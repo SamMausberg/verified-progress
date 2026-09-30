@@ -17,24 +17,28 @@ harness (`bench.sweep`, `bench/` on main: aiperf 0.13.0, workload
 
 ### 1.1 Bandwidth and bytes per step
 
-- HBM read bandwidth: the ceilings below assume **3.79 TB/s**, the read peak the profile
-  workstream measured (its evidence is pending; the figure is an input here, not a claim).
+- HBM read bandwidth: **3.83 TB/s** over 4 GiB and **3.79 TB/s** over exactly the head's
+  1.27 GB (profile workstream, `evidence/profiles/hbm_bandwidth.json`); the ceilings below
+  use 3.79 TB/s.
 - Weights read once per decode step: 7.14 GB backbone + 1.27 GB tied head = **8.41 GB**
   (derived). Floor at batch 1: **2.22 ms/token, 451 tokens/s**. Measured plain decode at
   batch 1: 281 tokens/s end to end (Section 2), i.e. 3.56 ms per token, 62% of the floor.
-  Which kernels take the rest is the profile workstream's attribution (pending).
+  The profile workstream attributes the 3.54 ms step to weight GEMMs (68%), head (10%),
+  small kernels (6.5%), GDN state (6.2%), attention (4.8%) and idle (4.3%)
+  (`evidence/profiles/step_share.csv`).
 - GDN recurrent state (**code**): FP32 (`mamba_ssm_dtype: float32` in the config),
   24 layers x 32 heads x 128 x 128 per request = 50.3 MB, read and written once per
   step by `fused_recurrent_gated_delta_rule_packed_decode_kernel`, i.e. **100.7 MB per
-  request per step**. Whether the kernel runs at the bandwidth limit is the profile
-  workstream's measurement (pending).
+  request per step**. The profile workstream measured the kernel at 3.47-3.48 TB/s, i.e.
+  purely bandwidth-bound (`evidence/profiles/README.md`).
 - Attention KV: 8 layers x 4 KV heads x 256 x 2 x 2 B = 32 KB per context token, about
   10.9 MB per request per step at the benchmark's mean decode context (~334 tokens).
 - Crossover (**derived**, confirms the charter): FP32 state bytes alone equal the weight
   bytes at **B = 84**; with KV and conv state, per-request bytes pass the weights at
-  **B = 74** (`ceilings.json`). The measured crossover in kernel time is the profile
-  workstream's (pending). The 24% gain of FP16 state at c = 128 and its absence at c = 1
-  (Section 2) are what a per-request byte term predicts.
+  **B = 74** (`ceilings.json`). In kernel time the crossover is near B = 110-120, and at
+  B = 128 the GDN kernel is 41.6% of an 8.9 ms step (profile workstream,
+  `evidence/profiles/README.md`). The 24% gain of FP16 state at c = 128 and its absence at
+  c = 1 (Section 2) are what a per-request byte term predicts.
 
 ### 1.2 Speculative verification and the state
 
@@ -124,6 +128,36 @@ One_batch engine-only decode steps (first pass, `decode_ceiling_try1.csv`, noisy
 B = 64 because of per-step host overhead): B = 512 FP32 state 26.9 ms (19.0k tok/s), BF16
 23.0 ms (22.3k), FP16 22.5 ms (22.8k). Rerun with longer decodes pending.
 
+## 2b. Speculation at high concurrency: byte arithmetic (derived)
+
+Bench's depth tuning (bench workstream, `evidence/bench/tuning/`, pending its PR) measured MTP
+three steps at c = 128: 9.59k tok/s stock and 11.94k with `--enable-linear-replayssm-spec`,
+against 13.42k for plain decode, with 3.26 tokens per verify cycle. The implied cycle is
+128 x 3.26 / y = **43.5 ms stock, 35.0 ms with ReplaySSM-spec** (plain: 9.5 ms per step).
+Assumptions for the components below: 3.8 TB/s, 650 TFLOPS BF16, context ~400 tokens.
+
+| component per cycle, B = 128 | stock | ReplaySSM-spec |
+|---|---|---|
+| verify GEMMs over 512 tokens (4.3 TFLOP) | 6.6 ms | 6.6 ms |
+| three draft steps + draft extend (weights, head, MTP layer) | ~1.7 ms | ~1.7 ms |
+| verify attention (KV read) + small kernels | ~1.5 ms | ~1.5 ms |
+| GDN state traffic: 352 MB/request stock (read, 4 snapshots, commit), ~100 MB with ReplaySSM-spec (read, fold write) | 11.9 ms | 3.4 ms |
+| sum of derived components | ~21.7 ms | ~13.2 ms |
+| cycle implied by the measured throughput | 43.5 ms | 35.0 ms |
+
+- Removing the snapshots saved ~8.5 ms per cycle, which the 252 MB/request of snapshot and
+  commit traffic it removes accounts for (32 GB at 3.8 TB/s = 8.5 ms).
+- What ReplaySSM-spec still moves is ~3.4 ms. A strict-replay verify (anchor read, operand
+  ring, anchor written every L = 4 committed tokens) would cut it to ~2.1 ms, about 4% of
+  the cycle; it cannot decide whether speculation beats plain decode at c = 128, so it is
+  not built.
+- The measured cycle is 2-2.7x the sum of its derived parts (as the profile workstream's
+  B = 32 MTP cycle, 12.5 ms unprofiled, is about 1.2-1.9x its GPU-busy time). The lever that
+  could let speculation win at c >= 32 is whatever makes the cycle that much slower than its
+  parts; the hostgap workstream is attributing MTP at B = 64 and 128.
+- The cheapest frontier gain meanwhile is scheduling: choose plain decode above the batch
+  size where MTP stops paying (`--speculative-adaptive`, measured in the next sweep).
+
 ## 3. Ranked portfolio
 
 Ranking by measured or derived gain at the relevant end, times the probability it holds,
@@ -133,7 +167,7 @@ to the measured noise floor); "lossy" changes them and needs the quality budget 
 | # | lever | end | class | ceiling (derived) or measured | quality cost | effort | status / owner |
 |---|---|---|---|---|---|---|---|
 | 1 | Public DFlash-4B drafter (z-lab) | latency | exact | drafter measured tau 6.18 at c=1, block 16 (`evidence/drafter/acceptance_summary.csv`); model card 3.4-4.6x on B200 | none | serving works | drafter owns baseline; I stack levers on it |
-| 2 | Remove the speculative host gap (MTP/DFlash, c=1-4) | latency | exact | idle share of the MTP cycle pending (profile workstream); 1/(1 - idle share) if removed | none | medium-high (sync removal) | levers queued (Triton attention, plan stream, glue graph) |
+| 2 | Remove the speculative host gap (MTP/DFlash, c=1-4) | latency | exact | GPU idle 21% / 20% / 15% of the unprofiled MTP cycle at B = 1 / 8 / 32 (derived by the profile workstream, `evidence/profiles/README.md`), i.e. up to 1.27x at B = 1 | none | medium-high (sync removal; hostgap workstream) | config-level levers queued (Triton attention, plan stream, glue graph) |
 | 3 | FP16 GDN state + capacity lift (radix off, 256-1,024) | throughput | lossy, likely near-lossless | measured 1.24x at c=128; derived ceiling 1.46x | pending (DAMP: FP16 near-lossless, BF16 not) | flags only | quality and c>=256 sweeps queued |
 | 4 | Strict write-avoiding replay (P4, patch 0007) | throughput | designed to be bit-identical; validation pending | derived 1.19x at B=128 (2D -> 1.25D) | none if the check passes | built | one-layer kernel check (every output and state word) and the end-to-end bitwise probe queued, then the pre-registered paired A/B (>=1.10x at B=128, 2,048-token prompts) |
 | 5 | MTP + ReplaySSM-spec at high batch | throughput | exact up to reassociation | derived 34.3k vs plain 23.7k (FP32) | none | flags only | queued |
