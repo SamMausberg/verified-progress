@@ -29,7 +29,7 @@ import aiohttp
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from client import generate, load_prompts
-from server import CONFIGS, git_sha, launch_with_retry
+from server import CONFIGS, flush_cache, git_sha, launch_with_retry
 from server import sglang_source_dir as sglang_dir
 
 
@@ -41,16 +41,20 @@ async def serve(
     out: list[dict[str, Any]] = []
     async with aiohttp.ClientSession(timeout=timeout) as s:
 
-        async def one(p: dict[str, Any]) -> None:
+        async def one(p: dict[str, Any], k: int) -> None:
             tapped = p['id'] in tap
-            rid = f'tap-{p["id"]}' if tapped else f'load-{p["id"]}-{time.monotonic_ns()}'
+            suffix = f'-r{k}' if args.repeats > 1 else ''
+            rid = f'tap-{p["id"]}{suffix}' if tapped else f'load-{p["id"]}-{time.monotonic_ns()}'
             async with sem:
+                if args.flush_each:
+                    flush_cache(url)
                 rec = await generate(s, url, p['input_ids'], args.max_new_tokens, rid=rid)
-            rec['id'] = p['id']
+            rec['id'] = p['id'] + suffix
             rec['tapped'] = tapped
             out.append(rec)
 
-        await asyncio.gather(*(one(p) for p in prompts))
+        for k in range(args.repeats):
+            await asyncio.gather(*(one(p, k) for p in prompts))
     return out
 
 
@@ -65,6 +69,8 @@ def main() -> None:
     ap.add_argument('--prompts', default=str(Path.home() / 'vp-data/state/prompts/prompts.jsonl'))
     ap.add_argument('--out-dir', required=True)
     ap.add_argument('--port', type=int, default=30054)
+    ap.add_argument('--repeats', type=int, default=1, help='send every prompt this many times')
+    ap.add_argument('--flush-each', action='store_true', help='flush the cache before each request')
     args = ap.parse_args()
 
     tap = {line.strip() for line in Path(args.tap_ids).read_text().splitlines() if line.strip()}

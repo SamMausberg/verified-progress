@@ -36,5 +36,13 @@
   ["fp32 head, plain vs mtp_s3 c1", "plain_fp32head/c1", "mtp_s3_fp32head/c1"],
   ["fp32 head, plain vs mtp_s3 c32", "plain_fp32head/c32", "mtp_s3_fp32head/c32"],
   ["retraction c32, plain", "plain/c32", "plain__retract/c32"],
-  ["retraction c32, mtp_s3", "mtp_s3/c32", "mtp_s3__retract/c32"]
+  ["retraction c32, mtp_s3", "mtp_s3/c32", "mtp_s3__retract/c32"],
+  ["state path c1, plain_fidecode vs plain", "plain/c1", "plain_fidecode/c1"],
+  ["batch c1 vs c32, plain_fidecode", "plain_fidecode/c1", "plain_fidecode/c32"],
+  ["state path c1, mtp_s3_fidecode vs mtp_s3", "mtp_s3/c1", "mtp_s3_fidecode/c1"],
+  ["batch c1 vs c32, mtp_s3_fidecode", "mtp_s3_fidecode/c1", "mtp_s3_fidecode/c32"],
+  ["state path c1, plain_replayssm vs plain", "plain/c1", "plain_replayssm/c1"],
+  ["batch c1 vs c32, plain_replayssm", "plain_replayssm/c1", "plain_replayssm/c32"],
+  ["state path c1, mtp_s3_replayssm vs mtp_s3", "mtp_s3/c1", "mtp_s3_replayssm/c1"],
+  ["batch c1 vs c32, mtp_s3_replayssm", "mtp_s3_replayssm/c1", "mtp_s3_replayssm/c32"]
 ]

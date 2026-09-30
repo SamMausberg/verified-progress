@@ -4,7 +4,7 @@
 #
 #   experiments/state_safety/run_all.sh [group...]
 #
-# Groups: plain mtp mtp_var plain_var controls (default: all). Raw outputs go to
+# Groups: plain mtp mtp_var plain_var controls paths (default: all). Raw outputs go to
 # ~/vp-data/state/runs/<config>[__tag]/<pass>.jsonl with a .meta.json beside each.
 set -euo pipefail
 
@@ -33,6 +33,9 @@ group() {
     plain_var)
       run --configs plain_noradix,plain_nooverlap,plain_det,plain_fp32head --passes c1,c32
       ;;
+    paths)
+      run --configs plain_fidecode,mtp_s3_fidecode,plain_replayssm,mtp_s3_replayssm --passes c1,c32
+      ;;
     controls)
       # Requesting logprobs must not change the tokens.
       run --configs plain,mtp_s3 --tag nolp --top-logprobs 0 --passes c1
@@ -48,7 +51,7 @@ group() {
 }
 
 if [ "$#" -eq 0 ]; then
-  set -- plain mtp mtp_var plain_var controls
+  set -- plain mtp mtp_var plain_var controls paths
 fi
 for g in "$@"; do
   group "$g"

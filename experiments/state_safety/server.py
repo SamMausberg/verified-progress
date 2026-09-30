@@ -80,6 +80,12 @@ CONFIGS: dict[str, list[str]] = {
     # FP32 logits instead of BF16: separates BF16 logit ties from other noise.
     'plain_fp32head': ['--enable-fp32-lm-head'],
     'mtp_s3_fp32head': [*_mtp(3, 1, 4), '--enable-fp32-lm-head'],
+    # Other GDN state paths: FlashInfer linear-attention decode (verify follows
+    # it) and the ReplaySSM ring-buffer decode and fold-on-commit verify.
+    'plain_fidecode': ['--linear-attn-decode-backend', 'flashinfer'],
+    'mtp_s3_fidecode': [*_mtp(3, 1, 4), '--linear-attn-decode-backend', 'flashinfer'],
+    'plain_replayssm': ['--enable-linear-replayssm', '--disable-radix-cache'],
+    'mtp_s3_replayssm': [*_mtp(3, 1, 4), '--enable-linear-replayssm-spec'],
 }
 
 SERVER_INFO_KEYS = [
@@ -164,7 +170,8 @@ def launch_with_retry(
                 srv = inner.enter_context(launch(flags, port, log_path))
             except (RuntimeError, TimeoutError) as exc:
                 inner.close()
-                if attempt == attempts - 1:
+                # Only memory pressure from other jobs is worth waiting out.
+                if attempt == attempts - 1 or '(startup failure)' in str(exc):
                     raise
                 print(f'launch attempt {attempt + 1} failed ({exc}); retrying', flush=True)
                 time.sleep(60)
@@ -207,7 +214,12 @@ def launch(
         deadline = time.monotonic() + startup_timeout
         while True:
             if proc.poll() is not None:
-                raise RuntimeError(f'server exited with {proc.returncode}; see {log_path}')
+                log.flush()
+                tail = log_path.read_text(errors='replace')[-4000:]
+                kind = 'memory' if 'memory' in tail.lower() else 'startup'
+                raise RuntimeError(
+                    f'server exited with {proc.returncode} ({kind} failure); see {log_path}'
+                )
             try:
                 urllib.request.urlopen(f'{base}/health_generate', timeout=5).read()
                 break

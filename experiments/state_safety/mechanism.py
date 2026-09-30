@@ -231,6 +231,11 @@ def main() -> None:
     ap.add_argument('--b', required=True)
     ap.add_argument('--prompts', default=str(Path.home() / 'vp-data/state/prompts/prompts.jsonl'))
     ap.add_argument('--out', required=True)
+    ap.add_argument(
+        '--untapped-a',
+        help='matrix run of configuration A at the same concurrency (jsonl); checks that '
+        'the tap leaves tokens and logprobs bitwise unchanged',
+    )
     args = ap.parse_args()
     dir_a, dir_b = Path(args.a), Path(args.b)
     names = json.loads((dir_a / 'tap' / 'slots.json').read_text())['names']
@@ -263,6 +268,22 @@ def main() -> None:
             1 for c in cases if c['diverged_at'] is not None and not c.get('first_difference')
         ),
     }
+    if args.untapped_a:
+        ref = {
+            json.loads(line)['id']: json.loads(line)
+            for line in Path(args.untapped_a).read_text().splitlines()
+        }
+        same = [
+            pid
+            for pid, r in ca.items()
+            if r['output_ids'] == ref[pid]['output_ids'][: len(r['output_ids'])]
+            and r['top_logprobs'] == ref[pid]['top_logprobs'][: len(r['top_logprobs'])]
+        ]
+        summary['tap_check'] = {
+            'untapped_run': args.untapped_a,
+            'prompts': len(ca),
+            'tokens_and_logprobs_bitwise_equal': len(same),
+        }
     Path(args.out).write_text(json.dumps({'summary': summary, 'cases': cases}, indent=1) + '\n')
     print(json.dumps(summary, indent=1))
 
