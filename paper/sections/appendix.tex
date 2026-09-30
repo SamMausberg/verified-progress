@@ -116,6 +116,7 @@ Envelope with Hopper accumulation model; integer pass; outward rounding & Proved
 Refinement ladder; candidate-count bounds & Proved & Theorem~\ref{thm:ladder}, Proposition~\ref{prop:candidates}\\
 Candidate sets and head-path runtime on real states & Pending & geometry, kernel\\
 Certified race; RNG contract; fixed-noise verification; coupling bounds & Proved & Section~\ref{sec:decisions}\\
+Sampling contract: fixed-noise verification with the stock seeded noise; token-identical to seeded non-speculative decoding & Design decided; pending & kernel; Section~\ref{sec:fixednoise}\\
 Common mass, bounded-range sampler, KL and sequence TV bounds & Proved & Propositions~\ref{prop:commonmass}--\ref{prop:kl}\\
 Acceptance guards with enclosures; residual races & Proved & Theorems~\ref{thm:guards}, \ref{thm:residualrace}, \ref{thm:residualself}\\
 Cheap decision is not cheap verification (constructed heads) & Finding (CPU) & \nolinkurl{data/synthetic_drift.csv}, \nolinkurl{evidence/synthetic_drift.json}\\
@@ -126,7 +127,7 @@ Stock divergence mechanisms and state safety (H5) & Pending & state; \nolinkurl{
 DFlash on GH200 & Pending & drafter; \nolinkurl{evidence/drafter/}\\
 Certified tail (P1), long-window repair (P2), anchored residual decoding (P3) & Hypotheses & Kill tests pending\\
 What an exact recurrent state must retain (Proposition~\ref{prop:minimal-state}); key-subspace reduction & Proved & Section~\ref{sec:minimal-state}\\
-State-structure witnesses ($-3/25$, reachability, SiLU rank, batch rank, RMSNorm, lazy decay, BF16 rank) & Under review & \nolinkurl{evidence/state_structure/} (PR \#20)\\
+State-structure witnesses ($-3/25$, reachability, SiLU rank, batch rank, RMSNorm, lazy decay, BF16 rank) & Finding (CPU) & \nolinkurl{evidence/state_structure/}\\
 Write avoidance for the recurrent state (P4); cross-request sharing (P5) & Pending; P5 rejected in analysis & moonshot, profile\\
 Stack levers, interaction matrix, exact and lossy frontiers (H4, H7) & Pending & moonshot, bench; \nolinkurl{evidence/moonshot/}, \nolinkurl{evidence/bench/}\\\bottomrule
 \end{longtable}

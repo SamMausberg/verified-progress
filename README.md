@@ -48,6 +48,10 @@ evidence path. `TASKS.md` tracks the work, `SETUP.md` describes the machine and
   inputs is below a threshold whose median over rows is 0.85% (64-row tiles
   of contiguous token ids). This compares envelope widths only; the measured
   drift is pending.
+- **State-structure witnesses.** `tests/test_state_structure.py` checks, in
+  exact arithmetic, why the recurrent state resists exact compression and why
+  computation cannot be shared across unrelated requests
+  (`evidence/state_structure/`).
 - **Lean.** `formal/DecisionGuards.lean` and `formal/CertifiedArgmax.lean`
   elaborate under Lean 4.19.0 (`formal/STATUS.md`). They cover decision logic
   and scaled-integer bounds, not IEEE rounding, exponentials or probability.
