@@ -39,7 +39,19 @@ every page. `natbib`, `eso-pic`, `forloop` and `times` come from TeX Live.
 
 ## How the paper uses the template
 
-`paper.tex` loads `\usepackage[accepted]{mlsys2025}` so that the author block prints; the
-paper is a preprint, not an accepted MLSys paper, so it replaces the style's
-proceedings notice with a preprint notice in its own preamble. The style file itself is
-not modified.
+`paper.tex` loads `\usepackage[accepted]{mlsys2025}` so that the author block prints. The
+paper is a preprint, not an accepted MLSys paper, so its preamble replaces the style's
+proceedings notice with a preprint notice. Three further settings live in `paper.tex`,
+and the style file itself is not modified:
+
+- `\raggedbottom` replaces the style's `\flushbottom`, which stretches any column that
+  holds a large float and reports an underfull page for it (the kit's own example paper
+  reports five). It changes no margin, font size or spacing.
+- hyperref is loaded with `hypertexnames=false`, because the style's `\@makecaption`
+  typesets each caption twice and otherwise produces duplicate PDF destinations.
+- `fix-cm` makes Computer Modern scalable, so math at the style's 5.5 pt script size
+  needs no font substitution.
+
+There is no affiliation to print, so the name is set in the author block directly rather
+than through `\mlsysauthor`, and the first-column footnote is written in `paper.tex`
+instead of `\printAffiliationsAndNotice`, which requires a correspondence address.
