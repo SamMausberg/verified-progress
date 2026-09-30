@@ -290,7 +290,7 @@ async def run_prefix(url: str, prompts: list[dict[str, Any]], args: argparse.Nam
                 for m in range(start + 1, start + n):
                     if P + m - 1 >= b:
                         break
-                    variants = [('max_new_tokens', m, {})]
+                    variants: list[tuple[str, int, dict[str, Any]]] = [('max_new_tokens', m, {})]
                     tok = out[m - 1]
                     if tok not in out[: m - 1]:
                         variants.append(('stop_token', args.long_len, {'stop_token_ids': [tok]}))
