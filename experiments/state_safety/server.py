@@ -13,6 +13,7 @@ import contextlib
 import json
 import os
 import signal
+import socket
 import subprocess
 import time
 import urllib.error
@@ -204,6 +205,9 @@ def launch(
         str(port),
         *flags,
     ]
+    # A server left on this port would answer the health check instead.
+    with contextlib.suppress(OSError), socket.create_connection(('127.0.0.1', port), timeout=1):
+        raise RuntimeError(f'port {port} is already in use (startup failure)')
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log = log_path.open('w')
     log.write(' '.join(cmd) + '\n')
