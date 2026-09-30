@@ -136,11 +136,44 @@ def paired(args: argparse.Namespace) -> None:
     write_csv(summary, args.out)
 
 
+_SERVER_DECODE = re.compile(
+    r'Decode batch, #running-req: (\d+).*?gen throughput \(token/s\): ([\d.]+)'
+)
+
+
+def server_decode_rates(server_log: Path, concurrencies: list[int]) -> dict[int, float]:
+    """Median server-logged decode throughput while ~c requests run, per concurrency c.
+
+    The scheduler logs `gen throughput` for every decode logging interval. Intervals
+    with between 0.9 c and c running requests are attributed to concurrency c (the
+    server warmup runs at the top concurrency and falls into that point's regime).
+    This is the GPU-side decode rate, so a client throughput well below it points at
+    the front end.
+    """
+    if not server_log.exists():
+        return {}
+    samples: dict[int, list[float]] = {c: [] for c in concurrencies}
+    for line in server_log.read_text(errors='replace').splitlines():
+        match = _SERVER_DECODE.search(line)
+        if not match:
+            continue
+        running, rate = int(match.group(1)), float(match.group(2))
+        for c in concurrencies:
+            if 0.9 * c <= running <= c:
+                samples[c].append(rate)
+    return {c: statistics.median(v) for c, v in samples.items() if v}
+
+
 def sweeps(args: argparse.Namespace) -> None:
     root = Path(args.path).expanduser()
     points: dict[tuple[str, int], list[dict[str, Any]]] = {}
+    server_rates: dict[tuple[str, int], list[float]] = {}
     for sweep_json in sorted(root.glob('*/*/sweep.json')):
         data = json.loads(sweep_json.read_text())
+        concs = sorted({p['concurrency'] for p in data.get('points', [])})
+        rates = server_decode_rates(sweep_json.parent / 'server/server.log', concs)
+        for c, rate in rates.items():
+            server_rates.setdefault((data['label'], c), []).append(rate)
         for point in data.get('points', []):
             points.setdefault((data['label'], point['concurrency']), []).append(point)
     rows = []
@@ -169,6 +202,13 @@ def sweeps(args: argparse.Namespace) -> None:
                 )
                 if any(p.get('ttft_ms') for p in plist)
                 else '',
+                'server_decode_tok_s': round(statistics.fmean(server_rates[(label, conc)]), 1)
+                if server_rates.get((label, conc))
+                else '',
+                'foreign_cpu_mean': round(
+                    statistics.fmean(float(p.get('foreign_cpu_during_mean') or 0) for p in plist),
+                    2,
+                ),
                 'completed': sum(p.get('completed', 0) for p in plist),
                 'requests': sum(p.get('requests', 0) for p in plist),
             }
