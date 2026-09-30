@@ -193,3 +193,62 @@ def test_hopper_model_is_tighter_but_covers_the_block_model() -> None:
     assert tight < TENSOR_CORE_FP32.gamma(k)
     # 160 blocks of 16 products, each at most (17 * 2^-25 + 2^-23) of its children.
     assert tight >= 160 * (Fraction(17, 2**25) + Fraction(1, 2**23))
+
+
+def kernel_decision(ids: np.ndarray, lo: np.ndarray, hi: np.ndarray) -> tuple[int, bool]:
+    """Port of the decision kernel's rule for one row (BF16 reference mode).
+
+    ``lo``/``hi`` are the smallest and largest BF16 values each candidate's stock
+    logit can round to. The winner is the smallest id among those with the
+    largest ``lo``; it is certified unless a smaller id can reach or pass it, or
+    a larger id can pass it.
+    """
+    best = lo.max()
+    k = int(ids[lo == best].min())
+    others = ids != k
+    amb = others & (((ids < k) & (hi >= best)) | ((ids > k) & (hi > best)))
+    return k, not bool(amb.any())
+
+
+def bf16_grid_between(a: float, b: float) -> list[float]:
+    """Every BF16 value in [a, b] (both BF16)."""
+    lo_bits = int(np.float32(a).view(np.int32)) >> 16
+    hi_bits = int(np.float32(b).view(np.int32)) >> 16
+    vals = []
+    for bits in range(min(lo_bits, hi_bits) - 2, max(lo_bits, hi_bits) + 3):
+        v = float(np.int32(bits << 16).view(np.float32))
+        if a <= v <= b:
+            vals.append(v)
+    return sorted(set(vals))
+
+
+def test_decision_rule_matches_brute_force() -> None:
+    """Certified iff every admissible combination of BF16 values gives the same
+    first-index argmax (independent candidate intervals)."""
+    import itertools
+
+    checked = certified = 0
+    for _ in range(3000):
+        n = int(RNG.integers(2, 5))
+        ids = RNG.choice(64, size=n, replace=False).astype(np.int64)
+        # Endpoints on the BF16 grid (as the kernel produces them), across binades.
+        base_bits = int(np.float32(RNG.uniform(16, 64)).view(np.int32)) >> 16
+        lo_list, hi_list = [], []
+        for _ in range(n):
+            lo_bits = base_bits + int(RNG.integers(-3, 3))
+            hi_bits = lo_bits + int(RNG.integers(0, 3))
+            lo_list.append(float(np.int32(lo_bits << 16).view(np.float32)))
+            hi_list.append(float(np.int32(hi_bits << 16).view(np.float32)))
+        lo = np.array(lo_list, dtype=np.float32)
+        hi = np.array(hi_list, dtype=np.float32)
+        k, ok = kernel_decision(ids, lo, hi)
+        grids = [bf16_grid_between(float(a), float(b)) for a, b in zip(lo, hi, strict=True)]
+        winners = set()
+        for combo in itertools.product(*grids):
+            vals = np.array(combo)
+            top = vals.max()
+            winners.add(int(ids[vals == top].min()))
+        assert ok == (winners == {k}), (ids, lo, hi, winners, k)
+        checked += 1
+        certified += ok
+    assert 0 < certified < checked
