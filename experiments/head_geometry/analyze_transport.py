@@ -42,7 +42,7 @@ ARMS = {
     'dflash27b': ('qwen3.8-27b', 'dflash_verify'),
 }
 RETAIN = 64  # exact top-m draft rows for the retained-tail mass bound
-UNION_SIZES = (1, 4, 16, 64)
+UNION_SIZES = (1, 4, 16, 64, 128)
 # Drift scaling: a hypothetical draft h_d(s) = h_t - s * Delta has logits
 # z_t - s * (z_t - z_d) exactly, and every transport radius scales by s.
 DRIFT_SCALES = (1.0, 0.3, 0.1, 0.03, 0.01)
@@ -359,7 +359,7 @@ def main() -> None:
         sz = np.array([p[0] for p in pairs_])
         fr = np.array([p[1] for p in pairs_])
         out: dict[str, Any] = {'steps': len(pairs_)}
-        for lo, hi in ((1, 4), (5, 8), (9, 16), (17, 32), (33, 64)):
+        for lo, hi in ((1, 4), (5, 8), (9, 16), (17, 32), (33, 64), (65, 128)):
             m = (sz >= lo) & (sz <= hi)
             if m.any():
                 out[f'rows{lo}-{hi}'] = {
