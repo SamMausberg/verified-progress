@@ -1,0 +1,128 @@
+% Section 5: transport (paper: original theorems plus the theory workstream's crossover
+% results; geometry: measurements, pending).
+% Claims and status:
+%  - Theorem transport, Proposition summary, retained-tail bound, admission rule,
+%    Propositions suprema/exclusion/static, Theorem crossover: proved (finding).
+%  - Table headconstants: derived from weights, evidence/precision/head_constants.json (PR #7).
+%  - Measured drift rho, certification rates: pending (geometry).
+\section{Transport on real hidden states}\label{sec:transport}
+Transport was the central mechanism of the earlier revisions. This section states it with the hypotheses that the proofs need, derives the condition under which it can beat the alternative, and reports what happened when real draft and target states were compared.
+
+\subsection{Tile geometry and already-paid summaries}\label{sec:transport-def}
+Let $W\in\R^{V\times D}$ be the head used for both a draft hidden vector $h^d$ and an aligned target hidden vector $h^t$, both taken at the head input (after the final norm). Write $\Delta=h^t-h^d$, $z_i^d=\langle w_i,h^d\rangle$ and $z_i^t=\langle w_i,h^t\rangle$. A vocabulary partition $\mathcal C$ covers all admitted tokens with disjoint tiles. For each tile $c$ choose a centre $\mu_c$ and a radius
+\begin{equation}
+r_c\ge\max_{i\in c}\norm{w_i-\mu_c}_\infty,\qquad a_c=\langle\mu_c,\Delta\rangle,\qquad\epsilon_c=r_c\norm\Delta_1.\label{eq:geometry}
+\end{equation}
+The draft pass emits $M_c^d=\max_{i\in c}z_i^d$ and $Z_c^d=\sum_{i\in c}\exp(z_i^d)$; stable implementations store a maximum and a scaled mass. The centres and radii are checkpoint metadata; the maxima and masses belong to one request, position and draft vector.
+
+\begin{theorem}[Transported tile certificates]\label{thm:transport}
+In real arithmetic, with the same head matrix for both passes and both masses taken at the same temperature, every $i\in c$ satisfies
+\begin{equation}
+z_i^d+a_c-\epsilon_c\le z_i^t\le z_i^d+a_c+\epsilon_c.\label{eq:transport-row}
+\end{equation}
+Consequently
+\begin{align}
+\max_{i\in c}z_i^t&\le M_c^d+a_c+\epsilon_c=:U_c,\label{eq:maxbound}\\
+e^{a_c-\epsilon_c}Z_c^d&\le Z_c^t\le e^{a_c+\epsilon_c}Z_c^d.\label{eq:massbound}
+\end{align}
+\end{theorem}
+\begin{proof}
+$z_i^t-z_i^d-a_c=\langle w_i-\mu_c,\Delta\rangle$, whose absolute value is at most $r_c\norm\Delta_1$ by Hölder's inequality. Maximization gives~\eqref{eq:maxbound}; monotonicity of the exponential and summation give~\eqref{eq:massbound}.
+\end{proof}
+In the engine the draft maxima and masses come from BF16-rounded draft logits, so~\eqref{eq:maxbound} and~\eqref{eq:massbound} must be widened by the draft kernel's error before they enclose anything the engine computes; Section~\ref{sec:selfevidence} gives the terms. The Euclidean form replaces $r_c$ by $r^{(2)}_c\ge\max_{i\in c}\norm{w_i-\mu_c}_2$ and $\norm\Delta_1$ by $\norm\Delta_2$.
+
+\subsection{A summary that supports both selection and mass}
+For a set of labelled logits, keep its top $k$ items under descending score then ascending token index, and the mass of every discarded item. Two such summaries merge by taking the top $k$ of their retained union and adding the newly discarded mass to the two old tails.
+
+\begin{proposition}[Top-$k$ plus tail is a compositional summary]\label{prop:summary}
+For disjoint finite domains the merge produces the same top-$k$ items and tail mass as summarizing the union, and it is associative and commutative in exact arithmetic under the common total order.
+\end{proposition}
+\begin{proof}
+An item omitted from a local top-$k$ has at least $k$ locally superior items and cannot enter the union's top-$k$, so every possible winner is retained. The original tails and the newly discarded items partition the final tail, so summing them gives its mass without subtracting nearly equal totals. Every parenthesization and order represents the same union.
+\end{proof}
+This is a sufficient-statistic construction from familiar reductions, and floating-point tail masses are not associative. Its value is an interface: one epilogue can serve candidate generation, bounds and completion. Retaining a small set $R_c$ per tile also tightens the mass bounds: recompute its target logits exactly and transport only the rest,
+\begin{equation}
+\sum_{i\in R_c}e^{z_i^t}+e^{a_c-\epsilon_c}Z^d_{c\setminus R_c}\le Z_c^t\le\sum_{i\in R_c}e^{z_i^t}+e^{a_c+\epsilon_c}Z^d_{c\setminus R_c},\label{eq:tail}
+\end{equation}
+which is never looser than transporting the whole tile, at the cost of $|R_c|$ extra row projections.
+
+\subsection{Geometry decides}\label{sec:geometry}
+A good draft does not imply a small $\norm{h^t-h^d}$. The head can ignore directions in which the states differ, and probabilities ignore a common shift of all logits, yet a crude hidden-space norm charges both. With $W=((1,0),(0,0))$ and $\Delta=(0,L)$ both logits are unchanged for every $L$, while $r_c\norm\Delta_1$ grows with $L$; coordinate radii remove that particular failure. The bounds form a hierarchy: a scalar radius; coordinate radii with $\epsilon_c=\sum_jr_{cj}|\Delta_j|$; grouped norms
+\begin{equation}
+\epsilon_c=\sum_gr_{cg}\norm{\Delta_g}_2,\qquad r_{cg}\ge\max_{i\in c}\norm{(w_i-\mu_c)_g}_2;\label{eq:groupbound}
+\end{equation}
+and a low-rank split $w_i=\mu_c+Qu_i+e_i$ with the projected part evaluated exactly and a norm bound on $e_i$. Richer geometry costs metadata and bound arithmetic, and a learned centre or subspace does not certify the residual radius; that radius must cover the stored weights.
+
+\subsection{Greedy and top-$k$ admission}
+Suppose at least $k$ distinct target rows have been evaluated and $\tau$ is the $k$-th best evaluated score. A tile may be skipped only when $U_c<\tau$; then at least $k$ evaluated items outrank every skipped one. The strict inequality preserves unresolved ties. This establishes exact selection; it does not establish an exact unrestricted softmax, because an omitted logit still contributes to the normalizer even when it cannot win.
+
+\subsection{What transport must beat}\label{sec:crossover}
+The alternative source of evidence (Section~\ref{sec:selfevidence}) evaluates a low-precision copy $\bar w_i=w_i-e_i$ of each row at the target state. In real arithmetic its error for row $i$ is $\langle e_i,h^t\rangle$, bounded by $\norm{e_i}_2\norm{h^t}_2$, where $e_i$ is known offline. Transport's error is $\langle w_i-\mu_c,\Delta\rangle$. The two can be compared exactly.
+
+\begin{proposition}[No better bound from the same information]\label{prop:suprema}
+For fixed $h$ and radii $\epsilon_b\ge0$ over a partition of the coordinates into blocks $b$,
+$\sup\{|\langle e,h\rangle|:\norm{e_b}_2\le\epsilon_b\ \forall b\}=\sum_b\epsilon_b\norm{h_b}_2$ and
+$\sup\{|\langle e,h\rangle|:\norm{e_b}_\infty\le\epsilon_b\ \forall b\}=\sum_b\epsilon_b\norm{h_b}_1$.
+Likewise $\sup\{\langle w-\mu,\Delta\rangle:\norm{w-\mu}_\infty\le r\}=r\norm\Delta_1$.
+\end{proposition}
+\begin{proof}
+The inequalities are Cauchy--Schwarz and Hölder. Equality holds at $e_b=\epsilon_bh_b/\norm{h_b}_2$, at $e_b=\epsilon_b\operatorname{sign}(h_b)$ and at $w=\mu+r\operatorname{sign}(\Delta)$.
+\end{proof}
+Both envelopes are therefore optimal for the metadata they use. For errors not aligned with $h$ the realized $|\langle e_i,h\rangle|$ is typically about $\norm{e_i}_2\norm h_2/\sqrt D$; closing that gap needs more arithmetic, not a better inequality.
+
+\begin{proposition}[Exclusion conditions]\label{prop:exclusion}
+After the winner $a$ is scored exactly, let $m_i=z_a-z_i$. Row-level transport excludes $i$ if and only if $m_i>r_c\norm\Delta_1-\langle w_i-\mu_c,\Delta\rangle$; tile-level transport excludes tile $c$ if and only if $z_a>M^d_c+\langle\mu_c,\Delta\rangle+r_c\norm\Delta_1$; self-evidence (in real arithmetic, with envelope $\beta_i$) excludes $i$ if and only if $m_i>\beta_i-\langle e_i,h\rangle$. The slack terms lie in $[0,2r_c\norm\Delta_1]$ and $[0,2\beta_i]$.
+\end{proposition}
+\begin{proof}
+Substitute $z_i^d+\langle\mu_c,\Delta\rangle=z_i-\langle w_i-\mu_c,\Delta\rangle$ and $\tilde z_i=z_i-\langle e_i,h\rangle$ into the upper bounds.
+\end{proof}
+
+\begin{theorem}[Transport cannot beat self-evidence unless drift is small]\label{thm:crossover}
+For every tile $c$ and every centre $\mu_c$, $r_c=\max_{k\in c}\norm{w_k-\mu_c}_\infty\ge\tfrac12\operatorname{diam}_\infty(c)$ and $r^{(2)}_c=\max_{k\in c}\norm{w_k-\mu_c}_2\ge\tfrac12\operatorname{diam}_2(c)$.
+\begin{enumerate}
+\item (Hölder family.) With $b$-bit round-to-nearest per-row codes, $s_i=\norm{w_i}_\infty/(2^{b-1}-1)$ and no clipping, $|\langle e_i,h\rangle|\le\tfrac{s_i}2\norm h_1$, and $\tfrac{s_i}2\norm h_1\le r_c\norm\Delta_1$ whenever $\norm\Delta_1/\norm h_1\ge\norm{w_i}_\infty/\bigl((2^{b-1}-1)\operatorname{diam}_\infty(c)\bigr)$. If some row of $c$ has the opposite sign, or zero, in the coordinate where $|w_{ij}|$ peaks, then $\operatorname{diam}_\infty(c)\ge\norm{w_i}_\infty$ and the condition is implied by $\norm\Delta_1/\norm h_1\ge1/(2^{b-1}-1)$: $1/127$ for int8 and $1/7$ for int4.
+\item (Euclidean family.) $\norm{e_i}_2\norm h_2\le r^{(2)}_c\norm\Delta_2$ if and only if $\norm\Delta_2/\norm h_2\ge\delta^\ast_i:=\norm{e_i}_2/r^{(2)}_c$.
+\end{enumerate}
+\end{theorem}
+\begin{proof}
+For rows $k,l$ of the tile, $\norm{w_k-w_l}\le\norm{w_k-\mu_c}+\norm{w_l-\mu_c}\le2r_c$. Round-to-nearest codes give $|e_{ij}|\le s_i/2$, and Hölder gives the first inequality. The rest is algebra, and opposite signs at the peak coordinate give $|w_{ij}-w_{kj}|\ge|w_{ij}|$.
+\end{proof}
+
+\begin{proposition}[Transport against the static screen]\label{prop:static}
+If $\mu_c$ lies in the convex hull of the tile's rows, then $U^{\rm T}_c-U^{\rm static}_c\ge r_c(\norm\Delta_1-\norm h_1)$, where $U^{\rm T}_c=M^d_c+\langle\mu_c,\Delta\rangle+r_c\norm\Delta_1$ and $U^{\rm static}_c=\langle\mu_c,h\rangle+r_c\norm h_1$. Transport is therefore no tighter than the static screen with the same geometry once $\norm\Delta_1\ge\norm h_1$.
+\end{proposition}
+\begin{proof}
+$U^{\rm T}_c-U^{\rm static}_c=(M^d_c-\langle\mu_c,h^d\rangle)+r_c(\norm\Delta_1-\norm h_1)$, and $M^d_c=\max_k\langle w_k,h^d\rangle\ge\langle\mu_c,h^d\rangle$ for a convex combination $\mu_c$.
+\end{proof}
+
+The quantity that decides the comparison is the \emph{drift ratio}
+\begin{equation}
+\rho=\frac{\norm{h^t-h^d}_2}{\norm{h^t}_2},\label{eq:rho}
+\end{equation}
+measured on the exact head inputs behind the same verified draft token. In the Euclidean family, with 64-row tiles of contiguous token indices and $\mu_c$ the tile mean, transport's envelope for row $i$ is narrower than the per-row int8 self-evidence envelope if and only if $\rho<\delta^\ast_i=\norm{e_i}_2/r^{(2)}_c(i)$. Table~\ref{tab:headconstants} evaluates $\delta^\ast$ on the Qwen3.5-4B head from the weights alone. Its median is 0.85\% against per-row int8 and 15.5\% against per-row int4. For the manuscript's original pairing of an $\ell_\infty$ radius with $\norm\Delta_1$ (Theorem~\ref{thm:crossover}, part~1, with the tile radius measured rather than bounded by the diameter), the corresponding threshold on $\norm\Delta_1/\norm h_1$ has a median of 0.30\%. The comparison is of envelope widths, not of certification rates, candidate counts or runtime; it uses no hidden states, and it ignores the BF16 rounding of the draft logits that transport also has to carry. The measured drift decides this width comparison, not which mechanism is faster. The Hölder condition of Theorem~\ref{thm:crossover} needs $\operatorname{diam}_\infty(c)\ge\norm{w_i}_\infty$, which holds for 99.9\% of rows with 64-row tiles (\nolinkurl{evidence/precision/head_constants.json}). It says that transport can compete with an int8 copy only if draft and target states agree to better than about one part in a hundred at the head input, which a drafter trained to predict tokens has no particular reason to achieve. The static tile screen is weak on this head for a related reason: the 64-row tile radius exceeds the row norm (median $r^{(2)}_c/\norm{w_i}_2=1.14$), so $\langle\mu_c,h\rangle+r^{(2)}_c\norm h_2$ is wider than the plain row bound $\norm{w_i}_2\norm h_2$, and tiles in token order are barely tighter than random ones. A scalar $\ell_\infty$ radius paired with $\norm\Delta_1$ is about four times looser again than the Euclidean pairing for a spread-out $\Delta$ (derived from the same constants, $r_c\approx1.30\norm{w_i}_\infty$ and $\norm\Delta_1\approx0.8\sqrt D\norm\Delta_2$). The enclosures of the two mechanisms can be intersected, so a hybrid is never looser than either; the question is only whether transport's cheaper evidence excludes enough to pay for itself.
+
+\begin{table}[tbp]
+\small\centering
+\begin{tabular}{@{}lrrr@{}}\toprule
+Quantity (tied head, $248{,}320\times2{,}560$) & p10 & p50 & p90\\\midrule
+Row $\norm{w_i}_2$ & 0.574 & 0.652 & 0.746\\
+int8 per-row $\norm{e_i}_2/\norm{w_i}_2$ & 0.81\% & 0.97\% & 1.25\%\\
+int8, 128-column groups & 0.64\% & 0.68\% & 0.75\%\\
+int4 per-row & 14.8\% & 17.5\% & 22.6\%\\
+64-row tile $r^{(2)}_c/\norm{w_i}_2$, token-index order & 0.99 & 1.14 & 1.31\\
+\quad random tiles (control) & 1.03 & 1.19 & 1.37\\
+$\delta^\ast$ against int8 per-row & 0.67\% & 0.85\% & 1.15\%\\
+$\delta^\ast$ against int8, 128-column groups & 0.51\% & 0.61\% & 0.72\%\\
+$\delta^\ast$ against int4 per-row & 12.2\% & 15.5\% & 20.8\%\\
+Hölder-family threshold on $\norm\Delta_1/\norm h_1$ against int8 per-row & 0.23\% & 0.30\% & 0.40\%\\\bottomrule
+\end{tabular}
+\caption{Weight-only constants of the Qwen3.5-4B head (float64 on CPU; quantiles over a one-million-row sample; no hidden states). $\delta^\ast_i=\norm{e_i}_2/r^{(2)}_c(i)$ is the drift ratio $\rho$ below which transport's Euclidean envelope for row $i$ is narrower than the Euclidean int8 envelope, with 64-row tiles of contiguous token indices and $\mu_c$ the tile mean (Theorem~\ref{thm:crossover}); the last row is the analogous threshold for the $\ell_\infty$/$\ell_1$ pairing, $s_i\norm h_1/2$ against $r_c\norm\Delta_1$. Widths are compared, not certification rates or runtime. Derived; \nolinkurl{evidence/precision/head_constants.json}.}
+\label{tab:headconstants}
+\end{table}
+
+\subsection{The measured drift}\label{sec:transport-measured}
+The decisive measurement captures aligned draft and target head inputs from the running engine, confirms the alignment on traceable cycles (the index that predicts a token is not automatically the index that consumes it), and evaluates $\rho$ and the certification rates of every transport variant on held-out prompts, against the static screen at $h^t$ and against self-evidence on the same states.
+
+\pending{geometry: capture and alignment method; the distribution of $\rho$ for the MTP drafter by draft step, and for the DFlash drafter by block position; certification rates (rows and tiles skipped, greedy and top-$k$) for scalar, coordinate, grouped and low-rank transport and the static screen; a drift-scaling replay that shrinks $\Delta$ to find where transport would start to help; evidence under \nolinkurl{evidence/head_geometry/}}
+
+\pendingfigure{Empirical distribution of the drift ratio $\rho$ on aligned MTP and DFlash head inputs, drawn against the band of $\delta^\ast$ quantiles from Table~\ref{tab:headconstants} (0.67\%--1.15\% against int8, 12.2\%--20.8\% against int4); $\rho$ to the left of the band means transport's envelope is the narrower one.}{evidence/head_geometry/rho.csv}

@@ -32,6 +32,7 @@ ignore = ["E501"]
 [tool.ruff.lint.isort]
 known-first-party = [
   "decision_reference",
+  "precision_reference",
   "race_reference",
   "v1_reference",
   "v2_reference",
@@ -39,7 +40,7 @@ known-first-party = [
 
 [tool.mypy]
 python_version = "3.13"
-files = ["src", "tests", "scripts", "experiments"]
+files = ["src", "tests", "scripts", "experiments", "bench"]
 mypy_path = "src"
 explicit_package_bases = true
 ignore_missing_imports = true
@@ -48,7 +49,7 @@ warn_redundant_casts = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 
 [tool.codespell]
 skip = "./evidence,./paper,./sources,./.venv,*.pdf,*.csv,*.jsonl,SHA256SUMS"

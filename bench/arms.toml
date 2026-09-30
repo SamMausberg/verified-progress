@@ -1,0 +1,70 @@
+# Server arms for the serving benchmark; see bench/README.md.
+#
+# Each arm inherits [defaults]. An arm's `args` override the default flags, and
+# `--set flag=value` / `--unset flag` on the command line override both. Flags
+# are sglang.launch_server flags without the leading dashes; `true` adds a bare
+# flag and `false` removes one. `max_concurrency` is the highest client
+# concurrency the sweep will offer; the launcher refuses a server whose
+# effective max_running_requests is lower. Optional per-arm keys:
+#   lossy = "..."   what the arm changes numerically (FP8 weights, FP8 KV, BF16
+#                   GDN state, ...); such arms need a quality measurement.
+#   require_full_graph_coverage = false   allow capacity above the largest
+#                   decode/verify CUDA graph (large batches then run eagerly).
+
+[defaults]
+model = "Qwen/Qwen3.5-4B"
+revision = "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a"
+max_concurrency = 128
+
+[defaults.args]
+# No FA3 on aarch64 (SETUP.md).
+attention-backend = "flashinfer"
+mm-attention-backend = "triton_attn"
+# Server capacity is fixed at the top client concurrency for every arm. The
+# GDN state cache, not the KV cache, bounds capacity for this model: each
+# running request reserves 5 state slots (radix cache with the extra_buffer
+# strategy under the overlap scheduler). 640 slots admit exactly 128 requests
+# and leave the rest of the static pool to the KV cache and, with speculation,
+# to the per-draft-token intermediate states. At the default split, MTP with
+# three steps is capped at 72 requests. The static fraction is raised from the
+# automatic 0.815 so a 5-step chain (6 intermediate states per request) also
+# fits at 128; about 6 GB stays free for activations after graph capture.
+max-running-requests = 128
+max-mamba-cache-size = 640
+mem-fraction-static = 0.85
+# /metrics: token, verify-call and CUDA-graph pass counters per sweep point.
+enable-metrics = true
+random-seed = 0
+
+[arms.plain]
+description = "Arm A: ordinary autoregressive decoding (no speculation)."
+
+[arms.mtp]
+description = """Arm B, untuned starting point: native MTP (the checkpoint's one \
+MTP layer, loaded implicitly) with the SGLang cookbook's Qwen3.5 settings, a \
+three-step chain with one draft per step."""
+
+[arms.mtp.args]
+speculative-algorithm = "NEXTN"
+speculative-num-steps = 3
+speculative-eagle-topk = 1
+speculative-num-draft-tokens = 4
+
+# DFlash block drafter (z-lab/Qwen3.5-4B-DFlash, Apache-2.0): a 6-layer draft
+# conditioned on eight target layers that proposes a whole block per pass. Only
+# algorithm flags live here; backend and runtime flags are shared by every arm
+# (chosen once on the tuning split). The model card's other B200 flags are
+# ablations, not part of the arm: trtllm_mha target attention (Blackwell only),
+# flashinfer GDN kernels and SGLANG_ENABLE_OVERLAP_PLAN_STREAM (tested on every
+# arm), tc_piecewise prefill graphs (torch.compile fails on Qwen3.5's residual
+# stream at bd66ce34), and --mamba-scheduler-strategy (named
+# --mamba-radix-cache-strategy here; already resolves to extra_buffer).
+[arms.dflash]
+description = """DFlash block drafter, block size 8 (the model card's serving \
+default)."""
+
+[arms.dflash.args]
+speculative-algorithm = "DFLASH"
+speculative-draft-model-path = "z-lab/Qwen3.5-4B-DFlash"
+speculative-draft-model-revision = "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf"
+speculative-dflash-block-size = 8

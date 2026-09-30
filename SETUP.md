@@ -106,7 +106,7 @@ draft exists.
 - `python scripts/verify_artifact.py` passes all six CPU jobs, but it
   rewrites `evidence/`. Run it on a copy unless you mean to regenerate the
   evidence.
-- The paper builds with `latexmk` (31 pages). The TeX Gyre fonts it needs
+- The paper builds with `latexmk` (pdfLaTeX and BibTeX). The TeX Gyre fonts it needs
   come from the `tex-gyre` apt package.
 - `formal/DecisionGuards.lean` elaborates without errors under Lean 4.19.0
   (`bash scripts/check_lean.sh`).

@@ -1,0 +1,15 @@
+% Section 8: drafting (drafter workstream draft to be integrated).
+% Claims and status:
+%  - Drafter configuration: read from the pinned config.json (finding, code/config reading).
+%  - Model-card numbers: the authors' claims on B200, quoted as such.
+%  - All GH200 measurements: pending (drafter, bench).
+\section{Drafting}\label{sec:drafting}
+The verifier's work per committed token falls as the drafter's accepted length rises, so the drafter is an axis of the stack in its own right, and it interacts with the head: every draft step of the MTP layer and every DFlash block projects through the same 1.27~GB head.
+
+The native MTP layer is one decoder layer (0.241~GB) that consumes the target's last hidden state and the embedding of the latest token and then runs the full head. SGLang serves it through the EAGLE worker with a chain of draft steps and one draft token per step in the configuration used here. The public DFlash drafter for this target~\cite{dflashpaper,dflash4bcard} (revision \texttt{9a1996cc}) has six Qwen3-style layers of width 2,560, five with sliding-window attention and one with full attention, drafts blocks of up to 16 tokens in one pass, and conditions on the target's hidden states after layers 1, 5, 9, 13, 17, 21, 25 and 29. It has no head of its own; SGLang projects its drafts through the target's tied head. Its model card reports, on one B200 in SGLang with greedy decoding and thinking enabled, 3.40--4.60$\times$ over autoregressive decoding at concurrency~1 with blocks of 16, and 2.15--2.61$\times$ at concurrency~32 with blocks of 8, against at most 2.31$\times$ and 1.80$\times$ for the MTP layer~\cite{dflash4bcard}. These are the authors' numbers on other hardware.
+
+\pending{drafter: DFlash on GH200 at block sizes 4, 8 and 16: acceptance probability by block position and domain, accepted length against concurrency, and the split of a cycle into draft forward, verification and host time; evidence under \nolinkurl{evidence/drafter/}}
+
+\pending{drafter: whether a targeted fine-tune is justified by a measured limitation (longer accepted blocks, cheaper drafting, or draft states that make certificates tighter), judged by total serving time}
+
+\pendingfigure{Acceptance probability by position within a DFlash block, per block size and domain.}{evidence/drafter/acceptance_by_position.csv}
