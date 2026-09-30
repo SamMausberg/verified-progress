@@ -157,3 +157,27 @@ GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x bench/campaigns/tuning_depth.sh
 python -m bench.pareto $(ls -d ~/vp-data/bench/tuning/tune-*/2026* | grep -v tune-mtp-s1/) \
     --out evidence/bench/tuning --status tuning --no-plot
 ```
+
+**GDN verify snapshot traffic (derived, not measured).** Speculative verify keeps one
+intermediate recurrent state per draft token per request so a rejected suffix can be
+rolled back: SGLang allocates `intermediate_ssm_state_cache` with that shape (13.69 GiB
+for 73 requests x 4 draft tokens in the first MTP launch). One snapshot is the FP32 SSM
+state of the 24 GDN layers, 24 x 32 heads x 128 x 128 x 4 B = 50.3 MB (48 MiB); the conv
+windows add about 0.5 MB. If every draft token's snapshot is written once per verify
+cycle, the write rate is c x D x cycles/s, with D draft tokens per request and
+cycles/s = y / (c x accept length) from the measured points. At c=128 that gives
+
+| Config | D | y (tok/s) | Accept | Cycles/s | Snapshots/s | Snapshot writes |
+|---|---|---|---|---|---|---|
+| MTP s2 | 3 | 9,153 | 2.66 | 26.9 | 10,325 | 520 GB/s |
+| MTP s3 | 4 | 9,593 | 3.26 | 23.0 | 11,773 | 593 GB/s |
+| MTP s4 | 5 | 9,276 | 3.72 | 19.5 | 12,464 | 627 GB/s |
+| MTP s5 | 6 | 8,719 | 4.07 | 16.7 | 12,851 | 647 GB/s |
+| MTP s7, radix off | 8 | 8,493 | 4.56 | 14.6 | 14,909 | 750 GB/s |
+
+For comparison, plain decoding reads and writes each request's state once per token:
+13,421 tok/s x 2 x 50.3 MB = 1.35 TB/s of state traffic at c=128 (same assumption).
+Buffered verify (`--enable-linear-replayssm-spec`) replaces the per-draft snapshots with
+a window of raw inputs folded into the checkpoint at commit; the measured effect is the
+c=128 difference between the replayssm-spec rows and their plain-verify counterparts
+(35 ms against 43 ms per cycle for three steps).
