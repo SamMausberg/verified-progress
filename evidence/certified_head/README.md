@@ -61,6 +61,24 @@ drafter-invariant, and token-identical to SGLang's seeded sampler applied to the
 verify pass's own logits (not necessarily to plain decoding, whose logits can
 differ).
 
+P8's first witness (logits [0, -0.125], seed 5, position 7, T =
+1.0253338813781738 and 1.025334119796753) is resolved as follows
+(`python experiments/certified_head/p8_witness_cpu.py`, CPU):
+
+- SGLang's noise for tokens 0 and 1 is 0.1264024025577399 and
+  0.24831388481983743, the audit's values exactly (a pure-Python replica of its
+  MurmurHash3 and FP64 Gumbel transform).
+- SGLang's chain (FP32 softmax, FP32 log) and the FP64 log of the same FP32
+  probabilities both give token 1 at both temperatures.
+- Exact arithmetic gives token 0 at the first temperature and token 1 at the
+  second (boundary T* = 1.02533410).
+
+The witness therefore separates SGLang's FP32-softmax chain from exact
+arithmetic, not the FP32 log from the FP64 log: rounding the softmax to FP32
+moves the margin by about 1e-7, more than the log's precision does. The GPU
+regression checks the certified sampler against SGLang's own chain at both
+temperatures.
+
 `reference='fp32'` targets SGLang with `--enable-fp32-lm-head`;
 `reference='real'` (exact real-arithmetic argmax, no dense fallback) is used
 for analysis only.
