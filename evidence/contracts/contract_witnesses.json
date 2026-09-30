@@ -59,8 +59,8 @@
       "5/2": "3/2"
     }
   },
-  "seconds": 0.036,
-  "repo_commit": "25278b6cb149799596118f6b818c0dc81b693a24",
+  "seconds": 0.039,
+  "repo_commit": "64fc8ce2d955df0cd3d194b5253252a84a917419",
   "numpy": "2.3.5",
   "python": "3.13.15",
   "scope": "exact and float32 witnesses separating the contracts; not model measurements"

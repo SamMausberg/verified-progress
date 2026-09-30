@@ -8,7 +8,7 @@
   ],
   "zero_rows": 0,
   "tile_rows": 64,
-  "repo_commit": "25278b6cb149799596118f6b818c0dc81b693a24",
+  "repo_commit": "64fc8ce2d955df0cd3d194b5253252a84a917419",
   "torch": "2.13.0+cu130",
   "rows": {
     "l2_norm": {
@@ -220,6 +220,6 @@
       }
     }
   },
-  "seconds": 5.2,
+  "seconds": 7.0,
   "scope": "weights only, float64 on CPU; quantiles over all rows; no hidden states"
 }
