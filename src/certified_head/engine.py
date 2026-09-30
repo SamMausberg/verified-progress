@@ -37,7 +37,16 @@ from .bounds import RefModel
 from .head import STATUS_BITS, CertifiedHead
 from .quantize import quantized_for
 
-PATHS = ('decode', 'verify', 'draft', 'sampled_verify')
+PATH_FLAG = {
+    'decode': 'decode',  # greedy plain decode
+    'verify': 'verify',  # greedy target verify (EAGLE/MTP, DFlash)
+    'draft': 'draft',  # MTP draft steps inside the draft CUDA graph
+    'draft_extend': 'draft',  # MTP draft-extend (first draft token of a round)
+    'dflash_draft': 'draft',  # DFlash top-1 projection of the draft block
+    'sampled_verify': 'sampled_verify',  # fixed-noise sampled verify
+}
+"""Engine paths (one CUDA-graph family each) and the flag that enables them."""
+PATHS = tuple(PATH_FLAG)
 COUNTERS = (
     'calls',
     'rows',
@@ -86,7 +95,7 @@ class Flags:
         )
 
     def enabled(self, path: str) -> bool:
-        return bool(getattr(self, path))
+        return bool(getattr(self, PATH_FLAG[path]))
 
     @property
     def any(self) -> bool:
