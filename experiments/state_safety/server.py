@@ -10,6 +10,7 @@ at 0.25.
 from __future__ import annotations
 
 import contextlib
+import fcntl
 import json
 import os
 import signal
@@ -190,6 +191,31 @@ def launch_with_retry(
 
 
 @contextlib.contextmanager
+def startup_lock() -> Iterator[None]:
+    """Hold the team's server start-up lock (scripts/gpu_startup_lock.sh semantics).
+
+    SGLang sizes its pools from the free memory it sees while loading, so
+    concurrent start-ups by shared jobs race; the lock covers launch until healthy.
+    """
+    path = Path(os.environ.get('GPU_LOCK_FILE', str(Path.home() / '.gpu.lock')) + '.startup')
+    wait = float(os.environ.get('GPU_STARTUP_LOCK_WAIT', '1800'))
+    with path.open('a') as f:  # not inherited by child processes
+        deadline = time.monotonic() + wait
+        while True:
+            try:
+                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() > deadline:
+                    raise TimeoutError('start-up lock not acquired') from None
+                time.sleep(1)
+        try:
+            yield
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
+
+
+@contextlib.contextmanager
 def launch(
     flags: list[str], port: int, log_path: Path, startup_timeout: float = 900.0
 ) -> Iterator[dict[str, Any]]:
@@ -212,6 +238,8 @@ def launch(
     log = log_path.open('w')
     log.write(' '.join(cmd) + '\n')
     log.flush()
+    start = startup_lock()
+    start.__enter__()
     proc = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
     base = f'http://127.0.0.1:{port}'
     try:
@@ -231,6 +259,7 @@ def launch(
                 if time.monotonic() > deadline:
                     raise TimeoutError(f'server not ready after {startup_timeout} s') from None
                 time.sleep(2)
+        start.__exit__(None, None, None)
         info = _get_json(f'{base}/get_server_info')
         summary = {k: info.get(k) for k in SERVER_INFO_KEYS}
         # max_running_requests is resolved inside the scheduler.
@@ -242,6 +271,7 @@ def launch(
         summary['cmd'] = cmd
         yield {'base_url': base, 'server_info': summary}
     finally:
+        start.__exit__(None, None, None)  # no-op if already released
         with contextlib.suppress(ProcessLookupError):
             os.killpg(proc.pid, signal.SIGTERM)
         try:
