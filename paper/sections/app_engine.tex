@@ -1,0 +1,63 @@
+% Appendices E to H: engine integration notes, CPU evidence and formal status,
+% reproduction, attribution.
+\section{Engine integration notes}\label{app:integration}
+The source audit uses SGLang commit \texttt{bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824}, a frozen research pin rather than the latest revision. The observations below come from reading that code; the integration is proposed engineering work unless a later section reports it measured.
+
+\begin{longtable}{@{}P{4.7cm}P{9.6cm}@{}}\toprule
+Path under \code{python/sglang/} & Observation and proposed integration\\\midrule\endhead
+\path{srt/layers/logits_processor.py} & \code{\_compute\_lm\_head} is the single hook through which plain decoding, the MTP drafter and the verifier compute logits: \code{torch.matmul} with BF16 output by default, \code{torch.mm(..., out\_dtype=float32)} under \code{-{}-enable-fp32-lm-head}. A certified head replaces this call for admitted consumers only; log-probability requests and unsupported transforms keep the ordinary path.\\
+\path{srt/models/qwen3_5_text.py} & The Qwen3.5 head is tied to \code{embed\_tokens}, which is not a \code{ParallelLMHead}, so SGLang's quantized-head paths do not apply; a low-precision copy must be separate and the BF16 head stays resident for re-scoring and fallback.\\
+\path{srt/models/qwen3_5_mtp.py} & \code{set\_embed\_and\_head} skips the head when embeddings are tied, so a reduced draft head from \code{-{}-speculative-token-map} does not reach the MTP drafter while indices are still remapped; the moonshot engine patch unties a reduced head for the drafter~\ev{moonshot-patches}.\\
+\path{srt/layers/sampler.py} & Unseeded sampling is an exponential race; seeded sampling is a Gumbel race keyed by (seed, position, token) in FP64 (\code{multinomial\_with\_seed}). The certified race uses the same field.\\
+\path{srt/models/dflash.py} & DFlash projects draft hidden states through the target head for its candidates; this is the draft-side summary producer for transport.\\
+\path{kernels/ops/attention/fla/gdn_replayssm_spec_fold.py} & The replay fold is written as a bitwise clone of the verify kernel and constrains operation order and warp count; its \code{accept\_lens} include the bonus token in that backend's indexing~\cite{gdncode}.\\\bottomrule
+\end{longtable}
+
+\section{CPU evidence and formal status}\label{app:cpu}
+The earlier revision's exact references use bounded integer head weights and hidden vectors, with unnormalized mass $2^z$ represented exactly in rational arithmetic; this is an exponential model with logits scaled by $\log2$ and avoids trusting floating exponentials. Eighteen test methods in the decision reference and three in the race reference pass, with four local tests of the benchmark client; Table~\ref{tab:tests} lists the generated finite instances inside them. The counts are not independent confirmations of anything about a trained model, and the race tests use fixed positive rational priorities, so they establish pathwise equivalence of the bounded and dense algorithms, not continuous Gumbel randomness. Seeds, commands and results are in the inherited evidence files and their logs~\ev{inherited}.
+
+\begin{table}[htbp]
+\small\centering
+\begin{tabularx}{\linewidth}{@{}P{5cm}rY@{}}\toprule
+Check & Executed count & Scope\\\midrule
+Top-$k$ plus tail composition & 250 & Exact union and associative merge.\\
+Transported tile bounds & 300 heads; 1,048 tiles & 3,787 weight rows enclosed.\\
+Greedy certified screening & 250 & Same winner under a deterministic total order.\\
+Retained-tail tightening & 565 tiles & Exact mass enclosed; bounds no looser.\\
+Acceptance interval guards & 1,600 & Certified bits agree with complete mass.\\
+Unresolved interval measure & 160 & Exact agreement with Theorem~\ref{thm:guards}.\\
+Lazy acceptance & 500 & With and without retained seeds; finite completion.\\
+Coupled one-step sampling & 200 & Same output with exact residual fallback.\\
+Rejection-correction identity & 300 pairs & Includes zero-probability support entries.\\
+Demand frontier & 1,092 partial states & 5,460 complete decision assignments.\\
+Exclusion-aware race summaries & 300 & Exact maxima after support exclusions.\\
+Target priority race & 250 & Same token as a dense priority race.\\
+Sparse-support residual race & 250 & Exact bounded and dense race equivalence.\\
+Finite-map execution & 400 & Scan, walk and composition agreement.\\
+Gated-delta replay & 150 trajectories & 868 accepted-prefix replay checks.\\
+Lease reuse & 300 schedules & Sequential epoch and base-prefix guards.\\\bottomrule
+\end{tabularx}
+\caption{CPU evidence inherited from the earlier revision, on \code{main}. Counterexamples for biased depth selection, graph-cost cliffs, batch unions, invalid numerical bounds, support truncation and stale namespaces are also included. No GPU implementation is exercised.}
+\label{tab:tests}
+\end{table}
+
+The theory workstream adds an exact reference that emulates BF16, FP32 and FP64 rounding on rationals and checks every bound and decision of Sections~\ref{sec:selfevidence} and~\ref{sec:decisions} against real arithmetic: 21 test methods and 40,015 generated checks, including 5,600 accumulation-bound checks over eight summation models, 420 certified argmax cases (72 exact ties), 360 races, 300 acceptance decisions with adversarial uniforms, 160 cases with subnormal products, witnesses that each envelope term is necessary, and the R-bf16 and split-$K$ witnesses of Section~\ref{sec:headcontracts} (\code{tests/test\_precision.py}~\ev{precision}). These are tests on synthetic heads, not proofs and not GPU measurements.
+
+\paragraph{Formal status} The earlier revision's Lean file (\code{formal/DecisionGuards.lean}, nine declarations for scaled-integer guards, monotone refinement, composition, replay and publication guards) could not be compiled when it was written. Lean 4.19.0 now elaborates it, together with \code{formal/CertifiedArgmax.lean}, which proves the certificate and its uniqueness, the candidate filter, the guards with enclosed numerators and their exclusivity, the residual interval, the Hölder bound and the sequential $\gamma_n$ bound in scaled integers, using only Lean's built-in axioms~\ev{lean}. IEEE rounding itself, the bridge from floating-point values to these integers, exponentials and every probability statement remain outside the checker.
+
+\section{Reproduction}\label{app:repro}
+The repository is at \repourl. The CPU evidence on its \code{main} branch is reproduced from the repository root with Python 3.13 and NumPy:
+\par\noindent\begin{minipage}{\linewidth}
+\begin{lstlisting}
+python -m venv .venv && . .venv/bin/activate
+python -m pip install -r requirements-cpu.txt
+python scripts/verify_artifact.py     # CPU tests, synthetic drift, Lean attempt
+python -m pip install -r requirements-dev.txt   # adds pytest
+python -m pytest tests/               # every CPU test; GPU tests skip
+\end{lstlisting}
+\end{minipage}\par\smallskip
+
+The paper builds with \code{latexmk -pdf paper.tex} in \code{paper/} (pdfLaTeX and BibTeX; no shell escape). Figures that read committed data files regenerate on each build, and a figure whose data file is absent builds as a marked placeholder. Figure sources are in the section files and in \code{paper/figures/}. GPU experiments go through the repository's GPU lock and are documented with their exact commands in \code{RUNBOOK.md} and in the \code{README.md} of each \code{evidence/} directory.
+
+\section{Attribution and disclosure}\label{app:attribution}
+Samuel Mausberg is the author of this paper and reviews its claims and implementation. The earlier revisions of the manuscript, its derivations and its reference code were prepared with GPT-6 Astra Pro (OpenAI) from research materials, public primary sources and local CPU execution. This revision was produced with Claude Code, using Claude Opus 5.5 agents for the literature review, theory, measurements and writing, on the earlier draft; the literature, theory and evidence changes this paper cites were approved by an independent reviewing agent before they were merged, and all of the work is subject to the author's review. No AI system is an author. The confidential assignment that motivated the work is not reproduced or quoted, and no model weights are redistributed.

@@ -1,0 +1,42 @@
+% Section 7: exactness under speculation: the stock engine's own divergences and its
+% recurrent state.
+% Claims and status:
+%  - The shared greedy rule of the two paths: code reading at bd66ce34.
+%  - Proposition gdn: proved here.
+%  - Divergence rates and mechanisms, deterministic mode, targeted state tests (H5):
+%    pending (state).
+\section{Exactness under speculation}\label{sec:speculation}
+A certified head claims to add no divergence of its own. Before that claim can be checked, two properties of the unmodified engine have to be known: where its equivalent configurations already disagree, and whether its recurrent state survives speculative verification intact.
+
+\subsection{Every divergence has a mechanism}\label{sec:divergence}
+Stock configurations that ought to be equivalent already disagree: plain decoding at different batch sizes, plain decoding against MTP speculation, and speculation at different batch sizes can emit different greedy tokens. Both greedy paths reduce to one rule, \code{torch.argmax} (first maximal index) over the BF16 head output widened exactly to FP32, so two runs that feed identical logits to it cannot choose different tokens. Every divergence therefore means that the computed logits differed, and the question is where. ``A tie'' is an observation about where the divergence became visible, not an explanation of why it happened.
+
+\paragraph{Differential tests} A fixed set of 320 prompts from five public datasets, tokenized once so that every configuration receives identical token IDs, is decoded greedily for up to 256 tokens with the top five logprobs at every position. The configurations differ only in settings that should leave greedy output unchanged: plain decoding against MTP speculation (one, three and five draft steps with top-$k$ 1, and a small tree with top-$k$ 2), the prefix cache and the overlap scheduler on or off, \code{-{}-enable-deterministic-inference} and \code{-{}-enable-fp32-lm-head}, each with one request in flight and with 32. Two runs of a prompt are compared position by position; the first position where the tokens differ is a divergence, the positions before it are the exposure, and the rate per 1,000 tokens is divergences over exposure.
+
+\paragraph{Locating the first difference} A diagnostic tap hashes the exact bits of every module output row by row inside the CUDA graphs and dumps the rows of selected requests with the head input and the logits fed to the argmax; tapped and untapped runs must agree bitwise. For each divergence both configurations are replayed on the prompt and the committed rows walked in order to the first position and module whose output bits differ; before that point every tensor, and therefore every cached attention and recurrent state, agrees. At the divergence the classification asks whether the head inputs agree (then the head GEMM itself produced different BF16 values for the same input) and, if not, whether the exact logits of the two competing tokens, recomputed in FP64 from each run's head input, are ordered the same way in both runs (a rounding flip: BF16 rounding created the tie or reversal) or differently (an order flip carried by the hidden state).
+
+The divergence rate per 1,000 tokens and the mechanism class for each configuration pair, the first differing module, the rate of exact BF16 top-two ties in plain decoding, and whether deterministic inference makes plain decoding and MTP speculation batch-invariant (and which kernel is responsible where it does not) are \pend{state-mech}.
+
+Two consequences follow before those numbers arrive. A certified head is compared with the stock head at the same batch shape and in the same serving configuration (Section~\ref{sec:same-shape}). And the reference for a speculative arm is stock speculative verification at the same shape, not plain decoding: greedy speculative verification is exact in real arithmetic, but its verify pass computes the target's logits with different kernels and at a different shape from plain decoding, so the stock noise floor applies to it as it does to fixed-noise sampling (Section~\ref{sec:fixednoise}).
+
+\subsection{Recurrent state under speculation}\label{sec:exactness-state}
+Qwen's hybrid architecture makes state correctness part of verification. Reusable state includes attention KV, recurrent tensors, convolution history, positions and backend metadata. With state orientation $S\in\R^{d_v\times d_k}$, the gated-delta update can be written
+\begin{equation}
+S_t=\alpha_tS_{t-1}+u_tk_t^\top,\qquad u_t=\beta_t\bigl(v_t-\alpha_tS_{t-1}k_t\bigr),\label{eq:gdn}
+\end{equation}
+which is the Gated DeltaNet rule $S_t=S_{t-1}\alpha_t(I-\beta_tk_tk_t^\top)+\beta_tv_tk_t^\top$~\cite{gdn} with the update vector made explicit. The update depends on the preceding state.
+
+\begin{proposition}[Replay of valid derived records]\label{prop:gdn}
+If $(\alpha_t,u_t,k_t)$ were recorded along a causal trajectory from $S_0$, applying the first $a$ records to that same $S_0$ reproduces $S_a$ in exact arithmetic:
+\[S_a=\Bigl(\prod_{j=1}^{a}\alpha_j\Bigr)S_0+\sum_{t=1}^{a}\Bigl(\prod_{j=t+1}^{a}\alpha_j\Bigr)u_tk_t^\top.\]
+\end{proposition}
+\begin{proof}
+Substitute the expansion at $a-1$ into~\eqref{eq:gdn}; the new gate multiplies every preceding term and the new outer product adds the last summand. Induction completes the proof.
+\end{proof}
+The qualification about $S_0$ matters: replaying a derived $u_t$ from a different state gives the wrong result even when the token IDs agree. The inherited CPU suite contains a one-dimensional witness (a record made at state zero and replayed from state two gives three, where the genuine update gives one)~\ev{inherited}. Replaying raw inputs with the true transition is a different operation. Regrouping the recurrence also does not preserve floating-point results; SGLang's replay fold constrains its operation order and warp count to be a bitwise clone of the verify kernel~\cite{gdncode}.
+
+A cycle may emit a correction or bonus token before that token has been consumed into every cache, so the runtime must distinguish the \emph{emitted} prefix from the \emph{materialized} state prefix; treating both as one accepted length invites off-by-one state errors. Publication of speculative state should check that the request's slot and epoch are still current, and memory must not be reused while any stream or captured graph can still write it. An epoch check does not by itself prevent a stale kernel from writing reused memory; ownership and delayed reuse are separate obligations.
+
+\paragraph{What SGLang does, and how it is tested (H5)} During verification SGLang computes the recurrent state and the convolution window after every draft position into per-position buffers and leaves the live state untouched; after acceptance a fused scatter copies the buffers of the last accepted position (for a tree, the last accepted node) into the request's slot. The emitted prefix includes the bonus token while the materialized state does not; the bonus token is the first input of the next cycle. Prefix reuse checkpoints the recurrent state every 256 tokens of sequence length into a ping-pong pair of slots, including checkpoints that fall inside a verify cycle, and a freshly allocated slot is cleared by the next forward on the same stream, after any in-flight verification by its previous owner. The MTP draft layer is a full-attention layer, and under greedy verification every committed token is the target's argmax, so an error in draft-side state could lower acceptance but not change the output.
+
+Each point where a speculative cycle touches this state is tested against a reference that isolates it. Truncation by \code{max\_new\_tokens} and stop tokens at every index inside a verify cycle must reproduce the untruncated run bitwise on the same server. Checkpoints taken during speculative decoding, including in the cycle that finished the request, are restored for a continuation and compared with a cold prefill of the same prefix. Requests aborted mid-stream with a recurrent pool of exactly four slots force the next request onto the freed slot while the aborted request's last verification may still be in flight. Chunked prefill at 200 and 256 tokens is compared with an unchunked prefill. And the logprob drift of every MTP run against plain decoding is bucketed by the draft position that the previous cycle rejected. The outcome of each test is \pend{state-targeted}.

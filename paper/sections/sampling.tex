@@ -1,0 +1,75 @@
+% Section 5: exact sampling and speculative decisions.
+% Claims and status:
+%  - Theorems race/fixednoise, Propositions rng/coupling/kl: proved here; known principles
+%    are attributed in the text. Secondary constructions (common mass, bounded range, guards,
+%    residual races, demand frontier) and the synthetic CPU experiment: Appendix app:derivations.
+%  - The adopted sampling contract: design decided; its measurement is pending (kernel).
+\section{Sampled decisions}\label{sec:decisions}
+Greedy selection is the easy consumer. A sampled decoder needs a token drawn from the target law, and a sampled speculative verifier needs an accept or reject bit for each drafted token and then a residual or bonus sample. This section turns the enclosures of Section~\ref{sec:selfevidence} into those decisions. Every statement takes enclosures of the logits as input and does not care which mechanism produced them, so it applies to transport as well. The construction the engine path adopts is fixed-noise verification (Section~\ref{sec:fixednoise}), because it reduces every sampled decision to a race.
+
+\subsection{A certified race under a keyed noise field}\label{sec:race}
+\begin{theorem}[Certified race]\label{thm:race}
+For any fixed noise vector $g$ and $T>0$, the ladder of Theorem~\ref{thm:ladder} with $f_i(x)=x/T+g_i$ returns the S-race token, which is the token of a dense race with the same $g$ and tie rule. If the $g_i$ are i.i.d.\ standard Gumbel and independent of $z$, the token has law $\softmax(z/T)$.
+\end{theorem}
+\begin{proof}
+Theorem~\ref{thm:ladder} and the Gumbel-max identity~\cite{gumbel1954,papandreou2011}; ties have probability zero under continuous noise.
+\end{proof}
+Using bounds to avoid evaluating most perturbed scores is the principle of A* Sampling~\cite{astar} and of lazy Gumbel sampling from a retrieved top set~\cite{mussmann2017}. What the fixed field adds is pathwise equality with the dense race, which a lazily instantiated field does not give. Top-$k$ sampling applies the ladder to membership (drop $i$ when $hi_i$ is below the $k$-th largest $lo$) and races over the certified set; equality then also needs the engine's tie semantics at the $k$-th position. Min-$p$ admits $i$ when $z_i\ge z_{\max}+T\log(\text{min-}p)$, which intervals decide without a partition function. Top-$p$ admission depends on the mass above each token relative to $Z$, needs partition bounds, and is usually cheaper to hand to the ordinary path.
+
+\begin{proposition}[RNG contract]\label{prop:rng}
+(i) Seeded equality between a certified and a dense procedure holds when both evaluate the same function of the same noise values with the same tie rule. This requires a counter-based field, a pure function of (seed, request, absolute position, draw purpose, token) that the certified path can evaluate for any token in any order; a stream consumed in evaluation order does not qualify, and in the exact reference assigning a stream to rows in candidate order changed the winner in 247 of 300 cases~\ev{precision}. (ii) Equality in distribution needs i.i.d.\ noise with the correct marginal, independent of the proposal draw, the acceptance uniform and the scores; a residual race also needs independence from the acceptance event. (iii) Fixed-noise verification (Section~\ref{sec:fixednoise}) needs the noise of a position to be the same whether the position is drafted or decoded plainly, so it must be keyed by absolute position, not by cycle or batch slot. (iv) A hash with $2^{32}$ levels makes the law exact only for the idealized continuous field; the stock seeded sampler shares that approximation.
+\end{proposition}
+The stock seeded sampler (Section~\ref{sec:stock}) already has the form (i) requires. FlashSampling's noise offset depends on the tiling~\cite{flashsampling}, so it cannot serve as a certified path's field without change.
+
+\subsection{Fixed-noise verification}\label{sec:fixednoise}
+\begin{theorem}[Fixed-noise verification]\label{thm:fixednoise}
+Let $G_{t,i}$ be keyed by (seed, absolute position $t$, token $i$) and i.i.d.\ standard Gumbel across $(t,i)$. Define $Y_t=\min\argmax_i\bigl(z_{t,i}(Y_{<t})/T+G_{t,i}\bigr)$. A speculative decoder that accepts a drafted token at position $t$ if and only if it equals $\argmax_i(z_{t,i}(x_{<t})/T+G_{t,i})$ at the drafted prefix, and emits that argmax at the first mismatch, outputs $Y$ for every drafter and every depth policy, and $Y$ has the target's autoregressive law.
+\end{theorem}
+\begin{proof}
+By induction on positions, every accepted token equals the argmax at a prefix equal to $Y_{<t}$, so it is $Y_t$; at the first mismatch the prefix is $Y_{<t}$ and the emitted token is $Y_t$. The drafter only changes how many positions one target pass verifies. Given $Y_{<t}$, $G_{t,\cdot}$ is independent of $z_t(Y_{<t})$, so $Y_t\mid Y_{<t}\sim\softmax(z_t(Y_{<t})/T)$.
+\end{proof}
+This is the drafter-invariant construction of Daliri, Musco and Suresh~\cite{daliri2025}. For the certified head it matters because verification becomes a perturbed argmax, which Theorem~\ref{thm:race} certifies with no partition function and no residual sampler. The theorem treats $z_t$ as a function of the prefix alone. In the engine the verify pass computes the logits with different kernels and at a different batch shape from plain decoding, and stock configurations that differ in this way can disagree (Section~\ref{sec:divergence}). What a fixed-noise verifier reproduces token for token is therefore the seeded sampler applied to the verify pass's own logits. Equality with seeded plain decoding would also need the verify-pass and plain-decode logits to agree, which requires kernels whose bits depend neither on the batch shape nor on whether a position is verified or decoded. The engine does not guarantee that at the pin, since the two paths use different kernels and shapes; how often, and how soon, the two computations part is the subject of the divergence measurement \pend{state-mech}.
+
+\begin{proposition}[Acceptance under fixed-noise coupling]\label{prop:coupling}
+Suppose that the drafter proposes the token $\argmax_i(\log q_i+G_i)$ and that the target accepts it exactly when it equals $\argmax_i(\log p_i+G_i)$. Then
+\begin{gather*}
+P(\text{accept})=\sum_i\Bigl(\sum_j\max\bigl(\tfrac{p_j}{p_i},\tfrac{q_j}{q_i}\bigr)\Bigr)^{-1},\\
+\tfrac12\sum_i\min(p_i,q_i)\le\sum_i\frac{p_iq_i}{p_i+q_i}\le P(\text{accept})\le\sum_i\min(p_i,q_i).
+\end{gather*}
+\end{proposition}
+\begin{proof}
+Both choose $i$ if and only if $G_i>\max_{j\ne i}(G_j+m_j)$ with $e^{m_j}=\max(p_j/p_i,q_j/q_i)$, an event of probability $(1+\sum_{j\ne i}e^{m_j})^{-1}$. The bounds follow from $\max(x,y)\le x+y$, from $\max(x,y)\ge x$ and $\ge y$ summed over $j$, and from $p+q\le2\max(p,q)$.
+\end{proof}
+Per position, fixed-noise acceptance of a sampled draft is at most the $\min(1,p/q)$ rate $1-\TV(p,q)$ and at least half of it; the two agree when $p=q$. Whether the cheaper certificate pays for any lost acceptance is an empirical question \pend{geometry-accept}.
+
+\paragraph{The sampling contract adopted here} The certified speculative path uses fixed-noise verification with exactly the stock seeded sampler's noise: $G_{t,i}=-\log(-\log x_{t,i})$ in FP64, with $x_{t,i}$ the 32-bit MurmurHash of (seed, absolute position $t$, token $i$) scaled to $[0,1]$, as in \code{multinomial\_with\_seed} (Section~\ref{sec:stock}). A drafted token is accepted if and only if it equals the target's keyed sample at its position, and at the first mismatch that sample is emitted. Four properties follow.
+\begin{itemize}
+\item \emph{Law.} The output is equal in law to target sampling, and it is drafter-invariant: the same keyed noise and the same verifier logits give the same tokens for any drafter and any depth policy.
+\item \emph{Acceptance.} For SGLang's default point-mass drafts the per-position acceptance probability is unchanged: the stock rule accepts a draft $d$ when a uniform coin falls below $p(d)$, and the keyed rule accepts it when $d$ wins the race, which also has probability $p(d)$.
+\item \emph{Seeded tokens.} With a seed, every committed token is the stock seeded sampler's token for the verify pass's own stock logits at that position (Theorem~\ref{thm:fixednoise} under R-stock at the verify shape), provided that every row whose race the certificate cannot decide under the stock rounding of $\log\softmax$ runs the stock sampler.
+\item \emph{Not plain seeded decoding.} The output equals seeded decoding without speculation only where the verify-pass and plain-decode logits agree, which the engine does not guarantee. Stock speculative sampling is equal to non-speculative decoding only in law, because its coins and its inverse-CDF residual consume randomness differently.
+\end{itemize}
+Without a seed the output equals stock in law. Top-$p$ requests fall back to the stock path. The design is decided; token-for-token agreement with the stock seeded sampler on the verify pass's logits for replayed steps, and acceptance against the stock speculative sampler, are \pend{kernel-seeded}.
+
+\subsection{Why the engine path does not certify the standard acceptance rule}\label{sec:standard-rule}
+The standard rule accepts a proposal $X=x$ when $Uq_xZ<e^{z_x}$ for a uniform $U$ and the partition $Z$. Enclosures of the numerator and of $Z$ decide that inequality whenever $U$ falls outside a narrow band, and the band's probability can be bounded by the unre-scored mass (Theorem~\ref{thm:guards}, Appendix~\ref{app:guards}); the Lean formalization proves these guards with enclosed numerators and their exclusivity. A rejection still requires a sample from $(p-q)_+$, and knowing that rejection occurred does not supply one; bounded residual races (Theorems~\ref{thm:residualrace} and~\ref{thm:residualself}) sample it exactly from enclosures, and a point-mass proposal, SGLang's default, reduces the residual to a race over the untried tokens. Under a stock-token contract, however, the stock inverse-CDF residual would still need a dense head row per verify step, and on constructed heads a cheap acceptance decision followed by a dense residual erased most of the saving (Appendix~\ref{app:synthetic}). The guards and residual races are therefore analysis in this revision, not built; fixed-noise verification needs neither a partition function nor a residual sampler. Two further constructions complete the theory and are also in Appendix~\ref{app:derivations}: a characterization of how much of an exact sample can be emitted before any candidate is separated (Proposition~\ref{prop:commonmass}, whose optimum for two laws is the overlap $1-\TV(p,q)$ of a maximal coupling), and a sampler that is exact under a bounded logit error (Proposition~\ref{prop:boundedrange}). A demand frontier that suppresses head work after the first certified rejection of a chain (Proposition~\ref{prop:frontier}) saves head work but not transformer layers.
+
+\subsection{When adaptive verification changes the sampling law}\label{sec:stopping}
+Avoiding work whose result is already determined differs from choosing which sampled proposals count. DSpark states that lossless speculation requires admission decisions that do not depend on future candidate tokens, and D-cut gives a counterexample and a repair~\cite{dspark,dcut}. A two-token illustration: let $p=q=(1/2,1/2)$, draw $X\sim q$, discard it and draw afresh from $p$ if $X=0$, and admit it to the ordinary verifier if $X=1$. Since $p=q$ an admitted proposal is always accepted, and the output law is
+\begin{equation}
+\Pr(Y=0)=\tfrac14,\qquad\Pr(Y=1)=\tfrac34.\label{eq:bias}
+\end{equation}
+The acceptance formula was unchanged; admission selected proposals by their realized value. A mandatory progress floor on the first token does not help, since the same construction applies at the second position. Three settings avoid the issue: greedy decoding; target-only verification with point-mass proposals, where there is no proposal law to bias; and fixed-noise verification (Theorem~\ref{thm:fixednoise}), under which every depth policy yields the same output. The demand frontier changes only the amount and order of arithmetic used to decide a fixed protocol, so it is exact pointwise.
+
+\subsection{An approximate mode, and why it cannot be certified harmless}\label{sec:approx-mode}
+\begin{proposition}[Approximate mode: KL and sequence total variation]\label{prop:kl}
+Suppose that $\min_c\norm{z-\tilde z-c\mathbf 1}_\infty\le\varepsilon$ at temperature one; at temperature $T$, replace $\varepsilon$ by $\varepsilon/T$. Then $\KL(p\,\|\,q)\le\varepsilon^2/2$ and $\KL(q\,\|\,p)\le\varepsilon^2/2$, so $\TV(p,q)\le\varepsilon/2$. If an approximate decoder samples $q_t$ in place of $p_t$ at every position and the bound holds with $\varepsilon_t$ at every reachable prefix, the laws $P$ and $Q$ of the first $N$ tokens satisfy $\KL(P\,\|\,Q)\le\tfrac12\sum_t\varepsilon_t^2$ and
+\[\TV(P,Q)\le\tfrac12\Bigl(\sum_{t=1}^N\varepsilon_t^2\Bigr)^{1/2}.\]
+\end{proposition}
+\begin{proof}
+Let $d=z-\tilde z-c\mathbf 1$ with $\norm d_\infty\le\varepsilon$; the shift $c$ changes neither law. Then $p$ is $q$ tilted by $d$: $p_i=q_ie^{d_i}/\E_q[e^d]$. Let $\psi(\lambda)=\log\E_q[e^{\lambda d}]$, so $\psi(0)=0$ and $\KL(p\,\|\,q)=\E_p[d]-\psi(1)=\psi'(1)-\psi(1)=\int_0^1\lambda\psi''(\lambda)\,d\lambda$. Here $\psi''(\lambda)$ is the variance of $d$ under the tilted law $q^{(\lambda)}$, at most $(2\varepsilon)^2/4=\varepsilon^2$ because $d$ takes values in an interval of length $2\varepsilon$. Hence $\KL(p\,\|\,q)\le\varepsilon^2/2$; the reverse divergence follows by exchanging the roles of $p$ and $q$. Pinsker's inequality gives $\TV\le\sqrt{\KL/2}\le\varepsilon/2$. For sequences, the chain rule gives $\KL(P\,\|\,Q)=\sum_t\E_P[\KL(p_t\,\|\,q_t)]\le\sum_t\varepsilon_t^2/2$, and Pinsker's inequality again gives the total-variation bound.
+\end{proof}
+To guarantee a sequence total variation of at most $0.01$ over $N=1{,}024$ tokens with a uniform bound, the proposition needs a logit error, up to a common shift, of at most $\varepsilon=6.25\times10^{-4}$, far tighter than any int8 envelope in Section~\ref{sec:selfevidence}. An approximate head is therefore a quality trade-off to be measured (Section~\ref{sec:stack-stacks}); these bounds cannot certify it as harmless over long outputs.
+
+\subsection{Measurements}\label{sec:decisions-measured}
+On captured plain-decode states, races through the int8 128-group pass at $T=1$ and $T=0.7$ need as few candidate rows as greedy selection (Section~\ref{sec:geometry-selfevidence}). Race candidate counts on speculative states, mass-enclosure ratios and $P_?$ for standard acceptance on real MTP and DFlash drafts, and the fraction of decisions resolved before any re-scoring are \pend{geometry-accept}.
