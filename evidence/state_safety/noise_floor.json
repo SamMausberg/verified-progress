@@ -1,6 +1,6 @@
 {
   "pairs": {
-    "batch c1 vs c32, plain": {
+    "concurrency 1 vs 32 (cap 16), plain": {
       "prompts": 320,
       "diverged": 167,
       "identical": 153,

@@ -14,6 +14,9 @@ This file is updated as runs complete. Results not yet collected are marked
   `run_meta.json` records `sglang_dirty: false`), Qwen/Qwen3.5-4B at
   `851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a`, one GH200 (sm_90), CUDA 13 compat,
   FlashInfer attention, Triton GDN kernels, CUDA graphs and the overlap scheduler on.
+- "c32" in run names means 32 client requests in flight against a server capped at
+  16 running requests (`--max-running-requests 16`): decode batches have at most 16
+  rows, and the rest wait in the queue.
 - Server flags common to every configuration: `--mem-fraction-static 0.25
   --max-running-requests 16 --mamba-full-memory-ratio 2 --incremental-streaming-output
   --random-seed 0` (see `run_meta.json` for the full command of each run).
@@ -127,8 +130,8 @@ disagree under either model (`float64_contradicts_bf16` is false in every case).
 ### Results
 
 **Plain decode vs MTP (steps 3, top-k 1), both at batch 1**
-(`mechanism_plain_c1_vs_mtp_s3_c1.json`; 167 prompts that diverged in the batch
-comparison below, generated up to two tokens past their known divergence).
+(`mechanism_plain_c1_vs_mtp_s3_c1.json`; 167 prompts that diverged in the
+concurrency comparison below, generated up to two tokens past their known divergence).
 
 - In all 167 prompts the first differing module output is layer 0's GDN recurrence
   output at the first speculative cycle, while its immediate input, the causal
@@ -144,7 +147,7 @@ comparison below, generated up to two tokens past their known divergence).
   head input differs in every case. Conservative model: rounding flip 29, order flip 7,
   accumulator ambiguous 93. Hopper model: rounding flip 89, order flip 16, ambiguous 24.
 
-**Plain decode at batch 1 vs 32 requests in flight** (`mechanism_plain_c1_vs_c32.json`;
+**Plain decode at client concurrency 1 vs 32, with at most 16 requests running** (`mechanism_plain_c1_vs_c32.json`;
 40 tapped prompts: the 16 whose divergence in the matrix run was not an exact tie,
 and 24 of the 151 that were, drawn at random; all 40 diverged again in the tapped
 reproduction, whose batches differ from the matrix run's).
@@ -187,19 +190,19 @@ server settings and commits per run. The margin classes there (`tie`, `one_ulp`,
 
 | Pair | Diverged | Compared tokens | Per 1,000 | Largest margin |
 |---|---|---|---|---|
-| Plain, batch 1 vs 32 | 167/320 | 48,816 | 3.42 | 0.375 nats |
+| Plain, concurrency 1 vs 32 (at most 16 running) | 167/320 | 48,816 | 3.42 | 0.375 nats |
 | Plain, batch 1, same server repeated | 0/320 | 70,042 | 0 | - |
-| Plain, batch 32, same server repeated | 0/320 | 70,060 | 0 | - |
+| Plain, concurrency 32, same server repeated | 0/320 | 70,060 | 0 | - |
 
 Plain decode at batch 1 has an exact BF16 tie between its top two logits at 11.3 of
 every 1,000 positions, and a nonzero gap of at most 0.125 at another 22.2
 (`noise_floor.json`, `top2_gap_plain_c1`). No run committed a token that was not its
 own top-1 (`self_consistency`). Same-server repeats reproduce every token at both
-batch sizes, and every logprob except those of one prompt (`humaneval-0044`, a
+concurrencies, and every logprob except those of one prompt (`humaneval-0044`, a
 128-token prompt), which differ from its prefill onward in both repeats; a tapped
 test of that prompt is queued.
 
-**Pending**: MTP steps 1/3/5 and the top-k 2 tree at batch 1 and 32, radix cache off,
+**Pending**: MTP steps 1/3/5 and the top-k 2 tree at concurrency 1 and 32, radix cache off,
 overlap off, deterministic inference and FP32 head for plain and MTP, fresh-server
 repeats, the logprobs-off control, retraction, and the ReplaySSM and FlashInfer GDN
 decode paths. These runs are queued.
@@ -225,7 +228,7 @@ PyTorch and disables the radix cache. In an early 8-prompt, 128-token check
 identical tokens and bitwise-identical logprobs) and MTP was not (2 of 8 diverged).
 Passing the deterministic KV split to FlashInfer's target-verify plan
 (`engine/sglang/patches/state/0002-verify-kv-split-deterministic.patch`) did not change
-that: 28 of 96 prompts still diverged between batch 1 and 32, 1.55 per 1,000 compared
+that: 28 of 96 prompts still diverged between concurrency 1 and 32 (at most 16 running), 1.55 per 1,000 compared
 tokens, all at exact ties (`noise_floor.csv`, row `deterministic + verify KV split
 patch`). A plausible reason, not yet tested: the
 draft is not batch-invariant, so acceptance lengths, and with them the offset of a
