@@ -158,9 +158,13 @@ def runs_table(evidence: Path) -> str:
             r = json.loads(line)
             if r.get('mode') == 'nsys' and r['window_kind'] == 'none':
                 kind = 'nsys attached, not collecting'
+                if 'hosttrace' in p.name:
+                    kind += ' (host NVTX server)'
             elif r['window_kind'] == 'nsys':
                 trace = 'graph' if 'graphtrace' in p.name else 'node'
                 kind = f'nsys collecting ({trace}-level graph trace)'
+                if 'hosttrace' in p.name:
+                    kind += ' + host NVTX and py-spy'
             elif r['window_kind'] == 'none':
                 kind = 'no profiler'
             elif r['window_kind'] == 'sglang':

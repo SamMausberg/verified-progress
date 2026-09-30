@@ -41,8 +41,9 @@ windows=("$VP_DATA"/plain_nsys/windows.jsonl "$VP_DATA"/mtp_nsys/windows.jsonl)
 run bytes_model.py --out "$EV/bytes_per_step.json" --attribution "$EV/attribution" \
   --windows "${windows[@]}" --csv "$EV/bytes_per_step_sweep.csv" > /dev/null
 plain=("$VP_DATA"/plain_nsys/plain_bs*.nsys-rep)
+mtp=("$VP_DATA"/mtp_nsys/mtp_bs*.nsys-rep)
 if [ "${#plain[@]}" -gt 0 ]; then
-  run check_labels.py "${plain[@]}" --out "$EV/label_structure_check.json"
+  run check_labels.py "${plain[@]}" "${mtp[@]}" --out "$EV/label_structure_check.json"
   run layer0_share.py "${plain[@]}" --out "$EV/p5_layer0_in_proj.json"
 fi
 for rep in "$VP_DATA"/plain_eager_nsys/*.nsys-rep; do

@@ -6,18 +6,33 @@ Only the "no profiler" rows (repeated windows on a server without nsys) are thro
 
 | Arm | B | Condition | windows | output tok/s (mean, sd) | tok/s/user | ms per step or cycle | accept len |
 |---|---|---|---|---|---|---|---|
-| mtp | 1 | nsys attached, not collecting | 2 | 372 (0) | 371.6 | 6.93 | 2.58 |
-| mtp | 1 | nsys collecting (node-level graph trace) | 2 | 332 (6) | 332.4 | 8.10 | 2.69 |
-| mtp | 8 | nsys attached, not collecting | 2 | 2384 (23) | 298.0 | 8.93 | 2.66 |
-| mtp | 8 | nsys collecting (node-level graph trace) | 2 | 2275 (30) | 284.3 | 9.66 | 2.75 |
-| mtp | 32 | nsys attached, not collecting | 2 | 6768 (24) | 211.5 | 13.13 | 2.78 |
-| mtp | 32 | nsys collecting (node-level graph trace) | 2 | 6518 (36) | 203.7 | 14.01 | 2.85 |
-| plain | 1 | nsys attached, not collecting | 2 | 288 (2) | 288.0 | 3.47 | - |
-| plain | 1 | nsys collecting (node-level graph trace) | 2 | 283 (1) | 283.2 | 3.53 | - |
+| mtp | 1 | no profiler | 3 | 384 (1) | 384.1 | 6.70 | 2.57 |
+| mtp | 1 | nsys attached, not collecting | 1 | 372 (0) | 371.9 | 6.87 | 2.56 |
+| mtp | 1 | nsys attached, not collecting (host NVTX server) | 1 | 371 (0) | 371.4 | 6.99 | 2.60 |
+| mtp | 1 | nsys collecting (node-level graph trace) | 1 | 337 (0) | 336.9 | 8.18 | 2.76 |
+| mtp | 1 | nsys collecting (node-level graph trace) + host NVTX and py-spy | 1 | 328 (0) | 327.9 | 8.03 | 2.63 |
+| mtp | 8 | no profiler | 3 | 2573 (3) | 321.7 | 8.27 | 2.66 |
+| mtp | 8 | nsys attached, not collecting | 1 | 2400 (0) | 300.0 | 8.88 | 2.66 |
+| mtp | 8 | nsys attached, not collecting (host NVTX server) | 1 | 2368 (0) | 296.0 | 8.97 | 2.65 |
+| mtp | 8 | nsys collecting (node-level graph trace) | 1 | 2296 (0) | 287.0 | 9.63 | 2.76 |
+| mtp | 8 | nsys collecting (node-level graph trace) + host NVTX and py-spy | 1 | 2254 (0) | 281.7 | 9.69 | 2.73 |
+| mtp | 32 | no profiler | 3 | 7087 (9) | 221.5 | 12.49 | 2.77 |
+| mtp | 32 | nsys attached, not collecting | 1 | 6785 (0) | 212.0 | 13.09 | 2.78 |
+| mtp | 32 | nsys attached, not collecting (host NVTX server) | 1 | 6750 (0) | 211.0 | 13.17 | 2.78 |
+| mtp | 32 | nsys collecting (node-level graph trace) | 1 | 6544 (0) | 204.5 | 13.78 | 2.82 |
+| mtp | 32 | nsys collecting (node-level graph trace) + host NVTX and py-spy | 1 | 6493 (0) | 202.9 | 14.24 | 2.89 |
+| plain | 1 | no profiler | 3 | 289 (1) | 288.8 | 3.46 | - |
+| plain | 1 | nsys attached, not collecting | 1 | 286 (0) | 286.4 | 3.49 | - |
+| plain | 1 | nsys attached, not collecting (host NVTX server) | 1 | 290 (0) | 289.6 | 3.45 | - |
+| plain | 1 | nsys collecting (node-level graph trace) | 1 | 282 (0) | 282.5 | 3.54 | - |
+| plain | 1 | nsys collecting (node-level graph trace) + host NVTX and py-spy | 1 | 284 (0) | 283.9 | 3.52 | - |
+| plain | 8 | no profiler | 3 | 2048 (6) | 256.0 | 3.91 | - |
 | plain | 8 | nsys attached, not collecting | 1 | 2029 (0) | 253.6 | 3.94 | - |
 | plain | 8 | nsys collecting (node-level graph trace) | 1 | 2011 (0) | 251.4 | 3.98 | - |
+| plain | 32 | no profiler | 3 | 6298 (5) | 196.8 | 5.08 | - |
 | plain | 32 | nsys attached, not collecting | 1 | 6227 (0) | 194.6 | 5.14 | - |
 | plain | 32 | nsys collecting (node-level graph trace) | 1 | 6240 (0) | 195.0 | 5.13 | - |
+| plain | 128 | no profiler | 3 | 14388 (15) | 112.4 | 8.90 | - |
 | plain | 128 | nsys attached, not collecting | 1 | 14216 (0) | 111.1 | 9.00 | - |
 | plain | 128 | nsys collecting (node-level graph trace) | 1 | 14404 (0) | 112.5 | 8.89 | - |
 
