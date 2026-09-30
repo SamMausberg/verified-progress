@@ -20,7 +20,7 @@ limit="${LIMIT:-0}"
 max_new="${MAX_NEW_TOKENS:-384}"
 export SGLANG_WORKTREE="${SGLANG_WORKTREE:-$HOME/sglang-wt/geometry}"
 # shellcheck source=/dev/null
-source "$HOME/verified-progress/scripts/sglang_env.sh"
+source "$repo/scripts/sglang_env.sh"
 
 qwen4b=(Qwen/Qwen3.5-4B 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a)
 qwen27b=(Qwen/Qwen3.8-27B 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0)
@@ -82,23 +82,19 @@ rm -f "$out"/heads/*.pkl
   echo "args=${common[*]} ${args[*]}"
 } >"$out/run_info.txt"
 
-# --mem-fraction-static is a fraction of the memory free at startup, so on a shared
-# GPU wait (up to 60 min) until enough is free for the fraction to cover the weights,
-# the GDN state slots and a small KV cache.
-need_mib="${NEED_FREE_MIB:-0}"
-for _ in $(seq 1 360); do
-  free_mib=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits | head -1)
-  [ "$free_mib" -ge "$need_mib" ] && break
-  sleep 10
-done
-
-# Launch and wait until healthy under the start-up lock, so that concurrent shared jobs
-# do not see each other's allocations in SGLang's free-memory probe. The server keeps
-# running after the lock is released; its PID goes to a file for the cleanup trap.
+# --mem-fraction-static is a fraction of the memory free at startup, so the server is
+# launched only when enough is free for that fraction to cover the weights, the GDN state
+# slots and a small KV cache. The check, the launch and the wait until healthy run under
+# the start-up lock (scripts/gpu_startup_lock.sh), so concurrent shared jobs neither race
+# in SGLang's free-memory probe nor change free memory between the check and the launch.
+# The server runs in its own process group (setsid), which the cleanup trap signals.
 launch_and_wait() {
-  local pidfile="$1" port="$2" log="$3"
-  shift 3
-  SGLANG_HEAD_CAPTURE_DIR="${CAPTURE_DIR:?}" python -m sglang.launch_server "$@" >"$log" 2>&1 &
+  local pidfile="$1" port="$2" log="$3" need="$4" free
+  shift 4
+  free=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits | head -1)
+  if [ "$free" -lt "$need" ]; then return 2; fi
+  SGLANG_HEAD_CAPTURE_DIR="${CAPTURE_DIR:?}" setsid python -m sglang.launch_server "$@" \
+    >"$log" 2>&1 &
   echo $! >"$pidfile"
   for _ in $(seq 1 180); do
     if curl -sf "http://127.0.0.1:$port/health" >/dev/null; then return 0; fi
@@ -108,24 +104,41 @@ launch_and_wait() {
   return 1
 }
 export -f launch_and_wait
+
 server=""
 stop_server() {
   [ -n "$server" ] || return 0
-  kill "$server" 2>/dev/null || true
-  # The server is not our child (it outlives the start-up lock), so poll for its exit.
+  kill -TERM -- "-$server" 2>/dev/null || true
   for _ in $(seq 1 120); do
-    kill -0 "$server" 2>/dev/null || return 0
+    pgrep -g "$server" >/dev/null || return 0
     sleep 1
   done
+  echo "server group $server survived SIGTERM for 120 s; sending SIGKILL" >&2
+  kill -KILL -- "-$server" 2>/dev/null || true
+  for _ in $(seq 1 30); do
+    pgrep -g "$server" >/dev/null || return 0
+    sleep 1
+  done
+  echo "server group $server is still alive after SIGKILL" >&2
+  return 1
 }
-trap stop_server EXIT
-CAPTURE_DIR="$out/heads" "$HOME/verified-progress/scripts/gpu_startup_lock.sh" \
-  bash -c 'launch_and_wait "$@"' _ "$out/server.pid" "$port" "$out/server.log" \
-  --model-path "${model[0]}" --revision "${model[1]}" "${common[@]}" "${args[@]}" || {
+trap 'stop_server || exit 1' EXIT
+
+need_mib="${NEED_FREE_MIB:-0}"
+rc=2
+for _ in $(seq 1 360); do
+  rc=0
+  CAPTURE_DIR="$out/heads" "$repo/scripts/gpu_startup_lock.sh" \
+    bash -c 'launch_and_wait "$@"' _ "$out/server.pid" "$port" "$out/server.log" "$need_mib" \
+    --model-path "${model[0]}" --revision "${model[1]}" "${common[@]}" "${args[@]}" || rc=$?
+  [ "$rc" -ne 2 ] && break
+  sleep 10  # not enough free memory yet; wait outside the start-up lock
+done
+if [ "$rc" -ne 0 ]; then
   server=$(cat "$out/server.pid" 2>/dev/null || true)
-  echo "server did not become healthy; see $out/server.log" >&2
+  echo "server did not become healthy (code $rc); see $out/server.log" >&2
   exit 1
-}
+fi
 server=$(cat "$out/server.pid")
 
 python "$repo/experiments/head_geometry/capture_client.py" --port "$port" \
