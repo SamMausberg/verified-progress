@@ -1,190 +1,109 @@
-# Reproduction and GPU research runbook
+# Runbook
 
-This runbook separates commands executed in the authoring environment from the
-GPU work that remains. The stages are cumulative; they do not reduce the research
-programme to the take-home deadline. A failed hypothesis stays in the evidence
-ledger and changes the next experiment rather than becoming a hidden omission.
+How to reproduce the evidence behind the paper and how to run new GPU
+experiments on this machine. `SETUP.md` describes the machine itself. Every
+committed result lives under `evidence/<topic>/` with a README that gives the
+exact command that produced it; this file indexes those directories and states
+the rules that make a run admissible as evidence.
 
-## 1. Reproduce the supplied evidence
+## 1. Environments
 
-From the bundle root, with Python and NumPy installed:
+- Repository CPU tooling: `. .venv/bin/activate` (Python 3.13, NumPy, ruff,
+  mypy, pytest, pre-commit; `requirements-cpu.txt` and `requirements-dev.txt`).
+- GPU and SGLang work: `source scripts/sglang_env.sh` (Python 3.12 venv in
+  `~/sglang/.venv`, torch 2.13 cu130, CUDA 13 through user-level compatibility
+  libraries). Never install or upgrade the NVIDIA driver or CUDA through apt.
+- Engine changes go in a private SGLang worktree:
+  `scripts/sglang_worktree.sh <name>` creates `~/sglang-wt/<name>` from the pin
+  (`bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824`); run with
+  `SGLANG_WORKTREE=~/sglang-wt/<name> source scripts/sglang_env.sh`. Patches are
+  delivered as `git format-patch` files under `engine/sglang/patches/`.
+- Models are pinned by revision (`--revision`); see `SETUP.md` for the list.
 
-```sh
-python scripts/verify_artifact.py
-```
-
-This runs six CPU jobs and records each result. The benchmark-client tests use a
-local mock endpoint. The synthetic experiment reports evaluated-row counts, not
-timing. The Lean attempt is recorded independently. In the authoring environment
-all CPU jobs passed and Lean was unavailable.
-
-Build the standalone paper with:
-
-```sh
-cd paper
-latexmk -pdf -interaction=nonstopmode -halt-on-error paper.tex
-```
-
-`evidence/claims.json` identifies the status of the mathematical results,
-references, formalization and proposed performance claims. The source hashes
-identify the supplied version. After editing, preserve both the original
-hashes/evidence and the new run rather than attributing one version's tests to
-another version's code.
-
-## 2. Freeze the deployment before a comparison
-
-Copy `configs/experiment_contract.example.json` to a new run directory and fill
-all deployment fields. Null fields are intentionally unresolved; they are not
-allowed to become implicit defaults in a confirmatory benchmark.
-
-Record the actual GPU identity, clocks, memory and compute capability, and save
-package versions. The following are capture commands for the future GPU
-machine, not commands executed here:
+## 2. CPU evidence and the paper
 
 ```sh
-nvidia-smi -q > gpu.txt
-python -m pip freeze > python-packages.txt
-python -c "import torch; print(torch.__version__); print(torch.version.cuda); print(torch.cuda.get_device_name()); print(torch.cuda.get_device_capability())" > torch-device.txt
-git -C /path/to/sglang rev-parse HEAD > engine-commit.txt
-python -m sglang.launch_server --help > server-help.txt
+. .venv/bin/activate
+python tests/test_precision.py              # certified-head reference, writes evidence/precision/
+python -m pytest tests/                      # all CPU tests
+bash scripts/check_lean.sh                   # Lean 4.19.0 from ~/.elan
+cd paper && latexmk -pdf -interaction=nonstopmode -halt-on-error paper.tex
 ```
 
-Use a private worktree. The source audit is anchored to SGLang commit
-`bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824`, but the environment must establish that
-its actual target/draft pair and backends work there. Do not force a stale commit
-merely to match a paper table when a compatibility fix is needed: record the new
-commit and re-audit the changed contract.
+`python scripts/verify_artifact.py` reruns the earlier revision's CPU jobs and
+overwrites their files in `evidence/`; use a copy unless regenerating them is
+the point.
 
-Qwen3.5-4B remains the primary small target. Ordinary decoding and native MTP are
-required baselines. A DFlash2 experiment requires a genuinely compatible draft
-checkpoint; the public 27B pair is a separate transfer lane, not evidence that a
-4B selector checkpoint is compatible. Pin all checkpoint revisions and record
-reasoning/template settings, tokenizer, context cap, state dtype, cache policy,
-maximum server capacity and graph/overlap settings. Runtime logs must identify
-the backend actually selected.
+## 3. Using the GPU
 
-## 3. Establish the optimized baselines
-
-Run an ordinary autoregressive server and the optimized existing speculative
-configuration. Preserve CUDA graphs and overlap in both. Use a server launched
-at fixed maximum capacity while client concurrency is varied. A synchronization
-inserted to make a diagnostic trace easier to read is not part of the production
-baseline.
-
-Use a pinned AIPerf installation as the main comparison client where supported.
-The exact invocation belongs in the run artifact after checking that version's
-CLI and request contract. The included auxiliary client provides a smaller
-independently testable protocol path for an already-running compatible endpoint:
+The GH200 is shared, so every GPU command goes through the lock:
 
 ```sh
-python scripts/benchmark_sse.py \
-  --url http://127.0.0.1:30000/v1/chat/completions \
-  --model Qwen/Qwen3.5-4B \
-  --workload data/smoke_workload.jsonl \
-  --concurrency 1 2 \
-  --repeat 1 \
-  --out runs/endpoint-smoke
+scripts/gpu_lock.sh -x <command...>   # exclusive: anything whose timing is reported
+scripts/gpu_lock.sh -s <command...>   # shared: correctness only, no timing claims
+scripts/gpu_lock.sh --status          # queued and running jobs
 ```
 
-That command is an endpoint smoke test, **not a meaningful performance panel**.
-The three prompts are deliberately tiny. Use a real frozen workload with enough
-requests per concurrency, disjoint tuning/confirmation prompts, and separately
-labelled text, code, mathematics, multilingual, long-context and shared-prefix
-panels. Keep natural-stopping quality runs distinct from fixed-length
-throughput runs.
+Jobs run in arrival order. Start a server, run the client and stop the server
+inside one locked command, trap the exit so the server always dies, and check
+that `nvidia-smi` is clean afterwards. Shared holders keep servers at
+`--mem-fraction-static 0.25` or less and other jobs under 20 GB. CPU-heavy
+analysis also goes under `-s`: the scheduler and the benchmark client are
+single-threaded Python loops, and a busy CPU distorts timed runs.
 
-The auxiliary client requires streamed `usage.completion_tokens`, at least one
-nonempty text/reasoning event, and terminal `[DONE]`. It fails on unsupported or
-truncated responses instead of counting chunks as tokens. It records raw usage,
-chunk times, errors and prompt hashes. Tool-only/multimodal responses are outside
-its admitted contract. Its per-user rate includes TTFT; it does not pretend to
-measure per-token TPOT from multi-token chunks. Keep those metric definitions
-unchanged across arms. The workload and server may contain private material;
-do not upload them automatically.
+## 4. Baseline servers
 
-## 4. Collect the decisive real-head replay data
+Plain decoding, as used for the baselines (CUDA graphs and the overlap
+scheduler are on by default; FA3 is unavailable on aarch64):
 
-Capture correctly aligned draft and target hidden vectors, candidate IDs,
-actual proposal rows, target reference decisions, output-head identity and the
-logical prefix/position. Confirm alignment using complete projections before
-using any certificate. A common head shape does not establish a common head or
-token mapping.
+```sh
+python -m sglang.launch_server \
+  --model-path Qwen/Qwen3.5-4B --revision 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a \
+  --attention-backend flashinfer --mm-attention-backend triton_attn \
+  --host 127.0.0.1 --port <port>
+```
 
-Split by prompt before fitting centres, low-rank geometry or a confidence model.
-Collect ordinary target-greedy anchors independently of the tested selector for
-replay studies; later perform on-policy serving tests. Record masks and penalties
-or restrict the first experiment to the explicitly supported no-transform
-contract. Avoid saving a full logits tensor for every long run when exact
-selected records and sampled debug projections suffice.
+Native MTP speculation adds `--speculative-algorithm NEXTN
+--speculative-num-steps 3 --speculative-eagle-topk 1
+--speculative-num-draft-tokens 4 --max-running-requests <N>` (the engine
+reports it as EAGLE). With speculation SGLang silently caps the running
+requests at 48 unless `--max-running-requests` is passed, and the GDN state
+cache caps capacity further (133 requests for plain decoding at default memory
+settings). The tuned speculative configurations, the DFlash arms and the
+capacity flags are defined by the serving harness and its arm file.
 
-Compare scalar, coordinate, grouped and low-rank residual bounds. Measure both
-max-score exclusion and mass-interval width near the actual acceptance threshold.
-Inspect worst cases and rejection positions, not only averages. Measure the
-union of retained vocabulary tiles across real microbatches: individual row
-sparsity need not save shared weight traffic.
+## 5. Experiments and where their evidence lives
 
-## 5. Implement and price the complete head path
+| Experiment | Evidence | Status |
+|---|---|---|
+| Certified-head exact reference, head constants, Lean | `evidence/precision/` | on `main` |
+| Earlier revision's CPU references and synthetic drift | `evidence/*.json`, `data/synthetic_drift.csv` | on `main` |
+| State-structure witnesses (P4, P5) | `evidence/state_structure/` | pull request #20 |
+| Attribution, head microbenchmark, bytes per step | `evidence/profiles/` | pull request #13 |
+| Head-input capture, transport and self-evidence replay | `evidence/head_geometry/` | pull request #16 |
+| Serving harness, frozen workload, quality check | `bench/`, `evidence/bench/` | pull request #17 |
+| Certified-head kernels and head-path runtime | `evidence/certified_head/` | in progress |
+| Divergence mechanisms and state safety | `evidence/state/` | in progress |
+| DFlash drafter on GH200 | `evidence/drafter/` | in progress |
+| Stack levers, ceilings, frontiers | `evidence/moonshot/` | in progress |
+| Long-window repair (P2, P3) | to be assigned | in progress |
 
-Begin with the strongest supported dense head-plus-selection/sampling path.
-Then add the evidence epilogue **without skipping target work**. This isolates
-its cost and prevents attributing a slower draft pass to an unrelated effect.
-Next add seeds, bounds and progressive target refinement; retain dense fallback.
-Compare staged compact work, bounded graph rounds and persistent queues rather
-than assuming the most fused design wins.
+When a pull request merges, the paper replaces the matching pending items
+with its numbers, and this table records the directory as on `main`.
 
-For every head ablation, count evidence production, metadata traffic, seed
-projections, bound kernels, refinement, repeated weight reads and completion.
-On sampled paths, a cheap rejection decision is not the completion of a cycle.
-Benchmark dense residual completion first. Evaluate the sparse-support residual
-race separately, with the actual proposal support, independent RNG fields and a
-dense race comparator using the same field. Bonus sampling is another charged
-completion path, including the cost of its anchor summary.
+## 6. What makes a run admissible
 
-Before a numerical exactness claim, enclose the chosen reference's cast,
-reduction, exponential and normalization behaviour. A real-arithmetic bound
-rounded downward is not a certificate. Near ties, interval ambiguity and stale
-metadata must select the tested fallback. Sanitizer and race checks belong to
-this stage, not to a later quality evaluation.
-
-## 6. Develop the connected systems branches
-
-The selector portfolio contains parallel lattice-plus-walk, realized-row
-execution, row-map composition and calibrated prefix-value search. Compare
-structural variants at identical candidates, score evaluations and RNG; compare
-learned objectives on held-out acceptance and on-policy time. Do not multiply
-savings for paths that require incompatible score work.
-
-For GDN and attention state, explicitly map emitted-token position to consumed
-model-state position. Test every rejection index, full acceptance, EOS,
-convolution history, flush boundaries, cache restore, cancellation, slot reuse
-and in-flight graph ownership. A logical epoch check does not prevent a stale
-kernel from corrupting reused physical memory before publication.
-
-The compiler admits consumer contracts, numerical evidence, layout and effect
-constraints. The tuner proposes only legal implementations, restores mutated
-state between trials, and records compilation/resources as well as timing. The
-scheduler prices context, recurrent flushes, graph tiers and tile-mask unions;
-it must not quietly use a total-token cost model where equal totals have
-different real costs. Sampled admission must obey the stopping-law conditions
-in the adaptive-verification discussion in Section 5 of the paper; preserving a verifier function alone is insufficient.
-
-## 7. Confirm and report
-
-Run baseline, each surviving component and their combinations. The manuscript
-specifies 12 ablations plus independent quality and fault panels. Freeze the
-selected implementation before confirmatory testing. Use paired runs with
-alternating order on an otherwise idle device, and retain complete raw requests.
-Confidence calculations should respect run/prompt clusters rather than treating
-every token as an independent sample.
-
-Produce the complete latency-throughput frontier, including regression regions,
-TTFT, memory, failure rate, acceptance/progress histograms and supported tail
-estimates. Add fixed-arrival load near the knee to expose queueing. A snapshot
-ratio optimum is not an online fairness or latency guarantee.
-
-The strongest final explanation has a trace and a mechanism: which target work
-became unnecessary, what established that fact, what the GPU actually avoided,
-and where the advantage disappeared. Real-head geometry, floating certificates
-or residual completion may defeat the initial design. A documented failure of
-one bound or execution path is useful research, but no synthetic work-count
-result can substitute for the optimized serving comparison.
+- Record the repository commit, the SGLang commit, the model revision, every
+  server flag and the hardware in the evidence directory, with the command.
+- Compare against the strongest optimized baseline with CUDA graphs and
+  overlap on. Launch each server arm once at its maximum capacity and sweep
+  client concurrency against it.
+- Repeat timed runs and report their variation; a microbenchmark is not an
+  end-to-end result and a candidate count is not a runtime.
+- For exactness claims, name the reference. The certified head is compared
+  with the stock head kernel at the same batch shape; stock configurations at
+  different shapes already disagree, so any other comparison measures the stock
+  noise floor.
+- Keep failed and negative runs and label them. Large raw outputs (traces,
+  hidden-state dumps) stay outside git under `~/vp-data/`; commit summaries and
+  the commands that regenerate them.

@@ -1,0 +1,37 @@
+% Section 4: where the time goes (profile workstream draft to be integrated; PR #13).
+% Claims and status:
+%  - Byte counts and the derived bytes-per-step model: derived (Table tab:bytes).
+%  - Measured attribution, head microbenchmark, MTP cycle, host gaps: pending (profile, PR #13).
+\section{Where the time goes}\label{sec:time}
+A component that occupies a fraction $f$ of a step can speed the step up by at most $1/(1-f)$, so the head's share of the time bounds what any head certificate can deliver, and the other shares say where the rest of the stack leaves room. This section measures those shares for SGLang serving Qwen3.5-4B in its production configuration: CUDA graphs for prefill and decode, the overlap scheduler, FlashInfer attention and greedy decoding, at batch sizes from 1 to 128 for plain decoding and from 1 to 32 for MTP speculation.
+
+Decode on this GPU is dominated by streaming bytes, so the byte counts of Table~\ref{tab:bytes} give a first picture before any trace. Figure~\ref{fig:bytes-derived} draws the derived bytes of one plain decode step against the batch size at a fixed context. The weights are streamed once whatever the batch; the recurrent state and the attention cache are per request. With FP32 GDN state that the decode kernel reads and writes once per step, the per-request term equals the weights near a batch of 70 at a 512-token context and dominates beyond it. The head's share of the bytes falls accordingly, from 15\% at batch one.
+
+\begin{figure}[tbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[width=.6\linewidth,height=5.2cm,xmode=log,log basis x=2,xmin=1,xmax=256,ymin=0,ymax=40,
+  xtick={1,2,4,8,16,32,64,128,256},xticklabels={1,2,4,8,16,32,64,128,256},
+  xlabel={Requests in the batch $B$},ylabel={GB per decode step},
+  stack plots=y,area style,grid=major,grid style={draw=ink!10},
+  legend style={at={(1.03,.5)},anchor=west,draw=none,fill=white,font=\small},legend cell align=left]
+\addplot[fill=ink!55,draw=ink,domain=1:256,samples=60] {7.140} \closedcycle;\addlegendentry{Decoder weights (7.14 GB)}
+\addplot[fill=teal!60,draw=teal,domain=1:256,samples=60] {1.271} \closedcycle;\addlegendentry{Head (1.27 GB)}
+\addplot[fill=ochre!55,draw=ochre,domain=1:256,samples=60] {0.1007*x} \closedcycle;\addlegendentry{GDN state, FP32 read + write}
+\addplot[fill=muted!40,draw=muted,domain=1:256,samples=60] {0.016777*x} \closedcycle;\addlegendentry{Attention KV at 512 tokens}
+\end{axis}
+\end{tikzpicture}
+\caption{Derived bytes per plain decode step against batch size, from the checkpoint's tensor sizes and configuration (Table~\ref{tab:bytes}): weights and head once per step, 100.7~MB of GDN state and 16.8~MB of attention KV (512 context tokens) per request. A calculation, not a measurement; logits and convolution state are omitted. The measured attribution is \pending{profile, PR~\#13}.}
+\label{fig:bytes-derived}
+\end{figure}
+
+\subsection{Attribution method}\label{sec:time-method}
+\pending{profile: workload and profiled windows (fixed concurrency, prefill excluded); nsys session tracing with CUDA-graph node records; step reconstruction from graph-replay correlation IDs; kernel categories and GEMM labelling; idle time split inside and outside replays; profiler perturbation against uncollected twin windows; the measured HBM read peak used as the bandwidth reference; draft in \nolinkurl{~/vp-coord/drafts/profile.tex}; evidence under \nolinkurl{evidence/profiles/}}
+
+\subsection{The head in plain decode and in speculation}\label{sec:time-head}
+\pending{profile: the head chain (GEMM, FP32 copy, argmax) as a share of the plain decode step at $B=1,8,32,128$; the head microbenchmark of the exact calls SGLang makes at $M=1$ to 256; the MTP cycle's target and draft head chains at $B=1,8,32$; evidence \nolinkurl{evidence/profiles/attribution/}, \nolinkurl{evidence/profiles/head_microbench.json}}
+
+\pendingfigure{Share of a plain decode step and of an MTP cycle by component (target head chain, draft heads, MTP layer, weight GEMMs, GDN state kernels, attention, small kernels, idle) at each batch size.}{evidence/profiles/breakdown.csv}
+
+\subsection{Recurrent state and host gaps}\label{sec:time-state}
+\pending{profile: measured GDN decode-kernel time per request and its implied bandwidth; bytes per step by component with the measured-kernel check; the per-position FP32 state writes of MTP verification; GPU idle time and the host call sites on the critical path of a speculative cycle; evidence \nolinkurl{evidence/profiles/bytes_per_step.json}, \nolinkurl{evidence/profiles/bytes_per_step_sweep.csv}}

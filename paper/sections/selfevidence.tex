@@ -1,0 +1,139 @@
+% Section 6: self-evidence (paper: theory from notes/theory_latex.tex; geometry and kernel
+% measurements pending; certified-tail hypothesis from PROPOSALS.md P1).
+% Claims and status:
+%  - Lemma tree, Theorems envelope/integer, Lemmas norms/outward, Theorem ladder,
+%    Proposition candidates, union model: proved (finding). Hopper accumulation constants
+%    rest on the published model of Khattak and Mikaitis (assumption, not a vendor contract).
+%  - Candidate sets on real states, kernel runtime: pending (geometry, kernel).
+%  - Certified tail: hypothesis with a kill test (pending).
+\section{Self-evidence: a certified low-precision head}\label{sec:selfevidence}
+A cheap approximation of the head can supply the evidence itself. The approximate pass bounds every row; rows whose interval can still matter are re-scored more precisely; exact arithmetic or the stock kernel completes whatever remains. Certified greedy screening of this form exists in public code (Section~\ref{sec:prior-certified}). What this section adds is an envelope that covers the floating-point arithmetic of the pass as the GPU performs it, including Hopper tensor-core accumulation under a published model, a refinement procedure that serves greedy selection and sampling alike, and bounds on how much re-scoring each needs.
+
+\subsection{Accumulation error}\label{sec:accumulation}
+\begin{lemma}[Accumulation trees]\label{lem:tree}
+Let $s=\sum_\ell p_\ell$ be evaluated by a rooted tree whose leaves carry the exact values $p_\ell$ and whose internal nodes $v$ return $\hat s_v$ with $|\hat s_v-\sum_c\hat s_c|\le u_v\sum_c|\hat s_c|+\eta_v$ over the children $c$ of $v$. Let $d$ be the largest number of internal nodes on a leaf-to-root path, $N$ the number of internal nodes, $u\ge\max_vu_v$, $\eta\ge\max_v\eta_v$ and $du<1$. Then
+\begin{equation}
+|\hat s_{\rm root}-s|\le\gamma_d\sum_\ell|p_\ell|+N\eta(1+\gamma_d),\qquad\gamma_d=(1+u)^d-1\le\frac{du}{1-du}.\label{eq:tree}
+\end{equation}
+A node that multiplies its only child by a constant $\sigma$ and rounds fits the model after multiplying the leaves below it by $\sigma$.
+\end{lemma}
+\begin{proof}
+For a node $v$ and a leaf $\ell$ below it let $P_{v\ell}=\prod(1+u_x)$ over the internal nodes $x$ on the path from $\ell$ up to $v$, and for an internal node $w$ below $v$ let $P'_{vw}$ be the same product over the nodes strictly above $w$ up to $v$ ($P'_{vv}=1$). By induction on height,
+\[|\hat s_v|\le\sum_\ell|p_\ell|P_{v\ell}+\eta\sum_wP'_{vw},\qquad|\hat s_v-s_v|\le\sum_\ell|p_\ell|(P_{v\ell}-1)+\eta\sum_wP'_{vw}.\]
+Leaves satisfy both with equality. For an internal node, $|\hat s_v|\le(1+u_v)\sum_c|\hat s_c|+\eta$ and $|\hat s_v-s_v|\le\sum_c|\hat s_c-s_c|+u_v\sum_c|\hat s_c|+\eta$; substituting the hypotheses for the children multiplies every $P$ and $P'$ by $(1+u_v)$ and adds $P'_{vv}=1$. Finally $P_{v\ell}\le(1+u)^d$, $P'_{vw}\le(1+u)^{d-1}$, and there are $N$ internal nodes.
+\end{proof}
+The IEEE model gives $u_v=u$ for a rounded addition, since $|a+b|\le|a|+|b|$~\cite{higham2002}. Sequential accumulation from zero has $d=n$, pairwise summation $\lceil\log_2n\rceil$, blocks of $B$ summed as a tree and then accumulated $\lceil n/B\rceil+\lceil\log_2B\rceil$, and split-$K$ adds the number of partials. A multi-term adder that aligns $k+1$ addends to the largest, truncates each to $F$ fractional bits below its leading bit, adds exactly and rounds once has $u_v=(k+1)2^{-F}+2^{1-p}$ with truncation, and depth $\lceil n/k\rceil$. Tensor cores behave this way rather than as IEEE adders~\cite{fasi2021}. Khattak and Mikaitis model Hopper's BF16 \code{wgmma} with FP32 output as $k=16$, $F=25$ with truncation~\cite{khattak2026}, so $u_v=17\cdot2^{-25}+2^{-23}$ and $\gamma_{D/16}\approx1.0\times10^{-4}$ at $D=2560$; the conservative default $D\cdot2^{-22}\cdot1.001=6.1\times10^{-4}$ covers it about sixfold. This is a published model, not a documented contract, so kernels built on it are validated against exact arithmetic on adversarial inputs. The same model gives FP8 \code{wgmma} only 13 fractional bits in 32-term blocks, consistent with the accumulation limits reported for FP8 training~\cite{deepseekv3}; an FP8 tensor-core pass needs periodic promotion to FP32 and its own analysis. On CUDA cores with IEEE round-to-nearest, $\gamma$ at $D=2560$ is about $1.7\times10^{-6}$ for a blocked reduction and plays no role.
+
+\subsection{The envelope of the approximate pass}\label{sec:envelope}
+Row $i$ is quantized with group scales $s_{ig}>0$, integer codes $q_{ij}$ and a set $O$ of columns kept exact. The dequantized row is $\bar w_{ij}=s_{ig(j)}q_{ij}$ for $j\notin O$ and $\bar w_{ij}=w_{ij}$ for $j\in O$; the error $e_i=w_i-\bar w_i$ is computed exactly offline. The pass computes $\hat t_g=\sum_{j\in g}q_{ij}h_j$, $\hat v_g=\fl(s_{ig}\hat t_g)$, sums the groups, adds $\sum_{j\in O}w_{ij}h_j$ and returns $\tilde z_i$.
+
+\begin{theorem}[Envelope]\label{thm:envelope}
+Suppose every product $q_{ij}h_j$ and $w_{ij}h_j$ is exact in the accumulator format (true for int8 or BF16 weights times BF16 activations in FP32; underflow is covered by $\eta$) and every node obeys Lemma~\ref{lem:tree} with $(u,\eta)$ and depth $d$. Then $|z_i-\tilde z_i|\le\beta_i$ with
+\begin{equation}
+\beta_i=Q_i+\gamma_d\norm{\bar w_i}_2\norm h_2+N\eta(1+\gamma_d)\max\bigl(1,\max_gs_{ig}\bigr),\label{eq:envelope}
+\end{equation}
+where $Q_i$ may be any of $\norm{e_i}_2\norm h_2$, $\sum_b\norm{e_{i,b}}_2\norm{h_b}_2$, $\norm{e_i}_\infty\norm h_1$ or $\sum_b\norm{e_{i,b}}_\infty\norm{h_b}_1$ for any partition of the columns into blocks $b$ (in particular $O$ and its complement, so that only the norm of $h$ outside $O$ enters). Round-to-nearest codes without clipping have $\norm{e_{i,g}}_\infty\le s_{ig}/2$.
+\end{theorem}
+\begin{proof}
+$z_i-\tilde z_i=\langle e_i,h\rangle+(\langle\bar w_i,h\rangle-\tilde z_i)$. The first term is bounded blockwise by Cauchy--Schwarz or Hölder. The second is the rounding error of evaluating $\langle\bar w_i,h\rangle$ by a tree whose leaves are $s_{ig}q_{ij}h_j$ and $w_{ij}h_j$; apply Lemma~\ref{lem:tree} and $\sum_j|\bar w_{ij}h_j|\le\norm{\bar w_i}_2\norm h_2$.
+\end{proof}
+The componentwise midpoint-radius form $|z-\tilde z|\le|e|^\top|h|$ is tighter than any of these relaxations and costs the same to evaluate when $|e|$ is stored per group~\cite{rump2010}; the norm forms are used here because they need one constant per row or block.
+
+\begin{theorem}[Integer pass]\label{thm:integer}
+Let $h=s_hq_h+e_h$ with $s_h$ a power of two and integer codes, so $s_hq_h$ and $e_h$ are exact. Let $I_i=\sum_jq_{ij}q_{h,j}$ be accumulated exactly in 32-bit integers ($D\,q^{\rm w}_{\max}q^{\rm h}_{\max}<2^{31}$; $2560\cdot127^2$ qualifies) and $\tilde z_i=\fl(\fl(s_i\fl(I_i))\,s_h)$ without overflow or underflow. Then
+\[|z_i-\tilde z_i|\le Q_i+\norm{s_iq_i}_2\norm{e_h}_2+\gamma_2\norm{s_iq_i}_2\norm{s_hq_h}_2.\]
+\end{theorem}
+\begin{proof}
+$z_i=s_is_hI_i+s_i\langle q_i,e_h\rangle+\langle e_i,h\rangle$. The two roundings give $|\tilde z_i-s_is_hI_i|\le\gamma_2s_is_h|I_i|$, and the last multiply by a power of two is exact. Apply Cauchy--Schwarz to $I_i$ and to $\langle q_i,e_h\rangle$.
+\end{proof}
+This path needs no model of floating-point accumulation at all, because int8 products accumulated in int32 are exact for this shape~\cite{abdelfattah2025}; it pays instead for quantizing the activation.
+
+\begin{lemma}[Computed norms]\label{lem:norms}
+In FP32 with round to nearest, let $\hat\sigma$ be any computed sum of $\fl(h_j^2)$ with depth $d\le2^{14}$, $\hat r\ge(1-2^{-16})\sqrt{\hat\sigma}$ any square root, and $N_2=\fl(\fl(\hat r(1+2^{-10}))+2^{-50})$. If $D\le2^{14}$ then $N_2\ge\norm h_2$. The same holds for $N_1=\fl(\fl(\hat\sigma_1(1+2^{-10}))+2^{-50})\ge\norm h_1$ with $\hat\sigma_1$ a computed sum of $|h_j|$.
+\end{lemma}
+\begin{proof}
+Nonnegative additions return at least $(1-u)$ times their exact sum, less $\mu$ under flush-to-zero, so $\norm h_2^2\le(1-u)^{-d}\hat\sigma+3D\mu$ and $\norm h_2\le(1-u)^{-d/2}(1-2^{-16})^{-1}\hat r+2^{-54}$ for $D\le2^{14}$. The computed $N_2\ge(1-u)^2(1+2^{-10})\hat r+2^{-51}$, and $(1-u)^2(1+2^{-10})\ge(1-u)^{-d/2}(1-2^{-16})^{-1}$ because $du/2\le2^{-11}$.
+\end{proof}
+
+\begin{lemma}[Outward rounding of the computed interval]\label{lem:outward}
+In a format with $p\ge12$ and round to nearest, let $\tilde z$ be representable, let $\beta^\ast$ be a real bound with $|z-\tilde z|\le\beta^\ast$, and let $b$ be computed from representable upper bounds by at most $k\le59$ rounded operations ($+$, $\times$, $\sqrt{\ }$) on nonnegative values along any path of the expression, so that $b\ge(1-u)^k\beta^\ast-k\mu$. Set
+\[\hat b=\fl\bigl(\fl(\fl(b(1+2^{6-p}))+\fl(2^{4-p}|\tilde z|))+2^{e_{\min}+26}\bigr),\quad lo=\fl(\tilde z-\hat b),\quad hi=\fl(\tilde z+\hat b).\]
+Then $lo\le z\le hi$, so every comparison between computed endpoints is sound.
+\end{lemma}
+\begin{proof}
+Each rounding of a nonnegative value loses at most a factor $(1-u)$ and $\mu$, so $\hat b(1-u)\ge(1-u)^4(1+64u)b+16u(1-u)^3|\tilde z|+(1-u)^22^{e_{\min}+26}-4\mu$. Also $lo\le\tilde z-\hat b(1-u)+u|\tilde z|+\mu$. It suffices that $\hat b(1-u)\ge\beta^\ast+u|\tilde z|+\mu$: the $|\tilde z|$ terms satisfy $16u(1-u)^3\ge u$, the $b$ terms satisfy $(1-u)^{4+k}(1+64u)\ge(1-63u)(1+64u)\ge1$ for $u\le2^{-12}$, and $2^{26}\mu$ absorbs the absolute terms. The upper endpoint is symmetric.
+\end{proof}
+For FP32 the constants are $1+2^{-18}$, $2^{-20}|\tilde z|$ and $2^{-100}$. Offline constants ($\norm{e_i}_2$, $\norm{\bar w_i}_2$, $\norm{w_i}_2$) are computed exactly and stored rounded up. The exact CPU reference emulates every BF16, FP32 and FP64 rounding on rationals and checks each bound against real arithmetic, including witnesses that the accumulation term, the outward rounding and the norm inflation are each necessary (\code{tests/test\_precision.py}, \nolinkurl{evidence/precision/}).
+
+\subsection{Certified argmax and its cost}\label{sec:ladder}
+\begin{theorem}[Refinement ladder]\label{thm:ladder}
+Let levels $\ell=0,\dots,L$ supply enclosures $lo^\ell_i\le z_i\le hi^\ell_i$, exact at level $L$, and let $f_i$ be nondecreasing maps. Starting from a row set $S$, at each level let $\tau=\max_{i\in S}f_i(lo^\ell_i)$ and keep $\{i\in S:f_i(hi^\ell_i)\ge\tau\}$; stop when one row remains, when every kept interval is a point, or at level $L$, and return the smallest kept index. The result is $\min\argmax_{i\in S}f_i(z_i)$. With $f_i=\mathrm{id}$ this is R-real, with $f_i=\rnb$ it is R-bf16, and with $f_i(x)=x/T+g_i$ it is S-race. The token does not depend on the precision or reduction order of any level.
+\end{theorem}
+\begin{proof}
+$[f_i(lo_i),f_i(hi_i)]$ encloses $f_i(z_i)$. A maximizer $m$ is never dropped: for the row $j$ that attains $\tau$, $f_m(hi_m)\ge f_m(z_m)\ge f_j(z_j)\ge f_j(lo_j)=\tau$. A dropped row is strictly below the row attaining $\tau$. If one row remains it is the maximizer. If all kept intervals are points, each kept value is at least $\tau$ and at most $\tau$, so all kept rows are maximizers, and every maximizer is kept. The exact level produces points. The returned index is a function of the maximizer set alone.
+\end{proof}
+The ladder decides R-real (or S-race); Theorem~\ref{thm:stock} then converts an R-real decision with enough margin into the stock kernel's decision, and a row without that margin runs the stock kernel (Figure~\ref{fig:contract}). The Lean formalization proves the certificate, its uniqueness across levels and both filter properties in scaled integers (\code{formal/CertifiedArgmax.lean}).
+
+\begin{proposition}[Candidate counts]\label{prop:candidates}
+Let the level-0 intervals have widths $\omega_i=hi_i-lo_i\le\omega$ (with outward rounding, $\omega_i\approx2\beta_i$) and let $C$ be the rows kept at level 0.
+\begin{enumerate}
+\item Greedy: $C\subseteq\{i:z_i\ge z_{\max}-\omega_i-\omega_a\}$ for any maximizer $a$, hence $|C|\le e^{2\omega/T'}/p^{(T')}_{\max}$ for every $T'>0$, where $p^{(T')}=\softmax(z/T')$.
+\item Race: if the $g_i$ are i.i.d.\ standard Gumbel and $p=\softmax(z/T)$, then with $t=2\omega/T$,
+\[\E|C|\le\sum_i\frac{p_ie^t}{1+p_i(e^t-1)}\le\min(V,e^t).\]
+\end{enumerate}
+\end{proposition}
+\begin{proof}
+(1) $hi_i\le z_i+\omega_i$ and $lo_a\ge z_a-\omega_a$, so a kept row satisfies $z_i+\omega_i\ge\tau\ge z_a-\omega_a$. Each such row has $p^{(T')}_i\ge p^{(T')}_{\max}e^{-2\omega/T'}$, and the probabilities sum to at most one. (2) In score space the widths are $\omega_i/T$, so $C\subseteq\{i:y_i\ge M-t\}$ with $y_i=z_i/T+g_i$ and $M=\max_jy_j$. Row $i$ belongs to that set if and only if $y_i+t\ge\max_{j\ne i}y_j$. The maximum of independent Gumbels with locations $z_j/T$ is Gumbel with location $\log\sum_{j\ne i}e^{z_j/T}$, and two independent Gumbels with locations $a,b$ satisfy $P(G_a\ge G_b)=e^a/(e^a+e^b)$. Hence the probability is $p_ie^t/(p_ie^t+1-p_i)$; sum over $i$.
+\end{proof}
+At $T=1$ and envelope half-width $\beta$ (so $t\approx4\beta$), the expected re-scoring set for exact sampling is at most 55 rows for $\beta=1$, 2,981 for $\beta=2$ and up to $1.6\times10^5$ for $\beta=3$ (Figure~\ref{fig:candidates}). Exact sampling through the cheap pass is therefore cheap only if the envelope is about two logits wide or less. Greedy selection has no distribution-free bound: a flat distribution (small $p_{\max}$) needs many rows. The envelope in logits is $\beta_i\approx\norm{e_i}_2\norm h_2$; with the int8 constants of Table~\ref{tab:headconstants} that is about $0.0063\norm h_2$, so the norm of the head input at the served positions decides whether $\beta$ is a fraction of a logit or several logits \pending{geometry: distribution of $\norm{h}_2$ at the head input and of $\beta$ per variant}.
+
+\begin{figure}[tbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[width=.78\linewidth,height=5.2cm,ymode=log,xmin=0,xmax=3.5,ymin=1,ymax=4e5,
+  xlabel={Envelope half-width $\beta$ (logits)},ylabel={Bound on $\E|C|$ (rows)},
+  grid=major,grid style={draw=ink!10},legend style={at={(.03,.97)},anchor=north west,draw=none,fill=white,font=\small}]
+\addplot[thick,teal,domain=0:3.5,samples=120]{min(248320,exp(4*x))};\addlegendentry{$T=1$}
+\addplot[thick,dashed,ochre,domain=0:3.5,samples=120]{min(248320,exp(4*x/0.7))};\addlegendentry{$T=0.7$}
+\addplot[thin,muted,domain=0:3.5,samples=2]{248320};\addlegendentry{whole vocabulary}
+\end{axis}
+\end{tikzpicture}
+\caption{The distribution-free bound $\min(V,e^{4\beta/T})$ on the expected number of rows an exact Gumbel race must re-score (Proposition~\ref{prop:candidates}, with $\omega\approx2\beta$). An analytic bound, not a measurement; measured candidate counts on real states are \pending{geometry}.}
+\label{fig:candidates}
+\end{figure}
+
+\subsection{Candidate sets on real hidden states}\label{sec:geometry-selfevidence}
+\pending{geometry: candidate-set sizes per head variant (int8 per row, int8 in 128- and 32-column groups, FP8 E4M3, int4) and envelope family on held-out plain-decode and MTP head inputs; distinct candidate rows in real co-scheduled batches; Gumbel-race candidates at $T=1$ and $T=0.7$; the share of positions whose re-scoring still overlaps under each accumulation model; outlier-exact columns, rotations and a centred head as ablations; evidence under \nolinkurl{evidence/head_geometry/}}
+
+\subsection{Sparse rows do not imply sparse weight traffic}\label{sec:union}
+For rows $i$ of a microbatch let $A_i$ be the set of retained vocabulary rows or tiles. A kernel that reuses weights across rows reads the union $\bigcup_iA_i$, not the average of the masks. If each row independently retained a tile with probability $f$, the batch would need that tile with probability
+\begin{equation}1-(1-f)^B.\label{eq:union}\end{equation}
+At $f=1/16$ and $B=32$ this is about $87.3\%$, so a per-row skip fraction of $93.75\%$ can coexist with nearly a full weight stream. Self-evidence is less exposed to this than transport, because its saving is in the bytes of the cheap pass, which every row shares, and its candidates are few rows rather than whole tiles; the union matters for the re-scoring gather. Figure~\ref{fig:union} is an analytic model, not a measurement of mask correlation.
+
+\begin{figure}[tbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[width=.78\linewidth,height=4.8cm,xlabel={Rows sharing a weight tile},ylabel={Probability the tile is needed},xmin=1,xmax=64,ymin=0,ymax=1,xtick={1,8,16,32,64},ytick={0,.25,.5,.75,1},grid=major,grid style={draw=ink!10},legend style={at={(.97,.05)},anchor=south east,draw=none,fill=white,font=\small}]
+\addplot[thick,teal,domain=1:64,samples=64]{1-(15/16)^x};\addlegendentry{$f=1/16$, independent masks}
+\addplot[dashed,ink,domain=1:64,samples=2]{1/16};\addlegendentry{Perfectly shared masks}
+\end{axis}
+\end{tikzpicture}
+\caption{A model of batch-union traffic, not a benchmark. Correlation among masks decides whether per-row sparsity becomes reduced weight traffic.}
+\label{fig:union}
+\end{figure}
+
+\subsection{Kernel and head-path runtime}\label{sec:kernel-design}
+A certified head pays off only if the whole path beats the strongest dense head chain at the served shapes:
+\begin{equation}
+T_{\rm cheap\ pass}+T_{\rm bounds}+T_{\rm compaction}+T_{\rm re\mbox{-}score}+\Pr[\text{fallback}]\,T_{\rm stock\ head}<T_{\rm stock\ head\ chain}.\label{eq:headgate}
+\end{equation}
+The right-hand side is the stock GEMM plus the FP32 copy and the argmax or top-1 that follow it; a fused dense epilogue that removes the copy and the argmax is a comparator in its own right, as is FlashSampling~\cite{flashsampling}. Equation~\eqref{eq:headgate} is a measurement criterion, not a prediction. If the head chain is a fraction $f$ of a step, removing it entirely gives at most $1/(1-f)$ overall under otherwise unchanged execution.
+
+\pending{kernel: the int8 layout and scales, the bound epilogue, candidate compaction, BF16 re-scoring and its accumulation contract, the graph-safe conditional fallback, and measured head-path time against the stock chain at $M=1$ to 256 with repeats and variance; draft in \nolinkurl{~/vp-coord/drafts/kernel.tex}; data \nolinkurl{evidence/certified_head/head_path_time.csv}}
+
+\pendingfigure{Head-path time against the number of rows $M$: stock cuBLAS BF16 GEMM plus FP32 copy plus argmax, the certified head (measured and expected), and the int8 pass alone, with p10--p90 bands.}{evidence/certified_head/head_path_time.csv}
+
+\subsection{Beyond the head: a certified tail (hypothesis)}\label{sec:tail}
+Section~\ref{sec:skipped} observed that in target-only decoding the last layer's MLP, the final norm and the head have no consumer in future state. The hypothesis, from a later proposal, is that a cheap surrogate of that tail with a sound enclosure could let the commit rule decide the token before the tail runs, removing up to 1.41~GB of the 8.41~GB streamed per step (derived, Table~\ref{tab:bytes}). A one-shot surrogate that costs $C$ (surrogate plus certificate) and certifies a fraction $p$ of positions pays only if $C<p\,T_{\rm tail}$, and the ceiling for a tail fraction $f$ of the step is $1/(1-f)$. The directional margin (Proposition~\ref{prop:directional}) is the natural certificate when the surrogate predicts the head input with a radius.
+
+The kill test is deliberately optimistic. Record, on about 2,000 positions from 16 prompts of mixed domains, the residual stream at the cut, the reference head input, the logits and the tokens; freeze an int8 tail surrogate; take the oracle radius $\norm{h-\tilde h}_2$; and apply the directional certificate with no overhead. If the oracle certification rate $p_{\rm oracle}$ satisfies $p_{\rm oracle}T_{\rm tail}\le C_{\rm surrogate}$, the one-shot design cannot pay and is dropped; otherwise real bounds are compared against the dense tail and against the certified head alone, which is the decisive ablation. The cut does not transfer to speculation without re-analysis, because the MTP layer and the DFlash drafter consume the target's hidden states. \pending{kill test for the certified tail; evidence path to be assigned}

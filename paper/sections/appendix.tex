@@ -1,0 +1,135 @@
+% Appendices (paper). Claims and status:
+%  - App. A: code reading at the SGLang pin; proposed integration, not implemented unless stated.
+%  - App. B: mechanisms carried over from the earlier revision; proved statements are marked;
+%    none is under test in this revision.
+%  - App. C: proved.
+%  - App. D: CPU evidence on main (evidence/*.json, *.log); Lean status under review (PR #7).
+%  - App. F: the claim ledger.
+\section{Engine integration notes}\label{app:integration}
+The source audit uses SGLang commit \texttt{bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824}, a frozen research pin rather than the latest revision. The observations below come from reading that code; the integration is proposed engineering work unless a later section reports it measured.
+
+\begin{longtable}{@{}P{4.7cm}P{9.6cm}@{}}\toprule
+Path under \code{python/sglang/} & Observation and proposed integration\\\midrule\endhead
+\path{srt/layers/logits_processor.py} & \code{\_compute\_lm\_head} is the single hook through which plain decoding, the MTP drafter and the verifier compute logits: \code{torch.matmul} with BF16 output by default, \code{torch.mm(..., out\_dtype=float32)} under \code{-{}-enable-fp32-lm-head}. A certified head replaces this call for admitted consumers only; log-probability requests and unsupported transforms keep the ordinary path.\\
+\path{srt/models/qwen3_5_text.py} & The Qwen3.5 head is tied to \code{embed\_tokens}, which is not a \code{ParallelLMHead}, so SGLang's quantized-head paths do not apply; a low-precision copy must be separate and the BF16 head stays resident for re-scoring and fallback.\\
+\path{srt/models/qwen3_5_mtp.py} & \code{set\_embed\_and\_head} skips the head when embeddings are tied, so a reduced draft head from \code{-{}-speculative-token-map} does not reach the MTP drafter while indices are still remapped \pending{moonshot: test and patch}.\\
+\path{srt/layers/sampler.py} & Unseeded sampling is an exponential race; seeded sampling is a Gumbel race keyed by (seed, position, token) in FP64 (\code{multinomial\_with\_seed}). The certified race uses the same field.\\
+\path{srt/models/dflash.py} & DFlash projects draft hidden states through the target head for its candidates; this is the draft-side summary producer for transport.\\
+\path{kernels/ops/attention/fla/gdn_replayssm_spec_fold.py} & The replay fold is written as a bitwise clone of the verify kernel and constrains operation order and warp count; its \code{accept\_lens} include the bonus token in that backend's indexing~\cite{gdncode}.\\\bottomrule
+\end{longtable}
+
+\section{Mechanisms carried over but not tested in this revision}\label{app:untested}
+The earlier revision developed a broader programme around the head. Nobody is testing these parts in this revision, so they are condensed here with their proved statements; they are hypotheses, not results.
+
+\paragraph{The DFlash~2 selector.} At the inspected implementation adjacent candidate scores have the form
+\begin{equation}
+S_t(a,b)=U_t(b)+\sum_{r=1}^{d_s}A(a)_r\,H(h_t)_r\,B(b)_r,\label{eq:selector}
+\end{equation}
+with a gate that depends on the draft hidden state~\cite{dflash,sgcode}. A greedy walk needs only the realized row $S_t(x_{t-1},\cdot)$, which reduces score work from $O(BLK^2d_s)$ to $O(BLKd_s)$ at the price of a dependent sequence of small contractions. Alternatively the lattice can emit, for every predecessor, its winning successor $f_t(a)=\argmax_bS_t(a,b)$, after which the path is $x_t=(f_t\circ\cdots\circ f_1)(x_0)$.
+
+\begin{proposition}[Finite-map execution]\label{prop:maps}
+Given the same row winners, serial map walking and prefix composition produce the same path. A work-efficient scan of length $L$ over $K$-entry maps uses $O(LK)$ map work and $O(\log L)$ composition stages, excluding the score producer.
+\end{proposition}
+\begin{proof}
+The $t$-th prefix composition applies exactly the first $t$ transitions to the anchor, and function composition is associative. A work-efficient tree scan uses $O(L)$ compositions of $O(K)$ indexed evaluations each, with logarithmic depth.
+\end{proof}
+Function scanning is standard; the question would be its profitable placement. The inherited CPU reference implements the simpler $O(LK\log L)$ Hillis--Steele scan and checks path equivalence only.
+
+\paragraph{Prefix value.} On a fixed lattice with a substochastic surrogate $r_t(a,b)$ for the probability of matching the next target token, $J_r(x)=\sum_{j=1}^{L}\prod_{t\le j}r_t(x_{t-1},x_t)$ is maximized by $V_t(a)=\max_br_t(a,b)(1+V_{t+1}(b))$ with $V_{L+1}=0$. If the estimate $\hat r$ also lies in $[0,1]$ and edge errors are uniformly bounded by $\epsilon_t$, telescoping gives $|J_r-J_{\hat r}|\le\delta=\sum_t(L-t+1)\epsilon_t$ and optimizer regret at most $2\delta$. LiLiCorr's finding that an exact best-path search over a different score decodes worse than the greedy rule~\cite{lilicorr} is the relevant warning.
+
+\paragraph{A compiler interface for evidence and effects.} The earlier revision proposed typed interfaces (head summaries, decision demands, state leases, evidence with an enclosure contract) so that illegal compositions become visible: a top-$k$ summary cannot satisfy a residual-sampling demand, a lease cannot be reused after cancellation, and a real-arithmetic enclosure cannot discharge a bitwise requirement without a numerical bridge. Search over implementations~\cite{mirage} would operate inside that boundary. No part of it is implemented.
+
+\paragraph{Scheduling and structural tuning.} If predicted progress $F_i(d)$ is known and cost depends only on the total optional depth $m$, the snapshot problem is solved by
+\begin{equation}
+G_i(m)=\max_{0\le d\le L_i}\{G_{i-1}(m-d)+F_i(d)\},\qquad\max_m\frac{G_B(m)}{C(m;z)},\label{eq:schedDP}
+\end{equation}
+which is exact only under that cost hypothesis. Graph tiers make cost discontinuous: with rewards $(1,1.9,2.7)$ and costs $(1,2,2)$ at depths $(0,1,2)$, depth one looks worse than zero while depth two is best, so stopping at the first local decline fails. Autotuning a kernel that mutates state must restore that state between trials~\cite{tritonautotune}.
+
+\paragraph{GPU execution families.} A certificate path can run as a two-stage mask-then-compact pipeline, as a bounded number of guarded refinement rounds inside a CUDA graph, or as a persistent work queue; ordinary inter-block spin barriers are not a legal substitute for global synchronization. Graph-safe designs need fixed buffers, device-resident masks and stable addresses, and a guarded stage that does nothing still costs a launch~\cite{vllmgraphs}. Nsight Systems establishes the critical path and Nsight Compute the traffic of selected kernels, whose replay and cache control change what is measured~\cite{nsight}. Hopper's asynchronous warp-group MMA requires \code{sm\_90a}, and Blackwell's data-centre and consumer targets expose different instruction sets and limits~\cite{ptxisa,hopper,blackwell}; implementation backends range from Triton to TileLang and CuTe~\cite{cute,tilelang,tritonautotune}.
+
+\section{Mathematical extensions and small falsifiers}\label{app:math}
+\paragraph{Transformed logits.} If a transform adds a known per-token correction $b_i$ with tile bounds $b_c^-\le b_i\le b_c^+$, then $z_i^d+a_c-\epsilon_c+b_c^-\le z_i^t+b_i\le z_i^d+a_c+\epsilon_c+b_c^+$, and the mass bounds multiply by $e^{b_c^\pm}$. A mask that deletes unknown members cannot preserve the unmasked lower mass; a safe lower bound may collapse to zero.
+
+\paragraph{One anchor mass cannot follow a temperature change.} The unnormalized masses $(1,3)$ and $(2,2)$ both sum to four, while their squares sum to ten and eight, so a mass at a new temperature cannot be reconstructed from the old sum alone.
+
+\paragraph{A conditional rate certificate.} If positive intervals enclose expected progress and time for a candidate and a baseline, $R_1^-/T_1^+>R_0^+/T_0^-$ (with $T_0^->0$) certifies $\lambda_1>\lambda_0$ in~\eqref{eq:rate}. Benchmark confidence intervals are not deterministic enclosures, so the inequality exposes what must be estimated rather than certifying a speedup.
+
+\paragraph{Agreement at an anchor proves nothing away from it.} Let $h^d=(1,0)$ and $h^t=(1,1)$. Rows with the same first coordinate have identical anchor logits while their second coordinates make the target logits arbitrarily different, so an anchor maximum or mass alone cannot certify the target; a geometric bound, more projection or exact completion is necessary.
+
+\paragraph{RNG tests.} Exhaustive tiny-law tests should cover point-mass proposals, zero support, $p=q$, acceptance at the comparison boundary, all-accept cycles, first-position rejection and candidate-dependent stopping, with proposal draws, acceptance uniforms and residual noise aligned across the compared procedures.
+
+\section{CPU evidence carried over from the earlier revision}\label{app:cpu}
+The earlier revision's exact references use bounded integer head weights and hidden vectors, with unnormalized mass $2^z$ represented exactly in rational arithmetic; this is an exponential model with logits scaled by $\log2$ and avoids trusting floating exponentials. Eighteen test methods in the decision reference and three in the race reference pass, with four local tests of the benchmark client; Table~\ref{tab:tests} lists the generated finite instances inside them. The counts are not independent confirmations of anything about a trained model, and the race tests use fixed positive rational priorities, so they establish pathwise equivalence of the bounded and dense algorithms, not continuous Gumbel randomness. Seeds, commands and results are in \nolinkurl{evidence/decision_tests.json}, \nolinkurl{evidence/race_tests.json} and their logs.
+
+\begin{table}[htbp]
+\small\centering
+\begin{tabularx}{\linewidth}{@{}P{5cm}rY@{}}\toprule
+Check & Executed count & Scope\\\midrule
+Top-$k$ plus tail composition & 250 & Exact union and associative merge.\\
+Transported tile bounds & 300 heads; 1,048 tiles & 3,787 weight rows enclosed.\\
+Greedy certified screening & 250 & Same winner under a deterministic total order.\\
+Retained-tail tightening & 565 tiles & Exact mass enclosed; bounds no looser.\\
+Acceptance interval guards & 1,600 & Certified bits agree with complete mass.\\
+Unresolved interval measure & 160 & Exact agreement with Theorem~\ref{thm:guards}.\\
+Lazy acceptance & 500 & With and without retained seeds; finite completion.\\
+Coupled one-step sampling & 200 & Same output with exact residual fallback.\\
+Rejection-correction identity & 300 pairs & Includes zero-probability support entries.\\
+Demand frontier & 1,092 partial states & 5,460 complete decision assignments.\\
+Exclusion-aware race summaries & 300 & Exact maxima after support exclusions.\\
+Target priority race & 250 & Same token as a dense priority race.\\
+Sparse-support residual race & 250 & Exact bounded and dense race equivalence.\\
+Finite-map execution & 400 & Scan, walk and composition agreement.\\
+Gated-delta replay & 150 trajectories & 868 accepted-prefix replay checks.\\
+Lease reuse & 300 schedules & Sequential epoch and base-prefix guards.\\\bottomrule
+\end{tabularx}
+\caption{CPU evidence inherited from the earlier revision, on \code{main}. Counterexamples for biased depth selection, graph-cost cliffs, batch unions, invalid numerical bounds, support truncation and stale namespaces are also included. No GPU implementation is exercised.}
+\label{tab:tests}
+\end{table}
+
+The theory workstream adds an exact reference that emulates BF16, FP32 and FP64 rounding on rationals and checks every bound and decision of Sections~\ref{sec:selfevidence} and~\ref{sec:decisions} against real arithmetic: 20 test methods and 39,761 generated checks, including 5,600 accumulation-bound checks over eight summation models, 420 certified argmax cases (72 exact ties), 360 races, 300 acceptance decisions with adversarial uniforms, witnesses that each envelope term is necessary, and the R-bf16 and split-$K$ witnesses of Section~\ref{sec:headcontracts} (\code{tests/test\_precision.py}, \nolinkurl{evidence/precision/}). These are tests on synthetic heads, not proofs and not GPU measurements.
+
+\paragraph{Formal status.} The earlier revision's Lean file (\code{formal/DecisionGuards.lean}, nine declarations for scaled-integer guards, monotone refinement, composition, replay and publication guards) could not be compiled when it was written. Lean 4.19.0 now elaborates it, together with \code{formal/CertifiedArgmax.lean}, which proves the certificate and its uniqueness, the candidate filter, the guards with enclosed numerators and their exclusivity, the residual interval, the Hölder bound and the sequential $\gamma_n$ bound in scaled integers, using only Lean's built-in axioms (\nolinkurl{formal/STATUS.md}, \nolinkurl{evidence/precision/lean_check.log}). IEEE rounding itself, the bridge from floating-point values to these integers, exponentials and every probability statement remain outside the checker.
+
+\section{Reproduction}\label{app:repro}
+The CPU evidence on \code{main} is reproduced from the repository root with Python 3.13 and NumPy:
+\begin{lstlisting}
+python -m venv .venv && . .venv/bin/activate
+python -m pip install -r requirements-cpu.txt
+python scripts/verify_artifact.py     # CPU tests, synthetic drift, Lean attempt
+\end{lstlisting}
+The paper builds with \code{latexmk -pdf paper.tex} in \code{paper/} (pdfLaTeX and BibTeX; no shell escape). Figures that read committed data files regenerate on each build. GPU experiments go through the repository's GPU lock and are documented with their exact commands in \code{RUNBOOK.md} and in the \code{README.md} of each \code{evidence/} directory.
+
+\section{Claim ledger}\label{app:ledger}
+\begin{longtable}{@{}P{6.2cm}P{2.1cm}P{5.9cm}@{}}\toprule
+Claim & Status & Evidence\\\midrule\endhead
+Head is 15.1\% of plain-step weight bytes, 84.1\% of an MTP draft step's & Derived & Checkpoint safetensors headers (Table~\ref{tab:bytes})\\
+GDN state 50.3~MB per request (FP32) & Derived & \code{config.json} (Table~\ref{tab:bytes})\\
+Stock head, sampling and verification behaviour at the pin & Code reading & Section~\ref{sec:stock}; SGLang \sourcepin\\
+Gap condition (Theorem~\ref{thm:stock}) and R-bf16 witness & Proved & Section~\ref{sec:headcontracts}\\
+Certified tokens equal stock tokens at the served shapes & Pending & kernel; \nolinkurl{evidence/certified_head/}\\
+Commit rule, directional margin, dead/deferred/enclosed accounting & Proved / definition & Section~\ref{sec:semantics}\\
+Transport theorem, summary merge, admission rule & Proved & Section~\ref{sec:transport}\\
+Transport--self-evidence crossover and static-screen comparison & Proved & Theorem~\ref{thm:crossover}, Proposition~\ref{prop:static}\\
+$\delta^\ast$ median 0.85\% (int8, $\ell_2$, 64-row tiles), 0.30\% ($\ell_\infty$/$\ell_1$) & Derived & \nolinkurl{evidence/precision/head_constants.json}\\
+Measured drift $\rho$ and transport certification & Pending & geometry; \nolinkurl{evidence/head_geometry/}\\
+Envelope with Hopper accumulation model; integer pass; outward rounding & Proved (model assumed) & Section~\ref{sec:selfevidence}; Khattak and Mikaitis~\cite{khattak2026}\\
+Refinement ladder; candidate-count bounds & Proved & Theorem~\ref{thm:ladder}, Proposition~\ref{prop:candidates}\\
+Candidate sets and head-path runtime on real states & Pending & geometry, kernel\\
+Certified race; RNG contract; fixed-noise verification; coupling bounds & Proved & Section~\ref{sec:decisions}\\
+Common mass, bounded-range sampler, KL and sequence TV bounds & Proved & Propositions~\ref{prop:commonmass}--\ref{prop:kl}\\
+Acceptance guards with enclosures; residual races & Proved & Theorems~\ref{thm:guards}, \ref{thm:residualrace}, \ref{thm:residualself}\\
+Cheap decision is not cheap verification (constructed heads) & Finding (CPU) & \nolinkurl{data/synthetic_drift.csv}, \nolinkurl{evidence/synthetic_drift.json}\\
+Exact references (inherited) & Finding (CPU) & \nolinkurl{evidence/decision_tests.json}, \nolinkurl{evidence/race_tests.json}\\
+Exact floating-point reference; Lean elaboration & Finding (CPU, Lean) & \nolinkurl{evidence/precision/}, \nolinkurl{formal/STATUS.md}\\
+Attribution, bytes per step, host gaps (H1, H6) & Pending & profile; \nolinkurl{evidence/profiles/} (PR \#13)\\
+Stock divergence mechanisms and state safety (H5) & Pending & state; \nolinkurl{evidence/state/}\\
+DFlash on GH200 & Pending & drafter; \nolinkurl{evidence/drafter/}\\
+Certified tail (P1), long-window repair (P2), anchored residual decoding (P3) & Hypotheses & Kill tests pending\\
+What an exact recurrent state must retain (Proposition~\ref{prop:minimal-state}); key-subspace reduction & Proved & Section~\ref{sec:minimal-state}\\
+State-structure witnesses ($-3/25$, reachability, SiLU rank, batch rank, RMSNorm, lazy decay, BF16 rank) & Under review & \nolinkurl{evidence/state_structure/} (PR \#20)\\
+Write avoidance for the recurrent state (P4); cross-request sharing (P5) & Pending; P5 rejected in analysis & moonshot, profile\\
+Stack levers, interaction matrix, exact and lossy frontiers (H4, H7) & Pending & moonshot, bench; \nolinkurl{evidence/moonshot/}, \nolinkurl{evidence/bench/}\\\bottomrule
+\end{longtable}
+
+\section{Attribution and disclosure}\label{app:attribution}
+Samuel Mausberg is the author of this paper and reviews its claims and implementation. The earlier revisions of the manuscript, its derivations and its reference code were prepared with GPT-6 Astra Pro (OpenAI) from research materials, public primary sources and local CPU execution. This revision was produced with Claude Code, using Claude Opus 5.5 agents for the literature review, theory, measurements and writing, on the earlier draft; each agent's work was reviewed by an independent reviewing agent before it was merged, and all of it is subject to the author's review. No AI system is an author. The confidential assignment that motivated the work is not reproduced or quoted, and no model weights are redistributed.
