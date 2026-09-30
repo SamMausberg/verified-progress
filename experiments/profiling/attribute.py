@@ -18,7 +18,8 @@ the launch's ID); the graph a node belongs to is ``graphNodeId >> 32``.
 Time. Kernels on different streams can overlap (the GDN ``in_proj_ba`` GEMM
 runs on a side stream). ``us_per_step`` splits every instant equally among the
 operations active at that instant, so categories plus idle sum exactly to the
-step. ``raw_us_per_step`` is the plain sum of durations.
+step. ``raw_us_per_step`` is the plain sum of durations and ``wall_us_per_step``
+the time during which at least one operation of the category runs.
 
 Categories come from kernel names (``RULES``) and, for GEMMs, from their
 neighbours in the replay (``label_gemms``): a GEMM followed by the activation
@@ -315,6 +316,10 @@ def attribute(trace: Trace, kind: str) -> dict:
             kernel_us[(cat, name)] += sh
             kernel_raw[(cat, name)] += rw
             kernel_cnt[(cat, name)] += 1
+        cats_arr = sub['cat'].to_numpy()
+        for cat in set(cats_arr):
+            sel = cats_arr == cat
+            row['wall:' + cat] = busy_union(list(zip(st[sel], en[sel], strict=True))) / 1e3
         step_us = (s1 - s0) / 1e3
         busy = busy_union(list(zip(st, en, strict=True))) / 1e3
         idle_in = 0.0
@@ -337,13 +342,16 @@ def attribute(trace: Trace, kind: str) -> dict:
     n = len(df)
     step_mean = float(df['_step_us'].mean())
     cats = [c for c in ORDER if c in df.columns]
-    cats += sorted(c for c in df.columns if c not in cats and not c.startswith(('_', 'raw:')))
+    cats += sorted(
+        c for c in df.columns if c not in cats and not c.startswith(('_', 'raw:', 'wall:'))
+    )
     table = [
         {
             'category': c,
             'us_per_step': float(df[c].mean()),
             'pct_of_step': 100 * float(df[c].mean()) / step_mean,
             'raw_us_per_step': float(df['raw:' + c].mean()) if 'raw:' + c in df else None,
+            'wall_us_per_step': float(df['wall:' + c].mean()) if 'wall:' + c in df else None,
             'us_p10': float(df[c].quantile(0.1)),
             'us_p90': float(df[c].quantile(0.9)),
         }
@@ -364,6 +372,25 @@ def attribute(trace: Trace, kind: str) -> dict:
     ]
 
     lo_t, hi_t = steps[0][0], steps[-1][1]
+
+    # Host lead: how long before a replay starts on the GPU its cudaGraphLaunch
+    # call began. A lead near zero means the GPU waits for the host.
+    launches = rt[rt['name'].str.startswith('cudaGraphLaunch')][['corr', 'start']]
+    lead = replays.merge(launches, on='corr', suffixes=('', '_api'))
+    lead = lead[(lead['start'] >= lo_t) & (lead['start'] < hi_t)]
+    in_win = rt[(rt['start'] >= lo_t) & (rt['start'] < hi_t)]
+    syncs = in_win[in_win['name'].str.contains('Synchronize')]
+    host_syncs = {
+        str(name).split('_v')[0]: {
+            'calls_per_step': len(grp) / n,
+            'host_blocked_us_per_step': float((grp['end'] - grp['start']).sum()) / 1e3 / n,
+        }
+        for name, grp in syncs.groupby('name')
+    }
+    host_lead = {
+        str(role): float(((grp['start'] - grp['start_api']) / 1e3).median())
+        for role, grp in lead.groupby('role')
+    }
 
     def head_stats(cat: str) -> dict:
         h = k[(k['cat'] == cat) & (k['start'] >= lo_t) & (k['start'] < hi_t)]
@@ -388,6 +415,8 @@ def attribute(trace: Trace, kind: str) -> dict:
         'step_us_p90': float(df['_step_us'].quantile(0.9)),
         'gpu_busy_pct': 100 * float(df['_busy_us'].mean()) / step_mean,
         'graph_replays_per_step': float(df['_replays'].mean()),
+        'host_lead_us_median_by_graph': host_lead,
+        'host_sync_calls': host_syncs,
         'eager_launch_calls_per_step': len(launch_calls) / n,
         'eager_kernel_records_per_launch_call': eager_records_ratio,
         'graph_roles': {str(g): r for g, r in roles.items()},

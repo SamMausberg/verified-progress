@@ -27,34 +27,78 @@
    },
    "kernel_time_check": {
     "backbone_weights": {
-     "kernel_us": 2826.550522727273,
-     "implied_tb_per_s": 2.5260867670996636,
+     "kernel_wall_us": 2440.1364807692307,
+     "implied_tb_per_s": 2.926111686076324,
      "floor_us_at_peak": 1883.9345308707125
     },
     "head_weights": {
-     "kernel_us": 351.12330069930067,
+     "kernel_wall_us": 351.12330069930067,
      "implied_tb_per_s": 3.620945683376382,
      "floor_us_at_peak": 335.4613192612137
     },
     "logits": {
-     "kernel_us": 12.087272727272726,
+     "kernel_wall_us": 12.087272727272726,
      "implied_tb_per_s": 0.24652707581227437,
      "floor_us_at_peak": 0.7862374670184696
     },
     "gdn_state": {
-     "kernel_us": 124.81496503496501,
+     "kernel_wall_us": 124.81496503496501,
      "implied_tb_per_s": 0.8065002139110541,
      "floor_us_at_peak": 26.560236411609498
     },
     "gdn_conv_state": {
-     "kernel_us": 55.43183216783216,
-     "implied_tb_per_s": 0.042562114722398285,
+     "kernel_wall_us": 55.43183216783217,
+     "implied_tb_per_s": 0.04256211472239828,
      "floor_us_at_peak": 0.6225055408970976
     },
     "attention_kv": {
-     "kernel_us": 132.5211520979021,
-     "implied_tb_per_s": 0.24405172674703904,
+     "kernel_wall_us": 132.5150541958042,
+     "implied_tb_per_s": 0.2440629571958779,
      "floor_us_at_peak": 8.533513456464378
+    }
+   },
+   "gemm_efficiency": {
+    "gdn_in_proj_gemm": {
+     "weight_bytes": 1517813760,
+     "wall_us": 487.5802692307692,
+     "tb_per_s": 3.1129515605596145,
+     "us_saved_at_head_gemm_rate": 68.40420509696492
+    },
+    "gdn_out_proj_gemm": {
+     "weight_bytes": 503316480,
+     "wall_us": 244.92725874125873,
+     "tb_per_s": 2.054963104501585,
+     "us_saved_at_head_gemm_rate": 105.9258695984428
+    },
+    "attn_qkv_gemm": {
+     "weight_bytes": 419430400,
+     "wall_us": 135.44228321678324,
+     "tb_per_s": 3.096746378150443,
+     "us_saved_at_head_gemm_rate": 19.607792264436625
+    },
+    "attn_o_proj_gemm": {
+     "weight_bytes": 167772160,
+     "wall_us": 80.96726923076925,
+     "tb_per_s": 2.0720985355430894,
+     "us_saved_at_head_gemm_rate": 34.6334728498306
+    },
+    "mlp_gate_up_gemm": {
+     "weight_bytes": 3019898880,
+     "wall_us": 936.2573426573425,
+     "tb_per_s": 3.225500877172017,
+     "us_saved_at_head_gemm_rate": 102.24900780044686
+    },
+    "mlp_down_gemm": {
+     "weight_bytes": 1509949440,
+     "wall_us": 554.9620576923078,
+     "tb_per_s": 2.720815628871648,
+     "us_saved_at_head_gemm_rate": 137.95789026385995
+    },
+    "lm_head_gemm": {
+     "weight_bytes": 1271398400,
+     "wall_us": 351.12330069930067,
+     "tb_per_s": 3.620945683376382,
+     "us_saved_at_head_gemm_rate": 0.0
     }
    }
   },
@@ -83,34 +127,78 @@
    },
    "kernel_time_check": {
     "backbone_weights": {
-     "kernel_us": 3021.78093503937,
-     "implied_tb_per_s": 2.3628820306614893,
+     "kernel_wall_us": 2601.7586988188973,
+     "implied_tb_per_s": 2.744340539820756,
      "floor_us_at_peak": 1883.9345308707125
     },
     "head_weights": {
-     "kernel_us": 356.18626771653544,
+     "kernel_wall_us": 356.18626771653544,
      "implied_tb_per_s": 3.5694761848927317,
      "floor_us_at_peak": 335.4613192612137
     },
     "logits": {
-     "kernel_us": 16.67332283464567,
+     "kernel_wall_us": 16.67332283464567,
      "implied_tb_per_s": 1.4297521997514064,
      "floor_us_at_peak": 6.289899736147757
     },
     "gdn_state": {
-     "kernel_us": 273.48066338582674,
+     "kernel_wall_us": 273.48066338582674,
      "implied_tb_per_s": 2.944655603909638,
      "floor_us_at_peak": 212.48189129287599
     },
     "gdn_conv_state": {
-     "kernel_us": 63.0539842519685,
+     "kernel_wall_us": 63.0539842519685,
      "implied_tb_per_s": 0.29933664341616534,
      "floor_us_at_peak": 4.980044327176781
     },
     "attention_kv": {
-     "kernel_us": 176.24270866141734,
+     "kernel_wall_us": 176.24270866141734,
      "implied_tb_per_s": 1.2821417108046778,
      "floor_us_at_peak": 59.62219736147757
+    }
+   },
+   "gemm_efficiency": {
+    "gdn_in_proj_gemm": {
+     "weight_bytes": 1517813760,
+     "wall_us": 496.13006889763784,
+     "tb_per_s": 3.0593061278717966,
+     "us_saved_at_head_gemm_rate": 70.90976166490788
+    },
+    "gdn_out_proj_gemm": {
+     "weight_bytes": 503316480,
+     "wall_us": 261.06748818897637,
+     "tb_per_s": 1.9279171201726553,
+     "us_saved_at_head_gemm_rate": 120.06179045377058
+    },
+    "attn_qkv_gemm": {
+     "weight_bytes": 419430400,
+     "wall_us": 139.6188346456693,
+     "tb_per_s": 3.0041104487403048,
+     "us_saved_at_head_gemm_rate": 22.114086532997803
+    },
+    "attn_o_proj_gemm": {
+     "weight_bytes": 167772160,
+     "wall_us": 86.36800000000001,
+     "tb_per_s": 1.9425268618006668,
+     "us_saved_at_head_gemm_rate": 39.36610075493141
+    },
+    "mlp_gate_up_gemm": {
+     "weight_bytes": 3019898880,
+     "wall_us": 1045.927559055118,
+     "tb_per_s": 2.887292579543607,
+     "us_saved_at_head_gemm_rate": 199.89337264388337
+    },
+    "mlp_down_gemm": {
+     "weight_bytes": 1509949440,
+     "wall_us": 572.6467480314959,
+     "tb_per_s": 2.636790386377872,
+     "us_saved_at_head_gemm_rate": 149.62965482587856
+    },
+    "lm_head_gemm": {
+     "weight_bytes": 1271398400,
+     "wall_us": 356.18626771653544,
+     "tb_per_s": 3.5694761848927317,
+     "us_saved_at_head_gemm_rate": 0.0
     }
    }
   },
@@ -139,34 +227,78 @@
    },
    "kernel_time_check": {
     "backbone_weights": {
-     "kernel_us": 3297.881501265823,
-     "implied_tb_per_s": 2.1650601664309095,
+     "kernel_wall_us": 2805.586939240506,
+     "implied_tb_per_s": 2.5449619016022664,
      "floor_us_at_peak": 1883.9345308707125
     },
     "head_weights": {
-     "kernel_us": 358.3258734177214,
+     "kernel_wall_us": 358.3258734177214,
      "implied_tb_per_s": 3.548162425094703,
      "floor_us_at_peak": 335.4613192612137
     },
     "logits": {
-     "kernel_us": 41.872850632911394,
+     "kernel_wall_us": 41.872850632911394,
      "implied_tb_per_s": 2.277248349675352,
      "floor_us_at_peak": 25.15959894459103
     },
     "gdn_state": {
-     "kernel_us": 928.9366810126583,
+     "kernel_wall_us": 928.9366810126583,
      "implied_tb_per_s": 3.4676480516287262,
      "floor_us_at_peak": 849.9275651715039
     },
     "gdn_conv_state": {
-     "kernel_us": 93.50747341772153,
-     "implied_tb_per_s": 0.807395058817745,
+     "kernel_wall_us": 93.5074734177215,
+     "implied_tb_per_s": 0.8073950588177452,
      "floor_us_at_peak": 19.920177308707125
     },
     "attention_kv": {
-     "kernel_us": 320.90672911392403,
-     "implied_tb_per_s": 2.24648571873378,
+     "kernel_wall_us": 320.90462278481016,
+     "implied_tb_per_s": 2.2465004640441846,
      "floor_us_at_peak": 190.21434934036938
+    }
+   },
+   "gemm_efficiency": {
+    "gdn_in_proj_gemm": {
+     "weight_bytes": 1517813760,
+     "wall_us": 531.6744075949366,
+     "tb_per_s": 2.854780554260507,
+     "us_saved_at_head_gemm_rate": 103.89980819522378
+    },
+    "gdn_out_proj_gemm": {
+     "weight_bytes": 503316480,
+     "wall_us": 313.3959063291139,
+     "tb_per_s": 1.6060084699110275,
+     "us_saved_at_head_gemm_rate": 171.5431894297273
+    },
+    "attn_qkv_gemm": {
+     "weight_bytes": 419430400,
+     "wall_us": 145.36464556962025,
+     "tb_per_s": 2.8853673350658022,
+     "us_saved_at_head_gemm_rate": 27.15404815346473
+    },
+    "attn_o_proj_gemm": {
+     "weight_bytes": 167772160,
+     "wall_us": 86.52225063291138,
+     "tb_per_s": 1.939063752650266,
+     "us_saved_at_head_gemm_rate": 39.23801166644917
+    },
+    "mlp_gate_up_gemm": {
+     "weight_bytes": 3019898880,
+     "wall_us": 1128.180941772152,
+     "tb_per_s": 2.6767859375964362,
+     "us_saved_at_head_gemm_rate": 277.06464037583214
+    },
+    "mlp_down_gemm": {
+     "weight_bytes": 1509949440,
+     "wall_us": 600.4487873417721,
+     "tb_per_s": 2.5147014563634134,
+     "us_saved_at_head_gemm_rate": 174.8906366436122
+    },
+    "lm_head_gemm": {
+     "weight_bytes": 1271398400,
+     "wall_us": 358.3258734177214,
+     "tb_per_s": 3.548162425094703,
+     "us_saved_at_head_gemm_rate": 0.0
     }
    }
   },
@@ -195,34 +327,78 @@
    },
    "kernel_time_check": {
     "backbone_weights": {
-     "kernel_us": 3137.6138854625556,
-     "implied_tb_per_s": 2.275650265662751,
+     "kernel_wall_us": 3081.6838061674007,
+     "implied_tb_per_s": 2.3169514853244944,
      "floor_us_at_peak": 1883.9345308707125
     },
     "head_weights": {
-     "kernel_us": 384.40697797356836,
+     "kernel_wall_us": 384.40697797356836,
      "implied_tb_per_s": 3.30742799389927,
      "floor_us_at_peak": 335.4613192612137
     },
     "logits": {
-     "kernel_us": 159.22142731277532,
+     "kernel_wall_us": 159.22142731277532,
      "implied_tb_per_s": 2.3955288332564546,
      "floor_us_at_peak": 100.63839577836411
     },
     "gdn_state": {
-     "kernel_us": 3701.556841409692,
+     "kernel_wall_us": 3701.556841409692,
      "implied_tb_per_s": 3.4809412471680283,
      "floor_us_at_peak": 3399.7102606860158
     },
     "gdn_conv_state": {
-     "kernel_us": 233.40320704845817,
-     "implied_tb_per_s": 1.2938549209278953,
+     "kernel_wall_us": 233.40320704845814,
+     "implied_tb_per_s": 1.2938549209278956,
      "floor_us_at_peak": 79.6807092348285
     },
     "attention_kv": {
-     "kernel_us": 681.1696519823788,
-     "implied_tb_per_s": 2.573451302327467,
+     "kernel_wall_us": 681.0618105726872,
+     "implied_tb_per_s": 2.5738587904759833,
      "floor_us_at_peak": 462.52161688654354
+    }
+   },
+   "gemm_efficiency": {
+    "gdn_in_proj_gemm": {
+     "weight_bytes": 1517813760,
+     "wall_us": 689.1959823788544,
+     "tb_per_s": 2.2022962971447657,
+     "us_saved_at_head_gemm_rate": 230.28538393205838
+    },
+    "gdn_out_proj_gemm": {
+     "weight_bytes": 503316480,
+     "wall_us": 311.4487885462555,
+     "tb_per_s": 1.6160489252481032,
+     "us_saved_at_head_gemm_rate": 159.27118077115216
+    },
+    "attn_qkv_gemm": {
+     "weight_bytes": 419430400,
+     "wall_us": 159.75922466960353,
+     "tb_per_s": 2.6253908083706583,
+     "us_saved_at_head_gemm_rate": 32.94455152368407
+    },
+    "attn_o_proj_gemm": {
+     "weight_bytes": 167772160,
+     "wall_us": 83.2095859030837,
+     "tb_per_s": 2.016260003930418,
+     "us_saved_at_head_gemm_rate": 32.483716644715926
+    },
+    "mlp_gate_up_gemm": {
+     "weight_bytes": 3019898880,
+     "wall_us": 1130.8117797356829,
+     "tb_per_s": 2.6705583847966943,
+     "us_saved_at_head_gemm_rate": 217.74613308506287
+    },
+    "mlp_down_gemm": {
+     "weight_bytes": 1509949440,
+     "wall_us": 707.2584449339208,
+     "tb_per_s": 2.1349330655798315,
+     "us_saved_at_head_gemm_rate": 250.72562160861082
+    },
+    "lm_head_gemm": {
+     "weight_bytes": 1271398400,
+     "wall_us": 384.40697797356836,
+     "tb_per_s": 3.30742799389927,
+     "us_saved_at_head_gemm_rate": 0.0
     }
    }
   }
