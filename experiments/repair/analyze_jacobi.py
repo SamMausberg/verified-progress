@@ -56,7 +56,10 @@ def lcp_from(cand: list[int], truth: list[int], start: int) -> int:
 def trace_files(run: Path) -> list[Path]:
     if (run / 'trace.jsonl').exists():
         return [run / 'trace.jsonl']
-    return sorted(run.glob('cycles*.jsonl'))  # the drafter workstream's DFlash trace format
+    # The drafter workstream's DFlash trace: cycles-panel.jsonl holds the panel requests only.
+    if (run / 'cycles-panel.jsonl').exists():
+        return [run / 'cycles-panel.jsonl']
+    return sorted(run.glob('cycles*.jsonl'))
 
 
 def hazards(accepts: list[int], block: int) -> list[float | None]:

@@ -216,7 +216,10 @@ def build_cases_drafter(trace_dir: Path, requests: Path) -> list[dict[str, Any]]
     target, accept) joined to requests (id, input_ids, output_ids) by matching committed streams."""
     reqs = [json.loads(line) for line in requests.read_text().splitlines() if line.strip()]
     by_rid: dict[str, list[dict[str, Any]]] = collections.OrderedDict()
-    for path in sorted(trace_dir.glob('cycles*.jsonl')):
+    paths = [trace_dir / 'cycles-panel.jsonl']
+    if not paths[0].exists():
+        paths = sorted(trace_dir.glob('cycles*.jsonl'))
+    for path in paths:
         for line in path.read_text().splitlines():
             if line.strip():
                 rec = json.loads(line)
