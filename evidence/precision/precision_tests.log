@@ -1,0 +1,142 @@
+test_acceptance (__main__.Precision.test_acceptance) ... ok
+test_accumulation_bound (__main__.Precision.test_accumulation_bound) ... ok
+test_bf16_contract (__main__.Precision.test_bf16_contract)
+Argmax of BF16-rounded exact logits, lowest index on BF16 ties, ... ok
+test_bounds_are_attained (__main__.Precision.test_bounds_are_attained)
+Blockwise Cauchy-Schwarz and the transport Hoelder bound are the ... ok
+test_candidate_set_bounds (__main__.Precision.test_candidate_set_bounds) ... ok
+test_certificate_refuses (__main__.Precision.test_certificate_refuses) ... ok
+test_certified_argmax (__main__.Precision.test_certified_argmax) ... ok
+test_envelope_encloses (__main__.Precision.test_envelope_encloses) ... ok
+test_envelope_terms_are_needed (__main__.Precision.test_envelope_terms_are_needed) ... ok
+test_exp2_bounds (__main__.Precision.test_exp2_bounds) ... ok
+test_integer_pass (__main__.Precision.test_integer_pass)
+W8A8-style pass: exact integer accumulation, activation error term. ... ok
+test_race (__main__.Precision.test_race) ... ok
+test_residual_race (__main__.Precision.test_residual_race) ... ok
+test_rng_contract (__main__.Precision.test_rng_contract)
+A counter-based field gives the same race winner in any evaluation ... ok
+test_rounding_emulation (__main__.Precision.test_rounding_emulation) ... ok
+test_sibling_verify (__main__.Precision.test_sibling_verify) ... ok
+test_stock_contract (__main__.Precision.test_stock_contract) ... ok
+test_topk (__main__.Precision.test_topk) ... ok
+test_transport_versus_self_evidence (__main__.Precision.test_transport_versus_self_evidence) ... ok
+
+----------------------------------------------------------------------
+Ran 19 tests in 35.208s
+
+OK
+{
+  "status": "pass",
+  "test_methods": 19,
+  "seed": 20260930,
+  "repo_commit": "1c55a2de6d369ddf0195b1d1dcdd873d3f0aa9fc",
+  "python": "3.13.15",
+  "numpy": "2.3.5",
+  "counts": {
+    "acceptance_decisions": 300,
+    "acceptance_rows_total": 3399,
+    "acceptance_adversarial_uniforms": 148,
+    "unresolved_measures": 200,
+    "unresolved_tail_bounds": 200,
+    "accumulation_bound_checks": 5600,
+    "bf16_contract_stock_comparisons": 900,
+    "bf16_contract_cases": 300,
+    "bf16_contract_agrees_with_stock": 900,
+    "real_contract_agrees_with_stock": 582,
+    "stock_rounding_identical_to_exact_rounding": 900,
+    "supremum_attainments": 300,
+    "candidate_set_bounds": 250,
+    "approx_only_attempts": 300,
+    "approx_only_refusals": 186,
+    "invalid_input_rejections": 5,
+    "certified_argmax_cases": 420,
+    "certified_argmax_exact_ties": 72,
+    "envelope_rows": 1767,
+    "envelope_heads": 260,
+    "accumulation_term_witnesses": 575,
+    "norm_inflation_checks": 300,
+    "norm_inflation_witnesses": 58,
+    "exp2_enclosures": 400,
+    "integer_pass_rows": 2767,
+    "integer_pass_argmax": 200,
+    "race_cases": 360,
+    "race_forced_top_ties": 62,
+    "residual_race_cases": 300,
+    "residual_race_rows_rescored": 667,
+    "residual_race_rows_total": 2735,
+    "zero_residual_refusals": 1,
+    "rng_contract_cases": 300,
+    "stateful_stream_divergences": 247,
+    "rounding_cases": 4000,
+    "sqrt_cases": 1500,
+    "sibling_verify_cases": 300,
+    "sibling_verify_rows_rescored": 1263,
+    "sibling_verify_rows_total": 2891,
+    "stock_contract_checks": 1200,
+    "stock_agreement_certified": 177,
+    "stock_differs_from_exact_argmax": 432,
+    "topk_cases": 200,
+    "crossover_implications": 1536,
+    "transport_comparisons": 300
+  },
+  "stats": {
+    "acceptance_rows_rescored_fraction": 0.35481023830538394,
+    "acceptance_mean_refinement_steps": 3.02,
+    "accumulation_max_error_over_bound": {
+      "sequential-nearest-b1-s1-ftzFalse": 0.4130078914346402,
+      "pairwise-nearest-b1-s1-ftzFalse": 0.8260158321036636,
+      "blocked-nearest-b4-s1-ftzFalse": 0.4355165354837244,
+      "blocked-nearest-b4-s3-ftzFalse": 0.4355165354837244,
+      "sequential-toward_zero-b1-s1-ftzFalse": 0.41312861108436566,
+      "fused-toward_zero-b4-s1-ftzFalse": 0.2360342297573914,
+      "fused-toward_zero-b8-s1-ftzTrue": 0.1717090926818739,
+      "sequential-nearest-b1-s1-ftzTrue": 0.4130078914346402
+    },
+    "bf16_contract_level_histogram": {
+      "0": 8,
+      "1": 288,
+      "3": 4
+    },
+    "argmax_certified_level_histogram": {
+      "0": 183,
+      "1": 191,
+      "2": 24,
+      "3": 22
+    },
+    "race_certified_level_histogram": {
+      "0": 259,
+      "1": 39,
+      "3": 62
+    }
+  },
+  "witnesses": {
+    "accumulation_term_needed": {
+      "z": "-2052628111239/4398046511104",
+      "zt": "-7830155/16777216"
+    },
+    "outward_rounding_needed": {
+      "zt": "1",
+      "beta": "2^-26",
+      "naive_lo": "1"
+    },
+    "bf16_output_tie": {
+      "z": [
+        "16",
+        "513/32"
+      ],
+      "stock": 0,
+      "exact": 1
+    },
+    "bf16_partials_flip": {
+      "z": [
+        "5/2",
+        "9/4"
+      ],
+      "stock_fp32": 0,
+      "stock_bf16_partials": 1
+    }
+  },
+  "seconds": 35.2,
+  "scope": "exact rational emulation of BF16/FP32/FP64 rounding, synthetic heads; no GPU, no model weights; the fused tensor-core adder is a model, not hardware"
+}
