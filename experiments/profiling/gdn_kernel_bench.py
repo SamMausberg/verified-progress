@@ -10,6 +10,8 @@ serving traces show two recurrent kernels:
   (MTP; reads the state once, writes one intermediate state per draft
   position into ``intermediate_states_buffer`` and leaves the state itself
   untouched, as in ``TritonGDNKernel.target_verify``).
+* ``verify_nosave``: the same launch without the intermediate buffer, which
+  isolates the cost of saving the per-position states.
 
 Each launch is timed as a CUDA-graph replay with L2 evicted inside the graph
 (the eviction's own time is subtracted), for one layer, at several batch
@@ -101,7 +103,9 @@ def decode_case(batch: int, slots: int) -> tuple[Callable[[], object], int]:
     return run, 2 * batch * STATE_BYTES
 
 
-def verify_case(batch: int, slots: int) -> tuple[Callable[[], object], int]:
+def verify_case(
+    batch: int, slots: int, save_states: bool = True
+) -> tuple[Callable[[], object], int]:
     dev = 'cuda'
     tokens = batch * DRAFT_TOKENS
     q = torch.randn(1, tokens, H, K, device=dev, dtype=torch.bfloat16)
@@ -134,19 +138,24 @@ def verify_case(batch: int, slots: int) -> tuple[Callable[[], object], int]:
             cu_seqlens=cu,
             is_kda=False,
             disable_state_update=True,
-            intermediate_states_buffer=inter,
-            intermediate_state_indices=inter_idx,
-            cache_steps=DRAFT_TOKENS,
+            intermediate_states_buffer=inter if save_states else None,
+            intermediate_state_indices=inter_idx if save_states else None,
+            cache_steps=DRAFT_TOKENS if save_states else None,
             retrieve_parent_token=None,
         )
 
-    return run, batch * STATE_BYTES * (1 + DRAFT_TOKENS)
+    return run, batch * STATE_BYTES * (1 + (DRAFT_TOKENS if save_states else 0))
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('--out', type=Path, required=True)
-    parser.add_argument('--mode', nargs='+', default=['decode', 'verify'])
+    parser.add_argument(
+        '--mode',
+        nargs='+',
+        default=['decode', 'verify', 'verify_nosave'],
+        choices=['decode', 'verify', 'verify_nosave'],
+    )
     parser.add_argument('--batch', type=int, nargs='+', default=[1, 8, 32, 128])
     parser.add_argument('--slots', type=int, default=667, help='state pool size (SGLang: 667)')
     parser.add_argument('--repeats', type=int, default=30)
@@ -160,7 +169,10 @@ def main() -> None:
     for mode in args.mode:
         for batch in args.batch:
             slots = max(args.slots, batch + 1) if mode == 'decode' else max(batch + 1, 64)
-            fn, state_bytes = (decode_case if mode == 'decode' else verify_case)(batch, slots)
+            if mode == 'decode':
+                fn, state_bytes = decode_case(batch, slots)
+            else:
+                fn, state_bytes = verify_case(batch, slots, save_states=mode == 'verify')
 
             def cold(fn: Callable[[], object] = fn) -> object:
                 flush.max()
