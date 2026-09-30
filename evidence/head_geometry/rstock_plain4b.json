@@ -1,0 +1,57 @@
+{
+  "positions": 6005,
+  "reference": "R-stock: stock BF16 head token at the served batch shape; rules from src/precision_reference.py (stock_gap) and bucket-exact interval rounding",
+  "gammas": {
+    "tensor_core_model": 0.0006112017390383282,
+    "gamma_1.19e-4": 0.000119,
+    "gamma_1e-5": 1e-05,
+    "fp32_tree_model": 1.6689328390431102e-06
+  },
+  "rules": {
+    "tensor_core_model": {
+      "gap": {
+        "positions_needing_stock_kernel": 0.030308076602830976,
+        "capture_batches_with_one_or_more": 0.216
+      },
+      "bucket": {
+        "positions_needing_stock_kernel": 0.013988343047460449,
+        "capture_batches_with_one_or_more": 0.10933333333333334
+      },
+      "certified_token_differs_from_engine": 0
+    },
+    "gamma_1.19e-4": {
+      "gap": {
+        "positions_needing_stock_kernel": 0.021815154038301414,
+        "capture_batches_with_one_or_more": 0.16
+      },
+      "bucket": {
+        "positions_needing_stock_kernel": 0.0034970857618651123,
+        "capture_batches_with_one_or_more": 0.028
+      },
+      "certified_token_differs_from_engine": 0
+    },
+    "gamma_1e-5": {
+      "gap": {
+        "positions_needing_stock_kernel": 0.019650291423813488,
+        "capture_batches_with_one_or_more": 0.14933333333333335
+      },
+      "bucket": {
+        "positions_needing_stock_kernel": 0.00016652789342214822,
+        "capture_batches_with_one_or_more": 0.0013333333333333333
+      },
+      "certified_token_differs_from_engine": 0
+    },
+    "fp32_tree_model": {
+      "gap": {
+        "positions_needing_stock_kernel": 0.01948376353039134,
+        "capture_batches_with_one_or_more": 0.148
+      },
+      "bucket": {
+        "positions_needing_stock_kernel": 0.0,
+        "capture_batches_with_one_or_more": 0.0
+      },
+      "certified_token_differs_from_engine": 0
+    }
+  },
+  "elapsed_s": 28.277812719345093
+}
