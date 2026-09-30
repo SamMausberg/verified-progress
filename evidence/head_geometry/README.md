@@ -29,7 +29,8 @@ BF16 output (R-stock).
 | `stats_plain4b.json` | Plain decode: norms, margins, top-m softmax mass, hidden-dimension energy, head statistics, envelope width versus realized error per quantizer, centring diagnostics | `python analyze_stats.py --arm plain4b --device cpu --out ../../evidence/head_geometry/stats_plain4b.json` | `239c482` |
 | `rstock_plain4b.json` | R-stock on the same 6,005 positions: share needing the stock kernel under the `stock_gap` rule and a bucket-exact rule, for four gammas; certified tokens against the engine's | `python analyze_rstock.py --device cpu --out ../../evidence/head_geometry/rstock_plain4b.json` | `0d10d3a` |
 | `alignment_dflash4b.json` | DFlash-4B capture: FP64 argmax of the captured draft and target head inputs against the engine's tokens, per block position; accept-length consistency | `python validate_alignment.py --arm dflash4b --device cpu --out ../../evidence/head_geometry/alignment_dflash4b.json` | `18fdf95` |
-| `rho_dflash4b.json`, `rho_dflash4b_pairs.csv`, `rho_dflash4b_quantiles.csv` | DFlash-4B drift ratio rho and the per-row threshold; head-metric drift; realized per-tile errors; certification rates; plot data (pairs CSV is a seeded 20,000-row subsample) | `python analyze_rho.py --arm dflash4b --device cpu --max-rows 40000 --out ../../evidence/head_geometry/rho_dflash4b.json` | `63c70f6` |
+| `rho_dflash4b.json`, `rho_dflash4b_pairs.csv`, `rho_dflash4b_quantiles.csv` | DFlash-4B drift ratio rho on 40,000 held-out pairs and the per-row threshold; head-metric drift; realized per-tile errors; certification rates; plot data (the pairs CSV is a seeded 15,000-row subsample with prompt id and split) | `python analyze_rho.py --arm dflash4b --device cpu --max-rows 40000 --csv-pairs 15000 --out ../../evidence/head_geometry/rho_dflash4b.json` | `5c59ba3` |
+| `transport_dflash4b.{json,csv}` | DFlash-4B transport on 4,000 held-out pairs: skip fractions for greedy, partition widths and P_? at T = 1 and 0.7, retained-tail bounds, static screen, oracle radii, drift scaling, tile unions over real and random batches, by outcome, position and domain | `python analyze_transport.py --arm dflash4b --device cpu --max-rows 4000 --out ../../evidence/head_geometry --tag dflash4b` | `99b2d3f` |
 | `stats_dflash4b.json` | DFlash-4B: norms of draft and target head inputs, margins, top-m mass, drift norms and cosine by outcome and position | `python analyze_stats.py --arm dflash4b --device cpu --max-rows 20000 --out ../../evidence/head_geometry/stats_dflash4b.json` | `239c482` |
 | `tail_killtest.json` | P1 kill test: INT8 surrogate of the final FFN (and head) versus certified head only | `python tail_killtest.py --threads 16 --out ../../evidence/head_geometry/tail_killtest.json` | `ea4f208` |
 
@@ -75,17 +76,17 @@ over the exact head inputs behind the same verified draft token; transport's l2 
 (64-row contiguous tiles, mean centre) is narrower than int8 per-row self-evidence for row
 i iff rho < ||e_i||_2 / r_c(i), whose median over the vocabulary is 0.0085.
 
-DFlash-4B, 40,000 pairs (`rho_dflash4b.json`):
+DFlash-4B, 40,000 pairs from the 160 held-out prompts (`rho_dflash4b.json`):
 
-| Group | p10 | median | p90 | worst |
-|---|---|---|---|---|
-| all (best 0.824) | 0.874 | 0.917 | 0.966 | 1.042 |
-| accepted | 0.864 | 0.910 | 0.959 | 1.021 |
-| rejected | 0.856 | 0.891 | 0.953 | 1.034 |
-| block position 1 | 0.852 | 0.882 | 0.941 | 1.016 |
-| block position 15 | 0.887 | 0.924 | 0.965 | 1.016 |
+| Group | smallest | p10 | median | p90 | largest |
+|---|---|---|---|---|---|
+| all | 0.823 | 0.875 | 0.917 | 0.964 | 1.039 |
+| accepted | 0.824 | 0.865 | 0.909 | 0.958 | 1.017 |
+| rejected | 0.824 | 0.856 | 0.891 | 0.952 | 1.039 |
+| block position 1 | 0.824 | 0.852 | 0.882 | 0.938 | 1.012 |
+| block position 15 | 0.835 | 0.889 | 0.924 | 0.964 | 1.020 |
 
-Medians by domain are 0.914-0.925 and by context length 0.915-0.933. Transport's envelope
+Medians by domain are 0.914-0.925 and by context length 0.915-0.934. Transport's envelope
 is narrower than int8 per-row (and than int8 g128, int4 per-row, int4 g128) on 0.08% of
 rows in every pair; those rows are three tiles of identical unused-token rows (r_c = 0).
 
@@ -99,7 +100,7 @@ show that it does not reproduce the target's head input.
 
 Drift that does not charge directions the head ignores is just as large: after removing
 each position's mean logit, ||W Delta|| / ||W h_t|| has median 0.85; restricted to W's
-leading 64 right singular directions the ratio is 0.89, and those directions carry 24% of
+leading 64 right singular directions the ratio is 0.89, and those directions carry 25% of
 Delta's norm (an isotropic vector would put 16% there). Realized, not certified, per-tile
 errors tell the same story: max_i |<w_i - mu_c, Delta>| is 77 times max_i |<e_i, h_t>|
 (median over tiles), and the realized transport error is the smaller one on 0.9% of rows.
