@@ -75,3 +75,23 @@ by the quality check, and all 500 MATH-500 problems.
 An earlier set (prompts-v1) excluded only mixed-v1 and overlapped mixed-v2's GSM8K prompts;
 it was used for nothing except a 64-row smoke test of the training code, and no reported
 number comes from it.
+
+## P6 support screen (zero-training selector bound)
+
+`support/zlab_b16_panel_v1_summary.json`, `support/zlab_b16_panel_v1_survival.csv`: for each of
+the 21,067 verify cycles of the block-16 panel-v1 trace, the drafter's block at that cycle's
+anchor is recomputed offline (Hugging Face target features over the committed sequence,
+SpecForge's drafter module, BF16) and its top-K candidates taken through the tied head.
+U_K is the longest prefix of the realized greedy continuation that lies inside the
+candidate sets, an upper bound on the accepted prefix of any selector over those frozen
+candidates. `tau_*` is 1 + the mean over cycles (pooled); `survival.csv` gives S(k) per
+position for the engine's accepted length (`L_engine`), the offline unary argmax (`L_hf`)
+and U_K for K = 1, 2, 4, 8, 16. The offline drafter's argmax agrees with the engine's
+drafted token at 97.4% of positions (different BF16 kernels) and its unary acceptance
+matches the engine's (6.200 against 6.204 tokens per cycle).
+
+    PYTHONPATH=~/vp-data/drafter/pylib:~/vp-data/drafter/src/SpecForge \
+    scripts/gpu_lock.sh -s python experiments/drafter/support_screen.py \
+        --trace ~/vp-data/drafter/trace/b16 --panel experiments/drafter/panel-v1.jsonl \
+        --draft z-lab/Qwen3.5-4B-DFlash@9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf \
+        --out ~/vp-data/drafter/support/zlab_b16

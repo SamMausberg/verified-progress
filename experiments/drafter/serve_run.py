@@ -27,7 +27,6 @@ import shlex
 import signal
 import subprocess
 import sys
-import threading
 import time
 import urllib.request
 from pathlib import Path
@@ -61,45 +60,6 @@ ARMS: dict[str, list[str]] = {
     ],
 }  # fmt: skip
 ARM_ENV = {'dflash': {'SGLANG_ENABLE_OVERLAP_PLAN_STREAM': '1'}}
-
-
-class CpuLoad:
-    """Samples CPU use by processes outside this run (bench.server.foreign_cpu)
-    while the clients run; timings are flagged if the mean exceeds 2 cores."""
-
-    def __init__(self, own_sessions: set[int]) -> None:
-        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-        from bench.server import foreign_cpu
-
-        self.sample = lambda: foreign_cpu(own_sessions, interval=5.0)
-        self.samples: list[dict] = []
-        self.done = threading.Event()
-        self.thread = threading.Thread(target=self.run, daemon=True)
-
-    def run(self) -> None:
-        while not self.done.is_set():
-            self.samples.append(self.sample())
-
-    def start(self) -> None:
-        self.thread.start()
-
-    def stop(self, path: Path) -> None:
-        self.done.set()
-        self.thread.join(timeout=15)
-        cores = [sample['cores'] for sample in self.samples]
-        mean = sum(cores) / len(cores) if cores else None
-        path.write_text(
-            json.dumps(
-                {
-                    'foreign_cores_mean': mean,
-                    'foreign_cores_max': max(cores, default=None),
-                    'flagged': mean is not None and mean > 2.0,
-                    'samples': self.samples,
-                },
-                indent=2,
-            )
-            + '\n'
-        )
 
 
 def git_revision(path: Path) -> str | None:
@@ -217,13 +177,18 @@ def main() -> None:
             f'http://127.0.0.1:{args.port}/server_info', timeout=30
         ) as response:
             (args.out / 'server_info.json').write_bytes(response.read())
-        load = CpuLoad({server.pid, os.getsid(0)})
-        load.start()
-        for client in args.client:
-            text = client.format(port=args.port, out=args.out)
-            print(f'[serve_run] {text}', flush=True)
-            status = subprocess.run(text, shell=True).returncode or status
-        load.stop(args.out / 'cpu_load.json')
+        # Foreign CPU load while the clients run (bench.hostload: everything outside
+        # this process tree, i.e. outside the server and the clients); a mean above
+        # two cores marks the run as contended.
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+        from bench.hostload import HostLoadSampler
+
+        with HostLoadSampler(root=os.getpid()) as load:
+            for client in args.client:
+                text = client.format(port=args.port, out=args.out)
+                print(f'[serve_run] {text}', flush=True)
+                status = subprocess.run(text, shell=True).returncode or status
+        (args.out / 'cpu_load.json').write_text(json.dumps(load.summary(), indent=2) + '\n')
     finally:
         os.killpg(server.pid, signal.SIGTERM)
         try:
