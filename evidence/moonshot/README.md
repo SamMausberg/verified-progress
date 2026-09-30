@@ -17,29 +17,28 @@ harness (`bench.sweep`, `bench/` on main: aiperf 0.13.0, workload
 
 ### 1.1 Bandwidth and bytes per step
 
-- HBM read peak **3.79-3.83 TB/s** (measured by the profile workstream; PR #13, under
-  review, `evidence/profiles/hbm_bandwidth.json` there).
+- HBM read bandwidth: the ceilings below assume **3.79 TB/s**, the read peak the profile
+  workstream measured (its evidence is pending; the figure is an input here, not a claim).
 - Weights read once per decode step: 7.14 GB backbone + 1.27 GB tied head = **8.41 GB**
   (derived). Floor at batch 1: **2.22 ms/token, 451 tokens/s**. Measured plain decode at
-  batch 1: 281 tokens/s end to end (Section 2), i.e. 3.56 ms per token; the profile
-  workstream's kernel attribution of that step (3.54 ms, linear layers at 3.05 TB/s on
-  average, ~0.8 ms of small kernels and idle gaps) is under review in PR #13.
+  batch 1: 281 tokens/s end to end (Section 2), i.e. 3.56 ms per token, 62% of the floor.
+  Which kernels take the rest is the profile workstream's attribution (pending).
 - GDN recurrent state (**code**): FP32 (`mamba_ssm_dtype: float32` in the config),
   24 layers x 32 heads x 128 x 128 per request = 50.3 MB, read and written once per
   step by `fused_recurrent_gated_delta_rule_packed_decode_kernel`, i.e. **100.7 MB per
-  request per step**. The profile workstream measured the kernel at 3.47 TB/s, i.e. purely
-  bandwidth-bound (PR #13, under review).
+  request per step**. Whether the kernel runs at the bandwidth limit is the profile
+  workstream's measurement (pending).
 - Attention KV: 8 layers x 4 KV heads x 256 x 2 x 2 B = 32 KB per context token, about
   10.9 MB per request per step at the benchmark's mean decode context (~334 tokens).
 - Crossover (**derived**, confirms the charter): FP32 state bytes alone equal the weight
   bytes at **B = 84**; with KV and conv state, per-request bytes pass the weights at
-  **B = 74** (`ceilings.json`). The profile workstream's measured crossover in kernel time,
-  B ~ 110-120, and its GDN share of 41.6% of an 8.9 ms step at B = 128 are under review
-  (PR #13); the 24% gain of FP16 state at c = 128 (Section 2) is consistent with them.
+  **B = 74** (`ceilings.json`). The measured crossover in kernel time is the profile
+  workstream's (pending). The 24% gain of FP16 state at c = 128 and its absence at c = 1
+  (Section 2) are what a per-request byte term predicts.
 
 ### 1.2 Speculative verification and the state
 
-- MTP verify (**code**; the profile workstream traced the same kernels, PR #13): the Triton verify kernel reads the state
+- MTP verify (**code**): the Triton verify kernel reads the state
   once and writes one FP32 intermediate state per draft position (D = 4 for three steps),
   and the commit copies the accepted one back: **352 MB per request per cycle**, 3.5
   plain steps. At B = 128 and accept length 2.8 speculation moves as many bytes per
@@ -60,9 +59,11 @@ harness (`bench.sweep`, `bench/` on main: aiperf 0.13.0, workload
 running request reserves 3 radix-retention slots + 2 ping-pong slots (overlap scheduler,
 `extra_buffer`) = 5 slots; 667 FP32 slots / 5 = 133. Decode touches one slot per request.
 `--max-mamba-cache-size`, `--disable-radix-cache` (1 slot/request) and the state dtype move
-it; the bench workstream reports plain decode running at 1,024 concurrent requests with the
-radix cache off (bench notes; evidence pending). Capacity then stops binding and bandwidth
-does, plus, at c >= 256, SGLang's streaming front end (bench notes; evidence pending).
+it; plain decode serves 512 and 1,024 concurrent requests with the radix cache off, and
+the server log shows decode near 16k tok/s at both (`evidence/bench/README.md`, probes
+section). Capacity then stops binding and bandwidth does; client-side throughput above
+c = 256 has not been measured cleanly yet (the bench probes' client numbers were
+contaminated, and a front-end cap is under investigation by bench).
 
 ### 1.4 Derived ceilings per lever stack
 
@@ -103,8 +104,7 @@ bench `plain` arm (radix on, max-running 128, mamba cache 640 slots, mem 0.85) p
 - `--quantization fp8` cannot use its CUTLASS GEMM here: the aarch64 sgl-kernel build aborts
   with "Arch conditional MMA instruction used without targeting sm90a" in a loop. The
   Triton W8A8 route runs but shows no consistent gain (0.96-1.06x across c = 1-128, single
-  runs, within run-to-run noise). **Negative result** until a cuBLASLt rowwise route is
-  wired.
+  runs). **Negative result** until a cuBLASLt rowwise route is wired.
 - FP8 KV does nothing at ~334-token contexts; it matters only for long contexts.
 - ReplaySSM and NGRAM arms failed to launch in this pass (radix strategy and bench's
   draft-graph check, both fixed in the harness); rerun pending.
@@ -122,7 +122,7 @@ to the measured noise floor); "lossy" changes them and needs the quality budget 
 | # | lever | end | class | ceiling (derived) or measured | quality cost | effort | status / owner |
 |---|---|---|---|---|---|---|---|
 | 1 | Public DFlash-4B drafter (z-lab) | latency | exact | drafter measured tau 6.18 at c=1, block 16 (`evidence/drafter/acceptance_summary.csv`); model card 3.4-4.6x on B200 | none | serving works | drafter owns baseline; I stack levers on it |
-| 2 | Remove the speculative host gap (MTP/DFlash, c=1-4) | latency | exact | up to 1.33x at B=1 if the ~25% idle the profile workstream reports goes (PR #13, under review) | none | medium-high (sync removal) | levers queued (Triton attention, plan stream, glue graph) |
+| 2 | Remove the speculative host gap (MTP/DFlash, c=1-4) | latency | exact | idle share of the MTP cycle pending (profile workstream); 1/(1 - idle share) if removed | none | medium-high (sync removal) | levers queued (Triton attention, plan stream, glue graph) |
 | 3 | FP16 GDN state + capacity lift (radix off, 256-1,024) | throughput | lossy, likely near-lossless | measured 1.24x at c=128; derived ceiling 1.46x | pending (DAMP: FP16 near-lossless, BF16 not) | flags only | quality and c>=256 sweeps queued |
 | 4 | Strict write-avoiding replay (P4, patch 0007) | throughput | designed to be bit-identical; validation pending | derived 1.19x at B=128 (2D -> 1.25D) | none if the check passes | built | one-layer kernel check (every output and state word) and the end-to-end bitwise probe queued, then the pre-registered paired A/B (>=1.10x at B=128, 2,048-token prompts) |
 | 5 | MTP + ReplaySSM-spec at high batch | throughput | exact up to reassociation | derived 34.3k vs plain 23.7k (FP32) | none | flags only | queued |
@@ -134,9 +134,9 @@ to the measured noise floor); "lossy" changes them and needs the quality budget 
 
 Deserving dedicated agents next: (a) a host-gap removal agent for the speculative cycle
 (sync-free verify planning; the profile workstream has the call sites), because it
-multiplies every drafter at c = 1-4; (b) the c >= 256 streaming front end (the bench
-workstream reports client throughput capped at 5-6.6k tok/s while the GPU decodes 16k;
-evidence pending), because every throughput lever above c = 128 is invisible behind it.
+multiplies every drafter at c = 1-4; (b) the c >= 256 streaming front end, because
+client throughput above c = 256 is not yet measured cleanly (see 1.3) and every throughput
+lever above c = 128 depends on it.
 The integrator assigned (b) to bench and kept (a) with moonshot.
 
 ### Quality budget for the lossy stack (fixed before measuring)

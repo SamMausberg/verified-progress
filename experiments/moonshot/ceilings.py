@@ -2,14 +2,14 @@
 
 A calculation, not a measurement. Bytes per decode step follow from the
 checkpoint's tensor sizes and SGLang's state layout (the same constants as the
-profile workstream's `experiments/profiling/bytes_model.py`, PR #13); FLOPs are 2 per
+profile workstream's bytes model); FLOPs are 2 per
 weight per token. The step-time floor at batch B is
 
     max(weight_bytes / BW, flops(B) / peak) + per-request bytes(B) / BW
 
 because per-request traffic (GDN state, attention KV) cannot overlap with itself
-and weights stream once per step whatever B is. BW is the HBM read peak the profile
-workstream measured (3.79 TB/s; PR #13, under review); compute peaks are the fraction of datasheet
+and weights stream once per step whatever B is. BW is an assumed HBM read peak of
+3.79 TB/s (the profile workstream's measurement, evidence pending); compute peaks are the fraction of datasheet
 dense peak that cuBLAS/CUTLASS reach at these shapes (assumed, stated below).
 
     python experiments/moonshot/ceilings.py --out evidence/moonshot/ceilings.json
@@ -22,7 +22,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-BW = 3.79e12  # HBM read peak measured by the profile workstream (PR #13, under review)
+BW = 3.79e12  # assumed HBM read peak (the profile workstream's measurement; evidence pending)
 # Assumed achievable dense throughput (fraction of datasheet 989 / 1979 TFLOPS).
 PEAK_BF16 = 0.70 * 989e12
 PEAK_FP8 = 0.60 * 1979e12
