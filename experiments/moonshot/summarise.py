@@ -89,6 +89,52 @@ def ceiling(args: argparse.Namespace) -> None:
     write_csv(rows, args.out)
 
 
+# Two-sided 97.5% Student t quantiles by degrees of freedom (df 1-10).
+_T975 = [12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306, 2.262, 2.228]
+
+
+def paired(args: argparse.Namespace) -> None:
+    """Paired speedup of `candidate` over `baseline` from repeated one_batch logs.
+
+    Logs are named `<config>.r<k>.log`; repeat k of each configuration forms a pair.
+    Reports the per-pair ratio of median decode-step latencies at each batch size,
+    their mean and a 95% t interval.
+    """
+    root = Path(args.path).expanduser()
+    rows: list[dict[str, Any]] = []
+    for base_log in sorted(root.glob(f'{args.baseline}.r*.log')):
+        tag = base_log.name[len(args.baseline) : -len('.log')]
+        cand_log = root / f'{args.candidate}{tag}.log'
+        if not cand_log.exists():
+            continue
+        base = parse_one_batch_log(base_log.read_text(errors='replace'))
+        cand = parse_one_batch_log(cand_log.read_text(errors='replace'))
+        for batch in sorted(set(base) & set(cand)):
+            rows.append({'repeat': tag, 'batch': batch, 'ratio': base[batch] / cand[batch]})
+    summary = []
+    for batch in sorted({r['batch'] for r in rows}):
+        ratios = [r['ratio'] for r in rows if r['batch'] == batch]
+        mean = statistics.fmean(ratios)
+        half = (
+            _T975[len(ratios) - 2] * statistics.stdev(ratios) / len(ratios) ** 0.5
+            if 2 <= len(ratios) <= 11
+            else float('nan')
+        )
+        summary.append(
+            {
+                'baseline': args.baseline,
+                'candidate': args.candidate,
+                'batch': batch,
+                'pairs': len(ratios),
+                'speedup_mean': round(mean, 4),
+                'ci95_low': round(mean - half, 4),
+                'ci95_high': round(mean + half, 4),
+                'ratios': ' '.join(f'{r:.4f}' for r in ratios),
+            }
+        )
+    write_csv(summary, args.out)
+
+
 def sweeps(args: argparse.Namespace) -> None:
     root = Path(args.path).expanduser()
     points: dict[tuple[str, int], list[dict[str, Any]]] = {}
@@ -210,6 +256,12 @@ def main() -> None:
     s.add_argument('--baseline', default='plain')
     s.add_argument('--out', type=Path, default=None)
     s.set_defaults(func=sweeps)
+    pr = sub.add_parser('paired')
+    pr.add_argument('path')
+    pr.add_argument('--baseline', required=True)
+    pr.add_argument('--candidate', required=True)
+    pr.add_argument('--out', type=Path, default=None)
+    pr.set_defaults(func=paired)
     i = sub.add_parser('interactions')
     i.add_argument('sweeps_csv')
     i.add_argument('--pairs', nargs='+', required=True, help='base:leverA:leverB')

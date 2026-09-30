@@ -47,6 +47,8 @@ CONFIGS: dict[str, list[str]] = {
     'fp8_weights': ['--quantization', 'fp8'],
     'fp8_kv': ['--kv-cache-dtype', 'fp8_e4m3'],
     'flashinfer_gdn': ['--linear-attn-decode-backend', 'flashinfer'],
+    'exact_replay_l4': ['--enable-linear-replayssm', '--linear-replayssm-cache-len', '4'],
+    'exact_replay_l8': ['--enable-linear-replayssm', '--linear-replayssm-cache-len', '8'],
     'stack_lossy': [
         '--quantization', 'fp8',
         '--kv-cache-dtype', 'fp8_e4m3',
@@ -56,11 +58,18 @@ CONFIGS: dict[str, list[str]] = {
 }  # fmt: skip
 
 
-def run_config(name: str, args: argparse.Namespace) -> dict[str, object]:
+# Environment per configuration (engine/moonshot switches).
+CONFIG_ENV: dict[str, dict[str, str]] = {
+    'exact_replay_l4': {'SGLANG_GDN_EXACT_REPLAY': '1'},
+    'exact_replay_l8': {'SGLANG_GDN_EXACT_REPLAY': '1'},
+}
+
+
+def run_config(name: str, args: argparse.Namespace, tag: str = '') -> dict[str, object]:
     out = Path(args.out).expanduser()
     out.mkdir(parents=True, exist_ok=True)
-    result_file = out / f'{name}.jsonl'
-    log_file = out / f'{name}.log'
+    result_file = out / f'{name}{tag}.jsonl'
+    log_file = out / f'{name}{tag}.log'
     if result_file.exists():
         result_file.unlink()
     batches = [str(b) for b in args.batch_sizes]
@@ -77,7 +86,7 @@ def run_config(name: str, args: argparse.Namespace) -> dict[str, object]:
         '--run-name', name,
         '--result-filename', str(result_file),
     ]  # fmt: skip
-    env = os.environ.copy()
+    env = {**os.environ, **CONFIG_ENV.get(name, {})}
     if '--quantization' in CONFIGS[name]:
         # CUTLASS FP8 GEMM in the aarch64 sgl-kernel wheel aborts on sm_90 here.
         env['USE_TRITON_W8A8_FP8_KERNEL'] = '1'
@@ -118,10 +127,17 @@ def main() -> None:
     parser.add_argument('--output-len', type=int, default=64)
     parser.add_argument('--timeout', type=int, default=900)
     parser.add_argument('--mem-fraction-static', type=float, default=0.80)
+    parser.add_argument('--repeats', type=int, default=1)
     args = parser.parse_args()
     summary = []
-    for name in args.configs:
-        record = run_config(name, args)
+    # Repeats alternate the configuration order (A B, B A, ...) so drift pairs up.
+    order = []
+    for rep in range(args.repeats):
+        names = args.configs if rep % 2 == 0 else args.configs[::-1]
+        order += [(name, f'.r{rep}' if args.repeats > 1 else '') for name in names]
+    for name, tag in order:
+        record = run_config(name, args, tag)
+        record['repeat_tag'] = tag
         summary.append(record)
         print(json.dumps({k: v for k, v in record.items() if k != 'rows'}), flush=True)
         for row in record['rows']:  # type: ignore[attr-defined]

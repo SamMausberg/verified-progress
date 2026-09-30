@@ -58,12 +58,12 @@ class Stack:
 
 STACKS = [
     Stack('baseline (FP32 state)'),
-    Stack('BF16 state', state_bytes_per_elem=2),
+    Stack('16-bit state (FP16 or BF16)', state_bytes_per_elem=2),
     Stack('ReplaySSM (FP32)', state_writes_per_step=1 / 16),
-    Stack('ReplaySSM + BF16 state', state_bytes_per_elem=2, state_writes_per_step=1 / 16),
+    Stack('ReplaySSM + 16-bit state', state_bytes_per_elem=2, state_writes_per_step=1 / 16),
     Stack('ReplaySSM + int8 state', state_bytes_per_elem=1, state_writes_per_step=1 / 16),
     Stack(
-        'ReplaySSM + BF16 state + FP8 W8A8 + FP8 KV',
+        'ReplaySSM + 16-bit state + FP8 W8A8 + FP8 KV',
         weight_scale=0.5,
         state_bytes_per_elem=2,
         state_writes_per_step=1 / 16,

@@ -53,12 +53,18 @@ LEVERS: dict[str, Lever] = {
         env={'SGLANG_MAMBA_SSM_DTYPE': 'float8_e4m3fn'},
     ),
     'replayssm': Lever(
-        {'enable-linear-replayssm': True},
+        # ReplaySSM refuses the extra_buffer radix strategy the overlap scheduler
+        # otherwise resolves to; no_buffer keeps the radix cache (3 slots/request).
+        {'enable-linear-replayssm': True, 'mamba-radix-cache-strategy': 'no_buffer'},
         note='decode reads a checkpoint plus a 16-step ring and writes the state every 16 steps',
         conflicts=('replayssm_spec',),
     ),
     'exact_replay': Lever(
-        {'enable-linear-replayssm': True, 'linear-replayssm-cache-len': 4},
+        {
+            'enable-linear-replayssm': True,
+            'linear-replayssm-cache-len': 4,
+            'mamba-radix-cache-strategy': 'no_buffer',
+        },
         note='rounding-preserving live replay (patch 0007): FP32 anchor written every 4 '
         'steps, ring of the packed decode operands; meant to be bit-identical',
         env={'SGLANG_GDN_EXACT_REPLAY': '1'},
@@ -140,6 +146,15 @@ LEVERS: dict[str, Lever] = {
         {},
         note='SGLANG_ENABLE_METADATA_GLUE_GRAPH: attention-metadata prep captured in a graph',
         env={'SGLANG_ENABLE_METADATA_GLUE_GRAPH': '1'},
+    ),
+    'draft_attn_triton': Lever(
+        {'speculative-draft-attention-backend': 'triton'},
+        note='Triton attention for the MTP draft layer: no host-side FlashInfer plan '
+        '(profile: kv_indptr .cpu() sync before every draft replay)',
+    ),
+    'attn_triton': Lever(
+        {'attention-backend': 'triton'},
+        note='Triton attention for target verify and draft: no FlashInfer plan syncs',
     ),
     'spec_attn_decode': Lever(
         {'speculative-attention-mode': 'decode'},
