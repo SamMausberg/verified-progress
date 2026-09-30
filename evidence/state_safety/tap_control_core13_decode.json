@@ -12,13 +12,13 @@
    "no_divergence": 3
   },
   "first_difference_module": {
-   "model.layers.13.linear_attn.attn": 4
+   "model.layers.13.linear_attn.gdn_core": 4
   },
   "first_difference_modes": {
-   "EXTEND vs EXTEND": 4
+   "DECODE vs DECODE": 4
   },
   "first_difference_output_index": {
-   "prompt": 4
+   "1": 4
   },
   "origin": {
    "caches_not_hashed": 4
@@ -32,16 +32,16 @@
    "prompt_len": 27,
    "diverged_at": 6,
    "first_difference": {
-    "position": 0,
-    "module": "model.layers.13.linear_attn.attn",
-    "modules_differing_at_position": 268,
-    "mode_a": "EXTEND",
-    "mode_b": "EXTEND",
+    "position": 27,
+    "module": "model.layers.13.linear_attn.gdn_core",
+    "modules_differing_at_position": 294,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
     "batch_a": 1,
     "batch_b": 1,
-    "tokens_a": 27,
-    "tokens_b": 27,
-    "output_index": null
+    "tokens_a": 1,
+    "tokens_b": 1,
+    "output_index": 1
    },
    "origin": "caches_not_hashed",
    "argmax_a": 63049,
@@ -98,16 +98,16 @@
    "prompt_len": 32,
    "diverged_at": null,
    "first_difference": {
-    "position": 0,
-    "module": "model.layers.13.linear_attn.attn",
-    "modules_differing_at_position": 268,
-    "mode_a": "EXTEND",
-    "mode_b": "EXTEND",
+    "position": 32,
+    "module": "model.layers.13.linear_attn.gdn_core",
+    "modules_differing_at_position": 297,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
     "batch_a": 1,
     "batch_b": 1,
-    "tokens_a": 32,
-    "tokens_b": 32,
-    "output_index": null
+    "tokens_a": 1,
+    "tokens_b": 1,
+    "output_index": 1
    },
    "origin": "caches_not_hashed",
    "cls": "no_divergence"
@@ -117,16 +117,16 @@
    "prompt_len": 19,
    "diverged_at": null,
    "first_difference": {
-    "position": 0,
-    "module": "model.layers.13.linear_attn.attn",
-    "modules_differing_at_position": 268,
-    "mode_a": "EXTEND",
-    "mode_b": "EXTEND",
+    "position": 19,
+    "module": "model.layers.13.linear_attn.gdn_core",
+    "modules_differing_at_position": 310,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
     "batch_a": 1,
     "batch_b": 1,
-    "tokens_a": 19,
-    "tokens_b": 19,
-    "output_index": null
+    "tokens_a": 1,
+    "tokens_b": 1,
+    "output_index": 1
    },
    "origin": "caches_not_hashed",
    "cls": "no_divergence"
@@ -136,16 +136,16 @@
    "prompt_len": 19,
    "diverged_at": null,
    "first_difference": {
-    "position": 0,
-    "module": "model.layers.13.linear_attn.attn",
-    "modules_differing_at_position": 268,
-    "mode_a": "EXTEND",
-    "mode_b": "EXTEND",
+    "position": 19,
+    "module": "model.layers.13.linear_attn.gdn_core",
+    "modules_differing_at_position": 310,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
     "batch_a": 1,
     "batch_b": 1,
-    "tokens_a": 19,
-    "tokens_b": 19,
-    "output_index": null
+    "tokens_a": 1,
+    "tokens_b": 1,
+    "output_index": 1
    },
    "origin": "caches_not_hashed",
    "cls": "no_divergence"

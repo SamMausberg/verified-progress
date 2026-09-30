@@ -69,13 +69,17 @@ Checks on the tool itself:
 - Neutrality: tapped runs match the untapped matrix run in tokens and logprobs for
   162 of 167 prompts (plain decode, batch 1). The five exceptions are an open question
   (below), not an assumption.
-- Positive controls (`tap_control_*.json`): a one-ulp change injected into the first
-  element of layer 9's `mlp.down_proj` output in every forward is named as the first
-  difference, at the first prompt token, for 4/4 prompts. A one-ulp change injected
-  into layer 13's GDN recurrence output is named at that op in decode; in prefill the
-  attention backends run eagerly between the captured segments of SGLang's breakable
-  prefill graph, and that version of the tap attributes the change to the enclosing
-  `linear_attn.attn` module (convolution plus recurrence) instead. Prefill
+- Positive controls (`tap_control_*.json`, analysed with the current `mechanism.py`):
+  a one-ulp change injected into the first element of layer 9's `mlp.down_proj` output
+  in every forward is named as the first difference, at the first prompt token, for
+  4/4 prompts (`tap_control_down9.json`). A one-ulp change injected into layer 13's
+  GDN recurrence output is named, when the search starts at the first decode position,
+  at that op (`linear_attn.gdn_core`, output index 1) for 4/4 prompts
+  (`tap_control_core13_decode.json`). Searched from the prompt, it is attributed to
+  the enclosing `linear_attn.attn` module (convolution plus recurrence) for 4/4
+  (`tap_control_core13.json`): in prefill the attention backends run eagerly between
+  the captured segments of SGLang's breakable prefill graph, and the tap version that
+  ran the controls did not regroup those eager tensors per token. Prefill
   attributions inside the GDN block therefore resolve to that module, not to its two
   kernels.
 - Withdrawn attributions: the first tap version hashed tensors laid out as
@@ -95,12 +99,21 @@ The remaining classes compare, in each run, the order of the two tokens' FP32
 accumulator values in the head GEMM, before BF16 rounding. Rounding to nearest is
 monotone, so where a run's BF16 logits for *a* and *b* differ, their order is the
 accumulator's order. Where they are tied, the float64 dot product of that run's head
-input with the two head rows stands in for the accumulator; it can differ from the
-accumulator by at most about 2D * 2^-24 times the sum of absolute products (the
-conservative model: every rounding in any order), and within that bound the
-accumulator's order is left undetermined. Where both the BF16 order and a float64 gap
-outside the bound are available, they never disagree (`float64_contradicts_bf16` is
-false in every case).
+input with the two head rows stands in for the accumulator. The gap between the two
+accumulators can differ from the float64 gap by up to gamma * (A_a + A_b), where A_t
+is the sum of absolute products of token t's dot product, and a float64 gap inside that
+bound leaves the accumulator's order undetermined. Two named error models are reported
+(`model_conservative` and `model_hopper` in each case record):
+
+- **conservative** (the project's model, the primary class): gamma(2K, 2^-23) =
+  2K u / (1 - 2K u), u = 2^-23, K = 2560, which covers any reduction order, split-K
+  with FP32 partials and truncating adders (gamma = 6.1e-4).
+- **Hopper**: the blocked Hopper `wgmma` accumulation model used by the kernel
+  workstream, gamma = 1.19e-4 including an FP32 split-K allowance; it rests on a
+  published measurement-based hardware model, not on vendor documentation.
+
+Where both the BF16 order and a float64 gap outside the bound are available, they never
+disagree under either model (`float64_contradicts_bf16` is false in every case).
 
 - **rounding flip**: the head inputs differ; the accumulator orders *a* and *b* the
   same way in both runs, and in one run BF16 rounding of the head output makes them
@@ -117,17 +130,19 @@ false in every case).
 (`mechanism_plain_c1_vs_mtp_s3_c1.json`; 167 prompts that diverged in the batch
 comparison below, generated up to two tokens past their known divergence).
 
-- In all 167 prompts the first differing bits are layer 0's GDN recurrence output at
-  the first speculative cycle: the plain-decode recurrent kernel and the target-verify
-  recurrent kernel produce different bits from the same inputs and the same state. The
-  convolution output just before it is identical. At this commit decode calls
+- In all 167 prompts the first differing module output is layer 0's GDN recurrence
+  output at the first speculative cycle, while its immediate input, the causal
+  convolution output, is bitwise equal. Whether the recurrent state entering that cycle
+  is also equal is **pending** the cache-hash rerun; if it is, the plain-decode and
+  target-verify recurrent kernels produce different bits from identical inputs and
+  state. At this commit decode calls
   `fused_recurrent_gated_delta_rule_packed_decode` (`kernels/ops/attention/fla/fused_recurrent.py`)
   and target verify calls `fused_sigmoid_gating_delta_rule_update`
   (`fla/fused_sigmoid_gating_recurrent.py`): separate Triton kernels that fuse the
   gating and the state update differently.
 - 129 of the 167 diverged within the generated length. Tie rule: 0. Head GEMM: 0; the
-  head input differs in every case. Rounding flip: 85. Order flip: 13. Accumulator
-  ambiguous: 31.
+  head input differs in every case. Conservative model: rounding flip 29, order flip 7,
+  accumulator ambiguous 93. Hopper model: rounding flip 89, order flip 16, ambiguous 24.
 
 **Plain decode at batch 1 vs 32 requests in flight** (`mechanism_plain_c1_vs_c32.json`;
 40 tapped prompts: the 16 whose divergence in the matrix run was not an exact tie,
@@ -143,8 +158,9 @@ reproduction, whose batches differ from the matrix run's).
   FP32 sum order of a row; the same function returns a constant in batch-invariant
   mode. FlashInfer's decode plan and cuBLAS's GEMM choice likewise depend on the
   batch.
-- At the divergence: tie rule 0, head GEMM 0, rounding flip 13, order flip 17,
-  accumulator ambiguous 10.
+- At the divergence: tie rule 0, head GEMM 0. Conservative model: rounding flip 3,
+  order flip 15, accumulator ambiguous 22. Hopper model: rounding flip 14, order flip
+  17, ambiguous 9.
 
 In words, subject to the pending cache-level check: the configurations first produce
 different module outputs at a kernel that is not invariant to the batch or to the
@@ -152,7 +168,8 @@ decode/verify path; the difference is carried forward through the recurrent stat
 the later layers; and it changes the chosen token only where the two leading logits
 are within about one BF16 step, either by reversing their order before rounding or by
 letting BF16 rounding merge them into a tie that the index rule resolves the other
-way.
+way. Which of the two happened cannot be decided for most divergences under the
+conservative accumulation model, and for about a fifth under the Hopper model.
 
 ## Noise floor
 

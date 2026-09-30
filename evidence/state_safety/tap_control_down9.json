@@ -4,7 +4,11 @@
   "b": "/home/ubuntu/vp-data/state/tap/v3_ctrl_down9",
   "prompts": 4,
   "classes": {
-   "order_unresolved": 1,
+   "accumulator_ambiguous": 1,
+   "no_divergence": 3
+  },
+  "classes_hopper_model": {
+   "rounding_flip": 1,
    "no_divergence": 3
   },
   "first_difference_module": {
@@ -16,6 +20,10 @@
   "first_difference_output_index": {
    "prompt": 4
   },
+  "origin": {
+   "caches_not_hashed": 4
+  },
+  "first_cache_difference": {},
   "no_hash_difference_before_divergence": 0
  },
  "cases": [
@@ -35,6 +43,7 @@
     "tokens_b": 27,
     "output_index": null
    },
+   "origin": "caches_not_hashed",
    "argmax_a": 63049,
    "argmax_b": 26310,
    "bf16_logits_a": [
@@ -56,8 +65,34 @@
     20.20977859632694
    ],
    "head_input_max_abs_diff": 0.171875,
-   "accumulation_bound": 0.020185702817840934,
-   "cls": "order_unresolved"
+   "exact_gap_a": 0.07810932412394322,
+   "exact_gap_b": 0.019581370783271268,
+   "bf16_gap_a": 0.125,
+   "bf16_gap_b": 0.0,
+   "abs_products_a": 131.25702598204953,
+   "abs_products_b": 131.25192683478235,
+   "model_conservative": {
+    "gap_bound_a": 0.08016185781241573,
+    "gap_bound_b": 0.0801587436391733,
+    "accumulator_order_source": [
+     "bf16",
+     "ambiguous"
+    ],
+    "float64_contradicts_bf16": false,
+    "cls": "accumulator_ambiguous"
+   },
+   "model_hopper": {
+    "gap_bound_a": 0.015619586091863895,
+    "gap_bound_b": 0.015618979293339101,
+    "accumulator_order_source": [
+     "bf16",
+     "float64"
+    ],
+    "float64_contradicts_bf16": false,
+    "cls": "rounding_flip",
+    "run_against_accumulator_order": "b"
+   },
+   "cls": "accumulator_ambiguous"
   },
   {
    "id": "alpaca_eval-0010",
@@ -75,6 +110,7 @@
     "tokens_b": 32,
     "output_index": null
    },
+   "origin": "caches_not_hashed",
    "cls": "no_divergence"
   },
   {
@@ -93,6 +129,7 @@
     "tokens_b": 19,
     "output_index": null
    },
+   "origin": "caches_not_hashed",
    "cls": "no_divergence"
   },
   {
@@ -111,6 +148,7 @@
     "tokens_b": 19,
     "output_index": null
    },
+   "origin": "caches_not_hashed",
    "cls": "no_divergence"
   }
  ]

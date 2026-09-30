@@ -256,12 +256,13 @@ def first_hash_difference(
     names_a: list[str],
     names_b: list[str],
     upto: int,
+    lo: int = 0,
 ) -> dict[str, Any] | None:
     """First (position, module) whose output bits differ; modules matched by name."""
     common = sorted(set(names_a) & set(names_b), key=exec_key)
     ia = np.array([names_a.index(n) for n in common])
     ib = np.array([names_b.index(n) for n in common])
-    for q in range(upto + 1):
+    for q in range(lo, upto + 1):
         if q not in ra or q not in rb:
             continue
         a, b = ra[q], rb[q]
@@ -306,8 +307,10 @@ def analyse_prompt(
     names: tuple[list[str], list[str]],
     head: Head,
     prompt,
+    start_output_index: int = 0,
 ):
     P = len(prompt)
+    lo = P + start_output_index - 1 if start_output_index > 0 else 0
     oa, ob = ca['output_ids'], cb['output_ids']
     n = min(len(oa), len(ob))
     d = next((i for i in range(n) if oa[i] != ob[i]), None)
@@ -315,7 +318,7 @@ def analyse_prompt(
     rb = committed_rows(dir_b / 'tap' / f'tap-{pid}', prompt + ob)
     upto = P + (d if d is not None else n) - 1
     out: dict[str, Any] = {'id': pid, 'prompt_len': P, 'diverged_at': d}
-    out['first_difference'] = first_hash_difference(ra, rb, names[0], names[1], upto)
+    out['first_difference'] = first_hash_difference(ra, rb, names[0], names[1], upto, lo)
     cache_a = entering_caches(dir_a / 'tap' / f'tap-{pid}', prompt + oa)
     cache_b = entering_caches(dir_b / 'tap' / f'tap-{pid}', prompt + ob)
     if cache_a and cache_b:
@@ -382,47 +385,74 @@ def analyse_prompt(
     # The class is decided by the order of the two tokens' FP32 accumulator values
     # (before BF16 rounding) in each run. Rounding to nearest is monotone, so where a
     # run's BF16 logits differ, their order is the accumulator's order. Where they
-    # are tied, the float64 dot product stands in for the accumulator, which it can
-    # differ from by up to about 2*D*2**-24 * sum|w*h|; a gap inside that bound
-    # leaves the accumulator's order undetermined.
-    bound_a = accumulation_bound(head, a['head_in'], (ta, tb))
-    bound_b = accumulation_bound(head, b['head_in'], (ta, tb))
+    # are tied, the float64 dot products stand in for the accumulators; the gap
+    # between two accumulators can differ from the float64 gap by up to
+    # gamma * (A_a + A_b), A_t = sum_j |w_tj h_j|, under a named error model, and
+    # a float64 gap inside that bound leaves the order undetermined.
     ga, gb = ea[0] - ea[1], eb[0] - eb[1]
     out['exact_gap_a'], out['exact_gap_b'] = ga, gb
-    out['accumulation_bound_a'], out['accumulation_bound_b'] = bound_a, bound_b
     out['bf16_gap_a'] = None if None in la else la[0] - la[1]
     out['bf16_gap_b'] = None if None in lb else lb[0] - lb[1]
-
-    def acc_order(bf16_gap, exact_gap, bound):
-        if bf16_gap is not None and bf16_gap != 0:
-            return int(np.sign(bf16_gap)), 'bf16'
-        if abs(exact_gap) > bound:
-            return int(np.sign(exact_gap)), 'float64'
-        return None, 'ambiguous'
-
-    oa, src_a = acc_order(out['bf16_gap_a'], ga, bound_a)
-    ob, src_b = acc_order(out['bf16_gap_b'], gb, bound_b)
-    out['accumulator_order_source'] = [src_a, src_b]
-    # Consistency check of the float64 stand-in where the BF16 order is known.
-    out['float64_contradicts_bf16'] = any(
-        bg is not None and bg != 0 and abs(eg) > bd and np.sign(bg) != np.sign(eg)
-        for bg, eg, bd in ((out['bf16_gap_a'], ga, bound_a), (out['bf16_gap_b'], gb, bound_b))
-    )
-    if oa is None or ob is None:
-        out['cls'] = 'accumulator_ambiguous'
-    elif oa != ob:
-        out['cls'] = 'order_flip'
-    else:
-        out['cls'] = 'rounding_flip'
-        # The run whose choice contradicts its accumulator order did so through BF16
-        # rounding of the head output into a tie and lowest-index tie-breaking.
-        out['run_against_accumulator_order'] = 'a' if oa < 0 else 'b'
+    abs_a = abs_products(head, a['head_in'], (ta, tb))
+    abs_b = abs_products(head, b['head_in'], (ta, tb))
+    out['abs_products_a'], out['abs_products_b'] = abs_a, abs_b
+    d = a['head_in'].shape[0]
+    for model, gamma in error_models(d).items():
+        bound_a, bound_b = gamma * abs_a, gamma * abs_b
+        oa, src_a = _acc_order(out['bf16_gap_a'], ga, bound_a)
+        ob, src_b = _acc_order(out['bf16_gap_b'], gb, bound_b)
+        res: dict[str, Any] = {
+            'gap_bound_a': bound_a,
+            'gap_bound_b': bound_b,
+            'accumulator_order_source': [src_a, src_b],
+            # Consistency of the float64 stand-in where the BF16 order is known.
+            'float64_contradicts_bf16': any(
+                bg is not None and bg != 0 and abs(eg) > bd and np.sign(bg) != np.sign(eg)
+                for bg, eg, bd in (
+                    (out['bf16_gap_a'], ga, bound_a),
+                    (out['bf16_gap_b'], gb, bound_b),
+                )
+            ),
+        }
+        if oa is None or ob is None:
+            res['cls'] = 'accumulator_ambiguous'
+        elif oa != ob:
+            res['cls'] = 'order_flip'
+        else:
+            res['cls'] = 'rounding_flip'
+            # The run whose choice contradicts its accumulator order did so through
+            # BF16 rounding of the head output into a tie and lowest-index ties.
+            res['run_against_accumulator_order'] = 'a' if oa < 0 else 'b'
+        out[f'model_{model}'] = res
+    # The conservative model is the primary class; the Hopper model is reported too.
+    out['cls'] = out['model_conservative']['cls']
     return out
 
 
-def accumulation_bound(head: Head, h: np.ndarray, toks: tuple[int, int]) -> float:
-    d = h.shape[0]
-    return max(2 * d * 2.0**-24 * float(np.sum(np.abs(head.row(t) * h))) for t in toks)
+def _acc_order(bf16_gap: float | None, exact_gap: float, bound: float):
+    if bf16_gap is not None and bf16_gap != 0:
+        return int(np.sign(bf16_gap)), 'bf16'
+    if abs(exact_gap) > bound:
+        return int(np.sign(exact_gap)), 'float64'
+    return None, 'ambiguous'
+
+
+def error_models(k: int) -> dict[str, float]:
+    """Relative FP32 accumulation error bounds gamma for a length-k dot product.
+
+    conservative: the project's model, gamma(2k, 2**-23) = 2k u / (1 - 2k u) with
+    u = 2**-23, covering any reduction order, split-K with FP32 partials and
+    truncating adders. hopper: the blocked Hopper wgmma model used by the kernel
+    workstream (1.19e-4 at k = 2560, including an FP32 split-K allowance); it rests
+    on a published measurement-based hardware model, not vendor documentation.
+    """
+    u = 2.0**-23
+    return {'conservative': 2 * k * u / (1 - 2 * k * u), 'hopper': 1.19e-4}
+
+
+def abs_products(head: Head, h: np.ndarray, toks: tuple[int, int]) -> float:
+    """A_a + A_b: the summed absolute products of the two tokens' dot products."""
+    return float(sum(np.sum(np.abs(head.row(t) * h.astype(np.float64))) for t in toks))
 
 
 def main() -> None:
@@ -431,6 +461,13 @@ def main() -> None:
     ap.add_argument('--b', required=True)
     ap.add_argument('--prompts', default=str(Path.home() / 'vp-data/state/prompts/prompts.jsonl'))
     ap.add_argument('--out', required=True)
+    ap.add_argument(
+        '--start-output-index',
+        type=int,
+        default=0,
+        help='search for the first difference from this output index on (1 = first decode '
+        'position); 0 searches from the first prompt token',
+    )
     ap.add_argument(
         '--untapped-a',
         help='matrix run of configuration A at the same concurrency (jsonl); checks that '
@@ -450,7 +487,15 @@ def main() -> None:
     for pid in sorted(ca.keys() & cb.keys()):
         cases.append(
             analyse_prompt(
-                pid, ca[pid], cb[pid], dir_a, dir_b, (names, names_b), head, prompts[pid]
+                pid,
+                ca[pid],
+                cb[pid],
+                dir_a,
+                dir_b,
+                (names, names_b),
+                head,
+                prompts[pid],
+                args.start_output_index,
             )
         )
     fd = [c['first_difference'] for c in cases if c.get('first_difference')]
@@ -459,6 +504,9 @@ def main() -> None:
         'b': args.b,
         'prompts': len(cases),
         'classes': dict(Counter(c['cls'] for c in cases)),
+        'classes_hopper_model': dict(
+            Counter(c['model_hopper']['cls'] if 'model_hopper' in c else c['cls'] for c in cases)
+        ),
         'first_difference_module': dict(Counter(f['module'] for f in fd).most_common(20)),
         'first_difference_modes': dict(Counter(f'{f["mode_a"]} vs {f["mode_b"]}' for f in fd)),
         'first_difference_output_index': dict(
