@@ -97,6 +97,17 @@ def max_tokens_for(concurrency: int) -> int:
     return min(16384, 524288 // concurrency)
 
 
+def sglang_dir() -> Path:
+    """Directory of the SGLang package this Python imports (clone or worktree)."""
+    out = subprocess.run(
+        [sys.executable, '-c', 'import sglang, os; print(os.path.dirname(sglang.__file__))'],
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout.strip()
+    return Path(out) if out else Path.home() / 'sglang'
+
+
 def scheduler_pid(server_pid: int) -> int:
     """PID of the SGLang scheduler process under the server (for py-spy)."""
     import psutil
@@ -264,7 +275,7 @@ def main() -> None:
         'server_command': shlex.join(cmd),
         'started': datetime.now().isoformat(timespec='seconds'),
         'sglang_sha': subprocess.run(
-            ['git', '-C', str(Path.home() / 'sglang'), 'rev-parse', 'HEAD'],
+            ['git', '-C', str(sglang_dir()), 'rev-parse', 'HEAD'],
             capture_output=True,
             text=True,
             check=False,

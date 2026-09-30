@@ -13,7 +13,7 @@ VP_DATA="${VP_DATA:-$HOME/vp-data/profile}"
 EVIDENCE="$REPO/evidence/profiles"
 mkdir -p "$VP_DATA" "$EVIDENCE"
 # shellcheck source=/dev/null
-source "$HOME/verified-progress/scripts/sglang_env.sh"
+source "$REPO/scripts/sglang_env.sh"
 cd "$REPO"
 
 # Sample SM/memory clocks and power every 100 ms while the timed runs execute.

@@ -18,7 +18,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 VP_DATA="${VP_DATA:-$HOME/vp-data/profile}"
 NCU="$HOME/.local/cuda-13.0/bin/ncu"
 # shellcheck source=/dev/null
-source "$HOME/verified-progress/scripts/sglang_env.sh"
+source "$REPO/scripts/sglang_env.sh"
 cd "$REPO"
 SCRATCH="$(mktemp -d)"
 trap 'sudo rm -rf "$SCRATCH"' EXIT

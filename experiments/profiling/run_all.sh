@@ -17,7 +17,7 @@ VP_DATA="${VP_DATA:-$HOME/vp-data/profile}"
 if [ "${VP_LOCKED:-0}" = 1 ]; then
   LOCK=(env)
 else
-  LOCK=("$HOME/verified-progress/scripts/gpu_lock.sh" -x)
+  LOCK=("$REPO/scripts/gpu_lock.sh" -x)
 fi
 RUN=(python "$REPO/experiments/profiling/run_profiles.py")
 
@@ -33,7 +33,7 @@ prof() {
   "${LOCK[@]}" "${RUN[@]}" "$@"
 }
 # shellcheck source=/dev/null
-source "$HOME/verified-progress/scripts/sglang_env.sh"
+source "$REPO/scripts/sglang_env.sh"
 cd "$REPO"
 
 step() {

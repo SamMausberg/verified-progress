@@ -10,7 +10,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 VP_DATA="${VP_DATA:-$HOME/vp-data/profile}"
 EV="$REPO/evidence/profiles"
 # shellcheck source=/dev/null
-source "$HOME/verified-progress/scripts/sglang_env.sh"
+source "$REPO/scripts/sglang_env.sh"
 cd "$REPO"
 mkdir -p "$EV/attribution" "$EV/windows" "$EV/diagnostics"
 

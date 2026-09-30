@@ -63,6 +63,36 @@ def to_number(text: str, unit: str) -> float | str:
     return value * scale.get(unit, 1)
 
 
+def metric_rows(text: str) -> list[tuple[str, str, str]]:
+    """(metric name, unit, value) for the first profiled result in ``--page raw --csv``.
+
+    Handles both layouts Nsight Compute versions produce: one row per metric with
+    'Metric Name', 'Metric Unit' and 'Metric Value' columns, or one column per
+    metric with a units row under the header and one row per kernel launch.
+    """
+    rows = [r for r in csv.reader(io.StringIO(text)) if r]
+    header = rows[0]
+    if 'Metric Name' in header and 'Metric Value' in header:
+        name_i = header.index('Metric Name')
+        unit_i = header.index('Metric Unit') if 'Metric Unit' in header else None
+        value_i = header.index('Metric Value')
+        id_i = header.index('ID') if 'ID' in header else None
+        first_id = rows[1][id_i] if id_i is not None else None
+        out = []
+        for r in rows[1:]:
+            if id_i is not None and r[id_i] != first_id:
+                continue
+            unit = r[unit_i] if unit_i is not None else ''
+            out.append((r[name_i], unit, r[value_i]))
+        # The kernel name is a column, not a metric, in this layout.
+        if 'Kernel Name' in header:
+            out.append(('Kernel Name', '', rows[1][header.index('Kernel Name')]))
+        return out
+    units = rows[1]
+    values = rows[2] if len(rows) > 2 else rows[1]
+    return list(zip(header, units, values, strict=True))
+
+
 def summarize(report: Path) -> dict:
     raw = subprocess.run(
         [str(NCU), '--import', str(report), '--csv', '--page', 'raw'],
@@ -70,11 +100,9 @@ def summarize(report: Path) -> dict:
         text=True,
         check=True,
     ).stdout
-    rows = list(csv.reader(io.StringIO(raw)))
-    header, units, first = rows[0], rows[1], rows[2]
     out: dict = {'report': report.name}
     stalls = {}
-    for name, unit, value in zip(header, units, first, strict=True):
+    for name, unit, value in metric_rows(raw):
         if name in KEEP:
             out[KEEP[name]] = to_number(value, unit) if name != 'Kernel Name' else value
         elif m := STALL.match(name):
