@@ -29,8 +29,8 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 
 | WS | Scope | Status |
 |---|---|---|
-| infra | GPU lock, SGLang worktrees, PR tooling, this list | done (PR #1, #2) |
-| lit | Literature review, novelty assessment, citation audit | active (PR #6 open) |
+| infra | GPU lock (FIFO queue), SGLang worktrees, PR tooling, this list | done (PR #1, #2, #8, #10) |
+| lit | Literature review, novelty assessment, citation audit | review (PR #6) |
 | bench | Baseline server arms, aiperf Pareto harness, quality baseline, spec tuning | active |
 | profile | nsys/ncu profiles and critical-path attribution | active |
 | geometry | Real-head replay: transport versus self-evidence bounds | active |
@@ -40,8 +40,8 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 | moonshot | Reformulations and approximations aimed at order-of-magnitude gains, with measured quality costs | active |
 | drafter | Public DFlash-4B drafter: serve, characterize, train only against a measured limitation | active |
 | integrate | SGLang integration of the certified head (draft, verify, decode) | todo |
-| paper | Manuscript revision as results land | todo |
-| review | Independent review of every PR before merge | ongoing |
+| paper | Manuscript revision as results land | active |
+| review | Independent review of every PR before merge | active |
 
 ## Task list
 
@@ -84,6 +84,7 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 - [ ] Before/after Pareto sweeps with acceptance and output-equality checks (bench, integrate)
 
 ### Paper and deliverables
-- [ ] Literature review and verified bibliography (lit)
+- [ ] Literature review and verified bibliography (lit; PR #6 in review)
+- [ ] Narrow the novelty claim: the greedy certified head is prior art (sparkpipe, dgpp, Laguna, knlp); the defensible parts are exact keyed-noise sampling, partition brackets for sampled acceptance, a Hopper-sound envelope and the SGLang/GH200 measurement under the stock-kernel contract; cite DSpark and D-cut for the sampled-depth counterexample (paper, kernel)
 - [ ] Revise the manuscript: methods, results, limitations, figures (paper)
 - [ ] README and RUNBOOK with exact reproduction commands (paper, infra)
