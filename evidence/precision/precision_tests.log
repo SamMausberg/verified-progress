@@ -23,14 +23,14 @@ test_topk (__main__.Precision.test_topk) ... ok
 test_transport_versus_self_evidence (__main__.Precision.test_transport_versus_self_evidence) ... ok
 
 ----------------------------------------------------------------------
-Ran 19 tests in 35.208s
+Ran 19 tests in 35.608s
 
 OK
 {
   "status": "pass",
   "test_methods": 19,
   "seed": 20260930,
-  "repo_commit": "1c55a2de6d369ddf0195b1d1dcdd873d3f0aa9fc",
+  "repo_commit": "9df1e0c76582d24cf5b02acf97a2459bdc774623",
   "python": "3.13.15",
   "numpy": "2.3.5",
   "counts": {
@@ -137,6 +137,6 @@ OK
       "stock_bf16_partials": 1
     }
   },
-  "seconds": 35.2,
+  "seconds": 35.6,
   "scope": "exact rational emulation of BF16/FP32/FP64 rounding, synthetic heads; no GPU, no model weights; the fused tensor-core adder is a model, not hardware"
 }

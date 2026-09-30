@@ -8,7 +8,7 @@ Python 3.12, torch 2.13.0+cu130 on CPU, safetensors 0.9.0-rc.1.
 
 Exact tests of `src/precision_reference.py`. Every BF16, FP32 and FP64 rounding is emulated on
 Fractions, so each bound and decision is checked against real arithmetic. Produced at commit
-`1c55a2de` (recorded in the JSON as `repo_commit`), seed 20260930:
+`9df1e0c7` (recorded in the JSON as `repo_commit`), seed 20260930:
 
 ```sh
 . .venv/bin/activate
@@ -56,7 +56,7 @@ errors. See `formal/STATUS.md` for what is and is not formalized.
 Weight-only constants of the Qwen3.5-4B tied head
 (`Qwen/Qwen3.5-4B@851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a`, tensor
 `model.language_model.embed_tokens.weight`, 248,320 x 2,560 BF16), computed in float64 on CPU at
-commit `e2d1e822` (the script has not changed since):
+commit `9df1e0c7`:
 
 ```sh
 ~/sglang/.venv/bin/python experiments/precision_head_constants/head_constants.py \
