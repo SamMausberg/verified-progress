@@ -1,0 +1,182 @@
+% Appendix G: evidence register, status of the questions, pending results, reproduction,
+% pins, attribution. Every path in G.1 must exist on the main branch (checked by script
+% before each pull request). Every item in G.3 is pending: its evidence file does not exist
+% on main. No pull-request numbers, owners or queue status appear anywhere in the paper.
+\section{Evidence register, pending results and reproduction}\label{app:record}
+\subsection{Evidence register}\label{app:register}
+Every committed result the paper cites is listed below with the claims it supports, the files that hold it and the program that produced them. All paths are relative to the repository at \repourl. The exact command behind each evidence file is in the \code{README.md} of the file's directory, and the files record the commits of this repository and of the engine that produced them where the generator records them. The text cites an entry as [E$n$]. Proved statements are not listed; their proofs are in the text and Appendix~\ref{app:checked} says which are machine-checked.
+
+\newcounter{evitem}
+\newcommand{\evgroup}[1]{\multicolumn{4}{@{}l}{\emph{#1}}\\}
+\newcommand{\evitem}[4]{\refstepcounter{evitem}\label{ev:#1}E\theevitem & #2 & #3 & #4\\}
+{\small
+\begin{longtable}{@{}P{.75cm}P{5.9cm}P{4.9cm}P{4.3cm}@{}}
+\toprule Entry & Supports & Files & Produced by\\\midrule\endfirsthead
+\toprule Entry & Supports & Files & Produced by\\\midrule\endhead
+\bottomrule\endlastfoot
+\evgroup{The certified head on captured engine states}
+\evitem{alignment}{Captured plain-decode head inputs reproduce the engine's tokens; \Rreal{} and \Rstock{} differ at about 0.5\% of greedy positions (Section~\ref{sec:transport-capture})}{\nolinkurl{evidence/head_geometry/alignment_plain4b.json}}{\nolinkurl{experiments/head_geometry/validate_alignment.py}}
+\evitem{selfevidence}{Candidate sets, envelope checks, head-input norms, batch unions, FP32 re-scoring and cascades on 6,005 held-out plain-decode positions (Section~\ref{sec:geometry-selfevidence}, Appendix~\ref{app:candidates})}{\nolinkurl{evidence/head_geometry/selfevidence_plain4b.json}}{\nolinkurl{experiments/head_geometry/analyze_selfevidence.py}}
+\evitem{selfevidence-csv}{Candidate counts per cheap head, envelope, accumulation model and decision}{\nolinkurl{evidence/head_geometry/selfevidence_plain4b.csv}}{\nolinkurl{experiments/head_geometry/analyze_selfevidence.py}}
+\evitem{ccdf}{Share of positions needing at least $k$ candidate rows (Figure~\ref{fig:candidates})}{\nolinkurl{evidence/head_geometry/selfevidence_plain4b_ccdf.csv}}{\nolinkurl{experiments/head_geometry/export_candidate_ccdf.py}}
+\evitem{stats}{Row norms, top-two margins, top-token mass, envelope width against realized error}{\nolinkurl{evidence/head_geometry/stats_plain4b.json}}{\nolinkurl{experiments/head_geometry/analyze_stats.py}}
+\evitem{rstock}{Rows and batches left to the stock kernel by rule and error model; no certified token differed from the engine's (Table~\ref{tab:rstock})}{\nolinkurl{evidence/head_geometry/rstock_plain4b.json}}{\nolinkurl{experiments/head_geometry/analyze_rstock.py}}
+\evitem{selfevidence-dflash}{Candidate sets on DFlash-4B verify and draft rows}{\nolinkurl{evidence/head_geometry/selfevidence_dflash4b.json}, \nolinkurl{selfevidence_dflash4b.csv}, \nolinkurl{selfevidence_dflash4b_ccdf.csv}}{\nolinkurl{experiments/head_geometry/analyze_selfevidence.py}}
+\evitem{tail}{Kill test of the certified decoder tail, P1 (Appendix~\ref{app:tail})}{\nolinkurl{evidence/head_geometry/tail_killtest.json}}{\nolinkurl{experiments/head_geometry/tail_killtest.py}}
+\evgroup{Transport}
+\evitem{head-constants}{Weight-only constants and the crossover thresholds $\delta^\ast$ (Table~\ref{tab:headconstants})}{\nolinkurl{evidence/precision/head_constants.json}}{\nolinkurl{experiments/precision_head_constants/head_constants.py}}
+\evitem{rho}{Drift ratio on 40,000 DFlash-4B pairs, by outcome, position, domain and context, with the per-row thresholds (Figure~\ref{fig:rho}, Table~\ref{tab:rho-groups})}{\nolinkurl{evidence/head_geometry/rho_dflash4b.json}, \nolinkurl{rho_dflash4b_quantiles.csv}, \nolinkurl{rho_dflash4b_pairs.csv}}{\nolinkurl{experiments/head_geometry/analyze_rho.py}}
+\evitem{transport}{Transport on DFlash-4B by bound family and tiling: skips, partition widths, $P_?$, batch unions, drift scaling (Tables~\ref{tab:transport}, \ref{tab:transport-families} and~\ref{tab:transport-scaling})}{\nolinkurl{evidence/head_geometry/transport_dflash4b.json}, \nolinkurl{transport_dflash4b.csv}}{\nolinkurl{experiments/head_geometry/analyze_transport.py}}
+\evitem{transport-mtp}{The same on 16,016 MTP-4B pairs, with their drift}{\nolinkurl{evidence/head_geometry/transport_mtp4b.json}, \nolinkurl{transport_mtp4b.csv}}{\nolinkurl{experiments/head_geometry/analyze_transport.py}}
+\evitem{stats-dflash}{Draft and target head-input statistics; alignment of the DFlash-4B capture (Appendix~\ref{app:transport-capture})}{\nolinkurl{evidence/head_geometry/stats_dflash4b.json}, \nolinkurl{alignment_dflash4b.json}}{\nolinkurl{experiments/head_geometry/analyze_stats.py}, \nolinkurl{validate_alignment.py}}
+\evgroup{Exact references and formal checks}
+\evitem{precision}{Exact floating-point reference: 21 test methods, 40,015 checks, the \Rbf, split-$K$ and noise-stream witnesses (Appendix~\ref{app:checked})}{\nolinkurl{evidence/precision/precision_tests.json}, \nolinkurl{precision_tests.log}}{\nolinkurl{tests/test_precision.py}}
+\evitem{lean}{Lean 4.19.0 elaboration of the two formal files (Appendix~\ref{app:checked})}{\nolinkurl{formal/STATUS.md}, \nolinkurl{evidence/precision/lean_check.log}}{\nolinkurl{scripts/check_lean.sh}}
+\evitem{inherited}{Exact rational reference for decisions and races (Table~\ref{tab:tests}); the replay witness of Proposition~\ref{prop:gdn}}{\nolinkurl{evidence/decision_tests.json}, \nolinkurl{race_tests.json} and their logs}{\nolinkurl{tests/test_decisions.py}, \nolinkurl{tests/test_races.py}, via \nolinkurl{scripts/verify_artifact.py}}
+\evitem{synthetic}{Work counts on constructed heads (Figure~\ref{fig:synthetic})}{\nolinkurl{data/synthetic_drift.csv}, \nolinkurl{evidence/synthetic_drift.json}}{\nolinkurl{experiments/synthetic_drift.py}}
+\evitem{contracts}{Witnesses that separate the exactness contracts; the regrouped recurrence; the transition norm (Appendix~\ref{app:contracts})}{\nolinkurl{evidence/contracts/contract_witnesses.json}, \nolinkurl{contract_witnesses.log}}{\nolinkurl{tests/test_contracts.py}}
+\evitem{state-structure}{Witnesses for the structure of the recurrent state and for sharing across requests (Appendix~\ref{app:minimal-state})}{\nolinkurl{evidence/state_structure/state_structure_tests.json}, \nolinkurl{state_structure_tests.log}}{\nolinkurl{tests/test_state_structure.py}}
+\evgroup{The stock engine}
+\evitem{state-mech}{First differing module outputs and divergence classes under both error models (Figure~\ref{fig:divergence}, Table~\ref{tab:divergence})}{\nolinkurl{evidence/state_safety/mechanism_plain_c1_vs_mtp_s3_c1.json}, \nolinkurl{mechanism_plain_c1_vs_c32.json}, \nolinkurl{divergences.csv}}{\nolinkurl{experiments/state_safety/mechanism.py}, \nolinkurl{compare.py}}
+\evitem{state-noise}{Divergence rates, BF16 top-two ties, same-server repeats and the deterministic-mode checks; the server settings of every run}{\nolinkurl{evidence/state_safety/noise_floor.csv}, \nolinkurl{noise_floor.json}, \nolinkurl{run_meta.json}}{\nolinkurl{experiments/state_safety/run_all.sh}, \nolinkurl{compare.py}}
+\evitem{state-tap}{Positive controls of the bit-exact tap}{\nolinkurl{evidence/state_safety/tap_control_down9.json}, \nolinkurl{tap_control_core13_decode.json}, \nolinkurl{tap_control_core13.json}}{\nolinkurl{experiments/state_safety/mechanism.py}}
+\evgroup{Where the time goes}
+\evitem{profile-attr}{Attribution of the plain step and the MTP cycle by component; unprofiled throughput; the state-slot reservation (Tables~\ref{tab:profile-plain}, \ref{tab:profile-mtp} and~\ref{tab:profile-ranked})}{\nolinkurl{evidence/profiles/attribution/}, \nolinkurl{tables.md}, \nolinkurl{breakdown.csv}, \nolinkurl{step_share.csv}, \nolinkurl{label_structure_check.json}, \nolinkurl{windows/}}{\nolinkurl{experiments/profiling/run_profiles.py}, \nolinkurl{attribute.py}, \nolinkurl{summarize.py}}
+\evitem{profile-head}{The head chain's share of a plain step and of an MTP cycle; the head microbenchmark and the kernels cuBLAS selects}{\nolinkurl{evidence/profiles/attribution/}, \nolinkurl{head_microbench.json}, \nolinkurl{head_microbench_kernels.json}}{\nolinkurl{experiments/profiling/attribute.py}, \nolinkurl{head_microbench.py}}
+\evitem{profile-bw}{Read bandwidth: 3.83~TB/s over 4~GiB, 3.79~TB/s over the head's footprint}{\nolinkurl{evidence/profiles/hbm_bandwidth.json}}{\nolinkurl{experiments/profiling/hbm_bandwidth.py}}
+\evitem{profile-bytes}{Bytes per step by component, checked against measured kernels; bytes per output token of plain decoding and MTP over the batch size}{\nolinkurl{evidence/profiles/bytes_per_step.json}, \nolinkurl{bytes_per_step_sweep.csv}, \nolinkurl{bytes_per_step_sweep_wide.csv}}{\nolinkurl{experiments/profiling/bytes_model.py}}
+\evitem{profile-host}{Host functions running while the GPU idles in the MTP cycle}{\nolinkurl{evidence/profiles/diagnostics/}}{\nolinkurl{experiments/profiling/host_gaps.py}, \nolinkurl{pyspy_summary.py}}
+\evitem{profile-p5}{Share of layer 0's GDN input projections in a plain step (P5)}{\nolinkurl{evidence/profiles/p5_layer0_in_proj.json}}{\nolinkurl{experiments/profiling/layer0_share.py}}
+\evitem{ceilings}{Derived ceilings per lever stack under both execution models (Table~\ref{tab:stack-ceilings}, Figure~\ref{fig:stack-ceilings})}{\nolinkurl{evidence/moonshot/ceilings.json}, \nolinkurl{ceilings.csv}}{\nolinkurl{experiments/moonshot/ceilings.py}}
+\evitem{levers}{First served lever measurements, single runs}{\nolinkurl{evidence/moonshot/lever_sweeps_quick.csv}}{\nolinkurl{experiments/moonshot/lever_sweep.py}, \nolinkurl{summarise.py}}
+\evitem{decode-steps}{First engine-only decode-step times by state precision}{\nolinkurl{evidence/moonshot/decode_ceiling_try1.csv}}{\nolinkurl{experiments/moonshot/decode_ceiling_sweep.py}}
+\evitem{moonshot-patches}{Engine patches for the reduced draft head, the relaxed greedy rule and rounding-preserving replay, with their tests; code, not results}{\nolinkurl{engine/sglang/patches/moonshot/}, \nolinkurl{tests/test_moonshot_levers.py}, \nolinkurl{tests/test_gdn_exact_replay.py}}{--}
+\evgroup{Drafting and serving}
+\evitem{drafter-launch}{Command, environment and resolved settings of the drafter's acceptance runs}{\nolinkurl{evidence/drafter/launch/}}{\nolinkurl{experiments/drafter/run_trace.sh}}
+\evitem{drafter-acc}{DFlash acceptance by block position and domain (Table~\ref{tab:drafter-tau}, Figure~\ref{fig:drafter-acceptance})}{\nolinkurl{evidence/drafter/acceptance_summary.csv}, \nolinkurl{acceptance_by_position.csv}}{\nolinkurl{experiments/drafter/summarize_acceptance.py}}
+\evitem{drafter-trace}{Acceptance by text segment and the class of the first rejected draft}{\nolinkurl{evidence/drafter/trace_segments_b16.csv}, \nolinkurl{trace_segments_b16_failures.json} (and the block-8 files)}{\nolinkurl{experiments/drafter/trace_analysis.py}}
+\evitem{drafter-data}{A training prompt set disjoint from every benchmark and quality set}{\nolinkurl{evidence/drafter/data/prompts-v2.manifest.json}}{\nolinkurl{experiments/drafter/build_train_prompts.py}}
+\evitem{workload}{The frozen serving workload: sources, revisions, splits and token statistics}{\nolinkurl{bench/workloads/mixed-v2/manifest.json}}{\nolinkurl{bench/build_workload.py}}
+\evitem{natural-lengths}{Where greedy outputs stop on 576 tuning prompts}{\nolinkurl{evidence/bench/workload/natural_lengths_tune.json}, \nolinkurl{natural_requests_tune.csv}}{\nolinkurl{bench/sweep.py}, \nolinkurl{bench/lengths.py}}
+\evitem{probes}{Feasibility probes of capacity and draft trees (what launches, not performance)}{\nolinkurl{evidence/bench/probes/}}{\nolinkurl{bench/campaigns/capacity_probes.sh}, \nolinkurl{bench/pareto.py}}
+\evitem{frontend}{Frontend diagnosis at concurrency 256 on a quiet host (single points)}{\nolinkurl{evidence/bench/frontend/}}{\nolinkurl{bench/campaigns/frontend_diagnostic.sh}, \nolinkurl{bench/pareto.py}}
+\evgroup{Literature}
+\evitem{litreview}{Literature review and citation audit behind Section~\ref{sec:related}}{\nolinkurl{sources/literature_review.md}, \nolinkurl{citation_audit.md}, \nolinkurl{source_manifest.json}}{--}
+\end{longtable}}
+A file name listed without a directory is in the directory of the entry's first file. Raw captures, traces and per-row arrays are not in the repository; each evidence README gives the command that regenerates them on the same hardware.
+
+\subsection{Status of the questions}\label{app:status}\label{sec:falsifiers}\label{sec:hypotheses}
+Table~\ref{tab:status} pairs each question of the programme (H1--H7) and each later proposal with a pre-registered kill test (P1--P6) with the test that decides or could damage it and its status. A failed hypothesis stays in the table with its mechanism.
+
+{\small
+\begin{longtable}{@{}P{5.2cm}P{4.6cm}P{6.5cm}@{}}
+\caption{Questions and proposals, the test that decides or could damage each, and the status. Pending entries are listed in Appendix~\ref{app:devrecord}.}\label{tab:status}\label{tab:failures}\label{tab:hypotheses}\\
+\toprule Question or claim & Deciding or damaging test & Status\\\midrule\endfirsthead
+\toprule Question or claim & Deciding or damaging test & Status\\\midrule\endhead
+\bottomrule\endlastfoot
+H1: the head is a large share of decode and MTP-speculation time & Nsight attribution at several batch sizes (Appendix~\ref{app:profile}) & Measured: the head chain is 10.3--6.1\% of a plain step ($B=1$--128) and 17.2--12.4\% of an MTP cycle ($B=1$--32), below its 15.1\% byte share~\ev{profile-head}\\
+H2: transport gives useful certificates on real hidden states, tighter than self-evidence and the static screen & Drift ratio against $\delta^\ast$; certification on aligned pairs (Section~\ref{sec:transport-measured}) & Refuted on DFlash-4B and MTP-4B for every bound family and tiling tested~\ev{rho,transport,transport-mtp}\\
+H3: a low-precision head with a rigorous envelope certifies the stock decision while reading fewer weight bytes & Candidate sets on replayed rows, then a GPU kernel against the stock head chain (Section~\ref{sec:selfevidence}) & Envelope and contract proved; candidate sets and fallback shares measured on replayed rows~\ev{selfevidence,rstock}; runtime \pend{kernel-path}\\
+\quad Certified tokens equal stock tokens & Same-shape token equality; measured cuBLAS error against the modelled $G_i$ & No disagreement on 6,005 replayed rows~\ev{rstock}; kernel error \pend{kernel-error}\\
+\quad Fewer bytes read means less time & Head-path time against the stock chain at each served shape & \pend{kernel-path}\\
+\quad Per-row sparsity reduces weight traffic & Batch unions of candidates; measured traffic & Candidate unions on capture batches measured~\ev{selfevidence}; traffic \pend{kernel-micro}\\
+\quad Certificates save target work & Count rows, re-scoring and completion, not only decision cost & A cheap decision is not a cheap verification on constructed heads~\ev{synthetic}\\
+H4: the certificate improves the served frontier without changing outputs & Before-and-after sweeps with output-equality checks (Appendix~\ref{app:serving}) & \pend{bench-cert}\\
+H5: SGLang's hybrid state stays correct under speculative verification & Targeted tests at every rejection position, aborts and prefix reuse (Appendix~\ref{app:state}) & \pend{state-targeted}\\
+H6: other layers of the stack leave measurable headroom & Attribution and controlled ablations (Appendices~\ref{app:profile} and~\ref{app:levers}) & Measured shares: FP32 state 41.6\% of a plain step at $B=128$; host gaps about 21\% of an unprofiled MTP cycle at $B=1$~\ev{profile-attr,profile-host}; removals \pend{moonshot-repeat}\\
+H7: reformulations and declared approximations multiply gains well beyond tuning & Bytes per step, quality--speed curves, end-to-end sweeps (Appendix~\ref{app:stack}) & Ceilings derived~\ev{ceilings}; first single runs~\ev{levers}; the rest \pend{moonshot-frontiers}\\
+\quad Adaptive sampled depth stays exact & Tiny laws with candidate-dependent stopping & Settled by prior art and Theorem~\ref{thm:fixednoise} (Appendix~\ref{app:stopping})\\
+P1: a certificate on the decision can skip the final layer's MLP and the head & Oracle-radius replay at the cut (Appendix~\ref{app:tail}) & Rejected by its kill test~\ev{tail}\\
+P2: long-window exact repair from a DFlash window beats optimized DFlash substantially & Perfect-continuation oracle, then real windows (Appendix~\ref{app:repair}) & Hypothesis \pend{repair-a,repair-jacobi}\\
+P3: target-anchored residual repair is much cheaper than recomputation & Oracle and real-correction kill tests (Appendix~\ref{app:repair}) & Hypothesis \pend{repair-residual,repair-verdict}\\
+P4: writing the recurrent state less often, bit-exactly, gives at least $1.10\times$ decode throughput at batch 128 & Bit-exactness check, then paired timing (Appendix~\ref{app:minimal-state}) & Hypothesis \pend{moonshot-p4}\\
+\quad The recurrent state compresses exactly & Exact witnesses; rank audit of captured keys & Witnesses committed~\ev{state-structure}; audit \pend{moonshot-rank}\\
+P5: exact computation can be shared across unrelated requests & Analysis, exact witnesses, measured share of the one structural candidate & Rejected in analysis and by its pre-registered criterion (at most 0.60\% of a step)~\ev{profile-p5}\\
+P6: a draft selector trained for rate beats the same selector with the strongest matched objective by $1.25\times$ & Candidate-support screen, then a matched-objective comparison (Appendix~\ref{app:selector}) & Hypothesis \pend{drafter-p6}\\
+Results transfer & New prompts, a second model or a second GPU & \pend{transfer}\\
+\end{longtable}}
+
+\subsection{Pending results}\label{app:devrecord}
+Each entry is designed work whose result is not in the repository's main branch. The text marks it \mbox{[pending D$n$]} and says beside the marker what the result will decide; no number stands in for it.
+
+\newcounter{devitem}
+\newcommand{\devitem}[3]{\refstepcounter{devitem}\label{dev:#1}D\thedevitem & #2 & #3\\}
+{\small
+\begin{longtable}{@{}P{.75cm}P{10.5cm}P{5.0cm}@{}}
+\toprule Entry & Pending result & Evidence it will produce\\\midrule\endfirsthead
+\toprule Entry & Pending result & Evidence it will produce\\\midrule\endhead
+\bottomrule\endlastfoot
+\devitem{kernel-impl}{The certified-head implementation, with its tests}{\nolinkurl{src/certified_head/}, \nolinkurl{tests/}}
+\devitem{kernel-error}{The cuBLAS kernel selected per batch size, whether disabling reduced-precision reduction changes its output, and its observed accumulation error against both error models; decides whether the modelled $G_i$ covers the stock kernel at the served shapes}{\nolinkurl{evidence/certified_head/stock_invariance.json}}
+\devitem{kernel-invariance}{Row-wise and column-subset bitwise invariance of the stock head GEMM by batch size, which the row-wise fallback needs}{\nolinkurl{evidence/certified_head/stock_invariance.json}}
+\devitem{kernel-replay}{Undecided rows and batches by error model and fallback mode on decode steps replayed through the kernel}{\nolinkurl{evidence/certified_head/replay_decisions.json}}
+\devitem{kernel-rowwise}{Cost of the invariance-checked row-wise fallback at $M=32$ to 256}{\nolinkurl{evidence/certified_head/micro_head.json}}
+\devitem{kernel-micro}{Per-$M$ times of the int8, integer and BF16 passes; stage times; the int8 pass's effective bandwidth; primitive costs; batch-union traffic}{\nolinkurl{evidence/certified_head/micro_head.json}, \nolinkurl{head_primitives.json}}
+\devitem{kernel-path}{Complete head-path time and variance for $M=1$ to 256, certified against the stock chain, per error model; decides whether fewer bytes means less time (H3)}{\nolinkurl{evidence/certified_head/head_path_time.csv}}
+\devitem{kernel-seeded}{The written slack derivation for the seeded race with its tests; token-for-token agreement with the stock seeded sampler on replayed steps; acceptance against the stock speculative sampler}{\nolinkurl{evidence/certified_head/}}
+\devitem{geometry-drift}{For the MTP capture: the alignment check, the drift by draft step, outcome and domain, and self-evidence candidate sets (its transport result is committed)}{\nolinkurl{evidence/head_geometry/alignment_mtp4b.json}, \nolinkurl{rho_mtp4b.json}, \nolinkurl{selfevidence_mtp4b.json}}
+\devitem{geometry-work}{Work counts per mechanism converted to predicted time with the kernel's primitive costs (model predictions)}{\nolinkurl{evidence/head_geometry/work_model.json}}
+\devitem{geometry-accept}{Race candidate counts on speculative states at $T=1$ and 0.7; mass-enclosure ratios and $P_?$ for the standard rule on real drafts; decisions resolved before re-scoring; acceptance under fixed-noise coupling against standard verification}{\nolinkurl{evidence/head_geometry/}, \nolinkurl{evidence/certified_head/}}
+\devitem{state-mech}{Whether the caches entering the first differing module agree; the remaining configuration pairs (MTP with one, three and five steps and a tree, prefix cache and overlap off, deterministic mode and the FP32 head in full); the five prompts whose output the tap changed}{\nolinkurl{evidence/state_safety/}}
+\devitem{state-targeted}{Outcome of each targeted state test of Appendix~\ref{app:state} (H5)}{\nolinkurl{evidence/state_safety/targeted.json}}
+\devitem{moonshot-repeat}{Repeated engine-only and served measurements up to $B=1{,}024$ per state and weight format, a paired rerun of the FP16-state lever, and the levers that fail or regress, with mechanisms}{\nolinkurl{evidence/moonshot/}}
+\devitem{moonshot-state}{MTP with and without replayed verification at concurrency 128 to 1,024; logit-probe KL, divergence rate and GSM8K for FP32, FP16, BF16 and FP8 state, with and without replay}{\nolinkurl{evidence/moonshot/lever_sweeps_hc.csv}, \nolinkurl{lever_quality.csv}}
+\devitem{moonshot-rank}{Rank and observability audit of captured $q$, $k$, $\alpha$ and $\beta$ traces, by exact or modular rank}{\nolinkurl{evidence/moonshot/}}
+\devitem{moonshot-p4}{P4: the bit-exactness result of rounding-preserving replay, then the pre-registered paired timing at batch 128}{\nolinkurl{evidence/moonshot/}}
+\devitem{moonshot-patches}{Measured effect of the reduced draft head and the relaxed greedy rule, and the rule's quality curve}{\nolinkurl{evidence/moonshot/}}
+\devitem{moonshot-frontiers}{The interaction matrix and the exact and lossy frontiers, one server launch per arm, with the lossy stack's quality}{\nolinkurl{evidence/moonshot/interactions.csv}, \nolinkurl{frontier_exact.csv}, \nolinkurl{frontier_lossy.csv}}
+\devitem{drafter-cycle}{Committed tokens per cycle against tuned MTP on the same prompts; the split of a DFlash cycle at batch 1, 4, 16 and 64 from an untraced run}{\nolinkurl{evidence/drafter/cycle_split.csv}}
+\devitem{drafter-equality}{DFlash divergences against plain decoding per 1,000 tokens, blocks 8 and 16, by mechanism}{\nolinkurl{evidence/drafter/equality.json}}
+\devitem{drafter-train}{Which limitation of the drafter the measurements support, and the decision on training}{\nolinkurl{evidence/drafter/}}
+\devitem{drafter-p6}{P6: the candidate-support screen $U$ against measured acceptance, then the matched-objective comparison}{\nolinkurl{evidence/drafter/}}
+\devitem{repair-a}{$V(B)$, $C_{\rm state}(B)$, draft cost and cycle period per width, acceptance of the reference continuation per width, $S_{\rm a}(B)$ and $S_{\rm b}(B)$}{\nolinkurl{evidence/repair/stage_a_timing.json}, \nolinkurl{stage_a_oracle.csv}}
+\devitem{repair-jacobi}{Accepted drafts against the number of Jacobi sweeps, recycle and keep, per block width}{\nolinkurl{evidence/repair/jacobi_progress.csv}}
+\devitem{repair-residual}{Decision agreement, $R_i$, hazards and progress per rank for the anchored residual evaluator}{\nolinkurl{evidence/repair/residual_eval.json}}
+\devitem{repair-verdict}{Kill-test verdicts for P2 and P3, and the first P3 condition to fail}{\nolinkurl{evidence/repair/README.md}}
+\devitem{bench-capacity}{Capacity limits per arm at default settings, from the server logs}{\nolinkurl{evidence/bench/}}
+\devitem{bench-tuning}{The chosen MTP and DFlash configurations, with the tuning evidence}{\nolinkurl{evidence/bench/tuning/}}
+\devitem{bench-quality}{GSM8K accuracy for arms A, B and C with intervals and paired tests}{\nolinkurl{evidence/bench/quality/}}
+\devitem{bench-frontier}{Frontier table and run-to-run variance for arms A, B and C (Figure~\ref{fig:frontier})}{\nolinkurl{evidence/bench/confirm/frontier.csv}, \nolinkurl{evidence/bench/variance/}}
+\devitem{bench-mtp}{Served MTP speculation against plain decoding across concurrency, with and without buffered GDN verification}{\nolinkurl{evidence/bench/}}
+\devitem{bench-cert}{Before-and-after frontiers for the certified head in drafting, verification and plain decoding, with output equality at the same batch shape (H4)}{\nolinkurl{evidence/bench/}}
+\devitem{bench-frontend}{Frontend behaviour above concurrency 256 on a quiet host, and repeats of the single-point diagnosis}{\nolinkurl{evidence/bench/frontend/}}
+\devitem{transfer}{Transfer to new prompts, a second model (the public DFlash~2 pair for Qwen3.8-27B) or a second GPU; not scheduled}{--}
+\end{longtable}}
+
+\subsection{Reproduction}\label{app:repro}
+The CPU evidence (the exact references, the contract and state-structure witnesses, the synthetic experiment and the Lean check) is reproduced from the repository root with Python 3.13, NumPy and, for the formal files, Lean 4.19.0:
+\par\noindent\begin{minipage}{\linewidth}
+\begin{verbatim}
+python -m venv .venv && . .venv/bin/activate
+python -m pip install -r requirements-cpu.txt -r requirements-dev.txt
+python scripts/verify_artifact.py        # rational references, synthetic drift, Lean check
+python tests/test_precision.py           # exact floating-point reference
+python tests/test_contracts.py           # contract witnesses
+python tests/test_state_structure.py     # recurrent-state witnesses
+python -m pytest tests/                  # every CPU test; GPU tests skip without CUDA
+\end{verbatim}
+\end{minipage}\par\smallskip
+The GPU experiments need the hardware and engine of Appendix~\ref{app:pins}: one GH200 and the engine at the pin with the patches under \path{engine/sglang/patches/}, whose \code{README.md} gives the commands that apply each series. Every evidence directory's \code{README.md} lists the exact command behind each file, and \code{RUNBOOK.md} collects the procedures. Timed runs were taken with exclusive use of the GPU and with the CPU load of other processes recorded for every point. The paper builds with \code{latexmk -pdf paper.tex} in \path{paper/} (pdfLaTeX and BibTeX, no shell escape); the build fetches the MLSys style file from the official kit and checks its SHA-256 digest (\path{paper/template/README.md}), and a figure whose data file is absent builds as a marked placeholder.
+
+\subsection{Hardware, software and model pins}\label{app:pins}
+\begin{table}[htbp]
+\small\centering
+\begin{tabularx}{\linewidth}{@{}P{3.4cm}Y@{}}\toprule
+Item & Pin\\\midrule
+GPU & One NVIDIA GH200 480GB: 96~GB HBM3, compute capability 9.0 (sm\_90), 132 SMs, 60~MB L2; clocks 1,980~MHz (SM) and 2,619~MHz (memory) during the profiles\\
+Host & 64-core Grace (aarch64); driver 570.195.03 with CUDA 13.0 forward-compatibility libraries\\
+Engine & SGLang \texttt{bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824} (0.5.21.dev861), PyTorch 2.13.0+cu130, FlashInfer 0.6.18, Triton 3.7.1; FlashAttention~3 and~4 are unavailable on this aarch64 host\\
+Target model & \code{Qwen/Qwen3.5-4B} at revision \texttt{851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a}, BF16; its MTP layer loads from the same checkpoint\\
+Block drafter & \code{z-lab/Qwen3.5-4B-DFlash} at revision \texttt{9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf} (weights SHA-256 \texttt{1eb221d3\ldots}; byte-identical to \code{modal-labs/Qwen3.5-4B-DFlash})\\
+Engine patches & Head-input capture (\path{engine/sglang/patches/geometry/}), divergence tap and verify KV split (\path{state/}), lever arms (\path{moonshot/}), acceptance trace hook (\path{drafter/}); each is off unless its flag or environment variable is set\\
+Serving client & AIPerf 0.13.0, closed-loop concurrency, streaming chat completions\\
+Profilers & Nsight Systems 2025.3.2, Nsight Compute 2025.3.1\\
+CPU references & Python 3.13.15, NumPy 2.3.5; Lean 4.19.0\\
+Prompts & 320 capture prompts (\path{evidence/head_geometry/prompt_manifest.csv}), 320 divergence prompts (\path{evidence/state_safety/prompt_manifest.json}), the serving workload~\ev{workload}, each with its sources and SHA-256 digests\\\bottomrule
+\end{tabularx}
+\caption{Pins of every measurement in the paper. The precise command, commits and resolved server settings of each run are recorded next to its evidence.}
+\label{tab:pins}
+\end{table}
+
+\subsection{Attribution and disclosure}\label{app:attribution}
+Samuel Mausberg is the author of this paper and is responsible for its claims. The earlier draft of the manuscript, its derivations and its reference code were prepared with GPT-6 Astra Pro (OpenAI) from research materials, public primary sources and local CPU execution. This version was produced with Claude Code, using Claude Opus 5.5 agents for the literature review, theory, measurements, implementation and writing; each change to the literature, theory and evidence this paper cites was reviewed by an independent reviewing agent before it was merged, and all of the work is subject to the author's review. No AI system is an author. The confidential assignment that motivated the work is not reproduced or quoted, and no model weights are redistributed.

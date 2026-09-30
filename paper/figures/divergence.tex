@@ -10,12 +10,12 @@
 \node[text=ink] at (15.5,-1.3) {decoder layer (shaded: full attention; others: Gated DeltaNet)};
 % row labels
 \node[anchor=east,align=right,text=ink] at (-1,1.5) {plain vs MTP\\(batch 1, 167)};
-\node[anchor=east,align=right,text=ink] at (-1,0.3) {batch 1 vs 32\\(plain, 40)};
+\node[anchor=east,align=right,text=ink] at (-1,0.3) {concurrency 1 vs 32\\(plain, 40)};
 \draw[ink!15] (-0.6,1.5) -- (31.6,1.5);\draw[ink!15] (-0.6,0.3) -- (31.6,0.3);
 % plain vs MTP: layer 0 GDN recurrence in all 167
 \fill[brick] (0,1.5) circle (5.5pt);
 \node[anchor=west,text=brick] at (0.9,1.5) {all 167: GDN recurrence (decode kernel vs target-verify kernel)};
-% batch 1 vs 32: gated RMSNorm in GDN layers (squares), attention output (triangle), prefill down_proj (diamond)
+% concurrency 1 vs 32 (batches of up to 16): gated RMSNorm in GDN layers (squares), attention output (triangle), prefill down_proj (diamond)
 \foreach \l/\n in {0/3,5/1,10/1,14/3,16/1,18/4,20/2,21/3,24/1,25/3,26/1,28/4,29/2} {
   \node[draw=teal,fill=teal!35,rectangle,minimum size={2.6pt+1.6pt*\n},inner sep=0pt] at (\l,0.3) {};
   \node[text=teal,font=\scriptsize] at (\l,0.72) {\n};}
