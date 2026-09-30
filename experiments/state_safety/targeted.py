@@ -21,6 +21,8 @@ summary. Tests:
               outputs are compared with the same probes served alone.
   prefill     per-position input logprobs of long prompts, for comparing
               chunked-prefill sizes offline (compare_prefill.py).
+  repeat      the same prompts several times at batch 1 on one server with
+              the cache flushed: run-to-run determinism of tokens and logprobs.
 
 Run under the shared GPU lock, e.g.
 
@@ -227,10 +229,27 @@ def _group(cases: list[dict[str, Any]], key: str, flag: str) -> dict[str, dict[s
 
 
 async def run_prefix(url: str, prompts: list[dict[str, Any]], args: argparse.Namespace):
-    """Checkpointed GDN states from decode, restored for new requests."""
+    """Checkpointed GDN states from decode, restored for new requests.
+
+    Every warm case starts from a flushed cache holding only the checkpoints of
+    one fresh generation A (or its truncated or stopped variant), so the state
+    it restores was taken during speculative decode; every cold case starts
+    from a flushed cache.
+    """
     chosen = [p for p in prompts if p['thinking']][: args.num_prompts]
     cases = []
     async with aiohttp.ClientSession(timeout=TIMEOUT) as s:
+
+        async def warm_cold(
+            seed_ids: list[int], seed_len: int, seed_kw: dict[str, Any], ids: list[int]
+        ):
+            flush_cache(url)
+            seed = await generate(s, url, seed_ids, seed_len, **seed_kw)
+            warm = await generate(s, url, ids, args.ext_len)
+            flush_cache(url)
+            cold = await generate(s, url, ids, args.ext_len)
+            return seed, warm, cold
+
         for p in chosen:
             P = len(p['input_ids'])
             flush_cache(url)
@@ -241,68 +260,72 @@ async def run_prefix(url: str, prompts: list[dict[str, Any]], args: argparse.Nam
                 for t in range(TRACK_INTERVAL, len(seq) - args.ext_len, TRACK_INTERVAL)
                 if t > P + 1
             ]
-            lengths = sorted({b + d for b in bounds for d in (0, 1, 3, 37)})
-            warm = {}
-            for L in lengths:
-                warm[L] = await generate(s, url, seq[:L], args.ext_len)
-            flush_cache(url)
-            for L in lengths:
-                cold = await generate(s, url, seq[:L], args.ext_len)
-                own = {'output_ids': seq[L : L + args.ext_len], 'top_logprobs': []}
-                cases.append(
-                    {
-                        'id': p['id'],
-                        'kind': 'decode_checkpoint',
-                        'prefix_len': L,
-                        'boundary': L - (L % TRACK_INTERVAL),
-                        'warm_cached_tokens': warm[L]['cached_tokens'],
-                        'cold_cached_tokens': cold['cached_tokens'],
-                        'warm_vs_cold': diff(cold, warm[L]),
-                        'warm_vs_original': diff(own, warm[L]),
-                    }
-                )
-            # A checkpoint taken in the cycle that also finished the request:
-            # truncate inside the boundary-crossing cycle, then reuse.
             for b in bounds:
+                for L in (b, b + 1, b + 3, b + 37):
+                    seed, warm, cold = await warm_cold(
+                        p['input_ids'], args.long_len, {'ignore_eos': True}, seq[:L]
+                    )
+                    own = {'output_ids': seq[L : L + args.ext_len], 'top_logprobs': []}
+                    cases.append(
+                        {
+                            'id': p['id'],
+                            'kind': 'decode_checkpoint',
+                            'prefix_len': L,
+                            'boundary': b,
+                            'seed_identical': seed['output_ids'] == a['output_ids'],
+                            'warm_cached_tokens': warm['cached_tokens'],
+                            'cold_cached_tokens': cold['cached_tokens'],
+                            'warm_vs_cold': diff(cold, warm),
+                            'warm_vs_original': diff(own, warm),
+                        }
+                    )
+                # A checkpoint taken in the cycle that also finished the
+                # request, cut there by max_new_tokens or by a stop token that
+                # first occurs before the boundary.
                 cyc = _crossing_cycle(a, P, b)
                 if cyc is None:
                     continue
                 start, n = cyc
+                out = a['output_ids']
                 for m in range(start + 1, start + n):
                     if P + m - 1 >= b:
                         break
-                    flush_cache(url)
-                    trunc = await generate(s, url, p['input_ids'], m)
-                    L = b + 1
-                    w = await generate(s, url, seq[:L], args.ext_len)
-                    flush_cache(url)
-                    c = await generate(s, url, seq[:L], args.ext_len)
-                    cases.append(
-                        {
-                            'id': p['id'],
-                            'kind': 'checkpoint_in_finishing_cycle',
-                            'boundary': b,
-                            'max_new_tokens': m,
-                            'truncated_identical': trunc['output_ids'] == a['output_ids'][:m],
-                            'prefix_len': L,
-                            'warm_cached_tokens': w['cached_tokens'],
-                            'warm_vs_cold': diff(c, w),
-                        }
-                    )
+                    variants = [('max_new_tokens', m, {})]
+                    tok = out[m - 1]
+                    if tok not in out[: m - 1]:
+                        variants.append(('stop_token', args.long_len, {'stop_token_ids': [tok]}))
+                    for how, seed_len, kw in variants:
+                        seed, warm, cold = await warm_cold(
+                            p['input_ids'], seed_len, kw, seq[: b + 1]
+                        )
+                        cases.append(
+                            {
+                                'id': p['id'],
+                                'kind': 'checkpoint_in_finishing_cycle',
+                                'finished_by': how,
+                                'boundary': b,
+                                'output_len': m,
+                                'seed_identical': seed['output_ids'] == out[:m],
+                                'prefix_len': b + 1,
+                                'warm_cached_tokens': warm['cached_tokens'],
+                                'cold_cached_tokens': cold['cached_tokens'],
+                                'warm_vs_cold': diff(cold, warm),
+                            }
+                        )
     summary: dict[str, Any] = {}
     for kind in ('decode_checkpoint', 'checkpoint_in_finishing_cycle'):
         ks = [c for c in cases if c['kind'] == kind]
         summary[kind] = {
             'cases': len(ks),
+            'seed_identical': sum(c['seed_identical'] for c in ks),
             'warm_vs_cold_identical': sum(c['warm_vs_cold']['identical'] for c in ks),
             'divergence_classes': _count(
                 c['warm_vs_cold'].get('cls') for c in ks if not c['warm_vs_cold']['identical']
             ),
             'warm_cache_hit_at_boundary': sum(
-                1
-                for c in ks
-                if c['warm_cached_tokens'] is not None and c['warm_cached_tokens'] >= c['boundary']
+                1 for c in ks if (c['warm_cached_tokens'] or 0) >= c['boundary']
             ),
+            'cold_cache_hits': sum(1 for c in ks if (c['cold_cached_tokens'] or 0) > 0),
         }
     return {'cases': cases, 'summary': summary}
 
@@ -372,6 +395,61 @@ async def run_abort(url: str, prompts: list[dict[str, Any]], args: argparse.Name
     return {'cases': cases, 'aborts': aborts, 'summary': summary}
 
 
+# ---------------------------------------------------------------- run-to-run repeats
+
+
+async def run_repeat(url: str, prompts: list[dict[str, Any]], args: argparse.Namespace):
+    """Same prompt, same server, batch 1, cache flushed: are logprobs bitwise equal?"""
+    chosen = prompts[:: max(1, len(prompts) // args.num_prompts)][: args.num_prompts]
+    # Include every prompt whose length is a multiple of 64 (FLA chunk size),
+    # where the matrix showed a prefill that did not repeat bitwise.
+    chosen += [p for p in prompts if len(p['input_ids']) % 64 == 0 and p not in chosen]
+    cases = []
+    async with aiohttp.ClientSession(timeout=TIMEOUT) as s:
+        for p in chosen:
+            recs = []
+            for _ in range(args.repeats):
+                flush_cache(url)
+                recs.append(await generate(s, url, p['input_ids'], args.full_len))
+            first = recs[0]
+            same_tokens = sum(r['output_ids'] == first['output_ids'] for r in recs[1:])
+            same_lp = sum(r['top_logprobs'] == first['top_logprobs'] for r in recs[1:])
+            mismatch_pos = [
+                next(
+                    (
+                        i
+                        for i, (x, y) in enumerate(
+                            zip(first['top_logprobs'], r['top_logprobs'], strict=False)
+                        )
+                        if x != y
+                    ),
+                    None,
+                )
+                for r in recs[1:]
+            ]
+            cases.append(
+                {
+                    'id': p['id'],
+                    'prompt_len': len(p['input_ids']),
+                    'repeats': len(recs),
+                    'tokens_identical': same_tokens,
+                    'logprobs_bitwise_identical': same_lp,
+                    'first_logprob_mismatch': mismatch_pos,
+                }
+            )
+    reps = sum(c['repeats'] - 1 for c in cases)
+    summary = {
+        'prompts': len(cases),
+        'repeat_pairs': reps,
+        'tokens_identical': sum(c['tokens_identical'] for c in cases),
+        'logprobs_bitwise_identical': sum(c['logprobs_bitwise_identical'] for c in cases),
+        'prompts_with_any_logprob_mismatch': [
+            c['id'] for c in cases if c['logprobs_bitwise_identical'] < c['repeats'] - 1
+        ],
+    }
+    return {'cases': cases, 'summary': summary}
+
+
 # ---------------------------------------------------------------- prefill logprobs
 
 
@@ -413,6 +491,7 @@ TESTS = {
     'prefix': run_prefix,
     'abort': run_abort,
     'prefill': run_prefill,
+    'repeat': run_repeat,
 }
 
 
@@ -432,6 +511,7 @@ def main() -> None:
     ap.add_argument('--lanes', type=int, default=4)
     ap.add_argument('--abort-max-tokens', type=int, default=60)
     ap.add_argument('--block', type=int, default=4, help='tokens per full verify cycle')
+    ap.add_argument('--repeats', type=int, default=5)
     args = ap.parse_args()
 
     prompts = load_prompts(args.prompts)
@@ -440,7 +520,13 @@ def main() -> None:
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
-    with launch_with_retry(flags, args.port, out_dir / f'{name}.server.log') as srv:
+    # Only the abort test depends on the batch cap (a full pool forces reuse).
+    with launch_with_retry(
+        flags,
+        args.port,
+        out_dir / f'{name}.server.log',
+        require_full_batch=args.test == 'abort',
+    ) as srv:
         result = asyncio.run(TESTS[args.test](srv['base_url'], prompts, args))
     result['meta'] = {
         'test': args.test,

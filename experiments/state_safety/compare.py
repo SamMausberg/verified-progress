@@ -219,6 +219,46 @@ def summarize(rows: Iterable[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def run_meta(root: Path, runs: list[str]) -> dict[str, Any]:
+    """Flags, resolved server settings, commits and acceptance for each run."""
+    out: dict[str, Any] = {}
+    for name in runs:
+        meta_path = root / f'{name}.meta.json'
+        if not meta_path.exists():
+            continue
+        meta = json.loads(meta_path.read_text())
+        info = {k: v for k, v in meta['server_info'].items() if k != 'cmd'}
+        entry = {
+            k: meta[k]
+            for k in (
+                'concurrency',
+                'warm',
+                'max_new_tokens',
+                'num_prompts',
+                'output_tokens',
+                'wall_s',
+                'flags',
+                'repo_sha',
+                'sglang_sha',
+                'sglang_dirty',
+                'started_at',
+            )
+        }
+        entry['server_info'] = info
+        run = load_run(root / f'{name}.jsonl')
+        verify = sum(r.get('spec_verify_ct') or 0 for r in run.values())
+        if verify:
+            tokens = sum(len(r['output_ids']) for r in run.values())
+            entry['spec_accept_length'] = round(tokens / verify, 4)
+            entry['cycles_one_chunk_each'] = sum(spec_cycles_consistent(r) for r in run.values())
+        entry['finish'] = {}
+        for r in run.values():
+            k = (r['finish_reason'] or {}).get('type', 'none')
+            entry['finish'][k] = entry['finish'].get(k, 0) + 1
+        out[name] = entry
+    return out
+
+
 def write_table(path: str, summary: dict[str, Any]) -> None:
     cols = [
         'pair',
@@ -261,6 +301,7 @@ def main() -> None:
     ap.add_argument('--out-json', required=True)
     ap.add_argument('--out-csv', required=True, help='one row per divergence event')
     ap.add_argument('--out-table', help='one row per pair (CSV)')
+    ap.add_argument('--out-meta', help='run metadata and acceptance per run (JSON)')
     args = ap.parse_args()
 
     root = Path(args.runs)
@@ -292,6 +333,9 @@ def main() -> None:
 
     if args.out_table:
         write_table(args.out_table, summary)
+    if args.out_meta:
+        runs = sorted({r for _, ra, rb in pairs for r in (ra, rb)})
+        Path(args.out_meta).write_text(json.dumps(run_meta(root, runs), indent=1) + '\n')
     Path(args.out_json).write_text(
         json.dumps({'pairs': summary, 'self_consistency': consistency}, indent=2) + '\n'
     )

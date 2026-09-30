@@ -3,7 +3,7 @@
 #
 #   experiments/state_safety/run_targeted.sh [group...]
 #
-# Groups: exact (truncation, stops), prefix, abort, prefill (default: all).
+# Groups: exact (truncation, stops), prefix, abort, repeat, prefill (default: all).
 # Outputs: ~/vp-data/state/targeted/<test>__<config>[__tag].json
 set -euo pipefail
 
@@ -44,6 +44,10 @@ group() {
       t abort --config mtp_s3_det --extra-flags "$small_pool" --tag smallpool
       t abort --config plain_det --extra-flags "$small_pool" --tag smallpool
       ;;
+    repeat)
+      t repeat --config plain --num-prompts 40
+      t repeat --config mtp_s3 --num-prompts 40
+      ;;
     prefill)
       for c in mtp_s3 plain; do
         t prefill --config "$c"
@@ -59,7 +63,7 @@ group() {
 }
 
 if [ "$#" -eq 0 ]; then
-  set -- exact prefix abort prefill
+  set -- exact prefix abort repeat prefill
 fi
 for g in "$@"; do
   group "$g"

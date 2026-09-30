@@ -135,14 +135,18 @@ def sglang_source_dir() -> Path:
 
 @contextlib.contextmanager
 def launch_with_retry(
-    flags: list[str], port: int, log_path: Path, attempts: int = 6
+    flags: list[str],
+    port: int,
+    log_path: Path,
+    attempts: int = 6,
+    require_full_batch: bool = True,
 ) -> Iterator[dict[str, Any]]:
     """launch(), retried while other shared-lock jobs squeeze the memory budget.
 
     SGLang sizes its pools from the free memory it sees at startup, so a server
     started while another job is allocating can fail or come up with a smaller
-    batch cap. Both cases are retried after a pause; errors raised by the
-    caller's block are not.
+    batch cap. Both cases are retried after a pause (the second only with
+    require_full_batch); errors raised by the caller's block are not.
     """
     all_flags = BASE_FLAGS + flags
     # The last --max-running-requests on the command line wins.
@@ -166,7 +170,8 @@ def launch_with_retry(
                 time.sleep(60)
                 continue
             cap = srv['server_info'].get('effective_max_running_requests')
-            if cap is not None and cap < wanted and attempt < attempts - 1:
+            short = require_full_batch and cap is not None and cap < wanted
+            if short and attempt < attempts - 1:
                 inner.close()
                 print(f'launch attempt {attempt + 1}: batch cap {cap}; retrying', flush=True)
                 time.sleep(60)
