@@ -20,9 +20,9 @@ anything timed).
 | `accept_probe.py` | Greedy `/generate` probe: output ids, optional top-2 logprobs, per-request speculative counters; summary with acceptance by block position per domain |
 | `summarize_acceptance.py` | Probe summaries to `acceptance_by_position.csv` and `acceptance_summary.csv` |
 | `compare_outputs.py` | First token divergence between two probe runs, classified by the reference run's top-2 logprob gap |
-| `build_panel.py`, `panel-v1.jsonl` | Characterization panel shared with the repair workstream: 32 MATH-500 problems (seeded sample) and the first 16 chat, code and maths prompts of the bench confirm split |
+| `build_panel.py`, `panel-v1.jsonl` | Characterization panel shared with the repair workstream: 32 MATH-500 problems (seeded sample) and the first 16 chat, code and maths prompts of the bench's mixed-v1 confirm split (commit 8b4b7ab; its maths prompts are GSM8K test). Acceptance only, never quality |
 | `run_trace.sh` | Per-cycle trace (drafted tokens, target argmax at every block position, accepted length) on the panel at blocks 16 and 8; needs the engine patch below |
-| `build_train_prompts.py` | Training prompts (chat, code, maths) from permissive public sources, disjoint from every bench split and the panel |
+| `build_train_prompts.py` | Training prompts (chat, code, maths) from permissive public sources; fails unless they are disjoint (text and id) from every bench split of mixed-v1 and mixed-v2, the panel and MT-Bench |
 | `gen_targets.py`, `run_gen_segment.sh` | The target's own greedy thinking-mode responses to the training prompts, generated with SGLang in resumable segments |
 | `train_dflash.py` | Fine-tunes a DFlash or DFlash 2 drafter against the frozen target in resumable time-boxed segments; exports a checkpoint SGLang loads unchanged |
 

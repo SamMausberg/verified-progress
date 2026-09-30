@@ -6,8 +6,8 @@
 set -uo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 max="${1:-4}"
-prompts="$HOME/vp-data/drafter/data/prompts-v1.jsonl"
-out="$HOME/vp-data/drafter/data/targets-v1.jsonl"
+prompts="$HOME/vp-data/drafter/data/prompts-v2.jsonl"
+out="$HOME/vp-data/drafter/data/targets-v2.jsonl"
 for i in $(seq 1 "$max"); do
   done_rows=$( [ -f "$out" ] && wc -l < "$out" || echo 0 )
   total=$(wc -l < "$prompts")

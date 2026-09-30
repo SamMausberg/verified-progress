@@ -1,14 +1,23 @@
-"""Build the DFlash-4B characterization panel shared with the repair workstream.
+"""Build a DFlash-4B characterization panel.
 
-The panel is 32 MATH-500 problems (a seeded sample of the 500, ids kept) plus the
-first 16 chat, 16 code and 16 math prompts of the bench confirm split
-(bench/workloads/mixed-v1/confirm.jsonl, file order). MATH-500 problems use the
-bench's gsm8k instruction suffix. Rows follow the bench workload format
-(id, domain, source, text), with domain "math500" for the MATH-500 rows.
+panel-v1 (shared with the repair workstream's trace) and panel-v2 (the
+evaluation panel for trained drafters) differ only in the confirm split they
+draw from. Each is 32 MATH-500 problems (a seeded sample of the 500, ids kept) plus the
+first 16 chat, 16 code and 16 maths prompts, in file order, of a bench
+confirm split: mixed-v1 (bench/workloads/mixed-v1/confirm.jsonl at commit 8b4b7ab,
+maths = GSM8K test) for panel-v1, mixed-v2 (on main, maths = GSM8K train) for
+panel-v2. Chat is MT-Bench first turns and OASST1 root prompts in both. MATH-500 problems use the bench's GSM8K instruction suffix.
+Rows follow the bench workload format (id, domain, source, text), with domain
+"math500" for the MATH-500 rows.
 
-    python experiments/drafter/build_panel.py \
-        --confirm bench/workloads/mixed-v1/confirm.jsonl \
+The panel measures acceptance only. It includes benchmark test problems, so it
+is never used for quality claims, and no training prompt may match it.
+
+    git show 8b4b7ab:bench/workloads/mixed-v1/confirm.jsonl > /tmp/mixed-v1-confirm.jsonl
+    python experiments/drafter/build_panel.py --confirm /tmp/mixed-v1-confirm.jsonl \
         --out experiments/drafter/panel-v1.jsonl
+    python experiments/drafter/build_panel.py \
+        --confirm bench/workloads/mixed-v2/confirm.jsonl --out experiments/drafter/panel-v2.jsonl
 """
 
 from __future__ import annotations

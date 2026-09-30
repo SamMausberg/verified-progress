@@ -5,8 +5,8 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
 source "$HOME/verified-progress/scripts/sglang_env.sh"
-prompts="${1:-$HOME/vp-data/drafter/data/prompts-v1.jsonl}"
-out="${2:-$HOME/vp-data/drafter/data/targets-v1.jsonl}"
+prompts="${1:-$HOME/vp-data/drafter/data/prompts-v2.jsonl}"
+out="${2:-$HOME/vp-data/drafter/data/targets-v2.jsonl}"
 log_dir="$HOME/vp-data/drafter/runs/gen-$(date +%Y%m%d-%H%M%S)"
 python "$here/serve_run.py" --arm plain --port 30081 --out "$log_dir" \
   --mem 0.25 --max-running 96 --extra "--disable-radix-cache" \

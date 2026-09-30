@@ -9,21 +9,27 @@ Sources (public, permissive licences, pinned revisions):
     maths openai/gsm8k main/train (MIT); EleutherAI/hendrycks_math train (MIT);
           both with the bench's "reason step by step ... \\boxed{}" suffix
 
-Every prompt whose normalised text (case- and whitespace-folded) or id appears in
-any bench workload split (warmup, tune, confirm) or in the drafter panel is
-dropped, so training never sees an evaluation prompt. Prompts longer than
+Every prompt whose normalised text (case- and whitespace-folded, maths suffix
+removed) or id appears in an `--exclude` file is dropped, and the build fails if
+any chosen prompt still hashes (SHA-256 of the normalised text) to an excluded
+one; the per-file overlap counts go into the manifest. Prompts longer than
 1,024 chat-templated tokens are dropped, as in the bench workload. Sampling is
 seeded; each domain gets `--per-domain` prompts.
 
     python experiments/drafter/build_train_prompts.py --per-domain 6000 \
-        --exclude ~/vp-wt/bench/bench/workloads/mixed-v1/*.jsonl \
-        --exclude experiments/drafter/panel-v1.jsonl \
-        --out ~/vp-data/drafter/data/prompts-v1.jsonl
+        --exclude bench/workloads/mixed-v2/*.jsonl ~/vp-data/drafter/data/bench-v1/*.jsonl \
+            experiments/drafter/panel-v1.jsonl experiments/drafter/mtbench-first-turn.jsonl \
+        --out ~/vp-data/drafter/data/prompts-v2.jsonl
+
+The bench workload's mixed-v1 splits (commit 8b4b7ab, removed from the tree)
+are excluded as well as mixed-v2: the panel was drawn from mixed-v1, and
+mixed-v2 takes its maths prompts from GSM8K train, one of the sources here.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import random
 import re
@@ -48,6 +54,14 @@ SOURCES = {
     'gsm8k': ('openai/gsm8k', '740312add88f781978c0658806c59bc2815b9866'),
     'hendrycks_math': ('EleutherAI/hendrycks_math', '21a5633873b6a120296cce3e2df9d5550074f4a3'),
 }
+LICENCES = {
+    'ultrachat': 'MIT',
+    'oasst1': 'Apache-2.0',
+    'magicoder': 'MIT',
+    'mbpp': 'CC-BY-4.0',
+    'gsm8k': 'MIT',
+    'hendrycks_math': 'MIT',
+}
 # Share of each domain drawn from each source (the remainder goes to the last).
 MIX = {
     'chat': [('oasst1', 0.3), ('ultrachat', 0.7)],
@@ -57,7 +71,13 @@ MIX = {
 
 
 def normalise(text: str) -> str:
-    return re.sub(r'\s+', ' ', text).strip().lower()
+    """Case- and whitespace-folded text without the maths instruction suffix, so a
+    problem matches whether or not a split appended the suffix."""
+    return re.sub(r'\s+', ' ', text.replace(MATH_SUFFIX, '')).strip().lower()
+
+
+def prompt_hash(text: str) -> str:
+    return hashlib.sha256(normalise(text).encode()).hexdigest()
 
 
 def snapshot(key: str, patterns: list[str]) -> Path:
@@ -191,14 +211,37 @@ def main() -> None:
     rng.shuffle(chosen)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(''.join(json.dumps(row) + '\n' for row in chosen))
+    # Overlap check: no chosen prompt may match any excluded row by
+    # normalised text or by id (it is a hard failure, not a statistic).
+    overlap: dict[str, dict[str, Any]] = {}
+    chosen_hashes = [prompt_hash(item['text']) for item in chosen]
+    for path in args.exclude:
+        rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+        hashes = {prompt_hash(row['text']) for row in rows}
+        ids = {row['id'] for row in rows}
+        overlap[str(path)] = {
+            'rows': len(rows),
+            'file_sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+            'hash_matches': sum(h in hashes for h in chosen_hashes),
+            'id_matches': sum(item['id'] in ids for item in chosen),
+        }
+    if any(v['hash_matches'] or v['id_matches'] for v in overlap.values()):
+        raise RuntimeError(f'training prompts overlap an excluded split: {overlap}')
     manifest = {
         'seed': SEED,
         'per_domain': args.per_domain,
-        'sources': {key: {'repo': SOURCES[key][0], 'revision': SOURCES[key][1]} for key in SOURCES},
+        'sources': {
+            key: {'repo': repo, 'revision': revision, 'licence': LICENCES[key]}
+            for key, (repo, revision) in SOURCES.items()
+        },
         'mix': MIX,
-        'excluded_files': [str(path) for path in args.exclude],
+        'filters': {'min_chars': MIN_CHARS, 'max_prompt_tokens': MAX_PROMPT_TOKENS},
+        'disjointness_check': overlap,
         'stats': stats,
         'rows': len(chosen),
+        'sha256': hashlib.sha256(
+            ''.join(json.dumps(row) + '\n' for row in chosen).encode()
+        ).hexdigest(),
     }
     args.out.with_suffix('.manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
     print(json.dumps(stats, indent=1))

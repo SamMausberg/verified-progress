@@ -13,11 +13,11 @@ ckpt="$2"
 shift 2
 if [ "$#" -eq 0 ]; then set -- 16; fi
 root="$HOME/vp-data/drafter/eval/$label"
-ref="$HOME/vp-data/drafter/trace/plain/requests.jsonl"
+ref="$HOME/vp-data/drafter/eval/plain/requests.jsonl"
 for block in "$@"; do
   python "$here/serve_run.py" --arm dflash --block "$block" --draft-path "$ckpt" --port 30085 \
     --out "$root/b$block" --mem 0.25 --max-running 4 \
-    --client "python $here/accept_probe.py --port {port} --workload $here/panel-v1.jsonl \
+    --client "python $here/accept_probe.py --port {port} --workload $here/panel-v2.jsonl \
       --per-domain 32 --max-new-tokens 2048 --concurrency 1 --label $label-b$block --out {out}"
   if [ -f "$ref" ]; then
     python "$here/compare_outputs.py" --ref "$ref" --test "$root/b$block/requests.jsonl" \

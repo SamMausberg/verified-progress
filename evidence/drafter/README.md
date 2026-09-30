@@ -21,12 +21,16 @@ resolved server settings).
 
 `acceptance_by_position.csv`, `acceptance_summary.csv`: panel
 `experiments/drafter/panel-v1.jsonl` (32 MATH-500 problems, a seeded sample; the first
-16 chat, 16 code and 16 maths prompts of the bench confirm split, where `math` is GSM8K and
-`chat` is MT-Bench and OASST1), greedy, thinking on (chat template default), natural stop
-at up to 2,048 new tokens, concurrency 1, blocks 16 and 8. Columns: `accept_prob` is
-alpha_k = S(k)/S(k-1), `survival` is S(k), the share of verify cycles that accept at least
-k drafted tokens, `n` the cycles that reached position k; `tau` is completion tokens per
-verify cycle. From SGLang's per-request `spec_correct_drafts_histogram`, pooled per domain.
+16 chat, 16 code and 16 maths prompts of the bench's mixed-v1 confirm split at commit
+8b4b7ab, where `math` is GSM8K test and `chat` is MT-Bench first turns and OASST1), greedy,
+thinking on (chat template default), natural stop at up to 2,048 new tokens, concurrency 1,
+blocks 16 and 8. The panel contains benchmark test problems and measures acceptance only,
+never quality. Columns: `accept_prob` is alpha_k = S(k)/S(k-1), `survival` is S(k), the
+share of verify cycles that accept at least k drafted tokens, `n` the cycles that reached
+position k (from SGLang's per-request `spec_correct_drafts_histogram`, pooled per domain).
+`tau_mean_per_request` is the model card's accept length (completion tokens / verify
+cycles per request, averaged over requests); `tau_pooled` divides a domain's total tokens
+by its total verify cycles, which weights long responses more.
 
 These runs used the engine trace hook (`engine/sglang/patches/`), which synchronizes the
 stream every cycle, on a shared GPU: acceptance and tokens are valid, timings are not.
@@ -49,3 +53,25 @@ token, or neither).
 The per-cycle trace itself (drafted tokens, the target's argmax at all block rows,
 accepted length) is 5-7 MB per block size and stays in `~/vp-data/drafter/trace/`
 (`trace_manifest.json` there lists the files and fields).
+
+## Training data
+
+`data/prompts-v2.manifest.json`: the 18,000 training prompts (6,000 each of chat, code and
+maths) with sources, pinned revisions, licences, the mix, filters, the SHA-256 of the prompt
+file, and the disjointness check. The builder fails if any training prompt matches an
+excluded file by id or by the SHA-256 of its normalised text (case and whitespace folded,
+maths instruction suffix removed); every count in `disjointness_check` is zero. Excluded:
+all three splits of bench mixed-v2 (on main) and of the retired mixed-v1 (commit 8b4b7ab),
+both drafter panels, the 80 MT-Bench first turns of the card gate, the GSM8K test set used
+by the quality check, and all 500 MATH-500 problems.
+
+    python experiments/drafter/build_train_prompts.py --per-domain 6000 \
+        --exclude bench/workloads/mixed-v2/*.jsonl ~/vp-data/drafter/data/bench-v1/*.jsonl \
+            experiments/drafter/panel-v1.jsonl experiments/drafter/panel-v2.jsonl \
+            experiments/drafter/mtbench-first-turn.jsonl \
+            ~/vp-data/drafter/data/exclude/gsm8k-test.jsonl ~/vp-data/drafter/data/exclude/math500.jsonl \
+        --out ~/vp-data/drafter/data/prompts-v2.jsonl
+
+An earlier set (prompts-v1) excluded only mixed-v1 and overlapped mixed-v2's GSM8K prompts;
+it was used for nothing except a 64-row smoke test of the training code, and no reported
+number comes from it.

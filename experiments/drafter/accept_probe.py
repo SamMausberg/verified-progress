@@ -148,6 +148,18 @@ def summarize(records: list[dict[str, Any]], wall_s: float) -> dict[str, Any]:
             'requests': len(group),
             'completion_tokens': tokens,
             'accept_length': tokens / verify if verify else None,
+            # The model card's definition: completion_tokens / spec_verify_ct per
+            # request (generation turn), averaged over requests.
+            'accept_length_mean_per_request': (
+                sum(
+                    r['completion_tokens'] / r['spec_verify_ct']
+                    for r in group
+                    if r['spec_verify_ct']
+                )
+                / max(1, sum(1 for r in group if r['spec_verify_ct']))
+                if verify
+                else None
+            ),
             'per_request_tok_s_mean': sum(
                 (r['completion_tokens'] or 0) / r['latency_s'] for r in group
             )
@@ -226,7 +238,8 @@ def main() -> None:
         head = ' '.join(f'{a:.2f}' for a in alpha[1:9] if a is not None)
         print(
             f'{args.label} {domain:6s} n={entry["requests"]:3d} tok={entry["completion_tokens"]:7d}'
-            f' tau={entry["accept_length"] or 0:.2f} tok/s/req={entry["per_request_tok_s_mean"]:.1f}'
+            f' tau={entry["accept_length"] or 0:.2f}'
+            f' tau_req={entry["accept_length_mean_per_request"] or 0:.2f} tok/s/req={entry["per_request_tok_s_mean"]:.1f}'
             f' alpha[1..8]={head}'
         )
 

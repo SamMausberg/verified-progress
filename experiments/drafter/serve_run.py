@@ -20,6 +20,7 @@ commands are shell strings; `{port}` and `{out}` are substituted. Run it under
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import shlex
@@ -153,12 +154,24 @@ def main() -> None:
     (args.out / 'launch.json').write_text(json.dumps(launch, indent=2) + '\n')
 
     log = (args.out / 'server.log').open('w')
+    # Start-up is serialized with other jobs' servers (the same lock file as
+    # scripts/gpu_startup_lock.sh): SGLang sizes its pools from the free memory
+    # it sees while loading, so concurrent start-ups race. The lock descriptor
+    # is not inherited by the server (Popen closes fds) and is released once the
+    # server is healthy.
+    lock_path = os.environ.get('GPU_LOCK_FILE', str(Path.home() / '.gpu.lock')) + '.startup'
+    startup_lock = open(lock_path, 'a')  # noqa: SIM115 (released before the clients run)
+    fcntl.flock(startup_lock, fcntl.LOCK_EX)
     server = subprocess.Popen(
         command, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True
     )
     status = 0
     try:
-        wait_ready(args.port, server, args.ready_timeout)
+        try:
+            wait_ready(args.port, server, args.ready_timeout)
+        finally:
+            fcntl.flock(startup_lock, fcntl.LOCK_UN)
+            startup_lock.close()
         with urllib.request.urlopen(
             f'http://127.0.0.1:{args.port}/server_info', timeout=30
         ) as response:

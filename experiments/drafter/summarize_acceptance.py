@@ -6,10 +6,13 @@ made with the given drafter label and block size. Writes
     acceptance_by_position.csv  drafter, block_size, position, domain,
                                 accept_prob (alpha_k), survival (S(k)), n
     acceptance_summary.csv      drafter, block_size, domain, requests,
-                                completion_tokens, cycles, tau
+                                completion_tokens, cycles, tau_mean_per_request,
+                                tau_pooled
 
 where n is the number of verify cycles that reached position k (the
-denominator of alpha_k) and tau = completion tokens / verify cycles.
+denominator of alpha_k). tau_mean_per_request is the model card's accept length
+(completion tokens / verify cycles per request, averaged over requests);
+tau_pooled divides the domain's total tokens by its total verify cycles.
 
     python experiments/drafter/summarize_acceptance.py \
         --run zlab:16:RUN16 --run zlab:8:RUN8 --out evidence/drafter
@@ -21,6 +24,17 @@ import argparse
 import csv
 import json
 from pathlib import Path
+
+
+def per_request_tau(directory: Path, domain: str) -> float | None:
+    """Mean over requests of completion_tokens / spec_verify_ct (the card's metric)."""
+    rows = [json.loads(line) for line in (directory / 'requests.jsonl').read_text().splitlines()]
+    values = [
+        r['completion_tokens'] / r['spec_verify_ct']
+        for r in rows
+        if r['spec_verify_ct'] and (domain == 'all' or r['domain'] == domain)
+    ]
+    return sum(values) / len(values) if values else None
 
 
 def main() -> None:
@@ -44,7 +58,10 @@ def main() -> None:
                     'requests': entry['requests'],
                     'completion_tokens': entry['completion_tokens'],
                     'cycles': cycles,
-                    'tau': entry['accept_length'],
+                    'tau_mean_per_request': entry.get('accept_length_mean_per_request')
+                    if 'accept_length_mean_per_request' in entry
+                    else per_request_tau(Path(directory), domain),
+                    'tau_pooled': entry['accept_length'],
                 }
             )
             survival = acc.get('survival') or []
