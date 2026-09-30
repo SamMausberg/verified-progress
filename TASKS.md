@@ -34,12 +34,12 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 | lit | Literature review, novelty assessment, citation audit | done (PR #6) |
 | bench | Baseline server arms, aiperf Pareto harness, quality baseline, spec tuning | active |
 | profile | nsys/ncu profiles and critical-path attribution | active |
-| geometry | Real-head replay: transport versus self-evidence bounds | active |
+| geometry | Real-head replay: transport versus self-evidence bounds | active (PR #16 merged; H2 drift pending) |
 | kernel | Certified low-precision head kernels and microbenchmarks | active |
 | theory | Floating-point certificate proofs, exact references, Lean | done (PR #7) |
 | state | Speculative-decoding state safety and output-equality tests | active |
 | moonshot | Reformulations and approximations aimed at order-of-magnitude gains, with measured quality costs | active |
-| drafter | Public DFlash-4B drafter: serve, characterize, train only against a measured limitation | active |
+| drafter | Public DFlash-4B drafter: serve, characterize, train only against a measured limitation | active (PR #22 merged) |
 | repair | Long-window exact repair and target-anchored residual decoding (H8) | active |
 | integrate | SGLang integration of the certified head (draft, verify, decode) | todo |
 | paper | Manuscript revision as results land | active |
@@ -105,5 +105,7 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 - [x] Literature review and verified bibliography (lit; PR #6: 194 verified entries, citation audit)
 - [ ] Narrow the novelty claim: the greedy certified head is prior art (sparkpipe, dgpp, Laguna, knlp); the defensible parts are exact keyed-noise sampling, partition brackets for sampled acceptance, a Hopper-sound envelope and the SGLang/GH200 measurement under the stock-kernel contract; cite DSpark and D-cut for the sampled-depth counterexample (paper, kernel)
 - [x] Paper milestone 1: manuscript reorganized around the evidence, R-stock contract, PR #7 theory with proofs, verified BibTeX, pending markers for GPU results (paper; PR #21)
-- [ ] Paper milestone 2+: integrate workstream results as their evidence PRs merge; five-contract framing; final figures (paper)
+- [x] Paper milestone 2: workstream methods, merged geometry, bench and contract evidence, P7 contracts, P6 objectives with verified prior art (paper; PR #30)
+- [x] Paper milestone 3: DFlash-4B acceptance by position (paper; PR #32)
+- [ ] Paper milestones 4+: profile attribution (#13), moonshot (#27), H2 drift, kernel runtime, state mechanisms, serving frontiers (paper)
 - [ ] README and RUNBOOK with exact reproduction commands (paper, infra; rewritten in PR #21, final pass after the serving results)

@@ -96,7 +96,7 @@ capacity flags are defined by the serving harness and its arm file.
 | Serving harness, frozen workload, quality check | `bench/`, `evidence/bench/` | on `main`; sweeps in progress |
 | Certified-head kernels and head-path runtime | `evidence/certified_head/` | in progress |
 | Divergence mechanisms and state safety | `evidence/state/` | in progress |
-| DFlash drafter on GH200 | `evidence/drafter/` | in progress |
+| DFlash drafter on GH200 | `evidence/drafter/` | on `main` (acceptance); timing in progress |
 | Stack levers, ceilings, frontiers | `evidence/moonshot/` | in progress |
 | Long-window repair (P2, P3) | to be assigned | in progress |
 
