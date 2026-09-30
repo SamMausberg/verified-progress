@@ -92,21 +92,41 @@ for _ in $(seq 1 360); do
   sleep 10
 done
 
-SGLANG_HEAD_CAPTURE_DIR="$out/heads" python -m sglang.launch_server \
-  --model-path "${model[0]}" --revision "${model[1]}" "${common[@]}" "${args[@]}" \
-  >"$out/server.log" 2>&1 &
-server=$!
-trap 'kill "$server" 2>/dev/null || true; wait "$server" 2>/dev/null || true' EXIT
-
-for _ in $(seq 1 180); do
-  if curl -sf "http://127.0.0.1:$port/health" >/dev/null; then break; fi
-  if ! kill -0 "$server" 2>/dev/null; then
-    echo "server exited; see $out/server.log" >&2
-    exit 1
-  fi
-  sleep 5
-done
-curl -sf "http://127.0.0.1:$port/health" >/dev/null
+# Launch and wait until healthy under the start-up lock, so that concurrent shared jobs
+# do not see each other's allocations in SGLang's free-memory probe. The server keeps
+# running after the lock is released; its PID goes to a file for the cleanup trap.
+launch_and_wait() {
+  local pidfile="$1" port="$2" log="$3"
+  shift 3
+  SGLANG_HEAD_CAPTURE_DIR="${CAPTURE_DIR:?}" python -m sglang.launch_server "$@" >"$log" 2>&1 &
+  echo $! >"$pidfile"
+  for _ in $(seq 1 180); do
+    if curl -sf "http://127.0.0.1:$port/health" >/dev/null; then return 0; fi
+    if ! kill -0 "$(cat "$pidfile")" 2>/dev/null; then return 1; fi
+    sleep 5
+  done
+  return 1
+}
+export -f launch_and_wait
+server=""
+stop_server() {
+  [ -n "$server" ] || return 0
+  kill "$server" 2>/dev/null || true
+  # The server is not our child (it outlives the start-up lock), so poll for its exit.
+  for _ in $(seq 1 120); do
+    kill -0 "$server" 2>/dev/null || return 0
+    sleep 1
+  done
+}
+trap stop_server EXIT
+CAPTURE_DIR="$out/heads" "$HOME/verified-progress/scripts/gpu_startup_lock.sh" \
+  bash -c 'launch_and_wait "$@"' _ "$out/server.pid" "$port" "$out/server.log" \
+  --model-path "${model[0]}" --revision "${model[1]}" "${common[@]}" "${args[@]}" || {
+  server=$(cat "$out/server.pid" 2>/dev/null || true)
+  echo "server did not become healthy; see $out/server.log" >&2
+  exit 1
+}
+server=$(cat "$out/server.pid")
 
 python "$repo/experiments/head_geometry/capture_client.py" --port "$port" \
   --prompts "$data/prompts.jsonl" --out "$out" --model "${model[0]}" --revision "${model[1]}" \

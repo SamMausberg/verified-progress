@@ -6,13 +6,18 @@ Apply them in a private worktree, never in `~/sglang` itself:
 
 ```sh
 scripts/sglang_worktree.sh <name>                      # creates ~/sglang-wt/<name>
-git -C ~/sglang-wt/<name> am "$PWD"/engine/sglang/patches/<patch>.patch
+git -C ~/sglang-wt/<name> am "$PWD"/engine/sglang/patches/<workstream>/<patch>.patch
 SGLANG_WORKTREE=~/sglang-wt/<name> source scripts/sglang_env.sh
 ```
 
-## 0001-head-capture-replay-dumps.patch (capture only)
+Patches live under `engine/sglang/patches/<workstream>/NNNN-<topic>.patch`, with one
+section per workstream below.
 
-Records the exact LM-head inputs for the real-head replay in
+## geometry
+
+### geometry/0001-head-capture-replay-dumps.patch (capture only)
+
+The geometry workstream's patch. It records the exact LM-head inputs for the real-head replay in
 `experiments/head_geometry/`. It changes nothing unless `SGLANG_HEAD_CAPTURE_DIR` is set.
 When it is set:
 
@@ -23,7 +28,8 @@ When it is set:
   verification one `mtp_verify` record per step stores the draft and target head inputs,
   the verify tokens, the engine's target argmax, its top-2 logits and the accept lengths.
 - DFlash: one `dflash_verify` record per step with the draft hidden states at block
-  positions 1..7 (the input to `candidate_topk` on the target head), the stashed target
+  positions 1 to block size - 1 (the input to the draft's projection through the target
+  head), the stashed target
   verify head input, the proposed block, the target argmax and accept lengths.
 - Plain decode (no speculation): one `plain_decode` record per forward with the head
   input, the sampled token and the engine's top-2 logits.

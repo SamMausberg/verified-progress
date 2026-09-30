@@ -5,7 +5,7 @@ per-row arrays stay in `~/vp-data/geometry/` (outside git); every file here was 
 by the command listed with it.
 
 Common setup: one GH200 (sm_90), SGLang `bd66ce343e` plus the capture patch
-`engine/sglang/patches/0001-head-capture-replay-dumps.patch` (SGLang commit `4b86a01087`, same content as the `416f97a119` that ran the plain-decode capture,
+`engine/sglang/patches/geometry/0001-head-capture-replay-dumps.patch` (SGLang commit `4b86a01087`, same content as the `416f97a119` that ran the plain-decode capture,
 on branch `engine/geometry`), Qwen3.5-4B @ `851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a`,
 320 public prompts (`prompt_manifest.csv`, split by prompt into analysis and held-out
 halves before any fitting), greedy decoding, 384 new tokens. The capture servers ran
@@ -90,9 +90,9 @@ the stock kernel must decide, at:
 
 | gamma for the stock kernel's FP32 accumulation | Positions failing | Capture-run batches with at least one |
 |---|---|---|
-| 6.11e-4 (fused-adder tensor-core model) | 3.03% | 21.6% |
-| 1.19e-4 | 2.18% | 16.0% |
-| 1.67e-6 (IEEE FP32 blocked tree) | 1.95% | 14.8% |
+| 6.11e-4: conservative default, the largest fused-adder model of `src/precision_reference.py` | 3.03% | 21.6% |
+| 1.19e-4: a tighter tensor-core model (the kernel workstream's; its justification is pending that workstream's evidence) | 2.18% | 16.0% |
+| 1.67e-6: IEEE FP32 blocked tree, not justified for the stock tensor-core GEMM (shown for scale) | 1.95% | 14.8% |
 
 The floor near 2% belongs to this sufficient condition, not to R-stock itself: with G
 nearly zero (last row) the condition asks for an exact margin above one BF16 spacing at
@@ -104,10 +104,13 @@ outward to FP32 and then to BF16, and compare with the tie rule) certifies most 
 
 | gamma | gap rule: positions / batches needing the stock kernel | bucket-exact rule: positions / batches |
 |---|---|---|
-| 6.11e-4 | 3.03% / 21.6% | 1.40% / 10.9% |
-| 1.19e-4 | 2.18% / 16.0% | 0.35% / 2.8% |
-| 1e-5 | 1.97% / 14.9% | 0.017% / 0.13% |
-| 1.67e-6 | 1.95% / 14.8% | 0% / 0% |
+| 6.11e-4 (conservative default) | 3.03% / 21.6% | 1.40% / 10.9% |
+| 1.19e-4 (tighter tensor-core model, pending its evidence) | 2.18% / 16.0% | 0.35% / 2.8% |
+| 1e-5 (not justified for the stock tensor-core GEMM) | 1.97% / 14.9% | 0.017% / 0.13% |
+| 1.67e-6 (IEEE FP32 tree; not justified for the stock tensor-core GEMM) | 1.95% / 14.8% | 0% / 0% |
+
+The last two rows only show how the rate scales with gamma: a 0% fallback is not
+achievable with the stock BF16 tensor-core GEMM unless its error is shown to be that small.
 
 For every gamma, no certified token differed from the token the engine returned at the
 capture's batch shape, i.e. no counterexample to any of these error models for cuBLAS on
