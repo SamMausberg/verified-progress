@@ -1,4 +1,3 @@
 Lean (version 4.19.0, aarch64-unknown-linux-gnu, commit 6caaee842e94, Release)
 checking CertifiedArgmax.lean
 checking DecisionGuards.lean
-exit status: 0

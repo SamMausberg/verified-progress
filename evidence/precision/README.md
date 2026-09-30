@@ -1,21 +1,21 @@
 # Evidence: certified low-precision head (theory workstream)
 
 CPU only; no GPU, no model inference. Machine: GH200 host, 64-core Grace (aarch64).
-Repository `.venv`: Python 3.13.5, NumPy 2.3.5. SGLang venv (for the weight-only calculation):
+Repository `.venv`: Python 3.13.15, NumPy 2.3.5. SGLang venv (for the weight-only calculation):
 Python 3.12, torch 2.13.0+cu130 on CPU, safetensors 0.9.0-rc.1.
 
 ## `precision_tests.json`, `precision_tests.log`
 
 Exact tests of `src/precision_reference.py`. Every BF16, FP32 and FP64 rounding is emulated on
 Fractions, so each bound and decision is checked against real arithmetic. Produced at commit
-`9df1e0c7` (recorded in the JSON as `repo_commit`), seed 20260930:
+`8296b585` (recorded in the JSON as `repo_commit`), seed 20260930:
 
 ```sh
 . .venv/bin/activate
 python tests/test_precision.py 2>&1 | tee evidence/precision/precision_tests.log
 ```
 
-Result: 19 test methods passed in 35 s; 39,760 generated checks (per-kind counts in the JSON).
+Result: 20 test methods passed in 35 s; 39,761 generated checks (per-kind counts in the JSON).
 Highlights:
 
 - 5,600 accumulation-bound checks across eight summation models (sequential, pairwise, blocked,
@@ -32,10 +32,15 @@ Highlights:
   acceptance decisions (148 with the uniform placed next to the threshold), 300 residual races,
   300 SGLang-style sibling verifications, 200 unresolved-probability measures and 200 tail-bound
   checks.
-- Stock-head emulation: on adversarial near-tie heads, the BF16-tie contract (R-bf16) matched the
-  emulated stock head in 900 of 900 comparisons, the real-argmax contract (R-real) in 582 of 900.
-  A constructed witness shows reduced-precision split-K reductions reversing a token that the
-  FP32-model gap condition certifies.
+- Stock-head emulation. The adopted contract is R-stock: the token the stock head kernel returns
+  at this batch shape, certified only through the gap condition and otherwise computed by the
+  stock head itself. R-real and R-bf16 are batch-invariant references, and neither is stock
+  equality. In all 900 comparisons on adversarial near-tie heads (D <= 8), the emulated stock
+  rounding coincided with exact rounding, so R-bf16's 900/900 agreement there exercises only the
+  tie rule (R-real agreed in 582 of 900). A constructed witness (`test_bf16_contract_is_not_stock`)
+  has R-bf16 choose a different token from the emulated stock head, and the gap condition refuses
+  to certify it. Another witness shows reduced-precision split-K reductions reversing a token that
+  the FP32-model gap condition certifies.
 - A stream of noise consumed in evaluation order changed the race winner in 247 of 300 cases; a
   counter-based field never can.
 
@@ -65,6 +70,12 @@ commit `9df1e0c7`:
 
 Per-row round-to-nearest quantization errors (int8 and int4 per row, int8 with 128-column groups),
 64-row tile radii and diameters in token-id order and for random tiles, and the relative
-hidden-state drift below which transport's bound is narrower than self-evidence's. Quantiles are
+hidden-state drift below which transport's bound is narrower than self-evidence's. That drift
+threshold is defined as follows: rho = `||h_t - h_d||_2 / ||h_t||_2` at the head input (after the
+final norm); for row i, transport's l2 half-width `r_c(i) ||Delta||_2` is narrower than the int8
+per-row round-to-nearest half-width `||e_i||_2 ||h_t||_2` if and only if rho < `||e_i||_2 / r_c(i)`,
+with `r_c(i)` the l2 radius about the mean of row i's 64-row tile of contiguous token ids. Its
+median over rows is 0.85% (p10 0.67%, p90 1.15%); in the manuscript's l_inf/l_1 family the median
+is 0.30%. It compares envelope width only, not certification rate or runtime. Quantiles are
 over a one-million-row sample. This is a derived calculation from the weights; no hidden states
 are involved, so it does not by itself decide whether either certificate is useful.
