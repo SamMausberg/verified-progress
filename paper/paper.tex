@@ -73,6 +73,9 @@
   {\small\color{ochre}\textsf{Pending figure.} #1\par\smallskip
   \footnotesize\textsf{Data:} \texttt{\detokenize{#2}}}
   \end{tcolorbox}}
+% A figure that reads a committed data file: draw it if the file exists, otherwise a
+% pending placeholder naming the file (so the source builds before the evidence merges).
+\newcommand{\datafigure}[3]{\IfFileExists{#1}{#2}{\pendingfigure{#3}{#1}}}
 \newtheorem{theorem}{Theorem}[section]
 \newtheorem{proposition}[theorem]{Proposition}
 \newtheorem{lemma}[theorem]{Lemma}
