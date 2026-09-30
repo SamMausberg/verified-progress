@@ -93,9 +93,10 @@ the stock kernel must decide, at:
 | 1.19e-4 | 2.18% | 16.0% |
 | 1.67e-6 (IEEE FP32 blocked tree) | 1.95% | 14.8% |
 
-The floor near 2% comes from the BF16 spacing term, not from the accumulation model: about
-2% of greedy decisions have an exact top-2 margin below one BF16 spacing (0.0625 or 0.125
-for logits in [8, 32)). Resolving those rows one at a time keeps the cost small; running
+The floor near 2% comes from the BF16 spacing term, not from the accumulation model: with
+G nearly zero (last row) the condition reduces to an exact margin above one BF16 spacing
+at the winner's magnitude (0.0625 or 0.125 for logits in [8, 32)), and 1.95% of positions
+have a smaller margin. Resolving those rows one at a time keeps the cost small; running
 the dense head for the whole batch would not.
 
 ## P1: certified decoder tail (plain decoding only) - negative result
