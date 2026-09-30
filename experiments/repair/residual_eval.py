@@ -174,32 +174,72 @@ def first_change(y: list[int], y0: list[int]) -> int:
     return len(y)
 
 
-def build_cases(run: Path, requests: Path) -> list[dict[str, Any]]:
-    reqs = [json.loads(line) for line in requests.read_text().splitlines() if line.strip()]
-    results = [
-        json.loads(line)
-        for line in (run / 'results.jsonl').read_text().splitlines()
-        if line.strip()
-    ]
-    by_id = {r['id']: r for r in reqs}
+def load_cycles(paths: list[Path]) -> dict[str, list[dict[str, Any]]]:
+    """Trace records per request, normalized to prefix, cand, tpred, accept.
+
+    Reads both serve_probe.py traces (prefix, cand, tpred) and the drafter workstream's
+    DFlash traces (prefix_len, draft, target). Server health checks are skipped.
+    """
     by_rid: dict[str, list[dict[str, Any]]] = collections.OrderedDict()
-    for line in (run / 'trace.jsonl').read_text().splitlines():
-        rec = json.loads(line)
-        by_rid.setdefault(rec['rid'], []).append(rec)
-    rids = list(by_rid)[: len(results)]
-    block = int(json.loads((run / 'run.json').read_text())['block'])
+    for path in paths:
+        for line in path.read_text().splitlines():
+            if not line.strip():
+                continue
+            rec = json.loads(line)
+            if str(rec['rid']).startswith('HEALTH'):
+                continue
+            if 'prefix_len' in rec:
+                rec = {
+                    'rid': rec['rid'],
+                    'prefix': rec['prefix_len'],
+                    'cand': rec['draft'],
+                    'tpred': rec['target'],
+                    'accept': rec['accept'],
+                }
+            by_rid.setdefault(rec['rid'], []).append(rec)
+    for recs in by_rid.values():
+        recs.sort(key=lambda r: r['prefix'])
+    return by_rid
+
+
+def committed_stream(recs: list[dict[str, Any]]) -> dict[int, int]:
+    stream = {}
+    for rec in recs:
+        p, a = rec['prefix'], rec['accept']
+        stream[p] = rec['cand'][0]
+        for j in range(1, a + 1):
+            stream[p + j] = rec['cand'][j]
+        stream[p + a + 1] = rec['tpred'][a]
+    return stream
+
+
+def match_cases(
+    by_rid: dict[str, list[dict[str, Any]]], reqs: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Join requests (id, input_ids, output_ids) to trace requests by their committed streams."""
+    streams = {rid: (recs[0]['prefix'], committed_stream(recs)) for rid, recs in by_rid.items()}
     cases = []
-    for ri, (rid, res) in enumerate(zip(rids, results, strict=False)):
-        prompt = by_id[res['id']]['input_ids']
-        full = prompt + res['output_ids']
-        for rec in sorted(by_rid[rid], key=lambda r: r['prefix']):
+    for ri, req in enumerate(reqs):
+        full = req['input_ids'] + req['output_ids']
+        match = None
+        for rid, (start, stream) in streams.items():
+            if start != len(req['input_ids']):
+                continue
+            pos = [q for q in sorted(stream) if q < len(full)][:64]
+            if pos and all(stream[q] == full[q] for q in pos):
+                match = rid
+                break
+        if match is None:
+            continue
+        block = len(by_rid[match][0]['cand'])
+        for rec in by_rid[match]:
             p, a0 = rec['prefix'], rec['accept']
             if a0 >= block - 2 or p + block > len(full) or full[p] != rec['cand'][0]:
                 continue
             cases.append(
                 {
                     'request': ri,
-                    'id': res['id'],
+                    'id': req['id'],
                     'prefix': p,
                     'a0_engine': a0,
                     'block': block,
@@ -211,62 +251,32 @@ def build_cases(run: Path, requests: Path) -> list[dict[str, Any]]:
     return cases
 
 
+def build_cases(run: Path, requests: Path) -> list[dict[str, Any]]:
+    """Cases from a serve_probe.py run (trace.jsonl, results.jsonl) and its request file."""
+    by_id = {
+        json.loads(line)['id']: json.loads(line)
+        for line in requests.read_text().splitlines()
+        if line.strip()
+    }
+    results = [
+        json.loads(line)
+        for line in (run / 'results.jsonl').read_text().splitlines()
+        if line.strip()
+    ]
+    reqs = [
+        {'id': r['id'], 'input_ids': by_id[r['id']]['input_ids'], 'output_ids': r['output_ids']}
+        for r in results
+    ]
+    return match_cases(load_cycles([run / 'trace.jsonl']), reqs)
+
+
 def build_cases_drafter(trace_dir: Path, requests: Path) -> list[dict[str, Any]]:
-    """Cases from the drafter workstream's DFlash trace (cycles*.jsonl: rid, prefix_len, draft,
-    target, accept) joined to requests (id, input_ids, output_ids) by matching committed streams."""
+    """Cases from the drafter workstream's DFlash trace joined to requests (id, input_ids, output_ids)."""
     reqs = [json.loads(line) for line in requests.read_text().splitlines() if line.strip()]
-    by_rid: dict[str, list[dict[str, Any]]] = collections.OrderedDict()
     paths = [trace_dir / 'cycles-panel.jsonl']
     if not paths[0].exists():
         paths = sorted(trace_dir.glob('cycles*.jsonl'))
-    for path in paths:
-        for line in path.read_text().splitlines():
-            if line.strip():
-                rec = json.loads(line)
-                by_rid.setdefault(rec['rid'], []).append(rec)
-    streams = {}
-    for rid, recs in by_rid.items():
-        recs.sort(key=lambda r: r['prefix_len'])
-        stream = {}
-        for rec in recs:
-            p, a = rec['prefix_len'], rec['accept']
-            stream[p] = rec['draft'][0]
-            for j in range(1, a + 1):
-                stream[p + j] = rec['draft'][j]
-            stream[p + a + 1] = rec['target'][a]
-        streams[rid] = (recs[0]['prefix_len'], stream)
-    cases = []
-    for ri, req in enumerate(reqs):
-        full = req['input_ids'] + req['output_ids']
-        n_prompt = len(req['input_ids'])
-        match = None
-        for rid, (start, stream) in streams.items():
-            if start != n_prompt:
-                continue
-            pos = [q for q in sorted(stream) if q < len(full)][:64]
-            if pos and all(stream[q] == full[q] for q in pos):
-                match = rid
-                break
-        if match is None:
-            continue
-        block = len(by_rid[match][0]['draft'])
-        for rec in by_rid[match]:
-            p, a0 = rec['prefix_len'], rec['accept']
-            if a0 >= block - 2 or p + block > len(full) or full[p] != rec['draft'][0]:
-                continue
-            cases.append(
-                {
-                    'request': ri,
-                    'id': req['id'],
-                    'prefix': p,
-                    'a0_engine': a0,
-                    'block': block,
-                    'full': full,
-                    'y0': rec['draft'],
-                    'tpred_engine': rec['target'],
-                }
-            )
-    return cases
+    return match_cases(load_cycles(paths), reqs)
 
 
 def spread(cases: list[dict[str, Any]], n: int) -> list[dict[str, Any]]:

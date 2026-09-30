@@ -70,6 +70,29 @@ def split_requests(cycles: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
     return groups
 
 
+def match_groups(
+    groups: list[list[dict[str, Any]]], results: list[dict[str, Any]], block: int
+) -> list[list[dict[str, Any]]]:
+    """Assign cycle groups to recorded requests in order, by committed length.
+
+    The log also holds the server's own warm-up request, health checks, the driver's
+    warm-up and the flush request; a recorded request's group commits its output length
+    (plus at most one block past a max_new_tokens cut).
+    """
+    kept = []
+    i = 0
+    for row in results:
+        n = row.get('n_out') or len(row.get('output_ids', []))
+        while i < len(groups):
+            group = groups[i]
+            i += 1
+            total = 1 + sum(r['commit'][0] for r in group)
+            if n <= total <= n + block:
+                kept.append(group)
+                break
+    return kept
+
+
 def summarize_run(run: Path, drop_first: int, drop_last: int) -> dict[str, Any]:
     info = json.loads((run / 'run.json').read_text())
     results = [
@@ -78,7 +101,9 @@ def summarize_run(run: Path, drop_first: int, drop_last: int) -> dict[str, Any]:
         if line.strip()
     ]
     groups = split_requests(load_cycles(run))
-    kept = groups[drop_first : len(groups) - drop_last if drop_last else None]
+    kept = match_groups(groups, results, int(info['block']))
+    if not kept:
+        kept = groups[drop_first : len(groups) - drop_last if drop_last else None]
     phase: dict[str, list[float]] = {p: [] for p in PHASES}
     period: list[float] = []
     commit: list[float] = []

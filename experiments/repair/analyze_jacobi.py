@@ -72,6 +72,17 @@ def hazards(accepts: list[int], block: int) -> list[float | None]:
     return out
 
 
+def first_tokens(recs: list[dict[str, Any]], n: int) -> list[int]:
+    """The first n committed tokens of a request, from its verify cycles."""
+    out: list[int] = []
+    for rec in recs:
+        a = rec['accept']
+        out.extend([rec['cand'][0], *rec['cand'][1 : a + 1]])
+        if len(out) >= n:
+            break
+    return out[:n]
+
+
 def load_trace(run: Path) -> dict[str, list[dict[str, Any]]]:
     by_rid: dict[str, list[dict[str, Any]]] = collections.OrderedDict()
     for path in trace_files(run):
@@ -88,7 +99,8 @@ def load_trace(run: Path) -> dict[str, list[dict[str, Any]]]:
                     'accept': rec['accept'],
                     'commit': rec['accept'] + 1,
                 }
-            by_rid.setdefault(rec['rid'], []).append(rec)
+            if not str(rec['rid']).startswith('HEALTH'):  # server health checks
+                by_rid.setdefault(rec['rid'], []).append(rec)
     for recs in by_rid.values():
         recs.sort(key=lambda r: r['prefix'])
     return by_rid
@@ -107,7 +119,27 @@ def analyze_run(
     else:
         block = len(next(iter(by_rid.values()))[0]['cand'])
     rids = list(by_rid)
-    rids = rids[drop_first : len(rids) - drop_last if drop_last else None]
+    if (run / 'results.jsonl').exists():
+        # serve_probe.py runs: keep the recorded requests (not the server's warm-up, the
+        # driver's warm-up or the flush request, which can share a prompt): each result is
+        # matched to the request with the same first committed tokens and the closest length.
+        outputs = [
+            json.loads(line)['output_ids']
+            for line in (run / 'results.jsonl').read_text().splitlines()
+            if line.strip()
+        ]
+        committed = {rid: 1 + sum(r['accept'] + 1 for r in recs) for rid, recs in by_rid.items()}
+        heads = {rid: tuple(first_tokens(recs, 16)) for rid, recs in by_rid.items()}
+        chosen = []
+        for out in outputs:
+            candidates = [
+                rid for rid in rids if heads[rid] == tuple(out[:16]) and rid not in chosen
+            ]
+            if candidates:
+                chosen.append(min(candidates, key=lambda rid: abs(committed[rid] - len(out))))
+        rids = chosen
+    else:
+        rids = rids[drop_first : len(rids) - drop_last if drop_last else None]
 
     a0s: list[int] = []
     sweeps: dict[str, list[list[int]]] = {'recycle': [], 'keep': []}
