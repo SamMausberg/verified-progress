@@ -31,7 +31,7 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 | WS | Scope | Status |
 |---|---|---|
 | infra | GPU lock (FIFO queue), SGLang worktrees, PR tooling, this list | done (PR #1, #2, #8, #10) |
-| lit | Literature review, novelty assessment, citation audit | review (PR #6) |
+| lit | Literature review, novelty assessment, citation audit | done (PR #6) |
 | bench | Baseline server arms, aiperf Pareto harness, quality baseline, spec tuning | active |
 | profile | nsys/ncu profiles and critical-path attribution | active |
 | geometry | Real-head replay: transport versus self-evidence bounds | active |
@@ -87,7 +87,7 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 - [ ] Theory in the paper: contracts, common-mass bound, bounded-range sampling, dead/deferred/enclosed accounting (paper)
 
 - [ ] P4: bit-exact live replay of recurrent state at batch 128, pre-registered 1.10x threshold; rank/observability audit on captured traces (moonshot)
-- [ ] P5: first-layer token projection table, decided by its measured time share from existing traces (profile)
+- [x] P5: first-layer token projection table rejected by its pre-registered 1% criterion: layer 0's input projections take 0.60% / 0.52% / 0.33% of a plain decode step at batch 1 / 32 / 128, ceiling 1.006x (profile; evidence in PR #13)
 - [ ] Reproduce the P4/P5 counterexamples as exact tests (paper)
 
 ### Engine
@@ -98,7 +98,7 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 - [ ] Before/after Pareto sweeps with acceptance and output-equality checks (bench, integrate)
 
 ### Paper and deliverables
-- [ ] Literature review and verified bibliography (lit; PR #6 in review)
+- [x] Literature review and verified bibliography (lit; PR #6: 194 verified entries, citation audit)
 - [ ] Narrow the novelty claim: the greedy certified head is prior art (sparkpipe, dgpp, Laguna, knlp); the defensible parts are exact keyed-noise sampling, partition brackets for sampled acceptance, a Hopper-sound envelope and the SGLang/GH200 measurement under the stock-kernel contract; cite DSpark and D-cut for the sampled-depth counterexample (paper, kernel)
 - [ ] Revise the manuscript: methods, results, limitations, figures (paper)
 - [ ] README and RUNBOOK with exact reproduction commands (paper, infra)
