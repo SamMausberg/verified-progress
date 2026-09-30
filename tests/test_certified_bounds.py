@@ -191,8 +191,12 @@ def test_hopper_model_is_tighter_but_covers_the_block_model() -> None:
     k = 2560
     tight = HOPPER_WGMMA_BF16.gamma(k)
     assert tight < TENSOR_CORE_FP32.gamma(k)
-    # 160 blocks of 16 products, each at most (17 * 2^-25 + 2^-23) of its children.
-    assert tight >= 160 * (Fraction(17, 2**25) + Fraction(1, 2**23))
+    # 160 blocks of 16 products, each at most p = 17 * 2^-25 + 2^-23 of its children,
+    # plus 160 FP32 split-K additions; the errors compound along the path.
+    p = Fraction(17, 2**25) + Fraction(1, 2**23)
+    u = Fraction(1, 2**23)
+    assert tight >= (1 + p) ** 160 * (1 + u) ** 160 - 1
+    assert tight <= ((1 + p) ** 160 * (1 + u) ** 160 - 1) * (1 + Fraction(1, 10**3))
 
 
 def kernel_decision(ids: np.ndarray, lo: np.ndarray, hi: np.ndarray) -> tuple[int, bool]:

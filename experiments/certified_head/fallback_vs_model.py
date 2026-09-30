@@ -13,7 +13,8 @@ could compete are counted: only there could a decision over the full vocabulary
 differ.
 
 ``6.1e-4``  conservative model (2K roundings at 2^-23; the kernel's default),
-``1.19e-4`` Hopper wgmma model of Khattak and Mikaitis with a split-K allowance,
+``1.19e-4`` Hopper wgmma model of Khattak and Mikaitis with a split-K allowance
+            (both as the kernel computes them, rounded up to FP32),
 smaller values show what tighter knowledge of the stock kernel would buy.
 
 Batch-level rates group rows exactly as the engine batched them. Usage::
@@ -37,11 +38,25 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'src'))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from certified_head.bounds import bf16_candidate_threshold, bf16_round
+from certified_head.bounds import (
+    HOPPER_WGMMA_BF16,
+    TENSOR_CORE_FP32,
+    bf16_candidate_threshold,
+    bf16_round,
+    f32_up,
+)
 from certified_head.quantize import load_head_weight
 from real_states import plain_decode_steps
 
-GAMMAS = [6.1073e-4, 1.1921e-4, 3e-5, 1e-5, 3e-6, 1e-6, 0.0]
+GAMMAS = [
+    f32_up(TENSOR_CORE_FP32.gamma(2560)),
+    f32_up(HOPPER_WGMMA_BF16.gamma(2560)),
+    3e-5,
+    1e-5,
+    3e-6,
+    1e-6,
+    0.0,
+]
 TOP = 64
 
 

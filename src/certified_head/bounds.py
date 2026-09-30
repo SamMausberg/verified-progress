@@ -148,10 +148,12 @@ class BlockedTensorCoreModel:
 
     Blocks of ``block`` products are summed with ``frac_bits`` fractional bits
     kept and truncation, so each block node errs by at most
-    ``(block + 1) 2^-frac_bits + 2^-23`` times the sum of its children's
-    magnitudes; the accumulation path has ``K / block`` nodes. Split-K with FP32
-    partials adds at most ``K / block`` further FP32 additions. This rests on a
-    published measurement-based model, not on NVIDIA documentation.
+    ``p = (block + 1) 2^-frac_bits + 2^-23`` times the sum of its children's
+    magnitudes; the accumulation path has ``n = K / block`` nodes. Split-K with
+    FP32 partials adds at most ``n`` further FP32 additions. The errors compound
+    along the path, so the radius is ``(1 + gamma_n(p)) (1 + gamma_n(2^-23)) - 1``,
+    which bounds ``(1 + p)^n (1 + 2^-23)^n - 1``. This rests on a published
+    measurement-based model, not on NVIDIA documentation.
     """
 
     name: str
@@ -161,7 +163,7 @@ class BlockedTensorCoreModel:
     def gamma(self, k: int) -> Fraction:
         nodes = -(-k // self.block)
         per_node = (self.block + 1) * Fraction(1, 2**self.frac_bits) + U_FP32_TRUNC
-        return nodes * per_node + gamma(nodes, U_FP32_TRUNC)
+        return (1 + gamma(nodes, per_node)) * (1 + gamma(nodes, U_FP32_TRUNC)) - 1
 
 
 HOPPER_WGMMA_BF16 = BlockedTensorCoreModel('hopper-wgmma-bf16', 16, 25)
