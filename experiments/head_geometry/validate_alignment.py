@@ -132,6 +132,17 @@ def main() -> None:
         result['draft'] = agreement(rd, ps.draft_token[keep], None)
         result['draft']['draft_token_in_fp64_top16'] = float(rd['in_topk'].mean())
         result['target'] = agreement(rt, ps.target_argmax[keep], ps.target_top2[keep])
+        # Per draft position: for MTP the first draft row comes from the draft-extend
+        # pass and later rows from the draft decode steps, so check each separately.
+        pos_k = ps.position[keep]
+        for p in np.unique(pos_k):
+            m = pos_k == p
+            sub_d = {k: v[m] for k, v in rd.items()}
+            sub_t = {k: v[m] for k, v in rt.items()}
+            result[f'draft_position{p}'] = agreement(sub_d, ps.draft_token[keep][m], None)
+            result[f'target_position{p}'] = agreement(
+                sub_t, ps.target_argmax[keep][m], ps.target_top2[keep][m]
+            )
         # Accept length = 1 + drafts accepted before the first mismatch (bonus included).
         pos = ps.position[keep]
         acc = ps.accepted[keep]

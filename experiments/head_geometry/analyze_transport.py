@@ -63,6 +63,16 @@ def delta_basis(pairs, keep: np.ndarray, rank: int, device) -> torch.Tensor:
     return B.top_basis(d.T @ d, rank)
 
 
+def csv_breakdown(metric: str) -> bool:
+    """Metrics that the CSV breaks down by outcome, position and domain (all others
+    appear for the whole set only, to keep the file small)."""
+    headline = ('contig64|', 'kmeans256|', 'drift1.0|kmeans256|', 'drift0.1|kmeans256|')
+    families = ('|best|', '|coord|', '|oracle|')
+    return 'row_lowrank' in metric or (
+        metric.startswith(headline) and any(f in metric for f in families)
+    )
+
+
 @torch.no_grad()
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
@@ -413,12 +423,7 @@ def main() -> None:
         wr = csv.DictWriter(f, fieldnames=list(summary_rows[0].keys()))
         wr.writeheader()
         for r in summary_rows:
-            if (
-                r['group'] == 'all'
-                or '|best|' in r['metric']
-                or '|coord|' in r['metric']
-                or 'row_lowrank' in r['metric']
-            ):
+            if r['group'] == 'all' or csv_breakdown(r['metric']):
                 wr.writerow({k: (round(v, 6) if isinstance(v, float) else v) for k, v in r.items()})
     (args.out / f'transport_{tag}.json').write_text(json.dumps(result, indent=2) + '\n')
     raw_dir = args.data / 'analysis'

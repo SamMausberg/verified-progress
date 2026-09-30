@@ -9,9 +9,18 @@ and count the candidate rows that must be rescored exactly:
 
 beta_i = Q_i + gamma * A_i: Q_i bounds the quantization error in real arithmetic
 (several bound families, and their elementwise minimum, which is also valid), and
-gamma * A_i bounds the online FP32 or tensor-core accumulation error (theory notes,
-2026-09-30). The exact values z_i are FP64 products of the BF16 operands (contract C1).
-Every envelope is checked against the exact values; any violation is reported.
+gamma * A_i bounds the online FP32 or tensor-core accumulation error under the
+accumulator models of src/precision_reference.py. The reference decision is R-real
+(evidence/precision/README.md): the argmax of the real-arithmetic <w_i, h> over the BF16
+operands, computed here in FP64. Every envelope is checked against the exact values; any
+violation is reported.
+
+The adopted engine contract is R-stock: the stock head's token at the same batch shape,
+certified only through the gap condition (stock_gap in src/precision_reference.py) and
+otherwise computed by the stock head. For each position this script also reports whether
+the R-real winner a passes that condition against every other row,
+z_a - z_b > G_a + G_b + ulp_bf16(max(|z_a|, |z_b|) + max(G_a, G_b)), G_i = gamma * sum_j
+|w_ij h_j|, for several gamma; a position that fails needs the stock kernel.
 
 Fitted quantities (outlier dimensions, PCA basis) come from the plain-decode analysis
 split only; all statistics are on the held-out split.
@@ -38,6 +47,14 @@ from replay_data import load_decode, load_head, load_pairs, prompt_table
 F64 = torch.float64
 DECISIONS = ('greedy', 'gumbel_t1.0', 'gumbel_t0.7')
 GAMMAS = ('tensor_core', 'fp32_tree')
+# gamma values for the stock cuBLAS pre-rounding error G_i = gamma * sum_j |w_ij h_j| in the
+# R-stock gap condition: the reference tensor-core model, a tighter wgmma model, and the
+# reference IEEE FP32 tree.
+RSTOCK_GAMMAS = {
+    'tensor_core_model': B.accumulation_gamma(2560, 'tensor_core'),
+    'gamma_1.19e-4': 1.19e-4,
+    'fp32_tree_model': B.accumulation_gamma(2560, 'fp32_tree'),
+}
 
 
 @dataclass
@@ -227,6 +244,8 @@ def evaluate(
     fallback: dict[tuple, list[np.ndarray]] = {}
     unions: dict[tuple, list[tuple[int, int]]] = {}
     stats: dict[str, list[np.ndarray]] = {'margin': [], 'p_max': [], 'hnorm': []}
+    rstock: dict[str, list[np.ndarray]] = {}
+    rstock_steps: dict[str, list[tuple[int, int]]] = {}
     firsts = {v[0] for v in cascades_spec(cascades)}
     n_rows = hs.h.shape[0]
     for s, e in step_chunks(hs.step, chunk):
@@ -239,6 +258,19 @@ def evaluate(
         stats['p_max'].append(torch.exp(top2[:, 0] - torch.logsumexp(z, 1)).cpu().numpy())
         hn = h.norm(dim=1)
         stats['hnorm'].append(hn.cpu().numpy())
+        # R-stock gap condition for the R-real winner against every other row.
+        abs_sum = h.abs() @ w.double().abs().T
+        winner = z.argmax(1, keepdim=True)
+        z_a = z.gather(1, winner)
+        for gname, gval in RSTOCK_GAMMAS.items():
+            g = gval * abs_sum
+            g_a = g.gather(1, winner)
+            big = torch.maximum(z_a.abs(), z.abs()) + torch.maximum(g_a, g)
+            ulp = torch.exp2(torch.floor(torch.log2(big.clamp_min(2.0**-126))) - 7)
+            fail = (z_a - z <= g_a + g + ulp).scatter(1, winner, False).any(1)
+            rstock.setdefault(gname, []).append(fail.cpu().numpy())
+            rstock_steps.setdefault(gname, []).extend(step_unions(fail[:, None], step))
+        del abs_sum
         noise = B.gumbel_noise((n, z.shape[1]), seed + s, w.device)
         targets = {'greedy': (z, 1.0)}
         for t in (1.0, 0.7):
@@ -311,6 +343,8 @@ def evaluate(
         'unions': unions,
         'checks': checks,
         'stats': {k: np.concatenate(v) for k, v in stats.items()},
+        'rstock_fallback': {k: np.concatenate(v) for k, v in rstock.items()},
+        'rstock_steps': rstock_steps,
     }
 
 
@@ -392,7 +426,8 @@ def main() -> None:
     result: dict[str, Any] = {
         'model': 'Qwen/Qwen3.5-4B@851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a',
         'head_shape': [vocab, dim],
-        'contract': 'C1: argmax of real-arithmetic <w_i, h> over BF16 operands, FP64 replay',
+        'reference': 'R-real (src/precision_reference.py): argmax of real-arithmetic '
+        '<w_i, h> over the BF16 operands, FP64 replay',
         'gammas': {g: B.accumulation_gamma(dim, g) for g in GAMMAS},
         'fitted_on_plain_analysis_split': fitted,
         'sets': {},
@@ -408,6 +443,13 @@ def main() -> None:
             'margin_quantiles': np.quantile(res['stats']['margin'], [0.01, 0.1, 0.5, 0.9]).tolist(),
             'p_max_quantiles': np.quantile(res['stats']['p_max'], [0.01, 0.1, 0.5, 0.9]).tolist(),
             'hnorm_quantiles': np.quantile(res['stats']['hnorm'], [0.01, 0.5, 0.99]).tolist(),
+            'rstock_fallback_share': {
+                k: float(v.mean()) for k, v in res['rstock_fallback'].items()
+            },
+            'rstock_steps_with_fallback': {
+                k: float(np.mean([u > 0 for _, u in v])) for k, v in res['rstock_steps'].items()
+            },
+            'rstock_gammas': RSTOCK_GAMMAS,
             'fp32_rescore_needs_fp64': {
                 f'{dec}|{g}': float(v.mean()) for (dec, g), v in res['fallback'].items()
             },

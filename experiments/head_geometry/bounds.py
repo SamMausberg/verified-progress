@@ -7,16 +7,21 @@ real logits. The floating-point cost of computing a bound *online* (FP32 or tens
 accumulation) is modelled explicitly by :func:`accumulation_gamma` and the ``A`` term of
 the self-evidence envelope; it is not hidden in the FP64 evaluation.
 
-Notation follows ``paper/paper.tex`` Section 4 and ``~/vp-coord/notes/theory.md``:
+Notation follows ``paper/paper.tex`` Section 4 and ``src/precision_reference.py``:
 ``W`` is the [V, D] head, ``h`` a head input, ``Delta = h_target - h_draft``.
 """
 
 from __future__ import annotations
 
 import math
+import sys
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import torch
+
+# The merged exact reference (src/precision_reference.py) supplies the accumulator models.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'src'))
 
 F64 = torch.float64
 
@@ -540,19 +545,27 @@ def rotated_head(w: torch.Tensor, basis: torch.Tensor, rest: QuantHead, name: st
 
 
 def accumulation_gamma(dim: int, model: str) -> float:
-    """gamma for |fl(sum) - sum| <= gamma * sum |terms| (theory notes, 2026-09-30).
+    """gamma with |fl(sum) - sum| <= gamma * sum |terms| for a D-term dot product plus
+    one scale multiply, from the accumulator models of ``src/precision_reference.py``.
 
-    ``tensor_core``: conservative alignment-and-truncation model, D * 2^-22 * 1.001.
-    ``fp32_tree``: IEEE FP32 on CUDA cores, tree depth D/128 + log2(128) (+1 for the
-    scale multiply), gamma = (d+1)u / (1 - (d+1)u) with u = 2^-24.
+    ``tensor_core``: the largest gamma over the reference's fused multi-term adder model
+    (``Accumulator(order='fused')``) with groups of 2 to 64 products, rounding to nearest
+    or toward zero. ``fp32_tree``: IEEE FP32 on CUDA cores, a balanced tree over blocks of
+    128 products and a sequential sum across blocks (``Accumulator(order='blocked')``).
     """
+    import precision_reference as ref
+
     if model == 'tensor_core':
-        return dim * 2.0**-22 * 1.001
-    if model == 'fp32_tree':
-        depth = math.ceil(dim / 128) + 7 + 1
-        u = 2.0**-24
-        return (depth + 1) * u / (1 - (depth + 1) * u)
-    raise ValueError(model)
+        accs = [
+            ref.Accumulator('fused', ref.FP32, rounding, block=k)
+            for k in (2, 4, 8, 16, 32, 64)
+            for rounding in ('nearest', 'toward_zero')
+        ]
+    elif model == 'fp32_tree':
+        accs = [ref.Accumulator('blocked', ref.FP32, 'nearest', block=128)]
+    else:
+        raise ValueError(model)
+    return max(float(ref.gamma(a.depth(dim) + 1, a.node_roundoff)) for a in accs)
 
 
 # ---------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 """Transport versus int8: the drift ratio rho on real aligned pairs.
 
-Definitions (theory notes and evidence/precision/head_constants.json, PR #7):
+Definitions (as in evidence/precision/head_constants.json and
+experiments/precision_head_constants/head_constants.py):
 
   rho = ||h_t - h_d||_2 / ||h_t||_2, h_d and h_t the exact LM-head inputs (after the
   final norm) behind the same verified draft token.
