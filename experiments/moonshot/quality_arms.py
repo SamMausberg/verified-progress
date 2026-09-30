@@ -15,10 +15,14 @@ A configuration is `<base arm>[+lever...]`, with levers from `levers.py`.
 from __future__ import annotations
 
 import argparse
+import contextlib
+import fcntl
 import json
+import os
 import subprocess
 import sys
 import time
+from collections.abc import Iterator
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -42,6 +46,24 @@ SHARED_FLAGS: dict[str, dict[str, object]] = {
         'cuda-graph-max-bs-decode': 8,
     },
 }
+
+
+@contextlib.contextmanager
+def startup_lock() -> Iterator[None]:
+    """Hold ~/.gpu.lock.startup while a shared-mode server starts (scripts/gpu_startup_lock.sh).
+
+    SGLang sizes its pools from the free memory it sees while loading, so concurrent
+    start-ups of shared jobs race; the lock serialises launch-and-wait-healthy only.
+    """
+    path = Path(os.environ.get('GPU_LOCK_FILE', Path.home() / '.gpu.lock')).with_suffix(
+        '.lock.startup'
+    )
+    with path.open('a') as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
 
 
 def parse_config(text: str) -> tuple[str, list[str]]:
@@ -138,8 +160,9 @@ def main() -> None:
             for attempt in range(3):
                 server = launch(config, run_dir, args.port, {})
                 try:
-                    server.start()
-                    server.wait_ready()
+                    with startup_lock():
+                        server.start()
+                        server.wait_ready()
                     server.record_and_verify()
                     break
                 except Exception as exc:
