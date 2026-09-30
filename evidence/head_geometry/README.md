@@ -96,8 +96,13 @@ the stock kernel must decide, at:
 The floor near 2% comes from the BF16 spacing term, not from the accumulation model: with
 G nearly zero (last row) the condition reduces to an exact margin above one BF16 spacing
 at the winner's magnitude (0.0625 or 0.125 for logits in [8, 32)), and 1.95% of positions
-have a smaller margin. Resolving those rows one at a time keeps the cost small; running
-the dense head for the whole batch would not.
+have a smaller margin. Under R-stock the fallback reruns the stock head at the served
+batch shape, which the table's last column puts at 15-22% of capture-run batches.
+Resolving undecided rows one at a time returns the stock decision only if the stock head
+GEMM is bitwise batch-invariant row by row; the kernel workstream has measured that for
+M = 1-256 on this stack but has not yet committed it as evidence, and without that
+precondition R-stock requires the rerun at the same batch shape. The cost of either
+fallback mode is not measured here.
 
 ## P1: certified decoder tail (plain decoding only) - negative result
 
