@@ -218,7 +218,11 @@ def summarise_point(
             'span_s': span_s,
             'x_e2e': statistics.fmean(row['e2e_tps'] for row in ok),
             'x_e2e_p50': quantile([row['e2e_tps'] for row in ok], 0.5),
-            'x_decode': statistics.fmean(row['decode_tps'] for row in ok if row['decode_tps']),
+            'x_decode': (
+                statistics.fmean(rates)
+                if (rates := [row['decode_tps'] for row in ok if row['decode_tps']])
+                else math.nan
+            ),
             'y': total / span_s if span_s > 0 else math.nan,
             **steady_throughput(ok),
             'isl_mean': statistics.fmean(row['isl'] for row in ok if row['isl'] is not None),

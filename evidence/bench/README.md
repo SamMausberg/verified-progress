@@ -71,3 +71,50 @@ scripts/gpu_lock.sh -x bench/campaigns/capacity_probes.sh   # ran with mixed-v1/
 python -m bench.pareto ~/vp-data/bench/probes/cap-*/2026* ~/vp-data/bench/probes/tree-*/2026* \
     --out evidence/bench/probes --status feasibility-probe --points-only
 ```
+
+## frontend/
+
+What limits streamed throughput at high concurrency. One plain server (capacity 256,
+`--max-mamba-cache-size 1280`) at client concurrency 256 on the `mixed-v2` tune split,
+512 output tokens, on a quiet host (other processes at most 0.54 cores). Each row
+compares the client-observed y with the server's own decode rate while the full batch
+runs (median of its log's `gen throughput` lines with at least 90% of the peak running
+requests), and lists processes that used at least 0.3 cores. Every row is a single
+point of 512 requests; none has been repeated. The only rough indication of
+point-to-point noise is the pair that differs just in aiperf's worker count and gave
+15,363 and 15,439 tok/s (0.5% apart), against the 5-8% differences discussed below. The
+one-token control runs used the then-default `--stream-interval 1`; the campaign script
+now pins it explicitly.
+
+| Server | Client | y (tok/s) | Server decode (tok/s) | Busy processes (cores) |
+|---|---|---|---|---|
+| default (stream every token) | default (raw export, per-chunk usage) | 15,363 | 18,022 | tokenizer manager 1.01, aiperf timing manager 1.01 |
+| default | records-only export, no per-chunk usage | 16,593 | 18,035 | tokenizer manager 0.97, timing manager 0.88 |
+| default | 64 aiperf workers | 15,439 | 18,025 | tokenizer manager 1.01, timing manager 1.01 |
+| default | non-streaming | 16,510 | 18,020 | timing manager 0.90 |
+| `--incremental-streaming-output` | default | 16,178 | 18,014 | tokenizer manager 1.01, timing manager 0.91 |
+| `--stream-interval 4` | default | 16,546 | 18,031 | timing manager 0.91, tokenizer manager 0.35 |
+| `--tokenizer-worker-num 4 --detokenizer-worker-num 2` | default | 14,914 | 17,886 | detokenizer 0.94, four tokenizer workers 0.6-0.75 |
+| `SGLANG_RUST_SERVER=1` | default | launch failed: the embedded Rust server wants a local `tokenizer.json` path, not a Hub ID | | |
+
+(`sglang::scheduler` always shows about one core: its event loop polls.)
+
+Reading: with one-token chunks the tokenizer-manager process (HTTP plus the OpenAI
+serving layer) runs at a full core and the client receives about 85% of the server's
+full-batch decode rate. Streaming every 4 tokens takes that process to 0.35 cores and
+gives the same y as a non-streaming client, about 92% of the full-batch rate; the rest
+is prefill of each new wave and the drain, which y includes by definition. Every arm
+therefore streams every 4 tokens (`stream-interval = 4` in `bench/arms.toml`). The
+first token is still sent at once, so TTFT and the last-chunk time that define x and y
+are unchanged. The earlier probe rows (5.6-6.6K tok/s at c=256-1,024) were CPU
+contention, not a frontend limit. Not measured: concurrency above 256 on a quiet host,
+and the Rust server with a local tokenizer path. The records-only and non-streaming
+rows carry `invalid_reason` "prompts differ from the workload prefix" because without
+the raw export the prompts cannot be checked; they are diagnostics, not frontier data.
+
+```sh
+scripts/gpu_lock.sh -x bench/campaigns/frontend_diagnostic.sh
+python -m bench.pareto ~/vp-data/bench/frontend/fe-plain*/2026* --out evidence/bench/frontend \
+    --status frontend-diagnostic --points-only
+```
+`frontend_summary.json` holds the per-point comparison and process peaks.

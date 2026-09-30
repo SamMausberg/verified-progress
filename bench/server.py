@@ -188,69 +188,6 @@ def gpu_lock_held_by_someone() -> bool:
     return result.returncode != 0
 
 
-def _cpu_seconds_by_pid() -> dict[int, tuple[int, float]]:
-    """pid -> (session id, user+system CPU seconds) from /proc."""
-    tick = os.sysconf('SC_CLK_TCK')
-    times: dict[int, tuple[int, float]] = {}
-    for entry in Path('/proc').iterdir():
-        if not entry.name.isdigit():
-            continue
-        try:
-            stat = (entry / 'stat').read_text()
-        except OSError:
-            continue
-        # Fields after the command name: state ppid pgrp session ... utime(11) stime(12).
-        fields = stat.rsplit(')', 1)[-1].split()
-        times[int(entry.name)] = (int(fields[3]), (int(fields[11]) + int(fields[12])) / tick)
-    return times
-
-
-def foreign_cpu(own_sessions: set[int], interval: float = 2.0) -> dict[str, Any]:
-    """CPU cores used over `interval` s by processes outside `own_sessions`.
-
-    `own` lists the busiest processes inside them (server and client), since a
-    single-threaded frontend process near 1.0 cores is a serving bottleneck.
-    """
-    before = _cpu_seconds_by_pid()
-    time.sleep(interval)
-    after = _cpu_seconds_by_pid()
-    usage = {
-        pid: ((seconds - before[pid][1]) / interval, session in own_sessions)
-        for pid, (session, seconds) in after.items()
-        if pid in before
-    }
-
-    def listing(own: bool, limit: int) -> list[dict[str, Any]]:
-        chosen = sorted(
-            ((pid, cores) for pid, (cores, mine) in usage.items() if mine is own),
-            key=lambda item: -item[1],
-        )[:limit]
-        return [
-            {'pid': pid, 'cores': round(cores, 2), 'cmd': process_title(pid)[:120]}
-            for pid, cores in chosen
-            if cores >= 0.05
-        ]
-
-    return {
-        'cores': round(sum(cores for cores, mine in usage.values() if not mine), 2),
-        'top': listing(False, 5),
-        'own': listing(True, 8),
-    }
-
-
-def wait_for_quiet_cpu(
-    own_sessions: set[int], max_cores: float, max_wait_s: float
-) -> dict[str, Any]:
-    """Wait until foreign CPU use drops to `max_cores`; report what was seen."""
-    started = time.monotonic()
-    while True:
-        sample = foreign_cpu(own_sessions)
-        waited = time.monotonic() - started
-        if sample['cores'] <= max_cores or waited >= max_wait_s:
-            return {**sample, 'waited_s': round(waited, 1), 'quiet': sample['cores'] <= max_cores}
-        time.sleep(10.0)
-
-
 def port_free(host: str, port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

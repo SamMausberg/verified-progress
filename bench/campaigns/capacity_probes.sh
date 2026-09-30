@@ -3,7 +3,7 @@
 # Run under: scripts/gpu_lock.sh -x (from the bench worktree root).
 set -uo pipefail
 # shellcheck source=/dev/null
-source ~/verified-progress/scripts/sglang_env.sh
+source "$(dirname "$0")/../../scripts/sglang_env.sh"
 cd "$(dirname "$0")/../.." || exit 1
 OUT=~/vp-data/bench/probes
 COMMON=(--out "$OUT" --port 30012 --osl 256 --waves 2 --min-requests 16 --workload bench/workloads/mixed-v2/tune.jsonl)
