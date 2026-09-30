@@ -1,0 +1,408 @@
+From 19834cfaf87498ccb4f349c7247c1b6447b3934a Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <sam@findtensor.com>
+Date: Wed, 30 Sep 2026 20:37:27 +0000
+Subject: [PATCH 1/2] Add a bit-exact tensor tap for divergence forensics
+
+With SGLANG_STATE_TAP_DIR set, forward hooks on the target model, plus
+explicit taps after the GDN causal convolution and recurrence, hash the
+exact bits of every output one row per token into static buffers. The
+hashes are captured into CUDA graphs and replayed with them. After each
+target forward that contains a request whose rid starts with
+SGLANG_STATE_TAP_RID_PREFIX (default tap-), the rows of that request are
+saved with the head input and the logits fed to argmax.
+SGLANG_STATE_TAP_PERTURB=<module> adds one unit in the last place to the
+first element of that output in every forward, as a positive control.
+Off unless SGLANG_STATE_TAP_DIR is set.
+---
+ python/sglang/srt/debug_utils/state_tap.py    | 282 ++++++++++++++++++
+ .../layers/attention/linear/gdn_backend.py    |  16 +
+ .../sglang/srt/model_executor/model_runner.py |   9 +
+ 3 files changed, 307 insertions(+)
+ create mode 100644 python/sglang/srt/debug_utils/state_tap.py
+
+diff --git a/python/sglang/srt/debug_utils/state_tap.py b/python/sglang/srt/debug_utils/state_tap.py
+new file mode 100644
+index 0000000000..899ae5d42a
+--- /dev/null
++++ b/python/sglang/srt/debug_utils/state_tap.py
+@@ -0,0 +1,282 @@
++"""Bit-exact tensor tap for locating where two serving configurations diverge.
++
++Enabled with SGLANG_STATE_TAP_DIR. Forward hooks on the target model's modules
++write, for every row of every forward, a 64-bit hash of each module output's
++exact bits into a static device buffer. Because the hooks only launch GPU ops
++into static buffers, they are captured into CUDA graphs and replayed with them;
++the rest of the forward is unchanged (the hooks only read module outputs).
++
++After each target-model forward that contains a request whose rid starts with
++SGLANG_STATE_TAP_RID_PREFIX (default "tap-"), the rows of that request are
++copied to the host and saved: per-module hashes, input token ids and positions,
++the head input (final norm output), and the logits fed to argmax (full rows
++where the top-2 gap is at most SGLANG_STATE_TAP_FULL_GAP, top-16 otherwise).
++Two runs of the same prompt can then be compared position by position and
++module by module; slots are numbered in first-execution order, which follows
++the model's layer order, so the lowest differing slot at the earliest
++differing position names the first op whose output bits differ. Row counts
++are reset before every forward, so a slot the forward did not write reads 0.
++
++Diagnostic only: the host copies synchronize the forward stream.
++"""
++
++from __future__ import annotations
++
++import json
++import logging
++import os
++from pathlib import Path
++from typing import Any, Dict, List, Optional
++
++import numpy as np
++import torch
++
++logger = logging.getLogger(__name__)
++
++_MAX_ROWS = 8192 + 256
++_MAX_COLS = 262144
++
++
++def _enabled() -> bool:
++    return bool(os.environ.get("SGLANG_STATE_TAP_DIR"))
++
++
++class StateTap:
++    def __init__(self, model: torch.nn.Module, device: torch.device):
++        self.dir = Path(os.environ["SGLANG_STATE_TAP_DIR"])
++        self.dir.mkdir(parents=True, exist_ok=True)
++        self.prefix = os.environ.get("SGLANG_STATE_TAP_RID_PREFIX", "tap-")
++        self.full_gap = float(os.environ.get("SGLANG_STATE_TAP_FULL_GAP", "0.5"))
++        # Positive control: add one unit in the last place to the first element
++        # of this module's output in every forward, before it is hashed and
++        # consumed downstream. The tap must name this module as the first
++        # difference against an unperturbed run.
++        self.perturb = os.environ.get("SGLANG_STATE_TAP_PERTURB") or None
++        gen = torch.Generator(device="cpu").manual_seed(0x5EED)
++        # Odd random multipliers: sum(bits_i * c_i) mod 2**64 as the row hash.
++        self.coeff = (
++            torch.randint(1, 2**62, (_MAX_COLS,), generator=gen, dtype=torch.int64) * 2
++            + 1
++        ).to(device)
++        self.names: List[str] = []
++        self.slot_of: Dict[str, int] = {}
++        for name, module in model.named_modules():
++            if not name or "visual" in name or ".mtp" in name:
++                continue
++            module.register_forward_hook(self._make_hook(name))
++        # Slots are assigned on first call; allocate generously.
++        self.max_slots = 4 * sum(1 for _ in model.named_modules())
++        self.hashes = torch.zeros(
++            (self.max_slots, _MAX_ROWS), dtype=torch.int64, device=device
++        )
++        self.rows = torch.zeros((self.max_slots,), dtype=torch.int64, device=device)
++        self.head_in: Optional[torch.Tensor] = None
++        self.head_in_name: Optional[str] = None
++        self._mode = "unknown"
++        self._names_written = 0
++        self._tokens: Optional[int] = None
++        self._tokens_real: Optional[int] = None
++        self.forward_count = 0
++        logger.info("state tap enabled: dir=%s prefix=%s", self.dir, self.prefix)
++
++    # ------------------------------------------------------------ hooks
++    def _slot(self, key: str) -> int:
++        slot = self.slot_of.get(key)
++        if slot is None:
++            slot = len(self.names)
++            assert slot < self.max_slots, "state tap: too many slots"
++            self.names.append(key)
++            self.slot_of[key] = slot
++        return slot
++
++    def _record(self, key: str, t: torch.Tensor) -> None:
++        if t.dim() == 0 or t.numel() == 0:
++            return
++        if key == self.perturb and t.is_contiguous():
++            first = t.view(-1)[:1]
++            if first.dtype in (torch.bfloat16, torch.float16):
++                first.view(torch.int16).add_(1)
++            elif first.dtype == torch.float32:
++                first.view(torch.int32).add_(1)
++        # One row per token: tensors laid out as [1, T, ...] or [T * heads, ...]
++        # are regrouped with the token count of this forward.
++        # Logits keep their own rows (one per request in a prefill).
++        # Captured graph segments see the padded token count (set by layer 0's
++        # norm during capture); code that runs eagerly, such as attention
++        # backends between the segments of a breakable prefill graph, sees the
++        # real count of this forward.
++        if torch.cuda.is_current_stream_capturing():
++            T = self._tokens
++        else:
++            T = self._tokens_real or self._tokens
++        if key != "logits_processor" and T and t.numel() % T == 0:
++            n = T
++        else:
++            n = t.shape[0]
++        if n > _MAX_ROWS:
++            return
++        flat = t.reshape(n, -1)
++        if flat.shape[1] > _MAX_COLS:
++            return
++        if flat.dtype in (torch.bfloat16, torch.float16):
++            bits = flat.contiguous().view(torch.int16).to(torch.int64)
++        elif flat.dtype == torch.float32:
++            bits = flat.contiguous().view(torch.int32).to(torch.int64)
++        elif flat.dtype == torch.bool:
++            bits = flat.to(torch.int64)
++        elif flat.dtype in (torch.int32, torch.int64, torch.int16, torch.uint8):
++            bits = flat.to(torch.int64)
++        else:
++            return
++        slot = self._slot(key)
++        h = (bits * self.coeff[: bits.shape[1]]).sum(dim=-1)
++        self.hashes[slot, :n].copy_(h)
++        self.rows[slot].fill_(n)
++
++    def _make_hook(self, name: str):
++        is_final_norm = name.endswith("model.norm") or name == "norm"
++        # The first decoder layer's input norm runs as a module in every
++        # forward (the embedding lookup does not always), and its first output
++        # is [tokens, hidden]: it fixes the token count for the regrouping.
++        sets_tokens = name.endswith("layers.0.input_layernorm")
++
++        def hook(module, args, output):
++            if sets_tokens:
++                first = output[0] if isinstance(output, (tuple, list)) else output
++                if isinstance(first, torch.Tensor):
++                    self._tokens = int(first.shape[0])
++            outs: List[Any]
++            if isinstance(output, torch.Tensor):
++                outs = [output]
++            elif isinstance(output, (tuple, list)):
++                outs = list(output)
++            elif hasattr(output, "next_token_logits"):
++                outs = [output.next_token_logits]
++            else:
++                return
++            for i, o in enumerate(outs):
++                if isinstance(o, torch.Tensor):
++                    self._record(name if i == 0 else f"{name}#{i}", o)
++            if is_final_norm and isinstance(outs[0], torch.Tensor):
++                self.head_in_name = name
++                t = outs[0]
++                if self.head_in is None or self.head_in.shape[1] != t.shape[-1]:
++                    self.head_in = torch.zeros(
++                        (_MAX_ROWS, t.shape[-1]), dtype=t.dtype, device=t.device
++                    )
++                self.head_in[: t.shape[0]].copy_(t.reshape(t.shape[0], -1))
++
++        return hook
++
++    # ------------------------------------------------------------ read-out
++    def begin(self, mode: str, num_tokens: int) -> None:
++        self._mode = mode
++        self._tokens_real = num_tokens
++        self.rows.zero_()
++
++    def end(self, forward_batch, logits_output) -> None:
++        mode = self._mode
++        if len(self.names) != self._names_written:
++            (self.dir / "slots.json").write_text(
++                json.dumps({"names": self.names, "head_in": self.head_in_name})
++            )
++            self._names_written = len(self.names)
++        self.forward_count += 1
++        rids = forward_batch.rids or []
++        tapped = [i for i, r in enumerate(rids) if r and r.startswith(self.prefix)]
++        if not tapped:
++            return
++        torch.cuda.current_stream().synchronize()
++        fm = forward_batch.forward_mode
++        n_tokens = int(forward_batch.input_ids.shape[0])
++        bs = len(rids)
++        if fm.is_target_verify():
++            per = forward_batch.spec_info.draft_token_num
++            spans = [(i * per, (i + 1) * per) for i in range(bs)]
++            logit_spans = spans
++        elif fm.is_decode():
++            spans = [(i, i + 1) for i in range(bs)]
++            logit_spans = spans
++        elif fm.is_extend():
++            lens = forward_batch.extend_seq_lens_cpu
++            starts = [0]
++            for x in lens[:-1]:
++                starts.append(starts[-1] + x)
++            spans = [(s, s + x) for s, x in zip(starts, lens)]
++            logit_spans = [(i, i + 1) for i in range(bs)]
++        else:
++            return
++        logits = getattr(logits_output, "next_token_logits", None)
++        n_slots = len(self.names)
++        rows = self.rows[:n_slots].cpu()
++        ids = forward_batch.input_ids.cpu()
++        pos = forward_batch.positions.cpu()
++        for i in tapped:
++            a, b = spans[i]
++            la, lb = logit_spans[i]
++            hashes_tok = self.hashes[:n_slots, a:b].cpu()
++            hashes_req = self.hashes[:n_slots, la:lb].cpu()
++            rec: Dict[str, Any] = {
++                "mode": mode,
++                "forward_count": self.forward_count,
++                "batch_size": bs,
++                "num_tokens": n_tokens,
++                "row_start": a,
++                "input_ids": ids[a:b].numpy(),
++                "positions": pos[a:b].numpy(),
++                # Only slots whose row count equals this forward's token count
++                # are indexed by token; others (e.g. logits of an extend) by request.
++                "hash_rows": rows.numpy(),
++                "hashes_tok": hashes_tok.numpy(),
++                "hashes_req": hashes_req.numpy(),
++            }
++            if self.head_in is not None:
++                # A prefill keeps only its last row; decode and verify keep all.
++                prefill = fm.is_extend() and not fm.is_target_verify()
++                rec["head_in"] = (
++                    (self.head_in[b - 1 : b] if prefill else self.head_in[a:b])
++                    .float()
++                    .cpu()
++                    .numpy()
++                )
++            if logits is not None and logits.shape[0] >= lb:
++                lg = logits[la:lb].float()
++                top = torch.topk(lg, 16, dim=-1)
++                rec["top16_values"] = top.values.cpu().numpy()
++                rec["top16_ids"] = top.indices.cpu().numpy()
++                rec["argmax"] = torch.argmax(lg, dim=-1).cpu().numpy()
++                gap = top.values[:, 0] - top.values[:, 1]
++                keep = (gap <= self.full_gap).cpu()
++                rec["full_logits_rows"] = keep.nonzero().flatten().numpy()
++                if bool(keep.any()):
++                    rec["full_logits"] = lg[keep.to(lg.device)].cpu().numpy()
++            out_dir = self.dir / rids[i]
++            out_dir.mkdir(parents=True, exist_ok=True)
++            np.savez(out_dir / f"{self.forward_count:07d}_{mode}.npz", **rec)
++
++
++_TAP: Optional[StateTap] = None
++
++
++def maybe_install(model: torch.nn.Module, device, is_draft_worker: bool) -> None:
++    global _TAP
++    if _TAP is None and not is_draft_worker and _enabled():
++        _TAP = StateTap(model, torch.device(device))
++
++
++def record(name: str, tensor: torch.Tensor) -> None:
++    """Tap a tensor that is not a module output (e.g. inside an attention backend)."""
++    if _TAP is not None:
++        _TAP._record(name, tensor)
++
++
++def begin(forward_batch, is_draft_worker: bool) -> None:
++    if _TAP is not None and not is_draft_worker:
++        _TAP.begin(
++            forward_batch.forward_mode.name, int(forward_batch.input_ids.shape[0])
++        )
++
++
++def end(forward_batch, output, is_draft_worker: bool) -> None:
++    if _TAP is not None and not is_draft_worker:
++        _TAP.end(forward_batch, getattr(output, "logits_output", None))
+diff --git a/python/sglang/srt/layers/attention/linear/gdn_backend.py b/python/sglang/srt/layers/attention/linear/gdn_backend.py
+index 5045bf5809..a6ae17341e 100644
+--- a/python/sglang/srt/layers/attention/linear/gdn_backend.py
++++ b/python/sglang/srt/layers/attention/linear/gdn_backend.py
+@@ -9,6 +9,7 @@ from sglang.kernels.ops.mamba.causal_conv1d_triton import (
+     causal_conv1d_update,
+ )
+ from sglang.srt.configs.hybrid_arch import hybrid_gdn_config
++from sglang.srt.debug_utils import state_tap
+ from sglang.srt.environ import envs
+ from sglang.srt.layers.attention.hybrid_linear_attn_backend import MambaAttnBackendBase
+ from sglang.srt.layers.attention.linear.kernels.gdn_triton import TritonGDNKernel
+@@ -826,6 +827,9 @@ class GDNAttnBackend(MambaAttnBackendBase):
+                 layer.activation,
+                 conv_state_indices=cache_indices,
+             )
++        state_tap.record(
++            f"model.layers.{layer.layer_id}.linear_attn.gdn_conv", mixed_qkv
++        )
+ 
+         # Skip split + reshape + separate gating kernel by consuming
+         # the packed mixed_qkv directly in a single fused Triton kernel.
+@@ -847,6 +851,9 @@ class GDNAttnBackend(MambaAttnBackendBase):
+                 replayssm_write_pos=replayssm_write_pos,
+                 replayssm_force_flush=replayssm_force_flush,
+             )
++            state_tap.record(
++                f"model.layers.{layer.layer_id}.linear_attn.gdn_core", core_attn_out
++            )
+             self._track_mamba_state_decode(
+                 forward_batch, conv_states, ssm_states, cache_indices, layer.layer_id
+             )
+@@ -875,6 +882,9 @@ class GDNAttnBackend(MambaAttnBackendBase):
+             cache_indices=cache_indices,
+             query_start_loc=query_start_loc,
+         )
++        state_tap.record(
++            f"model.layers.{layer.layer_id}.linear_attn.gdn_core", core_attn_out
++        )
+ 
+         self._track_mamba_state_decode(
+             forward_batch, conv_states, ssm_states, cache_indices, layer.layer_id
+@@ -1033,6 +1043,9 @@ class GDNAttnBackend(MambaAttnBackendBase):
+                 state_cache_indices,
+             )
+ 
++        state_tap.record(
++            f"model.layers.{layer.layer_id}.linear_attn.gdn_conv", mixed_qkv
++        )
+         actual_seq_len = mixed_qkv.shape[0]
+         qkv_dim = layer.q_dim + layer.k_dim + layer.v_dim
+         if (
+@@ -1182,6 +1195,9 @@ class GDNAttnBackend(MambaAttnBackendBase):
+                     h_track_buf=h_track_buf,
+                 )
+ 
++        state_tap.record(
++            f"model.layers.{layer.layer_id}.linear_attn.gdn_core", core_attn_out
++        )
+         return core_attn_out
+ 
+     def _forward_extend_mis(
+diff --git a/python/sglang/srt/model_executor/model_runner.py b/python/sglang/srt/model_executor/model_runner.py
+index bc1d618af4..e05bf84e31 100644
+--- a/python/sglang/srt/model_executor/model_runner.py
++++ b/python/sglang/srt/model_executor/model_runner.py
+@@ -1250,6 +1250,11 @@ class ModelRunner:
+ 
+         self.maybe_precompile_model_kernels_after_loading()
+ 
++        # Diagnostic bit-exact tensor tap (SGLANG_STATE_TAP_DIR); no-op otherwise.
++        from sglang.srt.debug_utils import state_tap
++
++        state_tap.maybe_install(self.model, self.device, self.is_draft_worker)
++
+         # Register model for layerwise NVTX profiling if enabled
+         if get_exec().comm.enable_layerwise_nvtx_marker:
+             pyt_hooks = PytHooks()
+@@ -1757,12 +1762,16 @@ class ModelRunner:
+                 forward_batch,
+             ) as recorder_outputs,
+         ):
++            from sglang.srt.debug_utils import state_tap
++
++            state_tap.begin(forward_batch, self.is_draft_worker)
+             output = self._forward_raw(
+                 forward_batch,
+                 pp_proxy_tensors,
+                 reinit_attn_backend,
+                 split_forward_count,
+             )
++            state_tap.end(forward_batch, output, self.is_draft_worker)
+             if self.enable_elastic_ep:
+                 output = self._maybe_rebalance_after_rank_fault(
+                     output,
+-- 
+2.34.1
+
