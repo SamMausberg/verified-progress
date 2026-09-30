@@ -21,10 +21,12 @@ import argparse
 import gzip
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from dataclasses import asdict
 from pathlib import Path
@@ -43,10 +45,12 @@ from bench.server import (
     Server,
     add_arm_arguments,
     arm_from_args,
+    foreign_cpu,
     gpu_lock_held_by_someone,
     gpu_snapshot,
     http_get,
     http_post,
+    wait_for_quiet_cpu,
 )
 
 AIPERF = str(Path.home() / '.local/bin/aiperf')
@@ -184,6 +188,9 @@ class Sweep:
         }
         self.body = request_body(args.ignore_eos, args.thinking)
         self.points: list[dict[str, Any]] = []
+        assert server.proc is not None
+        # The sweep (with its aiperf children) and the server each own a session.
+        self.own_sessions = {os.getsid(0), os.getsid(server.proc.pid)}
 
     @property
     def url(self) -> str:
@@ -268,12 +275,26 @@ class Sweep:
         prompts = [*cycled(self.warmup_pool, warmup), *measured]
         point_dir = self.run_dir / f'r{repeat}' / f'c{concurrency:03d}'
         flushed = self.flush_cache()
+        cpu_before = wait_for_quiet_cpu(
+            self.own_sessions, args.quiet_cpu_cores, args.quiet_cpu_wait
+        )
         before = self.metrics()
         log_start = self.server.log_path.stat().st_size
         gpu_before = gpu_snapshot()
+        samples: list[float] = []
+        stop = threading.Event()
+
+        def sample_cpu() -> None:
+            while not stop.is_set():
+                samples.append(foreign_cpu(self.own_sessions, interval=5.0)['cores'])
+
+        sampler = threading.Thread(target=sample_cpu, daemon=True)
+        sampler.start()
         started = time.time()
         result = self.run_aiperf(point_dir, concurrency, requests, warmup, prompts, args.osl)
         elapsed = time.time() - started
+        stop.set()
+        sampler.join()
         after = self.metrics()
         with self.server.log_path.open('rb') as handle:
             handle.seek(log_start)
@@ -301,6 +322,10 @@ class Sweep:
                 'server_log': log_segment_stats(segment),
                 'gpu_before': gpu_before['values'],
                 'gpu_after': gpu_snapshot()['values'],
+                # CPU cores used by processes outside this sweep and its server.
+                'foreign_cpu_before': cpu_before,
+                'foreign_cpu_during_max': max(samples) if samples else None,
+                'foreign_cpu_during_mean': sum(samples) / len(samples) if samples else None,
             }
         )
         (point_dir / 'point.json').write_text(json.dumps(summary, indent=2, default=str) + '\n')
@@ -364,7 +389,8 @@ def format_point(summary: dict[str, Any]) -> str:
         f'y={summary.get("y", float("nan")):8.1f} tok/s '
         f'ttft_p50={summary.get("ttft_ms", {}).get("p50", float("nan")):7.1f} ms '
         f'accept={spec.get("accept_length", float("nan")):.3f} '
-        f'osl_mismatch={summary.get("osl_mismatch")}'
+        f'osl_mismatch={summary.get("osl_mismatch")} '
+        f'foreign_cpu={summary.get("foreign_cpu_during_max")}'
     )
 
 
@@ -396,6 +422,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--warmup-osl', type=int, default=128)
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--point-timeout', type=float, default=3600.0)
+    parser.add_argument(
+        '--quiet-cpu-cores',
+        type=float,
+        default=2.0,
+        help='before each point, wait until other processes use at most this many cores',
+    )
+    parser.add_argument('--quiet-cpu-wait', type=float, default=600.0, help='seconds')
     parser.add_argument('--pyspy', action='store_true')
     parser.add_argument(
         '--allow-unlocked', action='store_true', help='skip the GPU lock check (debug only)'

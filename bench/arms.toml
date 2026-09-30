@@ -26,9 +26,12 @@ mm-attention-backend = "triton_attn"
 # strategy under the overlap scheduler). 640 slots admit exactly 128 requests
 # and leave the rest of the static pool to the KV cache and, with speculation,
 # to the per-draft-token intermediate states. At the default split, MTP with
-# three steps is capped at 72 requests.
+# three steps is capped at 72 requests. The static fraction is raised from the
+# automatic 0.815 so a 5-step chain (6 intermediate states per request) also
+# fits at 128; about 6 GB stays free for activations after graph capture.
 max-running-requests = 128
 max-mamba-cache-size = 640
+mem-fraction-static = 0.85
 # /metrics: token, verify-call and CUDA-graph pass counters per sweep point.
 enable-metrics = true
 random-seed = 0
