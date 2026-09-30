@@ -23,6 +23,7 @@ per-tile errors of both mechanisms, and the certification rates they lead to.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import time
 from pathlib import Path
@@ -213,6 +214,33 @@ def main() -> None:
     result['elapsed_s'] = time.time() - t0
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2) + '\n')
+    # Plot data: one row per pair, and a quantile table with the weight-only thresholds.
+    stem = args.out.with_suffix('')
+    with open(f'{stem}_pairs.csv', 'w', newline='') as f:
+        wr = csv.writer(f)
+        wr.writerow(['position', 'outcome', 'domain', 'context_len', 'rho', 'rho_head_centred'])
+        for i in range(len(keep)):
+            wr.writerow(
+                [
+                    int(ps.position[keep[i]]),
+                    outcome[i],
+                    dom[i],
+                    int(ctx[i]),
+                    f'{arrays["rho"][i]:.4g}',
+                    f'{arrays["rho_head_centred"][i]:.4g}',
+                ]
+            )
+    qs = np.round(np.arange(0.005, 1.0, 0.005), 3)
+    table = {'q': qs, 'rho_all': np.quantile(arrays['rho'], qs)}
+    for p in np.unique(ps.position[keep]):
+        table[f'rho_position{p}'] = np.quantile(arrays['rho'][ps.position[keep] == p], qs)
+    for name, t in thresholds.items():
+        table[f'threshold_{name}'] = np.quantile(t.cpu().numpy(), qs)
+    with open(f'{stem}_quantiles.csv', 'w', newline='') as f:
+        wr = csv.writer(f)
+        wr.writerow(list(table))
+        for i in range(len(qs)):
+            wr.writerow([f'{table[k][i]:.5g}' for k in table])
     for key in ('rho', 'rho_head_centred', 'frac_rows_transport_narrower|int8_row'):
         print(key, json.dumps(result['metrics'][key]['all']))
     print(f'done in {result["elapsed_s"]:.0f}s')
