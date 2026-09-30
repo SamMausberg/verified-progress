@@ -3,6 +3,210 @@
  "peak_tb_per_s": 3.79,
  "configs": [
   {
+   "arm": "mtp",
+   "batch": 1,
+   "mean_context_tokens": 1268.5,
+   "per_step": {
+    "total_gb": 13.385534976,
+    "components_gb": {
+     "backbone_weights": 7.140111872,
+     "head_weights": 1.2713984,
+     "logits": 0.01191936,
+     "gdn_state_verify_read": 0.050331648,
+     "gdn_state_verify_intermediate_write": 0.201326592,
+     "gdn_state_commit": 0.100663296,
+     "gdn_conv_state": 0.00589824,
+     "attention_kv": 0.041566208,
+     "mtp_layer_weights": 0.723597312,
+     "draft_head_weights": 3.8141952,
+     "draft_logits": 0.00893952,
+     "mtp_attention_kv": 0.015587328
+    },
+    "components_pct": {
+     "backbone_weights": 53.34199854396615,
+     "head_weights": 9.498300981466876,
+     "logits": 0.08904657170125196,
+     "gdn_state_verify_read": 0.3760152141116784,
+     "gdn_state_verify_intermediate_write": 1.5040608564467135,
+     "gdn_state_commit": 0.7520304282233568,
+     "gdn_conv_state": 0.04406428290371231,
+     "attention_kv": 0.31053079368532815,
+     "mtp_layer_weights": 5.405815406686365,
+     "draft_head_weights": 28.49490294440063,
+     "draft_logits": 0.06678492877593897,
+     "mtp_attention_kv": 0.11644904763199806
+    }
+   },
+   "accept_length": 2.7550000000000003,
+   "per_output_token": {
+    "total_gb": 4.858633385117967,
+    "components_gb": {
+     "backbone_weights": 2.5916921495462795,
+     "head_weights": 0.4614876225045372,
+     "logits": 0.004326446460980036,
+     "gdn_state_verify_read": 0.01826920072595281,
+     "gdn_state_verify_intermediate_write": 0.07307680290381124,
+     "gdn_state_commit": 0.03653840145190562,
+     "gdn_conv_state": 0.002140921960072595,
+     "attention_kv": 0.015087552813067149,
+     "mtp_layer_weights": 0.2626487520871143,
+     "draft_head_weights": 1.3844628675136115,
+     "draft_logits": 0.0032448348457350265,
+     "mtp_attention_kv": 0.00565783230490018
+    },
+    "components_pct": {
+     "backbone_weights": 53.34199854396615,
+     "head_weights": 9.498300981466876,
+     "logits": 0.08904657170125196,
+     "gdn_state_verify_read": 0.3760152141116784,
+     "gdn_state_verify_intermediate_write": 1.5040608564467135,
+     "gdn_state_commit": 0.7520304282233568,
+     "gdn_conv_state": 0.04406428290371231,
+     "attention_kv": 0.31053079368532815,
+     "mtp_layer_weights": 5.405815406686365,
+     "draft_head_weights": 28.49490294440063,
+     "draft_logits": 0.06678492877593897,
+     "mtp_attention_kv": 0.11644904763199806
+    }
+   }
+  },
+  {
+   "arm": "mtp",
+   "batch": 8,
+   "mean_context_tokens": 1047.0,
+   "per_step": {
+    "total_gb": 16.359321088,
+    "components_gb": {
+     "backbone_weights": 7.140111872,
+     "head_weights": 1.2713984,
+     "logits": 0.09535488,
+     "gdn_state_verify_read": 0.402653184,
+     "gdn_state_verify_intermediate_write": 1.610612736,
+     "gdn_state_commit": 0.805306368,
+     "gdn_conv_state": 0.04718592,
+     "attention_kv": 0.274464768,
+     "mtp_layer_weights": 0.723597312,
+     "draft_head_weights": 3.8141952,
+     "draft_logits": 0.07151616,
+     "mtp_attention_kv": 0.102924288
+    },
+    "components_pct": {
+     "backbone_weights": 43.64552681368583,
+     "head_weights": 7.7717063755940625,
+     "logits": 0.5828779781695547,
+     "gdn_state_verify_read": 2.461307421219068,
+     "gdn_state_verify_intermediate_write": 9.845229684876273,
+     "gdn_state_commit": 4.922614842438136,
+     "gdn_conv_state": 0.28843446342410956,
+     "attention_kv": 1.6777271289169038,
+     "mtp_layer_weights": 4.423150007922872,
+     "draft_head_weights": 23.31511912678219,
+     "draft_logits": 0.43715848362716603,
+     "mtp_attention_kv": 0.6291476733438389
+    }
+   },
+   "accept_length": 2.7640000000000002,
+   "per_output_token": {
+    "total_gb": 5.918712405209841,
+    "components_gb": {
+     "backbone_weights": 2.5832532098408105,
+     "head_weights": 0.4599849493487699,
+     "logits": 0.034498871201157744,
+     "gdn_state_verify_read": 0.1456777076700434,
+     "gdn_state_verify_intermediate_write": 0.5827108306801736,
+     "gdn_state_commit": 0.2913554153400868,
+     "gdn_conv_state": 0.01707160636758321,
+     "attention_kv": 0.0992998437047757,
+     "mtp_layer_weights": 0.26179352821997104,
+     "draft_head_weights": 1.3799548480463095,
+     "draft_logits": 0.025874153400868304,
+     "mtp_attention_kv": 0.03723744138929088
+    },
+    "components_pct": {
+     "backbone_weights": 43.64552681368583,
+     "head_weights": 7.7717063755940625,
+     "logits": 0.5828779781695547,
+     "gdn_state_verify_read": 2.461307421219068,
+     "gdn_state_verify_intermediate_write": 9.845229684876273,
+     "gdn_state_commit": 4.922614842438136,
+     "gdn_conv_state": 0.28843446342410956,
+     "attention_kv": 1.6777271289169038,
+     "mtp_layer_weights": 4.423150007922872,
+     "draft_head_weights": 23.31511912678219,
+     "draft_logits": 0.43715848362716603,
+     "mtp_attention_kv": 0.6291476733438389
+    }
+   }
+  },
+  {
+   "arm": "mtp",
+   "batch": 32,
+   "mean_context_tokens": 751.390625,
+   "per_step": {
+    "total_gb": 26.163168768,
+    "components_gb": {
+     "backbone_weights": 7.140111872,
+     "head_weights": 1.2713984,
+     "logits": 0.38141952,
+     "gdn_state_verify_read": 1.610612736,
+     "gdn_state_verify_intermediate_write": 6.442450944,
+     "gdn_state_commit": 3.221225472,
+     "gdn_conv_state": 0.18874368,
+     "attention_kv": 0.787890176,
+     "mtp_layer_weights": 0.723597312,
+     "draft_head_weights": 3.8141952,
+     "draft_logits": 0.28606464,
+     "mtp_attention_kv": 0.295458816
+    },
+    "components_pct": {
+     "backbone_weights": 27.2906998969216,
+     "head_weights": 4.85949699470287,
+     "logits": 1.4578490984108612,
+     "gdn_state_verify_read": 6.156030832052461,
+     "gdn_state_verify_intermediate_write": 24.624123328209844,
+     "gdn_state_commit": 12.312061664104922,
+     "gdn_conv_state": 0.7214098631311477,
+     "attention_kv": 3.0114478218848753,
+     "mtp_layer_weights": 2.765709759457834,
+     "draft_head_weights": 14.578490984108612,
+     "draft_logits": 1.093386823808146,
+     "mtp_attention_kv": 1.1292929332068282
+    }
+   },
+   "accept_length": 2.8175,
+   "per_output_token": {
+    "total_gb": 9.285951647914818,
+    "components_gb": {
+     "backbone_weights": 2.534201196805679,
+     "head_weights": 0.45125054125998226,
+     "logits": 0.13537516237799468,
+     "gdn_state_verify_read": 0.5716460464951199,
+     "gdn_state_verify_intermediate_write": 2.2865841859804794,
+     "gdn_state_commit": 1.1432920929902397,
+     "gdn_conv_state": 0.06698977107364686,
+     "attention_kv": 0.2796415886424135,
+     "mtp_layer_weights": 0.25682247098491573,
+     "draft_head_weights": 1.3537516237799467,
+     "draft_logits": 0.101531371783496,
+     "mtp_attention_kv": 0.10486559574090507
+    },
+    "components_pct": {
+     "backbone_weights": 27.2906998969216,
+     "head_weights": 4.85949699470287,
+     "logits": 1.4578490984108612,
+     "gdn_state_verify_read": 6.156030832052461,
+     "gdn_state_verify_intermediate_write": 24.624123328209844,
+     "gdn_state_commit": 12.312061664104922,
+     "gdn_conv_state": 0.7214098631311477,
+     "attention_kv": 3.0114478218848753,
+     "mtp_layer_weights": 2.765709759457834,
+     "draft_head_weights": 14.578490984108612,
+     "draft_logits": 1.093386823808146,
+     "mtp_attention_kv": 1.1292929332068282
+    }
+   }
+  },
+  {
    "arm": "plain",
    "batch": 1,
    "mean_context_tokens": 987.0,
