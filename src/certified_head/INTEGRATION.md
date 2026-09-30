@@ -30,6 +30,30 @@ ids, stats = head.gumbel_sample(H, seeds, positions, temps)  # seeded, temperatu
   nonzero means that row took the fallback) are views of internal buffers,
   overwritten by the next call.
 
+## Engine glue
+
+`certified_head.engine` is what the SGLang patch imports. `install(lm_head.weight,
+vocab_size, max_batch)` builds one head per enabled path from the engine's own
+head tensor (`weight[:vocab_size]`, so padded rows are excluded); the int8 copy
+is cached under its SHA-256 and the per-path heads share it (`CertifiedHead.sibling`).
+`PathHead.argmax(H, gate=g)` and `PathHead.gumbel_sample(..., gate=g)` keep
+device counters (calls, rows, fallback rows and calls, rows by status bit, and
+in check mode rows whose token differs from the stock token passed in).
+
+| Variable | Meaning |
+|---|---|
+| `SGLANG_CERTIFIED_HEAD_DECODE=1` | greedy plain decode |
+| `SGLANG_CERTIFIED_HEAD_VERIFY=1` | greedy target verify (MTP/EAGLE, DFlash) |
+| `SGLANG_CERTIFIED_HEAD_DRAFT=1` | MTP draft top-1, DFlash top-1 projection |
+| `SGLANG_CERTIFIED_HEAD_SAMPLED_VERIFY=1` | fixed-noise sampled verify (its own arm) |
+| `SGLANG_CERTIFIED_HEAD_FALLBACK` | `batch` (default) or `columns` (only for batch sizes whose start-up self-test passes) |
+| `SGLANG_CERTIFIED_HEAD_MODEL` | `conservative` (default) or `hopper-wgmma` |
+| `SGLANG_CERTIFIED_HEAD_CHECK=1` | also run the stock head at the same shape and count differing rows |
+| `SGLANG_CERTIFIED_HEAD_STATS=path` | write the counters as JSON |
+| `SGLANG_CERTIFIED_HEAD_SRC=dir` | directory added to `sys.path` to import `certified_head` |
+
+All are off by default; with none set the patched engine runs its stock code.
+
 ## Graph capture
 
 Grids are fixed for a given `M` and all buffers are allocated at construction,
@@ -40,6 +64,12 @@ JIT, cuBLAS handles and, for sampling, SGLang's `torch.compile`d
 captured step has a fixed topology and no host synchronization; outside capture
 the fallback check costs one `.item()`. Use one instance per graph family
 (target decode, draft, verify), since buffers are shared across calls.
+
+A batch the certified head may not serve (a sampled request, logprobs,
+penalties, grammar) is chosen per replay with `gate`, a 0-d device bool: the
+certified stages run in one conditional node, each fallback in its own
+top-level node, and the caller runs its stock head under `not gate`. No
+conditional node is nested.
 
 ## Contract
 
