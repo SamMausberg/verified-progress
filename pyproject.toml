@@ -52,3 +52,16 @@ pythonpath = ["src"]
 
 [tool.codespell]
 skip = "./evidence,./paper,./sources,./.venv,*.pdf,*.csv,*.jsonl,SHA256SUMS"
+
+# The supplied bundle's files are byte-exact records tied to SHA256SUMS and the
+# evidence logs, so their existing annotation gaps are silenced here rather than
+# fixed in place. New code gets the full check.
+[[tool.mypy.overrides]]
+module = [
+  "scripts.benchmark_sse",
+  "tests.test_decisions",
+  "tests.test_races",
+  "tests.test_v2",
+  "v2_reference",
+]
+ignore_errors = true
