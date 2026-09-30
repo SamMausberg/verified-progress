@@ -204,7 +204,7 @@ GEMM efficiency (`bytes_per_step.json`, `gemm_efficiency`): the split-K projecti
 MLP down projection 2.1-2.7 TB/s and gate/up 2.7-3.2 TB/s. If every weight GEMM ran at
 the head GEMM's rate the step would be 469 us (B = 1) to 923 us (B = 128) shorter.
 
-### MTP speculation
+### MTP speculation (`attribution/mtp_bs*.json`, measured)
 
 The cycle, from the traces: a draft graph with two MTP forwards, each followed by the
 full head, the FP32 copy and the Triton top-1; eager verify preparation; the
@@ -212,54 +212,125 @@ target-verify graph (all 32 layers over 4 tokens per request, head over 4B rows)
 eager `torch.argmax` + `VerifyTreeGreedy`; the GDN state commit
 (`_fused_mamba_state_scatter_with_mask_kernel`, `_fused_conv_window_scatter_multi_kernel`);
 the draft-extend graph (MTP layer over the verified tokens, head over B rows); eager
-`torch.argmax`. Every cycle streams the 1.27 GB head four times.
+`torch.argmax`. Every cycle streams the 1.27 GB head four times: three draft projections
+and one verification. Configuration: NEXTN (EAGLE v2), 3 steps, topk 1, 4 draft tokens,
+otherwise default flags (the speculative configuration is not yet tuned).
 
-**Pending**: attribution per cycle at B = 1, 8, 32 (`attribution/mtp_bs*.json`). The
-first MTP collection lost every eager kernel record at B = 8 and 32 (CUPTI's 50 default
-buffers filled; see Caveats); the rerun uses a flush interval.
+| | B=1 | B=8 | B=32 |
+|---|---|---|---|
+| Cycle under nsys (us) | 8407 | 9833 | 13886 |
+| Cycle, nsys attached but not collecting (ms) | 6.87 | 8.88 | 13.09 |
+| Acceptance length (server log, per window) | 2.56-2.76 | 2.66-2.76 | 2.78-2.82 |
+| Target head chain (verify GEMM over 4B rows, FP32 copy, argmax) | 4.4% | 4.1% | 3.9% |
+| Draft head chain (3 draft head GEMMs, FP32 copies, top-1, extend argmax) | 12.9% | 11.3% | 8.5% |
+| **Head total, share of the cycle** | **17.2%** | **15.3%** | **12.4%** |
+| Head total, share of GPU-busy time | 27.5% | 22.8% | 16.3% |
+| MTP layer (non-head draft work) | 4.6% | 4.4% | 3.7% |
+| Target weight GEMMs | 29.6% | 28.4% | 22.2% |
+| GDN verify kernel (writes 4 FP32 states per request) | 1.4% | 5.5% | 18.3% |
+| GDN state commit (scatter of the accepted state) | 0.5% | 3.2% | 8.9% |
+| GPU idle (inside + outside graph replays) | 37.3% | 32.7% | 23.5% |
 
-MTP verification writes one FP32 state per draft position for rollback (derived from
-the code path): the verify kernel `fused_sigmoid_gating_delta_rule_update_kernel` runs
-with `disable_state_update=True` and an `intermediate_states_buffer` of shape
+(Full per-category table in `tables.md`; every eager launch call has a kernel record;
+foreign CPU load 0.5-1.0 cores during every window.)
+
+**Head fraction, MTP: 17.2%, 15.3% and 12.4% of a speculative cycle at B = 1, 8, 32**,
+three quarters of it in the draft heads. Because a quarter to a third of the profiled
+cycle is idle, the head's share of the time the GPU is actually busy is larger (27.5% at
+B = 1), which is the relevant share once the idle time is removed.
+
+**The host gap.** The GPU idles for about 3.0-3.1 ms of every profiled cycle outside
+graph replays, almost independently of batch size. The host lead of the draft and
+verify graph launches is 44-46 us and 380-411 us (against 1.7-5.9 ms in plain decode),
+so the GPU waits for the host twice per cycle. A diagnostic run with NVTX ranges on
+the speculative worker's host functions (`--host-trace`, `host_functions.json`) and
+py-spy samples of the scheduler (`diagnostics/host_gaps_mtp_bs*.json`,
+`diagnostics/pyspy_mtp_bs*.json`) names the host code running during the idle time:
+
+| Exposed host time per profiled cycle (innermost function) | B=1 | B=8 | B=32 |
+|---|---|---|---|
+| Target-verify attention planning: `run_eagle_verify` > `eagle_prepare_for_verify` > `DecodeCudaGraphRunner.load_batch` > `init_forward_metadata_out_graph` (`decode_cuda_graph_runner.py:1464`) > FlashInfer `BatchPrefillWithPagedKVCacheWrapper.plan` | 1.43 ms | 1.51 ms | 1.17 ms |
+| Draft attention planning: `FlashInferMultiStepDraftBackend.common_template` (`flashinfer_backend.py:2418`, `kv_indptr[:, :bs+1].cpu()`) | 0.53 ms | 0.55 ms | 0.46 ms |
+| Graph launch calls (`DecodeCudaGraphRunner.execute`, `EAGLEDraftCudaGraphRunner.execute`), inflated by node-level tracing | 0.78 ms | 0.82 ms | 0.58 ms |
+| Everything else (smaller host functions: `prepare_for_draft`, `resolve_seq_lens_cpu`, `eagle_sample`, `build_eagle_verify_input`, ...) | 0.54 ms | 0.48 ms | 1.22 ms |
+| GPU idle per cycle in these host-trace windows | 3.29 ms | 3.36 ms | 3.42 ms |
+
+Only 14% of `load_batch`'s host time overlaps GPU work at B = 1, whereas the draft-extend
+host path (1.7 ms per cycle) is 97% hidden behind the verify graph. py-spy puts 26-31% of
+all scheduler CPU samples at B = 1 inside the FlashInfer plan chain for verification and
+another 5% in `compute_spec_mrope_positions` (`forward_batch_info.py:1403-1417`).
+Without the profiler the idle time shrinks, mainly because `cudaGraphLaunch` costs
+about 350 us per call under node-level tracing: subtracting the traced GPU-busy time
+from the uncollected cycle leaves about 1.6, 2.3 and 2.5 ms per cycle (23%, 25%, 19%).
+This combines two measurements (derived); the graph-level-trace calibration
+(`diagnostics/graph_level_trace.json`, pending) measures it in one.
+
+**Recurrent state in verification** (derived from the code path, checked against the
+trace): the verify kernel `fused_sigmoid_gating_delta_rule_update_kernel` runs with
+`disable_state_update=True` and an `intermediate_states_buffer` of shape
 [24, slots + 1, 4, 32, 128, 128] in the state dtype (`TritonGDNKernel.target_verify`,
 `srt/mem_cache/memory_pool.py:758-788`), and the commit copies the accepted step's state
-back into the slot. That is 352 MB of state traffic per request per cycle, against
-100.7 MB per plain step. With an acceptance length of 2.8, MTP moves 26% fewer bytes per
-output token than plain decode at B = 32, 6% fewer at B = 128 and none at B = 256
-(`bytes_per_step_sweep.csv`, context 700).
+back into the slot: 352 MB of state traffic per request per cycle, against 100.7 MB per
+plain step. At B = 32 the verify kernel (2.54 ms, 3.2 TB/s implied) and the commit
+(1.23 ms, 2.6 TB/s implied) take 27% of the cycle. At the measured acceptance, MTP moves
+fewer bytes per output token than plain decode at small batch, but the advantage shrinks
+with batch and disappears near B = 256 (`bytes_per_step_sweep.csv`, context 700,
+acceptance 2.8).
 
-## Ranked stack-wide opportunities (plain decode; MTP rows pending)
+## Ranked stack-wide opportunities
 
 Ceilings are Amdahl bounds 1/(1-f) for removing a component entirely under otherwise
-unchanged execution, not predicted gains.
+unchanged execution, not predicted gains. f comes from one nsys-collected measurement
+unless marked; for plain decode the collected windows are within 1.4% of the uncollected
+ones, while for MTP the profiler lengthens the host-bound cycle by 5-19%, so the MTP
+idle row gives both the profiled value and the derived unprofiled one.
 
 | # | Bottleneck | Layer | Where | f | Ceiling |
 |---|---|---|---|---|---|
-| 1 | FP32 recurrent state read and written every step | kernel / state format | `fused_recurrent_gated_delta_rule_packed_decode_kernel`; pool dtype from `mamba_ssm_dtype` | 41.6% (B=128), 18.0% (B=32) | 1.71x, 1.22x |
-| 2 | Weight GEMMs below the head GEMM's bandwidth (excess time only) | kernel (cuBLAS configs, split-K) | GDN `out_proj`, attention `o_proj` (split-K + `splitKreduce_kernel`), MLP down | 15.5% (B=32), 13.2% (B=1) | 1.18x, 1.15x |
-| 3 | 65 RMSNorm launches per step (FlashInfer CuTe-DSL `FusedAddRMSNormKernel`, ~2.3 us each at B=1) | kernel fusion | `GemmaRMSNorm` around every layer | 4.8% (B=8) | 1.05x |
-| 4 | Gaps between graph nodes (about 450 nodes per replay) | graph / fusion | decode graph | 3.0% (B=1) | 1.03x |
-| 5 | Eager sampling and bookkeeping after each replay (argmax + about 20 small kernels, copies) | runtime / sampling | `ModelRunner.sample`, overlap bookkeeping | 2.6% (B=1) | 1.03x |
-| 6 | FP32 logits copy and eager argmax | sampling | `_copy_logits_to_buffer`, `Sampler.forward` | 1.8% (B=128) | 1.02x |
-| 7 | GDN `in_proj_ba` as a one-CTA GEMM on a side stream, nearly as long as the main `in_proj_qkvz` GEMM (19.5 vs 21 us at B=1) | kernel / model | `Qwen3_5GatedDeltaNet`; the merged projection path is ROCm-only | on the critical path only when it outlasts qkvz | - |
+| 1 | FP32 recurrent state read and written every step | kernel / state format | `fused_recurrent_gated_delta_rule_packed_decode_kernel`; pool dtype from `mamba_ssm_dtype` | plain: 41.6% (B=128), 18.0% (B=32) | 1.71x, 1.22x |
+| 2 | Host-bound gaps in the speculative cycle (verify and draft attention planning with blocking D2H copies) | speculative worker / attention backend | `eagle_prepare_for_verify` > `load_batch` > FlashInfer `plan`; `FlashInferMultiStepDraftBackend.common_template` | MTP B=1: 37.3% profiled, ~23% derived unprofiled | 1.59x profiled, ~1.30x |
+| 3 | Per-position FP32 state writes in verification plus the commit copy | speculative worker / state format | verify kernel `intermediate_states_buffer`; `_fused_mamba_state_scatter_with_mask_kernel` | MTP B=32: 27.2% (of which saves and commit, not the recurrence itself, are the removable part) | 1.37x (whole) |
+| 4 | Weight GEMMs below the head GEMM's bandwidth (excess time only) | kernel (cuBLAS configs, split-K) | GDN `out_proj`, attention `o_proj` (split-K + `splitKreduce_kernel`), MLP down | plain: 15.5% (B=32), 13.2% (B=1) | 1.18x, 1.15x |
+| 5 | Three full-vocabulary draft heads per cycle | speculative worker / kernel | `Qwen3_5ForCausalLMMTP.forward` head, `draft_topk1_postprocess` | MTP: 12.9% (B=1), 8.5% (B=32) | 1.15x, 1.09x |
+| 6 | 65 RMSNorm launches per step (FlashInfer CuTe-DSL `FusedAddRMSNormKernel`, ~2.3 us each at B=1) | kernel fusion | `GemmaRMSNorm` around every layer | plain: 4.8% (B=8) | 1.05x |
+| 7 | Gaps between graph nodes (about 450 nodes per replay, ~0.35 us each) | graph / fusion | decode graph | plain: 3.0% (B=1) | 1.03x |
+| 8 | Eager sampling and bookkeeping after each replay (argmax + about 20 small kernels, copies) | runtime / sampling | `ModelRunner.sample`, overlap bookkeeping | plain: 2.6% (B=1) | 1.03x |
+| 9 | FP32 logits copy and eager argmax | sampling | `_copy_logits_to_buffer`, `Sampler.forward` | plain: 1.8% (B=128) | 1.02x |
+| 10 | GDN `in_proj_ba` as a one-CTA GEMM on a side stream, nearly as long as the main `in_proj_qkvz` GEMM (19.5 vs 21 us at B=1) | kernel / model | `Qwen3_5GatedDeltaNet`; the merged projection path is ROCm-only | on the critical path only when it outlasts qkvz | - |
 
-For comparison, the head chain itself: 10.3% (B=1) to 6.1% (B=128) of a plain step,
-ceilings 1.11x to 1.07x.
+For comparison, the head chain itself: 10.3% (B=1) to 6.1% (B=128) of a plain step
+(ceilings 1.11x to 1.07x) and 17.2% (B=1) to 12.4% (B=32) of an MTP cycle (1.21x to
+1.14x). Removing layer 0's input projection (proposal P5) is worth at most 0.60% of a
+plain step (`p5_layer0_in_proj.json`).
 
 ## Caveats
 
 - **Profiler perturbation.** Collected windows ran within -1.3% to +1.4% of the
   uncollected windows' step time for plain decode (`windows/plain_nsys.jsonl`), so kernel
-  shares are reported directly. Kernel durations under node-level tracing can still
-  include CUPTI overhead; idle gaps between graph nodes are the most exposed. Host-side
-  times (API durations, `cudaGraphLaunch` taking about 350 us under node tracing) are
-  inflated by the tracer and are used only qualitatively.
+  shares are reported directly. MTP is host-bound, and there the collected cycle is 19%,
+  8% and 5% longer than the uncollected one at B = 1, 8, 32 (`windows/mtp_nsys.jsonl`):
+  CUPTI adds cost to every CUDA API call on the critical path, above all
+  `cudaGraphLaunch` (about 350 us per call under node-level tracing). Kernel durations
+  are barely affected; idle time and host-side times are, which is why the MTP idle
+  share is given both profiled and derived. The host-function NVTX ranges and py-spy
+  add their own overhead; use their split, not their absolute times.
+- **Host load.** Other agents' CPU jobs share this machine. Every window since the MTP
+  rerun records the mean number of busy cores outside our server and client
+  (`cpu_cores_busy_foreign` in `windows/*.jsonl`); all MTP and diagnostic windows here
+  ran with 0.3-1.4 foreign cores, below the team's 2-core limit for host-gap claims. The
+  earlier plain windows predate this field; plain decode is not host-bound (host lead
+  1.7-5.9 ms).
 - **Dropped records.** With default settings, CUPTI filled its 50 buffers in every
   window; plain windows kept all eager kernel records (checked against launch calls),
   but the MTP windows at B = 8 and 32 lost all of them, which would have shown the
   verification work as idle time. Those traces were discarded
   (`~/vp-data/profile/mtp_nsys_cupti_drop/`) and the runs repeated with
-  `--cuda-flush-interval`.
+  `--cuda-flush-interval=250`, which lets CUPTI allocate more buffers; `attribute.py`
+  checks every configuration (`eager_kernel_records_per_launch_call` in each summary,
+  1.00 for all committed MTP traces).
+- **py-spy.** The sampler hung on the traced scheduler for the MTP B = 8 host-trace
+  window (the driver now bounds the wait), so py-spy summaries exist for B = 1 and 32
+  only; the NVTX host-gap attribution covers all three.
 - **One window per configuration.** Step-to-step variation within a window is recorded
   (p10/p90 per category); window-to-window variance comes from the repeated unprofiled
   baselines (pending).
@@ -271,25 +342,40 @@ ceilings 1.11x to 1.07x.
 ## Reproduction
 
 ```sh
+# GPU runs (each step takes its own exclusive lock; raw data to ~/vp-data/profile):
+experiments/profiling/run_all.sh plain mtp baseline host dflash
+experiments/profiling/run_all.sh microbench gdn ncu startprofile graphtrace eager
+# Analysis (CPU only) regenerates every file here from the raw runs:
+experiments/profiling/analyze_all.sh
+```
+
+`run_all.sh` names each step's exact `run_profiles.py` command; `analyze_all.sh` names
+the analysis command behind each evidence file. One configuration by hand:
+
+```sh
 source scripts/sglang_env.sh
-experiments/profiling/run_all.sh plain mtp baseline   # each step takes the exclusive GPU lock
-experiments/profiling/run_microbench.sh               # under scripts/gpu_lock.sh -x
-python experiments/profiling/attribute.py ~/vp-data/profile/plain_nsys/plain_bs8.nsys-rep \
-  --kind plain --out-prefix evidence/profiles/attribution/plain_bs8
-python experiments/profiling/bytes_model.py --out evidence/profiles/bytes_per_step.json \
-  --attribution evidence/profiles/attribution --windows ~/vp-data/profile/plain_nsys/windows.jsonl \
-  --csv evidence/profiles/bytes_per_step_sweep.csv
-python experiments/profiling/summarize.py --evidence evidence/profiles
+python experiments/profiling/run_profiles.py --arm mtp --mode nsys --concurrency 1 8 32 \
+  --out-dir ~/vp-data/profile/mtp_nsys
+python experiments/profiling/attribute.py ~/vp-data/profile/mtp_nsys/mtp_bs8.nsys-rep \
+  --kind spec --out-prefix evidence/profiles/attribution/mtp_bs8
 ```
 
 ## Files
 
-| File | Content | Status |
-|---|---|---|
-| `hbm_bandwidth.json` | read and copy bandwidth with per-repeat timings | measured |
-| `head_microbench.json`, `head_microbench_kernels.json` | head GEMM, FP32 copy, argmax, top-1 and chains at M = 1-256; kernel names per variant | measured |
-| `attribution/<arm>_bs<B>.json`, `_categories.csv` | per-step attribution, kernel table, head GEMM stats, host lead, syncs | measured |
-| `bytes_per_step.json` | bytes by component per profiled configuration, implied bandwidths, GEMM efficiency | derived + measured check |
-| `bytes_per_step_sweep.csv`, `_wide.csv` | bytes by component over batch size at context 700 | derived |
-| `tables.md`, `step_share.csv`, `breakdown.csv` | generated tables and figure data | measured |
-| `windows/<run>.jsonl`, `_meta.json`, `_server_startup.log` | client window records, server commands, startup logs | measured |
+| File | Content | Produced by | Status |
+|---|---|---|---|
+| `hbm_bandwidth.json` | read and copy bandwidth with per-repeat timings | `run_microbench.sh` (`hbm_bandwidth.py`) | measured |
+| `head_microbench.json`, `head_microbench_kernels.json` | head GEMM, FP32 copy, argmax, top-1 and chains at M = 1-256; kernel names per variant | `run_microbench.sh` (`head_microbench.py`, `head_kernel_names.py`) | measured |
+| `attribution/<arm>_bs<B>.json`, `_categories.csv` | per-step attribution, kernel table, head GEMM stats, host lead, syncs, completeness | `attribute.py` | measured |
+| `bytes_per_step.json` | bytes by component per profiled configuration, implied bandwidths, GEMM efficiency | `bytes_model.py` | derived + measured check |
+| `bytes_per_step_sweep.csv`, `_wide.csv` | bytes by component over batch size at context 700 | `bytes_model.py --csv` | derived |
+| `tables.md`, `step_share.csv`, `breakdown.csv` | generated tables and figure data | `summarize.py` | measured |
+| `p5_layer0_in_proj.json` | layer 0's GDN input projections as a share of a plain step | `layer0_share.py` | measured |
+| `diagnostics/host_gaps_*.json`, `diagnostics/pyspy_*.json` | host functions during GPU idle time; scheduler CPU samples | `host_gaps.py`, `pyspy_summary.py` on `run_all.sh host` | diagnostic |
+| `windows/<run>.jsonl`, `_meta.json`, `_server_startup.log` | client window records (with host load), server commands, startup logs | `run_profiles.py`, `collect_run.py` | measured |
+
+Pending (queued GPU runs): `windows/plain_none.jsonl` and `windows/mtp_none.jsonl`
+(unprofiled throughput repeats), regenerated plain traces from the committed code,
+`label_structure_check.json` and `label_validation.json` (GEMM label checks),
+`gdn_kernel_bench.json`, `ncu_key_kernels.json`, `microbench_clocks.json`, the DFlash
+attribution, the `/start_profile` comparison and `diagnostics/graph_level_trace.json`.
