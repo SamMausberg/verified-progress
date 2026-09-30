@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Run the targeted state tests (targeted.py), one shared GPU-lock hold per group.
+# Run the targeted state tests (targeted.py) in shared GPU-lock holds of at
+# most ~30 minutes each.
 #
 #   experiments/state_safety/run_targeted.sh [group...]
 #
-# Groups: exact (truncation, stops), prefix, abort, repeat, prefill (default: all).
+# Groups: exact (truncation, stops), prefix, abort_repeat, prefill (default: all).
 # Outputs: ~/vp-data/state/targeted/<test>__<config>[__tag].json
 set -euo pipefail
 
@@ -12,8 +13,13 @@ lock="$HOME/verified-progress/scripts/gpu_lock.sh"
 # shellcheck source=/dev/null
 source "$HOME/verified-progress/scripts/sglang_env.sh"
 
-t() {
-  "$lock" -s python "$here/targeted.py" "$@"
+# One lock hold runs several targeted.py invocations: t_hold "args1" "args2" ...
+t_hold() {
+  local cmds=()
+  for a in "$@"; do
+    cmds+=("python $here/targeted.py $a")
+  done
+  "$lock" -s bash -c "$(printf '%s; ' "${cmds[@]}")"
 }
 
 # A GDN pool with exactly four slots (radix off: one slot per request) and a
@@ -25,35 +31,29 @@ small_pool_radix="--max-running-requests 4 --max-mamba-cache-size 20"
 group() {
   case "$1" in
     exact)
-      for c in mtp_s3 mtp_s5 mtp_tree plain; do
-        block=4
-        [ "$c" = mtp_s5 ] && block=6
-        [ "$c" = plain ] && block=1
-        t truncation --config "$c" --block "$block"
-        t stops --config "$c" --block "$block"
-      done
+      t_hold "truncation --config mtp_s3" "stops --config mtp_s3" \
+        "truncation --config mtp_s5 --block 6" "stops --config mtp_s5 --block 6"
+      t_hold "truncation --config mtp_tree" "stops --config mtp_tree" \
+        "truncation --config plain --block 1" "stops --config plain --block 1"
       ;;
     prefix)
-      for c in mtp_s3 mtp_tree plain; do
-        t prefix --config "$c" --num-prompts 12
-      done
+      t_hold "prefix --config mtp_s3 --num-prompts 12" "prefix --config mtp_tree --num-prompts 12"
+      t_hold "prefix --config plain --num-prompts 12"
       ;;
-    abort)
-      t abort --config mtp_s3 --extra-flags "$small_pool" --tag smallpool
-      t abort --config mtp_s3 --extra-flags "$small_pool_radix" --tag smallpool_radix
-      t abort --config mtp_s3_det --extra-flags "$small_pool" --tag smallpool
-      t abort --config plain_det --extra-flags "$small_pool" --tag smallpool
-      ;;
-    repeat)
-      t repeat --config plain --num-prompts 40
-      t repeat --config mtp_s3 --num-prompts 40
+    abort_repeat)
+      t_hold "abort --config mtp_s3 --extra-flags '$small_pool' --tag smallpool" \
+        "abort --config mtp_s3 --extra-flags '$small_pool_radix' --tag smallpool_radix" \
+        "abort --config mtp_s3_det --extra-flags '$small_pool' --tag smallpool" \
+        "abort --config plain_det --extra-flags '$small_pool' --tag smallpool" \
+        "repeat --config plain --num-prompts 40" "repeat --config mtp_s3 --num-prompts 40"
       ;;
     prefill)
-      for c in mtp_s3 plain; do
-        t prefill --config "$c"
-        t prefill --config "$c" --extra-flags "--chunked-prefill-size 256" --tag chunk256
-        t prefill --config "$c" --extra-flags "--chunked-prefill-size 200" --tag chunk200
-      done
+      t_hold "prefill --config mtp_s3" \
+        "prefill --config mtp_s3 --extra-flags '--chunked-prefill-size 256' --tag chunk256" \
+        "prefill --config mtp_s3 --extra-flags '--chunked-prefill-size 200' --tag chunk200" \
+        "prefill --config plain" \
+        "prefill --config plain --extra-flags '--chunked-prefill-size 256' --tag chunk256" \
+        "prefill --config plain --extra-flags '--chunked-prefill-size 200' --tag chunk200"
       ;;
     *)
       echo "unknown group $1" >&2
@@ -63,7 +63,7 @@ group() {
 }
 
 if [ "$#" -eq 0 ]; then
-  set -- exact prefix abort repeat prefill
+  set -- exact prefix abort_repeat prefill
 fi
 for g in "$@"; do
   group "$g"
