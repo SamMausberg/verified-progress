@@ -20,19 +20,29 @@ BF16 output (R-stock).
 
 ## Decision so far
 
-- **H2, transport: refuted on DFlash-4B** (MTP-4B pending). The drafter's head input is not
-  close to the target's (rho median 0.92, smallest 0.82, against a per-row int8 threshold
-  of 0.0085), no certified bound family or tiling skips more than 0.5% of the vocabulary,
-  sampled acceptance is never decided, and the union over real verify batches needs 99.9%
-  of the head. Even oracle radii lose to the batch union at 16 rows.
+- **H2, transport: refuted on DFlash-4B for every bound family and tiling tested** (scalar,
+  coordinate, grouped 32/128 and low-rank radii with W or Delta bases, and their minimum;
+  contiguous tiles of 64, 256 and 1,024 rows, random 256-row tiles, k-means tiles of 64,
+  256 and 1,024 rows), on z-lab/Qwen3.5-4B-DFlash @9a1996cc and the 160 held-out prompts;
+  MTP-4B is pending. The drafter's head input is not close to the target's (rho median
+  0.92, smallest 0.82, against a per-row int8 threshold of 0.0085). For greedy
+  verification the certified bounds skip at most 0.6% of the vocabulary on average (p90
+  0.8%, k-means 64-row tiles), no better than the static screen. For sampled acceptance the
+  test stays undecided with probability 0.92-0.96 on average (median 1), whether P_? is
+  taken at the draft token or averaged over x ~ q, at T = 1 and 0.7; computing the exact
+  top-64 draft rows and transporting only the tail lowers P_? at the draft token to 0.58 on
+  average (median still 1). Over the capture's real verify batches the union of unresolved
+  tiles is at least 99.5% of the head. Even oracle radii lose to the batch union at 16 rows.
 - **H3, self-evidence: confirmed.** An int8 head with a rigorous per-row envelope certifies
   the R-real argmax and the Gumbel-max winner with 1.3-1.6 candidate rows on average (p99
   5-8) on plain decode and on the DFlash-4B verify rows a greedy verifier needs, reading
   0.50-0.52 of the BF16 head's bytes. FP8 per-row and int4 alone do not certify cheaply.
 - **For kernels:** int8 weights with FP16 scales per row (or per 128-group), W8A16, the row
   Cauchy-Schwarz (or blockwise l2) envelope, compaction of rows with hi >= max lo, and BF16
-  rescoring of those rows. Under R-stock about 2% of positions (bucket-exact rule with the
-  conservative model: 1.4%) still need the stock kernel.
+  rescoring of those rows. Under R-stock on plain decode, the bucket-exact rule leaves 1.4%
+  of positions to the stock kernel with the conservative accumulation model and 0.35% with
+  the tighter model (its justification pending the kernel workstream's evidence); the
+  `stock_gap` sufficient condition alone leaves 2-3%.
 
 ## Files
 
@@ -126,6 +136,35 @@ Certification (greedy, threshold = exact target score of the draft token): certi
 transport and the static l2 screen each skip 0.08% of rows; transport with oracle
 (realized) radii would skip 99.9% (p10 67%); int8 per-row self-evidence skips all but one
 or two rows.
+
+### Transport certification rates (DFlash-4B)
+
+`transport_dflash4b.{json,csv}`, 4,000 held-out pairs (110 prompts). Best certified family
+per tiling (the elementwise minimum of all certified radii), transport against the static
+screen with the same geometry, and oracle radii (realized per-tile deviations, a ceiling
+that no certified geometry can reach). Shares of the vocabulary skipped for greedy
+verification are means over pairs; the partition width is the median of log(Z+/Z-) at
+T = 1, and P_? is averaged over x ~ q at T = 1.
+
+| Tiling | Transport skip | Static skip | Oracle skip (mean / median) | log(Z+/Z-) | E_q P_? (mean / median) |
+|---|---|---|---|---|---|
+| contiguous 64 | 0.08% | 0.08% | 89% / 99.9% | 133 | 0.995 / 1 |
+| contiguous 256 | 0% | 0% | 84% / 99.5% | 213 | 1.000 / 1 |
+| contiguous 1,024 | 0% | 0% | 77% / 97.9% | 244 | 1.000 / 1 |
+| random 256 | 0% | 0% | 76% / 99.3% | 238 | 1.000 / 1 |
+| k-means 64 | 0.59% | 0.58% | 84% / 99.4% | 135 | 0.964 / 1 |
+| k-means 256 | 0.10% | 0.10% | 77% / 96.5% | 138 | 0.982 / 1 |
+| k-means 1,024 | 0.02% | 0.02% | 68% / 90.2% | 146 | 0.991 / 1 |
+
+Unions over the capture's real verify batches (9 to 128 paired rows): 99.48-100% of the
+vocabulary is needed for every certified family and tiling. Over random groups of 4, 16 and
+64 pairs, even oracle radii on k-means 256-row tiles need 63%, 97% and 99.9%.
+
+Drift scaling is a model extrapolation, not a measured drafter: it replaces h_d by
+h_t - s Delta, which scales rho, the logit drift and every radius by s. With the best
+certified family on k-means 256-row tiles the mean share skipped is 1.6% at s = 0.3,
+49% at s = 0.1, 77% at s = 0.03 and 84% at s = 0.01 (medians 0.3%, 49%, 96% and 99%), and
+the mean E_q P_? at T = 1 is 1.00, 1.00, 0.96 and 0.66 at those scales.
 
 ## H3: self-evidence
 
