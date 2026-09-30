@@ -74,3 +74,19 @@ SGLANG_WORKTREE=~/sglang-wt/drafter source scripts/sglang_env.sh
 
 The drafter's timed runs use the stock engine; trained drafters load through SGLang's
 unmodified `DFlashDraftModel` and `DFlash2DraftModel`.
+
+## repair (`repair-*.patch`, branch `engine/repair`)
+
+`repair-0001` adds `sglang/srt/speculative/repair_probe.py` and hooks in the DFlash worker
+(`dflash_worker_v2.py`) for the long-window repair oracles in `experiments/repair/`. Nothing
+changes unless one of these variables is set:
+
+| Variable | Effect |
+|---|---|
+| `SGLANG_REPAIR_TIMING_LOG=<path>` | one JSON line per decode cycle: GPU phase times from CUDA events (draft, verify, accept, commit, append) and the cycle start on the GPU timeline, resolved lazily without host syncs |
+| `SGLANG_REPAIR_ORACLE=<json>` | each block's draft tokens are replaced by the request's reference continuation; the target still verifies them |
+| `SGLANG_REPAIR_POLICY=recycle\|keep`, `SGLANG_REPAIR_MAX_PASSES=r` | after a rejection the next block is drafted from the previous pass's target predictions (a sliding Jacobi step) or from the previous draft's tail, falling back to the fresh draft; greedy only |
+| `SGLANG_REPAIR_SWEEPS=k` with `SGLANG_REPAIR_TRACE=<path>` | probe mode: k extra full verify passes per block (Jacobi and correct-one sweeps) from the same committed prefix, then the original draft's pass is re-run and committed, so the trajectory is plain DFlash; the committed GDN conv and SSM states are restored before every extra pass and the re-run must reproduce the first pass's argmax |
+| `SGLANG_REPAIR_TRACE=<path>` | one JSON line per request per cycle: prefix length, fresh draft, verified block, target argmax at every position, accepted length, sweeps (syncs the host; no timing from traced runs) |
+
+Forced full acceptance uses SGLang's existing `SGLANG_SIMULATE_ACC_LEN`.
