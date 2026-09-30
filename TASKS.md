@@ -31,12 +31,12 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 | WS | Scope | Status |
 |---|---|---|
 | infra | GPU lock (FIFO queue), SGLang worktrees, PR tooling, this list | done (PR #1, #2, #8, #10) |
-| lit | Literature review, novelty assessment, citation audit | review (PR #6) |
+| lit | Literature review, novelty assessment, citation audit | done (PR #6) |
 | bench | Baseline server arms, aiperf Pareto harness, quality baseline, spec tuning | active |
 | profile | nsys/ncu profiles and critical-path attribution | active |
 | geometry | Real-head replay: transport versus self-evidence bounds | active |
 | kernel | Certified low-precision head kernels and microbenchmarks | active |
-| theory | Floating-point certificate proofs, exact references, Lean | review (PR #7) |
+| theory | Floating-point certificate proofs, exact references, Lean | done (PR #7) |
 | state | Speculative-decoding state safety and output-equality tests | active |
 | moonshot | Reformulations and approximations aimed at order-of-magnitude gains, with measured quality costs | active |
 | drafter | Public DFlash-4B drafter: serve, characterize, train only against a measured limitation | active |
@@ -62,8 +62,8 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 - [ ] Capture aligned draft/target hidden states at the head boundary for MTP and DFlash2 (geometry)
 - [ ] Measure transport bounds (scalar, coordinate, grouped, low-rank) against logit margins (geometry)
 - [ ] Measure self-evidence bounds (int8, FP8, int4; per-row, blockwise, outlier-exact, rotated) (geometry)
-- [ ] Rigorous floating-point envelope for the low-precision head and the certified decisions (theory)
-- [ ] Exact CPU reference and tests for the new certificates (theory)
+- [x] Rigorous floating-point envelope for the low-precision head and the certified decisions (theory; PR #7)
+- [x] Exact CPU reference and tests for the new certificates (theory; PR #7: 20 methods, 39,761 checks, Lean lemmas)
 - [ ] Triton kernels: low-precision head with bound epilogue, candidate compaction, exact refinement, graph-safe fallback (kernel)
 - [ ] Kernel correctness and microbenchmarks against cuBLAS BF16 plus argmax (kernel)
 
@@ -83,8 +83,12 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 - [ ] Full-target Jacobi repair from DFlash-initialized windows: committed tokens per target pass (repair)
 - [ ] Correction locality: activation changes after real corrections, fixed-basis capture on held-out corrections (repair)
 - [ ] Go/no-go on the residual evaluator prototype against its controls (repair)
-- [ ] State-safe tail oracle: INT8 final FFN plus head, isotropic margin certificate at the oracle radius, versus certified head-only (geometry)
+- [x] State-safe tail oracle: INT8 final FFN plus head versus certified head-only (geometry): rejected, the FFN surrogate lowers certification and saves at most 0.071 GB per token (evidence pending in PR #16)
 - [ ] Theory in the paper: contracts, common-mass bound, bounded-range sampling, dead/deferred/enclosed accounting (paper)
+
+- [ ] P4: bit-exact live replay of recurrent state at batch 128, pre-registered 1.10x threshold; rank/observability audit on captured traces (moonshot)
+- [x] P5: first-layer token projection table rejected by its pre-registered 1% criterion: layer 0's input projections take 0.60% / 0.52% / 0.33% of a plain decode step at batch 1 / 32 / 128, ceiling 1.006x (profile; evidence in PR #13)
+- [ ] Reproduce the P4/P5 counterexamples as exact tests (paper)
 
 ### Engine
 - [ ] Differential output-equality tests: MTP versus plain decode, rejection positions, aborts, prefix reuse (state)
@@ -94,7 +98,7 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 - [ ] Before/after Pareto sweeps with acceptance and output-equality checks (bench, integrate)
 
 ### Paper and deliverables
-- [ ] Literature review and verified bibliography (lit; PR #6 in review)
+- [x] Literature review and verified bibliography (lit; PR #6: 194 verified entries, citation audit)
 - [ ] Narrow the novelty claim: the greedy certified head is prior art (sparkpipe, dgpp, Laguna, knlp); the defensible parts are exact keyed-noise sampling, partition brackets for sampled acceptance, a Hopper-sound envelope and the SGLang/GH200 measurement under the stock-kernel contract; cite DSpark and D-cut for the sampled-depth counterexample (paper, kernel)
 - [ ] Revise the manuscript: methods, results, limitations, figures (paper)
 - [ ] README and RUNBOOK with exact reproduction commands (paper, infra)
