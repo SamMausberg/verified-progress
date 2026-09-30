@@ -8,14 +8,14 @@ Python 3.12, torch 2.13.0+cu130 on CPU, safetensors 0.9.0-rc.1.
 
 Exact tests of `src/precision_reference.py`. Every BF16, FP32 and FP64 rounding is emulated on
 Fractions, so each bound and decision is checked against real arithmetic. Produced at commit
-`8296b585` (recorded in the JSON as `repo_commit`), seed 20260930:
+`a5334a1e` (recorded in the JSON as `repo_commit`), seed 20260930:
 
 ```sh
 . .venv/bin/activate
 python tests/test_precision.py 2>&1 | tee evidence/precision/precision_tests.log
 ```
 
-Result: 20 test methods passed in 35 s; 39,761 generated checks (per-kind counts in the JSON).
+Result: 21 test methods passed in 37 s; 40,015 generated checks (per-kind counts in the JSON).
 Highlights:
 
 - 5,600 accumulation-bound checks across eight summation models (sequential, pairwise, blocked,
@@ -43,6 +43,10 @@ Highlights:
   the FP32-model gap condition certifies.
 - A stream of noise consumed in evaluation order changed the race winner in 247 of 300 cases; a
   counter-based field never can.
+- Subnormal operands: 160 heads with subnormal BF16 weights and hidden states, with and without
+  flush to zero; every FP32 rescoring interval enclosed the exact logit, and the 71 exact ties
+  between identical rows resolved to the smallest index. Underflowing products stay exact until
+  the modelled accumulator rounds them (for example `2^-149 + 2^-150` rounds to even, `2^-148`).
 
 Scope: synthetic heads with small V and D. The tensor-core adder is a model, not hardware. Tests
 are not proofs.
