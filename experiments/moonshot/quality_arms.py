@@ -18,6 +18,7 @@ import argparse
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -29,13 +30,13 @@ from levers import compose, environment, lossy_label, target_model
 # intermediate state per draft token under speculation).
 SHARED_FLAGS: dict[str, dict[str, object]] = {
     'plain': {
-        'mem-fraction-static': 0.22,
+        'mem-fraction-static': 0.25,
         'max-running-requests': 32,
         'max-mamba-cache-size': 170,
         'cuda-graph-max-bs-decode': 32,
     },
     'speculative': {
-        'mem-fraction-static': 0.22,
+        'mem-fraction-static': 0.25,
         'max-running-requests': 8,
         'max-mamba-cache-size': 45,
         'cuda-graph-max-bs-decode': 8,
@@ -125,10 +126,24 @@ def main() -> None:
     for config in args.configs:
         run_dir = out_root / config
         run_dir.mkdir(parents=True, exist_ok=True)
-        server = launch(config, run_dir, args.port, {})
         entry: dict[str, object] = {}
+        server = None
         try:
-            with server:
+            # Shared-lock neighbours can hold memory at our startup; retry a few times.
+            for attempt in range(3):
+                server = launch(config, run_dir, args.port, {})
+                try:
+                    server.start()
+                    server.wait_ready()
+                    server.record_and_verify()
+                    break
+                except Exception as exc:
+                    server.stop()
+                    entry[f'launch_attempt_{attempt}'] = repr(exc)[-300:]
+                    time.sleep(60)
+            else:
+                raise RuntimeError('server did not start in three attempts')
+            try:
                 url = server.base_url
                 is_reference = config == args.reference
                 if is_reference and args.calibrate_token_map:
@@ -148,12 +163,14 @@ def main() -> None:
                 gen_ref = (ref_dir if not is_reference else run_dir) / 'generate.json'
                 probe(url, run_dir / 'score.json', config, 'score', gen_ref)
                 entry['server_info'] = server.server_info().get('internal_states')
+            finally:
+                server.stop()
             if config != args.reference:
                 for mode in ('generate', 'score'):
                     entry[mode] = compare(ref_dir / f'{mode}.json', run_dir / f'{mode}.json')
         except Exception as exc:  # record and continue with the next configuration
             entry['error'] = repr(exc)[-2000:]
-        entry['launch'] = server.launch_record.get('command')
+        entry['launch'] = server.launch_record.get('command') if server else None
         summary[config] = entry
         summary_path.write_text(json.dumps(summary, indent=1))
         print(json.dumps({config: entry}, indent=1), flush=True)

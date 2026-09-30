@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import statistics
 from pathlib import Path
 from typing import Any
@@ -41,32 +42,49 @@ def write_csv(rows: list[dict[str, Any]], out: Path | None) -> None:
         print('  '.join(str(row.get(f, '')).ljust(widths[f]) for f in fields))
 
 
+_DECODE_STEP = re.compile(r'Decode \d+\. Batch size: (\d+),')
+_DECODE_MEDIAN = re.compile(r'Decode\.  median latency: ([\d.]+) s')
+
+
+def parse_one_batch_log(text: str) -> dict[int, float]:
+    """Median decode latency per batch size from a one_batch log.
+
+    one_batch writes its JSONL only after every batch size finishes, so a run that
+    fails at its largest batch (out of memory) leaves only the log. A batch size
+    that appears twice (warmup, then the measured run) keeps the last median.
+    """
+    medians: dict[int, float] = {}
+    batch = None
+    for line in text.splitlines():
+        step = _DECODE_STEP.search(line)
+        if step:
+            batch = int(step.group(1))
+        median = _DECODE_MEDIAN.search(line)
+        if median and batch is not None:
+            medians[batch] = float(median.group(1))
+    return medians
+
+
 def ceiling(args: argparse.Namespace) -> None:
     root = Path(args.path).expanduser()
-    rows = []
+    rows: list[dict[str, Any]] = []
     base: dict[int, float] = {}
-    for jsonl in sorted(root.glob('*.jsonl')):
-        name = jsonl.stem
-        for line in jsonl.read_text().splitlines():
-            if not line:
-                continue
-            r = json.loads(line)
-            step = r['median_decode_latency']
+    for log in sorted(root.glob('*.log')):
+        name = log.stem
+        for batch, step in sorted(parse_one_batch_log(log.read_text(errors='replace')).items()):
             rows.append(
                 {
                     'config': name,
-                    'batch': r['batch_size'],
-                    'input_len': r['input_len'],
-                    'output_len': r['output_len'],
+                    'batch': batch,
                     'step_ms': round(1e3 * step, 3),
-                    'tokens_per_s': round(r['batch_size'] / step),
+                    'tokens_per_s': round(batch / step),
                 }
             )
             if name == args.base:
-                base[r['batch_size']] = step
+                base[batch] = step
     for row in rows:
-        ref = base.get(row['batch'])
-        row['speedup_vs_base'] = round(ref / (row['step_ms'] / 1e3), 3) if ref else ''
+        ref = base.get(int(row['batch']))
+        row['speedup_vs_base'] = round(ref / (float(row['step_ms']) / 1e3), 3) if ref else ''
     rows.sort(key=lambda r: (r['config'] != args.base, r['config'], r['batch']))
     write_csv(rows, args.out)
 

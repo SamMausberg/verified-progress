@@ -18,6 +18,8 @@ SGLANG_WORKTREE=~/sglang-wt/<name> source scripts/sglang_env.sh
 | 0002 | `SGLANG_SPEC_RELAXED_GREEDY_LOGIT_GAP=g`: lossy relaxed greedy verification for linear draft chains (accept a draft whose target logit is within `g` of the argmax). | `g = 0`, exact |
 | 0003 | `SGLANG_MAMBA_SSM_DTYPE=float8_e4m3fn`: experimental unscaled FP8 GDN state for quality studies. | unchanged |
 | 0004 | The same relaxed rule on the DFlash greedy verify path (same chain layout). | `g = 0`, exact |
+| 0005 | `--speculative-token-map` for DFlash: the captured draft greedy head (tp = 1) scores only the hot rows and maps the argmax back to its token id. The eager fallback keeps the full head. | unchanged without a token map |
+| 0006 | Under an 8-bit GDN state, the ReplaySSM decode ring keeps 16-bit (d, k) records, so the state is rounded to 8 bits only at a flush. | unchanged for FP32/FP16/BF16 state |
 
 Tests: `tests/test_moonshot_levers.py` (the engine tests run in the SGLang venv with
 the worktree on `PYTHONPATH` and skip elsewhere).

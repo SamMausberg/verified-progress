@@ -47,6 +47,11 @@ def build(config: str, args: argparse.Namespace) -> tuple[Any, list[str]]:
                 'max-mamba-cache-size': False,
             }
         )
+    env = dict(environment(levers))
+    if args.capacity:
+        # Verify graphs at hundreds of requests x draft tokens overflow the default
+        # 384 MB FlashInfer workspace (bench: MTP s3 at 512 needed 670 MB).
+        env['SGLANG_FLASHINFER_WORKSPACE_SIZE'] = str(1 << 30)
     capacity = int(flags.get('max-running-requests') or 0)
     if capacity:
         points = [c for c in points if c <= capacity]
@@ -57,7 +62,7 @@ def build(config: str, args: argparse.Namespace) -> tuple[Any, list[str]]:
             **arm.to_json(),
             'name': config,
             **({'model': model[0], 'revision': model[1]} if model else {}),
-            'env': {**arm.env, **environment(levers)},
+            'env': {**arm.env, **env},
             **({'max_concurrency': capacity} if capacity else {}),
             'lossy': lossy_label(levers),
         }

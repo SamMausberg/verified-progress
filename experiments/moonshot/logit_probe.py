@@ -34,6 +34,7 @@ import json
 import math
 import statistics
 import time
+import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -67,31 +68,38 @@ def select_prompts(workload: Path, per_domain: int) -> list[dict[str, Any]]:
     return chosen
 
 
+def chat_ids(tok: Any, text: str, thinking: bool) -> list[int]:
+    """Token ids of a one-message chat prompt, as the server's chat template builds it.
+
+    (With transformers 5, `apply_chat_template(tokenize=True)` returns a BatchEncoding,
+    not a list, so template to text and encode that.)
+    """
+    templated = tok.apply_chat_template(
+        [{'role': 'user', 'content': text}],
+        add_generation_prompt=True,
+        enable_thinking=thinking,
+        tokenize=False,
+    )
+    return list(tok.encode(templated, add_special_tokens=False))
+
+
 def tokenize(prompts: list[dict[str, Any]], thinking: bool) -> list[list[int]]:
     from transformers import AutoTokenizer
 
     tok = AutoTokenizer.from_pretrained(MODEL, revision=REVISION)
-    out = []
-    for row in prompts:
-        ids = tok.apply_chat_template(
-            [{'role': 'user', 'content': row['text']}],
-            add_generation_prompt=True,
-            enable_thinking=thinking,
-            tokenize=True,
-        )
-        if isinstance(ids, dict):
-            ids = ids['input_ids']
-        out.append(list(ids))
-    return out
+    return [chat_ids(tok, row['text'], thinking) for row in prompts]
 
 
 def post(url: str, payload: dict[str, Any], timeout: float = 600.0) -> dict[str, Any]:
     request = urllib.request.Request(
         url, data=json.dumps(payload).encode(), headers={'Content-Type': 'application/json'}
     )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        result: dict[str, Any] = json.loads(response.read())
-        return result
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            result: dict[str, Any] = json.loads(response.read())
+            return result
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f'{url}: HTTP {exc.code}: {exc.read()[:500]!r}') from exc
 
 
 def top_list(entries: list[Any] | None) -> list[list[float]]:

@@ -30,7 +30,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
-from logit_probe import MODEL, REVISION, default_workload, post
+from logit_probe import MODEL, REVISION, chat_ids, default_workload, post
 
 HF_HUB = Path.home() / '.cache/huggingface/hub'
 SOURCES = {
@@ -66,16 +66,8 @@ def cmd_generate(args: argparse.Namespace) -> None:
     prompts = calibration_prompts()
 
     def one(row: dict[str, str]) -> dict[str, Any]:
-        ids = tok.apply_chat_template(
-            [{'role': 'user', 'content': row['text']}],
-            add_generation_prompt=True,
-            enable_thinking=True,
-            tokenize=True,
-        )
-        if isinstance(ids, dict):
-            ids = ids['input_ids']
         payload = {
-            'input_ids': list(ids),
+            'input_ids': chat_ids(tok, row['text'], True),
             'sampling_params': {'temperature': 0.0, 'max_new_tokens': args.max_new_tokens},
         }
         result = post(f'{args.url}/generate', payload)

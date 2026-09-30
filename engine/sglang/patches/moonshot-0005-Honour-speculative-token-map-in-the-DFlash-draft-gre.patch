@@ -1,0 +1,94 @@
+From 98a62e021b845c5d69e098046e34579aa2c2261c Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Wed, 30 Sep 2026 19:22:59 +0000
+Subject: [PATCH 5/6] Honour --speculative-token-map in the DFlash draft greedy
+ head
+
+At tp=1 the captured draft sampler scores only the hot vocabulary rows and
+maps the argmax back to its token id; the target verifies every token, so
+outputs are unchanged. The eager fallback keeps the full head.
+---
+ .../srt/speculative/dflash_worker_v2.py       | 34 ++++++++++++++++++-
+ 1 file changed, 33 insertions(+), 1 deletion(-)
+
+diff --git a/python/sglang/srt/speculative/dflash_worker_v2.py b/python/sglang/srt/speculative/dflash_worker_v2.py
+index 2143f5186c..a0baca62ec 100644
+--- a/python/sglang/srt/speculative/dflash_worker_v2.py
++++ b/python/sglang/srt/speculative/dflash_worker_v2.py
+@@ -93,6 +93,7 @@ from sglang.srt.speculative.spec_utils import (
+     build_grammar_vocab_mask,
+     draft_pp_context,
+     draft_tp_context,
++    load_token_map,
+ )
+ from sglang.srt.utils import is_cuda, is_hip, is_npu, is_xpu
+ from sglang.srt.utils.common import empty_context
+@@ -132,13 +133,28 @@ class _DflashDraftSampler:
+     """
+
+     def __init__(
+-        self, *, weight, block_size, num_org, org_vocab_start, max_bs, tp_group=None
++        self,
++        *,
++        weight,
++        block_size,
++        num_org,
++        org_vocab_start,
++        max_bs,
++        tp_group=None,
++        hot_token_id=None,
+     ):
+         self.weight = weight
+         self.block_size = int(block_size)
+         self.num_org = int(num_org)
+         self.org_vocab_start = int(org_vocab_start)
+         self.tp_group = tp_group
++        # Optional reduced draft vocabulary (--speculative-token-map, tp=1 only):
++        # score only the hot rows and map the winner back to its token id. The
++        # target still verifies every token, so outputs are unchanged.
++        self.hot_token_id = None
++        if hot_token_id is not None:
++            self.hot_token_id = hot_token_id.to(device=weight.device, dtype=torch.long)
++            self.hot_weight = weight[self.hot_token_id].contiguous()
+         self.tp_size = int(tp_group.world_size) if tp_group is not None else 1
+         max_tokens = int(max_bs) * (self.block_size - 1)
+         device = weight.device
+@@ -173,6 +189,10 @@ class _DflashDraftSampler:
+         if hs.dtype != self.weight.dtype:
+             hs = hs.to(self.weight.dtype)
+         n = hs.shape[0]
++        if self.hot_token_id is not None:
++            hot = torch.argmax(torch.matmul(hs, self.hot_weight.T), dim=-1)
++            self.out[:n].copy_(self.hot_token_id[hot])
++            return
+         logits = torch.matmul(hs, self.weight[: self.num_org].T)
+         if self.tp_size == 1:
+             tokens = torch.argmax(logits, dim=-1).to(torch.long)
+@@ -912,6 +932,17 @@ class DFlashWorkerV2(BaseSpecWorker):
+                 "DFLASH draft greedy head folded into the draft cuda graph (tp=%d).",
+                 tp_group.world_size,
+             )
++        hot_token_id = None
++        token_map = get_spec().speculative_token_map
++        if token_map is not None:
++            if tp_group.world_size != 1 or org_vocab_start != 0:
++                return _eager("--speculative-token-map needs tp=1")
++            hot_token_id = load_token_map(token_map)
++            if self.model_runner.tp_rank == 0:
++                logger.info(
++                    "DFLASH draft greedy head restricted to %d hot tokens.",
++                    int(hot_token_id.numel()),
++                )
+         return _DflashDraftSampler(
+             weight=lm_head.weight,
+             block_size=self.block_size,
+@@ -919,6 +950,7 @@ class DFlashWorkerV2(BaseSpecWorker):
+             org_vocab_start=org_vocab_start,
+             max_bs=max(get_exec().graph.cuda_graph_config.decode.bs),
+             tp_group=tp_group if tp_group.world_size > 1 else None,
++            hot_token_id=hot_token_id,
+         )
+
+     def _init_fused_kv_helper(self) -> None:
+--
+2.34.1

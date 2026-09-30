@@ -1,7 +1,7 @@
 From 8e381aae645e9897d6d34c3183960ed82d580bc7 Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <samuelmausberg@gmail.com>
 Date: Wed, 30 Sep 2026 19:01:19 +0000
-Subject: [PATCH 2/4] Add lossy relaxed greedy verification for linear draft
+Subject: [PATCH 2/6] Add lossy relaxed greedy verification for linear draft
  chains
 
 SGLANG_SPEC_RELAXED_GREEDY_LOGIT_GAP=g (default 0, exact) accepts a chain

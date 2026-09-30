@@ -77,25 +77,31 @@ def run_config(name: str, args: argparse.Namespace) -> dict[str, object]:
         '--run-name', name,
         '--result-filename', str(result_file),
     ]  # fmt: skip
+    env = os.environ.copy()
+    if '--quantization' in CONFIGS[name]:
+        # CUTLASS FP8 GEMM in the aarch64 sgl-kernel wheel aborts on sm_90 here.
+        env['USE_TRITON_W8A8_FP8_KERNEL'] = '1'
     started = time.time()
+    returncode: int | str
     with log_file.open('w') as log:
         log.write(' '.join(cmd) + '\n')
         log.flush()
-        proc = subprocess.run(
-            cmd,
-            stdout=log,
-            stderr=subprocess.STDOUT,
-            timeout=args.timeout,
-            check=False,
-            env=os.environ.copy(),
-        )
+        proc = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=env)
+        # A kernel that aborts in a loop can print gigabytes; stop it early.
+        while proc.poll() is None:
+            if time.time() - started > args.timeout or log_file.stat().st_size > 64 << 20:
+                proc.kill()
+                proc.wait()
+                break
+            time.sleep(5)
+        returncode = proc.returncode
     rows = []
     if result_file.exists():
         rows = [json.loads(line) for line in result_file.read_text().splitlines() if line]
     return {
         'config': name,
         'flags': CONFIGS[name],
-        'returncode': proc.returncode,
+        'returncode': returncode,
         'seconds': round(time.time() - started, 1),
         'rows': rows,
     }

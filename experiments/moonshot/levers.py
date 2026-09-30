@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-TOKEN_MAP_DIR = Path.home() / 'vp-data/moonshot/token_map'
+BENCH_TOKEN_MAPS = Path.home() / 'vp-data/bench/token_map'
 DFLASH_DRAFT = 'z-lab/Qwen3.5-4B-DFlash'
 DFLASH_DRAFT_REVISION = '9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf'
 NOTA_DRAFT = 'nota-ai/Qwen3.5-4B-DFlash-GPTQ-W4A16'
@@ -59,8 +59,8 @@ LEVERS: dict[str, Lever] = {
     ),
     'replayssm_spec': Lever(
         {'enable-linear-replayssm-spec': True},
-        note='MTP verify stores raw per-draft inputs and folds the accepted prefix at commit',
-        arm='mtp',
+        note='chain verify (MTP top-1, DFlash) stores per-draft inputs and folds the '
+        'accepted prefix at commit instead of one state snapshot per draft token',
         conflicts=('replayssm', 'tree'),
     ),
     'no_radix': Lever(
@@ -71,6 +71,10 @@ LEVERS: dict[str, Lever] = {
     'fp8_weights': Lever(
         {'quantization': 'fp8'},
         lossy='online FP8 E4M3 W8A8 linear layers (per-channel weights, dynamic activations)',
+        # The aarch64 sgl-kernel CUTLASS FP8 GEMM aborts on this GH200 ("Arch
+        # conditional MMA instruction used without targeting appropriate compute
+        # capability"), so route the GEMMs to SGLang's Triton W8A8 kernel.
+        env={'USE_TRITON_W8A8_FP8_KERNEL': '1'},
     ),
     'fp8_kv': Lever({'kv-cache-dtype': 'fp8_e4m3'}, lossy='FP8 E4M3 attention KV cache'),
     # --- speculation shape ---
@@ -117,6 +121,22 @@ LEVERS: dict[str, Lever] = {
         {'speculative-adaptive': True},
         note='SGLang adaptive steps: candidate depths chosen by batch size and acceptance',
         arm='mtp',
+    ),
+    # Host-overhead levers for the speculative cycle (profile: MTP at B=1 idles the
+    # GPU ~25% of the cycle while the host prepares verify).
+    'plan_stream': Lever(
+        {},
+        note='SGLANG_ENABLE_OVERLAP_PLAN_STREAM: verify metadata planning on its own stream',
+        env={'SGLANG_ENABLE_OVERLAP_PLAN_STREAM': '1'},
+    ),
+    'glue_graph': Lever(
+        {},
+        note='SGLANG_ENABLE_METADATA_GLUE_GRAPH: attention-metadata prep captured in a graph',
+        env={'SGLANG_ENABLE_METADATA_GLUE_GRAPH': '1'},
+    ),
+    'spec_attn_decode': Lever(
+        {'speculative-attention-mode': 'decode'},
+        note='verify and draft extend use the decode attention backend path',
     ),
     'ngram': Lever(
         {
@@ -172,10 +192,18 @@ LEVERS: dict[str, Lever] = {
         note='chain drafts only (MTP top-1, DFlash); needs engine/moonshot patches 0002 and 0004',
         env={'SGLANG_SPEC_RELAXED_GREEDY_LOGIT_GAP': '2.0'},
     ),
-    'hot32k': Lever(
-        {'speculative-token-map': str(TOKEN_MAP_DIR / 'qwen3_5_4b_hot32768.pt')},
-        note='draft head restricted to 32,768 frequent rows (needs the tied-head patch)',
-        arm='mtp',
+    # Hot-vocabulary draft heads. Maps from the bench workstream: token frequencies of
+    # 3.1M natural-length MTP outputs on the mixed-v1 tune split
+    # (~/vp-data/bench/token_map/hot32k_tune.json; 16,384 rows cover 99.8% of them).
+    'hot8k': Lever(
+        {'speculative-token-map': str(BENCH_TOKEN_MAPS / 'hot8192_tune.pt')},
+        note='draft head restricted to 8,192 frequent rows (MTP: patch 0001; DFlash: 0005)',
+        conflicts=('hot16k',),
+    ),
+    'hot16k': Lever(
+        {'speculative-token-map': str(BENCH_TOKEN_MAPS / 'hot16384_tune.pt')},
+        note='draft head restricted to 16,384 frequent rows (MTP: patch 0001; DFlash: 0005)',
+        conflicts=('hot8k',),
     ),
 }
 

@@ -1,7 +1,7 @@
 From d4bb4b531cb6d0206aece991cc5f436a370b8b6c Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <samuelmausberg@gmail.com>
 Date: Wed, 30 Sep 2026 19:01:19 +0000
-Subject: [PATCH 3/4] Allow an experimental FP8 E4M3 GDN state through
+Subject: [PATCH 3/6] Allow an experimental FP8 E4M3 GDN state through
  SGLANG_MAMBA_SSM_DTYPE
 
 Unscaled float8_e4m3fn state storage for quality studies; the server flag's

@@ -26,11 +26,11 @@ def test_compose_merges_and_refuses_conflicts() -> None:
     with pytest.raises(ValueError, match='conflicts'):
         compose(['mtp_s5', 'replayssm', 'replayssm_spec'], 'mtp')
     with pytest.raises(ValueError, match='needs base arm'):
-        compose(['replayssm_spec'], 'plain')
+        compose(['mtp_s5'], 'plain')
 
 
 def test_lossy_labels_and_model_swaps() -> None:
-    assert lossy_label(['replayssm_spec', 'hot32k']) == ''
+    assert lossy_label(['replayssm_spec', 'hot16k']) == ''
     assert 'FP8' in lossy_label(['fp8_weights'])
     assert target_model(['fp8_kv']) is None
     assert target_model(['qad_target']) == (
