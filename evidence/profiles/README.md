@@ -80,11 +80,13 @@ measured on this GPU, not the 4.0 TB/s datasheet value.
 
 | Kernel | Bytes counted | TB/s (median of 30; min-max) |
 |---|---|---|
-| Triton grid-stride read, 4 GiB | read | 3.827 (3.820-3.833) |
-| Same read over exactly the head's 1.27 GB | read | 3.791 (3.784-3.796) |
+| Triton grid-stride read, 4 GiB, best of 9 launch configurations (programs x block) | read | 3.827 (3.820-3.833) |
+| Same read, best configuration, over exactly the head's 1.27 GB | read | 3.791 (3.784-3.796) |
 | `dst.copy_(src)` D2D, 4 GiB | read + write | 2.601 (2.598-2.601) |
 
-The attribution uses 3.79 TB/s (read over the head's footprint) as the peak.
+The nine launch configurations of the read kernel span 3.59-3.83 TB/s
+(`read_sweep_median_tb_per_s`); the table reports the best. The attribution uses
+3.79 TB/s (the best configuration over the head's footprint) as the peak.
 
 ### Which kernels implement the head and its consumer
 
