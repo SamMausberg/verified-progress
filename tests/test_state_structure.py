@@ -1,5 +1,8 @@
 """Exact witnesses about recurrent-state structure and cross-request sharing (P4, P5).
 
+P4 (minimal recurrent state) and P5 (sharing across requests) are the proposals listed in
+TASKS.md.
+
 Each test checks one small counterexample from the P4 and P5 analyses in exact rational
 arithmetic (Fractions), or with numpy float32 where the point is floating-point rounding.
 They are witnesses to specific claims, not measurements of the model: a witness shows that a
@@ -12,6 +15,7 @@ from __future__ import annotations
 
 import json
 import math
+import subprocess
 import sys
 import time
 import unittest
@@ -179,6 +183,7 @@ class StateStructure(unittest.TestCase):
 
     def test_rmsnorm_hides_no_null_space(self) -> None:
         # o1 and o2 differ only in the null space of W_o = [1, 0], but RMSNorm precedes W_o.
+        # RMSNorm here is x / sqrt(mean(x^2)) with no epsilon and no weight.
         def rmsnorm(o: list[Q]) -> list[Q]:
             ms = sum((x * x for x in o), Q(0)) / len(o)
             root = Q(math.isqrt(ms.numerator), math.isqrt(ms.denominator))
@@ -200,6 +205,8 @@ class StateStructure(unittest.TestCase):
 
     def test_fp32_lazy_decay_is_one_ulp_off(self) -> None:
         # Deferring a decay reassociates two FP32 roundings: fl(fl(a1 x) a2) != fl(fl(a1 a2) x).
+        # Arithmetic is IEEE binary32 with round to nearest, ties to even (NumPy scalar
+        # multiplies, no FMA contraction); a kernel that contracts or reorders may differ.
         a1, a2, x = np.float32(0.9), np.float32(0.9), np.float32(1.3)
         eager = (a1 * x) * a2
         lazy = (a1 * a2) * x
@@ -229,7 +236,7 @@ class StateStructure(unittest.TestCase):
         rounded = bf16(product)
         r_rounded = rank([[Q(float(x)) for x in row] for row in rounded])
         self.assertEqual(rank(exact), 1)
-        self.assertGreaterEqual(r_rounded, 28)
+        self.assertEqual(r_rounded, 28)
         WITNESSES['bf16_rounded_outer_product'] = {'size': 32, 'seed': 0, 'rank': r_rounded}
 
 
@@ -242,6 +249,9 @@ if __name__ == '__main__':
         'methods': result.testsRun,
         'witnesses': WITNESSES,
         'seconds': round(time.perf_counter() - start, 3),
+        'repo_commit': subprocess.run(
+            ['git', 'rev-parse', 'HEAD'], cwd=ROOT, capture_output=True, text=True, check=False
+        ).stdout.strip(),
         'numpy': np.__version__,
         'python': sys.version.split()[0],
         'scope': 'exact rational witnesses and float32 rounding cases; not model measurements',
