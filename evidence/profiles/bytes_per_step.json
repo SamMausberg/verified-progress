@@ -1,0 +1,236 @@
+{
+ "note": "derived from checkpoint sizes, config and SGLang state layout; see docstring",
+ "peak_tb_per_s": 3.79,
+ "configs": [
+  {
+   "arm": "plain",
+   "batch": 1,
+   "mean_context_tokens": 987.0,
+   "per_step": {
+    "total_gb": 8.54985472,
+    "components_gb": {
+     "backbone_weights": 7.140111872,
+     "head_weights": 1.2713984,
+     "logits": 0.00297984,
+     "gdn_state": 0.100663296,
+     "gdn_conv_state": 0.002359296,
+     "attention_kv": 0.032342016
+    },
+    "components_pct": {
+     "backbone_weights": 83.5114993860387,
+     "head_weights": 14.870409400359963,
+     "logits": 0.034852522032093665,
+     "gdn_state": 1.1773684968532425,
+     "gdn_conv_state": 0.027594574144997868,
+     "attention_kv": 0.37827562057101244
+    }
+   },
+   "kernel_time_check": {
+    "backbone_weights": {
+     "kernel_us": 2826.550522727273,
+     "implied_tb_per_s": 2.5260867670996636,
+     "floor_us_at_peak": 1883.9345308707125
+    },
+    "head_weights": {
+     "kernel_us": 351.12330069930067,
+     "implied_tb_per_s": 3.620945683376382,
+     "floor_us_at_peak": 335.4613192612137
+    },
+    "logits": {
+     "kernel_us": 12.087272727272726,
+     "implied_tb_per_s": 0.24652707581227437,
+     "floor_us_at_peak": 0.7862374670184696
+    },
+    "gdn_state": {
+     "kernel_us": 124.81496503496501,
+     "implied_tb_per_s": 0.8065002139110541,
+     "floor_us_at_peak": 26.560236411609498
+    },
+    "gdn_conv_state": {
+     "kernel_us": 55.43183216783216,
+     "implied_tb_per_s": 0.042562114722398285,
+     "floor_us_at_peak": 0.6225055408970976
+    },
+    "attention_kv": {
+     "kernel_us": 132.5211520979021,
+     "implied_tb_per_s": 0.24405172674703904,
+     "floor_us_at_peak": 8.533513456464378
+    }
+   }
+  },
+  {
+   "arm": "plain",
+   "batch": 8,
+   "mean_context_tokens": 862.0,
+   "per_step": {
+    "total_gb": 9.485497856,
+    "components_gb": {
+     "backbone_weights": 7.140111872,
+     "head_weights": 1.2713984,
+     "logits": 0.02383872,
+     "gdn_state": 0.805306368,
+     "gdn_conv_state": 0.018874368,
+     "attention_kv": 0.225968128
+    },
+    "components_pct": {
+     "backbone_weights": 75.27398119101952,
+     "head_weights": 13.403602207297784,
+     "logits": 0.25131754138683343,
+     "gdn_state": 8.489869274395627,
+     "gdn_conv_state": 0.19898131111864753,
+     "attention_kv": 2.3822484747815857
+    }
+   },
+   "kernel_time_check": {
+    "backbone_weights": {
+     "kernel_us": 3021.78093503937,
+     "implied_tb_per_s": 2.3628820306614893,
+     "floor_us_at_peak": 1883.9345308707125
+    },
+    "head_weights": {
+     "kernel_us": 356.18626771653544,
+     "implied_tb_per_s": 3.5694761848927317,
+     "floor_us_at_peak": 335.4613192612137
+    },
+    "logits": {
+     "kernel_us": 16.67332283464567,
+     "implied_tb_per_s": 1.4297521997514064,
+     "floor_us_at_peak": 6.289899736147757
+    },
+    "gdn_state": {
+     "kernel_us": 273.48066338582674,
+     "implied_tb_per_s": 2.944655603909638,
+     "floor_us_at_peak": 212.48189129287599
+    },
+    "gdn_conv_state": {
+     "kernel_us": 63.0539842519685,
+     "implied_tb_per_s": 0.29933664341616534,
+     "floor_us_at_peak": 4.980044327176781
+    },
+    "attention_kv": {
+     "kernel_us": 176.24270866141734,
+     "implied_tb_per_s": 1.2821417108046778,
+     "floor_us_at_peak": 59.62219736147757
+    }
+   }
+  },
+  {
+   "arm": "plain",
+   "batch": 32,
+   "mean_context_tokens": 687.515625,
+   "per_step": {
+    "total_gb": 12.52450048,
+    "components_gb": {
+     "backbone_weights": 7.140111872,
+     "head_weights": 1.2713984,
+     "logits": 0.09535488,
+     "gdn_state": 3.221225472,
+     "gdn_conv_state": 0.075497472,
+     "attention_kv": 0.720912384
+    },
+    "components_pct": {
+     "backbone_weights": 57.009154843355475,
+     "head_weights": 10.151290281239225,
+     "logits": 0.7613467710929418,
+     "gdn_state": 25.7193927785294,
+     "gdn_conv_state": 0.6027982682467828,
+     "attention_kv": 5.756017057536174
+    }
+   },
+   "kernel_time_check": {
+    "backbone_weights": {
+     "kernel_us": 3297.881501265823,
+     "implied_tb_per_s": 2.1650601664309095,
+     "floor_us_at_peak": 1883.9345308707125
+    },
+    "head_weights": {
+     "kernel_us": 358.3258734177214,
+     "implied_tb_per_s": 3.548162425094703,
+     "floor_us_at_peak": 335.4613192612137
+    },
+    "logits": {
+     "kernel_us": 41.872850632911394,
+     "implied_tb_per_s": 2.277248349675352,
+     "floor_us_at_peak": 25.15959894459103
+    },
+    "gdn_state": {
+     "kernel_us": 928.9366810126583,
+     "implied_tb_per_s": 3.4676480516287262,
+     "floor_us_at_peak": 849.9275651715039
+    },
+    "gdn_conv_state": {
+     "kernel_us": 93.50747341772153,
+     "implied_tb_per_s": 0.807395058817745,
+     "floor_us_at_peak": 19.920177308707125
+    },
+    "attention_kv": {
+     "kernel_us": 320.90672911392403,
+     "implied_tb_per_s": 2.24648571873378,
+     "floor_us_at_peak": 190.21434934036938
+    }
+   }
+  },
+  {
+   "arm": "plain",
+   "batch": 128,
+   "mean_context_tokens": 417.9375,
+   "per_step": {
+    "total_gb": 23.732778496,
+    "components_gb": {
+     "backbone_weights": 7.140111872,
+     "head_weights": 1.2713984,
+     "logits": 0.38141952,
+     "gdn_state": 12.884901888,
+     "gdn_conv_state": 0.301989888,
+     "attention_kv": 1.752956928
+    },
+    "components_pct": {
+     "backbone_weights": 30.08544437055028,
+     "head_weights": 5.3571409694582774,
+     "logits": 1.6071422908374833,
+     "gdn_state": 54.2915861713017,
+     "gdn_conv_state": 1.2724590508898836,
+     "attention_kv": 7.386227146962371
+    }
+   },
+   "kernel_time_check": {
+    "backbone_weights": {
+     "kernel_us": 3137.6138854625556,
+     "implied_tb_per_s": 2.275650265662751,
+     "floor_us_at_peak": 1883.9345308707125
+    },
+    "head_weights": {
+     "kernel_us": 384.40697797356836,
+     "implied_tb_per_s": 3.30742799389927,
+     "floor_us_at_peak": 335.4613192612137
+    },
+    "logits": {
+     "kernel_us": 159.22142731277532,
+     "implied_tb_per_s": 2.3955288332564546,
+     "floor_us_at_peak": 100.63839577836411
+    },
+    "gdn_state": {
+     "kernel_us": 3701.556841409692,
+     "implied_tb_per_s": 3.4809412471680283,
+     "floor_us_at_peak": 3399.7102606860158
+    },
+    "gdn_conv_state": {
+     "kernel_us": 233.40320704845817,
+     "implied_tb_per_s": 1.2938549209278953,
+     "floor_us_at_peak": 79.6807092348285
+    },
+    "attention_kv": {
+     "kernel_us": 681.1696519823788,
+     "implied_tb_per_s": 2.573451302327467,
+     "floor_us_at_peak": 462.52161688654354
+    }
+   }
+  }
+ ],
+ "crossover": {
+  "gdn_state_equals_weights_batch_plain": 83.56084696451823,
+  "per_request_state_bytes_per_step_plain": 100663296,
+  "per_request_state_bytes_per_cycle_mtp": 352321536,
+  "weight_bytes_per_step": 8411510272
+ }
+}
