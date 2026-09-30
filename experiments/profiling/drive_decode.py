@@ -146,6 +146,20 @@ async def stream_one(
         state.done = True
 
 
+def cpu_load(
+    cpu0: tuple[float, float] | None, cpu1: tuple[float, float] | None, seconds: float
+) -> dict:
+    if cpu0 is None or cpu1 is None or seconds <= 0:
+        return {}
+    total = (cpu1[0] - cpu0[0]) / seconds
+    own = (cpu1[1] - cpu0[1]) / seconds
+    return {
+        'cpu_cores_busy_total': total,
+        'cpu_cores_busy_own': own,
+        'cpu_cores_busy_foreign': total - own,
+    }
+
+
 def tokens_at(states: list[ReqState], at: float) -> int:
     """Output tokens received by time ``at``, summed over requests."""
     total = 0
@@ -192,6 +206,46 @@ class Profiler:
             await asyncio.to_thread(subprocess.run, cmd, check=True)
 
 
+def server_tree(port: int) -> list:
+    """psutil processes of the SGLang server listening on ``port`` (with children)."""
+    try:
+        import psutil
+
+        procs = []
+        for proc in psutil.process_iter(['cmdline']):
+            cmd = proc.info.get('cmdline') or []
+            if 'sglang.launch_server' in cmd and str(port) in cmd:
+                procs.append(proc)
+                procs.extend(proc.children(recursive=True))
+        return procs
+    except Exception:
+        return []
+
+
+def cpu_snapshot(procs: list) -> tuple[float, float] | None:
+    """Machine-wide busy CPU seconds and CPU seconds of our own processes."""
+    try:
+        with open('/proc/stat') as fh:
+            vals = [int(v) for v in fh.readline().split()[1:9]]
+        busy = (sum(vals) - vals[3] - vals[4]) / os.sysconf('SC_CLK_TCK')
+        own = 0.0
+        seen = set()
+        for proc in [*procs, *__import__('psutil').Process(os.getpid()).children(recursive=True)]:
+            if proc.pid in seen:
+                continue
+            seen.add(proc.pid)
+            try:
+                t = proc.cpu_times()
+                own += t.user + t.system
+            except Exception:
+                continue
+        mine = os.times()
+        own += mine.user + mine.system
+        return busy, own
+    except Exception:
+        return None
+
+
 async def abort_all(session: aiohttp.ClientSession, base: str) -> int:
     async with session.post(f'{base}/abort_request', json={'abort_all': True}) as resp:
         return resp.status
@@ -214,6 +268,8 @@ async def run(args: argparse.Namespace) -> dict:
         await asyncio.sleep(args.settle)
 
         load_before = os.getloadavg()
+        procs = server_tree(args.port)
+        cpu0 = cpu_snapshot(procs)
         profiler = Profiler(args)
         t_before_start = time.perf_counter()
         await profiler.start(session)
@@ -224,6 +280,7 @@ async def run(args: argparse.Namespace) -> dict:
         t1 = time.perf_counter()
         wall1 = time.time()
         load_after = os.getloadavg()
+        cpu1 = cpu_snapshot(procs)
         await profiler.stop(session)
         t_after_stop = time.perf_counter()
         if spy is not None:
@@ -255,6 +312,9 @@ async def run(args: argparse.Namespace) -> dict:
         # CPU work during a window would inflate host gaps.
         'host_loadavg_1m_before': load_before[0],
         'host_loadavg_1m_after': load_after[0],
+        # Mean cores busy during the window: all processes, and all minus the
+        # server tree and this client (foreign load from other jobs).
+        **cpu_load(cpu0, cpu1, t1 - t0),
         'profiler_start_s': t0 - t_before_start,
         'profiler_stop_s': t_after_stop - t1,
         'prefill_to_all_decoding_s': t_all_decoding - t_submit,
