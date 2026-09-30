@@ -122,16 +122,51 @@ At $f=1/16$ and $B=32$ this is about $87.3\%$, so a per-row skip fraction of $93
 \label{fig:union}
 \end{figure}
 
-\subsection{Kernel and head-path runtime}\label{sec:kernel-design}
+\subsection{The certified head as a kernel pipeline}\label{sec:kernel-design}
 A certified head pays off only if the whole path beats the strongest dense head chain at the served shapes:
 \begin{equation}
 T_{\rm cheap\ pass}+T_{\rm bounds}+T_{\rm compaction}+T_{\rm re\mbox{-}score}+\Pr[\text{fallback}]\,T_{\rm stock\ head}<T_{\rm stock\ head\ chain}.\label{eq:headgate}
 \end{equation}
-The right-hand side is the stock GEMM plus the FP32 copy and the argmax or top-1 that follow it; a fused dense epilogue that removes the copy and the argmax is a comparator in its own right, as is FlashSampling~\cite{flashsampling}. Equation~\eqref{eq:headgate} is a measurement criterion, not a prediction. If the head chain is a fraction $f$ of a step, removing it entirely gives at most $1/(1-f)$ overall under otherwise unchanged execution.
+The right-hand side is the stock GEMM plus the FP32 copy and the argmax or top-1 that follow it; a fused dense epilogue that removes the copy and the argmax is a comparator in its own right, as is FlashSampling~\cite{flashsampling}. Equation~\eqref{eq:headgate} is a measurement criterion, not a prediction, and if the head chain is a fraction $f$ of a step, removing it entirely gives at most $1/(1-f)$.
 
-\pending{kernel: the int8 layout and scales, the bound epilogue, candidate compaction, BF16 re-scoring and its accumulation contract, the graph-safe conditional fallback, and measured head-path time against the stock chain at $M=1$ to 256 with repeats and variance; data \nolinkurl{evidence/certified_head/head_path_time.csv}}
+Figure~\ref{fig:kernel-path} shows the path for a batch of $M$ head inputs; the implementation is in \code{src/certified\_head/} \pending{kernel: pull request with the implementation and its tests}. Every launch has a grid fixed by $M$ and by buffer capacities, so the whole path, fallback included, is captured once per batch size.
 
-\pendingfigure{Head-path time against the number of rows $M$: stock cuBLAS BF16 GEMM plus FP32 copy plus argmax, the certified head (measured and expected), and the int8 pass alone, with p10--p90 bands.}{evidence/certified_head/head_path_time.csv}
+\begin{figure}[tbp]
+\centering
+\begin{tikzpicture}[node distance=.5cm and .55cm]
+\node[box,text width=2.6cm] (prep) {Input norms\\$\norm{h_g}_2$, rounded up};
+\node[good,text width=2.7cm,right=of prep] (gemv) {int8 pass with\\envelope epilogue};
+\node[good,text width=2.5cm,right=of gemv] (sel) {Candidate\\compaction};
+\node[good,text width=2.7cm,right=of sel] (ref) {Re-score candidates\\from BF16 rows};
+\node[box,text width=3.2cm,below=.8cm of ref] (dec) {Decision on BF16\\intervals (Prop.~\ref{prop:stockinterval})};
+\node[warn,text width=3.2cm,left=1.2cm of dec] (fb) {Stock head at the same $M$ (conditional node)};
+\draw[flow] (prep)--(gemv);\draw[flow] (gemv)--node[above,label]{tile\\top-4}(sel);\draw[flow] (sel)--(ref);\draw[flow] (ref)--(dec);
+\draw[flow] (dec)--node[above,label]{undecided}(fb);
+\end{tikzpicture}
+\caption{The certified greedy path. Only the approximate pass streams the whole head, in int8 at half the bytes of BF16; candidate rows are re-read in BF16, and the stock head runs only when the device-side flag is set.}
+\label{fig:kernel-path}
+\end{figure}
+
+\paragraph{Weights and metadata.} Each row is stored as symmetric int8 codes $q_i$ with an FP32 scale $s_i=\fl(\max_j|w_{ij}|/127)$. The error $e_i=w_i-s_iq_i$ is computed offline in FP64, where it is exact, and its group norms, with those of $q_i$ and $w_i$, are stored as FP64 upper bounds over 128-column groups. From them the head builds one FP32 coefficient per row and group, rounded up,
+\[A_{ig}\ge\norm{e_{ig}}_2+\gamma_{\rm acc}s_i\norm{q_{ig}}_2+\gamma_{\rm ref}\norm{w_{ig}}_2,\]
+so that $\sum_gA_{ig}\norm{h_g}_2$ bounds the quantization error, the pass's own accumulation error and the stock kernel's accumulation error at once (Theorem~\ref{thm:envelope} with the reference's error folded in). With one group per row the metadata is about 1~MB beside 636~MB of codes (derived).
+
+\paragraph{The approximate pass.} A Triton kernel tiles the vocabulary and covers all $M$ inputs in one or a few column blocks, so each weight tile is read from HBM once. Codes are converted to BF16 in registers by byte permutation and a BF16 subtraction rather than by conversion instructions, fed to \code{wgmma} against the BF16 inputs, and accumulated in FP32; the per-row scale multiplies the accumulator once. The epilogue evaluates the envelope with directed rounding (PTX \code{fma.rp} and \code{add.rm}), so the stored bounds enclose the reference's value without the inflation of Lemma~\ref{lem:outward}, and it never writes the $M\times V$ logits. Per input it folds the largest lower bound into one word with an atomic maximum, and per input and vocabulary tile it keeps the four largest upper bounds with their indices and the largest remaining upper bound.
+
+\paragraph{Selection and re-scoring.} A compaction kernel applies the threshold to the tile summaries and appends surviving indices to a fixed-capacity list. A tile whose remaining bound reaches the threshold may hold more than four candidates, so all of its rows are appended and the list stays complete; only a list longer than its capacity sends the row to the batch fallback. The re-scoring kernel re-reads the BF16 rows of the candidates, forms each product exactly in FP64 and sums in FP64; its own error is below $10^{-12}$ relative to $\sum_j|w_{ij}h_j|$, and the interval it stores is widened by the stock kernel's bound and rounded outward before Proposition~\ref{prop:stockinterval} decides.
+
+\paragraph{Arithmetic by batch size.} The int8 pass is bandwidth-bound at small $M$, but converting codes in registers makes it issue-bound at large $M$ because the conversion repeats for every column block. Two further passes share the epilogue, selection and re-scoring: an integer pass that quantizes each input to int8 and accumulates exactly in int32 (Theorem~\ref{thm:integer}), and a BF16 pass over the stored head that keeps only the accumulation terms, a certified dense head that never writes logits and so removes the stock chain's FP32 copy and separate argmax. The pass is chosen per $M$ from measured times \pending{kernel: per-$M$ times of the three passes; \nolinkurl{evidence/certified_head/micro_head.json}}.
+
+\paragraph{Sampling.} For the seeded sampler the pipeline carries perturbed scores instead of logits. The stock chain divides FP32 logits by the temperature, takes \code{softmax} and \code{log} in FP32 and adds the FP64 keyed Gumbel field before the argmax. The normalization is a shift shared by a row, so it cancels from every comparison; what remains is the rounding of the exponential, the division and the logarithm, which the kernel bounds from CUDA's documented maximum errors for those functions and adds to the race's slack (Theorem~\ref{thm:race}), sending undecided rows to the stock sampler \pending{kernel: the written derivation of that slack with its tests, and token-for-token agreement with the stock seeded sampler on replayed steps; \nolinkurl{evidence/certified_head/}}.
+
+\subsection{Cost of the certified head path}\label{sec:kernel-runtime}
+Every timing is a CUDA-graph replay of the complete path (input norms, the int8 pass, compaction, re-scoring, the decision and the conditional fallback) on real decode head inputs, against the stock chain captured the same way. A graph holds 20 back-to-back calls; the median and spread are taken over 50 replays, with the L2 cache warm and with a 256~MB write between calls. Because a fallback costs the stock chain, the expected cost at batch size $M$ is $T_{\rm cert}(M)+P_{\rm fb}(M)\,T_{\rm stock}(M)$, with $P_{\rm fb}(M)$ the measured fraction of real batches of size $M$ that contain an undecided row.
+
+\pending{kernel: complete head-path time and variance for $M=1$ to 256, certified against the stock chain, per error model; stage times and the int8 pass's effective bandwidth against the measured read peak; primitive costs for the replay's predictions; \nolinkurl{evidence/certified_head/micro_head.json}, \nolinkurl{evidence/certified_head/head_primitives.json}}
+
+\pendingfigure{Head-path time against the number of rows $M$: stock cuBLAS BF16 GEMM plus FP32 copy plus argmax, the certified path without fallback and with the measured fallback rate, and the int8 pass alone as the bandwidth floor, with p10--p90 bands.}{evidence/certified_head/head_path_time.csv}
+
+Certifying a greedy head from a cheaper copy and re-scoring survivors is not new: sparkpipe screens with an E4M3 shadow on CUDA cores and re-scores in BF16~\cite{sparkpipehead}, dgpp uses int8 bit planes with a fixed floating-point slack~\cite{dgpphead}, a Metal implementation re-scores with a replica of the production kernel~\cite{lagunaprune}, and knlp reports that on an H100 such a head wins only at batch one under a CUDA graph~\cite{knlphead}. What this implementation adds is narrower: a contract stated against a closed-source stock kernel at the engine's own batch shapes, with that kernel as the fallback rather than a replica; a graph-safe path whose undecided rows cost a conditional stock head; the extension to the engine's seeded sampler; and runtime measured for the complete path against the engine's actual head chain.
 
 \subsection{Beyond the head: a certified tail (rejected)}\label{sec:tail}
 Section~\ref{sec:skipped} observed that in target-only decoding the last layer's MLP, the final norm and the head have no consumer in future state. The hypothesis, from a later proposal, is that a cheap surrogate of that tail with a sound enclosure could let the commit rule decide the token before the tail runs, removing up to 1.41~GB of the 8.41~GB streamed per step (derived, Table~\ref{tab:bytes}). A one-shot surrogate that costs $C$ (surrogate plus certificate) and certifies a fraction $p$ of positions pays only if $C<p\,T_{\rm tail}$, and the ceiling for a tail fraction $f$ of the step is $1/(1-f)$. The directional margin (Proposition~\ref{prop:directional}) is the natural certificate when the surrogate predicts the head input with a radius.
