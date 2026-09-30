@@ -107,7 +107,7 @@ errors tell the same story: max_i |<w_i - mu_c, Delta>| is 77 times max_i |<e_i,
 
 Certification (greedy, threshold = exact target score of the draft token): certified l2
 transport and the static l2 screen each skip 0.08% of rows; transport with oracle
-(realized) radii would skip 99.9% (p10 65%); int8 per-row self-evidence skips all but one
+(realized) radii would skip 99.9% (p10 67%); int8 per-row self-evidence skips all but one
 or two rows.
 
 ## H3: self-evidence on plain decode
