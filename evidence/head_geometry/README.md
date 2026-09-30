@@ -20,11 +20,13 @@ BF16 output (R-stock).
 
 ## Decision so far
 
-- **H2, transport: refuted on DFlash-4B for every bound family and tiling tested** (scalar,
-  coordinate, grouped 32/128 and low-rank radii with W or Delta bases, and their minimum;
-  contiguous tiles of 64, 256 and 1,024 rows, random 256-row tiles, k-means tiles of 64,
-  256 and 1,024 rows), on z-lab/Qwen3.5-4B-DFlash @9a1996cc and the 160 held-out prompts;
-  MTP-4B is pending. The drafter's head input is not close to the target's (rho median
+- **H2, transport: refuted on DFlash-4B and on native MTP-4B for every bound family and
+  tiling tested** (scalar, coordinate, grouped 32/128 and low-rank radii with W or Delta
+  bases, and their minimum; contiguous tiles of 64, 256 and 1,024 rows, random 256-row
+  tiles, k-means tiles of 64, 256 and 1,024 rows), on z-lab/Qwen3.5-4B-DFlash @9a1996cc and
+  the model's own MTP layer (NEXTN, 4 steps), over the 160 held-out prompts. The
+  numbers below are for DFlash-4B; "Transport certification rates (MTP-4B)" gives the
+  MTP-4B ones, which tell the same story. The drafter's head input is not close to the target's (rho median
   0.92, smallest 0.82, against a per-row int8 threshold of 0.0085). For greedy
   verification the certified bounds skip at most 0.6% of the vocabulary on average (p90
   0.8%, k-means 64-row tiles), no better than the static screen. For sampled acceptance the
@@ -56,6 +58,7 @@ BF16 output (R-stock).
 | `rstock_plain4b.json` | R-stock on the same 6,005 positions: share needing the stock kernel under the `stock_gap` rule and a bucket-exact rule, for four gammas; certified tokens against the engine's | `python analyze_rstock.py --device cpu --out ../../evidence/head_geometry/rstock_plain4b.json` | `0d10d3a` |
 | `alignment_dflash4b.json` | DFlash-4B capture: FP64 argmax of the captured draft and target head inputs against the engine's tokens, per block position; accept-length consistency | `python validate_alignment.py --arm dflash4b --device cpu --out ../../evidence/head_geometry/alignment_dflash4b.json` | `18fdf95` |
 | `rho_dflash4b.json`, `rho_dflash4b_pairs.csv`, `rho_dflash4b_quantiles.csv` | DFlash-4B drift ratio rho on 40,000 held-out pairs and the per-row threshold; head-metric drift; realized per-tile errors; certification rates; plot data (the pairs CSV is a seeded 15,000-row subsample with prompt id and split) | `python analyze_rho.py --arm dflash4b --device cpu --max-rows 40000 --csv-pairs 15000 --out ../../evidence/head_geometry/rho_dflash4b.json` | `5c59ba3` |
+| `transport_mtp4b.{json,csv}` | MTP-4B transport on 16,016 held-out pairs (all held-out pairs of 160 prompts), same metrics as for DFlash-4B, run on the GPU | `python analyze_transport.py --arm mtp4b --max-rows 16000 --out ../../evidence/head_geometry` under `gpu_lock.sh -s` (committed in `54c4b63`) | `99b2d3f` |
 | `transport_dflash4b.{json,csv}` | DFlash-4B transport on 4,000 held-out pairs: skip fractions for greedy, partition widths and P_? at T = 1 and 0.7, retained-tail bounds, static screen, oracle radii, drift scaling, tile unions over real and random batches, by outcome, position and domain | `python analyze_transport.py --arm dflash4b --device cpu --max-rows 4000 --out ../../evidence/head_geometry --tag dflash4b` | `99b2d3f` |
 | `stats_dflash4b.json` | DFlash-4B: norms of draft and target head inputs, margins, top-m mass, drift norms and cosine by outcome and position | `python analyze_stats.py --arm dflash4b --device cpu --max-rows 20000 --out ../../evidence/head_geometry/stats_dflash4b.json` | `239c482` |
 | `selfevidence_dflash4b.{json,csv}`, `selfevidence_dflash4b_ccdf.csv` | H3 on 4,000 held-out DFlash-4B verify rows and 4,020 draft rows (int8, FP8 and int4 heads), split by whether the verifier needs the row | `python analyze_selfevidence.py --device cpu --threads 40 --sets dflash_verify dflash_draft --max-rows 4000 --chunk 64 --heads int8_row int8_g128 int8_g32 fp8_row int4_g128 int4_g32 --out ../../evidence/head_geometry --tag dflash4b`, then `export_candidate_ccdf.py --tag dflash4b` | `fa7aad8` |
@@ -165,6 +168,36 @@ h_t - s Delta, which scales rho, the logit drift and every radius by s. With the
 certified family on k-means 256-row tiles the mean share skipped is 1.6% at s = 0.3,
 49% at s = 0.1, 77% at s = 0.03 and 84% at s = 0.01 (medians 0.3%, 49%, 96% and 99%), and
 the mean E_q P_? at T = 1 is 1.00, 1.00, 0.96 and 0.66 at those scales.
+
+### Transport certification rates (MTP-4B)
+
+`transport_mtp4b.{json,csv}`: native MTP (NEXTN, 4 draft steps, topk 1), 16,016 held-out
+pairs from 160 prompts (9,969 accepted, 2,298 rejected, 3,749 unreached). Same columns as
+the DFlash-4B table above.
+
+| Tiling | Transport skip | Static skip | Oracle skip (mean / median) | log(Z+/Z-) | E_q P_? (mean / median) |
+|---|---|---|---|---|---|
+| contiguous 64 | 0.08% | 0.08% | 98.5% / 99.97% | 146 | 1.000 / 1 |
+| contiguous 256 | 0% | 0% | 96.4% / 99.8% | 233 | 1.000 / 1 |
+| contiguous 1,024 | 0% | 0% | 92.9% / 99.2% | 268 | 1.000 / 1 |
+| random 256 | 0% | 0% | 94.7% / 99.8% | 255 | 1.000 / 1 |
+| k-means 64 | 0.64% | 0.64% | 96.0% / 99.9% | 146 | 0.998 / 1 |
+| k-means 256 | 0.11% | 0.11% | 92.3% / 99.7% | 152 | 0.999 / 1 |
+| k-means 1,024 | 0.02% | 0.02% | 86.8% / 98.6% | 162 | 1.000 / 1 |
+
+The largest certified skip is the row-level variant on k-means 64-row tiles: 0.65% of the
+vocabulary on average (p90 0.78%). Accepted and rejected pairs differ little (0.12% and
+0.10% with k-means 256-row tiles). The partition interval spans 146-268 nats depending on
+the tiling, so sampled acceptance stays undecided with probability of at least 0.997 on
+average. Over the capture's real verify batches (1-32 paired rows) every certified family
+and tiling needs 99.4-100% of the vocabulary. Oracle radii would skip 96% of the rows of one
+pair on k-means 64-row tiles, but random groups of 16 and 64 pairs need 62% and 92% of the
+vocabulary with 256-row k-means tiles. The drift ratio of these pairs,
+||Delta||_2 / ||h_t||_2, has median 0.95 (p10 0.77); unlike the DFlash drafter, the MTP
+head input is slightly larger than the target's (median norms 176 and 160). Drift scaling
+(the model extrapolation below) with the best certified family on k-means 256-row tiles
+gives a mean share skipped of 80% at s = 0.1 and 96% at s = 0.03 (medians 96% and 99.8%),
+with mean E_q P_? at T = 1 of 1.00 and 0.97.
 
 ## H3: self-evidence
 
