@@ -178,7 +178,7 @@ def main() -> None:
                     add_generation_prompt=True,
                     enable_thinking=True,
                 )
-                if isinstance(ids, dict):
+                if not isinstance(ids, list):
                     ids = ids['input_ids']
                 if len(ids) > MAX_PROMPT_TOKENS:
                     dropped['long'] += 1

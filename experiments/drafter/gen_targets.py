@@ -96,7 +96,7 @@ async def run(args: argparse.Namespace) -> None:
             add_generation_prompt=True,
             enable_thinking=True,
         )
-        if isinstance(ids, dict):
+        if not isinstance(ids, list):
             ids = ids['input_ids']
         queue.put_nowait((row, list(ids)))
     state = {'done': 0, 'tokens': 0, 'errors': 0, 'stop_at': time.monotonic() + args.deadline}

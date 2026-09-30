@@ -60,7 +60,7 @@ def build_input_ids(rows: list[dict[str, Any]], thinking: bool) -> list[list[int
             add_generation_prompt=True,
             enable_thinking=thinking,
         )
-        if isinstance(ids, dict):  # transformers 5 returns a BatchEncoding
+        if not isinstance(ids, list):  # transformers 5 returns a BatchEncoding
             ids = ids['input_ids']
         out.append(list(ids))
     return out
@@ -78,6 +78,7 @@ def run_one(
     port: int, row: dict[str, Any], input_ids: list[int], args: argparse.Namespace
 ) -> dict[str, Any]:
     body: dict[str, Any] = {
+        'rid': row['id'],  # lets the engine's DFlash trace name the request
         'input_ids': input_ids,
         'sampling_params': {
             'temperature': 0.0,
