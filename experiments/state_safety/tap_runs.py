@@ -37,6 +37,7 @@ async def serve(
     url: str, prompts: list[dict[str, Any]], tap: set[str], args
 ) -> list[dict[str, Any]]:
     sem = asyncio.Semaphore(args.concurrency)
+    limits = json.loads(Path(args.limits).read_text()) if args.limits else {}
     timeout = aiohttp.ClientTimeout(total=None, sock_read=900)
     out: list[dict[str, Any]] = []
     async with aiohttp.ClientSession(timeout=timeout) as s:
@@ -48,7 +49,8 @@ async def serve(
             async with sem:
                 if args.flush_each:
                     flush_cache(url)
-                rec = await generate(s, url, p['input_ids'], args.max_new_tokens, rid=rid)
+                limit = limits.get(p['id'], args.max_new_tokens) if tapped else args.max_new_tokens
+                rec = await generate(s, url, p['input_ids'], limit, rid=rid)
             rec['id'] = p['id'] + suffix
             rec['tapped'] = tapped
             out.append(rec)
@@ -70,6 +72,7 @@ def main() -> None:
     ap.add_argument('--out-dir', required=True)
     ap.add_argument('--port', type=int, default=30054)
     ap.add_argument('--repeats', type=int, default=1, help='send every prompt this many times')
+    ap.add_argument('--limits', help='JSON {prompt id: max_new_tokens} for tapped prompts')
     ap.add_argument('--flush-each', action='store_true', help='flush the cache before each request')
     args = ap.parse_args()
 
