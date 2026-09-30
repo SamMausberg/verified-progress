@@ -77,7 +77,14 @@ quality.
 
 Per point, the runner sends `max(64, 8 c)` measured requests (the first prompts of
 the split, in order) after one wave of warmup requests from the warmup pool at the
-same concurrency, and flushes the prefix cache before each point. A server-level
+same concurrency, and flushes the prefix cache before each point (a point is not
+measured if the flush fails). A point with more measured requests than the split has
+prompts reuses prompts, which can then hit the prefix cache within the point;
+`point.json` reports `repeated_prompts`, and sweeps that large should run with the
+radix cache off or treat those points separately. `bench.pareto` keeps points with
+failed requests, a nonzero aiperf exit, wrong output lengths, an unflushed cache,
+unexpected prompts or non-finite metrics out of the frontier and lists them with an
+`invalid_reason`. A server-level
 warmup at the top concurrency runs once after launch. Repeats alternate the
 concurrency order.
 
@@ -139,3 +146,11 @@ python -m bench.quality compare <plain run dir> <mtp run dir>
 A variant needs no new arm to be tried: `--set speculative-num-steps=4
 --set speculative-num-draft-tokens=5 --label mtp-s4`. Promote it to `arms.toml`
 once it is a result.
+
+## Open items
+
+- Concurrency above 256 has not been measured on a quiet host; the frontend diagnosis
+  (evidence/bench/frontend/) covers c=256 only.
+- `SGLANG_RUST_SERVER=1` (SGLang's embedded Rust HTTP server, an alternative to the
+  Python tokenizer manager) fails at launch here because it wants a local
+  `tokenizer.json` path rather than a Hub model ID; untested with `--tokenizer-path`.

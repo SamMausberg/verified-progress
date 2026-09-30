@@ -25,8 +25,11 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from bench.hostload import CONTENTION_CORES
+
 POINT_FIELDS = (
     'status',
+    'invalid_reason',
     'label',
     'run',
     'repeat',
@@ -57,11 +60,39 @@ AGGREGATED = ('x_e2e', 'x_decode', 'y', 'y_steady', 'ttft_p50_ms', 'itl_p50_ms',
 SERIES_COLOURS = ('#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7')
 
 
+def invalid_reason(point: dict[str, Any]) -> str:
+    """Why a point cannot stand for its configuration; empty when it can.
+
+    A point computed from a partial set of requests, a failed or partial aiperf run,
+    outputs of the wrong length, a warm prefix cache or unexpected prompts would
+    look like a valid measurement of something it did not measure.
+    """
+    reasons = []
+    if point.get('failed'):
+        reasons.append(f'{point["failed"]} failed requests')
+    if point.get('aiperf_exit_code') not in (None, 0):
+        reasons.append(f'aiperf exit {point["aiperf_exit_code"]}')
+    if point.get('osl_mismatch'):
+        reasons.append(f'{point["osl_mismatch"]} outputs of the wrong length')
+    if point.get('cache_flushed') is False:
+        reasons.append('prefix cache not flushed')
+    if point.get('prompts_as_expected') is False:
+        reasons.append('prompts differ from the workload prefix')
+    for key in ('x_e2e', 'y'):
+        if not _finite(point.get(key)):
+            reasons.append(f'{key} not finite')
+    foreign = point.get('foreign_cpu_during_mean')
+    if isinstance(foreign, int | float) and math.isfinite(foreign) and foreign > CONTENTION_CORES:
+        reasons.append(f'host_contention ({foreign:.1f} foreign cores on average)')
+    return '; '.join(reasons)
+
+
 def point_row(label: str, run: str, point: dict[str, Any], status: str = '') -> dict[str, Any]:
     spec = point.get('spec') or {}
     counters = point.get('server_counters') or {}
     return {
         'status': status,
+        'invalid_reason': invalid_reason(point),
         'label': label,
         'run': run,
         'repeat': point.get('repeat'),
@@ -151,20 +182,39 @@ def load_launches(run_dirs: list[Path], relabel: dict[str, str]) -> list[dict[st
 
 
 def dominated(point: tuple[float, float], others: list[tuple[float, float]]) -> bool:
-    """True if some other point is at least as good on both axes and better on one."""
+    """True if some other point is at least as good on both axes and better on one.
+
+    A point with a non-finite coordinate counts as dominated, so it can never be
+    marked Pareto-optimal; non-finite points never dominate others.
+    """
     x, y = point
+    if not (math.isfinite(x) and math.isfinite(y)):
+        return True
     return any(
-        ox >= x and oy >= y and (ox > x or oy > y) for ox, oy in others if (ox, oy) != (x, y)
+        ox >= x and oy >= y and (ox > x or oy > y)
+        for ox, oy in others
+        if math.isfinite(ox) and math.isfinite(oy) and (ox, oy) != (x, y)
     )
 
 
 def aggregate(rows: list[dict[str, Any]], baseline: str | None) -> list[dict[str, Any]]:
     groups: dict[tuple[str, int], list[dict[str, Any]]] = defaultdict(list)
+    invalid: dict[tuple[str, int], int] = defaultdict(int)
     for row in rows:
-        groups[(row['label'], int(row['concurrency']))].append(row)
+        key = (row['label'], int(row['concurrency']))
+        if row.get('invalid_reason'):
+            invalid[key] += 1
+            groups.setdefault(key, [])
+        else:
+            groups[key].append(row)
     frontier = []
     for (label, concurrency), members in sorted(groups.items()):
-        entry: dict[str, Any] = {'label': label, 'concurrency': concurrency, 'n': len(members)}
+        entry: dict[str, Any] = {
+            'label': label,
+            'concurrency': concurrency,
+            'n': len(members),
+            'n_invalid': invalid[(label, concurrency)],
+        }
         for field in AGGREGATED:
             values = [float(m[field]) for m in members if _finite(m.get(field))]
             entry[f'{field}_mean'] = statistics.fmean(values) if values else math.nan

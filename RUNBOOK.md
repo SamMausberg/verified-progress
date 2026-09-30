@@ -97,7 +97,7 @@ capacity flags are defined by the serving harness and its arm file.
 | Certified-head kernels and head-path runtime | `evidence/certified_head/` | in progress |
 | Divergence mechanisms and state safety | `evidence/state/` | in progress |
 | DFlash drafter on GH200 | `evidence/drafter/` | on `main` (acceptance); timing in progress |
-| Stack levers, ceilings, frontiers | `evidence/moonshot/` | in progress |
+| Stack levers, ceilings, frontiers | `evidence/moonshot/` | on `main` (ceilings, first lever runs); repeats and frontiers in progress |
 | Long-window repair (P2, P3) | to be assigned | in progress |
 
 When a pull request merges, the paper replaces the matching pending items

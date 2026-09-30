@@ -35,6 +35,14 @@ mem-fraction-static = 0.85
 # /metrics: token, verify-call and CUDA-graph pass counters per sweep point.
 enable-metrics = true
 random-seed = 0
+# Stream every 4 tokens (the first token is still sent at once). With one-token
+# chunks the tokenizer-manager process saturates one core near 16K chunks/s and
+# caps plain decoding at high concurrency: at c=256 on a quiet host the client
+# saw 15.4K tok/s against 18.0K of server-side decode; with an interval of 4 the
+# process drops to 0.35 cores and the client sees 16.5K, the same as a
+# non-streaming client (evidence/bench/frontend/). TTFT and the last-chunk time
+# that define x and y are unchanged; only chunk granularity is coarser.
+stream-interval = 4
 
 [arms.plain]
 description = "Arm A: ordinary autoregressive decoding (no speculation)."

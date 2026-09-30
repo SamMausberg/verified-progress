@@ -316,3 +316,157 @@ def test_frontier_dominance_and_aggregation() -> None:
     assert not by_label['a']['pareto_optimal'] and by_label['b']['pareto_optimal']
     assert by_label['b']['y_vs_a'] == pytest.approx(2.0)
     assert math.isnan(by_label['a']['accept_length_mean'])
+
+
+def test_loop_onset_finds_repetition_and_ignores_varied_text() -> None:
+    from bench.lengths import LOOP_WINDOW, loop_onset
+
+    varied = list(range(2000))
+    assert loop_onset(varied) is None
+    looping = [*range(1000), *([7, 8, 9, 10, 11] * 200)]
+    onset = loop_onset(looping)
+    assert onset is not None and 1000 - LOOP_WINDOW < onset <= 1000
+
+
+def test_point_is_not_measured_after_a_failed_cache_flush(tmp_path: Path) -> None:
+    import argparse
+
+    from bench.sweep import Sweep
+
+    sweep = Sweep.__new__(Sweep)
+    sweep.args = argparse.Namespace(min_requests=4, waves=1, min_warmup=1)
+    sweep.workload = [{'id': 'p', 'domain': 'chat', 'text': 'x'}]
+    sweep.warmup_pool = sweep.workload
+    sweep.run_dir = tmp_path
+    sweep.flush_cache = lambda: False  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError, match='flush failed'):
+        sweep.point(0, 1)
+    assert not any(tmp_path.iterdir())
+
+
+def test_invalid_points_never_reach_the_frontier() -> None:
+    from bench.pareto import invalid_reason, point_row
+
+    good = {'concurrency': 1, 'x_e2e': 100.0, 'y': 100.0, 'failed': 0, 'aiperf_exit_code': 0}
+    partial = {**good, 'x_e2e': 500.0, 'y': 500.0, 'failed': 3}
+    assert invalid_reason(good) == ''
+    assert 'failed requests' in invalid_reason(partial)
+    assert 'aiperf exit' in invalid_reason({**good, 'aiperf_exit_code': 1})
+    assert 'wrong length' in invalid_reason({**good, 'osl_mismatch': 2})
+    assert 'cache' in invalid_reason({**good, 'cache_flushed': False})
+    assert 'not finite' in invalid_reason({**good, 'y': math.nan})
+    rows = [point_row('a', 'r1', good), point_row('a', 'r2', partial)]
+    rows.append(point_row('b', 'r3', {**good, 'x_e2e': math.nan, 'y': math.nan}))
+    by_label = {entry['label']: entry for entry in aggregate(rows, baseline=None)}
+    assert by_label['a']['n'] == 1 and by_label['a']['n_invalid'] == 1
+    assert by_label['a']['x_e2e_mean'] == pytest.approx(100.0)
+    assert by_label['a']['pareto_optimal']
+    assert by_label['b']['n'] == 0 and not by_label['b']['pareto_optimal']
+    assert dominated((math.nan, 1.0), [(1.0, 1.0)])
+    assert not dominated((1.0, 1.0), [(math.nan, math.nan)])
+
+
+def _quality_run(directory: Path, ids: list[str], task_file: Path) -> Path:
+    import csv
+
+    directory.mkdir()
+    with (directory / 'problems.csv').open('w', newline='') as handle:
+        writer = csv.DictWriter(
+            handle, fieldnames=['id', 'correct', 'predicted_answer', 'generation_sha']
+        )
+        writer.writeheader()
+        for key in ids:
+            writer.writerow(
+                {'id': key, 'correct': True, 'predicted_answer': '1', 'generation_sha': 'h'}
+            )
+    import hashlib
+
+    digest = hashlib.sha256(task_file.read_bytes()).hexdigest() if task_file.exists() else 'gone'
+    summary = {'task_file': str(task_file), 'task_sha256': digest, 'sgl_eval_exit_code': 0}
+    (directory / 'quality.json').write_text(json.dumps(summary))
+    return directory
+
+
+def test_quality_comparison_requires_the_same_complete_problem_set(tmp_path: Path) -> None:
+    from bench.quality import compare
+
+    task_file = tmp_path / 'tasks.jsonl'
+    task_file.write_text('{}\n{}\n{}\n')
+    full = ['p0', 'p1', 'p2']
+    a = _quality_run(tmp_path / 'a', full, task_file)
+    assert compare(a, _quality_run(tmp_path / 'b', full, task_file))['problems'] == 3
+    with pytest.raises(ValueError, match='different problems'):
+        compare(a, _quality_run(tmp_path / 'c', full[:2], task_file))
+    partial = _quality_run(tmp_path / 'd', full[:2], task_file)
+    with pytest.raises(ValueError, match='task file has 3'):
+        compare(partial, _quality_run(tmp_path / 'e', full[:2], task_file))
+
+
+def test_quality_comparison_fails_closed_without_the_task_set(tmp_path: Path) -> None:
+    from bench.quality import compare
+
+    task_file = tmp_path / 'tasks.jsonl'
+    task_file.write_text('{}\n{}\n{}\n')
+    a = _quality_run(tmp_path / 'a', ['p0', 'p1'], task_file)
+    b = _quality_run(tmp_path / 'b', ['p0', 'p1'], task_file)
+    task_file.unlink()
+    with pytest.raises(ValueError, match='cannot establish the task set'):
+        compare(a, b)
+    for run in (a, b):
+        summary = json.loads((run / 'quality.json').read_text())
+        (run / 'quality.json').write_text(json.dumps({**summary, 'task_problems': 3}))
+    with pytest.raises(ValueError, match='task file has 3'):
+        compare(a, b)
+    summary = json.loads((a / 'quality.json').read_text())
+    (a / 'quality.json').write_text(json.dumps({**summary, 'sgl_eval_exit_code': 1}))
+    with pytest.raises(ValueError, match='sgl-eval exited'):
+        compare(a, b)
+
+
+def test_host_load_tree_and_contention_summary() -> None:
+    from bench.hostload import CONTENTION_CORES, process_tree, summarise
+
+    table = {1: (0, 0.0), 10: (1, 0.0), 11: (10, 0.0), 12: (11, 0.0), 20: (1, 0.0)}
+    assert process_tree(10, table) == {10, 11, 12}
+    quiet = [{'cores': 0.5, 'top': [], 'own': []}] * 3
+    busy = [{'cores': 3.0, 'top': [{'cmd': 'analysis', 'cores': 3.0}], 'own': []}] * 3
+    assert not summarise(quiet)['contended']
+    report = summarise(busy)
+    assert report['contended'] and report['foreign_cores_mean'] > CONTENTION_CORES
+    assert report['top_foreign_mean_cores'] == {'analysis': 3.0}
+
+
+def test_contended_points_are_invalid() -> None:
+    from bench.pareto import invalid_reason
+
+    point = {'concurrency': 1, 'x_e2e': 1.0, 'y': 1.0, 'failed': 0, 'aiperf_exit_code': 0}
+    assert invalid_reason({**point, 'foreign_cpu_during_mean': 0.4}) == ''
+    assert invalid_reason({**point, 'foreign_cpu_during_mean': 3.0}).startswith('host_contention')
+
+
+def test_host_load_counts_short_lived_foreign_processes() -> None:
+    import subprocess
+    import sys
+    import threading
+    import time
+
+    from bench.hostload import sample
+
+    # The run's own tree is a sleeping process; the burner starts after the first
+    # snapshot and exits before the second, so only host totals can see it.
+    root = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(10)'])
+    burner_code = 'import time\nt = time.time()\nwhile time.time() - t < 0.7:\n    pass'
+
+    def burn() -> None:
+        time.sleep(0.2)
+        subprocess.run([sys.executable, '-c', burner_code], check=True)
+
+    thread = threading.Thread(target=burn)
+    thread.start()
+    try:
+        result = sample(root.pid, interval=1.5)
+    finally:
+        thread.join()
+        root.kill()
+    assert result['cores'] >= 0.25
+    assert all('while time.time()' not in proc['cmd'] for proc in result['top'])

@@ -3,7 +3,7 @@
 # thinking mode (greedy), and draft-vocabulary statistics for a token map.
 set -uo pipefail
 # shellcheck source=/dev/null
-source ~/verified-progress/scripts/sglang_env.sh
+source "$(dirname "$0")/../../scripts/sglang_env.sh"
 cd "$(dirname "$0")/../.." || exit 1
 python -m bench.sweep --arm mtp --label natural-tune-mtp --out ~/vp-data/bench/natural \
   --workload bench/workloads/mixed-v2/tune.jsonl --no-ignore-eos --osl 16384 \

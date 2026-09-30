@@ -75,7 +75,7 @@ shows them as pending items, never as numbers.
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install -r requirements-cpu.txt
+python -m pip install -r requirements-dev.txt   # NumPy plus pytest and the lint tools
 python tests/test_precision.py             # certified-head reference (about 35 s)
 python -m pytest tests/                     # every CPU test
 bash scripts/check_lean.sh                  # needs Lean 4.19.0 (~/.elan)
@@ -120,3 +120,21 @@ The literature, theory and evidence changes the paper cites were approved by an
 independent reviewing agent before merging, and all of the work remains subject
 to the author's review. No AI system is an author. The confidential assignment that motivated
 the work is not included, and no model weights are redistributed.
+
+## Citing this work
+
+If you use or build on this work, please cite it. GitHub's "Cite this repository" button
+reads `CITATION.cff`; the equivalent BibTeX entry is:
+
+```bibtex
+@techreport{mausberg2026verifier,
+  author = {Mausberg, Samuel},
+  title  = {The Work a Verifier Needs},
+  year   = {2026},
+  month  = sep,
+  note   = {Research manuscript, revision 4, in progress},
+  url    = {https://github.com/SamMausberg/verified-progress}
+}
+```
+
+Copyright © 2026 Samuel Mausberg.

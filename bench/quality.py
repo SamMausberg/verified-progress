@@ -27,6 +27,7 @@ import csv
 import hashlib
 import json
 import math
+import os
 import statistics
 import subprocess
 import sys
@@ -34,6 +35,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from bench.hostload import HostLoadSampler
 from bench.results import counter_deltas, iter_jsonl, parse_prometheus
 from bench.server import (
     Server,
@@ -224,6 +226,26 @@ def summarise(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def count_problems(path: Path) -> int:
+    return sum(1 for line in path.read_text().splitlines() if line.strip())
+
+
+def task_count(summary: dict[str, Any]) -> int:
+    """Problems in the run's task set; fails closed when it cannot be established.
+
+    Uses the count recorded at run time, else a task file (the recorded path, then
+    the repository's) whose SHA-256 equals the recorded hash.
+    """
+    if isinstance(summary.get('task_problems'), int):
+        return int(summary['task_problems'])
+    for candidate in (Path(str(summary.get('task_file') or '')), TASK_FILE):
+        if candidate.is_file() and (
+            hashlib.sha256(candidate.read_bytes()).hexdigest() == summary.get('task_sha256')
+        ):
+            return count_problems(candidate)
+    raise ValueError('cannot establish the task set: no recorded count and no file with its hash')
+
+
 def compare(run_a: Path, run_b: Path) -> dict[str, Any]:
     """Paired comparison on the same problems: accuracy delta, McNemar, identity."""
 
@@ -232,7 +254,22 @@ def compare(run_a: Path, run_b: Path) -> dict[str, Any]:
             return {row['id']: row for row in csv.DictReader(handle)}
 
     a, b = load(run_a), load(run_b)
-    shared = sorted(set(a) & set(b))
+    if set(a) != set(b):
+        raise ValueError(
+            f'runs scored different problems: {len(set(a) - set(b))} only in A, '
+            f'{len(set(b) - set(a))} only in B; a paired comparison needs identical sets'
+        )
+    summaries = [json.loads((run / 'quality.json').read_text()) for run in (run_a, run_b)]
+    task_hashes = {summary.get('task_sha256') for summary in summaries}
+    if len(task_hashes) != 1 or None in task_hashes:
+        raise ValueError('runs used different (or unrecorded) task files')
+    for run, summary in zip((run_a, run_b), summaries, strict=True):
+        if summary.get('sgl_eval_exit_code') not in (None, 0):
+            raise ValueError(f'{run}: sgl-eval exited with {summary["sgl_eval_exit_code"]}')
+    expected = task_count(summaries[0])
+    if len(a) != expected:
+        raise ValueError(f'runs scored {len(a)} problems, the task file has {expected}')
+    shared = sorted(a)
     only_a = sum(1 for key in shared if a[key]['correct'] == 'True' and b[key]['correct'] != 'True')
     only_b = sum(1 for key in shared if b[key]['correct'] == 'True' and a[key]['correct'] != 'True')
     acc_a = sum(a[key]['correct'] == 'True' for key in shared) / len(shared)
@@ -270,7 +307,10 @@ def run(args: argparse.Namespace) -> int:
             server.base_url, arm.model, task_file, run_dir / 'sgl_eval', args.threads, args.seed
         )
         started = time.time()
-        with (run_dir / 'sgl_eval_console.txt').open('w') as console:
+        with (
+            HostLoadSampler(os.getpid(), interval=1.0) as sampler,
+            (run_dir / 'sgl_eval_console.txt').open('w') as console,
+        ):
             result = subprocess.run(command, stdout=console, stderr=subprocess.STDOUT, check=False)
         elapsed = time.time() - started
         after = parse_prometheus(http_get(f'{server.base_url}/metrics'))
@@ -289,6 +329,7 @@ def run(args: argparse.Namespace) -> int:
         'repo': server.launch_record.get('repo'),
         'task_file': str(task_file),
         'task_sha256': hashlib.sha256(task_file.read_bytes()).hexdigest(),
+        'task_problems': count_problems(task_file),
         'generation': {
             'temperature': TEMPERATURE,
             'top_p': TOP_P,
@@ -302,6 +343,8 @@ def run(args: argparse.Namespace) -> int:
         'sgl_eval_command': command,
         'sgl_eval_exit_code': result.returncode,
         'wall_s': elapsed,
+        # Foreign CPU load during the evaluation; it affects wall time, not accuracy.
+        'host_load': sampler.summary(),
         'server_counters': counter_deltas(before, after),
         'avg_spec_accept_length_since_start': (server_info.get('internal_states') or [{}])[0].get(
             'avg_spec_accept_length'

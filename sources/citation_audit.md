@@ -139,6 +139,6 @@ The paper agent owns `paper.tex`. Line numbers refer to `origin/main` at `34f528
 `sources/source_manifest.json` has the corrected bibliography text for every entry
 above, plus entries for the sources the paper should add. `paper/references.bib`
 has BibTeX for all of them, using the existing `\cite` keys where the source is
-the same. `SHA256SUMS` records the imported bundle and was not regenerated, so
+the same. `sources/bundle-v3.sha256` (formerly `SHA256SUMS`) records the imported bundle and was not regenerated, so
 `sources/source_manifest.json` now differs from it by design (as `.gitignore`
 already does).

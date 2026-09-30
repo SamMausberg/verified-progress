@@ -2,7 +2,7 @@
 # Generated evidence, the paper and the checksum list are byte-exact records of
 # the supplied bundle, and git format-patch files must stay applicable, so the
 # auto-fixing hooks leave them alone.
-exclude: ^(evidence/|data/|sources/|paper/|SHA256SUMS$|engine/sglang/patches/.*\.patch$)
+exclude: ^(evidence/|data/|sources/|paper/|engine/sglang/patches/.*\.patch$)
 
 repos:
   - repo: local

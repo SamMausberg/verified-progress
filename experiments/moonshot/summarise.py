@@ -3,7 +3,8 @@
 * ``ceiling``: one_batch decode-step sweeps (decode_ceiling_sweep.py) -> step time and
   tokens/s per configuration and batch size, with the ratio to the base configuration.
 * ``sweeps``: bench.sweep runs (lever_sweep.py) -> x (tokens/s/user), y (tokens/s/GPU),
-  acceptance and TTFT per configuration and concurrency, with ratios to a baseline label.
+  acceptance and TTFT per configuration and concurrency (means over repeats; TTFT is the
+  mean of the per-run medians), with ratios to a baseline label.
 * ``quality``: quality_arms.py summary -> one row per configuration.
 
     python experiments/moonshot/summarise.py ceiling ~/vp-data/moonshot/decode_ceiling \
@@ -160,7 +161,14 @@ def sweeps(args: argparse.Namespace) -> None:
                 'y_tok_s_gpu': round(statistics.fmean(ys), 1) if ys else '',
                 'y_std': round(statistics.stdev(ys), 1) if len(ys) > 1 else '',
                 'accept_len': round(statistics.fmean(spec), 3) if spec else '',
-                'ttft_p50_ms': round(plist[-1].get('ttft_ms', {}).get('p50', float('nan')), 1),
+                'ttft_p50_ms': round(
+                    statistics.fmean(
+                        [float(p['ttft_ms']['p50']) for p in plist if p.get('ttft_ms')]
+                    ),
+                    1,
+                )
+                if any(p.get('ttft_ms') for p in plist)
+                else '',
                 'completed': sum(p.get('completed', 0) for p in plist),
                 'requests': sum(p.get('requests', 0) for p in plist),
             }

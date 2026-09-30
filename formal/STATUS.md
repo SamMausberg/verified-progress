@@ -14,7 +14,7 @@ Nine declarations: scaled-integer acceptance and rejection guards, monotone
 refinement, chronological function composition, deterministic replay, and
 publication guards. It now elaborates. Its header comment still says "NOT
 COMPILED"; that comment is stale but the file is left byte-identical to the
-bundle (`SHA256SUMS`).
+bundle (`sources/bundle-v3.sha256`).
 
 ## `CertifiedArgmax.lean` (theory workstream)
 

@@ -1,8 +1,8 @@
 """Exact witnesses that separate the exactness contracts (P7 in TASKS.md).
 
 Each test checks one small counterexample showing that two of the paper's contracts differ:
-identical internal state, identical greedy outputs, identical seeded samples, and the exact
-sampling distribution. Exact cases use Fractions; floating-point cases use NumPy scalar and
+identical internal state, identical greedy outputs, identical seeded samples, the exact
+sampling distribution, and empirical quality equivalence. Exact cases use Fractions; floating-point cases use NumPy scalar and
 elementwise float32 arithmetic (IEEE binary32, round to nearest, ties to even, no FMA
 contraction), with every reduction written as an explicit sequential loop so that the
 evaluation order is the one stated. The query-invisible state witness (equal readout now,
@@ -52,6 +52,14 @@ def matvec_rows(m: np.ndarray, x: np.ndarray) -> np.ndarray:
     for j in range(m.shape[1]):
         acc = (acc + m[:, j] * x[j]).astype(np.float32)
     return acc
+
+
+def sequential_norm(x: np.ndarray) -> np.float32:
+    """Euclidean norm with the squares summed left to right in float64, rounded to float32."""
+    total = 0.0
+    for value in x.astype(np.float64):
+        total += float(value) * float(value)
+    return F32(np.sqrt(total))
 
 
 def matmul(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -140,7 +148,7 @@ class Contracts(unittest.TestCase):
         seq_out, split_out = [], []
         for _ in range(steps):
             k = rng.standard_normal(d).astype(F32)
-            k = (k / F32(np.sqrt(np.sum(k.astype(np.float64) ** 2)))).astype(F32)
+            k = (k / sequential_norm(k)).astype(F32)
             v = rng.standard_normal(d).astype(F32)
             q = rng.standard_normal(d).astype(F32)
             alpha = F32(rng.uniform(0.9, 1.0))
@@ -166,6 +174,36 @@ class Contracts(unittest.TestCase):
             'steps': steps,
             'dim': d,
             'seed': 7,
+        }
+
+    def test_equal_quality_different_outputs(self) -> None:
+        # Empirical quality equivalence compares a score on a fixed set, not the outputs.
+        # Two greedy decoders answer four problems; each is right on two, so their accuracies
+        # are equal (difference 0, within any margin), yet they give different answers on
+        # every problem. Equal task scores therefore imply none of the stronger contracts.
+        reference = ['a', 'b', 'c', 'd']
+        decoder_x = ['a', 'b', 'x', 'y']
+        decoder_y = ['z', 'w', 'c', 'd']
+
+        def accuracy(answers: list[str]) -> Q:
+            correct = sum(1 for got, want in zip(answers, reference, strict=True) if got == want)
+            return Q(correct, len(reference))
+
+        only_x = sum(
+            1 for x, y, r in zip(decoder_x, decoder_y, reference, strict=True) if x == r != y
+        )
+        only_y = sum(
+            1 for x, y, r in zip(decoder_x, decoder_y, reference, strict=True) if y == r != x
+        )
+        differing = sum(1 for x, y in zip(decoder_x, decoder_y, strict=True) if x != y)
+        self.assertEqual(accuracy(decoder_x), accuracy(decoder_y))
+        self.assertEqual(differing, len(reference))
+        self.assertEqual((only_x, only_y), (2, 2))
+        WITNESSES['equal_quality_different_outputs'] = {
+            'accuracy_x': str(accuracy(decoder_x)),
+            'accuracy_y': str(accuracy(decoder_y)),
+            'problems_with_different_answers': differing,
+            'discordant_pairs_x_only_y_only': [only_x, only_y],
         }
 
     def test_transition_norm_and_error_growth(self) -> None:

@@ -67,22 +67,33 @@ contaminated, and a front-end cap is under investigation by bench).
 
 ### 1.4 Derived ceilings per lever stack
 
-`ceilings.py` -> `ceilings.json`, `ceilings.csv`. Step floor at batch B:
-`max(W / BW, B F / P) + B s / BW` with W weight bytes, F = 2 FLOPs per weight, s per-request
-bytes, BW = 3.79 TB/s, P = 70% (BF16) or 60% (FP8) of datasheet peak (assumed). Tokens/s
-ceiling for B -> infinity:
+`ceilings.py` -> `ceilings.json`, `ceilings.csv`, with W the weight bytes, s the
+per-request bytes, F = 2 FLOPs per weight, BW = 3.79 TB/s (assumed, see 1.1) and P = 70%
+(BF16) or 60% (FP8) of datasheet peak (assumed). Two execution models:
 
-| stack | per-request MB/step | ceiling tok/s |
-|---|---|---|
-| plain, FP32 state | 114.0 | 23.7k |
-| FP16 (or BF16) state | 63.6 | 34.6k |
-| ReplaySSM, FP32 | 66.8 | 33.6k |
-| ReplaySSM + FP16 state | 40.0 | 44.0k |
-| ReplaySSM + int8 state | 26.7 | 52.1k |
-| ReplaySSM + FP16 + FP8 W8A8 + FP8 KV | 34.6 | 61.7k |
-| ReplaySSM + int8 + FP8 W8A8 + FP8 KV + FP8 head | 21.2 | 78.9k |
-| MTP (accept 3), stock verify, FP32 | - | 19.5k |
-| MTP (accept 3), ReplaySSM-spec, FP32 | - | 34.3k |
+- **layer-serial**, `max(W / BW, B F / P) + B s / BW`: the engine as it runs today, where
+  each layer's weight GEMM and its per-request state/KV kernels run one after the other.
+  This is a model of the current engine, not a hardware bound.
+- **overlapped**, `max((W + B s) / BW, B F / P)`: the overlapped roofline at the assumed P
+  and BW, for an engine that overlaps the memory-bound per-request kernels with the batch
+  GEMMs (batch splitting, NanoFlow-style). Its compute-bound rows inherit the assumed P;
+  at the datasheet peaks they would be higher. As B grows it approaches
+  `min(BW / s, P / F)` (`overlapped_limit_tokens_per_s` in `ceilings.json`; 33.3k tok/s for
+  plain FP32).
+
+Tokens/s ceilings at B = 2,048 (context 334):
+
+| stack | per-request MB/step | layer-serial | overlapped |
+|---|---|---|---|
+| plain, FP32 state | 114.0 | 23.7k | 32.1k |
+| 16-bit (FP16 or BF16) state | 63.6 | 34.6k | 55.9k |
+| ReplaySSM, FP32 | 66.8 | 33.6k | 53.5k |
+| ReplaySSM + 16-bit state | 40.0 | 44.0k | 82.3k (compute-bound) |
+| ReplaySSM + int8 state | 26.7 | 52.1k | 82.3k (compute-bound) |
+| ReplaySSM + 16-bit + FP8 W8A8 + FP8 KV | 34.6 | 61.7k | 102.6k |
+| ReplaySSM + int8 + FP8 W8A8 + FP8 KV + FP8 head | 21.2 | 78.9k | 141.2k |
+| MTP (accept 3), stock verify, FP32 (layer-serial) | - | 19.5k | - |
+| MTP (accept 3), ReplaySSM-spec, FP32 (layer-serial) | - | 34.3k | - |
 
 Batch-1 floors: plain BF16 2.22 ms (451 tok/s); MTP 3 steps at accept 3.4: 995 tok/s,
 1,337 with a 32k-row draft head, 2,123 with that and an FP8 target. None of these is ten
