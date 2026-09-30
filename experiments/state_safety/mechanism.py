@@ -11,7 +11,13 @@ of every row of a tapped request. For each tapped prompt:
 2. First difference. Walking positions in order, the first q where any module
    output hash differs between A and B, and at that q the first module in
    execution order. Before that point every output bit agrees, including all
-   cached state, so this module's kernel is where the runs part.
+   cached state that was hashed, so this module's kernel is where the runs part.
+   With a tap that also hashes the caches each forward reads (KV per position and
+   attention layer through the request's req_to_token row, GDN convolution and
+   SSM state per layer), the first forward start whose entering caches differ is
+   reported too; if it comes at or before the first differing module output, the
+   origin is the cache state (e.g. a repointed or rolled-back cache), not the
+   module.
 3. At the token divergence (output index d; the logits come from row P+d-1):
    whether the logits fed to argmax are bitwise equal, whether the head input
    (final norm output) is bitwise equal, and the exact (float64) logits of the
@@ -20,11 +26,16 @@ of every row of a tapped request. For each tapped prompt:
 
    tie_rule        logits bitwise equal, different token (tie handling differs)
    head_gemm       head input equal, logits differ (LM-head GEMM accumulation)
-   order_flip      head inputs differ and the exact logit order of the two
-                   tokens differs between the runs
-   rounding_flip   head inputs differ, the exact order is the same in both
-                   runs, and BF16 rounding of the head output creates the tie
-                   or reversal in one of them
+   order_flip      head inputs differ and the two tokens' FP32 accumulator
+                   values are ordered differently in the two runs (read from
+                   the BF16 values where they are not tied, else from float64)
+   rounding_flip   head inputs differ, the two tokens' FP32 accumulator values
+                   are ordered the same way in both runs, and BF16 rounding of
+                   the head output ties them in one run, where lowest-index
+                   tie-breaking picks against that order
+   accumulator_ambiguous  a run's BF16 logits for the two tokens are tied and
+                   the float64 gap is inside the FP32 accumulation bound, so
+                   that run's accumulator order cannot be determined
    upstream_order_unknown  head inputs differ but a run did not save the head
                    input of that row (first tap version, MTP verify rows)
 
@@ -77,6 +88,78 @@ def load_client(d: Path) -> dict[str, dict[str, Any]]:
         if r.get('tapped'):
             out[r['id']] = r
     return out
+
+
+def entering_caches(tap_dir: Path, seq: list[int]) -> dict[int, dict[str, Any]]:
+    """Cache state read by each committed forward, keyed by its first position.
+
+    Only forwards whose first row is on the committed path count (a verify cycle
+    starts at its root, which is always committed). Empty for tap versions that
+    did not hash caches.
+    """
+    out: dict[int, dict[str, Any]] = {}
+    for f in sorted(tap_dir.glob('*.npz')):
+        z = np.load(f)
+        if 'cache_positions' not in z:
+            continue
+        q0 = int(z['positions'][0])
+        if q0 >= len(seq) or int(z['input_ids'][0]) != seq[q0]:
+            continue
+        out[q0] = {
+            'mode': f.stem.split('_', 1)[1],
+            'cached': int(z['cache_positions']),
+            'attn_layers': [int(x) for x in z['cache_attn_layers']],
+            'gdn_layers': [int(x) for x in z['cache_gdn_layers']]
+            if 'cache_gdn_layers' in z
+            else [],
+            'k': z.get('cache_k'),
+            'v': z.get('cache_v'),
+            'conv': z.get('cache_conv'),
+            'ssm': z.get('cache_ssm'),
+        }
+    return out
+
+
+def first_cache_difference(
+    ca: dict[int, dict[str, Any]], cb: dict[int, dict[str, Any]], upto: int
+) -> dict[str, Any] | None:
+    """First forward start (shared by both runs) whose entering caches differ."""
+    for q0 in sorted(ca.keys() & cb.keys()):
+        if q0 > upto:
+            break
+        a, b = ca[q0], cb[q0]
+        found: list[dict[str, Any]] = []
+        for kind in ('k', 'v'):
+            if a[kind] is None or b[kind] is None:
+                continue
+            n = min(a[kind].shape[1], b[kind].shape[1])
+            for li, layer in enumerate(a['attn_layers']):
+                d = np.nonzero(a[kind][li, :n] != b[kind][li, :n])[0]
+                if len(d):
+                    found.append(
+                        {
+                            'cache': f'kv_{kind}',
+                            'layer': layer,
+                            'first_position': int(d[0]),
+                            'positions_differing': len(d),
+                        }
+                    )
+        for kind in ('conv', 'ssm'):
+            if a[kind] is None or b[kind] is None:
+                continue
+            for li, layer in enumerate(a['gdn_layers']):
+                if a[kind][li] != b[kind][li]:
+                    found.append({'cache': kind, 'layer': layer})
+        if found:
+            first = min(found, key=lambda x: (x['layer'], x['cache']))
+            return {
+                'entering_position': q0,
+                'mode_a': a['mode'],
+                'mode_b': b['mode'],
+                'first': first,
+                'caches_differing': len(found),
+            }
+    return None
 
 
 def committed_rows(tap_dir: Path, seq: list[int]) -> dict[int, dict[str, Any]]:
@@ -233,6 +316,22 @@ def analyse_prompt(
     upto = P + (d if d is not None else n) - 1
     out: dict[str, Any] = {'id': pid, 'prompt_len': P, 'diverged_at': d}
     out['first_difference'] = first_hash_difference(ra, rb, names[0], names[1], upto)
+    cache_a = entering_caches(dir_a / 'tap' / f'tap-{pid}', prompt + oa)
+    cache_b = entering_caches(dir_b / 'tap' / f'tap-{pid}', prompt + ob)
+    if cache_a and cache_b:
+        fc = first_cache_difference(cache_a, cache_b, upto)
+        out['first_cache_difference'] = fc
+        fm = out['first_difference']
+        # A cache that already differs when a forward starts, at or before the first
+        # differing module output, is where the runs parted; otherwise the module is.
+        if fc is not None and (fm is None or fc['entering_position'] <= fm['position']):
+            out['origin'] = 'cache'
+        elif fm is not None:
+            out['origin'] = 'module'
+        else:
+            out['origin'] = 'none'
+    else:
+        out['origin'] = 'caches_not_hashed'
     if out['first_difference'] is not None:
         fd = out['first_difference']
         fd['output_index'] = fd['position'] - P + 1 if fd['position'] >= P else None
@@ -280,28 +379,44 @@ def analyse_prompt(
     out['exact_logits_a'] = ea
     out['exact_logits_b'] = eb
     out['head_input_max_abs_diff'] = float(np.max(np.abs(a['head_in'] - b['head_in'])))
-    # The class depends only on the exact (real-arithmetic) order of the two
-    # tokens under each run's head input. The kernel's FP32 accumulator can
-    # differ from exact by up to about 2*D*2**-24 * sum|w*h|; when an exact gap
-    # is smaller than that, the accumulator's own order is not implied by it,
-    # which is flagged rather than turned into a class.
-    bound = max(
-        accumulation_bound(head, a['head_in'], (ta, tb)),
-        accumulation_bound(head, b['head_in'], (ta, tb)),
-    )
+    # The class is decided by the order of the two tokens' FP32 accumulator values
+    # (before BF16 rounding) in each run. Rounding to nearest is monotone, so where a
+    # run's BF16 logits differ, their order is the accumulator's order. Where they
+    # are tied, the float64 dot product stands in for the accumulator, which it can
+    # differ from by up to about 2*D*2**-24 * sum|w*h|; a gap inside that bound
+    # leaves the accumulator's order undetermined.
+    bound_a = accumulation_bound(head, a['head_in'], (ta, tb))
+    bound_b = accumulation_bound(head, b['head_in'], (ta, tb))
     ga, gb = ea[0] - ea[1], eb[0] - eb[1]
     out['exact_gap_a'], out['exact_gap_b'] = ga, gb
-    out['accumulation_bound'] = bound
-    out['exact_gap_within_accumulation_bound'] = bool(min(abs(ga), abs(gb)) <= bound)
-    if la[0] is not None and la[1] is not None and lb[0] is not None and lb[1] is not None:
-        out['bf16_gap_a'], out['bf16_gap_b'] = la[0] - la[1], lb[0] - lb[1]
-    if np.sign(ga) != np.sign(gb):
+    out['accumulation_bound_a'], out['accumulation_bound_b'] = bound_a, bound_b
+    out['bf16_gap_a'] = None if None in la else la[0] - la[1]
+    out['bf16_gap_b'] = None if None in lb else lb[0] - lb[1]
+
+    def acc_order(bf16_gap, exact_gap, bound):
+        if bf16_gap is not None and bf16_gap != 0:
+            return int(np.sign(bf16_gap)), 'bf16'
+        if abs(exact_gap) > bound:
+            return int(np.sign(exact_gap)), 'float64'
+        return None, 'ambiguous'
+
+    oa, src_a = acc_order(out['bf16_gap_a'], ga, bound_a)
+    ob, src_b = acc_order(out['bf16_gap_b'], gb, bound_b)
+    out['accumulator_order_source'] = [src_a, src_b]
+    # Consistency check of the float64 stand-in where the BF16 order is known.
+    out['float64_contradicts_bf16'] = any(
+        bg is not None and bg != 0 and abs(eg) > bd and np.sign(bg) != np.sign(eg)
+        for bg, eg, bd in ((out['bf16_gap_a'], ga, bound_a), (out['bf16_gap_b'], gb, bound_b))
+    )
+    if oa is None or ob is None:
+        out['cls'] = 'accumulator_ambiguous'
+    elif oa != ob:
         out['cls'] = 'order_flip'
     else:
         out['cls'] = 'rounding_flip'
-        # The run whose choice contradicts its own exact order did so through
-        # BF16 rounding of the head output (and lowest-index tie-breaking).
-        out['run_against_exact_order'] = 'a' if ga < 0 else 'b'
+        # The run whose choice contradicts its accumulator order did so through BF16
+        # rounding of the head output into a tie and lowest-index tie-breaking.
+        out['run_against_accumulator_order'] = 'a' if oa < 0 else 'b'
     return out
 
 
@@ -349,6 +464,14 @@ def main() -> None:
         'first_difference_output_index': dict(
             Counter(
                 'prompt' if f['output_index'] is None else str(f['output_index']) for f in fd
+            ).most_common(10)
+        ),
+        'origin': dict(Counter(c.get('origin') for c in cases)),
+        'first_cache_difference': dict(
+            Counter(
+                f'{c["first_cache_difference"]["first"]["cache"]} layer {c["first_cache_difference"]["first"]["layer"]}'
+                for c in cases
+                if c.get('first_cache_difference')
             ).most_common(10)
         ),
         'no_hash_difference_before_divergence': sum(

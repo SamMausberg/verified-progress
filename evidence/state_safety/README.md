@@ -48,11 +48,21 @@ logits fed to argmax.
 `experiments/state_safety/mechanism.py` replays two configurations on the same
 prompts and aligns the committed rows by sequence position (for MTP, only verify rows
 on the accepted path). Walking positions in order, it reports the first position and,
-in execution order, the first module whose output bits differ. Before that point every
-tensor, and therefore every cached KV and GDN state, is bitwise equal, so the module
-it names is the kernel where the two runs part. At the token divergence it then
-recomputes, in float64, the exact logits of the two competing tokens from each run's
-saved head input and the BF16 head weights.
+in execution order, the first module whose output bits differ: the **first differing
+module output**. Before it, every hashed module output is bitwise equal. That is not
+yet proof that the module's kernel is where the runs part: the caches (attention KV,
+GDN convolution window and SSM state) are not module outputs, and a difference written
+into a cache without a differing output (a rolled-back verify state, a radix repoint,
+a batch-dependent cache write) would first show up in the module that reads it. The
+current tap therefore also hashes, before every tapped forward, the caches that
+forward reads (KV per cached position and attention layer, through the request's
+`req_to_token` row; GDN convolution and SSM state per layer), and `mechanism.py`
+reports the first forward whose entering caches differ. The results below were
+collected before cache hashing was added, so they name first differing module
+outputs; the cache-level check is **pending** (a queued run repeats them with the cache
+hashes). At the token divergence the analysis also recomputes, in float64, the exact
+logits of the two competing tokens from each run's saved head input and the BF16 head
+weights.
 
 Checks on the tool itself:
 
@@ -81,17 +91,25 @@ For the token position where the runs first choose differently, with competing t
 
 - **tie rule**: the logits fed to argmax are bitwise equal, yet the tokens differ.
 - **head GEMM**: the head input is bitwise equal but the logits differ.
-- **rounding flip**: the head inputs differ; the exact (float64) logits of *a* and
-  *b* are ordered the same way under both runs' head inputs, and in one run the BF16
-  rounding of the head output makes the two logits exactly equal (or reverses them),
-  so lowest-index tie-breaking chooses the token with the lower exact logit.
-- **order flip**: the head inputs differ and the exact order of *a* and *b* is
-  different in the two runs.
+The remaining classes compare, in each run, the order of the two tokens' FP32
+accumulator values in the head GEMM, before BF16 rounding. Rounding to nearest is
+monotone, so where a run's BF16 logits for *a* and *b* differ, their order is the
+accumulator's order. Where they are tied, the float64 dot product of that run's head
+input with the two head rows stands in for the accumulator; it can differ from the
+accumulator by at most about 2D * 2^-24 times the sum of absolute products (the
+conservative model: every rounding in any order), and within that bound the
+accumulator's order is left undetermined. Where both the BF16 order and a float64 gap
+outside the bound are available, they never disagree (`float64_contradicts_bf16` is
+false in every case).
 
-The float64 recomputation stands in for cuBLAS's FP32 accumulator. With the
-conservative model (every one of 2D roundings at 2^-24 relative to the sum of
-absolute products) the smaller exact gap is inside the accumulation bound in 18 of the
-plain-vs-MTP rounding flips; the per-case flag is `exact_gap_within_accumulation_bound`.
+- **rounding flip**: the head inputs differ; the accumulator orders *a* and *b* the
+  same way in both runs, and in one run BF16 rounding of the head output makes them
+  exactly equal, so lowest-index tie-breaking chooses against that order.
+- **order flip**: the head inputs differ and the accumulator orders *a* and *b*
+  differently in the two runs.
+- **accumulator ambiguous**: in a run whose BF16 logits for *a* and *b* are tied, the
+  float64 gap is inside the accumulation bound, so that run's accumulator order, and
+  with it the class, cannot be determined from the data.
 
 ### Results
 
@@ -108,7 +126,8 @@ comparison below, generated up to two tokens past their known divergence).
   (`fla/fused_sigmoid_gating_recurrent.py`): separate Triton kernels that fuse the
   gating and the state update differently.
 - 129 of the 167 diverged within the generated length. Tie rule: 0. Head GEMM: 0; the
-  head input differs in every case. Rounding flip: 102. Order flip: 27.
+  head input differs in every case. Rounding flip: 85. Order flip: 13. Accumulator
+  ambiguous: 31.
 
 **Plain decode at batch 1 vs 32 requests in flight** (`mechanism_plain_c1_vs_c32.json`;
 40 tapped prompts: the 16 whose divergence in the matrix run was not an exact tie,
@@ -124,14 +143,16 @@ reproduction, whose batches differ from the matrix run's).
   FP32 sum order of a row; the same function returns a constant in batch-invariant
   mode. FlashInfer's decode plan and cuBLAS's GEMM choice likewise depend on the
   batch.
-- At the divergence: tie rule 0, head GEMM 0, rounding flip 19, order flip 21.
+- At the divergence: tie rule 0, head GEMM 0, rounding flip 13, order flip 17,
+  accumulator ambiguous 10.
 
-In words: the configurations compute slightly different hidden states from the first
-kernel that is not invariant to the batch or to the decode/verify path; the difference
-is carried forward through the recurrent state and the later layers; and it changes
-the chosen token only where the two leading logits are within about one BF16 step,
-either by reversing their exact order or by letting BF16 rounding merge them into a
-tie that the index rule resolves the other way.
+In words, subject to the pending cache-level check: the configurations first produce
+different module outputs at a kernel that is not invariant to the batch or to the
+decode/verify path; the difference is carried forward through the recurrent state and
+the later layers; and it changes the chosen token only where the two leading logits
+are within about one BF16 step, either by reversing their order before rounding or by
+letting BF16 rounding merge them into a tie that the index rule resolves the other
+way.
 
 ## Noise floor
 

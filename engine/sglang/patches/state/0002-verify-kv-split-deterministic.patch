@@ -1,4 +1,4 @@
-From 3e35d1814f2fc70433ae1d2bdcca1072c992016e Mon Sep 17 00:00:00 2001
+From 5f18d65fbd7ce971acb3dd143a0e7c8ea181d367 Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <sam@findtensor.com>
 Date: Wed, 30 Sep 2026 19:28:54 +0000
 Subject: [PATCH 2/2] Pin the FlashInfer target-verify KV split under
