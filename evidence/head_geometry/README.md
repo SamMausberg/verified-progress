@@ -28,12 +28,17 @@ BF16 output (R-stock).
 | `selfevidence_plain4b_ccdf.csv` | Share of positions needing at least k candidate rows (plot data) | `python export_candidate_ccdf.py --tag plain4b --out ../../evidence/head_geometry/selfevidence_plain4b_ccdf.csv` | `18fdf95` |
 | `stats_plain4b.json` | Plain decode: norms, margins, top-m softmax mass, hidden-dimension energy, head statistics, envelope width versus realized error per quantizer, centring diagnostics | `python analyze_stats.py --arm plain4b --device cpu --out ../../evidence/head_geometry/stats_plain4b.json` | `239c482` |
 | `rstock_plain4b.json` | R-stock on the same 6,005 positions: share needing the stock kernel under the `stock_gap` rule and a bucket-exact rule, for four gammas; certified tokens against the engine's | `python analyze_rstock.py --device cpu --out ../../evidence/head_geometry/rstock_plain4b.json` | `0d10d3a` |
+| `alignment_dflash4b.json` | DFlash-4B capture: FP64 argmax of the captured draft and target head inputs against the engine's tokens, per block position; accept-length consistency | `python validate_alignment.py --arm dflash4b --device cpu --out ../../evidence/head_geometry/alignment_dflash4b.json` | `18fdf95` |
+| `rho_dflash4b.json`, `rho_dflash4b_pairs.csv`, `rho_dflash4b_quantiles.csv` | DFlash-4B drift ratio rho and the per-row threshold; head-metric drift; realized per-tile errors; certification rates; plot data (pairs CSV is a seeded 20,000-row subsample) | `python analyze_rho.py --arm dflash4b --device cpu --max-rows 40000 --out ../../evidence/head_geometry/rho_dflash4b.json` | `63c70f6` |
+| `stats_dflash4b.json` | DFlash-4B: norms of draft and target head inputs, margins, top-m mass, drift norms and cosine by outcome and position | `python analyze_stats.py --arm dflash4b --device cpu --max-rows 20000 --out ../../evidence/head_geometry/stats_dflash4b.json` | `239c482` |
 | `tail_killtest.json` | P1 kill test: INT8 surrogate of the final FFN (and head) versus certified head only | `python tail_killtest.py --threads 16 --out ../../evidence/head_geometry/tail_killtest.json` | `ea4f208` |
 
 The plain-decode capture ran with the capture patch before SGLang's own formatting hooks
 reordered two imports in it; the committed patch is that code after formatting.
 
-## Alignment (plain decode)
+## Alignment
+
+### Plain decode
 
 The captured head inputs reproduce the engine's decisions. Over 105,269 plain-decode
 positions the FP64 argmax equals the engine's token at 99.51%. All 519 disagreements lie
@@ -44,6 +49,63 @@ positions are consistent with cuBLAS's FP32 accumulation landing on the other si
 BF16 rounding boundary (not verified at the capture shape). The engine's own top two
 logits were equal in BF16 at 1.0% of positions, where the stock decision is set by the tie
 rule. So R-real and the stock decision (R-stock) differ on about 0.5% of greedy positions.
+
+### DFlash-4B
+
+The DFlash-4B capture (z-lab/Qwen3.5-4B-DFlash @9a1996cc, block size 16, 5 concurrent
+requests, 320 prompts) has 24,020 verify blocks and 360,300 draft slots. The FP64 argmax
+of the captured draft head input equals the engine's draft token at 98.2% of slots and
+the target's at 98.9%; every disagreement lies within one BF16 spacing, BF16-rounding the
+exact logits reproduces the engine at 99.996% (draft) and 99.998% (target), and the engine's
+accept lengths match the derived labels on all 24,020 blocks. Draft agreement falls from
+99.4% at block position 1 to 97.0% at position 15, as later draft distributions get
+flatter (more near-ties). Only 39% of prompts produce output identical to plain decoding
+(median first divergence at token 181): greedy speculation and plain decoding compute the
+target at different batch shapes, and near-ties then diverge; this is not a pairing error,
+since the per-slot checks above use the engine's own decisions.
+
+## H2: transport on real pairs
+
+### The drift ratio
+
+Definition as in `evidence/precision/head_constants.json`: rho = ||h_t - h_d||_2 / ||h_t||_2
+over the exact head inputs behind the same verified draft token; transport's l2 envelope
+(64-row contiguous tiles, mean centre) is narrower than int8 per-row self-evidence for row
+i iff rho < ||e_i||_2 / r_c(i), whose median over the vocabulary is 0.0085.
+
+DFlash-4B, 40,000 pairs (`rho_dflash4b.json`):
+
+| Group | p10 | median | p90 | worst |
+|---|---|---|---|---|
+| all (best 0.824) | 0.874 | 0.917 | 0.966 | 1.042 |
+| accepted | 0.864 | 0.910 | 0.959 | 1.021 |
+| rejected | 0.856 | 0.891 | 0.953 | 1.034 |
+| block position 1 | 0.852 | 0.882 | 0.941 | 1.016 |
+| block position 15 | 0.887 | 0.924 | 0.965 | 1.016 |
+
+Medians by domain are 0.914-0.925 and by context length 0.915-0.933. Transport's envelope
+is narrower than int8 per-row (and than int8 g128, int4 per-row, int4 g128) on 0.08% of
+rows in every pair; those rows are three tiles of identical unused-token rows (r_c = 0).
+
+Two properties of the drafter explain the size of rho (`stats_dflash4b.json`). Its head
+input always has norm 50.6 (= sqrt(2560): the draft's final RMSNorm has unit gain) while
+the target's is about 159, so rho >= 0.68 by the triangle inequality alone; and the angle is
+large too (median cos(h_d, h_t) 0.41), so even the best scalar rescaling of h_d would leave
+rho near 0.91. The drafter is trained to put the right token on top of W h_d, and its
+softer logits (median top-1 mass 0.17 against 0.69 for the target at the same positions)
+show that it does not reproduce the target's head input.
+
+Drift that does not charge directions the head ignores is just as large: after removing
+each position's mean logit, ||W Delta|| / ||W h_t|| has median 0.85; restricted to W's
+leading 64 right singular directions the ratio is 0.89, and those directions carry 24% of
+Delta's norm (an isotropic vector would put 16% there). Realized, not certified, per-tile
+errors tell the same story: max_i |<w_i - mu_c, Delta>| is 77 times max_i |<e_i, h_t>|
+(median over tiles), and the realized transport error is the smaller one on 0.9% of rows.
+
+Certification (greedy, threshold = exact target score of the draft token): certified l2
+transport and the static l2 screen each skip 0.08% of rows; transport with oracle
+(realized) radii would skip 99.9% (p10 65%); int8 per-row self-evidence skips all but one
+or two rows.
 
 ## H3: self-evidence on plain decode
 
