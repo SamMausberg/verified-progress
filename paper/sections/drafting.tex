@@ -53,17 +53,17 @@ The per-position rates of Figure~\ref{fig:drafter-acceptance} show why a longer 
 \nextgroupplot[ymin=0.6,ymax=1,ylabel={Conditional acceptance $\alpha_k$},title={\small (a) $\alpha_k=S(k)/S(k-1)$},
   legend to name=acclegend,legend columns=5,legend style={/tikz/every even column/.append style={column sep=6pt}}]
 \addplot[thick,ink,mark=*,mark size=1.3pt,discard if not={domain}{all},discard if not={block_size}{16}] table[x=position,y=accept_prob,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};\addlegendentry{all}
-\addplot[semithick,ochre,dashed,mark=square,mark size=1.4pt,discard if not={domain}{chat},discard if not={block_size}{16}] table[x=position,y=accept_prob,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};\addlegendentry{chat}
+\addplot[semithick,ochre,dashed,mark=square,mark options={solid},mark size=1.4pt,discard if not={domain}{chat},discard if not={block_size}{16}] table[x=position,y=accept_prob,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};\addlegendentry{chat}
 \addplot[semithick,teal,mark=triangle,mark size=1.6pt,discard if not={domain}{code},discard if not={block_size}{16}] table[x=position,y=accept_prob,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};\addlegendentry{code}
-\addplot[semithick,brick,dashdotted,mark=diamond,mark size=1.6pt,discard if not={domain}{math},discard if not={block_size}{16}] table[x=position,y=accept_prob,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};\addlegendentry{GSM8K}
-\addplot[semithick,muted,densely dotted,mark=o,mark size=1.3pt,discard if not={domain}{math500},discard if not={block_size}{16}] table[x=position,y=accept_prob,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};\addlegendentry{MATH-500}
+\addplot[semithick,brick,dashdotted,mark=diamond,mark options={solid},mark size=1.6pt,discard if not={domain}{math},discard if not={block_size}{16}] table[x=position,y=accept_prob,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};\addlegendentry{GSM8K}
+\addplot[semithick,muted,densely dotted,mark=o,mark options={solid},mark size=1.3pt,discard if not={domain}{math500},discard if not={block_size}{16}] table[x=position,y=accept_prob,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};\addlegendentry{MATH-500}
 \nextgroupplot[ymode=log,ymin=0.02,ymax=1,ylabel={Share of cycles reaching $k$, $S(k)$},title={\small (b) Survival $S(k)$},
   ytick={0.02,0.05,0.1,0.2,0.5,1},yticklabels={0.02,0.05,0.1,0.2,0.5,1}]
 \addplot[thick,ink,mark=*,mark size=1.3pt,discard if not={domain}{all},discard if not={block_size}{16}] table[x=position,y=survival,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};
-\addplot[semithick,ochre,dashed,mark=square,mark size=1.4pt,discard if not={domain}{chat},discard if not={block_size}{16}] table[x=position,y=survival,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};
+\addplot[semithick,ochre,dashed,mark=square,mark options={solid},mark size=1.4pt,discard if not={domain}{chat},discard if not={block_size}{16}] table[x=position,y=survival,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};
 \addplot[semithick,teal,mark=triangle,mark size=1.6pt,discard if not={domain}{code},discard if not={block_size}{16}] table[x=position,y=survival,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};
-\addplot[semithick,brick,dashdotted,mark=diamond,mark size=1.6pt,discard if not={domain}{math},discard if not={block_size}{16}] table[x=position,y=survival,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};
-\addplot[semithick,muted,densely dotted,mark=o,mark size=1.3pt,discard if not={domain}{math500},discard if not={block_size}{16}] table[x=position,y=survival,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};
+\addplot[semithick,brick,dashdotted,mark=diamond,mark options={solid},mark size=1.6pt,discard if not={domain}{math},discard if not={block_size}{16}] table[x=position,y=survival,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};
+\addplot[semithick,muted,densely dotted,mark=o,mark options={solid},mark size=1.3pt,discard if not={domain}{math500},discard if not={block_size}{16}] table[x=position,y=survival,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};
 \end{groupplot}
 \node[anchor=north] at ($(group c1r1.south)!.5!(group c2r1.south)+(0,-1.0cm)$) {\pgfplotslegendfromname{acclegend}};
 \end{tikzpicture}}{Conditional acceptance and survival by block position, block size 16, per domain.}

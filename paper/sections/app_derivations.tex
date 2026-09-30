@@ -141,11 +141,11 @@ At zero drift the summaries describe the target exactly and the acceptance decis
   grid=major,grid style={draw=ink!10},legend style={at={(1.02,.5)},anchor=west,draw=none,font=\footnotesize,cells={align=left}},legend cell align=left]
 \addplot[thick,teal,mark=*,discard if not={family}{clustered},unbounded coords=discard] table[x=drift,y=accept_projected_fraction,col sep=comma]{../data/synthetic_drift.csv};
 \addlegendentry{Clustered: decision}
-\addplot[thick,teal,dashed,mark=o,discard if not={family}{clustered},unbounded coords=discard] table[x=drift,y=decision_plus_residual_projected_fraction,col sep=comma]{../data/synthetic_drift.csv};
+\addplot[thick,teal,dashed,mark=o,mark options={solid},discard if not={family}{clustered},unbounded coords=discard] table[x=drift,y=decision_plus_residual_projected_fraction,col sep=comma]{../data/synthetic_drift.csv};
 \addlegendentry{Clustered: decision\\+ dense residual}
 \addplot[thick,ochre,mark=square*,discard if not={family}{unstructured},unbounded coords=discard] table[x=drift,y=accept_projected_fraction,col sep=comma]{../data/synthetic_drift.csv};
 \addlegendentry{Unstructured: decision}
-\addplot[thick,ochre,dashed,mark=square,discard if not={family}{unstructured},unbounded coords=discard] table[x=drift,y=decision_plus_residual_projected_fraction,col sep=comma]{../data/synthetic_drift.csv};
+\addplot[thick,ochre,dashed,mark=square,mark options={solid},discard if not={family}{unstructured},unbounded coords=discard] table[x=drift,y=decision_plus_residual_projected_fraction,col sep=comma]{../data/synthetic_drift.csv};
 \addlegendentry{Unstructured: decision\\+ dense residual}
 \addplot[thin,muted,mark=triangle,discard if not={family}{clustered},unbounded coords=discard] table[x=drift,y=acceptance_fraction,col sep=comma]{../data/synthetic_drift.csv};
 \addlegendentry{Clustered: accepted}
