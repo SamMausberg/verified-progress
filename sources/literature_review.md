@@ -47,7 +47,8 @@ in `paper/references.bib`, and the keys are given in brackets.
 9. Floating-point error analysis for certified computation
 10. Implementations to compare against or reuse
 11. Novelty assessment for H2 and H3
-12. Coverage, and what could not be verified
+12. Moonshot directions: reformulations and approximations
+13. Coverage, and what could not be verified
 
 ## 1. The LM head as a cost, and how it has been reduced
 
@@ -797,7 +798,7 @@ The manuscript's Sec. 6.3 ("Progressive precision without changing the target")
 currently cites nothing and must cite these.
 
 **What we did not find, as of 30 September 2026, with the coverage limits in
-Section 12.**
+Section 13.**
 
 1. An exact **Gumbel-max sample** certified through a low-precision head under a
    fixed, per-token-keyed noise field. With that field the bounded race returns the
@@ -874,7 +875,160 @@ uniformly tighter than CSV-Decode's l_2/l_2. The baselines H2 must beat are CSV-
 static bound at h_t and H3's quantization envelope, measured on the same aligned
 hidden states.
 
-## 12. Coverage, and what could not be verified
+## 12. Moonshot directions: reformulations and approximations
+
+This section serves the moonshot track (`~/vp-coord/MOONSHOTS.md`), which accepts
+measured quality trade-offs in exchange for large speedups.
+
+**How the numbers were checked.**
+
+- Every paper's existence and metadata were checked on its arXiv abstract page.
+- Numbers marked **(checked)** I read in the source myself.
+- The remaining numbers were read from the paper text by two scout agents and not
+  re-read by me.
+- All speedups are the authors' own, on their hardware. None was measured on our
+  GH200.
+- "Lossless" means the target distribution or greedy output is preserved.
+
+### 12.1 Trained parallel and block drafters (lossless)
+
+| Work | Reported speedup (baseline, batch, hardware) | Quality | Code / engine |
+|---|---|---|---|
+| **DFlash** for Qwen3.5-4B, `z-lab/Qwen3.5-4B-DFlash` [`dflash4bcard`], paper [`dflashpaper`] | vs autoregressive, greedy, 1x B200, SGLang: 3.40-4.60x at concurrency 1 (block 16); 2.15-2.61x at concurrency 32 (block 8). MTP's best: 1.96-2.31x and 1.53-1.80x **(checked)** | lossless | Apache-2.0 checkpoint; `z-lab/dflash` (MIT); SGLang `srt/models/dflash.py` and `dflash_worker_v2.py` (chain verify with GDN commit); SpecForge ships `configs/qwen3.5-4b-dflash.json` |
+| **DFlash 2** [`dflash`] | Qwen3.5-4B mean accepted length at T = 1: MTP 4.54, DFlash 4.92, DSpark 5.49, DFlash 2 5.97 **(checked)**; no throughput reported for 4B | lossless | 4B drafter unreleased; SGLang `DFlash2DraftModel`; SpecForge `configs/qwen3.5-4b-dflash2.json` |
+| **DSpark** [`dspark`] | DeepSeek-V4 production: 60-85 % faster per user than MTP-1 at matched throughput **(checked)** | lossless | `deepseek-ai/DeepSpec` (MIT); SGLang DSpark worker needs an offline SPS table; no Qwen3.5-4B drafter |
+| **DDTree** [`ddtree`] | Qwen3-4B AIME24, T = 0: 5.56x -> 7.27x over autoregressive with a best-first tree from DFlash marginals (8x H200) | lossless | `liranringel/ddtree` (MIT); not in SGLang |
+| **JetSpec** [`jetspec`] | up to 9.64x on MATH-500 (Qwen3-8B, H100); in vLLM, 4.33x at batch 1 and 3.81x at batch 16 | lossless | `hao-ai-lab/JetSpec` (MIT) |
+| **DFlare** [`dflare`] | 5.52x average on Qwen3-4B (+11 % over DFlash); about 100 h on 32 GPUs of training | lossless | Tencent AngelSlim |
+| TAPS [`taps`]; DFlow [`dflow`]; D2SD [`d2sd`]; LiLiCorr [`lilicorr`]; Domino [`domino`] | TAPS up to 7.9x (batch 1, A800/A40); DFlow +13.2 % accepted length over DFlash on Qwen3-4B; LiLiCorr +7-19 % accepted length | lossless | prototypes; LiLiCorr is in SGLang (`models/lilicorr.py`) |
+| Hydra [`hydra`]; Speculative Streaming [`specstreaming`]; Lookahead decoding [`lookahead`]; CLLMs [`cllm`] | Hydra up to 2.70x (A100, Vicuna); Speculative Streaming 1.8-3.1x (A100, batch 1); Lookahead 1.8x (A100, batch 1); CLLMs 2.4-3.4x | lossless except Speculative Streaming and CLLMs, which fine-tune the target (CLLM LLaMA2-7B GSM8K 59.1 -> 56.4) | Hydra and Lookahead Apache-2.0 |
+
+**GDN constraint.** Trees multiply recurrent-state snapshots. SGLang at `bd66ce3` has a
+top-k > 1 tree path for GDN on Triton, which stores a full state per node, while
+DFlash verification is chain-only. Tree drafters (DDTree, TAPS, JetSpec) therefore
+need Bole- or TreeWY-style state factorization before they are practical at more
+than a few requests (Section 8).
+
+### 12.2 Relaxed or lossy acceptance
+
+| Work | Mechanism | Reported speedup | Quality cost | Code |
+|---|---|---|---|---|
+| SGLang thresholds | `speculative_accept_threshold_single` / `_acc` (`srt/arg_groups/fields/spec.py`); the kernel accepts if `coin < prob_acc/threshold_acc` or `p_target >= threshold_single` | none published | none published; applies only at T > 0 on EAGLE and DFLASH paths; DSpark hard-codes 1.0; greedy has no lossy path | in tree |
+| Medusa typical acceptance [`medusa`] | accept if p_target(x) > min(eps, delta exp(-H)) | Medusa-2 2.83x (Vicuna-7B, A100, batch 1) | MT-Bench 6.17 -> 6.18; quality falls monotonically as eps grows | Apache-2.0 |
+| Judge Decoding [`judgedecoding`] | a linear head on target embeddings accepts "correct but mismatched" tokens | 8B/405B: 9.7x (HF), 3.9x (gpt-fast, 8x H100) | "maintained" on GSM8K and HumanEval (per-benchmark deltas not extracted) | none checked |
+| AutoJudge [`autojudge`] | judge trained without annotation | about 2x over plain speculative decoding at <= 1 % GSM8K drop (Llama-3.1-70B) | as stated | NeurIPS 2025 per arXiv |
+| FLy [`fly`] | entropy gate plus deferred window, training-free | 2.81x (70B), 5.07x (405B) | > 99 % accuracy retained | ICLR 2026 per arXiv |
+| Margins, Not Windows [`marginsnotwindows`] | accept a mismatch when p(draft)/p(top-1) > kappa | +16-45 % over EAGLE-3 (A100, batch 1, greedy, kappa = 0.2); gain near zero by batch 16 | 94-96 % task accuracy retained | implemented in SGLang, no code link found |
+| Fuzzy SD [`fuzzysd`]; Approximate SD [`asd`]; speculative cascades [`speccascades`] | divergence threshold; mismatch budget with a logit-regret gate; cascade deferral | Fuzzy: about 2 % accuracy loss for over 5 tok/s more; ASD: +7.78 % average throughput (Qwen3-14B, DSpark drafter) | as stated | ASD Apache-2.0 |
+
+For Qwen3.5-4B no quality curve exists; one would have to be measured. DFlash's
+per-position acceptance on Qwen3.5-4B is about 0.78-0.88 (DFlash 2 blog, Fig. 5,
+per the scout). A lossy rule mainly raises it at concurrency 1-8, where speculation
+is bandwidth-bound.
+
+### 12.3 Datastore and retrieval drafting (lossless; gains depend on the workload)
+
+- **SGLang `NGRAM`**, which descends from Ant Group's trie-based Lookahead
+  [`antlookahead`] (2.66-6.26x in Alipay production). It supports GDN and tree
+  verification on the hybrid backend. Its PR benchmarks show 2.61x at concurrency 1
+  falling to 1.81x at concurrency 4 for one internal model.
+- **SuffixDecoding** [`suffixdecoding`] (NeurIPS 2025): 5.3x on AgenticSQL and 2.5x on
+  SWE-Bench (Llama-3.1-8B, H100, batch 1). On chat it loses to EAGLE unless combined
+  with it. Code `snowflakedb/ArcticInference` (Apache-2.0); vLLM `suffix`.
+- **REST** [`rest`] (NAACL 2024): 2.12-2.36x HumanEval, 1.62-1.77x MT-Bench (A6000,
+  batch 1).
+- **LLMA** [`llma`]: over 2x when output copies a reference.
+- **Prompt lookup decoding** (A. Saxena, `apoorvumang/prompt-lookup-decoding`, no
+  licence file): 2-4x on input-grounded tasks.
+
+These help agentic, code and summarization traffic, and little on open chat.
+
+### 12.4 Quantized targets and quantized self-speculation
+
+- **Nota, "Quantize the Target, Quantize the Drafter: Efficient Inference with
+  Qwen3.5-4B"** (Jaeyeon Kim, Jewon Lee, Bo-Kyeong Kim; arXiv 2607.04244v2; ICML 2026
+  AdaptFM workshop competition) [`nota2026`]. An INT4 AWQ target recovered by
+  quantization-aware distillation, plus a DFlash drafter trained for it and then
+  GPTQ-INT4 with sliding-window attention **(checked)**:
+  - RTX 5000 Ada, cumulative over BF16: INT4 target 2.16x; + BF16 drafter 3.32x;
+    + INT4 drafter 3.55x; + SWA 3.57x.
+  - A10G, against the competition's unoptimized BF16 baseline: 6.978x.
+  - Quality: MMLU-Pro 0.690 -> 0.659, IFEval 0.857 -> 0.845, GPQA-D 0.700 -> 0.667.
+  - Checkpoints `nota-ai/Qwen3.5-4B-QAD-W4A16` and `nota-ai/Qwen3.5-4B-DFlash-GPTQ-W4A16`
+    (Apache-2.0) are in the local HF cache; code `nota-github/adaptfm-quant-dflash`.
+  - This is the one measured Qwen3.5-4B quality/speed point for a lossy target.
+- **QSpec** [`qspec`]: W4A4 draft, W4A16 verify on shared weights; up to 1.64x (L20),
+  1.24x average in vLLM (A100, batch 1-32). Lossless only relative to W4A16.
+- **QuantSpec** [`quantspec`]: 4-bit weights and a hierarchical 4-bit KV cache in the
+  draft; about 2.5x at 4k-128k context. It targets long-context KV, which matters
+  less here because only 8 of 32 layers keep KV.
+- Draft-side quantization is lossless end to end. Target quantization is a declared
+  quality trade-off (M5).
+
+### 12.5 Recurrent-state quantization and compression
+
+| Work | Mechanism | Reported speedup (hardware) | Quality | Code / engine |
+|---|---|---|---|---|
+| **DAMP** [`damp`] | decay-aware mixed precision: risky channels high precision, rest INT8 (9.9 bits average) | 69.1 % less state storage; GDN update 1.46-1.65x (batch 32-256); TPOT up to -10.9 % | Qwen3.6-35B-A3B AIME 2026: FP32 85.46, **FP16 84.58**, **BF16 79.71**, FP8 29.27, INT8 18.48, DAMP 83.65 **(checked)** | implemented in SGLang, no code link found |
+| **LeapQuant** [`leapquant`] | quantize the state once per 16-token window, with an INT8 residual, compensator tokens and smoothing; 1.19 B/element (3.4x smaller) **(checked)** | kernel 2.05-3.70x, end to end 1.47x on B200, RTX PRO 6000 and RTX 5090 **(checked)**; not Hopper | Qwen3.5-9B AIME: FP32 87.9, BF16 72.1, LeapQuant 8-bit near FP32 **(checked)** | TileLang in vLLM; no code link found |
+| **STEPQuant** [`stepquant`] | lifetime- and error-aware precision, about 6-bit budget | 5.03x state compression; decode +20.5 % at batch 512 (Qwen3.8-27B, TP4, A800, SGLang 0.5.12) | close to FP32 | `Dreamer-Toby/STEPQuant` (no licence) |
+| **SketchSSM** [`sketchssm`] | full-state writes; reads from a low-rank sketch precomputed per window | about 10x less state traffic; decode up to 2.64x (B300, vLLM) | 90.94 -> 90.72 average at 9.5x less traffic | none found |
+| **ReplaySSM** [`replayssm`] | cache inputs; write state only on flush | standard decode up to 1.48x; speculative 1.87-1.96x over standard decode; 3.0-3.3x more concurrency (vLLM) **(checked)** | equal up to FP error | SGLang flags `--enable-linear-replayssm[-spec]` at `bd66ce3` |
+| Quamba2 [`quamba2`]; Quamba [`quamba`]; MambaQuant [`mambaquant`] | W4A8/W8A8 for Mamba; Quamba2 also stores the cached SSM state in 8 bits | Quamba2 Mamba2-8B TPOT 22.73 -> 7.43 ms (A5000, batch 1) | about 1.6 % average drop | Quamba code under a non-commercial research licence |
+
+**Findings.**
+
+- SGLang at `bd66ce3` accepts only `float32`, `bfloat16` or `float16` for
+  `--mamba-ssm-dtype` (`srt/arg_groups/fields/exec_.py`) **(checked)**, and Qwen3.5
+  defaults to FP32.
+- DAMP and LeapQuant both show BF16 state costing several AIME points, while FP16 and
+  windowed 8-bit are near FP32. **A float16 state is the cheapest moonshot
+  experiment:** half the state bytes and half the per-request memory. Whether
+  SGLang's sm_90 GDN kernels accept an FP16 state was not checked.
+- No paper offloads the live recurrent state to Grace memory. GH200 offload work
+  (BOOST, SuperInfer, DAK, per the scout) moves weights or KV instead.
+
+### 12.6 2:4 sparsity with FP8 on Hopper
+
+- **SparseGPT** (Frantar and Alistarh, ICML 2023, PMLR 202:10323-10337) [`sparsegpt`]
+  and **Wanda** (Sun, Liu, Bair, Kolter, ICLR 2024) [`wanda`]: one-shot 2:4 pruning
+  raises LLaMA-7B WikiText perplexity from 5.68 to 11.00 and 11.53 respectively.
+- **MaskLLM** (NeurIPS 2024) [`maskllm`]: learned 2:4 masks reach 6.72 perplexity
+  (dense 5.12) at about 1,280 A100-hours.
+- Red Hat's Sparse-Llama-3.1-8B-2of4 (FP8, H100, vLLM, Dec 2024 blog; per the scout)
+  reports 1.7x single-stream latency over dense BF16. Only up to about 30 % of that
+  comes from sparsity, and it needed 13B tokens of distillation.
+- **SlideSparse** [`slidesparse`]: cuSPARSELt is often slower than dense at M < 256, and
+  1-3B models gain 1.05-1.18x in decode. **SpenseGPT** [`spensegpt`]: 1.2x end to end
+  on B200 with FP8.
+- **Engine support.** SGLang at `bd66ce3` raises
+  `ImportError("CompressedTensors24 is not supported now")` **(checked)**. vLLM
+  removed its 2:4 integration in PR #36799, merged 23 Mar 2026 **(checked)**.
+- **Verdict.** A dead end for a 4B model at decode batch sizes on this stack.
+
+### 12.7 The three most promising items for Qwen3.5-4B on one GH200
+
+These are also posted in `~/vp-coord/notes/lit.md`. They are judgement, not measurement.
+
+1. **DFlash now, DFlash 2 or DSpark next.** The 4B drafter is public, lossless and
+   supported in SGLang with GDN commit. The card reports about twice MTP's speedup at
+   both concurrency 1 and 32 on B200. The risks are hardware and backend: no FA3/FA4
+   on aarch64, and the flashinfer backend's per-block sync. SpecForge configs exist
+   for training a DFlash 2 drafter.
+2. **Recurrent-state traffic for the high-concurrency end.** ReplaySSM flags already
+   exist in SGLang. Follow with an FP16 state test and then a windowed 8-bit state
+   (LeapQuant/DAMP-style kernel on sm_90). These lift throughput and the 133-request
+   cap together.
+3. **Measured lossy arms on top of 1.**
+   - A greedy margin or typical-acceptance rule in the DFlash chain verifier. It
+     needs a small kernel change and our own quality curve.
+   - The Nota INT4 target plus matched drafter, whose checkpoints are local and
+     whose quality cost is measured.
+
+The combination is plausibly several-fold at concurrency 1 (the scout estimates
+8-10x for all three; that is an estimate, not a measurement) and much less at 32+.
+
+## 13. Coverage, and what could not be verified
 
 **Coverage.**
 
@@ -915,3 +1069,13 @@ hidden states.
   not examined.
 - The PR 36136 sampling-law concern (Section 5.2) comes from reading the code. It has
   not been tested.
+- Moonshot section (Section 12). Numbers not marked **(checked)** were read from the
+  paper text by scout agents and not re-read by me. Specifically:
+  - the Judge Decoding venue (a saved iclr.cc listing);
+  - the Red Hat 2:4 blog numbers and the SGLang NGRAM PR benchmarks;
+  - the SlideSparse and SpenseGPT figures;
+  - the DFlash per-position acceptance of 0.78-0.88;
+  - the scout's 8-10x combined estimate, which is an estimate, not a measurement.
+
+  No code release was found for LeapQuant, DAMP, SketchSSM, Bole, TreeWY or DFlow.
+  Whether SGLang's GDN kernels accept a float16 state on sm_90 was not checked.

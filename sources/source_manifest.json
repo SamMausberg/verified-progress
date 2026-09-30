@@ -1,6 +1,6 @@
 {
   "audit_date": "2026-09-30",
-  "source_count": 159,
+  "source_count": 194,
   "sources": [
     {
       "key": "sgcode",
@@ -1774,6 +1774,392 @@
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
       "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Repository, issue or pull request read through the GitHub API; numbers are self-reported by the authors and not reproduced."
+    },
+    {
+      "key": "jetspec",
+      "bibliography_text": "Lanxiang Hu, Zhaoxiang Feng, Yulun Wu et al. \\emph{JetSpec: Breaking the Scaling Ceiling of Speculative Decoding with Parallel Tree Drafting}. 2026; arXiv:2606.18394. \\url{https://arxiv.org/abs/2606.18394}.",
+      "urls": [
+        "https://arxiv.org/abs/2606.18394"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "dflare",
+      "bibliography_text": "Jiebin Zhang, Zhenghan Yu, Song Liu et al. \\emph{DFlare: Scaling Up Draft Capacity for Block Diffusion Speculative Decoding}. 2026; arXiv:2606.02091. \\url{https://arxiv.org/abs/2606.02091}.",
+      "urls": [
+        "https://arxiv.org/abs/2606.02091"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "taps",
+      "bibliography_text": "Zhuoyu Wang, Junnan Huang and Xinyu Chen. \\emph{TAPS: Target-Aware Prefix Tree Selection for Diffusion-Drafted Speculative Decoding}. 2026; arXiv:2606.00487. \\url{https://arxiv.org/abs/2606.00487}.",
+      "urls": [
+        "https://arxiv.org/abs/2606.00487"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "dflow",
+      "bibliography_text": "Yaojie Zhang, Linfeng Zhang, Bin Cui and Xupeng Miao. \\emph{DFlow: Enabling Verifier Information Flow in Block Diffusion Speculative Decoding}. 2026; arXiv:2609.06498. \\url{https://arxiv.org/abs/2609.06498}.",
+      "urls": [
+        "https://arxiv.org/abs/2609.06498"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "d2sd",
+      "bibliography_text": "Liyuan Zhang, Jiarui Zhang, Jinwei Yao et al. \\emph{D$^2$SD: Accelerating Speculative Decoding with Dual Diffusion Draft Models}. 2026; arXiv:2606.04446. \\url{https://arxiv.org/abs/2606.04446}.",
+      "urls": [
+        "https://arxiv.org/abs/2606.04446"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "hydra",
+      "bibliography_text": "Zachary Ankner, Rishab Parthasarathy, Aniruddha Nrusimha, Christopher Rinard, Jonathan Ragan-Kelley and William Brandon. \\emph{Hydra: Sequentially-Dependent Draft Heads for Medusa Decoding}. 2024; arXiv:2402.05109. \\url{https://arxiv.org/abs/2402.05109}.",
+      "urls": [
+        "https://arxiv.org/abs/2402.05109"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "specstreaming",
+      "bibliography_text": "Nikhil Bhendawade, Irina Belousova, Qichen Fu, Henry Mason, Mohammad Rastegari and Mahyar Najibi. \\emph{Speculative Streaming: Fast LLM Inference without Auxiliary Models}. 2024; arXiv:2402.11131. \\url{https://arxiv.org/abs/2402.11131}.",
+      "urls": [
+        "https://arxiv.org/abs/2402.11131"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "lookahead",
+      "bibliography_text": "Yichao Fu, Peter Bailis, Ion Stoica and Hao Zhang. \\emph{Break the Sequential Dependency of LLM Inference Using Lookahead Decoding}. Proceedings of the 41st International Conference on Machine Learning, pp. 14060--14079, 2024; arXiv:2402.02057. \\url{https://arxiv.org/abs/2402.02057}.",
+      "urls": [
+        "https://arxiv.org/abs/2402.02057"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "cllm",
+      "bibliography_text": "Siqi Kou, Lanxiang Hu, Zhezhi He, Zhijie Deng and Hao Zhang. \\emph{CLLMs: Consistency Large Language Models}. 2024; arXiv:2403.00835. \\url{https://arxiv.org/abs/2403.00835}.",
+      "urls": [
+        "https://arxiv.org/abs/2403.00835"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "judgedecoding",
+      "bibliography_text": "Gregor Bachmann, Sotiris Anagnostidis, Albert Pumarola et al. \\emph{Judge Decoding: Faster Speculative Sampling Requires Going Beyond Model Alignment}. 2025; arXiv:2501.19309. \\url{https://arxiv.org/abs/2501.19309}.",
+      "urls": [
+        "https://arxiv.org/abs/2501.19309"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "autojudge",
+      "bibliography_text": "Roman Garipov, Fedor Velikonivtsev, Ivan Ermakov, Ruslan Svirschevski, Vage Egiazarian and Max Ryabinin. \\emph{AutoJudge: Judge Decoding Without Manual Annotation}. 2025; arXiv:2504.20039. \\url{https://arxiv.org/abs/2504.20039}.",
+      "urls": [
+        "https://arxiv.org/abs/2504.20039"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "fly",
+      "bibliography_text": "Jinze Li, Yixing Xu, Guanchen Li et al. \\emph{Training-Free Loosely Speculative Decoding: Accepting Semantically Correct Drafts Beyond Exact Match}. 2025; arXiv:2511.22972. \\url{https://arxiv.org/abs/2511.22972}.",
+      "urls": [
+        "https://arxiv.org/abs/2511.22972"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "marginsnotwindows",
+      "bibliography_text": "Oszkár Urbán, Young D. Kwon, Stylianos I. Venieris and Cecilia Mascolo. \\emph{Margins, Not Windows: Training-Free Per-Step Lossy Speculative Decoding}. 2026; arXiv:2609.02897. \\url{https://arxiv.org/abs/2609.02897}.",
+      "urls": [
+        "https://arxiv.org/abs/2609.02897"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "fuzzysd",
+      "bibliography_text": "Maximilian Holsman, Yukun Huang and Bhuwan Dhingra. \\emph{Fuzzy Speculative Decoding for a Tunable Accuracy-Runtime Tradeoff}. 2025; arXiv:2502.20704. \\url{https://arxiv.org/abs/2502.20704}.",
+      "urls": [
+        "https://arxiv.org/abs/2502.20704"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "asd",
+      "bibliography_text": "Yuannuo Feng, Zegang Peng, Yuxin Xie et al. \\emph{Approximate Speculative Decoding}. 2026; arXiv:2608.03447. \\url{https://arxiv.org/abs/2608.03447}.",
+      "urls": [
+        "https://arxiv.org/abs/2608.03447"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "speccascades",
+      "bibliography_text": "Harikrishna Narasimhan, Wittawat Jitkrittum, Ankit Singh Rawat et al. \\emph{Faster Cascades via Speculative Decoding}. 2024; arXiv:2405.19261. \\url{https://arxiv.org/abs/2405.19261}.",
+      "urls": [
+        "https://arxiv.org/abs/2405.19261"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "antlookahead",
+      "bibliography_text": "Yao Zhao, Zhitian Xie, Chen Liang, Chenyi Zhuang and Jinjie Gu. \\emph{Lookahead: An Inference Acceleration Framework for Large Language Model with Lossless Generation Accuracy}. 2023; arXiv:2312.12728. \\url{https://arxiv.org/abs/2312.12728}.",
+      "urls": [
+        "https://arxiv.org/abs/2312.12728"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "suffixdecoding",
+      "bibliography_text": "Gabriele Oliaro, Zhihao Jia, Daniel Campos and Aurick Qiao. \\emph{SuffixDecoding: Extreme Speculative Decoding for Emerging AI Applications}. 2024; arXiv:2411.04975. \\url{https://arxiv.org/abs/2411.04975}.",
+      "urls": [
+        "https://arxiv.org/abs/2411.04975"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "rest",
+      "bibliography_text": "Zhenyu He, Zexuan Zhong, Tianle Cai, Jason D. Lee and Di He. \\emph{REST: Retrieval-Based Speculative Decoding}. 2023; arXiv:2311.08252. \\url{https://arxiv.org/abs/2311.08252}.",
+      "urls": [
+        "https://arxiv.org/abs/2311.08252"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "llma",
+      "bibliography_text": "Nan Yang, Tao Ge, Liang Wang et al. \\emph{Inference with Reference: Lossless Acceleration of Large Language Models}. 2023; arXiv:2304.04487. \\url{https://arxiv.org/abs/2304.04487}.",
+      "urls": [
+        "https://arxiv.org/abs/2304.04487"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "nota2026",
+      "bibliography_text": "Jaeyeon Kim, Jewon Lee and Bo-Kyeong Kim. \\emph{Quantize the Target, Quantize the Drafter: Efficient Inference with Qwen3.5-4B}. 2026; arXiv:2607.04244. \\url{https://arxiv.org/abs/2607.04244}.",
+      "urls": [
+        "https://arxiv.org/abs/2607.04244"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "qspec",
+      "bibliography_text": "Juntao Zhao, Wenhao Lu, Sheng Wang, Lingpeng Kong and Chuan Wu. \\emph{QSpec: Speculative Decoding with Complementary Quantization Schemes}. 2024; arXiv:2410.11305. \\url{https://arxiv.org/abs/2410.11305}.",
+      "urls": [
+        "https://arxiv.org/abs/2410.11305"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "quantspec",
+      "bibliography_text": "Rishabh Tiwari, Haocheng Xi, Aditya Tomar et al. \\emph{QuantSpec: Self-Speculative Decoding with Hierarchical Quantized KV Cache}. 2025; arXiv:2502.10424. \\url{https://arxiv.org/abs/2502.10424}.",
+      "urls": [
+        "https://arxiv.org/abs/2502.10424"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "damp",
+      "bibliography_text": "Tao Zhang, Jianchao Tan, Pingwei Sun et al. \\emph{DAMP: Decay-Aware Mixed-Precision Recurrent-State Quantization}. 2026; arXiv:2608.27513. \\url{https://arxiv.org/abs/2608.27513}.",
+      "urls": [
+        "https://arxiv.org/abs/2608.27513"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "leapquant",
+      "bibliography_text": "Yi Pan, Haocheng Xi, Kan Zhu et al. \\emph{LeapQuant: Efficient Linear Attention with Accurate Recurrent State Quantization}. 2026; arXiv:2609.38166. \\url{https://arxiv.org/abs/2609.38166}.",
+      "urls": [
+        "https://arxiv.org/abs/2609.38166"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "stepquant",
+      "bibliography_text": "Bingchen Yao, Haobo Xu, Haokun Lin et al. \\emph{STEPQuant: When and Where Errors Matter in Delta-Rule Recurrent State Quantization}. 2026; arXiv:2609.38169. \\url{https://arxiv.org/abs/2609.38169}.",
+      "urls": [
+        "https://arxiv.org/abs/2609.38169"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "sketchssm",
+      "bibliography_text": "Omin Kwon, JoongWon Shin, Minseo Kim, Kurt Keutzer, Sehoon Kim and Jae W. Lee. \\emph{SketchSSM: Write to the Full State, Read from a Compact Sketch}. 2026; arXiv:2609.33051. \\url{https://arxiv.org/abs/2609.33051}.",
+      "urls": [
+        "https://arxiv.org/abs/2609.33051"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "quamba",
+      "bibliography_text": "Hung-Yueh Chiang, Chi-Chih Chang, Natalia Frumkin, Kai-Chiang Wu and Diana Marculescu. \\emph{Quamba: A Post-Training Quantization Recipe for Selective State Space Models}. 2024; arXiv:2410.13229. \\url{https://arxiv.org/abs/2410.13229}.",
+      "urls": [
+        "https://arxiv.org/abs/2410.13229"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "quamba2",
+      "bibliography_text": "Hung-Yueh Chiang, Chi-Chih Chang, Natalia Frumkin, Kai-Chiang Wu, Mohamed S. Abdelfattah and Diana Marculescu. \\emph{Quamba2: A Robust and Scalable Post-training Quantization Framework for Selective State Space Models}. 2025; arXiv:2503.22879. \\url{https://arxiv.org/abs/2503.22879}.",
+      "urls": [
+        "https://arxiv.org/abs/2503.22879"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "mambaquant",
+      "bibliography_text": "Zukang Xu, Yuxuan Yue, Xing Hu et al. \\emph{MambaQuant: Quantizing the Mamba Family with Variance Aligned Rotation Methods}. 2025; arXiv:2501.13484. \\url{https://arxiv.org/abs/2501.13484}.",
+      "urls": [
+        "https://arxiv.org/abs/2501.13484"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "sparsegpt",
+      "bibliography_text": "Elias Frantar and Dan Alistarh. \\emph{SparseGPT: Massive Language Models Can Be Accurately Pruned in One-Shot}. Proceedings of the 40th International Conference on Machine Learning, pp. 10323--10337, 2023; arXiv:2301.00774. \\url{https://proceedings.mlr.press/v202/frantar23a.html}.",
+      "urls": [
+        "https://proceedings.mlr.press/v202/frantar23a.html",
+        "https://arxiv.org/abs/2301.00774"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page and the PMLR proceedings page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "wanda",
+      "bibliography_text": "Mingjie Sun, Zhuang Liu, Anna Bair and J. Zico Kolter. \\emph{A Simple and Effective Pruning Approach for Large Language Models}. 2023; arXiv:2306.11695. \\url{https://arxiv.org/abs/2306.11695}.",
+      "urls": [
+        "https://arxiv.org/abs/2306.11695"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "maskllm",
+      "bibliography_text": "Gongfan Fang, Hongxu Yin, Saurav Muralidharan et al. \\emph{MaskLLM: Learnable Semi-Structured Sparsity for Large Language Models}. 2024; arXiv:2409.17481. \\url{https://arxiv.org/abs/2409.17481}.",
+      "urls": [
+        "https://arxiv.org/abs/2409.17481"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "slidesparse",
+      "bibliography_text": "Hanyong Shao, Yingbo Hao, Ting Song et al. \\emph{SlideSparse: Fast and Flexible (2N-2):2N Structured Sparsity}. 2026; arXiv:2603.05232. \\url{https://arxiv.org/abs/2603.05232}.",
+      "urls": [
+        "https://arxiv.org/abs/2603.05232"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "spensegpt",
+      "bibliography_text": "Jaeseong Lee, Seung-won Hwang and Samyam Rajbhandari. \\emph{SpenseGPT: Practical One-shot Pruning Enabling Sparse and Dense GEMMs for LLM Inference}. 2026; arXiv:2606.10445. \\url{https://arxiv.org/abs/2606.10445}.",
+      "urls": [
+        "https://arxiv.org/abs/2606.10445"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
     }
   ],
   "scope": "Public primary sources only. No confidential assignment text or downloaded third-party paper/code bodies redistributed. Entries added on 30 September 2026 come from the lit workstream's literature review; paper/references.bib holds the matching BibTeX.",
