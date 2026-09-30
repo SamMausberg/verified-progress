@@ -340,6 +340,19 @@ def main() -> None:
     v, k = w.shape
     pool = real_rows(args.pool_rows)
     status = {'w8a16': row_status(head, pool, 'argmax'), 'sample': row_status(head, pool, 'sample')}
+    # The same kernels under the Hopper wgmma error model: only the fallback rate changes.
+    hopper = CertifiedHead.from_quantized(
+        w,
+        qh,
+        reference='bf16',
+        ref_model='hopper-wgmma',
+        group_size=args.group_size,
+        capacity=args.capacity,
+        max_batch=max(args.batches),
+    )
+    status['w8a16_hopper'] = row_status(hopper, pool, 'argmax')
+    status['sample_hopper'] = row_status(hopper, pool, 'sample')
+    del hopper
     amb_row = ambiguous_row(status['w8a16'], pool)
     heads_by_arith = {}
     for arith in ('w8a8', 'bf16'):
