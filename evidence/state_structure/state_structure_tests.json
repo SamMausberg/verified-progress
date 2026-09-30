@@ -52,7 +52,8 @@
       "det": "243/1000"
     }
   },
-  "seconds": 0.037,
+  "seconds": 0.032,
+  "repo_commit": "e0edd061a272f4db8450cafa9b6e0589fe025f72",
   "numpy": "2.3.5",
   "python": "3.13.15",
   "scope": "exact rational witnesses and float32 rounding cases; not model measurements"
