@@ -64,7 +64,7 @@
 % Evidence-status macros. Every result that is not yet committed evidence is
 % written with \pending; a number whose evidence sits in an open pull request
 % carries \underreview; a figure whose data file does not exist yet is drawn
-% with \pendingfigure. See ~/vp-coord/PAPER_PLAN.md.
+% with \pendingfigure.
 \newcommand{\pending}[1]{{\color{ochre}\textsf{\small[pending\if\relax\detokenize{#1}\relax\else: #1\fi]}}}
 \newcommand{\underreview}[1]{{\color{muted}\,\textsf{\scriptsize[under review, #1]}}}
 \newcommand{\pendingfigure}[2]{%

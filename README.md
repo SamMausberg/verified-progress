@@ -108,7 +108,8 @@ each build.
 
 Samuel Mausberg is the author. The earlier revisions were prepared with GPT-6
 Astra Pro (OpenAI). This revision was produced with Claude Code, using Claude
-Opus 5.5 agents for the literature review, theory, measurements and writing;
-changes are merged after independent review and remain subject to the author's
-review. No AI system is an author. The confidential assignment that motivated
+Opus 5.5 agents for the literature review, theory, measurements and writing.
+The literature, theory and evidence changes the paper cites were approved by an
+independent reviewing agent before merging, and all of the work remains subject
+to the author's review. No AI system is an author. The confidential assignment that motivated
 the work is not included, and no model weights are redistributed.

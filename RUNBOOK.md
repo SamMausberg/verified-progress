@@ -67,8 +67,8 @@ python -m sglang.launch_server \
 Native MTP speculation adds `--speculative-algorithm NEXTN
 --speculative-num-steps 3 --speculative-eagle-topk 1
 --speculative-num-draft-tokens 4 --max-running-requests <N>` (the engine
-reports it as EAGLE). With speculation SGLang silently caps the running
-requests at 48 unless `--max-running-requests` is passed, and the GDN state
+reports it as EAGLE). With speculation SGLang resets the running-request
+cap to 48 (it logs this) unless `--max-running-requests` is passed, and the GDN state
 cache caps capacity further (133 requests for plain decoding at default memory
 settings). The tuned speculative configurations, the DFlash arms and the
 capacity flags are defined by the serving harness and its arm file.

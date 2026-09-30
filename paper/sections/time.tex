@@ -26,7 +26,7 @@ Decode on this GPU is dominated by streaming bytes, so the byte counts of Table~
 \end{figure}
 
 \subsection{Attribution method}\label{sec:time-method}
-\pending{profile: workload and profiled windows (fixed concurrency, prefill excluded); nsys session tracing with CUDA-graph node records; step reconstruction from graph-replay correlation IDs; kernel categories and GEMM labelling; idle time split inside and outside replays; profiler perturbation against uncollected twin windows; the measured HBM read peak used as the bandwidth reference; draft in \nolinkurl{~/vp-coord/drafts/profile.tex}; evidence under \nolinkurl{evidence/profiles/}}
+\pending{profile: workload and profiled windows (fixed concurrency, prefill excluded); nsys session tracing with CUDA-graph node records; step reconstruction from graph-replay correlation IDs; kernel categories and GEMM labelling; idle time split inside and outside replays; profiler perturbation against uncollected twin windows; the measured HBM read peak used as the bandwidth reference; evidence under \nolinkurl{evidence/profiles/}}
 
 \subsection{The head in plain decode and in speculation}\label{sec:time-head}
 \pending{profile: the head chain (GEMM, FP32 copy, argmax) as a share of the plain decode step at $B=1,8,32,128$; the head microbenchmark of the exact calls SGLang makes at $M=1$ to 256; the MTP cycle's target and draft head chains at $B=1,8,32$; evidence \nolinkurl{evidence/profiles/attribution/}, \nolinkurl{evidence/profiles/head_microbench.json}}

@@ -116,7 +116,7 @@ Envelope with Hopper accumulation model; integer pass; outward rounding & Proved
 Refinement ladder; candidate-count bounds & Proved & Theorem~\ref{thm:ladder}, Proposition~\ref{prop:candidates}\\
 Candidate sets and head-path runtime on real states & Pending & geometry, kernel\\
 Certified race; RNG contract; fixed-noise verification; coupling bounds & Proved & Section~\ref{sec:decisions}\\
-Sampling contract: fixed-noise verification with the stock seeded noise; token-identical to seeded non-speculative decoding & Design decided; pending & kernel; Section~\ref{sec:fixednoise}\\
+Sampling contract: fixed-noise verification with the stock seeded noise; committed tokens equal the seeded sampler's tokens for the verify pass's logits & Design decided; pending & kernel; Section~\ref{sec:fixednoise}\\
 Common mass, bounded-range sampler, KL and sequence TV bounds & Proved & Propositions~\ref{prop:commonmass}--\ref{prop:kl}\\
 Acceptance guards with enclosures; residual races & Proved & Theorems~\ref{thm:guards}, \ref{thm:residualrace}, \ref{thm:residualself}\\
 Cheap decision is not cheap verification (constructed heads) & Finding (CPU) & \nolinkurl{data/synthetic_drift.csv}, \nolinkurl{evidence/synthetic_drift.json}\\
@@ -125,7 +125,8 @@ Exact floating-point reference; Lean elaboration & Finding (CPU, Lean) & \nolink
 Attribution, bytes per step, host gaps (H1, H6) & Pending & profile; \nolinkurl{evidence/profiles/} (PR \#13)\\
 Stock divergence mechanisms and state safety (H5) & Pending & state; \nolinkurl{evidence/state/}\\
 DFlash on GH200 & Pending & drafter; \nolinkurl{evidence/drafter/}\\
-Certified tail (P1), long-window repair (P2), anchored residual decoding (P3) & Hypotheses & Kill tests pending\\
+Certified tail (P1) & Rejected by its kill test & Evidence pending in the geometry pull request (\nolinkurl{evidence/head_geometry/tail_killtest.json})\\
+Long-window repair (P2), anchored residual decoding (P3) & Hypotheses & Kill tests pending\\
 What an exact recurrent state must retain (Proposition~\ref{prop:minimal-state}); key-subspace reduction & Proved & Section~\ref{sec:minimal-state}\\
 State-structure witnesses ($-3/25$, reachability, SiLU rank, batch rank, RMSNorm, lazy decay, BF16 rank) & Finding (CPU) & \nolinkurl{evidence/state_structure/}\\
 Write avoidance for the recurrent state (P4); cross-request sharing (P5) & Pending; P5 rejected in analysis & moonshot, profile\\
@@ -133,4 +134,4 @@ Stack levers, interaction matrix, exact and lossy frontiers (H4, H7) & Pending &
 \end{longtable}
 
 \section{Attribution and disclosure}\label{app:attribution}
-Samuel Mausberg is the author of this paper and reviews its claims and implementation. The earlier revisions of the manuscript, its derivations and its reference code were prepared with GPT-6 Astra Pro (OpenAI) from research materials, public primary sources and local CPU execution. This revision was produced with Claude Code, using Claude Opus 5.5 agents for the literature review, theory, measurements and writing, on the earlier draft; each agent's work was reviewed by an independent reviewing agent before it was merged, and all of it is subject to the author's review. No AI system is an author. The confidential assignment that motivated the work is not reproduced or quoted, and no model weights are redistributed.
+Samuel Mausberg is the author of this paper and reviews its claims and implementation. The earlier revisions of the manuscript, its derivations and its reference code were prepared with GPT-6 Astra Pro (OpenAI) from research materials, public primary sources and local CPU execution. This revision was produced with Claude Code, using Claude Opus 5.5 agents for the literature review, theory, measurements and writing, on the earlier draft; the literature, theory and evidence changes this paper cites were approved by an independent reviewing agent before they were merged, and all of the work is subject to the author's review. No AI system is an author. The confidential assignment that motivated the work is not reproduced or quoted, and no model weights are redistributed.

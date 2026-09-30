@@ -64,7 +64,7 @@ We do not claim norm or quantization bounds, bound-then-refine search, certified
 \begin{enumerate}
 \item a floating-point envelope for a low-precision head pass that is sound for the accumulation the GPU actually performs (NVIDIA tensor cores align addends to the largest term and truncate~\cite{fasi2021}, and Khattak and Mikaitis model Hopper's BF16 and FP8 paths in detail~\cite{khattak2026}; existing certified heads use CUDA-core FMA, replay the production order, or assume FP32 is exact);
 \item an exactness contract against the stock kernel at the same batch shape, with a stated gap condition and fallback;
-\item extension of the certified head from greedy selection to exact sampling under a fixed counter-keyed noise field (pathwise equal to the dense race) and to fixed-noise verification with the engine's own seeded noise, which keeps seeded outputs token-identical to non-speculative decoding; partition brackets for standard acceptance are analysed but not built;
+\item extension of the certified head from greedy selection to exact sampling under a fixed counter-keyed noise field (pathwise equal to the dense race) and to fixed-noise verification with the engine's own seeded noise, whose committed tokens are the seeded sampler's tokens for the verify pass's logits; partition brackets for standard acceptance are analysed but not built;
 \item a measurement inside SGLang on HBM3 with CUDA graphs, applied to draft steps, verification and plain decoding, against the stock head chain and FlashSampling;
 \item for transport, the only mechanism not found in prior work (draft-side tile summaries carried through a shared head to prune the verifier's head), a measurement of whether it survives real geometry.
 \end{enumerate}

@@ -17,7 +17,7 @@ so $x$ is the mean per-request end-to-end output rate, which includes the time t
 Each confirmatory point is repeated with alternating arm order on an otherwise idle machine, and the variation across repeats is reported; CPU-heavy work elsewhere on the host is detected and recorded, because the scheduler and the client are single-threaded Python loops that share the CPU. Exact changes are checked for output equality against the stock configuration at the same batch shape (Section~\ref{sec:divergence}); lossy changes are measured against the quality budget of Section~\ref{sec:stack}.
 
 \subsection{Frontiers}
-\pending{bench: tuned MTP and DFlash configurations; the baseline frontiers with repeat variance; the quality baseline; draft in \nolinkurl{~/vp-coord/drafts/bench.tex}; evidence \nolinkurl{evidence/bench/confirm/frontier.csv}}
+\pending{bench: tuned MTP and DFlash configurations; the baseline frontiers with repeat variance; the quality baseline; evidence \nolinkurl{evidence/bench/confirm/frontier.csv}}
 
 \pending{bench, integration: before/after frontiers for the certified head in MTP drafting, verification and plain decoding, with output-equality checks (H4)}
 
