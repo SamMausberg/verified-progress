@@ -556,7 +556,7 @@ def main() -> None:
         'classes_hopper_model': dict(
             Counter(c['model_hopper']['cls'] if 'model_hopper' in c else c['cls'] for c in cases)
         ),
-        'first_difference_module': dict(Counter(f['module'] for f in fd).most_common(20)),
+        'first_difference_module': dict(Counter(f['module'] for f in fd).most_common()),
         'first_difference_modes': dict(Counter(f'{f["mode_a"]} vs {f["mode_b"]}' for f in fd)),
         'first_difference_output_index': dict(
             Counter(

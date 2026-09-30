@@ -48,6 +48,38 @@ d['top2_gap_plain_c1'] = {
 open(sys.argv[2], 'w').write(json.dumps(d, indent=2) + '\n')
 PY
 
+# First differing module per comparison, one row per module, for the paper's figure.
+nice -n 19 python - "$evidence" <<'PY'
+import csv
+import json
+import re
+import sys
+from pathlib import Path
+
+KINDS = {
+    'linear_attn.gdn_core': 'gdn_core',
+    'linear_attn.gdn_conv': 'gdn_conv',
+    'linear_attn.norm': 'gated_norm',
+    'linear_attn.attn': 'gdn_block',
+    'attn': 'attn',
+    'mlp.down_proj': 'mlp_down_proj',
+}
+evidence = Path(sys.argv[1])
+rows = []
+for path in sorted(evidence.glob('mechanism_*.json')):
+    pair = path.stem[len('mechanism_'):]
+    summary = json.loads(path.read_text())['summary']
+    for module, count in summary['first_difference_module'].items():
+        m = re.match(r'model\.layers\.(\d+)\.(.+)$', module)
+        layer, suffix = (int(m.group(1)), m.group(2)) if m else ('', module)
+        kind = KINDS.get(suffix, suffix.replace('.', '_'))
+        rows.append([pair, module, layer, kind, count])
+with open(evidence / 'first_difference_by_module.csv', 'w', newline='') as f:
+    w = csv.writer(f)
+    w.writerow(['pair', 'module', 'layer', 'kind', 'count'])
+    w.writerows(rows)
+PY
+
 # Drift and divergences by rejection position, for every speculative config.
 for spec in mtp_s1 mtp_s3 mtp_s5 mtp_tree; do
   if [ -f "$runs/$spec/c1.jsonl" ]; then

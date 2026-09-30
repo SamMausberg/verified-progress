@@ -171,6 +171,12 @@ letting BF16 rounding merge them into a tie that the index rule resolves the oth
 way. Which of the two happened cannot be decided for most divergences under the
 conservative accumulation model, and for about a fifth under the Hopper model.
 
+`first_difference_by_module.csv` (columns `pair,module,layer,kind,count`, written by
+`experiments/state_safety/analyze_all.sh` from the `mechanism_*.json` summaries) lists
+the first differing module output per comparison; `kind` is `gdn_core`, `gdn_conv`,
+`gated_norm`, `gdn_block` (the whole GDN attention module), `attn` (full attention) or
+`mlp_down_proj`.
+
 ## Noise floor
 
 Rate is divergences per 1,000 compared tokens (compared tokens stop at the first
