@@ -151,11 +151,25 @@ complete head-path microbenchmarks with both fallback modes and both error
 models, primitive costs and the Nsight Compute summary are rerun at the final
 commit in one exclusive hold and committed here with their commands.
 
+## Seeded sampling precision on real rows (`p8_witnesses.json`)
+
+On the first 60,000 real decode rows (seed 5, position = row index, SGLang's own
+noise), SGLang's temperature-only seeded token (FP32 softmax and log) never
+differs from the token with an FP64 log of the same FP32 probabilities (0 rows
+at T = 0.7 and at T = 1.0). It differs from the token under exact
+arithmetic (FP64 logits and log-softmax) on 184 rows (0.31%) at T = 0.7 and 211
+rows (0.35%) at T = 1.0; that difference combines the stock head's BF16 logits
+and the FP32 softmax, which this check does not separate. The first eight of
+these rows are kept with their inputs, and `tests/test_certified_head.py`
+replays them against the certified sampler. On real rows, therefore, the log's precision does not
+move a seeded token, while the BF16 logits and FP32 softmax together do.
+
 ## Files and commands
 
 | File | What | Command |
 |---|---|---|
 | `stock_invariance.json` | stock GEMM kernel per M, reduced-precision flag test, row/column-subset invariance, observed accumulation error, library versions | `python experiments/certified_head/stock_invariance.py --out evidence/certified_head/stock_invariance.json` (commit fd0fd4a, GPU) |
+| `p8_witnesses.json` | seeded-token differences between SGLang's chain, an FP64 log and exact arithmetic on 60,000 real rows, with the first witnesses | `python experiments/certified_head/p8_witness_search.py --rows 60000 --out evidence/certified_head/p8_witnesses.json` (commit ab507a9, GPU, shared lock) |
 | `fallback_vs_model.json` | undecided fraction versus the stock error bound | `python experiments/certified_head/fallback_vs_model.py --rows 20000 --out evidence/certified_head/fallback_vs_model.json` (CPU) |
 
 Real head inputs come from the geometry workstream's plain-decode capture
