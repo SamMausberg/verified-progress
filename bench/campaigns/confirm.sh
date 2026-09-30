@@ -5,7 +5,7 @@
 # Run under: scripts/gpu_lock.sh -x bench/campaigns/confirm.sh <repeat index>
 set -uo pipefail
 # shellcheck source=/dev/null
-source ~/verified-progress/scripts/sglang_env.sh
+source "$(dirname "$0")/../../scripts/sglang_env.sh"
 cd "$(dirname "$0")/../.." || exit 1
 REPEAT=${1:?repeat index}
 COMMON=(--out ~/vp-data/bench/confirm --port 30010 --concurrency 1 2 4 8 16 32 64 128

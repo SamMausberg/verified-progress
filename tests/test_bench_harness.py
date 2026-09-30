@@ -442,3 +442,31 @@ def test_contended_points_are_invalid() -> None:
     point = {'concurrency': 1, 'x_e2e': 1.0, 'y': 1.0, 'failed': 0, 'aiperf_exit_code': 0}
     assert invalid_reason({**point, 'foreign_cpu_during_mean': 0.4}) == ''
     assert invalid_reason({**point, 'foreign_cpu_during_mean': 3.0}).startswith('host_contention')
+
+
+def test_host_load_counts_short_lived_foreign_processes() -> None:
+    import subprocess
+    import sys
+    import threading
+    import time
+
+    from bench.hostload import sample
+
+    # The run's own tree is a sleeping process; the burner starts after the first
+    # snapshot and exits before the second, so only host totals can see it.
+    root = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(10)'])
+    burner_code = 'import time\nt = time.time()\nwhile time.time() - t < 0.7:\n    pass'
+
+    def burn() -> None:
+        time.sleep(0.2)
+        subprocess.run([sys.executable, '-c', burner_code], check=True)
+
+    thread = threading.Thread(target=burn)
+    thread.start()
+    try:
+        result = sample(root.pid, interval=1.5)
+    finally:
+        thread.join()
+        root.kill()
+    assert result['cores'] >= 0.25
+    assert all('while time.time()' not in proc['cmd'] for proc in result['top'])

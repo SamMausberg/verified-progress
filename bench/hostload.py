@@ -28,6 +28,11 @@ import time
 from pathlib import Path
 from typing import Any
 
+# Idle-host background (IDE server, agent CLIs, kernel threads) measures 0.3-0.6
+# cores here. A run needs its four single-threaded loops (scheduler, tokenizer
+# manager, detokenizer, client timing manager) to keep a core each and the memory
+# system to itself; 2 cores admits the background and rejects any real job. It is
+# a heuristic threshold, not a derived one.
 CONTENTION_CORES = 2.0
 _TICK = os.sysconf('SC_CLK_TCK')
 
@@ -46,6 +51,13 @@ def cpu_by_pid() -> dict[int, tuple[int, float]]:
         fields = stat.rsplit(')', 1)[-1].split()
         table[int(entry.name)] = (int(fields[1]), (int(fields[11]) + int(fields[12])) / _TICK)
     return table
+
+
+def busy_cpu_seconds() -> float:
+    """CPU time spent busy on all cores since boot (everything but idle and iowait)."""
+    fields = [int(value) for value in Path('/proc/stat').read_text().split('\n', 1)[0].split()[1:9]]
+    # user nice system idle iowait irq softirq steal
+    return (sum(fields) - fields[3] - fields[4]) / _TICK
 
 
 def process_tree(root: int, table: dict[int, tuple[int, float]]) -> set[int]:
@@ -70,18 +82,28 @@ def title(pid: int) -> str:
 
 
 def sample(root: int, interval: float = 1.0) -> dict[str, Any]:
-    """CPU cores used over `interval` s outside and inside the process tree of `root`."""
+    """CPU cores used over `interval` s outside and inside the process tree of `root`.
+
+    Foreign load is the host's total busy CPU time (/proc/stat) minus the time of
+    the run's own processes, so processes that start and exit within the
+    interval (builds, hooks, compiles) are counted too. The per-process lists
+    only cover processes alive at both ends of the interval and are diagnostic.
+    """
+    busy_before = busy_cpu_seconds()
     before = cpu_by_pid()
     time.sleep(interval)
+    busy_after = busy_cpu_seconds()
     after = cpu_by_pid()
     own = process_tree(root, after) | process_tree(root, before)
     usage = {
-        pid: (seconds - before[pid][1]) / interval
+        pid: max(0.0, (seconds - before[pid][1]) / interval)
         for pid, (_, seconds) in after.items()
         if pid in before
     }
     foreign = {pid: cores for pid, cores in usage.items() if pid not in own}
     mine = {pid: cores for pid, cores in usage.items() if pid in own}
+    total = (busy_after - busy_before) / interval
+    foreign_total = max(0.0, total - sum(mine.values()))
 
     def top(items: dict[int, float], limit: int) -> list[dict[str, Any]]:
         ranked = sorted(items.items(), key=lambda item: -item[1])[:limit]
@@ -91,7 +113,12 @@ def sample(root: int, interval: float = 1.0) -> dict[str, Any]:
             if cores >= 0.05
         ]
 
-    return {'cores': round(sum(foreign.values()), 2), 'top': top(foreign, 5), 'own': top(mine, 8)}
+    return {
+        'cores': round(foreign_total, 2),
+        'host_busy_cores': round(total, 2),
+        'top': top(foreign, 5),
+        'own': top(mine, 8),
+    }
 
 
 class HostLoadSampler:

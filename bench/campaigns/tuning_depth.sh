@@ -4,7 +4,7 @@
 # Run under: scripts/gpu_lock.sh -x bench/campaigns/tuning_depth.sh
 set -uo pipefail
 # shellcheck source=/dev/null
-source ~/verified-progress/scripts/sglang_env.sh
+source "$(dirname "$0")/../../scripts/sglang_env.sh"
 cd "$(dirname "$0")/../.." || exit 1
 COMMON=(--out ~/vp-data/bench/tuning --port 30013 --workload bench/workloads/mixed-v2/tune.jsonl
         --concurrency 1 8 32 128 --min-requests 32 --waves 4 --osl 512 --quiet-cpu-wait 300)

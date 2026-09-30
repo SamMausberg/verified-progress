@@ -5,7 +5,7 @@
 # Run under: DEPTH=<steps> scripts/gpu_lock.sh -x bench/campaigns/tuning_knobs.sh [mtp|plain|all]
 set -uo pipefail
 # shellcheck source=/dev/null
-source ~/verified-progress/scripts/sglang_env.sh
+source "$(dirname "$0")/../../scripts/sglang_env.sh"
 cd "$(dirname "$0")/../.." || exit 1
 D=${DEPTH:?set DEPTH to the chosen MTP depth}
 GROUP=${1:-all}
