@@ -345,6 +345,7 @@ def decision_stats(approx: torch.Tensor, exact: torch.Tensor, start: int) -> dic
         'agree': [int(a) for a in agree[start:]],
         'ratio': [min(r, 1e9) for r in ratio[start:]],
         'tie': [int(m == 0) for m in margin.tolist()[start:]],
+        'margin': [round(m, 4) for m in margin.tolist()[start:]],
         'first_disagreement': first,
         'agree_before_start': all(agree[:start]),
     }
