@@ -133,7 +133,9 @@ What an exact recurrent state must retain (Proposition~\ref{prop:minimal-state})
 State-structure witnesses ($-3/25$, reachability, SiLU rank, batch rank, RMSNorm, lazy decay, BF16 rank) & Finding (CPU) & \nolinkurl{evidence/state_structure/}\\
 Contract witnesses (reassociation, BF16 cell, law versus argmax, law versus seeded token, regrouped GDN recurrence, transition norm) & Finding (CPU) & \nolinkurl{evidence/contracts/}\\
 Write avoidance for the recurrent state (P4); cross-request sharing (P5) & Pending; P5 rejected in analysis & moonshot, profile\\
-Stack levers, interaction matrix, exact and lossy frontiers (H4, H7) & Pending & moonshot, bench; \nolinkurl{evidence/moonshot/}, \nolinkurl{evidence/bench/}\\\bottomrule
+Derived throughput ceilings per lever stack & Derived & \nolinkurl{evidence/moonshot/ceilings.json}\\
+First lever runs: FP16 state $1.24\times$ at $c=128$, FP8 weights and KV no gain (single runs) & Finding (single runs) & \nolinkurl{evidence/moonshot/lever_sweeps_quick.csv}\\
+Repeated lever measurements, quality, interaction matrix, exact and lossy frontiers (H4, H7) & Pending & moonshot, bench; \nolinkurl{evidence/bench/}\\\bottomrule
 \end{longtable}
 
 \section{Attribution and disclosure}\label{app:attribution}
