@@ -111,3 +111,27 @@ engine; acceptance only (foreign CPU load averaged 1.99 cores, which does not af
 acceptance).
 
     scripts/gpu_lock.sh -s experiments/drafter/run_card_gate.sh
+
+## Evaluation panel baselines and output equality (panel-v2)
+
+`panel_v2/acceptance_summary.csv`, `panel_v2/acceptance_by_position.csv`: panel-v2 (the
+first 16 chat, code and maths prompts of bench mixed-v2's confirm split, maths = GSM8K
+train, plus the same 32 MATH-500 problems), greedy, thinking on, up to 2,048 new tokens,
+concurrency 1, stock engine, for the public drafter at block 16 and native MTP (3 steps,
+top-1, 4 draft tokens). Tokens per cycle per request (pooled): DFlash 6.81 (6.11), MTP 3.38
+(3.34). By position, MTP accepts more at the first three positions (alpha 0.90, 0.86, 0.86)
+than DFlash (0.86, 0.79, 0.81), and DFlash keeps drafting to position 15.
+
+`panel_v2/equality_{zlab_b16,mtp3}.json`: first divergence of each output from plain decoding
+at concurrency 1 (plain run with top-2 logprobs), classified by the plain run's top-2 gap.
+DFlash: 77 of 80 sequences diverge somewhere in up to 2,048 tokens, 3.06 per 1,000 compared
+tokens, every divergence at an exact tie (48) or a top-2 gap of at most 0.25 nats (29). MTP:
+77 of 80, 2.50 per 1,000, 40 ties and 37 within 0.25 nats. Both match the stock noise floor
+the state workstream measured between plain decoding at batch 1 and 32 (3.42 per 1,000, all
+within 0.375 nats; PR #37): speculative verification computes the target at a different
+batch shape, and near-ties flip. No divergence has a larger margin.
+
+    scripts/gpu_lock.sh -s experiments/drafter/run_equality.sh
+    python experiments/drafter/summarize_acceptance.py \
+        --run zlab:16:~/vp-data/drafter/eval/zlab/b16 --run mtp3:4:~/vp-data/drafter/eval/mtp3 \
+        --out evidence/drafter/panel_v2
