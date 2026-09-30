@@ -61,6 +61,12 @@ for raw in "$VP_DATA"/*_hosttrace/*_pyspy.txt; do
   run pyspy_summary.py "$raw" --out "$EV/diagnostics/$b.json" > /dev/null
 done
 
+# Graph-level trace calibration.
+gl=("$VP_DATA"/plain_nsys_graphtrace/*.nsys-rep "$VP_DATA"/mtp_nsys_graphtrace/*.nsys-rep)
+if [ "${#gl[@]}" -gt 0 ]; then
+  run graph_level.py "${gl[@]}" --out "$EV/diagnostics/graph_level_trace.json"
+fi
+
 # Nsight Compute summaries.
 ncu=("$VP_DATA"/ncu/*.ncu-rep)
 if [ "${#ncu[@]}" -gt 0 ]; then
