@@ -51,7 +51,8 @@ evidence path. `TASKS.md` tracks the work, `SETUP.md` describes the machine and
 - **State-structure witnesses.** `tests/test_state_structure.py` checks, in
   exact arithmetic, why the recurrent state resists exact compression and why
   computation cannot be shared across unrelated requests
-  (`evidence/state_structure/`).
+  (`evidence/state_structure/`); `tests/test_contracts.py` separates the
+  exactness contracts the paper uses (`evidence/contracts/`).
 - **Lean.** `formal/DecisionGuards.lean` and `formal/CertifiedArgmax.lean`
   elaborate under Lean 4.19.0 (`formal/STATUS.md`). They cover decision logic
   and scaled-integer bounds, not IEEE rounding, exponentials or probability.

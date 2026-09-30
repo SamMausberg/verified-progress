@@ -26,6 +26,7 @@ the rules that make a run admissible as evidence.
 . .venv/bin/activate
 python tests/test_precision.py              # certified-head reference, writes evidence/precision/
 python tests/test_state_structure.py        # P4/P5 witnesses, writes evidence/state_structure/
+python tests/test_contracts.py              # P7 contract witnesses, writes evidence/contracts/
 python -m pytest tests/                      # all CPU tests
 bash scripts/check_lean.sh                   # Lean 4.19.0 from ~/.elan
 cd paper && latexmk -pdf -interaction=nonstopmode -halt-on-error paper.tex
@@ -89,6 +90,7 @@ capacity flags are defined by the serving harness and its arm file.
 | Certified-head exact reference, head constants, Lean | `evidence/precision/` | on `main` |
 | Earlier revision's CPU references and synthetic drift | `evidence/*.json`, `data/synthetic_drift.csv` | on `main` |
 | State-structure witnesses (P4, P5) | `evidence/state_structure/` | on `main` |
+| Contract witnesses (P7) | `evidence/contracts/` | on `main` |
 | Attribution, head microbenchmark, bytes per step | `evidence/profiles/` | pull request #13 |
 | Head-input capture, transport and self-evidence replay | `evidence/head_geometry/` | pull request #16 |
 | Serving harness, frozen workload, quality check | `bench/`, `evidence/bench/` | on `main`; sweeps in progress |
