@@ -9,8 +9,9 @@ concurrency) and marks points that no other point beats on both axes.
         --out evidence/bench/confirm --baseline plain
 
 Writes `points.csv` (one row per run and point), `frontier.csv` (mean, std,
-min and max over repeats), one `<label>.dat` per label for PGFPlots, and
-`pareto.png` for a quick look.
+min and max over repeats), `launches.csv` (one row per server launch: capacity,
+graph range, memory split, failed checks, source commits), one `<label>.dat` per
+label for PGFPlots, and `pareto.png` for a quick look.
 """
 
 from __future__ import annotations
@@ -94,6 +95,51 @@ def load_points(run_dirs: list[Path], relabel: dict[str, str]) -> list[dict[str,
         label = relabel.get(manifest['label'], manifest['label'])
         for point in manifest.get('points', []):
             rows.append(point_row(label, run_dir.name, point))
+    return rows
+
+
+def launch_row(label: str, run: str, manifest: dict[str, Any]) -> dict[str, Any]:
+    """What the server actually ran: capacity, graph range, memory and checks."""
+    launch = manifest.get('launch') or {}
+    captures = launch.get('graph_captures') or {}
+    step = captures.get('target verify') or captures.get('target decode') or {}
+    limits = launch.get('final_limits') or {}
+    memory = launch.get('memory_usage') or {}
+    checks = launch.get('checks') or []
+    source = launch.get('sglang_source') or {}
+    return {
+        'label': label,
+        'run': run,
+        'arm': (manifest.get('arm') or {}).get('name'),
+        'args': json.dumps((manifest.get('arm') or {}).get('args'), sort_keys=True),
+        'env': json.dumps((manifest.get('arm') or {}).get('env'), sort_keys=True),
+        'max_running_requests': limits.get('max_running_requests'),
+        'max_total_num_tokens': limits.get('max_total_num_tokens'),
+        'graph_max_batch': max(step.get('sizes') or [0]),
+        'weights_gb': memory.get('weight'),
+        'kv_cache_gb': memory.get('kvcache'),
+        'ready_after_s': launch.get('ready_after_s'),
+        'checks_failed': ';'.join(
+            c['name'] for c in checks if c.get('required') and not c.get('ok')
+        ),
+        'overlap_event_loop': next(
+            (c.get('ok') for c in checks if c.get('name') == 'overlap_event_loop_pyspy'), None
+        ),
+        'sglang_head': source.get('head'),
+        'sglang_dirty': bool(source.get('dirty_files')),
+        'repo_head': (launch.get('repo') or {}).get('head'),
+        'server_version': launch.get('server_version'),
+    }
+
+
+def load_launches(run_dirs: list[Path], relabel: dict[str, str]) -> list[dict[str, Any]]:
+    rows = []
+    for run_dir in run_dirs:
+        manifest_path = run_dir / 'sweep.json'
+        if manifest_path.exists():
+            manifest = json.loads(manifest_path.read_text())
+            label = relabel.get(manifest['label'], manifest['label'])
+            rows.append(launch_row(label, run_dir.name, manifest))
     return rows
 
 
@@ -251,6 +297,7 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit('no sweep points found')
     args.out.mkdir(parents=True, exist_ok=True)
     write_csv(rows, args.out / 'points.csv', list(POINT_FIELDS))
+    write_csv(load_launches(args.runs, relabel), args.out / 'launches.csv')
     frontier = aggregate(rows, args.baseline)
     write_csv(frontier, args.out / 'frontier.csv')
     write_pgfplots(frontier, args.out)

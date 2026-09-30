@@ -206,23 +206,35 @@ def _cpu_seconds_by_pid() -> dict[int, tuple[int, float]]:
 
 
 def foreign_cpu(own_sessions: set[int], interval: float = 2.0) -> dict[str, Any]:
-    """CPU cores used by processes outside `own_sessions` over `interval` seconds."""
+    """CPU cores used over `interval` s by processes outside `own_sessions`.
+
+    `own` lists the busiest processes inside them (server and client), since a
+    single-threaded frontend process near 1.0 cores is a serving bottleneck.
+    """
     before = _cpu_seconds_by_pid()
     time.sleep(interval)
     after = _cpu_seconds_by_pid()
     usage = {
-        pid: (seconds - before[pid][1]) / interval
+        pid: ((seconds - before[pid][1]) / interval, session in own_sessions)
         for pid, (session, seconds) in after.items()
-        if session not in own_sessions and pid in before
+        if pid in before
     }
-    top = sorted(usage.items(), key=lambda item: -item[1])[:5]
-    return {
-        'cores': round(sum(usage.values()), 2),
-        'top': [
+
+    def listing(own: bool, limit: int) -> list[dict[str, Any]]:
+        chosen = sorted(
+            ((pid, cores) for pid, (cores, mine) in usage.items() if mine is own),
+            key=lambda item: -item[1],
+        )[:limit]
+        return [
             {'pid': pid, 'cores': round(cores, 2), 'cmd': process_title(pid)[:120]}
-            for pid, cores in top
+            for pid, cores in chosen
             if cores >= 0.05
-        ],
+        ]
+
+    return {
+        'cores': round(sum(cores for cores, mine in usage.values() if not mine), 2),
+        'top': listing(False, 5),
+        'own': listing(True, 8),
     }
 
 
@@ -322,9 +334,17 @@ def verify_launch(log_text: str, server_info: dict[str, Any], arm: Arm) -> list[
     def completed(key: str) -> bool:
         return bool(captures.get(key, {}).get('completed'))
 
-    if arm.speculative:
+    algorithm = str(args.get('speculative-algorithm', '')).upper()
+    if algorithm in ('NEXTN', 'EAGLE', 'EAGLE3'):
         decode_keys = ['target verify', 'draft decode', 'draft extend']
         prefill_keys = ['target prefill', 'draft prefill']
+    elif arm.speculative:
+        # Other drafters (DFLASH, ...) run one draft pass per block; require the
+        # target verify graph, one captured draft graph and every graph begun.
+        drafted = [key for key in captures if key.startswith('draft ') and completed(key)]
+        begun = [key for key in captures if key != 'target prefill']
+        decode_keys = sorted({'target verify', *begun, *(drafted[:1] or ['draft decode'])})
+        prefill_keys = ['target prefill']
     else:
         decode_keys = ['target decode']
         prefill_keys = ['target prefill']

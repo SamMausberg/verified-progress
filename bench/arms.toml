@@ -49,3 +49,25 @@ speculative-algorithm = "NEXTN"
 speculative-num-steps = 3
 speculative-eagle-topk = 1
 speculative-num-draft-tokens = 4
+
+# DFlash block drafter (z-lab/Qwen3.5-4B-DFlash, Apache-2.0): a 6-layer draft
+# conditioned on eight target layers that proposes a whole block per pass. The
+# model card's B200 flags, adapted to sm_90: flashinfer target attention instead
+# of trtllm_mha (Blackwell only); the card's --mamba-scheduler-strategy is
+# --mamba-radix-cache-strategy here and already resolves to extra_buffer.
+[arms.dflash]
+description = """DFlash block drafter, block size 8 (the card's serving default), \
+with the card's GDN (linear attention) kernels, piecewise prefill graphs and \
+overlapped plan stream."""
+
+[arms.dflash.args]
+speculative-algorithm = "DFLASH"
+speculative-draft-model-path = "z-lab/Qwen3.5-4B-DFlash"
+speculative-draft-model-revision = "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf"
+speculative-dflash-block-size = 8
+linear-attn-prefill-backend = "flashinfer"
+linear-attn-decode-backend = "flashinfer"
+cuda-graph-backend-prefill = "tc_piecewise"
+
+[arms.dflash.env]
+SGLANG_ENABLE_OVERLAP_PLAN_STREAM = "1"

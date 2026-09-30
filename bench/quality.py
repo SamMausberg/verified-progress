@@ -3,9 +3,13 @@
 The task set is the full GSM8K test split (1,319 problems) frozen from a pinned
 revision into `bench/quality/gsm8k_test.jsonl`. Scoring uses sgl-eval's GSM8K
 benchmark (NeMo-Skills `generic/math` prompt, last `\\boxed{}` answer, symbolic
-equality). Generation settings are fixed: greedy (temperature 0), thinking on
-(the benchmark's reasoning setting), natural stopping with a 16,384-token
-limit, no system prompt.
+equality). Generation settings are fixed: thinking on (the benchmark's reasoning
+setting), Qwen's recommended thinking-mode sampling for precise tasks
+(temperature 0.6, top-p 0.95; sgl-eval has no top-k option), a fixed request
+seed, natural stopping with a 16,384-token limit, no system prompt. Greedy
+decoding is not used here: in thinking mode it falls into repetition loops on
+about a third of maths prompts (bench/README.md), which would make the check
+slow and loop-dominated.
 
     python -m bench.quality build                      # (re)create the frozen task file
     gpu_lock.sh -x python -m bench.quality run --arm plain --label plain
@@ -47,6 +51,8 @@ GSM8K_REPO = 'openai/gsm8k'
 GSM8K_REVISION = '740312add88f781978c0658806c59bc2815b9866'
 GSM8K_FILE = 'main/test-00000-of-00001.parquet'
 MAX_TOKENS = 16384
+TEMPERATURE = 0.6
+TOP_P = 0.95
 THINKING = True
 
 
@@ -106,7 +112,7 @@ def mcnemar_exact(only_a: int, only_b: int) -> float:
 
 
 def sgl_eval_command(
-    base_url: str, model: str, task_file: Path, out_dir: Path, threads: int
+    base_url: str, model: str, task_file: Path, out_dir: Path, threads: int, seed: int = 0
 ) -> list[str]:
     executable = Path(sys.executable).with_name('sgl-eval')
     return [
@@ -120,7 +126,9 @@ def sgl_eval_command(
         '--from-dataset',
         str(task_file),
         '--temperature',
-        '0',
+        str(TEMPERATURE),
+        '--top-p',
+        str(TOP_P),
         '--max-tokens',
         str(MAX_TOKENS),
         '--chat-template-kwarg',
@@ -128,7 +136,7 @@ def sgl_eval_command(
         '--num-threads',
         str(threads),
         '--seed',
-        '0',
+        str(seed),
         '--out-dir',
         str(out_dir),
     ]
@@ -221,7 +229,7 @@ def run(args: argparse.Namespace) -> int:
     with server:
         before = parse_prometheus(http_get(f'{server.base_url}/metrics'))
         command = sgl_eval_command(
-            server.base_url, arm.model, task_file, run_dir / 'sgl_eval', args.threads
+            server.base_url, arm.model, task_file, run_dir / 'sgl_eval', args.threads, args.seed
         )
         started = time.time()
         with (run_dir / 'sgl_eval_console.txt').open('w') as console:
@@ -244,11 +252,12 @@ def run(args: argparse.Namespace) -> int:
         'task_file': str(task_file),
         'task_sha256': hashlib.sha256(task_file.read_bytes()).hexdigest(),
         'generation': {
-            'temperature': 0.0,
+            'temperature': TEMPERATURE,
+            'top_p': TOP_P,
             'max_tokens': MAX_TOKENS,
             'chat_template_kwargs': {'enable_thinking': THINKING},
             'prompt': 'sgl-eval gsm8k default (NeMo-Skills generic/math, zero-shot)',
-            'seed': 0,
+            'seed': args.seed,
             'threads': args.threads,
         },
         'sgl_eval_command': command,
@@ -292,6 +301,7 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument('--out', type=Path, default=Path.home() / 'vp-data/bench/quality')
     run_parser.add_argument('--tasks', type=Path, default=TASK_FILE)
     run_parser.add_argument('--threads', type=int, default=128)
+    run_parser.add_argument('--seed', type=int, default=0, help='request sampling seed')
     run_parser.add_argument('--allow-unlocked', action='store_true')
     compare_parser = commands.add_parser('compare', help='paired comparison of two runs')
     compare_parser.add_argument('run_a', type=Path)

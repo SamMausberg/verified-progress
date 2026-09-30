@@ -99,6 +99,8 @@ def aiperf_command(
     body: dict[str, Any],
     seed: int,
     aiperf: str = AIPERF,
+    per_chunk_usage: bool = True,
+    export_level: str = 'raw',
 ) -> list[str]:
     command = [
         aiperf,
@@ -129,9 +131,9 @@ def aiperf_command(
         '--extra-inputs',
         json.dumps(body),
         '--use-server-token-count',
-        '--per-chunk-usage',
+        *(['--per-chunk-usage'] if per_chunk_usage else []),
         '--export-level',
-        'raw',
+        export_level,
         '--output-artifact-dir',
         str(artifact_dir),
         '--random-seed',
@@ -169,6 +171,16 @@ def log_segment_stats(text: str) -> dict[str, Any]:
         'logged_accept_len_mean': sum(accept) / len(accept) if accept else None,
         'prefill_log_lines': text.count('Prefill batch'),
     }
+
+
+def peak_own_cpu(samples: list[dict[str, Any]]) -> dict[str, float]:
+    """Highest per-process CPU (cores) seen for each server/client process title."""
+    peaks: dict[str, float] = {}
+    for sample in samples:
+        for entry in sample.get('own', []):
+            title = entry['cmd'][:60]
+            peaks[title] = max(peaks.get(title, 0.0), entry['cores'])
+    return dict(sorted(peaks.items(), key=lambda item: -item[1])[:8])
 
 
 def sha256_file(path: Path) -> str:
@@ -237,6 +249,8 @@ class Sweep:
             osl=osl,
             body=self.body,
             seed=self.args.seed,
+            per_chunk_usage=self.args.per_chunk_usage,
+            export_level=self.args.export_level,
         )
         (point_dir / 'aiperf_command.json').write_text(json.dumps(command, indent=1) + '\n')
         with (point_dir / 'aiperf_console.txt').open('w') as console:
@@ -281,12 +295,12 @@ class Sweep:
         before = self.metrics()
         log_start = self.server.log_path.stat().st_size
         gpu_before = gpu_snapshot()
-        samples: list[float] = []
+        samples: list[dict[str, Any]] = []
         stop = threading.Event()
 
         def sample_cpu() -> None:
             while not stop.is_set():
-                samples.append(foreign_cpu(self.own_sessions, interval=5.0)['cores'])
+                samples.append(foreign_cpu(self.own_sessions, interval=5.0))
 
         sampler = threading.Thread(target=sample_cpu, daemon=True)
         sampler.start()
@@ -324,8 +338,11 @@ class Sweep:
                 'gpu_after': gpu_snapshot()['values'],
                 # CPU cores used by processes outside this sweep and its server.
                 'foreign_cpu_before': cpu_before,
-                'foreign_cpu_during_max': max(samples) if samples else None,
-                'foreign_cpu_during_mean': sum(samples) / len(samples) if samples else None,
+                'foreign_cpu_during_max': max((x['cores'] for x in samples), default=None),
+                'foreign_cpu_during_mean': (
+                    sum(x['cores'] for x in samples) / len(samples) if samples else None
+                ),
+                'own_cpu_during_peak': peak_own_cpu(samples),
             }
         )
         (point_dir / 'point.json').write_text(json.dumps(summary, indent=2, default=str) + '\n')
@@ -370,6 +387,8 @@ class Sweep:
             'min_requests': args.min_requests,
             'waves': args.waves,
             'min_warmup': args.min_warmup,
+            'per_chunk_usage': args.per_chunk_usage,
+            'export_level': args.export_level,
             'aiperf_version': subprocess.run(
                 [AIPERF, '--version'], capture_output=True, text=True, check=False
             ).stdout.strip(),
@@ -416,6 +435,18 @@ def main(argv: list[str] | None = None) -> int:
         default=True,
         help='chat_template_kwargs.enable_thinking (the fixed setting is on)',
     )
+    parser.add_argument(
+        '--per-chunk-usage',
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help='ask for usage on every streamed chunk (exact multi-token chunk counts)',
+    )
+    parser.add_argument(
+        '--export-level',
+        choices=('raw', 'records'),
+        default='raw',
+        help='raw keeps every SSE packet (needed for speculative stats and y_steady)',
+    )
     parser.add_argument('--min-requests', type=int, default=64)
     parser.add_argument('--waves', type=int, default=8, help='measured requests >= waves * c')
     parser.add_argument('--min-warmup', type=int, default=2)
@@ -430,6 +461,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument('--quiet-cpu-wait', type=float, default=600.0, help='seconds')
     parser.add_argument('--pyspy', action='store_true')
+    parser.add_argument(
+        '--no-strict', action='store_true', help='run even if launch checks fail (probing only)'
+    )
     parser.add_argument(
         '--allow-unlocked', action='store_true', help='skip the GPU lock check (debug only)'
     )
@@ -458,6 +492,7 @@ def main(argv: list[str] | None = None) -> int:
         host=args.host,
         sglang_worktree=args.sglang_worktree,
         pyspy=args.pyspy,
+        strict=not args.no_strict,
     )
     print(f'run directory: {run_dir}', flush=True)
     with server:
