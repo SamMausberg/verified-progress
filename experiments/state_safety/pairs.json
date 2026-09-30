@@ -44,5 +44,8 @@
   ["state path c1, plain_replayssm vs plain", "plain/c1", "plain_replayssm/c1"],
   ["batch c1 vs c32, plain_replayssm", "plain_replayssm/c1", "plain_replayssm/c32"],
   ["state path c1, mtp_s3_replayssm vs mtp_s3", "mtp_s3/c1", "mtp_s3_replayssm/c1"],
-  ["batch c1 vs c32, mtp_s3_replayssm", "mtp_s3_replayssm/c1", "mtp_s3_replayssm/c32"]
+  ["batch c1 vs c32, mtp_s3_replayssm", "mtp_s3_replayssm/c1", "mtp_s3_replayssm/c32"],
+  ["deterministic, plain c1 vs c8 (8-prompt validation)", "plain_det__validate/c1", "plain_det__validate/c8"],
+  ["deterministic, mtp_s3 c1 vs c8 (8-prompt validation)", "mtp_s3_det__validate/c1", "mtp_s3_det__validate/c8"],
+  ["deterministic + verify KV split patch, mtp_s3 c1 vs c32 (96 prompts)", "mtp_s3_det__verifyfix/c1", "mtp_s3_det__verifyfix/c32"]
 ]
