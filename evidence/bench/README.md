@@ -154,9 +154,33 @@ better at high concurrency.
 
 ```sh
 GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x bench/campaigns/tuning_depth.sh
-python -m bench.pareto $(ls -d ~/vp-data/bench/tuning/tune-*/2026* | grep -v tune-mtp-s1/) \
-    --out evidence/bench/tuning --status tuning --no-plot
+GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x bench/campaigns/tuning_knobs_dflash.sh
+python -m bench.pareto $(for d in ~/vp-data/bench/tuning/tune-*/2026*; do \
+    [ -f $d/r0/c001/point.json ] && echo $d; done) --out evidence/bench/tuning --status tuning --no-plot
 ```
+
+Slot T2 (state handling, backends, adaptive depth, DFlash); radix cache off and the KV
+cache capped at 1M tokens throughout, y in tok/s:
+
+| Config | c=1 | c=8 | c=32 | c=128 | Accept length |
+|---|---|---|---|---|---|
+| plain | 282 | 2,004 | (invalid) | 13,844 | - |
+| plain, Triton attention | 286 | 2,018 | 6,241 | 13,846 | - |
+| plain + `--enable-linear-replayssm` | 244 | 1,807 | 5,909 | 14,981 | - |
+| MTP s3 + replayssm-spec | 456 | 2,667 | 6,925 | 13,011 | 3.26 |
+| MTP s3 + replayssm-spec, Triton attention | 535 | 3,093 | 7,103 | 11,353 | 3.27 |
+| MTP adaptive depth + replayssm-spec | 474 | 2,603 | 5,968 | 10,010 | 3.89 to 1.00 |
+| DFlash block 8 | 686 | 3,443 | 6,727 | 10,226 | 4.75 |
+
+Invalid point: plain at c=32 (mean foreign load 2.8 cores from another workstream's
+analysis scripts); the Triton twin at c=32 is valid and plain is otherwise indifferent
+to the backend. Rejected at launch, so not performance results: DFlash with
+replayssm-spec (SGLang refuses buffered verify for DFLASH on non-KDA models), MTP
+replayssm-spec with FlashInfer GDN decode (NotImplementedError), and the first MTP
+replayssm-spec runs without the radix cache (out of memory in prefill before the KV
+cap existed; rerun as the row above). Adaptive depth drops to zero draft steps at
+c=128 yet stays below plain there, so the speculative worker's per-step overhead
+remains. DFlash block 8 is the strongest speculator at c<=8; plain is best at c=128.
 
 **GDN verify snapshot traffic (derived, not measured).** Speculative verify keeps one
 intermediate recurrent state per draft token per request so a rejected suffix can be
