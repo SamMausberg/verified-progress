@@ -32,6 +32,12 @@ mm-attention-backend = "triton_attn"
 max-running-requests = 128
 max-mamba-cache-size = 640
 mem-fraction-static = 0.85
+# Cap the KV cache at 1M tokens (a full batch of 128 at 7.8K tokens each, well
+# above the sweeps' ~600 and the quality runs' mean ~5.4K). Without a cap, a
+# configuration that needs little state memory (radix cache off, buffered verify)
+# hands ~2M tokens to the target KV cache, SGLang then allocates the draft's KV for
+# the same token count outside the static pool, and prefill runs out of memory.
+max-total-tokens = 1000000
 # /metrics: token, verify-call and CUDA-graph pass counters per sweep point.
 enable-metrics = true
 random-seed = 0

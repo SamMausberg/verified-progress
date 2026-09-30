@@ -34,3 +34,6 @@ for b in 8 16; do
 done
 run --arm dflash --label tune-dflash-b8-noradix --set speculative-dflash-block-size=8 \
   "${NORADIX[@]}" --no-strict
+# Reruns after capping the KV cache (--max-total-tokens) in bench/arms.toml.
+mtp 3 --label tune-mtp-s3-rspec-noradix "${RSPEC[@]}" "${NORADIX[@]}"
+mtp 4 --label tune-mtp-s4-rspec-noradix "${RSPEC[@]}" "${NORADIX[@]}"
