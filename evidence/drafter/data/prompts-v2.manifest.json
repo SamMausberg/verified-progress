@@ -1,0 +1,192 @@
+{
+  "seed": 20260930,
+  "per_domain": 6000,
+  "sources": {
+    "ultrachat": {
+      "repo": "HuggingFaceH4/ultrachat_200k",
+      "revision": "8049631c405ae6576f93f445c6b8166f76f5505a",
+      "licence": "MIT"
+    },
+    "oasst1": {
+      "repo": "OpenAssistant/oasst1",
+      "revision": "fdf72ae0827c1cda404aff25b6603abec9e3399b",
+      "licence": "Apache-2.0"
+    },
+    "magicoder": {
+      "repo": "ise-uiuc/Magicoder-OSS-Instruct-75K",
+      "revision": "5f839b1f368a76b161028bb9edff055db34022b2",
+      "licence": "MIT"
+    },
+    "mbpp": {
+      "repo": "google-research-datasets/mbpp",
+      "revision": "4bb6404fdc6cacfda99d4ac4205087b89d32030c",
+      "licence": "CC-BY-4.0"
+    },
+    "gsm8k": {
+      "repo": "openai/gsm8k",
+      "revision": "740312add88f781978c0658806c59bc2815b9866",
+      "licence": "MIT"
+    },
+    "hendrycks_math": {
+      "repo": "EleutherAI/hendrycks_math",
+      "revision": "21a5633873b6a120296cce3e2df9d5550074f4a3",
+      "licence": "MIT"
+    }
+  },
+  "mix": {
+    "chat": [
+      [
+        "oasst1",
+        0.3
+      ],
+      [
+        "ultrachat",
+        0.7
+      ]
+    ],
+    "code": [
+      [
+        "mbpp",
+        0.06
+      ],
+      [
+        "magicoder",
+        0.94
+      ]
+    ],
+    "math": [
+      [
+        "gsm8k",
+        0.5
+      ],
+      [
+        "hendrycks_math",
+        0.5
+      ]
+    ]
+  },
+  "filters": {
+    "min_chars": 16,
+    "max_prompt_tokens": 1024
+  },
+  "disjointness_check": {
+    "bench/workloads/mixed-v2/confirm.jsonl": {
+      "rows": 1152,
+      "file_sha256": "b65a50e4f7543d350a695681494f88d6de790f122853e34f8ac0ac44f2539674",
+      "hash_matches": 0,
+      "id_matches": 0
+    },
+    "bench/workloads/mixed-v2/tune.jsonl": {
+      "rows": 576,
+      "file_sha256": "35896665fe5e6d7b01397058c4ea876db29e488471a183a0b41073fa70c2c003",
+      "hash_matches": 0,
+      "id_matches": 0
+    },
+    "bench/workloads/mixed-v2/warmup.jsonl": {
+      "rows": 129,
+      "file_sha256": "b1f74fd72be86e60c4109ca9ee025d3f971a75c80e7f62392def6066ca767c6b",
+      "hash_matches": 0,
+      "id_matches": 0
+    },
+    "~/vp-data/drafter/data/bench-v1/confirm.jsonl": {
+      "rows": 1152,
+      "file_sha256": "137469edb92810e2bf787d80d997af939efcfa1bb133f7ba6a20d649c6f6b9f5",
+      "hash_matches": 0,
+      "id_matches": 0
+    },
+    "~/vp-data/drafter/data/bench-v1/tune.jsonl": {
+      "rows": 576,
+      "file_sha256": "a7d87f0b24952d747e456f237e725c3bae38b3e810c8bee6445e790939e5c644",
+      "hash_matches": 0,
+      "id_matches": 0
+    },
+    "~/vp-data/drafter/data/bench-v1/warmup.jsonl": {
+      "rows": 129,
+      "file_sha256": "4bcd636ef40a16f4a4208305d970c24690bd169be3a6ed0308a1dc37ee0ddc58",
+      "hash_matches": 0,
+      "id_matches": 0
+    },
+    "experiments/drafter/panel-v1.jsonl": {
+      "rows": 80,
+      "file_sha256": "e02f8bef57cf1bc992f0be890beb03268c666321f7dc573e20faae0615292e95",
+      "hash_matches": 0,
+      "id_matches": 0
+    },
+    "experiments/drafter/panel-v2.jsonl": {
+      "rows": 80,
+      "file_sha256": "3ff884b4176e8a85a8353eeafa953532cea48e5b6b9117bff0be9b7b44cf9adf",
+      "hash_matches": 0,
+      "id_matches": 0
+    },
+    "experiments/drafter/mtbench-first-turn.jsonl": {
+      "rows": 80,
+      "file_sha256": "f4460a2cd211d89afe196d822f02723c04a991ca970a04c3f9c21033653f979a",
+      "hash_matches": 0,
+      "id_matches": 0
+    },
+    "~/vp-data/drafter/data/exclude/gsm8k-test.jsonl": {
+      "rows": 1319,
+      "file_sha256": "f3382fb200206480ea90a674789bdde43d08f1d43b33ecf15b918256f81f677a",
+      "hash_matches": 0,
+      "id_matches": 0
+    },
+    "~/vp-data/drafter/data/exclude/math500.jsonl": {
+      "rows": 500,
+      "file_sha256": "d77133e976d7dd2ab47e6f5b8209d86ddc6029d5ce1068aa4399e8af6a6cf51c",
+      "hash_matches": 0,
+      "id_matches": 0
+    }
+  },
+  "stats": {
+    "oasst1": {
+      "pool": 3670,
+      "kept": 1800,
+      "excluded": 334,
+      "duplicate": 5,
+      "short": 46,
+      "long": 3
+    },
+    "ultrachat": {
+      "pool": 69289,
+      "kept": 4200,
+      "excluded": 0,
+      "duplicate": 0,
+      "short": 1,
+      "long": 94
+    },
+    "mbpp": {
+      "pool": 374,
+      "kept": 360,
+      "excluded": 0,
+      "duplicate": 0,
+      "short": 0,
+      "long": 0
+    },
+    "magicoder": {
+      "pool": 75197,
+      "kept": 5640,
+      "excluded": 0,
+      "duplicate": 0,
+      "short": 0,
+      "long": 1
+    },
+    "gsm8k": {
+      "pool": 7473,
+      "kept": 3000,
+      "excluded": 282,
+      "duplicate": 0,
+      "short": 0,
+      "long": 0
+    },
+    "hendrycks_math": {
+      "pool": 7500,
+      "kept": 3000,
+      "excluded": 0,
+      "duplicate": 1,
+      "short": 0,
+      "long": 2
+    }
+  },
+  "rows": 18000,
+  "sha256": "97123d99679b50ff0c466afe4003843bbb6afacee4bb8744e35e7e2b9047b9a1"
+}
