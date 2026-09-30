@@ -470,3 +470,14 @@ def test_host_load_counts_short_lived_foreign_processes() -> None:
         root.kill()
     assert result['cores'] >= 0.25
     assert all('while time.time()' not in proc['cmd'] for proc in result['top'])
+
+
+def test_single_step_mtp_needs_no_draft_decode_graph() -> None:
+    log = SPEC_LOG.replace('Capture draft decode CUDA graph', 'x')
+    state = spec_state(speculative_num_steps=1, speculative_num_draft_tokens=2)
+    one_step = spec_arm(**{'speculative-num-steps': 1, 'speculative-num-draft-tokens': 2})
+    checks = {c.name: c for c in verify_launch(log, state, one_step)}
+    assert checks['cuda_graph_decode'].ok
+    assert not {c.name: c for c in verify_launch(log, spec_state(), spec_arm())}[
+        'cuda_graph_decode'
+    ].ok
