@@ -24,9 +24,39 @@ Counting weight bytes gives the shape of the trade before any timing. At batch o
 \subsection{Acceptance by block position}\label{sec:drafter-acceptance}
 Let $h_j$ be the number of verify cycles in which exactly $j$ drafted tokens were accepted, $N=\sum_jh_j$, and $S(k)=\sum_{j\ge k}h_j/N$ the fraction of cycles that accept at least $k$. The conditional acceptance of block position $k$ is $\alpha_k=S(k)/S(k-1)$, and a cycle commits $\tau=1+\sum_{k\ge1}S(k)$ tokens on average. SGLang reports $h$ per request, so $\alpha_k$ and $\tau$ are measured rather than modelled. The card reports mean accepted lengths of 5.9--7.7 at block 16 on a B200 for its five benchmarks, against 3.3--3.5 for MTP with three steps~\cite{dflash4bcard}; these are the authors' numbers on other hardware.
 
-\pending{drafter: $\alpha_k$ for $k=1,\dots,15$ at block sizes 4, 8 and 16 per domain, greedy with thinking on, concurrency 1, and $\tau$ against tuned MTP on the same prompts; \nolinkurl{evidence/drafter/acceptance_by_position.csv}}
+The measurement uses a panel of 32 MATH-500 problems and the first 16 chat, 16 code and 16 GSM8K prompts of the benchmark's earlier confirmation split, decoded greedily with thinking on, stopping naturally at up to 2,048 new tokens, at concurrency 1, with blocks of 16 and 8 (\nolinkurl{evidence/drafter/}). The runs used an engine trace hook that synchronizes every cycle on a shared GPU, so acceptance and token counts are valid and timings are not; the panel contains benchmark test problems and measures acceptance only, never quality.
 
-\pendingfigure{Conditional acceptance $\alpha_k$ against block position $k$, one line per domain, block size 16, with MTP's three positions for comparison.}{evidence/drafter/acceptance_by_position.csv}
+\begin{table}[tbp]
+\small\centering
+\begin{tabular}{@{}lrrrrr@{}}\toprule
+Block size & All & Chat & Code & GSM8K & MATH-500\\\midrule
+16 & 6.98 & 4.26 & 7.87 & 7.16 & 7.81\\
+8 & 5.34 & 3.80 & 5.76 & 5.45 & 5.84\\\bottomrule
+\end{tabular}
+\caption{Committed tokens per verify cycle $\tau$ for the public DFlash drafter on GH200, averaged over requests as the model card does (greedy, thinking on, concurrency 1; 16 to 32 requests per domain). Pooled over tokens instead, block 16 gives 6.18 overall. Measured, \nolinkurl{evidence/drafter/acceptance_summary.csv}.}
+\label{tab:drafter-tau}
+\end{table}
+
+A block of 16 commits 7.0 tokens per verify cycle on average and a block of 8 commits 5.3 (Table~\ref{tab:drafter-tau}); the MATH-500 value, 7.8, is close to the 7.48 the card reports for that benchmark on a B200~\cite{dflash4bcard}. Acceptance depends strongly on the domain: chat commits about four tokens per cycle and code or mathematics about seven to eight. The per-position rates of Figure~\ref{fig:drafter-acceptance} show why a longer block still pays. Over all domains the conditional acceptance dips at the second position (0.80) and then rises toward 0.9, so the share of cycles that reach position 15 is still 13\%; the rise is a selection effect, since cycles that get that far are in predictable stretches of text, not a sign that the drafter is better deep in the block. Chat is lower throughout (0.69 at positions 2 and 3). Two further observations bound what training could change. Acceptance is lower in the answer after the thinking text than in the thinking itself for chat (3.3 against 4.2 tokens per cycle) and higher for code and mathematics, so no single segment dominates. And the first rejected draft in a cycle equals the target's token at the previous position in about 6\% of cycles, a repetition-type failure, while in 94\% it is some other token (\nolinkurl{evidence/drafter/trace_segments_b16.csv}, \nolinkurl{evidence/drafter/trace_segments_b16_failures.json}).
+
+\begin{figure}[tbp]
+\centering
+\datafigure{../evidence/drafter/acceptance_by_position.csv}{%
+\begin{tikzpicture}
+\begin{axis}[width=.78\linewidth,height=5.2cm,xmin=0.5,xmax=15.5,ymin=0.4,ymax=1,xtick={1,3,5,7,9,11,13,15},
+  xlabel={Block position $k$},ylabel={Conditional acceptance $\alpha_k$},grid=major,grid style={draw=ink!10},
+  legend style={at={(.97,.03)},anchor=south east,draw=none,fill=white,font=\small},legend columns=2,legend cell align=left,unbounded coords=discard]
+\addplot[thick,ink,mark=*,mark size=1.2pt,discard if not={domain}{all},discard if not={block_size}{16}] table[x=position,y=accept_prob,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};\addlegendentry{all}
+\addplot[thick,ochre,discard if not={domain}{chat},discard if not={block_size}{16}] table[x=position,y=accept_prob,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};\addlegendentry{chat}
+\addplot[thick,teal,discard if not={domain}{code},discard if not={block_size}{16}] table[x=position,y=accept_prob,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};\addlegendentry{code}
+\addplot[thick,dashed,muted,discard if not={domain}{math500},discard if not={block_size}{16}] table[x=position,y=accept_prob,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};\addlegendentry{MATH-500}
+\end{axis}
+\end{tikzpicture}}{Conditional acceptance by block position, block size 16, per domain.}
+\caption{Conditional acceptance $\alpha_k=S(k)/S(k-1)$ of the public DFlash drafter by block position, block size 16, greedy with thinking on. Measured, \nolinkurl{evidence/drafter/acceptance_by_position.csv}.}
+\label{fig:drafter-acceptance}
+\end{figure}
+
+\pending{drafter and bench: $\tau$ against tuned MTP on the same prompts, and the split of a cycle into draft, verification and host time from an untraced run}
 
 \subsection{Output equality and limits}\label{sec:drafter-limits}
 Greedy speculative verification is exact in real arithmetic, but the verify pass computes the target's logits at a different batch shape from plain decoding, so the stock noise floor of Section~\ref{sec:divergence} applies \pending{drafter: divergences of DFlash (blocks 8 and 16) against plain decoding per 1,000 tokens, classified by mechanism, against the plain-decoding floor; \nolinkurl{evidence/drafter/equality.json}}. Four limitations are candidates: acceptance that decays with block position or by domain; drafting cost dominated by the full-vocabulary head for fifteen positions; the verifier's per-position state writes, which bound block size at high concurrency; and draft states far from the target's in the head's metric, which decides whether transport can use DFlash drafts (Section~\ref{sec:transport-measured}). A custom drafter is worth training only against one of these, judged by total serving time: fine-tuning on the target's own outputs for acceptance, adding DFlash~2's selector~\cite{dflash} for acceptance, or an auxiliary loss on $\norm{h^t-h^d}_2^2/\norm{h^t}_2^2$ if transport's required drift reduction proves reachable \pending{drafter: which limitation the measurements support, and the decision on training}.
