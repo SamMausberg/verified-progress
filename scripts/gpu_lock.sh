@@ -9,8 +9,9 @@
 #                                         other jobs must stay under 20 GB
 #   scripts/gpu_lock.sh --status          list queued and running tickets
 #
-# Every job takes a ticket named <arrival ns>-<x|s>-<pid>, so jobs run in arrival
-# order. An exclusive job waits until its ticket is the oldest live ticket of
+# Every job takes a ticket named <rank>-<arrival ns>-<x|s>-<pid>, so jobs run in
+# arrival order. The rank is 5; GPU_LOCK_PRIORITY=1 gives rank 1, which sorts ahead
+# of every normal ticket (use it only when the integrator grants priority). An exclusive job waits until its ticket is the oldest live ticket of
 # either kind, then takes the lock exclusively (which also waits for shared jobs
 # already running) and keeps its ticket until it exits. A shared job waits only
 # for older exclusive tickets, takes the lock in shared mode alongside other
@@ -79,7 +80,9 @@ case "$mode" in
 esac
 
 mkdir -p "$QUEUE_DIR"
-name="$(date +%s%N)-$kind-$$"
+rank=5
+if [ "${GPU_LOCK_PRIORITY:-0}" = 1 ]; then rank=1; fi
+name="$rank-$(date +%s%N)-$kind-$$"
 ticket="$QUEUE_DIR/$name"
 printf '%s\n' "$*" > "$ticket"
 trap 'rm -f "$ticket"' EXIT
