@@ -18,6 +18,22 @@ BF16 operands. "Exact" below means that real-arithmetic value, the R-real refere
 `src/precision_reference.py` and `evidence/precision/README.md`, not the stock kernel's
 BF16 output (R-stock).
 
+## Decision so far
+
+- **H2, transport: refuted on DFlash-4B** (MTP-4B pending). The drafter's head input is not
+  close to the target's (rho median 0.92, smallest 0.82, against a per-row int8 threshold
+  of 0.0085), no certified bound family or tiling skips more than 0.5% of the vocabulary,
+  sampled acceptance is never decided, and the union over real verify batches needs 99.9%
+  of the head. Even oracle radii lose to the batch union at 16 rows.
+- **H3, self-evidence: confirmed.** An int8 head with a rigorous per-row envelope certifies
+  the R-real argmax and the Gumbel-max winner with 1.3-1.6 candidate rows on average (p99
+  5-8) on plain decode and on the DFlash-4B verify rows a greedy verifier needs, reading
+  0.50-0.52 of the BF16 head's bytes. FP8 per-row and int4 alone do not certify cheaply.
+- **For kernels:** int8 weights with FP16 scales per row (or per 128-group), W8A16, the row
+  Cauchy-Schwarz (or blockwise l2) envelope, compaction of rows with hi >= max lo, and BF16
+  rescoring of those rows. Under R-stock about 2% of positions (bucket-exact rule with the
+  conservative model: 1.4%) still need the stock kernel.
+
 ## Files
 
 | File | What it holds | Command (from `experiments/head_geometry/`) | Code |
@@ -32,6 +48,7 @@ BF16 output (R-stock).
 | `rho_dflash4b.json`, `rho_dflash4b_pairs.csv`, `rho_dflash4b_quantiles.csv` | DFlash-4B drift ratio rho on 40,000 held-out pairs and the per-row threshold; head-metric drift; realized per-tile errors; certification rates; plot data (the pairs CSV is a seeded 15,000-row subsample with prompt id and split) | `python analyze_rho.py --arm dflash4b --device cpu --max-rows 40000 --csv-pairs 15000 --out ../../evidence/head_geometry/rho_dflash4b.json` | `5c59ba3` |
 | `transport_dflash4b.{json,csv}` | DFlash-4B transport on 4,000 held-out pairs: skip fractions for greedy, partition widths and P_? at T = 1 and 0.7, retained-tail bounds, static screen, oracle radii, drift scaling, tile unions over real and random batches, by outcome, position and domain | `python analyze_transport.py --arm dflash4b --device cpu --max-rows 4000 --out ../../evidence/head_geometry --tag dflash4b` | `99b2d3f` |
 | `stats_dflash4b.json` | DFlash-4B: norms of draft and target head inputs, margins, top-m mass, drift norms and cosine by outcome and position | `python analyze_stats.py --arm dflash4b --device cpu --max-rows 20000 --out ../../evidence/head_geometry/stats_dflash4b.json` | `239c482` |
+| `selfevidence_dflash4b.{json,csv}`, `selfevidence_dflash4b_ccdf.csv` | H3 on 4,000 held-out DFlash-4B verify rows and 4,020 draft rows (int8, FP8 and int4 heads), split by whether the verifier needs the row | `python analyze_selfevidence.py --device cpu --threads 40 --sets dflash_verify dflash_draft --max-rows 4000 --chunk 64 --heads int8_row int8_g128 int8_g32 fp8_row int4_g128 int4_g32 --out ../../evidence/head_geometry --tag dflash4b`, then `export_candidate_ccdf.py --tag dflash4b` | `fa7aad8` |
 | `tail_killtest.json` | P1 kill test: INT8 surrogate of the final FFN (and head) versus certified head only | `python tail_killtest.py --threads 16 --out ../../evidence/head_geometry/tail_killtest.json` | `ea4f208` |
 
 The plain-decode capture ran with the capture patch before SGLang's own formatting hooks
@@ -110,7 +127,7 @@ transport and the static l2 screen each skip 0.08% of rows; transport with oracl
 (realized) radii would skip 99.9% (p10 67%); int8 per-row self-evidence skips all but one
 or two rows.
 
-## H3: self-evidence on plain decode
+## H3: self-evidence
 
 `selfevidence_plain4b.csv` has one row per (head, envelope, accumulation model, decision).
 The candidate counts certify the R-real decision. Headline, with the tensor-core
@@ -143,6 +160,29 @@ per step on average) the int8 g128 candidates cover 9.5-12.5 distinct rows. Resc
 position undecided; with the tensor-core error model for the rescoring, 2.1% still overlap.
 The int4 g32 plus int4-residual cascade reads 0.32 of BF16 bytes at batch 1 and 0.41-0.42
 over real batches of 5-16 rows.
+
+### DFlash-4B verify and draft head inputs
+
+`selfevidence_dflash4b.json` splits verify rows into those a greedy verifier needs (every
+earlier draft accepted; 1,162 of 4,000) and those after the first rejection, which are
+conditioned on a wrong prefix and have much flatter distributions (median top-1/top-2
+margin 1.7 logits over all verify rows against 7.3 on plain decode):
+
+| Rows | Head, envelope | Candidates mean | median | p99 | max | 1 candidate |
+|---|---|---|---|---|---|---|
+| verify, needed | int8 per-row, row CS | 1.57 | 1 | 8 | 22 | 75.9% |
+| verify, needed | int8 g128, blockwise | 1.35 | 1 | 6 | 17 | 81.6% |
+| verify, after the first rejection | int8 per-row, row CS | 4.03 | 3 | 20 | 31 | 28.4% |
+| draft, needed | int8 per-row, row CS | 1.28 | 1 | 4 | 13 | 80.8% |
+| draft, needed | int8 g128, blockwise | 1.17 | 1 | 3 | 7 | 86.0% |
+
+On the rows the verifier needs, int8 behaves as on plain decode. The draft head needs even
+fewer candidates although its margins are small, because its input has a third of the
+target's norm and the envelope scales with ||h||. A draft proposal does not have to be the
+exact argmax for greedy speculation to stay lossless, so the draft head can also use an
+uncertified low-precision head; certification matters for the verifier. FP8 per-row needs
+28.9 candidates on average over all verify rows (p99 240), and int4 g32 a median of 92,317.
+No envelope was violated and no winner was missed.
 
 ### R-stock: how often the stock decision needs the stock kernel
 
