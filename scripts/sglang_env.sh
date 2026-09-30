@@ -17,3 +17,8 @@ export LD_LIBRARY_PATH="$CUDA_COMPAT_DIR:$CUDA_HOME/lib64${LD_LIBRARY_PATH:+:$LD
 
 # shellcheck source=/dev/null
 source "$SGLANG_DIR/.venv/bin/activate"
+
+# An engine worktree from scripts/sglang_worktree.sh shadows the editable install.
+if [ -n "${SGLANG_WORKTREE:-}" ]; then
+  export PYTHONPATH="$SGLANG_WORKTREE/python${PYTHONPATH:+:$PYTHONPATH}"
+fi
