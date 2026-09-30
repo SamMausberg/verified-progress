@@ -194,6 +194,101 @@ def test_norm_bounds_are_per_row_upper_bounds(
             assert bool((codes.abs() <= 127).all())
 
 
+def adversarial_w8a8_hidden(k: int = 2560) -> torch.Tensor:
+    """BF16 rows that stress a non-power-of-two activation scale.
+
+    ``s_h = RN_fp32(max|h| / 127)`` has a full 24-bit mantissa for these maxima,
+    so ``s_h q_h`` is not a BF16 or FP32 value; elements sit as close as BF16
+    allows to half-codes ``(j + 1/2) s_h`` (where ``x / s_h`` rounding decides the
+    code), at the clamp, far below the scale (codes 0, subnormals) and at
+    maxima whose scale rounds down (``max|h| / s_h > 127``).
+    """
+    bits = torch.arange(0, 0x7F80, dtype=torch.int32).to(torch.int16)
+    pos = bits.view(torch.bfloat16).double()  # every finite non-negative BF16 value
+    rows = []
+    gen = torch.Generator().manual_seed(7)
+    for amax in (3.140625, 0.0301513671875, 1.7e4):
+        amax_bf16 = float(torch.tensor(amax, dtype=torch.bfloat16))
+        s = float(torch.tensor(amax_bf16 / 127, dtype=torch.float32))  # RN_fp32, as the kernel
+        cand = pos[(pos > 0) & (pos <= amax_bf16)]
+        t = cand / s
+        best: dict[int, int] = {}  # per code j, the BF16 value closest to (j + 1/2) s_h
+        for i in torch.argsort((t - torch.floor(t) - 0.5).abs()).tolist():
+            best.setdefault(int(t[i]), i)
+        closest = cand[list(best.values())]
+        near_half = closest.repeat(k // closest.numel() + 1)[: k - 1]
+        signs = torch.where(torch.rand(k - 1, generator=gen) < 0.5, -1.0, 1.0).double()
+        rows.append(torch.cat([torch.tensor([amax_bf16]).double(), near_half * signs]))
+    # The scale rounds down, so max|h| / s_h > 127: every code is at the clamp.
+    for amax in pos[(pos > 1) & (pos < 2)]:
+        a = float(amax)
+        if float(torch.tensor(a / 127, dtype=torch.float32)) < a / 127:
+            rows.append(
+                torch.full((k,), a).double() * torch.where(torch.arange(k) % 2 == 0, 1.0, -1.0)
+            )
+            break
+    tiny = pos[(pos > 0) & (pos < 2.0**-120)]  # subnormal BF16 values
+    mixed = torch.cat(
+        [torch.tensor([256.0]), tiny[torch.randint(0, tiny.numel(), (k - 1,), generator=gen)]]
+    )
+    rows.append(mixed.double())
+    rows.append(torch.full((k,), 3.140625).double())  # constant rows: q = 127 everywhere
+    rows.append(torch.randn(k, generator=gen).double() * 1e3)
+    rows.append(torch.randn(k, generator=gen).double() * 1e-3)
+    return torch.stack(rows).to(torch.bfloat16).cuda()
+
+
+@pytest.mark.parametrize('group_size', [2560, 128])
+def test_w8a8_activation_error_bound_is_exact_for_non_dyadic_scales(
+    checkpoint: tuple[Any, Any], group_size: int
+) -> None:
+    """The W8A8 activation error ``e_h = h - s_h q_h`` needs no power-of-two scale.
+
+    The kernel forms ``e_h`` in FP64 from the FP32 ``s_h`` that the epilogue
+    also multiplies by; ``q s_h`` has at most 31 significant bits and the
+    subtraction is exact (``|x| >= 2^-16 s_h``, or ``q = 0``), and the group norms
+    are rounded up. Checked here in exact rational arithmetic on adversarial
+    rows, together with the envelope and the decision.
+    """
+    from fractions import Fraction
+
+    w, qh = checkpoint
+    h = adversarial_w8a8_hidden()
+    m = h.shape[0]
+    head = CertifiedHead.from_quantized(
+        w, qh, reference='bf16', group_size=group_size, max_batch=m, capacity=64
+    )
+    head.arith_for = lambda _m: 'w8a8'
+    head._prep(h, m)
+    g = 2560 // group_size
+    s_h = head._hs[:m].cpu().tolist()
+    codes = head._hq[:m].cpu().tolist()
+    bound = head._b[:m, g : 2 * g].cpu().tolist()
+    x = h.float().cpu().tolist()
+    assert all(float(np.float32(v)) == v for v in s_h)
+    for r in range(m):
+        s = Fraction(s_h[r])
+        assert s.denominator & (s.denominator - 1) == 0  # an FP32 value
+        for j in range(g):
+            sl = slice(j * group_size, (j + 1) * group_size)
+            sq = sum(
+                (Fraction(xv) - q * s) ** 2 for xv, q in zip(x[r][sl], codes[r][sl], strict=True)
+            )
+            assert Fraction(bound[r][j]) ** 2 >= sq, (r, j)
+        assert all(abs(q) <= 127 for q in codes[r])
+    lo, hi, _ = head.envelope(h)
+    ex = exact_logits_fp64(h, w)
+    slack = 1e-9 * (1 + ex.abs())
+    finite = torch.isfinite(lo) & torch.isfinite(hi)
+    assert bool((lo.double()[finite] <= (ex - slack)[finite]).all())
+    assert bool((hi.double()[finite] >= (ex + slack)[finite]).all())
+    ids, stats = head.argmax(h)
+    assert torch.equal(ids, reference_argmax(h, w, 'bf16'))
+    print(
+        f'W8A8 adversarial rows (group {group_size}): fallback rows {int(stats.fallback.sum())} of {m}'
+    )
+
+
 def test_noncontiguous_hidden_is_rejected(head_bf16: CertifiedHead) -> None:
     h = random_hidden(8).T.contiguous().T  # a strided view of the same values
     with pytest.raises(ValueError):
