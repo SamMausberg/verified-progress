@@ -35,6 +35,7 @@ from __future__ import annotations
 import argparse
 import collections
 import csv
+import hashlib
 import json
 import statistics
 from collections.abc import Sequence
@@ -271,6 +272,37 @@ def analyze_run(
     return summary, progress_rows, src_rows
 
 
+def write_one_step(manifest: Path, summaries: list[dict[str, Any]], path: Path) -> None:
+    """One-step recycling summary with the shared trace's provenance (hashes, launch)."""
+    man = json.loads(manifest.read_text())
+
+    def sha256(p: str) -> str:
+        return hashlib.sha256(Path(p).expanduser().read_bytes()).hexdigest()
+
+    trace = {}
+    for name, run in man['runs'].items():
+        trace[name] = {
+            'cycles_file': run['cycles_file'],
+            'sha256': sha256(run['cycles_file']),
+            'requests_file': run['requests_file'],
+            'sha256_requests': sha256(run['requests_file']),
+            'launch_command': run['launch']['command'],
+            'launch_env': run['launch'].get('env'),
+        }
+    out = {
+        'kind': 'measured offline from the drafter workstream DFlash-4B greedy trace (real target '
+        'argmax at every verify row); one-step comparison of next-block draft sources',
+        'trace': trace,
+        'panel': man['panel_file'],
+        'math500_ids': man['math500_ids'],
+        'results': [
+            {k: v for k, v in s.items() if k not in ('run', 'hazards', 'one_correction')}
+            for s in summaries
+        ],
+    }
+    path.write_text(json.dumps(out, indent=1))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -279,6 +311,12 @@ def main() -> None:
     ap.add_argument('--drop-first', type=int, default=0)
     ap.add_argument('--drop-last', type=int, default=1, help='the flush request')
     ap.add_argument('--out-dir', type=Path, required=True)
+    ap.add_argument(
+        '--manifest',
+        type=Path,
+        default=None,
+        help='drafter trace manifest; also writes one_step_recycling.json with provenance',
+    )
     args = ap.parse_args()
     summaries, progress, sources = [], [], []
     for run in args.runs:
@@ -291,6 +329,8 @@ def main() -> None:
         print(json.dumps({k: v for k, v in s.items() if k not in ('accept_hist',)}, default=str))
     args.out_dir.mkdir(parents=True, exist_ok=True)
     (args.out_dir / 'jacobi_summary.json').write_text(json.dumps(summaries, indent=2, default=str))
+    if args.manifest is not None:
+        write_one_step(args.manifest, summaries, args.out_dir / 'one_step_recycling.json')
     for name, rows in (('jacobi_progress.csv', progress), ('draft_source_accuracy.csv', sources)):
         if rows:
             with open(args.out_dir / name, 'w', newline='') as f:
