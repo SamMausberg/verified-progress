@@ -75,9 +75,15 @@ SGLANG_WORKTREE=~/sglang-wt/drafter source scripts/sglang_env.sh
 The drafter's timed runs use the stock engine; trained drafters load through SGLang's
 unmodified `DFlashDraftModel` and `DFlash2DraftModel`.
 
-## repair (`repair-*.patch`, branch `engine/repair`)
+## repair (`patches/repair/0001`, branch `engine/repair`)
 
-`repair-0001` adds `sglang/srt/speculative/repair_probe.py` and hooks in the DFlash worker
+```sh
+scripts/sglang_worktree.sh repair
+git -C ~/sglang-wt/repair am "$PWD"/engine/sglang/patches/repair/*.patch
+SGLANG_WORKTREE=~/sglang-wt/repair source scripts/sglang_env.sh
+```
+
+`0001` adds `sglang/srt/speculative/repair_probe.py` and hooks in the DFlash worker
 (`dflash_worker_v2.py`) for the long-window repair oracles in `experiments/repair/`. Nothing
 changes unless one of these variables is set:
 

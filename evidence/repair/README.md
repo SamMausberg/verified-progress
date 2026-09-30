@@ -4,7 +4,7 @@ Evidence for the repair workstream's kill tests of PROPOSALS.md P2 (long-window 
 repair) and P3 (target-anchored residual decoding). Setting throughout: Qwen/Qwen3.5-4B
 at `851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a`, drafter z-lab/Qwen3.5-4B-DFlash at
 `9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf`, SGLang `bd66ce343e` plus
-`engine/sglang/patches/repair-0001-*.patch` (engine commit `101e52731b` on branch
+`engine/sglang/patches/repair/0001-*.patch` (engine commit `101e52731b` on branch
 `engine/repair`), one GH200, greedy decoding, concurrency 1. Code is in
 `experiments/repair/`; raw traces stay in `~/vp-data/repair/`.
 

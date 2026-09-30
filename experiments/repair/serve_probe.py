@@ -36,6 +36,7 @@ import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -47,6 +48,10 @@ MODEL_REVISION = '851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a'
 DRAFT = 'z-lab/Qwen3.5-4B-DFlash'
 DRAFT_REVISION = '9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf'
 HOME = Path.home()
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO))
+from bench.server import foreign_cpu, wait_for_quiet_cpu
+
 ENGINE_WORKTREE = HOME / 'sglang-wt' / 'repair'
 
 # The configuration of the drafter workstream's shared DFlash-4B baseline trace
@@ -65,6 +70,8 @@ BASE_ARGS = {
     'linear-attn-prefill-backend': 'flashinfer',
     'linear-attn-decode-backend': 'flashinfer',
     'random-seed': '0',
+    # Shared default for served comparisons with DFlash (bench notes, 2026-09-30).
+    'stream-interval': '4',
 }
 BASE_ENV = {'SGLANG_ENABLE_OVERLAP_PLAN_STREAM': '1'}
 
@@ -74,6 +81,45 @@ def http_json(url: str, payload: Any = None, timeout: float = 30.0) -> Any:
     req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode())
+
+
+class CpuWatch:
+    """Sample CPU use by processes outside this run's sessions while requests are served."""
+
+    def __init__(self, own_sessions: set[int], period_s: float = 5.0):
+        self.own = own_sessions
+        self.period = period_s
+        self.samples: list[float] = []
+        self.top: list[dict[str, Any]] = []
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+
+    def _run(self) -> None:
+        while not self._stop.is_set():
+            sample = foreign_cpu(self.own, interval=2.0)
+            self.samples.append(sample['cores'])
+            if sample['cores'] > 2.0:
+                self.top.append(sample)
+            self._stop.wait(self.period)
+
+    def __enter__(self) -> CpuWatch:
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self._stop.set()
+        self._thread.join(timeout=30)
+
+    def summary(self) -> dict[str, Any]:
+        n = len(self.samples)
+        mean = sum(self.samples) / n if n else None
+        return {
+            'samples': n,
+            'mean_cores': mean,
+            'max_cores': max(self.samples) if n else None,
+            'contaminated': bool(mean is not None and mean > 2.0),
+            'busy_samples_top': self.top[:5],
+        }
 
 
 @contextlib.contextmanager
@@ -368,7 +414,14 @@ def main() -> int:
             stream_generate(
                 base, request['input_ids'], min(args.max_new_tokens, 256), args.ignore_eos
             )
-        with open(out / 'results.jsonl', 'w') as results:
+        own = {os.getsid(0), proc.pid}
+        # Timed runs wait (up to 10 min) for other jobs' CPU use to fall below 2 cores.
+        quiet_wait = 600 if args.timing else 0
+        run_info['foreign_cpu_before'] = wait_for_quiet_cpu(
+            own, max_cores=2.0, max_wait_s=quiet_wait
+        )
+        watch = CpuWatch(own)
+        with watch, open(out / 'results.jsonl', 'w') as results:
             for request in requests:
                 gen = generate_with_logprobs if args.logprobs else stream_generate
                 rec = gen(base, request['input_ids'], args.max_new_tokens, args.ignore_eos)
@@ -402,6 +455,7 @@ def main() -> int:
         # A short trailing request lets the engine flush the timing records of
         # the last recorded request (they are resolved lazily).
         stream_generate(base, requests[0]['input_ids'], 64, args.ignore_eos)
+        run_info['foreign_cpu_during'] = watch.summary()
         run_info['ready_s'] = ready_s
         run_info['finished'] = time.strftime('%Y-%m-%dT%H:%M:%S%z')
         (out / 'run.json').write_text(json.dumps(run_info, indent=2))
