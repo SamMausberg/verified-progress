@@ -25,6 +25,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from bench.hostload import CONTENTION_CORES
+
 POINT_FIELDS = (
     'status',
     'invalid_reason',
@@ -79,6 +81,9 @@ def invalid_reason(point: dict[str, Any]) -> str:
     for key in ('x_e2e', 'y'):
         if not _finite(point.get(key)):
             reasons.append(f'{key} not finite')
+    foreign = point.get('foreign_cpu_during_mean')
+    if isinstance(foreign, int | float) and math.isfinite(foreign) and foreign > CONTENTION_CORES:
+        reasons.append(f'host_contention ({foreign:.1f} foreign cores on average)')
     return '; '.join(reasons)
 
 

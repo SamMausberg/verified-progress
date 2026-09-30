@@ -26,12 +26,12 @@ import re
 import shutil
 import subprocess
 import sys
-import threading
 import time
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+from bench.hostload import HostLoadSampler, wait_for_quiet
 from bench.results import (
     counter_deltas,
     iter_jsonl,
@@ -45,12 +45,10 @@ from bench.server import (
     Server,
     add_arm_arguments,
     arm_from_args,
-    foreign_cpu,
     gpu_lock_held_by_someone,
     gpu_snapshot,
     http_get,
     http_post,
-    wait_for_quiet_cpu,
 )
 
 AIPERF = str(Path.home() / '.local/bin/aiperf')
@@ -101,6 +99,8 @@ def aiperf_command(
     aiperf: str = AIPERF,
     per_chunk_usage: bool = True,
     export_level: str = 'raw',
+    streaming: bool = True,
+    workers: int | None = None,
 ) -> list[str]:
     command = [
         aiperf,
@@ -115,7 +115,7 @@ def aiperf_command(
         url,
         '--endpoint-type',
         'chat',
-        '--streaming',
+        *(['--streaming'] if streaming else []),
         '--input-file',
         str(input_file),
         '--custom-dataset-type',
@@ -147,6 +147,8 @@ def aiperf_command(
     ]
     if warmup > 0:
         command += ['--warmup-request-count', str(warmup)]
+    if workers:
+        command += ['--workers-max', str(workers)]
     return command
 
 
@@ -164,23 +166,18 @@ def log_segment_stats(text: str) -> dict[str, Any]:
     graph = [flag == 'True' for _, _, flag, _ in lines]
     accept = [float(value) for _, value, _, _ in lines if value]
     running = [int(value) for value, _, _, _ in lines]
+    top = max(running) if running else 0
+    # The server's own decode rate while (nearly) the full batch is running: what
+    # the GPU sustains, against which the client-observed y can be compared.
+    full = sorted(float(tps) for run, _, _, tps in lines if top and int(run) >= 0.9 * top)
     return {
         'decode_log_lines': len(lines),
         'decode_log_lines_without_graph': graph.count(False),
-        'max_running_logged': max(running) if running else 0,
+        'max_running_logged': top,
         'logged_accept_len_mean': sum(accept) / len(accept) if accept else None,
+        'logged_gen_tps_full_batch_p50': full[len(full) // 2] if full else None,
         'prefill_log_lines': text.count('Prefill batch'),
     }
-
-
-def peak_own_cpu(samples: list[dict[str, Any]]) -> dict[str, float]:
-    """Highest per-process CPU (cores) seen for each server/client process title."""
-    peaks: dict[str, float] = {}
-    for sample in samples:
-        for entry in sample.get('own', []):
-            title = entry['cmd'][:60]
-            peaks[title] = max(peaks.get(title, 0.0), entry['cores'])
-    return dict(sorted(peaks.items(), key=lambda item: -item[1])[:8])
 
 
 def sha256_file(path: Path) -> str:
@@ -200,9 +197,6 @@ class Sweep:
         }
         self.body = request_body(args.ignore_eos, args.thinking)
         self.points: list[dict[str, Any]] = []
-        assert server.proc is not None
-        # The sweep (with its aiperf children) and the server each own a session.
-        self.own_sessions = {os.getsid(0), os.getsid(server.proc.pid)}
 
     @property
     def url(self) -> str:
@@ -249,8 +243,10 @@ class Sweep:
             osl=osl,
             body=self.body,
             seed=self.args.seed,
-            per_chunk_usage=self.args.per_chunk_usage,
+            per_chunk_usage=self.args.per_chunk_usage and self.args.streaming,
             export_level=self.args.export_level,
+            streaming=self.args.streaming,
+            workers=self.args.aiperf_workers,
         )
         (point_dir / 'aiperf_command.json').write_text(json.dumps(command, indent=1) + '\n')
         with (point_dir / 'aiperf_console.txt').open('w') as console:
@@ -295,26 +291,16 @@ class Sweep:
             raise RuntimeError(
                 f'prefix-cache flush failed before c={concurrency}; not measuring this point'
             )
-        cpu_before = wait_for_quiet_cpu(
-            self.own_sessions, args.quiet_cpu_cores, args.quiet_cpu_wait
-        )
+        # The sweep's own process tree (server, aiperf) is excluded from foreign load.
+        cpu_before = wait_for_quiet(os.getpid(), args.quiet_cpu_cores, args.quiet_cpu_wait)
         before = self.metrics()
         log_start = self.server.log_path.stat().st_size
         gpu_before = gpu_snapshot()
-        samples: list[dict[str, Any]] = []
-        stop = threading.Event()
-
-        def sample_cpu() -> None:
-            while not stop.is_set():
-                samples.append(foreign_cpu(self.own_sessions, interval=5.0))
-
-        sampler = threading.Thread(target=sample_cpu, daemon=True)
-        sampler.start()
         started = time.time()
-        result = self.run_aiperf(point_dir, concurrency, requests, warmup, prompts, args.osl)
+        with HostLoadSampler(os.getpid(), interval=1.0) as sampler:
+            result = self.run_aiperf(point_dir, concurrency, requests, warmup, prompts, args.osl)
         elapsed = time.time() - started
-        stop.set()
-        sampler.join()
+        host_load = sampler.summary()
         after = self.metrics()
         with self.server.log_path.open('rb') as handle:
             handle.seek(log_start)
@@ -331,6 +317,12 @@ class Sweep:
         summary.update(
             {
                 'repeat': repeat,
+                'client': {
+                    'streaming': args.streaming,
+                    'per_chunk_usage': args.per_chunk_usage and args.streaming,
+                    'export_level': args.export_level,
+                    'aiperf_workers': args.aiperf_workers,
+                },
                 'aiperf_exit_code': result.returncode,
                 'wall_s': elapsed,
                 'warmup_requests': warmup,
@@ -342,13 +334,13 @@ class Sweep:
                 'server_log': log_segment_stats(segment),
                 'gpu_before': gpu_before['values'],
                 'gpu_after': gpu_snapshot()['values'],
-                # CPU cores used by processes outside this sweep and its server.
+                # CPU cores used by processes outside this sweep, its server and client,
+                # sampled once per second during the point (bench/hostload.py).
                 'foreign_cpu_before': cpu_before,
-                'foreign_cpu_during_max': max((x['cores'] for x in samples), default=None),
-                'foreign_cpu_during_mean': (
-                    sum(x['cores'] for x in samples) / len(samples) if samples else None
-                ),
-                'own_cpu_during_peak': peak_own_cpu(samples),
+                'host_load': host_load,
+                'foreign_cpu_during_max': host_load['foreign_cores_max'],
+                'foreign_cpu_during_mean': host_load['foreign_cores_mean'],
+                'own_cpu_during_peak': host_load['own_peak_cores'],
             }
         )
         (point_dir / 'point.json').write_text(json.dumps(summary, indent=2, default=str) + '\n')
@@ -395,6 +387,8 @@ class Sweep:
             'min_warmup': args.min_warmup,
             'per_chunk_usage': args.per_chunk_usage,
             'export_level': args.export_level,
+            'streaming': args.streaming,
+            'aiperf_workers': args.aiperf_workers,
             'aiperf_version': subprocess.run(
                 [AIPERF, '--version'], capture_output=True, text=True, check=False
             ).stdout.strip(),
@@ -419,7 +413,7 @@ def format_point(summary: dict[str, Any]) -> str:
     )
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     add_arm_arguments(parser)
     parser.add_argument('--label', default=None, help='run label (default: arm name)')
@@ -476,6 +470,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         '--allow-busy-gpu', action='store_true', help='run even if other GPU processes exist'
     )
+    parser.add_argument(
+        '--streaming',
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help='stream responses (needed for TTFT and ITL; --no-streaming is diagnostic only)',
+    )
+    parser.add_argument(
+        '--aiperf-workers', type=int, default=None, help='aiperf --workers-max (default: aiperf)'
+    )
+    return parser
+
+
+def prepare(parser: argparse.ArgumentParser, argv: list[str] | None) -> argparse.Namespace:
+    """Parse arguments and apply the checks every timed run needs."""
     args = parser.parse_args(argv)
     args.workload = args.workload.resolve()
     args.warmup_pool = args.warmup_pool.resolve()
@@ -488,7 +496,13 @@ def main(argv: list[str] | None = None) -> int:
     busy = gpu_snapshot()['compute_apps']
     if busy and not args.allow_busy_gpu:
         parser.error(f'GPU has running processes: {busy}')
+    args.arm_resolved = arm
+    return args
 
+
+def main(argv: list[str] | None = None) -> int:
+    args = prepare(build_parser(), argv)
+    arm = args.arm_resolved
     run_dir = args.out.expanduser() / args.label / time.strftime('%Y%m%d-%H%M%S')
     run_dir.mkdir(parents=True, exist_ok=True)
     server = Server(

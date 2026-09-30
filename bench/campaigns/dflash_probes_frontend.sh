@@ -3,7 +3,7 @@
 # a frontend diagnostic and a quality-pipeline smoke, in one exclusive slot.
 set -uo pipefail
 # shellcheck source=/dev/null
-source ~/verified-progress/scripts/sglang_env.sh
+source "$(dirname "$0")/../../scripts/sglang_env.sh"
 cd "$(dirname "$0")/../.." || exit 1
 COMMON=(--out ~/vp-data/bench/probes --port 30012 --osl 512 --waves 2 --min-requests 16
         --workload bench/workloads/mixed-v2/tune.jsonl --no-strict --quiet-cpu-wait 120)

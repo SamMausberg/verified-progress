@@ -1,0 +1,155 @@
+{
+ "summary": {
+  "a": "/home/ubuntu/vp-data/state/tap/v3_smoke",
+  "b": "/home/ubuntu/vp-data/state/tap/v3_ctrl_down9",
+  "prompts": 4,
+  "classes": {
+   "accumulator_ambiguous": 1,
+   "no_divergence": 3
+  },
+  "classes_hopper_model": {
+   "rounding_flip": 1,
+   "no_divergence": 3
+  },
+  "first_difference_module": {
+   "model.layers.9.mlp.down_proj": 4
+  },
+  "first_difference_modes": {
+   "EXTEND vs EXTEND": 4
+  },
+  "first_difference_output_index": {
+   "prompt": 4
+  },
+  "origin": {
+   "caches_not_hashed": 4
+  },
+  "first_cache_difference": {},
+  "no_hash_difference_before_divergence": 0
+ },
+ "cases": [
+  {
+   "id": "alpaca_eval-0000",
+   "prompt_len": 27,
+   "diverged_at": 6,
+   "first_difference": {
+    "position": 0,
+    "module": "model.layers.9.mlp.down_proj",
+    "modules_differing_at_position": 317,
+    "mode_a": "EXTEND",
+    "mode_b": "EXTEND",
+    "batch_a": 1,
+    "batch_b": 1,
+    "tokens_a": 27,
+    "tokens_b": 27,
+    "output_index": null
+   },
+   "origin": "caches_not_hashed",
+   "argmax_a": 63049,
+   "argmax_b": 26310,
+   "bf16_logits_a": [
+    20.25,
+    20.125
+   ],
+   "bf16_logits_b": [
+    20.25,
+    20.25
+   ],
+   "logits_bitwise_equal": false,
+   "head_input_bitwise_equal": false,
+   "exact_logits_a": [
+    20.26015775918495,
+    20.182048435061006
+   ],
+   "exact_logits_b": [
+    20.229359967110213,
+    20.20977859632694
+   ],
+   "head_input_max_abs_diff": 0.171875,
+   "exact_gap_a": 0.07810932412394322,
+   "exact_gap_b": 0.019581370783271268,
+   "bf16_gap_a": 0.125,
+   "bf16_gap_b": 0.0,
+   "abs_products_a": 131.25702598204953,
+   "abs_products_b": 131.25192683478235,
+   "model_conservative": {
+    "gap_bound_a": 0.08016185781241573,
+    "gap_bound_b": 0.0801587436391733,
+    "accumulator_order_source": [
+     "bf16",
+     "ambiguous"
+    ],
+    "float64_contradicts_bf16": false,
+    "cls": "accumulator_ambiguous"
+   },
+   "model_hopper": {
+    "gap_bound_a": 0.015619586091863895,
+    "gap_bound_b": 0.015618979293339101,
+    "accumulator_order_source": [
+     "bf16",
+     "float64"
+    ],
+    "float64_contradicts_bf16": false,
+    "cls": "rounding_flip",
+    "run_against_accumulator_order": "b"
+   },
+   "cls": "accumulator_ambiguous"
+  },
+  {
+   "id": "alpaca_eval-0010",
+   "prompt_len": 32,
+   "diverged_at": null,
+   "first_difference": {
+    "position": 0,
+    "module": "model.layers.9.mlp.down_proj",
+    "modules_differing_at_position": 317,
+    "mode_a": "EXTEND",
+    "mode_b": "EXTEND",
+    "batch_a": 1,
+    "batch_b": 1,
+    "tokens_a": 32,
+    "tokens_b": 32,
+    "output_index": null
+   },
+   "origin": "caches_not_hashed",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0020",
+   "prompt_len": 19,
+   "diverged_at": null,
+   "first_difference": {
+    "position": 0,
+    "module": "model.layers.9.mlp.down_proj",
+    "modules_differing_at_position": 317,
+    "mode_a": "EXTEND",
+    "mode_b": "EXTEND",
+    "batch_a": 1,
+    "batch_b": 1,
+    "tokens_a": 19,
+    "tokens_b": 19,
+    "output_index": null
+   },
+   "origin": "caches_not_hashed",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0030",
+   "prompt_len": 19,
+   "diverged_at": null,
+   "first_difference": {
+    "position": 0,
+    "module": "model.layers.9.mlp.down_proj",
+    "modules_differing_at_position": 317,
+    "mode_a": "EXTEND",
+    "mode_b": "EXTEND",
+    "batch_a": 1,
+    "batch_b": 1,
+    "tokens_a": 19,
+    "tokens_b": 19,
+    "output_index": null
+   },
+   "origin": "caches_not_hashed",
+   "cls": "no_divergence"
+  }
+ ]
+}

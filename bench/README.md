@@ -146,3 +146,11 @@ python -m bench.quality compare <plain run dir> <mtp run dir>
 A variant needs no new arm to be tried: `--set speculative-num-steps=4
 --set speculative-num-draft-tokens=5 --label mtp-s4`. Promote it to `arms.toml`
 once it is a result.
+
+## Open items
+
+- Concurrency above 256 has not been measured on a quiet host; the frontend diagnosis
+  (evidence/bench/frontend/) covers c=256 only.
+- `SGLANG_RUST_SERVER=1` (SGLang's embedded Rust HTTP server, an alternative to the
+  Python tokenizer manager) fails at launch here because it wants a local
+  `tokenizer.json` path rather than a Hub model ID; untested with `--tokenizer-path`.

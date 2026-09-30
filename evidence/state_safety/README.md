@@ -1,0 +1,235 @@
+# State safety and the stock noise floor (H5)
+
+Evidence for whether SGLang keeps Qwen3.5-4B's hybrid Gated DeltaNet (GDN) plus
+attention state correct under native MTP speculation, and for how and why stock
+configurations that should give the same greedy output disagree. Scripts and exact
+commands are in [`experiments/state_safety/`](../../experiments/state_safety/README.md).
+
+This file is updated as runs complete. Results not yet collected are marked
+**pending**; nothing below is extrapolated from them.
+
+## Setup
+
+- SGLang `bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824` (stock clone for all matrix runs;
+  `run_meta.json` records `sglang_dirty: false`), Qwen/Qwen3.5-4B at
+  `851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a`, one GH200 (sm_90), CUDA 13 compat,
+  FlashInfer attention, Triton GDN kernels, CUDA graphs and the overlap scheduler on.
+- Server flags common to every configuration: `--mem-fraction-static 0.25
+  --max-running-requests 16 --mamba-full-memory-ratio 2 --incremental-streaming-output
+  --random-seed 0` (see `run_meta.json` for the full command of each run).
+- 320 prompts from GSM8K, HumanEval, MT-Bench, AlpacaEval and CNN/DailyMail at pinned
+  revisions, tokenized once (`prompt_manifest.json`, including the SHA-256 of the
+  token IDs); 105 use Qwen's thinking mode. Greedy decoding, up to 256 new tokens,
+  top-5 target logprobs at every output position.
+
+## Why equivalent configurations disagree: the mechanism
+
+### The decision rule is the same in every path
+
+The LM head is a BF16 `torch.matmul(H, W.T)` (`logits_processor._compute_lm_head`)
+whose output is widened to FP32 exactly. Plain decode (`layers/sampler.py`, greedy
+branch) and MTP verification (`speculative/eagle_utils.eagle_sample`) both take
+`torch.argmax` over that tensor, which returns the first index among equal maxima.
+The draft's own top-1 choice changes only what is proposed, never what is committed.
+Two runs that feed identical logits to this rule cannot choose different tokens, so
+every divergence means the logits differed. The questions are where the computed
+values first differ and how that difference reaches the chosen token.
+
+### Method: a bit-exact tensor tap
+
+`engine/sglang/patches/state/0001-state-tap.patch` hooks every module of the target
+model, plus two points inside the GDN backend (after the causal convolution and after
+the recurrent kernel), and writes a 64-bit hash of each output's exact bits, one row
+per token, into static device buffers. The hooks only launch GPU ops, so they are
+captured into the CUDA graphs and replay with them. For tapped requests the rows are
+saved after every forward together with the head input (final norm output) and the
+logits fed to argmax.
+
+`experiments/state_safety/mechanism.py` replays two configurations on the same
+prompts and aligns the committed rows by sequence position (for MTP, only verify rows
+on the accepted path). Walking positions in order, it reports the first position and,
+in execution order, the first module whose output bits differ: the **first differing
+module output**. Before it, every hashed module output is bitwise equal. That is not
+yet proof that the module's kernel is where the runs part: the caches (attention KV,
+GDN convolution window and SSM state) are not module outputs, and a difference written
+into a cache without a differing output (a rolled-back verify state, a radix repoint,
+a batch-dependent cache write) would first show up in the module that reads it. The
+current tap therefore also hashes, before every tapped forward, the caches that
+forward reads (KV per cached position and attention layer, through the request's
+`req_to_token` row; GDN convolution and SSM state per layer), and `mechanism.py`
+reports the first forward whose entering caches differ. The results below were
+collected before cache hashing was added, so they name first differing module
+outputs; the cache-level check is **pending** (a queued run repeats them with the cache
+hashes). At the token divergence the analysis also recomputes, in float64, the exact
+logits of the two competing tokens from each run's saved head input and the BF16 head
+weights.
+
+Checks on the tool itself:
+
+- Neutrality: tapped runs match the untapped matrix run in tokens and logprobs for
+  162 of 167 prompts (plain decode, batch 1). The five exceptions are an open question
+  (below), not an assumption.
+- Positive controls (`tap_control_*.json`, analysed with the current `mechanism.py`):
+  a one-ulp change injected into the first element of layer 9's `mlp.down_proj` output
+  in every forward is named as the first difference, at the first prompt token, for
+  4/4 prompts (`tap_control_down9.json`). A one-ulp change injected into layer 13's
+  GDN recurrence output is named, when the search starts at the first decode position,
+  at that op (`linear_attn.gdn_core`, output index 1) for 4/4 prompts
+  (`tap_control_core13_decode.json`). Searched from the prompt, it is attributed to
+  the enclosing `linear_attn.attn` module (convolution plus recurrence) for 4/4
+  (`tap_control_core13.json`): in prefill the attention backends run eagerly between
+  the captured segments of SGLang's breakable prefill graph, and the tap version that
+  ran the controls did not regroup those eager tensors per token. Prefill
+  attributions inside the GDN block therefore resolve to that module, not to its two
+  kernels.
+- Withdrawn attributions: the first tap version hashed tensors laid out as
+  `[1, T, ...]` (the GDN core output) or `[T * heads, ...]` (the gated norm) with the
+  wrong row count, which silently excluded the GDN core from the comparison and
+  misaligned the norm's rows. Every module attribution from that version is withdrawn
+  and none is used here. The results below come from the corrected tap.
+
+### Classes at the divergence
+
+For the token position where the runs first choose differently, with competing tokens
+*a* and *b*:
+
+- **tie rule**: the logits fed to argmax are bitwise equal, yet the tokens differ.
+- **head GEMM**: the head input is bitwise equal but the logits differ.
+The remaining classes compare, in each run, the order of the two tokens' FP32
+accumulator values in the head GEMM, before BF16 rounding. Rounding to nearest is
+monotone, so where a run's BF16 logits for *a* and *b* differ, their order is the
+accumulator's order. Where they are tied, the float64 dot product of that run's head
+input with the two head rows stands in for the accumulator. The gap between the two
+accumulators can differ from the float64 gap by up to gamma * (A_a + A_b), where A_t
+is the sum of absolute products of token t's dot product, and a float64 gap inside that
+bound leaves the accumulator's order undetermined. Two named error models are reported
+(`model_conservative` and `model_hopper` in each case record):
+
+- **conservative** (the project's model, the primary class): gamma(2K, 2^-23) =
+  2K u / (1 - 2K u), u = 2^-23, K = 2560, which covers any reduction order, split-K
+  with FP32 partials and truncating adders (gamma = 6.1e-4).
+- **Hopper**: the blocked Hopper `wgmma` accumulation model used by the kernel
+  workstream, gamma = 1.19e-4 including an FP32 split-K allowance; it rests on a
+  published measurement-based hardware model, not on vendor documentation.
+
+Where both the BF16 order and a float64 gap outside the bound are available, they never
+disagree under either model (`float64_contradicts_bf16` is false in every case).
+
+- **rounding flip**: the head inputs differ; the accumulator orders *a* and *b* the
+  same way in both runs, and in one run BF16 rounding of the head output makes them
+  exactly equal, so lowest-index tie-breaking chooses against that order.
+- **order flip**: the head inputs differ and the accumulator orders *a* and *b*
+  differently in the two runs.
+- **accumulator ambiguous**: in a run whose BF16 logits for *a* and *b* are tied, the
+  float64 gap is inside the accumulation bound, so that run's accumulator order, and
+  with it the class, cannot be determined from the data.
+
+### Results
+
+**Plain decode vs MTP (steps 3, top-k 1), both at batch 1**
+(`mechanism_plain_c1_vs_mtp_s3_c1.json`; 167 prompts that diverged in the batch
+comparison below, generated up to two tokens past their known divergence).
+
+- In all 167 prompts the first differing module output is layer 0's GDN recurrence
+  output at the first speculative cycle, while its immediate input, the causal
+  convolution output, is bitwise equal. Whether the recurrent state entering that cycle
+  is also equal is **pending** the cache-hash rerun; if it is, the plain-decode and
+  target-verify recurrent kernels produce different bits from identical inputs and
+  state. At this commit decode calls
+  `fused_recurrent_gated_delta_rule_packed_decode` (`kernels/ops/attention/fla/fused_recurrent.py`)
+  and target verify calls `fused_sigmoid_gating_delta_rule_update`
+  (`fla/fused_sigmoid_gating_recurrent.py`): separate Triton kernels that fuse the
+  gating and the state update differently.
+- 129 of the 167 diverged within the generated length. Tie rule: 0. Head GEMM: 0; the
+  head input differs in every case. Conservative model: rounding flip 29, order flip 7,
+  accumulator ambiguous 93. Hopper model: rounding flip 89, order flip 16, ambiguous 24.
+
+**Plain decode at batch 1 vs 32 requests in flight** (`mechanism_plain_c1_vs_c32.json`;
+40 tapped prompts: the 16 whose divergence in the matrix run was not an exact tie,
+and 24 of the 151 that were, drawn at random; all 40 diverged again in the tapped
+reproduction, whose batches differ from the matrix run's).
+
+- First differing op: a GDN gated RMSNorm in decode (29 prompts), a full-attention
+  layer's output in decode (6), or `mlp.down_proj` in a prefill batched with other
+  requests (5). Never the GDN recurrence, and never a decode GEMM.
+- The gated norm (`kernels/ops/attention/fla/layernorm_gated.py`) chooses
+  `ROWS_PER_BLOCK` from the row count (`calc_rows_per_block`: 1 row per program for a
+  batch of 1, 2 for a batch of 16), which changes the Triton reduction tile and so the
+  FP32 sum order of a row; the same function returns a constant in batch-invariant
+  mode. FlashInfer's decode plan and cuBLAS's GEMM choice likewise depend on the
+  batch.
+- At the divergence: tie rule 0, head GEMM 0. Conservative model: rounding flip 3,
+  order flip 15, accumulator ambiguous 22. Hopper model: rounding flip 14, order flip
+  17, ambiguous 9.
+
+In words, subject to the pending cache-level check: the configurations first produce
+different module outputs at a kernel that is not invariant to the batch or to the
+decode/verify path; the difference is carried forward through the recurrent state and
+the later layers; and it changes the chosen token only where the two leading logits
+are within about one BF16 step, either by reversing their order before rounding or by
+letting BF16 rounding merge them into a tie that the index rule resolves the other
+way. Which of the two happened cannot be decided for most divergences under the
+conservative accumulation model, and for about a fifth under the Hopper model.
+
+## Noise floor
+
+Rate is divergences per 1,000 compared tokens (compared tokens stop at the first
+divergence of each prompt). `divergences.csv` lists every event with both runs'
+margins; `noise_floor.csv` has one row per pair; `run_meta.json` has flags, resolved
+server settings and commits per run. The margin classes there (`tie`, `one_ulp`,
+`near`, `large`) describe the observed logprob gap at the divergence, not its cause.
+
+| Pair | Diverged | Compared tokens | Per 1,000 | Largest margin |
+|---|---|---|---|---|
+| Plain, batch 1 vs 32 | 167/320 | 48,816 | 3.42 | 0.375 nats |
+| Plain, batch 1, same server repeated | 0/320 | 70,042 | 0 | - |
+| Plain, batch 32, same server repeated | 0/320 | 70,060 | 0 | - |
+
+Plain decode at batch 1 has an exact BF16 tie between its top two logits at 11.3 of
+every 1,000 positions, and a nonzero gap of at most 0.125 at another 22.2
+(`noise_floor.json`, `top2_gap_plain_c1`). No run committed a token that was not its
+own top-1 (`self_consistency`). Same-server repeats reproduce every token at both
+batch sizes, and every logprob except those of one prompt (`humaneval-0044`, a
+128-token prompt), which differ from its prefill onward in both repeats; a tapped
+test of that prompt is queued.
+
+**Pending**: MTP steps 1/3/5 and the top-k 2 tree at batch 1 and 32, radix cache off,
+overlap off, deterministic inference and FP32 head for plain and MTP, fresh-server
+repeats, the logprobs-off control, retraction, and the ReplaySSM and FlashInfer GDN
+decode paths. These runs are queued.
+
+## Open: five prompts where tapping changed the output
+
+For 5 of 167 prompts (plain decode, batch 1) the tapped run differs from the untapped
+one from output index 2 on (three change tokens), and two tapped runs of four of them
+also differ, in MTP too. In each, the first differing module at output index 2 is
+layer 3's attention output (the first full-attention layer) while its `qkv_proj`
+output, and every earlier module, is identical: the attention read different KV.
+**Hypothesis, not yet tested**: after the prefill, radix-cache insertion repoints the
+running request's prefix KV to an older copy of the same tokens computed in another
+request's prefill (valid values, not bitwise equal), and the tap's per-forward
+synchronization changes whether decode step 2 reads the repointed copy. A tapped run
+with `--disable-radix-cache` is queued as the test.
+
+## Deterministic inference
+
+With the FlashInfer backend, `--enable-deterministic-inference` switches sampling to
+PyTorch and disables the radix cache. In an early 8-prompt, 128-token check
+(`noise_floor.csv`, validation rows), plain decode was batch-invariant (batch 1 vs 8:
+identical tokens and bitwise-identical logprobs) and MTP was not (2 of 8 diverged).
+Passing the deterministic KV split to FlashInfer's target-verify plan
+(`engine/sglang/patches/state/0002-verify-kv-split-deterministic.patch`) did not change
+that: 28 of 96 prompts still diverged between batch 1 and 32, 1.55 per 1,000 compared
+tokens, all at exact ties (`noise_floor.csv`, row `deterministic + verify KV split
+patch`). A plausible reason, not yet tested: the
+draft is not batch-invariant, so acceptance lengths, and with them the offset of a
+position inside its verify block, differ between batch sizes. **Pending**: the full
+deterministic-mode pairs.
+
+## Targeted state tests
+
+**Pending** (queued): truncation and stop tokens at every index inside a verify cycle,
+GDN checkpoint reuse at the 256-token tracking interval including checkpoints taken in
+the cycle that finished the request, aborts with slot reuse on a four-slot GDN pool,
+chunked prefill at 200 and 256 tokens, run-to-run repeats, and per-rejection-position
+drift. Small debug runs of each test passed their checks.

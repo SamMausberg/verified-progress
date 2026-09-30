@@ -1,0 +1,24 @@
+{
+  "argv": [
+    "/home/ubuntu/vp-wt/profile/experiments/profiling/run_profiles.py",
+    "--arm",
+    "mtp",
+    "--mode",
+    "nsys",
+    "--host-trace",
+    "--py-spy",
+    "--concurrency",
+    "1",
+    "8",
+    "32",
+    "--out-dir",
+    "/home/ubuntu/vp-data/profile/mtp_nsys_hosttrace"
+  ],
+  "env": {},
+  "server_command": "nsys launch --session-new=vp_mtp_2794409 --trace=cuda,nvtx --cuda-graph-trace=node --cuda-flush-interval=250 --python-functions-trace=/home/ubuntu/vp-wt/profile/experiments/profiling/host_functions.json /home/ubuntu/sglang/.venv/bin/python -m sglang.launch_server --model-path Qwen/Qwen3.5-4B --revision 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a --attention-backend flashinfer --mm-attention-backend triton_attn --host 127.0.0.1 --port 30020 --speculative-algorithm NEXTN --speculative-num-steps 3 --speculative-eagle-topk 1 --speculative-num-draft-tokens 4",
+  "started": "2026-09-30T21:47:58",
+  "sglang_sha": "bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824",
+  "repo_sha": "985356d7681c6fdfee49e9320975b88a8c983db3",
+  "nsys_version": "NVIDIA Nsight Systems version 2025.3.2.474-253236389321v0",
+  "gpu": "NVIDIA GH200 480GB, 570.195.03, 1980 MHz, 2619 MHz"
+}
