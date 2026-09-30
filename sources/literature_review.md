@@ -877,7 +877,7 @@ hidden states.
 
 ## 12. Moonshot directions: reformulations and approximations
 
-This section serves the moonshot track (`~/vp-coord/MOONSHOTS.md`), which accepts
+This section serves the moonshot track (`TASKS.md`, hypothesis H7), which accepts
 measured quality trade-offs in exchange for large speedups.
 
 **How the numbers were checked.**
@@ -1008,7 +1008,7 @@ These help agentic, code and summarization traffic, and little on open chat.
 
 ### 12.7 The three most promising items for Qwen3.5-4B on one GH200
 
-These are also posted in `~/vp-coord/notes/lit.md`. They are judgement, not measurement.
+They are judgement, not measurement.
 
 1. **DFlash now, DFlash 2 or DSpark next.** The 4B drafter is public, lossless and
    supported in SGLang with GDN commit. The card reports about twice MTP's speedup at
