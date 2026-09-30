@@ -51,10 +51,10 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 - [x] `scripts/gpu_lock.sh`, `scripts/sglang_worktree.sh`, worktree hook in `scripts/sglang_env.sh` (infra; PR #1, writer-preference turnstile in PR #2)
 
 ### Baselines and measurement
-- [ ] Frozen workload and aiperf sweep harness producing the concurrency Pareto curve (bench)
+- [x] Frozen workload and aiperf sweep harness producing the concurrency Pareto curve (bench; PR #17)
 - [ ] Baseline arms: plain decode and native-MTP speculation, CUDA graphs and overlap confirmed (bench)
 - [ ] Tune the speculative baseline (steps, draft tokens, backend) so the denominator is strong (bench)
-- [ ] Add the public DFlash drafter (`z-lab/Qwen3.5-4B-DFlash@9a1996c`, block 4/8/16) as the strongest existing speculative baseline (bench, drafter)
+- [ ] Add the public DFlash drafter (`z-lab/Qwen3.5-4B-DFlash@9a1996c`, block 4/8/16) as the strongest existing speculative baseline (bench, drafter; served on sm_90, block 16 mean accept 6.18 on the pilot panel)
 - [ ] Quality baseline on a fixed task set (bench)
 - [ ] nsys attribution of head, backbone, sampling and host gaps for decode and MTP (profile)
 
@@ -88,7 +88,10 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 
 - [ ] P4: bit-exact live replay of recurrent state at batch 128, pre-registered 1.10x threshold; rank/observability audit on captured traces (moonshot)
 - [x] P5: first-layer token projection table rejected by its pre-registered 1% criterion: layer 0's input projections take 0.60% / 0.52% / 0.33% of a plain decode step at batch 1 / 32 / 128, ceiling 1.006x (profile; evidence in PR #13)
-- [ ] Reproduce the P4/P5 counterexamples as exact tests (paper)
+- [x] Reproduce the P4/P5 counterexamples as exact tests (paper; PR #20)
+- [ ] P6: zero-training candidate-support screen for DFlash, then a rate-trained selector against the same selector trained with the strongest matched objective, pre-registered 1.25x (drafter)
+- [ ] P7: certified block-parallel GDN verification against strict replay on a captured trace (reference, strict, certified fast, unchecked fast, reduced precision) (moonshot)
+- [ ] P7: five-contract framing of every exactness claim in the paper, counterexamples reproduced as tests (paper)
 
 ### Engine
 - [ ] Differential output-equality tests: MTP versus plain decode, rejection positions, aborts, prefix reuse (state)
