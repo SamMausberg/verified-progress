@@ -222,6 +222,43 @@ def sweeps(args: argparse.Namespace) -> None:
     write_csv(rows, args.out)
 
 
+def paired_sweeps(args: argparse.Namespace) -> None:
+    """Paired lever-over-baseline ratios from a sweeps CSV (client y and server decode rate).
+
+    Each pair is `baseline_label:candidate_label` (labels as in the CSV, e.g.
+    `plain_r1:plain+fp16_state_r1`); pairs run back to back (A B B A) so drift cancels.
+    Reports per concurrency the ratio in every pair and their mean.
+    """
+    with Path(args.sweeps_csv).expanduser().open() as handle:
+        table = list(csv.DictReader(handle))
+    by_key = {(row['config'], int(row['concurrency'])): row for row in table}
+    rows: list[dict[str, Any]] = []
+    concs = sorted({int(r['concurrency']) for r in table})
+    for conc in concs:
+        client, server = [], []
+        for pair in args.pairs:
+            base, cand = pair.split(':')
+            b, c = by_key.get((base, conc)), by_key.get((cand, conc))
+            if not b or not c or not b['y_tok_s_gpu'] or not c['y_tok_s_gpu']:
+                continue
+            client.append(float(c['y_tok_s_gpu']) / float(b['y_tok_s_gpu']))
+            if b.get('server_decode_tok_s') and c.get('server_decode_tok_s'):
+                server.append(float(c['server_decode_tok_s']) / float(b['server_decode_tok_s']))
+        if not client:
+            continue
+        rows.append(
+            {
+                'concurrency': conc,
+                'pairs': len(client),
+                'client_y_ratio_mean': round(statistics.fmean(client), 4),
+                'client_y_ratios': ' '.join(f'{r:.4f}' for r in client),
+                'server_decode_ratio_mean': round(statistics.fmean(server), 4) if server else '',
+                'server_decode_ratios': ' '.join(f'{r:.4f}' for r in server),
+            }
+        )
+    write_csv(rows, args.out)
+
+
 def interactions(args: argparse.Namespace) -> None:
     """Four-way (baseline, A, B, A+B) comparison from a sweeps CSV.
 
@@ -310,6 +347,11 @@ def main() -> None:
     pr.add_argument('--candidate', required=True)
     pr.add_argument('--out', type=Path, default=None)
     pr.set_defaults(func=paired)
+    ps = sub.add_parser('paired-sweeps')
+    ps.add_argument('sweeps_csv')
+    ps.add_argument('--pairs', nargs='+', required=True, help='baseline_label:candidate_label')
+    ps.add_argument('--out', type=Path, default=None)
+    ps.set_defaults(func=paired_sweeps)
     i = sub.add_parser('interactions')
     i.add_argument('sweeps_csv')
     i.add_argument('--pairs', nargs='+', required=True, help='base:leverA:leverB')
