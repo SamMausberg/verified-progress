@@ -230,7 +230,7 @@ Three lessons for the team follow.
   uses min_S y_i as an upper bound on every other score and lazily instantiates the
   few tail Gumbels that exceed `B = M - S_min`. Theorem 3.1 states the result is an
   exact sample. With an approximate top-k of additive error c they widen the cutoff by
-  c (Sec. 3.3), which is an interval-bound form. **This is the direct precedent for
+  c (Sec. 3.4, "Approximate top elements"), which is an interval-bound form. **This is the direct precedent for
   exact Gumbel-max from bounded scores.** H3 differs by bounding every row with a
   dense low-precision pass instead of a sublinear index, and by using a fixed,
   per-token-keyed noise field so the bounded race returns the same token as the dense
@@ -324,9 +324,8 @@ output" can mean.
 - **Chen et al.**, "Accelerating Large Language Model Decoding with Speculative
   Sampling", arXiv 2302.01318 [`chen2023specsampling`]. The same rule, derived
   independently. It notes that outputs are exact only "within hardware numerics" and
-  that even greedy outputs can differ because the compute graph differs. This is the
-  earliest statement of the bitwise-versus-distribution distinction the manuscript
-  draws.
+  that even greedy outputs can differ because the compute graph differs. It is an early
+  statement of the bitwise-versus-distribution distinction the manuscript draws.
 - **Blockwise parallel decoding** (Stern, Shazeer, Uszkoreit, NeurIPS 2018, arXiv
   1811.03115) [`stern2018`]: greedy verification by argmax tests.
 - **SpecInfer** (Miao et al., ASPLOS 2024, doi:10.1145/3620666.3651335) [`specinfer`]:
@@ -393,8 +392,8 @@ output" can mean.
     the MTP-1 baseline at matched throughput.
 - **Other parallel drafters.** Domino (arXiv 2605.29707) [`domino`]; DDTree (Ringel and
   Romano, arXiv 2604.12989) [`ddtree`]; LiLiCorr (arXiv 2608.20530v2) [`lilicorr`],
-  which reranks DFlash candidates and describes DFlash2 as identity-only (Section 2
-  of the audit).
+  which reranks DFlash candidates and describes DFlash2 as identity-only (see the
+  `lilicorr` row of the audit).
 
 ### 4.3 What the drafters mean for the head
 
