@@ -36,4 +36,4 @@ run --arm dflash --label tune-dflash-b8-noradix --set speculative-dflash-block-s
   "${NORADIX[@]}" --no-strict
 # Reruns after capping the KV cache (--max-total-tokens) in bench/arms.toml.
 mtp 3 --label tune-mtp-s3-rspec-noradix "${RSPEC[@]}" "${NORADIX[@]}"
-mtp 4 --label tune-mtp-s4-rspec-noradix "${RSPEC[@]}" "${NORADIX[@]}"
+run --arm plain --label tune-plain-noradix-triton "${NORADIX[@]}" --set attention-backend=triton
