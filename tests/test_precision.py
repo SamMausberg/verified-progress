@@ -297,6 +297,45 @@ class Precision(unittest.TestCase):
         count('certified_argmax_exact_ties', ties)
         self.assertGreater(ties, 0)
 
+    def test_subnormal_products(self) -> None:
+        """Products of subnormal BF16 operands can underflow FP32.
+
+        The ladder must round them as the modelled accumulator does (gradual
+        underflow or flush to zero), keep every interval an enclosure of the
+        exact logit, and still resolve an exact tie between identical rows to
+        the smallest index (review comment on PR #7).
+        """
+        t = pow2(-133)  # the smallest positive BF16 subnormal
+        ties = 0
+        for ftz in (False, True):
+            ladder = (Accumulator('sequential', FP32, ftz=ftz), FP64_SEQUENTIAL, None)
+            for _ in range(80):
+                D = R.randint(2, 8)
+
+                def sub_row(d: int) -> list[Q]:
+                    return [Q(R.randint(-127, 127)) * t for _ in range(d)]
+
+                row = sub_row(D)
+                W = [list(row), list(row), sub_row(D)]
+                if R.random() < 0.5:  # a normal-range weight next to subnormal ones
+                    W[2][0] = bf16_value(-7, -3)
+                h = sub_row(D)
+                ev = Evaluator(quantize_head(W), tuple(h), ladder=ladder)
+                for i in range(len(W)):
+                    lo, hi = ev.interval(1, i)
+                    self.assertTrue(lo <= dot(W[i], h) <= hi)
+                cert = certify_argmax(ev)
+                self.assertIsNotNone(cert)
+                assert cert is not None
+                self.assertEqual(cert.token, exact_argmax([dot(w, h) for w in W]))
+                ties += int(cert.exact_tie)
+                count('subnormal_product_cases')
+        self.assertGreater(ties, 0)
+        count('subnormal_exact_ties', ties)
+        t2 = Q(1, 2**133)
+        with self.assertRaises(ValueError):  # an inexact normal-range leaf is still an input error
+            FP32_SEQUENTIAL.sum([Q(1) + t2])
+
     def test_certificate_refuses(self) -> None:
         refused = 0
         for _ in range(300):

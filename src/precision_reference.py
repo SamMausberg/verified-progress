@@ -245,9 +245,25 @@ class Accumulator:
         return [range(s, min(s + size, n)) for s in range(0, n, size)] if n else []
 
     def sum(self, terms: Sequence[Q]) -> Q:
+        """Sum exact leaves (for example products of BF16 values) in this order.
+
+        A product of two BF16 values has at most 16 significant bits, so it is
+        exact in FP32 unless it lies below the normal range. Such a leaf is
+        rounded into the format as the modelled accumulator would (gradual
+        underflow, or flush to zero with ``ftz``); its error is at most
+        ``underflow``, one of the ``nodes(n)`` terms that ``error_bound``
+        charges. A leaf that is inexact in the normal range is an input error.
+        """
+        leaves = []
         for t in terms:
             if not is_representable(t, self.fmt):
-                raise ValueError('accumulated leaves must be exact in the accumulator format')
+                if abs(t) >= self.fmt.min_normal:
+                    raise ValueError('accumulated leaves must be exact in the accumulator format')
+                t = self._r(t)
+            elif self.ftz and 0 < abs(t) < self.fmt.min_normal:
+                t = Q(0)
+            leaves.append(t)
+        terms = leaves
         partials = [self._chunk([terms[j] for j in c]) for c in self._chunks(len(terms))]
         if not partials:
             return Q(0)
