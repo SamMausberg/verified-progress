@@ -16,11 +16,11 @@ value (contract C1 in the theory notes), not the stock kernel's BF16 output.
 
 | File | What it holds | Command (from `experiments/head_geometry/`) | Code |
 |---|---|---|---|
-| `prompt_manifest.csv` | Prompt sources, split, thinking flag and SHA-256 (no texts) | `python build_prompts.py --out ~/vp-data/geometry --manifest ../../evidence/head_geometry/prompt_manifest.csv` | `7c61269` |
-| `alignment_plain4b.json` | Plain decode: FP64 argmax of the captured head input against the engine's token | `python validate_alignment.py --arm plain4b --device cpu --out ../../evidence/head_geometry/alignment_plain4b.json` | `2175785` |
-| `selfevidence_plain4b.{json,csv}` | H3 on 6,005 held-out plain-decode positions: candidate counts per head, envelope, accumulation model and decision; batch unions; cascades; rescoring overlap | `python analyze_selfevidence.py --device cpu --threads 48 --sets plain --max-rows 6000 --chunk 64 --out ../../evidence/head_geometry --tag plain4b` | `2175785` |
-| `selfevidence_plain4b_ccdf.csv` | Share of positions needing at least k candidate rows (plot data) | `python export_candidate_ccdf.py --tag plain4b --out ../../evidence/head_geometry/selfevidence_plain4b_ccdf.csv` | `a49b5ec` |
-| `tail_killtest.json` | P1 kill test: INT8 surrogate of the final FFN (and head) versus certified head only | `python tail_killtest.py --threads 16 --out ../../evidence/head_geometry/tail_killtest.json` | this commit |
+| `prompt_manifest.csv` | Prompt sources, split, thinking flag and SHA-256 (no texts) | `python build_prompts.py --out ~/vp-data/geometry --manifest ../../evidence/head_geometry/prompt_manifest.csv` | `018f927` |
+| `alignment_plain4b.json` | Plain decode: FP64 argmax of the captured head input against the engine's token | `python validate_alignment.py --arm plain4b --device cpu --out ../../evidence/head_geometry/alignment_plain4b.json` | `f0e9c30` |
+| `selfevidence_plain4b.{json,csv}` | H3 on 6,005 held-out plain-decode positions: candidate counts per head, envelope, accumulation model and decision; batch unions; cascades; rescoring overlap | `python analyze_selfevidence.py --device cpu --threads 48 --sets plain --max-rows 6000 --chunk 64 --out ../../evidence/head_geometry --tag plain4b` | `f0e9c30` |
+| `selfevidence_plain4b_ccdf.csv` | Share of positions needing at least k candidate rows (plot data) | `python export_candidate_ccdf.py --tag plain4b --out ../../evidence/head_geometry/selfevidence_plain4b_ccdf.csv` | `5831da1` |
+| `tail_killtest.json` | P1 kill test: INT8 surrogate of the final FFN (and head) versus certified head only | `python tail_killtest.py --threads 16 --out ../../evidence/head_geometry/tail_killtest.json` | `ea4f208` |
 
 The plain-decode capture ran with the capture patch before SGLang's own formatting hooks
 reordered two imports in it; the committed patch is that code after formatting.
