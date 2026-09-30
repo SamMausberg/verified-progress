@@ -44,7 +44,8 @@ The captured head inputs reproduce the engine's decisions. Over 105,269 plain-de
 positions the FP64 argmax equals the engine's token at 99.51%. All 519 disagreements lie
 within one BF16 spacing of the FP64 winner (largest FP64 gap 0.118 logits; the spacing is
 0.125 for logits in [16, 32)). Rounding the exact logits to BF16 and taking the first
-maximal index, as the stock head does, reproduces the engine at 99.998%; the remaining two
+maximal index (R-bf16, a batch-invariant reference that is not the stock computation, which
+rounds cuBLAS's FP32 accumulation) reproduces the engine at 99.998%; the remaining two
 positions are consistent with cuBLAS's FP32 accumulation landing on the other side of a
 BF16 rounding boundary (not verified at the capture shape). The engine's own top two
 logits were equal in BF16 at 1.0% of positions, where the stock decision is set by the tie
@@ -55,8 +56,9 @@ rule. So R-real and the stock decision (R-stock) differ on about 0.5% of greedy 
 The DFlash-4B capture (z-lab/Qwen3.5-4B-DFlash @9a1996cc, block size 16, 5 concurrent
 requests, 320 prompts) has 24,020 verify blocks and 360,300 draft slots. The FP64 argmax
 of the captured draft head input equals the engine's draft token at 98.2% of slots and
-the target's at 98.9%; every disagreement lies within one BF16 spacing, BF16-rounding the
-exact logits reproduces the engine at 99.996% (draft) and 99.998% (target), and the engine's
+the target's at 98.9%; every disagreement lies within one BF16 spacing, R-bf16 (the exact
+logits rounded to BF16, first maximal index) reproduces the engine at 99.996% (draft) and
+99.998% (target), and the engine's
 accept lengths match the derived labels on all 24,020 blocks. Draft agreement falls from
 99.4% at block position 1 to 97.0% at position 15, as later draft distributions get
 flatter (more near-ties). Only 39% of prompts produce output identical to plain decoding
