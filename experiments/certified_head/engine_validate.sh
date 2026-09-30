@@ -19,6 +19,10 @@
 #   plain_check_hopper   the same under the Hopper wgmma error model
 #   plain_c1             greedy plain decode, certified, one request at a time
 #   plain_c1_stock       the stock server, one request at a time
+#   mtp_check            MTP (NEXTN, 3 steps, top-1), greedy verify, check mode
+#   mtp_c1, mtp_c1_stock MTP certified and stock, one request at a time
+#   dflash_check         DFlash (block 16), greedy verify, check mode
+#   dflash_c1, dflash_c1_stock  DFlash certified and stock, one request at a time
 #
 # Environment: PORT (default 30040), LIMIT (prompts, default 64), MAX_NEW_TOKENS
 # (default 256), NEED_FREE_MIB (default 40000).
@@ -39,6 +43,14 @@ model=(--model-path Qwen/Qwen3.5-4B --revision 851bf6e806efd8d0a36b00ddf55e13ccb
 common=(--attention-backend flashinfer --mm-attention-backend triton_attn
   --host 127.0.0.1 --port "$port" --mem-fraction-static 0.25 --random-seed 0)
 plain=(--max-running-requests 16)
+# The geometry workstream's MTP and DFlash settings at a 0.25 memory fraction.
+mtp=(--max-mamba-cache-size 24 --max-running-requests 8 --speculative-algorithm NEXTN
+  --speculative-num-steps 3 --speculative-eagle-topk 1 --speculative-num-draft-tokens 4)
+dflash=(--max-running-requests 8 --speculative-algorithm DFLASH
+  --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash
+  --speculative-draft-model-revision 9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf
+  --speculative-dflash-block-size 16 --linear-attn-prefill-backend flashinfer
+  --linear-attn-decode-backend flashinfer)
 export SGLANG_CERTIFIED_HEAD_SRC="$repo/src"
 export port
 
@@ -74,14 +86,18 @@ export -f launch_and_wait
 
 # Runs in a subshell per arm, so the exported flags do not leak into the next arm.
 run_arm() {
-  local arm="$1" dir="$out_root/$1" conc=16 rc
+  local arm="$1" dir="$out_root/$1" conc=16 rc need="$need_mib"
   local -a args=("${plain[@]}") flags=()
   case "$arm" in
+    mtp_*) args=("${mtp[@]}") conc=8 need=70000 ;;&
+    dflash_*) args=("${dflash[@]}") conc=8 need=70000 ;;&
     plain_check) flags=(DECODE=1 CHECK=1) ;;
     plain_check_columns) flags=(DECODE=1 CHECK=1 FALLBACK=columns) ;;
     plain_check_hopper) flags=(DECODE=1 CHECK=1 MODEL=hopper-wgmma) ;;
     plain_c1) flags=(DECODE=1) conc=1 ;;
-    plain_c1_stock) conc=1 ;;
+    plain_c1_stock | mtp_c1_stock | dflash_c1_stock) conc=1 ;;
+    mtp_check | dflash_check) flags=(VERIFY=1 CHECK=1) ;;
+    mtp_c1 | dflash_c1) flags=(VERIFY=1) conc=1 ;;
     *) echo "unknown arm $arm" >&2; return 64 ;;
   esac
   local kv
@@ -102,7 +118,7 @@ run_arm() {
   for _ in $(seq 1 360); do
     rc=0
     "$repo/scripts/gpu_startup_lock.sh" bash -c 'launch_and_wait "$@"' _ \
-      "$dir/server.pid" "$dir/server.log" "$need_mib" "${model[@]}" "${common[@]}" "${args[@]}" \
+      "$dir/server.pid" "$dir/server.log" "$need" "${model[@]}" "${common[@]}" "${args[@]}" \
       || rc=$?
     [ "$rc" -ne 2 ] && break
     sleep 10
@@ -126,9 +142,11 @@ for arm in "$@"; do
   (run_arm "$arm") || status=1
   echo "=== $arm done $(date +%T)"
 done
-if [ -f "$out_root/plain_c1/outputs.jsonl" ] && [ -f "$out_root/plain_c1_stock/outputs.jsonl" ]; then
-  python "$repo/experiments/certified_head/engine_equality.py" compare \
-    "$out_root/plain_c1/outputs.jsonl" "$out_root/plain_c1_stock/outputs.jsonl" \
-    --out "$out_root/plain_c1_vs_stock.json" >/dev/null || status=1
-fi
+for name in plain mtp dflash; do
+  a="$out_root/${name}_c1/outputs.jsonl" b="$out_root/${name}_c1_stock/outputs.jsonl"
+  if [ -f "$a" ] && [ -f "$b" ]; then
+    python "$repo/experiments/certified_head/engine_equality.py" compare "$a" "$b" \
+      --out "$out_root/${name}_c1_vs_stock.json" >/dev/null || status=1
+  fi
+done
 exit "$status"
