@@ -146,12 +146,17 @@ def load_source(key: str) -> list[dict[str, Any]]:
     return items
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=(__doc__ or '').split('\n\n')[0])
     parser.add_argument('--per-domain', type=int, default=6000)
-    parser.add_argument('--exclude', type=Path, nargs='+', default=[])
+    # extend: repeated --exclude flags accumulate instead of the last one winning.
+    parser.add_argument('--exclude', type=Path, nargs='+', action='extend', default=[])
     parser.add_argument('--out', type=Path, required=True)
-    args = parser.parse_args()
+    return parser
+
+
+def main() -> None:
+    args = build_parser().parse_args()
 
     from transformers import AutoTokenizer
 
