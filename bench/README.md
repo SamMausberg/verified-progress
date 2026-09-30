@@ -77,7 +77,14 @@ quality.
 
 Per point, the runner sends `max(64, 8 c)` measured requests (the first prompts of
 the split, in order) after one wave of warmup requests from the warmup pool at the
-same concurrency, and flushes the prefix cache before each point. A server-level
+same concurrency, and flushes the prefix cache before each point (a point is not
+measured if the flush fails). A point with more measured requests than the split has
+prompts reuses prompts, which can then hit the prefix cache within the point;
+`point.json` reports `repeated_prompts`, and sweeps that large should run with the
+radix cache off or treat those points separately. `bench.pareto` keeps points with
+failed requests, a nonzero aiperf exit, wrong output lengths, an unflushed cache,
+unexpected prompts or non-finite metrics out of the frontier and lists them with an
+`invalid_reason`. A server-level
 warmup at the top concurrency runs once after launch. Repeats alternate the
 concurrency order.
 
