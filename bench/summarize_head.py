@@ -59,8 +59,10 @@ def rows(data: dict[str, Any]) -> list[dict[str, float]]:
         samp = med(e, 'certified_sample')
         samp_cost = med(e, 'certified_sample_fallback') - samp
         p = {
-            k: rates.get(k, {}).get('batch_fallback_rate', NAN) for k in ('w8a8', 'bf16', 'sample')
+            k: rates.get(k, {}).get('batch_fallback_rate', NAN)
+            for k in ('w8a8', 'bf16', 'sample', 'sample_hopper', 'w8a16_hopper')
         }
+        hop = rates.get('w8a16_hopper', {})
         row = {
             'M': int(m),
             'stock_us': stock,
@@ -88,6 +90,12 @@ def rows(data: dict[str, Any]) -> list[dict[str, float]]:
             'sample_us': samp,
             'sample_batch_fallback_rate': p['sample'],
             'sample_expected_us': samp + p['sample'] * samp_cost,
+            'hopper_batch_fallback_rate': p['w8a16_hopper'],
+            'hopper_w8a16_expected_us': cert + p['w8a16_hopper'] * dense_cost,
+            'hopper_columns_expected_us': cols
+            + hop.get('batch_columns_only_rate', NAN) * cols_cost
+            + hop.get('batch_dense_rate', NAN) * dense_cost,
+            'hopper_sample_expected_us': samp + p['sample_hopper'] * samp_cost,
         }
         modes = ('w8a16_expected_us', 'columns_expected_us', 'w8a8_expected_us', 'bf16_expected_us')
         finite = [row[k] for k in modes if row[k] == row[k]]
