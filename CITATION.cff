@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use or build on this work, please cite it as below."
+title: "The Work a Verifier Needs"
+type: software
+authors:
+  - family-names: Mausberg
+    given-names: Samuel
+repository-code: "https://github.com/SamMausberg/verified-progress"
+url: "https://github.com/SamMausberg/verified-progress"
+date-released: 2026-09-30
+keywords:
+  - speculative decoding
+  - LLM inference
+  - certified computation
+  - SGLang
+preferred-citation:
+  type: report
+  title: "The Work a Verifier Needs"
+  authors:
+    - family-names: Mausberg
+      given-names: Samuel
+  year: 2026
+  month: 9
+  url: "https://github.com/SamMausberg/verified-progress"
+  notes: "Research manuscript, revision 4, in progress."
