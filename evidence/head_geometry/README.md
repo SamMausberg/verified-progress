@@ -20,6 +20,7 @@ value (contract C1 in the theory notes), not the stock kernel's BF16 output.
 | `alignment_plain4b.json` | Plain decode: FP64 argmax of the captured head input against the engine's token | `python validate_alignment.py --arm plain4b --device cpu --out ../../evidence/head_geometry/alignment_plain4b.json` | `f0e9c30` |
 | `selfevidence_plain4b.{json,csv}` | H3 on 6,005 held-out plain-decode positions: candidate counts per head, envelope, accumulation model and decision; batch unions; cascades; rescoring overlap | `python analyze_selfevidence.py --device cpu --threads 48 --sets plain --max-rows 6000 --chunk 64 --out ../../evidence/head_geometry --tag plain4b` | `f0e9c30` |
 | `selfevidence_plain4b_ccdf.csv` | Share of positions needing at least k candidate rows (plot data) | `python export_candidate_ccdf.py --tag plain4b --out ../../evidence/head_geometry/selfevidence_plain4b_ccdf.csv` | `5831da1` |
+| `stats_plain4b.json` | Plain decode: norms, margins, top-m softmax mass, hidden-dimension energy, head statistics, envelope width versus realized error per quantizer, centring diagnostics | `python analyze_stats.py --arm plain4b --device cpu --out ../../evidence/head_geometry/stats_plain4b.json` | this commit |
 | `tail_killtest.json` | P1 kill test: INT8 surrogate of the final FFN (and head) versus certified head only | `python tail_killtest.py --threads 16 --out ../../evidence/head_geometry/tail_killtest.json` | `ea4f208` |
 
 The plain-decode capture ran with the capture patch before SGLang's own formatting hooks
@@ -51,16 +52,24 @@ Headline, tensor-core accumulation model (gamma = D * 2^-22 * 1.001 = 6.1e-4):
 | int4 g128 | 0.27 + candidates | blockwise L2 | 72,847 | 13,991 | 248,295 | 248,320 | 0% | 0% |
 
 No envelope was violated and the exact winner was always a candidate, for every variant
-and position. Gumbel-max races with the same noise field give the same picture at
+and position. The rigorous envelopes are loose by design: the int8 per-row Cauchy-Schwarz
+half-width has a median of 1.00 logit, 75 times the median realized error of 0.013 (FP8:
+2.7 logits; int4 g128: 12.8), because it assumes the worst alignment of e_i and h. Int8
+still certifies cheaply because the decisions are rarely close: the median top-1/top-2
+margin is 7.3 logits (p10 0.68) and the top token holds a median 99.9% of the mass at
+T = 1 (`stats_plain4b.json`). Gumbel-max races with the same noise field give the same picture at
 T = 1.0 and 0.7. Outlier-exact columns, a PCA rotation of h and quantizing W minus its
-mean row change the mean candidate count by at most 7% for 1-12% more bytes (centring
-makes it worse). Over real decode batches of 7-10 rows the int8 g128 candidates cover
+mean row change the mean candidate count by at most 7% for 1-12% more bytes. Post-norm h
+has no dominant dimensions (the top 8 hold 4.0% of the energy). Centring makes things
+worse: the mean row points along the bulk of rows (median cosine 0.39) but not along the
+rows that compete for the argmax (median cosine -0.11 over each position's top 8), so it
+lowers the median ||e_i|| over all rows by 14% and raises it by 20% on those rows. Over real decode batches of 7-10 rows the int8 g128 candidates cover
 9.5-12.5 distinct rows. Rescoring candidates with IEEE FP32 accumulation leaves no
 position undecided; with the tensor-core error model for the rescoring, 2.1% still overlap.
 The int4 g32 plus int4-residual cascade reads 0.32 of BF16 bytes at batch 1 and 0.41-0.42
 over real batches of 5-16 rows.
 
-## P1: certified decoder tail (plain decoding only)
+## P1: certified decoder tail (plain decoding only) - negative result
 
 `tail_killtest.json`: 2,064 positions (16 held-out prompts, 4 per domain, 129 tokens
 each), residual at the cut and reference head input from an HF transformers BF16 forward

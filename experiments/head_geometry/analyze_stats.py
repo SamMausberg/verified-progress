@@ -17,6 +17,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import bounds as B
 import numpy as np
 import torch
 from huggingface_hub import hf_hub_download
@@ -28,7 +29,8 @@ FINAL_NORM = {
     'qwen3.5-4b': ['model.language_model.norm.weight', 'mtp.norm.weight'],
     'qwen3.8-27b': ['model.language_model.norm.weight'],
 }
-ARMS = {
+ARMS: dict[str, tuple[str, str | None]] = {
+    'plain4b': ('qwen3.5-4b', None),
     'mtp4b': ('qwen3.5-4b', 'mtp_verify'),
     'dflash4b': ('qwen3.5-4b', 'dflash_verify'),
     'dflash27b': ('qwen3.8-27b', 'dflash_verify'),
@@ -109,6 +111,48 @@ def head_stats(model: str, w: torch.Tensor) -> dict[str, Any]:
     }
 
 
+@torch.no_grad()
+def quant_stats(w: torch.Tensor, h: torch.Tensor) -> dict[str, Any]:
+    """Envelope width versus realized error, over all rows and over the top-8 rows.
+
+    The row Cauchy-Schwarz half-width ||e_i|| ||h|| against the realized |<e_i, h>|, per
+    quantizer, and why centring on the mean row helps typical rows but not the rows that
+    compete for the argmax.
+    """
+    w64 = w.double()
+    centre = w64.mean(0)
+    heads = {
+        'int8_row': B.quantize(w, 'int8', None, 'int8_row'),
+        'int8_row_centred': B.quantize(w, 'int8', None, 'c', centre=centre),
+        'int8_g128': B.quantize(w, 'int8', 128, 'int8_g128'),
+        'fp8_row': B.quantize(w, 'fp8', None, 'fp8_row'),
+        'int4_g128': B.quantize(w, 'int4', 128, 'int4_g128'),
+    }
+    h64 = h.to(w.device).double()
+    z = h64 @ w64.T
+    top = torch.topk(z, 8, dim=1).indices
+    hn = h64.norm(dim=1, keepdim=True)
+    out: dict[str, Any] = {'positions': int(h.shape[0])}
+    for name, qh in heads.items():
+        err = (z - qh.z_hat(h64)).abs()
+        half = hn * qh.e2[None]
+        out[name] = {
+            'row_cs_halfwidth_median': float(half.median()),
+            'realized_error_median': float(err.median()),
+            'realized_error_max': float(err.max()),
+            'halfwidth_over_realized_median': float((half / err.clamp_min(1e-30)).median()),
+            'e2_median_all_rows': float(qh.e2.median()),
+            'e2_median_top8_rows': float(qh.e2[top].median()),
+            'row_cs_halfwidth_median_top8': float(half.gather(1, top).median()),
+        }
+    cos = (w64 @ centre) / (w64.norm(dim=1) * centre.norm())
+    out['cos_row_with_mean_row'] = {
+        'median_all_rows': float(cos.median()),
+        'median_top8_rows': float(cos[top].median()),
+    }
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('--arm', choices=sorted(ARMS), default='mtp4b')
@@ -139,16 +183,24 @@ def main() -> None:
         'sets': {},
     }
     sets: dict[str, torch.Tensor] = {}
-    if args.arm == 'mtp4b':
+    if args.arm == 'plain4b':
         d = load_decode(args.data / 'plain4b' / 'heads')
         sets['plain'] = d.h[torch.from_numpy(held(d.rid))]
-    ps = load_pairs(args.data / args.arm / 'heads', kind)
-    i = held(ps.rid)
-    sets['verify'] = ps.h_target[torch.from_numpy(i)]
-    sets['draft'] = ps.h_draft[torch.from_numpy(i)]
+    else:
+        ps = load_pairs(args.data / args.arm / 'heads', str(kind))
+        i = held(ps.rid)
+        sets['verify'] = ps.h_target[torch.from_numpy(i)]
+        sets['draft'] = ps.h_draft[torch.from_numpy(i)]
     for name, h in sets.items():
         result['sets'][name] = {'hidden': hidden_stats(h), 'logits': logit_stats(w64, h)}
         print(name, 'done', flush=True)
+    if args.arm == 'plain4b':
+        sample = torch.from_numpy(rng.choice(sets['plain'].shape[0], 512, replace=False))
+        result['quantization'] = quant_stats(w, sets['plain'][sample])
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(json.dumps(result, indent=2) + '\n')
+        print(json.dumps(result['quantization'], indent=1))
+        return
 
     hd, ht = ps.h_draft[torch.from_numpy(i)].double(), ps.h_target[torch.from_numpy(i)].double()
     delta = ht - hd
