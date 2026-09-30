@@ -11,6 +11,7 @@ Run under the shared GPU lock::
 
 from __future__ import annotations
 
+import json
 import os
 import pickle
 from pathlib import Path
@@ -694,3 +695,32 @@ def test_p8_witness_interior_bf16_values() -> None:
         assert torch.equal(ids, stock), r0
         counts += torch.bincount(stock.cpu(), minlength=4)
     print(f'stock token counts over {b_all.numel()} BF16 values: {counts.tolist()}')
+
+
+def test_p8_engine_real_witnesses(head_bf16: CertifiedHead) -> None:
+    """Real decode rows where SGLang's seeded token differs from the FP64-log or
+    exact-arithmetic token (``experiments/certified_head/p8_witness_search.py``):
+    the certified sampler must still return SGLang's token on each."""
+    path = Path(
+        os.environ.get(
+            'VP_P8_WITNESSES',
+            Path(__file__).parents[1] / 'evidence/certified_head/p8_witnesses.json',
+        )
+    )
+    if not path.exists():
+        pytest.skip(f'no witness file at {path}')
+    data = json.loads(path.read_text())
+    cases = [w for kind in data['witnesses'].values() for w in kind]
+    if not cases:
+        pytest.skip('the search found no witnesses')
+    for w in cases:
+        bits = np.frombuffer(bytes.fromhex(w['hidden_bf16_hex']), dtype=np.int16).copy()
+        h = torch.from_numpy(bits).view(torch.bfloat16).view(1, -1).cuda()
+        seeds = torch.tensor([w['seed']], dtype=torch.int64, device='cuda')
+        positions = torch.tensor([w['position']], dtype=torch.int64, device='cuda')
+        temps = torch.tensor([w['temperature']], dtype=torch.float32, device='cuda')
+        ids, _ = head_bf16.gumbel_sample(h, seeds, positions, temps)
+        stock = stock_seeded_sample(h, head_bf16.weight, 'bf16', seeds, positions, temps)
+        assert int(stock) == w['stock_token'], w['row']
+        assert torch.equal(ids, stock), w['row']
+    print(f"{len(cases)} engine-real P8 witnesses reproduce SGLang's token")
