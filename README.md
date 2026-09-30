@@ -75,7 +75,7 @@ shows them as pending items, never as numbers.
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install -r requirements-cpu.txt
+python -m pip install -r requirements-dev.txt   # NumPy plus pytest and the lint tools
 python tests/test_precision.py             # certified-head reference (about 35 s)
 python -m pytest tests/                     # every CPU test
 bash scripts/check_lean.sh                  # needs Lean 4.19.0 (~/.elan)

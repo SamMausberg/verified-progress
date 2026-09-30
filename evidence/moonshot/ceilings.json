@@ -1,5 +1,10 @@
 {
  "note": "derived floors (not measurements); see module docstring for assumptions",
+ "execution_models": {
+  "step_floor_ms": "layer-serial: max(W/BW, B F/P) + B s/BW",
+  "overlapped_floor_ms": "overlapped roofline at the assumed P and BW: max((W + B s)/BW, B F/P)",
+  "overlapped_limit_tokens_per_s": "B -> infinity limit of the overlapped roofline: min(BW/s, P/F)"
+ },
  "bandwidth_tb_s": 3.79,
  "peak_bf16_tflops_assumed": 692.3,
  "peak_fp8_tflops_assumed": 1187.4,
@@ -11,6 +16,8 @@
    "batch": 1,
    "step_floor_ms": 2.249,
    "tokens_per_s_ceiling": 445,
+   "overlapped_floor_ms": 2.249,
+   "overlapped_tokens_per_s_ceiling": 445,
    "per_request_mb": 113.97
   },
   {
@@ -18,6 +25,8 @@
    "batch": 8,
    "step_floor_ms": 2.46,
    "tokens_per_s_ceiling": 3252,
+   "overlapped_floor_ms": 2.46,
+   "overlapped_tokens_per_s_ceiling": 3252,
    "per_request_mb": 113.97
   },
   {
@@ -25,6 +34,8 @@
    "batch": 32,
    "step_floor_ms": 3.182,
    "tokens_per_s_ceiling": 10058,
+   "overlapped_floor_ms": 3.182,
+   "overlapped_tokens_per_s_ceiling": 10058,
    "per_request_mb": 113.97
   },
   {
@@ -32,6 +43,8 @@
    "batch": 64,
    "step_floor_ms": 4.144,
    "tokens_per_s_ceiling": 15444,
+   "overlapped_floor_ms": 4.144,
+   "overlapped_tokens_per_s_ceiling": 15444,
    "per_request_mb": 113.97
   },
   {
@@ -39,6 +52,8 @@
    "batch": 128,
    "step_floor_ms": 6.068,
    "tokens_per_s_ceiling": 21093,
+   "overlapped_floor_ms": 6.068,
+   "overlapped_tokens_per_s_ceiling": 21093,
    "per_request_mb": 113.97
   },
   {
@@ -46,6 +61,8 @@
    "batch": 256,
    "step_floor_ms": 10.808,
    "tokens_per_s_ceiling": 23685,
+   "overlapped_floor_ms": 9.917,
+   "overlapped_tokens_per_s_ceiling": 25813,
    "per_request_mb": 113.97
   },
   {
@@ -53,6 +70,8 @@
    "batch": 512,
    "step_floor_ms": 21.617,
    "tokens_per_s_ceiling": 23685,
+   "overlapped_floor_ms": 17.615,
+   "overlapped_tokens_per_s_ceiling": 29065,
    "per_request_mb": 113.97
   },
   {
@@ -60,6 +79,8 @@
    "batch": 1024,
    "step_floor_ms": 43.234,
    "tokens_per_s_ceiling": 23685,
+   "overlapped_floor_ms": 33.012,
+   "overlapped_tokens_per_s_ceiling": 31019,
    "per_request_mb": 113.97
   },
   {
@@ -67,6 +88,8 @@
    "batch": 2048,
    "step_floor_ms": 86.467,
    "tokens_per_s_ceiling": 23685,
+   "overlapped_floor_ms": 63.804,
+   "overlapped_tokens_per_s_ceiling": 32098,
    "per_request_mb": 113.97
   },
   {
@@ -74,6 +97,8 @@
    "batch": 1,
    "step_floor_ms": 2.236,
    "tokens_per_s_ceiling": 447,
+   "overlapped_floor_ms": 2.236,
+   "overlapped_tokens_per_s_ceiling": 447,
    "per_request_mb": 63.64
   },
   {
@@ -81,6 +106,8 @@
    "batch": 8,
    "step_floor_ms": 2.354,
    "tokens_per_s_ceiling": 3399,
+   "overlapped_floor_ms": 2.354,
+   "overlapped_tokens_per_s_ceiling": 3399,
    "per_request_mb": 63.64
   },
   {
@@ -88,6 +115,8 @@
    "batch": 32,
    "step_floor_ms": 2.757,
    "tokens_per_s_ceiling": 11608,
+   "overlapped_floor_ms": 2.757,
+   "overlapped_tokens_per_s_ceiling": 11608,
    "per_request_mb": 63.64
   },
   {
@@ -95,6 +124,8 @@
    "batch": 64,
    "step_floor_ms": 3.294,
    "tokens_per_s_ceiling": 19430,
+   "overlapped_floor_ms": 3.294,
+   "overlapped_tokens_per_s_ceiling": 19430,
    "per_request_mb": 63.64
   },
   {
@@ -102,6 +133,8 @@
    "batch": 128,
    "step_floor_ms": 4.369,
    "tokens_per_s_ceiling": 29300,
+   "overlapped_floor_ms": 4.369,
+   "overlapped_tokens_per_s_ceiling": 29300,
    "per_request_mb": 63.64
   },
   {
@@ -109,6 +142,8 @@
    "batch": 256,
    "step_floor_ms": 7.409,
    "tokens_per_s_ceiling": 34554,
+   "overlapped_floor_ms": 6.518,
+   "overlapped_tokens_per_s_ceiling": 39278,
    "per_request_mb": 63.64
   },
   {
@@ -116,6 +151,8 @@
    "batch": 512,
    "step_floor_ms": 14.817,
    "tokens_per_s_ceiling": 34554,
+   "overlapped_floor_ms": 10.816,
+   "overlapped_tokens_per_s_ceiling": 47337,
    "per_request_mb": 63.64
   },
   {
@@ -123,6 +160,8 @@
    "batch": 1024,
    "step_floor_ms": 29.635,
    "tokens_per_s_ceiling": 34554,
+   "overlapped_floor_ms": 19.413,
+   "overlapped_tokens_per_s_ceiling": 52749,
    "per_request_mb": 63.64
   },
   {
@@ -130,6 +169,8 @@
    "batch": 2048,
    "step_floor_ms": 59.27,
    "tokens_per_s_ceiling": 34554,
+   "overlapped_floor_ms": 36.606,
+   "overlapped_tokens_per_s_ceiling": 55947,
    "per_request_mb": 63.64
   },
   {
@@ -137,6 +178,8 @@
    "batch": 1,
    "step_floor_ms": 2.237,
    "tokens_per_s_ceiling": 447,
+   "overlapped_floor_ms": 2.237,
+   "overlapped_tokens_per_s_ceiling": 447,
    "per_request_mb": 66.78
   },
   {
@@ -144,6 +187,8 @@
    "batch": 8,
    "step_floor_ms": 2.36,
    "tokens_per_s_ceiling": 3389,
+   "overlapped_floor_ms": 2.36,
+   "overlapped_tokens_per_s_ceiling": 3389,
    "per_request_mb": 66.78
   },
   {
@@ -151,6 +196,8 @@
    "batch": 32,
    "step_floor_ms": 2.783,
    "tokens_per_s_ceiling": 11497,
+   "overlapped_floor_ms": 2.783,
+   "overlapped_tokens_per_s_ceiling": 11497,
    "per_request_mb": 66.78
   },
   {
@@ -158,6 +205,8 @@
    "batch": 64,
    "step_floor_ms": 3.347,
    "tokens_per_s_ceiling": 19121,
+   "overlapped_floor_ms": 3.347,
+   "overlapped_tokens_per_s_ceiling": 19121,
    "per_request_mb": 66.78
   },
   {
@@ -165,6 +214,8 @@
    "batch": 128,
    "step_floor_ms": 4.475,
    "tokens_per_s_ceiling": 28605,
+   "overlapped_floor_ms": 4.475,
+   "overlapped_tokens_per_s_ceiling": 28605,
    "per_request_mb": 66.78
   },
   {
@@ -172,6 +223,8 @@
    "batch": 256,
    "step_floor_ms": 7.621,
    "tokens_per_s_ceiling": 33591,
+   "overlapped_floor_ms": 6.73,
+   "overlapped_tokens_per_s_ceiling": 38038,
    "per_request_mb": 66.78
   },
   {
@@ -179,6 +232,8 @@
    "batch": 512,
    "step_floor_ms": 15.242,
    "tokens_per_s_ceiling": 33591,
+   "overlapped_floor_ms": 11.241,
+   "overlapped_tokens_per_s_ceiling": 45548,
    "per_request_mb": 66.78
   },
   {
@@ -186,6 +241,8 @@
    "batch": 1024,
    "step_floor_ms": 30.485,
    "tokens_per_s_ceiling": 33591,
+   "overlapped_floor_ms": 20.263,
+   "overlapped_tokens_per_s_ceiling": 50536,
    "per_request_mb": 66.78
   },
   {
@@ -193,6 +250,8 @@
    "batch": 2048,
    "step_floor_ms": 60.97,
    "tokens_per_s_ceiling": 33591,
+   "overlapped_floor_ms": 38.306,
+   "overlapped_tokens_per_s_ceiling": 53464,
    "per_request_mb": 66.78
   },
   {
@@ -200,6 +259,8 @@
    "batch": 1,
    "step_floor_ms": 2.23,
    "tokens_per_s_ceiling": 448,
+   "overlapped_floor_ms": 2.23,
+   "overlapped_tokens_per_s_ceiling": 448,
    "per_request_mb": 40.04
   },
   {
@@ -207,6 +268,8 @@
    "batch": 8,
    "step_floor_ms": 2.304,
    "tokens_per_s_ceiling": 3472,
+   "overlapped_floor_ms": 2.304,
+   "overlapped_tokens_per_s_ceiling": 3472,
    "per_request_mb": 40.04
   },
   {
@@ -214,6 +277,8 @@
    "batch": 32,
    "step_floor_ms": 2.557,
    "tokens_per_s_ceiling": 12512,
+   "overlapped_floor_ms": 2.557,
+   "overlapped_tokens_per_s_ceiling": 12512,
    "per_request_mb": 40.04
   },
   {
@@ -221,6 +286,8 @@
    "batch": 64,
    "step_floor_ms": 2.896,
    "tokens_per_s_ceiling": 22103,
+   "overlapped_floor_ms": 2.896,
+   "overlapped_tokens_per_s_ceiling": 22103,
    "per_request_mb": 40.04
   },
   {
@@ -228,6 +295,8 @@
    "batch": 128,
    "step_floor_ms": 3.572,
    "tokens_per_s_ceiling": 35837,
+   "overlapped_floor_ms": 3.572,
+   "overlapped_tokens_per_s_ceiling": 35837,
    "per_request_mb": 40.04
   },
   {
@@ -235,6 +304,8 @@
    "batch": 256,
    "step_floor_ms": 5.815,
    "tokens_per_s_ceiling": 44023,
+   "overlapped_floor_ms": 4.924,
+   "overlapped_tokens_per_s_ceiling": 51989,
    "per_request_mb": 40.04
   },
   {
@@ -242,6 +313,8 @@
    "batch": 512,
    "step_floor_ms": 11.63,
    "tokens_per_s_ceiling": 44023,
+   "overlapped_floor_ms": 7.629,
+   "overlapped_tokens_per_s_ceiling": 67114,
    "per_request_mb": 40.04
   },
   {
@@ -249,6 +322,8 @@
    "batch": 1024,
    "step_floor_ms": 23.26,
    "tokens_per_s_ceiling": 44023,
+   "overlapped_floor_ms": 13.038,
+   "overlapped_tokens_per_s_ceiling": 78538,
    "per_request_mb": 40.04
   },
   {
@@ -256,6 +331,8 @@
    "batch": 2048,
    "step_floor_ms": 46.521,
    "tokens_per_s_ceiling": 44023,
+   "overlapped_floor_ms": 24.883,
+   "overlapped_tokens_per_s_ceiling": 82305,
    "per_request_mb": 40.04
   },
   {
@@ -263,6 +340,8 @@
    "batch": 1,
    "step_floor_ms": 2.226,
    "tokens_per_s_ceiling": 449,
+   "overlapped_floor_ms": 2.226,
+   "overlapped_tokens_per_s_ceiling": 449,
    "per_request_mb": 26.67
   },
   {
@@ -270,6 +349,8 @@
    "batch": 8,
    "step_floor_ms": 2.276,
    "tokens_per_s_ceiling": 3515,
+   "overlapped_floor_ms": 2.276,
+   "overlapped_tokens_per_s_ceiling": 3515,
    "per_request_mb": 26.67
   },
   {
@@ -277,6 +358,8 @@
    "batch": 32,
    "step_floor_ms": 2.445,
    "tokens_per_s_ceiling": 13090,
+   "overlapped_floor_ms": 2.445,
+   "overlapped_tokens_per_s_ceiling": 13090,
    "per_request_mb": 26.67
   },
   {
@@ -284,6 +367,8 @@
    "batch": 64,
    "step_floor_ms": 2.67,
    "tokens_per_s_ceiling": 23972,
+   "overlapped_floor_ms": 2.67,
+   "overlapped_tokens_per_s_ceiling": 23972,
    "per_request_mb": 26.67
   },
   {
@@ -291,6 +376,8 @@
    "batch": 128,
    "step_floor_ms": 3.12,
    "tokens_per_s_ceiling": 41023,
+   "overlapped_floor_ms": 3.12,
+   "overlapped_tokens_per_s_ceiling": 41023,
    "per_request_mb": 26.67
   },
   {
@@ -298,6 +385,8 @@
    "batch": 256,
    "step_floor_ms": 4.912,
    "tokens_per_s_ceiling": 52117,
+   "overlapped_floor_ms": 4.021,
+   "overlapped_tokens_per_s_ceiling": 63665,
    "per_request_mb": 26.67
   },
   {
@@ -305,6 +394,8 @@
    "batch": 512,
    "step_floor_ms": 9.824,
    "tokens_per_s_ceiling": 52117,
+   "overlapped_floor_ms": 6.221,
+   "overlapped_tokens_per_s_ceiling": 82305,
    "per_request_mb": 26.67
   },
   {
@@ -312,6 +403,8 @@
    "batch": 1024,
    "step_floor_ms": 19.648,
    "tokens_per_s_ceiling": 52117,
+   "overlapped_floor_ms": 12.442,
+   "overlapped_tokens_per_s_ceiling": 82305,
    "per_request_mb": 26.67
   },
   {
@@ -319,6 +412,8 @@
    "batch": 2048,
    "step_floor_ms": 39.296,
    "tokens_per_s_ceiling": 52117,
+   "overlapped_floor_ms": 24.883,
+   "overlapped_tokens_per_s_ceiling": 82305,
    "per_request_mb": 26.67
   },
   {
@@ -326,6 +421,8 @@
    "batch": 1,
    "step_floor_ms": 1.287,
    "tokens_per_s_ceiling": 777,
+   "overlapped_floor_ms": 1.287,
+   "overlapped_tokens_per_s_ceiling": 777,
    "per_request_mb": 34.57
   },
   {
@@ -333,6 +430,8 @@
    "batch": 8,
    "step_floor_ms": 1.35,
    "tokens_per_s_ceiling": 5924,
+   "overlapped_floor_ms": 1.35,
+   "overlapped_tokens_per_s_ceiling": 5924,
    "per_request_mb": 34.57
   },
   {
@@ -340,6 +439,8 @@
    "batch": 32,
    "step_floor_ms": 1.569,
    "tokens_per_s_ceiling": 20391,
+   "overlapped_floor_ms": 1.569,
+   "overlapped_tokens_per_s_ceiling": 20391,
    "per_request_mb": 34.57
   },
   {
@@ -347,6 +448,8 @@
    "batch": 64,
    "step_floor_ms": 1.861,
    "tokens_per_s_ceiling": 34387,
+   "overlapped_floor_ms": 1.861,
+   "overlapped_tokens_per_s_ceiling": 34387,
    "per_request_mb": 34.57
   },
   {
@@ -354,6 +457,8 @@
    "batch": 128,
    "step_floor_ms": 2.445,
    "tokens_per_s_ceiling": 52353,
+   "overlapped_floor_ms": 2.445,
+   "overlapped_tokens_per_s_ceiling": 52353,
    "per_request_mb": 34.57
   },
   {
@@ -361,6 +466,8 @@
    "batch": 256,
    "step_floor_ms": 4.149,
    "tokens_per_s_ceiling": 61708,
+   "overlapped_floor_ms": 3.613,
+   "overlapped_tokens_per_s_ceiling": 70865,
    "per_request_mb": 34.57
   },
   {
@@ -368,6 +475,8 @@
    "batch": 512,
    "step_floor_ms": 8.297,
    "tokens_per_s_ceiling": 61708,
+   "overlapped_floor_ms": 5.948,
+   "overlapped_tokens_per_s_ceiling": 86085,
    "per_request_mb": 34.57
   },
   {
@@ -375,6 +484,8 @@
    "batch": 1024,
    "step_floor_ms": 16.594,
    "tokens_per_s_ceiling": 61708,
+   "overlapped_floor_ms": 10.618,
+   "overlapped_tokens_per_s_ceiling": 96442,
    "per_request_mb": 34.57
   },
   {
@@ -382,6 +493,8 @@
    "batch": 2048,
    "step_floor_ms": 33.188,
    "tokens_per_s_ceiling": 61708,
+   "overlapped_floor_ms": 19.958,
+   "overlapped_tokens_per_s_ceiling": 102615,
    "per_request_mb": 34.57
   },
   {
@@ -389,6 +502,8 @@
    "batch": 1,
    "step_floor_ms": 1.115,
    "tokens_per_s_ceiling": 897,
+   "overlapped_floor_ms": 1.115,
+   "overlapped_tokens_per_s_ceiling": 897,
    "per_request_mb": 21.2
   },
   {
@@ -396,6 +511,8 @@
    "batch": 8,
    "step_floor_ms": 1.154,
    "tokens_per_s_ceiling": 6930,
+   "overlapped_floor_ms": 1.154,
+   "overlapped_tokens_per_s_ceiling": 6930,
    "per_request_mb": 21.2
   },
   {
@@ -403,6 +520,8 @@
    "batch": 32,
    "step_floor_ms": 1.289,
    "tokens_per_s_ceiling": 24831,
+   "overlapped_floor_ms": 1.289,
+   "overlapped_tokens_per_s_ceiling": 24831,
    "per_request_mb": 21.2
   },
   {
@@ -410,6 +529,8 @@
    "batch": 64,
    "step_floor_ms": 1.468,
    "tokens_per_s_ceiling": 43606,
+   "overlapped_floor_ms": 1.468,
+   "overlapped_tokens_per_s_ceiling": 43606,
    "per_request_mb": 21.2
   },
   {
@@ -417,6 +538,8 @@
    "batch": 128,
    "step_floor_ms": 1.826,
    "tokens_per_s_ceiling": 70110,
+   "overlapped_floor_ms": 1.826,
+   "overlapped_tokens_per_s_ceiling": 70110,
    "per_request_mb": 21.2
   },
   {
@@ -424,6 +547,8 @@
    "batch": 256,
    "step_floor_ms": 3.246,
    "tokens_per_s_ceiling": 78878,
+   "overlapped_floor_ms": 2.542,
+   "overlapped_tokens_per_s_ceiling": 100719,
    "per_request_mb": 21.2
   },
   {
@@ -431,6 +556,8 @@
    "batch": 512,
    "step_floor_ms": 6.491,
    "tokens_per_s_ceiling": 78878,
+   "overlapped_floor_ms": 3.974,
+   "overlapped_tokens_per_s_ceiling": 128845,
    "per_request_mb": 21.2
   },
   {
@@ -438,6 +565,8 @@
    "batch": 1024,
    "step_floor_ms": 12.982,
    "tokens_per_s_ceiling": 78878,
+   "overlapped_floor_ms": 7.254,
+   "overlapped_tokens_per_s_ceiling": 141166,
    "per_request_mb": 21.2
   },
   {
@@ -445,6 +574,8 @@
    "batch": 2048,
    "step_floor_ms": 25.964,
    "tokens_per_s_ceiling": 78878,
+   "overlapped_floor_ms": 14.508,
+   "overlapped_tokens_per_s_ceiling": 141166,
    "per_request_mb": 21.2
   }
  ],
@@ -525,5 +656,14 @@
    "mtp_stock_tok_s": 19505,
    "mtp_replayssm_spec_tok_s": 34321
   }
- ]
+ ],
+ "overlapped_limit_tokens_per_s": {
+  "baseline (FP32 state)": 33255,
+  "16-bit state (FP16 or BF16)": 59558,
+  "ReplaySSM (FP32)": 56753,
+  "ReplaySSM + 16-bit state": 82305,
+  "ReplaySSM + int8 state": 82305,
+  "ReplaySSM + 16-bit state + FP8 W8A8 + FP8 KV": 109632,
+  "ReplaySSM + int8 state + FP8 W8A8 + FP8 KV + FP8 head": 141166
+ }
 }

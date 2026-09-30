@@ -28,7 +28,7 @@ anything timed).
 
 ## Engine patch
 
-`engine/sglang/patches/drafter-0001-dflash-cycle-trace.patch` adds an opt-in
+`engine/sglang/patches/drafter/0001-dflash-cycle-trace.patch` adds an opt-in
 trace (`SGLANG_DFLASH_TRACE_PATH`) to SGLang's DFlash worker. It changes nothing
 unless the variable is set; with it set, every verify cycle synchronizes the
 stream, so traced runs give no timings.

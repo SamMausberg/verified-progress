@@ -3,24 +3,67 @@
 %  - Floor equation, speculation-state mechanism, lever classes, composition rule, frontier and
 %    quality-budget definitions: derivation and design.
 %  - Per-request bytes and the verify state writes: derived from the config and code path.
-%  - Numerical ceilings: pending commit (evidence/moonshot/ceilings.{json,csv}); they also use
-%    the measured HBM read peak (profile).
+%  - Numerical ceilings: derived, evidence/moonshot/ceilings.{json,csv}; they take the HBM read
+%    peak (3.79 TB/s) from the profile workstream as an input, and assume P.
+%  - First lever runs (single runs): evidence/moonshot/lever_sweeps_quick.csv, decode_ceiling_try1.csv.
 %  - P4 write avoidance and P5 sharing: analysis with exact witnesses (evidence/state_structure/);
 %    measurements pending.
-%  - Every lever measurement, the interaction matrix and both frontiers: pending.
+%  - Repeated lever measurements, quality, the interaction matrix and both frontiers: pending.
 \section{Stacking every axis}\label{sec:stack}
-The certified head and a better drafter each attack one term of the verifier's cost. When the head is a sixth of a plain step's bytes and the recurrent state dominates at high concurrency, a paper about avoided work also has to ask what the whole stack can gain when every term is attacked, which of those gains keep the target's decisions, and what the others cost in quality. This section starts from bytes and floating-point operations per token, which set hard ceilings on this machine, and then lists the levers, how they compose, and the two stacks they form.
+The certified head and a better drafter each attack one term of the verifier's cost. When the head is a sixth of a plain step's bytes and the recurrent state dominates at high concurrency, a paper about avoided work also has to ask what the whole stack can gain when every term is attacked, which of those gains keep the target's decisions, and what the others cost in quality. This section starts from bytes and floating-point operations per token, which, under a stated execution model and an assumed tensor-core rate, bound what each lever can deliver, and then lists the levers, how they compose, and the two stacks they form.
 
 \subsection{Where the ceilings are}\label{sec:stack-ceilings}
-A decode step streams the linear weights once whatever the batch size, $W=8.41$~GB, and everything else is per request: 100.7~MB of FP32 recurrent state read and written, and 32~KiB of attention KV per context token (Table~\ref{tab:bytes}). With $F$ the floating-point operations per token (two per weight), $s$ the per-request bytes per step, $\mathrm{BW}$ the measured HBM read bandwidth and $P$ an achievable tensor-core rate, the step time at batch $B$ is bounded below by
+A decode step streams the linear weights once whatever the batch size, $W=8.41$~GB, and everything else is per request: 100.7~MB of FP32 recurrent state read and written, and 32~KiB of attention KV per context token (Table~\ref{tab:bytes}). With $F$ the floating-point operations per token (two per weight), $s$ the per-request bytes per step, $\mathrm{BW}$ the measured HBM read bandwidth and $P$ an achievable tensor-core rate, and with each layer's weight GEMMs and its per-request kernels (recurrent state, attention) running in turn, as they do at the pin, the step time at batch $B$ is bounded below by
 \begin{equation}
 t(B)\ge\max\!\left(\frac{W}{\mathrm{BW}},\,\frac{BF}{P}\right)+\frac{Bs}{\mathrm{BW}},\label{eq:stack-floor}
 \end{equation}
-because per-request traffic cannot hide behind itself while the weights stream once. $P$ is taken as 70\% of the BF16 and 60\% of the FP8 datasheet peaks, assumptions stated so that the ceilings can be recomputed. Two consequences follow before any measurement. As $B$ grows the throughput ceiling approaches $1/(F/P+s/\mathrm{BW})$, set by the per-request state and the arithmetic rather than the weights, so halving the state's bytes or writing it less often raises it while a faster head does not; and even with every byte removed, the arithmetic term caps an FP8 engine, so no single lever gives an order of magnitude at high concurrency. At batch one the weights bound the step, and the draft head and the target's weight bytes are the terms to cut.
+since in that order the weight stream and the GEMM arithmetic can overlap each other while the per-request traffic adds to them. An engine that overlapped the memory-bound per-request kernels with the batch GEMMs would be bounded only by
+\begin{equation}
+t(B)\ge\max\!\left(\frac{W+Bs}{\mathrm{BW}},\,\frac{BF}{P}\right),\label{eq:stack-floor-overlap}
+\end{equation}
+whose large-batch ceiling is $\min(\mathrm{BW}/s,\,P/F)$; Equation~\eqref{eq:stack-floor} is the bound for the engine as it runs, not for every engine on this machine. $P$ is taken as 70\% of the BF16 and 60\% of the FP8 datasheet peaks, assumptions stated so that the ceilings can be recomputed. Two consequences follow before any measurement. Under Equation~\eqref{eq:stack-floor}, as $B$ grows the throughput ceiling approaches $1/(F/P+s/\mathrm{BW})$, set by the per-request state and the arithmetic rather than the weights, so halving the state's bytes or writing it less often raises it while a faster head does not; and even with every byte removed, the arithmetic term caps an FP8 engine, so no single lever gives an order of magnitude at high concurrency. At batch one the weights bound the step, and the draft head and the target's weight bytes are the terms to cut.
 
-\pending{moonshot: derived ceilings per lever stack and measured decode-step times to $B=1024$ per state and weight format; \nolinkurl{evidence/moonshot/ceilings.csv}, \nolinkurl{evidence/moonshot/decode_ceiling.csv}}
+Table~\ref{tab:stack-ceilings} and Figure~\ref{fig:stack-ceilings} evaluate the floor for stacks of levers (\nolinkurl{evidence/moonshot/ceilings.json}). The bandwidth input is the profile workstream's measured read peak of 3.79~TB/s, taken here as an input whose evidence is \pending{profile}, and $P$ is assumed as above; the ceilings are derived, not measured. At batch one the floor is 2.25~ms per token (445 tokens/s), of which the weights alone account for 2.22~ms; plain decoding measured 281 tokens/s at concurrency one in a single run, 63\% of that rate (\nolinkurl{evidence/moonshot/ceilings.csv}, \nolinkurl{evidence/moonshot/lever_sweeps_quick.csv}). At large batch the plain engine's ceiling under Equation~\eqref{eq:stack-floor} is 23.7k tokens/s, because each request moves 114~MB per step and needs 8.4~GFLOP. Halving the state bytes, writing the state less often and moving weights and cache to FP8 raise the ceiling to between 34k and 79k tokens/s; none reaches ten times the plain engine's, because 8.4~GFLOP per token cap an FP8 engine near 140k tokens/s at the assumed rate even with every byte removed (about 235k at the datasheet FP8 peak, of which the assumed rate is 60\%; derived from the same constants).
 
-\pendingfigure{Bytes and step time per token against batch size: derived floors from Equation~\eqref{eq:stack-floor} for each lever stack, with measured step times as points.}{evidence/moonshot/ceilings.csv}
+\begin{table}[tbp]
+\small\centering
+\begin{tabular}{@{}lrr@{}}\toprule
+Lever stack & MB per request per step & Ceiling (tokens/s)\\\midrule
+Plain, FP32 state & 114.0 & 23.7k\\
+16-bit state & 63.6 & 34.6k\\
+Replayed state writes, FP32 & 66.8 & 33.6k\\
+Replayed state writes, 16-bit state & 40.0 & 44.0k\\
+Replayed state writes, int8 state & 26.7 & 52.1k\\
+Replayed, 16-bit state, FP8 weights and KV & 34.6 & 61.7k\\
+Replayed, int8 state, FP8 weights, KV and head & 21.2 & 78.9k\\
+MTP (accepted length 3), stock verification, FP32 & -- & 19.5k\\
+MTP (accepted length 3), replayed verification, FP32 & -- & 34.3k\\\bottomrule
+\end{tabular}
+\caption{Derived large-batch throughput ceilings from Equation~\eqref{eq:stack-floor}, which assumes that per-request kernels do not overlap the weight GEMMs, with the HBM read bandwidth taken as 3.79~TB/s and the tensor-core rate assumed at 70\% (BF16) or 60\% (FP8) of the datasheet peak. An engine with that overlap is bounded only by Equation~\eqref{eq:stack-floor-overlap}. Not measurements; \nolinkurl{evidence/moonshot/ceilings.json}.}
+\label{tab:stack-ceilings}
+\end{table}
+
+\begin{figure}[tbp]
+\centering
+\datafigure{../evidence/moonshot/ceilings.csv}{%
+\begin{tikzpicture}
+\begin{axis}[width=.8\linewidth,height=5.6cm,xmode=log,log basis x=2,ymode=log,xmin=0.8,xmax=2400,ymin=100,ymax=1e5,
+  xtick={1,8,32,128,512,2048},xticklabels={1,8,32,128,512,2048},
+  xlabel={Batch size $B$ (lines) or client concurrency $c$ (points)},ylabel={Output tokens/s},grid=major,grid style={draw=ink!10},
+  legend style={at={(.97,.03)},anchor=south east,draw=none,fill=white,font=\scriptsize},legend cell align=left]
+\addplot[thick,ink,discard if not={stack}{"baseline (FP32 state)"}] table[x=batch,y=tokens_per_s_ceiling,col sep=comma]{../evidence/moonshot/ceilings.csv};\addlegendentry{plain, FP32 state (derived)}
+\addplot[thick,dashdotted,teal] table[x=batch,y=tokens_per_s_ceiling,col sep=comma,discard if not={stack}{"16-bit state (FP16 or BF16)"}]{../evidence/moonshot/ceilings.csv};\addlegendentry{16-bit state (derived)}
+\addplot[thick,dashed,teal,discard if not={stack}{"ReplaySSM + 16-bit state"}] table[x=batch,y=tokens_per_s_ceiling,col sep=comma]{../evidence/moonshot/ceilings.csv};\addlegendentry{replayed, 16-bit state (derived)}
+\addplot[thick,dotted,ochre,discard if not={stack}{"ReplaySSM + int8 state + FP8 W8A8 + FP8 KV + FP8 head"}] table[x=batch,y=tokens_per_s_ceiling,col sep=comma]{../evidence/moonshot/ceilings.csv};\addlegendentry{replayed, int8 state, FP8 (derived)}
+\addplot[only marks,mark=*,mark size=1.6pt,ink,discard if not={config}{plain}] table[x expr=\thisrow{concurrency}/1.12,y=y_tok_s_gpu,col sep=comma]{../evidence/moonshot/lever_sweeps_quick.csv};\addlegendentry{plain, served (single run)}
+\addplot[only marks,mark=square,mark size=2.2pt,thick,teal,discard if not={config}{plain+fp16_state}] table[x expr=\thisrow{concurrency}*1.12,y=y_tok_s_gpu,col sep=comma]{../evidence/moonshot/lever_sweeps_quick.csv};\addlegendentry{FP16 state, served (single run)}
+\end{axis}
+\end{tikzpicture}}{Derived throughput ceilings per lever stack against batch size, with measured served throughput.}
+\caption{Derived throughput ceilings per lever stack against batch size under the layer-serial model of Equation~\eqref{eq:stack-floor} and the assumed tensor-core rate (lines, \nolinkurl{evidence/moonshot/ceilings.csv}) and served output throughput of single benchmark runs at client concurrency 1, 32 and 128 (points, \nolinkurl{evidence/moonshot/lever_sweeps_quick.csv}; the two series are offset slightly left and right of their concurrency so that both stay visible). The gap between line and point at a given concurrency is overhead above that layer-serial floor, and at high concurrency it includes the server's streaming path.}
+\label{fig:stack-ceilings}
+\end{figure}
+
+\pending{moonshot: repeated decode-step and served measurements to $B=1024$ per state and weight format}
 
 \subsection{Speculation and the recurrent state}\label{sec:stack-state}
 The hybrid architecture changes the economics of speculation. A verify pass over $D$ draft tokens must be able to roll back to any accepted prefix, and SGLang's Triton verify kernel does so by writing one full FP32 state per draft position and copying the accepted one back at commit. Per request and cycle that is one state read, $D$ state writes and a read and write at commit: $352$~MB for $D=4$, three and a half plain steps (derived from the code path). With an accepted length of about three, speculation spends more state bytes per output token than plain decoding while saving weight bytes, so at high batch, where the state dominates, its bandwidth advantage can vanish. SGLang's replay path for speculation stores each draft token's inputs and folds the accepted prefix into the state at commit, reading and writing the state once per cycle, which would make speculation cheaper in state bytes per token than plain decoding; trees do not get this benefit yet, because the replay path handles only chains and a tree keeps one full state per node~\cite{treewy,gdntreescan}.
@@ -36,6 +79,8 @@ State precision is the cheapest lever and the most dangerous. DAMP reports reaso
 \subsection{Levers by axis}\label{sec:stack-levers}
 Table~\ref{tab:axes} lists the levers, each built as a separate server flag or environment variable so that any subset composes. A lever is \emph{exact} when it leaves the target's arithmetic unchanged, so every emitted token is the target's decision at its own batch shape under the stock-kernel contract, with its measured noise floor; drafting levers are exact because the target verifies every token. A lever is \emph{lossy} when it changes the target's arithmetic or decisions, and it carries a measured quality cost. SGLang's replay path for plain decoding belongs to the lossy group as implemented: its decode kernel reconstructs the state on tensor cores from BF16-cast operands and persists that rounding at every flush (code reading at the pin); the bit-exact alternative is the rounding-preserving replay above.
 
+The first single-run measurements on the benchmark harness (plain arm with the prefix cache on, capacity 128) separate the levers by where they act (\nolinkurl{evidence/moonshot/lever_sweeps_quick.csv}). FP16 recurrent state raised served throughput at concurrency 128 from 13.5k to 16.7k tokens/s ($1.24\times$) and changed nothing at concurrency one, which is what a per-request byte term predicts; its quality cost is \pending{moonshot: GSM8K and logit-probe agreement for FP16 state}. FP8 KV did nothing at these short contexts ($0.99\times$). FP8 W8A8 weights could not use their CUTLASS GEMM: the one in the installed aarch64 \code{sgl-kernel} aborts at run time because that binary was not compiled for \code{sm\_90a}, as its logged error states, and the Triton route showed no consistent gain ($0.96$--$1.06\times$ across concurrencies), a negative result until a different GEMM route is wired. These are single runs without repeats. A first engine-only pass of decode steps at batch 512 took 26.9~ms with FP32 state, 23.0~ms with BF16 and 22.5~ms with FP16 (\nolinkurl{evidence/moonshot/decode_ceiling_try1.csv}); it is noisy at small batch sizes and is to be repeated.
+
 Two levers need engine changes. SGLang's hot-vocabulary draft head (\code{-{}-speculative-token-map}, after FR-Spec~\cite{frspec}) does the wrong thing on Qwen3.5 as read at the pin: the MTP layer's head is the tied embedding, and \code{set\_embed\_and\_head} ignores the truncated head in that case, so the drafter scores all 248,320 rows while the worker remaps indices as if it had scored the hot subset; the patch unties a reduced head for the drafter only. The second change adds a relaxed greedy rule for chains, accepting a draft token whose target logit is within $g$ of the maximum; SGLang's existing relaxed thresholds act only when sampling, and the rule is lossy by construction, so its quality curve is the measurement~\cite{marginsnotwindows} \pending{moonshot: the patches and their tests}.
 
 \begin{table}[tbp]
@@ -46,10 +91,10 @@ Progress per verify pass & MTP and DFlash drafting, deeper chains, trees where t
 & Relaxed greedy acceptance within $g$ logits & lossy & \pending{}\\
 Bytes per verify pass & Certified int8 head (Section~\ref{sec:selfevidence}) & exact & \pending{}\\
 & Replayed verification of the recurrent state & exact$^\ast$ & \pending{}\\
-& FP8 W8A8 weights, FP8 KV; int4 target with a matched drafter~\cite{nota2026} & lossy & \pending{}\\
+& FP8 W8A8 weights, FP8 KV; int4 target with a matched drafter~\cite{nota2026} & lossy & FP8 weights: no consistent gain; FP8 KV: no gain (single runs); int4 \pending{}\\
 Bytes per draft step & Hot-vocabulary or low-precision draft head & exact & \pending{}\\
 Concurrency and state & One state slot per request (lifts the 133-request cap) & exact & \pending{}\\
-& FP16 state; replayed decoding; rounding-preserving replay (P4) & lossy, lossy, exact & \pending{}\\
+& FP16 state; replayed decoding; rounding-preserving replay (P4) & lossy, lossy, exact & FP16: $1.24\times$ at $c=128$ (single run, quality pending); others \pending{}\\
 System overheads & Host gaps and synchronizations, fusion, attention backend per shape & exact & \pending{}\\\bottomrule
 \end{tabularx}
 \caption{Levers by axis. $^\ast$The replay fold is written as a bitwise clone of the verify kernel's state update, but the verify outputs use a chunked reformulation whose rounding differs, so it is exact only up to the batch-shape noise floor until the differential tests confirm more.}
@@ -64,4 +109,4 @@ The \emph{exact stack} admits only levers that keep the target's decisions: capa
 \pending{moonshot: the interaction matrix (speed at concurrency 1 and at peak, acceptance and quality for each measured pair) and both frontiers from one server launch per arm; \nolinkurl{evidence/moonshot/interactions.csv}, \nolinkurl{evidence/moonshot/frontier_exact.csv}, \nolinkurl{evidence/moonshot/frontier_lossy.csv}}
 
 \subsection{What did not work}\label{sec:stack-failed}
-\pending{moonshot: levers that failed to launch or regressed, with their mechanisms}
+So far: FP8 W8A8 weights, whose CUTLASS GEMM in the installed aarch64 \code{sgl-kernel} aborts at run time because that binary was not compiled for \code{sm\_90a}, and whose Triton fallback showed no consistent gain in single runs; FP8 KV cache, which saves nothing at short contexts; BF16 recurrent state, which moves the same bytes as FP16 and is worse on quality in published measurements on another GDN model~\cite{damp}; and 2:4 sparsity, which the engine does not support at the pin (its compressed-tensors loader raises an error for 2:4 schemes; code reading, \path{python/sglang/srt/layers/quantization/compressed_tensors/compressed_tensors.py}). An MTP server with BF16 state at 512 concurrent requests also failed to capture its verify graph (Section~\ref{sec:serving-protocol}). \pending{moonshot: remaining levers that fail or regress, with their mechanisms}
