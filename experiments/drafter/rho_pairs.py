@@ -84,7 +84,10 @@ def block_hidden(
     mask_token: int,
 ) -> torch.Tensor:
     """Draft head inputs for blocks at `anchors`: [n_anchors, block, hidden]."""
-    from specforge.algorithms.common.dflash_family_model import create_dflash_block_mask
+    from specforge.algorithms.common.dflash_family_model import (
+        create_dflash_block_mask,
+        create_dflash_sdpa_mask,
+    )
 
     seq_len = ids.shape[1]
     n = anchors.shape[0]
@@ -97,23 +100,24 @@ def block_hidden(
         ]
     )[None]
     keep = torch.ones(1, n, dtype=torch.bool, device=ids.device)
+    flex = draft.config._attn_implementation == 'flex_attention'
+    builder = create_dflash_block_mask if flex else create_dflash_sdpa_mask
     masks = {}
     layer_types = set(getattr(draft, 'layer_types', ['full_attention']))
     if 'full_attention' in layer_types:
-        masks['full_attention'] = create_dflash_block_mask(
-            anchors[None], keep, seq_len, block, ids.device
-        )
+        masks['full_attention'] = builder(anchors[None], keep, seq_len, block, ids.device)
     if 'sliding_attention' in layer_types:
-        masks['sliding_attention'] = create_dflash_block_mask(
+        masks['sliding_attention'] = builder(
             anchors[None], keep, seq_len, block, ids.device, sliding_window=draft.sliding_window
         )
-    with torch.autocast('cuda', dtype=torch.bfloat16):
+    kwargs = {'kernel_options': {'BACKEND': 'TRITON'}} if flex else {}
+    with torch.autocast(ids.device.type, dtype=torch.bfloat16):
         hidden = draft(
             position_ids=positions,
             noise_embedding=embed(noise),
             target_hidden=features,
             attention_mask=masks,
-            kernel_options={'BACKEND': 'TRITON'},
+            **kwargs,
         )
     return hidden.view(n, block, -1)
 

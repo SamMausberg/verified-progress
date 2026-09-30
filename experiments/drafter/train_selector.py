@@ -76,7 +76,8 @@ class SelectorTrainer:
         self.device = device
         self.target = load_target(device)
         self.draft, self.config = build_draft(
-            resolve_init(args.init), argparse.Namespace(dflash2=False)
+            resolve_init(args.init),
+            argparse.Namespace(dflash2=False, attention_backend=args.attention_backend),
         )
         self.draft.to(device=device, dtype=torch.bfloat16).eval().requires_grad_(False)
         dflash = self.config['dflash_config']
@@ -264,9 +265,13 @@ def main() -> None:
     parser.add_argument('--log-every', type=int, default=10)
     parser.add_argument('--segment-minutes', type=float, default=25)
     parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--device', default='cuda')
+    parser.add_argument(
+        '--attention-backend', choices=['flex_attention', 'sdpa'], default='flex_attention'
+    )
     args = parser.parse_args()
 
-    device = torch.device('cuda')
+    device = torch.device(args.device)
     random.seed(args.seed)
     torch.manual_seed(args.seed)
     run = args.run.expanduser()
