@@ -123,7 +123,32 @@ def main() -> None:
             if t < b:
                 by_path['(outside trace ranges)'] += (b - t) / 1e3
                 by_leaf['(outside trace ranges)'] += (b - t) / 1e3
+    # Host time per function over whole cycles, split into the part the GPU
+    # overlaps (hidden) and the part it waits through (exposed). A function
+    # called on the critical path shows up mostly as exposed time.
+    all_by_leaf: dict[str, float] = defaultdict(float)
+    for lo, hi in cycles:
+        i = max(int(np.searchsorted(seg_start, lo, side='right')) - 1, 0)
+        while i < len(segs) and segs[i][0] < hi:
+            s0, s1, path = segs[i]
+            d = (min(s1, hi) - max(s0, lo)) / 1e3
+            if d > 0:
+                for name in {part for part in path.split(' > ')}:
+                    all_by_leaf[name] += d
+            i += 1
+    idle_inclusive: dict[str, float] = defaultdict(float)
+    for path, v in by_path.items():
+        for name in set(path.split(' > ')):
+            idle_inclusive[name] += v
     n = len(cycles)
+    exposure = {
+        name: {
+            'host_us_per_cycle': total / n,
+            'exposed_us_per_cycle': idle_inclusive.get(name, 0.0) / n,
+            'hidden_fraction': 1 - idle_inclusive.get(name, 0.0) / total if total else None,
+        }
+        for name, total in sorted(all_by_leaf.items(), key=lambda kv: -kv[1])
+    }
     out = {
         'report': args.report.name,
         'cycles': n,
@@ -132,6 +157,7 @@ def main() -> None:
         'idle_by_innermost_function_us_per_cycle': {
             p: v / n for p, v in sorted(by_leaf.items(), key=lambda kv: -kv[1])
         },
+        'host_function_exposure_inclusive': exposure,
         'idle_by_call_path_us_per_cycle': {
             p: v / n for p, v in sorted(by_path.items(), key=lambda kv: -kv[1])[:25]
         },
