@@ -92,7 +92,7 @@ capacity flags are defined by the serving harness and its arm file.
 | State-structure witnesses (P4, P5) | `evidence/state_structure/` | on `main` |
 | Contract witnesses (P7) | `evidence/contracts/` | on `main` |
 | Attribution, head microbenchmark, bytes per step | `evidence/profiles/` | pull request #13 |
-| Head-input capture, transport and self-evidence replay | `evidence/head_geometry/` | pull request #16 |
+| Head-input capture, transport and self-evidence replay | `evidence/head_geometry/` | on `main` (plain decode); MTP and DFlash in progress |
 | Serving harness, frozen workload, quality check | `bench/`, `evidence/bench/` | on `main`; sweeps in progress |
 | Certified-head kernels and head-path runtime | `evidence/certified_head/` | in progress |
 | Divergence mechanisms and state safety | `evidence/state/` | in progress |

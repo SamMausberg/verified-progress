@@ -106,7 +106,7 @@ Head is 15.1\% of plain-step weight bytes, 84.1\% of an MTP draft step's & Deriv
 GDN state 50.3~MB per request (FP32) & Derived & \code{config.json} (Table~\ref{tab:bytes})\\
 Stock head, sampling and verification behaviour at the pin & Code reading & Section~\ref{sec:stock}; SGLang \sourcepin\\
 Gap condition (Theorem~\ref{thm:stock}) and R-bf16 witness & Proved & Section~\ref{sec:headcontracts}\\
-Certified tokens equal stock tokens at the served shapes & Pending & kernel; \nolinkurl{evidence/certified_head/}\\
+Certified tokens equal stock tokens at the served shapes, with the kernel's measured error & Pending & kernel; \nolinkurl{evidence/certified_head/}\\
 Commit rule, directional margin, dead/deferred/enclosed accounting & Proved / definition & Section~\ref{sec:semantics}\\
 Transport theorem, summary merge, admission rule & Proved & Section~\ref{sec:transport}\\
 Transport--self-evidence crossover and static-screen comparison & Proved & Theorem~\ref{thm:crossover}, Proposition~\ref{prop:static}\\
@@ -114,7 +114,7 @@ $\delta^\ast$ median 0.85\% (int8, $\ell_2$, 64-row tiles), 0.30\% ($\ell_\infty
 Measured drift $\rho$ and transport certification & Pending & geometry; \nolinkurl{evidence/head_geometry/}\\
 Envelope with Hopper accumulation model; integer pass; outward rounding & Proved (model assumed) & Section~\ref{sec:selfevidence}; Khattak and Mikaitis~\cite{khattak2026}\\
 Refinement ladder; candidate-count bounds & Proved & Theorem~\ref{thm:ladder}, Proposition~\ref{prop:candidates}\\
-Plain-decode alignment of captured head inputs; candidate sets per cheap head; R-stock fallback share & Finding & \nolinkurl{evidence/head_geometry/alignment_plain4b.json}, \nolinkurl{evidence/head_geometry/selfevidence_plain4b.json}\\
+Plain-decode alignment of captured head inputs; candidate sets per cheap head; R-stock fallback share by rule and model; certified tokens equal the engine's on 6,005 rows & Finding & \nolinkurl{evidence/head_geometry/alignment_plain4b.json}, \nolinkurl{evidence/head_geometry/selfevidence_plain4b.json}, \nolinkurl{evidence/head_geometry/rstock_plain4b.json}\\
 Candidate sets on MTP and DFlash states; head-path runtime & Pending & geometry, kernel\\
 Certified race; RNG contract; fixed-noise verification; coupling bounds & Proved & Section~\ref{sec:decisions}\\
 Sampling contract: fixed-noise verification with the stock seeded noise; committed tokens equal the seeded sampler's tokens for the verify pass's logits & Design decided; pending & kernel; Section~\ref{sec:fixednoise}\\

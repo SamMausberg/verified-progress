@@ -53,6 +53,12 @@ evidence path. `TASKS.md` tracks the work, `SETUP.md` describes the machine and
   computation cannot be shared across unrelated requests
   (`evidence/state_structure/`); `tests/test_contracts.py` separates the
   exactness contracts the paper uses (`evidence/contracts/`).
+- **Head geometry on real states.** On 6,005 plain-decode head inputs captured
+  from the engine, an int8 copy of the head certifies the real-arithmetic winner
+  with 1.3-1.6 candidate rows per decision on average, and the stock-kernel
+  contract leaves 0.35% of rows to the stock kernel under the published Hopper
+  accumulation model; the certified decoder-tail proposal (P1) failed its kill
+  test (`evidence/head_geometry/`).
 - **Lean.** `formal/DecisionGuards.lean` and `formal/CertifiedArgmax.lean`
   elaborate under Lean 4.19.0 (`formal/STATUS.md`). They cover decision logic
   and scaled-integer bounds, not IEEE rounding, exponentials or probability.

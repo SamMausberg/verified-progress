@@ -85,7 +85,7 @@ Let the level-0 intervals have widths $\omega_i=hi_i-lo_i\le\omega$ (with outwar
 \begin{proof}
 (1) $hi_i\le z_i+\omega_i$ and $lo_a\ge z_a-\omega_a$, so a kept row satisfies $z_i+\omega_i\ge\tau\ge z_a-\omega_a$. Each such row has $p^{(T')}_i\ge p^{(T')}_{\max}e^{-2\omega/T'}$, and the probabilities sum to at most one. (2) In score space the widths are $\omega_i/T$, so $C\subseteq\{i:y_i\ge M-t\}$ with $y_i=z_i/T+g_i$ and $M=\max_jy_j$. Row $i$ belongs to that set if and only if $y_i+t\ge\max_{j\ne i}y_j$. The maximum of independent Gumbels with locations $z_j/T$ is Gumbel with location $\log\sum_{j\ne i}e^{z_j/T}$, and two independent Gumbels with locations $a,b$ satisfy $P(G_a\ge G_b)=e^a/(e^a+e^b)$. Hence the probability is $p_ie^t/(p_ie^t+1-p_i)$; sum over $i$.
 \end{proof}
-At $T=1$ and envelope half-width $\beta$ (so $t\approx4\beta$), the expected re-scoring set for exact sampling is at most 55 rows for $\beta=1$, 2,981 for $\beta=2$ and up to $1.6\times10^5$ for $\beta=3$ (Figure~\ref{fig:candidates}). Exact sampling through the cheap pass is therefore cheap only if the envelope is about two logits wide or less. Greedy selection has no distribution-free bound: a flat distribution (small $p_{\max}$) needs many rows. The envelope in logits is $\beta_i\approx\norm{e_i}_2\norm h_2$; with the int8 constants of Table~\ref{tab:headconstants} that is about $0.0063\norm h_2$, so the norm of the head input at the served positions decides whether $\beta$ is a fraction of a logit or several logits \pending{geometry: distribution of $\norm{h}_2$ at the head input and of $\beta$ per variant}.
+At $T=1$ and envelope half-width $\beta$ (so $t\approx4\beta$), the expected re-scoring set for exact sampling is at most 55 rows for $\beta=1$, 2,981 for $\beta=2$ and up to $1.6\times10^5$ for $\beta=3$ (Figure~\ref{fig:candidates}). Exact sampling through the cheap pass is therefore cheap only if the envelope is about two logits wide or less. Greedy selection has no distribution-free bound: a flat distribution (small $p_{\max}$) needs many rows. The envelope in logits is $\beta_i\approx\norm{e_i}_2\norm h_2$; with the int8 constants of Table~\ref{tab:headconstants} that is about $0.0063\norm h_2$, so the norm of the head input decides whether $\beta$ is a fraction of a logit or several. On captured plain-decode states that norm has a median of 159 (p10 132, p90 169), which puts the int8 row envelope at about one logit (Section~\ref{sec:geometry-selfevidence}).
 
 \begin{figure}[tbp]
 \centering
@@ -141,7 +141,23 @@ Gumbel races with the same noise field behave like greedy selection: at $T=1$ an
 \label{fig:geometry-candidates}
 \end{figure}
 
-\paragraph{How often the stock contract needs the stock kernel.} Under R-stock a row is certified only through the gap condition, and on the same positions it fails, sending the row to the stock kernel, at 3.03\% of positions with the conservative tensor-core model ($\gamma=6.1\times10^{-4}$), 2.18\% with $\gamma=1.19\times10^{-4}$, and 1.95\% even with IEEE FP32 accumulation ($\gamma=1.7\times10^{-6}$). The floor near 2\% comes from the BF16 spacing term, not from the accumulation model: with $G$ near zero the condition is a margin above one BF16 spacing at the winner's magnitude, and 1.95\% of positions have a smaller margin. Grouped by the capture run's decode batches, 14.8--21.6\% of batches contain at least one such row. If the fallback reruns the stock head for the whole batch at the same shape, that share of batches pays for both heads; a row-wise fallback would be much cheaper but needs the stock GEMM to be bitwise batch-invariant row by row, which is \pending{kernel: row-wise batch invariance of the stock head GEMM by batch size}. This is the first measured term of Equation~\eqref{eq:headgate}: whatever the kernel achieves, the fallback probability is not small at batch sizes above one.
+\paragraph{How often the stock contract needs the stock kernel.} Under R-stock a row is certified only when its token is the stock kernel's for every accumulator value the error model allows. Table~\ref{tab:rstock} gives, on the same positions, how often each rule leaves a row to the stock kernel, for four accumulation models of that kernel. The gap condition of Theorem~\ref{thm:stock} has a floor near 2\% even when the accumulation error is negligible, because it asks for a margin above one BF16 spacing at the winner's magnitude, which 1.95\% of positions lack. The interval form of Proposition~\ref{prop:stockinterval}, which rounds each accumulator interval into BF16 buckets and applies the first-index rule, has no such floor: two rows whose logits round to the same BF16 value under every admissible accumulation are decided by index, as the stock argmax decides them. Under the blocked model of Hopper accumulation ($\gamma=1.19\times10^{-4}$) it sends 0.35\% of rows and 2.8\% of the capture run's batches to the stock kernel. For every model and rule, no certified token differed from the token the engine returned at the capture's batch shape, which is consistent with the error models on these 6,005 rows but does not prove that cuBLAS stays within the smallest of them (\nolinkurl{evidence/head_geometry/rstock_plain4b.json}).
+
+\begin{table}[tbp]
+\small\centering
+\begin{tabular}{@{}lrrrr@{}}\toprule
+& \multicolumn{2}{c}{Gap condition (Thm.~\ref{thm:stock})} & \multicolumn{2}{c}{Interval form (Prop.~\ref{prop:stockinterval})}\\
+Stock accumulation model & rows & batches & rows & batches\\\midrule
+Conservative tensor-core model, $\gamma=6.1\times10^{-4}$ & 3.03\% & 21.6\% & 1.40\% & 10.9\%\\
+Blocked Hopper model, $\gamma=1.19\times10^{-4}$ & 2.18\% & 16.0\% & 0.35\% & 2.8\%\\
+$\gamma=10^{-5}$ & 1.97\% & 14.9\% & 0.017\% & 0.13\%\\
+IEEE FP32 blocked tree, $\gamma=1.7\times10^{-6}$ & 1.95\% & 14.8\% & 0\% & 0\%\\\bottomrule
+\end{tabular}
+\caption{Share of rows, and of the capture run's decode batches, that the stock contract leaves to the stock kernel on 6,005 held-out plain-decode positions, by rule and by the error model assumed for the stock kernel's FP32 accumulation. Measured, \nolinkurl{evidence/head_geometry/rstock_plain4b.json}.}
+\label{tab:rstock}
+\end{table}
+
+If the fallback reruns the stock head for the whole batch at the same shape, the batches in Table~\ref{tab:rstock} pay for both heads; a row-wise fallback would be cheaper but needs the stock GEMM to be bitwise batch-invariant row by row, which is \pending{kernel: row-wise batch invariance of the stock head GEMM by batch size}. This is the first measured term of Equation~\eqref{eq:headgate}: with the interval form and the published accumulation model, the fallback is rare enough not to decide the outcome.
 
 \subsection{Sparse rows do not imply sparse weight traffic}\label{sec:union}
 For rows $i$ of a microbatch let $A_i$ be the set of retained vocabulary rows or tiles. A kernel that reuses weights across rows reads the union $\bigcup_iA_i$, not the average of the masks. If each row independently retained a tile with probability $f$, the batch would need that tile with probability
@@ -178,10 +194,10 @@ Figure~\ref{fig:kernel-path} shows the path for a batch of $M$ head inputs; the 
 \node[good,text width=2.7cm,right=of sel] (ref) {Re-score candidates\\from BF16 rows};
 \node[box,text width=3.2cm,below=.8cm of ref] (dec) {Decision on BF16\\intervals (Prop.~\ref{prop:stockinterval})};
 \node[warn,text width=3.2cm,left=1.2cm of dec] (fb) {Stock head at the same $M$ (conditional node)};
-\draw[flow] (prep)--(gemv);\draw[flow] (gemv)--node[above,label]{tile\\top-4}(sel);\draw[flow] (sel)--(ref);\draw[flow] (ref)--(dec);
+\draw[flow] (prep)--(gemv);\draw[flow] (gemv)--(sel);\draw[flow] (sel)--(ref);\draw[flow] (ref)--(dec);
 \draw[flow] (dec)--node[above,label]{undecided}(fb);
 \end{tikzpicture}
-\caption{The certified greedy path. Only the approximate pass streams the whole head, in int8 at half the bytes of BF16; candidate rows are re-read in BF16, and the stock head runs only when the device-side flag is set.}
+\caption{The certified greedy path. Only the approximate pass streams the whole head, in int8 at half the bytes of BF16; its epilogue keeps the four largest upper bounds per tile. Candidate rows are re-read in BF16, and the stock head runs only when the device-side flag is set.}
 \label{fig:kernel-path}
 \end{figure}
 
