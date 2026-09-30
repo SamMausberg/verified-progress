@@ -373,9 +373,20 @@ output" can mean.
   - **FastMTP** (Cai et al., arXiv 2509.18362) [`fastmtp`] compresses only the draft
     vocabulary and states that "the verification phase retains the full vocabulary
     space, guaranteeing lossless generation quality".
-- **DFlash** (Jian Chen, Yesheng Liang, Zhijian Liu, ICML 2026, arXiv 2602.06036v2)
-  [`dflashpaper`]. A block-diffusion drafter conditioned on target hidden features
-  drafts a block in one pass.
+- **DFlash** (Jian Chen, Yesheng Liang, Zhijian Liu, ICML 2026, arXiv 2602.06036v2;
+  code github.com/z-lab/dflash, MIT) [`dflashpaper`]. A block-diffusion drafter
+  conditioned on target hidden features drafts a block in one pass.
+  - **A public DFlash drafter for our exact target exists:** `z-lab/Qwen3.5-4B-DFlash`
+    (revision `9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf`, Apache-2.0, updated
+    2026-06-19; mirror `modal-labs/Qwen3.5-4B-DFlash`) [`dflash4bcard`]. Siblings
+    `z-lab/Qwen3.5-9B-DFlash` and `z-lab/Qwen3.5-35B-A3B-DFlash` are public too.
+  - The card reports lossless results on SGLang, 1x B200, BF16, greedy with thinking
+    on, 5 runs per point. At concurrency 1, block 16 gives 3.40-4.60x over
+    autoregressive decoding; Qwen's MTP gives at most 1.96-2.31x. At concurrency 32,
+    block 8 gives 2.15-2.61x; MTP gives at most 1.53-1.80x.
+  - This drafter projects through the target's shared LM head, so it serves both as a
+    stronger speculative baseline and as a 4B test bed for the manuscript's
+    shared-head transport.
   - In SGLang, non-greedy DFLASH verification runs
     `tree_speculative_sampling_target_only` with all-zero draft probabilities, i.e.
     one-hot proposals.
@@ -384,7 +395,8 @@ output" can mean.
   selector `S_t(a,b) = U_t(b) + <A(a) (.) H(h_t), B(b)>`, and a greedy walk.
   - Its Table 3 reports mean acceptance length on **Qwen3.5-4B** at T = 1.0: MTP 4.54,
     DFlash 4.92, DSpark 5.49, DFlash 2 5.97. So a Qwen3.5-4B DFlash 2 drafter exists
-    at Inco AI, although no public checkpoint was found.
+    at Inco AI, although no public *DFlash 2* checkpoint for 4B was found. The DFlash
+    (v1) 4B drafter above is public.
 - **DSpark** (Cheng et al., DeepSeek, arXiv 2607.05147v1) [`dspark`]. A
   semi-autoregressive drafter whose Markov head adds a low-rank transition bias
   `W_1[x_{k-1}] W_2`, plus confidence-scheduled verification (Section 5).
