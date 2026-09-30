@@ -73,6 +73,13 @@ export SGLANG_CERTIFIED_HEAD_SRC="$PWD/src" SGLANG_CERTIFIED_HEAD_DECODE=1
 | 0003 | MTP draft top-1 (draft steps in the draft graph, and the draft-extend token) and DFlash's greedy draft projection | `DRAFT` |
 | 0004 | fixed-noise sampled verify for EAGLE/MTP (seeded, temperature only; needs `--enable-deterministic-inference`) | `SAMPLED_VERIFY` |
 
+Patch 0004 needs `--enable-deterministic-inference`, which is what gives every
+request a seed; its reference is stock SGLang in that mode (a different engine
+configuration from the default), namely SGLang's seeded sampler applied to the
+verify pass's own logits. It replaces the stock rejection-sampling verify, so
+its outputs are equal in law to target sampling but are not compared token by
+token with default-mode stock outputs.
+
 The host sets each graph's flag before a replay: a target batch is certified
 only if it needs no logits (all greedy for 0001-0002; seeded temperature-only
 sampling for 0004; no logprobs, penalties, logit bias, grammar, custom logit
