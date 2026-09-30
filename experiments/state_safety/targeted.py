@@ -23,6 +23,9 @@ summary. Tests:
               chunked-prefill sizes offline (compare_prefill.py).
   repeat      the same prompts several times at batch 1 on one server with
               the cache flushed: run-to-run determinism of tokens and logprobs.
+  history     a prompt served alone and after the earlier prompt that shares
+              the longest prefix with it: does radix insertion make its output
+              depend on which request computed the shared prefix first?
 
 Run under the shared GPU lock, e.g.
 
@@ -450,6 +453,71 @@ async def run_repeat(url: str, prompts: list[dict[str, Any]], args: argparse.Nam
     return {'cases': cases, 'summary': summary}
 
 
+# ---------------------------------------------------------------- history dependence
+
+
+def _lcp(a: list[int], b: list[int]) -> int:
+    n = 0
+    for x, y in zip(a, b, strict=False):
+        if x != y:
+            break
+        n += 1
+    return n
+
+
+async def run_history(url: str, prompts: list[dict[str, Any]], args: argparse.Namespace):
+    """Does a request's output depend on which earlier request shared its prefix?
+
+    For each chosen prompt Y: serve Y alone on an empty cache (reference), then serve
+    the earlier prompt X with the longest common prefix followed by Y. With the radix
+    cache on, inserting Y's prefix after its prefill can repoint Y's prefix KV to
+    X's copy of the same tokens; with it off, nothing is shared.
+    """
+    ids = [x for x in args.history_ids.split(',') if x] if args.history_ids else []
+    by_id = {p['id']: p for p in prompts}
+    order = [p['id'] for p in prompts]
+    cases = []
+    async with aiohttp.ClientSession(timeout=TIMEOUT) as s:
+        for yid in ids:
+            y = by_id[yid]
+            earlier = [by_id[i] for i in order[: order.index(yid)]]
+            x = max(earlier, key=lambda p: _lcp(p['input_ids'], y['input_ids']))
+            shared = _lcp(x['input_ids'], y['input_ids'])
+            flush_cache(url)
+            ref = await generate(s, url, y['input_ids'], args.full_len)
+            flush_cache(url)
+            await generate(s, url, x['input_ids'], args.full_len)
+            test = await generate(s, url, y['input_ids'], args.full_len)
+            first_lp = next(
+                (
+                    i
+                    for i, (u, v) in enumerate(
+                        zip(ref['top_logprobs'], test['top_logprobs'], strict=False)
+                    )
+                    if u != v
+                ),
+                None,
+            )
+            cases.append(
+                {
+                    'id': yid,
+                    'predecessor': x['id'],
+                    'shared_prefix_tokens': shared,
+                    'tokens_identical': ref['output_ids'] == test['output_ids'],
+                    'logprobs_identical': ref['top_logprobs'] == test['top_logprobs'],
+                    'first_logprob_difference': first_lp,
+                    'diff': diff(ref, test),
+                }
+            )
+    summary = {
+        'prompts': len(cases),
+        'logprobs_identical': sum(c['logprobs_identical'] for c in cases),
+        'tokens_identical': sum(c['tokens_identical'] for c in cases),
+        'first_logprob_difference': _count(c['first_logprob_difference'] for c in cases),
+    }
+    return {'cases': cases, 'summary': summary}
+
+
 # ---------------------------------------------------------------- prefill logprobs
 
 
@@ -492,6 +560,7 @@ TESTS = {
     'abort': run_abort,
     'prefill': run_prefill,
     'repeat': run_repeat,
+    'history': run_history,
 }
 
 
@@ -512,6 +581,7 @@ def main() -> None:
     ap.add_argument('--abort-max-tokens', type=int, default=60)
     ap.add_argument('--block', type=int, default=4, help='tokens per full verify cycle')
     ap.add_argument('--repeats', type=int, default=5)
+    ap.add_argument('--history-ids', default='', help='comma-separated prompt ids (history test)')
     args = ap.parse_args()
 
     prompts = load_prompts(args.prompts)
