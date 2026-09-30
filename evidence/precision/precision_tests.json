@@ -1,8 +1,8 @@
 {
   "status": "pass",
-  "test_methods": 20,
+  "test_methods": 21,
   "seed": 20260930,
-  "repo_commit": "8296b585caa5352ad061fff1feb9ecdae920127d",
+  "repo_commit": "960aa8020690cfa8a7354a311703349660634f28",
   "python": "3.13.15",
   "numpy": "2.3.5",
   "counts": {
@@ -49,8 +49,10 @@
     "stock_contract_checks": 1200,
     "stock_agreement_certified": 177,
     "stock_differs_from_exact_argmax": 432,
+    "subnormal_product_cases": 160,
+    "subnormal_exact_ties": 71,
     "topk_cases": 200,
-    "crossover_implications": 1536,
+    "crossover_implications": 1559,
     "transport_comparisons": 300
   },
   "stats": {
@@ -110,6 +112,6 @@
       "stock_bf16_partials": 1
     }
   },
-  "seconds": 35.0,
+  "seconds": 36.4,
   "scope": "exact rational emulation of BF16/FP32/FP64 rounding, synthetic heads; no GPU, no model weights; the fused tensor-core adder is a model, not hardware"
 }
