@@ -65,7 +65,8 @@ errors. See `formal/STATUS.md` for what is and is not formalized.
 Weight-only constants of the Qwen3.5-4B tied head
 (`Qwen/Qwen3.5-4B@851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a`, tensor
 `model.language_model.embed_tokens.weight`, 248,320 x 2,560 BF16), computed in float64 on CPU at
-commit `9df1e0c7`:
+the commit recorded in the JSON (`repo_commit`; first computed at `9df1e0c7`, regenerated with
+identical values after the quantile code stopped subsampling):
 
 ```sh
 ~/sglang/.venv/bin/python experiments/precision_head_constants/head_constants.py \
@@ -81,5 +82,5 @@ per-row round-to-nearest half-width `||e_i||_2 ||h_t||_2` if and only if rho < `
 with `r_c(i)` the l2 radius about the mean of row i's 64-row tile of contiguous token ids. Its
 median over rows is 0.85% (p10 0.67%, p90 1.15%); in the manuscript's l_inf/l_1 family the median
 is 0.30%. It compares envelope width only, not certification rate or runtime. Quantiles are
-over all 248,320 rows (the script's one-million-value sampling cap exceeds the row count). This is a derived calculation from the weights; no hidden states
+over all 248,320 rows. This is a derived calculation from the weights; no hidden states
 are involved, so it does not by itself decide whether either certificate is useful.
