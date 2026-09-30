@@ -5,9 +5,10 @@ for int8 and int4 per-row scales and int8 with 128-column group scales. For
 vocabulary tiles of 64 rows (contiguous token ids, and a random permutation
 as a control): l_inf and l_2 radii about the tile mean and the l_inf diameter.
 From these, per row, the relative hidden-state drift below which transport's
-bound is narrower than self-evidence's in the same norm family (see
-~/vp-coord/notes/theory.md). A derived calculation in float64 on CPU, not a
-certificate; hidden states are not involved.
+bound is narrower than self-evidence's in the same norm family (the crossover
+theorem in paper/sections/transport.tex). Quantiles are taken over every row of
+the head. A derived calculation in float64 on CPU, not a certificate; hidden
+states are not involved.
 
 Run with the SGLang venv (torch, safetensors):
   ~/sglang/.venv/bin/python experiments/precision_head_constants/head_constants.py \
@@ -54,10 +55,7 @@ def rtn_error(w: torch.Tensor, qmax: int, group: int | None) -> torch.Tensor:
 def summary(x: torch.Tensor) -> dict[str, float]:
     x = x.double().flatten()
     x = x[torch.isfinite(x)]
-    qs = torch.quantile(
-        x[torch.randperm(x.numel(), generator=torch.Generator().manual_seed(0))[:1_000_000]],
-        torch.tensor(QUANTILES, dtype=torch.float64),
-    )
+    qs = torch.quantile(x, torch.tensor(QUANTILES, dtype=torch.float64))
     out = {f'p{int(q * 100)}': float(v) for q, v in zip(QUANTILES, qs, strict=True)}
     out['mean'] = float(x.mean())
     return out
@@ -140,7 +138,7 @@ def main() -> None:
         'rows': rows,
         'tiles': tiles,
         'seconds': round(time.time() - start, 1),
-        'scope': 'weights only, float64 on CPU; quantiles over a 1M-row sample; no hidden states',
+        'scope': 'weights only, float64 on CPU; quantiles over all rows; no hidden states',
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + '\n')
