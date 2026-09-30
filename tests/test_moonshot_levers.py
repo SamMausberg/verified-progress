@@ -81,3 +81,30 @@ def test_reduced_draft_head_unties_only_for_a_reduced_vocabulary() -> None:
     assert head.weight.shape == (8, 4)
     assert not head.weight.requires_grad
     assert getattr(head, 'quant_method', None) is None
+
+
+@needs_sglang
+def test_mamba_state_carries_the_exact_replay_beta_ring() -> None:
+    """Patch 0007's beta ring reaches the per-layer cache view, and is None when off.
+
+    Codex flagged `replayssm_beta` as a local that never reaches the layer cache; the
+    pool passes it to `MambaPool.State`, whose field defaults to None, and
+    `at_layer_idx` slices every field, which this test pins down.
+    """
+    import torch
+    from sglang.srt.mem_cache.memory_pool import MambaPool
+
+    layers, slots, heads, ring = 3, 5, 2, 4
+    state = MambaPool.State(
+        conv=[torch.zeros(layers, slots, 2, 3)],
+        temporal=torch.zeros(layers, slots, heads, 2, 2),
+        replayssm_beta=torch.arange(layers * slots * heads * ring, dtype=torch.float32).view(
+            layers, slots, heads, ring
+        ),
+    )
+    view = state.at_layer_idx(1)
+    assert view.replayssm_beta is not None
+    assert view.replayssm_beta.shape == (slots, heads, ring)
+    assert torch.equal(view.replayssm_beta, state.replayssm_beta[1])
+    plain = MambaPool.State(conv=[torch.zeros(layers, slots, 2, 3)], temporal=torch.zeros(1))
+    assert plain.at_layer_idx(0).replayssm_beta is None

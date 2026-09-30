@@ -2,17 +2,27 @@
 
 A calculation, not a measurement. Bytes per decode step follow from the
 checkpoint's tensor sizes and SGLang's state layout (the same constants as the
-profile workstream's bytes model); FLOPs are 2 per
-weight per token. The step-time floor at batch B is
+profile workstream's bytes model); FLOPs are 2 per weight per token. With W the
+weight bytes, s the per-request bytes (GDN state, conv state, attention KV), F the
+FLOPs per token, BW the HBM read bandwidth and P the tensor-core rate, two step-time
+floors at batch B are reported:
 
-    max(weight_bytes / BW, flops(B) / peak) + per-request bytes(B) / BW
+* layer-serial (``step_floor_ms``): max(W / BW, B F / P) + B s / BW. This is the
+  execution model of the engine as it runs today: within a layer, the weight GEMM
+  and the per-request state/KV kernels run one after the other, so the per-request
+  term adds to whichever of the weight read and the batch GEMM is larger. It is not
+  a hardware bound.
+* overlapped (``overlapped_floor_ms``): max((W + B s) / BW, B F / P). This is the hard
+  roofline: an engine that overlaps the memory-bound per-request kernels with the
+  batch GEMMs (batch splitting, NanoFlow-style) is limited only by total bytes or total
+  FLOPs, whichever takes longer.
 
-because per-request traffic (GDN state, attention KV) cannot overlap with itself
-and weights stream once per step whatever B is. BW is an assumed HBM read peak of
-3.79 TB/s (the profile workstream's measurement, evidence pending); compute peaks are the fraction of datasheet
-dense peak that cuBLAS/CUTLASS reach at these shapes (assumed, stated below).
+BW is an assumed HBM read peak of 3.79 TB/s (the profile workstream's measurement,
+evidence pending); P is the fraction of datasheet dense peak that cuBLAS/CUTLASS
+reach at these shapes (assumed, stated below).
 
-    python experiments/moonshot/ceilings.py --out evidence/moonshot/ceilings.json
+    python experiments/moonshot/ceilings.py --out evidence/moonshot/ceilings.json \
+        --csv evidence/moonshot/ceilings.csv
 """
 
 from __future__ import annotations
@@ -50,10 +60,21 @@ class Stack:
         state = GDN_STATE_ELEMS * self.state_bytes_per_elem * (1 + self.state_writes_per_step)
         return state + CONV_BYTES + KV_BYTES_PER_TOKEN * self.kv_scale * context
 
+    def weight_bytes(self) -> float:
+        return BACKBONE_BYTES * self.weight_scale + HEAD_BYTES * self.head_scale
+
+    def compute_time(self, batch: int) -> float:
+        return 2 * PARAMS * batch / (PEAK_FP8 if self.fp8_compute else PEAK_BF16)
+
     def step_floor(self, batch: int, context: int) -> float:
-        weights = (BACKBONE_BYTES * self.weight_scale + HEAD_BYTES * self.head_scale) / BW
-        compute = 2 * PARAMS * batch / (PEAK_FP8 if self.fp8_compute else PEAK_BF16)
-        return max(weights, compute) + batch * self.per_request_bytes(context) / BW
+        """Layer-serial model: per-request traffic adds to the weight/GEMM time."""
+        weights = self.weight_bytes() / BW
+        return max(weights, self.compute_time(batch)) + batch * self.per_request_bytes(context) / BW
+
+    def overlapped_floor(self, batch: int, context: int) -> float:
+        """Hard roofline: all bytes or all FLOPs, whichever takes longer."""
+        total_bytes = self.weight_bytes() + batch * self.per_request_bytes(context)
+        return max(total_bytes / BW, self.compute_time(batch))
 
 
 STACKS = [
@@ -123,12 +144,15 @@ def main() -> None:
     for stack in STACKS:
         for b in batches:
             t = stack.step_floor(b, args.context)
+            t_over = stack.overlapped_floor(b, args.context)
             rows.append(
                 {
                     'stack': stack.name,
                     'batch': b,
                     'step_floor_ms': round(1e3 * t, 3),
                     'tokens_per_s_ceiling': round(b / t),
+                    'overlapped_floor_ms': round(1e3 * t_over, 3),
+                    'overlapped_tokens_per_s_ceiling': round(b / t_over),
                     'per_request_mb': round(stack.per_request_bytes(args.context) / 1e6, 2),
                 }
             )
@@ -156,6 +180,10 @@ def main() -> None:
         )
     result = {
         'note': 'derived floors (not measurements); see module docstring for assumptions',
+        'execution_models': {
+            'step_floor_ms': 'layer-serial: max(W/BW, B F/P) + B s/BW',
+            'overlapped_floor_ms': 'overlapped (hard roofline): max((W + B s)/BW, B F/P)',
+        },
         'bandwidth_tb_s': BW / 1e12,
         'peak_bf16_tflops_assumed': PEAK_BF16 / 1e12,
         'peak_fp8_tflops_assumed': PEAK_FP8 / 1e12,
@@ -170,11 +198,15 @@ def main() -> None:
     if args.csv:
         args.csv.parent.mkdir(parents=True, exist_ok=True)
         with args.csv.open('w') as handle:
-            handle.write('stack,batch,step_floor_ms,tokens_per_s_ceiling,per_request_mb\n')
+            handle.write(
+                'stack,batch,step_floor_ms,tokens_per_s_ceiling,overlapped_floor_ms,'
+                'overlapped_tokens_per_s_ceiling,per_request_mb\n'
+            )
             for row in rows:
                 handle.write(
                     f'"{row["stack"]}",{row["batch"]},{row["step_floor_ms"]},'
-                    f'{row["tokens_per_s_ceiling"]},{row["per_request_mb"]}\n'
+                    f'{row["tokens_per_s_ceiling"]},{row["overlapped_floor_ms"]},'
+                    f'{row["overlapped_tokens_per_s_ceiling"]},{row["per_request_mb"]}\n'
                 )
     text = json.dumps(result, indent=1)
     if args.out:
@@ -183,8 +215,8 @@ def main() -> None:
     for row in rows:
         if row['batch'] in (1, 128, 512, 1024):
             print(
-                f'{row["stack"]:55s} B={row["batch"]:5d} floor={row["step_floor_ms"]:8.3f} ms '
-                f'ceiling={row["tokens_per_s_ceiling"]:7d} tok/s'
+                f'{row["stack"]:55s} B={row["batch"]:5d} serial={row["tokens_per_s_ceiling"]:7d} '
+                f'overlapped={row["overlapped_tokens_per_s_ceiling"]:7d} tok/s'
             )
     for spec_row in spec_rows:
         print(spec_row)
