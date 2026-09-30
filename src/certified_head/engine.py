@@ -41,6 +41,7 @@ PATHS = ('decode', 'verify', 'draft', 'sampled_verify')
 COUNTERS = (
     'calls',
     'rows',
+    'padding_rows',
     'fallback_rows',
     'fallback_calls',
     'mismatch_rows',
@@ -96,29 +97,41 @@ class Flags:
 def _count_kernel(
     status_ptr,
     gate_ptr,
+    valid_ptr,
     mismatch_ptr,
     counters_ptr,
     M,
     NBITS: tl.constexpr,
     HAS_GATE: tl.constexpr,
+    HAS_VALID: tl.constexpr,
     HAS_MISMATCH: tl.constexpr,
     BLOCK: tl.constexpr,
 ):
+    """Add one call to the counters (see ``COUNTERS``) if the gate holds.
+
+    Row counts cover the first ``valid`` rows (the batch without CUDA-graph
+    padding); ``fallback_calls`` counts calls in which any row, padding
+    included, took the fallback, which is what the call cost.
+    """
     offs = tl.arange(0, BLOCK)
-    mask = offs < M
     g = tl.load(gate_ptr).to(tl.int64) if HAS_GATE else tl.full((), 1, tl.int64)
-    st = tl.load(status_ptr + offs, mask=mask, other=0)
+    n = tl.minimum(tl.load(valid_ptr).to(tl.int32), M) if HAS_VALID else M
+    st_all = tl.load(status_ptr + offs, mask=offs < M, other=0)
+    real = offs < n
+    st = tl.where(real, st_all, 0)
     fb = tl.sum((st != 0).to(tl.int64), axis=0)
+    fb_all = tl.sum((st_all != 0).to(tl.int64), axis=0)
     tl.atomic_add(counters_ptr + 0, g)
-    tl.atomic_add(counters_ptr + 1, g * M)
-    tl.atomic_add(counters_ptr + 2, g * fb)
-    tl.atomic_add(counters_ptr + 3, g * (fb > 0).to(tl.int64))
+    tl.atomic_add(counters_ptr + 1, g * n)
+    tl.atomic_add(counters_ptr + 2, g * (M - n))
+    tl.atomic_add(counters_ptr + 3, g * fb)
+    tl.atomic_add(counters_ptr + 4, g * (fb_all > 0).to(tl.int64))
     if HAS_MISMATCH:
-        mm = tl.load(mismatch_ptr + offs, mask=mask, other=0)
-        tl.atomic_add(counters_ptr + 4, g * tl.sum(mm.to(tl.int64), axis=0))
+        mm = tl.load(mismatch_ptr + offs, mask=real, other=0)
+        tl.atomic_add(counters_ptr + 5, g * tl.sum(mm.to(tl.int64), axis=0))
     for b in tl.static_range(NBITS):
-        n = tl.sum(((st >> b) & 1).to(tl.int64), axis=0)
-        tl.atomic_add(counters_ptr + 5 + b, g * n)
+        nb = tl.sum(((st >> b) & 1).to(tl.int64), axis=0)
+        tl.atomic_add(counters_ptr + 6 + b, g * nb)
 
 
 class PathHead:
@@ -135,6 +148,8 @@ class PathHead:
         self.counters = torch.zeros(len(COUNTERS), dtype=torch.int64, device=head.weight.device)
         self._mismatch = torch.zeros(head.max_batch, dtype=torch.bool, device=head.weight.device)
         self.column_report: dict[str, Any] | None = None
+        self.column_sizes: dict[int, bool] = {}
+        self.warmed: set[int] = set()
 
     def supports(self, m: int) -> bool:
         return 0 < m <= self.head.max_batch
@@ -143,21 +158,50 @@ class PathHead:
         """Start-up column self-test; call outside capture. Columns only if it passes."""
         sizes = sorted({m for m in batch_sizes if self.supports(m)})
         self.column_report = self.head.enable_column_fallback(sizes) if sizes else None
+        for m in sizes:
+            self.column_sizes[m] = bool(self.column_report and self.column_report['ok'])
         return self.column_report or {}
+
+    def warm(self, hidden: torch.Tensor, *, check: bool = False) -> None:
+        """Once per batch size, outside capture: compile every kernel variant a
+        captured call uses (gated, with counters) and, if column mode was
+        requested, self-test this shape. Counters are left unchanged."""
+        m = hidden.shape[0]
+        if m in self.warmed or not self.supports(m):
+            return
+        if self.flags.fallback == 'columns' and m not in self.column_sizes:
+            report = self.head.enable_column_fallback([m], extend=True)
+            self.column_sizes[m] = bool(report['ok'])
+            self.column_report = {
+                'batch_sizes': sorted(self.column_sizes),
+                'failures': sorted(k for k, ok in self.column_sizes.items() if not ok),
+                'ok': all(self.column_sizes.values()),
+            }
+        on = torch.ones((), dtype=torch.bool, device=hidden.device)
+        valid = torch.full((), m, dtype=torch.int32, device=hidden.device)
+        before = self.counters.clone()
+        h = hidden.contiguous()
+        stock = self.head.reference_argmax(h) if check else None
+        self.argmax(h, gate=on, valid=valid, stock_ids=stock)
+        self.counters.copy_(before)
+        self.warmed.add(m)
 
     def argmax(
         self,
         hidden: torch.Tensor,
         gate: torch.Tensor | None = None,
         stock_ids: torch.Tensor | None = None,
+        valid: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """R-stock greedy ids (int64 ``[M]``, a view of an internal buffer).
 
         ``stock_ids`` (check mode): the engine's own stock ids for the same rows,
-        compared on the device and counted as ``mismatch_rows``.
+        compared on the device and counted as ``mismatch_rows``. ``valid``: a
+        0-d device integer, the number of leading rows that are not CUDA-graph
+        padding (row counters cover only those).
         """
         ids, stats = self.head.argmax(hidden, gate=gate)
-        self._count(stats.status, gate, ids, stock_ids)
+        self._count(stats.status, gate, ids, stock_ids, valid)
         return ids
 
     def gumbel_sample(
@@ -168,9 +212,10 @@ class PathHead:
         temperatures: torch.Tensor,
         gate: torch.Tensor | None = None,
         stock_ids: torch.Tensor | None = None,
+        valid: torch.Tensor | None = None,
     ) -> torch.Tensor:
         ids, stats = self.head.gumbel_sample(hidden, seeds, positions, temperatures, gate=gate)
-        self._count(stats.status, gate, ids, stock_ids)
+        self._count(stats.status, gate, ids, stock_ids, valid)
         return ids
 
     def _count(
@@ -179,6 +224,7 @@ class PathHead:
         gate: torch.Tensor | None,
         ids: torch.Tensor,
         stock_ids: torch.Tensor | None,
+        valid: torch.Tensor | None = None,
     ) -> None:
         m = status.shape[0]
         mismatch = None
@@ -188,11 +234,13 @@ class PathHead:
         _count_kernel[(1,)](
             status,
             gate if gate is not None else status,
+            valid if valid is not None else status,
             mismatch if mismatch is not None else status,
             self.counters,
             m,
             NBITS=len(STATUS_BITS),
             HAS_GATE=gate is not None,
+            HAS_VALID=valid is not None,
             HAS_MISMATCH=mismatch is not None,
             BLOCK=max(16, triton.next_power_of_2(m)),
         )
@@ -266,6 +314,10 @@ def install(
     flags = flags or Flags.from_env()
     if not flags.any:
         return None
+    if _flag('SGLANG_SANITIZE_NAN_LOGITS'):
+        # The stock sampler would then replace nonfinite logits before its argmax,
+        # which the head's fallback (raw logits, first NaN wins) does not mirror.
+        raise RuntimeError('the certified head does not support SGLANG_SANITIZE_NAN_LOGITS')
     if _HEADS is None:
         _HEADS = EngineHeads(weight[:vocab_size], flags, max_batch)
     return _HEADS
