@@ -6,9 +6,11 @@ then BF16 round-to-nearest-even) is only known to lie within
 ``x_i +- gamma * a_i`` with ``x_i = <w_i, h>`` exact and ``a_i = sum_j |w_ij h_j|``.
 A row is decided when one token wins, under the first-index tie rule, for every
 BF16 value compatible with those intervals; otherwise the stock head must run.
-This is exactly the decision the GPU kernel makes after exact re-scoring
-(the approximate pass only discards tokens that cannot matter), evaluated here
-in FP64 for several values of ``gamma``:
+Each row is decided over its top ``TOP`` tokens by exact logit with the GPU
+kernel's bucket-exact rule, in FP64, for several values of ``gamma``. Every other
+token is then checked against the winning bucket, and the decided rows where one
+could compete are counted: only there could a decision over the full vocabulary
+differ.
 
 ``6.1e-4``  conservative model (2K roundings at 2^-23; the kernel's default),
 ``1.19e-4`` Hopper wgmma model of Khattak and Mikaitis with a split-K allowance,
@@ -84,12 +86,12 @@ def main() -> None:
         for g in GAMMAS:
             dec, best = decided(xt, at, g)
             ok[g].append(dec)
-            # Tokens outside the top TOP can matter only if their upper bound reaches
-            # the midpoint below the winner's lower BF16 value; count such rows.
+            # A token outside the top TOP can change a decided row only if its upper
+            # bound reaches the midpoint below the winner's lower BF16 value.
             upper = x + g * a_full
             upper.scatter_(1, top, float('-inf'))
             reach = upper.max(dim=1).values.numpy() >= bf16_candidate_threshold(best)
-            omitted[g] += int(reach.sum())
+            omitted[g] += int((reach & dec).sum())
         steps.append(np.full(h.shape[0], len(steps)))
         rows += h.shape[0]
     step_id = np.concatenate(steps)
@@ -112,7 +114,7 @@ def main() -> None:
             'row_fallback_rate': float((~d).mean()),
             'step_fallback_rate': float(per_step.mean()),
             'rows_undecided': int((~d).sum()),
-            'rows_where_a_token_outside_the_top_could_compete': omitted[g],
+            'decided_rows_where_a_token_outside_the_top_could_compete': omitted[g],
         }
         print(
             f'gamma={g:.3g}: rows undecided {(~d).mean():.4%}, engine steps with a fallback {per_step.mean():.2%}'
