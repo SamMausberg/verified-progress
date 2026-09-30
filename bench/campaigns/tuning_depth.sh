@@ -6,7 +6,7 @@ set -uo pipefail
 # shellcheck source=/dev/null
 source ~/verified-progress/scripts/sglang_env.sh
 cd "$(dirname "$0")/../.." || exit 1
-COMMON=(--out ~/vp-data/bench/tuning --port 30013 --workload bench/workloads/mixed-v1/tune.jsonl
+COMMON=(--out ~/vp-data/bench/tuning --port 30013 --workload bench/workloads/mixed-v2/tune.jsonl
         --concurrency 1 8 32 128 --min-requests 32 --waves 4 --osl 512 --quiet-cpu-wait 300)
 NORADIX=(--set disable-radix-cache=true --set max-mamba-cache-size=128)
 run() { echo "=== $*"; python -m bench.sweep "${COMMON[@]}" "$@" 2>&1 | grep -E "^\[FAIL|^r0|Error|done" | tail -6; }

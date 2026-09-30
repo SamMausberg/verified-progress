@@ -24,7 +24,7 @@ to `evidence/bench/`.
 | `pareto.py` | Frontier CSV, PGFPlots tables and a PNG from sweep runs |
 | `quality.py` | GSM8K accuracy for an arm and paired comparison of two runs |
 | `build_workload.py` | Rebuilds the frozen prompt set in `workloads/` |
-| `workloads/mixed-v1/` | Chat, code and maths prompts split into warmup, tune and confirm |
+| `workloads/mixed-v2/` | Chat, code and maths prompts split into warmup, tune and confirm |
 | `quality/gsm8k_test.jsonl` | Frozen GSM8K test split for `quality.py` |
 
 ## Metrics
@@ -55,13 +55,16 @@ and e_i the time from sending the request to its last non-empty streamed chunk
 
 ## Workload and request settings
 
-`workloads/mixed-v1` holds 1,857 prompts from pinned revisions of MT-Bench (first
-turns), OASST1 (English root prompts), HumanEval, MBPP and GSM8K test, split per
-domain into disjoint warmup (129), tune (576) and confirm (1,152) sets. Small
-sources are used in full and spread evenly, and each split interleaves chat, code
-and maths, so any prefix of a split is domain-balanced. `manifest.json` records
-sources, licences, filters, templates, token-length statistics and file hashes;
-`python -m bench.build_workload` rebuilds the files byte for byte.
+`workloads/mixed-v2` holds 1,857 prompts from pinned revisions of MT-Bench (first
+turns), OASST1 (English root prompts), HumanEval, MBPP and GSM8K **train**, split per
+domain into disjoint warmup (129), tune (576) and confirm (1,152) sets. GSM8K test is
+reserved for the quality check, so no workload prompt is a quality problem. Small
+sources are used in full and spread evenly, and each split interleaves chat, code and
+maths, so any prefix of a split is domain-balanced. `manifest.json` records sources,
+licences, filters, templates, token-length statistics and file hashes;
+`python -m bench.build_workload` rebuilds the files byte for byte. (`mixed-v1`, used
+only by the first feasibility probes, drew its maths prompts from GSM8K test; it is in
+git history at commit 8b4b7ab.)
 
 Every request uses the model's chat template with thinking on
 (`chat_template_kwargs.enable_thinking = true`, which is also the template's
@@ -128,7 +131,7 @@ scripts/gpu_lock.sh -x python -m bench.sweep --arm mtp --label mtp \
 python -m bench.pareto ~/vp-data/bench/runs/plain/* ~/vp-data/bench/runs/mtp/* \
     --out evidence/bench/confirm --baseline plain
 
-# Quality (GSM8K test, greedy, thinking on, natural stopping)
+# Quality (GSM8K test, thinking on, T 0.6 / top-p 0.95 / top-k 20, fixed seed, natural stopping)
 scripts/gpu_lock.sh -x python -m bench.quality run --arm plain
 python -m bench.quality compare <plain run dir> <mtp run dir>
 ```

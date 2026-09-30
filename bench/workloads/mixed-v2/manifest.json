@@ -1,5 +1,5 @@
 {
-  "name": "mixed-v1",
+  "name": "mixed-v2",
   "model": "Qwen/Qwen3.5-4B",
   "tokenizer_revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
   "chat_template_kwargs": {
@@ -85,40 +85,40 @@
       "repo": "openai/gsm8k",
       "revision": "740312add88f781978c0658806c59bc2815b9866",
       "files": [
-        "main/test-00000-of-00001.parquet"
+        "main/train-00000-of-00001.parquet"
       ],
       "licence": "MIT",
       "domain": "math",
-      "rows_read": 1319,
-      "candidates": 1319,
-      "kept_after_filters": 1319
+      "rows_read": 7473,
+      "candidates": 7473,
+      "kept_after_filters": 7473
     }
   ],
   "files": {
     "warmup": {
       "file": "warmup.jsonl",
       "prompts": 129,
-      "sha256": "4bcd636ef40a16f4a4208305d970c24690bd169be3a6ed0308a1dc37ee0ddc58"
+      "sha256": "b1f74fd72be86e60c4109ca9ee025d3f971a75c80e7f62392def6066ca767c6b"
     },
     "tune": {
       "file": "tune.jsonl",
       "prompts": 576,
-      "sha256": "a7d87f0b24952d747e456f237e725c3bae38b3e810c8bee6445e790939e5c644"
+      "sha256": "35896665fe5e6d7b01397058c4ea876db29e488471a183a0b41073fa70c2c003"
     },
     "confirm": {
       "file": "confirm.jsonl",
       "prompts": 1152,
-      "sha256": "137469edb92810e2bf787d80d997af939efcfa1bb133f7ba6a20d649c6f6b9f5"
+      "sha256": "b65a50e4f7543d350a695681494f88d6de790f122853e34f8ac0ac44f2539674"
     }
   },
   "prompt_token_stats": {
     "warmup": {
       "all": {
         "n": 129,
-        "mean": 77.6,
+        "mean": 80.0,
         "min": 16,
         "p10": 26.8,
-        "p50": 72.0,
+        "p50": 75.0,
         "p90": 143.0,
         "p99": 166.0,
         "max": 209
@@ -145,13 +145,13 @@
       },
       "math": {
         "n": 43,
-        "mean": 82.4,
-        "min": 52,
-        "p10": 62.2,
-        "p50": 79.0,
-        "p90": 112.00000000000004,
-        "p99": 137.9,
-        "max": 148
+        "mean": 89.7,
+        "min": 50,
+        "p10": 62.0,
+        "p50": 84.0,
+        "p90": 129.60000000000002,
+        "p99": 152.0,
+        "max": 160
       },
       "by_source": {
         "mtbench": 6,
@@ -164,10 +164,10 @@
     "tune": {
       "all": {
         "n": 576,
-        "mean": 91.9,
+        "mean": 91.1,
         "min": 14,
         "p10": 23.0,
-        "p50": 76.0,
+        "p50": 74.0,
         "p90": 172.5,
         "p99": 353.8,
         "max": 865
@@ -194,13 +194,13 @@
       },
       "math": {
         "n": 192,
-        "mean": 86.5,
-        "min": 53,
-        "p10": 63.0,
-        "p50": 82.0,
-        "p90": 115.80000000000001,
-        "p99": 154.5,
-        "max": 160
+        "mean": 84.0,
+        "min": 47,
+        "p10": 62.0,
+        "p50": 79.0,
+        "p90": 112.80000000000001,
+        "p99": 154.3,
+        "max": 172
       },
       "by_source": {
         "mtbench": 24,
@@ -213,11 +213,11 @@
     "confirm": {
       "all": {
         "n": 1152,
-        "mean": 88.4,
+        "mean": 87.9,
         "min": 14,
         "p10": 24.0,
         "p50": 78.0,
-        "p90": 159.0,
+        "p90": 158.0,
         "p99": 282.5,
         "max": 765
       },
@@ -243,13 +243,13 @@
       },
       "math": {
         "n": 384,
-        "mean": 87.8,
-        "min": 51,
-        "p10": 63.0,
-        "p50": 84.0,
-        "p90": 119.0,
-        "p99": 151.2,
-        "max": 167
+        "mean": 86.4,
+        "min": 46,
+        "p10": 62.0,
+        "p50": 82.5,
+        "p90": 115.0,
+        "p99": 152.0,
+        "max": 162
       },
       "by_source": {
         "mtbench": 50,

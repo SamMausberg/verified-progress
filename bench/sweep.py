@@ -11,7 +11,7 @@ drift does not line up with concurrency.
 Run it under the exclusive GPU lock; the lock covers start, sweep and shutdown:
 
     ~/verified-progress/scripts/gpu_lock.sh -x python -m bench.sweep --arm mtp \\
-        --workload bench/workloads/mixed-v1/confirm.jsonl --label mtp-s3 \\
+        --workload bench/workloads/mixed-v2/confirm.jsonl --label mtp-s3 \\
         --out ~/vp-data/bench/runs
 """
 
@@ -56,8 +56,8 @@ from bench.server import (
 AIPERF = str(Path.home() / '.local/bin/aiperf')
 DEFAULT_CONCURRENCY = (1, 2, 4, 8, 16, 32, 64, 128)
 REPO_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_WORKLOAD = REPO_DIR / 'bench/workloads/mixed-v1/confirm.jsonl'
-DEFAULT_WARMUP_POOL = REPO_DIR / 'bench/workloads/mixed-v1/warmup.jsonl'
+DEFAULT_WORKLOAD = REPO_DIR / 'bench/workloads/mixed-v2/confirm.jsonl'
+DEFAULT_WARMUP_POOL = REPO_DIR / 'bench/workloads/mixed-v2/warmup.jsonl'
 
 _DECODE_LINE = re.compile(
     r'Decode batch.*?#running-req: (\d+).*?(?:accept len: ([\d.]+).*?)?cuda graph: (True|False)'

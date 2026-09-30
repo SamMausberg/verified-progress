@@ -305,6 +305,10 @@ def test_frontier_dominance_and_aggregation() -> None:
         {'label': 'a', 'concurrency': 1, 'x_e2e': 110.0, 'y': 110.0, 'failed': 0},
         {'label': 'b', 'concurrency': 1, 'x_e2e': 200.0, 'y': 210.0, 'failed': 0},
     ]
+    from bench.pareto import point_row
+
+    row = point_row('a', 'run', {'concurrency': 4, 'foreign_cpu_during_max': 0.5}, 'probe')
+    assert row['status'] == 'probe' and row['foreign_cpu_max'] == 0.5
     frontier = aggregate(rows, baseline='a')
     by_label = {entry['label']: entry for entry in frontier}
     assert by_label['a']['x_e2e_mean'] == pytest.approx(105.0)

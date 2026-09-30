@@ -51,25 +51,20 @@ speculative-eagle-topk = 1
 speculative-num-draft-tokens = 4
 
 # DFlash block drafter (z-lab/Qwen3.5-4B-DFlash, Apache-2.0): a 6-layer draft
-# conditioned on eight target layers that proposes a whole block per pass. The
-# model card's B200 flags, adapted to sm_90: flashinfer target attention instead
-# of trtllm_mha (Blackwell only); the card's --mamba-scheduler-strategy is
-# --mamba-radix-cache-strategy here and already resolves to extra_buffer.
+# conditioned on eight target layers that proposes a whole block per pass. Only
+# algorithm flags live here; backend and runtime flags are shared by every arm
+# (chosen once on the tuning split). The model card's other B200 flags are
+# ablations, not part of the arm: trtllm_mha target attention (Blackwell only),
+# flashinfer GDN kernels and SGLANG_ENABLE_OVERLAP_PLAN_STREAM (tested on every
+# arm), tc_piecewise prefill graphs (torch.compile fails on Qwen3.5's residual
+# stream at bd66ce34), and --mamba-scheduler-strategy (named
+# --mamba-radix-cache-strategy here; already resolves to extra_buffer).
 [arms.dflash]
-description = """DFlash block drafter, block size 8 (the card's serving default), \
-with the card's GDN (linear attention) kernels and overlapped plan stream."""
+description = """DFlash block drafter, block size 8 (the model card's serving \
+default)."""
 
 [arms.dflash.args]
 speculative-algorithm = "DFLASH"
 speculative-draft-model-path = "z-lab/Qwen3.5-4B-DFlash"
 speculative-draft-model-revision = "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf"
 speculative-dflash-block-size = 8
-linear-attn-prefill-backend = "flashinfer"
-linear-attn-decode-backend = "flashinfer"
-# The card's --cuda-graph-backend-prefill tc_piecewise is left out: at bd66ce34
-# torch.compile fails on Qwen3.5's residual-stream Contribution object during
-# prefill graph capture (reported by the drafter workstream), so the default
-# breakable prefill graph is used.
-
-[arms.dflash.env]
-SGLANG_ENABLE_OVERLAP_PLAN_STREAM = "1"

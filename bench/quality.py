@@ -5,8 +5,7 @@ revision into `bench/quality/gsm8k_test.jsonl`. Scoring uses sgl-eval's GSM8K
 benchmark (NeMo-Skills `generic/math` prompt, last `\\boxed{}` answer, symbolic
 equality). Generation settings are fixed: thinking on (the benchmark's reasoning
 setting), Qwen's recommended thinking-mode sampling for precise tasks
-(temperature 0.6, top-p 0.95; sgl-eval has no top-k option), a fixed request
-seed, natural stopping with a 16,384-token limit, no system prompt. Greedy
+(temperature 0.6, top-p 0.95, top-k 20), a fixed request seed, natural stopping with a 16,384-token limit, no system prompt. Greedy
 decoding is not used here: in thinking mode it falls into repetition loops on
 about a third of maths prompts (bench/README.md), which would make the check
 slow and loop-dominated.
@@ -53,6 +52,9 @@ GSM8K_FILE = 'main/test-00000-of-00001.parquet'
 MAX_TOKENS = 16384
 TEMPERATURE = 0.6
 TOP_P = 0.95
+# sgl-eval has no top-k option and the checkpoint ships no generation_config.json,
+# so top-k is added to each request body (see run_sgl_eval_with_body).
+EXTRA_BODY = {'top_k': 20}
 THINKING = True
 
 
@@ -114,9 +116,13 @@ def mcnemar_exact(only_a: int, only_b: int) -> float:
 def sgl_eval_command(
     base_url: str, model: str, task_file: Path, out_dir: Path, threads: int, seed: int = 0
 ) -> list[str]:
-    executable = Path(sys.executable).with_name('sgl-eval')
     return [
-        str(executable),
+        sys.executable,
+        '-m',
+        'bench.quality',
+        'sgl-eval',
+        '--extra-body',
+        json.dumps(EXTRA_BODY),
         'run',
         'gsm8k',
         '--base-url',
@@ -140,6 +146,38 @@ def sgl_eval_command(
         '--out-dir',
         str(out_dir),
     ]
+
+
+def run_sgl_eval_with_body(argv: list[str], extra_body: dict[str, Any]) -> int:
+    """sgl-eval's own run pipeline (0.1.2) with extra fields in every request body.
+
+    This mirrors `sgl_eval.pipeline.cmd_run`; only the generation config gains
+    `extra_body`, so prompts, answer extraction and scoring are sgl-eval's.
+    """
+    import dataclasses
+
+    from sgl_eval.cli import build_parser
+    from sgl_eval.pipeline import report, setup
+
+    args = build_parser().parse_args(argv)
+    ctx = setup.prepare_run(args)
+    gen = ctx.inputs.gen
+    ctx.inputs.gen = dataclasses.replace(gen, extra_body={**(gen.extra_body or {}), **extra_body})
+    try:
+        result = ctx.spec.run(
+            sampler=ctx.sampler,
+            gen=ctx.inputs.gen,
+            n_repeats=ctx.inputs.n_repeats,
+            num_examples=ctx.inputs.num_examples,
+            num_threads=ctx.num_threads,
+            predictions_writer=ctx.writer,
+            load_examples=ctx.load_examples,
+            bench_args=ctx.bench_args,
+            prompt_yaml=ctx.prompt_yaml,
+        )
+    finally:
+        setup.teardown(ctx)
+    return int(report.render(result, ctx))
 
 
 def load_predictions(eval_dir: Path) -> list[dict[str, Any]]:
@@ -254,6 +292,7 @@ def run(args: argparse.Namespace) -> int:
         'generation': {
             'temperature': TEMPERATURE,
             'top_p': TOP_P,
+            'extra_body': EXTRA_BODY,
             'max_tokens': MAX_TOKENS,
             'chat_template_kwargs': {'enable_thinking': THINKING},
             'prompt': 'sgl-eval gsm8k default (NeMo-Skills generic/math, zero-shot)',
@@ -303,6 +342,9 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument('--threads', type=int, default=128)
     run_parser.add_argument('--seed', type=int, default=0, help='request sampling seed')
     run_parser.add_argument('--allow-unlocked', action='store_true')
+    wrapper = commands.add_parser('sgl-eval', help='sgl-eval with extra request fields')
+    wrapper.add_argument('--extra-body', type=json.loads, default={})
+    wrapper.add_argument('sgl_eval_args', nargs=argparse.REMAINDER)
     compare_parser = commands.add_parser('compare', help='paired comparison of two runs')
     compare_parser.add_argument('run_a', type=Path)
     compare_parser.add_argument('run_b', type=Path)
@@ -313,6 +355,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == 'run':
         return run(args)
+    if args.command == 'sgl-eval':
+        return run_sgl_eval_with_body(args.sgl_eval_args, args.extra_body)
     report = compare(args.run_a, args.run_b)
     print(json.dumps(report, indent=2))
     if args.out:

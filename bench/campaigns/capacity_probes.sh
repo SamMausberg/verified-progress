@@ -6,7 +6,7 @@ set -uo pipefail
 source ~/verified-progress/scripts/sglang_env.sh
 cd "$(dirname "$0")/../.." || exit 1
 OUT=~/vp-data/bench/probes
-COMMON=(--out "$OUT" --port 30012 --osl 256 --waves 2 --min-requests 16 --workload bench/workloads/mixed-v1/tune.jsonl)
+COMMON=(--out "$OUT" --port 30012 --osl 256 --waves 2 --min-requests 16 --workload bench/workloads/mixed-v2/tune.jsonl)
 run() { echo "=== $*"; python -m bench.sweep "${COMMON[@]}" "$@" 2>&1 | grep -E "^\[|^r0|Error|error|done" | tail -20; }
 
 run --arm plain --label cap-plain-radix-256 --max-concurrency 256 \

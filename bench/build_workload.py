@@ -7,7 +7,7 @@ domain into disjoint warmup, tuning and confirmation sets, and writes
 
 Run in the SGLang venv (needs huggingface_hub, pyarrow and transformers):
 
-    python -m bench.build_workload --out bench/workloads/mixed-v1
+    python -m bench.build_workload --out bench/workloads/mixed-v2
 
 The output is deterministic for a fixed seed and source revisions; the manifest
 records the SHA-256 of every file so a later run can confirm it is unchanged.
@@ -85,11 +85,13 @@ SOURCES = (
         'CC-BY-4.0',
         'code',
     ),
+    # GSM8K *train*: the test split is the quality check (bench/quality.py), so
+    # no workload split may contain its problems.
     Source(
         'gsm8k',
         'openai/gsm8k',
         '740312add88f781978c0658806c59bc2815b9866',
-        ('main/test-00000-of-00001.parquet',),
+        ('main/train-00000-of-00001.parquet',),
         'MIT',
         'math',
     ),
@@ -189,7 +191,7 @@ def load_mbpp(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def load_gsm8k(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
         {
-            'id': f'gsm8k-test-{index:04d}',
+            'id': f'gsm8k-train-{index:04d}',
             'text': GSM8K_TEMPLATE.format(question=row['question'].strip()),
         }
         for index, row in enumerate(rows)
@@ -409,7 +411,7 @@ def build(out_dir: Path, seed: int) -> dict[str, Any]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
-    parser.add_argument('--out', type=Path, default=Path('bench/workloads/mixed-v1'))
+    parser.add_argument('--out', type=Path, default=Path('bench/workloads/mixed-v2'))
     parser.add_argument('--seed', type=int, default=DEFAULT_SEED)
     args = parser.parse_args(argv)
     manifest = build(args.out, args.seed)

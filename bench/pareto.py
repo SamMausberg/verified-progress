@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 POINT_FIELDS = (
+    'status',
     'label',
     'run',
     'repeat',
@@ -49,16 +50,18 @@ POINT_FIELDS = (
     'decode_graph_fraction',
     'isl_mean',
     'span_s',
+    'foreign_cpu_max',
 )
 AGGREGATED = ('x_e2e', 'x_decode', 'y', 'y_steady', 'ttft_p50_ms', 'itl_p50_ms', 'accept_length')
 # Reference categorical order (dataviz palette, light surface), assigned per label in order.
 SERIES_COLOURS = ('#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7')
 
 
-def point_row(label: str, run: str, point: dict[str, Any]) -> dict[str, Any]:
+def point_row(label: str, run: str, point: dict[str, Any], status: str = '') -> dict[str, Any]:
     spec = point.get('spec') or {}
     counters = point.get('server_counters') or {}
     return {
+        'status': status,
         'label': label,
         'run': run,
         'repeat': point.get('repeat'),
@@ -82,10 +85,14 @@ def point_row(label: str, run: str, point: dict[str, Any]) -> dict[str, Any]:
         'decode_graph_fraction': counters.get('decode_graph_fraction'),
         'isl_mean': point.get('isl_mean'),
         'span_s': point.get('span_s'),
+        # CPU cores used by other processes during the point (blank: not recorded).
+        'foreign_cpu_max': point.get('foreign_cpu_during_max'),
     }
 
 
-def load_points(run_dirs: list[Path], relabel: dict[str, str]) -> list[dict[str, Any]]:
+def load_points(
+    run_dirs: list[Path], relabel: dict[str, str], status: str = ''
+) -> list[dict[str, Any]]:
     rows = []
     for run_dir in run_dirs:
         manifest_path = run_dir / 'sweep.json'
@@ -94,7 +101,7 @@ def load_points(run_dirs: list[Path], relabel: dict[str, str]) -> list[dict[str,
         manifest = json.loads(manifest_path.read_text())
         label = relabel.get(manifest['label'], manifest['label'])
         for point in manifest.get('points', []):
-            rows.append(point_row(label, run_dir.name, point))
+            rows.append(point_row(label, run_dir.name, point, status))
     return rows
 
 
@@ -290,15 +297,29 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument('--title', default='Qwen3.5-4B on one GH200: latency-throughput')
     parser.add_argument('--no-plot', action='store_true')
+    parser.add_argument(
+        '--status',
+        default='',
+        help='status written into every row, e.g. feasibility-probe or confirmation',
+    )
+    parser.add_argument(
+        '--points-only',
+        action='store_true',
+        help='write points.csv and launches.csv only (no frontier or Pareto flags)',
+    )
     args = parser.parse_args(argv)
     relabel = dict(item.split('=', 1) for item in args.relabel)
-    rows = load_points(args.runs, relabel)
+    rows = load_points(args.runs, relabel, args.status)
     if not rows:
         raise SystemExit('no sweep points found')
     args.out.mkdir(parents=True, exist_ok=True)
     write_csv(rows, args.out / 'points.csv', list(POINT_FIELDS))
     write_csv(load_launches(args.runs, relabel), args.out / 'launches.csv')
+    if args.points_only:
+        return 0
     frontier = aggregate(rows, args.baseline)
+    for entry in frontier:
+        entry['status'] = args.status
     write_csv(frontier, args.out / 'frontier.csv')
     write_pgfplots(frontier, args.out)
     if not args.no_plot:

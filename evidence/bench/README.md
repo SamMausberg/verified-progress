@@ -24,7 +24,10 @@ below condenses them.
 ## workload/
 
 Natural output lengths on the tune split, used to justify the fixed 512-token panel and
-the sampled quality check.
+the sampled quality check. Measured on workload `mixed-v1` (git history, commit 8b4b7ab),
+whose maths prompts were GSM8K test problems; `mixed-v2` replaces them with GSM8K train
+problems so that no workload prompt is in the quality set. A rerun on `mixed-v2` will
+replace these files.
 
 - `natural_requests_tune.csv`: one row per request (576), from
   `~/vp-data/bench/natural/natural-tune-mtp/20260930-191122`.
@@ -47,20 +50,24 @@ used up to 24 CPU cores during it.
 ## probes/
 
 Feasibility probes for capacity and draft trees: one short load point per configuration
-on the tune split (output 256 tokens for the capacity rows, 512 for the trees; two
-waves). They establish what launches and serves, not tuned performance.
+on the `mixed-v1` tune split (output 256 tokens for the capacity rows, 512 for the trees;
+two waves). They establish what launches and serves, not performance: every row carries
+`status = feasibility-probe`, and `foreign_cpu_max` gives the CPU cores other processes
+used during the point where it was recorded. The two plain-decode probes ran before that
+recording existed, while another workstream's analysis job used 41-47 cores (sampled at
+18:54 and 19:01); their client throughput is contaminated and not used anywhere.
 
 | Label | Change from the base flags | Result |
 |---|---|---|
-| cap-plain-radix-256 | `--max-running-requests 256 --max-mamba-cache-size 1280` | serves 256 concurrent; client throughput limited by the streaming path and a 45-core foreign CPU job |
-| cap-plain-noradix-1024 | `--disable-radix-cache --max-running-requests 1024 --max-mamba-cache-size 1024 --cuda-graph-max-bs-decode 1024` | serves 512 and 1,024 concurrent; server log shows decode saturating near 16K tok/s from batch 256 |
-| cap-mtp-noradix-256 | MTP s3 + `--disable-radix-cache --max-running-requests 256 --max-mamba-cache-size 256` | serves 256 concurrent, accept length 3.27 |
-| cap-mtp-bf16state-noradix-512 | as above at 512 with `--mamba-ssm-dtype bfloat16 --cuda-graph-max-bs-decode 512` | fails at verify-graph capture: FlashInfer workspace overflow (`batch_prefill_tmp_v` needs 670,040,064 bytes, 402,653,184 available) |
+| cap-plain-radix-256 | `--max-running-requests 256 --max-mamba-cache-size 1280` | serves 256 concurrent (512/512 requests); throughput contaminated (see above) |
+| cap-plain-noradix-1024 | `--disable-radix-cache --max-running-requests 1024 --max-mamba-cache-size 1024 --cuda-graph-max-bs-decode 1024` | serves 512 and 1,024 concurrent; server log shows decode near 16K tok/s at 512 and 1,024 running; client throughput contaminated |
+| cap-mtp-noradix-256 | MTP s3 + `--disable-radix-cache --max-running-requests 256 --max-mamba-cache-size 256` | serves 256 concurrent, accept length 3.27, quiet host (0.39 foreign cores) |
+| cap-mtp-bf16state-noradix-512 | as above at 512 with `--mamba-ssm-dtype bfloat16 --cuda-graph-max-bs-decode 512` | fails at verify-graph capture: FlashInfer workspace overflow (`batch_prefill_tmp_v` needs 670,040,064 bytes, 402,653,184 available); no points |
 | tree-mtp-s3-k4-d8 | MTP s3, `--speculative-eagle-topk 4 --speculative-num-draft-tokens 8`, capacity 32 | trees work on the GDN hybrid; accept length 3.56 at c=1 |
 | tree-mtp-s3-k2-d6 | MTP s3, `--speculative-eagle-topk 2 --speculative-num-draft-tokens 6`, capacity 32 | works; accept length 3.45 at c=1 |
 
 ```sh
-scripts/gpu_lock.sh -x bench/campaigns/capacity_probes.sh   # the commands in the table
+scripts/gpu_lock.sh -x bench/campaigns/capacity_probes.sh   # ran with mixed-v1/tune.jsonl
 python -m bench.pareto ~/vp-data/bench/probes/cap-*/2026* ~/vp-data/bench/probes/tree-*/2026* \
-    --out evidence/bench/probes --no-plot
+    --out evidence/bench/probes --status feasibility-probe --points-only
 ```
