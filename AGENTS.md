@@ -22,7 +22,8 @@ pre-commit run --files <changed files>
 
 The hooks run ruff (lint and format), mypy, codespell and shellcheck, and they
 also run automatically on `git commit`. Do not mass-reformat files you did not
-change: the bundle's evidence and `SHA256SUMS` are tied to the current source,
+change: the bundle's evidence is tied to the current source (`sources/bundle-v3.sha256` records the
+imported bundle, not the current tree),
 so a cleanup of existing code needs its own commit and a rerun of
 `scripts/verify_artifact.py`.
 

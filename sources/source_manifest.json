@@ -26,9 +26,9 @@
     },
     {
       "key": "qwencard",
-      "bibliography_text": "Qwen. \\emph{Qwen3.5-4B model card}. Hugging Face, revision \\texttt{851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a}. \\url{https://huggingface.co/Qwen/Qwen3.5-4B}.",
+      "bibliography_text": "Qwen. \\emph{Qwen3.5-4B model card}. Hugging Face, revision \\texttt{851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a}. \\url{https://huggingface.co/Qwen/Qwen3.5-4B/tree/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a}.",
       "urls": [
-        "https://huggingface.co/Qwen/Qwen3.5-4B"
+        "https://huggingface.co/Qwen/Qwen3.5-4B/tree/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a"
       ],
       "accessed": "2026-09-30",
       "evidence_type": "primary paper, official documentation, release or source code",
@@ -37,9 +37,9 @@
     },
     {
       "key": "dflashcard",
-      "bibliography_text": "Inco AI. \\emph{Qwen3.8-27B-DFlash2 model card}. Hugging Face, revision \\texttt{015e795645c74b1a0eeef3b570031fb62e769bc5}, created 18 August 2026. \\url{https://huggingface.co/incoai/Qwen3.8-27B-DFlash2}.",
+      "bibliography_text": "Inco AI. \\emph{Qwen3.8-27B-DFlash2 model card}. Hugging Face, revision \\texttt{015e795645c74b1a0eeef3b570031fb62e769bc5}, created 18 August 2026. \\url{https://huggingface.co/incoai/Qwen3.8-27B-DFlash2/tree/015e795645c74b1a0eeef3b570031fb62e769bc5}.",
       "urls": [
-        "https://huggingface.co/incoai/Qwen3.8-27B-DFlash2"
+        "https://huggingface.co/incoai/Qwen3.8-27B-DFlash2/tree/015e795645c74b1a0eeef3b570031fb62e769bc5"
       ],
       "accessed": "2026-09-30",
       "evidence_type": "primary paper, official documentation, release or source code",
@@ -389,9 +389,9 @@
     },
     {
       "key": "dflash4bcard",
-      "bibliography_text": "z-lab. \\emph{Qwen3.5-4B-DFlash model card}. Hugging Face, revision \\texttt{9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf} (created 5 March 2026, updated 19 June 2026; mirrored at \\texttt{modal-labs/Qwen3.5-4B-DFlash}). \\url{https://huggingface.co/z-lab/Qwen3.5-4B-DFlash}.",
+      "bibliography_text": "z-lab. \\emph{Qwen3.5-4B-DFlash model card}. Hugging Face, revision \\texttt{9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf} (created 5 March 2026, updated 19 June 2026; mirrored at \\texttt{modal-labs/Qwen3.5-4B-DFlash}). \\url{https://huggingface.co/z-lab/Qwen3.5-4B-DFlash/tree/9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf}.",
       "urls": [
-        "https://huggingface.co/z-lab/Qwen3.5-4B-DFlash",
+        "https://huggingface.co/z-lab/Qwen3.5-4B-DFlash/tree/9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
         "https://huggingface.co/modal-labs/Qwen3.5-4B-DFlash"
       ],
       "accessed": "2026-09-30",
