@@ -36,7 +36,7 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 | profile | nsys/ncu profiles and critical-path attribution | active |
 | geometry | Real-head replay: transport versus self-evidence bounds | active |
 | kernel | Certified low-precision head kernels and microbenchmarks | active |
-| theory | Floating-point certificate proofs, exact references, Lean | review (PR #7) |
+| theory | Floating-point certificate proofs, exact references, Lean | done (PR #7) |
 | state | Speculative-decoding state safety and output-equality tests | active |
 | moonshot | Reformulations and approximations aimed at order-of-magnitude gains, with measured quality costs | active |
 | drafter | Public DFlash-4B drafter: serve, characterize, train only against a measured limitation | active |
@@ -62,8 +62,8 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 - [ ] Capture aligned draft/target hidden states at the head boundary for MTP and DFlash2 (geometry)
 - [ ] Measure transport bounds (scalar, coordinate, grouped, low-rank) against logit margins (geometry)
 - [ ] Measure self-evidence bounds (int8, FP8, int4; per-row, blockwise, outlier-exact, rotated) (geometry)
-- [ ] Rigorous floating-point envelope for the low-precision head and the certified decisions (theory)
-- [ ] Exact CPU reference and tests for the new certificates (theory)
+- [x] Rigorous floating-point envelope for the low-precision head and the certified decisions (theory; PR #7)
+- [x] Exact CPU reference and tests for the new certificates (theory; PR #7: 20 methods, 39,761 checks, Lean lemmas)
 - [ ] Triton kernels: low-precision head with bound epilogue, candidate compaction, exact refinement, graph-safe fallback (kernel)
 - [ ] Kernel correctness and microbenchmarks against cuBLAS BF16 plus argmax (kernel)
 
@@ -83,8 +83,12 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 - [ ] Full-target Jacobi repair from DFlash-initialized windows: committed tokens per target pass (repair)
 - [ ] Correction locality: activation changes after real corrections, fixed-basis capture on held-out corrections (repair)
 - [ ] Go/no-go on the residual evaluator prototype against its controls (repair)
-- [ ] State-safe tail oracle: INT8 final FFN plus head, isotropic margin certificate at the oracle radius, versus certified head-only (geometry)
+- [x] State-safe tail oracle: INT8 final FFN plus head versus certified head-only (geometry): rejected, the FFN surrogate lowers certification and saves at most 0.071 GB per token (evidence pending in PR #16)
 - [ ] Theory in the paper: contracts, common-mass bound, bounded-range sampling, dead/deferred/enclosed accounting (paper)
+
+- [ ] P4: bit-exact live replay of recurrent state at batch 128, pre-registered 1.10x threshold; rank/observability audit on captured traces (moonshot)
+- [ ] P5: first-layer token projection table, decided by its measured time share from existing traces (profile)
+- [ ] Reproduce the P4/P5 counterexamples as exact tests (paper)
 
 ### Engine
 - [ ] Differential output-equality tests: MTP versus plain decode, rejection positions, aborts, prefix reuse (state)
