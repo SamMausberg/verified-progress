@@ -118,3 +118,42 @@ python -m bench.pareto ~/vp-data/bench/frontend/fe-plain*/2026* --out evidence/b
     --status frontend-diagnostic --points-only
 ```
 `frontend_summary.json` holds the per-point comparison and process peaks.
+
+## tuning/
+
+Configuration search on the `mixed-v2` tune split (never used for reported results):
+client concurrency 1, 8, 32 and 128, `max(32, 4c)` measured requests per point, 512
+output tokens, one run per configuration, base flags plus `--stream-interval 4`. Mean
+foreign CPU load stayed between 0.5 and 1.1 cores on every point (short bursts to ~10
+cores from other agents' document builds are included in the means); no point is
+invalid. `frontier.csv` has one row per configuration and concurrency (n = 1).
+
+Slot T1 (MTP depth and state handling), y in tok/s:
+
+| Config | c=1 | c=8 | c=32 | c=128 | Accept length |
+|---|---|---|---|---|---|
+| plain | 282 | 1,982 | 6,087 | 13,421 | - |
+| MTP s2 | 385 | 2,288 | 5,455 | 9,153 | 2.66 |
+| MTP s3 | 461 | 2,482 | 5,839 | 9,593 | 3.26 |
+| MTP s4 | 465 | 2,608 | 5,761 | 9,276 | 3.72 |
+| MTP s5 | 468 | 2,575 | 5,684 | 8,719 | 4.07 |
+| MTP s3, radix cache off | 466 | 2,534 | 6,127 | 10,106 | 3.26 |
+| MTP s5, radix cache off | 481 | 2,699 | 6,087 | 9,456 | 4.10 |
+| MTP s7, radix cache off | 465 | 2,514 | 5,690 | 8,493 | 4.60 |
+| MTP s3, `--enable-linear-replayssm-spec` | 447 | 2,646 | 6,469 | 11,941 | 3.27 |
+| MTP s5, `--enable-linear-replayssm-spec` | 462 | 2,666 | 6,502 | 11,186 | 4.09 |
+
+Rejected by launch checks: MTP s1 (the check required a draft-decode graph that a
+one-step chain does not capture; the check is fixed and s1 will be rerun). Reading:
+MTP gains 1.65x over plain at c=1 but falls behind from c~32. Its verify pass writes one
+GDN state snapshot (~47 MB in FP32) per draft token per request, a cost that grows with
+batch; SGLang's buffered GDN verify (`--enable-linear-replayssm-spec`, chains only)
+removes those snapshots and recovers 24% at c=128 for three steps at a 3% cost at c=1.
+Depth matters little at low concurrency (steps 3-5 within ~4%) and shallow chains are
+better at high concurrency.
+
+```sh
+GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x bench/campaigns/tuning_depth.sh
+python -m bench.pareto $(ls -d ~/vp-data/bench/tuning/tune-*/2026* | grep -v tune-mtp-s1/) \
+    --out evidence/bench/tuning --status tuning --no-plot
+```
