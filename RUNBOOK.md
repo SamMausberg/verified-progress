@@ -32,6 +32,13 @@ bash scripts/check_lean.sh                   # Lean 4.19.0 from ~/.elan
 cd paper && latexmk -pdf -interaction=nonstopmode -halt-on-error paper.tex
 ```
 
+The paper uses the MLSys author kit. Its style file, `mlsys2025.sty`, carries no
+licence and is not committed: `paper/latexmkrc` runs `paper/template/fetch_mlsys_kit.sh`
+before every build, which needs network access, `curl` and `unzip` the first time,
+downloads the official kit, checks the SHA-256 of the archive and of the file, and stops
+the build with an error naming the failed step if either check fails
+(`paper/template/README.md` lists the files, licences and digests).
+
 `python scripts/verify_artifact.py` reruns the earlier revision's CPU jobs and
 overwrites their files in `evidence/`; use a copy unless regenerating them is
 the point.

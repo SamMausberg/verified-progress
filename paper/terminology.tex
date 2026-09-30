@@ -1,0 +1,20 @@
+% Terminology, declared once (macros.tex explains \term). Scope main: printed in the main
+% text's Table tab:terms (owner: main-text author). Scope app: terms used only in the
+% appendices (owner: appendix editor). The glossary quotes the main definitions verbatim.
+\term{main}{Head input $h$}{The BF16 vector the engine feeds to the output head (the final norm's output), captured bit for bit.}
+\term{main}{Real logit $z_i$}{$\langle w_i,h\rangle$ in exact arithmetic over the stored BF16 row $w_i$ and head input $h$.}
+\term{main}{Stock head}{SGLang's head at the pin: a cuBLAS BF16 GEMM with FP32 accumulation and BF16 output, widened to FP32, then \code{torch.argmax}, which returns the first maximal index.}
+\term{main}{Batch shape}{The number of head inputs $M$ in one head GEMM call. cuBLAS chooses its kernel per shape, so a row's stock logits may depend on it.}
+\term{main}{\Rreal, \Rbf, \Rstock, \Srace}{The four references for one decision (Definition~\ref{def:contracts}): the real-arithmetic argmax, the argmax of real logits rounded to BF16, the stock head's token, and a race under a fixed noise vector.}
+\term{main}{Error model, $G_i$, $\gamma$}{An assumed bound $|\hat y_i-z_i|\le G_i=\gamma\sum_j|w_{ij}h_j|$ on the stock kernel's FP32 accumulator $\hat y_i$ before BF16 rounding; the \modelcons{} and the \modelhopper{} set $\gamma$ (Table~\ref{tab:assumptions}).}
+\term{main}{Envelope $\beta_i$}{A proved bound on $|z_i-\tilde z_i|$ for the approximate value $\tilde z_i$ of the low-precision pass.}
+\term{main}{Enclosure $[lo_i,hi_i]$}{An interval that contains $z_i$, computed with outward rounding.}
+\term{main}{Candidate}{A row that the level-0 enclosures cannot exclude; candidates are re-scored from their BF16 rows.}
+\term{main}{Certified row}{A head input whose \Rstock{} token the enclosures fix for every accumulator value the error model admits.}
+\term{main}{Fallback}{The stock head run on the same inputs at the same batch shape; its own argmax decides. Whole-batch mode reruns the batch; row-wise mode finishes one row from its gathered candidate rows.}
+\term{main}{Self-evidence}{Enclosures from a low-precision copy of the head evaluated at the target's own head input.}
+\term{main}{Transport}{Enclosures carried from a drafter's head input $h^d$ to the target's $h^t$ through a tile bound, reusing the draft pass's per-tile maxima and masses.}
+\term{main}{Drift ratio $\rho$}{$\norm{h^t-h^d}_2/\norm{h^t}_2$ for the draft and target head inputs behind the same verified draft token.}
+\term{main}{Threshold $\delta^\ast_i$}{The drift ratio below which transport's envelope for row $i$ is narrower than the int8 envelope (Theorem~\ref{thm:crossover}); derived from the weights alone.}
+\term{main}{Keyed noise field}{Gumbel noise $G_{t,i}$ that is a pure function of (seed, absolute position $t$, token $i$), as in the engine's seeded sampler.}
+\term{main}{Capture, replay, held-out}{Head inputs recorded from the running engine and re-evaluated offline; held-out rows come from prompts that no choice of head, envelope or threshold was fitted on.}
