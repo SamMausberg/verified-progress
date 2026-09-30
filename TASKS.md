@@ -48,6 +48,7 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 ## Task list
 
 ### Infrastructure
+- [x] FIFO GPU queue with typed tickets, integrator-granted priority lane, and a server start-up lock (PR #10, #14, #15, #28)
 - [x] `scripts/gpu_lock.sh`, `scripts/sglang_worktree.sh`, worktree hook in `scripts/sglang_env.sh` (infra; PR #1, writer-preference turnstile in PR #2)
 
 ### Baselines and measurement
@@ -59,9 +60,9 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 - [ ] nsys attribution of head, backbone, sampling and host gaps for decode and MTP (profile)
 
 ### Mechanism
-- [ ] Capture aligned draft/target hidden states at the head boundary for MTP and DFlash2 (geometry)
+- [ ] Capture aligned draft/target hidden states at the head boundary for MTP-4B and DFlash-4B (geometry; capture patch merged in PR #16, held-out captures running)
 - [ ] Measure transport bounds (scalar, coordinate, grouped, low-rank) against logit margins (geometry)
-- [ ] Measure self-evidence bounds (int8, FP8, int4; per-row, blockwise, outlier-exact, rotated) (geometry)
+- [x] Measure self-evidence bounds on plain decode (geometry; PR #16): int8 heads certify with 1.3-1.6 candidate rows on average at about half the head bytes, no envelope violations; FP8 and int4 alone fail; the stock kernel is needed at 0.35% (gamma 1.19e-4) to 1.40% (gamma 6.11e-4) of positions under the bucket-exact R-stock rule
 - [x] Rigorous floating-point envelope for the low-precision head and the certified decisions (theory; PR #7)
 - [x] Exact CPU reference and tests for the new certificates (theory; PR #7: 20 methods, 39,761 checks, Lean lemmas)
 - [ ] Triton kernels: low-precision head with bound epilogue, candidate compaction, exact refinement, graph-safe fallback (kernel)
@@ -83,7 +84,7 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 - [ ] Full-target Jacobi repair from DFlash-initialized windows: committed tokens per target pass (repair)
 - [ ] Correction locality: activation changes after real corrections, fixed-basis capture on held-out corrections (repair)
 - [ ] Go/no-go on the residual evaluator prototype against its controls (repair)
-- [x] State-safe tail oracle: INT8 final FFN plus head versus certified head-only (geometry): rejected, the FFN surrogate lowers certification and saves at most 0.071 GB per token (evidence pending in PR #16)
+- [x] State-safe tail oracle: INT8 final FFN plus head versus certified head-only (geometry): rejected, the FFN surrogate lowers certification and saves at most 0.071 GB per token (PR #16)
 - [ ] Theory in the paper: contracts, common-mass bound, bounded-range sampling, dead/deferred/enclosed accounting (paper)
 
 - [ ] P4: bit-exact live replay of recurrent state at batch 128, pre-registered 1.10x threshold; rank/observability audit on captured traces (moonshot)
