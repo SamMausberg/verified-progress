@@ -224,6 +224,26 @@ def main() -> None:
                         f'{amount:.0f},{amount / acc:.0f}'
                     )
         args.csv.write_text('\n'.join(lines) + '\n')
+        # Wide form for stacked bars: GB per output token by coarse component.
+        groups = {
+            'weights': ('backbone_weights', 'mtp_layer_weights'),
+            'head': ('head_weights', 'draft_head_weights'),
+            'gdn_state': ('gdn_state', 'gdn_state_verify_read',
+                          'gdn_state_verify_intermediate_write', 'gdn_state_commit',
+                          'gdn_conv_state'),
+            'attention_kv': ('attention_kv', 'mtp_attention_kv'),
+            'logits': ('logits', 'draft_logits'),
+        }  # fmt: skip
+        wide = ['arm,batch,x,' + ','.join(groups)]
+        for i, (arm, fn, acc) in enumerate(
+            (('plain', plain_bytes, 1.0), ('mtp', mtp_bytes, args.csv_accept))
+        ):
+            for j, batch in enumerate(args.csv_batches):
+                parts = fn(batch, args.csv_context)
+                vals = [sum(parts.get(c, 0.0) for c in cs) / acc / 1e9 for cs in groups.values()]
+                x = j * 3 + i
+                wide.append(f'{arm},{batch},{x},' + ','.join(f'{v:.3f}' for v in vals))
+        args.csv.with_name(args.csv.stem + '_wide.csv').write_text('\n'.join(wide) + '\n')
     for e in out['configs']:
         s = e['per_step']
         comps = ', '.join(f'{k} {v:.2f}' for k, v in s['components_gb'].items() if v > 0.005)
