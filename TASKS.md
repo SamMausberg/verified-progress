@@ -14,6 +14,7 @@ item points at its PR and evidence.
 | H4 | That certificate improves the served latency-throughput frontier over tuned MTP speculation without changing outputs | Before/after Pareto sweeps and output-equality checks |
 | H5 | SGLang's hybrid GDN state stays correct under speculative verification (every rejection position, aborts, prefix reuse) | Differential tests against non-speculative decoding |
 | H6 | Other layers of the stack (backend choice, graphs, scheduling, spec parameters) leave measurable headroom | Profiles and controlled ablations |
+| H7 | Reformulations and declared approximations can multiply gains well beyond tuning (recurrent-state traffic at high concurrency; near-free drafting and lossy targets at low concurrency) | Measured bytes per step, quality-versus-speed curves, end-to-end Pareto sweeps |
 
 ## Workstreams
 
@@ -27,6 +28,7 @@ item points at its PR and evidence.
 | kernel | Certified low-precision head kernels and microbenchmarks | active |
 | theory | Floating-point certificate proofs, exact references, Lean | active |
 | state | Speculative-decoding state safety and output-equality tests | active |
+| moonshot | Reformulations and approximations aimed at order-of-magnitude gains, with measured quality costs | active |
 | integrate | SGLang integration of the certified head (draft, verify, decode) | todo |
 | paper | Manuscript revision as results land | todo |
 | review | Independent review of every PR before merge | ongoing |
@@ -51,6 +53,14 @@ item points at its PR and evidence.
 - [ ] Exact CPU reference and tests for the new certificates (theory)
 - [ ] Triton kernels: low-precision head with bound epilogue, candidate compaction, exact refinement, graph-safe fallback (kernel)
 - [ ] Kernel correctness and microbenchmarks against cuBLAS BF16 plus argmax (kernel)
+
+### Moonshots (H7)
+- [ ] Measure the ceilings: HBM bandwidth, bytes per step by component, GDN state dtype and the 133-request cap (moonshot, profile)
+- [ ] Quick-test existing levers with a quality proxy: FP8 weights, FP8 KV, state precision, deeper MTP, draft trees, n-gram drafting, hot-vocab draft head (moonshot)
+- [ ] Ranked portfolio of reformulations with ceilings and quality costs (moonshot)
+- [ ] Throughput: reformulate GDN state handling and lift the concurrency cap (moonshot, M1)
+- [ ] Latency: near-free draft head, deeper drafting, relaxed acceptance, lossy target arms (moonshot, M2)
+- [ ] Trained block drafter for Qwen3.5-4B (M3, pending a free slot)
 
 ### Engine
 - [ ] Differential output-equality tests: MTP versus plain decode, rejection positions, aborts, prefix reuse (state)
