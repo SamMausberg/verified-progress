@@ -421,7 +421,9 @@ def save_state(trainer: Trainer, run: Path) -> None:
         'cursor': trainer.cursor,
         'rng': {
             'torch': torch.get_rng_state(),
-            'cuda': torch.cuda.get_rng_state() if torch.cuda.is_available() else None,
+            # Only for CUDA runs: querying the CUDA RNG creates a CUDA context, which a
+            # --device cpu dry run must not do outside the GPU lock.
+            'cuda': torch.cuda.get_rng_state() if trainer.device.type == 'cuda' else None,
             'python': random.getstate(),
         },
         'args': vars(trainer.args),
