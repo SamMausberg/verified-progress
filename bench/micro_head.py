@@ -295,7 +295,12 @@ def main() -> None:
     )
     ap.add_argument('--capacity', type=int, default=256)
     ap.add_argument('--group-size', type=int, default=2560)
-    ap.add_argument('--pool-rows', type=int, default=16384)
+    ap.add_argument(
+        '--pool-rows',
+        type=int,
+        default=16384,
+        help='real decode rows (capture order) for timing batches and fallback rates',
+    )
     ap.add_argument('--arms', nargs='*', default=None)
     ap.add_argument(
         '--gemv-configs',
@@ -389,6 +394,7 @@ def main() -> None:
             'trials': args.trials,
             'capacity': args.capacity,
             'group_size': args.group_size,
+            'pool_rows': int(pool.shape[0]),
             'reference': head.reference,
             'selection': head.selection,
             'gemv_configs': {m: head.gemv_config(m).__dict__ for m in args.batches},

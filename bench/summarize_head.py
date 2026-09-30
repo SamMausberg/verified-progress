@@ -3,7 +3,10 @@
 Times are per call in microseconds (CUDA-graph replay, warm L2, median). The
 expected time of a certified mode is its time on a batch it decides fully plus
 the measured fraction of real batches (consecutive decode rows) that need a
-fallback times the measured cost of that fallback:
+fallback times the measured cost of that fallback. Fallback rates come from
+batches of M consecutive real decode rows in capture order (``pool_rows`` in the
+JSON's config); the capture's engine batches held at most 16 requests, so at
+larger M these batches are not the engine's own.
 
 ``stock_us``            SGLang's chain: cuBLAS BF16 GEMM, FP32 copy, argmax
 ``w8a16_expected_us``   W8A16 pass, whole-batch stock fallback

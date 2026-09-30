@@ -43,7 +43,7 @@ step invariance 120 python experiments/certified_head/stock_invariance.py --out 
 timed tune_w8a16 420 python bench/tune_gemv.py --arith w8a16 --out "$OUT/gemv_sweep_w8a16.json"
 timed tune_w8a8 360 python bench/tune_gemv.py --arith w8a8 --batches 16 32 64 128 256 \
   --out "$OUT/gemv_sweep_w8a8.json"
-timed micro 900 python bench/micro_head.py --trials 30 --gemv-configs "$OUT/gemv_sweep_w8a16.json" \
+timed micro 900 python bench/micro_head.py --trials 30 --pool-rows 60000 --gemv-configs "$OUT/gemv_sweep_w8a16.json" \
   --w8a8-configs "$OUT/gemv_sweep_w8a8.json" --out "$OUT/micro_head.json"
 timed primitives 300 python bench/head_primitives.py --trials 15 --out "$OUT/head_primitives.json"
 step ncu 240 sudo -E env PATH="$PATH" LD_LIBRARY_PATH="$LD_LIBRARY_PATH" PYTHONPATH="$PYTHONPATH" \
