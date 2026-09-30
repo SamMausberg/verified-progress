@@ -58,7 +58,7 @@ SGLang's `--enable-return-hidden-states` returns the target's stored hidden stat
 generated tokens. It does not return the MTP draft's head inputs, it returns the
 auxiliary layer features rather than the head input for DFlash targets, and it carries
 no draft tokens or accept lengths per verify step. The patch
-(`engine/sglang/patches/0001-head-capture-replay-dumps.patch`) instead stashes the
+(`engine/sglang/patches/geometry/0001-head-capture-replay-dumps.patch`) instead stashes the
 tensor `LogitsProcessor` hands to the head and joins it, inside the speculative workers,
 with the tokens and decisions of the same verify step. Alignment is then checked
 end to end by recomputing argmaxes (below), not assumed.

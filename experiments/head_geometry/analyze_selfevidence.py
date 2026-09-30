@@ -65,6 +65,7 @@ class HiddenSet:
     step: np.ndarray  # capture step (a real co-scheduled batch)
     domain: np.ndarray
     position: np.ndarray  # draft/verify slot (0 for plain decode)
+    reached: np.ndarray  # the verifier needs this row (all earlier drafts accepted)
 
 
 def load_sets(
@@ -78,7 +79,9 @@ def load_sets(
     split = np.array([table[r]['split'] if r in table else '' for r in d.rid])
     fit_rows = d.h[torch.from_numpy(known & (split == 'analysis'))]
 
-    def add(name, h, rid, step, position):
+    def add(name, h, rid, step, position, reached=None):
+        if reached is None:
+            reached = np.ones(len(rid), bool)
         split = np.array([table[r]['split'] if r in table else '' for r in rid])
         idx = np.nonzero(split == 'heldout')[0]
         if max_rows and len(idx) > max_rows:
@@ -97,7 +100,7 @@ def load_sets(
         idx = idx[np.argsort(step[idx], kind='stable')]
         dom = np.array([table[r]['domain'] for r in rid[idx]])
         sets[name] = HiddenSet(
-            name, h[torch.from_numpy(idx)], rid[idx], step[idx], dom, position[idx]
+            name, h[torch.from_numpy(idx)], rid[idx], step[idx], dom, position[idx], reached[idx]
         )
 
     if 'plain' in names:
@@ -111,9 +114,10 @@ def load_sets(
             rid = np.concatenate([ps.rid, ps.bonus_rid])
             block_step = ps.step[ps.position == 1]
             pos = np.concatenate([ps.position - 1, np.full(len(ps.bonus_rid), ps.position.max())])
-            add('verify', h, rid, np.concatenate([ps.step, block_step]), pos)
+            reach = np.concatenate([ps.reached, ps.bonus_reached])
+            add('verify', h, rid, np.concatenate([ps.step, block_step]), pos, reach)
         if 'draft' in names:
-            add('draft', ps.h_draft, ps.rid, ps.step, ps.position)
+            add('draft', ps.h_draft, ps.rid, ps.step, ps.position, ps.reached)
     if 'dflash_verify' in names or 'dflash_draft' in names:
         pd = load_pairs(data / 'dflash4b' / 'heads', 'dflash_verify')
         if 'dflash_verify' in names:
@@ -121,9 +125,10 @@ def load_sets(
             rid = np.concatenate([pd.rid, pd.bonus_rid])
             block_step = pd.step[pd.position == 1]
             pos = np.concatenate([pd.position - 1, np.full(len(pd.bonus_rid), pd.position.max())])
-            add('dflash_verify', h, rid, np.concatenate([pd.step, block_step]), pos)
+            reach = np.concatenate([pd.reached, pd.bonus_reached])
+            add('dflash_verify', h, rid, np.concatenate([pd.step, block_step]), pos, reach)
         if 'dflash_draft' in names:
-            add('dflash_draft', pd.h_draft, pd.rid, pd.step, pd.position)
+            add('dflash_draft', pd.h_draft, pd.rid, pd.step, pd.position, pd.reached)
     return sets, fit_rows
 
 
@@ -393,6 +398,12 @@ def main() -> None:
     ap.add_argument('--seed', type=int, default=20260930)
     ap.add_argument('--ranks', type=int, nargs='+', default=[64, 256])
     ap.add_argument('--tag', default='4b')
+    ap.add_argument(
+        '--heads',
+        nargs='*',
+        default=None,
+        help='evaluate only these heads (default: all); cascades always run',
+    )
     ap.add_argument('--device', default='cuda')
     ap.add_argument('--threads', type=int, default=48, help='CPU threads (device cpu)')
     args = ap.parse_args()
@@ -406,6 +417,8 @@ def main() -> None:
     w = load_head('qwen3.5-4b', args.device)
     vocab, dim = w.shape
     heads, fitted = build_heads(w, fit, tuple(args.ranks))
+    if args.heads:
+        heads = {k: v for k, v in heads.items() if k in set(args.heads)}
     cascades = {
         cname: B.residual_head(w, heads[first], kind, group, cname)
         for cname, (first, kind, group) in CASCADES.items()
@@ -438,6 +451,7 @@ def main() -> None:
         res = evaluate(hs, w, heads, cascades, args.chunk, args.seed)
         info: dict[str, Any] = {
             'rows': int(hs.h.shape[0]),
+            'reached_rows': int(hs.reached.sum()),
             'prompts': len(set(hs.rid)),
             'checks': res['checks'],
             'margin_quantiles': np.quantile(res['stats']['margin'], [0.01, 0.1, 0.5, 0.9]).tolist(),
@@ -481,6 +495,10 @@ def main() -> None:
                 for dom in np.unique(hs.domain):
                     m = hs.domain == dom
                     info['by_domain'][f'{head}|{dec}|{dom}'] = summarize(c[m])
+                if not hs.reached.all():
+                    info.setdefault('by_reached', {})
+                    for label, m in (('reached', hs.reached), ('unreached', ~hs.reached)):
+                        info['by_reached'][f'{head}|{dec}|{label}'] = summarize(c[m])
         for cname, rhead in cascades.items():
             meta1 = metadata_bytes(rhead.first, CASCADE_ENV, dim)
             meta2 = metadata_bytes(rhead.second, CASCADE_ENV, dim)
