@@ -623,15 +623,19 @@ class CertifiedHead:
         report['ok'] = not report['failures']
         return report
 
-    def enable_column_fallback(self, batch_sizes: list[int]) -> dict[str, Any]:
+    def enable_column_fallback(
+        self, batch_sizes: list[int], *, extend: bool = False
+    ) -> dict[str, Any]:
         """Switch to ``fallback_mode='columns'`` only if the self-test passes for
         every batch size the caller will use; otherwise stay in ``batch`` mode.
-        Call it outside CUDA-graph capture, once at start-up.
+        Call it outside CUDA-graph capture, at start-up. With ``extend`` the
+        checked sizes are added to those already enabled (a failure adds none).
         """
         report = self.column_invariance_self_test(batch_sizes)
-        self.fallback_mode = 'columns' if report['ok'] else 'batch'
         # Only the checked batch sizes use the column path; others keep 'batch'.
-        self._column_batches = set(batch_sizes) if report['ok'] else set()
+        passed = set(batch_sizes) if report['ok'] else set()
+        self._column_batches = (self._column_batches | passed) if extend else passed
+        self.fallback_mode = 'columns' if self._column_batches else 'batch'
         report['mode'] = self.fallback_mode
         return report
 

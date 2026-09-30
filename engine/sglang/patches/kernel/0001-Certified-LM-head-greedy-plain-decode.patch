@@ -1,0 +1,435 @@
+From ffa1c7d430799e591790b1fcebdf3bc46a935006 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Wed, 30 Sep 2026 22:18:48 +0000
+Subject: [PATCH] Certified LM head: greedy plain decode
+
+Behind SGLANG_CERTIFIED_HEAD_DECODE (off by default), the target head in
+the decode CUDA graphs is computed by the verified-progress certified_head
+package, imported from SGLANG_CERTIFIED_HEAD_SRC. Each graph captures the
+certified head under a device flag and the stock head under its negation.
+Before a replay the host sets the flag when the batch is all greedy and
+needs no logits (no logprobs, penalties, logit bias, grammar, custom logit
+processor, sampling mask, observer or beam rows). The certified ids are
+copied out after the replay and replace the sampler's argmax. Undecided
+rows run this engine's own BF16 head at the same shape, so the token is the
+stock head's token for that batch. Eager forwards run the stock head.
+
+SGLANG_CERTIFIED_HEAD_CHECK also runs the stock head in every certified step
+and counts rows whose tokens differ; SGLANG_CERTIFIED_HEAD_STATS writes the
+counters. Unsupported configurations (TP or PP > 1, DP attention, quantized,
+LoRA, FP32, scaled or softcapped heads, padded vocabularies, NaN
+sanitizing) log a warning and keep the stock head.
+---
+ python/sglang/srt/environ.py                  |  20 ++
+ python/sglang/srt/layers/certified_head.py    | 273 ++++++++++++++++++
+ python/sglang/srt/layers/logits_processor.py  |  15 +-
+ .../sglang/srt/model_executor/model_runner.py |  16 +-
+ 4 files changed, 321 insertions(+), 3 deletions(-)
+ create mode 100644 python/sglang/srt/layers/certified_head.py
+
+diff --git a/python/sglang/srt/environ.py b/python/sglang/srt/environ.py
+index f3571906ff..c30b504d56 100644
+--- a/python/sglang/srt/environ.py
++++ b/python/sglang/srt/environ.py
+@@ -1802,6 +1802,26 @@ class Envs:
+     SGLANG_PLATFORM = EnvStr("")
+     SGLANG_PLUGINS = EnvStr("")
+
++    # ===================================================================
++    # Certified LM head (verified-progress certified_head package)
++    # ===================================================================
++    # Greedy plain decode through the certified head; off by default.
++    SGLANG_CERTIFIED_HEAD_DECODE = EnvBool(False)
++    # Undecided rows: "batch" reruns the stock head on the whole batch;
++    # "columns" (only for shapes whose start-up self-test passes) gathers them.
++    SGLANG_CERTIFIED_HEAD_FALLBACK = EnvStr("batch")
++    # Stock-kernel accumulation model: "conservative" or "hopper-wgmma".
++    SGLANG_CERTIFIED_HEAD_MODEL = EnvStr("conservative")
++    # Largest batch (rows) the certified head serves; larger ones run stock.
++    SGLANG_CERTIFIED_HEAD_MAX_ROWS = EnvInt(256)
++    # Validation: also run the stock head and count rows whose tokens differ.
++    SGLANG_CERTIFIED_HEAD_CHECK = EnvBool(False)
++    # Write the head's counters as JSON to this path every N certified steps.
++    SGLANG_CERTIFIED_HEAD_STATS = EnvStr("")
++    SGLANG_CERTIFIED_HEAD_STATS_EVERY = EnvInt(1)
++    # Directory holding the certified_head package, added to sys.path.
++    SGLANG_CERTIFIED_HEAD_SRC = EnvStr("")
++
+     # ===================================================================
+     # KV-Canary and Token-Oracle (testing only)
+     # ===================================================================
+diff --git a/python/sglang/srt/layers/certified_head.py b/python/sglang/srt/layers/certified_head.py
+new file mode 100644
+index 0000000000..83c25e711f
+--- /dev/null
++++ b/python/sglang/srt/layers/certified_head.py
+@@ -0,0 +1,273 @@
++"""Certified low-precision LM head (verified-progress, kernel workstream).
++
++With an ``SGLANG_CERTIFIED_HEAD_*`` path flag set, the target head on that path
++is computed by the ``certified_head`` package from verified-progress
++(``src/certified_head``, imported, not copied). It reads an int8 copy of the head
++with a rigorous error envelope, rescores the few candidates exactly and, when a
++row is undecided, runs this engine's own BF16 head at the same batch shape, so
++the token is the one the stock head returns for that batch. With no flag set,
++nothing here runs.
++
++Each decode CUDA graph captures the certified head under a device flag and the
++stock head (``LogitsProcessor._get_logits``) under its negation. Before each
++replay the host sets the flag: a batch is certified only if it is all greedy and
++needs no logits (no logprobs, penalties, logit bias, grammar, custom logit
++processor, sampling mask or beam rows). The certified ids are copied out right
++after the replay and replace the sampler's ``torch.argmax``. Eager forwards run
++the stock head.
++"""
++
++from __future__ import annotations
++
++import json
++import logging
++import math
++import sys
++from pathlib import Path
++from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Set
++
++import torch
++
++from sglang.srt.environ import envs
++
++if TYPE_CHECKING:
++    from sglang.srt.model_executor.forward_batch_info import ForwardBatch, ForwardMode
++
++logger = logging.getLogger(__name__)
++
++PATH_FLAGS = {
++    "decode": envs.SGLANG_CERTIFIED_HEAD_DECODE,
++}
++
++
++class _PathState:
++    """Host and device state of one path (one CUDA-graph family)."""
++
++    def __init__(self, device: torch.device) -> None:
++        self.gate = torch.zeros((), dtype=torch.bool, device=device)
++        self.valid = torch.zeros((), dtype=torch.int32, device=device)
++        # Graph sizes captured with the certified head, and without it.
++        self.covered: Set[int] = set()
++        self.uncovered: Set[int] = set()
++        self.steps = {"certified": 0, "stock_graph": 0, "eager": 0}
++
++    def max_rows(self, limit: int) -> int:
++        """Largest row count whose padded graph certainly has the certified head."""
++        cut = min(self.uncovered, default=math.inf)
++        top = max((m for m in self.covered if m < cut), default=0)
++        return min(top, limit)
++
++
++_heads: Any = None  # certified_head.engine.EngineHeads
++_state: Dict[str, _PathState] = {}
++_dump_calls = 0
++
++
++def _any_flag() -> bool:
++    return any(flag.get() for flag in PATH_FLAGS.values())
++
++
++def _unsupported(model_runner) -> Optional[str]:
++    server_args = model_runner.server_args
++    model = model_runner.model
++    if model_runner.device != "cuda":
++        return "needs CUDA"
++    if model_runner.tp_size != 1 or getattr(model_runner, "pp_size", 1) != 1:
++        return "needs tp_size = pp_size = 1"
++    if getattr(server_args, "enable_dp_attention", False):
++        return "does not support DP attention"
++    processor = getattr(model, "logits_processor", None)
++    lm_head = getattr(model, "lm_head", None)
++    if processor is None or lm_head is None or not hasattr(lm_head, "weight"):
++        return "model has no lm_head.weight and logits_processor"
++    if getattr(lm_head, "quant_method", None) is not None and not type(
++        lm_head.quant_method
++    ).__name__.startswith("Unquantized"):
++        return "quantized lm_head"
++    if hasattr(lm_head, "set_lora"):
++        return "LoRA lm_head"
++    if lm_head.weight.dtype != torch.bfloat16:
++        return "lm_head is not BF16"
++    if lm_head.weight.shape[0] != model_runner.model_config.vocab_size:
++        # The fallback must run the stock GEMM at the stock shape.
++        return "padded vocabulary"
++    if processor.use_fp32_lm_head or processor.logit_scale is not None:
++        return "FP32 or scaled lm_head"
++    if processor.final_logit_softcapping or processor.do_tensor_parallel_all_gather:
++        return "logit softcapping or gathered logits"
++    if envs.SGLANG_SANITIZE_NAN_LOGITS.get():
++        return "SGLANG_SANITIZE_NAN_LOGITS changes the stock argmax on nonfinite logits"
++    return None
++
++
++def install(model_runner) -> None:
++    """Build the heads from the target model's own lm_head (after load_model)."""
++    global _heads
++    if not _any_flag() or model_runner.is_draft_worker or _heads is not None:
++        return
++    reason = _unsupported(model_runner)
++    if reason is not None:
++        logger.warning("Certified LM head disabled: %s.", reason)
++        return
++    src = envs.SGLANG_CERTIFIED_HEAD_SRC.get()
++    if src and src not in sys.path:
++        sys.path.insert(0, src)
++    from certified_head import engine
++
++    model = model_runner.model
++    flags = engine.Flags(
++        decode=envs.SGLANG_CERTIFIED_HEAD_DECODE.get(),
++        fallback=envs.SGLANG_CERTIFIED_HEAD_FALLBACK.get(),
++        model=envs.SGLANG_CERTIFIED_HEAD_MODEL.get(),
++        check=envs.SGLANG_CERTIFIED_HEAD_CHECK.get(),
++        stats=envs.SGLANG_CERTIFIED_HEAD_STATS.get() or None,
++    )
++    weight = model.lm_head.weight
++    vocab = model_runner.model_config.vocab_size
++    max_batch = {p: engine.MAX_HEAD_BATCH for p in engine.PATHS}
++    _heads = engine.install(weight, vocab, max_batch, flags)
++    for path in _heads.paths:
++        _state[path] = _PathState(weight.device)
++    model.logits_processor.certified_role = "target"
++    logger.info(
++        "Certified LM head on %s (fallback %s, stock error model %s, check %s).",
++        ", ".join(_heads.paths),
++        flags.fallback,
++        flags.model,
++        flags.check,
++    )
++
++
++def _path_for(role: Optional[str], forward_mode: ForwardMode) -> Optional[str]:
++    if role == "target" and forward_mode.is_decode():
++        return "decode"
++    return None
++
++
++def gated_logits(
++    role: Optional[str],
++    forward_mode: ForwardMode,
++    hidden: torch.Tensor,
++    stock_logits: Callable[[], torch.Tensor],
++) -> Optional[torch.Tensor]:
++    """Called by ``LogitsProcessor.forward`` in place of ``_get_logits``.
++
++    Returns None when the stock head should run as usual. Under capture it
++    records the certified head under the path's gate and the stock head under
++    its negation, and returns the stock logits tensor (stale when the gate held).
++    """
++    path = _path_for(role, forward_mode)
++    st = _state.get(path) if path is not None else None
++    if st is None:
++        return None
++    head = _heads.get(path)
++    m = hidden.shape[0]
++    ok = hidden.dtype == torch.bfloat16 and hidden.is_contiguous() and head.supports(m)
++    if not torch.cuda.is_current_stream_capturing():
++        if ok:  # graph warm-up or eager forward: compile and self-test this shape once
++            head.warm(hidden, check=_heads.flags.check)
++        return None
++    if not ok:
++        st.uncovered.add(m)
++        return None
++    st.covered.add(m)
++    from torch._higher_order_ops.cudagraph_conditional_nodes import _if_body
++
++    if _heads.flags.check:
++        # Validation: always run the stock head and count rows whose tokens differ.
++        logits = stock_logits()
++        head.argmax(
++            hidden,
++            gate=st.gate,
++            valid=st.valid,
++            stock_ids=torch.argmax(logits, dim=-1),
++        )
++        return logits
++    head.argmax(hidden, gate=st.gate, valid=st.valid)
++    out = []
++    with _if_body(torch.logical_not(st.gate)):
++        out.append(stock_logits())
++    return out[0]
++
++
++def _needs_logits(forward_batch: ForwardBatch, observer: Any) -> bool:
++    si = forward_batch.sampling_info
++    if si is None or not si.is_all_greedy or forward_batch.return_logprob:
++        return True
++    if len(si.temperatures) != forward_batch.batch_size:  # beam tail rows
++        return True
++    orchestrator = si.penalizer_orchestrator
++    return bool(
++        si.grammars is not None
++        or (orchestrator is not None and orchestrator.is_required)
++        or si.acc_additive_penalties is not None
++        or si.acc_scaling_penalties is not None
++        or si.logit_bias is not None
++        or si.has_custom_logit_processor
++        or si.sampling_mask_batch_indices is not None
++        or si.sampling_support_logprobs_capture_indices is not None
++        or (observer is not None and observer.is_active(si))
++    )
++
++
++def before_replay(
++    model_runner, forward_batch: ForwardBatch, can_run_graph: bool
++) -> None:
++    """Set the gate for the replay about to run (host side, current stream)."""
++    if _heads is None or model_runner.is_draft_worker:
++        return
++    path = _path_for("target", forward_batch.forward_mode)
++    st = _state.get(path) if path is not None else None
++    if st is None:
++        return
++    forward_batch.certified_rows = None
++    if not can_run_graph:
++        st.steps["eager"] += 1
++        return
++    rows = forward_batch.batch_size
++    limit = envs.SGLANG_CERTIFIED_HEAD_MAX_ROWS.get()
++    certify = rows <= st.max_rows(limit) and not _needs_logits(
++        forward_batch, model_runner.sampling_observer
++    )
++    st.gate.fill_(certify)
++    st.valid.fill_(rows)
++    st.steps["certified" if certify else "stock_graph"] += 1
++    if certify:
++        forward_batch.certified_rows = rows
++
++
++def after_replay(model_runner, forward_batch: ForwardBatch) -> None:
++    """Copy the certified ids out of the head's buffer before the next replay."""
++    rows = getattr(forward_batch, "certified_rows", None)
++    if rows is None:
++        return
++    path = _path_for("target", forward_batch.forward_mode)
++    forward_batch.certified_ids = _heads.get(path).head._ids[:rows].clone()
++    _maybe_dump()
++
++
++def take_ids(forward_batch: ForwardBatch) -> Optional[torch.Tensor]:
++    """The certified greedy ids for this batch, or None to run the sampler."""
++    ids = getattr(forward_batch, "certified_ids", None)
++    forward_batch.certified_ids = None
++    return ids
++
++
++def _maybe_dump() -> None:
++    global _dump_calls
++    if not _heads.flags.stats:
++        return
++    _dump_calls += 1
++    every = max(1, envs.SGLANG_CERTIFIED_HEAD_STATS_EVERY.get())
++    if _dump_calls % every:
++        return
++    report = _heads.stats()
++    for path, st in _state.items():
++        report["paths"][path]["host_steps"] = dict(st.steps)
++        report["paths"][path]["graph_sizes_certified"] = sorted(st.covered)
++        report["paths"][path]["graph_sizes_stock_only"] = sorted(st.uncovered)
++    out = Path(_heads.flags.stats)
++    out.parent.mkdir(parents=True, exist_ok=True)
++    tmp = out.with_suffix(out.suffix + ".tmp")
++    tmp.write_text(json.dumps(report, indent=1) + "\n")
++    tmp.replace(out)
+diff --git a/python/sglang/srt/layers/logits_processor.py b/python/sglang/srt/layers/logits_processor.py
+index 77b47df9c9..cdda6574e3 100644
+--- a/python/sglang/srt/layers/logits_processor.py
++++ b/python/sglang/srt/layers/logits_processor.py
+@@ -29,7 +29,7 @@ from sglang.kernels.ops.activation.softcap import (
+ from sglang.srt.beam_search.logits_capture import BeamLogitsCapture
+ from sglang.srt.distributed.device_communicators import triton_symm_mem_ag
+ from sglang.srt.environ import envs
+-from sglang.srt.layers import layernorm_sp
++from sglang.srt.layers import certified_head, layernorm_sp
+ from sglang.srt.layers.aux_hidden_states import (
+     AuxHiddenStates,
+     pack_aux_hidden_states,
+@@ -476,6 +476,8 @@ class LogitsProcessor(nn.Module):
+             self.final_logit_softcapping = None
+
+         self.return_full_logits = return_full_logits
++        # Set by certified_head.install for the target model's head.
++        self.certified_role: Optional[str] = None
+         self.enable_mis = get_exec().features.enable_mis
+         self.rl_on_policy_target = get_exec().deterministic.rl_on_policy_target
+
+@@ -588,7 +590,16 @@ class LogitsProcessor(nn.Module):
+
+         if not logits_metadata.extend_return_logprob:
+             # Compute logits for both input and sampled tokens.
+-            logits = self._get_logits(pruned_states, lm_head, logits_metadata)
++            logits = None
++            if sample_indices is None and self.certified_role is not None:
++                logits = certified_head.gated_logits(
++                    self.certified_role,
++                    logits_metadata.forward_mode,
++                    pruned_states,
++                    lambda: self._get_logits(pruned_states, lm_head, logits_metadata),
++                )
++            if logits is None:
++                logits = self._get_logits(pruned_states, lm_head, logits_metadata)
+             sampled_logits = (
+                 logits[sample_indices] if sample_indices is not None else logits
+             )
+diff --git a/python/sglang/srt/model_executor/model_runner.py b/python/sglang/srt/model_executor/model_runner.py
+index bc1d618af4..2172ff85dd 100644
+--- a/python/sglang/srt/model_executor/model_runner.py
++++ b/python/sglang/srt/model_executor/model_runner.py
+@@ -69,7 +69,7 @@ from sglang.srt.eplb.expert_location_updater import ExpertLocationUpdater
+ from sglang.srt.kv_canary.api import install_canary
+ from sglang.srt.kv_canary.runner.canary_manager import context_tuple
+ from sglang.srt.kv_canary.token_oracle.install import install_token_oracle_from_env
+-from sglang.srt.layers import deep_gemm_wrapper, model_parallel
++from sglang.srt.layers import certified_head, deep_gemm_wrapper, model_parallel
+ from sglang.srt.layers.attention.dsa.utils import is_dsa_enable_prefill_cp
+ from sglang.srt.layers.cp.utils import (
+     get_cp_strategy,
+@@ -672,6 +672,8 @@ class ModelRunner:
+         self.maybe_init_lora_manager()
+         self.maybe_enable_batch_invariant_mode()
+         self.configure_kv_cache_dtype()
++        # Before the KV pool is sized, so the int8 head copy counts as weights.
++        certified_head.install(self)
+
+     def init_memory_saver_adapter(self):
+         self.memory_saver_adapter = TorchMemorySaverAdapter.create(
+@@ -1891,12 +1893,15 @@ class ModelRunner:
+                 self.hisparse_coordinator.wait_for_pending_backup()
+                 self.hisparse_coordinator.num_real_reqs.fill_(forward_batch.batch_size)
+
++            certified_head.before_replay(self, forward_batch, can_run_graph)
++
+             # Replay cuda graph if applicable
+             if can_run_graph:
+                 ret = self.decode_cuda_graph_runner.execute(
+                     forward_batch,
+                     pp_proxy_tensors=pp_proxy_tensors,
+                 )
++                certified_head.after_replay(self, forward_batch)
+                 return ModelRunnerOutput(logits_output=ret, can_run_graph=can_run_graph)
+
+             # DP / MLP-sync padding + attn-tp normalization. Only the decode
+@@ -2007,6 +2012,15 @@ class ModelRunner:
+         # runners may reuse backing objects. Never leak an auxiliary result from
+         # a previous replay into a request with no observer state.
+         logits_output.auxiliary_device_output = None
++        certified_ids = certified_head.take_ids(forward_batch)
++        if certified_ids is not None:
++            # Greedy ids from the certified head (the stock head's tokens for this
++            # batch); the batch needs no logits, so the sampler is skipped.
++            self.ngram_embedding_manager.update_after_decode(
++                next_token_ids=certified_ids,
++                forward_batch=forward_batch,
++            )
++            return certified_ids
+         observer = self.sampling_observer
+         # Preserve two-argument overrides when observation is inactive.
+         if observer is not None and observer.is_active(forward_batch.sampling_info):
+--
+2.34.1
