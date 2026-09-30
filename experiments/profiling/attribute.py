@@ -152,9 +152,20 @@ def label_gemms(names: list[str], cats: list[str], role: str) -> list[str]:
                 return False
         return False
 
+    def followed_by_argmax(i: int) -> bool:
+        # DFlash's draft head is torch.matmul then torch.argmax per 256-row chunk.
+        for j in range(i + 1, len(names)):
+            if cats[j] != 'gemm':
+                return names[j] == 'reduce_kernel'
+        return False
+
     for i in gemm_idx:
         nxt, prv = neighbour(i, 1), neighbour(i, -1)
-        if (role != 'draft' and i == gemm_idx[-1]) or (role == 'draft' and followed_by_topk(i)):
+        if (
+            (role not in ('draft', 'dflash_draft') and i == gemm_idx[-1])
+            or (role == 'draft' and followed_by_topk(i))
+            or (role == 'dflash_draft' and (followed_by_argmax(i) or i == gemm_idx[-1]))
+        ):
             lab = 'lm_head_gemm' if role == 'target' else 'draft_lm_head_gemm'
         elif role in DRAFT_LAYER:
             lab = DRAFT_LAYER[role]
@@ -180,10 +191,14 @@ def label_gemms(names: list[str], cats: list[str], role: str) -> list[str]:
             last = out[i]
         elif 'splitKreduce' in n:
             out[i] = last
-    # The first kernel after an LM-head GEMM is the BF16 -> FP32 logits copy.
+    # The first kernel after an LM-head GEMM is the BF16 -> FP32 logits copy
+    # (EAGLE/MTP and the target) or, in a DFlash draft graph, the argmax.
     for i in gemm_idx:
         if out[i].endswith('lm_head_gemm') and i + 1 < len(out) and out[i + 1] == 'unmatched':
-            out[i + 1] = 'logits_cast' if role == 'target' else 'draft_logits_cast'
+            if role == 'dflash_draft' and names[i + 1] == 'reduce_kernel':
+                out[i + 1] = 'spec_draft_topk'
+            else:
+                out[i + 1] = 'logits_cast' if role == 'target' else 'draft_logits_cast'
     keep = {'draft_lm_head_gemm', 'draft_logits_cast', 'spec_draft_topk'}
     for i, c in enumerate(out):
         if role in DRAFT_LAYER and c not in keep:
