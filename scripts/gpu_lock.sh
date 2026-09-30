@@ -7,20 +7,21 @@
 #                                         timing claims; servers must pass
 #                                         --mem-fraction-static 0.25 or less and
 #                                         other jobs must stay under 20 GB
-#   scripts/gpu_lock.sh --status          list queued exclusive jobs
+#   scripts/gpu_lock.sh --status          list queued and running tickets
 #
-# Jobs run in arrival order. An exclusive job takes a ticket (a file named by
-# arrival time and PID) and waits until it is the oldest live ticket; a shared
-# job waits until every exclusive ticket older than itself is gone, then runs
-# alongside other shared jobs. Tickets of dead processes are discarded, so a
-# crashed job cannot stall the queue. The head exclusive job also holds a
-# turnstile that shared jobs must pass. Locks are released when the command and
-# every child holding them exit, so a server left running keeps the GPU locked.
-# GPU_LOCK_WAIT (seconds, default 4 h) bounds each wait; a timeout exits 75.
+# Every job takes a ticket named <arrival ns>-<x|s>-<pid>, so jobs run in arrival
+# order. An exclusive job waits until its ticket is the oldest live ticket of
+# either kind, then takes the lock exclusively (which also waits for shared jobs
+# already running) and keeps its ticket until it exits. A shared job waits only
+# for older exclusive tickets, takes the lock in shared mode alongside other
+# shared jobs, and drops its ticket once the lock is held. Tickets of dead
+# processes are discarded, so a crashed job cannot stall the queue. The lock is
+# released when the command and every child holding it exit, so a server left
+# running keeps the GPU locked. GPU_LOCK_WAIT (seconds, default 4 h) bounds each
+# wait; a timeout exits 75.
 set -euo pipefail
 
 LOCK_FILE="${GPU_LOCK_FILE:-$HOME/.gpu.lock}"
-TURNSTILE="$LOCK_FILE.turnstile"
 QUEUE_DIR="$LOCK_FILE.queue"
 WAIT="${GPU_LOCK_WAIT:-14400}"
 
@@ -42,14 +43,23 @@ live_tickets() {
   done | sort
 }
 
-earlier_exclusive() {
-  local ticket stamp
+# Succeeds while a live ticket older than $1 exists; $2 limits it to one kind.
+older_ticket() {
+  local ticket name
   while read -r ticket; do
-    stamp="$(basename "$ticket")"
-    stamp="${stamp%%-*}"
-    if [ "$stamp" -lt "$1" ]; then return 0; fi
+    name="$(basename "$ticket")"
+    [ "$name" \< "$1" ] || continue
+    if [ -z "${2:-}" ] || [[ $name == *-"$2"-* ]]; then return 0; fi
   done < <(live_tickets)
   return 1
+}
+
+wait_while() {
+  local deadline=$((SECONDS + WAIT))
+  while "$@"; do
+    if [ "$SECONDS" -ge "$deadline" ]; then exit 75; fi
+    sleep 1
+  done
 }
 
 mode="${1:-}"
@@ -63,29 +73,24 @@ fi
 [ "$#" -ge 2 ] || usage
 shift
 case "$mode" in
-  -x)
-    mkdir -p "$QUEUE_DIR"
-    ticket="$QUEUE_DIR/$(date +%s%N)-$$"
-    printf '%s\n' "$*" > "$ticket"
-    trap 'rm -f "$ticket"' EXIT
-    deadline=$((SECONDS + WAIT))
-    until [ "$(live_tickets | head -n 1)" = "$ticket" ]; do
-      if [ "$SECONDS" -ge "$deadline" ]; then exit 75; fi
-      sleep 2
-    done
-    flock -x -w "$WAIT" -E 75 "$TURNSTILE" flock -x -w "$WAIT" -E 75 "$LOCK_FILE" "$@"
-    ;;
-  -s)
-    # Wait for exclusive jobs that arrived earlier, then join other shared holders.
-    mkdir -p "$QUEUE_DIR"
-    arrival="$(date +%s%N)"
-    deadline=$((SECONDS + WAIT))
-    while earlier_exclusive "$arrival"; do
-      if [ "$SECONDS" -ge "$deadline" ]; then exit 75; fi
-      sleep 2
-    done
-    flock -x -w "$WAIT" -E 75 "$TURNSTILE" true
-    exec flock -s -w "$WAIT" -E 75 "$LOCK_FILE" "$@"
-    ;;
+  -x) kind=x ;;
+  -s) kind=s ;;
   *) usage ;;
 esac
+
+mkdir -p "$QUEUE_DIR"
+name="$(date +%s%N)-$kind-$$"
+ticket="$QUEUE_DIR/$name"
+printf '%s\n' "$*" > "$ticket"
+trap 'rm -f "$ticket"' EXIT
+
+if [ "$kind" = x ]; then
+  wait_while older_ticket "$name"
+  flock -x -w "$WAIT" -E 75 "$LOCK_FILE" "$@"
+else
+  wait_while older_ticket "$name" x
+  # Drop the ticket as soon as the shared lock is held, then run the command.
+  # shellcheck disable=SC2016 # $0 and $@ belong to the inner shell
+  flock -s -w "$WAIT" -E 75 "$LOCK_FILE" \
+    bash -c 'rm -f "$0"; exec "$@"' "$ticket" "$@"
+fi
