@@ -13,6 +13,7 @@ import json
 import platform
 import random
 import struct
+import subprocess
 import sys
 import time
 import unittest
@@ -692,6 +693,9 @@ if __name__ == '__main__':
         'status': 'pass' if result.wasSuccessful() else 'fail',
         'test_methods': result.testsRun,
         'seed': SEED,
+        'repo_commit': subprocess.run(
+            ['git', 'rev-parse', 'HEAD'], capture_output=True, text=True, cwd=ROOT
+        ).stdout.strip(),
         'python': platform.python_version(),
         'numpy': np.__version__,
         'counts': COUNTS,
