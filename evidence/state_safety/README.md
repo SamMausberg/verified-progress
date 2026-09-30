@@ -102,7 +102,11 @@ comparison below, generated up to two tokens past their known divergence).
 - In all 167 prompts the first differing bits are layer 0's GDN recurrence output at
   the first speculative cycle: the plain-decode recurrent kernel and the target-verify
   recurrent kernel produce different bits from the same inputs and the same state. The
-  convolution output just before it is identical.
+  convolution output just before it is identical. At this commit decode calls
+  `fused_recurrent_gated_delta_rule_packed_decode` (`kernels/ops/attention/fla/fused_recurrent.py`)
+  and target verify calls `fused_sigmoid_gating_delta_rule_update`
+  (`fla/fused_sigmoid_gating_recurrent.py`): separate Triton kernels that fuse the
+  gating and the state update differently.
 - 129 of the 167 diverged within the generated length. Tie rule: 0. Head GEMM: 0; the
   head input differs in every case. Rounding flip: 102. Order flip: 27.
 
