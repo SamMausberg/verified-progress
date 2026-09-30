@@ -248,29 +248,24 @@ class Accumulator:
         """Sum exact leaves (for example products of BF16 values) in this order.
 
         A product of two BF16 values has at most 16 significant bits, so it is
-        exact in FP32 unless it lies below the normal range. Such a leaf is
-        rounded into the format as the modelled accumulator would (gradual
-        underflow, or flush to zero with ``ftz``); its error is at most
-        ``underflow``, one of the ``nodes(n)`` terms that ``error_bound``
-        charges. A leaf that is inexact in the normal range is an input error.
+        exact in FP32 unless it lies below the normal range. Such a leaf is kept
+        exact, as inside an FMA or a tensor-core adder, and only the modelled
+        accumulator operation rounds it (gradual underflow, or flush to zero of
+        the result with ``ftz``). A chunk that is a single leaf is rounded once at
+        the end. Each such rounding errs by at most ``underflow``, one of the
+        ``nodes(n)`` terms that ``error_bound`` charges. A leaf that is inexact in
+        the normal range is an input error.
         """
-        leaves = []
         for t in terms:
-            if not is_representable(t, self.fmt):
-                if abs(t) >= self.fmt.min_normal:
-                    raise ValueError('accumulated leaves must be exact in the accumulator format')
-                t = self._r(t)
-            elif self.ftz and 0 < abs(t) < self.fmt.min_normal:
-                t = Q(0)
-            leaves.append(t)
-        terms = leaves
+            if not is_representable(t, self.fmt) and abs(t) >= self.fmt.min_normal:
+                raise ValueError('accumulated leaves must be exact in the accumulator format')
         partials = [self._chunk([terms[j] for j in c]) for c in self._chunks(len(terms))]
         if not partials:
             return Q(0)
         acc = partials[0]
         for p in partials[1:]:
             acc = self._r(acc + p)
-        return acc
+        return self._r(acc)
 
     def _chunk_depth(self, n: int) -> int:
         if n == 0:

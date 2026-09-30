@@ -332,6 +332,10 @@ class Precision(unittest.TestCase):
                 count('subnormal_product_cases')
         self.assertGreater(ties, 0)
         count('subnormal_exact_ties', ties)
+        # Leaves stay exact until the accumulator rounds: 2^-149 + 2^-150 is a tie
+        # that rounds to even (2^-148); rounding the leaf first would give 2^-149.
+        self.assertEqual(FP32_SEQUENTIAL.sum([pow2(-149), pow2(-150)]), pow2(-148))
+        self.assertIn(FP32_SEQUENTIAL.sum([pow2(-266)]), (Q(0), pow2(-149)))
         t2 = Q(1, 2**133)
         with self.assertRaises(ValueError):  # an inexact normal-range leaf is still an input error
             FP32_SEQUENTIAL.sum([Q(1) + t2])
