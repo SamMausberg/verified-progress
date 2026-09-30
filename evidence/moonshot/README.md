@@ -74,9 +74,12 @@ per-request bytes, F = 2 FLOPs per weight, BW = 3.79 TB/s (assumed, see 1.1) and
 - **layer-serial**, `max(W / BW, B F / P) + B s / BW`: the engine as it runs today, where
   each layer's weight GEMM and its per-request state/KV kernels run one after the other.
   This is a model of the current engine, not a hardware bound.
-- **overlapped**, `max((W + B s) / BW, B F / P)`: the hard roofline for an engine that
-  overlaps the memory-bound per-request kernels with the batch GEMMs (batch splitting,
-  NanoFlow-style).
+- **overlapped**, `max((W + B s) / BW, B F / P)`: the overlapped roofline at the assumed P
+  and BW, for an engine that overlaps the memory-bound per-request kernels with the batch
+  GEMMs (batch splitting, NanoFlow-style). Its compute-bound rows inherit the assumed P;
+  at the datasheet peaks they would be higher. As B grows it approaches
+  `min(BW / s, P / F)` (`overlapped_limit_tokens_per_s` in `ceilings.json`; 33.3k tok/s for
+  plain FP32).
 
 Tokens/s ceilings at B = 2,048 (context 334):
 

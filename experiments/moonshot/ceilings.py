@@ -12,10 +12,12 @@ floors at batch B are reported:
   and the per-request state/KV kernels run one after the other, so the per-request
   term adds to whichever of the weight read and the batch GEMM is larger. It is not
   a hardware bound.
-* overlapped (``overlapped_floor_ms``): max((W + B s) / BW, B F / P). This is the hard
-  roofline: an engine that overlaps the memory-bound per-request kernels with the
-  batch GEMMs (batch splitting, NanoFlow-style) is limited only by total bytes or total
-  FLOPs, whichever takes longer.
+* overlapped (``overlapped_floor_ms``): max((W + B s) / BW, B F / P), the overlapped
+  roofline at the assumed P and BW: an engine that overlaps the memory-bound
+  per-request kernels with the batch GEMMs (batch splitting, NanoFlow-style) is limited
+  only by total bytes or total FLOPs, whichever takes longer. Its compute-bound rows
+  inherit the assumed P (at the datasheet peak they would be higher). As B grows its
+  tokens/s approach min(BW / s, P / F) (``overlapped_limit_tokens_per_s``).
 
 BW is an assumed HBM read peak of 3.79 TB/s (the profile workstream's measurement,
 evidence pending); P is the fraction of datasheet dense peak that cuBLAS/CUTLASS
@@ -71,8 +73,13 @@ class Stack:
         weights = self.weight_bytes() / BW
         return max(weights, self.compute_time(batch)) + batch * self.per_request_bytes(context) / BW
 
+    def overlapped_limit(self, context: int) -> float:
+        """Tokens/s of the overlapped roofline as B grows: min(BW / s, P / F)."""
+        peak = PEAK_FP8 if self.fp8_compute else PEAK_BF16
+        return min(BW / self.per_request_bytes(context), peak / (2 * PARAMS))
+
     def overlapped_floor(self, batch: int, context: int) -> float:
-        """Hard roofline: all bytes or all FLOPs, whichever takes longer."""
+        """Overlapped roofline at the assumed P and BW: all bytes or all FLOPs."""
         total_bytes = self.weight_bytes() + batch * self.per_request_bytes(context)
         return max(total_bytes / BW, self.compute_time(batch))
 
@@ -182,7 +189,10 @@ def main() -> None:
         'note': 'derived floors (not measurements); see module docstring for assumptions',
         'execution_models': {
             'step_floor_ms': 'layer-serial: max(W/BW, B F/P) + B s/BW',
-            'overlapped_floor_ms': 'overlapped (hard roofline): max((W + B s)/BW, B F/P)',
+            'overlapped_floor_ms': 'overlapped roofline at the assumed P and BW: '
+            'max((W + B s)/BW, B F/P)',
+            'overlapped_limit_tokens_per_s': 'B -> infinity limit of the overlapped '
+            'roofline: min(BW/s, P/F)',
         },
         'bandwidth_tb_s': BW / 1e12,
         'peak_bf16_tflops_assumed': PEAK_BF16 / 1e12,
@@ -194,6 +204,9 @@ def main() -> None:
         'throughput': rows,
         'batch1_latency': latency,
         'mtp_high_batch_accept3': spec_rows,
+        'overlapped_limit_tokens_per_s': {
+            stack.name: round(stack.overlapped_limit(args.context)) for stack in STACKS
+        },
     }
     if args.csv:
         args.csv.parent.mkdir(parents=True, exist_ok=True)

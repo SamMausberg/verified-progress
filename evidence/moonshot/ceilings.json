@@ -2,7 +2,8 @@
  "note": "derived floors (not measurements); see module docstring for assumptions",
  "execution_models": {
   "step_floor_ms": "layer-serial: max(W/BW, B F/P) + B s/BW",
-  "overlapped_floor_ms": "overlapped (hard roofline): max((W + B s)/BW, B F/P)"
+  "overlapped_floor_ms": "overlapped roofline at the assumed P and BW: max((W + B s)/BW, B F/P)",
+  "overlapped_limit_tokens_per_s": "B -> infinity limit of the overlapped roofline: min(BW/s, P/F)"
  },
  "bandwidth_tb_s": 3.79,
  "peak_bf16_tflops_assumed": 692.3,
@@ -655,5 +656,14 @@
    "mtp_stock_tok_s": 19505,
    "mtp_replayssm_spec_tok_s": 34321
   }
- ]
+ ],
+ "overlapped_limit_tokens_per_s": {
+  "baseline (FP32 state)": 33255,
+  "16-bit state (FP16 or BF16)": 59558,
+  "ReplaySSM (FP32)": 56753,
+  "ReplaySSM + 16-bit state": 82305,
+  "ReplaySSM + int8 state": 82305,
+  "ReplaySSM + 16-bit state + FP8 W8A8 + FP8 KV": 109632,
+  "ReplaySSM + int8 state + FP8 W8A8 + FP8 KV + FP8 head": 141166
+ }
 }
