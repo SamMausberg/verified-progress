@@ -73,6 +73,9 @@
   {\small\color{ochre}\textsf{Pending figure.} #1\par\smallskip
   \footnotesize\textsf{Data:} \texttt{\detokenize{#2}}}
   \end{tcolorbox}}
+% A figure that reads a committed data file: draw it if the file exists, otherwise a
+% pending placeholder naming the file (so the source builds before the evidence merges).
+\newcommand{\datafigure}[3]{\IfFileExists{#1}{#2}{\pendingfigure{#3}{#1}}}
 \newtheorem{theorem}{Theorem}[section]
 \newtheorem{proposition}[theorem]{Proposition}
 \newtheorem{lemma}[theorem]{Lemma}
@@ -90,6 +93,7 @@
 \renewcommand{\topfraction}{.88}\renewcommand{\bottomfraction}{.6}\renewcommand{\textfraction}{.1}\renewcommand{\floatpagefraction}{.75}
 \setcounter{tocdepth}{1}
 \begin{document}
+\pagenumbering{roman}
 \begin{titlepage}
 \vspace*{0in}
 \noindent{\small\sffamily\color{teal}SYSTEMS RESEARCH\quad /\quad WORK IN PROGRESS\quad /\quad REVISION 4}\par
@@ -106,14 +110,14 @@
 
 We state the exactness contract a certified head can meet in a real engine: the token the stock head kernel returns at the same batch shape, certified only when a gap condition covers that kernel's accumulation error and BF16 rounding, with the stock kernel as the fallback. We prove a floating-point envelope for the low-precision pass that holds for Hopper tensor-core accumulation under a published model, or needs no accumulation model for an integer pass; exact greedy selection and exact Gumbel-max sampling under a counter-keyed noise field from one refinement procedure; bounds on the rows that must be re-scored; and conditions under which exact sampling can finish before the scores are known. From the weights alone, transport's envelope is narrower than an int8 envelope only if draft and target head inputs agree to within about 0.85\% in relative $\ell_2$ distance (median row, Euclidean envelopes, 64-row tiles); this compares envelope widths, not certification rates or runtime. The greedy certified head is prior art, and our claim is narrower (Section~\ref{sec:prior-novelty}).
 
-The measurements that decide the hypotheses (the drift of real draft states, candidate sets and head-path runtime, the attribution of time across the stack, and latency--throughput frontiers for an exact stack and for a lossy stack under a stated quality budget) are in progress. Each appears as a marked pending item, never as a number.
+On 6,005 plain-decode head inputs captured from the engine, an int8 head certifies the real-arithmetic winner with 1.3 to 1.6 candidate rows per decision on average, and, assuming the published Khattak--Mikaitis model of Hopper tensor-core accumulation for the stock kernel, the stock contract leaves 0.35\% of rows (2.8\% of the capture run's batches of up to 16 requests) to the stock kernel, or 1.40\% of rows (10.9\% of those batches) under a more conservative model; no certified token differed from the engine's. The other measurements that decide the hypotheses (the drift of real draft states, head-path runtime, the attribution of time across the stack, and latency--throughput frontiers for an exact stack and for a lossy stack under a stated quality budget) are in progress; each appears as a marked pending item, never as a number.
 \end{abstract}
 \vfill
 \begin{researchbox}
 \small\textbf{How to read the evidence in this revision.} A \emph{finding} is a theorem proved in the text or a result whose evidence is committed on the repository's \code{main} branch. \emph{Derived} numbers are calculations from the pinned checkpoint, configuration or source code; the formula and inputs are given where they are used. A number followed by {\color{muted}\textsf{\scriptsize[under review, PR \#N]}} rests on evidence in an open pull request. {\color{ochre}\textsf{\small[pending: \dots]}} marks an experiment that has been designed but whose result is not yet committed, with the evidence path it will produce. Hypotheses are labelled as such. Table~\ref{tab:hypotheses} gives the status of each question; Appendix~\ref{app:ledger} lists every claim with its evidence path.
 \end{researchbox}
 \end{titlepage}
-\setcounter{page}{1}
+\pagenumbering{arabic}
 \tableofcontents
 \newpage
 
