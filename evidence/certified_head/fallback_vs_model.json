@@ -1,0 +1,43 @@
+{
+ "rows": 20000,
+ "steps": 1260,
+ "top_tokens_checked": 64,
+ "gammas": {
+  "0.0006107": {
+   "row_fallback_rate": 0.02235,
+   "step_fallback_rate": 0.29444444444444445,
+   "rows_undecided": 447
+  },
+  "0.0001192": {
+   "row_fallback_rate": 0.0045,
+   "step_fallback_rate": 0.06825396825396825,
+   "rows_undecided": 90
+  },
+  "3e-05": {
+   "row_fallback_rate": 0.001,
+   "step_fallback_rate": 0.01507936507936508,
+   "rows_undecided": 20
+  },
+  "1e-05": {
+   "row_fallback_rate": 0.00045,
+   "step_fallback_rate": 0.007142857142857143,
+   "rows_undecided": 9
+  },
+  "3e-06": {
+   "row_fallback_rate": 0.0002,
+   "step_fallback_rate": 0.0031746031746031746,
+   "rows_undecided": 4
+  },
+  "1e-06": {
+   "row_fallback_rate": 0.0001,
+   "step_fallback_rate": 0.0015873015873015873,
+   "rows_undecided": 2
+  },
+  "0": {
+   "row_fallback_rate": 0.0,
+   "step_fallback_rate": 0.0,
+   "rows_undecided": 0
+  }
+ },
+ "rows_whose_exact_bf16_top2_tie": 323
+}
