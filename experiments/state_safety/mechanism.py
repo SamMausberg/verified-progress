@@ -217,7 +217,14 @@ def first_hash_difference(
 
 
 def analyse_prompt(
-    pid: str, ca, cb, dir_a: Path, dir_b: Path, names: list[str], head: Head, prompt
+    pid: str,
+    ca,
+    cb,
+    dir_a: Path,
+    dir_b: Path,
+    names: tuple[list[str], list[str]],
+    head: Head,
+    prompt,
 ):
     P = len(prompt)
     oa, ob = ca['output_ids'], cb['output_ids']
