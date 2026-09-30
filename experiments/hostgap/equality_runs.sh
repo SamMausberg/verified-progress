@@ -24,12 +24,14 @@ cd "$REPO" || exit 1
 config=${1:?usage: $0 mtp|dflash variant...}
 shift
 case "$config" in
-  mtp) ARM=(--arm mtp --set enable-linear-replayssm-spec=true --concurrency 1 8 32) ;;
+  mtp)
+    ARM=(--arm mtp --set enable-linear-replayssm-spec=true --set disable-radix-cache=true
+      --set max-total-tokens=1000000 --concurrency 1 8 32) ;;
   # DFlash block 8 keeps 8 intermediate GDN states per request, so a 0.25 slot
   # holds 16 requests.
   dflash)
-    ARM=(--arm dflash --set disable-radix-cache=true --shared-capacity 16 --no-strict
-      --concurrency 1 8 16) ;;
+    ARM=(--arm dflash --set disable-radix-cache=true --set max-total-tokens=1000000
+      --shared-capacity 16 --no-strict --concurrency 1 8 16) ;;
   *) echo "unknown config $config" >&2; exit 64 ;;
 esac
 

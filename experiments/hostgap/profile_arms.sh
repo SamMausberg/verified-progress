@@ -11,7 +11,7 @@
 #
 # Steps (arm labels):
 #   mtp-none, mtp-host, mtp-node          stock SGLang, tuned MTP (s3, replayssm-spec)
-#   dflash-none, dflash-host              stock SGLang, DFlash block 8 (radix off)
+#   dflash-none, dflash-host              stock SGLang, DFlash block 8
 #   mtp-patched-none, mtp-patched-host    patched worktree + HOSTGAP_ENV
 #   mtp-validate                          patched + SGLANG_HOSTGAP_VALIDATE=1 (checks only)
 #   dflash-patched-none, dflash-patched-host
@@ -28,8 +28,12 @@ read -ra MTP_NODE_C <<<"${MTP_NODE_C:-32 64 128}"
 source "$REPO/scripts/sglang_env.sh"
 cd "$REPO" || exit 1
 
-MTP=(--arm mtp --set enable-linear-replayssm-spec=true)
-DFLASH=(--arm dflash --set disable-radix-cache=true --set max-mamba-cache-size=128 --no-strict)
+# bench's tuned arms (tuning slot T2): radix cache off, GDN state cache sized for
+# 128 requests, KV cache capped at 1M tokens.
+TUNED=(--set disable-radix-cache=true --set max-mamba-cache-size=128
+  --set max-total-tokens=1000000)
+MTP=(--arm mtp --set enable-linear-replayssm-spec=true "${TUNED[@]}")
+DFLASH=(--arm dflash "${TUNED[@]}" --no-strict)
 patched() {
   local out=(--sglang-worktree "$SGLANG_PATCHED")
   local kv envs

@@ -9,7 +9,8 @@
 # A = stock SGLang (~/sglang at the pin), B = the hostgap worktree with the
 # flags in HOSTGAP_ENV. Both use the same arm and flags (bench defaults,
 # including --stream-interval 4). ARM_ARGS selects the configuration
-# (default: the interim tuned MTP arm, s3 + replayssm-spec); LABEL_PREFIX
+# (default: bench's tuned MTP arm: s3 + replayssm-spec, radix cache off, GDN
+# state cache 128, KV capped at 1M tokens); LABEL_PREFIX
 # names the runs. Results go to $OUT/<prefix>-{stock,hostgap}/<timestamp>/.
 set -uo pipefail
 
@@ -18,7 +19,8 @@ OUT="${OUT:-$HOME/vp-data/hostgap/ab}"
 PORT="${PORT:-30101}"
 PATCHED="${SGLANG_PATCHED:-$HOME/sglang-wt/hostgap}"
 read -ra ENVS <<<"${HOSTGAP_ENV:-SGLANG_HOSTGAP_VERIFY_PLAN=1 SGLANG_HOSTGAP_DRAFT_INDPTR=1}"
-read -ra ARM_ARGS <<<"${ARM_ARGS:---arm mtp --set enable-linear-replayssm-spec=true}"
+TUNED="--set disable-radix-cache=true --set max-mamba-cache-size=128 --set max-total-tokens=1000000"
+read -ra ARM_ARGS <<<"${ARM_ARGS:---arm mtp --set enable-linear-replayssm-spec=true $TUNED}"
 read -ra CONC <<<"${CONC:-1 2 4 8 16 32}"
 PREFIX="${LABEL_PREFIX:-mtp-rspec}"
 # shellcheck source=/dev/null
