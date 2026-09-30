@@ -30,6 +30,7 @@ from transformers import AutoTokenizer
 ARMS = {
     'mtp4b': ('qwen3.5-4b', 'mtp_verify'),
     'plain4b': ('qwen3.5-4b', 'plain_decode'),
+    'dflash4b': ('qwen3.5-4b', 'dflash_verify'),
     'dflash27b': ('qwen3.8-27b', 'dflash_verify'),
 }
 TOKENIZER = {
@@ -104,12 +105,15 @@ def main() -> None:
     ap.add_argument('--data', type=Path, default=Path.home() / 'vp-data/geometry')
     ap.add_argument('--out', type=Path, required=True)
     ap.add_argument('--plain-arm', default='plain4b', help='arm to compare outputs with')
+    ap.add_argument('--device', default='cuda')
     args = ap.parse_args()
+    if args.device == 'cpu':
+        torch.set_num_threads(48)
 
     model, kind = ARMS[args.arm]
     heads = args.data / args.arm / 'heads'
     table = prompt_table(args.data / 'prompts.jsonl')
-    w64 = load_head(model, 'cuda').double()
+    w64 = load_head(model, args.device).double()
     tok = AutoTokenizer.from_pretrained(TOKENIZER[model][0], revision=TOKENIZER[model][1])
     result: dict[str, Any] = {'arm': args.arm, 'model': model, 'kind': kind}
 

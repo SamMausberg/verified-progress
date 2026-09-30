@@ -28,7 +28,11 @@ FINAL_NORM = {
     'qwen3.5-4b': ['model.language_model.norm.weight', 'mtp.norm.weight'],
     'qwen3.8-27b': ['model.language_model.norm.weight'],
 }
-ARMS = {'mtp4b': ('qwen3.5-4b', 'mtp_verify'), 'dflash27b': ('qwen3.8-27b', 'dflash_verify')}
+ARMS = {
+    'mtp4b': ('qwen3.5-4b', 'mtp_verify'),
+    'dflash4b': ('qwen3.5-4b', 'dflash_verify'),
+    'dflash27b': ('qwen3.8-27b', 'dflash_verify'),
+}
 
 
 def q(v: np.ndarray, qs=(0.01, 0.1, 0.5, 0.9, 0.99)) -> dict[str, float]:
@@ -112,11 +116,14 @@ def main() -> None:
     ap.add_argument('--out', type=Path, required=True)
     ap.add_argument('--max-rows', type=int, default=20000)
     ap.add_argument('--seed', type=int, default=20260930)
+    ap.add_argument('--device', default='cuda')
     args = ap.parse_args()
+    if args.device == 'cpu':
+        torch.set_num_threads(48)
     model, kind = ARMS[args.arm]
     rng = np.random.default_rng(args.seed)
     table = prompt_table(args.data / 'prompts.jsonl')
-    w = load_head(model, 'cuda')
+    w = load_head(model, args.device)
     w64 = w.double()
 
     def held(rid: np.ndarray) -> np.ndarray:

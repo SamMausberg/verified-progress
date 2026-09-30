@@ -12,6 +12,28 @@ and in FP64, two ways of certifying the head's decision without computing it den
 
 Results and their interpretation are in `evidence/head_geometry/README.md`.
 
+## The transport-versus-int8 threshold
+
+The comparison between the two mechanisms is stated per vocabulary row, in the l2
+(Cauchy-Schwarz) family, as in the theory notes and `evidence/precision/head_constants.json`
+(PR #7):
+
+- `rho = ||h_t - h_d||_2 / ||h_t||_2`, where `h_d` and `h_t` are the exact LM-head inputs
+  (after the final norm) behind the same verified draft token.
+- Transport's error term for row `i` is `r_c ||Delta||_2`, with
+  `r_c = max_{j in c} ||w_j - mu_c||_2` over the row's 64-row contiguous tile `c` and
+  `mu_c` the tile mean.
+- The int8 per-row self-evidence term is `||e_i||_2 ||h_t||_2`, `e_i = w_i - s_i q_i`.
+- Transport's envelope is narrower for row `i` iff `rho < t_i := ||e_i||_2 / r_c(i)`.
+
+The threshold `t_i` depends on the weights only; `rho` depends on the drafter.
+`analyze_rho.py` measures both, the fraction of rows where transport is narrower for
+every pair (also against int8 g128, int4 per-row and int4 g128), head-metric versions
+of the drift that do not charge directions the head ignores, realized (not certified)
+per-tile errors of both mechanisms, and the certification rates that follow. A ratio
+below the threshold is necessary but not sufficient: tile certification also needs the
+tile maxima to fall below a threshold score, which `analyze_transport.py` measures.
+
 ## Files
 
 | File | Role |
@@ -24,6 +46,7 @@ Results and their interpretation are in `evidence/head_geometry/README.md`.
 | `bounds.py` | Tilings, transport and static bounds, quantizers, envelopes, candidate sets |
 | `analyze_transport.py` | H2 metrics |
 | `analyze_selfevidence.py` | H3 metrics |
+| `analyze_rho.py` | The drift ratio rho, the per-row threshold and head-metric drift |
 | `analyze_stats.py` | Norms, drift, margins, top-m mass, hidden-dimension outliers |
 
 `tests/test_head_geometry_bounds.py` checks that every bound encloses exact values on

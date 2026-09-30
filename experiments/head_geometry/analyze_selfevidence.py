@@ -97,6 +97,16 @@ def load_sets(
             add('verify', h, rid, np.concatenate([ps.step, block_step]), pos)
         if 'draft' in names:
             add('draft', ps.h_draft, ps.rid, ps.step, ps.position)
+    if 'dflash_verify' in names or 'dflash_draft' in names:
+        pd = load_pairs(data / 'dflash4b' / 'heads', 'dflash_verify')
+        if 'dflash_verify' in names:
+            h = torch.cat([pd.h_target, pd.h_bonus])
+            rid = np.concatenate([pd.rid, pd.bonus_rid])
+            block_step = pd.step[pd.position == 1]
+            pos = np.concatenate([pd.position - 1, np.full(len(pd.bonus_rid), pd.position.max())])
+            add('dflash_verify', h, rid, np.concatenate([pd.step, block_step]), pos)
+        if 'dflash_draft' in names:
+            add('dflash_draft', pd.h_draft, pd.rid, pd.step, pd.position)
     return sets, fit_rows
 
 

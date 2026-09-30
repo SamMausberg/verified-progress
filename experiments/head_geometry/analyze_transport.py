@@ -36,9 +36,18 @@ import torch
 from replay_data import load_head, load_pairs, prompt_table
 
 F64 = torch.float64
-ARMS = {'mtp4b': ('qwen3.5-4b', 'mtp_verify'), 'dflash27b': ('qwen3.8-27b', 'dflash_verify')}
+ARMS = {
+    'mtp4b': ('qwen3.5-4b', 'mtp_verify'),
+    'dflash4b': ('qwen3.5-4b', 'dflash_verify'),
+    'dflash27b': ('qwen3.8-27b', 'dflash_verify'),
+}
 RETAIN = 64  # exact top-m draft rows for the retained-tail mass bound
 UNION_SIZES = (1, 4, 16, 64)
+# Drift scaling: a hypothetical draft h_d(s) = h_t - s * Delta has logits
+# z_t - s * (z_t - z_d) exactly, and every transport radius scales by s.
+DRIFT_SCALES = (1.0, 0.3, 0.1, 0.03, 0.01)
+DRIFT_TILINGS = ('contig256', 'kmeans256')
+DRIFT_BOUNDS = ('coord', 'group128', 'best', 'oracle')
 
 
 def build_tilings(w: torch.Tensor, seed: int) -> list[B.Tiling]:
@@ -64,7 +73,10 @@ def main() -> None:
     ap.add_argument('--chunk', type=int, default=64)
     ap.add_argument('--seed', type=int, default=20260930)
     ap.add_argument('--tag', default=None)
+    ap.add_argument('--device', default='cuda')
     args = ap.parse_args()
+    if args.device == 'cpu':
+        torch.set_num_threads(48)
     tag = args.tag or args.arm
     t0 = time.time()
     torch.backends.cuda.matmul.allow_tf32 = False
@@ -72,7 +84,7 @@ def main() -> None:
     table = prompt_table(args.data / 'prompts.jsonl')
     ps = load_pairs(args.data / args.arm / 'heads', kind)
     split = np.array([table[r]['split'] if r in table else '' for r in ps.rid])
-    w = load_head(model, 'cuda')
+    w = load_head(model, args.device)
     vocab, dim = w.shape
     dev = w.device
 
@@ -256,6 +268,32 @@ def main() -> None:
                         row_upper = zd + (a + eps[bname])[:, t.tile_of_row]
                         put(key + '|rowlevel_rows_skipped', (row_upper < tau).double().mean(1))
 
+        for tname in DRIFT_TILINGS:
+            geo = geos[tname]
+            t = geo.tiling
+            sizes = t.sizes.to(F64)
+            a = delta @ geo.mu.T
+            eps = B.tile_epsilons(geo, delta)
+            eps['best'] = torch.stack(list(eps.values())).amin(0)
+            eps['oracle'] = B.seg_max((zt - zd - a[:, t.tile_of_row]).abs(), t)
+            for scale in DRIFT_SCALES:
+                zds = zt - scale * (zt - zd)
+                md_s = B.seg_max(zds, t)
+                lzd_s = B.seg_logsumexp(zds, t)
+                lq_s = zds - torch.logsumexp(zds, 1, keepdim=True)
+                for bname in DRIFT_BOUNDS:
+                    e_s = scale * eps[bname]
+                    upper = md_s + scale * a + e_s
+                    key = f'drift{scale}|{tname}|{bname}'
+                    put(key + '|rows_skipped', 1 - ((upper >= tau).double() @ sizes) / vocab)
+                    lz_hi = torch.logsumexp(lzd_s + scale * a + e_s, 1)
+                    lz_lo = torch.logsumexp(lzd_s + scale * a - e_s, 1)
+                    put(key + '|log_width|t1.0', lz_hi - lz_lo)
+                    put(
+                        key + '|p_unresolved_q|t1.0',
+                        B.expected_unresolved(logp, lq_s, lzt - lz_lo, lzt - lz_hi),
+                    )
+
         for rname, q in row_bases.items():
             ra, rr = row_a[rname], row_r[rname]
             pd = delta @ q
@@ -327,6 +365,8 @@ def main() -> None:
         sizes_np = geos[tname].tiling.sizes.cpu().numpy().astype(np.float64)
         res = {}
         for bsz in UNION_SIZES:
+            if bsz > len(mk):
+                continue
             fr = []
             for _ in range(400):
                 pick = rng.choice(len(mk), size=bsz, replace=False)
