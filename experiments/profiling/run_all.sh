@@ -20,6 +20,18 @@ else
   LOCK=("$HOME/verified-progress/scripts/gpu_lock.sh" -x)
 fi
 RUN=(python "$REPO/experiments/profiling/run_profiles.py")
+
+# Profile runs are skipped when their output directory already holds window
+# records, so a queued hold can be resubmitted without repeating finished work.
+# Set VP_RERUN=1 (or delete the directory) to repeat a run.
+prof() {
+  local out="${*: -1}"
+  if [ -s "$out/windows.jsonl" ] && [ "${VP_RERUN:-0}" != 1 ]; then
+    echo "skip: $out already has windows.jsonl"
+    return 0
+  fi
+  "${LOCK[@]}" "${RUN[@]}" "$@"
+}
 # shellcheck source=/dev/null
 source "$HOME/verified-progress/scripts/sglang_env.sh"
 cd "$REPO"
@@ -27,39 +39,39 @@ cd "$REPO"
 step() {
   case "$1" in
     microbench) "${LOCK[@]}" experiments/profiling/run_microbench.sh ;;
-    plain) "${LOCK[@]}" "${RUN[@]}" --arm plain --mode nsys --concurrency 1 8 32 128 \
+    plain) prof --arm plain --mode nsys --concurrency 1 8 32 128 \
       --out-dir "$VP_DATA/plain_nsys" ;;
-    mtp) "${LOCK[@]}" "${RUN[@]}" --arm mtp --mode nsys --concurrency 1 8 32 \
+    mtp) prof --arm mtp --mode nsys --concurrency 1 8 32 \
       --out-dir "$VP_DATA/mtp_nsys" ;;
     baseline)
-      "${LOCK[@]}" "${RUN[@]}" --arm plain --mode none --concurrency 1 8 32 128 --repeats 3 \
+      prof --arm plain --mode none --concurrency 1 8 32 128 --repeats 3 \
         --out-dir "$VP_DATA/plain_none"
-      "${LOCK[@]}" "${RUN[@]}" --arm mtp --mode none --concurrency 1 8 32 --repeats 3 \
+      prof --arm mtp --mode none --concurrency 1 8 32 --repeats 3 \
         --out-dir "$VP_DATA/mtp_none" ;;
     startprofile)
-      "${LOCK[@]}" "${RUN[@]}" --arm plain --mode sglang --concurrency 8 32 \
+      prof --arm plain --mode sglang --concurrency 8 32 \
         --out-dir "$VP_DATA/plain_sglang"
-      "${LOCK[@]}" "${RUN[@]}" --arm mtp --mode sglang --concurrency 8 \
+      prof --arm mtp --mode sglang --concurrency 8 \
         --out-dir "$VP_DATA/mtp_sglang" ;;
     graphtrace)
-      "${LOCK[@]}" "${RUN[@]}" --arm plain --mode nsys --graph-trace graph --concurrency 1 32 \
+      prof --arm plain --mode nsys --graph-trace graph --concurrency 1 32 \
         --out-dir "$VP_DATA/plain_nsys_graphtrace"
-      "${LOCK[@]}" "${RUN[@]}" --arm mtp --mode nsys --graph-trace graph --concurrency 1 8 \
+      prof --arm mtp --mode nsys --graph-trace graph --concurrency 1 8 \
         --out-dir "$VP_DATA/mtp_nsys_graphtrace" ;;
     eager)
-      "${LOCK[@]}" "${RUN[@]}" --arm plain-eager --mode nsys --concurrency 8 \
+      prof --arm plain-eager --mode nsys --concurrency 8 \
         --out-dir "$VP_DATA/plain_eager_nsys"
-      "${LOCK[@]}" "${RUN[@]}" --arm mtp-eager --mode nsys --concurrency 8 \
+      prof --arm mtp-eager --mode nsys --concurrency 8 \
         --out-dir "$VP_DATA/mtp_eager_nsys" ;;
     host)
-      "${LOCK[@]}" "${RUN[@]}" --arm mtp --mode nsys --host-trace --py-spy --concurrency 1 8 32 \
+      prof --arm mtp --mode nsys --host-trace --py-spy --concurrency 1 8 32 \
         --out-dir "$VP_DATA/mtp_nsys_hosttrace"
-      "${LOCK[@]}" "${RUN[@]}" --arm plain --mode nsys --host-trace --py-spy --concurrency 1 \
+      prof --arm plain --mode nsys --host-trace --py-spy --concurrency 1 \
         --out-dir "$VP_DATA/plain_nsys_hosttrace" ;;
     dflash)
-      "${LOCK[@]}" "${RUN[@]}" --arm dflash16 --mode nsys --concurrency 1 4 16 64 \
+      prof --arm dflash16 --mode nsys --concurrency 1 4 16 64 \
         --out-dir "$VP_DATA/dflash16_nsys"
-      "${LOCK[@]}" "${RUN[@]}" --arm dflash8 --mode nsys --concurrency 1 4 16 64 \
+      prof --arm dflash8 --mode nsys --concurrency 1 4 16 64 \
         --out-dir "$VP_DATA/dflash8_nsys" ;;
     gdn) "${LOCK[@]}" python experiments/profiling/gdn_kernel_bench.py \
       --out evidence/profiles/gdn_kernel_bench.json ;;
