@@ -73,12 +73,12 @@ def innermost_segments(ranges: pd.DataFrame) -> list[tuple[int, int, str]]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('report', type=Path)
-    parser.add_argument('--kind', choices=('plain', 'spec'), required=True)
+    parser.add_argument('--kind', choices=('plain', 'spec', 'dflash'), required=True)
     parser.add_argument('--out', type=Path, required=True)
     args = parser.parse_args()
     trace = load(args.report)
-    k, replays, _ = label_all(trace)
-    anchor = 'target' if args.kind == 'plain' else 'draft'
+    k, replays, _ = label_all(trace, 'dflash' if args.kind == 'dflash' else 'eagle')
+    anchor = 'draft' if args.kind == 'spec' else 'target'
     cycles = list(pairwise(replays[replays['role'] == anchor]['start'].to_list()))
 
     launches = trace.runtime[trace.runtime['name'].str.startswith('cudaGraphLaunch')]

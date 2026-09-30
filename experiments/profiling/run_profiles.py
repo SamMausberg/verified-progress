@@ -60,11 +60,30 @@ MTP_FLAGS = [
     "--speculative-num-draft-tokens", "4",
 ]  # fmt: skip
 EAGER_FLAGS = ['--disable-cuda-graph', '--enable-layerwise-nvtx-marker']
+# DFlash-4B draft (flags from the drafter workstream). One server covers
+# B = 1-64: block 16 keeps 16 FP32 GDN states per request, so the radix cache
+# is off and the state pool is sized for 64 requests.
+DFLASH_FLAGS = [
+    "--speculative-algorithm", "DFLASH",
+    "--speculative-draft-model-path", "z-lab/Qwen3.5-4B-DFlash",
+    "--speculative-draft-model-revision", "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
+    "--linear-attn-prefill-backend", "flashinfer",
+    "--linear-attn-decode-backend", "flashinfer",
+    "--disable-radix-cache",
+    "--max-running-requests", "64",
+    "--max-mamba-cache-size", "64",
+]  # fmt: skip
 ARMS = {
     'plain': [],
     'mtp': MTP_FLAGS,
     'plain-eager': EAGER_FLAGS,
     'mtp-eager': MTP_FLAGS + EAGER_FLAGS,
+    'dflash16': [*DFLASH_FLAGS, '--speculative-dflash-block-size', '16'],
+    'dflash8': [*DFLASH_FLAGS, '--speculative-dflash-block-size', '8'],
+}
+ARM_ENV = {
+    'dflash16': {'SGLANG_ENABLE_OVERLAP_PLAN_STREAM': '1'},
+    'dflash8': {'SGLANG_ENABLE_OVERLAP_PLAN_STREAM': '1'},
 }
 HERE = Path(__file__).resolve().parent
 LOG_LINE = re.compile(r'^\[(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\] Decode batch.*?#running-req: (\d+)')
@@ -76,6 +95,19 @@ def max_tokens_for(concurrency: int) -> int:
     # Keep C * max_new_tokens well inside the KV pool so admission control
     # (which reserves for future tokens) admits all C requests at once.
     return min(16384, 524288 // concurrency)
+
+
+def scheduler_pid(server_pid: int) -> int:
+    """PID of the SGLang scheduler process under the server (for py-spy)."""
+    import psutil
+
+    for child in psutil.Process(server_pid).children(recursive=True):
+        try:
+            if 'scheduler' in child.name() or 'scheduler' in ' '.join(child.cmdline()):
+                return child.pid
+        except psutil.Error:
+            continue
+    return -1
 
 
 def wait_ready(port: int, proc: subprocess.Popen, log: Path, timeout: float) -> None:
@@ -145,6 +177,8 @@ def drive(args: argparse.Namespace, concurrency: int, profiler: str, output: str
         "--profile-steps", str(args.profile_steps),
         "--output", output,
     ]  # fmt: skip
+    if args.py_spy and profiler != 'none':
+        cmd += ['--py-spy-pid', str(args.scheduler_pid), '--py-spy-out', f'{output}_pyspy.txt']
     before = summary.read_text().count('\n') if summary.exists() else 0
     subprocess.run([*cmd, '--summary', str(summary)], check=True)
     rows = summary.read_text().splitlines()
@@ -190,6 +224,11 @@ def main() -> None:
         help='NVTX ranges on the host functions in host_functions.json (diagnostic)',
     )
     parser.add_argument('--extra-server-args', default='')
+    parser.add_argument(
+        '--py-spy',
+        action='store_true',
+        help='sample the scheduler with py-spy (sudo) during collected windows (diagnostic)',
+    )
     args = parser.parse_args()
 
     args.out_dir = args.out_dir.expanduser().resolve()
@@ -221,6 +260,7 @@ def main() -> None:
     cmd = prefix + server
     meta = {
         'argv': sys.argv,
+        'env': ARM_ENV.get(args.arm, {}),
         'server_command': shlex.join(cmd),
         'started': datetime.now().isoformat(timespec='seconds'),
         'sglang_sha': subprocess.run(
@@ -246,9 +286,13 @@ def main() -> None:
 
     log = args.out_dir / 'server.log'
     with log.open('w') as fh:
-        proc = subprocess.Popen(cmd, stdout=fh, stderr=subprocess.STDOUT, start_new_session=True)
+        env = {**os.environ, **ARM_ENV.get(args.arm, {})}
+        proc = subprocess.Popen(
+            cmd, stdout=fh, stderr=subprocess.STDOUT, start_new_session=True, env=env
+        )
     try:
         wait_ready(args.port, proc, log, timeout=900)
+        args.scheduler_pid = scheduler_pid(proc.pid)
         for c in args.concurrency:
             if args.mode == 'none':
                 for _ in range(args.repeats):

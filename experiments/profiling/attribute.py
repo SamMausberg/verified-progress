@@ -75,8 +75,9 @@ ORDER = [
     'draft_lm_head_gemm',
     'draft_logits_cast',
     'spec_draft_topk',
-    'draft_extend_argmax',
+    'draft_argmax_eager',
     'mtp_layer',
+    'draft_model',
     'gdn_in_proj_gemm',
     'gdn_out_proj_gemm',
     'gdn_conv',
@@ -109,7 +110,7 @@ ORDER = [
 # Categories summed into the per-configuration head share.
 HEAD_CATS = {
     'target': ['lm_head_gemm', 'logits_cast', 'sampling_argmax'],
-    'draft': ['draft_lm_head_gemm', 'draft_logits_cast', 'spec_draft_topk', 'draft_extend_argmax'],
+    'draft': ['draft_lm_head_gemm', 'draft_logits_cast', 'spec_draft_topk', 'draft_argmax_eager'],
 }
 
 
@@ -120,6 +121,10 @@ def name_category(name: str) -> str:
         if re.search(pattern, name):
             return cat
     return 'unmatched'
+
+
+# Non-head work inside draft graphs goes to one category per drafter.
+DRAFT_LAYER = {'draft': 'mtp_layer', 'draft_extend': 'mtp_layer', 'dflash_draft': 'draft_model'}
 
 
 def label_gemms(names: list[str], cats: list[str], role: str) -> list[str]:
@@ -151,8 +156,8 @@ def label_gemms(names: list[str], cats: list[str], role: str) -> list[str]:
         nxt, prv = neighbour(i, 1), neighbour(i, -1)
         if (role != 'draft' and i == gemm_idx[-1]) or (role == 'draft' and followed_by_topk(i)):
             lab = 'lm_head_gemm' if role == 'target' else 'draft_lm_head_gemm'
-        elif role in ('draft', 'draft_extend'):
-            lab = 'mtp_layer'
+        elif role in DRAFT_LAYER:
+            lab = DRAFT_LAYER[role]
         elif nxt == 'mlp_activation':
             lab = 'mlp_gate_up_gemm'
         elif prv == 'mlp_activation':
@@ -181,21 +186,29 @@ def label_gemms(names: list[str], cats: list[str], role: str) -> list[str]:
             out[i + 1] = 'logits_cast' if role == 'target' else 'draft_logits_cast'
     keep = {'draft_lm_head_gemm', 'draft_logits_cast', 'spec_draft_topk'}
     for i, c in enumerate(out):
-        if role in ('draft', 'draft_extend') and c not in keep:
-            out[i] = 'mtp_layer'
+        if role in DRAFT_LAYER and c not in keep:
+            out[i] = DRAFT_LAYER[role]
         elif out[i] == 'unmatched':
             out[i] = 'other_in_graph'
     return out
 
 
-def graph_roles(k: pd.DataFrame) -> dict[int, str]:
-    """Map graph id -> target | draft | draft_extend by the kernels it contains."""
+def graph_roles(k: pd.DataFrame, spec: str = 'eagle') -> dict[int, str]:
+    """Map graph id -> target | draft | draft_extend | dflash_draft by its kernels.
+
+    A graph with GDN recurrent kernels is the target model (decode or verify).
+    For EAGLE/MTP, a graph with the Triton top-1 kernels is the multi-step draft
+    graph and any other is draft extend; for DFlash every other graph belongs to
+    the block drafter.
+    """
     roles = {}
     ing = k[k['node_id'].notna()]
     for gid, grp in ing.groupby('graph_id'):
         one = grp[grp['corr'] == grp['corr'].iloc[0]]['name']
         if one.str.contains('delta_rule|fused_recurrent|sigmoid_gating').any():
             roles[int(gid)] = 'target'
+        elif spec == 'dflash':
+            roles[int(gid)] = 'dflash_draft'
         elif one.str.contains('_draft_topk1').any():
             roles[int(gid)] = 'draft'
         else:
@@ -203,10 +216,12 @@ def graph_roles(k: pd.DataFrame) -> dict[int, str]:
     return roles
 
 
-def label_all(trace: Trace) -> tuple[pd.DataFrame, pd.DataFrame, dict[int, str]]:
+def label_all(
+    trace: Trace, spec: str = 'eagle'
+) -> tuple[pd.DataFrame, pd.DataFrame, dict[int, str]]:
     k = trace.kernels.copy()
     k['cat'] = [name_category(n) for n in k['name']]
-    roles = graph_roles(k)
+    roles = graph_roles(k, spec)
     k['role'] = 'eager'
     ing = k['node_id'].notna()
     k.loc[ing, 'role'] = [roles[int(g)] for g in k.loc[ing, 'graph_id']]
@@ -226,7 +241,7 @@ def label_all(trace: Trace) -> tuple[pd.DataFrame, pd.DataFrame, dict[int, str]]
     replays = replays.reset_index().sort_values('start').reset_index(drop=True)
 
     # Eager kernels: the first reduce_kernel after a target replay is the greedy
-    # argmax; after a draft-extend replay it is the draft-extend argmax.
+    # argmax; after a draft-extend (or DFlash draft) replay it is the draft's.
     ends = replays['end'].to_numpy()
     rroles = replays['role'].to_numpy()
     seen: set[int] = set()
@@ -240,7 +255,8 @@ def label_all(trace: Trace) -> tuple[pd.DataFrame, pd.DataFrame, dict[int, str]]
                 seen.add(j)
                 k.at[idx, 'cat'] = {
                     'target': 'sampling_argmax',
-                    'draft_extend': 'draft_extend_argmax',
+                    'draft_extend': 'draft_argmax_eager',
+                    'dflash_draft': 'draft_argmax_eager',
                 }.get(rroles[j], 'runtime_eager_small')
             else:
                 k.at[idx, 'cat'] = 'runtime_eager_small'
@@ -263,8 +279,11 @@ def exclusive_shares(starts: np.ndarray, ends: np.ndarray) -> np.ndarray:
 
 
 def attribute(trace: Trace, kind: str) -> dict:
-    k, replays, roles = label_all(trace)
-    anchor = 'target' if kind == 'plain' else 'draft'
+    spec = 'dflash' if kind == 'dflash' else 'eagle'
+    k, replays, roles = label_all(trace, spec)
+    # Plain steps and DFlash cycles start at a target replay; EAGLE cycles at
+    # the draft replay.
+    anchor = 'draft' if kind == 'spec' else 'target'
     anchors = replays[replays['role'] == anchor]['start'].to_list()
     steps = list(pairwise(anchors))
     if not steps:
@@ -432,7 +451,12 @@ def attribute(trace: Trace, kind: str) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('report', type=Path)
-    parser.add_argument('--kind', choices=('plain', 'spec'), required=True)
+    parser.add_argument(
+        '--kind',
+        choices=('plain', 'spec', 'dflash'),
+        required=True,
+        help='plain decode, EAGLE/MTP speculation, or DFlash speculation',
+    )
     parser.add_argument('--out-prefix', type=Path, required=True)
     args = parser.parse_args()
     result = attribute(load(args.report), args.kind)

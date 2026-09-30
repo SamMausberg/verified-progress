@@ -1,17 +1,19 @@
 # Generated tables (experiments/profiling/summarize.py)
 
-## Throughput of the profiled configurations
+## Client-side token rates per window
+
+Only the "no profiler" rows (repeated windows on a server without nsys) are throughput results. The other rows are single windows on a server with nsys attached; they exist to measure the profiler's perturbation.
 
 | Arm | B | Condition | windows | output tok/s (mean, sd) | tok/s/user | ms per step or cycle | accept len |
 |---|---|---|---|---|---|---|---|
-| plain | 1 | attached, not collecting | 1 | 286 (0) | 286.4 | 3.49 | - |
-| plain | 1 | collecting (node trace) | 1 | 282 (0) | 282.5 | 3.54 | - |
-| plain | 8 | attached, not collecting | 1 | 2029 (0) | 253.6 | 3.94 | - |
-| plain | 8 | collecting (node trace) | 1 | 2011 (0) | 251.4 | 3.98 | - |
-| plain | 32 | attached, not collecting | 1 | 6227 (0) | 194.6 | 5.14 | - |
-| plain | 32 | collecting (node trace) | 1 | 6240 (0) | 195.0 | 5.13 | - |
-| plain | 128 | attached, not collecting | 1 | 14216 (0) | 111.1 | 9.00 | - |
-| plain | 128 | collecting (node trace) | 1 | 14404 (0) | 112.5 | 8.89 | - |
+| plain | 1 | nsys attached, not collecting | 1 | 286 (0) | 286.4 | 3.49 | - |
+| plain | 1 | nsys collecting (node-level graph trace) | 1 | 282 (0) | 282.5 | 3.54 | - |
+| plain | 8 | nsys attached, not collecting | 1 | 2029 (0) | 253.6 | 3.94 | - |
+| plain | 8 | nsys collecting (node-level graph trace) | 1 | 2011 (0) | 251.4 | 3.98 | - |
+| plain | 32 | nsys attached, not collecting | 1 | 6227 (0) | 194.6 | 5.14 | - |
+| plain | 32 | nsys collecting (node-level graph trace) | 1 | 6240 (0) | 195.0 | 5.13 | - |
+| plain | 128 | nsys attached, not collecting | 1 | 14216 (0) | 111.1 | 9.00 | - |
+| plain | 128 | nsys collecting (node-level graph trace) | 1 | 14404 (0) | 112.5 | 8.89 | - |
 
 ## Attribution per decode step or speculative cycle (us per step, % of step)
 

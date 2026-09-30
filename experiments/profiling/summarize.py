@@ -20,9 +20,9 @@ GROUPS: list[tuple[str, list[str]]] = [
     ('Target logits BF16->FP32 copy', ['logits_cast']),
     ('Target greedy argmax (eager)', ['sampling_argmax']),
     ('Draft LM head GEMMs (MTP)', ['draft_lm_head_gemm']),
-    ('Draft logits copy + top-1 + extend argmax', [
-        'draft_logits_cast', 'spec_draft_topk', 'draft_extend_argmax']),
-    ('MTP layer (fc, attention, MLP, norms)', ['mtp_layer']),
+    ('Draft logits copy + top-1 + eager draft argmax', [
+        'draft_logits_cast', 'spec_draft_topk', 'draft_argmax_eager']),
+    ('MTP layer or DFlash draft model (non-head)', ['mtp_layer', 'draft_model']),
     ('GDN in_proj GEMMs (qkvz + ba)', ['gdn_in_proj_gemm']),
     ('GDN out_proj GEMM', ['gdn_out_proj_gemm']),
     ('GDN conv (fused proj/conv update)', ['gdn_conv']),
@@ -53,6 +53,7 @@ CONFIGS = [
     ('mtp', 1),
     ('mtp', 8),
     ('mtp', 32),
+    *[(arm, b) for arm in ('dflash16', 'dflash8') for b in (1, 4, 16, 64)],
 ]
 
 
@@ -69,8 +70,8 @@ def load_attr(evidence: Path) -> dict[tuple[str, int], dict]:
 COARSE: list[tuple[str, list[str]]] = [
     ('head', ['lm_head_gemm', 'logits_cast', 'sampling_argmax']),
     ('draft_head', ['draft_lm_head_gemm', 'draft_logits_cast', 'spec_draft_topk',
-                    'draft_extend_argmax']),
-    ('mtp_layer', ['mtp_layer']),
+                    'draft_argmax_eager']),
+    ('draft_model', ['mtp_layer', 'draft_model']),
     ('weight_gemms', ['gdn_in_proj_gemm', 'gdn_out_proj_gemm', 'attn_qkv_gemm',
                       'attn_o_proj_gemm', 'mlp_gate_up_gemm', 'mlp_down_gemm', 'other_gemm']),
     ('gdn_state', ['gdn_conv', 'gdn_recurrent', 'gdn_gated_norm', 'gdn_state_track',
@@ -156,15 +157,14 @@ def runs_table(evidence: Path) -> str:
         for line in p.read_text().splitlines():
             r = json.loads(line)
             if r.get('mode') == 'nsys' and r['window_kind'] == 'none':
-                kind = 'attached, not collecting'
+                kind = 'nsys attached, not collecting'
             elif r['window_kind'] == 'nsys':
-                kind = (
-                    'collecting (node trace)'
-                    if 'graphtrace' not in p.name
-                    else 'collecting (graph trace)'
-                )
+                trace = 'graph' if 'graphtrace' in p.name else 'node'
+                kind = f'nsys collecting ({trace}-level graph trace)'
             elif r['window_kind'] == 'none':
                 kind = 'no profiler'
+            elif r['window_kind'] == 'sglang':
+                kind = 'SGLang /start_profile (CUDA_PROFILER) under nsys'
             else:
                 continue
             rows.setdefault((r['arm'], r['concurrency'], kind), []).append(r)
@@ -217,7 +217,10 @@ def main() -> None:
     attr = load_attr(args.evidence)
     parts = [
         '# Generated tables (experiments/profiling/summarize.py)',
-        '## Throughput of the profiled configurations',
+        '## Client-side token rates per window',
+        'Only the "no profiler" rows (repeated windows on a server without nsys) are '
+        'throughput results. The other rows are single windows on a server with nsys '
+        "attached; they exist to measure the profiler's perturbation.",
         runs_table(args.evidence),
         '## Attribution per decode step or speculative cycle (us per step, % of step)',
         attribution_table(attr),

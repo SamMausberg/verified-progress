@@ -34,6 +34,7 @@ import asyncio
 import json
 import os
 import subprocess
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -172,6 +173,18 @@ class Profiler:
             async with session.post(f'{a.base}/start_profile', json=body) as resp:
                 print('start_profile:', resp.status, (await resp.text())[:200], flush=True)
 
+    def start_py_spy(self) -> subprocess.Popen | None:
+        a = self.args
+        if not a.py_spy_out or a.py_spy_pid <= 0:
+            return None
+        py_spy = Path(sys.executable).with_name('py-spy')
+        cmd = [
+            'sudo', '-n', str(py_spy), 'record', '--pid', str(a.py_spy_pid),
+            '--duration', str(max(1, round(a.window))), '--rate', '500', '--nonblocking',
+            '--threads', '--format', 'raw', '--output', a.py_spy_out,
+        ]  # fmt: skip
+        return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+
     async def stop(self, session: aiohttp.ClientSession) -> None:
         a = self.args
         if a.profiler == 'nsys':
@@ -204,6 +217,7 @@ async def run(args: argparse.Namespace) -> dict:
         profiler = Profiler(args)
         t_before_start = time.perf_counter()
         await profiler.start(session)
+        spy = profiler.start_py_spy()
         t0 = time.perf_counter()
         wall0 = time.time()
         await asyncio.sleep(args.window)
@@ -212,6 +226,12 @@ async def run(args: argparse.Namespace) -> dict:
         load_after = os.getloadavg()
         await profiler.stop(session)
         t_after_stop = time.perf_counter()
+        if spy is not None:
+            await asyncio.to_thread(spy.wait)
+            subprocess.run(
+                ['sudo', '-n', 'chown', f'{os.getuid()}:{os.getgid()}', args.py_spy_out],
+                check=False,
+            )
 
         finished_early = [i for i, s in enumerate(states) if s.done]
         for task in tasks:
@@ -263,6 +283,8 @@ def main() -> None:
     parser.add_argument('--profile-steps', type=int, default=200)
     parser.add_argument('--output', default='', help='nsys report path (nsys mode)')
     parser.add_argument('--summary', type=Path, help='append the JSON summary to this file')
+    parser.add_argument('--py-spy-pid', type=int, default=-1)
+    parser.add_argument('--py-spy-out', default='')
     args = parser.parse_args()
     args.base = f'http://127.0.0.1:{args.port}'
     result = asyncio.run(run(args))

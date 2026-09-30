@@ -9,7 +9,7 @@
 #
 #   scripts/gpu_lock.sh -x env VP_LOCKED=1 experiments/profiling/run_all.sh step...
 #
-# Steps: microbench plain mtp baseline startprofile graphtrace eager host gdn ncu
+# Steps: microbench plain mtp baseline startprofile graphtrace eager host dflash gdn ncu
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -52,10 +52,15 @@ step() {
       "${LOCK[@]}" "${RUN[@]}" --arm mtp-eager --mode nsys --concurrency 8 \
         --out-dir "$VP_DATA/mtp_eager_nsys" ;;
     host)
-      "${LOCK[@]}" "${RUN[@]}" --arm mtp --mode nsys --host-trace --concurrency 1 8 \
+      "${LOCK[@]}" "${RUN[@]}" --arm mtp --mode nsys --host-trace --py-spy --concurrency 1 8 32 \
         --out-dir "$VP_DATA/mtp_nsys_hosttrace"
-      "${LOCK[@]}" "${RUN[@]}" --arm plain --mode nsys --host-trace --concurrency 1 \
+      "${LOCK[@]}" "${RUN[@]}" --arm plain --mode nsys --host-trace --py-spy --concurrency 1 \
         --out-dir "$VP_DATA/plain_nsys_hosttrace" ;;
+    dflash)
+      "${LOCK[@]}" "${RUN[@]}" --arm dflash16 --mode nsys --concurrency 1 4 16 64 \
+        --out-dir "$VP_DATA/dflash16_nsys"
+      "${LOCK[@]}" "${RUN[@]}" --arm dflash8 --mode nsys --concurrency 1 4 16 64 \
+        --out-dir "$VP_DATA/dflash8_nsys" ;;
     gdn) "${LOCK[@]}" python experiments/profiling/gdn_kernel_bench.py \
       --out evidence/profiles/gdn_kernel_bench.json ;;
     ncu) "${LOCK[@]}" experiments/profiling/run_ncu.sh ;;
@@ -65,7 +70,7 @@ step() {
 
 main() {
   if [ "$#" -eq 0 ]; then
-    set -- microbench plain mtp baseline startprofile graphtrace eager host gdn ncu
+    set -- microbench plain mtp baseline startprofile graphtrace eager host dflash gdn ncu
   fi
   for s in "$@"; do step "$s"; done
 }
