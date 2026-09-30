@@ -29,6 +29,8 @@ Request files are JSONL with `id`, `input_ids` and optionally `continuation`.
 from __future__ import annotations
 
 import argparse
+import contextlib
+import fcntl
 import json
 import os
 import signal
@@ -47,9 +49,11 @@ DRAFT_REVISION = '9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf'
 HOME = Path.home()
 ENGINE_WORKTREE = HOME / 'sglang-wt' / 'repair'
 
-# The bench `dflash` arm's kernels (bench/arms.toml), which the drafter's
-# baseline trace also uses: flashinfer GDN kernels for prefill and decode,
-# piecewise prefill graphs and the overlapped plan stream.
+# The configuration of the drafter workstream's shared DFlash-4B baseline trace
+# (~/vp-data/drafter/trace/trace_manifest.json): flashinfer attention and GDN
+# kernels for prefill and decode and the overlapped plan stream. Piecewise
+# prefill graphs (tc_piecewise, on the model card) crash capture for Qwen3.5
+# at the pin, so the default prefill graph is used.
 BASE_ARGS = {
     'model-path': MODEL,
     'revision': MODEL_REVISION,
@@ -60,7 +64,6 @@ BASE_ARGS = {
     'speculative-draft-model-revision': DRAFT_REVISION,
     'linear-attn-prefill-backend': 'flashinfer',
     'linear-attn-decode-backend': 'flashinfer',
-    'cuda-graph-backend-prefill': 'tc_piecewise',
     'random-seed': '0',
 }
 BASE_ENV = {'SGLANG_ENABLE_OVERLAP_PLAN_STREAM': '1'}
@@ -71,6 +74,23 @@ def http_json(url: str, payload: Any = None, timeout: float = 30.0) -> Any:
     req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode())
+
+
+@contextlib.contextmanager
+def startup_lock():
+    """Serialize server start-up with other GPU jobs (scripts/gpu_startup_lock.sh).
+
+    SGLang sizes its pools from the free memory it sees while loading, so concurrent
+    start-ups under the shared lock can starve each other. The lock file descriptor
+    is not inherited by the server (close_fds), so it is released on exit.
+    """
+    path = Path(os.environ.get('GPU_LOCK_FILE', str(HOME / '.gpu.lock')) + '.startup')
+    with open(path, 'a') as fh:
+        fcntl.flock(fh, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(fh, fcntl.LOCK_UN)
 
 
 def wait_ready(base: str, proc: subprocess.Popen, log: Path, timeout: float = 900.0) -> float:
@@ -315,6 +335,8 @@ def main() -> int:
 
     log = out / 'server.log'
     base = f'http://127.0.0.1:{args.port}'
+    startup = contextlib.ExitStack()
+    startup.enter_context(startup_lock())
     with open(log, 'w') as log_file:
         proc = subprocess.Popen(
             cmd, env=env, stdout=log_file, stderr=subprocess.STDOUT, start_new_session=True
@@ -336,7 +358,10 @@ def main() -> int:
     signal.signal(signal.SIGTERM, on_signal)
     signal.signal(signal.SIGINT, on_signal)
     try:
-        ready_s = wait_ready(base, proc, log)
+        try:
+            ready_s = wait_ready(base, proc, log)
+        finally:
+            startup.close()
         server_info = http_json(f'{base}/server_info')
         (out / 'server_info.json').write_text(json.dumps(server_info, indent=2, default=str))
         for request in requests[: args.warmup]:
