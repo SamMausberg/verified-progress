@@ -24,7 +24,8 @@ Reported per B (all from real target passes; nothing uses reference tokens):
   DFlash draft filling positions neither can reach, scored against the
   committed stream, next to the fresh draft's actual acceptance;
 - how far one corrected token moves the target's own predictions downstream
-  (keep sweep 1 versus the first pass).
+  (keep sweep 1 versus the first pass);
+- the per-position conditional failure hazards h_i of each sweep's candidate.
 
     python experiments/repair/analyze_jacobi.py ~/vp-data/repair/runs/probe_b16 ... --out-dir evidence/repair
 """
@@ -56,6 +57,15 @@ def trace_files(run: Path) -> list[Path]:
     if (run / 'trace.jsonl').exists():
         return [run / 'trace.jsonl']
     return sorted(run.glob('cycles*.jsonl'))  # the drafter workstream's DFlash trace format
+
+
+def hazards(accepts: list[int], block: int) -> list[float | None]:
+    """h_i = P(first failure at draft position i | drafts 1..i-1 accepted), i = 1..block-1."""
+    out: list[float | None] = []
+    for i in range(1, block):
+        reached = [a for a in accepts if a >= i - 1]
+        out.append(sum(1 for a in reached if a == i - 1) / len(reached) if reached else None)
+    return out
 
 
 def load_trace(run: Path) -> dict[str, list[dict[str, Any]]]:
@@ -188,6 +198,12 @@ def analyze_run(
         'A_D': mean([a + 1 for a in a0s]),
         'accept_hist': dict(collections.Counter(a0s)),
     }
+    summary['hazards'] = {}
+    for kind, rows in sweeps.items():
+        if rows:
+            summary['hazards'][kind] = [
+                hazards([row[r] for row in rows], block) for r in range(len(rows[0]))
+            ]
     progress_rows = []
     for kind, rows in sweeps.items():
         if not rows:
