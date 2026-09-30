@@ -177,7 +177,8 @@ LEVERS: dict[str, Lever] = {
             'speculative-draft-model-path': DFLASH_DRAFT,
             'speculative-draft-model-revision': DFLASH_DRAFT_REVISION,
             'speculative-dflash-block-size': 16,
-            # The drafter workstream's validated flags (notes/drafter.md, 19:41).
+            # The drafter workstream's validated flags
+            # (evidence/drafter/launch/zlab_b16_panel_trace.json).
             'linear-attn-prefill-backend': 'flashinfer',
             'linear-attn-decode-backend': 'flashinfer',
             # Block 16 at radix off caps capacity at 64 (bench's dflash arm).

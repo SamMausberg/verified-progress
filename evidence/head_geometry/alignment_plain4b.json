@@ -1,0 +1,22 @@
+{
+  "arm": "plain4b",
+  "model": "qwen3.5-4b",
+  "kind": "plain_decode",
+  "decode": {
+    "rows": 105269,
+    "fp64_argmax_equals_engine_token": 0.9950697736275637,
+    "mismatches": 519,
+    "mismatches_within_one_bf16_spacing": 519,
+    "mismatches_beyond_one_bf16_spacing": 0,
+    "bf16_rounded_argmax_equals_engine_token": 0.9999810010544414,
+    "mismatch_fp64_gap_quantiles": [
+      0.00040358322439715266,
+      0.035413062549196184,
+      0.08605850711155653,
+      0.11801825783913955
+    ],
+    "engine_token_rank_max": 3,
+    "engine_top2_tied_fraction": 0.009955447472665267
+  },
+  "dropped_non_prompt_rows": 7
+}

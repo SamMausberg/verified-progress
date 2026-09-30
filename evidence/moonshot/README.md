@@ -5,10 +5,10 @@ Status: Phase 1 in progress. Measured results so far are single runs; every row 
 
 Setup for everything here: Qwen/Qwen3.5-4B @ `851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a` on one
 GH200 (96 GB HBM3, sm_90, aarch64), SGLang `bd66ce343e` plus the engine/moonshot patches
-(`engine/sglang/patches/moonshot-000{1..7}`, branch head `233fe67ede`; each patch is off
+(`engine/sglang/patches/moonshot/0001-0007`, branch head `233fe67ede`; each patch is off
 unless its flag or environment variable is set), FlashInfer attention, CUDA graphs and the
 overlap scheduler on, greedy decoding. Serving numbers come from the bench workstream's
-harness (`bench.sweep`, branch `bench/harness`: aiperf 0.13.0, workload
+harness (`bench.sweep`, `bench/` on main: aiperf 0.13.0, workload
 `mixed-v2/confirm.jsonl` sha256 `b65a50e4...`, OSL 512 fixed, thinking on). Labels:
 **measured**, **derived** (calculated from the config and a measured bandwidth), **code**
 (read from the source, not run).
@@ -17,29 +17,29 @@ harness (`bench.sweep`, branch `bench/harness`: aiperf 0.13.0, workload
 
 ### 1.1 Bandwidth and bytes per step
 
-- HBM read peak **3.79-3.83 TB/s** (measured, profile workstream,
-  `evidence/profiles/hbm_bandwidth.json`).
+- HBM read peak **3.79-3.83 TB/s** (measured by the profile workstream; PR #13, under
+  review, `evidence/profiles/hbm_bandwidth.json` there).
 - Weights read once per decode step: 7.14 GB backbone + 1.27 GB tied head = **8.41 GB**
   (derived). Floor at batch 1: **2.22 ms/token, 451 tokens/s**. Measured plain decode at
-  batch 1: 3.54 ms/step (profile), 281 tokens/s end to end (this README, Section 2): the
-  linear layers reach 3.05 TB/s on average and the remaining ~0.8 ms is small kernels
-  (GDN, attention, norms) and idle gaps.
+  batch 1: 281 tokens/s end to end (Section 2), i.e. 3.56 ms per token; the profile
+  workstream's kernel attribution of that step (3.54 ms, linear layers at 3.05 TB/s on
+  average, ~0.8 ms of small kernels and idle gaps) is under review in PR #13.
 - GDN recurrent state (**code**): FP32 (`mamba_ssm_dtype: float32` in the config),
   24 layers x 32 heads x 128 x 128 per request = 50.3 MB, read and written once per
   step by `fused_recurrent_gated_delta_rule_packed_decode_kernel`, i.e. **100.7 MB per
-  request per step**. The kernel runs at 3.47 TB/s (profile), so it is purely
-  bandwidth-bound.
+  request per step**. The profile workstream measured the kernel at 3.47 TB/s, i.e. purely
+  bandwidth-bound (PR #13, under review).
 - Attention KV: 8 layers x 4 KV heads x 256 x 2 x 2 B = 32 KB per context token, about
   10.9 MB per request per step at the benchmark's mean decode context (~334 tokens).
 - Crossover (**derived**, confirms the charter): FP32 state bytes alone equal the weight
   bytes at **B = 84**; with KV and conv state, per-request bytes pass the weights at
-  **B = 74** (`ceilings.json`). In kernel time the crossover is B ~ 110-120 because the
-  weight GEMMs run slower than the state kernel (profile). At B = 128 the GDN kernel is
-  41.6% of the 8.9 ms step.
+  **B = 74** (`ceilings.json`). The profile workstream's measured crossover in kernel time,
+  B ~ 110-120, and its GDN share of 41.6% of an 8.9 ms step at B = 128 are under review
+  (PR #13); the 24% gain of FP16 state at c = 128 (Section 2) is consistent with them.
 
 ### 1.2 Speculative verification and the state
 
-- MTP verify (**code**, confirmed by profile): the Triton verify kernel reads the state
+- MTP verify (**code**; the profile workstream traced the same kernels, PR #13): the Triton verify kernel reads the state
   once and writes one FP32 intermediate state per draft position (D = 4 for three steps),
   and the commit copies the accepted one back: **352 MB per request per cycle**, 3.5
   plain steps. At B = 128 and accept length 2.8 speculation moves as many bytes per
@@ -60,9 +60,9 @@ harness (`bench.sweep`, branch `bench/harness`: aiperf 0.13.0, workload
 running request reserves 3 radix-retention slots + 2 ping-pong slots (overlap scheduler,
 `extra_buffer`) = 5 slots; 667 FP32 slots / 5 = 133. Decode touches one slot per request.
 `--max-mamba-cache-size`, `--disable-radix-cache` (1 slot/request) and the state dtype move
-it; bench verified plain decode at 1,024 concurrent requests with the radix cache off.
-Capacity stops binding; bandwidth (and, at c >= 256, SGLang's streaming front end; bench)
-does.
+it; the bench workstream reports plain decode running at 1,024 concurrent requests with the
+radix cache off (bench notes; evidence pending). Capacity then stops binding and bandwidth
+does, plus, at c >= 256, SGLang's streaming front end (bench notes; evidence pending).
 
 ### 1.4 Derived ceilings per lever stack
 
@@ -102,8 +102,9 @@ bench `plain` arm (radix on, max-running 128, mamba cache 640 slots, mem 0.85) p
 - FP16 state gains exactly where the state dominates (c = 128) and nothing at c = 1.
 - `--quantization fp8` cannot use its CUTLASS GEMM here: the aarch64 sgl-kernel build aborts
   with "Arch conditional MMA instruction used without targeting sm90a" in a loop. The
-  Triton W8A8 route runs but gives no speedup at any concurrency. **Negative result**
-  until a cuBLASLt rowwise route is wired.
+  Triton W8A8 route runs but shows no consistent gain (0.96-1.06x across c = 1-128, single
+  runs, within run-to-run noise). **Negative result** until a cuBLASLt rowwise route is
+  wired.
 - FP8 KV does nothing at ~334-token contexts; it matters only for long contexts.
 - ReplaySSM and NGRAM arms failed to launch in this pass (radix strategy and bench's
   draft-graph check, both fixed in the harness); rerun pending.
@@ -120,22 +121,23 @@ to the measured noise floor); "lossy" changes them and needs the quality budget 
 
 | # | lever | end | class | ceiling (derived) or measured | quality cost | effort | status / owner |
 |---|---|---|---|---|---|---|---|
-| 1 | Public DFlash-4B drafter (z-lab) | latency | exact | drafter measured tau 6.18 at c=1 (notes/drafter.md); card 3.4-4.6x on B200 | none | serving works | drafter owns baseline; I stack levers on it |
-| 2 | Remove the speculative host gap (MTP/DFlash, c=1-4) | latency | exact | up to 1.33x at B=1 (profile: 25% idle) | none | medium-high (sync removal) | levers queued (Triton attention, plan stream, glue graph) |
+| 1 | Public DFlash-4B drafter (z-lab) | latency | exact | drafter measured tau 6.18 at c=1, block 16 (`evidence/drafter/acceptance_summary.csv`); model card 3.4-4.6x on B200 | none | serving works | drafter owns baseline; I stack levers on it |
+| 2 | Remove the speculative host gap (MTP/DFlash, c=1-4) | latency | exact | up to 1.33x at B=1 if the ~25% idle the profile workstream reports goes (PR #13, under review) | none | medium-high (sync removal) | levers queued (Triton attention, plan stream, glue graph) |
 | 3 | FP16 GDN state + capacity lift (radix off, 256-1,024) | throughput | lossy, likely near-lossless | measured 1.24x at c=128; derived ceiling 1.46x | pending (DAMP: FP16 near-lossless, BF16 not) | flags only | quality and c>=256 sweeps queued |
-| 4 | Strict write-avoiding replay (P4, patch 0007) | throughput | exact by construction | derived 1.19x at B=128 (2D -> 1.25D) | none if bit-identical | built | bit-exactness and paired A/B queued |
+| 4 | Strict write-avoiding replay (P4, patch 0007) | throughput | designed to be bit-identical; validation pending | derived 1.19x at B=128 (2D -> 1.25D) | none if the check passes | built | one-layer kernel check (every output and state word) and the end-to-end bitwise probe queued, then the pre-registered paired A/B (>=1.10x at B=128, 2,048-token prompts) |
 | 5 | MTP + ReplaySSM-spec at high batch | throughput | exact up to reassociation | derived 34.3k vs plain 23.7k (FP32) | none | flags only | queued |
-| 6 | INT4 QAD target (nota-ai) with its INT4 DFlash drafter | latency | lossy | verify bytes 8.4 -> 3.3 GB (2.6x fewer); nota reports 7x on A10G | nota: MMLU-Pro -3.1, IFEval -1.2, GPQA-D -3.3 points; GSM8K pending | checkpoints local | load test queued |
+| 6 | INT4 QAD target (nota-ai) with its INT4 DFlash drafter | latency | lossy | verify weight bytes 8.4 -> 3.3 GB (2.6x fewer, derived from the safetensors headers); arXiv 2607.04244 reports 6.98x over its baseline on an A10G | the same report: MMLU-Pro 0.690 -> 0.659, IFEval 0.857 -> 0.845, GPQA-D 0.700 -> 0.667; GSM8K here pending | checkpoints local | load test queued |
 | 7 | Hot-vocab draft head (patches 0001 MTP, 0005 DFlash) | latency | exact | MTP cycle floor -26% at c=1 | none | built | queued |
 | 8 | Relaxed greedy acceptance, g in {1, 2} (patches 0002, 0004) | latency | lossy | pending | pending | built | queued |
 | 9 | Certified int8 head | latency | exact | head is 15% of plain bytes, 39% of verify bytes under the INT4 target | none | kernel workstream | integrate workstream |
 | - | FP8 W8A8 (Triton), FP8 KV, BF16 state, 2:4 sparsity | - | lossy | measured no gain (FP8 W8A8, FP8 KV); BF16 dominated by FP16; 2:4 unsupported in SGLang | - | - | dropped |
 
 Deserving dedicated agents next: (a) a host-gap removal agent for the speculative cycle
-(sync-free verify planning; profile has the call sites), because it multiplies every
-drafter at c = 1-4; (b) a front-end agent for c >= 256 (bench found the streaming path
-caps client throughput at 5-6.6k tok/s while the GPU decodes 16k), because every
-throughput lever above c = 128 is invisible behind it.
+(sync-free verify planning; the profile workstream has the call sites), because it
+multiplies every drafter at c = 1-4; (b) the c >= 256 streaming front end (the bench
+workstream reports client throughput capped at 5-6.6k tok/s while the GPU decodes 16k;
+evidence pending), because every throughput lever above c = 128 is invisible behind it.
+The integrator assigned (b) to bench and kept (a) with moonshot.
 
 ### Quality budget for the lossy stack (fixed before measuring)
 
@@ -147,14 +149,16 @@ run-to-run noise. The combination is measured as a combination.
 
 ## 4. Reproduction
 
+From the repository root, with the engine/moonshot patches applied in
+`~/sglang-wt/moonshot` (see `engine/sglang/README.md`):
+
 ```sh
-source scripts/sglang_env.sh
-export SGLANG_WORKTREE=~/sglang-wt/moonshot PYTHONPATH=~/sglang-wt/moonshot/python:~/vp-wt/bench
-cd ~/vp-wt/bench   # bench harness root
-scripts/gpu_lock.sh -x python ~/vp-wt/moonshot/experiments/moonshot/lever_sweep.py \
+SGLANG_WORKTREE=~/sglang-wt/moonshot source scripts/sglang_env.sh
+export PYTHONPATH=$SGLANG_WORKTREE/python:$PWD
+scripts/gpu_lock.sh -x python experiments/moonshot/lever_sweep.py \
   --out ~/vp-data/moonshot/sweeps --concurrency 1 32 128 \
   --configs plain plain+fp16_state plain+fp8_weights plain+fp8_kv
-python ~/vp-wt/moonshot/experiments/moonshot/summarise.py sweeps ~/vp-data/moonshot/sweeps \
+python experiments/moonshot/summarise.py sweeps ~/vp-data/moonshot/sweeps \
   --baseline plain --out evidence/moonshot/lever_sweeps_quick.csv
 python experiments/moonshot/ceilings.py --out evidence/moonshot/ceilings.json \
   --csv evidence/moonshot/ceilings.csv

@@ -1,0 +1,110 @@
+From 1b2fb0a62897482ecdadbfb9051f5c6795a84d6c Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <sam@findtensor.com>
+Date: Wed, 30 Sep 2026 20:16:09 +0000
+Subject: [PATCH] DFLASH: opt-in per-cycle trace of greedy verification
+
+SGLANG_DFLASH_TRACE_PATH=<prefix> appends one JSON line per request per
+verify cycle (drafted block, target argmax at every block row, accepted
+length, prefix length). Off by default; when on it synchronizes every cycle.
+---
+ python/sglang/srt/speculative/dflash_trace.py | 61 +++++++++++++++++++
+ .../srt/speculative/dflash_worker_v2.py       |  9 +++
+ 2 files changed, 70 insertions(+)
+ create mode 100644 python/sglang/srt/speculative/dflash_trace.py
+
+diff --git a/python/sglang/srt/speculative/dflash_trace.py b/python/sglang/srt/speculative/dflash_trace.py
+new file mode 100644
+index 0000000000..4e0c23c471
+--- /dev/null
++++ b/python/sglang/srt/speculative/dflash_trace.py
+@@ -0,0 +1,61 @@
++"""Opt-in per-cycle trace of DFLASH greedy verification.
++
++Set ``SGLANG_DFLASH_TRACE_PATH=/path/prefix`` to append one JSON line per request
++per verify cycle to ``<prefix>.<pid>.jsonl``:
++
++    {"rid": ..., "prefix_len": p, "draft": [16 ids], "target": [16 ids],
++     "accept": a}
++
++``draft[0]`` is the anchor (the previous cycle's bonus token, already
++committed); ``draft[k]`` for k >= 1 is the drafted token for position p + k and
++``target[k - 1]`` is the target's greedy choice for that position, so ``accept``
++counts the leading k with ``draft[k] == target[k - 1]``. Recording copies the
++tensors to the host every cycle, which synchronizes the stream: use it for
++traces, never for timed runs. Sampled verification is not traced.
++"""
++
++from __future__ import annotations
++
++import json
++import os
++from typing import List, Optional
++
++import torch
++
++_PATH = os.environ.get("SGLANG_DFLASH_TRACE_PATH")
++
++
++class DFlashTracer:
++    def __init__(self, prefix: str) -> None:
++        self.path = f"{prefix}.{os.getpid()}.jsonl"
++        self._handle = open(self.path, "a", buffering=1)
++
++    def record(
++        self,
++        rids: List[str],
++        prefix_lens: torch.Tensor,
++        draft_tokens: torch.Tensor,
++        target_predict: torch.Tensor,
++        accept_len: torch.Tensor,
++    ) -> None:
++        bs = len(rids)
++        prefix = prefix_lens[:bs].tolist()
++        draft = draft_tokens[:bs].tolist()
++        target = target_predict[:bs].tolist()
++        accept = accept_len[:bs].tolist()
++        for i, rid in enumerate(rids):
++            self._handle.write(
++                json.dumps(
++                    {
++                        "rid": rid,
++                        "prefix_len": int(prefix[i]),
++                        "draft": draft[i],
++                        "target": target[i],
++                        "accept": int(accept[i]),
++                    }
++                )
++                + "\n"
++            )
++
++
++TRACER: Optional[DFlashTracer] = DFlashTracer(_PATH) if _PATH else None
+diff --git a/python/sglang/srt/speculative/dflash_worker_v2.py b/python/sglang/srt/speculative/dflash_worker_v2.py
+index 75e698ee80..ec356ba076 100644
+--- a/python/sglang/srt/speculative/dflash_worker_v2.py
++++ b/python/sglang/srt/speculative/dflash_worker_v2.py
+@@ -48,6 +48,7 @@ from sglang.srt.runtime_context import (
+ )
+ from sglang.srt.sampling.sampling_batch_info import SamplingBatchInfo
+ from sglang.srt.server_args import ServerArgs
++from sglang.srt.speculative import dflash_trace
+ from sglang.srt.speculative.base_spec_worker import BaseSpecWorker
+ from sglang.srt.speculative.dflash_info import DFlashVerifyInput
+ from sglang.srt.speculative.dflash_info_v2 import DFlashDraftInputV2
+@@ -2807,6 +2808,14 @@ class DFlashWorkerV2(BaseSpecWorker):
+             prefix_lens=prefix_lens,
+             bs=bs,
+         )
++        if dflash_trace.TRACER is not None and target_predict is not None:
++            dflash_trace.TRACER.record(
++                [req.rid for req in batch.reqs],
++                prefix_lens,
++                candidates,
++                target_predict,
++                accept_len,
++            )
+
+         if SIMULATE_ACC_LEN > 0:
+             if SIMULATE_ACC_TOKEN_MODE not in ("fixed", "real-draft-token"):
+--
+2.34.1

@@ -1,0 +1,27 @@
+{
+  "math500": {
+    "other": 6148,
+    "repeat_previous": 331,
+    "skip_ahead": 10
+  },
+  "all": {
+    "other": 17475,
+    "repeat_previous": 1082,
+    "skip_ahead": 39
+  },
+  "chat": {
+    "other": 6575,
+    "repeat_previous": 468,
+    "skip_ahead": 15
+  },
+  "code": {
+    "other": 1483,
+    "repeat_previous": 89,
+    "skip_ahead": 6
+  },
+  "math": {
+    "other": 3269,
+    "repeat_previous": 194,
+    "skip_ahead": 8
+  }
+}

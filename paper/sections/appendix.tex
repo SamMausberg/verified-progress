@@ -106,7 +106,7 @@ Head is 15.1\% of plain-step weight bytes, 84.1\% of an MTP draft step's & Deriv
 GDN state 50.3~MB per request (FP32) & Derived & \code{config.json} (Table~\ref{tab:bytes})\\
 Stock head, sampling and verification behaviour at the pin & Code reading & Section~\ref{sec:stock}; SGLang \sourcepin\\
 Gap condition (Theorem~\ref{thm:stock}) and R-bf16 witness & Proved & Section~\ref{sec:headcontracts}\\
-Certified tokens equal stock tokens at the served shapes & Pending & kernel; \nolinkurl{evidence/certified_head/}\\
+Certified tokens equal stock tokens at the served shapes, with the kernel's measured error & Pending & kernel; \nolinkurl{evidence/certified_head/}\\
 Commit rule, directional margin, dead/deferred/enclosed accounting & Proved / definition & Section~\ref{sec:semantics}\\
 Transport theorem, summary merge, admission rule & Proved & Section~\ref{sec:transport}\\
 Transport--self-evidence crossover and static-screen comparison & Proved & Theorem~\ref{thm:crossover}, Proposition~\ref{prop:static}\\
@@ -114,7 +114,8 @@ $\delta^\ast$ median 0.85\% (int8, $\ell_2$, 64-row tiles), 0.30\% ($\ell_\infty
 Measured drift $\rho$ and transport certification & Pending & geometry; \nolinkurl{evidence/head_geometry/}\\
 Envelope with Hopper accumulation model; integer pass; outward rounding & Proved (model assumed) & Section~\ref{sec:selfevidence}; Khattak and Mikaitis~\cite{khattak2026}\\
 Refinement ladder; candidate-count bounds & Proved & Theorem~\ref{thm:ladder}, Proposition~\ref{prop:candidates}\\
-Candidate sets and head-path runtime on real states & Pending & geometry, kernel\\
+Plain-decode alignment of captured head inputs; candidate sets per cheap head; R-stock fallback share by rule and model; certified tokens equal the engine's on 6,005 rows & Finding & \nolinkurl{evidence/head_geometry/alignment_plain4b.json}, \nolinkurl{evidence/head_geometry/selfevidence_plain4b.json}, \nolinkurl{evidence/head_geometry/rstock_plain4b.json}\\
+Candidate sets on MTP and DFlash states; head-path runtime & Pending & geometry, kernel\\
 Certified race; RNG contract; fixed-noise verification; coupling bounds & Proved & Section~\ref{sec:decisions}\\
 Sampling contract: fixed-noise verification with the stock seeded noise; committed tokens equal the seeded sampler's tokens for the verify pass's logits & Design decided; pending & kernel; Section~\ref{sec:fixednoise}\\
 Common mass, bounded-range sampler, KL and sequence TV bounds & Proved & Propositions~\ref{prop:commonmass}--\ref{prop:kl}\\
@@ -123,12 +124,13 @@ Cheap decision is not cheap verification (constructed heads) & Finding (CPU) & \
 Exact references (inherited) & Finding (CPU) & \nolinkurl{evidence/decision_tests.json}, \nolinkurl{evidence/race_tests.json}\\
 Exact floating-point reference; Lean elaboration & Finding (CPU, Lean) & \nolinkurl{evidence/precision/}, \nolinkurl{formal/STATUS.md}\\
 Attribution, bytes per step, host gaps (H1, H6) & Pending & profile; \nolinkurl{evidence/profiles/} (PR \#13)\\
-Stock divergence mechanisms and state safety (H5) & Pending & state; \nolinkurl{evidence/state/}\\
+Stock divergence mechanisms and state safety (H5) & Pending & state; \nolinkurl{evidence/state_safety/}\\
 DFlash on GH200 & Pending & drafter; \nolinkurl{evidence/drafter/}\\
-Certified tail (P1) & Rejected by its kill test & Evidence pending in the geometry pull request (\nolinkurl{evidence/head_geometry/tail_killtest.json})\\
+Certified tail (P1) & Rejected by its kill test & \nolinkurl{evidence/head_geometry/tail_killtest.json}\\
 Long-window repair (P2), anchored residual decoding (P3) & Hypotheses & Kill tests pending\\
 What an exact recurrent state must retain (Proposition~\ref{prop:minimal-state}); key-subspace reduction & Proved & Section~\ref{sec:minimal-state}\\
 State-structure witnesses ($-3/25$, reachability, SiLU rank, batch rank, RMSNorm, lazy decay, BF16 rank) & Finding (CPU) & \nolinkurl{evidence/state_structure/}\\
+Contract witnesses (reassociation, BF16 cell, law versus argmax, law versus seeded token, regrouped GDN recurrence, transition norm) & Finding (CPU) & \nolinkurl{evidence/contracts/}\\
 Write avoidance for the recurrent state (P4); cross-request sharing (P5) & Pending; P5 rejected in analysis & moonshot, profile\\
 Stack levers, interaction matrix, exact and lossy frontiers (H4, H7) & Pending & moonshot, bench; \nolinkurl{evidence/moonshot/}, \nolinkurl{evidence/bench/}\\\bottomrule
 \end{longtable}
