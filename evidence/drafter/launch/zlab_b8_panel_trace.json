@@ -1,0 +1,71 @@
+{
+  "launch": {
+    "command": [
+      "/home/ubuntu/sglang/.venv/bin/python",
+      "-m",
+      "sglang.launch_server",
+      "--model-path",
+      "Qwen/Qwen3.5-4B",
+      "--revision",
+      "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "30080",
+      "--attention-backend",
+      "flashinfer",
+      "--mm-attention-backend",
+      "triton_attn",
+      "--random-seed",
+      "0",
+      "--enable-metrics",
+      "--speculative-algorithm",
+      "DFLASH",
+      "--speculative-draft-model-path",
+      "z-lab/Qwen3.5-4B-DFlash",
+      "--speculative-draft-model-revision",
+      "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
+      "--linear-attn-prefill-backend",
+      "flashinfer",
+      "--linear-attn-decode-backend",
+      "flashinfer",
+      "--speculative-dflash-block-size",
+      "8",
+      "--mem-fraction-static",
+      "0.25",
+      "--max-running-requests",
+      "4"
+    ],
+    "env": {
+      "SGLANG_ENABLE_OVERLAP_PLAN_STREAM": "1",
+      "SGLANG_DFLASH_TRACE_PATH": "/home/ubuntu/vp-data/drafter/trace/b8/cycles"
+    },
+    "sglang_worktree": "/home/ubuntu/sglang-wt/drafter",
+    "sglang_revision": "bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824",
+    "sglang_dirty": true,
+    "repo_revision": "2e72bcdbc55eca4cbde6c36d81e270b8db62e892",
+    "clients": [
+      "python /home/ubuntu/vp-wt/drafter/experiments/drafter/accept_probe.py --port {port} --workload /home/ubuntu/vp-wt/drafter/experiments/drafter/panel-v1.jsonl       --per-domain 32 --max-new-tokens 2048 --concurrency 1 --label b8 --out {out}"
+    ],
+    "started": "2026-09-30T19:52:35+0000"
+  },
+  "server_info_subset": {
+    "speculative_algorithm": "DFLASH",
+    "speculative_num_draft_tokens": 8,
+    "speculative_draft_model_path": "z-lab/Qwen3.5-4B-DFlash",
+    "speculative_draft_model_revision": "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
+    "speculative_draft_attention_backend": "flashinfer",
+    "attention_backend": "flashinfer",
+    "linear_attn_prefill_backend": "flashinfer",
+    "linear_attn_decode_backend": "flashinfer",
+    "cuda_graph_backend_prefill": null,
+    "disable_cuda_graph": false,
+    "disable_overlap_schedule": false,
+    "max_running_requests": 4,
+    "mem_fraction_static": 0.25,
+    "mamba_radix_cache_strategy": "extra_buffer",
+    "random_seed": 0,
+    "internal_disable_overlap_schedule": false
+  },
+  "version": "0.5.21.dev861+gbd66ce343"
+}

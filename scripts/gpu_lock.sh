@@ -19,12 +19,14 @@
 # processes are discarded, so a crashed job cannot stall the queue. The lock is
 # released when the command and every child holding it exit, so a server left
 # running keeps the GPU locked. GPU_LOCK_WAIT (seconds, default 4 h) bounds each
-# wait; a timeout exits 75.
+# wait; a timeout exits 75. To extend a wait without losing your place, cancel
+# the waiting job and resubmit it with GPU_LOCK_ARRIVAL set to the arrival time
+# (nanoseconds) in its old ticket name; it must not lie in the future.
 set -euo pipefail
 
 LOCK_FILE="${GPU_LOCK_FILE:-$HOME/.gpu.lock}"
 QUEUE_DIR="$LOCK_FILE.queue"
-WAIT="${GPU_LOCK_WAIT:-14400}"
+WAIT="${GPU_LOCK_WAIT:-43200}"
 
 usage() {
   echo "usage: $0 -x|-s <command...> | --status" >&2
@@ -50,7 +52,10 @@ older_ticket() {
   while read -r ticket; do
     name="$(basename "$ticket")"
     [ "$name" \< "$1" ] || continue
+    # Tickets without a kind marker come from an older version of this script
+    # and are treated as exclusive.
     if [ -z "${2:-}" ] || [[ $name == *-"$2"-* ]]; then return 0; fi
+    if [ "$2" = x ] && [[ $name != *-s-* && $name != *-x-* ]]; then return 0; fi
   done < <(live_tickets)
   return 1
 }
@@ -82,7 +87,15 @@ esac
 mkdir -p "$QUEUE_DIR"
 rank=5
 if [ "${GPU_LOCK_PRIORITY:-0}" = 1 ]; then rank=1; fi
-name="$rank-$(date +%s%N)-$kind-$$"
+arrival="$(date +%s%N)"
+if [ -n "${GPU_LOCK_ARRIVAL:-}" ]; then
+  if ! [[ $GPU_LOCK_ARRIVAL =~ ^[0-9]{19}$ ]] || [[ $GPU_LOCK_ARRIVAL > $arrival ]]; then
+    echo "GPU_LOCK_ARRIVAL must be a past time in nanoseconds (19 digits)" >&2
+    exit 64
+  fi
+  arrival="$GPU_LOCK_ARRIVAL"
+fi
+name="$rank-$arrival-$kind-$$"
 ticket="$QUEUE_DIR/$name"
 printf '%s\n' "$*" > "$ticket"
 trap 'rm -f "$ticket"' EXIT

@@ -1,0 +1,38 @@
+From 652c024eccade9ff4150ff29c374a729f6184420 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Wed, 30 Sep 2026 19:13:08 +0000
+Subject: [PATCH 4/7] Apply relaxed greedy verification to the DFlash greedy
+ path
+
+Uses the same SGLANG_SPEC_RELAXED_GREEDY_LOGIT_GAP rule as the EAGLE chain
+(DFlash blocks share the candidates/target_predict chain layout).
+---
+ python/sglang/srt/speculative/dflash_worker_v2.py | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/python/sglang/srt/speculative/dflash_worker_v2.py b/python/sglang/srt/speculative/dflash_worker_v2.py
+index 75e698ee80..2143f5186c 100644
+--- a/python/sglang/srt/speculative/dflash_worker_v2.py
++++ b/python/sglang/srt/speculative/dflash_worker_v2.py
+@@ -74,6 +74,7 @@ from sglang.srt.speculative.draft_worker_common import (
+     make_draft_sampler_capture_hook,
+ )
+ from sglang.srt.speculative.dspark_components.dspark_draft import resolve_greedy_mask
++from sglang.srt.speculative.eagle_utils import relax_greedy_chain_predict
+ from sglang.srt.speculative.lilicorr_utils import (
+     build_lilicorr_draft_sampler,
+     propose_lilicorr_block,
+@@ -2162,6 +2163,11 @@ class DFlashWorkerV2(BaseSpecWorker):
+             target_predict = torch.argmax(next_token_logits, dim=-1).view(
+                 bs, int(self.block_size)
+             )
++            relaxed_gap = envs.SGLANG_SPEC_RELAXED_GREEDY_LOGIT_GAP.get()
++            if relaxed_gap > 0:
++                target_predict = relax_greedy_chain_predict(
++                    next_token_logits, candidates, target_predict, relaxed_gap
++                )
+             self._tp_sync.sync(SpecTpSyncSite.DFLASH_ACCEPT_GREEDY, target_predict)
+             if self._use_triton_accept_bonus:
+                 try:
+--
+2.34.1

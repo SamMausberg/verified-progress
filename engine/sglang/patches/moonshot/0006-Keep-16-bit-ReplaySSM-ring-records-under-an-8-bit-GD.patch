@@ -1,0 +1,30 @@
+From d3a1d447cd283c2152e1abe91e2cf60193634d56 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Wed, 30 Sep 2026 19:23:36 +0000
+Subject: [PATCH 6/7] Keep 16-bit ReplaySSM ring records under an 8-bit GDN
+ state
+
+With the experimental FP8 state, the decode ring would otherwise round the
+per-step (d, k) records to FP8 too; keeping them in the activation dtype
+means the state is rounded to 8 bits only when the ring is flushed.
+---
+ python/sglang/srt/mem_cache/memory_pool.py | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/python/sglang/srt/mem_cache/memory_pool.py b/python/sglang/srt/mem_cache/memory_pool.py
+index aa8a3b44bf..ce1c70a5b5 100644
+--- a/python/sglang/srt/mem_cache/memory_pool.py
++++ b/python/sglang/srt/mem_cache/memory_pool.py
+@@ -667,6 +667,10 @@ class MambaPool:
+                 # Decode records follow the SSM dtype. Spec-verify compact d/k
+                 # records follow the activation dtype; g stays fp32.
+                 ring_dtype = conv_dtype if enable_linear_replayssm_spec else ssm_dtype
++                if ring_dtype.itemsize < 2:
++                    # An 8-bit checkpoint (experimental FP8 state) keeps 16-bit
++                    # ring records, so rounding to 8 bits happens only at a flush.
++                    ring_dtype = conv_dtype
+                 # Fold-every-commit: one verify window, no chunked (d, k)
+                 # records. KDA is the exception on both counts: its window
+                 # stays L-sized (the fused verify ring-write drops
+--
+2.34.1

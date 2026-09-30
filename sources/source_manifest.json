@@ -397,7 +397,7 @@
       "accessed": "2026-09-30",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review; not yet cited in paper.tex. Hugging Face API and card read: Apache-2.0, base model Qwen/Qwen3.5-4B, DFlash (v1) drafter, SGLang launch line (block size 8 recommended at high concurrency), B200 greedy benchmarks: 3.40-4.60x over autoregressive at concurrency 1 (block 16) and 2.15-2.61x at concurrency 32 (block 8), versus MTP at best 1.96-2.31x and 1.53-1.80x. Not reproduced. Siblings z-lab/Qwen3.5-9B-DFlash and z-lab/Qwen3.5-35B-A3B-DFlash also public."
+      "audit_note": "Added 30 Sep 2026 by the lit review; not yet cited in paper.tex. Hugging Face API and card read: Apache-2.0, base model Qwen/Qwen3.5-4B, DFlash (v1) drafter, SGLang launch line (block size 8 recommended at high concurrency), B200 greedy benchmarks: 3.40-4.60x over autoregressive at concurrency 1 (block 16) and 2.15-2.61x at concurrency 32 (block 8), versus the best MTP setting per workload at 1.99-2.31x and 1.56-1.80x. Not reproduced. Siblings z-lab/Qwen3.5-9B-DFlash and z-lab/Qwen3.5-35B-A3B-DFlash also public."
     },
     {
       "key": "dspark",

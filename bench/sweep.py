@@ -300,6 +300,12 @@ class Sweep:
         prompts = [*cycled(self.warmup_pool, warmup), *measured]
         point_dir = self.run_dir / f'r{repeat}' / f'c{concurrency:03d}'
         flushed = self.flush_cache()
+        if not flushed:
+            # A warm prefix cache would inflate TTFT, throughput and acceptance for the
+            # prompts the previous point or its warmup already served.
+            raise RuntimeError(
+                f'prefix-cache flush failed before c={concurrency}; not measuring this point'
+            )
         cpu_before = wait_for_quiet_cpu(
             self.own_sessions, args.quiet_cpu_cores, args.quiet_cpu_wait
         )

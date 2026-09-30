@@ -1,0 +1,39 @@
+% Section 12: what did not work, limits, conclusion (paper, with all workstreams).
+% Claims and status: corrections are findings of the literature and theory reviews
+% (PR #6, PR #7); the failure table tracks the status of each hypothesis.
+\section{What did not work, and the limits of what did}\label{sec:limits}
+\subsection{What the review of the earlier revision overturned}
+Several claims of the earlier revision did not survive review, and they are recorded here rather than silently removed.
+\begin{itemize}
+\item The counterexample showing that sampled verification depth chosen from realized proposals biases the output law was presented as a contribution. DSpark and D-cut state the condition with their own counterexamples~\cite{dspark,dcut}; it is now an illustration (Section~\ref{sec:stopping}).
+\item ``Progressive precision'' was proposed without citation. Certified greedy screening with a low-precision head and exact re-scoring is implemented publicly~\cite{sparkpipehead,dgpphead,lagunaprune,knlphead}, and the bound-then-refine pattern is classical~\cite{vafile,fexipro}. The claim is narrowed accordingly (Section~\ref{sec:prior-novelty}).
+\item The static tile screen proposed as an ablation is CSV-Decode's mechanism~\cite{csvdecode}, and on this head the tile radius exceeds the row norm, so the screen is looser than a per-row bound (Table~\ref{tab:headconstants}).
+\item Statements about the engine were out of date at the pin: plain and seeded sampling are already races, seeded noise is counter-keyed, and default sampled verification uses point-mass drafts, whose residual needs no partition function (Section~\ref{sec:stock}).
+\item ``Exact'' was defined against real arithmetic. It is now defined against the stock kernel at the same batch shape, and the evidence that a certified token equals the stock token is conditional on a modelled error bound for that kernel (Section~\ref{sec:headcontracts}).
+\item The Lean file could not be compiled when the earlier revision was written. Lean 4.19.0 now elaborates it and a second file for the certified decisions (\nolinkurl{formal/STATUS.md}, \nolinkurl{evidence/precision/lean_check.log}).
+\end{itemize}
+
+\subsection{Failure criteria}
+Table~\ref{tab:failures} pairs each hypothesis with the fastest test that could damage it and the response if it fails. A failed hypothesis stays in the paper with its mechanism; the programme stays ambitious by testing stronger alternatives, not by weakening the meaning of correctness or changing the comparison after the fact.
+
+\begin{longtable}{@{}P{3.1cm}P{4.1cm}P{4.3cm}P{2.6cm}@{}}
+\toprule Hypothesis & Fastest damaging test & Response if it fails & Status\\\midrule\endhead
+Transport is tighter than self-evidence and the static screen & Aligned real-head replay: $\rho$ against $\delta^\ast$ (Section~\ref{sec:crossover}) & Drop transport as the head's evidence source; keep it only if an intersected hybrid pays for its metadata & Crossover derived from weights; $\rho$ \pending{}\\
+Certificates save target work & Count rows, re-scoring and completion, not only decision cost & Reject acceptance-only speed claims; measure residual races separately & Cheap decision $\ne$ cheap verification on constructed heads (Section~\ref{sec:synthetic})\\
+Certified tokens equal stock tokens & Same-shape token equality on captured states; measured cuBLAS error against the modelled $G_i$ & Widen $G_i$ or send more rows to the stock fallback & \pending{}\\
+Fewer bytes read means less time & Head-path time against the stock chain at each served shape & Keep the dense head at shapes where it wins & \pending{}\\
+Per-row sparsity reduces weight traffic & Batch unions of candidates and measured HBM traffic & Group compatible rows or stay dense & \pending{}\\
+The head is a large share of the step (H1) & nsys attribution & Move effort to the dominant term (state, host gaps) & Bytes derived; time \pending{}\\
+Speculative state is equivalent (H5) & Every rejection position, aborts, prefix reuse & Correct the state path before timing & \pending{}\\
+Adaptive sampled depth stays exact & Exhaustive tiny laws with candidate-dependent stopping & Non-anticipating policies or fixed-noise verification & Settled by prior art and Theorem~\ref{thm:fixednoise}\\
+Recurrent state compresses exactly & Exact witnesses; rank audit of captured keys & Reduce state writes instead of state size & Exact witnesses (\nolinkurl{evidence/state_structure/}); audit \pending{}\\
+Sharing across requests pays & Measured share of the one structural candidate & Reject & Rejected in analysis; share \pending{}\\
+Results transfer & New prompts, a second model or GPU & Narrow the claim and explain the dependence & \pending{}\\\bottomrule
+\caption{Failure criteria and their current status.}\label{tab:failures}
+\end{longtable}
+
+\subsection{Scope}
+The measurements concern one model, one engine commit and one GPU, and the experiments are text-only on a multimodal checkpoint. The agreement of certified tokens with the stock kernel rests on a published model of Hopper tensor-core accumulation and on the absence of reduced-precision split-$K$ reductions in the kernels the engine selects; both are tested, neither is a vendor guarantee. The exact CPU references test the certificates on synthetic heads with small vocabularies and widths; they are tests, not proofs, and the Lean files cover the decision logic and scaled-integer bounds, not IEEE rounding, exponentials or probability. The head constants of Table~\ref{tab:headconstants} use no hidden states, so they decide nothing about certification rates on their own. Every end-to-end result is pending in this revision.
+
+\subsection{What the completed paper should establish}\label{sec:conclusion}
+The question was what work a verifier actually needs. The mathematics now says precisely what evidence suffices for each consumer, how to state exactness against the kernel an engine actually runs, and when each of the two evidence sources can be tighter than the other. The measurements will say which of them survives real hidden states, real kernels and real batching on this model, and what the rest of the serving stack contributes when every axis is pushed. A useful outcome includes a well-explained negative one: transport failing on real geometry, or a certified head that reads half the bytes yet loses to the stock chain at the shapes that matter, would each rule out a tempting argument with a mechanism attached.
