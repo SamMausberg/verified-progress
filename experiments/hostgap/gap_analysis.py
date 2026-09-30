@@ -39,18 +39,23 @@ from typing import Any
 import numpy as np
 
 KERNEL_CLASSES = [
-    ('head_or_gemm', re.compile(r'nvjet|gemm|cutlass|sm90_xmma|cublas', re.I)),
-    ('attention', re.compile(r'BatchPrefill|BatchDecode|flashinfer|MergeState|attention', re.I)),
+    # Order matters: the first matching class wins.
     (
         'gdn_state',
         re.compile(
-            r'gated_delta|fused_recurrent|chunk_|causal_conv|mamba|conv1d|replayssm|state_scatter',
+            r'delta_rule|gated_delta|fused_recurrent|causal_conv|mamba|conv1d|replayssm'
+            r'|state_scatter|conv_window|qkvzba|sigmoid_mul',
             re.I,
         ),
     ),
     ('norm_act', re.compile(r'norm|silu|gelu|act_and_mul|rotary|rope', re.I)),
+    (
+        'attention',
+        re.compile(r'BatchPrefill|BatchDecode|MergeState|kv_indices|store_kvcache', re.I),
+    ),
+    ('gemm', re.compile(r'nvjet|gemm|cutlass|sm90_xmma|cublas|splitKreduce', re.I)),
     ('sampling', re.compile(r'argmax|topk|top_k|sample|verify|tree|reduce_kernel', re.I)),
-    ('copy_index', re.compile(r'copy|elementwise|index|gather|scatter|fill|cat|arange', re.I)),
+    ('copy_index', re.compile(r'copy|elementwise|index|gather|scatter|fill|cat|arange|Scan', re.I)),
 ]
 
 
