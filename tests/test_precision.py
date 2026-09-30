@@ -422,8 +422,11 @@ class Precision(unittest.TestCase):
             count('integer_pass_argmax')
 
     def test_bf16_contract(self) -> None:
-        """Argmax of BF16-rounded exact logits, lowest index on BF16 ties,
-        against the emulated stock head (FP32 accumulation, BF16 output)."""
+        """R-bf16 (argmax of BF16-rounded exact logits, lowest index on BF16
+        ties) against the emulated stock head (FP32 accumulation, BF16 output).
+        At these small widths the emulated stock rounding almost always equals
+        exact rounding, so agreement here exercises the tie rule only; it does
+        not show that R-bf16 is stock equality (see the next test)."""
         engine = (
             Accumulator('blocked', FP32, block=4, splits=2),
             Accumulator('sequential', FP32),
@@ -457,6 +460,24 @@ class Precision(unittest.TestCase):
         count('stock_rounding_identical_to_exact_rounding', rounding_matches)
         STATS['bf16_contract_level_histogram'] = {str(k): v for k, v in sorted(levels.items())}
         self.assertGreater(agree_bf16, agree_real)
+
+    def test_bf16_contract_is_not_stock(self) -> None:
+        """Witness that R-bf16 is not stock equality, and that the R-stock gap
+        condition refuses to certify it (so the stock head would run)."""
+        W = [[Q(16), Q(0), Q(0)], [Q(16), Q(1, 16), pow2(-30)]]
+        h = [Q(1)] * 3
+        z = [dot(w, h) for w in W]
+        self.assertEqual(z, [Q(16), Q(16) + Q(1, 16) + pow2(-30)])
+        self.assertEqual([round_to(v, BF16) for v in z], [Q(16), Q(16) + Q(1, 8)])
+        cert = certify_argmax(Evaluator(quantize_head(W), tuple(h)), contract='bf16')
+        assert cert is not None
+        self.assertEqual(cert.token, 1)
+        stock_L = stock_logits(W, h, FP32_SEQUENTIAL)
+        self.assertEqual(stock_L, [Q(16), Q(16)])  # 16.0625 rounds to even
+        self.assertEqual(stock_argmax(stock_L), 0)
+        for g in (Q(0), pow2(-20), pow2(-10)):
+            self.assertFalse(stock_agrees(z, 1, [g, g]))
+        count('bf16_not_stock_witnesses')
 
     def test_race(self) -> None:
         levels: dict[int, int] = {}

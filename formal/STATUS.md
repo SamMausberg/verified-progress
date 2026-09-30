@@ -3,8 +3,9 @@
 Checked on 2026-09-30 with Lean 4.19.0 (elan toolchain from `lean-toolchain`,
 aarch64): `bash scripts/check_lean.sh` elaborates every file below with no
 errors. Neither file contains `sorry`, `admit` or a new `axiom`. `#print axioms`
-on the main theorems reports only Lean's built-in `propext` and `Quot.sound`
-(used by `simp` and `omega`); no classical choice. A deliberately false
+on the main theorems reports only Lean's standard axioms: `propext`, `Quot.sound`
+and, for `envelope_compose`, `widen` and `shift_encloses` (through `omega`),
+`Classical.choice`. No axiom is added. A deliberately false
 variant of `sequential_sum_bound` is rejected, so the check is not vacuous.
 
 ## `DecisionGuards.lean` (from the supplied bundle, unchanged)

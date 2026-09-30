@@ -317,7 +317,9 @@ def outward_interval(zt: Q, beta: Q, fmt: BinaryFormat = FP32, ftz: bool = False
     lo = fl(zt - bhat), hi = fl(zt + bhat). If beta was computed from valid
     upper bounds with at most 59 round-to-nearest operations on nonnegative
     values, then lo <= z <= hi as real numbers for every z with
-    |z - zt| <= (the real value of the beta formula).
+    |z - zt| <= (the real value of the beta formula). The constants are
+    established for precision p >= 24 (FP32 and wider); they do not hold for
+    BF16 (p = 8).
     """
     p = fmt.precision
 
@@ -460,10 +462,13 @@ class TokenNorms:
 def token_norms(
     h: Sequence[Q], blocks: Sequence[Sequence[int]], acc: Accumulator | None
 ) -> TokenNorms:
-    """Exact mode (acc None): tight upper bounds. Kernel mode: the FP32 recipe
-    N2 = fl(sqrt(fl_sum h_j^2)) * (1 + 2^-10) + 2^-50, valid for any
-    summation order of depth <= 2^14 and any sqrt within 2^-16 relative
-    (the absolute term covers underflow or flush-to-zero of h_j^2)."""
+    """Exact mode (acc None): tight upper bounds. Kernel mode, FP32 recipes:
+    N2 = fl(sqrt(fl_sum h_j^2)) * (1 + 2^-10) + 2^-50 is an upper bound on
+    ||h||_2 for any summation order of depth <= 2^14 and any sqrt within 2^-16
+    relative (the square root halves the relative summation error);
+    N1 = fl(fl_sum |h_j|) * (1 + 2^-10) + 2^-50 is an upper bound on ||h||_1
+    only for depth <= 2^13 (at depth 2^14 the standard model leaves a margin
+    of -6.0e-7). The absolute terms cover underflow or flush-to-zero."""
 
     def l2(idx: Sequence[int]) -> Q:
         if acc is None:
@@ -655,7 +660,9 @@ class Evaluator:
         if len(self.h) != self.head.width:
             raise ValueError('hidden width mismatch')
         if any(not is_representable(Q(x), BF16) for x in self.h):
-            raise ValueError('contract C1 is defined on the BF16 hidden vector the head consumes')
+            raise ValueError(
+                'the R-real reference is defined on the BF16 hidden vector the head consumes'
+            )
         if not self.ladder or self.ladder[-1] is not None or None in self.ladder[:-1]:
             raise ValueError('the ladder must end with exact arithmetic')
         self.h = tuple(Q(x) for x in self.h)
@@ -770,11 +777,16 @@ def certify_argmax(
     max_level: int | None = None,
     contract: Literal['real', 'bf16'] = 'real',
 ) -> Certificate | None:
-    """Greedy token under contract 'real' (argmax of the exact logits,
-    smallest index among exact ties) or 'bf16' (argmax of the exact logits
-    rounded to BF16, smallest index among BF16 ties: the stock engine's tie
-    behaviour). 'real' also accepts an additive per-token bias (logit bias,
-    additive penalties); both accept a mask (excluded tokens)."""
+    """Greedy token under the batch-invariant reference 'real' (R-real: argmax
+    of the exact logits, smallest index among exact ties) or 'bf16' (R-bf16:
+    argmax of the exact logits rounded to BF16, smallest index among BF16
+    ties). Neither is stock equality: the stock head rounds its own FP32
+    accumulation to BF16, which can land on the other side of a BF16 rounding
+    boundary from the exact logit (test_bf16_contract_is_not_stock). Equality
+    with the stock head (R-stock) needs the gap condition in `stock_agrees`
+    and a fallback to the stock head at the same batch shape when it fails.
+    'real' also accepts an additive per-token bias (logit bias, additive
+    penalties); both accept a mask (excluded tokens)."""
     rows = set(range(ev.head.vocabulary)) - set(masked)
     if contract == 'bf16':
         if bias is not None:
@@ -792,7 +804,7 @@ def exact_argmax(scores: Sequence[Q], rows: Iterable[int] | None = None) -> int:
 
 
 # --------------------------------------------------------------------------
-# Stock engine emulation (contract C2).
+# Stock engine emulation (R-stock).
 # --------------------------------------------------------------------------
 
 
