@@ -42,7 +42,8 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 | drafter | Public DFlash-4B drafter: serve, characterize, train only against a measured limitation | active (PR #22 merged) |
 | repair | Long-window exact repair and target-anchored residual decoding (H8) | active |
 | integrate | SGLang integration of the certified head (draft, verify, decode) | todo |
-| paper | Manuscript revision as results land | active |
+| paper | Manuscript revision as results land | done (milestones PRs #21, #30, #32, #36; editorial PR #49) |
+| author, appendix | Focused MLSys-format paper: main text, and appendices with the evidence register | active |
 | review | Independent review of every PR before merge | active |
 
 ## Task list
@@ -99,7 +100,7 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 
 ### Engine
 - [ ] Differential output-equality tests: MTP versus plain decode, rejection positions, aborts, prefix reuse (state)
-- [ ] Explain every stock divergence by mechanism (state; PR #37 in review): the tie rule and head GEMM cause none; first differing outputs are layer 0's GDN recurrence (plain vs MTP) and gated RMSNorm, FlashInfer decode and prefill down_proj (batch 1 vs 32); the flip classes are reported under two named accumulation models; cache-state hashing and the radix-race test pending
+- [x] Explain every stock divergence by mechanism (state; PR #37 merged): the tie rule and head GEMM cause none; first differing outputs are layer 0's GDN recurrence (plain vs MTP) and gated RMSNorm, FlashInfer decode and prefill down_proj (batch 1 vs 32); the flip classes are reported under two named accumulation models; cache-state hashing and the radix-race test pending
 - [ ] Exactness contract for the certified head: the stock head kernel's decision at the same batch shape, with fallback to that kernel when the gap condition fails (kernel, theory)
 - [ ] Integrate the certified head into the MTP draft, verification and plain decode paths (integrate)
 - [ ] Before/after Pareto sweeps with acceptance and output-equality checks (bench, integrate)
@@ -110,5 +111,7 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 - [x] Paper milestone 1: manuscript reorganized around the evidence, R-stock contract, PR #7 theory with proofs, verified BibTeX, pending markers for GPU results (paper; PR #21)
 - [x] Paper milestone 2: workstream methods, merged geometry, bench and contract evidence, P7 contracts, P6 objectives with verified prior art (paper; PR #30)
 - [x] Paper milestone 3: DFlash-4B acceptance by position (paper; PR #32)
-- [ ] Paper milestones 4+: profile attribution (#13), moonshot (#27), H2 drift, kernel runtime, state mechanisms, serving frontiers (paper)
+- [x] Editorial revision organized around the certified head and the stock-kernel contract, with H2's refutation, divergence mechanisms and an evidence register (editor; PR #49)
+- [ ] Focused MLSys-format paper: 10-page main text on the certified head and transport's negative result, terminology and numerical-assumptions tables, secondary investigations in appendices (author, appendix)
+- [ ] Integrate remaining results as they merge: certified-head runtime (#45), profile attribution (#13), bench MTP-versus-plain crossover, serving frontiers, drafter, repair, hostgap (author, appendix)
 - [ ] README and RUNBOOK with exact reproduction commands (paper, infra; rewritten in PR #21, final pass after the serving results)
