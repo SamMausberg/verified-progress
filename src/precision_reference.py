@@ -461,21 +461,22 @@ def token_norms(
     h: Sequence[Q], blocks: Sequence[Sequence[int]], acc: Accumulator | None
 ) -> TokenNorms:
     """Exact mode (acc None): tight upper bounds. Kernel mode: the FP32 recipe
-    N2 = fl(sqrt(fl_sum h_j^2)) * (1 + 2^-10) + 2^-60, valid for any
-    summation order of depth <= 2^15 and any sqrt within 2^-16 relative."""
+    N2 = fl(sqrt(fl_sum h_j^2)) * (1 + 2^-10) + 2^-50, valid for any
+    summation order of depth <= 2^14 and any sqrt within 2^-16 relative
+    (the absolute term covers underflow or flush-to-zero of h_j^2)."""
 
     def l2(idx: Sequence[int]) -> Q:
         if acc is None:
             return sqrt_up(_norm2_sq(h[j] for j in idx), FP64)
         r = lambda v: round_to(v, acc.fmt, 'nearest', acc.ftz)  # noqa: E731
         ss = acc.sum([r(h[j] * h[j]) for j in idx])
-        return r(r(sqrt_round(ss, acc.fmt) * (1 + pow2(-10))) + pow2(-60))
+        return r(r(sqrt_round(ss, acc.fmt) * (1 + pow2(-10))) + pow2(-50))
 
     def l1(idx: Sequence[int]) -> Q:
         if acc is None:
             return sum((abs(h[j]) for j in idx), Q())
         r = lambda v: round_to(v, acc.fmt, 'nearest', acc.ftz)  # noqa: E731
-        return r(r(acc.sum([abs(h[j]) for j in idx]) * (1 + pow2(-10))) + pow2(-60))
+        return r(r(acc.sum([abs(h[j]) for j in idx]) * (1 + pow2(-10))) + pow2(-50))
 
     everything = range(len(h))
     return TokenNorms(l2(everything), l1(everything), tuple(l2(b) for b in blocks))
