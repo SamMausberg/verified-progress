@@ -19,14 +19,14 @@ item points at its PR and evidence.
 
 | WS | Scope | Status |
 |---|---|---|
-| infra | GPU lock, SGLang worktrees, PR tooling, this list | active |
-| lit | Literature review, novelty assessment, citation audit | todo |
-| bench | Baseline server arms, aiperf Pareto harness, quality baseline, spec tuning | todo |
-| profile | nsys/ncu profiles and critical-path attribution | todo |
-| geometry | Real-head replay: transport versus self-evidence bounds | todo |
-| kernel | Certified low-precision head kernels and microbenchmarks | todo |
-| theory | Floating-point certificate proofs, exact references, Lean | todo |
-| state | Speculative-decoding state safety and output-equality tests | todo |
+| infra | GPU lock, SGLang worktrees, PR tooling, this list | done (PR #1, #2) |
+| lit | Literature review, novelty assessment, citation audit | active |
+| bench | Baseline server arms, aiperf Pareto harness, quality baseline, spec tuning | active |
+| profile | nsys/ncu profiles and critical-path attribution | active |
+| geometry | Real-head replay: transport versus self-evidence bounds | active |
+| kernel | Certified low-precision head kernels and microbenchmarks | active |
+| theory | Floating-point certificate proofs, exact references, Lean | active |
+| state | Speculative-decoding state safety and output-equality tests | active |
 | integrate | SGLang integration of the certified head (draft, verify, decode) | todo |
 | paper | Manuscript revision as results land | todo |
 | review | Independent review of every PR before merge | ongoing |
@@ -34,7 +34,7 @@ item points at its PR and evidence.
 ## Task list
 
 ### Infrastructure
-- [ ] `scripts/gpu_lock.sh`, `scripts/sglang_worktree.sh`, worktree hook in `scripts/sglang_env.sh` (infra)
+- [x] `scripts/gpu_lock.sh`, `scripts/sglang_worktree.sh`, worktree hook in `scripts/sglang_env.sh` (infra; PR #1, writer-preference turnstile in PR #2)
 
 ### Baselines and measurement
 - [ ] Frozen workload and aiperf sweep harness producing the concurrency Pareto curve (bench)
