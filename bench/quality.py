@@ -232,7 +232,21 @@ def compare(run_a: Path, run_b: Path) -> dict[str, Any]:
             return {row['id']: row for row in csv.DictReader(handle)}
 
     a, b = load(run_a), load(run_b)
-    shared = sorted(set(a) & set(b))
+    if set(a) != set(b):
+        raise ValueError(
+            f'runs scored different problems: {len(set(a) - set(b))} only in A, '
+            f'{len(set(b) - set(a))} only in B; a paired comparison needs identical sets'
+        )
+    summaries = [json.loads((run / 'quality.json').read_text()) for run in (run_a, run_b)]
+    task_hashes = {summary.get('task_sha256') for summary in summaries}
+    if len(task_hashes) != 1:
+        raise ValueError('runs used different task files')
+    task_file = Path(str(summaries[0].get('task_file', '')))
+    if task_file.is_file():
+        expected = sum(1 for line in task_file.read_text().splitlines() if line.strip())
+        if len(a) != expected:
+            raise ValueError(f'runs scored {len(a)} problems, the task file has {expected}')
+    shared = sorted(a)
     only_a = sum(1 for key in shared if a[key]['correct'] == 'True' and b[key]['correct'] != 'True')
     only_b = sum(1 for key in shared if b[key]['correct'] == 'True' and a[key]['correct'] != 'True')
     acc_a = sum(a[key]['correct'] == 'True' for key in shared) / len(shared)

@@ -316,3 +316,74 @@ def test_frontier_dominance_and_aggregation() -> None:
     assert not by_label['a']['pareto_optimal'] and by_label['b']['pareto_optimal']
     assert by_label['b']['y_vs_a'] == pytest.approx(2.0)
     assert math.isnan(by_label['a']['accept_length_mean'])
+
+
+def test_point_is_not_measured_after_a_failed_cache_flush(tmp_path: Path) -> None:
+    import argparse
+
+    from bench.sweep import Sweep
+
+    sweep = Sweep.__new__(Sweep)
+    sweep.args = argparse.Namespace(min_requests=4, waves=1, min_warmup=1)
+    sweep.workload = [{'id': 'p', 'domain': 'chat', 'text': 'x'}]
+    sweep.warmup_pool = sweep.workload
+    sweep.run_dir = tmp_path
+    sweep.flush_cache = lambda: False  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError, match='flush failed'):
+        sweep.point(0, 1)
+    assert not any(tmp_path.iterdir())
+
+
+def test_invalid_points_never_reach_the_frontier() -> None:
+    from bench.pareto import invalid_reason, point_row
+
+    good = {'concurrency': 1, 'x_e2e': 100.0, 'y': 100.0, 'failed': 0, 'aiperf_exit_code': 0}
+    partial = {**good, 'x_e2e': 500.0, 'y': 500.0, 'failed': 3}
+    assert invalid_reason(good) == ''
+    assert 'failed requests' in invalid_reason(partial)
+    assert 'aiperf exit' in invalid_reason({**good, 'aiperf_exit_code': 1})
+    assert 'wrong length' in invalid_reason({**good, 'osl_mismatch': 2})
+    assert 'cache' in invalid_reason({**good, 'cache_flushed': False})
+    assert 'not finite' in invalid_reason({**good, 'y': math.nan})
+    rows = [point_row('a', 'r1', good), point_row('a', 'r2', partial)]
+    rows.append(point_row('b', 'r3', {**good, 'x_e2e': math.nan, 'y': math.nan}))
+    by_label = {entry['label']: entry for entry in aggregate(rows, baseline=None)}
+    assert by_label['a']['n'] == 1 and by_label['a']['n_invalid'] == 1
+    assert by_label['a']['x_e2e_mean'] == pytest.approx(100.0)
+    assert by_label['a']['pareto_optimal']
+    assert by_label['b']['n'] == 0 and not by_label['b']['pareto_optimal']
+    assert dominated((math.nan, 1.0), [(1.0, 1.0)])
+    assert not dominated((1.0, 1.0), [(math.nan, math.nan)])
+
+
+def _quality_run(directory: Path, ids: list[str], task_file: Path) -> Path:
+    import csv
+
+    directory.mkdir()
+    with (directory / 'problems.csv').open('w', newline='') as handle:
+        writer = csv.DictWriter(
+            handle, fieldnames=['id', 'correct', 'predicted_answer', 'generation_sha']
+        )
+        writer.writeheader()
+        for key in ids:
+            writer.writerow(
+                {'id': key, 'correct': True, 'predicted_answer': '1', 'generation_sha': 'h'}
+            )
+    summary = {'task_file': str(task_file), 'task_sha256': 'same'}
+    (directory / 'quality.json').write_text(json.dumps(summary))
+    return directory
+
+
+def test_quality_comparison_requires_the_same_complete_problem_set(tmp_path: Path) -> None:
+    from bench.quality import compare
+
+    task_file = tmp_path / 'tasks.jsonl'
+    task_file.write_text('{}\n{}\n{}\n')
+    full = ['p0', 'p1', 'p2']
+    a = _quality_run(tmp_path / 'a', full, task_file)
+    assert compare(a, _quality_run(tmp_path / 'b', full, task_file))['problems'] == 3
+    with pytest.raises(ValueError, match='different problems'):
+        compare(a, _quality_run(tmp_path / 'c', full[:2], task_file))
+    partial = _quality_run(tmp_path / 'd', full[:2], task_file)
+    with pytest.raises(ValueError, match='task file has 3'):
+        compare(partial, _quality_run(tmp_path / 'e', full[:2], task_file))
