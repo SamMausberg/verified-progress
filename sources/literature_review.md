@@ -142,16 +142,6 @@ frozen head.
   error. The paper reports a packed W4 Phi head cutting batch-1 latency by 10.8 %
   (A10G). The shift is exact for H3 too, since argmax, softmax and Gumbel-max are
   unchanged.
-  - On our head it does not help certification. The geometry workstream measured 6,005
-    held-out plain-decode positions of Qwen3.5-4B with FP64 replay (preliminary;
-    `~/vp-coord/notes/geometry.md`, branch `geometry/replay`). This is a team
-    measurement, not a literature result.
-  - Centring cut the median ||e_i||_2 over all rows by 14 %, but raised the median
-    int8 candidate count from 1.55 to 1.69.
-  - The mean row is aligned with the bulk of rarely used rows (median cosine 0.39) and
-    nearly orthogonal to the rows that win at real positions (median cosine -0.09). So
-    centring enlarges exactly the competing rows' envelopes (their ||e_i|| rises 17 %).
-  - Do not assume the paper's quality gains carry over to certification.
 - **ARCHead** (Kocabay, Akkuş, Yuksel, arXiv 2608.02703v1) [`archead`]. Low-rank core
   plus INT4 residual for the Qwen3-8B head at 25.6 % of BF16 storage. Top-1 agreement
   is 93.05 %, so without a certificate about 7 % of greedy tokens change.
@@ -870,19 +860,6 @@ soundness and measurement, and a negative result would also be informative.
 | Frieder et al., "Caching Historical Embeddings in Conversational Search" (arXiv 2211.14155; ACM TWeb 2024) [`frieder2024`] | a cache radius that guarantees true neighbours for a drifted query | query-drift reuse in retrieval |
 | FlashSampling [`flashsampling`] | emits per-tile maxima (and per-group log-sum-exp in its grouped variant) during the head pass | the draft-side summary production, without transport |
 | E142 (`morganmcg1/qwen38-challenge_senpai` PR #142, 2026-08-22) [`e142`] | exact top-2 verify-readout screens on a Qwen3.8 affine-4 head (248,320 x 5,120), seeded with the draft token's logit | **refuted**: median row survival 1.0000 for block max-norm and for a 2-bit copy with group-scale bounds, about 0.998 for centroid-radius leaves and an SVD basis |
-
-**Team measurements (preliminary, geometry workstream; `~/vp-coord/notes/geometry.md`,
-branch `geometry/replay`; not literature).** On Qwen3.5-4B plain-decode positions:
-
-- An int8 per-row head with the row Cauchy-Schwarz envelope leaves a mean of 1.55
-  candidate rows (p99 8, max 30) at 0.50 of the BF16 bytes. With int8 g128 the mean is
-  1.34 (p99 5).
-- These are much tighter than dgpp's reported median 4 and p99 40k, which is consistent
-  with dgpp's coarser 6-bit plane.
-- On real MTP-4B draft/target pairs (a small smoke capture), rho = ||h_t - h_d||_2 /
-  ||h_t||_2 is about 1.0 at the median. Certified l2 transport skips only 0.08 % of
-  rows. This agrees with E142: radius-times-norm terms are of the order of the logit
-  scale on this head family.
 
 **Verdict.** Every ingredient is published: tile bounds, summary emission, and
 transporting an inner product under a bounded displacement. We found no work that
