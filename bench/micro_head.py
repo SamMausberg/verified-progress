@@ -15,11 +15,19 @@ Arms (per batch size M):
 ``certified``        ``CertifiedHead.argmax`` on real head inputs, all stages plus
                      the conditional fallback node (not taken).
 ``certified_fallback`` the same with one row forced to fall back (taken).
+``certified_columns_mode`` / ``certified_columns_fallback`` the column-fallback
+                     mode without a fallback, and with one real near-tie row
+                     completed from the stock GEMM on its gathered candidates.
 ``int8_gemv``        the Triton W8A16 GEMM alone, BF16 output (the ceiling).
 ``int8_envelope``    prep + W8A16 GEMM with the envelope epilogue.
 ``marlin_w8a16``     SGLang's GPTQ-Marlin kernel with uint8b128 per-channel
                      weights (an existing W8A16 kernel, BF16 scales).
-``torch_int8pack``   ``torch._weight_int8pack_mm`` (skipped if unsupported).
+``torch_int8pack``   ``torch._weight_int8pack_mm`` (with ``--int8pack``; 11-22 ms at
+                     M = 8-16 here, so off by default).
+``certified_sample`` / ``stock_seeded_sample`` SGLang's seeded sampler at T = 0.7
+                     (no top-k/top-p): the certified path with its fallback node,
+                     and the stock chain (GEMM, FP32 copy, ``div_``, softmax, log,
+                     ``multinomial_with_seed``).
 
 Stage times of the certified path are differences of graphs that run growing
 prefixes of the pipeline. Run under the exclusive lock::
@@ -30,6 +38,8 @@ prefixes of the pipeline. Run under the exclusive lock::
 from __future__ import annotations
 
 import argparse
+import functools
+import gc
 import json
 import platform
 import statistics
@@ -48,7 +58,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
 sys.path.insert(0, str(ROOT / 'experiments' / 'certified_head'))
 
-from certified_head.head import CertifiedHead, GemvConfig
+from certified_head.head import STATUS_BITS, CertifiedHead, GemvConfig
 from certified_head.quantize import MODEL_ID, MODEL_REVISION, load_or_build
 from real_states import plain_decode_steps
 
@@ -82,7 +92,10 @@ def time_graph(
         end.record()
         end.synchronize()
         out.append(start.elapsed_time(end) * 1000.0 / inner)
+    # Each captured graph keeps a private memory pool; release it before the next one.
     del graph
+    gc.collect()
+    torch.cuda.empty_cache()
     return out
 
 
@@ -114,8 +127,7 @@ def measure(
 def read_peak_tbps(nbytes: int) -> float:
     """HBM read bandwidth of a plain streaming sum over ``nbytes``."""
     x = torch.empty(nbytes // 4, dtype=torch.float32, device='cuda').fill_(1.0)
-    out = torch.empty((), device='cuda')
-    t = time_graph(lambda: torch.sum(x, out=out), 5, 20, None)
+    t = time_graph(lambda: x.sum(), 5, 20, None)
     return nbytes / (statistics.median(t) * 1e-6) / 1e12
 
 
@@ -128,33 +140,70 @@ def real_rows(n: int) -> torch.Tensor:
     return torch.cat(rows)[:n].cuda()
 
 
-def pick_batch(
-    head: CertifiedHead, pool: torch.Tensor, m: int
-) -> tuple[torch.Tensor, dict[str, Any]]:
-    """First batch of ``m`` consecutive real rows with no fallback row."""
-    for start in range(0, pool.shape[0] - m + 1, m):
-        h = pool[start : start + m].contiguous()
-        _, stats = head.argmax(h, fallback=False)
-        if not bool(stats.fallback.any()):
-            return h, stats.summary()
-    raise RuntimeError(f'no fallback-free batch of {m} real rows')
+def sample_inputs(idx: torch.Tensor, temp: float = 0.7) -> tuple[torch.Tensor, ...]:
+    """Seeds and positions keyed by the pool row index, so a row's noise is fixed."""
+    idx = idx.to('cuda', torch.int64)
+    seeds = (idx + 1) * 7919
+    positions = idx + 1000
+    temps = torch.full((idx.numel(),), temp, dtype=torch.float32, device='cuda')
+    return seeds, positions, temps
 
 
-def fallback_rate(head: CertifiedHead, pool: torch.Tensor, m: int) -> dict[str, float]:
-    """Fraction of real batches of size ``m`` that take the dense fallback."""
-    hit = total = 0
-    rows_fb = rows = 0
-    for start in range(0, pool.shape[0] - m + 1, m):
-        _, stats = head.argmax(pool[start : start + m].contiguous(), fallback=False)
-        f = stats.fallback
-        hit += int(f.any())
-        total += 1
-        rows_fb += int(f.sum())
-        rows += m
+def row_status(head: CertifiedHead, pool: torch.Tensor, kind: str) -> torch.Tensor:
+    """Certificate status of every pool row (0 = decided).
+
+    A row's status does not depend on the rest of its batch (the envelope,
+    selection and decision are per row), so batches of any size can be formed
+    from these statuses.
+    """
+    out = []
+    for s0 in range(0, pool.shape[0], 256):
+        h = pool[s0 : s0 + 256].contiguous()
+        if kind == 'argmax':
+            _, stats = head.argmax(h, fallback=False)
+        else:
+            idx = torch.arange(s0, s0 + h.shape[0])
+            _, stats = head.gumbel_sample(h, *sample_inputs(idx), fallback=False)
+        out.append(stats.status.clone())
+    return torch.cat(out)
+
+
+def decided_batch(status: torch.Tensor, m: int) -> torch.Tensor:
+    """Indices of the first ``m`` decided rows."""
+    idx = (status == 0).nonzero().flatten()
+    if idx.numel() < m:
+        raise RuntimeError(f'only {idx.numel()} decided rows for a batch of {m}')
+    return idx[:m]
+
+
+def ambiguous_row(status: torch.Tensor, pool: torch.Tensor) -> torch.Tensor:
+    """A real row undecided only because of a near tie (complete candidate list)."""
+    hit = (status == STATUS_BITS['ambiguous']).nonzero()
+    if not hit.numel():
+        raise RuntimeError('no ambiguous real row in the pool')
+    return pool[int(hit[0, 0])].clone()
+
+
+def fallback_rate(status: torch.Tensor, m: int) -> dict[str, float]:
+    """Fraction of real batches of ``m`` consecutive rows that take a fallback, by kind.
+
+    ``batch_columns_only_rate``: every undecided row is a near tie with a
+    complete candidate list (the column fallback suffices).
+    ``batch_dense_rate``: some undecided row needs the whole-batch stock head.
+    """
+    amb = STATUS_BITS['ambiguous']
+    n = status.numel() // m * m
+    st = status[:n].view(-1, m)
+    undecided = st != 0
+    other = (st != 0) & (st != amb)
+    any_fb = undecided.any(dim=1)
+    dense = other.any(dim=1)
     return {
-        'batches': total,
-        'batch_fallback_rate': hit / total,
-        'row_fallback_rate': rows_fb / rows,
+        'batches': int(st.shape[0]),
+        'batch_fallback_rate': float(any_fb.double().mean()),
+        'batch_columns_only_rate': float((any_fb & ~dense).double().mean()),
+        'batch_dense_rate': float(dense.double().mean()),
+        'row_fallback_rate': float(undecided.double().mean()),
     }
 
 
@@ -244,7 +293,7 @@ def main() -> None:
     ap.add_argument(
         '--cold', action='store_true', help='also measure with L2 flushed between calls'
     )
-    ap.add_argument('--capacity', type=int, default=64)
+    ap.add_argument('--capacity', type=int, default=256)
     ap.add_argument('--group-size', type=int, default=2560)
     ap.add_argument('--pool-rows', type=int, default=16384)
     ap.add_argument('--arms', nargs='*', default=None)
@@ -255,7 +304,13 @@ def main() -> None:
         help='tune_gemv.py output to use instead of the defaults',
     )
     ap.add_argument('--out', type=Path, default=None)
+    ap.add_argument(
+        '--int8pack', action='store_true', help='also time torch._weight_int8pack_mm (slow)'
+    )
+    ap.add_argument('--w8a8-configs', type=Path, default=None)
+    ap.add_argument('--bf16-configs', type=Path, default=None)
     args = ap.parse_args()
+    args.arith_configs = {'w8a8': args.w8a8_configs, 'bf16': args.bf16_configs}
 
     torch.backends.cuda.matmul.allow_tf32 = False
     w_cpu, qh = load_or_build()
@@ -268,21 +323,51 @@ def main() -> None:
         capacity=args.capacity,
         max_batch=max(args.batches),
     )
+    head_cols = CertifiedHead.from_quantized(
+        w,
+        qh,
+        reference='bf16',
+        group_size=args.group_size,
+        capacity=args.capacity,
+        max_batch=max(args.batches),
+    )
+    column_self_test = head_cols.enable_column_fallback(args.batches)
     if args.gemv_configs is not None:
-        tuned = json.loads(args.gemv_configs.read_text())['batches']
-        table = {int(m): GemvConfig(**e['best']['config']) for m, e in tuned.items()}
-        head.gemv_config = lambda m: table[min(b for b in table if b >= m)]
+        table_fn = _table_config(args.gemv_configs)
+        if table_fn is not None:
+            head.gemv_config = functools.partial(table_fn, 'w8a16')
+            head_cols.gemv_config = head.gemv_config
     v, k = w.shape
     pool = real_rows(args.pool_rows)
+    status = {'w8a16': row_status(head, pool, 'argmax'), 'sample': row_status(head, pool, 'sample')}
+    amb_row = ambiguous_row(status['w8a16'], pool)
+    heads_by_arith = {}
+    for arith in ('w8a8', 'bf16'):
+        other = CertifiedHead.from_quantized(
+            w,
+            qh,
+            reference='bf16',
+            group_size=args.group_size,
+            capacity=args.capacity,
+            max_batch=max(args.batches),
+        )
+        other.arith_for = functools.partial(_const_arith, arith)
+        if args.arith_configs.get(arith):
+            table_fn = _table_config(args.arith_configs[arith])
+            if table_fn is not None:
+                other.arith_config = table_fn
+        heads_by_arith[arith] = other
+        status[arith] = row_status(other, pool, 'argmax')
     flush = torch.empty(256 * 2**20 // 4, dtype=torch.float32, device='cuda')
     marlin = marlin_arm(head.q, head.scale)
-    has_int8pack = True
+    has_int8pack = args.int8pack
     scale_bf16 = head.scale.to(torch.bfloat16)
-    try:
-        torch._weight_int8pack_mm(pool[:1], head.q, scale_bf16)
-    except Exception as exc:
-        print(f'torch._weight_int8pack_mm unavailable on CUDA: {exc}', file=sys.stderr)
-        has_int8pack = False
+    if has_int8pack:
+        try:
+            torch._weight_int8pack_mm(pool[:1], head.q, scale_bf16)
+        except Exception as exc:
+            print(f'torch._weight_int8pack_mm unavailable on CUDA: {exc}', file=sys.stderr)
+            has_int8pack = False
 
     result: dict[str, Any] = {
         'environment': environment(),
@@ -298,26 +383,49 @@ def main() -> None:
             'weight_bytes_int8': v * k,
         },
         'read_peak_tbps_1p27GB': read_peak_tbps(v * k * 2),
+        'column_self_test': column_self_test,
         'batches': {},
     }
     for m in args.batches:
-        h, cand = pick_batch(head, pool, m)
+        h = pool[decided_batch(status['w8a16'], m)].contiguous()
+        _, stats = head.argmax(h, fallback=False)
+        cand = stats.summary()
         h_fb = h.clone()
         h_fb[0] = float('inf')  # nonfinite row forces the dense fallback
+        h_amb = h.clone()
+        h_amb[0] = amb_row
         arms = build_arms(head, w, h, h_fb, marlin, scale_bf16 if has_int8pack else None)
+        arms['certified_columns_mode'] = functools.partial(head_cols.argmax, h)
+        s_idx = decided_batch(status['sample'], m)
+        arms.update(sampling_arms(head, w, pool[s_idx].contiguous(), s_idx))
+        for arith in ('w8a8', 'bf16'):
+            other = heads_by_arith[arith]
+            h_a = pool[decided_batch(status[arith], m)].contiguous()
+            arms[f'certified_{arith}'] = functools.partial(other.argmax, h_a)
+            arms[f'{arith}_envelope'] = functools.partial(_envelope_pass, other, h_a)
+        arms['certified_columns_fallback'] = functools.partial(head_cols.argmax, h_amb)
         if args.arms:
             arms = {n: f for n, f in arms.items() if n in args.arms}
         entry: dict[str, Any] = {
             'certified_batch_stats': cand,
-            'fallback_rate_real': fallback_rate(head, pool, m),
+            'fallback_rate_real': fallback_rate(status['w8a16'], m),
+            'fallback_rate_by_config': {k: fallback_rate(v, m) for k, v in status.items()},
         }
         for name, fn in arms.items():
-            entry[name] = measure(fn, args, flush)
+            try:
+                entry[name] = measure(fn, args, flush)
+            except Exception as exc:  # one failing arm must not lose the others
+                entry[name] = {'error': f'{type(exc).__name__}: {exc}'[:300]}
+                print(f'M={m:4d} {name:20s} failed: {entry[name]["error"]}', flush=True)
+                continue
             print(f'M={m:4d} {name:20s} {entry[name]["warm"]["median_us"]:9.1f} us', flush=True)
         result['batches'][str(m)] = entry
-    if args.out:
-        args.out.parent.mkdir(parents=True, exist_ok=True)
-        args.out.write_text(json.dumps(result, indent=1) + '\n')
+        if args.out:  # write after every batch size so a failure keeps what was measured
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            args.out.write_text(json.dumps(result, indent=1) + '\n')
+        del arms
+        gc.collect()
+        torch.cuda.empty_cache()
 
 
 def build_arms(
@@ -369,6 +477,57 @@ def build_arms(
     if scale_bf16 is not None:
         arms['torch_int8pack'] = lambda: torch._weight_int8pack_mm(h, head.q, scale_bf16)
     return arms
+
+
+def sampling_arms(
+    head: CertifiedHead, w: torch.Tensor, h: torch.Tensor, idx: torch.Tensor
+) -> dict[str, Callable[[], Any]]:
+    """Seeded sampling at T = 0.7: the certified path and SGLang's stock chain."""
+    from certified_head.reference import stock_seeded_sample
+
+    seeds, positions, temps = sample_inputs(idx)
+    h_fb = h.clone()
+    h_fb[0] = float('inf')
+
+    def certified_sample() -> Any:
+        return head.gumbel_sample(h, seeds, positions, temps)
+
+    def certified_sample_fallback() -> Any:
+        return head.gumbel_sample(h_fb, seeds, positions, temps)
+
+    def stock_seeded() -> Any:
+        return stock_seeded_sample(h, w, 'bf16', seeds, positions, temps)
+
+    return {
+        'certified_sample': certified_sample,
+        'certified_sample_fallback': certified_sample_fallback,
+        'stock_seeded_sample': stock_seeded,
+    }
+
+
+def _const_arith(arith: str, _m: int) -> Any:
+    return arith
+
+
+def _envelope_pass(head: CertifiedHead, h: torch.Tensor) -> Any:
+    m = h.shape[0]
+    head._prep(h, m)
+    return head._gemv(h, m, head._top, 3)
+
+
+def _table_config(path: Path) -> Callable[[Any, int], GemvConfig] | None:
+    """Tuned tiles per batch size (nearest tuned M at or above, else the largest)."""
+    if not path.exists():
+        print(f'no sweep table at {path}; using defaults', file=sys.stderr)
+        return None
+    tuned = json.loads(path.read_text())['batches']
+    table = {int(m): GemvConfig(**e['best']['config']) for m, e in tuned.items()}
+
+    def pick(_a: Any, m: int) -> GemvConfig:
+        above = [b for b in table if b >= m]
+        return table[min(above) if above else max(table)]
+
+    return pick
 
 
 def _prefix(head: CertifiedHead, h: torch.Tensor, m: int, stages: int) -> None:

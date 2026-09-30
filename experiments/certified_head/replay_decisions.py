@@ -12,7 +12,10 @@ certificate leaves undecided (by reason), and agreement:
 ``real``  decided rows vs the FP64 argmax (lowest index among equal values).
 
 It also counts how often the three references disagree with each other, which
-is the price of choosing one contract over another. Run under the shared lock::
+is the price of choosing one contract over another. With ``--sample-temps`` it
+also draws one seeded sample per row and temperature (seed and position drawn
+from a fixed generator) and checks it against SGLang's seeded sampler on the
+same batch. Run under the shared lock::
 
     scripts/gpu_lock.sh -s python experiments/certified_head/replay_decisions.py \\
         --out evidence/certified_head/replay_decisions.json
@@ -35,13 +38,19 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'src'))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from certified_head.bounds import Reference
+from certified_head.bounds import Reference, RefModel
 from certified_head.head import STATUS_BITS, CertifiedHead
 from certified_head.quantize import MODEL_ID, MODEL_REVISION, load_or_build
-from certified_head.reference import exact_logits_fp64, reference_argmax
+from certified_head.reference import exact_logits_fp64, reference_argmax, stock_seeded_sample
 from real_states import plain_decode_steps
 
-CONTRACTS: tuple[Reference, ...] = ('bf16', 'fp32', 'real')
+CONFIGS: dict[str, tuple[Reference, RefModel]] = {
+    'bf16/conservative': ('bf16', 'conservative'),
+    'bf16/hopper-wgmma': ('bf16', 'hopper-wgmma'),
+    'fp32/conservative': ('fp32', 'conservative'),
+    'fp32/hopper-wgmma': ('fp32', 'hopper-wgmma'),
+    'real': ('real', 'conservative'),
+}
 
 
 def histogram(values: np.ndarray) -> dict[str, int]:
@@ -57,9 +66,10 @@ def main() -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     ap.add_argument('--limit-rows', type=int, default=None)
-    ap.add_argument('--capacity', type=int, default=64)
+    ap.add_argument('--capacity', type=int, default=256)
     ap.add_argument('--group-size', type=int, default=2560)
     ap.add_argument('--selection', default='tiles', choices=['tiles', 'dense'])
+    ap.add_argument('--sample-temps', type=float, nargs='*', default=[])
     ap.add_argument('--out', type=Path, default=None)
     args = ap.parse_args()
 
@@ -69,20 +79,24 @@ def main() -> None:
         c: CertifiedHead.from_quantized(
             w,
             qh,
-            reference=c,
+            reference=ref,
+            ref_model=model,
             group_size=args.group_size,
             capacity=args.capacity,
             max_batch=256,
             selection=args.selection,
         )
-        for c in CONTRACTS
+        for c, (ref, model) in CONFIGS.items()
     }
-    cand: dict[str, list[np.ndarray]] = {c: [] for c in CONTRACTS}
-    reasons: dict[str, Counter[str]] = {c: Counter() for c in CONTRACTS}
+    cand: dict[str, list[np.ndarray]] = {c: [] for c in CONFIGS}
+    reasons: dict[str, Counter[str]] = {c: Counter() for c in CONFIGS}
     agree: Counter[str] = Counter()
     disagree_examples: list[dict[str, Any]] = []
     steps = rows = 0
     batch_fallback: Counter[str] = Counter()
+    sample_cand: dict[str, list[np.ndarray]] = {}
+    sample_undecided: Counter[str] = Counter()
+    gen = torch.Generator(device='cuda').manual_seed(20260930)
     t0 = time.time()
     for h_cpu, engine in plain_decode_steps(limit_rows=args.limit_rows):
         h = h_cpu.cuda().contiguous()
@@ -105,7 +119,7 @@ def main() -> None:
                 reasons[c][name] += int(((st & bit) != 0).sum())
             reasons[c]['undecided_rows'] += int((~decided).sum())
             batch_fallback[c] += int(bool((~decided).any()))
-            want = {'bf16': ref16, 'fp32': ref32, 'real': ref_real}[c]
+            want = {'bf16': ref16, 'fp32': ref32, 'real': ref_real}[head.reference]
             agree[f'{c}_decided_eq_reference'] += int(((ids == want) & decided).sum())
             agree[f'{c}_decided'] += int(decided.sum())
             bad = decided & (ids != want)
@@ -120,9 +134,25 @@ def main() -> None:
                         'ref': int(want[i]),
                     }
                 )
-            if c != 'real':
+            if head.reference != 'real':
                 full, _ = head.argmax(h)
                 agree[f'{c}_with_fallback_eq_reference'] += int((full == want).sum())
+        for temp in args.sample_temps:
+            seeds = torch.randint(0, 2**62, (m,), device='cuda', generator=gen)
+            positions = torch.randint(0, 2**20, (m,), device='cuda', generator=gen)
+            temps = torch.full((m,), temp, dtype=torch.float32, device='cuda')
+            for c in ('bf16/conservative', 'bf16/hopper-wgmma', 'fp32/conservative'):
+                head = heads[c]
+                ids, stats = head.gumbel_sample(h, seeds, positions, temps, fallback=False)
+                key = f'{c}@T={temp}'
+                sample_cand.setdefault(key, []).append(stats.candidates.cpu().numpy())
+                decided = stats.status == 0
+                sample_undecided[key] += int((~decided).sum())
+                ref = stock_seeded_sample(h, w, head.reference, seeds, positions, temps)
+                agree[f'sample_{key}_decided_eq_reference'] += int(((ids == ref) & decided).sum())
+                agree[f'sample_{key}_decided'] += int(decided.sum())
+                full, _ = head.gumbel_sample(h, seeds, positions, temps)
+                agree[f'sample_{key}_with_fallback_eq_reference'] += int((full == ref).sum())
         steps += 1
         rows += m
     elapsed = time.time() - t0
@@ -137,7 +167,7 @@ def main() -> None:
         'disagreements': disagree_examples,
         'contracts': {},
     }
-    for c in CONTRACTS:
+    for c in CONFIGS:
         cc = np.concatenate(cand[c])
         out['contracts'][c] = {
             'candidates': {
@@ -150,6 +180,19 @@ def main() -> None:
             'status_rows': dict(reasons[c]),
             'row_fallback_rate': reasons[c]['undecided_rows'] / rows,
             'step_fallback_rate': batch_fallback[c] / steps,
+        }
+    out['sampling'] = {}
+    for key, arrs in sample_cand.items():
+        cc = np.concatenate(arrs)
+        out['sampling'][key] = {
+            'candidates': {
+                'mean': float(cc.mean()),
+                'quantiles': {
+                    str(q): float(np.quantile(cc, q)) for q in (0.5, 0.9, 0.99, 0.999, 1.0)
+                },
+                'histogram': histogram(cc),
+            },
+            'row_fallback_rate': sample_undecided[key] / rows,
         }
     print(json.dumps(out, indent=1))
     if args.out:

@@ -96,25 +96,29 @@ class GemvConfig:
 
 
 def default_arith_config(arith: Arith, m: int) -> GemvConfig:
-    """Tile shape for the W8A8 and BF16 passes (from ``bench/tune_gemv.py``)."""
-    if m <= 16:
-        return GemvConfig(64, 16, 128, 4, 3)
+    """Tile shape for the W8A8 and BF16 passes (from ``bench/tune_gemv.py`` on GH200)."""
+    if arith == 'w8a8':
+        if m <= 16:
+            return GemvConfig(128, 16, 128, 4, 3, tma=True)
+        if m <= 32:
+            return GemvConfig(256, 32, 128, 4, 3, tma=True)
+        return GemvConfig(128, 64, 128, 4, 3, tma=True)
     if m <= 32:
-        return GemvConfig(64, 32, 128, 4, 3)
+        return GemvConfig(128, 32, 64, 4, 3, tma=True)
     if m <= 64:
-        return GemvConfig(128, 64, 128, 4, 3)
-    return GemvConfig(128, 128, 128, 8, 3)
+        return GemvConfig(128, 64, 64, 4, 3, tma=True)
+    return GemvConfig(128, 128, 64, 4, 3, tma=True)
 
 
 def default_gemv_config(m: int) -> GemvConfig:
-    """Tile shape by batch size: the fastest in ``bench/tune_gemv.py`` on GH200."""
+    """W8A16 tile shape by batch size: the fastest in ``bench/tune_gemv.py`` on GH200."""
     if m <= 16:
-        return GemvConfig(64, 16, 128, 4, 3)
+        return GemvConfig(128, 16, 128, 4, 4, tma=True)
     if m <= 32:
-        return GemvConfig(64, 32, 128, 4, 3)
+        return GemvConfig(128, 32, 64, 4, 4, tma=True)
     if m <= 64:
-        return GemvConfig(128, 64, 128, 4, 3)
-    return GemvConfig(64, 128, 128, 4, 3)
+        return GemvConfig(128, 64, 64, 4, 4, tma=True)
+    return GemvConfig(128, 128, 64, 4, 3, tma=True)
 
 
 @dataclass

@@ -38,18 +38,27 @@ def candidates(m: int) -> list[GemvConfig]:
     block_ms = sorted({bm, min(bm, 128), min(bm, 64)})
     out = []
     for block_m, block_v, block_k, warps, stages in itertools.product(
-        block_ms, (64, 128, 256), (128, 256, 512), (4, 8), (3, 4)
+        block_ms, (64, 128, 256), (64, 128, 256), (4, 8), (3, 4)
     ):
         # Shared memory per stage: int8 weights plus BF16 activations.
         smem = stages * (block_v * block_k + 2 * block_k * block_m)
         if smem > 200 * 1024 or block_v * block_m > 128 * 256:
             continue
         out.append(GemvConfig(block_v, block_m, block_k, warps, stages))
+        out.append(GemvConfig(block_v, block_m, block_k, warps, stages, tma=True))
     return out
 
 
 def _fixed(cfg: GemvConfig) -> Callable[[int], GemvConfig]:
     return lambda _m: cfg
+
+
+def _const_arith(arith: Any, _m: int) -> Any:
+    return arith
+
+
+def _fixed_arith(cfg: GemvConfig) -> Callable[[Any, int], GemvConfig]:
+    return lambda _a, _m: cfg
 
 
 def main() -> None:
@@ -60,6 +69,7 @@ def main() -> None:
     ap.add_argument('--inner', type=int, default=10)
     ap.add_argument('--trials', type=int, default=15)
     ap.add_argument('--epilogue', type=int, default=3)
+    ap.add_argument('--arith', default='w8a16', choices=['w8a16', 'w8a8', 'bf16'])
     ap.add_argument('--out', type=Path, default=None)
     args = ap.parse_args()
     w, qh = load_or_build()
@@ -75,8 +85,10 @@ def main() -> None:
         out = torch.empty(m, head.vocab, dtype=torch.bfloat16, device='cuda')
         target = out if args.epilogue == 0 else head._top
         rows: list[dict[str, Any]] = []
+        head.arith_for = functools.partial(_const_arith, args.arith)
         for cfg in candidates(m):
             head.gemv_config = _fixed(cfg)
+            head.arith_config = _fixed_arith(cfg)
             try:
                 head._prep(h, m)
 
@@ -95,6 +107,9 @@ def main() -> None:
             'n_configs': len(rows),
             'failed': len(rows) - len(ok),
         }
+        if args.out:  # write after every batch size so a timeout keeps what was measured
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            args.out.write_text(json.dumps(result, indent=1) + '\n')
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(json.dumps(result, indent=1) + '\n')
