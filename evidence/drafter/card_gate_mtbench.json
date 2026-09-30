@@ -1,0 +1,53 @@
+{
+  "description": "MT-Bench first turns (80, HuggingFaceH4/mt_bench_prompts e3a795c raw/question.jsonl), card settings: DFLASH block 16, greedy, thinking on, <=4096 new tokens, concurrency 1. Model card (z-lab/Qwen3.5-4B-DFlash, B200): mean accept length 5.93.",
+  "requests": 80,
+  "finish_reasons": {
+    "stop": 54,
+    "length": 26
+  },
+  "mean_completion_tokens": 2615.3875,
+  "accept_length_mean_per_request": 5.732344679405333,
+  "accept_length_median_per_request": 5.630434782608695,
+  "accept_length_mean_per_request_bootstrap95": [
+    5.363920367456593,
+    6.125073375646848
+  ],
+  "accept_length_pooled": 5.2544198895027625,
+  "alpha_by_position": [
+    0.8150426921145153,
+    0.7493760591588353,
+    0.7718021462933268,
+    0.8131692504395077,
+    0.8434879454926625,
+    0.8566990291262135,
+    0.8631912964641886,
+    0.8704967965549837,
+    0.8737934362934364,
+    0.8811101905550952,
+    0.8895157498824636,
+    0.897815362931642,
+    0.9014913657770801,
+    0.9131475838049631,
+    0.9199046483909415
+  ],
+  "survival_by_position": [
+    0.8150426921145153,
+    0.6107734806629834,
+    0.4713962832747363,
+    0.3833249623304872,
+    0.3233299849321949,
+    0.2769964841788046,
+    0.23910095429432446,
+    0.208136614766449,
+    0.18186840783525868,
+    0.16024610748367654,
+    0.1425414364640884,
+    0.1279758915118031,
+    0.11536916122551481,
+    0.10534907081868408,
+    0.09691109994977398
+  ],
+  "cycles": 39820,
+  "foreign_cpu_cores_mean": 1.992,
+  "note": "Correctness/acceptance run on a shared GPU slot; latencies are not timings."
+}

@@ -95,3 +95,14 @@ matches the engine's (6.200 against 6.204 tokens per cycle).
         --trace ~/vp-data/drafter/trace/b16 --panel experiments/drafter/panel-v1.jsonl \
         --draft z-lab/Qwen3.5-4B-DFlash@9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf \
         --out ~/vp-data/drafter/support/zlab_b16
+
+## Card-reproduction gate (MT-Bench)
+
+`card_gate_mtbench.json`, `launch/zlab_b16_card_gate.json`: the 80 MT-Bench first turns with
+the model card's settings (block 16, greedy, thinking on, up to 4,096 new tokens,
+concurrency 1). Mean accept length per request 5.73 (bootstrap 95% interval 5.36-6.13,
+median 5.63; pooled 5.25) against the card's 5.93 on B200, so serving on this sm_90 host
+with the substituted backends reproduces the card within the sampling noise of 80 prompts.
+Shared GPU slot, stock engine; acceptance only.
+
+    scripts/gpu_lock.sh -s experiments/drafter/run_card_gate.sh
