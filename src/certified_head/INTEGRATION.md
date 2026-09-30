@@ -48,11 +48,45 @@ in check mode rows whose token differs from the stock token passed in).
 | `SGLANG_CERTIFIED_HEAD_SAMPLED_VERIFY=1` | fixed-noise sampled verify (its own arm) |
 | `SGLANG_CERTIFIED_HEAD_FALLBACK` | `batch` (default) or `columns` (only for batch sizes whose start-up self-test passes) |
 | `SGLANG_CERTIFIED_HEAD_MODEL` | `conservative` (default) or `hopper-wgmma` |
+| `SGLANG_CERTIFIED_HEAD_MAX_ROWS` | largest batch in rows the head serves (default 256); larger batches run stock |
 | `SGLANG_CERTIFIED_HEAD_CHECK=1` | also run the stock head at the same shape and count differing rows |
-| `SGLANG_CERTIFIED_HEAD_STATS=path` | write the counters as JSON |
+| `SGLANG_CERTIFIED_HEAD_STATS=path` | write the counters as JSON (every `SGLANG_CERTIFIED_HEAD_STATS_EVERY` steps, default 1) |
 | `SGLANG_CERTIFIED_HEAD_SRC=dir` | directory added to `sys.path` to import `certified_head` |
 
 All are off by default; with none set the patched engine runs its stock code.
+
+## The SGLang patch series
+
+`engine/sglang/patches/kernel/0001-0004` apply in order to `bd66ce34`:
+
+```sh
+scripts/sglang_worktree.sh kernel
+git -C ~/sglang-wt/kernel am "$PWD"/engine/sglang/patches/kernel/*.patch
+SGLANG_WORKTREE=~/sglang-wt/kernel source scripts/sglang_env.sh
+export SGLANG_CERTIFIED_HEAD_SRC="$PWD/src" SGLANG_CERTIFIED_HEAD_DECODE=1
+```
+
+| Patch | Path | Flag |
+|---|---|---|
+| 0001 | greedy plain decode: decode graphs capture the certified head under a device flag and the stock head under its negation; the certified ids replace the sampler's argmax | `DECODE` |
+| 0002 | greedy target verify: the same in the TARGET_VERIFY graphs; the ids replace the argmax in `eagle_sample` (EAGLE/MTP) and in DFlash's accept step | `VERIFY` |
+| 0003 | MTP draft top-1 (draft steps in the draft graph, and the draft-extend token) and DFlash's greedy draft projection | `DRAFT` |
+| 0004 | fixed-noise sampled verify for EAGLE/MTP (seeded, temperature only; needs `--enable-deterministic-inference`) | `SAMPLED_VERIFY` |
+
+The host sets each graph's flag before a replay: a target batch is certified
+only if it needs no logits (all greedy for 0001-0002; seeded temperature-only
+sampling for 0004; no logprobs, penalties, logit bias, grammar, custom logit
+processors, sampling masks or beam rows), and only if its padded graph was
+captured with the certified head. MTP drafting is greedy top-1 for every batch
+unless rejection sampling is on. Unsupported configurations (TP or PP > 1, DP
+attention, quantized, LoRA, FP32, scaled or softcapped heads, padded
+vocabularies, `SGLANG_SANITIZE_NAN_LOGITS`, `SGLANG_ENABLE_ASYNC_ASSERT`) log a
+warning and keep the stock head. Each call checks that the caller's head
+tensor is the one the certified head was built from, so every fallback runs
+the stock GEMM on the same bytes at the same shape.
+
+`experiments/certified_head/engine_validate.sh` runs each path in check mode
+and one request at a time against the stock server (see its header).
 
 ## Graph capture
 

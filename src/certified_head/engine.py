@@ -36,6 +36,7 @@ import triton.language as tl
 from .bounds import RefModel
 from .head import STATUS_BITS, CertifiedHead
 from .quantize import quantized_for
+from .reference import stock_seeded_sample
 
 PATH_FLAG = {
     'decode': 'decode',  # greedy plain decode
@@ -194,6 +195,31 @@ class PathHead:
         self.argmax(h, gate=on, valid=valid, stock_ids=stock)
         self.counters.copy_(before)
         self.warmed.add(m)
+
+    def warm_sampling(self, hidden: torch.Tensor) -> None:
+        """``warm`` for :meth:`gumbel_sample`, including the stock sampler that
+        the fallback runs (SGLang compiles ``multinomial_with_seed``)."""
+        m = hidden.shape[0]
+        if m in self.warmed or not self.supports(m):
+            return
+        dev = hidden.device
+        h = hidden.contiguous()
+        seeds = torch.arange(m, dtype=torch.int64, device=dev)
+        positions = torch.arange(m, dtype=torch.int64, device=dev)
+        temps = torch.ones(m, dtype=torch.float32, device=dev)
+        on = torch.ones((), dtype=torch.bool, device=dev)
+        valid = torch.full((), m, dtype=torch.int32, device=dev)
+        before = self.counters.clone()
+        self.gumbel_sample(h, seeds, positions, temps, gate=on, valid=valid)
+        stock_seeded_sample(h, self.head.weight, self.head.reference, seeds, positions, temps)
+        self.counters.copy_(before)
+        self.warmed.add(m)
+
+    def add_mismatches(self, ids: torch.Tensor, stock_ids: torch.Tensor) -> None:
+        """Count rows whose tokens differ, for checks run outside the graph."""
+        self.counters[COUNTERS.index('mismatch_rows')] += (
+            (ids.view(-1) != stock_ids.view(-1).to(ids.dtype)).sum().to(torch.int64)
+        )
 
     def argmax(
         self,
