@@ -9,6 +9,7 @@ correctness-only probes.
 Modes (the probe variables are documented in the engine's
 `sglang/srt/speculative/repair_probe.py`):
 
+- `plain`: the target alone, no speculation (the greedy reference; --block is ignored).
 - `fresh`: stock DFlash at block size B (the baseline cycle).
 - `force`: stock verification, then the accepted length is forced to B
   (`SGLANG_SIMULATE_ACC_LEN`): the cost of an ideal drafter at width B. The
@@ -128,6 +129,32 @@ def stream_generate(
     return {'output_ids': output_ids, 'arrivals': arrivals, 'meta_info': meta}
 
 
+def generate_with_logprobs(
+    base: str, input_ids: list[int], max_new_tokens: int, ignore_eos: bool
+) -> dict[str, Any]:
+    """Non-streaming request that also returns the top-2 logprobs at every output position."""
+    payload = {
+        'input_ids': input_ids,
+        'sampling_params': {
+            'temperature': 0.0,
+            'max_new_tokens': max_new_tokens,
+            'ignore_eos': ignore_eos,
+        },
+        'return_logprob': True,
+        'top_logprobs_num': 2,
+        'logprob_start_len': -1,
+    }
+    t_send = time.perf_counter()
+    out = http_json(f'{base}/generate', payload, timeout=1800)
+    elapsed = time.perf_counter() - t_send
+    meta = out.get('meta_info', {})
+    positions = meta.pop('output_top_logprobs', None) or []
+    top2 = [[[p[0], p[1]] for p in position[:2]] for position in positions]
+    meta.pop('output_token_logprobs', None)
+    ids = out.get('output_ids', [])
+    return {'output_ids': ids, 'arrivals': [(elapsed, len(ids))], 'meta_info': meta, 'top2': top2}
+
+
 def summarize(rec: dict[str, Any]) -> dict[str, Any]:
     arr = rec['arrivals']
     n = len(rec['output_ids'])
@@ -150,7 +177,9 @@ def main() -> int:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     ap.add_argument(
-        '--mode', required=True, choices=['fresh', 'force', 'oracle', 'recycle', 'keep', 'probe']
+        '--mode',
+        required=True,
+        choices=['plain', 'fresh', 'force', 'oracle', 'recycle', 'keep', 'probe'],
     )
     ap.add_argument('--block', type=int, required=True)
     ap.add_argument('--requests', type=Path, required=True)
@@ -168,6 +197,11 @@ def main() -> int:
     ap.add_argument('--timing', action='store_true', help='log per-cycle GPU phase times')
     ap.add_argument(
         '--trace', action='store_true', help='log per-cycle drafts and target argmax (syncs)'
+    )
+    ap.add_argument(
+        '--logprobs',
+        action='store_true',
+        help='non-streaming requests with top-2 logprobs (no timing)',
     )
     ap.add_argument('--warmup', type=int, default=1, help='requests sent first and not recorded')
     ap.add_argument(
@@ -195,6 +229,9 @@ def main() -> int:
             'port': str(args.port),
         }
     )
+    if args.mode == 'plain':
+        for key in [k for k in server_args if k.startswith('speculative-')]:
+            del server_args[key]
     if args.mem_fraction is not None:
         server_args['mem-fraction-static'] = str(args.mem_fraction)
     for item in args.arg:
@@ -308,10 +345,16 @@ def main() -> int:
             )
         with open(out / 'results.jsonl', 'w') as results:
             for request in requests:
-                rec = stream_generate(
-                    base, request['input_ids'], args.max_new_tokens, args.ignore_eos
-                )
-                row = {'id': request['id'], **summarize(rec), 'output_ids': rec['output_ids']}
+                gen = generate_with_logprobs if args.logprobs else stream_generate
+                rec = gen(base, request['input_ids'], args.max_new_tokens, args.ignore_eos)
+                row = {
+                    'id': request['id'],
+                    'domain': request.get('domain'),
+                    **summarize(rec),
+                    'output_ids': rec['output_ids'],
+                }
+                if 'top2' in rec:
+                    row['top2'] = rec['top2']
                 if 'continuation' in request:
                     ref = request['continuation']
                     got = rec['output_ids']
@@ -323,7 +366,11 @@ def main() -> int:
                 results.write(json.dumps(row) + '\n')
                 print(
                     json.dumps(
-                        {k: v for k, v in row.items() if k not in ('output_ids', 'meta_info')}
+                        {
+                            k: v
+                            for k, v in row.items()
+                            if k not in ('output_ids', 'meta_info', 'top2')
+                        }
                     ),
                     flush=True,
                 )
