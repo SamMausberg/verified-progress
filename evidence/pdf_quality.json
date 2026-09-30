@@ -1,0 +1,169 @@
+{
+  "pages": 31,
+  "word_count_including_bibliography_and_headers": 14819,
+  "native_figures": 6,
+  "references": 34,
+  "undefined_bibliography_keys": [],
+  "overfull_boxes": 0,
+  "latex_warnings": [],
+  "page_geometry_issues": [],
+  "page_stats": [
+    {
+      "physical_page": 1,
+      "characters": 2520,
+      "words": 341
+    },
+    {
+      "physical_page": 2,
+      "characters": 1194,
+      "words": 188
+    },
+    {
+      "physical_page": 3,
+      "characters": 4201,
+      "words": 609
+    },
+    {
+      "physical_page": 4,
+      "characters": 3206,
+      "words": 444
+    },
+    {
+      "physical_page": 5,
+      "characters": 4157,
+      "words": 600
+    },
+    {
+      "physical_page": 6,
+      "characters": 3142,
+      "words": 476
+    },
+    {
+      "physical_page": 7,
+      "characters": 3336,
+      "words": 549
+    },
+    {
+      "physical_page": 8,
+      "characters": 3371,
+      "words": 522
+    },
+    {
+      "physical_page": 9,
+      "characters": 3984,
+      "words": 605
+    },
+    {
+      "physical_page": 10,
+      "characters": 4345,
+      "words": 658
+    },
+    {
+      "physical_page": 11,
+      "characters": 3381,
+      "words": 531
+    },
+    {
+      "physical_page": 12,
+      "characters": 4109,
+      "words": 593
+    },
+    {
+      "physical_page": 13,
+      "characters": 3269,
+      "words": 513
+    },
+    {
+      "physical_page": 14,
+      "characters": 3489,
+      "words": 500
+    },
+    {
+      "physical_page": 15,
+      "characters": 3299,
+      "words": 516
+    },
+    {
+      "physical_page": 16,
+      "characters": 3038,
+      "words": 439
+    },
+    {
+      "physical_page": 17,
+      "characters": 3396,
+      "words": 497
+    },
+    {
+      "physical_page": 18,
+      "characters": 3852,
+      "words": 525
+    },
+    {
+      "physical_page": 19,
+      "characters": 3269,
+      "words": 464
+    },
+    {
+      "physical_page": 20,
+      "characters": 3818,
+      "words": 558
+    },
+    {
+      "physical_page": 21,
+      "characters": 3881,
+      "words": 563
+    },
+    {
+      "physical_page": 22,
+      "characters": 3203,
+      "words": 426
+    },
+    {
+      "physical_page": 23,
+      "characters": 3001,
+      "words": 429
+    },
+    {
+      "physical_page": 24,
+      "characters": 3913,
+      "words": 557
+    },
+    {
+      "physical_page": 25,
+      "characters": 3632,
+      "words": 513
+    },
+    {
+      "physical_page": 26,
+      "characters": 2910,
+      "words": 377
+    },
+    {
+      "physical_page": 27,
+      "characters": 3133,
+      "words": 426
+    },
+    {
+      "physical_page": 28,
+      "characters": 3096,
+      "words": 438
+    },
+    {
+      "physical_page": 29,
+      "characters": 3100,
+      "words": 416
+    },
+    {
+      "physical_page": 30,
+      "characters": 3368,
+      "words": 337
+    },
+    {
+      "physical_page": 31,
+      "characters": 2295,
+      "words": 209
+    }
+  ],
+  "render_engine": "PyMuPDF/fitz",
+  "visual_review": "All pages reviewed as contact sheets; enlarged cover/diagrams inspected. Two diagram layout defects corrected and rerendered. Final render and geometry/reference checks completed."
+}

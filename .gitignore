@@ -1,0 +1,41 @@
+# --- Private: never commit ---
+/Sam's Inco Take Home Challenge.pdf
+/writing.md
+
+# Source archive (already extracted into this repo)
+/Inco_Verifier_Research_v3.zip
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# LaTeX build artifacts (paper/paper.pdf itself is tracked)
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.toc
+paper/*.fls
+paper/*.fdb_latexmk
+paper/*.synctex.gz
+paper/*.bbl
+paper/*.blg
+
+# Lean build output
+formal/.lake/
+formal/build/
+
+# Benchmark/GPU run output (may contain private workloads; see RUNBOOK.md)
+runs/
+
+# Secrets, editors and OS files
+.env
+.env.*
+.vscode/
+.idea/
+.DS_Store

@@ -1,0 +1,101 @@
+{
+  "status": "pass",
+  "test_methods": 18,
+  "seed": 20260930,
+  "python": "3.13.5",
+  "numpy": "2.3.5",
+  "counts": {
+    "acceptance_guard_instances": 1600,
+    "ambiguity_measures": 160,
+    "union_models": 8,
+    "cost_counterexamples": 3,
+    "coupled_sampling_cases": 200,
+    "lease_reuse_schedules": 300,
+    "numeric_support_counterexamples": 3,
+    "gdn_prefixes": 868,
+    "gdn_trajectories": 150,
+    "greedy_screens": 250,
+    "lazy_accept_decisions": 500,
+    "map_scan_cases": 400,
+    "map_associativity_cases": 400,
+    "namespace_rejections": 2,
+    "rejection_law_pairs": 300,
+    "retained_tightenings": 565,
+    "depth_bias_witnesses": 2,
+    "top_tail_partitions": 250,
+    "transport_tiles": 1048,
+    "transport_weight_rows": 3787,
+    "transport_heads": 300,
+    "frontier_completions": 5460,
+    "partial_frontier_states": 1092
+  },
+  "witnesses": {
+    "batch_union_B32_f1over16": 0.8732112136229997,
+    "graph_plateau": {
+      "depth": 2,
+      "reward": "27/10",
+      "cost": "2"
+    },
+    "same_total_different_cost": {
+      "(0, 0)": "1",
+      "(1, 0)": "10",
+      "(0, 1)": "1",
+      "(1, 1)": "11"
+    },
+    "rounded_bound": {
+      "real": "16777217",
+      "float32": 16777216.0
+    },
+    "truncated_target_TV": "1/4",
+    "derived_record_wrong_state": {
+      "wrong": "[[Fraction(3, 1)]]",
+      "true": "[[Fraction(1, 1)]]"
+    },
+    "zero_drift_greedy": {
+      "winner": 0,
+      "projected_rows": 2,
+      "vocabulary": 4
+    },
+    "candidate_dependent_depth": {
+      "p": [
+        "1/2",
+        "1/2"
+      ],
+      "q": [
+        "1/2",
+        "1/2"
+      ],
+      "output": [
+        "1/4",
+        "3/4"
+      ]
+    }
+  },
+  "seconds": 0.45263127699990946,
+  "scope": "bounded synthetic integer logits with exact rational base-2 masses; no GPU, model weights or trained predictor"
+}
+
+--- stderr ---
+test_acceptance_guards (__main__.Decisions.test_acceptance_guards) ... ok
+test_ambiguity_measure (__main__.Decisions.test_ambiguity_measure) ... ok
+test_batch_union (__main__.Decisions.test_batch_union) ... ok
+test_cost_counterexamples (__main__.Decisions.test_cost_counterexamples) ... ok
+test_coupled_one_step (__main__.Decisions.test_coupled_one_step) ... ok
+test_epoch_and_prefix_guard (__main__.Decisions.test_epoch_and_prefix_guard) ... ok
+test_floating_and_support_counterexamples (__main__.Decisions.test_floating_and_support_counterexamples) ... ok
+test_gdn_replay (__main__.Decisions.test_gdn_replay) ... ok
+test_greedy_screen (__main__.Decisions.test_greedy_screen) ... ok
+test_lazy_accept_completion (__main__.Decisions.test_lazy_accept_completion) ... ok
+test_map_scan (__main__.Decisions.test_map_scan) ... ok
+test_namespace (__main__.Decisions.test_namespace) ... ok
+test_rejection_law (__main__.Decisions.test_rejection_law) ... ok
+test_retained_mass_tightening (__main__.Decisions.test_retained_mass_tightening) ... ok
+test_sample_dependent_depth_bias (__main__.Decisions.test_sample_dependent_depth_bias) ... ok
+test_summary_monoid (__main__.Decisions.test_summary_monoid) ... ok
+test_transport_enclosure (__main__.Decisions.test_transport_enclosure) ... ok
+test_verification_frontier (__main__.Decisions.test_verification_frontier) ... ok
+
+----------------------------------------------------------------------
+Ran 18 tests in 0.452s
+
+OK

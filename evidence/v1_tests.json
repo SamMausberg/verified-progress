@@ -1,0 +1,47 @@
+{
+  "status": "PASS",
+  "scope": "Synthetic exact-rational CPU checks only; no GPU/model/Lean verification",
+  "seed": 20260930,
+  "python": "3.13.5",
+  "optimality_lattices": 300,
+  "exhaustively_enumerated_paths": 21663,
+  "valid_certificates_checked": 300,
+  "corrupted_certificates_rejected": 300,
+  "perturbation_bound_lattices": 100,
+  "perturbation_bound_paths": 2573,
+  "abstract_greedy_verifier_cases": 2000,
+  "forced_accepted_draft_lengths": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "counterexample": {
+    "label": "constructed mathematical example; not model measurements",
+    "greedy_path": [
+      0,
+      0,
+      0
+    ],
+    "prefix_optimal_path": [
+      1,
+      1,
+      1
+    ],
+    "whole_survival_optimal_path": [
+      2,
+      2,
+      2
+    ],
+    "prefix_values": {
+      "A": "999/2000",
+      "B": "287/400",
+      "C": "29701/50000"
+    }
+  },
+  "seconds": 0.2645
+}

@@ -1,0 +1,64 @@
+{
+  "claims": [
+    {
+      "id": "C1",
+      "claim": "Shared-head max and mass transport",
+      "status": "written mathematical proof plus finite exact-rational CPU tests",
+      "not_established": "useful real-model bounds or floating GPU enclosures"
+    },
+    {
+      "id": "C2",
+      "claim": "Acceptance guards and fixed-protocol frontier",
+      "status": "written proof, 1600 guard cases and 5460 frontier completions passed",
+      "not_established": "engine RNG, masking, state correctness"
+    },
+    {
+      "id": "C3",
+      "claim": "Sparse-support residual and target races",
+      "status": "written conditional proof, 250+250 pathwise rational comparisons passed",
+      "not_established": "continuous Gumbel implementation, GPU speed or useful pruning"
+    },
+    {
+      "id": "C4",
+      "claim": "Candidate-dependent sampled depth can bias output",
+      "status": "exact constructed two-token law (1/4,3/4) for target (1/2,1/2)",
+      "not_established": "a bug in any named production implementation"
+    },
+    {
+      "id": "C5",
+      "claim": "GDN replay and publication guards",
+      "status": "exact finite recurrence and sequential logical-state tests",
+      "not_established": "CUDA race freedom or production rollback"
+    },
+    {
+      "id": "C6",
+      "claim": "Compiler, GPU kernels and joint scheduler",
+      "status": "design, cost models, interfaces and experiment plan",
+      "not_established": "implemented compiler, GPU kernels or serving speedup"
+    },
+    {
+      "id": "C7",
+      "claim": "Synthetic drift falsification",
+      "status": "executed work-count experiment, CSV/JSON included",
+      "not_established": "latency or real-head performance; sparse-race completion saving"
+    },
+    {
+      "id": "C8",
+      "claim": "Lean guard lemmas",
+      "status": "source only; not compiled",
+      "not_established": "machine-checked proof"
+    },
+    {
+      "id": "C9",
+      "claim": "Auxiliary SSE client",
+      "status": "four local protocol tests passed",
+      "not_established": "real engine compatibility or throughput"
+    },
+    {
+      "id": "C10",
+      "claim": "Novelty",
+      "status": "candidate integrated research contribution with targeted source comparison",
+      "not_established": "exhaustive priority, acceptance by a venue, or performance advantage"
+    }
+  ]
+}

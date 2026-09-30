@@ -1,0 +1,2 @@
+# Version used for the executed CPU evidence. Python 3.13.5 was used.
+numpy==2.3.5

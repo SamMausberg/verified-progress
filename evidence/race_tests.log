@@ -1,0 +1,22 @@
+{
+  "status": "pass",
+  "methods": 3,
+  "seed": 314159,
+  "counts": {
+    "exclusion_summaries": 300,
+    "residual_race_equivalences": 250,
+    "target_race_equivalences": 250
+  },
+  "seconds": 0.36229565699977684,
+  "scope": "exact rational pathwise priorities, not continuous distribution sampling or GPU execution"
+}
+
+--- stderr ---
+test_exclusion_summary (__main__.Races.test_exclusion_summary) ... ok
+test_residual_race (__main__.Races.test_residual_race) ... ok
+test_target_race (__main__.Races.test_target_race) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.362s
+
+OK

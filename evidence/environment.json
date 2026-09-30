@@ -1,0 +1,20 @@
+{
+  "python": "3.13.5",
+  "implementation": "CPython",
+  "numpy": "2.3.5",
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "machine": "x86_64",
+  "gpu_used": false,
+  "model_weights_loaded": false,
+  "lean_compiled": false,
+  "date": "2026-09-30",
+  "pdflatex": [
+    "pdfTeX 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian)",
+    "kpathsea version 6.4.0/dev",
+    "Copyright 2024 Han The Thanh (pdfTeX) et al.",
+    "There is NO warranty.  Redistribution of this software is"
+  ],
+  "latexmk": [
+    "Latexmk, John Collins, 11 Dec. 2024. Version 4.86"
+  ]
+}

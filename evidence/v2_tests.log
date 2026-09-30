@@ -1,0 +1,16 @@
+
+--- stderr ---
+test_certified_screening (__main__.Evidence.test_certified_screening) ... ok
+test_floating_and_cost_counterexamples (__main__.Evidence.test_floating_and_cost_counterexamples) ... ok
+test_lazy_selector (__main__.Evidence.test_lazy_selector) ... ok
+test_lse_merge (__main__.Evidence.test_lse_merge) ... ok
+test_prefix_dp_and_perturbation (__main__.Evidence.test_prefix_dp_and_perturbation) ... ok
+test_rejection_law (__main__.Evidence.test_rejection_law) ... ok
+test_scheduler (__main__.Evidence.test_scheduler) ... ok
+test_state_replay (__main__.Evidence.test_state_replay) ... ok
+test_tiled_topk (__main__.Evidence.test_tiled_topk) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.978s
+
+OK

@@ -1,0 +1,3 @@
+{"id":"smoke-explanation","prompt":"Explain why a matrix product cannot generally be replaced by the product of its elementwise maxima.","max_tokens":96}
+{"id":"smoke-code","prompt":"Write a Python function that returns the first repeated item in a list, or None. Explain its time complexity.","max_tokens":128}
+{"id":"smoke-math","prompt":"A process completes five items in ten seconds, then six items in thirteen seconds. What is its combined throughput? Show the denominator.","max_tokens":96}

@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "status": "TEMPLATE_NOT_EXECUTED",
+  "scope": "single GPU; text only; no offload unless separate declared arm",
+  "engine": {
+    "repository": "sgl-project/sglang",
+    "inspected_commit": "bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824",
+    "executed_commit": null,
+    "command": null,
+    "selected_backends": null
+  },
+  "target": {
+    "model": "Qwen/Qwen3.5-4B",
+    "revision": null,
+    "weight_dtype": "bfloat16",
+    "tokenizer_revision": null,
+    "chat_template_hash": null,
+    "reasoning_mode": null,
+    "transforms": "initially greedy; no arbitrary logprobs or unsupported penalties"
+  },
+  "draft": {
+    "mechanism": null,
+    "checkpoint": null,
+    "revision": null,
+    "actual_proposal_law": null,
+    "shared_head_identity": null,
+    "alignment_checked": false
+  },
+  "hardware": {
+    "gpu": null,
+    "compute_capability": null,
+    "memory_bytes": null,
+    "clocks": null,
+    "driver": null,
+    "cuda": null,
+    "offload": false
+  },
+  "server": {
+    "max_running_requests": null,
+    "context_cap": null,
+    "cuda_graphs": true,
+    "overlap": true,
+    "graph_tiers": null,
+    "state_dtype": null,
+    "cache_namespace": null,
+    "cache_policy": null
+  },
+  "workload": {
+    "train_sha256": null,
+    "test_sha256": null,
+    "split_unit": "prompt",
+    "panels": [
+      "text",
+      "code",
+      "mathematics",
+      "multilingual",
+      "long-context",
+      "shared-prefix"
+    ],
+    "max_output_tokens": null,
+    "natural_stopping_separate": true
+  },
+  "measurement": {
+    "client": "pinned AIPerf plus auxiliary SSE client",
+    "client_version": null,
+    "concurrencies": [
+      1,
+      2,
+      4,
+      8,
+      16,
+      32
+    ],
+    "capacity_fixed_during_client_sweep": true,
+    "confirmatory_paired_runs": 5,
+    "run_order": "alternate baseline/candidate; randomize kernel screening",
+    "x_axis": "explicit mean request-level output tokens/s; state inclusion/exclusion of TTFT",
+    "y_axis": "actual completed output tokens / common wall span / GPU count",
+    "failure_policy": "report failures; invalidate matched performance comparison",
+    "raw_records": true
+  },
+  "admission": {
+    "mathematical_reference_checked": false,
+    "actual_q_checked": false,
+    "numerical_enclosures_checked": false,
+    "graph_lifetimes_checked": false,
+    "state_commit_checked": false,
+    "gpu_sanitizers_checked": false
+  },
+  "budget": {
+    "compute_cap_currency": null,
+    "authorized_cap": null,
+    "provider_quote": null,
+    "spent_in_authoring_environment": 0
+  }
+}

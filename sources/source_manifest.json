@@ -1,0 +1,387 @@
+{
+  "audit_date": "2026-09-30",
+  "source_count": 34,
+  "sources": [
+    {
+      "key": "sgcode",
+      "bibliography_text": "SGLang contributors. \\emph{DFlash model and candidate-head implementation}. Frozen commit \\sourcepin, \\path{python/sglang/srt/models/dflash.py}. \\url{https://github.com/sgl-project/sglang/blob/bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824/python/sglang/srt/models/dflash.py}.",
+      "urls": [
+        "https://github.com/sgl-project/sglang/blob/bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824/python/sglang/srt/models/dflash.py"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Direct code read at frozen commit: shared target head, dense projection/candidate_topk and optional partition. File presence does not establish executed backend."
+    },
+    {
+      "key": "qwenconfig",
+      "bibliography_text": "Qwen. \\emph{Qwen3.5-4B configuration}. Inspected 30 September 2026; deployment revision still to be pinned. \\url{https://huggingface.co/Qwen/Qwen3.5-4B/raw/main/config.json}.",
+      "urls": [
+        "https://huggingface.co/Qwen/Qwen3.5-4B/raw/main/config.json"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Configuration read; actual deployment checkpoint revision unresolved. Do not infer loaded runtime dimensions without checking."
+    },
+    {
+      "key": "qwencard",
+      "bibliography_text": "Qwen. \\emph{Qwen3.5-4B model card}. \\url{https://huggingface.co/Qwen/Qwen3.5-4B}.",
+      "urls": [
+        "https://huggingface.co/Qwen/Qwen3.5-4B"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Official model card; model not loaded."
+    },
+    {
+      "key": "dflashcard",
+      "bibliography_text": "Inco AI. \\emph{Qwen3.8-27B-DFlash2 model card}. \\url{https://huggingface.co/incoai/Qwen3.8-27B-DFlash2}.",
+      "urls": [
+        "https://huggingface.co/incoai/Qwen3.8-27B-DFlash2"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Public 27B pair card; does not establish a compatible public 4B selector checkpoint."
+    },
+    {
+      "key": "dflash",
+      "bibliography_text": "Inco AI. \\emph{DFlash 2: Keep Drafting Parallel}. 18 August 2026. \\url{https://inco.ai/blog/dflash2/}.",
+      "urls": [
+        "https://inco.ai/blog/dflash2/"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Used for the specific mechanism or contract cited in the manuscript; not an exhaustive source or priority audit."
+    },
+    {
+      "key": "flashsampling",
+      "bibliography_text": "Tomas Ruiz et al. \\emph{FlashSampling: Fast and Memory-Efficient Exact Sampling}. arXiv:2603.15854v2, 12 May 2026. \\url{https://arxiv.org/html/2603.15854v2}.",
+      "urls": [
+        "https://arxiv.org/html/2603.15854v2"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "v2 algorithm, numerical/RNG discussion and integration baseline inspected. Exact mathematical sampler law is distinct from seeded numerical equivalence."
+    },
+    {
+      "key": "sonic",
+      "bibliography_text": "\\emph{SonicSampler: Unified Tile-Aware Kernels for LLM Sampling and Speculative Verification}. arXiv:2607.20475v1. \\url{https://arxiv.org/html/2607.20475v1}.",
+      "urls": [
+        "https://arxiv.org/html/2607.20475v1"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Versioned manuscript read; truncated top-k verification path must not be treated as an unconditional full-support exact comparator."
+    },
+    {
+      "key": "specvocab",
+      "bibliography_text": "Williams et al. \\emph{Speculative Decoding with a Speculative Vocabulary}. arXiv:2602.13836v2, 17 July 2026. \\url{https://arxiv.org/html/2602.13836v2}.",
+      "urls": [
+        "https://arxiv.org/html/2602.13836v2"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "v1 reviewed earlier; v2 introduction and mechanism rechecked for the final bibliography. No reported throughput reproduced."
+    },
+    {
+      "key": "dynaspec",
+      "bibliography_text": "\\emph{DynaSpec: Context-aware Dynamic Speculative Sampling for Large-Vocabulary Language Models}. Versioned manuscript, arXiv:2510.13847v3, 3 February 2026. \\url{https://arxiv.org/html/2510.13847v3}.",
+      "urls": [
+        "https://arxiv.org/html/2510.13847v3"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "v1 reviewed earlier; v3 context-dependent shortlisting and full-vocabulary verification mechanism rechecked. No reported throughput reproduced."
+    },
+    {
+      "key": "microspec",
+      "bibliography_text": "\\emph{MicroSpec: Accelerating Speculative Decoding with Lightweight In-Context Vocabularies}. arXiv:2605.26444v1. The unversioned abstract surfaced a different title during this audit; this citation refers specifically to v1. \\url{https://arxiv.org/html/2605.26444v1}.",
+      "urls": [
+        "https://arxiv.org/html/2605.26444v1"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Versioned v1 title differs from surfaced unversioned abstract; bibliography deliberately identifies the version."
+    },
+    {
+      "key": "replayssm",
+      "bibliography_text": "Dao AI Lab. \\emph{ReplaySSM: Cache SSM Inputs, Not State}. 2026. \\url{https://dao-lab.ai/blog/2026/replayssm/}.",
+      "urls": [
+        "https://dao-lab.ai/blog/2026/replayssm/"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Algorithm and numerical/state qualifications inspected; replay is prior art, not this manuscript's invention."
+    },
+    {
+      "key": "gdncode",
+      "bibliography_text": "SGLang contributors. \\emph{GDN ReplaySSM speculative fold}. Frozen commit \\sourcepin. \\url{https://github.com/sgl-project/sglang/blob/bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824/python/sglang/kernels/ops/attention/fla/gdn_replayssm_spec_fold.py}.",
+      "urls": [
+        "https://github.com/sgl-project/sglang/blob/bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824/python/sglang/kernels/ops/attention/fla/gdn_replayssm_spec_fold.py"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Direct read at frozen commit, lines 1-95: raw replay records and comments constraining operation order and warp count. No GPU execution."
+    },
+    {
+      "key": "opttree",
+      "bibliography_text": "\\emph{OPT-Tree: Speculative Decoding with Adaptive Draft Tree Structure}. arXiv:2406.17276. \\url{https://arxiv.org/abs/2406.17276}.",
+      "urls": [
+        "https://arxiv.org/abs/2406.17276"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Used for the specific mechanism or contract cited in the manuscript; not an exhaustive source or priority audit."
+    },
+    {
+      "key": "dcut",
+      "bibliography_text": "\\emph{D-cut: Adaptive Verification Depth Pruning for Batched Speculative Decoding}. arXiv:2607.14647. \\url{https://arxiv.org/abs/2607.14647}.",
+      "urls": [
+        "https://arxiv.org/abs/2607.14647"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Used for the specific mechanism or contract cited in the manuscript; not an exhaustive source or priority audit."
+    },
+    {
+      "key": "pr36136",
+      "bibliography_text": "SGLang PR 36136. \\emph{Dynamic verification for DFlash2}. Inspected open/unmerged, 30 September 2026; head \\texttt{c0235e700214f1de5044be25f795faf5b755e450}. \\url{https://github.com/sgl-project/sglang/pull/36136}.",
+      "urls": [
+        "https://github.com/sgl-project/sglang/pull/36136"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Metadata/body read: open, unmerged; head c0235e700214f1de5044be25f795faf5b755e450. Reported benchmark arm greedy. No claim of a sampled-law bug in this PR."
+    },
+    {
+      "key": "mirage",
+      "bibliography_text": "Mengdi Wu et al. \\emph{Mirage: A Multi-Level Superoptimizer for Tensor Programs}. OSDI 2025; arXiv:2405.05751v3. \\url{https://arxiv.org/abs/2405.05751}.",
+      "urls": [
+        "https://arxiv.org/abs/2405.05751"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Used for the specific mechanism or contract cited in the manuscript; not an exhaustive source or priority audit."
+    },
+    {
+      "key": "lilicorr",
+      "bibliography_text": "Rusanovsky et al. \\emph{LiLiCorr: Lightweight Likelihood Correlation of Parallel Drafts for Speculative Decoding}. arXiv:2608.20530v2, 22 September 2026. \\url{https://arxiv.org/html/2608.20530v2}.",
+      "urls": [
+        "https://arxiv.org/html/2608.20530v2"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "v2 negative best-path experiment used as a warning. Actual DFlash gated score comes from first-party code/blog, not an inconsistent simplified description."
+    },
+    {
+      "key": "astar",
+      "bibliography_text": "Chris J. Maddison, Daniel Tarlow and Tom Minka. \\emph{A* Sampling}. 2014. \\url{https://arxiv.org/abs/1411.0030}.",
+      "urls": [
+        "https://arxiv.org/abs/1411.0030"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Used for the specific mechanism or contract cited in the manuscript; not an exhaustive source or priority audit."
+    },
+    {
+      "key": "specdecode",
+      "bibliography_text": "Yaniv Leviathan, Matan Kalman and Yossi Matias. \\emph{Fast Inference from Transformers via Speculative Decoding}. ICML 2023; arXiv:2211.17192. \\url{https://arxiv.org/abs/2211.17192}.",
+      "urls": [
+        "https://arxiv.org/abs/2211.17192"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Used for the specific mechanism or contract cited in the manuscript; not an exhaustive source or priority audit."
+    },
+    {
+      "key": "floatguide",
+      "bibliography_text": "NVIDIA. \\emph{Floating Point and IEEE 754}. Documentation inspected 30 September 2026. \\url{https://docs.nvidia.com/cuda/floating-point/index.html}.",
+      "urls": [
+        "https://docs.nvidia.com/cuda/floating-point/index.html"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Used for the specific mechanism or contract cited in the manuscript; not an exhaustive source or priority audit."
+    },
+    {
+      "key": "torchnumeric",
+      "bibliography_text": "PyTorch. \\emph{Numerical accuracy}. \\url{https://docs.pytorch.org/docs/stable/notes/numerical_accuracy.html}.",
+      "urls": [
+        "https://docs.pytorch.org/docs/stable/notes/numerical_accuracy.html"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Stable documentation redirected to 2.14 during the audit; numerical order caveats retained."
+    },
+    {
+      "key": "torchtopk",
+      "bibliography_text": "PyTorch. \\emph{torch.topk}. Tie-stability qualification. \\url{https://docs.pytorch.org/docs/stable/generated/torch.topk.html}.",
+      "urls": [
+        "https://docs.pytorch.org/docs/stable/generated/torch.topk.html"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Stable documentation redirected to 2.14 during the audit; ties are not promised stable."
+    },
+    {
+      "key": "flashinferapi",
+      "bibliography_text": "FlashInfer. \\emph{Sampling API}. Documentation inspected 30 September 2026. \\url{https://docs.flashinfer.ai/api/sampling.html}.",
+      "urls": [
+        "https://docs.flashinfer.ai/api/sampling.html"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Used for the specific mechanism or contract cited in the manuscript; not an exhaustive source or priority audit."
+    },
+    {
+      "key": "cute",
+      "bibliography_text": "NVIDIA CUTLASS. \\emph{CuTe DSL overview}. \\url{https://docs.nvidia.com/cutlass/latest/media/docs/pythonDSL/overview.html}.",
+      "urls": [
+        "https://docs.nvidia.com/cutlass/latest/media/docs/pythonDSL/overview.html"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Used for the specific mechanism or contract cited in the manuscript; not an exhaustive source or priority audit."
+    },
+    {
+      "key": "tilelang",
+      "bibliography_text": "TileLang contributors. \\emph{TileLang documentation}. \\url{https://tilelang.com/}.",
+      "urls": [
+        "https://tilelang.com/"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Used for the specific mechanism or contract cited in the manuscript; not an exhaustive source or priority audit."
+    },
+    {
+      "key": "tritonautotune",
+      "bibliography_text": "Triton contributors. \\emph{triton.autotune}. Configuration pruning and reset/restore semantics. \\url{https://triton-lang.org/main/python-api/generated/triton.autotune.html}.",
+      "urls": [
+        "https://triton-lang.org/main/python-api/generated/triton.autotune.html"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Used for the specific mechanism or contract cited in the manuscript; not an exhaustive source or priority audit."
+    },
+    {
+      "key": "hopper",
+      "bibliography_text": "NVIDIA. \\emph{Hopper Tuning Guide}. CUDA 13.0.2 archive. \\url{https://docs.nvidia.com/cuda/archive/13.0.2/hopper-tuning-guide/index.html}.",
+      "urls": [
+        "https://docs.nvidia.com/cuda/archive/13.0.2/hopper-tuning-guide/index.html"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Used for the specific mechanism or contract cited in the manuscript; not an exhaustive source or priority audit."
+    },
+    {
+      "key": "blackwell",
+      "bibliography_text": "NVIDIA. \\emph{Blackwell Tuning Guide}. CUDA 13.4 documentation inspected 30 September 2026. \\url{https://docs.nvidia.com/cuda/blackwell-tuning-guide/index.html}.",
+      "urls": [
+        "https://docs.nvidia.com/cuda/blackwell-tuning-guide/index.html"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Used for the specific mechanism or contract cited in the manuscript; not an exhaustive source or priority audit."
+    },
+    {
+      "key": "vllmgraphs",
+      "bibliography_text": "vLLM contributors. \\emph{CUDA Graphs design}. \\url{https://docs.vllm.ai/en/latest/design/cuda_graphs/}.",
+      "urls": [
+        "https://docs.vllm.ai/en/latest/design/cuda_graphs/"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Used for the specific mechanism or contract cited in the manuscript; not an exhaustive source or priority audit."
+    },
+    {
+      "key": "nsight",
+      "bibliography_text": "NVIDIA. \\emph{Nsight Compute Profiling Guide}. \\url{https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html}.",
+      "urls": [
+        "https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Used for the specific mechanism or contract cited in the manuscript; not an exhaustive source or priority audit."
+    },
+    {
+      "key": "gdn",
+      "bibliography_text": "Songlin Yang, Jan Kautz and Ali Hatamizadeh. \\emph{Gated Delta Networks: Improving Mamba2 with Delta Rule}. ICLR 2025; arXiv:2412.06464v3. \\url{https://arxiv.org/abs/2412.06464}.",
+      "urls": [
+        "https://arxiv.org/abs/2412.06464"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Used for the specific mechanism or contract cited in the manuscript; not an exhaustive source or priority audit."
+    },
+    {
+      "key": "sglangpaper",
+      "bibliography_text": "Lianmin Zheng et al. \\emph{SGLang: Efficient Execution of Structured Language Model Programs}. arXiv:2312.07104v2. \\url{https://arxiv.org/abs/2312.07104}.",
+      "urls": [
+        "https://arxiv.org/abs/2312.07104"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Used for the specific mechanism or contract cited in the manuscript; not an exhaustive source or priority audit."
+    },
+    {
+      "key": "flashinfer",
+      "bibliography_text": "Zihao Ye et al. \\emph{FlashInfer: Efficient and Customizable Attention Engine for LLM Inference Serving}. MLSys 2025; arXiv:2501.01005v2. \\url{https://arxiv.org/abs/2501.01005}.",
+      "urls": [
+        "https://arxiv.org/abs/2501.01005"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Used for the specific mechanism or contract cited in the manuscript; not an exhaustive source or priority audit."
+    },
+    {
+      "key": "aiperf",
+      "bibliography_text": "NVIDIA. \\emph{AIPerf Metrics Reference}. \\url{https://docs.nvidia.com/aiperf/reference/ai-perf-metrics-reference}.",
+      "urls": [
+        "https://docs.nvidia.com/aiperf/reference/ai-perf-metrics-reference"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Used for the specific mechanism or contract cited in the manuscript; not an exhaustive source or priority audit."
+    }
+  ],
+  "scope": "Public primary sources only. No confidential assignment text or downloaded third-party paper/code bodies redistributed.",
+  "limitations": [
+    "This is a targeted prior-art audit, not proof of novelty or completeness.",
+    "Model/deployment revisions remain unresolved until the GPU experiment.",
+    "Integration paths inherited from v2 are candidate seams unless separately marked as directly read.",
+    "Third-party performance numbers are not reproduced or credited to this artifact."
+  ]
+}

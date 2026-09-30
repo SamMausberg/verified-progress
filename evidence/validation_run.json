@@ -1,0 +1,67 @@
+{
+  "python": "3.13.5",
+  "cpu_checks_pass": true,
+  "cpu_runs": [
+    {
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tests/test_decisions.py"
+      ],
+      "exit_code": 0,
+      "log": "evidence/decision_tests.log"
+    },
+    {
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tests/test_races.py"
+      ],
+      "exit_code": 0,
+      "log": "evidence/race_tests.log"
+    },
+    {
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tests/test_benchmark_client.py"
+      ],
+      "exit_code": 0,
+      "log": "evidence/benchmark_client_tests.log"
+    },
+    {
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tests/test_v2.py"
+      ],
+      "exit_code": 0,
+      "log": "evidence/v2_tests.log"
+    },
+    {
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "src/v1_reference.py",
+        "--output",
+        "evidence/v1_tests.json"
+      ],
+      "exit_code": 0,
+      "log": "evidence/v1_tests.log"
+    },
+    {
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "experiments/synthetic_drift.py"
+      ],
+      "exit_code": 0,
+      "log": "evidence/synthetic_drift.log"
+    }
+  ],
+  "lean_check": {
+    "command": [
+      "bash",
+      "scripts/check_lean.sh"
+    ],
+    "exit_code": 2,
+    "log": "evidence/lean_attempt.log"
+  },
+  "lean_status": "not_validated",
+  "gpu_status": "not_run",
+  "real_model_status": "not_run"
+}

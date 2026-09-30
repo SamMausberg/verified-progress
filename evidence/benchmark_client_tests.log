@@ -1,0 +1,11 @@
+
+--- stderr ---
+test_missing_usage_fails (__main__.Protocol.test_missing_usage_fails) ... ok
+test_sse_multiline (__main__.Protocol.test_sse_multiline) ... ok
+test_truncated_stream_fails (__main__.Protocol.test_truncated_stream_fails) ... ok
+test_usage_not_chunks (__main__.Protocol.test_usage_not_chunks) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.524s
+
+OK
