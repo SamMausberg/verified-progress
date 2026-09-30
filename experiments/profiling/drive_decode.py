@@ -32,6 +32,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import subprocess
 import time
 from dataclasses import dataclass, field
@@ -199,6 +200,7 @@ async def run(args: argparse.Namespace) -> dict:
         t_all_decoding = time.perf_counter()
         await asyncio.sleep(args.settle)
 
+        load_before = os.getloadavg()
         profiler = Profiler(args)
         t_before_start = time.perf_counter()
         await profiler.start(session)
@@ -207,6 +209,7 @@ async def run(args: argparse.Namespace) -> dict:
         await asyncio.sleep(args.window)
         t1 = time.perf_counter()
         wall1 = time.time()
+        load_after = os.getloadavg()
         await profiler.stop(session)
         t_after_stop = time.perf_counter()
 
@@ -228,6 +231,10 @@ async def run(args: argparse.Namespace) -> dict:
         'window_s': dt,
         'window_wall_start': wall0,
         'window_wall_end': wall1,
+        # Host load matters for host-bound phases (speculative cycles); other jobs'
+        # CPU work during a window would inflate host gaps.
+        'host_loadavg_1m_before': load_before[0],
+        'host_loadavg_1m_after': load_after[0],
         'profiler_start_s': t0 - t_before_start,
         'profiler_stop_s': t_after_stop - t1,
         'prefill_to_all_decoding_s': t_all_decoding - t_submit,
