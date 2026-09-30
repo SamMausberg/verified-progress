@@ -50,7 +50,10 @@ older_ticket() {
   while read -r ticket; do
     name="$(basename "$ticket")"
     [ "$name" \< "$1" ] || continue
+    # Tickets without a kind marker come from an older version of this script
+    # and are treated as exclusive.
     if [ -z "${2:-}" ] || [[ $name == *-"$2"-* ]]; then return 0; fi
+    if [ "$2" = x ] && [[ $name != *-s-* && $name != *-x-* ]]; then return 0; fi
   done < <(live_tickets)
   return 1
 }
