@@ -1,7 +1,7 @@
 From 652c024eccade9ff4150ff29c374a729f6184420 Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <samuelmausberg@gmail.com>
 Date: Wed, 30 Sep 2026 19:13:08 +0000
-Subject: [PATCH 4/6] Apply relaxed greedy verification to the DFlash greedy
+Subject: [PATCH 4/7] Apply relaxed greedy verification to the DFlash greedy
  path
 
 Uses the same SGLANG_SPEC_RELAXED_GREEDY_LOGIT_GAP rule as the EAGLE chain

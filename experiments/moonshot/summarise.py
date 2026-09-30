@@ -128,6 +128,48 @@ def sweeps(args: argparse.Namespace) -> None:
     write_csv(rows, args.out)
 
 
+def interactions(args: argparse.Namespace) -> None:
+    """Four-way (baseline, A, B, A+B) comparison from a sweeps CSV.
+
+    Each pair is `base:A:B` with lever names as in levers.py; the configs looked up
+    are `base`, `base+A`, `base+B` and `base+A+B`. The interaction factor is
+    r(A+B) / (r(A) r(B)): 1 when the gains multiply, below 1 when they conflict.
+    """
+    with Path(args.sweeps_csv).expanduser().open() as handle:
+        table = list(csv.DictReader(handle))
+    by_key = {(row['config'], int(row['concurrency'])): row for row in table}
+    rows: list[dict[str, Any]] = []
+    for pair in args.pairs:
+        base, lever_a, lever_b = pair.split(':')
+        names = {
+            'base': base,
+            'A': f'{base}+{lever_a}',
+            'B': f'{base}+{lever_b}',
+            'AB': f'{base}+{lever_a}+{lever_b}',
+        }
+        concs = sorted({c for (cfg, c) in by_key if cfg == names['base']})
+        for conc in concs:
+            got = {k: by_key.get((v, conc)) for k, v in names.items()}
+            if any(g is None or not g['y_tok_s_gpu'] for g in got.values()):
+                continue
+            y = {k: float(g['y_tok_s_gpu']) for k, g in got.items() if g}
+            r_a, r_b, r_ab = y['A'] / y['base'], y['B'] / y['base'], y['AB'] / y['base']
+            rows.append(
+                {
+                    'pair': pair,
+                    'concurrency': conc,
+                    'y_base': round(y['base'], 1),
+                    'r_A': round(r_a, 3),
+                    'r_B': round(r_b, 3),
+                    'r_AB': round(r_ab, 3),
+                    'interaction': round(r_ab / (r_a * r_b), 3),
+                    'accept_base': got['base']['accept_len'],  # type: ignore[index]
+                    'accept_AB': got['AB']['accept_len'],  # type: ignore[index]
+                }
+            )
+    write_csv(rows, args.out)
+
+
 def quality(args: argparse.Namespace) -> None:
     summary = json.loads(Path(args.path).expanduser().read_text())
     rows = []
@@ -168,6 +210,11 @@ def main() -> None:
     s.add_argument('--baseline', default='plain')
     s.add_argument('--out', type=Path, default=None)
     s.set_defaults(func=sweeps)
+    i = sub.add_parser('interactions')
+    i.add_argument('sweeps_csv')
+    i.add_argument('--pairs', nargs='+', required=True, help='base:leverA:leverB')
+    i.add_argument('--out', type=Path, default=None)
+    i.set_defaults(func=interactions)
     q = sub.add_parser('quality')
     q.add_argument('path')
     q.add_argument('--out', type=Path, default=None)

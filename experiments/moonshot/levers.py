@@ -57,6 +57,13 @@ LEVERS: dict[str, Lever] = {
         note='decode reads a checkpoint plus a 16-step ring and writes the state every 16 steps',
         conflicts=('replayssm_spec',),
     ),
+    'exact_replay': Lever(
+        {'enable-linear-replayssm': True, 'linear-replayssm-cache-len': 4},
+        note='rounding-preserving live replay (patch 0007): FP32 anchor written every 4 '
+        'steps, ring of the packed decode operands; meant to be bit-identical',
+        env={'SGLANG_GDN_EXACT_REPLAY': '1'},
+        conflicts=('replayssm', 'bf16_state', 'fp16_state', 'fp8_state'),
+    ),
     'replayssm_spec': Lever(
         {'enable-linear-replayssm-spec': True},
         note='chain verify (MTP top-1, DFlash) stores per-draft inputs and folds the '
@@ -155,12 +162,17 @@ LEVERS: dict[str, Lever] = {
             'speculative-draft-model-path': DFLASH_DRAFT,
             'speculative-draft-model-revision': DFLASH_DRAFT_REVISION,
             'speculative-dflash-block-size': 16,
-            # 16 FP32 intermediate GDN states per request bound capacity.
-            'max-running-requests': 32,
-            'max-mamba-cache-size': 160,
+            # The drafter workstream's validated flags (notes/drafter.md, 19:41).
+            'linear-attn-prefill-backend': 'flashinfer',
+            'linear-attn-decode-backend': 'flashinfer',
+            # Block 16 at radix off caps capacity at 64 (bench's dflash arm).
+            'disable-radix-cache': True,
+            'max-running-requests': 64,
+            'max-mamba-cache-size': 64,
         },
         note='public BF16 DFlash block drafter (z-lab); the target verifies, so exact',
         arm='plain',
+        env={'SGLANG_ENABLE_OVERLAP_PLAN_STREAM': '1'},
     ),
     'dflash_nota': Lever(
         {

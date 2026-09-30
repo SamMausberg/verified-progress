@@ -1,7 +1,7 @@
 From 9b25e6e123d849324d6cd3df24827232f76974b8 Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <samuelmausberg@gmail.com>
 Date: Wed, 30 Sep 2026 19:00:54 +0000
-Subject: [PATCH 1/6] Untie a reduced MTP draft head for
+Subject: [PATCH 1/7] Untie a reduced MTP draft head for
  --speculative-token-map on tied Qwen3.5 checkpoints
 
 Qwen3_5ForCausalLMMTP.set_embed_and_head ignored the truncated head when

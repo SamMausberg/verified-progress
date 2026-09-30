@@ -1,0 +1,396 @@
+From 233fe67ede528bf55a0c46e6d6932947e9400d3d Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Wed, 30 Sep 2026 19:57:43 +0000
+Subject: [PATCH 7/7] Add a rounding-preserving live-replay GDN decode kernel
+ (SGLANG_GDN_EXACT_REPLAY)
+
+With --enable-linear-replayssm and an FP32 state, the ring stores the packed
+decode's own FP32 operands (normalized key, raw value, g, beta) and each step
+replays them from the dense anchor in the packed kernel's order before
+processing the current token, so outputs and anchors are meant to be
+bit-identical to the packed decode while the state is written only every
+--linear-replayssm-cache-len steps (state traffic 2D -> D + D/L).
+---
+ .../fla/fused_recurrent_exact_replay.py       | 250 ++++++++++++++++++
+ python/sglang/srt/environ.py                  |   5 +
+ .../layers/attention/linear/gdn_backend.py    |   2 +
+ .../attention/linear/kernels/gdn_triton.py    |  30 +++
+ python/sglang/srt/mem_cache/memory_pool.py    |  16 ++
+ 5 files changed, 303 insertions(+)
+ create mode 100644 python/sglang/kernels/ops/attention/fla/fused_recurrent_exact_replay.py
+
+diff --git a/python/sglang/kernels/ops/attention/fla/fused_recurrent_exact_replay.py b/python/sglang/kernels/ops/attention/fla/fused_recurrent_exact_replay.py
+new file mode 100644
+index 0000000000..0d16d638fd
+--- /dev/null
++++ b/python/sglang/kernels/ops/attention/fla/fused_recurrent_exact_replay.py
+@@ -0,0 +1,250 @@
++# SPDX-License-Identifier: Apache-2.0
++"""Rounding-preserving live replay for GDN decode (bit-identical to the packed decode).
++
++The packed decode kernel (``fused_recurrent_gated_delta_rule_packed_decode_kernel``)
++reads and writes each request's FP32 state every step. This kernel keeps the state
++write-avoiding without changing a single bit of it:
++
++* the dense FP32 state in the pool is an *anchor*, written only every ``L`` steps
++  (or when ``force_flush`` asks for it);
++* between anchors, each step appends the exact FP32 operands the packed kernel
++  used (L2-normalized key, raw value, decay ``g`` and ``beta``) to a small per-slot
++  ring;
++* every step reloads the anchor and replays the ring in order with the packed
++  kernel's own arithmetic (same tile shape, same operation order, same reduction),
++  then processes the current token exactly as the packed kernel does.
++
++By induction the register state after replaying ``j`` records equals the FP32 state
++the packed kernel would have stored after those steps, so outputs and anchors are
++bit-identical, provided the compiler lowers the replayed and the straight-line
++update identically; ``experiments/moonshot/gdn_exact_replay_check.py`` compares
++every state word and output against the packed kernel. State traffic per step
++falls from read + write (2D) to read + D/L, at the cost of up to L-1 replayed
++rank-one updates in registers.
++
++Unlike ReplaySSM (``fused_recurrent_linear_replayssm``), which reconstructs the
++state from BF16-cast operands on tensor cores, nothing here is approximated.
++Ring cursor protocol (``write_pos``, flush at ``L - 1``, ``force_flush``) is
++ReplaySSM's, so the same pool plumbing drives it.
++"""
++
++from __future__ import annotations
++
++from typing import Optional
++
++import torch
++import triton
++import triton.language as tl
++
++from sglang.kernels.ops.attention.fla.op import exp
++
++
++@triton.jit
++def gdn_exact_replay_decode_kernel(
++    mixed_qkv,
++    a,
++    b,
++    A_log,
++    dt_bias,
++    o,
++    h0,
++    k_ring,  # [slots, H, L, K] fp32: L2-normalized keys
++    v_ring,  # [slots, HV, L, V] raw values (activation dtype or wider)
++    g_ring,  # [slots, HV, L] fp32: log decay g
++    beta_ring,  # [slots, HV, L] fp32: beta
++    ssm_state_indices,
++    write_pos,
++    force_flush,
++    scale,
++    stride_mixed_qkv_tok: tl.constexpr,
++    stride_a_tok: tl.constexpr,
++    stride_b_tok: tl.constexpr,
++    stride_state_slot: tl.constexpr,
++    stride_indices_seq: tl.constexpr,
++    H: tl.constexpr,
++    HV: tl.constexpr,
++    K: tl.constexpr,
++    V: tl.constexpr,
++    BK: tl.constexpr,
++    BV: tl.constexpr,
++    L: tl.constexpr,
++    SOFTPLUS_THRESHOLD: tl.constexpr,
++    USE_QK_L2NORM_IN_KERNEL: tl.constexpr,
++    HAS_FORCE_FLUSH: tl.constexpr,
++):
++    # Grid, tile shape and every arithmetic step below mirror
++    # fused_recurrent_gated_delta_rule_packed_decode_kernel; keep them in sync.
++    i_v, i_nh = tl.program_id(0), tl.program_id(1)
++    i_n, i_hv = i_nh // HV, i_nh % HV
++    i_h = i_hv // (HV // H)
++
++    o_k = tl.arange(0, BK)
++    o_v = i_v * BV + tl.arange(0, BV)
++    mask_k = o_k < K
++    mask_v = o_v < V
++    mask_h = mask_v[:, None] & mask_k[None, :]
++
++    state_idx = tl.load(ssm_state_indices + i_n * stride_indices_seq).to(tl.int64)
++    p_o = o + (i_n * HV + i_hv) * V + o_v
++
++    if state_idx < 0:
++        zero = tl.zeros([BV], dtype=tl.float32).to(p_o.dtype.element_ty)
++        tl.store(p_o, zero, mask=mask_v)
++        return
++
++    p_h0 = h0 + state_idx * stride_state_slot
++    p_h0 = p_h0 + i_hv * V * K + o_v[:, None] * K + o_k[None, :]
++    b_h = tl.load(p_h0, mask=mask_h, other=0).to(tl.float32)
++
++    n_rec = tl.load(write_pos + i_n).to(tl.int32)
++    ring_k = k_ring + ((state_idx * H + i_h) * L) * K
++    ring_v = v_ring + ((state_idx * HV + i_hv) * L) * V
++    ring_g = g_ring + (state_idx * HV + i_hv) * L
++    ring_beta = beta_ring + (state_idx * HV + i_hv) * L
++
++    # Replay the committed steps since the anchor, in order.
++    for j in range(0, n_rec):
++        r_k = tl.load(ring_k + j * K + o_k, mask=mask_k, other=0)
++        r_v = tl.load(ring_v + j * V + o_v, mask=mask_v, other=0).to(tl.float32)
++        r_g = tl.load(ring_g + j)
++        r_beta = tl.load(ring_beta + j)
++        b_h *= exp(r_g)
++        r_v -= tl.sum(b_h * r_k[None, :], 1)
++        r_v *= r_beta
++        b_h += r_v[:, None] * r_k[None, :]
++
++    # The current token, exactly as the packed decode kernel computes it.
++    p_mixed = mixed_qkv + i_n * stride_mixed_qkv_tok
++    q_off = i_h * K + o_k
++    k_off = (H * K) + i_h * K + o_k
++    v_off = (2 * H * K) + i_hv * V + o_v
++    b_q = tl.load(p_mixed + q_off, mask=mask_k, other=0).to(tl.float32)
++    b_k = tl.load(p_mixed + k_off, mask=mask_k, other=0).to(tl.float32)
++    b_v_raw = tl.load(p_mixed + v_off, mask=mask_v, other=0)
++    b_v = b_v_raw.to(tl.float32)
++
++    if USE_QK_L2NORM_IN_KERNEL:
++        b_q = b_q / tl.sqrt(tl.sum(b_q * b_q) + 1e-6)
++        b_k = b_k / tl.sqrt(tl.sum(b_k * b_k) + 1e-6)
++    b_q = b_q * scale
++
++    a_val = tl.load(a + i_n * stride_a_tok + i_hv).to(tl.float32)
++    b_val = tl.load(b + i_n * stride_b_tok + i_hv).to(tl.float32)
++    A_log_val = tl.load(A_log + i_hv).to(tl.float32)
++    dt_bias_val = tl.load(dt_bias + i_hv).to(tl.float32)
++    x = a_val + dt_bias_val
++    softplus_x = tl.where(x <= SOFTPLUS_THRESHOLD, tl.log(1.0 + tl.exp(x)), x)
++    g_val = -tl.exp(A_log_val) * softplus_x
++    beta_val = tl.sigmoid(b_val).to(b.dtype.element_ty).to(tl.float32)
++
++    b_h *= exp(g_val)
++    b_v -= tl.sum(b_h * b_k[None, :], 1)
++    b_v *= beta_val
++    b_h += b_v[:, None] * b_k[None, :]
++    b_o = tl.sum(b_h * b_q[None, :], 1)
++    tl.store(p_o, b_o.to(p_o.dtype.element_ty), mask=mask_v)
++
++    is_flush = n_rec >= L - 1
++    if HAS_FORCE_FLUSH:
++        is_flush = is_flush | (tl.load(force_flush + i_n) != 0)
++    if is_flush:
++        tl.store(p_h0, b_h.to(p_h0.dtype.element_ty), mask=mask_h)
++    else:
++        tl.store(
++            ring_v + n_rec * V + o_v,
++            b_v_raw.to(v_ring.dtype.element_ty),
++            mask=mask_v,
++        )
++        if i_v == 0:
++            tl.store(ring_g + n_rec, g_val)
++            tl.store(ring_beta + n_rec, beta_val)
++            if i_hv == i_h * (HV // H):
++                tl.store(ring_k + n_rec * K + o_k, b_k, mask=mask_k)
++
++
++def fused_recurrent_gdn_exact_replay_decode(
++    mixed_qkv: torch.Tensor,
++    a: torch.Tensor,
++    b: torch.Tensor,
++    A_log: torch.Tensor,
++    dt_bias: torch.Tensor,
++    scale: float,
++    initial_state: torch.Tensor,
++    k_ring: torch.Tensor,
++    v_ring: torch.Tensor,
++    g_ring: torch.Tensor,
++    beta_ring: torch.Tensor,
++    out: torch.Tensor,
++    ssm_state_indices: torch.Tensor,
++    write_pos: torch.Tensor,
++    force_flush: Optional[torch.Tensor] = None,
++    use_qk_l2norm_in_kernel: bool = True,
++) -> torch.Tensor:
++    """One decode step with the anchor + exact-ring state (see module docstring).
++
++    Shapes: ``mixed_qkv`` [B, 2*H*K + HV*V]; ``a``, ``b`` [B, HV]; ``initial_state``
++    [slots, HV, V, K] FP32 (the anchor, updated in place at a flush); ``k_ring``
++    [slots, H, L, K] FP32; ``v_ring`` [slots, HV, L, V] in ``mixed_qkv``'s dtype or
++    FP32 (both hold the raw value exactly); ``g_ring`` and ``beta_ring`` [slots, HV, L]
++    FP32; ``write_pos`` [B] int32 records since the
++    anchor (the caller advances it: ``(write_pos + 1) % L``, reset after a forced
++    flush); ``out`` [B, 1, HV, V]. The caller owns cursor bookkeeping, as in ReplaySSM.
++    """
++    if initial_state.dtype != torch.float32:
++        raise ValueError("exact replay needs the FP32 state the packed kernel keeps")
++    B = mixed_qkv.shape[0]
++    _, HV, V, K = initial_state.shape
++    H = k_ring.shape[1]
++    L = k_ring.shape[2]
++    if any(r.dtype != torch.float32 for r in (k_ring, g_ring, beta_ring)):
++        raise ValueError("k_ring, g_ring and beta_ring must be float32")
++    if v_ring.dtype not in (mixed_qkv.dtype, torch.float32):
++        raise ValueError("v_ring must hold raw values in mixed_qkv's dtype or float32")
++    if tuple(v_ring.shape[1:]) != (HV, L, V):
++        raise ValueError("v_ring must have shape [slots, HV, L, V]")
++    if tuple(g_ring.shape[1:]) != (HV, L) or tuple(beta_ring.shape[1:]) != (HV, L):
++        raise ValueError("g_ring and beta_ring must have shape [slots, HV, L]")
++    if write_pos.dtype != torch.int32 or write_pos.shape[0] != B:
++        raise ValueError("write_pos must be int32 with one entry per row")
++    if out.shape != (B, 1, HV, V):
++        raise ValueError(f"out must have shape {(B, 1, HV, V)}")
++    BK = triton.next_power_of_2(K)
++    if BK != K:
++        raise ValueError("exact replay supports power-of-two K only (one K tile)")
++    BV = min(triton.next_power_of_2(V), 32)
++    grid = (triton.cdiv(V, BV), B * HV)
++    gdn_exact_replay_decode_kernel[grid](
++        mixed_qkv=mixed_qkv,
++        a=a,
++        b=b,
++        A_log=A_log,
++        dt_bias=dt_bias,
++        o=out,
++        h0=initial_state,
++        k_ring=k_ring,
++        v_ring=v_ring,
++        g_ring=g_ring,
++        beta_ring=beta_ring,
++        ssm_state_indices=ssm_state_indices,
++        write_pos=write_pos,
++        force_flush=force_flush if force_flush is not None else write_pos,
++        scale=scale,
++        stride_mixed_qkv_tok=mixed_qkv.stride(0),
++        stride_a_tok=a.stride(0),
++        stride_b_tok=b.stride(0),
++        stride_state_slot=initial_state.stride(0),
++        stride_indices_seq=ssm_state_indices.stride(0),
++        H=H,
++        HV=HV,
++        K=K,
++        V=V,
++        BK=BK,
++        BV=BV,
++        L=L,
++        SOFTPLUS_THRESHOLD=20.0,
++        USE_QK_L2NORM_IN_KERNEL=use_qk_l2norm_in_kernel,
++        HAS_FORCE_FLUSH=force_flush is not None,
++        num_warps=1,
++        num_stages=3,
++    )
++    return out
+diff --git a/python/sglang/srt/environ.py b/python/sglang/srt/environ.py
+index d9874903f3..81d77dc851 100644
+--- a/python/sglang/srt/environ.py
++++ b/python/sglang/srt/environ.py
+@@ -1387,6 +1387,11 @@ class Envs:
+     # draft token whose target logit is within this gap of the target argmax
+     # logit (p_draft / p_max >= exp(-gap)). 0 keeps exact greedy verification.
+     SGLANG_SPEC_RELAXED_GREEDY_LOGIT_GAP = EnvFloat(0.0)
++    # With --enable-linear-replayssm (GDN, FP32 state): use the rounding-preserving
++    # replay kernel, which stores the packed decode's own FP32 operands in the ring
++    # and replays them in its order, so states and outputs stay bit-identical to the
++    # packed decode while the state is written only every ring length steps.
++    SGLANG_GDN_EXACT_REPLAY = EnvBool(False)
+     # Which speculative decisions rank 0 broadcasts to its TP group; narrowing
+     # it under live traffic isolates where ranks actually diverge. Comma
+     # separated presets ("all", "rng", "init", "off"), or SpecTpSyncSite slugs
+diff --git a/python/sglang/srt/layers/attention/linear/gdn_backend.py b/python/sglang/srt/layers/attention/linear/gdn_backend.py
+index 5045bf5809..c529134ba8 100644
+--- a/python/sglang/srt/layers/attention/linear/gdn_backend.py
++++ b/python/sglang/srt/layers/attention/linear/gdn_backend.py
+@@ -668,6 +668,7 @@ class GDNAttnBackend(MambaAttnBackendBase):
+         replayssm_d = layer_cache.replayssm_d
+         replayssm_k = layer_cache.replayssm_k
+         replayssm_g = layer_cache.replayssm_g
++        replayssm_beta = layer_cache.replayssm_beta
+
+         return_z = False
+         conv_already_applied = False
+@@ -844,6 +845,7 @@ class GDNAttnBackend(MambaAttnBackendBase):
+                 replayssm_d=replayssm_d,
+                 replayssm_k=replayssm_k,
+                 replayssm_g=replayssm_g,
++                replayssm_beta=replayssm_beta,
+                 replayssm_write_pos=replayssm_write_pos,
+                 replayssm_force_flush=replayssm_force_flush,
+             )
+diff --git a/python/sglang/srt/layers/attention/linear/kernels/gdn_triton.py b/python/sglang/srt/layers/attention/linear/kernels/gdn_triton.py
+index 0e5c0e10ca..d2795db7ed 100644
+--- a/python/sglang/srt/layers/attention/linear/kernels/gdn_triton.py
++++ b/python/sglang/srt/layers/attention/linear/kernels/gdn_triton.py
+@@ -1,5 +1,6 @@
+ import torch
+
++from sglang.srt.environ import envs
+ from sglang.srt.layers.attention.linear.kernels.kernel_backend import (
+     LinearAttnKernelBase,
+ )
+@@ -10,6 +11,9 @@ if not is_cpu():
+     from sglang.kernels.ops.attention.fla.fused_recurrent import (
+         fused_recurrent_gated_delta_rule_packed_decode,
+     )
++    from sglang.kernels.ops.attention.fla.fused_recurrent_exact_replay import (
++        fused_recurrent_gdn_exact_replay_decode,
++    )
+     from sglang.kernels.ops.attention.fla.fused_recurrent_linear_replayssm import (
+         fused_recurrent_gdn_replayssm_decode,
+     )
+@@ -93,6 +97,32 @@ class TritonGDNKernel(LinearAttnKernelBase):
+         # boundary). None when radix tracking is off / flag off; the kernel
+         # treats None as "no forced flush" (byte-identical to slice 1a/1b).
+         replayssm_force_flush = kwargs.get("replayssm_force_flush")
++        replayssm_beta = kwargs.get("replayssm_beta")
++        if (
++            replayssm_beta is not None
++            and replayssm_write_pos is not None
++            and envs.SGLANG_GDN_EXACT_REPLAY.get()
++        ):
++            # Rounding-preserving replay: bit-identical to the packed decode below.
++            fused_recurrent_gdn_exact_replay_decode(
++                mixed_qkv=mixed_qkv,
++                a=a,
++                b=b,
++                A_log=A_log,
++                dt_bias=dt_bias,
++                scale=scale,
++                initial_state=ssm_states,
++                k_ring=replayssm_k,
++                v_ring=replayssm_d,
++                g_ring=replayssm_g,
++                beta_ring=replayssm_beta,
++                out=out,
++                ssm_state_indices=cache_indices,
++                write_pos=replayssm_write_pos,
++                force_flush=replayssm_force_flush,
++                use_qk_l2norm_in_kernel=True,
++            )
++            return out.transpose(0, 1)
+         if (
+             replayssm_d is not None
+             and replayssm_k is not None
+diff --git a/python/sglang/srt/mem_cache/memory_pool.py b/python/sglang/srt/mem_cache/memory_pool.py
+index ce1c70a5b5..d1b4ad061a 100644
+--- a/python/sglang/srt/mem_cache/memory_pool.py
++++ b/python/sglang/srt/mem_cache/memory_pool.py
+@@ -711,6 +711,22 @@ class MambaPool:
+                     dtype=torch.float32,
+                     device=device,
+                 )
++                if (
++                    envs.SGLANG_GDN_EXACT_REPLAY.get()
++                    and enable_linear_replayssm
++                    and not cache_params.is_kda
++                ):
++                    # Exact replay keeps the packed decode's FP32 operands: keys and
++                    # raw values in the (FP32) d/k rings, plus a beta ring.
++                    if ssm_dtype != torch.float32:
++                        raise ValueError(
++                            "SGLANG_GDN_EXACT_REPLAY needs --mamba-ssm-dtype float32"
++                        )
++                    replayssm_beta = torch.zeros(
++                        size=(num_mamba_layers, num_slots, hv, L),
++                        dtype=torch.float32,
++                        device=device,
++                    )
+                 # KDA still uses raw-input fold-every-commit. GDN materializes
+                 # its compact d/k/g history directly and needs no duplicate ring.
+                 if enable_linear_replayssm_spec and cache_params.is_kda:
+--
+2.34.1

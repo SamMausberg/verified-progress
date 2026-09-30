@@ -1,7 +1,7 @@
 From 98a62e021b845c5d69e098046e34579aa2c2261c Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <samuelmausberg@gmail.com>
 Date: Wed, 30 Sep 2026 19:22:59 +0000
-Subject: [PATCH 5/6] Honour --speculative-token-map in the DFlash draft greedy
+Subject: [PATCH 5/7] Honour --speculative-token-map in the DFlash draft greedy
  head
 
 At tp=1 the captured draft sampler scores only the hot vocabulary rows and

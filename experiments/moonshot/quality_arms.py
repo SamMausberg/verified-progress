@@ -77,7 +77,9 @@ def launch(config: str, out_dir: Path, port: int, extra: dict[str, object]):
     return Server(arm, out_dir / 'server', port, strict=False)
 
 
-def probe(url: str, out: Path, label: str, mode: str, reference: Path | None) -> None:
+def probe(
+    url: str, out: Path, label: str, mode: str, reference: Path | None, concurrency: int
+) -> None:
     command = [
         sys.executable,
         str(HERE / 'logit_probe.py'),
@@ -90,6 +92,8 @@ def probe(url: str, out: Path, label: str, mode: str, reference: Path | None) ->
         str(out),
         '--label',
         label,
+        '--concurrency',
+        str(concurrency),
     ]
     if reference is not None:
         command += ['--reference', str(reference)]
@@ -113,6 +117,7 @@ def main() -> None:
     parser.add_argument('--configs', nargs='+', required=True)
     parser.add_argument('--port', type=int, default=30071)
     parser.add_argument('--reference', default='plain', help='label of the reference config')
+    parser.add_argument('--probe-concurrency', type=int, default=16)
     parser.add_argument(
         '--calibrate-token-map',
         action='store_true',
@@ -159,9 +164,10 @@ def main() -> None:
                         ],
                         check=True,
                     )
-                probe(url, run_dir / 'generate.json', config, 'generate', None)
+                conc = args.probe_concurrency
+                probe(url, run_dir / 'generate.json', config, 'generate', None, conc)
                 gen_ref = (ref_dir if not is_reference else run_dir) / 'generate.json'
-                probe(url, run_dir / 'score.json', config, 'score', gen_ref)
+                probe(url, run_dir / 'score.json', config, 'score', gen_ref, conc)
                 entry['server_info'] = server.server_info().get('internal_states')
             finally:
                 server.stop()
