@@ -26,12 +26,12 @@ import re
 import shutil
 import subprocess
 import sys
-import threading
 import time
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+from bench.hostload import HostLoadSampler, wait_for_quiet
 from bench.results import (
     counter_deltas,
     iter_jsonl,
@@ -45,12 +45,10 @@ from bench.server import (
     Server,
     add_arm_arguments,
     arm_from_args,
-    foreign_cpu,
     gpu_lock_held_by_someone,
     gpu_snapshot,
     http_get,
     http_post,
-    wait_for_quiet_cpu,
 )
 
 AIPERF = str(Path.home() / '.local/bin/aiperf')
@@ -182,16 +180,6 @@ def log_segment_stats(text: str) -> dict[str, Any]:
     }
 
 
-def peak_own_cpu(samples: list[dict[str, Any]]) -> dict[str, float]:
-    """Highest per-process CPU (cores) seen for each server/client process title."""
-    peaks: dict[str, float] = {}
-    for sample in samples:
-        for entry in sample.get('own', []):
-            title = entry['cmd'][:60]
-            peaks[title] = max(peaks.get(title, 0.0), entry['cores'])
-    return dict(sorted(peaks.items(), key=lambda item: -item[1])[:8])
-
-
 def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -209,9 +197,6 @@ class Sweep:
         }
         self.body = request_body(args.ignore_eos, args.thinking)
         self.points: list[dict[str, Any]] = []
-        assert server.proc is not None
-        # The sweep (with its aiperf children) and the server each own a session.
-        self.own_sessions = {os.getsid(0), os.getsid(server.proc.pid)}
 
     @property
     def url(self) -> str:
@@ -306,26 +291,16 @@ class Sweep:
             raise RuntimeError(
                 f'prefix-cache flush failed before c={concurrency}; not measuring this point'
             )
-        cpu_before = wait_for_quiet_cpu(
-            self.own_sessions, args.quiet_cpu_cores, args.quiet_cpu_wait
-        )
+        # The sweep's own process tree (server, aiperf) is excluded from foreign load.
+        cpu_before = wait_for_quiet(os.getpid(), args.quiet_cpu_cores, args.quiet_cpu_wait)
         before = self.metrics()
         log_start = self.server.log_path.stat().st_size
         gpu_before = gpu_snapshot()
-        samples: list[dict[str, Any]] = []
-        stop = threading.Event()
-
-        def sample_cpu() -> None:
-            while not stop.is_set():
-                samples.append(foreign_cpu(self.own_sessions, interval=5.0))
-
-        sampler = threading.Thread(target=sample_cpu, daemon=True)
-        sampler.start()
         started = time.time()
-        result = self.run_aiperf(point_dir, concurrency, requests, warmup, prompts, args.osl)
+        with HostLoadSampler(os.getpid(), interval=1.0) as sampler:
+            result = self.run_aiperf(point_dir, concurrency, requests, warmup, prompts, args.osl)
         elapsed = time.time() - started
-        stop.set()
-        sampler.join()
+        host_load = sampler.summary()
         after = self.metrics()
         with self.server.log_path.open('rb') as handle:
             handle.seek(log_start)
@@ -359,13 +334,13 @@ class Sweep:
                 'server_log': log_segment_stats(segment),
                 'gpu_before': gpu_before['values'],
                 'gpu_after': gpu_snapshot()['values'],
-                # CPU cores used by processes outside this sweep and its server.
+                # CPU cores used by processes outside this sweep, its server and client,
+                # sampled once per second during the point (bench/hostload.py).
                 'foreign_cpu_before': cpu_before,
-                'foreign_cpu_during_max': max((x['cores'] for x in samples), default=None),
-                'foreign_cpu_during_mean': (
-                    sum(x['cores'] for x in samples) / len(samples) if samples else None
-                ),
-                'own_cpu_during_peak': peak_own_cpu(samples),
+                'host_load': host_load,
+                'foreign_cpu_during_max': host_load['foreign_cores_max'],
+                'foreign_cpu_during_mean': host_load['foreign_cores_mean'],
+                'own_cpu_during_peak': host_load['own_peak_cores'],
             }
         )
         (point_dir / 'point.json').write_text(json.dumps(summary, indent=2, default=str) + '\n')

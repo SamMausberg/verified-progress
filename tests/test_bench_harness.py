@@ -421,3 +421,24 @@ def test_quality_comparison_fails_closed_without_the_task_set(tmp_path: Path) ->
     (a / 'quality.json').write_text(json.dumps({**summary, 'sgl_eval_exit_code': 1}))
     with pytest.raises(ValueError, match='sgl-eval exited'):
         compare(a, b)
+
+
+def test_host_load_tree_and_contention_summary() -> None:
+    from bench.hostload import CONTENTION_CORES, process_tree, summarise
+
+    table = {1: (0, 0.0), 10: (1, 0.0), 11: (10, 0.0), 12: (11, 0.0), 20: (1, 0.0)}
+    assert process_tree(10, table) == {10, 11, 12}
+    quiet = [{'cores': 0.5, 'top': [], 'own': []}] * 3
+    busy = [{'cores': 3.0, 'top': [{'cmd': 'analysis', 'cores': 3.0}], 'own': []}] * 3
+    assert not summarise(quiet)['contended']
+    report = summarise(busy)
+    assert report['contended'] and report['foreign_cores_mean'] > CONTENTION_CORES
+    assert report['top_foreign_mean_cores'] == {'analysis': 3.0}
+
+
+def test_contended_points_are_invalid() -> None:
+    from bench.pareto import invalid_reason
+
+    point = {'concurrency': 1, 'x_e2e': 1.0, 'y': 1.0, 'failed': 0, 'aiperf_exit_code': 0}
+    assert invalid_reason({**point, 'foreign_cpu_during_mean': 0.4}) == ''
+    assert invalid_reason({**point, 'foreign_cpu_during_mean': 3.0}).startswith('host_contention')
