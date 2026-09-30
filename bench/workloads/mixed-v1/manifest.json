@@ -1,0 +1,263 @@
+{
+  "name": "mixed-v1",
+  "model": "Qwen/Qwen3.5-4B",
+  "tokenizer_revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+  "chat_template_kwargs": {
+    "enable_thinking": true
+  },
+  "isl_definition": "tokens of the chat-templated request (one user message, add_generation_prompt=True, enable_thinking=True), i.e. the server-side prompt_tokens",
+  "seed": 20260930,
+  "prompts_per_domain": {
+    "warmup": 43,
+    "tune": 192,
+    "confirm": 384
+  },
+  "filters": {
+    "min_prompt_chars": 16,
+    "max_prompt_tokens": 1024,
+    "dedupe": "case- and whitespace-normalised text, first occurrence kept",
+    "oasst1": "role=prompter, root message, lang=en, not deleted, review_result=true, not synthetic, detoxify toxicity < 0.1"
+  },
+  "templates": {
+    "humaneval": "Complete the following Python function.\n\n```python\n{prompt}\n```",
+    "mbpp": "{text}\nYour code should pass these tests:\n\n{tests}",
+    "gsm8k": "{question}\nPlease reason step by step, and put your final answer within \\boxed{{}}.",
+    "mtbench": "first turn verbatim",
+    "oasst1": "text verbatim (stripped)"
+  },
+  "order": "per domain: small sources used in full, the largest fills the rest; each source's prompts (seeded shuffle) spread evenly through the domain list, which is cut into warmup, tune and confirm in that order; per split: round-robin chat, code, math",
+  "sources": [
+    {
+      "key": "mtbench",
+      "repo": "HuggingFaceH4/mt_bench_prompts",
+      "revision": "e3a795c5e9a82ee40611c416b8a7786c73198991",
+      "files": [
+        "raw/question.jsonl"
+      ],
+      "licence": "Apache-2.0 (MT-Bench questions from lm-sys/FastChat)",
+      "domain": "chat",
+      "rows_read": 80,
+      "candidates": 80,
+      "kept_after_filters": 80
+    },
+    {
+      "key": "oasst1",
+      "repo": "OpenAssistant/oasst1",
+      "revision": "fdf72ae0827c1cda404aff25b6603abec9e3399b",
+      "files": [
+        "data/train-00000-of-00001-b42a775f407cee45.parquet",
+        "data/validation-00000-of-00001-134b8fd0c89408b6.parquet"
+      ],
+      "licence": "Apache-2.0",
+      "domain": "chat",
+      "rows_read": 88838,
+      "candidates": 3601,
+      "kept_after_filters": 3522
+    },
+    {
+      "key": "humaneval",
+      "repo": "openai/openai_humaneval",
+      "revision": "7dce6050a7d6d172f3cc5c32aa97f52fa1a2e544",
+      "files": [
+        "openai_humaneval/test-00000-of-00001.parquet"
+      ],
+      "licence": "MIT",
+      "domain": "code",
+      "rows_read": 164,
+      "candidates": 164,
+      "kept_after_filters": 164
+    },
+    {
+      "key": "mbpp",
+      "repo": "google-research-datasets/mbpp",
+      "revision": "4bb6404fdc6cacfda99d4ac4205087b89d32030c",
+      "files": [
+        "full/test-00000-of-00001.parquet"
+      ],
+      "licence": "CC-BY-4.0",
+      "domain": "code",
+      "rows_read": 500,
+      "candidates": 500,
+      "kept_after_filters": 499
+    },
+    {
+      "key": "gsm8k",
+      "repo": "openai/gsm8k",
+      "revision": "740312add88f781978c0658806c59bc2815b9866",
+      "files": [
+        "main/test-00000-of-00001.parquet"
+      ],
+      "licence": "MIT",
+      "domain": "math",
+      "rows_read": 1319,
+      "candidates": 1319,
+      "kept_after_filters": 1319
+    }
+  ],
+  "files": {
+    "warmup": {
+      "file": "warmup.jsonl",
+      "prompts": 129,
+      "sha256": "4bcd636ef40a16f4a4208305d970c24690bd169be3a6ed0308a1dc37ee0ddc58"
+    },
+    "tune": {
+      "file": "tune.jsonl",
+      "prompts": 576,
+      "sha256": "a7d87f0b24952d747e456f237e725c3bae38b3e810c8bee6445e790939e5c644"
+    },
+    "confirm": {
+      "file": "confirm.jsonl",
+      "prompts": 1152,
+      "sha256": "137469edb92810e2bf787d80d997af939efcfa1bb133f7ba6a20d649c6f6b9f5"
+    }
+  },
+  "prompt_token_stats": {
+    "warmup": {
+      "all": {
+        "n": 129,
+        "mean": 77.6,
+        "min": 16,
+        "p10": 26.8,
+        "p50": 72.0,
+        "p90": 143.0,
+        "p99": 166.0,
+        "max": 209
+      },
+      "chat": {
+        "n": 43,
+        "mean": 38.1,
+        "min": 16,
+        "p10": 20.0,
+        "p50": 33.0,
+        "p90": 57.40000000000001,
+        "p99": 97.2,
+        "max": 101
+      },
+      "code": {
+        "n": 43,
+        "mean": 112.2,
+        "min": 63,
+        "p10": 69.6,
+        "p50": 108.0,
+        "p90": 154.60000000000002,
+        "p99": 191.8,
+        "max": 209
+      },
+      "math": {
+        "n": 43,
+        "mean": 82.4,
+        "min": 52,
+        "p10": 62.2,
+        "p50": 79.0,
+        "p90": 112.00000000000004,
+        "p99": 137.9,
+        "max": 148
+      },
+      "by_source": {
+        "mtbench": 6,
+        "oasst1": 37,
+        "humaneval": 11,
+        "mbpp": 32,
+        "gsm8k": 43
+      }
+    },
+    "tune": {
+      "all": {
+        "n": 576,
+        "mean": 91.9,
+        "min": 14,
+        "p10": 23.0,
+        "p50": 76.0,
+        "p90": 172.5,
+        "p99": 353.8,
+        "max": 865
+      },
+      "chat": {
+        "n": 192,
+        "mean": 46.5,
+        "min": 14,
+        "p10": 18.0,
+        "p50": 29.5,
+        "p90": 72.80000000000001,
+        "p99": 340.3,
+        "max": 393
+      },
+      "code": {
+        "n": 192,
+        "mean": 142.9,
+        "min": 62,
+        "p10": 70.0,
+        "p50": 113.0,
+        "p90": 255.0,
+        "p99": 431.5,
+        "max": 865
+      },
+      "math": {
+        "n": 192,
+        "mean": 86.5,
+        "min": 53,
+        "p10": 63.0,
+        "p50": 82.0,
+        "p90": 115.80000000000001,
+        "p99": 154.5,
+        "max": 160
+      },
+      "by_source": {
+        "mtbench": 24,
+        "oasst1": 168,
+        "humaneval": 51,
+        "mbpp": 141,
+        "gsm8k": 192
+      }
+    },
+    "confirm": {
+      "all": {
+        "n": 1152,
+        "mean": 88.4,
+        "min": 14,
+        "p10": 24.0,
+        "p50": 78.0,
+        "p90": 159.0,
+        "p99": 282.5,
+        "max": 765
+      },
+      "chat": {
+        "n": 384,
+        "mean": 47.1,
+        "min": 14,
+        "p10": 18.300000000000004,
+        "p50": 32.0,
+        "p90": 86.0,
+        "p99": 228.5,
+        "max": 369
+      },
+      "code": {
+        "n": 384,
+        "mean": 130.3,
+        "min": 57,
+        "p10": 72.0,
+        "p50": 114.0,
+        "p90": 216.7,
+        "p99": 311.4,
+        "max": 765
+      },
+      "math": {
+        "n": 384,
+        "mean": 87.8,
+        "min": 51,
+        "p10": 63.0,
+        "p50": 84.0,
+        "p90": 119.0,
+        "p99": 151.2,
+        "max": 167
+      },
+      "by_source": {
+        "mtbench": 50,
+        "oasst1": 334,
+        "humaneval": 102,
+        "mbpp": 282,
+        "gsm8k": 384
+      }
+    }
+  }
+}
