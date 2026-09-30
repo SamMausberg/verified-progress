@@ -166,6 +166,7 @@ def main() -> None:
         'anchor_values_per_token': anchor,
         'anchor_bytes_per_token_bf16': anchor_bytes,
         'hbm_write_TBps': write_tbps,
+        'hbm_read_TBps': gdn.get('hbm_1GiB', {}).get('read_TBps_median'),
         'rows': table,
     }
     args.out_dir.mkdir(parents=True, exist_ok=True)
