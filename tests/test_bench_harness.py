@@ -369,7 +369,10 @@ def _quality_run(directory: Path, ids: list[str], task_file: Path) -> Path:
             writer.writerow(
                 {'id': key, 'correct': True, 'predicted_answer': '1', 'generation_sha': 'h'}
             )
-    summary = {'task_file': str(task_file), 'task_sha256': 'same'}
+    import hashlib
+
+    digest = hashlib.sha256(task_file.read_bytes()).hexdigest() if task_file.exists() else 'gone'
+    summary = {'task_file': str(task_file), 'task_sha256': digest, 'sgl_eval_exit_code': 0}
     (directory / 'quality.json').write_text(json.dumps(summary))
     return directory
 
@@ -387,3 +390,24 @@ def test_quality_comparison_requires_the_same_complete_problem_set(tmp_path: Pat
     partial = _quality_run(tmp_path / 'd', full[:2], task_file)
     with pytest.raises(ValueError, match='task file has 3'):
         compare(partial, _quality_run(tmp_path / 'e', full[:2], task_file))
+
+
+def test_quality_comparison_fails_closed_without_the_task_set(tmp_path: Path) -> None:
+    from bench.quality import compare
+
+    task_file = tmp_path / 'tasks.jsonl'
+    task_file.write_text('{}\n{}\n{}\n')
+    a = _quality_run(tmp_path / 'a', ['p0', 'p1'], task_file)
+    b = _quality_run(tmp_path / 'b', ['p0', 'p1'], task_file)
+    task_file.unlink()
+    with pytest.raises(ValueError, match='cannot establish the task set'):
+        compare(a, b)
+    for run in (a, b):
+        summary = json.loads((run / 'quality.json').read_text())
+        (run / 'quality.json').write_text(json.dumps({**summary, 'task_problems': 3}))
+    with pytest.raises(ValueError, match='task file has 3'):
+        compare(a, b)
+    summary = json.loads((a / 'quality.json').read_text())
+    (a / 'quality.json').write_text(json.dumps({**summary, 'sgl_eval_exit_code': 1}))
+    with pytest.raises(ValueError, match='sgl-eval exited'):
+        compare(a, b)
