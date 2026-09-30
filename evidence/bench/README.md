@@ -79,7 +79,12 @@ What limits streamed throughput at high concurrency. One plain server (capacity 
 512 output tokens, on a quiet host (other processes at most 0.54 cores). Each row
 compares the client-observed y with the server's own decode rate while the full batch
 runs (median of its log's `gen throughput` lines with at least 90% of the peak running
-requests), and lists processes that used at least 0.3 cores.
+requests), and lists processes that used at least 0.3 cores. Every row is a single
+point of 512 requests; none has been repeated. The only rough indication of
+point-to-point noise is the pair that differs just in aiperf's worker count and gave
+15,363 and 15,439 tok/s (0.5% apart), against the 5-8% differences discussed below. The
+one-token control runs used the then-default `--stream-interval 1`; the campaign script
+now pins it explicitly.
 
 | Server | Client | y (tok/s) | Server decode (tok/s) | Busy processes (cores) |
 |---|---|---|---|---|
