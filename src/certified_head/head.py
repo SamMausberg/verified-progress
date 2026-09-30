@@ -8,6 +8,11 @@ the dense reference itself, so a fallback costs time and never changes the
 answer. Inside CUDA-graph capture the fallback is a conditional graph node
 driven by a device flag; outside capture it costs one host synchronization.
 
+``CertifiedHead.gumbel_sample(hidden, seeds, positions, temperatures)`` does
+the same for SGLang's seeded sampler (no top-k, top-p or min-p): the token it
+returns is the token ``stock_seeded_sample`` returns for the same batch (see
+:mod:`certified_head.reference`).
+
 With ``reference='real'`` the target is the exact real-arithmetic argmax of the
 stored BF16 values. No dense GPU kernel computes that exactly, so undecided
 rows are reported in ``stats.status`` instead of being recomputed.
@@ -24,9 +29,18 @@ import torch
 import triton
 
 from certified_head import kernels as K
-from certified_head.bounds import Reference, envelope_coefficients, kernel_constants
+from certified_head.bounds import (
+    Arith,
+    Reference,
+    RefModel,
+    arith_coefficients,
+    f32_up,
+    kernel_constants,
+    scale_rel_error,
+    sqrt_upper_f32,
+)
 from certified_head.quantize import MODEL_ID, MODEL_REVISION, QuantizedHead, load_or_build
-from certified_head.reference import reference_argmax
+from certified_head.reference import reference_argmax, stock_seeded_sample
 
 STATUS_BITS = {
     'overflow': K.STATUS_OVERFLOW.value,
@@ -36,6 +50,20 @@ STATUS_BITS = {
     'empty': K.STATUS_EMPTY.value,
     'tile_overflow': K.STATUS_TILE_OVERFLOW.value,
 }
+
+Fallback = Literal['batch', 'columns']
+"""How undecided greedy rows are completed.
+
+``batch``: run the stock head on the whole batch, at the same shape, and take its
+argmax for the undecided rows. Exact by construction.
+``columns``: a row that is undecided only because of a near tie, with a complete
+candidate list, is completed by the stock GEMM on its candidates' head rows
+(gathered into one ``matmul``); every other undecided row uses ``batch``. The
+certificate guarantees that the stock argmax is among the candidates, so this
+returns the stock token whenever the stock kernel computes a logit identically
+when only a subset of head rows is multiplied (column-subset invariance, which
+``experiments/certified_head/stock_invariance.py`` measures per shape).
+"""
 
 Selection = Literal['dense', 'tiles']
 """How candidates are found after the approximate pass.
@@ -47,6 +75,14 @@ epilogue and scan only those (``M x V / BLOCK_V x TOP`` entries).
 
 TOP = 4
 MIN_BLOCK_V = 64
+COLS_CAP = 64
+"""Candidate slots per row that the column fallback gathers (larger lists use ``batch``)."""
+ARITH_CODES: dict[Arith, int] = {'w8a16': 0, 'w8a8': 1, 'bf16': 2}
+
+
+def default_arith(m: int) -> Arith:
+    """Approximate arithmetic by batch size (W8A16 until the others are measured)."""
+    return 'w8a16'
 
 
 @dataclass(frozen=True)
@@ -56,19 +92,29 @@ class GemvConfig:
     block_k: int
     num_warps: int
     num_stages: int
+    tma: bool = False
+
+
+def default_arith_config(arith: Arith, m: int) -> GemvConfig:
+    """Tile shape for the W8A8 and BF16 passes (from ``bench/tune_gemv.py``)."""
+    if m <= 16:
+        return GemvConfig(64, 16, 128, 4, 3)
+    if m <= 32:
+        return GemvConfig(64, 32, 128, 4, 3)
+    if m <= 64:
+        return GemvConfig(128, 64, 128, 4, 3)
+    return GemvConfig(128, 128, 128, 8, 3)
 
 
 def default_gemv_config(m: int) -> GemvConfig:
-    """Tile shape by batch size (from the sweep in ``bench/micro_head.py``)."""
+    """Tile shape by batch size: the fastest in ``bench/tune_gemv.py`` on GH200."""
     if m <= 16:
-        return GemvConfig(128, 16, 256, 4, 4)
+        return GemvConfig(64, 16, 128, 4, 3)
     if m <= 32:
-        return GemvConfig(128, 32, 256, 4, 4)
+        return GemvConfig(64, 32, 128, 4, 3)
     if m <= 64:
-        return GemvConfig(128, 64, 128, 4, 4)
-    if m <= 128:
-        return GemvConfig(128, 128, 64, 8, 4)
-    return GemvConfig(128, 256, 64, 8, 3)
+        return GemvConfig(128, 64, 128, 4, 3)
+    return GemvConfig(64, 128, 128, 4, 3)
 
 
 @dataclass
@@ -110,27 +156,36 @@ class CertifiedHead:
         weight: torch.Tensor,
         q: torch.Tensor,
         scale: torch.Tensor,
-        coeff: torch.Tensor,
+        coeff: dict[Arith, torch.Tensor],
         dup_rep: torch.Tensor,
         *,
+        wmax: float,
         group_size: int,
         reference: Reference = 'bf16',
-        capacity: int = 64,
+        ref_model: RefModel = 'conservative',
+        capacity: int = 256,
         max_batch: int = 256,
         selection: Selection = 'tiles',
+        fallback_mode: Fallback = 'batch',
         refine_split: int = 4,
     ) -> None:
         if weight.dtype != torch.bfloat16 or q.dtype != torch.int8:
             raise TypeError('weight must be BF16 and q int8')
         v, k = weight.shape
-        if q.shape != (v, k) or scale.shape != (v,) or coeff.shape[0] != v or dup_rep.shape != (v,):
+        if q.shape != (v, k) or scale.shape != (v,) or dup_rep.shape != (v,):
             raise ValueError('inconsistent head shapes')
         if k % group_size:
             raise ValueError('group_size must divide the hidden size')
         self.weight = weight
         self.q = q
         self.scale = scale
-        self.coeff = coeff.contiguous()
+        self.coeff = {a: c.contiguous() for a, c in coeff.items()}
+        if any(c.shape[0] != v for c in self.coeff.values()):
+            raise ValueError('inconsistent coefficient shapes')
+        self.arith_for: Callable[[int], Arith] = default_arith
+        self.arith_config: Callable[[Arith, int], GemvConfig] = default_arith_config
+        self._hq = torch.empty(max_batch, k, dtype=torch.int8, device=weight.device)
+        self._hs = torch.ones(max_batch, dtype=torch.float32, device=weight.device)
         self.dup_rep = dup_rep.to(torch.int32).contiguous()
         self.reference: Reference = reference
         self.mode = K.MODES[reference]
@@ -144,11 +199,12 @@ class CertifiedHead:
         self.selection: Selection = selection
         self.refine_split = refine_split
         self.gemv_config: Callable[[int], GemvConfig] = default_gemv_config
-        self.const = kernel_constants(reference, k, group_size)
+        self.ref_model: RefModel = ref_model
+        self.const = kernel_constants(reference, k, group_size, ref_model)
         dev = weight.device
         mb = max_batch
         nt = triton.cdiv(v, MIN_BLOCK_V)
-        self._b = torch.empty(mb, self.groups, dtype=torch.float32, device=dev)
+        self._b = torch.zeros(mb, 2 * self.groups, dtype=torch.float32, device=dev)
         self._hi = torch.empty(
             mb, v if selection == 'dense' else 0, dtype=torch.float32, device=dev
         )
@@ -161,8 +217,20 @@ class CertifiedHead:
         self._cand = torch.zeros(mb, capacity, dtype=torch.int32, device=dev)
         self._rlo = torch.empty(mb, capacity, dtype=torch.float32, device=dev)
         self._rhi = torch.empty(mb, capacity, dtype=torch.float32, device=dev)
+        self._rlo64 = torch.empty(mb, capacity, dtype=torch.float64, device=dev)
+        self._rhi64 = torch.empty(mb, capacity, dtype=torch.float64, device=dev)
+        self._no_seed = torch.zeros(mb, dtype=torch.int64, device=dev)
+        self._no_temp = torch.ones(mb, dtype=torch.float32, device=dev)
+        self._sampling: tuple[torch.Tensor, torch.Tensor, torch.Tensor] | None = None
+        self._hnorm = torch.empty(mb, dtype=torch.float32, device=dev)
+        self._ymax = torch.empty(mb, dtype=torch.float32, device=dev)
+        self.wmax = wmax
         self._ids = torch.zeros(mb, dtype=torch.int64, device=dev)
         self._any = torch.zeros((), dtype=torch.bool, device=dev)
+        self._any_cols = torch.zeros((), dtype=torch.bool, device=dev)
+        self._any_dense = torch.zeros((), dtype=torch.bool, device=dev)
+        self.fallback_mode: Fallback = fallback_mode
+        self._column_batches: set[int] | None = None
         c = self.const
         const64 = [0.0] * 3
         const64[K.CONST_SUMSQ_INFLATE.value] = c.sumsq_inflate
@@ -170,7 +238,7 @@ class CertifiedHead:
         const64[K.CONST_REFINE_RADIUS.value] = c.refine_radius
         self._const64 = torch.tensor(const64, dtype=torch.float64, device=dev)
         # FP32 kernel scalars must be exactly representable (they are passed as FP32).
-        for x in (c.rel_scale, c.abs_floor):
+        for x in (c.abs_floor, wmax):
             if float(np.float32(x)) != x:
                 raise ValueError(f'{x!r} is not an FP32 value')
 
@@ -184,29 +252,40 @@ class CertifiedHead:
         *,
         device: torch.device | str = 'cuda',
         reference: Reference = 'bf16',
+        ref_model: RefModel = 'conservative',
         group_size: int | None = None,
         **kwargs: Any,
     ) -> CertifiedHead:
         _, k = qh.shape
         gs = k if group_size is None else group_size
-        coeff = envelope_coefficients(
-            qh.err_sumsq,
-            qh.q_sumsq,
-            qh.w_sumsq,
-            qh.scale.numpy(),
-            reference,
-            k,
-            int(qh.info['base_group']),
-            gs,
-        )
+        coeff = {
+            a: torch.from_numpy(
+                arith_coefficients(
+                    a,
+                    qh.err_sumsq,
+                    qh.q_sumsq,
+                    qh.w_sumsq,
+                    qh.scale.numpy(),
+                    reference,
+                    k,
+                    int(qh.info['base_group']),
+                    gs,
+                    ref_model,
+                )
+            ).to(device)
+            for a in ARITH_CODES
+        }
+        wmax = f32_up(float(sqrt_upper_f32(qh.w_sumsq.sum(axis=1) * (1 + 2**-40)).max()))
         return cls(
             weight.to(device),
             qh.q.to(device),
             qh.scale.to(device),
-            torch.from_numpy(coeff).to(device),
+            coeff,
             torch.from_numpy(qh.dup_rep).to(device),
+            wmax=wmax,
             group_size=gs,
             reference=reference,
+            ref_model=ref_model,
             **kwargs,
         )
 
@@ -237,36 +316,82 @@ class CertifiedHead:
             self._count,
             self._status,
             self._any,
+            self._hnorm,
+            self._ymax,
             self._const64,
             K=self.hidden,
             G=self.groups,
             GS=self.group_size,
             CH=self.chunk,
+            BSTRIDE=2 * self.groups,
         )
+        if self.arith_for(m) == 'w8a8':
+            K._quantize_hidden_kernel[(m,)](
+                hidden,
+                self._hq,
+                self._hs,
+                self._b,
+                self._const64,
+                K=self.hidden,
+                G=self.groups,
+                GS=self.group_size,
+                CH=self.chunk,
+            )
+
+    def _sampling_args(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        if self._sampling is None:
+            return self._no_seed, self._no_seed, self._no_temp
+        return self._sampling
 
     def _gemv(self, hidden: torch.Tensor, m: int, out: torch.Tensor, epilogue: int) -> GemvConfig:
-        cfg = self.gemv_config(m)
+        arith = self.arith_for(m)
+        cfg = self.gemv_config(m) if arith == 'w8a16' else self.arith_config(arith, m)
+        seeds, positions, temps = self._sampling_args()
         if cfg.block_v < MIN_BLOCK_V:
             raise ValueError(f'block_v must be at least {MIN_BLOCK_V}')
         grid = (triton.cdiv(self.vocab, cfg.block_v) * triton.cdiv(m, cfg.block_m),)
+        coeff = self.coeff[arith]
+        weights = self.weight if arith == 'bf16' else self.q
+        inputs = self._hq[:m] if arith == 'w8a8' else hidden
+        q_desc = h_desc = None
+        if cfg.tma:
+            from triton.tools.tensor_descriptor import TensorDescriptor
+
+            k = self.hidden
+            q_desc = TensorDescriptor(weights, [self.vocab, k], [k, 1], [cfg.block_v, cfg.block_k])
+            h_desc = TensorDescriptor(inputs, [m, k], [k, 1], [cfg.block_m, cfg.block_k])
         K._gemv_envelope_kernel[grid](
-            self.q,
+            weights,
             self.scale,
-            self.coeff,
-            hidden,
+            coeff,
+            inputs,
             self._b,
             out,
             self._top_idx,
             self._rest,
             self._lower,
+            seeds,
+            positions,
+            temps,
+            self._hnorm,
+            self._hs,
+            self._ymax,
+            q_desc,
+            h_desc,
             m,
             self.vocab,
-            self.const.rel_scale,
+            scale_rel_error(arith),
             self.const.abs_floor,
+            self.wmax,
             K=self.hidden,
-            G=self.groups,
+            G=coeff.shape[1],
+            BSTRIDE=2 * self.groups,
             EPILOGUE=epilogue,
             TOP=TOP,
+            SAMPLE=self._sampling is not None,
+            MODE=self.mode,
+            ARITH=ARITH_CODES[arith],
+            TMA=cfg.tma,
             BLOCK_V=cfg.block_v,
             BLOCK_M=cfg.block_m,
             BLOCK_K=cfg.block_k,
@@ -303,27 +428,38 @@ class CertifiedHead:
                 self._lower,
                 self._count,
                 self._cand,
-                self._status,
                 nt,
+                self.vocab,
                 self.capacity,
-                MODE=self.mode,
+                cfg.block_v,
+                MODE=K.MODES['fp32'] if self._sampling is not None else self.mode,
                 TOP=TOP,
                 BLOCK=block,
+                MAX_TILE=triton.next_power_of_2(max(cfg.block_v, 16)),
                 num_warps=8,
             )
 
     def _refine(self, hidden: torch.Tensor, m: int) -> None:
+        sample = self._sampling is not None
+        seeds, positions, temps = self._sampling_args()
         K._refine_kernel[(m, self.refine_split)](
             self.weight,
             hidden,
             self._count,
             self._cand,
-            self._rlo,
-            self._rhi,
+            self._rlo64 if sample else self._rlo,
+            self._rhi64 if sample else self._rhi,
             self._const64,
+            seeds,
+            positions,
+            temps,
+            self._hnorm,
+            self._ymax,
             self.capacity,
+            self.wmax,
             K=self.hidden,
             MODE=self.mode,
+            SAMPLE=sample,
             NSPLIT=self.refine_split,
             BLOCK_C=16,
             BLOCK_K=256,
@@ -331,11 +467,12 @@ class CertifiedHead:
         )
 
     def _decide(self, m: int) -> None:
+        sample = self._sampling is not None
         K._decide_kernel[(m,)](
             self._count,
             self._cand,
-            self._rlo,
-            self._rhi,
+            self._rlo64 if sample else self._rlo,
+            self._rhi64 if sample else self._rhi,
             self._lower,
             self._status,
             self._ids,
@@ -343,6 +480,7 @@ class CertifiedHead:
             self.dup_rep,
             self.capacity,
             MODE=self.mode,
+            SAMPLE=sample,
             CAP_P2=self.capacity_p2,
             num_warps=4,
         )
@@ -369,16 +507,154 @@ class CertifiedHead:
         self._decide(m)
         ids = self._ids[:m]
         stats = HeadStats(self._count[:m], self._status[:m])
-        if fallback:
-            if torch.cuda.is_current_stream_capturing():
-                with _if_body(self._any):
-                    self._merge_fallback(hidden, ids, m)
-            elif bool(self._any.item()):
-                self._merge_fallback(hidden, ids, m)
+        if not fallback:
+            return ids, stats
+        cols_ok = self._column_batches is None or m in self._column_batches
+        if self.fallback_mode == 'batch' or not cols_ok:
+            self._when(self._any, lambda: self._merge_fallback(hidden, ids, m))
+        else:
+            K._route_kernel[(1,)](
+                self._status,
+                self._count,
+                self._any_cols,
+                self._any_dense,
+                m,
+                COLS_CAP,
+                BLOCK=triton.next_power_of_2(m),
+            )
+            self._when(self._any_cols, lambda: self._column_fallback(hidden, ids, m))
+            self._when(self._any_dense, lambda: self._merge_fallback(hidden, ids, m, cols=True))
         return ids, stats
 
-    def _merge_fallback(self, hidden: torch.Tensor, ids: torch.Tensor, m: int) -> None:
+    def column_invariance_self_test(
+        self, batch_sizes: list[int], trials: int = 4, seed: int = 0
+    ) -> dict[str, Any]:
+        """Check the stock-kernel property the column fallback relies on.
+
+        For each batch size, the stock logits of gathered head rows
+        (``matmul(H, W[cols].T)`` with ``M * COLS_CAP`` columns, the fallback's
+        shape) must equal the same columns of the full stock head bit for bit.
+        Returns a report; it does not change the mode.
+        """
+        gen = torch.Generator(device=self.weight.device).manual_seed(seed)
+        report: dict[str, Any] = {'batch_sizes': list(batch_sizes), 'failures': []}
+        for m in batch_sizes:
+            h = (torch.randn(m, self.hidden, device=self.weight.device, generator=gen) * 3).to(
+                torch.bfloat16
+            )
+            full = torch.matmul(h, self.weight.T)
+            for _ in range(trials):
+                cols = torch.randint(
+                    0, self.vocab, (m * COLS_CAP,), device=self.weight.device, generator=gen
+                )
+                sub = torch.matmul(h, self.weight.index_select(0, cols).T)
+                if not torch.equal(full[:, cols], sub):
+                    report['failures'].append(m)
+                    break
+            del full
+        report['ok'] = not report['failures']
+        return report
+
+    def enable_column_fallback(self, batch_sizes: list[int]) -> dict[str, Any]:
+        """Switch to ``fallback_mode='columns'`` only if the self-test passes for
+        every batch size the caller will use; otherwise stay in ``batch`` mode.
+        Call it outside CUDA-graph capture, once at start-up.
+        """
+        report = self.column_invariance_self_test(batch_sizes)
+        self.fallback_mode = 'columns' if report['ok'] else 'batch'
+        self._column_batches = set(batch_sizes) if report['ok'] else set()
+        report['mode'] = self.fallback_mode
+        return report
+
+    @staticmethod
+    def _when(pred: torch.Tensor, fn: Callable[[], None]) -> None:
+        """Run ``fn`` if the device flag is set: a conditional node under capture."""
+        if torch.cuda.is_current_stream_capturing():
+            with _if_body(pred):
+                fn()
+        elif bool(pred.item()):
+            fn()
+
+    def _column_fallback(self, hidden: torch.Tensor, ids: torch.Tensor, m: int) -> None:
+        """Stock logits of each row's candidates, from one gathered stock GEMM."""
+        cap = min(self.capacity, COLS_CAP)
+        cand = self._cand[:m, :cap]
+        valid = torch.arange(cap, device=cand.device)[None, :] < self._count[:m, None]
+        safe = torch.where(valid, cand, cand[:, :1])
+        cols = self.weight.index_select(0, safe.reshape(-1).long())
+        logits = torch.matmul(hidden, cols.T)
+        own = torch.diagonal(logits.view(m, m, cap), dim1=0, dim2=1).T.float()
+        own = torch.where(valid, own, float('-inf'))
+        best = own.max(dim=1, keepdim=True).values
+        big = torch.iinfo(torch.int32).max
+        tok = torch.where(own == best, cand, big).min(dim=1).values.long()
+        col = (self._status[:m] == STATUS_BITS['ambiguous']) & (self._count[:m] <= cap)
+        ids.copy_(torch.where(col, tok, ids))
+
+    def gumbel_sample(
+        self,
+        hidden: torch.Tensor,
+        seeds: torch.Tensor,
+        positions: torch.Tensor,
+        temperatures: torch.Tensor,
+        *,
+        fallback: bool = True,
+    ) -> tuple[torch.Tensor, HeadStats]:
+        """Token ids equal to SGLang's seeded sampler on the same batch.
+
+        The reference (:func:`certified_head.reference.stock_seeded_sample`) is
+        the stock chain: head logits (``reference``), ``div_(T)``, ``softmax``,
+        ``log``, then ``multinomial_with_seed``, whose noise is a function of
+        ``(seeds[m], positions[m], token id)``. Rows the certificate cannot decide
+        run that chain for the whole batch. ``seeds`` and ``positions`` are int64
+        ``[M]``, ``temperatures`` FP32 ``[M]`` and positive. The stock seeded
+        sampler with top-k, top-p or min-p keys its noise by sorted rank and is
+        not covered.
+        """
+        if self.reference == 'real' or self.selection != 'tiles':
+            raise ValueError('Gumbel sampling needs a bf16 or fp32 reference and tile selection')
+        if self.vocab > 2**18:
+            raise ValueError('the softmax error bound assumes a vocabulary of at most 2^18')
+        m = self._check(hidden)
+        for t, dtype in (
+            (seeds, torch.int64),
+            (positions, torch.int64),
+            (temperatures, torch.float32),
+        ):
+            if t.dtype != dtype or t.shape != (m,) or not t.is_contiguous():
+                raise ValueError(f'expected contiguous {dtype} of shape ({m},)')
+        self._sampling = (seeds, positions, temperatures)
+        try:
+            self._approximate(hidden, m)
+            self._refine(hidden, m)
+            self._decide(m)
+        finally:
+            self._sampling = None
+        ids = self._ids[:m]
+        stats = HeadStats(self._count[:m], self._status[:m])
+        if fallback:
+            args = (hidden, self.weight, self.reference, seeds, positions, temperatures)
+            if torch.cuda.is_current_stream_capturing():
+                with _if_body(self._any):
+                    self._merge(ids, m, stock_seeded_sample(*args))
+            elif bool(self._any.item()):
+                self._merge(ids, m, stock_seeded_sample(*args))
+        return ids, stats
+
+    def _merge_fallback(
+        self, hidden: torch.Tensor, ids: torch.Tensor, m: int, cols: bool = False
+    ) -> None:
         dense = reference_argmax(hidden, self.weight, self.reference)
+        if cols:
+            st = self._status[:m]
+            col = (st == STATUS_BITS['ambiguous']) & (
+                self._count[:m] <= min(self.capacity, COLS_CAP)
+            )
+            ids.copy_(torch.where((st != 0) & ~col, dense, ids))
+        else:
+            self._merge(ids, m, dense)
+
+    def _merge(self, ids: torch.Tensor, m: int, dense: torch.Tensor) -> None:
         ids.copy_(torch.where(self._status[:m] != 0, dense, ids))
 
     def reference_argmax(self, hidden: torch.Tensor) -> torch.Tensor:
@@ -390,6 +666,7 @@ class CertifiedHead:
         """``zt = s * (q @ h)`` from the int8 kernel alone (no envelope)."""
         m = self._check(hidden)
         out = torch.empty(m, self.vocab, dtype=dtype, device=hidden.device)
+        self._prep(hidden, m)
         self._gemv(hidden, m, out, 0)
         return out
 

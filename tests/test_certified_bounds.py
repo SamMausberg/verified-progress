@@ -8,8 +8,10 @@ import numpy as np
 import pytest
 
 from certified_head.bounds import (
+    HOPPER_WGMMA_BF16,
     TENSOR_CORE_FP32,
     U_FP32,
+    arith_coefficients,
     bf16_candidate_threshold,
     bf16_round,
     envelope_coefficients,
@@ -19,6 +21,7 @@ from certified_head.bounds import (
     gamma,
     kernel_constants,
     round_up_f32,
+    scale_rel_error,
     sqrt_upper_f32,
     sumsq_upper,
 )
@@ -150,3 +153,43 @@ def test_envelope_group_validation(bad: tuple[int, int, int]) -> None:
     z = np.zeros((2, max(1, k // base)))
     with pytest.raises(ValueError):
         envelope_coefficients(z, z, z, np.ones(2, np.float32), 'bf16', k, base, group)
+
+
+def test_arith_coefficients_bound_each_term() -> None:
+    v, k, base = 48, 512, 128
+    w = RNG.standard_normal((v, k)) * 0.02
+    scale = (np.abs(w).max(axis=1) / 127).astype(np.float32)
+    q = np.clip(np.round(w / scale[:, None]), -127, 127)
+    e = w - scale[:, None].astype(np.float64) * q
+    g = k // base
+
+    def sq(x: np.ndarray) -> np.ndarray:
+        return sumsq_upper((x * x).reshape(v, g, base).sum(-1), base)
+
+    for group in (128, 512):
+        n = k // group
+        e_n = np.linalg.norm(e.reshape(v, n, group), axis=2)
+        q_n = np.linalg.norm(q.reshape(v, n, group), axis=2)
+        w_n = np.linalg.norm(w.reshape(v, n, group), axis=2)
+        g_ref = float(TENSOR_CORE_FP32.gamma(k))
+        a8 = arith_coefficients('w8a8', sq(e), sq(q), sq(w), scale, 'bf16', k, base, group)
+        assert a8.shape == (v, 2 * n)
+        assert np.all(a8[:, :n].astype(np.float64) >= e_n + g_ref * w_n)
+        assert np.all(a8[:, n:].astype(np.float64) >= scale[:, None] * q_n)
+        ab = arith_coefficients('bf16', sq(e), sq(q), sq(w), scale, 'bf16', k, base, group)
+        assert np.all(ab.astype(np.float64) >= 2 * g_ref * w_n)
+        assert np.all(ab.astype(np.float64) <= 2 * g_ref * w_n * (1 + 1e-6))
+
+
+def test_scale_rel_error_constants() -> None:
+    assert scale_rel_error('bf16') == 0.0
+    assert Fraction(scale_rel_error('w8a16')) >= U_FP32 / (1 - U_FP32)
+    assert Fraction(scale_rel_error('w8a8')) >= ((1 + U_FP32) ** 3 - 1) / (1 - U_FP32) ** 3
+
+
+def test_hopper_model_is_tighter_but_covers_the_block_model() -> None:
+    k = 2560
+    tight = HOPPER_WGMMA_BF16.gamma(k)
+    assert tight < TENSOR_CORE_FP32.gamma(k)
+    # 160 blocks of 16 products, each at most (17 * 2^-25 + 2^-23) of its children.
+    assert tight >= 160 * (Fraction(17, 2**25) + Fraction(1, 2**23))

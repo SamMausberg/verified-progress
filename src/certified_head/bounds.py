@@ -133,17 +133,53 @@ class AccumulationModel:
 
 
 TENSOR_CORE_FP32 = AccumulationModel('tensor-core-fp32', 2, U_FP32_TRUNC)
-"""Assumed model for cuBLAS and Triton BF16 GEMMs with FP32 accumulation."""
+"""Conservative model for cuBLAS and Triton BF16 GEMMs with FP32 accumulation.
+
+At most ``2K`` roundings, each with relative error ``2^-23`` of the sum of
+magnitudes, in any order: covers any reduction tree, split-K with FP32
+partials, and truncating tensor-core adders.
+"""
+
+
+@dataclass(frozen=True)
+class BlockedTensorCoreModel:
+    """Hopper BF16 ``wgmma`` model of Khattak and Mikaitis (via the theory notes).
+
+    Blocks of ``block`` products are summed with ``frac_bits`` fractional bits
+    kept and truncation, so each block node errs by at most
+    ``(block + 1) 2^-frac_bits + 2^-23`` times the sum of its children's
+    magnitudes; the accumulation path has ``K / block`` nodes. Split-K with FP32
+    partials adds at most ``K / block`` further FP32 additions. This rests on a
+    published measurement-based model, not on NVIDIA documentation.
+    """
+
+    name: str
+    block: int
+    frac_bits: int
+
+    def gamma(self, k: int) -> Fraction:
+        nodes = -(-k // self.block)
+        per_node = (self.block + 1) * Fraction(1, 2**self.frac_bits) + U_FP32_TRUNC
+        return nodes * per_node + gamma(nodes, U_FP32_TRUNC)
+
+
+HOPPER_WGMMA_BF16 = BlockedTensorCoreModel('hopper-wgmma-bf16', 16, 25)
+
+RefModel = Literal['conservative', 'hopper-wgmma']
+REF_MODELS: dict[str, AccumulationModel | BlockedTensorCoreModel] = {
+    'conservative': TENSOR_CORE_FP32,
+    'hopper-wgmma': HOPPER_WGMMA_BF16,
+}
 
 FP64_ANY_ORDER = AccumulationModel('fp64-any-order', 1, U_FP64)
 """Textbook bound for FP64 summation in any order (products exact)."""
 
 
-def reference_gamma(reference: Reference, k: int) -> Fraction:
+def reference_gamma(reference: Reference, k: int, model: RefModel = 'conservative') -> Fraction:
     """Relative radius of the reference's own accumulation (zero for ``real``)."""
     if reference == 'real':
         return Fraction(0)
-    return TENSOR_CORE_FP32.gamma(k)
+    return REF_MODELS[model].gamma(k)
 
 
 @dataclass(frozen=True)
@@ -162,9 +198,11 @@ class KernelConstants:
     """FP64 factor covering the rounding of ``sqrt`` in FP64."""
 
 
-def kernel_constants(reference: Reference, k: int, max_group: int) -> KernelConstants:
+def kernel_constants(
+    reference: Reference, k: int, max_group: int, model: RefModel = 'conservative'
+) -> KernelConstants:
     g64 = FP64_ANY_ORDER.gamma(k)
-    gref = reference_gamma(reference, k)
+    gref = reference_gamma(reference, k, model)
     # |xh - x| <= g64 * a and |s_ref - x| <= gref * a, with a <= ah / (1 - g64).
     refine = (g64 + gref) / (1 - g64)
     # Squares add one rounding each: sum of n squares has relative error gamma_{n+1}.
@@ -208,6 +246,7 @@ def envelope_coefficients(
     k: int,
     base_group: int,
     group_size: int,
+    model: RefModel = 'conservative',
 ) -> np.ndarray:
     """Per-row, per-group envelope coefficients ``A`` (FP32, rounded up).
 
@@ -228,7 +267,7 @@ def envelope_coefficients(
         return s * float_up(1 + gamma(factor, U_FP64))
 
     g_acc = float_up(TENSOR_CORE_FP32.gamma(k))
-    g_ref = float_up(reference_gamma(reference, k))
+    g_ref = float_up(reference_gamma(reference, k, model))
     sqrt_up = float_up(1 + 2 * U_FP64)
     e_norm = np.sqrt(coarse(err_sumsq)) * sqrt_up
     q_norm = np.sqrt(coarse(q_sumsq)) * sqrt_up
@@ -238,6 +277,68 @@ def envelope_coefficients(
     # most gamma_5(u64); inflate by more than that.
     a = (e_norm + g_acc * s * q_norm + g_ref * w_norm) * float_up(1 + gamma(8, U_FP64))
     return round_up_f32(a)
+
+
+Arith = Literal['w8a16', 'w8a8', 'bf16']
+"""Arithmetic of the approximate pass (see ``kernels._gemv_envelope_kernel``)."""
+
+
+def scale_rel_error(arith: Arith) -> float:
+    """FP32 bound on ``|zt - exact(zt)| / |zt|`` from the pass's final multiplies.
+
+    ``w8a16``: one rounding of ``s_i * acc``. ``w8a8``: ``fl32`` of the int32
+    accumulator and the roundings of ``* s_i`` and ``* s_h``. ``bf16``: none.
+    """
+    if arith == 'bf16':
+        return 0.0
+    if arith == 'w8a16':
+        return f32_up(U_FP32 / (1 - U_FP32))
+    return f32_up(((1 + U_FP32) ** 3 - 1) / (1 - U_FP32) ** 3)
+
+
+def arith_coefficients(
+    arith: Arith,
+    err_sumsq: np.ndarray,
+    q_sumsq: np.ndarray,
+    w_sumsq: np.ndarray,
+    scale: np.ndarray,
+    reference: Reference,
+    k: int,
+    base_group: int,
+    group_size: int,
+    model: RefModel = 'conservative',
+) -> np.ndarray:
+    """Envelope coefficients for each arithmetic, FP32 rounded up.
+
+    ``w8a16``: ``[V, G]`` from :func:`envelope_coefficients`.
+    ``w8a8``: ``[V, 2G]``: ``||e_ig|| + gamma_ref ||w_ig||`` multiplies ``||h_g||``
+    and ``s_i ||q_ig||`` multiplies ``||e_h,g||``; the int32 accumulation is exact.
+    ``bf16``: ``[V, G]``: ``(gamma_acc + gamma_ref) ||w_ig||``.
+    """
+    if arith == 'w8a16':
+        return envelope_coefficients(
+            err_sumsq, q_sumsq, w_sumsq, scale, reference, k, base_group, group_size, model
+        )
+    if group_size % base_group or k % group_size:
+        raise ValueError(f'group_size {group_size} must be a multiple of {base_group} dividing {k}')
+    factor = group_size // base_group
+    v = err_sumsq.shape[0]
+    n_groups = k // group_size
+
+    def norm(x: np.ndarray) -> np.ndarray:
+        sq = np.asarray(x, dtype=np.float64).reshape(v, n_groups, factor).sum(axis=2)
+        return np.sqrt(sq * float_up(1 + gamma(factor, U_FP64))) * float_up(1 + 2 * U_FP64)
+
+    g_ref = float_up(reference_gamma(reference, k, model))
+    slack = float_up(1 + gamma(8, U_FP64))
+    w_norm = norm(w_sumsq)
+    if arith == 'bf16':
+        g_acc = float_up(TENSOR_CORE_FP32.gamma(k))
+        return round_up_f32((g_acc + g_ref) * w_norm * slack)
+    s = np.abs(np.asarray(scale, dtype=np.float64))[:, None]
+    a1 = (norm(err_sumsq) + g_ref * w_norm) * slack
+    a2 = s * norm(q_sumsq) * slack
+    return round_up_f32(np.concatenate([a1, a2], axis=1))
 
 
 # --- BF16 rounding helpers (host-side mirrors of the device code) -------------
