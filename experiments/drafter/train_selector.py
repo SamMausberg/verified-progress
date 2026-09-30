@@ -20,6 +20,8 @@ candidate. Objectives (`--objective`):
           exp(-(i-1)/gamma) (SpecForge's DFlash 2 selector loss; the control).
   dpace   D-PACE weights (SpecForge's formulation: cumulative products of
           (1-alpha) q + alpha, suffix-summed, detached) on the cross-entropy.
+  vat     VAT weights: 1 up to the current greedy walk's first rejection, then
+          the exponential decay restarted there.
 
 Metrics per position: unary greedy acceptance, the selector's greedy lattice
 walk (argmax at each slot with the chosen predecessor; with teacher forcing it
@@ -74,7 +76,8 @@ class SelectorTrainer:
         self.device = device
         self.target = load_target(device)
         self.draft, self.config = build_draft(
-            resolve_init(args.init), argparse.Namespace(dflash2=False)
+            resolve_init(args.init),
+            argparse.Namespace(dflash2=False, attention_backend=args.attention_backend),
         )
         self.draft.to(device=device, dtype=torch.bfloat16).eval().requires_grad_(False)
         dflash = self.config['dflash_config']
@@ -160,6 +163,14 @@ class SelectorTrainer:
                     smooth = (1 - self.args.dpace_alpha) * q + self.args.dpace_alpha
                     prefix = torch.cumprod(smooth, dim=-1) * covered
                     weights = torch.flip(torch.cumsum(torch.flip(prefix, [-1]), -1), [-1])
+            elif objective == 'vat':
+                # VAT (arXiv 2608.30135, Eq. 6): full weight up to the current greedy
+                # walk's first rejection k*, then the base decay restarted at k*.
+                with torch.no_grad():
+                    hit = (scores.argmax(-1) == match.float().argmax(-1)) & covered
+                    first_miss = (hit.long().cumprod(-1).sum(-1, keepdim=True)).float()
+                    after = (positions.float()[None] - first_miss).clamp_min(0)
+                    weights = torch.exp(-after / self.args.gamma)
             else:
                 raise ValueError(objective)
             weights = weights * covered
@@ -236,7 +247,7 @@ def main() -> None:
     parser.add_argument('--run', type=Path, required=True)
     parser.add_argument('--init', required=True)
     parser.add_argument('--data', type=Path, required=True)
-    parser.add_argument('--objective', choices=['prefix', 'ce', 'dpace'], default='prefix')
+    parser.add_argument('--objective', choices=['prefix', 'ce', 'dpace', 'vat'], default='prefix')
     parser.add_argument('--gamma', type=float, default=7.0)
     parser.add_argument('--dpace-alpha', type=float, default=0.5)
     parser.add_argument('--rank', type=int, default=256)
@@ -254,9 +265,13 @@ def main() -> None:
     parser.add_argument('--log-every', type=int, default=10)
     parser.add_argument('--segment-minutes', type=float, default=25)
     parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--device', default='cuda')
+    parser.add_argument(
+        '--attention-backend', choices=['flex_attention', 'sdpa'], default='flex_attention'
+    )
     args = parser.parse_args()
 
-    device = torch.device('cuda')
+    device = torch.device(args.device)
     random.seed(args.seed)
     torch.manual_seed(args.seed)
     run = args.run.expanduser()

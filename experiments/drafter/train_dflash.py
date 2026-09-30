@@ -127,7 +127,7 @@ def build_draft(init_dir: Path, args: argparse.Namespace) -> tuple[torch.nn.Modu
         )
         config_dict.pop('auto_map', None)
     config = Qwen3Config(**config_dict)
-    config._attn_implementation = 'flex_attention'
+    config._attn_implementation = getattr(args, 'attention_backend', 'flex_attention')
     is_dflash2 = 'selector_rank' in config.dflash_config
     cls = DFlash2DraftModel if is_dflash2 else DFlashDraftModel
     model = cls(config)
@@ -255,7 +255,7 @@ class Trainer:
             target_embed_tokens=self.target.model.embed_tokens,
             mask_token_id=int(dflash_config['mask_token_id']),
             block_size=self.block_size,
-            attention_backend='flex_attention',
+            attention_backend=args.attention_backend,
             num_anchors=args.num_anchors,
             loss_decay_gamma=args.gamma,
             selector_loss_alpha=args.selector_alpha,
@@ -286,7 +286,11 @@ class Trainer:
             groups = groups[1:]
         self.base_lrs = [group['lr'] for group in groups]
         self.optimizer = torch.optim.AdamW(
-            groups, betas=(0.9, 0.95), eps=1e-8, weight_decay=0.0, fused=True
+            groups,
+            betas=(0.9, 0.95),
+            eps=1e-8,
+            weight_decay=0.0,
+            fused=device.type == 'cuda',
         )
         self.step = 0
         self.epoch = 0
@@ -326,7 +330,7 @@ class Trainer:
         ids, mask = make_batch(row, self.device)
         features, last_hidden = target_features(self.target, ids, self.layer_ids)
         valid = int(((mask[:, :-1] > 0.5) & (mask[:, 1:] > 0.5)).sum())
-        with torch.autocast('cuda', dtype=torch.bfloat16):
+        with torch.autocast(self.device.type, dtype=torch.bfloat16):
             loss, _, metrics = self.model(
                 input_ids=ids,
                 hidden_states=features,
@@ -417,7 +421,9 @@ def save_state(trainer: Trainer, run: Path) -> None:
         'cursor': trainer.cursor,
         'rng': {
             'torch': torch.get_rng_state(),
-            'cuda': torch.cuda.get_rng_state(),
+            # Only for CUDA runs: querying the CUDA RNG creates a CUDA context, which a
+            # --device cpu dry run must not do outside the GPU lock.
+            'cuda': torch.cuda.get_rng_state() if trainer.device.type == 'cuda' else None,
             'python': random.getstate(),
         },
         'args': vars(trainer.args),
@@ -436,7 +442,8 @@ def load_state(trainer: Trainer, run: Path) -> bool:
     trainer.optimizer.load_state_dict(state['optimizer'])
     trainer.step, trainer.epoch, trainer.cursor = state['step'], state['epoch'], state['cursor']
     torch.set_rng_state(state['rng']['torch'].cpu())
-    torch.cuda.set_rng_state(state['rng']['cuda'].cpu())
+    if state['rng']['cuda'] is not None and trainer.device.type == 'cuda':
+        torch.cuda.set_rng_state(state['rng']['cuda'].cpu())
     random.setstate(state['rng']['python'])
     return True
 
@@ -444,7 +451,7 @@ def load_state(trainer: Trainer, run: Path) -> bool:
 @torch.no_grad()
 def evaluate(trainer: Trainer, rows: list[dict[str, Any]]) -> dict[str, float]:
     trainer.draft.eval()
-    fork = torch.random.fork_rng(devices=[trainer.device])
+    fork = torch.random.fork_rng(devices=[trainer.device] if trainer.device.type == 'cuda' else [])
     with fork:
         torch.manual_seed(1234)  # same anchors at every evaluation
         total = MetricSum()
@@ -456,7 +463,7 @@ def evaluate(trainer: Trainer, rows: list[dict[str, Any]]) -> dict[str, float]:
 
 
 def train(args: argparse.Namespace) -> None:
-    device = torch.device('cuda')
+    device = torch.device(args.device)
     torch.manual_seed(args.seed)
     random.seed(args.seed)
     run = args.run.expanduser()
@@ -598,6 +605,10 @@ def main() -> None:
     parser.add_argument('--eval-every', type=int, default=100)
     parser.add_argument('--log-every', type=int, default=10)
     parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--device', default='cuda')
+    parser.add_argument(
+        '--attention-backend', choices=['flex_attention', 'sdpa'], default='flex_attention'
+    )
     args = parser.parse_args()
     train(args)
 

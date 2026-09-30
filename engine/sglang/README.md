@@ -58,3 +58,18 @@ Every change is off unless its flag or environment variable is set.
 
 Tests: `tests/test_moonshot_levers.py` and `tests/test_gdn_exact_replay.py` (the engine
 tests run in the SGLang venv with the worktree on `PYTHONPATH` and skip elsewhere).
+
+## drafter (`patches/drafter/0001`, branch `engine/drafter`)
+
+```sh
+scripts/sglang_worktree.sh drafter
+git -C ~/sglang-wt/drafter am "$PWD"/engine/sglang/patches/drafter/*.patch
+SGLANG_WORKTREE=~/sglang-wt/drafter source scripts/sglang_env.sh
+```
+
+| Patch | What it changes | Default behaviour |
+|---|---|---|
+| 0001 | `SGLANG_DFLASH_TRACE_PATH=<prefix>`: the DFLASH worker appends one JSON line per request per greedy verify cycle to `<prefix>.<pid>.jsonl` (request id, prefix length, the drafted block with the anchor first, the target's argmax at every block row, accepted length). Used for the per-cycle traces in `evidence/drafter/` (`experiments/drafter/run_trace.sh`). It copies to the host every cycle, a stream sync, so traced runs give tokens and acceptance, not timings. | unchanged unless the variable is set |
+
+The drafter's timed runs use the stock engine; trained drafters load through SGLang's
+unmodified `DFlashDraftModel` and `DFlash2DraftModel`.

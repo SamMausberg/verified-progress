@@ -13,6 +13,12 @@ for i in $(seq 1 "$max"); do
   total=$(wc -l < "$prompts")
   echo "segment $i: $done_rows / $total rows done ($(date +%T))"
   if [ "$done_rows" -ge "$total" ]; then break; fi
+  # FIRST_ARRIVAL keeps the first segment's place when the driver is restarted.
+  if [ "$i" -eq 1 ] && [ -n "${FIRST_ARRIVAL:-}" ]; then
+    export GPU_LOCK_ARRIVAL="$FIRST_ARRIVAL"
+  else
+    unset GPU_LOCK_ARRIVAL
+  fi
   "$HOME/verified-progress/scripts/gpu_lock.sh" -s "$here/run_gen_segment.sh" "$prompts" "$out"
 done
 echo "finished $(date +%T)"

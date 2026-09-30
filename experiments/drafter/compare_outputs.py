@@ -1,7 +1,8 @@
 """Token-level output comparison of two greedy probe runs (accept_probe.py output).
 
 For every request present in both runs, finds the first position where the
-generated token ids differ and classifies it by the reference run's top-2
+generated token ids differ (a length mismatch counts as a divergence where the
+shorter output ends) and classifies it by the reference run's top-2
 logprob gap at that position (requires the reference run to have been made with
 --logprobs). The gap between the two most likely tokens' logprobs equals their
 logit gap, so a zero gap is an exact BF16 logit tie and a gap of at most 0.125
@@ -37,6 +38,20 @@ def classify(gap: float | None) -> str:
     return 'larger'
 
 
+def first_divergence(a: list[int], b: list[int]) -> int | None:
+    """First position where two greedy outputs differ, or None if they are equal.
+
+    Outputs of different lengths diverge at the shorter one's end even when one is
+    a prefix of the other: one run stopped (or was cut) where the other emitted a
+    token.
+    """
+    n = min(len(a), len(b))
+    index = next((i for i in range(n) if a[i] != b[i]), None)
+    if index is None and len(a) != len(b):
+        return n
+    return index
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('--ref', type=Path, required=True)
@@ -51,10 +66,9 @@ def main() -> None:
     classes: dict[str, int] = {}
     for rid in shared:
         a, b = ref[rid]['output_ids'], test[rid]['output_ids']
-        n = min(len(a), len(b))
-        index = next((i for i in range(n) if a[i] != b[i]), None)
+        index = first_divergence(a, b)
         if index is None:
-            compared += n
+            compared += len(a)
             continue
         compared += index + 1
         gap = None
@@ -68,8 +82,8 @@ def main() -> None:
                 'id': rid,
                 'domain': ref[rid]['domain'],
                 'position': index,
-                'ref_token': a[index],
-                'test_token': b[index],
+                'ref_token': a[index] if index < len(a) else None,  # None: stopped here
+                'test_token': b[index] if index < len(b) else None,
                 'ref_top2_gap': gap,
                 'class': name,
             }
