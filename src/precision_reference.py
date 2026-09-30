@@ -495,6 +495,7 @@ class EnvelopeRule:
 
     quant: tuple[QuantBound, ...] = ('l2', 'block', 'linf')
     accumulator: Accumulator | None = FP32_SEQUENTIAL
+    activation_bits: int | None = None  # W8A8-style integer pass (exact integer accumulation)
 
 
 def approx_logit(head: QuantizedHead, i: int, h: Sequence[Q], acc: Accumulator | None) -> Q:
@@ -564,6 +565,61 @@ def envelope(head: QuantizedHead, i: int, norms: TokenNorms, rule: EnvelopeRule)
     return beta
 
 
+@dataclass(frozen=True)
+class QuantizedActivation:
+    """h = scale * codes + error with a power-of-two scale, so scale * code is
+    exact and the error vector is exact."""
+
+    scale: Q
+    codes: tuple[int, ...]
+    error_l2: Q  # >= ||h - scale * codes||_2
+    dequant_l2: Q  # >= ||scale * codes||_2
+
+
+def quantize_activation(h: Sequence[Q], bits: int, fmt: BinaryFormat = FP32) -> QuantizedActivation:
+    qmax = 2 ** (bits - 1) - 1
+    amax = max(abs(x) for x in h)
+    scale = pow2(floor_log2(amax / qmax) + 1) if amax else Q(1)
+    codes = tuple(round(x / scale) for x in h)
+    if any(abs(c) > qmax for c in codes):
+        raise AssertionError('power-of-two activation scale must not clip')
+    up = lambda v: round_to(sqrt_up(v, FP64), fmt, 'up')  # noqa: E731
+    err = _norm2_sq(x - c * scale for x, c in zip(h, codes, strict=True))
+    return QuantizedActivation(scale, codes, up(err), up(_norm2_sq(c * scale for c in codes)))
+
+
+def approx_logit_integer(
+    head: QuantizedHead, i: int, act: QuantizedActivation, fmt: BinaryFormat
+) -> Q:
+    """Integer pass: I = sum q_ij q_hj is exact (int32 accumulation cannot
+    overflow for these shapes), then fl(fl(s_i * fl(I)) * s_h); the last
+    multiply is exact because s_h is a power of two."""
+    dot_int = sum(q * c for q, c in zip(head.codes[i], act.codes, strict=True))
+    if abs(dot_int) >= 2**31:
+        raise OverflowError('int32 accumulator overflow')
+    r = lambda v: round_to(v, fmt)  # noqa: E731
+    return r(r(head.scales[i][0] * r(Q(dot_int))) * act.scale)
+
+
+def envelope_integer(
+    head: QuantizedHead,
+    i: int,
+    norms: TokenNorms,
+    act: QuantizedActivation,
+    rule: EnvelopeRule,
+    fmt: BinaryFormat,
+) -> Q:
+    """beta_i for the integer pass: weight error <e_i, h>, activation error
+    s_i <q_i, e_h>, and three roundings of the rescale, in `fmt` RN."""
+    base = envelope(head, i, norms, EnvelopeRule(rule.quant, None))
+    r = lambda v: round_to(v, fmt)  # noqa: E731
+    g = round_to(gamma(3, fmt.unit_roundoff), fmt, 'up')
+    base = r(base)
+    activation = r(head.dequant_l2[i] * act.error_l2)
+    rescale = r(r(g * head.dequant_l2[i]) * act.dequant_l2)
+    return r(r(r(base + activation) + rescale) + pow2(fmt.emin + 8))
+
+
 # --------------------------------------------------------------------------
 # Evaluation ladder with work counts.
 # --------------------------------------------------------------------------
@@ -604,6 +660,13 @@ class Evaluator:
         self.h = tuple(Q(x) for x in self.h)
         self.approx_norms = token_norms(self.h, self.head.blocks, self.rule.accumulator)
         self.level_norms = [token_norms(self.h, self.head.blocks, a) for a in self.ladder]
+        self.activation: QuantizedActivation | None = None
+        if self.rule.activation_bits is not None:
+            if self.head.group_size != self.head.width or self.head.exact_columns:
+                raise ValueError('the integer pass is modelled for per-row scales only')
+            if self.rule.accumulator is None:
+                raise ValueError('the integer pass needs a format for its rescale')
+            self.activation = quantize_activation(self.h, self.rule.activation_bits)
 
     @property
     def levels(self) -> int:
@@ -620,9 +683,18 @@ class Evaluator:
             return self.cache[key]
         if level == 0:
             acc = self.rule.accumulator
-            zt = approx_logit(self.head, i, self.h, acc)
-            beta = envelope(self.head, i, self.approx_norms, self.rule)
-            out = outward_interval(zt, beta, acc.fmt, acc.ftz) if acc else (zt - beta, zt + beta)
+            if self.activation is not None and acc is not None:
+                zt = approx_logit_integer(self.head, i, self.activation, acc.fmt)
+                beta = envelope_integer(
+                    self.head, i, self.approx_norms, self.activation, self.rule, acc.fmt
+                )
+                out = outward_interval(zt, beta, acc.fmt)
+            else:
+                zt = approx_logit(self.head, i, self.h, acc)
+                beta = envelope(self.head, i, self.approx_norms, self.rule)
+                out = (
+                    outward_interval(zt, beta, acc.fmt, acc.ftz) if acc else (zt - beta, zt + beta)
+                )
         else:
             acc = self.ladder[level - 1]
             if acc is None:
@@ -677,11 +749,17 @@ def ladder_argmax(
         S = [i for i in S if iv[i][1] >= tau]
         if level == 0:
             candidates = len(S)
-        exact = level == ev.levels - 1
-        if len(S) == 1 or exact:
+        # Point intervals are exact transformed scores: then every survivor
+        # equals tau and S is exactly the set of maximizers.
+        decided = len(S) == 1 or level == ev.levels - 1 or all(iv[i][0] == iv[i][1] for i in S)
+        if decided:
             counts = tuple(ev.rows_at(lv) for lv in range(ev.levels))
-            return Certificate(S[0], level, candidates, counts, exact and len(S) > 1)
+            return Certificate(S[0], level, candidates, counts, len(S) > 1)
     return None
+
+
+def _bf16_transform(i: int, lo: Q, hi: Q) -> tuple[Q, Q]:
+    return round_to(lo, BF16), round_to(hi, BF16)
 
 
 def certify_argmax(
@@ -689,10 +767,18 @@ def certify_argmax(
     bias: Sequence[Q] | None = None,
     masked: Iterable[int] = (),
     max_level: int | None = None,
+    contract: Literal['real', 'bf16'] = 'real',
 ) -> Certificate | None:
-    """Contract C1 greedy token, optionally after an additive per-token bias
-    (logit bias, additive penalties) and a mask (excluded tokens)."""
+    """Greedy token under contract 'real' (argmax of the exact logits,
+    smallest index among exact ties) or 'bf16' (argmax of the exact logits
+    rounded to BF16, smallest index among BF16 ties: the stock engine's tie
+    behaviour). 'real' also accepts an additive per-token bias (logit bias,
+    additive penalties); both accept a mask (excluded tokens)."""
     rows = set(range(ev.head.vocabulary)) - set(masked)
+    if contract == 'bf16':
+        if bias is not None:
+            raise ValueError('bias after BF16 rounding needs the engine FP32 add; not modelled')
+        return ladder_argmax(ev, rows, _bf16_transform, max_level)
     if bias is None:
         return ladder_argmax(ev, rows, max_level=max_level)
     b = tuple(Q(x) for x in bias)

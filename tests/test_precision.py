@@ -399,6 +399,63 @@ class Precision(unittest.TestCase):
             'stock_bf16_partials': 1,
         }
 
+    def test_integer_pass(self) -> None:
+        """W8A8-style pass: exact integer accumulation, activation error term."""
+        for case in range(200):
+            V, D = R.randint(2, 24), R.randint(2, 24)
+            W = near_tie_head(V, D) if case % 2 else random_head(V, D)
+            h = bf16_vector(D, -3, 3)
+            if case % 3 == 0:
+                h, _ = with_outliers(h, 1)
+            head = quantize_head(W, bits=R.choice((4, 8)))
+            rule = EnvelopeRule(accumulator=FP32_SEQUENTIAL, activation_bits=R.choice((6, 8)))
+            ev = Evaluator(head, tuple(h), rule)
+            z = [dot(w, h) for w in W]
+            for i in range(V):
+                lo, hi = ev.interval(0, i)
+                self.assertTrue(lo <= z[i] <= hi, (case, i))
+                count('integer_pass_rows')
+            cert = certify_argmax(ev)
+            assert cert is not None
+            self.assertEqual(cert.token, exact_argmax(z))
+            count('integer_pass_argmax')
+
+    def test_bf16_contract(self) -> None:
+        """Argmax of BF16-rounded exact logits, lowest index on BF16 ties,
+        against the emulated stock head (FP32 accumulation, BF16 output)."""
+        engine = (
+            Accumulator('blocked', FP32, block=4, splits=2),
+            Accumulator('sequential', FP32),
+            Accumulator('fused', FP32, rounding='toward_zero', block=4),
+        )
+        agree_bf16, agree_real, rounding_matches, levels = 0, 0, 0, {}
+        for _ in range(300):
+            V, D = R.randint(2, 24), R.randint(2, 8)
+            W = near_tie_head(V, D)
+            h = bf16_vector(D, 4, 6)  # logits of order 10-30, where BF16 spacing is 1/16-1/8
+            ev = Evaluator(quantize_head(W, bits=8), tuple(h))
+            z = [dot(w, h) for w in W]
+            L = [round_to(v, BF16) for v in z]
+            cert = certify_argmax(ev, contract='bf16')
+            assert cert is not None
+            self.assertEqual(cert.token, stock_argmax(L))
+            levels[cert.level] = levels.get(cert.level, 0) + 1
+            for acc in engine:
+                stock_L = stock_logits(W, h, acc)
+                stock = stock_argmax(stock_L)
+                if stock_L == L:
+                    self.assertEqual(stock, cert.token)
+                    rounding_matches += 1
+                agree_bf16 += stock == cert.token
+                agree_real += stock == exact_argmax(z)
+                count('bf16_contract_stock_comparisons')
+            count('bf16_contract_cases')
+        count('bf16_contract_agrees_with_stock', agree_bf16)
+        count('real_contract_agrees_with_stock', agree_real)
+        count('stock_rounding_identical_to_exact_rounding', rounding_matches)
+        STATS['bf16_contract_level_histogram'] = {str(k): v for k, v in sorted(levels.items())}
+        self.assertGreater(agree_bf16, agree_real)
+
     def test_race(self) -> None:
         levels: dict[int, int] = {}
         for case in range(360):
