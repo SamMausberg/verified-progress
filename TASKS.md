@@ -14,6 +14,7 @@ item points at its PR and evidence.
 | H4 | That certificate improves the served latency-throughput frontier over tuned MTP speculation without changing outputs | Before/after Pareto sweeps and output-equality checks |
 | H5 | SGLang's hybrid GDN state stays correct under speculative verification (every rejection position, aborts, prefix reuse) | Differential tests against non-speculative decoding |
 | H6 | Other layers of the stack (backend choice, graphs, scheduling, spec parameters) leave measurable headroom | Profiles and controlled ablations |
+| H8 | Exact decoding can commit far more tokens per target pass by repairing long draft windows, and a target-anchored residual evaluator makes repairs much cheaper than recomputation | Wide-block verification oracle, full-target Jacobi progress, correction locality, then a residual-evaluator prototype |
 | H7 | Reformulations and declared approximations can multiply gains well beyond tuning (recurrent-state traffic at high concurrency; near-free drafting and lossy targets at low concurrency) | Measured bytes per step, quality-versus-speed curves, end-to-end Pareto sweeps |
 
 ## End goal
@@ -39,6 +40,7 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 | state | Speculative-decoding state safety and output-equality tests | active |
 | moonshot | Reformulations and approximations aimed at order-of-magnitude gains, with measured quality costs | active |
 | drafter | Public DFlash-4B drafter: serve, characterize, train only against a measured limitation | active |
+| repair | Long-window exact repair and target-anchored residual decoding (H8) | active |
 | integrate | SGLang integration of the certified head (draft, verify, decode) | todo |
 | paper | Manuscript revision as results land | active |
 | review | Independent review of every PR before merge | active |
@@ -75,6 +77,14 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 - [ ] Custom or fine-tuned drafter only against a measured limitation: longer accepted blocks, cheaper drafting, or certificate-friendly hidden states, judged by total serving time (drafter)
 - [ ] Interaction matrix of levers (compose, conflict, quality compounding) (moonshot)
 - [ ] Full-stack arms: exact stack and lossy stack, each with ablations, Pareto sweeps and quality checks (bench, moonshot, integrate)
+
+### Repair and progressive evaluation (H8, Sam's proposals P1-P3)
+- [ ] Wide-block verification with perfect continuations: V(B), GDN/KV state-commit cost, oracle speedup for an ideal drafter and for the two-pass anchor-plus-audit design (repair)
+- [ ] Full-target Jacobi repair from DFlash-initialized windows: committed tokens per target pass (repair)
+- [ ] Correction locality: activation changes after real corrections, fixed-basis capture on held-out corrections (repair)
+- [ ] Go/no-go on the residual evaluator prototype against its controls (repair)
+- [ ] State-safe tail oracle: INT8 final FFN plus head, isotropic margin certificate at the oracle radius, versus certified head-only (geometry)
+- [ ] Theory in the paper: contracts, common-mass bound, bounded-range sampling, dead/deferred/enclosed accounting (paper)
 
 ### Engine
 - [ ] Differential output-equality tests: MTP versus plain decode, rejection positions, aborts, prefix reuse (state)
