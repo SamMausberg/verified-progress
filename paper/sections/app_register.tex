@@ -7,12 +7,12 @@
 Every committed result the paper cites is listed below with the claims it supports, the files that hold it and the program that produced them. All paths are relative to the repository at \repourl. The exact command behind each evidence file is in the \code{README.md} of the file's directory, and the files record the commits of this repository and of the engine that produced them where the generator records them. The text cites an entry as [E$n$]. Proved statements are not listed; their proofs are in the text and Appendix~\ref{app:checked} says which are machine-checked.
 
 \newcounter{evitem}
-\newcommand{\evgroup}[1]{\multicolumn{4}{@{}l}{\emph{#1}}\\}
-\newcommand{\evitem}[4]{\refstepcounter{evitem}\label{ev:#1}E\theevitem & #2 & #3 & #4\\}
+\newcommand{\evgroup}[1]{\multicolumn{2}{@{}l}{\emph{#1}}\\*[1pt]}
+\newcommand{\evitem}[4]{\refstepcounter{evitem}\label{ev:#1}E\theevitem & #2\par\vspace{1pt}{\footnotesize\color{muted}#3\ifblank{#4}{}{; produced by #4}.\par}\vspace{2pt}\\}
 {\small
-\begin{longtable}{@{}P{.75cm}P{5.9cm}P{4.9cm}P{4.3cm}@{}}
-\toprule Entry & Supports & Files & Produced by\\\midrule\endfirsthead
-\toprule Entry & Supports & Files & Produced by\\\midrule\endhead
+\begin{longtable}{@{}P{.9cm}P{15.6cm}@{}}
+\toprule Entry & What it supports; files and the program that produced them\\\midrule\endfirsthead
+\toprule Entry & What it supports; files and the program that produced them\\\midrule\endhead
 \bottomrule\endlastfoot
 \evgroup{The certified head on captured engine states}
 \evitem{alignment}{Captured plain-decode head inputs reproduce the engine's tokens; \Rreal{} and \Rstock{} differ at about 0.5\% of greedy positions (Section~\ref{sec:transport-capture})}{\nolinkurl{evidence/head_geometry/alignment_plain4b.json}}{\nolinkurl{experiments/head_geometry/validate_alignment.py}}
@@ -50,7 +50,7 @@ Every committed result the paper cites is listed below with the claims it suppor
 \evitem{ceilings}{Derived ceilings per lever stack under both execution models (Table~\ref{tab:stack-ceilings}, Figure~\ref{fig:stack-ceilings})}{\nolinkurl{evidence/moonshot/ceilings.json}, \nolinkurl{ceilings.csv}}{\nolinkurl{experiments/moonshot/ceilings.py}}
 \evitem{levers}{First served lever measurements, single runs}{\nolinkurl{evidence/moonshot/lever_sweeps_quick.csv}}{\nolinkurl{experiments/moonshot/lever_sweep.py}, \nolinkurl{summarise.py}}
 \evitem{decode-steps}{First engine-only decode-step times by state precision}{\nolinkurl{evidence/moonshot/decode_ceiling_try1.csv}}{\nolinkurl{experiments/moonshot/decode_ceiling_sweep.py}}
-\evitem{moonshot-patches}{Engine patches for the reduced draft head, the relaxed greedy rule and rounding-preserving replay, with their tests; code, not results}{\nolinkurl{engine/sglang/patches/moonshot/}, \nolinkurl{tests/test_moonshot_levers.py}, \nolinkurl{tests/test_gdn_exact_replay.py}}{--}
+\evitem{moonshot-patches}{Engine patches for the reduced draft head, the relaxed greedy rule and rounding-preserving replay, with their tests; code, not results}{\nolinkurl{engine/sglang/patches/moonshot/}, \nolinkurl{tests/test_moonshot_levers.py}, \nolinkurl{tests/test_gdn_exact_replay.py}}{}
 \evgroup{Drafting and serving}
 \evitem{drafter-launch}{Command, environment and resolved settings of the drafter's acceptance runs}{\nolinkurl{evidence/drafter/launch/}}{\nolinkurl{experiments/drafter/run_trace.sh}}
 \evitem{drafter-acc}{DFlash acceptance by block position and domain (Table~\ref{tab:drafter-tau}, Figure~\ref{fig:drafter-acceptance})}{\nolinkurl{evidence/drafter/acceptance_summary.csv}, \nolinkurl{acceptance_by_position.csv}}{\nolinkurl{experiments/drafter/summarize_acceptance.py}}
@@ -61,7 +61,7 @@ Every committed result the paper cites is listed below with the claims it suppor
 \evitem{probes}{Feasibility probes of capacity and draft trees (what launches, not performance)}{\nolinkurl{evidence/bench/probes/}}{\nolinkurl{bench/campaigns/capacity_probes.sh}, \nolinkurl{bench/pareto.py}}
 \evitem{frontend}{Frontend diagnosis at concurrency 256 on a quiet host (single points)}{\nolinkurl{evidence/bench/frontend/}}{\nolinkurl{bench/campaigns/frontend_diagnostic.sh}, \nolinkurl{bench/pareto.py}}
 \evgroup{Literature}
-\evitem{litreview}{Literature review and citation audit behind Section~\ref{sec:related}}{\nolinkurl{sources/literature_review.md}, \nolinkurl{citation_audit.md}, \nolinkurl{source_manifest.json}}{--}
+\evitem{litreview}{Literature review and citation audit behind Section~\ref{sec:related}}{\nolinkurl{sources/literature_review.md}, \nolinkurl{citation_audit.md}, \nolinkurl{source_manifest.json}}{}
 \end{longtable}}
 A file name listed without a directory is in the directory of the entry's first file. Raw captures, traces and per-row arrays are not in the repository; each evidence README gives the command that regenerates them on the same hardware.
 
@@ -100,11 +100,11 @@ Results transfer & New prompts, a second model or a second GPU & \pend{transfer}
 Each entry is designed work whose result is not in the repository's main branch. The text marks it \mbox{[pending D$n$]} and says beside the marker what the result will decide; no number stands in for it.
 
 \newcounter{devitem}
-\newcommand{\devitem}[3]{\refstepcounter{devitem}\label{dev:#1}D\thedevitem & #2 & #3\\}
+\newcommand{\devitem}[3]{\refstepcounter{devitem}\label{dev:#1}D\thedevitem & #2\ifblank{#3}{}{\par\vspace{1pt}{\footnotesize\color{muted}To be committed in #3.\par}}\vspace{2pt}\\}
 {\small
-\begin{longtable}{@{}P{.75cm}P{10.5cm}P{5.0cm}@{}}
-\toprule Entry & Pending result & Evidence it will produce\\\midrule\endfirsthead
-\toprule Entry & Pending result & Evidence it will produce\\\midrule\endhead
+\begin{longtable}{@{}P{.9cm}P{15.6cm}@{}}
+\toprule Entry & Pending result, and where its evidence is to be committed\\\midrule\endfirsthead
+\toprule Entry & Pending result, and where its evidence is to be committed\\\midrule\endhead
 \bottomrule\endlastfoot
 \devitem{kernel-impl}{The certified-head implementation, with its tests}{\nolinkurl{src/certified_head/}, \nolinkurl{tests/}}
 \devitem{kernel-error}{The cuBLAS kernel selected per batch size, whether disabling reduced-precision reduction changes its output, and its observed accumulation error against both error models; decides whether the modelled $G_i$ covers the stock kernel at the served shapes}{\nolinkurl{evidence/certified_head/stock_invariance.json}}
@@ -140,7 +140,7 @@ Each entry is designed work whose result is not in the repository's main branch.
 \devitem{bench-mtp}{Served MTP speculation against plain decoding across concurrency, with and without buffered GDN verification}{\nolinkurl{evidence/bench/}}
 \devitem{bench-cert}{Before-and-after frontiers for the certified head in drafting, verification and plain decoding, with output equality at the same batch shape (H4)}{\nolinkurl{evidence/bench/}}
 \devitem{bench-frontend}{Frontend behaviour above concurrency 256 on a quiet host, and repeats of the single-point diagnosis}{\nolinkurl{evidence/bench/frontend/}}
-\devitem{transfer}{Transfer to new prompts, a second model (the public DFlash~2 pair for Qwen3.8-27B) or a second GPU; not scheduled}{--}
+\devitem{transfer}{Transfer to new prompts, a second model (the public DFlash~2 pair for Qwen3.8-27B) or a second GPU; not scheduled}{}
 \end{longtable}}
 
 \subsection{Reproduction}\label{app:repro}
@@ -159,10 +159,13 @@ python -m pytest tests/                  # every CPU test; GPU tests skip withou
 The GPU experiments need the hardware and engine of Appendix~\ref{app:pins}: one GH200 and the engine at the pin with the patches under \path{engine/sglang/patches/}, whose \code{README.md} gives the commands that apply each series. Every evidence directory's \code{README.md} lists the exact command behind each file, and \code{RUNBOOK.md} collects the procedures. Timed runs were taken with exclusive use of the GPU and with the CPU load of other processes recorded for every point. The paper builds with \code{latexmk -pdf paper.tex} in \path{paper/} (pdfLaTeX and BibTeX, no shell escape); the build fetches the MLSys style file from the official kit and checks its SHA-256 digest (\path{paper/template/README.md}), and a figure whose data file is absent builds as a marked placeholder.
 
 \subsection{Hardware, software and model pins}\label{app:pins}
-\begin{table}[htbp]
-\small\centering
-\begin{tabularx}{\linewidth}{@{}P{3.4cm}Y@{}}\toprule
-Item & Pin\\\midrule
+Every measurement in the paper was taken with the pins below; the precise command, commits and resolved server settings of each run are recorded next to its evidence.
+
+{\small
+\begin{longtable}{@{}P{3.4cm}P{13.1cm}@{}}
+\toprule Item & Pin\\\midrule\endfirsthead
+\toprule Item & Pin\\\midrule\endhead
+\bottomrule\endlastfoot
 GPU & One NVIDIA GH200 480GB: 96~GB HBM3, compute capability 9.0 (sm\_90), 132 SMs, 60~MB L2; clocks 1,980~MHz (SM) and 2,619~MHz (memory) during the profiles\\
 Host & 64-core Grace (aarch64); driver 570.195.03 with CUDA 13.0 forward-compatibility libraries\\
 Engine & SGLang \texttt{bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824} (0.5.21.dev861), PyTorch 2.13.0+cu130, FlashInfer 0.6.18, Triton 3.7.1; FlashAttention~3 and~4 are unavailable on this aarch64 host\\
@@ -172,11 +175,8 @@ Engine patches & Head-input capture (\path{engine/sglang/patches/geometry/}), di
 Serving client & AIPerf 0.13.0, closed-loop concurrency, streaming chat completions\\
 Profilers & Nsight Systems 2025.3.2, Nsight Compute 2025.3.1\\
 CPU references & Python 3.13.15, NumPy 2.3.5; Lean 4.19.0\\
-Prompts & 320 capture prompts (\path{evidence/head_geometry/prompt_manifest.csv}), 320 divergence prompts (\path{evidence/state_safety/prompt_manifest.json}), the serving workload~\ev{workload}, each with its sources and SHA-256 digests\\\bottomrule
-\end{tabularx}
-\caption{Pins of every measurement in the paper. The precise command, commits and resolved server settings of each run are recorded next to its evidence.}
-\label{tab:pins}
-\end{table}
+Prompts & 320 capture prompts (\path{evidence/head_geometry/prompt_manifest.csv}), 320 divergence prompts (\path{evidence/state_safety/prompt_manifest.json}), the serving workload~\ev{workload}, each with its sources and SHA-256 digests\\
+\end{longtable}}
 
 \subsection{Attribution and disclosure}\label{app:attribution}
 Samuel Mausberg is the author of this paper and is responsible for its claims. The earlier draft of the manuscript, its derivations and its reference code were prepared with GPT-6 Astra Pro (OpenAI) from research materials, public primary sources and local CPU execution. This version was produced with Claude Code, using Claude Opus 5.5 agents for the literature review, theory, measurements, implementation and writing; each change to the literature, theory and evidence this paper cites was reviewed by an independent reviewing agent before it was merged, and all of the work is subject to the author's review. No AI system is an author. The confidential assignment that motivated the work is not reproduced or quoted, and no model weights are redistributed.

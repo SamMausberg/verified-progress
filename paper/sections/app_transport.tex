@@ -54,7 +54,7 @@ Substitute $z_i^d+\langle\mu_c,\Delta\rangle=z_i-\langle w_i-\mu_c,\Delta\rangle
 \begin{proof}[Proof of Theorem~\ref{thm:crossover}]
 For rows $k$ and $l$ of the tile, $\norm{w_k-w_l}_2\le\norm{w_k-\mu_c}_2+\norm{w_l-\mu_c}_2\le2r_c$, so $r_c\ge\frac12\diam_2(c)$ for every centre. The equivalence is the definition of $\delta^\ast_i$ rearranged: $r_c\norm\Delta_2<\norm{e_i}_2\norm{h^t}_2$ exactly when $\norm\Delta_2/\norm{h^t}_2<\norm{e_i}_2/r_c$.
 \end{proof}
-The Hölder pairing has a crossover of the same kind, which does not even need the weights beyond one inequality.
+The Hölder pairing has a crossover of the same kind, with a sufficient condition that depends on the tile only through one property of its rows.
 \begin{proposition}[Crossover in the Hölder family]\label{prop:holder-crossover}
 With $b$-bit round-to-nearest per-row codes, $s_i=\norm{w_i}_\infty/(2^{b-1}-1)$ and no clipping, $|\langle e_i,h\rangle|\le\tfrac{s_i}2\norm h_1$, and $\tfrac{s_i}2\norm h_1\le r^\infty_c\norm\Delta_1$ whenever $\norm\Delta_1/\norm h_1\ge\norm{w_i}_\infty/\bigl((2^{b-1}-1)\diam_\infty(c)\bigr)$. If some row of $c$ has the opposite sign, or zero, in the coordinate where $|w_{ij}|$ peaks, then $\diam_\infty(c)\ge\norm{w_i}_\infty$ and the condition is implied by $\norm\Delta_1/\norm h_1\ge1/(2^{b-1}-1)$: $1/127$ for int8 and $1/7$ for int4.
 \end{proposition}
