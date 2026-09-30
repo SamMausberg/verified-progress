@@ -34,6 +34,14 @@ two models are reported separately:
   TACO 2026) plus an FP32 split-K allowance (1.19e-4). It rests on that model,
   not on vendor documentation.
 
+The approximate pass needs a model too. The W8A16 and BF16 passes accumulate on
+tensor cores (Triton `tl.dot`), and their own envelope uses the conservative
+model for that accumulation, whichever model is chosen for the stock kernel;
+candidate exclusion and the threshold check are sound only if it holds. The W8A8
+pass accumulates exactly in int32 and needs no model for itself. With
+`reference='fp32'` the same two assumptions apply (the stock kernel's FP32
+accumulation and our pass's), without the BF16 rounding step.
+
 Rows the certificate cannot decide are completed by the stock kernel itself:
 `fallback_mode='batch'` (default) reruns `torch.matmul` on the whole batch at
 the same shape and takes its argmax, and needs no model. `fallback_mode='columns'`
@@ -83,16 +91,22 @@ Real decode head inputs, 20 batch sizes from 1 to 256. For every size:
 | 224 | `nvjet_sm90_tst_128x224_64x4_2x1_v_bz_coopA_TNT` |
 | 256 | `nvjet_sm90_tst_320x128_64x3_1x2_h_bz_coopB_TNT` |
 
-The FP32-output kernel's largest observed error over 2,048 real rows is
-2.07e-6 of `sum_j |w_j h_j|` (median of row maxima 1.14e-6): 295 times inside
-the conservative model and 58 times inside the Hopper model. The invariance is
+The largest observed error of the FP32-output kernel (`torch.mm(...,
+out_dtype=float32)`) over 2,048 real rows is 2.07e-6 of `sum_j |w_j h_j|` (median
+of row maxima 1.14e-6): 295 times inside the conservative model and 58 times
+inside the Hopper model. The BF16-output kernel that SGLang runs does not expose
+its FP32 accumulator, so for it the model is assumed; its BF16 outputs fall
+inside the model's BF16 interval for every logit the GPU tests check. The invariance is
 a measured property of this build, so the column fallback's claim is conditional
 on it; the start-up self-test re-checks it on the deployed shapes.
 
 ## How often the certificate needs the stock kernel (`fallback_vs_model.json`)
 
-CPU, FP64: 20,000 real decode rows (1,260 engine steps), top 64 tokens per row,
-the same bucket-exact decision as the GPU kernel after rescoring.
+CPU, FP64: the first 20,000 real decode rows of the capture in capture order
+(1,260 engine steps, all prompt splits), top 64 tokens per row, the same
+bucket-exact decision as the GPU kernel after rescoring. (A rerun on 60,000 rows,
+which also checks every token outside the top 64 against the winning bucket, is
+pending; the reviewer's check of 3,013 rows found no such token.)
 
 | stock error bound gamma | rows undecided | engine steps with a fallback |
 |---|---|---|
@@ -102,6 +116,11 @@ the same bucket-exact decision as the GPU kernel after rescoring.
 | 1e-5 | 0.045% | 0.71% |
 | 1e-6 (about the largest observed cuBLAS error) | 0.010% | 0.16% |
 | 0 | 0 | 0 |
+
+The rate depends on the population. The same rule gives 1.46% and 0.28% on the
+GPU replay's 60,000 rows and 1.40% and 0.35% on the geometry workstream's
+held-out 6,005 rows: the first 20,000 rows in capture order fall back more often
+than later ones (their prompt mix differs), so figures should cite their rows.
 
 The fallback rate is set by the stock error model, not by the BF16 spacing:
 a decision that compares BF16 values exactly certifies BF16 ties, and only an
