@@ -27,6 +27,7 @@ BF16 output (R-stock).
 | `selfevidence_plain4b.{json,csv}` | H3 on 6,005 held-out plain-decode positions: R-real candidate counts per head, envelope, accumulation model and decision; batch unions; cascades; rescoring overlap; R-stock fallback share | `python analyze_selfevidence.py --device cpu --threads 40 --sets plain --max-rows 6000 --chunk 64 --out ../../evidence/head_geometry --tag plain4b` | `18fdf95` |
 | `selfevidence_plain4b_ccdf.csv` | Share of positions needing at least k candidate rows (plot data) | `python export_candidate_ccdf.py --tag plain4b --out ../../evidence/head_geometry/selfevidence_plain4b_ccdf.csv` | `18fdf95` |
 | `stats_plain4b.json` | Plain decode: norms, margins, top-m softmax mass, hidden-dimension energy, head statistics, envelope width versus realized error per quantizer, centring diagnostics | `python analyze_stats.py --arm plain4b --device cpu --out ../../evidence/head_geometry/stats_plain4b.json` | `239c482` |
+| `rstock_plain4b.json` | R-stock on the same 6,005 positions: share needing the stock kernel under the `stock_gap` rule and a bucket-exact rule, for four gammas; certified tokens against the engine's | `python analyze_rstock.py --device cpu --out ../../evidence/head_geometry/rstock_plain4b.json` | this commit |
 | `tail_killtest.json` | P1 kill test: INT8 surrogate of the final FFN (and head) versus certified head only | `python tail_killtest.py --threads 16 --out ../../evidence/head_geometry/tail_killtest.json` | `ea4f208` |
 
 The plain-decode capture ran with the capture patch before SGLang's own formatting hooks
@@ -93,16 +94,30 @@ the stock kernel must decide, at:
 | 1.19e-4 | 2.18% | 16.0% |
 | 1.67e-6 (IEEE FP32 blocked tree) | 1.95% | 14.8% |
 
-The floor near 2% comes from the BF16 spacing term, not from the accumulation model: with
-G nearly zero (last row) the condition reduces to an exact margin above one BF16 spacing
-at the winner's magnitude (0.0625 or 0.125 for logits in [8, 32)), and 1.95% of positions
-have a smaller margin. Under R-stock the fallback reruns the stock head at the served
-batch shape, which the table's last column puts at 15-22% of capture-run batches.
-Resolving undecided rows one at a time returns the stock decision only if the stock head
-GEMM is bitwise batch-invariant row by row; the kernel workstream has measured that for
-M = 1-256 on this stack but has not yet committed it as evidence, and without that
-precondition R-stock requires the rerun at the same batch shape. The cost of either
-fallback mode is not measured here.
+The floor near 2% belongs to this sufficient condition, not to R-stock itself: with G
+nearly zero (last row) the condition asks for an exact margin above one BF16 spacing at
+the winner's magnitude (0.0625 or 0.125 for logits in [8, 32)), which 1.95% of positions
+lack, although two rows whose logits round into the same BF16 value are still decided by
+the first-index rule. A bucket-exact rule (round both ends of each accumulator interval
+outward to FP32 and then to BF16, and compare with the tie rule) certifies most of them
+(`rstock_plain4b.json`, same positions):
+
+| gamma | gap rule: positions / batches needing the stock kernel | bucket-exact rule: positions / batches |
+|---|---|---|
+| 6.11e-4 | 3.03% / 21.6% | 1.40% / 10.9% |
+| 1.19e-4 | 2.18% / 16.0% | 0.35% / 2.8% |
+| 1e-5 | 1.97% / 14.9% | 0.017% / 0.13% |
+| 1.67e-6 | 1.95% / 14.8% | 0% / 0% |
+
+For every gamma, no certified token differed from the token the engine returned at the
+capture's batch shape, i.e. no counterexample to any of these error models for cuBLAS on
+these 6,005 rows. That is consistent with the models, not a proof that the stock kernel
+stays within the smallest one. Under R-stock the fallback reruns the stock head at the
+served batch shape. Resolving undecided rows one at a time returns the stock decision only
+if the stock head GEMM is bitwise batch-invariant row by row; whether it is on this stack
+is pending the kernel workstream's evidence, and without that precondition R-stock
+requires the rerun at the same batch shape. The cost of either fallback mode is not
+measured here.
 
 ## P1: certified decoder tail (plain decoding only) - negative result
 
