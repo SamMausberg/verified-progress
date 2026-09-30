@@ -137,7 +137,7 @@ frozen head.
 ### 1.4 Quantized, compressed and precision-sensitive heads (2024-2026)
 
 - **Softmax reparameterization** (Asim Kadav et al., arXiv 2609.31291v2, 28 Sep
-  2026, ICLR 2027 submission) [`softmaxreparam`]. Subtracting a multiple of the mean
+  2026) [`softmaxreparam`]. Subtracting a multiple of the mean
   row from every row leaves the softmax exactly unchanged but changes quantization
   error. The paper reports a packed W4 Phi head cutting batch-1 latency by 10.8 %
   (A10G). The shift is exact for H3 too, since argmax, softmax and Gumbel-max are
@@ -393,8 +393,8 @@ output" can mean.
     `z-lab/Qwen3.5-9B-DFlash` and `z-lab/Qwen3.5-35B-A3B-DFlash` are public too.
   - The card reports lossless results on SGLang, 1x B200, BF16, greedy with thinking
     on, 5 runs per point. At concurrency 1, block 16 gives 3.40-4.60x over
-    autoregressive decoding; Qwen's MTP gives at most 1.96-2.31x. At concurrency 32,
-    block 8 gives 2.15-2.61x; MTP gives at most 1.53-1.80x.
+    autoregressive decoding; the best MTP setting per workload gives 1.99-2.31x. At
+    concurrency 32, block 8 gives 2.15-2.61x; the best MTP setting gives 1.56-1.80x.
   - This drafter projects through the target's shared LM head, so it serves both as a
     stronger speculative baseline and as a 4B test bed for the manuscript's
     shared-head transport.
@@ -917,7 +917,7 @@ measured quality trade-offs in exchange for large speedups.
 
 | Work | Reported speedup (baseline, batch, hardware) | Quality | Code / engine |
 |---|---|---|---|
-| **DFlash** for Qwen3.5-4B, `z-lab/Qwen3.5-4B-DFlash` [`dflash4bcard`], paper [`dflashpaper`] | vs autoregressive, greedy, 1x B200, SGLang: 3.40-4.60x at concurrency 1 (block 16); 2.15-2.61x at concurrency 32 (block 8). MTP's best: 1.96-2.31x and 1.53-1.80x **(checked)** | lossless | Apache-2.0 checkpoint; `z-lab/dflash` (MIT); SGLang `srt/models/dflash.py` and `dflash_worker_v2.py` (chain verify with GDN commit); SpecForge ships `configs/qwen3.5-4b-dflash.json` |
+| **DFlash** for Qwen3.5-4B, `z-lab/Qwen3.5-4B-DFlash` [`dflash4bcard`], paper [`dflashpaper`] | vs autoregressive, greedy, 1x B200, SGLang: 3.40-4.60x at concurrency 1 (block 16); 2.15-2.61x at concurrency 32 (block 8). Best MTP setting per workload: 1.99-2.31x and 1.56-1.80x **(checked)** | lossless | Apache-2.0 checkpoint; `z-lab/dflash` (MIT); SGLang `srt/models/dflash.py` and `dflash_worker_v2.py` (chain verify with GDN commit); SpecForge ships `configs/qwen3.5-4b-dflash.json` |
 | **DFlash 2** [`dflash`] | Qwen3.5-4B mean accepted length at T = 1: MTP 4.54, DFlash 4.92, DSpark 5.49, DFlash 2 5.97 **(checked)**; no throughput reported for 4B | lossless | 4B drafter unreleased; SGLang `DFlash2DraftModel`; SpecForge `configs/qwen3.5-4b-dflash2.json` |
 | **DSpark** [`dspark`] | DeepSeek-V4 production: 60-85 % faster per user than MTP-1 at matched throughput **(checked)** | lossless | `deepseek-ai/DeepSpec` (MIT); SGLang DSpark worker needs an offline SPS table; no Qwen3.5-4B drafter |
 | **DDTree** [`ddtree`] | Qwen3-4B AIME24, T = 0: 5.56x -> 7.27x over autoregressive with a best-first tree from DFlash marginals (8x H200) | lossless | `liranringel/ddtree` (MIT); not in SGLang |
