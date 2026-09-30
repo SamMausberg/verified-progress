@@ -103,5 +103,6 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 ### Paper and deliverables
 - [x] Literature review and verified bibliography (lit; PR #6: 194 verified entries, citation audit)
 - [ ] Narrow the novelty claim: the greedy certified head is prior art (sparkpipe, dgpp, Laguna, knlp); the defensible parts are exact keyed-noise sampling, partition brackets for sampled acceptance, a Hopper-sound envelope and the SGLang/GH200 measurement under the stock-kernel contract; cite DSpark and D-cut for the sampled-depth counterexample (paper, kernel)
-- [ ] Revise the manuscript: methods, results, limitations, figures (paper)
-- [ ] README and RUNBOOK with exact reproduction commands (paper, infra)
+- [x] Paper milestone 1: manuscript reorganized around the evidence, R-stock contract, PR #7 theory with proofs, verified BibTeX, pending markers for GPU results (paper; PR #21)
+- [ ] Paper milestone 2+: integrate workstream results as their evidence PRs merge; five-contract framing; final figures (paper)
+- [ ] README and RUNBOOK with exact reproduction commands (paper, infra; rewritten in PR #21, final pass after the serving results)
