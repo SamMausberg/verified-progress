@@ -4,6 +4,11 @@
 # SHA-256 of the archive and of the file, and stops the build with a clear message if
 # either check fails (template/README.md).
 $pdf_mode = 1;
+# Keep TeX from wrapping log lines at 79 characters and latexmk from rejoining them; a
+# wrapped line next to "No file paper.bbl." otherwise hides the missing bibliography
+# from latexmk, which then never runs BibTeX.
+$ENV{'max_print_line'} = 10000;
+$log_wrap = 10000;
 $bibtex_use = 2;
 ensure_path('TEXINPUTS', './template//');
 ensure_path('BSTINPUTS', './template//');

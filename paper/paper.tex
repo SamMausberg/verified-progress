@@ -10,7 +10,7 @@
 \usepackage{microtype}
 \usepackage{graphicx}
 \usepackage{booktabs}
-\usepackage{hyperref}
+\usepackage[hypertexnames=false]{hyperref}
 \usepackage[accepted]{mlsys2025}
 \input{macros}
 \input{terminology}
@@ -48,8 +48,10 @@
 \input{sections/related}
 \input{sections/discussion}
 
+{\raggedright
 \bibliography{references}
 \bibliographystyle{mlsys2025}
+}
 
 \IfFileExists{sections/appendices.tex}{\appendix\input{sections/appendices}}{}
 \end{document}
