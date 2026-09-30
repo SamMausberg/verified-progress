@@ -103,6 +103,11 @@ the model card's settings (block 16, greedy, thinking on, up to 4,096 new tokens
 concurrency 1). Mean accept length per request 5.73 (bootstrap 95% interval 5.36-6.13,
 median 5.63; pooled 5.25) against the card's 5.93 on B200, so serving on this sm_90 host
 with the substituted backends reproduces the card within the sampling noise of 80 prompts.
-Shared GPU slot, stock engine; acceptance only.
+Conditional acceptance by position: 0.82, 0.75, 0.77, 0.81, then rising to 0.92 at position 15
+(the position-2 dip again). For the panel's chat rows (panel-v1, block 16), OASST1 prompts
+average 4.06 per request (14 prompts) and the two MT-Bench prompts 5.70, so the panel's low
+chat acceptance comes from OASST1-style prompts, not from serving. Shared GPU slot, stock
+engine; acceptance only (foreign CPU load averaged 1.99 cores, which does not affect
+acceptance).
 
     scripts/gpu_lock.sh -s experiments/drafter/run_card_gate.sh

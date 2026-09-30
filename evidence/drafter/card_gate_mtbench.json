@@ -49,5 +49,17 @@
   ],
   "cycles": 39820,
   "foreign_cpu_cores_mean": 1.992,
-  "note": "Correctness/acceptance run on a shared GPU slot; latencies are not timings."
+  "note": "Correctness/acceptance run on a shared GPU slot; latencies are not timings. Foreign CPU load averaged 1.99 cores (another drafter job and a kernel session ran beside it), which does not affect acceptance.",
+  "panel_v1_chat_by_source_block16": {
+    "oasst1": {
+      "requests": 14,
+      "accept_length_mean_per_request": 4.057240282035831,
+      "accept_length_pooled": 3.858922407324028
+    },
+    "mtbench": {
+      "requests": 2,
+      "accept_length_mean_per_request": 5.695094339622641,
+      "accept_length_pooled": 5.335559265442404
+    }
+  }
 }
