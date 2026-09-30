@@ -48,25 +48,28 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 ## Task list
 
 ### Infrastructure
+- [x] Repository hygiene after Codex review: bundle checksums moved to sources/bundle-v3.sha256, pinned manifest URLs, citation metadata (CITATION.cff), Codex comments addressed as a standing rule (PR #38, #39, #41)
 - [x] FIFO GPU queue with typed tickets, integrator-granted priority lane, and a server start-up lock (PR #10, #14, #15, #28)
 - [x] `scripts/gpu_lock.sh`, `scripts/sglang_worktree.sh`, worktree hook in `scripts/sglang_env.sh` (infra; PR #1, writer-preference turnstile in PR #2)
 
 ### Baselines and measurement
 - [x] Frozen workload and aiperf sweep harness producing the concurrency Pareto curve (bench; PR #17)
 - [ ] Baseline arms: plain decode and native-MTP speculation, CUDA graphs and overlap confirmed (bench)
-- [ ] Tune the speculative baseline (steps, draft tokens, backend) so the denominator is strong (bench)
+- [ ] Tune the speculative baseline (steps, draft tokens, backend) so the denominator is strong (bench; depth tuning running with priority)
+- [x] Diagnose the c>=256 throughput cap (bench; PR #46 in review): CPU contention from other jobs; on a quiet host the tokenizer manager saturates with one-token chunks, fixed by --stream-interval 4 as a shared default; host CPU load now recorded for every timed run
 - [ ] Add the public DFlash drafter (`z-lab/Qwen3.5-4B-DFlash@9a1996c`, block 4/8/16) as the strongest existing speculative baseline (bench, drafter; served on sm_90, block 16 mean accept 6.18 on the pilot panel)
 - [ ] Quality baseline on a fixed task set (bench)
 - [ ] nsys attribution of head, backbone, sampling and host gaps for decode and MTP (profile)
 
 ### Mechanism
 - [ ] Capture aligned draft/target hidden states at the head boundary for MTP-4B and DFlash-4B (geometry; capture patch merged in PR #16, held-out captures running)
-- [ ] Measure transport bounds (scalar, coordinate, grouped, low-rank) against logit margins (geometry)
+- [x] Measure transport bounds against logit margins on DFlash-4B, held-out (geometry; PR #35): H2 refuted under the tested families, tilings and drafter. Median drift ratio rho 0.917 (draft head-input norm 50.6 against about 159), transport skips a mean of 0.59% of rows (p90 0.77%), the verify-batch union is 99.48-100% of the vocabulary, and sampled acceptance is undecided with mean probability 0.935 at T = 1. MTP-4B pending (new PR)
 - [x] Measure self-evidence bounds on plain decode (geometry; PR #16): int8 heads certify with 1.3-1.6 candidate rows on average at about half the head bytes, no envelope violations; FP8 and int4 alone fail; the stock kernel is needed at 0.35% (gamma 1.19e-4) to 1.40% (gamma 6.11e-4) of positions under the bucket-exact R-stock rule
 - [x] Rigorous floating-point envelope for the low-precision head and the certified decisions (theory; PR #7)
 - [x] Exact CPU reference and tests for the new certificates (theory; PR #7: 20 methods, 39,761 checks, Lean lemmas)
-- [ ] Triton kernels: low-precision head with bound epilogue, candidate compaction, exact refinement, graph-safe fallback (kernel)
-- [ ] Kernel correctness and microbenchmarks against cuBLAS BF16 plus argmax (kernel)
+- [ ] Triton kernels: low-precision head with bound epilogue, candidate compaction, exact refinement, graph-safe fallback (kernel; PR #45 in review: 65 GPU tests, R-stock contract, fixed-noise sampling, invariance self-test)
+- [ ] Kernel correctness and microbenchmarks against the stock head plus argmax (kernel; partial table in PR #45; final rows pending GPU session)
+- [ ] SGLang integration of the certified head behind per-path flags, bitwise-equal to stock at the same shapes (kernel, started)
 
 ### Moonshots (H7)
 - [ ] Measure the ceilings: HBM bandwidth, bytes per step by component, GDN state dtype and the 133-request cap (moonshot, profile)
@@ -96,7 +99,7 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 
 ### Engine
 - [ ] Differential output-equality tests: MTP versus plain decode, rejection positions, aborts, prefix reuse (state)
-- [ ] Explain every stock divergence by mechanism: differing computed logits (and the first kernel where they differ), differing rounding, or differing tie handling (state)
+- [ ] Explain every stock divergence by mechanism (state; PR #37 in review): the tie rule and head GEMM cause none; first differing outputs are layer 0's GDN recurrence (plain vs MTP) and gated RMSNorm, FlashInfer decode and prefill down_proj (batch 1 vs 32); the flip classes are reported under two named accumulation models; cache-state hashing and the radix-race test pending
 - [ ] Exactness contract for the certified head: the stock head kernel's decision at the same batch shape, with fallback to that kernel when the gap condition fails (kernel, theory)
 - [ ] Integrate the certified head into the MTP draft, verification and plain decode paths (integrate)
 - [ ] Before/after Pareto sweeps with acceptance and output-equality checks (bench, integrate)
