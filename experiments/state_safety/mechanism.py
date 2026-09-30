@@ -25,8 +25,6 @@ of every row of a tapped request. For each tapped prompt:
    rounding_flip   head inputs differ, the exact order is the same in both
                    runs, and BF16 rounding of the head output creates the tie
                    or reversal in one of them
-   order_unresolved  an exact gap is within twice the FP32 accumulation bound,
-                   so the float64 recomputation cannot stand in for the kernel
    upstream_order_unknown  head inputs differ but a run did not save the head
                    input of that row (first tap version, MTP verify rows)
 
@@ -282,21 +280,28 @@ def analyse_prompt(
     out['exact_logits_a'] = ea
     out['exact_logits_b'] = eb
     out['head_input_max_abs_diff'] = float(np.max(np.abs(a['head_in'] - b['head_in'])))
-    # The float64 recomputation stands in for cuBLAS's FP32 accumulator, which
-    # can differ from it by about 2*D*2**-24 relative to sum |w*h|. Treat exact
-    # gaps inside that bound as unresolved rather than as an order.
+    # The class depends only on the exact (real-arithmetic) order of the two
+    # tokens under each run's head input. The kernel's FP32 accumulator can
+    # differ from exact by up to about 2*D*2**-24 * sum|w*h|; when an exact gap
+    # is smaller than that, the accumulator's own order is not implied by it,
+    # which is flagged rather than turned into a class.
     bound = max(
         accumulation_bound(head, a['head_in'], (ta, tb)),
         accumulation_bound(head, b['head_in'], (ta, tb)),
     )
-    out['accumulation_bound'] = bound
     ga, gb = ea[0] - ea[1], eb[0] - eb[1]
-    if min(abs(ga), abs(gb)) <= 2 * bound:
-        out['cls'] = 'order_unresolved'
-    elif np.sign(ga) != np.sign(gb):
+    out['exact_gap_a'], out['exact_gap_b'] = ga, gb
+    out['accumulation_bound'] = bound
+    out['exact_gap_within_accumulation_bound'] = bool(min(abs(ga), abs(gb)) <= bound)
+    if la[0] is not None and la[1] is not None and lb[0] is not None and lb[1] is not None:
+        out['bf16_gap_a'], out['bf16_gap_b'] = la[0] - la[1], lb[0] - lb[1]
+    if np.sign(ga) != np.sign(gb):
         out['cls'] = 'order_flip'
     else:
         out['cls'] = 'rounding_flip'
+        # The run whose choice contradicts its own exact order did so through
+        # BF16 rounding of the head output (and lowest-index tie-breaking).
+        out['run_against_exact_order'] = 'a' if ga < 0 else 'b'
     return out
 
 
