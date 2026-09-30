@@ -316,3 +316,13 @@ def test_frontier_dominance_and_aggregation() -> None:
     assert not by_label['a']['pareto_optimal'] and by_label['b']['pareto_optimal']
     assert by_label['b']['y_vs_a'] == pytest.approx(2.0)
     assert math.isnan(by_label['a']['accept_length_mean'])
+
+
+def test_loop_onset_finds_repetition_and_ignores_varied_text() -> None:
+    from bench.lengths import LOOP_WINDOW, loop_onset
+
+    varied = list(range(2000))
+    assert loop_onset(varied) is None
+    looping = [*range(1000), *([7, 8, 9, 10, 11] * 200)]
+    onset = loop_onset(looping)
+    assert onset is not None and 1000 - LOOP_WINDOW < onset <= 1000
