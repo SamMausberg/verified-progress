@@ -78,6 +78,13 @@ def main() -> None:
     ap.add_argument('--transport', type=Path, default=None)
     ap.add_argument('--out', type=Path, required=True)
     ap.add_argument('--drafts', type=int, default=3, help='MTP draft tokens per verify')
+    ap.add_argument(
+        '--int8-pass',
+        type=Path,
+        default=None,
+        help='kernel workstream sweep JSON (batches[M].best.median_us) for the measured '
+        'int8 envelope pass; without it the pass is priced by bandwidth',
+    )
     args = ap.parse_args()
 
     profile = json.loads(args.profile.read_text())
@@ -104,6 +111,10 @@ def main() -> None:
         'tensor_core_rescore_model': plain['fp32_rescore_needs_fp64']['greedy|tensor_core'],
     }
     rows: list[dict[str, Any]] = []
+    int8_pass: dict[int, float] | None = None
+    if args.int8_pass is not None:
+        sweep = json.loads(args.int8_pass.read_text())
+        int8_pass = {int(k): v['best']['median_us'] for k, v in sweep['batches'].items()}
     for m in (1, 2, 4, 8, 16, 32, 64):
         dense_us = interp(chain, m)
         rows.append(
@@ -119,25 +130,32 @@ def main() -> None:
         )
         u = union_rows(unions, m)
         u = cand_mean * m if u is None else u
+        pass_bytes = V * int8_row_bytes
+        rescore_bytes = u * BF16_ROW
+        if int8_pass is not None:
+            t_pass = interp(int8_pass, m) + rescore_bytes / bw(m)
+            pass_basis = 'measured int8 pass (kernel workstream sweep)'
+        else:
+            t_pass = (pass_bytes + rescore_bytes) / bw(m)
+            pass_basis = 'int8 pass priced at the BF16 GEMM bandwidth'
         for label, p in undecided.items():
             p_batch = 1 - (1 - p) ** m
-            pass_bytes = V * int8_row_bytes
-            rescore_bytes = u * BF16_ROW
-            t = (pass_bytes + rescore_bytes) / bw(m) + 2 * small_kernel_us + p_batch * dense_us
-            rows.append(
-                {
-                    'mechanism': f'int8_g128_selfevidence|{label}',
-                    'rows': m,
-                    'weight_bytes': pass_bytes + rescore_bytes,
-                    'metadata_bytes': 0,
-                    'kernels': 3,
-                    'fallback_probability_per_batch': p_batch,
-                    'candidate_union_rows': u,
-                    'predicted_us': t,
-                    'basis': 'model: bytes at the BF16 GEMM bandwidth, 2 extra small kernels, '
-                    'dense chain on fallback',
-                }
-            )
+            for fallback in ('batch_dense', 'per_row'):
+                extra = dense_us if fallback == 'batch_dense' else small_kernel_us
+                rows.append(
+                    {
+                        'mechanism': f'int8_g128_selfevidence|{label}|{fallback}',
+                        'rows': m,
+                        'weight_bytes': pass_bytes + rescore_bytes,
+                        'metadata_bytes': 0,
+                        'kernels': 3,
+                        'fallback_probability_per_batch': p_batch,
+                        'candidate_union_rows': u,
+                        'predicted_us': t_pass + 2 * small_kernel_us + p_batch * extra,
+                        'basis': f'model: {pass_basis}; 2 extra small kernels; on an '
+                        f'undecided row, {fallback}',
+                    }
+                )
     result: dict[str, Any] = {
         'rows': rows,
         'primitives': {
