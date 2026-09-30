@@ -284,7 +284,12 @@ async def run(args: argparse.Namespace) -> dict:
         await profiler.stop(session)
         t_after_stop = time.perf_counter()
         if spy is not None:
-            await asyncio.to_thread(spy.wait)
+            try:
+                await asyncio.to_thread(spy.wait, args.window + 20)
+            except subprocess.TimeoutExpired:
+                # py-spy can hang on a traced process; never let it stall the hold.
+                subprocess.run(['sudo', '-n', 'pkill', '-P', str(spy.pid)], check=False)
+                subprocess.run(['sudo', '-n', 'kill', str(spy.pid)], check=False)
             subprocess.run(
                 ['sudo', '-n', 'chown', f'{os.getuid()}:{os.getgid()}', args.py_spy_out],
                 check=False,
