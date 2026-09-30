@@ -8,7 +8,7 @@ Python 3.12, torch 2.13.0+cu130 on CPU, safetensors 0.9.0-rc.1.
 
 Exact tests of `src/precision_reference.py`. Every BF16, FP32 and FP64 rounding is emulated on
 Fractions, so each bound and decision is checked against real arithmetic. Produced at commit
-`e6907863` (recorded in the JSON as `repo_commit`), seed 20260930:
+`960aa802` (recorded in the JSON as `repo_commit`), seed 20260930:
 
 ```sh
 . .venv/bin/activate

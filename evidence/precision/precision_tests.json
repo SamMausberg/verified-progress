@@ -2,7 +2,7 @@
   "status": "pass",
   "test_methods": 21,
   "seed": 20260930,
-  "repo_commit": "a5334a1e680c0eebad659f7b3426ec9e920f3cc2",
+  "repo_commit": "960aa8020690cfa8a7354a311703349660634f28",
   "python": "3.13.15",
   "numpy": "2.3.5",
   "counts": {
@@ -112,6 +112,6 @@
       "stock_bf16_partials": 1
     }
   },
-  "seconds": 36.6,
+  "seconds": 36.4,
   "scope": "exact rational emulation of BF16/FP32/FP64 rounding, synthetic heads; no GPU, no model weights; the fused tensor-core adder is a model, not hardware"
 }
