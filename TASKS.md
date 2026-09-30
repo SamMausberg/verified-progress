@@ -16,6 +16,15 @@ item points at its PR and evidence.
 | H6 | Other layers of the stack (backend choice, graphs, scheduling, spec parameters) leave measurable headroom | Profiles and controlled ablations |
 | H7 | Reformulations and declared approximations can multiply gains well beyond tuning (recurrent-state traffic at high concurrency; near-free drafting and lossy targets at low concurrency) | Measured bytes per step, quality-versus-speed curves, end-to-end Pareto sweeps |
 
+## End goal
+
+Stack every axis that survives measurement into one composed configuration, and show what
+each axis contributed. Report two frontiers: an **exact stack** (the target's decisions
+are preserved) and a **lossy stack** under a stated quality budget whose combined quality
+cost is measured directly. Axes: progress per verify pass, bytes per verify pass, bytes per
+draft step, concurrency and batching, system overheads. Compositions are measured in the
+baseline, A, B, A+B pattern; isolated speedups are never multiplied.
+
 ## Workstreams
 
 | WS | Scope | Status |
@@ -61,6 +70,8 @@ item points at its PR and evidence.
 - [ ] Throughput: reformulate GDN state handling and lift the concurrency cap (moonshot, M1)
 - [ ] Latency: near-free draft head, deeper drafting, relaxed acceptance, lossy target arms (moonshot, M2)
 - [ ] Trained block drafter for Qwen3.5-4B (M3, pending a free slot)
+- [ ] Interaction matrix of levers (compose, conflict, quality compounding) (moonshot)
+- [ ] Full-stack arms: exact stack and lossy stack, each with ablations, Pareto sweeps and quality checks (bench, moonshot, integrate)
 
 ### Engine
 - [ ] Differential output-equality tests: MTP versus plain decode, rejection positions, aborts, prefix reuse (state)
