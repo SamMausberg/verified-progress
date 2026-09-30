@@ -24,8 +24,8 @@ BF16 output (R-stock).
 |---|---|---|---|
 | `prompt_manifest.csv` | Prompt sources, split, thinking flag and SHA-256 (no texts) | `python build_prompts.py --out ~/vp-data/geometry --manifest ../../evidence/head_geometry/prompt_manifest.csv` | `018f927` |
 | `alignment_plain4b.json` | Plain decode: FP64 argmax of the captured head input against the engine's token | `python validate_alignment.py --arm plain4b --device cpu --out ../../evidence/head_geometry/alignment_plain4b.json` | `f0e9c30` |
-| `selfevidence_plain4b.{json,csv}` | H3 on 6,005 held-out plain-decode positions: candidate counts per head, envelope, accumulation model and decision; batch unions; cascades; rescoring overlap | `python analyze_selfevidence.py --device cpu --threads 48 --sets plain --max-rows 6000 --chunk 64 --out ../../evidence/head_geometry --tag plain4b` | `f0e9c30` |
-| `selfevidence_plain4b_ccdf.csv` | Share of positions needing at least k candidate rows (plot data) | `python export_candidate_ccdf.py --tag plain4b --out ../../evidence/head_geometry/selfevidence_plain4b_ccdf.csv` | `5831da1` |
+| `selfevidence_plain4b.{json,csv}` | H3 on 6,005 held-out plain-decode positions: R-real candidate counts per head, envelope, accumulation model and decision; batch unions; cascades; rescoring overlap; R-stock fallback share | `python analyze_selfevidence.py --device cpu --threads 40 --sets plain --max-rows 6000 --chunk 64 --out ../../evidence/head_geometry --tag plain4b` | `18fdf95` |
+| `selfevidence_plain4b_ccdf.csv` | Share of positions needing at least k candidate rows (plot data) | `python export_candidate_ccdf.py --tag plain4b --out ../../evidence/head_geometry/selfevidence_plain4b_ccdf.csv` | `18fdf95` |
 | `stats_plain4b.json` | Plain decode: norms, margins, top-m softmax mass, hidden-dimension energy, head statistics, envelope width versus realized error per quantizer, centring diagnostics | `python analyze_stats.py --arm plain4b --device cpu --out ../../evidence/head_geometry/stats_plain4b.json` | `239c482` |
 | `tail_killtest.json` | P1 kill test: INT8 surrogate of the final FFN (and head) versus certified head only | `python tail_killtest.py --threads 16 --out ../../evidence/head_geometry/tail_killtest.json` | `ea4f208` |
 
@@ -47,14 +47,16 @@ rule. So R-real and the stock decision (R-stock) differ on about 0.5% of greedy 
 ## H3: self-evidence on plain decode
 
 `selfevidence_plain4b.csv` has one row per (head, envelope, accumulation model, decision).
-Headline, tensor-core accumulation model (gamma = D * 2^-22 * 1.001 = 6.1e-4):
+The candidate counts certify the R-real decision. Headline, with the tensor-core
+accumulation model (gamma = 6.11e-4, the largest over the fused-adder models of
+`src/precision_reference.py`):
 
 | Head | Bytes vs BF16 | Envelope | Candidates mean | median | p99 | max | 1 candidate | <= 8 |
 |---|---|---|---|---|---|---|---|---|
 | int8 per-row, FP16 scale | 0.502 | row Cauchy-Schwarz | 1.55 | 1 | 8 | 30 | 75.4% | 99.3% |
 | int8 g128 | 0.516 | blockwise L2 | 1.34 | 1 | 5 | 23 | 81.4% | 99.8% |
 | int8 g32 | 0.540 | blockwise L2 | 1.26 | 1 | 5 | 20 | 84.0% | 99.9% |
-| FP8 e4m3 per-row | 0.509 | blockwise L2 | 4.89 | 1 | 60 | 604 | 56.2% | 88.4% |
+| FP8 e4m3 per-row | 0.509 | blockwise L2 | 4.89 | 1 | 60 | 605 | 56.2% | 88.4% |
 | int4 g32 | 0.29 + candidates | blockwise L2 | 20,751 | 377 | 230,238 | 248,192 | 0.02% | 2.8% |
 | int4 g128 | 0.27 + candidates | blockwise L2 | 72,847 | 13,991 | 248,295 | 248,320 | 0% | 0% |
 
@@ -75,6 +77,26 @@ per step on average) the int8 g128 candidates cover 9.5-12.5 distinct rows. Resc
 position undecided; with the tensor-core error model for the rescoring, 2.1% still overlap.
 The int4 g32 plus int4-residual cascade reads 0.32 of BF16 bytes at batch 1 and 0.41-0.42
 over real batches of 5-16 rows.
+
+### R-stock: how often the stock decision needs the stock kernel
+
+The adopted engine contract is R-stock, the token the stock BF16 head returns at the same
+batch shape. It can be certified only through the gap condition (`stock_gap` in
+`src/precision_reference.py`): the R-real winner a must beat every other row b by
+G_a + G_b + ulp_bf16(max(|z_a|, |z_b|) + max(G_a, G_b)), where G_i = gamma sum_j |w_ij h_j|
+bounds cuBLAS's pre-rounding error. On the same 6,005 positions the condition fails, and
+the stock kernel must decide, at:
+
+| gamma for the stock kernel's FP32 accumulation | Positions failing | Capture-run batches with at least one |
+|---|---|---|
+| 6.11e-4 (fused-adder tensor-core model) | 3.03% | 21.6% |
+| 1.19e-4 | 2.18% | 16.0% |
+| 1.67e-6 (IEEE FP32 blocked tree) | 1.95% | 14.8% |
+
+The floor near 2% comes from the BF16 spacing term, not from the accumulation model: about
+2% of greedy decisions have an exact top-2 margin below one BF16 spacing (0.0625 or 0.125
+for logits in [8, 32)). Resolving those rows one at a time keeps the cost small; running
+the dense head for the whole batch would not.
 
 ## P1: certified decoder tail (plain decoding only) - negative result
 
