@@ -25,6 +25,8 @@
 #   dflash_c1, dflash_c1_stock  DFlash certified and stock, one request at a time
 #   mtp_draft_check      MTP draft top-1 (draft steps and draft extend), check mode
 #   dflash_draft_check   DFlash greedy draft projection, check mode
+#   mtp_sampled_check    MTP with fixed-noise sampled verify, seeded T = 0.7
+#                        (--enable-deterministic-inference), check mode
 #
 # Environment: PORT (default 30040), LIMIT (prompts, default 64), MAX_NEW_TOKENS
 # (default 256), NEED_FREE_MIB (default 40000).
@@ -88,7 +90,7 @@ export -f launch_and_wait
 
 # Runs in a subshell per arm, so the exported flags do not leak into the next arm.
 run_arm() {
-  local arm="$1" dir="$out_root/$1" conc=16 rc need="$need_mib"
+  local arm="$1" dir="$out_root/$1" conc=16 rc need="$need_mib" temp=0
   local -a args=("${plain[@]}") flags=()
   case "$arm" in
     mtp_*) args=("${mtp[@]}") conc=8 need=70000 ;;&
@@ -100,6 +102,9 @@ run_arm() {
     plain_c1_stock | mtp_c1_stock | dflash_c1_stock) conc=1 ;;
     mtp_check | dflash_check) flags=(VERIFY=1 CHECK=1) ;;
     mtp_draft_check | dflash_draft_check) flags=(DRAFT=1 CHECK=1) ;;
+    mtp_sampled_check)
+      flags=(SAMPLED_VERIFY=1 CHECK=1) temp=0.7
+      args+=(--enable-deterministic-inference) ;;
     mtp_c1 | dflash_c1) flags=(VERIFY=1) conc=1 ;;
     *) echo "unknown arm $arm" >&2; return 64 ;;
   esac
@@ -115,7 +120,7 @@ run_arm() {
     echo "sglang=$(git -C "$SGLANG_WORKTREE" rev-parse HEAD) dirty=$(git -C "$SGLANG_WORKTREE" status --porcelain | wc -l)"
     echo "flags=${flags[*]}"
     echo "args=${model[*]} ${common[*]} ${args[*]}"
-    echo "concurrency=$conc limit=$limit max_new_tokens=$max_new"
+    echo "concurrency=$conc limit=$limit max_new_tokens=$max_new temperature=$temp"
   } >"$dir/run_info.txt"
   rc=2
   for _ in $(seq 1 360); do
@@ -133,7 +138,8 @@ run_arm() {
     return 1
   fi
   python "$repo/experiments/certified_head/engine_equality.py" run --port "$port" --out "$dir" \
-    --limit "$limit" --max-new-tokens "$max_new" --concurrency "$conc" || rc=$?
+    --limit "$limit" --max-new-tokens "$max_new" --concurrency "$conc" --temperature "$temp" \
+    || rc=$?
   stop_server
   grep -E "Certified LM head|Traceback|Error" "$dir/server.log" | head -20 >"$dir/server_notes.txt" || true
   return "$rc"

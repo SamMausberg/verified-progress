@@ -105,6 +105,19 @@ def stock_seeded_sample(
     ``sampling_from_probs_torch``), then ``multinomial_with_seed``.
     """
     logits = reference_logits(hidden, weight, reference).float()
+    return stock_seeded_sample_from_logits(logits, seeds, positions, temperatures, inplace=True)
+
+
+def stock_seeded_sample_from_logits(
+    logits: torch.Tensor,
+    seeds: torch.Tensor,
+    positions: torch.Tensor,
+    temperatures: torch.Tensor,
+    *,
+    inplace: bool = False,
+) -> torch.Tensor:
+    """The same chain from FP32 logits (copied unless ``inplace``)."""
+    logits = logits.float() if inplace else logits.float().clone()
     logits.div_(temperatures.float()[:, None])
     probs = torch.softmax(logits, dim=-1)
     return stock_multinomial_with_seed(torch.log(probs), seeds, positions).view(-1)
