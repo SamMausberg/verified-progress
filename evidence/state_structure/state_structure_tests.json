@@ -1,0 +1,59 @@
+{
+  "status": "pass",
+  "methods": 9,
+  "witnesses": {
+    "bf16_rounded_outer_product": {
+      "size": 32,
+      "seed": 0,
+      "rank": 28
+    },
+    "coordinate_key_reachability": {
+      "dimension": 3,
+      "reached_target": true
+    },
+    "fp32_lazy_decay": {
+      "a1": 0.8999999761581421,
+      "a2": 0.8999999761581421,
+      "x": 1.2999999523162842,
+      "eager": 1.0529999732971191,
+      "lazy": 1.0529998540878296,
+      "ulps_apart": 1.0,
+      "eager_error": 6.771087367951625e-08,
+      "lazy_error": 5.1498415871265e-08
+    },
+    "noncommuting_transitions": {
+      "commute": false
+    },
+    "batch_rank_after_one_step": {
+      "before": 1,
+      "after": 4,
+      "requests": 4
+    },
+    "query_invisible": {
+      "q_dot_ds": "0",
+      "q_A_ds": "-3/25"
+    },
+    "rmsnorm_before_projection": {
+      "projection_without_norm": [
+        "1",
+        "1"
+      ],
+      "projection_after_norm": [
+        "1",
+        "1/5"
+      ]
+    },
+    "silu_rank": {
+      "rank_before": 1,
+      "rank_after": 2,
+      "det_over_log2_squared": "-64/1275"
+    },
+    "transition_determinant": {
+      "det": "243/1000"
+    }
+  },
+  "seconds": 0.037,
+  "numpy": "2.3.5",
+  "python": "3.13.15",
+  "scope": "exact rational witnesses and float32 rounding cases; not model measurements"
+}
