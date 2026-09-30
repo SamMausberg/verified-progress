@@ -67,16 +67,24 @@ def gumbel_field(seeds: torch.Tensor, positions: torch.Tensor, vocab: int) -> to
 
 
 def stock_multinomial_with_seed(
-    logprobs: torch.Tensor, seeds: torch.Tensor, positions: torch.Tensor
+    logprobs: torch.Tensor,
+    seeds: torch.Tensor,
+    positions: torch.Tensor,
+    *,
+    allow_replica: bool = False,
 ) -> torch.Tensor:
-    """SGLang's ``multinomial_with_seed`` (``[M, 1]`` ids), or an eager replica.
+    """SGLang's ``multinomial_with_seed`` (``[M, 1]`` ids).
 
-    The replica applies the same FP64 operations to the same noise field; the
-    tests check it against SGLang's compiled function.
+    The stock function defines the sampling contract, so it is required. With
+    ``allow_replica=True`` (tests without SGLang only) an eager replica applies the
+    same FP64 operations to the same noise field; the tests check it against
+    SGLang's compiled function.
     """
     try:
         from sglang.srt.layers.sampler import multinomial_with_seed
     except ImportError:
+        if not allow_replica:
+            raise
         g = gumbel_field(seeds, positions, logprobs.shape[1])
         return (g + logprobs.to(torch.float64)).argmax(dim=1, keepdim=True)
     return multinomial_with_seed(logprobs, seeds, positions)

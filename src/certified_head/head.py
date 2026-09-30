@@ -62,7 +62,10 @@ candidate list, is completed by the stock GEMM on its candidates' head rows
 certificate guarantees that the stock argmax is among the candidates, so this
 returns the stock token whenever the stock kernel computes a logit identically
 when only a subset of head rows is multiplied (column-subset invariance, which
-``experiments/certified_head/stock_invariance.py`` measures per shape).
+``experiments/certified_head/stock_invariance.py`` measures per shape). It can
+only be switched on by ``CertifiedHead.enable_column_fallback(batch_sizes)``,
+which checks that property for the fallback's exact GEMM shape at each batch
+size; unchecked batch sizes keep ``batch``.
 """
 
 Selection = Literal['dense', 'tiles']
@@ -170,7 +173,6 @@ class CertifiedHead:
         capacity: int = 256,
         max_batch: int = 256,
         selection: Selection = 'tiles',
-        fallback_mode: Fallback = 'batch',
         refine_split: int = 4,
     ) -> None:
         if weight.dtype != torch.bfloat16 or q.dtype != torch.int8:
@@ -233,8 +235,9 @@ class CertifiedHead:
         self._any = torch.zeros((), dtype=torch.bool, device=dev)
         self._any_cols = torch.zeros((), dtype=torch.bool, device=dev)
         self._any_dense = torch.zeros((), dtype=torch.bool, device=dev)
-        self.fallback_mode: Fallback = fallback_mode
-        self._column_batches: set[int] | None = None
+        # Column mode is only switched on by enable_column_fallback(), after its self-test.
+        self.fallback_mode: Fallback = 'batch'
+        self._column_batches: set[int] = set()
         c = self.const
         const64 = [0.0] * 3
         const64[K.CONST_SUMSQ_INFLATE.value] = c.sumsq_inflate
@@ -513,7 +516,7 @@ class CertifiedHead:
         stats = HeadStats(self._count[:m], self._status[:m])
         if not fallback:
             return ids, stats
-        cols_ok = self._column_batches is None or m in self._column_batches
+        cols_ok = m in self._column_batches
         if self.fallback_mode == 'batch' or not cols_ok:
             self._when(self._any, lambda: self._merge_fallback(hidden, ids, m))
         else:
@@ -536,12 +539,18 @@ class CertifiedHead:
         """Check the stock-kernel property the column fallback relies on.
 
         For each batch size, the stock logits of gathered head rows
-        (``matmul(H, W[cols].T)`` with ``M * COLS_CAP`` columns, the fallback's
-        shape) must equal the same columns of the full stock head bit for bit.
+        (``matmul(H, W[cols].T)`` with ``M * min(capacity, COLS_CAP)`` columns,
+        exactly the fallback's shape) must equal the same columns of the full
+        stock head bit for bit.
         Returns a report; it does not change the mode.
         """
         gen = torch.Generator(device=self.weight.device).manual_seed(seed)
-        report: dict[str, Any] = {'batch_sizes': list(batch_sizes), 'failures': []}
+        slots = min(self.capacity, COLS_CAP)  # the fallback gathers m * slots rows
+        report: dict[str, Any] = {
+            'batch_sizes': list(batch_sizes),
+            'gathered_rows_per_input': slots,
+            'failures': [],
+        }
         for m in batch_sizes:
             h = (torch.randn(m, self.hidden, device=self.weight.device, generator=gen) * 3).to(
                 torch.bfloat16
@@ -549,7 +558,7 @@ class CertifiedHead:
             full = torch.matmul(h, self.weight.T)
             for _ in range(trials):
                 cols = torch.randint(
-                    0, self.vocab, (m * COLS_CAP,), device=self.weight.device, generator=gen
+                    0, self.vocab, (m * slots,), device=self.weight.device, generator=gen
                 )
                 sub = torch.matmul(h, self.weight.index_select(0, cols).T)
                 if not torch.equal(full[:, cols], sub):
@@ -566,6 +575,7 @@ class CertifiedHead:
         """
         report = self.column_invariance_self_test(batch_sizes)
         self.fallback_mode = 'columns' if report['ok'] else 'batch'
+        # Only the checked batch sizes use the column path; others keep 'batch'.
         self._column_batches = set(batch_sizes) if report['ok'] else set()
         report['mode'] = self.fallback_mode
         return report

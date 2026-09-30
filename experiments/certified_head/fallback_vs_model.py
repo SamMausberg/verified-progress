@@ -35,7 +35,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'src'))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from certified_head.bounds import bf16_round
+from certified_head.bounds import bf16_candidate_threshold, bf16_round
 from certified_head.quantize import load_head_weight
 from real_states import plain_decode_steps
 
@@ -43,8 +43,9 @@ GAMMAS = [6.1073e-4, 1.1921e-4, 3e-5, 1e-5, 3e-6, 1e-6, 0.0]
 TOP = 64
 
 
-def decided(x: np.ndarray, a: np.ndarray, gamma: float) -> np.ndarray:
-    """Rows (of top-``TOP`` tokens, sorted by index) decided under ``gamma``."""
+def decided(x: np.ndarray, a: np.ndarray, gamma: float) -> tuple[np.ndarray, np.ndarray]:
+    """Rows (of top-``TOP`` tokens, sorted by index) decided under ``gamma``, and
+    each row's winning lower BF16 value."""
     lo = bf16_round(np.nextafter((x - gamma * a).astype(np.float32), np.float32(-np.inf)))
     hi = bf16_round(np.nextafter((x + gamma * a).astype(np.float32), np.float32(np.inf)))
     best = lo.max(axis=1, keepdims=True)
@@ -52,7 +53,7 @@ def decided(x: np.ndarray, a: np.ndarray, gamma: float) -> np.ndarray:
     k = np.where(lo == best, idx, x.shape[1]).min(axis=1, keepdims=True)
     others = idx != k
     amb = others & (((idx < k) & (hi >= best)) | ((idx > k) & (hi > best)))
-    return ~amb.any(axis=1)
+    return ~amb.any(axis=1), best[:, 0]
 
 
 def main() -> None:
@@ -68,6 +69,7 @@ def main() -> None:
     w_abs = w.abs()
     steps: list[np.ndarray] = []
     ok: dict[float, list[np.ndarray]] = {g: [] for g in GAMMAS}
+    omitted: dict[float, int] = dict.fromkeys(GAMMAS, 0)
     tie_rows = 0
     rows = 0
     for h_bf16, _ in plain_decode_steps(limit_rows=args.rows):
@@ -75,11 +77,19 @@ def main() -> None:
         x = h @ w.T
         top = torch.topk(x, TOP, dim=1).indices.sort(dim=1).values
         xt = torch.gather(x, 1, top).numpy()
-        at = torch.gather(h.abs() @ w_abs.T, 1, top).numpy()
+        a_full = h.abs() @ w_abs.T
+        at = torch.gather(a_full, 1, top).numpy()
         exact16 = bf16_round(xt.astype(np.float32))
         tie_rows += int((np.sort(exact16, axis=1)[:, -1] == np.sort(exact16, axis=1)[:, -2]).sum())
         for g in GAMMAS:
-            ok[g].append(decided(xt, at, g))
+            dec, best = decided(xt, at, g)
+            ok[g].append(dec)
+            # Tokens outside the top TOP can matter only if their upper bound reaches
+            # the midpoint below the winner's lower BF16 value; count such rows.
+            upper = x + g * a_full
+            upper.scatter_(1, top, float('-inf'))
+            reach = upper.max(dim=1).values.numpy() >= bf16_candidate_threshold(best)
+            omitted[g] += int(reach.sum())
         steps.append(np.full(h.shape[0], len(steps)))
         rows += h.shape[0]
     step_id = np.concatenate(steps)
@@ -89,6 +99,11 @@ def main() -> None:
         'top_tokens_checked': TOP,
         'gammas': {},
     }
+    out['population'] = (
+        f'the first {rows} decode rows of the geometry plain-decode capture, in capture order '
+        '(all prompt splits); each row decided over its top tokens, with every other token '
+        'checked against the winning bucket'
+    )
     out['rows_whose_exact_bf16_top2_tie'] = tie_rows
     for g in GAMMAS:
         d = np.concatenate(ok[g])
@@ -97,6 +112,7 @@ def main() -> None:
             'row_fallback_rate': float((~d).mean()),
             'step_fallback_rate': float(per_step.mean()),
             'rows_undecided': int((~d).sum()),
+            'rows_where_a_token_outside_the_top_could_compete': omitted[g],
         }
         print(
             f'gamma={g:.3g}: rows undecided {(~d).mean():.4%}, engine steps with a fallback {per_step.mean():.2%}'

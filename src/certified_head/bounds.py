@@ -65,11 +65,12 @@ U_FP64 = Fraction(1, 2**53)
 """Unit roundoff of FP64 round-to-nearest."""
 
 ABS_FLOOR = 2.0**-100
-"""Absolute slack added to every FP32 envelope.
+"""Absolute slack added to every FP32 envelope and to the rescoring radius.
 
-It covers FP32 underflow of products and partial sums (at most
-``2K * 2^-149`` for ``K <= 2^20``), which the relative model above ignores. It
-is far below any logit resolution.
+It covers FP32 underflow of products and partial sums, which the relative
+model above ignores, in the worst case of flush to zero: each of at most ``2K``
+rounding nodes then errs by less than ``2^-126``, and ``2K * 2^-126 < 2^-100``
+for ``K <= 2^25``. It is far below any logit resolution.
 """
 
 Reference = Literal['bf16', 'fp32', 'real']

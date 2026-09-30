@@ -344,9 +344,14 @@ def test_column_fallback_self_test(checkpoint: tuple[Any, Any]) -> None:
     w, qh = checkpoint
     head = CertifiedHead.from_quantized(w, qh, reference='bf16', max_batch=64)
     assert head.fallback_mode == 'batch'
+    with pytest.raises(TypeError):
+        CertifiedHead.from_quantized(w, qh, max_batch=8, fallback_mode='columns')
     report = head.enable_column_fallback([1, 8, 16, 64])
     print(f'column self-test: {report}')
     assert head.fallback_mode == ('columns' if report['ok'] else 'batch')
+    assert report['gathered_rows_per_input'] == min(head.capacity, 64)
+    # Batch sizes that were not checked keep the whole-batch fallback.
+    assert 32 not in head._column_batches
 
 
 def test_lower_index_within_one_bf16_spacing_below_the_winner(head_bf16: CertifiedHead) -> None:
@@ -440,9 +445,9 @@ def test_nonfinite_hidden_uses_reference(head_bf16: CertifiedHead) -> None:
 def test_cuda_graph_capture_and_replay(checkpoint: tuple[Any, Any], mode: str) -> None:
     w, qh = checkpoint
     m = 8
-    head = CertifiedHead.from_quantized(
-        w, qh, reference='bf16', max_batch=m, capacity=8, fallback_mode=mode
-    )
+    head = CertifiedHead.from_quantized(w, qh, reference='bf16', max_batch=m, capacity=8)
+    if mode == 'columns':
+        assert head.enable_column_fallback([m])['ok']
     static_h = peaked_hidden(w, m)
     static_ids = torch.zeros(m, dtype=torch.int64, device='cuda')
     stream = torch.cuda.Stream()
