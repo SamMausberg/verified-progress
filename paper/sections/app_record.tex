@@ -32,6 +32,9 @@ Each entry below is committed in the repository at \repourl; the command that pr
 \evitem{state-structure}{\nolinkurl{evidence/state_structure/}, \code{tests/test\_state\_structure.py}}{Witnesses for the structure of the recurrent state and for cross-request sharing}
 \evitem{inherited}{\nolinkurl{evidence/decision_tests.json}, \nolinkurl{evidence/race_tests.json}}{CPU references inherited from the earlier revision (Table~\ref{tab:tests})}
 \evitem{synthetic}{\nolinkurl{data/synthetic_drift.csv}, \nolinkurl{evidence/synthetic_drift.json}}{Work counts on constructed heads (Figure~\ref{fig:synthetic})}
+\evitem{state-mech}{\nolinkurl{evidence/state_safety/mechanism_plain_c1_vs_mtp_s3_c1.json}, \nolinkurl{evidence/state_safety/mechanism_plain_c1_vs_c32.json}, \nolinkurl{evidence/state_safety/divergences.csv}}{First differing module outputs and divergence classes under both error models (Figure~\ref{fig:divergence}, Table~\ref{tab:divergence})}
+\evitem{state-noise}{\nolinkurl{evidence/state_safety/noise_floor.csv}, \nolinkurl{evidence/state_safety/noise_floor.json}}{Divergence rates, BF16 top-two ties, self-consistency and the deterministic-mode checks}
+\evitem{state-tap}{\nolinkurl{evidence/state_safety/tap_control_down9.json}, \nolinkurl{evidence/state_safety/tap_control_core13_decode.json}, \nolinkurl{evidence/state_safety/README.md}}{Positive controls of the bit-exact tap and its method}
 \evitem{ceilings}{\nolinkurl{evidence/moonshot/ceilings.json}, \nolinkurl{evidence/moonshot/ceilings.csv}}{Derived ceilings per lever stack under both execution models (Table~\ref{tab:stack-ceilings}, Figure~\ref{fig:stack-ceilings})}
 \evitem{levers}{\nolinkurl{evidence/moonshot/lever_sweeps_quick.csv}}{First served lever measurements, single runs}
 \evitem{decode-steps}{\nolinkurl{evidence/moonshot/decode_ceiling_try1.csv}}{First engine-only decode-step times by state precision}
@@ -69,8 +72,8 @@ Each entry is designed work whose result is not committed on the main branch. Th
 \devitem{kernel-micro}{kernel; PR \#45 open}{Per-$M$ times of the int8, integer and BF16 passes; stage times; the int8 pass's effective bandwidth; primitive costs; batch-union traffic}{\nolinkurl{evidence/certified_head/micro_head.json}, \nolinkurl{head_primitives.json}}
 \devitem{kernel-path}{kernel; PR \#45 open}{Complete head-path time and variance for $M=1$ to 256, certified against the stock chain, per error model}{\nolinkurl{evidence/certified_head/head_path_time.csv}}
 \devitem{kernel-seeded}{kernel; PR \#45 open}{The written slack derivation for the seeded race with its tests; token-for-token agreement with the stock seeded sampler on replayed steps; acceptance against the stock speculative sampler}{\nolinkurl{evidence/certified_head/}}
-\devitem{state-mech}{state; PR \#37 open}{Divergence rate per 1,000 tokens and mechanism class for each configuration pair, the first differing module, the rate of exact BF16 top-two ties, and whether deterministic inference makes plain decoding and MTP speculation batch-invariant}{\nolinkurl{evidence/state_safety/noise_floor.csv}, \nolinkurl{divergences.csv}, \nolinkurl{mechanism_*.json}}
-\devitem{state-targeted}{state; PR \#37 open}{Outcome of each targeted state test of Section~\ref{sec:exactness-state} (H5)}{\nolinkurl{evidence/state_safety/targeted.json}}
+\devitem{state-mech}{state}{The cache-level check (whether the caches entering the first differing module agree); the remaining configuration pairs (MTP with one, three and five steps and a tree at batch 1 and 32, prefix cache and overlap off, deterministic mode and the FP32 head in full); the five prompts whose output the tap changed}{\nolinkurl{evidence/state_safety/}}
+\devitem{state-targeted}{state}{Outcome of each targeted state test of Section~\ref{sec:exactness-state} (H5)}{\nolinkurl{evidence/state_safety/targeted.json}}
 \devitem{moonshot-repeat}{moonshot}{Repeated decode-step and served measurements up to $B=1024$ per state and weight format, and the levers that fail or regress, with mechanisms}{\nolinkurl{evidence/moonshot/}}
 \devitem{moonshot-state}{moonshot}{MTP with and without replayed verification at concurrency 128 to 1024; logit-probe KL, divergence rate and GSM8K for FP32, FP16, BF16 and FP8 state, with and without replay, including the FP16 lever's quality cost}{\nolinkurl{evidence/moonshot/lever_sweeps_hc.csv}, \nolinkurl{lever_quality.csv}}
 \devitem{moonshot-rank}{moonshot}{Rank and observability audit of captured $q$, $k$, $\alpha$, $\beta$ traces, by exact or modular rank}{\nolinkurl{evidence/moonshot/}}
@@ -126,7 +129,8 @@ Transport--self-evidence crossover and static-screen comparison & Proved & Theor
 $\delta^\ast$ median 0.85\% (int8, $\ell_2$, 64-row tiles), 0.30\% ($\ell_\infty$/$\ell_1$) & Derived & \ev{head-constants}\\
 Transport refuted on DFlash-4B for every bound family and tiling tested (H2): drift median 0.917 against a threshold median 0.0085; at most 0.59\% of the vocabulary skipped on average; sampled acceptance undecided with probability 0.92--0.96 & Finding & \ev{rho,transport,stats-dflash}\\
 The same on MTP-4B: drift median 0.95; at most 0.65\% skipped on average; undecided with probability at least 0.997 & Finding & \ev{transport-mtp}\\
-Stock divergence mechanisms; state safety (H5) & Pending & \pend{state-mech,state-targeted}\\
+Stock divergences: tie rule and head GEMM cause none; first differing module outputs per pair; classes per named error model; 3.42 divergences per 1,000 tokens (batch 1 vs 32) & Finding & \ev{state-mech,state-noise}\\
+Equal caches entering the first differing module; state safety (H5) & Pending & \pend{state-mech,state-targeted}\\
 Replay of recorded GDN updates (Proposition~\ref{prop:gdn}) & Proved & Section~\ref{sec:exactness-state}\\
 What an exact recurrent state must retain (Proposition~\ref{prop:minimal-state}); key-subspace reduction & Proved & Section~\ref{sec:stack-state-need}\\
 State-structure witnesses ($-3/25$, reachability, SiLU rank, batch rank, RMSNorm, lazy decay, BF16 rank) & Finding (CPU) & \ev{state-structure}\\
