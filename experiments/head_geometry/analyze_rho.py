@@ -58,6 +58,7 @@ def dist(v: np.ndarray) -> dict[str, float]:
     q = np.quantile(v, [0.1, 0.5, 0.9])
     return {
         'n': len(v),
+        'best': float(v.min()),
         'p10': float(q[0]),
         'median': float(q[1]),
         'p90': float(q[2]),
@@ -75,6 +76,7 @@ def main() -> None:
     ap.add_argument('--chunk', type=int, default=128)
     ap.add_argument('--seed', type=int, default=20260930)
     ap.add_argument('--device', default='cuda')
+    ap.add_argument('--csv-pairs', type=int, default=20000, help='rows in the pairs CSV')
     args = ap.parse_args()
     if args.device == 'cpu':
         torch.set_num_threads(48)
@@ -220,7 +222,12 @@ def main() -> None:
     with open(f'{stem}_pairs.csv', 'w', newline='') as f:
         wr = csv.writer(f)
         wr.writerow(['position', 'outcome', 'domain', 'context_len', 'rho', 'rho_head_centred'])
-        for i in range(len(keep)):
+        # A seeded subsample keeps the plot data under the repository's 1 MB file limit.
+        rows_out = np.arange(len(keep))
+        if len(rows_out) > args.csv_pairs:
+            rng_csv = np.random.default_rng(args.seed)
+            rows_out = np.sort(rng_csv.choice(rows_out, args.csv_pairs, replace=False))
+        for i in rows_out:
             wr.writerow(
                 [
                     int(ps.position[keep[i]]),
@@ -240,8 +247,8 @@ def main() -> None:
     with open(f'{stem}_quantiles.csv', 'w', newline='') as f:
         wr = csv.writer(f)
         wr.writerow(list(table))
-        for i in range(len(qs)):
-            wr.writerow([f'{table[k][i]:.5g}' for k in table])
+        for j in range(len(qs)):
+            wr.writerow([f'{table[k][j]:.5g}' for k in table])
     for key in ('rho', 'rho_head_centred', 'frac_rows_transport_narrower|int8_row'):
         print(key, json.dumps(result['metrics'][key]['all']))
     print(f'done in {result["elapsed_s"]:.0f}s')
