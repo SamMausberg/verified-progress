@@ -1,0 +1,414 @@
+From 4b86a010873e7aa975be9e46b029967e9eee3371 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Wed, 30 Sep 2026 19:50:04 +0000
+Subject: [PATCH] Add capture-only head-input dumps for real-head replay
+
+Behind SGLANG_HEAD_CAPTURE_DIR, LogitsProcessor stashes the exact tensor it
+passes to the LM head, and the EAGLE/NEXTN verify, DFlash verify and plain
+decode paths append one pickled record per forward step with the aligned
+draft and target head inputs (BF16 bits), draft tokens, the engine's target
+argmax and accept lengths. Requires --disable-cuda-graph and
+--disable-overlap-schedule; measurement only.
+---
+ python/sglang/srt/debug_utils/head_capture.py | 113 ++++++++++++++++++
+ python/sglang/srt/layers/logits_processor.py  |   4 +
+ python/sglang/srt/managers/tp_worker.py       |  29 +++++
+ .../srt/speculative/dflash_worker_v2.py       |  61 ++++++++++
+ .../sglang/srt/speculative/eagle_worker_v2.py |  49 ++++++++
+ 5 files changed, 256 insertions(+)
+ create mode 100644 python/sglang/srt/debug_utils/head_capture.py
+
+diff --git a/python/sglang/srt/debug_utils/head_capture.py b/python/sglang/srt/debug_utils/head_capture.py
+new file mode 100644
+index 0000000000..ee91c0bee5
+--- /dev/null
++++ b/python/sglang/srt/debug_utils/head_capture.py
+@@ -0,0 +1,113 @@
++"""Capture-only instrumentation: record the exact LM-head inputs for offline replay.
++
++Disabled unless ``SGLANG_HEAD_CAPTURE_DIR`` is set. When enabled, ``LogitsProcessor``
++stashes the tensor it passes to the head (``pruned_states``), and the speculative and
++plain decode workers append one pickled record per forward step to
++``$SGLANG_HEAD_CAPTURE_DIR/<kind>_<pid>.pkl``. Hidden vectors are stored as raw BF16
++bits (``uint16``) so that the offline analysis sees exactly the values the head read.
++
++The stash is plain Python state, so CUDA graph replay would leave it stale: run the
++server with ``--disable-cuda-graph`` and ``--disable-overlap-schedule``. The hooks
++refuse to write a record whose stashed tensor has the wrong forward mode or row count.
++
++This module is for measurement only; it adds device-to-host copies and is not meant
++for serving.
++"""
++
++from __future__ import annotations
++
++import logging
++import os
++import pickle
++import time
++from typing import Any, Dict, List, Optional
++
++import numpy as np
++import torch
++
++logger = logging.getLogger(__name__)
++
++_DIR = os.environ.get("SGLANG_HEAD_CAPTURE_DIR")
++_stash: Optional[torch.Tensor] = None
++_stash_mode: Optional[str] = None
++_files: Dict[str, Any] = {}
++_counts: Dict[str, int] = {}
++_skipped: Dict[str, int] = {}
++
++
++def enabled() -> bool:
++    return _DIR is not None
++
++
++def stash_head_input(hidden: torch.Tensor, forward_mode: Any) -> None:
++    """Called by LogitsProcessor with the exact tensor handed to the LM head."""
++    global _stash, _stash_mode
++    _stash = hidden
++    _stash_mode = getattr(forward_mode, "name", str(forward_mode))
++
++
++def take_head_input(
++    expect_mode: Optional[str], expect_rows: int
++) -> Optional[torch.Tensor]:
++    """Return and clear the stash if it matches the expected mode and row count.
++
++    ``expect_mode=None`` accepts any forward mode (the draft decode steps).
++    """
++    global _stash, _stash_mode
++    hidden, mode = _stash, _stash_mode
++    _stash, _stash_mode = None, None
++    if (
++        hidden is None
++        or (expect_mode is not None and mode != expect_mode)
++        or hidden.shape[0] != expect_rows
++    ):
++        key = str(expect_mode)
++        _skipped[key] = _skipped.get(key, 0) + 1
++        if _skipped[key] <= 5:
++            logger.warning(
++                "head_capture: stash mismatch (have %s rows=%s, want %s rows=%d)",
++                mode,
++                None if hidden is None else tuple(hidden.shape),
++                expect_mode,
++                expect_rows,
++            )
++        return None
++    return hidden
++
++
++def bf16_bits(t: torch.Tensor) -> np.ndarray:
++    """BF16 tensor -> uint16 numpy array holding the exact bit patterns."""
++    if t.dtype != torch.bfloat16:
++        raise TypeError(f"head_capture expects BF16 head inputs, got {t.dtype}")
++    return t.detach().contiguous().view(torch.int16).cpu().numpy().view(np.uint16)
++
++
++def top2(logits: torch.Tensor) -> np.ndarray:
++    """Engine logits -> [rows, 2] float32 (best, second-best) values."""
++    vals = torch.topk(logits.float(), 2, dim=-1).values
++    return vals.cpu().numpy().astype(np.float32)
++
++
++def write(kind: str, record: Dict[str, Any]) -> None:
++    """Append one record; files are flushed per record so a killed server loses none."""
++    f = _files.get(kind)
++    if f is None:
++        os.makedirs(_DIR, exist_ok=True)
++        path = os.path.join(_DIR, f"{kind}_{os.getpid()}.pkl")
++        f = open(path, "ab")
++        _files[kind] = f
++        logger.info("head_capture: writing %s records to %s", kind, path)
++    record["kind"] = kind
++    record["step"] = _counts.get(kind, 0)
++    record["wall_time"] = time.time()
++    pickle.dump(record, f, protocol=pickle.HIGHEST_PROTOCOL)
++    f.flush()
++    _counts[kind] = record["step"] + 1
++
++
++def batch_meta(reqs: List[Any], seq_lens: torch.Tensor) -> Dict[str, Any]:
++    return {
++        "rids": [str(r.rid) for r in reqs],
++        "prompt_lens": np.asarray([len(r.origin_input_ids) for r in reqs], np.int64),
++        "seq_lens": seq_lens.detach().cpu().numpy().astype(np.int64),
++    }
+diff --git a/python/sglang/srt/layers/logits_processor.py b/python/sglang/srt/layers/logits_processor.py
+index 77b47df9c9..f02d111115 100644
+--- a/python/sglang/srt/layers/logits_processor.py
++++ b/python/sglang/srt/layers/logits_processor.py
+@@ -27,6 +27,7 @@ from sglang.kernels.ops.activation.softcap import (
+     softcap_inplace_logits as fused_softcap,
+ )
+ from sglang.srt.beam_search.logits_capture import BeamLogitsCapture
++from sglang.srt.debug_utils import head_capture
+ from sglang.srt.distributed.device_communicators import triton_symm_mem_ag
+ from sglang.srt.environ import envs
+ from sglang.srt.layers import layernorm_sp
+@@ -573,6 +574,9 @@ class LogitsProcessor(nn.Module):
+             aux_hidden_states,
+             logits_metadata,
+         )
++        if head_capture.enabled():
++            # Capture-only: the exact tensor handed to the LM head below.
++            head_capture.stash_head_input(pruned_states, logits_metadata.forward_mode)
+ 
+         hidden_states_to_store = self._get_hidden_states_to_store(
+             hidden_states,
+diff --git a/python/sglang/srt/managers/tp_worker.py b/python/sglang/srt/managers/tp_worker.py
+index 6adfbe0437..8961abe94b 100644
+--- a/python/sglang/srt/managers/tp_worker.py
++++ b/python/sglang/srt/managers/tp_worker.py
+@@ -19,9 +19,11 @@ import logging
+ from abc import ABC, abstractmethod
+ from typing import TYPE_CHECKING, List, Optional, Tuple
+ 
++import numpy as np
+ import torch
+ 
+ from sglang.srt.beam_search.logits_capture import capture_pre_sample_logits
++from sglang.srt.debug_utils import head_capture
+ from sglang.srt.environ import envs
+ from sglang.srt.managers.io_struct import (
+     DestroyWeightsUpdateGroupReqInput,
+@@ -686,6 +688,12 @@ class TpModelWorker(BaseTpWorker):
+                 batch_result.next_token_ids = self.model_runner.sample(
+                     logits_output, forward_batch
+                 )
++                if (
++                    head_capture.enabled()
++                    and batch is not None
++                    and not self.enable_spec
++                ):
++                    self._head_capture_plain(batch, forward_batch, batch_result)
+             else:
+                 # For prefill-only requests, create dummy token IDs on CPU
+                 # The size should match the batch size (number of sequences), not total tokens
+@@ -717,6 +725,27 @@ class TpModelWorker(BaseTpWorker):
+                 expert_distribution_metrics=out.expert_distribution_metrics,
+             )
+ 
++    def _head_capture_plain(self, batch, forward_batch, batch_result) -> None:
++        """Capture-only: record plain-decode head inputs and the sampled tokens."""
++        mode = forward_batch.forward_mode
++        if not (mode.is_decode() or mode.is_extend()):
++            return
++        bs = len(batch.reqs)
++        hidden = head_capture.take_head_input(mode.name, bs)
++        if hidden is None:
++            return
++        logits = batch_result.logits_output.next_token_logits
++        record = head_capture.batch_meta(batch.reqs, forward_batch.seq_lens)
++        record.update(
++            forward_mode=mode.name,
++            hidden=head_capture.bf16_bits(hidden),
++            next_token_ids=batch_result.next_token_ids.detach().cpu().numpy(),
++            engine_argmax=torch.argmax(logits, dim=-1).cpu().numpy(),
++            engine_top2=head_capture.top2(logits),
++            output_lens=np.asarray([len(r.output_ids) for r in batch.reqs], np.int64),
++        )
++        head_capture.write("plain_decode", record)
++
+     def forward_batch_split_prefill(self, batch: ScheduleBatch):
+         if batch.split_index == 0:
+             forward_batch = ForwardBatch.init_new(
+diff --git a/python/sglang/srt/speculative/dflash_worker_v2.py b/python/sglang/srt/speculative/dflash_worker_v2.py
+index 75e698ee80..5e8cf2fba4 100644
+--- a/python/sglang/srt/speculative/dflash_worker_v2.py
++++ b/python/sglang/srt/speculative/dflash_worker_v2.py
+@@ -18,6 +18,7 @@ from sglang.kernels.ops.speculative.dspark.dspark_accept import (
+     accept_sampling,
+ )
+ from sglang.srt.configs.hybrid_arch import mambaish_config
++from sglang.srt.debug_utils import head_capture
+ from sglang.srt.environ import envs
+ from sglang.srt.layers.logits_processor import should_apply_lm_head_quant_method
+ from sglang.srt.layers.logprob_processor import compute_spec_logprobs
+@@ -2203,6 +2204,46 @@ class DFlashWorkerV2(BaseSpecWorker):
+                 out_tokens, commit_lens = _commit_accept(candidates, accept_len, bonus)
+         return accept_len, commit_lens, bonus, out_tokens, new_seq_lens, target_predict
+ 
++    def _head_capture_verify(
++        self,
++        *,
++        batch,
++        prefix_lens,
++        draft_hidden,
++        draft_tokens,
++        logits,
++        accept_len,
++        commit_lens,
++    ) -> None:
++        """Capture-only: one record per verify step with aligned head inputs.
++
++        draft_hidden[:, k] (k >= 1) is the head input that proposed draft_tokens[:, k];
++        target_hidden[:, j] is the verify head input whose argmax is compared with
++        draft_tokens[:, j + 1].
++        """
++        bs = len(batch.reqs)
++        block = int(self.block_size)
++        target = head_capture.take_head_input("TARGET_VERIFY", bs * block)
++        if (
++            target is None
++            or draft_hidden is None
++            or draft_hidden.shape[0] != bs * block
++        ):
++            return
++        record = head_capture.batch_meta(batch.reqs, prefix_lens)
++        record.update(
++            draft_tokens=draft_tokens.detach().cpu().numpy().copy(),
++            draft_hidden=head_capture.bf16_bits(
++                draft_hidden.view(bs, block, -1)[:, 1:, :]
++            ),
++            target_hidden=head_capture.bf16_bits(target.view(bs, block, -1)),
++            target_argmax=torch.argmax(logits, dim=-1).view(bs, block).cpu().numpy(),
++            target_top2=head_capture.top2(logits).reshape(bs, block, 2),
++            accept_lens=commit_lens.detach().cpu().numpy(),
++            num_correct_drafts=accept_len.detach().cpu().numpy(),
++        )
++        head_capture.write("dflash_verify", record)
++
+     def _validate_phase1_sampling_support(self, batch: ScheduleBatch) -> None:
+         sampling_info = batch.sampling_info
+         if sampling_info is None or sampling_info.is_all_greedy:
+@@ -2702,6 +2743,15 @@ class DFlashWorkerV2(BaseSpecWorker):
+         draft_tokens = self._draft_block_tokens_buf[:bs]
+         draft_tokens[:, 0].copy_(block_ids[:, 0])
+         draft_tokens[:, 1:].copy_(draft_next)
++        # Capture-only: the draft head input is block positions 1..block_size-1.
++        capture_draft_hidden = (
++            draft_logits_output.hidden_states
++            if head_capture.enabled()
++            and draft_logits_output is not None
++            and draft_logits_output.hidden_states is not None
++            else None
++        )
++        capture_prefix_lens = prefix_lens.clone() if head_capture.enabled() else None
+ 
+         # Must stay ahead of the target verify launch below.
+         grammar_tree = (
+@@ -2808,6 +2858,17 @@ class DFlashWorkerV2(BaseSpecWorker):
+             bs=bs,
+         )
+ 
++        if capture_prefix_lens is not None:
++            self._head_capture_verify(
++                batch=batch,
++                prefix_lens=capture_prefix_lens,
++                draft_hidden=capture_draft_hidden,
++                draft_tokens=draft_tokens,
++                logits=logits_output.next_token_logits,
++                accept_len=accept_len,
++                commit_lens=commit_lens,
++            )
++
+         if SIMULATE_ACC_LEN > 0:
+             if SIMULATE_ACC_TOKEN_MODE not in ("fixed", "real-draft-token"):
+                 raise ValueError(
+diff --git a/python/sglang/srt/speculative/eagle_worker_v2.py b/python/sglang/srt/speculative/eagle_worker_v2.py
+index 993b53f637..d935b94bd2 100644
+--- a/python/sglang/srt/speculative/eagle_worker_v2.py
++++ b/python/sglang/srt/speculative/eagle_worker_v2.py
+@@ -10,6 +10,7 @@ from sglang.kernels.ops.speculative.topk1 import (
+     draft_topk1_postprocess,
+ )
+ from sglang.srt.configs.model_config import get_dsa_mtp_topk_width
++from sglang.srt.debug_utils import head_capture
+ from sglang.srt.environ import envs
+ from sglang.srt.hardware_backend.npu.graph_runner.eagle_draft_extend_npu_graph_runner import (
+     EAGLEDraftExtendNpuGraphRunner,
+@@ -700,6 +701,9 @@ class EagleDraftWorker(EagleDraftWorkerBase):
+         )
+ 
+         maybe_detect_nan(topk_p, "draft_forward: NaN in initial topk_p from spec_info")
++        # Capture-only: head inputs of draft tokens 1..num_steps. The first came
++        # from draft extend; later ones are stashed by each draft step's head.
++        capture_hidden = [hidden_states] if head_capture.enabled() else None
+ 
+         if self.hot_token_id is not None:
+             topk_index = self.hot_token_id[topk_index]
+@@ -790,6 +794,12 @@ class EagleDraftWorker(EagleDraftWorkerBase):
+                 maybe_detect_nan(
+                     logits_output.next_token_logits, f"draft_forward step {i}"
+                 )
++                if capture_hidden is not None:
++                    capture_hidden.append(
++                        head_capture.take_head_input(
++                            None, logits_output.next_token_logits.shape[0]
++                        )
++                    )
+                 maybe_detect_inf(
+                     logits_output.next_token_logits, f"draft_forward step {i}"
+                 )
+@@ -840,6 +850,7 @@ class EagleDraftWorker(EagleDraftWorkerBase):
+             if get_spec().speculative_use_rejection_sampling
+             else None
+         )
++        self.head_capture_draft_hidden = capture_hidden
+ 
+         # Organize the results
+         if draft_tokens_topk1 is not None:
+@@ -1380,11 +1391,18 @@ class EAGLEWorkerV2(BaseSpecWorker):
+                     verify_input: EagleVerifyInput = self.draft_worker.draft(batch)
+             assert verify_input.is_verify_input()
+             batch.spec_info = verify_input
++            capture_seq_lens = (
++                batch.seq_lens.clone() if head_capture.enabled() else None
++            )
+             batch_output = self.verify(
+                 batch,
+                 pp_proxy_tensors=pp_proxy_tensors,
+                 grammar_barrier=grammar_barrier,
+             )
++            if capture_seq_lens is not None and not batch.forward_mode.is_idle():
++                self._head_capture_verify(
++                    batch, capture_seq_lens, verify_input, batch_output
++                )
+             # Publish before draft_extend so the fence is at verify-end.
+             if on_publish is not None:
+                 on_publish(batch_output.new_seq_lens)
+@@ -1449,6 +1467,37 @@ class EAGLEWorkerV2(BaseSpecWorker):
+ 
+             return batch_output
+ 
++    def _head_capture_verify(self, batch, seq_lens, verify_input, batch_output):
++        """Capture-only: one record per verify step with aligned head inputs.
++
++        Row k of draft_hidden produced draft token k+1 (draft_tokens[:, k+1]); row j
++        of target_hidden is the head input at verify position j, whose argmax is
++        compared with draft token j+1.
++        """
++        bs = len(batch.reqs)
++        width = self.speculative_num_draft_tokens
++        target = head_capture.take_head_input("TARGET_VERIFY", bs * width)
++        drafts = getattr(self.draft_worker, "head_capture_draft_hidden", None)
++        self.draft_worker.head_capture_draft_hidden = None
++        if (
++            self.topk != 1
++            or target is None
++            or not drafts
++            or any(h is None or h.shape[0] != bs for h in drafts)
++        ):
++            return
++        logits = batch_output.logits_output.next_token_logits
++        record = head_capture.batch_meta(batch.reqs, seq_lens)
++        record.update(
++            draft_tokens=verify_input.draft_token.view(bs, width).cpu().numpy(),
++            draft_hidden=head_capture.bf16_bits(torch.stack(drafts, dim=1)),
++            target_hidden=head_capture.bf16_bits(target.view(bs, width, -1)),
++            target_argmax=torch.argmax(logits, dim=-1).view(bs, width).cpu().numpy(),
++            target_top2=head_capture.top2(logits).reshape(bs, width, 2),
++            accept_lens=batch_output.accept_lens.cpu().numpy(),
++        )
++        head_capture.write("mtp_verify", record)
++
+     def _forward_prefill_batch(
+         self, batch, on_publish=None, pp_proxy_tensors=None, coordination_plan=None
+     ):
+-- 
+2.34.1
+

@@ -1,0 +1,53 @@
+From 9b25e6e123d849324d6cd3df24827232f76974b8 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Wed, 30 Sep 2026 19:00:54 +0000
+Subject: [PATCH 1/7] Untie a reduced MTP draft head for
+ --speculative-token-map on tied Qwen3.5 checkpoints
+
+Qwen3_5ForCausalLMMTP.set_embed_and_head ignored the truncated head when
+tie_word_embeddings is set, so the drafter scored the full 248,320-row
+embedding while EAGLE remapped its top-k indices through hot_token_id.
+---
+ python/sglang/srt/models/qwen3_5_mtp.py | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/python/sglang/srt/models/qwen3_5_mtp.py b/python/sglang/srt/models/qwen3_5_mtp.py
+index b90d6f728c..804e49ddcd 100644
+--- a/python/sglang/srt/models/qwen3_5_mtp.py
++++ b/python/sglang/srt/models/qwen3_5_mtp.py
+@@ -91,6 +91,17 @@ def _mtp_quant_config(quant_config):
+     return quant_config
+
+
++class _ReducedDraftHead(nn.Module):
++    """Untied draft head holding a subset of vocabulary rows (FR-Spec style).
++
++    LogitsProcessor treats any module with a plain ``weight`` as a linear head.
++    """
++
++    def __init__(self, weight: torch.Tensor):
++        super().__init__()
++        self.weight = nn.Parameter(weight.detach(), requires_grad=False)
++
++
+ class Qwen3_5ForCausalLMMTP(nn.Module):
+     # The loader reads this off the model class and hands it to the quant
+     # config, which needs it to expand fused module names (qkv_proj ->
+@@ -177,6 +188,15 @@ class Qwen3_5ForCausalLMMTP(nn.Module):
+         if head is not None and not self.config.tie_word_embeddings:
+             del self.lm_head.weight
+             self.lm_head.weight = head
++        elif (
++            head is not None
++            and head.shape[0] != self.model.embed_tokens.weight.shape[0]
++        ):
++            # A reduced draft vocabulary (--speculative-token-map) on a tied
++            # checkpoint: the drafter's topk indices are remapped through
++            # hot_token_id, so its head must be the truncated rows, not the
++            # tied full-vocabulary embedding. Untie the draft head only.
++            self.lm_head = _ReducedDraftHead(head)
+         current_platform.empty_cache()
+         current_platform.synchronize()
+
+--
+2.34.1

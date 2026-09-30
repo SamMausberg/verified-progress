@@ -26,9 +26,9 @@
     },
     {
       "key": "qwencard",
-      "bibliography_text": "Qwen. \\emph{Qwen3.5-4B model card}. Hugging Face, revision \\texttt{851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a}. \\url{https://huggingface.co/Qwen/Qwen3.5-4B}.",
+      "bibliography_text": "Qwen. \\emph{Qwen3.5-4B model card}. Hugging Face, revision \\texttt{851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a}. \\url{https://huggingface.co/Qwen/Qwen3.5-4B/tree/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a}.",
       "urls": [
-        "https://huggingface.co/Qwen/Qwen3.5-4B"
+        "https://huggingface.co/Qwen/Qwen3.5-4B/tree/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a"
       ],
       "accessed": "2026-09-30",
       "evidence_type": "primary paper, official documentation, release or source code",
@@ -37,9 +37,9 @@
     },
     {
       "key": "dflashcard",
-      "bibliography_text": "Inco AI. \\emph{Qwen3.8-27B-DFlash2 model card}. Hugging Face, revision \\texttt{015e795645c74b1a0eeef3b570031fb62e769bc5}, created 18 August 2026. \\url{https://huggingface.co/incoai/Qwen3.8-27B-DFlash2}.",
+      "bibliography_text": "Inco AI. \\emph{Qwen3.8-27B-DFlash2 model card}. Hugging Face, revision \\texttt{015e795645c74b1a0eeef3b570031fb62e769bc5}, created 18 August 2026. \\url{https://huggingface.co/incoai/Qwen3.8-27B-DFlash2/tree/015e795645c74b1a0eeef3b570031fb62e769bc5}.",
       "urls": [
-        "https://huggingface.co/incoai/Qwen3.8-27B-DFlash2"
+        "https://huggingface.co/incoai/Qwen3.8-27B-DFlash2/tree/015e795645c74b1a0eeef3b570031fb62e769bc5"
       ],
       "accessed": "2026-09-30",
       "evidence_type": "primary paper, official documentation, release or source code",
@@ -389,15 +389,15 @@
     },
     {
       "key": "dflash4bcard",
-      "bibliography_text": "z-lab. \\emph{Qwen3.5-4B-DFlash model card}. Hugging Face, revision \\texttt{9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf} (created 5 March 2026, updated 19 June 2026; mirrored at \\texttt{modal-labs/Qwen3.5-4B-DFlash}). \\url{https://huggingface.co/z-lab/Qwen3.5-4B-DFlash}.",
+      "bibliography_text": "z-lab. \\emph{Qwen3.5-4B-DFlash model card}. Hugging Face, revision \\texttt{9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf} (created 5 March 2026, updated 19 June 2026; mirrored at \\texttt{modal-labs/Qwen3.5-4B-DFlash}). \\url{https://huggingface.co/z-lab/Qwen3.5-4B-DFlash/tree/9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf}.",
       "urls": [
-        "https://huggingface.co/z-lab/Qwen3.5-4B-DFlash",
+        "https://huggingface.co/z-lab/Qwen3.5-4B-DFlash/tree/9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
         "https://huggingface.co/modal-labs/Qwen3.5-4B-DFlash"
       ],
       "accessed": "2026-09-30",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review; not yet cited in paper.tex. Hugging Face API and card read: Apache-2.0, base model Qwen/Qwen3.5-4B, DFlash (v1) drafter, SGLang launch line (block size 8 recommended at high concurrency), B200 greedy benchmarks: 3.40-4.60x over autoregressive at concurrency 1 (block 16) and 2.15-2.61x at concurrency 32 (block 8), versus MTP at best 1.96-2.31x and 1.53-1.80x. Not reproduced. Siblings z-lab/Qwen3.5-9B-DFlash and z-lab/Qwen3.5-35B-A3B-DFlash also public."
+      "audit_note": "Added 30 Sep 2026 by the lit review; not yet cited in paper.tex. Hugging Face API and card read: Apache-2.0, base model Qwen/Qwen3.5-4B, DFlash (v1) drafter, SGLang launch line (block size 8 recommended at high concurrency), B200 greedy benchmarks: 3.40-4.60x over autoregressive at concurrency 1 (block 16) and 2.15-2.61x at concurrency 32 (block 8), versus the best MTP setting per workload at 1.99-2.31x and 1.56-1.80x. Not reproduced. Siblings z-lab/Qwen3.5-9B-DFlash and z-lab/Qwen3.5-35B-A3B-DFlash also public."
     },
     {
       "key": "dspark",

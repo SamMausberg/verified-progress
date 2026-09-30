@@ -40,7 +40,7 @@ known-first-party = [
 
 [tool.mypy]
 python_version = "3.13"
-files = ["src", "tests", "scripts", "experiments"]
+files = ["src", "tests", "scripts", "experiments", "bench"]
 mypy_path = "src"
 explicit_package_bases = true
 ignore_missing_imports = true
@@ -49,12 +49,12 @@ warn_redundant_casts = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 
 [tool.codespell]
-skip = "./evidence,./paper,./sources,./.venv,*.pdf,*.csv,*.jsonl,SHA256SUMS"
+skip = "./evidence,./paper,./sources,./.venv,*.pdf,*.csv,*.jsonl"
 
-# The supplied bundle's files are byte-exact records tied to SHA256SUMS and the
+# The supplied bundle's files are byte-exact records tied to sources/bundle-v3.sha256 and the
 # evidence logs, so their existing annotation gaps are silenced here rather than
 # fixed in place. New code gets the full check.
 [[tool.mypy.overrides]]

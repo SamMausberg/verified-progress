@@ -1,0 +1,58 @@
+{
+  "status": "pass",
+  "methods": 6,
+  "witnesses": {
+    "bf16_cell": {
+      "fp32": [
+        1.0,
+        1.0009765625
+      ],
+      "bf16": 1.0
+    },
+    "reassociation_flips_greedy": {
+      "sequential_logits": [
+        1.0,
+        1.0
+      ],
+      "regrouped_logits": [
+        1.0,
+        1.0000001192092896
+      ],
+      "sequential_token": 0,
+      "regrouped_token": 1
+    },
+    "regrouped_gdn_outputs": {
+      "outputs": 1600,
+      "differ_fp32": 1481,
+      "differ_after_bf16": 2,
+      "steps": 50,
+      "dim": 32,
+      "seed": 7
+    },
+    "same_argmax_different_law": {
+      "law_1_0": [
+        "2/3",
+        "1/3"
+      ],
+      "law_2_0": [
+        "4/5",
+        "1/5"
+      ]
+    },
+    "same_law_different_seeded_tokens": {
+      "uniform": "1/4",
+      "token_order_01": 0,
+      "token_order_10": 1
+    },
+    "transition_norm_by_beta": {
+      "1/2": "1",
+      "2": "1",
+      "5/2": "3/2"
+    }
+  },
+  "seconds": 0.033,
+  "repo_commit": "29c85d7fafbc8eae0a10b39851731e293ba6cbf0",
+  "numpy": "2.3.5",
+  "python": "3.13.15",
+  "scope": "exact and float32 witnesses separating the contracts; not model measurements"
+}

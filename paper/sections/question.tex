@@ -1,0 +1,96 @@
+% Section 1: the question, the setting, hypotheses and contributions (paper).
+% Claims and status:
+%  - Head, weight, state byte counts: derived from the checkpoint (safetensors headers) and config
+%    at Qwen/Qwen3.5-4B@851bf6e; formulas in the text.
+%  - Hypotheses H1-H7, P1-P3: status in Table tab:hypotheses.
+\section{The question}\label{sec:question}
+Before choosing a faster implementation of an operation, it is worth asking which facts its consumer needs, and whether some of those facts are already implied by work done earlier. In speculative decoding the gap between what is computed and what is needed is concrete. At every verified position the target model projects its hidden state through the output head and produces a score for each of 248,320 tokens. A greedy verifier then asks for one winner. A sampled verifier asks whether a uniform draw falls below a ratio of probabilities, which is a single inequality. A tensor that is convenient to produce is not necessarily the right interface.
+
+This paper asks what work a verifier actually needs, and tests two ways of supplying the missing facts more cheaply than a full projection. The first, which earlier revisions of this manuscript proposed and developed, reuses work the drafter has already paid for. A drafter that projects its own hidden state through the same head can summarize each vocabulary tile (its maximum score and its probability mass). When the target's hidden state arrives, a Hölder bound transports those summaries to the target, and the verifier projects only the tiles whose bounds leave the decision open. We call this \emph{transport}. The second source produces its own evidence: evaluate the head at low precision, attach a rigorous envelope to every row, and re-score in full precision only the rows whose interval can still change the decision. We call this \emph{self-evidence}. Both keep an exact fallback, so neither changes the decision it certifies; they differ in what the evidence costs and in how tight it is.
+
+The two mechanisms fail for different reasons. Transport's error term for a row is the product of the row's deviation from its tile centre and the change between draft and target hidden states. On a trained head both factors can be of the same order as the logits themselves, in which case the transported bound certifies nothing. Self-evidence pays for a full low-precision pass over the head, and its error term is the quantization residual times the hidden-state norm; the difficulty there is to make the envelope cover the floating-point arithmetic the engine actually performs, not an idealized dot product. Which failure dominates is an empirical question about a particular head and a particular engine, and answering it is the core of this revision.
+
+The earlier revision was a research design with executable CPU references and no GPU evidence. This one tests the design in a real engine and reorganizes the paper around what the evidence shows. It keeps the mathematics that survives review, corrects what did not, and adds the theory needed to state exactness against a real kernel rather than against real arithmetic. It also widens the scope to the rest of the serving stack: when the head is only one term of the cost, a paper about avoided work has to say what the other terms are and what can be done about them.
+
+\subsection{The setting}\label{sec:setting}
+The target is Qwen3.5-4B at revision \modelpin~\cite{qwenconfig,qwencard}. Its configuration gives hidden width 2,560, a vocabulary of 248,320, and 32 decoder layers, of which 24 use Gated DeltaNet (GDN) linear attention~\cite{gdn} and 8 use full attention (every fourth layer). It has one native multi-token-prediction (MTP) layer, and the output head is tied to the input embedding. The checkpoint is multimodal; its vision tower is loaded by the engine but unused in every experiment here, which are text-only.
+
+Table~\ref{tab:bytes} gives the byte counts that frame the rest of the paper. They are derived from the checkpoint's tensor sizes and the configuration, not measured. A plain decode step streams every decoder weight once plus the whole head; the embedding lookup reads only one row per request. The head is therefore 15.1\% of the weight bytes of a plain step. An MTP draft step runs one small layer followed by the same head, so there the head is 84.1\% of the weight bytes. The recurrent state is per request: the configuration stores it in FP32 (\code{mamba\_ssm\_dtype}), so each request holds $24\times32\times128\times128\times4$ bytes $=50.3$~MB of GDN state, and a decode kernel that reads and writes it once per step moves 100.7~MB per request per step. That equals the weight bytes of a step at a batch of 84 requests. Section~\ref{sec:time} replaces these calculations with measurements.
+
+\begin{table}[tbp]
+\small\centering
+\begin{tabularx}{\linewidth}{@{}P{5.2cm}rY@{}}\toprule
+Component & Bytes & Derivation\\\midrule
+Tied head (and input embedding) & 1.271 GB & $248{,}320\times2{,}560\times2$ (BF16)\\
+Decoder weights other than the embedding & 7.140 GB & sum of tensor sizes in the checkpoint\\
+Weights streamed per plain decode step & 8.411 GB & decoder weights plus the head; head share 15.1\%\\
+MTP layer & 0.241 GB & sum of tensor sizes; a draft step streams it plus the head (84.1\% head)\\
+Final decoder layer's MLP & 0.142 GB & $3\times2{,}560\times9{,}216\times2$\\
+Vision tower (loaded, unused) & 0.667 GB & sum of tensor sizes\\
+GDN recurrent state per request & 50.3 MB & $24\times32\times128\times128\times4$ (FP32)\\
+Attention KV per context token & 32 KiB & $8\times4\times256\times2\times2$ (BF16 K and V)\\\bottomrule
+\end{tabularx}
+\caption{Byte counts for Qwen3.5-4B at revision \modelpin, derived from the checkpoint's safetensors headers and \code{config.json}. They are calculations, not measurements; Section~\ref{sec:time} reports what the kernels actually move.}
+\label{tab:bytes}
+\end{table}
+
+The engine is SGLang at commit \sourcepin~\cite{sglangpaper}, with CUDA graphs and the overlap scheduler on, the FlashInfer attention backend~\cite{flashinfer} (FlashAttention~3 is not available on this aarch64 host), and the model revision pinned. The machine is one NVIDIA GH200 with 96~GB of HBM3 (compute capability 9.0) and a 64-core Grace CPU. Two drafters are in scope. The native MTP layer is served through SGLang's \code{NEXTN} path, which the engine reports as EAGLE~\cite{eagle}. The public DFlash block drafter for this exact target, \code{z-lab/Qwen3.5-4B-DFlash}~\cite{dflashpaper,dflash4bcard}, has six layers, drafts blocks of up to 16 tokens conditioned on eight of the target's intermediate hidden states, and has no head of its own: its drafts are projected through the target's tied head. It is therefore both the strongest public speculative baseline for this model and a direct test bed for transport. The public DFlash~2 pair for Qwen3.8-27B~\cite{dflash,dflashcard} is a transfer lane; no DFlash~2 checkpoint for the 4B model is public.
+
+\subsection{Hypotheses and their status}\label{sec:hypotheses}
+Table~\ref{tab:hypotheses} lists the questions the work must answer, what would decide each, and where the evidence stands. The status column is updated as results are committed; a hypothesis that fails stays in the table with the reason.
+
+\begin{table}[tbp]
+\small\centering
+\begin{tabularx}{\linewidth}{@{}P{.6cm}YP{3.7cm}P{3.1cm}@{}}\toprule
+& Hypothesis & Deciding evidence & Status\\\midrule
+H1 & The head is a large share of decode and MTP-speculation time for this model on GH200. & nsys attribution at several batch sizes (Section~\ref{sec:time}). & Byte shares derived (Table~\ref{tab:bytes}); measured shares \pending{profile, PR~\#13}\\
+H2 & Transport gives useful certificates on real hidden states. & Aligned MTP and DFlash replay: bound widths against logit margins (Section~\ref{sec:transport}). & Crossover derived from weights; measured drift \pending{geometry}\\
+H3 & A low-precision head with a rigorous envelope certifies the stock decision while reading fewer weight bytes. & Replay candidate sets, then a GPU kernel against the stock head chain (Section~\ref{sec:selfevidence}). & Envelope and contract proved; plain-decode candidate sets measured (Section~\ref{sec:geometry-selfevidence}); runtime \pending{kernel}\\
+H4 & The certificate improves the served latency--throughput frontier without changing outputs. & Before/after Pareto sweeps with output-equality checks (Section~\ref{sec:serving}). & \pending{bench, integration}\\
+H5 & SGLang's hybrid state stays correct under speculative verification. & Differential tests against plain decoding at every rejection position, aborts and prefix reuse (Section~\ref{sec:exactness-state}). & \pending{state}\\
+H6 & Other layers of the stack leave measurable headroom. & Profiles and controlled ablations (Sections~\ref{sec:time}, \ref{sec:stack}). & \pending{profile, moonshot}\\
+H7 & Reformulations and declared approximations multiply gains well beyond tuning. & Bytes per step, quality--speed curves, end-to-end sweeps (Section~\ref{sec:stack}). & Ceilings derived; measurements \pending{moonshot}\\
+P1 & A certificate on the decision can skip the final layer's MLP and the head in target-only decoding. & Oracle-radius replay at the cut, then real bounds (Section~\ref{sec:tail}). & Rejected by its kill test (Section~\ref{sec:tail})\\
+P2 & Long-window exact repair from a DFlash window beats optimized DFlash substantially. & Perfect-continuation oracle, then real proposals (Section~\ref{sec:repair}). & Hypothesis \pending{repair}\\
+P3 & Target-anchored residual repair is much cheaper than recomputation. & Oracle and real-correction kill tests (Section~\ref{sec:repair}). & Hypothesis \pending{repair}\\
+P4 & Writing the recurrent state less often, bit-exactly, gives at least $1.10\times$ decode at batch 128. & Bit-exactness check, then paired timing (Section~\ref{sec:stack}). & Hypothesis \pending{moonshot}\\
+P5 & Exact computation can be shared across unrelated requests. & Analysis and exact witnesses; measured ceiling of the one structural candidate (Section~\ref{sec:stack}). & Rejected in analysis; ceiling \pending{profile}\\\bottomrule
+\end{tabularx}
+\caption{Questions and the evidence that decides them. H1--H7 are the working hypotheses of the programme; P1--P5 are later proposals with designed kill tests or pre-registered criteria.}
+\label{tab:hypotheses}
+\end{table}
+
+\subsection{Contributions}\label{sec:contributions}
+The contributions of this revision, at the strength the evidence currently supports, are these.
+\begin{enumerate}
+\item \emph{An exactness contract for a certified head in a real engine} (Section~\ref{sec:semantics}). The reference is the stock head kernel's decision for the same hidden state at the same batch shape, not a higher-precision recomputation. A gap condition (Theorem~\ref{thm:stock}) states when a certified token must equal the stock token; every other row runs the stock kernel. The section also names five contracts (identical state, greedy outputs, seeded samples, sampling law and empirical quality) against an executable reference, states a general commit rule for decisions from partial information, and classifies skipped work as dead, deferred or soundly enclosed. These are proved results; the stock kernel's error model on which the gap condition rests is an assumption that is tested, not proved.
+\item \emph{A comparison of the two evidence sources} (Section~\ref{sec:transport}). Each envelope is the best its metadata allows (Proposition~\ref{prop:suprema}). Transport's envelope is narrower than an int8 self-evidence envelope for row $i$ only if the drift ratio $\rho=\norm{h^t-h^d}_2/\norm{h^t}_2$ is below $\norm{e_i}_2/r_c(i)$ (Theorem~\ref{thm:crossover}). With 64-row tiles of contiguous token indices and the tile mean as centre, that threshold has a median of 0.85\% over the rows of this head (weights only; a comparison of envelope widths, not of certification rates or runtime; \nolinkurl{evidence/precision/head_constants.json}). The measured drift of real draft states is \pending{geometry}.
+\item \emph{A floating-point envelope and the certified decisions built on it} (Sections~\ref{sec:selfevidence} and~\ref{sec:decisions}). The envelope covers Hopper tensor-core accumulation under the published model of Khattak and Mikaitis~\cite{khattak2026}, or needs no accumulation model when the pass is an integer product. One refinement procedure gives exact greedy selection and exact Gumbel-max sampling under a counter-keyed noise field, with a bound on the expected number of re-scored rows. Fixed-noise verification~\cite{daliri2025}, with the stock seeded sampler's noise field, turns sampled verification into a certified argmax with no partition function; it is the sampling contract adopted for the certified speculative path (design decided, measurement pending). Acceptance guards with enclosed numerators, residual races, a characterization of how much of an exact sample can be emitted before the scores are known, and KL and total-variation bounds for an approximate mode complete the set. Several of these rest on known principles (Gumbel-max, A* Sampling~\cite{astar}, maximal coupling); Section~\ref{sec:prior} says which parts are new. On 6,005 captured plain-decode states an int8 head certifies the real-arithmetic winner with 1.3--1.6 candidate rows per decision on average, and the interval form of the stock contract leaves 0.35\% of rows (2.8\% of the capture run's batches of up to 16 requests) to the stock kernel if the stock kernel follows the Khattak--Mikaitis model of Hopper accumulation, an assumption, and 1.40\% of rows (10.9\% of those batches) under a more conservative model, against 2--3\% of rows for the plain gap condition (Section~\ref{sec:geometry-selfevidence}).
+\item \emph{Measurements on every axis of the serving stack} (Sections~\ref{sec:time} and~\ref{sec:drafting}--\ref{sec:serving}): attribution and bytes per step, drafting, the certified head's runtime, repair, recurrent state, and two latency--throughput frontiers, one exact and one lossy under a stated quality budget. These are \pending{} in this revision.
+\end{enumerate}
+The greedy form of the certified low-precision head is not new: several public implementations screen a low-precision copy of an LM head with a bound and re-score the survivors exactly (Section~\ref{sec:prior-certified}). Nor is using bounds to obtain an exact Gumbel-max sample~\cite{astar,mussmann2017}. What we claim is narrower, and Section~\ref{sec:prior-novelty} states it.
+
+\begin{figure}[tbp]
+\centering
+\begin{tikzpicture}[node distance=.7cm]
+\node[box,text width=2.5cm] (draft) {Drafter\\hidden $h^{d}$};
+\node[good,text width=3.0cm,right=of draft] (dh) {Draft head pass\\tile maxima, masses};
+\node[box,text width=2.6cm,right=of dh] (target) {Target backbone\\hidden $h^{t}$};
+\node[good,text width=3.0cm,below=1.0cm of dh] (trans) {\emph{Transport}\\$z^d+\langle\mu_c,\Delta\rangle\pm r_c\norm{\Delta}$};
+\node[good,text width=3.0cm,below=1.0cm of target] (self) {\emph{Self-evidence}\\low-precision pass\\$\tilde z_i\pm\beta_i$};
+\node[box,text width=3.2cm,below=1.0cm of trans,xshift=1.9cm] (dec) {Decision on intervals\\argmax, race, guard};
+\node[good,text width=2.6cm,right=1.1cm of dec] (commit) {Certified token};
+\node[warn,text width=3.0cm,left=1.1cm of dec] (fallback) {Stock head kernel at\\the same batch shape};
+\draw[flow] (draft)--(dh);\draw[flow] (dh)--(target);
+\draw[dashedflow] (dh)--(trans);\draw[flow] (target.south west)--(trans.north east);
+\draw[flow] (target)--(self);
+\draw[flow] (trans)--(dec);\draw[flow] (self)--(dec);
+\draw[flow] (dec)--node[above,label]{decided}(commit);
+\draw[flow] (dec)--node[above,label]{open}(fallback);
+\end{tikzpicture}
+\caption{Two sources of evidence for the same decision. Transport reuses the drafter's head pass and bounds only the change $\Delta=h^t-h^d$; self-evidence pays for a cheap pass over the head at the target state. Either way the decision is taken on intervals, rows or tiles are refined while it stays open, and a row that cannot be certified runs the stock head kernel. The target backbone always runs; the saving, if any, is in the head.}
+\label{fig:flow}
+\end{figure}
+
+\subsection{Reading guide}
+Section~\ref{sec:prior} places the work against prior art. Section~\ref{sec:semantics} fixes what ``exact'' means in this engine. Section~\ref{sec:time} measures where the time goes. Sections~\ref{sec:transport}--\ref{sec:decisions} develop and test the two evidence sources and the decisions built on them. Sections~\ref{sec:drafting}--\ref{sec:stack} cover drafting, repair and the rest of the stack, and Section~\ref{sec:serving} reports the served frontiers. Section~\ref{sec:limits} collects what did not work and the limits of what did. The appendices hold the engine integration notes, the CPU evidence inherited from the earlier revision, mechanisms not yet tested, reproduction commands, the claim ledger and the attribution statement.
