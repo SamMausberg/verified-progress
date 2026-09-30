@@ -1,6 +1,6 @@
-From 416f97a119fd5dd19d65d2c529bc84c9810971d6 Mon Sep 17 00:00:00 2001
-From: Samuel Mausberg <sam@findtensor.com>
-Date: Wed, 30 Sep 2026 18:48:52 +0000
+From 4b86a010873e7aa975be9e46b029967e9eee3371 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Wed, 30 Sep 2026 19:50:04 +0000
 Subject: [PATCH] Add capture-only head-input dumps for real-head replay
 
 Behind SGLANG_HEAD_CAPTURE_DIR, LogitsProcessor stashes the exact tensor it

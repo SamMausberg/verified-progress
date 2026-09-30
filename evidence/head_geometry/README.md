@@ -5,12 +5,18 @@ per-row arrays stay in `~/vp-data/geometry/` (outside git); every file here was 
 by the command listed with it.
 
 Common setup: one GH200 (sm_90), SGLang `bd66ce343e` plus the capture patch
-`engine/sglang/patches/0001-head-capture-replay-dumps.patch` (SGLang commit `416f97a119`
+`engine/sglang/patches/0001-head-capture-replay-dumps.patch` (SGLang commit `4b86a01087`, same content as the `416f97a119` that ran the plain-decode capture,
 on branch `engine/geometry`), Qwen3.5-4B @ `851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a`,
 320 public prompts (`prompt_manifest.csv`, split by prompt into analysis and held-out
-halves before any fitting), greedy decoding, 384 new tokens. All logits in the analyses
-are FP64 values of the stored BF16 operands; "exact" below means that real-arithmetic
-value (contract C1 in the theory notes), not the stock kernel's BF16 output.
+halves before any fitting), greedy decoding, 384 new tokens. The capture servers ran
+with `--disable-cuda-graph --disable-overlap-schedule` (the capture hooks run in Python
+between forwards), `--mem-fraction-static 0.25` and the FlashInfer attention backend; the
+plain-decode arm used `--max-running-requests 16`, the MTP arm `--max-running-requests 8`
+with `--max-mamba-cache-size 24` (full flags per arm in `experiments/head_geometry/run_capture.sh`
+and each run's `run_info.txt`). All logits in the analyses are FP64 values of the stored
+BF16 operands. "Exact" below means that real-arithmetic value, the R-real reference of
+`src/precision_reference.py` and `evidence/precision/README.md`, not the stock kernel's
+BF16 output (R-stock).
 
 ## Files
 
@@ -33,9 +39,10 @@ positions the FP64 argmax equals the engine's token at 99.51%. All 519 disagreem
 within one BF16 spacing of the FP64 winner (largest FP64 gap 0.118 logits; the spacing is
 0.125 for logits in [16, 32)). Rounding the exact logits to BF16 and taking the first
 maximal index, as the stock head does, reproduces the engine at 99.998%; the remaining two
-positions differ by cuBLAS accumulation at a rounding boundary. The engine's own top two
+positions are consistent with cuBLAS's FP32 accumulation landing on the other side of a
+BF16 rounding boundary (not verified at the capture shape). The engine's own top two
 logits were equal in BF16 at 1.0% of positions, where the stock decision is set by the tie
-rule. So C1 and the stock decision differ on about 0.5% of greedy positions.
+rule. So R-real and the stock decision (R-stock) differ on about 0.5% of greedy positions.
 
 ## H3: self-evidence on plain decode
 
@@ -63,8 +70,8 @@ mean row change the mean candidate count by at most 7% for 1-12% more bytes. Pos
 has no dominant dimensions (the top 8 hold 4.0% of the energy). Centring makes things
 worse: the mean row points along the bulk of rows (median cosine 0.39) but not along the
 rows that compete for the argmax (median cosine -0.11 over each position's top 8), so it
-lowers the median ||e_i|| over all rows by 14% and raises it by 20% on those rows. Over real decode batches of 7-10 rows the int8 g128 candidates cover
-9.5-12.5 distinct rows. Rescoring candidates with IEEE FP32 accumulation leaves no
+lowers the median ||e_i|| over all rows by 14% and raises it by 20% on those rows. Over the capture run's own decode batches (up to 16 running requests; 7-10 held-out rows
+per step on average) the int8 g128 candidates cover 9.5-12.5 distinct rows. Rescoring candidates with IEEE FP32 accumulation leaves no
 position undecided; with the tensor-core error model for the rescoring, 2.1% still overlap.
 The int4 g32 plus int4-residual cascade reads 0.32 of BF16 bytes at batch 1 and 0.41-0.42
 over real batches of 5-16 rows.

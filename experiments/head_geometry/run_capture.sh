@@ -48,12 +48,14 @@ case "$arm" in
     args=(--mem-fraction-static 0.25 --max-running-requests 16)
     ;;
   dflash4b)
-    # Block size 8 (7 drafts per verify) as in the drafter's model card.
+    # Block size 16 (15 drafts per verify) and FlashInfer linear-attention backends, the
+    # configuration the drafter workstream validated on this machine.
     model=("${qwen4b[@]}")
     args=(--mem-fraction-static 0.25 --max-running-requests 8 --speculative-algorithm DFLASH
       --speculative-draft-model-path "${dflash4[0]}"
       --speculative-draft-model-revision "${dflash4[1]}"
-      --speculative-dflash-block-size 8 --speculative-draft-attention-backend flashinfer)
+      --speculative-dflash-block-size 16 --linear-attn-prefill-backend flashinfer
+      --linear-attn-decode-backend flashinfer)
     NEED_FREE_MIB="${NEED_FREE_MIB:-70000}"
     ;;
   dflash27b)

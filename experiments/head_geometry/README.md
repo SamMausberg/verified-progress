@@ -15,8 +15,8 @@ Results and their interpretation are in `evidence/head_geometry/README.md`.
 ## The transport-versus-int8 threshold
 
 The comparison between the two mechanisms is stated per vocabulary row, in the l2
-(Cauchy-Schwarz) family, as in the theory notes and `evidence/precision/head_constants.json`
-(PR #7):
+(Cauchy-Schwarz) family, as in `evidence/precision/head_constants.json` and
+`experiments/precision_head_constants/head_constants.py`:
 
 - `rho = ||h_t - h_d||_2 / ||h_t||_2`, where `h_d` and `h_t` are the exact LM-head inputs
   (after the final norm) behind the same verified draft token.
@@ -114,7 +114,12 @@ template with thinking enabled for one third of the prompts (assigned by seed).
 |---|---|---|---|
 | `plain4b` | Qwen3.5-4B @851bf6e8 | none | 16 |
 | `mtp4b` | Qwen3.5-4B @851bf6e8 | NEXTN, 4 steps, topk 1, 5 draft tokens | 8 (24 GDN state slots) |
+| `dflash4b` | Qwen3.5-4B @851bf6e8 | z-lab/Qwen3.5-4B-DFlash @9a1996cc, block 16 | 8 |
 | `dflash27b` | Qwen3.8-27B @1d4bf0f2 | DFlash2 @015e7956, block 8 | 16 |
 
-Four draft steps are one more than the untuned bench default (3); positions 1-3 are
-computed identically, and position 4 adds a deeper, lower-acceptance slot.
+Four draft steps are one more than the bench and profile MTP arms (3 steps, 4 draft
+tokens). The extra step does not change positions 1-3: the MTP draft chain for a step
+depends only on earlier steps, and the target verify pass is causal, so its head inputs at
+verify positions 0-2 are the same computation with one more token appended (up to
+kernel-shape numerics). Position 4 adds a deeper, lower-acceptance slot; every result is
+reported per position, so the 3-step configuration is the subset of positions 1-3.
