@@ -90,6 +90,7 @@
 \renewcommand{\topfraction}{.88}\renewcommand{\bottomfraction}{.6}\renewcommand{\textfraction}{.1}\renewcommand{\floatpagefraction}{.75}
 \setcounter{tocdepth}{1}
 \begin{document}
+\pagenumbering{roman}
 \begin{titlepage}
 \vspace*{0in}
 \noindent{\small\sffamily\color{teal}SYSTEMS RESEARCH\quad /\quad WORK IN PROGRESS\quad /\quad REVISION 4}\par
@@ -113,7 +114,7 @@ The measurements that decide the hypotheses (the drift of real draft states, can
 \small\textbf{How to read the evidence in this revision.} A \emph{finding} is a theorem proved in the text or a result whose evidence is committed on the repository's \code{main} branch. \emph{Derived} numbers are calculations from the pinned checkpoint, configuration or source code; the formula and inputs are given where they are used. A number followed by {\color{muted}\textsf{\scriptsize[under review, PR \#N]}} rests on evidence in an open pull request. {\color{ochre}\textsf{\small[pending: \dots]}} marks an experiment that has been designed but whose result is not yet committed, with the evidence path it will produce. Hypotheses are labelled as such. Table~\ref{tab:hypotheses} gives the status of each question; Appendix~\ref{app:ledger} lists every claim with its evidence path.
 \end{researchbox}
 \end{titlepage}
-\setcounter{page}{1}
+\pagenumbering{arabic}
 \tableofcontents
 \newpage
 
