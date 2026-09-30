@@ -32,6 +32,7 @@ ignore = ["E501"]
 [tool.ruff.lint.isort]
 known-first-party = [
   "decision_reference",
+  "precision_reference",
   "race_reference",
   "v1_reference",
   "v2_reference",
