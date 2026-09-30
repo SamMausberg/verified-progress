@@ -1,0 +1,54 @@
+# Tool configuration only; install with `pip install -r requirements-dev.txt`.
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+extend-exclude = ["evidence", "paper", "sources"]
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle errors
+  "W",   # pycodestyle warnings
+  "F",   # pyflakes
+  "I",   # isort
+  "B",   # flake8-bugbear
+  "UP",  # pyupgrade
+  "SIM", # flake8-simplify
+  "RUF", # ruff-specific
+]
+# The formatter owns line length.
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests and scripts put src/ on sys.path before importing it, and the tests
+# and experiment pull in a whole reference module with `import *`.
+"tests/*" = ["E402", "F403", "F405"]
+"scripts/*" = ["E402"]
+"experiments/*" = ["E402", "F403", "F405"]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+  "decision_reference",
+  "race_reference",
+  "v1_reference",
+  "v2_reference",
+]
+
+[tool.mypy]
+python_version = "3.13"
+files = ["src", "tests", "scripts", "experiments"]
+mypy_path = "src"
+explicit_package_bases = true
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.codespell]
+skip = "./evidence,./paper,./sources,./.venv,*.pdf,*.csv,*.jsonl,SHA256SUMS"

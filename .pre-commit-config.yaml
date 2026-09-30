@@ -1,0 +1,59 @@
+# Install once with `pre-commit install`; run everything with `pre-commit run --all-files`.
+# Generated evidence, the paper and the checksum list are byte-exact records of
+# the supplied bundle, so the auto-fixing hooks leave them alone.
+exclude: ^(evidence/|data/|sources/|paper/|SHA256SUMS$)
+
+repos:
+  - repo: local
+    hooks:
+      - id: forbid-private-files
+        name: forbid private files (take-home PDF, writing.md)
+        entry: these files are private and must never be committed
+        language: fail
+        files: ^(Sam's Inco Take Home Challenge\.pdf|writing\.md)$
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-ast
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: detect-private-key
+      - id: debug-statements
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.9
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.3.1
+    hooks:
+      - id: mypy
+        pass_filenames: false
+        additional_dependencies: [numpy==2.3.5]
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.3
+    hooks:
+      - id: codespell
+        additional_dependencies: [tomli]
+
+  # The shellcheck-py repo hook builds from source and fails on aarch64;
+  # installing its PyPI wheel works on both architectures.
+  - repo: local
+    hooks:
+      - id: shellcheck
+        name: shellcheck
+        entry: shellcheck
+        language: python
+        additional_dependencies: [shellcheck-py==0.11.0.1]
+        types: [shell]
