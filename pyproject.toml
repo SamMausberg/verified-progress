@@ -40,7 +40,7 @@ known-first-party = [
 
 [tool.mypy]
 python_version = "3.13"
-files = ["src", "tests", "scripts", "experiments"]
+files = ["src", "tests", "scripts", "experiments", "bench"]
 mypy_path = "src"
 explicit_package_bases = true
 ignore_missing_imports = true
@@ -49,7 +49,7 @@ warn_redundant_casts = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 
 [tool.codespell]
 skip = "./evidence,./paper,./sources,./.venv,*.pdf,*.csv,*.jsonl,SHA256SUMS"
