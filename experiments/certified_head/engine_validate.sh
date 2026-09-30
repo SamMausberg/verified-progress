@@ -23,6 +23,8 @@
 #   mtp_c1, mtp_c1_stock MTP certified and stock, one request at a time
 #   dflash_check         DFlash (block 16), greedy verify, check mode
 #   dflash_c1, dflash_c1_stock  DFlash certified and stock, one request at a time
+#   mtp_draft_check      MTP draft top-1 (draft steps and draft extend), check mode
+#   dflash_draft_check   DFlash greedy draft projection, check mode
 #
 # Environment: PORT (default 30040), LIMIT (prompts, default 64), MAX_NEW_TOKENS
 # (default 256), NEED_FREE_MIB (default 40000).
@@ -97,6 +99,7 @@ run_arm() {
     plain_c1) flags=(DECODE=1) conc=1 ;;
     plain_c1_stock | mtp_c1_stock | dflash_c1_stock) conc=1 ;;
     mtp_check | dflash_check) flags=(VERIFY=1 CHECK=1) ;;
+    mtp_draft_check | dflash_draft_check) flags=(DRAFT=1 CHECK=1) ;;
     mtp_c1 | dflash_c1) flags=(VERIFY=1) conc=1 ;;
     *) echo "unknown arm $arm" >&2; return 64 ;;
   esac

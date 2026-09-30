@@ -1,0 +1,499 @@
+From c874a3c6d2789f24cb6def3f19806328494084c8 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Wed, 30 Sep 2026 22:29:29 +0000
+Subject: [PATCH] Certified LM head: MTP draft top-1 and DFlash greedy draft
+ projection
+
+Behind SGLANG_CERTIFIED_HEAD_DRAFT (off by default):
+
+- MTP draft steps inside the EAGLE draft CUDA graph: the draft model's
+  logits processor captures the certified head under a device flag and the
+  stock head under its negation, and draft_topk1 replaces
+  draft_topk1_postprocess with two conditional nodes, the stock top-1 under
+  the negated flag and, under the flag, the certified ids with the same side
+  effects (positions advanced, draft token column written).
+- MTP draft extend (the first draft token of a round): the certified ids
+  are attached to the replay's output and replace the argmax outside the
+  graph.
+- DFlash's _DflashDraftSampler (tp=1, no vocabulary offset): the in-graph
+  projection writes its output from the certified head or from the stock
+  matmul and argmax.
+
+Top-1 drafting is greedy whatever the requests' sampling parameters, so the
+MTP gates are set for every batch unless rejection sampling samples draft
+proposals. Each call checks that the draft reads the target's head tensor,
+so the fallback reads the bytes the stock drafter reads. Check mode covers
+the draft paths as well.
+---
+ python/sglang/srt/environ.py                  |   3 +
+ python/sglang/srt/layers/certified_head.py    | 225 +++++++++++++++---
+ python/sglang/srt/layers/logits_processor.py  |   1 +
+ .../srt/speculative/dflash_worker_v2.py       |  19 +-
+ .../sglang/srt/speculative/eagle_worker_v2.py |  41 +++-
+ 5 files changed, 240 insertions(+), 49 deletions(-)
+
+diff --git a/python/sglang/srt/environ.py b/python/sglang/srt/environ.py
+index 9f4be1c4f5..2c6f1e4fdd 100644
+--- a/python/sglang/srt/environ.py
++++ b/python/sglang/srt/environ.py
+@@ -1809,6 +1809,9 @@ class Envs:
+     SGLANG_CERTIFIED_HEAD_DECODE = EnvBool(False)
+     # Greedy target verify (EAGLE/MTP and DFlash) through the certified head.
+     SGLANG_CERTIFIED_HEAD_VERIFY = EnvBool(False)
++    # MTP draft top-1 (draft steps and draft extend) and DFlash's greedy draft
++    # projection through the certified head.
++    SGLANG_CERTIFIED_HEAD_DRAFT = EnvBool(False)
+     # Undecided rows: "batch" reruns the stock head on the whole batch;
+     # "columns" (only for shapes whose start-up self-test passes) gathers them.
+     SGLANG_CERTIFIED_HEAD_FALLBACK = EnvStr("batch")
+diff --git a/python/sglang/srt/layers/certified_head.py b/python/sglang/srt/layers/certified_head.py
+index 90e7bc49ae..940abe57b9 100644
+--- a/python/sglang/srt/layers/certified_head.py
++++ b/python/sglang/srt/layers/certified_head.py
+@@ -24,7 +24,7 @@ import logging
+ import math
+ import sys
+ from pathlib import Path
+-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Set
++from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Set, Tuple
+
+ import torch
+
+@@ -39,6 +39,7 @@ logger = logging.getLogger(__name__)
+ PATH_FLAGS = {
+     "decode": envs.SGLANG_CERTIFIED_HEAD_DECODE,
+     "verify": envs.SGLANG_CERTIFIED_HEAD_VERIFY,
++    "draft": envs.SGLANG_CERTIFIED_HEAD_DRAFT,
+ }
+
+
+@@ -63,6 +64,8 @@ class _PathState:
+ _heads: Any = None  # certified_head.engine.EngineHeads
+ _state: Dict[str, _PathState] = {}
+ _dump_calls = 0
++# The last captured MTP draft step: (certified ids view, gate), consumed by draft_topk1.
++_draft_step: Optional[Tuple[torch.Tensor, torch.Tensor]] = None
+
+
+ def _any_flag() -> bool:
+@@ -105,9 +108,20 @@ def _unsupported(model_runner) -> Optional[str]:
+
+
+ def install(model_runner) -> None:
+-    """Build the heads from the target model's own lm_head (after load_model)."""
++    """Build the heads from the target model's own lm_head (after load_model).
++
++    For a draft worker, mark its logits processor so the MTP draft paths use the
++    certified head; each call checks that the draft reads the target's head tensor.
++    """
+     global _heads
+-    if not _any_flag() or model_runner.is_draft_worker or _heads is not None:
++    if not _any_flag():
++        return
++    if model_runner.is_draft_worker:
++        processor = getattr(model_runner.model, "logits_processor", None)
++        if _heads is not None and "draft" in _heads.paths and processor is not None:
++            processor.certified_role = "draft"
++        return
++    if _heads is not None:
+         return
+     reason = _unsupported(model_runner)
+     if reason is not None:
+@@ -122,6 +136,7 @@ def install(model_runner) -> None:
+     flags = engine.Flags(
+         decode=envs.SGLANG_CERTIFIED_HEAD_DECODE.get(),
+         verify=envs.SGLANG_CERTIFIED_HEAD_VERIFY.get(),
++        draft=envs.SGLANG_CERTIFIED_HEAD_DRAFT.get(),
+         fallback=envs.SGLANG_CERTIFIED_HEAD_FALLBACK.get(),
+         model=envs.SGLANG_CERTIFIED_HEAD_MODEL.get(),
+         check=envs.SGLANG_CERTIFIED_HEAD_CHECK.get(),
+@@ -148,13 +163,53 @@ def _path_for(role: Optional[str], forward_mode: ForwardMode) -> Optional[str]:
+         return "decode"
+     if role == "target" and forward_mode.is_target_verify():
+         return "verify"
++    if role == "draft" and forward_mode.is_decode():
++        return "draft"
++    if role == "draft" and forward_mode.is_draft_extend_v2():
++        return "draft_extend"
+     return None
+
+
++def _same_weight(weight: torch.Tensor, head: Any) -> bool:
++    """The caller's head tensor is the bytes the certified head's fallback reads."""
++    w = head.head.weight
++    return (
++        weight.data_ptr() == w.data_ptr()
++        and tuple(weight.shape) == tuple(w.shape)
++        and weight.stride() == w.stride()
++    )
++
++
++def _capturable(path: str, hidden: torch.Tensor, weight: torch.Tensor):
++    """The path's state and head if ``hidden`` can use the certified head now.
++
++    Outside capture (graph warm-up or an eager forward) it compiles and
++    self-tests this shape once and returns None, so the stock head runs.
++    """
++    st = _state.get(path)
++    if st is None:
++        return None
++    head = _heads.get(path)
++    m = hidden.shape[0]
++    ok = (
++        hidden.dtype == torch.bfloat16
++        and hidden.is_contiguous()
++        and head.supports(m)
++        and _same_weight(weight, head)
++    )
++    if not torch.cuda.is_current_stream_capturing():
++        if ok:
++            head.warm(hidden, check=_heads.flags.check)
++        return None
++    (st.covered if ok else st.uncovered).add(m)
++    return (st, head) if ok else None
++
++
+ def gated_logits(
+     role: Optional[str],
+     forward_mode: ForwardMode,
+     hidden: torch.Tensor,
++    lm_head: Any,
+     stock_logits: Callable[[], torch.Tensor],
+ ) -> Optional[torch.Tensor]:
+     """Called by ``LogitsProcessor.forward`` in place of ``_get_logits``.
+@@ -163,38 +218,127 @@ def gated_logits(
+     records the certified head under the path's gate and the stock head under
+     its negation, and returns the stock logits tensor (stale when the gate held).
+     """
++    global _draft_step
+     path = _path_for(role, forward_mode)
+-    st = _state.get(path) if path is not None else None
+-    if st is None:
++    if path == "draft":
++        _draft_step = None
++    found = _capturable(path, hidden, lm_head.weight) if path is not None else None
++    if found is None:
+         return None
+-    head = _heads.get(path)
+-    m = hidden.shape[0]
+-    ok = hidden.dtype == torch.bfloat16 and hidden.is_contiguous() and head.supports(m)
+-    if not torch.cuda.is_current_stream_capturing():
+-        if ok:  # graph warm-up or eager forward: compile and self-test this shape once
+-            head.warm(hidden, check=_heads.flags.check)
+-        return None
+-    if not ok:
+-        st.uncovered.add(m)
+-        return None
+-    st.covered.add(m)
++    st, head = found
+     from torch._higher_order_ops.cudagraph_conditional_nodes import _if_body
+
+     if _heads.flags.check:
+         # Validation: always run the stock head and count rows whose tokens differ.
+         logits = stock_logits()
+-        head.argmax(
++        ids = head.argmax(
+             hidden,
+             gate=st.gate,
+             valid=st.valid,
+             stock_ids=torch.argmax(logits, dim=-1),
+         )
+-        return logits
+-    head.argmax(hidden, gate=st.gate, valid=st.valid)
+-    out = []
+-    with _if_body(torch.logical_not(st.gate)):
+-        out.append(stock_logits())
+-    return out[0]
++    else:
++        ids = head.argmax(hidden, gate=st.gate, valid=st.valid)
++        out = []
++        with _if_body(torch.logical_not(st.gate)):
++            out.append(stock_logits())
++        logits = out[0]
++    if path == "draft":
++        _draft_step = (ids, st.gate)
++    return logits
++
++
++def draft_topk1(
++    stock: Callable[[], Tuple[torch.Tensor, torch.Tensor]],
++    positions: torch.Tensor,
++    draft_tokens: Optional[torch.Tensor],
++    column: int,
++) -> Tuple[torch.Tensor, torch.Tensor]:
++    """``draft_topk1_postprocess`` for an MTP draft step inside the draft graph.
++
++    If the step's head was captured with the certified head, the stock top-1
++    runs under ``not gate`` and, under ``gate``, the certified ids take its place
++    with the same side effects (positions advanced, draft token column written).
++    """
++    global _draft_step
++    step, _draft_step = _draft_step, None
++    if step is None or not torch.cuda.is_current_stream_capturing():
++        return stock()
++    from torch._higher_order_ops.cudagraph_conditional_nodes import _if_body
++
++    ids, gate = step
++    bs = ids.shape[0]
++    topk_p = torch.ones((bs, 1), dtype=torch.float32, device=ids.device)
++    topk_index = torch.empty((bs, 1), dtype=torch.int64, device=ids.device)
++    with _if_body(torch.logical_not(gate)):
++        topk_index.copy_(stock()[1])
++    with _if_body(gate):
++        topk_index.copy_(ids.view(bs, 1))
++        positions.add_(1)
++        if draft_tokens is not None:
++            draft_tokens[:, column].copy_(ids)
++    return topk_p, topk_index
++
++
++def gated_draft_sample(
++    hidden: torch.Tensor,
++    weight: torch.Tensor,
++    out: torch.Tensor,
++    stock: Callable[[], None],
++) -> bool:
++    """DFlash's in-graph greedy draft projection (``_DflashDraftSampler``).
++
++    Under capture, writes ``out[:n]`` from the certified head under the gate and
++    from ``stock`` under its negation, and returns True; otherwise returns False
++    and the caller runs ``stock``.
++    """
++    found = _capturable("dflash_draft", hidden, weight)
++    if found is None:
++        return False
++    st, head = found
++    from torch._higher_order_ops.cudagraph_conditional_nodes import _if_body
++
++    n = hidden.shape[0]
++    if _heads.flags.check:
++        stock()
++        ids = head.argmax(hidden, gate=st.gate, valid=st.valid, stock_ids=out[:n])
++    else:
++        ids = head.argmax(hidden, gate=st.gate, valid=st.valid)
++        with _if_body(torch.logical_not(st.gate)):
++            stock()
++    with _if_body(st.gate):
++        out[:n].copy_(ids)
++    return True
++
++
++def set_gate(path: str, rows: int, eligible: bool = True) -> bool:
++    """Before a replay of the path's graph: certify iff eligible and the padded
++    graph for ``rows`` was captured with the certified head."""
++    st = _state.get(path)
++    if st is None:
++        return False
++    limit = envs.SGLANG_CERTIFIED_HEAD_MAX_ROWS.get()
++    certify = bool(eligible) and rows <= st.max_rows(limit)
++    st.gate.fill_(certify)
++    st.valid.fill_(rows)
++    st.steps["certified" if certify else "stock_graph"] += 1
++    _maybe_dump()  # reads the counters of earlier replays
++    return certify
++
++
++def attach_ids(path: str, logits_output: LogitsProcessorOutput, rows: int) -> None:
++    """After a certified replay whose argmax runs outside the graph: copy the ids
++    out of the head's buffer onto the output, before the next replay."""
++    logits_output.certified_ids = _heads.get(path).head._ids[:rows].clone()
++    _maybe_dump()
++
++
++def mtp_draft_eligible(topk: int) -> bool:
++    """MTP drafting is greedy top-1 whatever the requests' sampling parameters,
++    unless draft proposals are sampled for rejection sampling."""
++    from sglang.srt.runtime_context import get_spec
++
++    return topk == 1 and not get_spec().speculative_use_rejection_sampling
+
+
+ def _needs_logits(forward_batch: ForwardBatch, observer: Any) -> bool:
+@@ -222,10 +366,21 @@ def _needs_logits(forward_batch: ForwardBatch, observer: Any) -> bool:
+ def before_replay(
+     model_runner, forward_batch: ForwardBatch, can_run_graph: bool
+ ) -> None:
+-    """Set the gate for the replay about to run (host side, current stream)."""
+-    if _heads is None or model_runner.is_draft_worker:
++    """Set the gate for the ModelRunner graph replay about to run."""
++    if _heads is None:
++        return
++    mode = forward_batch.forward_mode
++    if model_runner.is_draft_worker:
++        # The DFlash draft graph (TARGET_VERIFY mode on the draft runner) projects
++        # block positions 1..B-1 of each request through the target head.
++        if "dflash_draft" in _state and mode.is_target_verify():
++            if can_run_graph:
++                rows = int(forward_batch.input_ids.shape[0]) - forward_batch.batch_size
++                set_gate("dflash_draft", rows)
++            else:
++                _state["dflash_draft"].steps["eager"] += 1
+         return
+-    path = _path_for("target", forward_batch.forward_mode)
++    path = _path_for("target", mode)
+     st = _state.get(path) if path is not None else None
+     if st is None:
+         return
+@@ -236,16 +391,10 @@ def before_replay(
+     # Decode rows are requests; verify rows are requests x draft tokens. CUDA-graph
+     # padding follows the real rows.
+     rows = int(forward_batch.input_ids.shape[0])
+-    limit = envs.SGLANG_CERTIFIED_HEAD_MAX_ROWS.get()
+-    certify = (
+-        rows <= st.max_rows(limit)
+-        and not _needs_logits(forward_batch, model_runner.sampling_observer)
+-        and not (path == "verify" and _verify_needs_logits(model_runner))
+-    )
+-    st.gate.fill_(certify)
+-    st.valid.fill_(rows)
+-    st.steps["certified" if certify else "stock_graph"] += 1
+-    if certify:
++    eligible = not _needs_logits(
++        forward_batch, model_runner.sampling_observer
++    ) and not (path == "verify" and _verify_needs_logits(model_runner))
++    if set_gate(path, rows, eligible):
+         forward_batch.certified_rows = rows
+
+
+@@ -264,9 +413,7 @@ def after_replay(
+     rows = getattr(forward_batch, "certified_rows", None)
+     if rows is None:
+         return
+-    path = _path_for("target", forward_batch.forward_mode)
+-    logits_output.certified_ids = _heads.get(path).head._ids[:rows].clone()
+-    _maybe_dump()
++    attach_ids(_path_for("target", forward_batch.forward_mode), logits_output, rows)
+
+
+ def take_ids(logits_output: LogitsProcessorOutput) -> Optional[torch.Tensor]:
+diff --git a/python/sglang/srt/layers/logits_processor.py b/python/sglang/srt/layers/logits_processor.py
+index d5a58702af..75f3943b43 100644
+--- a/python/sglang/srt/layers/logits_processor.py
++++ b/python/sglang/srt/layers/logits_processor.py
+@@ -601,6 +601,7 @@ class LogitsProcessor(nn.Module):
+                     self.certified_role,
+                     logits_metadata.forward_mode,
+                     pruned_states,
++                    lm_head,
+                     lambda: self._get_logits(pruned_states, lm_head, logits_metadata),
+                 )
+             if logits is None:
+diff --git a/python/sglang/srt/speculative/dflash_worker_v2.py b/python/sglang/srt/speculative/dflash_worker_v2.py
+index 15abe223d6..d023c875ba 100644
+--- a/python/sglang/srt/speculative/dflash_worker_v2.py
++++ b/python/sglang/srt/speculative/dflash_worker_v2.py
+@@ -173,13 +173,22 @@ class _DflashDraftSampler:
+         if hs.dtype != self.weight.dtype:
+             hs = hs.to(self.weight.dtype)
+         n = hs.shape[0]
+-        logits = torch.matmul(hs, self.weight[: self.num_org].T)
+         if self.tp_size == 1:
+-            tokens = torch.argmax(logits, dim=-1).to(torch.long)
+-            if self.org_vocab_start:
+-                tokens += self.org_vocab_start
+-            self.out[:n].copy_(tokens)
++
++            def stock():
++                logits = torch.matmul(hs, self.weight[: self.num_org].T)
++                tokens = torch.argmax(logits, dim=-1).to(torch.long)
++                if self.org_vocab_start:
++                    tokens += self.org_vocab_start
++                self.out[:n].copy_(tokens)
++
++            # Certified LM head: the same greedy tokens without the logits.
++            if self.org_vocab_start or not certified_head.gated_draft_sample(
++                hs, self.weight[: self.num_org], self.out, stock
++            ):
++                stock()
+             return
++        logits = torch.matmul(hs, self.weight[: self.num_org].T)
+         local_max = self.local_max[:n]
+         local_arg = self.local_arg[:n]
+         torch.max(logits, dim=-1, out=(local_max, local_arg))
+diff --git a/python/sglang/srt/speculative/eagle_worker_v2.py b/python/sglang/srt/speculative/eagle_worker_v2.py
+index 993b53f637..256ae53385 100644
+--- a/python/sglang/srt/speculative/eagle_worker_v2.py
++++ b/python/sglang/srt/speculative/eagle_worker_v2.py
+@@ -19,6 +19,7 @@ from sglang.srt.hardware_backend.npu.graph_runner.eagle_draft_npu_graph_runner i
+ )
+ from sglang.srt.hardware_backend.npu.graph_runner.npu_graph_runner import NPUGraphRunner
+ from sglang.srt.kv_canary.runner.canary_manager import context_tuple
++from sglang.srt.layers import certified_head
+ from sglang.srt.layers.attention.flashinfer_backend import FlashInferAttnBackend
+ from sglang.srt.layers.attention.index_topk_share import IndexTopKShareState
+ from sglang.srt.layers.attention.qsa.config import parse_qsa_profile
+@@ -642,6 +643,12 @@ class EagleDraftWorker(EagleDraftWorkerBase):
+         with canary_outside_ctx:
+             # Run draft
+             if can_run_decode_cuda_graph:
++                if not forward_batch.forward_mode.is_idle():
++                    certified_head.set_gate(
++                        "draft",
++                        forward_batch.batch_size,
++                        certified_head.mtp_draft_eligible(self.topk),
++                    )
+                 parent_list, top_scores_index, draft_tokens, draft_probs = (
+                     self.cuda_graph_runner.execute(forward_batch)
+                 )
+@@ -803,8 +810,17 @@ class EagleDraftWorker(EagleDraftWorkerBase):
+                     forward_batch.positions.add_(1)
+                 elif self.topk == 1:
+                     if _is_cuda or _is_hip:
+-                        topk_p, topk_index = draft_topk1_postprocess(
+-                            logits_output.next_token_logits,
++                        # Certified LM head: the same top-1 without the logits,
++                        # when this draft step was captured with it.
++                        topk_p, topk_index = certified_head.draft_topk1(
++                            lambda logits=logits_output.next_token_logits, col=i + 1: (
++                                draft_topk1_postprocess(
++                                    logits,
++                                    forward_batch.positions,
++                                    draft_tokens_topk1,
++                                    col,
++                                )
++                            ),
+                             forward_batch.positions,
+                             draft_tokens_topk1,
+                             i + 1,
+@@ -1106,11 +1122,22 @@ class EagleDraftWorker(EagleDraftWorkerBase):
+             if (c := self.draft_runner.canary_manager) is not None
+             else contextlib.nullcontext()
+         )
++        certified_rows = 0
+         with canary_ctx:
+             if can_run_decode_cuda_graph:
++                if not forward_batch.forward_mode.is_idle() and certified_head.set_gate(
++                    "draft_extend",
++                    len(batch.seq_lens),
++                    certified_head.mtp_draft_eligible(self.topk),
++                ):
++                    certified_rows = len(batch.seq_lens)
+                 draft_logits_output = self.cuda_graph_runner_for_draft_extend.execute(
+                     forward_batch, select_index
+                 )
++                if certified_rows:
++                    certified_head.attach_ids(
++                        "draft_extend", draft_logits_output, certified_rows
++                    )
+             else:
+                 draft_logits_output = self.draft_runner.forward(
+                     forward_batch
+@@ -1161,9 +1188,13 @@ class EagleDraftWorker(EagleDraftWorkerBase):
+         elif self.topk == 1 and not _is_hip:
+             # Gated to CUDA: see #26358 — ROCm's argmax tie-break corrupts
+             # MTP draft selection on FP8 logits.
+-            ret_topk_index = torch.argmax(
+-                draft_logits_output.next_token_logits, dim=-1, keepdim=True
+-            )
++            certified_ids = certified_head.take_ids(draft_logits_output)
++            if certified_ids is not None:
++                ret_topk_index = certified_ids.view(-1, 1)
++            else:
++                ret_topk_index = torch.argmax(
++                    draft_logits_output.next_token_logits, dim=-1, keepdim=True
++                )
+             ret_topk_p = torch.ones_like(ret_topk_index, dtype=torch.float32)
+             ret_draft_probs = None
+         else:
+--
+2.34.1
