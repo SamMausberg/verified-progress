@@ -14,6 +14,7 @@ item points at its PR and evidence.
 | H4 | That certificate improves the served latency-throughput frontier over tuned MTP speculation without changing outputs | Before/after Pareto sweeps and output-equality checks |
 | H5 | SGLang's hybrid GDN state stays correct under speculative verification (every rejection position, aborts, prefix reuse) | Differential tests against non-speculative decoding |
 | H6 | Other layers of the stack (backend choice, graphs, scheduling, spec parameters) leave measurable headroom | Profiles and controlled ablations |
+| H8 | Exact decoding can commit far more tokens per target pass by repairing long draft windows, and a target-anchored residual evaluator makes repairs much cheaper than recomputation | Wide-block verification oracle, full-target Jacobi progress, correction locality, then a residual-evaluator prototype |
 | H7 | Reformulations and declared approximations can multiply gains well beyond tuning (recurrent-state traffic at high concurrency; near-free drafting and lossy targets at low concurrency) | Measured bytes per step, quality-versus-speed curves, end-to-end Pareto sweeps |
 
 ## End goal
@@ -29,18 +30,20 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 
 | WS | Scope | Status |
 |---|---|---|
-| infra | GPU lock, SGLang worktrees, PR tooling, this list | done (PR #1, #2) |
-| lit | Literature review, novelty assessment, citation audit | active |
+| infra | GPU lock (FIFO queue), SGLang worktrees, PR tooling, this list | done (PR #1, #2, #8, #10) |
+| lit | Literature review, novelty assessment, citation audit | review (PR #6) |
 | bench | Baseline server arms, aiperf Pareto harness, quality baseline, spec tuning | active |
 | profile | nsys/ncu profiles and critical-path attribution | active |
 | geometry | Real-head replay: transport versus self-evidence bounds | active |
 | kernel | Certified low-precision head kernels and microbenchmarks | active |
-| theory | Floating-point certificate proofs, exact references, Lean | active |
+| theory | Floating-point certificate proofs, exact references, Lean | review (PR #7) |
 | state | Speculative-decoding state safety and output-equality tests | active |
 | moonshot | Reformulations and approximations aimed at order-of-magnitude gains, with measured quality costs | active |
+| drafter | Public DFlash-4B drafter: serve, characterize, train only against a measured limitation | active |
+| repair | Long-window exact repair and target-anchored residual decoding (H8) | active |
 | integrate | SGLang integration of the certified head (draft, verify, decode) | todo |
-| paper | Manuscript revision as results land | todo |
-| review | Independent review of every PR before merge | ongoing |
+| paper | Manuscript revision as results land | active |
+| review | Independent review of every PR before merge | active |
 
 ## Task list
 
@@ -51,6 +54,7 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 - [ ] Frozen workload and aiperf sweep harness producing the concurrency Pareto curve (bench)
 - [ ] Baseline arms: plain decode and native-MTP speculation, CUDA graphs and overlap confirmed (bench)
 - [ ] Tune the speculative baseline (steps, draft tokens, backend) so the denominator is strong (bench)
+- [ ] Add the public DFlash drafter (`z-lab/Qwen3.5-4B-DFlash@9a1996c`, block 4/8/16) as the strongest existing speculative baseline (bench, drafter)
 - [ ] Quality baseline on a fixed task set (bench)
 - [ ] nsys attribution of head, backbone, sampling and host gaps for decode and MTP (profile)
 
@@ -69,16 +73,28 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 - [ ] Ranked portfolio of reformulations with ceilings and quality costs (moonshot)
 - [ ] Throughput: reformulate GDN state handling and lift the concurrency cap (moonshot, M1)
 - [ ] Latency: near-free draft head, deeper drafting, relaxed acceptance, lossy target arms (moonshot, M2)
-- [ ] Trained block drafter for Qwen3.5-4B (M3, pending a free slot)
+- [ ] Characterize the public DFlash drafter on GH200: acceptance per block position, draft versus verify cost (drafter)
+- [ ] Custom or fine-tuned drafter only against a measured limitation: longer accepted blocks, cheaper drafting, or certificate-friendly hidden states, judged by total serving time (drafter)
 - [ ] Interaction matrix of levers (compose, conflict, quality compounding) (moonshot)
 - [ ] Full-stack arms: exact stack and lossy stack, each with ablations, Pareto sweeps and quality checks (bench, moonshot, integrate)
 
+### Repair and progressive evaluation (H8, Sam's proposals P1-P3)
+- [ ] Wide-block verification with perfect continuations: V(B), GDN/KV state-commit cost, oracle speedup for an ideal drafter and for the two-pass anchor-plus-audit design (repair)
+- [ ] Full-target Jacobi repair from DFlash-initialized windows: committed tokens per target pass (repair)
+- [ ] Correction locality: activation changes after real corrections, fixed-basis capture on held-out corrections (repair)
+- [ ] Go/no-go on the residual evaluator prototype against its controls (repair)
+- [ ] State-safe tail oracle: INT8 final FFN plus head, isotropic margin certificate at the oracle radius, versus certified head-only (geometry)
+- [ ] Theory in the paper: contracts, common-mass bound, bounded-range sampling, dead/deferred/enclosed accounting (paper)
+
 ### Engine
 - [ ] Differential output-equality tests: MTP versus plain decode, rejection positions, aborts, prefix reuse (state)
+- [ ] Explain every stock divergence by mechanism: differing computed logits (and the first kernel where they differ), differing rounding, or differing tie handling (state)
+- [ ] Exactness contract for the certified head: the stock head kernel's decision at the same batch shape, with fallback to that kernel when the gap condition fails (kernel, theory)
 - [ ] Integrate the certified head into the MTP draft, verification and plain decode paths (integrate)
 - [ ] Before/after Pareto sweeps with acceptance and output-equality checks (bench, integrate)
 
 ### Paper and deliverables
-- [ ] Literature review and verified bibliography (lit)
+- [ ] Literature review and verified bibliography (lit; PR #6 in review)
+- [ ] Narrow the novelty claim: the greedy certified head is prior art (sparkpipe, dgpp, Laguna, knlp); the defensible parts are exact keyed-noise sampling, partition brackets for sampled acceptance, a Hopper-sound envelope and the SGLang/GH200 measurement under the stock-kernel contract; cite DSpark and D-cut for the sampled-depth counterexample (paper, kernel)
 - [ ] Revise the manuscript: methods, results, limitations, figures (paper)
 - [ ] README and RUNBOOK with exact reproduction commands (paper, infra)
