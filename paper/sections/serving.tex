@@ -1,0 +1,26 @@
+% Section 11: serving results (bench workstream draft to be integrated).
+% Claims and status:
+%  - Protocol and metric definitions: design, matching the bench harness (bench/ on its branch).
+%  - Frontiers, variance, quality: pending (bench).
+\section{Serving results}\label{sec:serving}
+The decisive test of every mechanism in this paper is the served latency--throughput frontier against the strongest optimized baseline, with outputs checked. This section fixes the protocol; the results are pending.
+
+\subsection{Protocol}
+Each server arm is launched once at its fixed maximum capacity, with CUDA graphs and the overlap scheduler confirmed on, and client concurrency is swept against it. The baselines are plain decoding, the native MTP configuration after tuning of its steps and draft tokens, and the public DFlash drafter at its best block size; the main denominator for any speculative change is the strongest of these, not plain decoding. A diagnostic run that forces synchronization is not a baseline. Prompts come from a frozen mixed workload with disjoint tuning, confirmation and warm-up splits, the prefix cache is flushed between points, and fixed-length throughput runs are kept separate from natural-stopping quality runs.
+
+For request $i$ let $n_i$ be the server-reported number of output tokens and $e_i$ the interval from sending the request to its last non-empty streamed chunk. The frontier plots
+\begin{equation}
+x=\frac1N\sum_i\frac{n_i}{e_i},\qquad y=\frac{\sum_in_i}{t_{\rm last\ completion}-t_{\rm first\ send}},\label{eq:frontier}
+\end{equation}
+so $x$ is the mean per-request end-to-end output rate, which includes the time to first token, and $y$ is the output throughput of the one GPU. A decode-only rate that excludes the first token and a steady-state throughput that excludes the drain are reported alongside. One token per streamed chunk is never assumed. AIPerf is the load generator~\cite{aiperf}. Time to first token, inter-token latency, accepted length, failures and CUDA-graph coverage are kept for every point, and failures stay in the report.
+
+Each confirmatory point is repeated with alternating arm order on an otherwise idle machine, and the variation across repeats is reported; CPU-heavy work elsewhere on the host is detected and recorded, because the scheduler and the client are single-threaded Python loops that share the CPU. Exact changes are checked for output equality against the stock configuration at the same batch shape (Section~\ref{sec:divergence}); lossy changes are measured against the quality budget of Section~\ref{sec:stack}.
+
+\subsection{Frontiers}
+\pending{bench: tuned MTP and DFlash configurations; the baseline frontiers with repeat variance; the quality baseline; evidence \nolinkurl{evidence/bench/confirm/frontier.csv}}
+
+\pending{bench, integration: before/after frontiers for the certified head in MTP drafting, verification and plain decoding, with output-equality checks (H4)}
+
+\pending{bench, moonshot: the exact-stack and lossy-stack frontiers with their ablations; evidence \nolinkurl{evidence/moonshot/frontier_exact.csv}, \nolinkurl{evidence/moonshot/frontier_lossy.csv}}
+
+\pendingfigure{Tokens per second per user against tokens per second per GPU across client concurrencies for plain decoding, tuned MTP, DFlash, the exact stack and the lossy stack, with repeat ranges.}{evidence/bench/confirm/frontier.csv}
