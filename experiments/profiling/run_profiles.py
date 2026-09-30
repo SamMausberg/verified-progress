@@ -230,6 +230,17 @@ def main() -> None:
             check=False,
         ).stdout.strip(),
     }
+    meta['repo_sha'] = subprocess.run(
+        ['git', '-C', str(HERE), 'rev-parse', 'HEAD'], capture_output=True, text=True, check=False
+    ).stdout.strip()
+    meta['nsys_version'] = subprocess.run(
+        ['nsys', '--version'], capture_output=True, text=True, check=False
+    ).stdout.strip()
+    meta['gpu'] = subprocess.run(
+        ['nvidia-smi', '--query-gpu=name,driver_version,clocks.max.sm,clocks.max.mem',
+         '--format=csv,noheader'],
+        capture_output=True, text=True, check=False,
+    ).stdout.strip()  # fmt: skip
     (args.out_dir / 'run_meta.json').write_text(json.dumps(meta, indent=2) + '\n')
     print(meta['server_command'], flush=True)
 

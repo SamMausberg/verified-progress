@@ -30,7 +30,7 @@ python experiments/profiling/clock_summary.py "$VP_DATA/microbench_clocks.csv" \
   --out "$EVIDENCE/microbench_clocks.json"
 
 # Kernel names and CUPTI durations; timings under the tracer are not reported.
-nsys profile --trace=cuda,nvtx --cuda-graph-trace=node --force-overwrite=true \
+nsys profile --trace=cuda,nvtx,cublas --cuda-graph-trace=node --force-overwrite=true \
   --output "$VP_DATA/head_microbench" \
   python experiments/profiling/head_microbench.py --nvtx --repeats 5 --inner 5 \
   --out "$VP_DATA/head_microbench_under_nsys.json"

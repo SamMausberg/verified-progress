@@ -224,7 +224,7 @@ def main() -> None:
         'weight': f'{HEAD_KEY} from Qwen/Qwen3.5-4B@851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a',
         'weight_bytes': weight_bytes,
         'measured_read_peak_tb_per_s': peak,
-        'roofline_floor_us_at_measured_peak': weight_bytes / peak / 1e-6 if peak else None,
+        'roofline_floor_us_at_measured_peak': weight_bytes / (peak * 1e12) * 1e6 if peak else None,
         'l2_evict_reduction_us_median': flush_median,
         'repeats': args.repeats,
         'inner': args.inner,
