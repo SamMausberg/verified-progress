@@ -1,0 +1,119 @@
+[
+ {
+  "run": "fe-plain-incremental/20260930-212657",
+  "variant": "default",
+  "concurrency": 256,
+  "y_client": 16178.160986731318,
+  "server_decode_tps_full_batch": 18013.78,
+  "ttft_p50_ms": 345.01029900000003,
+  "foreign_cpu_max": 0.39,
+  "own_cpu_peak": {
+   "sglang::scheduler": 1.01,
+   "/home/ubuntu/sglang/.venv/bin/python -m sglang.launch_server": 1.01,
+   "aiperf timing_manager": 0.91,
+   "sglang::detokenizer": 0.18,
+   "aiperf record_processor_82daea7e": 0.06,
+   "aiperf record_processor_9bf3c105": 0.06,
+   "aiperf record_processor_c5275bfb": 0.06,
+   "aiperf record_processor_2f40447a": 0.06
+  }
+ },
+ {
+  "run": "fe-plain-interval4/20260930-212855",
+  "variant": "default",
+  "concurrency": 256,
+  "y_client": 16545.62507820393,
+  "server_decode_tps_full_batch": 18030.56,
+  "ttft_p50_ms": 355.1133095,
+  "foreign_cpu_max": 0.54,
+  "own_cpu_peak": {
+   "sglang::scheduler": 1.01,
+   "aiperf timing_manager": 0.91,
+   "/home/ubuntu/sglang/.venv/bin/python -m sglang.launch_server": 0.35,
+   "sglang::detokenizer": 0.06
+  }
+ },
+ {
+  "run": "fe-plain-workers/20260930-213050",
+  "variant": "default",
+  "concurrency": 256,
+  "y_client": 14914.493562568128,
+  "server_decode_tps_full_batch": 17886.1,
+  "ttft_p50_ms": 370.579165,
+  "foreign_cpu_max": 0.52,
+  "own_cpu_peak": {
+   "sglang::scheduler": 1.01,
+   "aiperf timing_manager": 1.01,
+   "sglang::detokenizer": 0.94,
+   "sglang::tokenizer_worker:2623531": 0.75,
+   "sglang::tokenizer_worker:2623530": 0.73,
+   "sglang::tokenizer_worker:2623529": 0.72,
+   "sglang::detokenizer_router": 0.63,
+   "sglang::tokenizer_worker:2623532": 0.6
+  }
+ },
+ {
+  "run": "fe-plain/20260930-212309",
+  "variant": "default",
+  "concurrency": 256,
+  "y_client": 15363.215597840706,
+  "server_decode_tps_full_batch": 18021.54,
+  "ttft_p50_ms": 375.515044,
+  "foreign_cpu_max": 0.41,
+  "own_cpu_peak": {
+   "sglang::scheduler": 1.01,
+   "/home/ubuntu/sglang/.venv/bin/python -m sglang.launch_server": 1.01,
+   "aiperf timing_manager": 1.01,
+   "sglang::detokenizer": 0.18,
+   "": 0.17,
+   "aiperf record_processor_be5166b4": 0.06,
+   "aiperf record_processor_15918aaa": 0.06,
+   "aiperf record_processor_debad415": 0.06
+  }
+ },
+ {
+  "run": "fe-plain/20260930-212309",
+  "variant": "records-only",
+  "concurrency": 256,
+  "y_client": 16592.601119345945,
+  "server_decode_tps_full_batch": 18034.68,
+  "ttft_p50_ms": 331.6833375,
+  "foreign_cpu_max": 0.48,
+  "own_cpu_peak": {
+   "sglang::scheduler": 1.01,
+   "/home/ubuntu/sglang/.venv/bin/python -m sglang.launch_server": 0.97,
+   "aiperf timing_manager": 0.88,
+   "sglang::detokenizer": 0.18
+  }
+ },
+ {
+  "run": "fe-plain/20260930-212309",
+  "variant": "workers-64",
+  "concurrency": 256,
+  "y_client": 15438.579435999143,
+  "server_decode_tps_full_batch": 18025.08,
+  "ttft_p50_ms": 353.7954885,
+  "foreign_cpu_max": 0.4,
+  "own_cpu_peak": {
+   "sglang::scheduler": 1.01,
+   "/home/ubuntu/sglang/.venv/bin/python -m sglang.launch_server": 1.01,
+   "aiperf timing_manager": 1.01,
+   "sglang::detokenizer": 0.18,
+   "aiperf system_controller": 0.07
+  }
+ },
+ {
+  "run": "fe-plain/20260930-212309",
+  "variant": "non-streaming",
+  "concurrency": 256,
+  "y_client": 16509.953510776315,
+  "server_decode_tps_full_batch": 18020.19,
+  "ttft_p50_ms": NaN,
+  "foreign_cpu_max": 0.53,
+  "own_cpu_peak": {
+   "sglang::scheduler": 1.01,
+   "aiperf timing_manager": 0.9,
+   "/home/ubuntu/sglang/.venv/bin/python -m sglang.launch_server": 0.1
+  }
+ }
+]
