@@ -7,7 +7,7 @@ vocabulary never changes outputs; it only lowers acceptance when the target's
 token is outside the map.
 
 ``generate`` collects greedy continuations from a running server on a calibration
-prompt set that is disjoint from the benchmark's confirm split (mixed-v1 tune,
+prompt set that is disjoint from the benchmark's confirm split (mixed-v2 tune,
 AlpacaEval, No Robots test, MATH-500). ``build`` ranks tokens by frequency on
 the calibration part, writes one map per size (a ``torch.save``'d list of token
 ids, the format ``--speculative-token-map`` loads), and reports coverage, the
@@ -49,7 +49,7 @@ def calibration_prompts() -> list[dict[str, str]]:
 
     prompts = []
     for row in (json.loads(x) for x in default_workload().read_text().splitlines() if x):
-        prompts.append({'source': 'mixed-v1-tune', 'text': row['text']})
+        prompts.append({'source': 'mixed-v2-tune', 'text': row['text']})
     for row in json.loads((HF_HUB / SOURCES['alpaca_eval']).read_text()):
         prompts.append({'source': 'alpaca_eval', 'text': row['instruction']})
     for row in pq.read_table(HF_HUB / SOURCES['no_robots']).to_pylist():

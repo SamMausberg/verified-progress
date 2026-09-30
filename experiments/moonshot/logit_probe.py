@@ -44,8 +44,8 @@ MODEL = 'Qwen/Qwen3.5-4B'
 REVISION = '851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a'
 REPO_DIR = Path(__file__).resolve().parents[2]
 WORKLOAD_CANDIDATES = (
-    REPO_DIR / 'bench/workloads/mixed-v1/tune.jsonl',
-    Path.home() / 'vp-wt/bench/bench/workloads/mixed-v1/tune.jsonl',
+    REPO_DIR / 'bench/workloads/mixed-v2/tune.jsonl',
+    Path.home() / 'vp-wt/bench/bench/workloads/mixed-v2/tune.jsonl',
 )
 
 
@@ -53,7 +53,7 @@ def default_workload() -> Path:
     for path in WORKLOAD_CANDIDATES:
         if path.exists():
             return path
-    raise SystemExit('mixed-v1 tune split not found; pass --workload')
+    raise SystemExit('mixed-v2 tune split not found; pass --workload')
 
 
 def select_prompts(workload: Path, per_domain: int) -> list[dict[str, Any]]:

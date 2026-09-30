@@ -48,7 +48,7 @@ def main() -> None:
         started = time.time()
         try:
             arm, _ = build(config, shape)
-            bench_quality.arm_from_args = lambda _args, arm=arm: arm
+            vars(bench_quality)['arm_from_args'] = lambda _args, arm=arm: arm
             code = bench_quality.main(
                 [
                     'run',

@@ -104,11 +104,11 @@ def main() -> None:
             arm, argv = build(config, args)
             print(f'== {config}: {json.dumps(arm.to_json())}', flush=True)
             # bench.sweep resolves its arm from the CLI; hand it ours instead.
-            bench_sweep.arm_from_args = lambda _args, arm=arm: arm
+            vars(bench_sweep)['arm_from_args'] = lambda _args, arm=arm: arm
             # NGRAM has no draft model, hence no draft-decode graph for bench's
             # launch check to find; record the checks but do not abort on them.
             ngram = arm.args.get('speculative-algorithm') == 'NGRAM'
-            bench_sweep.Server = functools.partial(bench_server.Server, strict=not ngram)
+            vars(bench_sweep)['Server'] = functools.partial(bench_server.Server, strict=not ngram)
             code = bench_sweep.main(argv)
             status = f'exit {code}'
         except Exception:  # keep going: one failed configuration must not end the job
