@@ -30,14 +30,15 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 | WS | Scope | Status |
 |---|---|---|
 | infra | GPU lock, SGLang worktrees, PR tooling, this list | done (PR #1, #2) |
-| lit | Literature review, novelty assessment, citation audit | active |
+| lit | Literature review, novelty assessment, citation audit | active (PR #6 open) |
 | bench | Baseline server arms, aiperf Pareto harness, quality baseline, spec tuning | active |
 | profile | nsys/ncu profiles and critical-path attribution | active |
 | geometry | Real-head replay: transport versus self-evidence bounds | active |
 | kernel | Certified low-precision head kernels and microbenchmarks | active |
-| theory | Floating-point certificate proofs, exact references, Lean | active |
+| theory | Floating-point certificate proofs, exact references, Lean | review (PR #7) |
 | state | Speculative-decoding state safety and output-equality tests | active |
 | moonshot | Reformulations and approximations aimed at order-of-magnitude gains, with measured quality costs | active |
+| drafter | Public DFlash-4B drafter: serve, characterize, train only against a measured limitation | active |
 | integrate | SGLang integration of the certified head (draft, verify, decode) | todo |
 | paper | Manuscript revision as results land | todo |
 | review | Independent review of every PR before merge | ongoing |
@@ -51,6 +52,7 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 - [ ] Frozen workload and aiperf sweep harness producing the concurrency Pareto curve (bench)
 - [ ] Baseline arms: plain decode and native-MTP speculation, CUDA graphs and overlap confirmed (bench)
 - [ ] Tune the speculative baseline (steps, draft tokens, backend) so the denominator is strong (bench)
+- [ ] Add the public DFlash drafter (`z-lab/Qwen3.5-4B-DFlash@9a1996c`, block 4/8/16) as the strongest existing speculative baseline (bench, drafter)
 - [ ] Quality baseline on a fixed task set (bench)
 - [ ] nsys attribution of head, backbone, sampling and host gaps for decode and MTP (profile)
 
@@ -69,12 +71,15 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 - [ ] Ranked portfolio of reformulations with ceilings and quality costs (moonshot)
 - [ ] Throughput: reformulate GDN state handling and lift the concurrency cap (moonshot, M1)
 - [ ] Latency: near-free draft head, deeper drafting, relaxed acceptance, lossy target arms (moonshot, M2)
-- [ ] Trained block drafter for Qwen3.5-4B (M3, pending a free slot)
+- [ ] Characterize the public DFlash drafter on GH200: acceptance per block position, draft versus verify cost (drafter)
+- [ ] Custom or fine-tuned drafter only against a measured limitation: longer accepted blocks, cheaper drafting, or certificate-friendly hidden states, judged by total serving time (drafter)
 - [ ] Interaction matrix of levers (compose, conflict, quality compounding) (moonshot)
 - [ ] Full-stack arms: exact stack and lossy stack, each with ablations, Pareto sweeps and quality checks (bench, moonshot, integrate)
 
 ### Engine
 - [ ] Differential output-equality tests: MTP versus plain decode, rejection positions, aborts, prefix reuse (state)
+- [ ] Explain every stock divergence by mechanism: differing computed logits (and the first kernel where they differ), differing rounding, or differing tie handling (state)
+- [ ] Exactness contract for the certified head: the stock head kernel's decision at the same batch shape, with fallback to that kernel when the gap condition fails (kernel, theory)
 - [ ] Integrate the certified head into the MTP draft, verification and plain decode paths (integrate)
 - [ ] Before/after Pareto sweeps with acceptance and output-equality checks (bench, integrate)
 
