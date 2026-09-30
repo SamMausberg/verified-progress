@@ -57,8 +57,7 @@ speculative-num-draft-tokens = 4
 # --mamba-radix-cache-strategy here and already resolves to extra_buffer.
 [arms.dflash]
 description = """DFlash block drafter, block size 8 (the card's serving default), \
-with the card's GDN (linear attention) kernels, piecewise prefill graphs and \
-overlapped plan stream."""
+with the card's GDN (linear attention) kernels and overlapped plan stream."""
 
 [arms.dflash.args]
 speculative-algorithm = "DFLASH"
@@ -67,7 +66,10 @@ speculative-draft-model-revision = "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf"
 speculative-dflash-block-size = 8
 linear-attn-prefill-backend = "flashinfer"
 linear-attn-decode-backend = "flashinfer"
-cuda-graph-backend-prefill = "tc_piecewise"
+# The card's --cuda-graph-backend-prefill tc_piecewise is left out: at bd66ce34
+# torch.compile fails on Qwen3.5's residual-stream Contribution object during
+# prefill graph capture (reported by the drafter workstream), so the default
+# breakable prefill graph is used.
 
 [arms.dflash.env]
 SGLANG_ENABLE_OVERLAP_PLAN_STREAM = "1"
