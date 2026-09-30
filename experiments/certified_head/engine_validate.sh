@@ -40,6 +40,9 @@ limit="${LIMIT:-64}"
 max_new="${MAX_NEW_TOKENS:-256}"
 need_mib="${NEED_FREE_MIB:-40000}"
 export SGLANG_WORKTREE="${SGLANG_WORKTREE:-$HOME/sglang-wt/kernel}"
+# The start-up lock serializes server launches between shared jobs (main's scripts/).
+startup_lock="$repo/scripts/gpu_startup_lock.sh"
+[ -x "$startup_lock" ] || startup_lock="$HOME/verified-progress/scripts/gpu_startup_lock.sh"
 # shellcheck source=/dev/null
 source "$repo/scripts/sglang_env.sh"
 
@@ -125,7 +128,7 @@ run_arm() {
   rc=2
   for _ in $(seq 1 360); do
     rc=0
-    "$repo/scripts/gpu_startup_lock.sh" bash -c 'launch_and_wait "$@"' _ \
+    "$startup_lock" bash -c 'launch_and_wait "$@"' _ \
       "$dir/server.pid" "$dir/server.log" "$need" "${model[@]}" "${common[@]}" "${args[@]}" \
       || rc=$?
     [ "$rc" -ne 2 ] && break
