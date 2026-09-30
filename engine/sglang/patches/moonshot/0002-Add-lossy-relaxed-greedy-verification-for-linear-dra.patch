@@ -1,0 +1,88 @@
+From 8e381aae645e9897d6d34c3183960ed82d580bc7 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Wed, 30 Sep 2026 19:01:19 +0000
+Subject: [PATCH 2/7] Add lossy relaxed greedy verification for linear draft
+ chains
+
+SGLANG_SPEC_RELAXED_GREEDY_LOGIT_GAP=g (default 0, exact) accepts a chain
+draft token whose target logit is within g of the row maximum. The bonus
+token and rejected rows keep the exact argmax. Off by default.
+---
+ python/sglang/srt/environ.py                 |  4 +++
+ python/sglang/srt/speculative/eagle_utils.py | 32 ++++++++++++++++++++
+ 2 files changed, 36 insertions(+)
+
+diff --git a/python/sglang/srt/environ.py b/python/sglang/srt/environ.py
+index f3571906ff..d9874903f3 100644
+--- a/python/sglang/srt/environ.py
++++ b/python/sglang/srt/environ.py
+@@ -1383,6 +1383,10 @@ class Envs:
+     # Saves the per-step draft forward, but the draft KV goes stale: an upshift
+     # back to steps>0 starts from a cold draft state (low accept until it recovers).
+     SGLANG_SPEC_SKIP_ZERO_STEP_DRAFT_EXTEND = EnvBool(False)
++    # Lossy relaxed greedy verification for linear draft chains: accept a
++    # draft token whose target logit is within this gap of the target argmax
++    # logit (p_draft / p_max >= exp(-gap)). 0 keeps exact greedy verification.
++    SGLANG_SPEC_RELAXED_GREEDY_LOGIT_GAP = EnvFloat(0.0)
+     # Which speculative decisions rank 0 broadcasts to its TP group; narrowing
+     # it under live traffic isolates where ranks actually diverge. Comma
+     # separated presets ("all", "rng", "init", "off"), or SpecTpSyncSite slugs
+diff --git a/python/sglang/srt/speculative/eagle_utils.py b/python/sglang/srt/speculative/eagle_utils.py
+index 91ee6212b5..ca9455ad2c 100644
+--- a/python/sglang/srt/speculative/eagle_utils.py
++++ b/python/sglang/srt/speculative/eagle_utils.py
+@@ -11,6 +11,7 @@ from sglang.kernels.ops.speculative.spec_tree import (
+     sgl_build_tree_kernel_efficient_triton,
+     verify_tree_greedy_kernel_triton,
+ )
++from sglang.srt.environ import envs
+ from sglang.srt.hardware_backend.npu.dsv4.dsv4_common_hooks import (
+     maybe_build_dsv4_verify_bundle,
+ )
+@@ -710,6 +711,32 @@ def _verify_uses_greedy(
+     return is_all_greedy or is_cpu or is_xpu or (is_hip and not use_rejection_sampling)
+
+
++def relax_greedy_chain_predict(
++    next_token_logits: torch.Tensor,
++    candidates: torch.Tensor,
++    target_predict: torch.Tensor,
++    logit_gap: float,
++) -> torch.Tensor:
++    """Lossy relaxed greedy verification for a linear draft chain.
++
++    Row j of a chain verifies draft token candidates[:, j + 1]. It is accepted
++    when its target logit is within `logit_gap` of the row's maximum, by
++    reporting it as the target's prediction; the last row (the bonus token)
++    and rejected rows keep the exact argmax.
++    """
++    bs, width = candidates.shape
++    logits = next_token_logits.view(bs, width, -1)
++    drafts = candidates[:, 1:].to(torch.int64)
++    draft_logit = logits[:, :-1].gather(-1, drafts.unsqueeze(-1)).squeeze(-1)
++    max_logit = logits[:, :-1].amax(dim=-1)
++    near = draft_logit >= max_logit - logit_gap
++    relaxed = target_predict.clone()
++    relaxed[:, :-1] = torch.where(
++        near, drafts.to(relaxed.dtype), target_predict[:, :-1]
++    )
++    return relaxed
++
++
+ def _can_use_sparse_uno_tree_target_sampling(
+     max_top_k: Optional[int],
+     sampling_info: SamplingBatchInfo,
+@@ -816,6 +843,11 @@ def eagle_sample(
+     ):
+         target_predict = torch.argmax(next_token_logits, dim=-1)
+         target_predict = target_predict.reshape(bs, verify_input.draft_token_num)
++        relaxed_gap = envs.SGLANG_SPEC_RELAXED_GREEDY_LOGIT_GAP.get()
++        if relaxed_gap > 0 and verify_input.tree_topk == 1:
++            target_predict = relax_greedy_chain_predict(
++                next_token_logits, candidates, target_predict, relaxed_gap
++            )
+         predict, accept_index, num_correct_drafts = verify_tree_greedy_func(
+             predicts=predict,  # mutable
+             accept_index=accept_index,  # mutable
+--
+2.34.1
