@@ -428,7 +428,8 @@ class Precision(unittest.TestCase):
             Accumulator('sequential', FP32),
             Accumulator('fused', FP32, rounding='toward_zero', block=4),
         )
-        agree_bf16, agree_real, rounding_matches, levels = 0, 0, 0, {}
+        agree_bf16, agree_real, rounding_matches = 0, 0, 0
+        levels: dict[int, int] = {}
         for _ in range(300):
             V, D = R.randint(2, 24), R.randint(2, 8)
             W = near_tie_head(V, D)
