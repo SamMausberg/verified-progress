@@ -1,0 +1,64 @@
+stack,batch,step_floor_ms,tokens_per_s_ceiling,per_request_mb
+"baseline (FP32 state)",1,2.249,445,113.97
+"baseline (FP32 state)",8,2.46,3252,113.97
+"baseline (FP32 state)",32,3.182,10058,113.97
+"baseline (FP32 state)",64,4.144,15444,113.97
+"baseline (FP32 state)",128,6.068,21093,113.97
+"baseline (FP32 state)",256,10.808,23685,113.97
+"baseline (FP32 state)",512,21.617,23685,113.97
+"baseline (FP32 state)",1024,43.234,23685,113.97
+"baseline (FP32 state)",2048,86.467,23685,113.97
+"BF16 state",1,2.236,447,63.64
+"BF16 state",8,2.354,3399,63.64
+"BF16 state",32,2.757,11608,63.64
+"BF16 state",64,3.294,19430,63.64
+"BF16 state",128,4.369,29300,63.64
+"BF16 state",256,7.409,34554,63.64
+"BF16 state",512,14.817,34554,63.64
+"BF16 state",1024,29.635,34554,63.64
+"BF16 state",2048,59.27,34554,63.64
+"ReplaySSM (FP32)",1,2.237,447,66.78
+"ReplaySSM (FP32)",8,2.36,3389,66.78
+"ReplaySSM (FP32)",32,2.783,11497,66.78
+"ReplaySSM (FP32)",64,3.347,19121,66.78
+"ReplaySSM (FP32)",128,4.475,28605,66.78
+"ReplaySSM (FP32)",256,7.621,33591,66.78
+"ReplaySSM (FP32)",512,15.242,33591,66.78
+"ReplaySSM (FP32)",1024,30.485,33591,66.78
+"ReplaySSM (FP32)",2048,60.97,33591,66.78
+"ReplaySSM + BF16 state",1,2.23,448,40.04
+"ReplaySSM + BF16 state",8,2.304,3472,40.04
+"ReplaySSM + BF16 state",32,2.557,12512,40.04
+"ReplaySSM + BF16 state",64,2.896,22103,40.04
+"ReplaySSM + BF16 state",128,3.572,35837,40.04
+"ReplaySSM + BF16 state",256,5.815,44023,40.04
+"ReplaySSM + BF16 state",512,11.63,44023,40.04
+"ReplaySSM + BF16 state",1024,23.26,44023,40.04
+"ReplaySSM + BF16 state",2048,46.521,44023,40.04
+"ReplaySSM + int8 state",1,2.226,449,26.67
+"ReplaySSM + int8 state",8,2.276,3515,26.67
+"ReplaySSM + int8 state",32,2.445,13090,26.67
+"ReplaySSM + int8 state",64,2.67,23972,26.67
+"ReplaySSM + int8 state",128,3.12,41023,26.67
+"ReplaySSM + int8 state",256,4.912,52117,26.67
+"ReplaySSM + int8 state",512,9.824,52117,26.67
+"ReplaySSM + int8 state",1024,19.648,52117,26.67
+"ReplaySSM + int8 state",2048,39.296,52117,26.67
+"ReplaySSM + BF16 state + FP8 W8A8 + FP8 KV",1,1.287,777,34.57
+"ReplaySSM + BF16 state + FP8 W8A8 + FP8 KV",8,1.35,5924,34.57
+"ReplaySSM + BF16 state + FP8 W8A8 + FP8 KV",32,1.569,20391,34.57
+"ReplaySSM + BF16 state + FP8 W8A8 + FP8 KV",64,1.861,34387,34.57
+"ReplaySSM + BF16 state + FP8 W8A8 + FP8 KV",128,2.445,52353,34.57
+"ReplaySSM + BF16 state + FP8 W8A8 + FP8 KV",256,4.149,61708,34.57
+"ReplaySSM + BF16 state + FP8 W8A8 + FP8 KV",512,8.297,61708,34.57
+"ReplaySSM + BF16 state + FP8 W8A8 + FP8 KV",1024,16.594,61708,34.57
+"ReplaySSM + BF16 state + FP8 W8A8 + FP8 KV",2048,33.188,61708,34.57
+"ReplaySSM + int8 state + FP8 W8A8 + FP8 KV + FP8 head",1,1.115,897,21.2
+"ReplaySSM + int8 state + FP8 W8A8 + FP8 KV + FP8 head",8,1.154,6930,21.2
+"ReplaySSM + int8 state + FP8 W8A8 + FP8 KV + FP8 head",32,1.289,24831,21.2
+"ReplaySSM + int8 state + FP8 W8A8 + FP8 KV + FP8 head",64,1.468,43606,21.2
+"ReplaySSM + int8 state + FP8 W8A8 + FP8 KV + FP8 head",128,1.826,70110,21.2
+"ReplaySSM + int8 state + FP8 W8A8 + FP8 KV + FP8 head",256,3.246,78878,21.2
+"ReplaySSM + int8 state + FP8 W8A8 + FP8 KV + FP8 head",512,6.491,78878,21.2
+"ReplaySSM + int8 state + FP8 W8A8 + FP8 KV + FP8 head",1024,12.982,78878,21.2
+"ReplaySSM + int8 state + FP8 W8A8 + FP8 KV + FP8 head",2048,25.964,78878,21.2

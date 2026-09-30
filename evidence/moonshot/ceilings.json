@@ -1,0 +1,529 @@
+{
+ "note": "derived floors (not measurements); see module docstring for assumptions",
+ "bandwidth_tb_s": 3.79,
+ "peak_bf16_tflops_assumed": 692.3,
+ "peak_fp8_tflops_assumed": 1187.4,
+ "context_tokens": 334,
+ "state_equals_weights_batch_fp32": 74,
+ "throughput": [
+  {
+   "stack": "baseline (FP32 state)",
+   "batch": 1,
+   "step_floor_ms": 2.249,
+   "tokens_per_s_ceiling": 445,
+   "per_request_mb": 113.97
+  },
+  {
+   "stack": "baseline (FP32 state)",
+   "batch": 8,
+   "step_floor_ms": 2.46,
+   "tokens_per_s_ceiling": 3252,
+   "per_request_mb": 113.97
+  },
+  {
+   "stack": "baseline (FP32 state)",
+   "batch": 32,
+   "step_floor_ms": 3.182,
+   "tokens_per_s_ceiling": 10058,
+   "per_request_mb": 113.97
+  },
+  {
+   "stack": "baseline (FP32 state)",
+   "batch": 64,
+   "step_floor_ms": 4.144,
+   "tokens_per_s_ceiling": 15444,
+   "per_request_mb": 113.97
+  },
+  {
+   "stack": "baseline (FP32 state)",
+   "batch": 128,
+   "step_floor_ms": 6.068,
+   "tokens_per_s_ceiling": 21093,
+   "per_request_mb": 113.97
+  },
+  {
+   "stack": "baseline (FP32 state)",
+   "batch": 256,
+   "step_floor_ms": 10.808,
+   "tokens_per_s_ceiling": 23685,
+   "per_request_mb": 113.97
+  },
+  {
+   "stack": "baseline (FP32 state)",
+   "batch": 512,
+   "step_floor_ms": 21.617,
+   "tokens_per_s_ceiling": 23685,
+   "per_request_mb": 113.97
+  },
+  {
+   "stack": "baseline (FP32 state)",
+   "batch": 1024,
+   "step_floor_ms": 43.234,
+   "tokens_per_s_ceiling": 23685,
+   "per_request_mb": 113.97
+  },
+  {
+   "stack": "baseline (FP32 state)",
+   "batch": 2048,
+   "step_floor_ms": 86.467,
+   "tokens_per_s_ceiling": 23685,
+   "per_request_mb": 113.97
+  },
+  {
+   "stack": "BF16 state",
+   "batch": 1,
+   "step_floor_ms": 2.236,
+   "tokens_per_s_ceiling": 447,
+   "per_request_mb": 63.64
+  },
+  {
+   "stack": "BF16 state",
+   "batch": 8,
+   "step_floor_ms": 2.354,
+   "tokens_per_s_ceiling": 3399,
+   "per_request_mb": 63.64
+  },
+  {
+   "stack": "BF16 state",
+   "batch": 32,
+   "step_floor_ms": 2.757,
+   "tokens_per_s_ceiling": 11608,
+   "per_request_mb": 63.64
+  },
+  {
+   "stack": "BF16 state",
+   "batch": 64,
+   "step_floor_ms": 3.294,
+   "tokens_per_s_ceiling": 19430,
+   "per_request_mb": 63.64
+  },
+  {
+   "stack": "BF16 state",
+   "batch": 128,
+   "step_floor_ms": 4.369,
+   "tokens_per_s_ceiling": 29300,
+   "per_request_mb": 63.64
+  },
+  {
+   "stack": "BF16 state",
+   "batch": 256,
+   "step_floor_ms": 7.409,
+   "tokens_per_s_ceiling": 34554,
+   "per_request_mb": 63.64
+  },
+  {
+   "stack": "BF16 state",
+   "batch": 512,
+   "step_floor_ms": 14.817,
+   "tokens_per_s_ceiling": 34554,
+   "per_request_mb": 63.64
+  },
+  {
+   "stack": "BF16 state",
+   "batch": 1024,
+   "step_floor_ms": 29.635,
+   "tokens_per_s_ceiling": 34554,
+   "per_request_mb": 63.64
+  },
+  {
+   "stack": "BF16 state",
+   "batch": 2048,
+   "step_floor_ms": 59.27,
+   "tokens_per_s_ceiling": 34554,
+   "per_request_mb": 63.64
+  },
+  {
+   "stack": "ReplaySSM (FP32)",
+   "batch": 1,
+   "step_floor_ms": 2.237,
+   "tokens_per_s_ceiling": 447,
+   "per_request_mb": 66.78
+  },
+  {
+   "stack": "ReplaySSM (FP32)",
+   "batch": 8,
+   "step_floor_ms": 2.36,
+   "tokens_per_s_ceiling": 3389,
+   "per_request_mb": 66.78
+  },
+  {
+   "stack": "ReplaySSM (FP32)",
+   "batch": 32,
+   "step_floor_ms": 2.783,
+   "tokens_per_s_ceiling": 11497,
+   "per_request_mb": 66.78
+  },
+  {
+   "stack": "ReplaySSM (FP32)",
+   "batch": 64,
+   "step_floor_ms": 3.347,
+   "tokens_per_s_ceiling": 19121,
+   "per_request_mb": 66.78
+  },
+  {
+   "stack": "ReplaySSM (FP32)",
+   "batch": 128,
+   "step_floor_ms": 4.475,
+   "tokens_per_s_ceiling": 28605,
+   "per_request_mb": 66.78
+  },
+  {
+   "stack": "ReplaySSM (FP32)",
+   "batch": 256,
+   "step_floor_ms": 7.621,
+   "tokens_per_s_ceiling": 33591,
+   "per_request_mb": 66.78
+  },
+  {
+   "stack": "ReplaySSM (FP32)",
+   "batch": 512,
+   "step_floor_ms": 15.242,
+   "tokens_per_s_ceiling": 33591,
+   "per_request_mb": 66.78
+  },
+  {
+   "stack": "ReplaySSM (FP32)",
+   "batch": 1024,
+   "step_floor_ms": 30.485,
+   "tokens_per_s_ceiling": 33591,
+   "per_request_mb": 66.78
+  },
+  {
+   "stack": "ReplaySSM (FP32)",
+   "batch": 2048,
+   "step_floor_ms": 60.97,
+   "tokens_per_s_ceiling": 33591,
+   "per_request_mb": 66.78
+  },
+  {
+   "stack": "ReplaySSM + BF16 state",
+   "batch": 1,
+   "step_floor_ms": 2.23,
+   "tokens_per_s_ceiling": 448,
+   "per_request_mb": 40.04
+  },
+  {
+   "stack": "ReplaySSM + BF16 state",
+   "batch": 8,
+   "step_floor_ms": 2.304,
+   "tokens_per_s_ceiling": 3472,
+   "per_request_mb": 40.04
+  },
+  {
+   "stack": "ReplaySSM + BF16 state",
+   "batch": 32,
+   "step_floor_ms": 2.557,
+   "tokens_per_s_ceiling": 12512,
+   "per_request_mb": 40.04
+  },
+  {
+   "stack": "ReplaySSM + BF16 state",
+   "batch": 64,
+   "step_floor_ms": 2.896,
+   "tokens_per_s_ceiling": 22103,
+   "per_request_mb": 40.04
+  },
+  {
+   "stack": "ReplaySSM + BF16 state",
+   "batch": 128,
+   "step_floor_ms": 3.572,
+   "tokens_per_s_ceiling": 35837,
+   "per_request_mb": 40.04
+  },
+  {
+   "stack": "ReplaySSM + BF16 state",
+   "batch": 256,
+   "step_floor_ms": 5.815,
+   "tokens_per_s_ceiling": 44023,
+   "per_request_mb": 40.04
+  },
+  {
+   "stack": "ReplaySSM + BF16 state",
+   "batch": 512,
+   "step_floor_ms": 11.63,
+   "tokens_per_s_ceiling": 44023,
+   "per_request_mb": 40.04
+  },
+  {
+   "stack": "ReplaySSM + BF16 state",
+   "batch": 1024,
+   "step_floor_ms": 23.26,
+   "tokens_per_s_ceiling": 44023,
+   "per_request_mb": 40.04
+  },
+  {
+   "stack": "ReplaySSM + BF16 state",
+   "batch": 2048,
+   "step_floor_ms": 46.521,
+   "tokens_per_s_ceiling": 44023,
+   "per_request_mb": 40.04
+  },
+  {
+   "stack": "ReplaySSM + int8 state",
+   "batch": 1,
+   "step_floor_ms": 2.226,
+   "tokens_per_s_ceiling": 449,
+   "per_request_mb": 26.67
+  },
+  {
+   "stack": "ReplaySSM + int8 state",
+   "batch": 8,
+   "step_floor_ms": 2.276,
+   "tokens_per_s_ceiling": 3515,
+   "per_request_mb": 26.67
+  },
+  {
+   "stack": "ReplaySSM + int8 state",
+   "batch": 32,
+   "step_floor_ms": 2.445,
+   "tokens_per_s_ceiling": 13090,
+   "per_request_mb": 26.67
+  },
+  {
+   "stack": "ReplaySSM + int8 state",
+   "batch": 64,
+   "step_floor_ms": 2.67,
+   "tokens_per_s_ceiling": 23972,
+   "per_request_mb": 26.67
+  },
+  {
+   "stack": "ReplaySSM + int8 state",
+   "batch": 128,
+   "step_floor_ms": 3.12,
+   "tokens_per_s_ceiling": 41023,
+   "per_request_mb": 26.67
+  },
+  {
+   "stack": "ReplaySSM + int8 state",
+   "batch": 256,
+   "step_floor_ms": 4.912,
+   "tokens_per_s_ceiling": 52117,
+   "per_request_mb": 26.67
+  },
+  {
+   "stack": "ReplaySSM + int8 state",
+   "batch": 512,
+   "step_floor_ms": 9.824,
+   "tokens_per_s_ceiling": 52117,
+   "per_request_mb": 26.67
+  },
+  {
+   "stack": "ReplaySSM + int8 state",
+   "batch": 1024,
+   "step_floor_ms": 19.648,
+   "tokens_per_s_ceiling": 52117,
+   "per_request_mb": 26.67
+  },
+  {
+   "stack": "ReplaySSM + int8 state",
+   "batch": 2048,
+   "step_floor_ms": 39.296,
+   "tokens_per_s_ceiling": 52117,
+   "per_request_mb": 26.67
+  },
+  {
+   "stack": "ReplaySSM + BF16 state + FP8 W8A8 + FP8 KV",
+   "batch": 1,
+   "step_floor_ms": 1.287,
+   "tokens_per_s_ceiling": 777,
+   "per_request_mb": 34.57
+  },
+  {
+   "stack": "ReplaySSM + BF16 state + FP8 W8A8 + FP8 KV",
+   "batch": 8,
+   "step_floor_ms": 1.35,
+   "tokens_per_s_ceiling": 5924,
+   "per_request_mb": 34.57
+  },
+  {
+   "stack": "ReplaySSM + BF16 state + FP8 W8A8 + FP8 KV",
+   "batch": 32,
+   "step_floor_ms": 1.569,
+   "tokens_per_s_ceiling": 20391,
+   "per_request_mb": 34.57
+  },
+  {
+   "stack": "ReplaySSM + BF16 state + FP8 W8A8 + FP8 KV",
+   "batch": 64,
+   "step_floor_ms": 1.861,
+   "tokens_per_s_ceiling": 34387,
+   "per_request_mb": 34.57
+  },
+  {
+   "stack": "ReplaySSM + BF16 state + FP8 W8A8 + FP8 KV",
+   "batch": 128,
+   "step_floor_ms": 2.445,
+   "tokens_per_s_ceiling": 52353,
+   "per_request_mb": 34.57
+  },
+  {
+   "stack": "ReplaySSM + BF16 state + FP8 W8A8 + FP8 KV",
+   "batch": 256,
+   "step_floor_ms": 4.149,
+   "tokens_per_s_ceiling": 61708,
+   "per_request_mb": 34.57
+  },
+  {
+   "stack": "ReplaySSM + BF16 state + FP8 W8A8 + FP8 KV",
+   "batch": 512,
+   "step_floor_ms": 8.297,
+   "tokens_per_s_ceiling": 61708,
+   "per_request_mb": 34.57
+  },
+  {
+   "stack": "ReplaySSM + BF16 state + FP8 W8A8 + FP8 KV",
+   "batch": 1024,
+   "step_floor_ms": 16.594,
+   "tokens_per_s_ceiling": 61708,
+   "per_request_mb": 34.57
+  },
+  {
+   "stack": "ReplaySSM + BF16 state + FP8 W8A8 + FP8 KV",
+   "batch": 2048,
+   "step_floor_ms": 33.188,
+   "tokens_per_s_ceiling": 61708,
+   "per_request_mb": 34.57
+  },
+  {
+   "stack": "ReplaySSM + int8 state + FP8 W8A8 + FP8 KV + FP8 head",
+   "batch": 1,
+   "step_floor_ms": 1.115,
+   "tokens_per_s_ceiling": 897,
+   "per_request_mb": 21.2
+  },
+  {
+   "stack": "ReplaySSM + int8 state + FP8 W8A8 + FP8 KV + FP8 head",
+   "batch": 8,
+   "step_floor_ms": 1.154,
+   "tokens_per_s_ceiling": 6930,
+   "per_request_mb": 21.2
+  },
+  {
+   "stack": "ReplaySSM + int8 state + FP8 W8A8 + FP8 KV + FP8 head",
+   "batch": 32,
+   "step_floor_ms": 1.289,
+   "tokens_per_s_ceiling": 24831,
+   "per_request_mb": 21.2
+  },
+  {
+   "stack": "ReplaySSM + int8 state + FP8 W8A8 + FP8 KV + FP8 head",
+   "batch": 64,
+   "step_floor_ms": 1.468,
+   "tokens_per_s_ceiling": 43606,
+   "per_request_mb": 21.2
+  },
+  {
+   "stack": "ReplaySSM + int8 state + FP8 W8A8 + FP8 KV + FP8 head",
+   "batch": 128,
+   "step_floor_ms": 1.826,
+   "tokens_per_s_ceiling": 70110,
+   "per_request_mb": 21.2
+  },
+  {
+   "stack": "ReplaySSM + int8 state + FP8 W8A8 + FP8 KV + FP8 head",
+   "batch": 256,
+   "step_floor_ms": 3.246,
+   "tokens_per_s_ceiling": 78878,
+   "per_request_mb": 21.2
+  },
+  {
+   "stack": "ReplaySSM + int8 state + FP8 W8A8 + FP8 KV + FP8 head",
+   "batch": 512,
+   "step_floor_ms": 6.491,
+   "tokens_per_s_ceiling": 78878,
+   "per_request_mb": 21.2
+  },
+  {
+   "stack": "ReplaySSM + int8 state + FP8 W8A8 + FP8 KV + FP8 head",
+   "batch": 1024,
+   "step_floor_ms": 12.982,
+   "tokens_per_s_ceiling": 78878,
+   "per_request_mb": 21.2
+  },
+  {
+   "stack": "ReplaySSM + int8 state + FP8 W8A8 + FP8 KV + FP8 head",
+   "batch": 2048,
+   "step_floor_ms": 25.964,
+   "tokens_per_s_ceiling": 78878,
+   "per_request_mb": 21.2
+  }
+ ],
+ "batch1_latency": {
+  "plain_bf16": {
+   "cycle_ms": 2.2193667546174143,
+   "tokens_per_s": 450.57897615141354
+  },
+  "mtp3_accept3.4": {
+   "cycle_ms": 3.416675461741425,
+   "tokens_per_s": 995.1193896148025
+  },
+  "mtp3_accept3.4_hot32k": {
+   "cycle_ms": 2.5430915866496204,
+   "tokens_per_s": 1336.9553884134027
+  },
+  "mtp3_accept3.4_hot32k_fp8target": {
+   "cycle_ms": 1.6011390800533143,
+   "tokens_per_s": 2123.488235567136
+  },
+  "mtp5_accept4.5_hot32k_fp8target": {
+   "cycle_ms": 1.816955634741452,
+   "tokens_per_s": 2476.670268638859
+  }
+ },
+ "mtp_high_batch_accept3": [
+  {
+   "batch": 1,
+   "plain_fp32_tok_s": 445,
+   "mtp_stock_tok_s": 767,
+   "mtp_replayssm_spec_tok_s": 780
+  },
+  {
+   "batch": 8,
+   "plain_fp32_tok_s": 3252,
+   "mtp_stock_tok_s": 5232,
+   "mtp_replayssm_spec_tok_s": 5917
+  },
+  {
+   "batch": 32,
+   "plain_fp32_tok_s": 10058,
+   "mtp_stock_tok_s": 13907,
+   "mtp_replayssm_spec_tok_s": 20092
+  },
+  {
+   "batch": 64,
+   "plain_fp32_tok_s": 15444,
+   "mtp_stock_tok_s": 19219,
+   "mtp_replayssm_spec_tok_s": 33448
+  },
+  {
+   "batch": 128,
+   "plain_fp32_tok_s": 21093,
+   "mtp_stock_tok_s": 19505,
+   "mtp_replayssm_spec_tok_s": 34321
+  },
+  {
+   "batch": 256,
+   "plain_fp32_tok_s": 23685,
+   "mtp_stock_tok_s": 19505,
+   "mtp_replayssm_spec_tok_s": 34321
+  },
+  {
+   "batch": 512,
+   "plain_fp32_tok_s": 23685,
+   "mtp_stock_tok_s": 19505,
+   "mtp_replayssm_spec_tok_s": 34321
+  },
+  {
+   "batch": 1024,
+   "plain_fp32_tok_s": 23685,
+   "mtp_stock_tok_s": 19505,
+   "mtp_replayssm_spec_tok_s": 34321
+  },
+  {
+   "batch": 2048,
+   "plain_fp32_tok_s": 23685,
+   "mtp_stock_tok_s": 19505,
+   "mtp_replayssm_spec_tok_s": 34321
+  }
+ ]
+}
