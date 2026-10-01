@@ -94,7 +94,7 @@
    }
   }
  },
- "panel": "experiments/drafter/panel-v1.jsonl (branch drafter/block-drafter)",
+ "panel": "experiments/drafter/panel-v1.jsonl",
  "math500_ids": [
   "math500-test/precalculus/989.json",
   "math500-test/counting_and_probability/389.json",

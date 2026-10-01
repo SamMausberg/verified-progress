@@ -40,7 +40,12 @@
       "S_a_real_e2e": 1.9974030720958562,
       "S_b_decode": 1.647795861082746,
       "S_b_e2e": 1.6238169598521042,
-      "gate_lower_us_per_token": 288.1044117647059,
+      "anchor_pass_floor_us": 2214.0390781290826,
+      "S_b_ceiling_decode": 2.185809478276008,
+      "S_b_ceiling_e2e": 2.1282790606769475,
+      "S_b_ceiling_anchor_free_e2e": 3.0240455953255587,
+      "state_share_needed_for_target": 0.719020547293192,
+      "gate_lower_us_per_token": 306.11093750000003,
       "gate_rejects": false
     },
     {
@@ -65,7 +70,12 @@
       "S_a_real_e2e": 2.899087565325697,
       "S_b_decode": 2.187086342255724,
       "S_b_e2e": 2.1294619665984302,
-      "gate_lower_us_per_token": 224.67045454545453,
+      "anchor_pass_floor_us": 2230.5343882937022,
+      "S_b_ceiling_decode": 3.2235603133023605,
+      "S_b_ceiling_e2e": 3.0680478912327978,
+      "S_b_ceiling_anchor_free_e2e": 3.9088226682057456,
+      "state_share_needed_for_target": 0.6239923224796382,
+      "gate_lower_us_per_token": 231.69140625,
       "gate_rejects": false
     },
     {
@@ -90,7 +100,12 @@
       "S_a_real_e2e": 3.1718870855332835,
       "S_b_decode": 2.0475564387376344,
       "S_b_e2e": 1.9998014930201709,
-      "gate_lower_us_per_token": 242.09846153846152,
+      "anchor_pass_floor_us": 2263.525008622942,
+      "S_b_ceiling_decode": 3.4544745297026216,
+      "S_b_ceiling_e2e": 3.271432616710124,
+      "S_b_ceiling_anchor_free_e2e": 3.7022819431376806,
+      "state_share_needed_for_target": 0.6448906022901039,
+      "gate_lower_us_per_token": 245.88125,
       "gate_rejects": false
     },
     {
@@ -115,7 +130,12 @@
       "S_a_real_e2e": 3.7192035455451316,
       "S_b_decode": 2.2888054443332293,
       "S_b_e2e": 2.223481131888442,
-      "gate_lower_us_per_token": 218.73290697674418,
+      "anchor_pass_floor_us": 2329.5062492814213,
+      "S_b_ceiling_decode": 4.071248487825931,
+      "S_b_ceiling_e2e": 3.8048644589581246,
+      "S_b_ceiling_anchor_free_e2e": 4.089702115285567,
+      "state_share_needed_for_target": 0.6031647836762717,
+      "gate_lower_us_per_token": 220.4417578125,
       "gate_rejects": false
     },
     {
@@ -140,7 +160,12 @@
       "S_a_real_e2e": 4.676598495632134,
       "S_b_decode": 2.8977117858855097,
       "S_b_e2e": 2.777555356316387,
-      "gate_lower_us_per_token": 174.9730155642023,
+      "anchor_pass_floor_us": 2461.46873059838,
+      "S_b_ceiling_decode": 5.244013810638043,
+      "S_b_ceiling_e2e": 4.781431749977996,
+      "S_b_ceiling_anchor_free_e2e": 5.013248144804921,
+      "state_share_needed_for_target": 0.5014434612866925,
+      "gate_lower_us_per_token": 175.65650390624998,
       "gate_rejects": false
     }
   ]

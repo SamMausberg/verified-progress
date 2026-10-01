@@ -119,7 +119,7 @@ def main() -> None:
                     **attempt(accepts[k] - a0, k, repair_us),
                 }
             )
-    max_extra = B - 1 - a0 + 1
+    max_extra = B - 1 - a0  # the audited candidate accepts at most B - 1 drafts
     rigorous = audit_us / max_extra >= per_token_base
     out = {
         'kind': 'derived: measured progress (residual_eval.py) and phase times (stage_a.py); repair cost is a bytes-only lower bound',

@@ -75,7 +75,7 @@ SGLANG_WORKTREE=~/sglang-wt/drafter source scripts/sglang_env.sh
 The drafter's timed runs use the stock engine; trained drafters load through SGLang's
 unmodified `DFlashDraftModel` and `DFlash2DraftModel`.
 
-## repair (`patches/repair/0001`, branch `engine/repair`)
+## repair (`patches/repair/0001-0002`, branch `engine/repair`, head `5d8e00e3e1`)
 
 ```sh
 scripts/sglang_worktree.sh repair
@@ -94,5 +94,11 @@ changes unless one of these variables is set:
 | `SGLANG_REPAIR_POLICY=recycle\|keep`, `SGLANG_REPAIR_MAX_PASSES=r` | after a rejection the next block is drafted from the previous pass's target predictions (a sliding Jacobi step) or from the previous draft's tail, falling back to the fresh draft; greedy only |
 | `SGLANG_REPAIR_SWEEPS=k` with `SGLANG_REPAIR_TRACE=<path>` | probe mode: k extra full verify passes per block (Jacobi and correct-one sweeps) from the same committed prefix, then the original draft's pass is re-run and committed, so the trajectory is plain DFlash; the committed GDN conv and SSM states are restored before every extra pass and the re-run must reproduce the first pass's argmax |
 | `SGLANG_REPAIR_TRACE=<path>` | one JSON line per request per cycle: prefix length, fresh draft, verified block, target argmax at every position, accepted length, sweeps (syncs the host; no timing from traced runs) |
+
+`0002` adds one variable to the FlashInfer GDN verify kernel:
+
+| Variable | Effect |
+|---|---|
+| `SGLANG_REPAIR_DROP_VERIFY_STATES=1` | the verify kernel skips the per-position FP32 state writes. Timing with forced acceptance only: the commit then copies stale scratch into the request's state, so it corrupts the committed state and every token after the first cycle |
 
 Forced full acceptance uses SGLang's existing `SGLANG_SIMULATE_ACC_LEN`.

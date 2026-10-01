@@ -16,8 +16,13 @@ run this derives:
   drafting at width B, the draft-cache update and host gaps;
 - S_b(B) = B C_D / (A_D (C_anchor + C_audit + C_state)) with C_anchor = V0(B) + anchor
   write and C_audit = V(B) + commit(B) (free repair, P3's two-pass design);
+- the ceiling for S_b: the anchor pass costs at least one read of the weights at the HBM
+  read peak plus writing its anchor cache at that rate (the byte-bound V0 above is an
+  estimate, not a bound), and the share of V(B) the per-position state writes would need
+  to be for P3 to reach the target if both passes dropped them (boundary replay);
 - each converted end to end with the measured unaffected fraction f, and Sam's economic
-  gate: reject if (V(B) + commit(B)) / (B + 1) >= C_D / A_D.
+  gate: reject if (V(B) + commit(B)) / B >= C_D / A_D (a width-B cycle commits at most B
+  tokens: the bonus token and B - 1 drafts; Sam's B + 1 counts B drafts).
 
 The baseline (C_D, A_D, f) is the real DFlash run named by --baseline, or given
 explicitly. Derived calculation from measured inputs; labelled as such in the output.
@@ -85,6 +90,18 @@ def main() -> None:
     )
     ap.add_argument('--f', type=float, default=None, help='override the unaffected fraction f')
     ap.add_argument('--target', type=float, default=5.0, help='end-to-end speedup target')
+    ap.add_argument(
+        '--weight-bytes',
+        type=float,
+        default=8.41e9,
+        help='weights read per target pass (4.2058e9 BF16 parameters incl. the tied head)',
+    )
+    ap.add_argument(
+        '--read-tbps',
+        type=float,
+        default=3.827,
+        help='HBM read peak (evidence/profiles/hbm_bandwidth.json, 4 GiB read)',
+    )
     ap.add_argument('--out-dir', type=Path, required=True)
     args = ap.parse_args()
 
@@ -143,6 +160,11 @@ def main() -> None:
             continue
         v0 = verify - (0.0 if replay_protocol else states)
         anchor_write = B * anchor_bytes / (write_tbps * 1e12) * 1e6
+        # Ceiling for the anchor pass: it cannot cost less than reading the weights once,
+        # and its anchor cache is written at no more than the read peak.
+        weight_floor = args.weight_bytes / (args.read_tbps * 1e12) * 1e6
+        anchor_write_fast = B * anchor_bytes / (args.read_tbps * 1e12) * 1e6
+        c_b_floor = weight_floor + anchor_write_fast + verify + commit
         c_state_sglang = (0.0 if replay_protocol else states) + commit
         s_a = B * cd / (ad * (verify + commit))
         s_a_real = B * cd / (ad * period)
@@ -171,8 +193,22 @@ def main() -> None:
                 'S_a_real_e2e': e2e(s_a_real),
                 'S_b_decode': s_b,
                 'S_b_e2e': e2e(s_b),
-                'gate_lower_us_per_token': (verify + commit) / (B + 1),
-                'gate_rejects': (verify + commit) / (B + 1) >= per_token_base,
+                'anchor_pass_floor_us': weight_floor + anchor_write_fast,
+                'S_b_ceiling_decode': B * cd / (ad * c_b_floor),
+                'S_b_ceiling_e2e': e2e(B * cd / (ad * c_b_floor)),
+                'S_b_ceiling_anchor_free_e2e': e2e(B * cd / (ad * (verify + commit))),
+                # Share of V(B) the per-position state writes would need to be for P3 to reach
+                # the target if both of its passes ran without per-position states (boundary
+                # replay, its cost not charged): 2 V (1 - s) + anchor write + commit = budget.
+                'state_share_needed_for_target': max(
+                    0.0,
+                    1.0 - (B * cd / (ad * need_decode) - anchor_write_fast - commit) / (2 * verify),
+                )
+                if need_decode != float('inf')
+                else None,
+                # A width-B SGLang DFlash cycle commits at most B tokens (bonus plus B - 1 drafts).
+                'gate_lower_us_per_token': (verify + commit) / B,
+                'gate_rejects': (verify + commit) / B >= per_token_base,
             }
         )
     out = {

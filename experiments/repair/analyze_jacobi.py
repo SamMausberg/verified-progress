@@ -325,7 +325,7 @@ def write_one_step(manifest: Path, summaries: list[dict[str, Any]], path: Path) 
         'kind': 'measured offline from the drafter workstream DFlash-4B greedy trace (real target '
         'argmax at every verify row); one-step comparison of next-block draft sources',
         'trace': trace,
-        'panel': man['panel_file'],
+        'panel': man['panel_file'].split(' (')[0],
         'math500_ids': man['math500_ids'],
         'results': [
             {k: v for k, v in s.items() if k not in ('run', 'hazards', 'one_correction')}
