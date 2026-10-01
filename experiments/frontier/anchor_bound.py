@@ -65,6 +65,36 @@ def proxy(s_d: list[float], horizon: int, decayed: bool) -> list[float]:
     return out
 
 
+def alpha_needed_in_gap(width: int, spacing: int, threshold: float) -> float | None:
+    """Smallest constant per-position acceptance a within the first gap, S'(m) = a^m, for which
+    the first-gap bound reaches the threshold (None if even a = 1 does not)."""
+    if bound([1.0] * (spacing - 1), width, spacing) < threshold:
+        return None
+    lo, hi = 0.0, 1.0
+    for _ in range(60):
+        mid = (lo + hi) / 2
+        if bound([mid**m for m in range(1, spacing)], width, spacing) >= threshold:
+            hi = mid
+        else:
+            lo = mid
+    return hi
+
+
+def independent_gaps(sp: list[float], width: int, spacing: int) -> float:
+    """Expected commit if every gap behaved like the first and gaps failed independently
+    (an estimate for context, not a bound): survival multiplies by S'(s - 1) per gap."""
+    total, carry, k = 1.0, 1.0, 1
+    while k <= width - 1:
+        total += carry  # the anchor at position k
+        for m in range(1, spacing):
+            if k + m > width - 1:
+                break
+            total += carry * sp[m - 1]
+        carry *= sp[spacing - 2]
+        k += spacing
+    return total
+
+
 def bound(sp: list[float], width: int, spacing: int) -> float:
     gap = spacing - 1
     return 2 + sum(sp[:gap]) + (width - 1 - spacing) * sp[gap - 1]
@@ -93,12 +123,12 @@ def main() -> None:
                     entry[key] = {
                         'E_G_star_upper': round(bound(sp, width, spacing), 2),
                         'first_gap_survival_proxy': round(sp[-1], 4),
+                        'independent_gaps_estimate': round(independent_gaps(sp, width, spacing), 2),
                     }
-            # Most lenient survival the first gap would need: every earlier position counted as
-            # surviving, so E <= 1 + spacing + (width - 1 - spacing) S.
-            entry['first_gap_survival_needed_lenient'] = round(
-                (lenient - 1 - spacing) / (width - 1 - spacing), 4
-            )
+            # Reported beside the rule: the constant per-position acceptance inside the first
+            # gap that the bound would need (DFlash-16 measures 0.80-0.91 per position).
+            need_a = alpha_needed_in_gap(width, spacing, lenient)
+            entry['gap_alpha_needed_for_threshold'] = None if need_a is None else round(need_a, 4)
             entry['rejected'] = entry['all']['E_G_star_upper'] < lenient
             # Sensitivity, not part of the rule: the cycle time a cheaper verify would have to
             # save for the pooled bound to reach the lenient threshold.
@@ -144,7 +174,7 @@ def main() -> None:
                 r,
                 e['spacing'],
                 e['all'],
-                e['first_gap_survival_needed_lenient'],
+                e['gap_alpha_needed_for_threshold'],
                 e['rejected'],
             )
 

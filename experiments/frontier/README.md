@@ -108,8 +108,12 @@ column. P-B is a no-go at width B if r = 2, 4, 8 and 16 (the proposal's counts) 
 rejected; it goes to its Stage A (an adapted wide expander, GPU budget needed) only if one
 of them survives. This bound uses inputs that were already committed when the rule was
 written, and its rough size was anticipated from them; it is a derived bound, not a new
-measurement. The escape is an expander whose first-gap survival reaches the
-`first_gap_survival_needed_lenient` value in the JSON.
+measurement. The escape is an expander that drafts inside a gap at the per-position
+acceptance `gap_alpha_needed_for_threshold` in the JSON. (That field and
+`independent_gaps_estimate`, the expected commit if every gap behaved like the first and gaps
+failed independently, were added after the first run as reporting only; they replace a
+`first_gap_survival_needed_lenient` field that was meaningless for gaps longer than the
+threshold. The rule is unchanged.)
 
 **B2 (P-B, optional smoke test, run only on request).** Plant true tokens at block
 slots 4 and 8 of DFlash-4B's block-16 input at the panel-v1 anchors (the support-screen
