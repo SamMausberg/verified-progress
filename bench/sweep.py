@@ -170,9 +170,12 @@ def log_segment_stats(text: str) -> dict[str, Any]:
     top = max(running) if running else 0
     # The server's own decode rate while (nearly) the full batch is running: what
     # the GPU sustains, against which the client-observed y can be compared.
+    # The first decode line of a segment covers the time since the previous log line,
+    # which lies before the point (idle time, cache flush, client start-up), so its
+    # rate is not the point's; it is left out of the full-batch rates.
     full_lines = [
         (int(run), float(acc) if acc else 1.0, float(tps))
-        for run, acc, _, tps in lines
+        for run, acc, _, tps in lines[1:]
         if top and int(run) >= 0.9 * top
     ]
     full = sorted(tps for _, _, tps in full_lines)

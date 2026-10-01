@@ -338,6 +338,9 @@ def test_log_segment_stats() -> None:
     assert stats['logged_gen_tps_full_batch_p50'] == pytest.approx(12.0)
     assert stats['logged_gen_tps_full_batch'] == pytest.approx(12.0)
     two = (
+        # The first line spans the gap before the segment and is ignored.
+        'Decode batch, #running-req: 10, accept len: 2.00, cuda graph: True, '
+        'gen throughput (token/s): 1.0\n'
         'Decode batch, #running-req: 10, accept len: 2.00, cuda graph: True, '
         'gen throughput (token/s): 100.0\n'
         'Decode batch, #running-req: 10, accept len: 4.00, cuda graph: True, '
