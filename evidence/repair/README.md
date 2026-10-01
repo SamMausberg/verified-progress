@@ -96,8 +96,9 @@ and are excluded.
 
 **Cross-session caveat.** The FlashInfer-with-states column comes from the Stage A session
 (00:04-00:41 UTC), the other two from this session. The draft phase, which neither change
-touches, is 2.0-2.6% shorter in this session (2.335 against 2.397 ms at B = 16, 3.148 against
-3.212 ms at B = 256), so differences of a few percent between the sessions are within drift; a
+touches, is 1.8-2.6% shorter in this session (2.335 and 2.339 against 2.397 ms at B = 16, 3.148
+and 3.131 against 3.207 ms at B = 256), so differences of a few percent between the sessions are
+within drift; a
 same-session control (all three variants at B = 16 and 256) is queued.
 
 With `--linear-attn-decode-backend flashinfer` SGLang verifies GDN layers with FlashInfer's
@@ -149,9 +150,10 @@ f = 2.39%, so 5x end to end needs 5.54x in decode; decode / end to end):
   and its measured state writes (4.10 ms, FlashInfer verify kernel, cross-session), P3's ceiling
   with a state-free audit and an uncharged boundary replay would also reach it at B = 256
   (5.18x end to end, `S_b_ceiling_stateless_audit_e2e`; 2.33 ms needed).
-- P2 therefore turns on drafting: a 5x gain needs blocks of 64 or more tokens accepted almost
-  entirely, and the repair mechanisms tested here do not produce them (one-step recycling below;
-  exact Jacobi about one token per pass, Stage B). P3 stays refuted by Stage B.
+- With the Triton kernel (pending exactness classification), P2 therefore turns on drafting: a
+  5x gain needs blocks of 64 or more tokens accepted almost entirely, and the repair mechanisms
+  tested here do not produce them (one-step recycling below; exact Jacobi about one token per
+  pass, Stage B). P3 stays refuted by Stage B.
 
 ### P3 Stage B: anchored residual evaluation on real DFlash blocks (block 16)
 
