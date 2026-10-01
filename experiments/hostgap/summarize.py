@@ -108,7 +108,11 @@ def summarize_label(label_dir: Path) -> dict[str, Any]:
     out: dict[str, Any] = {'label': label_dir.name, 'by_concurrency': {}}
     for c in sorted({w['concurrency'] for w in windows}):
         rows = [w for w in windows if w['concurrency'] == c]
-        counted = [r for r in rows if r['window_kind'] in ('unprofiled', 'uncollected')]
+        counted = [
+            r
+            for r in rows
+            if r['window_kind'] in ('unprofiled', 'uncollected') and not r.get('invalid_reason')
+        ]
         entry: dict[str, Any] = {'counter_windows': counter_summary(counted)}
         for r in rows:
             if r['window_kind'] == 'pyspy' and Path(r['output']).exists():
