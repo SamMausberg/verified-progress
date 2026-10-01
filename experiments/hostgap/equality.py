@@ -32,6 +32,8 @@ import fcntl
 import hashlib
 import json
 import os
+import re
+import subprocess
 import sys
 import time
 import urllib.request
@@ -46,6 +48,41 @@ from bench.server import Server, add_arm_arguments, arm_from_args, http_post
 
 DEFAULT_WORKLOAD = REPO / 'bench' / 'workloads' / 'mixed-v2' / 'tune.jsonl'
 LENGTHS = (128, 224, 320, 416, 512)
+
+
+_MAMBA = re.compile(r'Mamba Cache is allocated\. max_mamba_cache_size: (\d+)')
+_KV = re.compile(r'KV Cache is allocated\. dtype: [\w.]+, #tokens: (\d+)')
+_RUNNING = re.compile(r'#running-req: (\d+)')
+
+
+def resolved_pools(log_text: str) -> dict[str, Any]:
+    """Pool sizes and the running-request high-water mark from a server log."""
+    running = [int(x) for x in _RUNNING.findall(log_text)]
+    return {
+        'mamba_cache_slots': [int(x) for x in _MAMBA.findall(log_text)],
+        'kv_cache_tokens': [int(x) for x in _KV.findall(log_text)],
+        'max_running_reqs_seen': max(running) if running else None,
+    }
+
+
+def free_gib() -> float | None:
+    out = subprocess.run(
+        ['nvidia-smi', '--query-gpu=memory.free', '--format=csv,noheader,nounits', '-i', '0'],
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout.strip()
+    return int(out) / 1024 if out.isdigit() else None
+
+
+def wait_free(min_gib: float, timeout: float = 300.0) -> float | None:
+    """Block until the GPU has at least `min_gib` free (pools are sized from it)."""
+    deadline = time.monotonic() + timeout
+    while True:
+        free = free_gib()
+        if free is None or free >= min_gib or time.monotonic() > deadline:
+            return free
+        time.sleep(2.0)
 
 
 def max_new_tokens(prompt_id: str) -> int:
@@ -139,6 +176,9 @@ def run(args: argparse.Namespace) -> int:
     )
     lock = startup_lock() if args.shared else contextlib.nullcontext()
     with lock:
+        free_at_start = wait_free(args.min_free_gb) if args.min_free_gb else free_gib()
+        if args.min_free_gb and (free_at_start is None or free_at_start < args.min_free_gb):
+            raise SystemExit(f'only {free_at_start} GiB free, need {args.min_free_gb}')
         server.start()
         try:
             server.wait_ready()
@@ -156,6 +196,9 @@ def run(args: argparse.Namespace) -> int:
                     'sglang_source': server.launch_record.get('sglang_source'),
                     'repo': server.launch_record.get('repo'),
                     'checks': server.launch_record.get('checks'),
+                    'free_gib_at_start': free_at_start,
+                    'final_limits': server.launch_record.get('final_limits'),
+                    'memory_usage': server.launch_record.get('memory_usage'),
                     'prompts': len(prompts),
                     'workload': str(args.workload),
                 },
@@ -211,6 +254,11 @@ def run(args: argparse.Namespace) -> int:
             for record in records:
                 handle.write(json.dumps(record) + '\n')
         server.stop()
+        summary_path = out_dir / 'launch_summary.json'
+        if summary_path.exists():
+            summary = json.loads(summary_path.read_text())
+            summary['pools'] = resolved_pools(server.log_text())
+            summary_path.write_text(json.dumps(summary, indent=2, default=str) + '\n')
     return 0
 
 
@@ -228,11 +276,27 @@ def compare(args: argparse.Namespace) -> int:
 
     a, b = load(args.a), load(args.b)
     keys = sorted(set(a) & set(b))
+
+    def pools(path: Path) -> dict[str, Any]:
+        summary = json.loads((path / 'launch_summary.json').read_text())
+        resolved = summary.get('pools') or {}
+        return {
+            'final_limits': summary.get('final_limits'),
+            'mamba_cache_slots': resolved.get('mamba_cache_slots'),
+            'kv_cache_tokens': resolved.get('kv_cache_tokens'),
+        }
+
+    pools_a, pools_b = pools(args.a), pools(args.b)
     summary: dict[str, Any] = {
         'a': str(args.a),
         'b': str(args.b),
         'only_in_a': len(set(a) - set(b)),
         'only_in_b': len(set(b) - set(a)),
+        'pools_a': pools_a,
+        'pools_b': pools_b,
+        # Pool sizes decide the running limit and batch composition; a comparison
+        # between servers with different pools is not an equality test.
+        'pools_equal': pools_a == pools_b,
         'by_concurrency': {},
         'mismatches': [],
     }
@@ -289,7 +353,8 @@ def compare(args: argparse.Namespace) -> int:
         )
         summary['by_concurrency'][str(concurrency)] = stats
     summary['all_equal'] = (
-        not summary['only_in_a']
+        summary['pools_equal']
+        and not summary['only_in_a']
         and not summary['only_in_b']
         and all(s['all_equal'] for s in summary['by_concurrency'].values())
     )
@@ -313,6 +378,9 @@ def main() -> int:
     run_p.add_argument('--workload', type=Path, default=DEFAULT_WORKLOAD)
     run_p.add_argument('--shared', action='store_true', help='shared GPU slot sizing and lock')
     run_p.add_argument('--shared-capacity', type=int, default=32)
+    run_p.add_argument(
+        '--min-free-gb', type=float, default=0.0, help='wait for this much free GPU memory'
+    )
     run_p.add_argument('--no-strict', action='store_true')
     cmp_p = sub.add_parser('compare')
     cmp_p.add_argument('a', type=Path)

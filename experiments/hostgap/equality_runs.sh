@@ -30,17 +30,20 @@ cd "$REPO" || exit 1
 config=${1:?usage: $0 mtp|dflash variant...}
 shift
 TUNED=(--set disable-radix-cache=true --set max-total-tokens=1000000)
-SHARED=()
+MODE_ARGS=()
 if [ "${EQ_MODE:-exclusive}" = shared ]; then
-  SHARED=(--shared)
+  MODE_ARGS=(--shared)
   case "$config" in
     mtp) C=(1 8 32) ;;
     # DFlash block 8 keeps 8 intermediate GDN states per request, so a 0.25
     # slot holds 16 requests.
-    dflash) C=(1 8 16); SHARED+=(--shared-capacity 16) ;;
+    dflash) C=(1 8 16); MODE_ARGS+=(--shared-capacity 16) ;;
   esac
 else
+  # Pools pinned: explicit running limit (arm default 128), KV tokens (1M) and
+  # mamba slots (128), and every server starts on an empty GPU.
   TUNED+=(--set max-mamba-cache-size=128)
+  MODE_ARGS=(--min-free-gb "${EQ_MIN_FREE_GB:-90}")
   C=(1 8 32)
 fi
 case "$config" in
@@ -60,7 +63,7 @@ for variant in "$@"; do
     *) echo "unknown variant $variant" >&2; continue ;;
   esac
   echo "=== $(date -u +%H:%M:%S) $config $variant"
-  python experiments/hostgap/equality.py run "${ARM[@]}" "${extra[@]}" "${SHARED[@]}" \
+  python experiments/hostgap/equality.py run "${ARM[@]}" "${extra[@]}" "${MODE_ARGS[@]}" \
     --concurrency "${C[@]}" --label "$variant" --out "$OUT/$config" --port "$PORT" ||
     echo "!!! $config $variant failed ($?)"
 done
