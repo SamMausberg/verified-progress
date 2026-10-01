@@ -47,7 +47,11 @@ tile maxima to fall below a threshold score, which `analyze_transport.py` measur
 | `analyze_transport.py` | H2 metrics |
 | `analyze_selfevidence.py` | H3 metrics |
 | `analyze_rho.py` | The drift ratio rho, the per-row threshold and head-metric drift |
-| `analyze_stats.py` | Norms, drift, margins, top-m mass, hidden-dimension outliers |
+| `analyze_stats.py` | Norms, drift, margins, top-m mass, hidden-dimension outliers; envelope width against realized error |
+| `analyze_rstock.py` | How often the stock head's decision (R-stock) needs the stock kernel: `stock_gap` rule and a bucket-exact rule |
+| `export_candidate_ccdf.py` | Candidate-count CCDFs for plotting |
+| `tail_killtest.py` | Proposal P1 kill test: INT8 surrogate of the final FFN versus certifying the head alone (HF forward on CPU) |
+| `work_model.py` | Work and predicted time per mechanism from replay counts and measured primitive costs (model predictions) |
 
 `tests/test_head_geometry_bounds.py` checks that every bound encloses exact values on
 random BF16 heads (it skips without torch).
@@ -74,34 +78,40 @@ input at position `S` (the bonus position) has no draft anchor.
 
 ## Commands
 
-All GPU commands go through the lock. Captures use `SGLANG_WORKTREE=~/sglang-wt/geometry`
-with the patch applied; raw dumps go to `~/vp-data/geometry/` (outside git).
+Captures and every CPU-heavy analysis go through the GPU lock (`-s` for correctness work;
+CPU-heavy jobs too, so they never overlap a timed exclusive run). Captures use
+`SGLANG_WORKTREE=~/sglang-wt/geometry` with the patch applied; raw dumps go to
+`~/vp-data/geometry/` (outside git). The exact command and code commit behind each
+committed file are listed in `evidence/head_geometry/README.md`; the pattern is:
 
 ```sh
 source scripts/sglang_env.sh
 python experiments/head_geometry/build_prompts.py --out ~/vp-data/geometry \
     --manifest evidence/head_geometry/prompt_manifest.csv
 
+# Captures (server start-up is serialized by scripts/gpu_startup_lock.sh inside the script)
 scripts/gpu_lock.sh -s experiments/head_geometry/run_capture.sh plain4b
 scripts/gpu_lock.sh -s experiments/head_geometry/run_capture.sh mtp4b
-scripts/gpu_lock.sh -x experiments/head_geometry/run_capture.sh dflash27b
+scripts/gpu_lock.sh -s experiments/head_geometry/run_capture.sh dflash4b
 
 cd experiments/head_geometry
-../../scripts/gpu_lock.sh -s python validate_alignment.py --arm plain4b \
-    --out ../../evidence/head_geometry/alignment_plain4b.json
-../../scripts/gpu_lock.sh -s python validate_alignment.py --arm mtp4b \
-    --out ../../evidence/head_geometry/alignment_mtp4b.json
-../../scripts/gpu_lock.sh -s python analyze_selfevidence.py --sets plain verify draft \
-    --out ../../evidence/head_geometry
-../../scripts/gpu_lock.sh -s python analyze_transport.py --arm mtp4b \
-    --out ../../evidence/head_geometry
-../../scripts/gpu_lock.sh -s python analyze_stats.py --arm mtp4b \
-    --out ../../evidence/head_geometry/stats_4b.json
+EV=../../evidence/head_geometry
+L=../../scripts/gpu_lock.sh
+$L -s python validate_alignment.py --arm dflash4b --device cpu --out $EV/alignment_dflash4b.json
+$L -s python analyze_rho.py --arm dflash4b --device cpu --max-rows 40000 --csv-pairs 15000 \
+    --out $EV/rho_dflash4b.json
+$L -s python analyze_transport.py --arm dflash4b --device cpu --max-rows 4000 --out $EV \
+    --tag dflash4b
+$L -s python analyze_selfevidence.py --device cpu --threads 40 --sets dflash_verify dflash_draft \
+    --max-rows 4000 --heads int8_row int8_g128 int8_g32 fp8_row int4_g128 int4_g32 \
+    --out $EV --tag dflash4b
+$L -s python analyze_stats.py --arm dflash4b --device cpu --out $EV/stats_dflash4b.json
 ```
 
-The 27B analyses use `--arm dflash27b` for `validate_alignment.py`,
-`analyze_transport.py` and `analyze_stats.py`; the 27B head in FP64 is 10 GB, so they
-run under `-x` when the shared budget (20 GB) is tight.
+`--device cuda` runs the same analyses on the GPU (the transport analysis on 16,000 pairs
+takes about three minutes there, against about six minutes for 4,000 pairs on 40 CPU
+cores). The 27B DFlash2 arm (`dflash27b`) is wired into the capture script and the
+analyses but was not run.
 
 ## Server configuration used for capture
 

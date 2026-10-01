@@ -1,0 +1,99 @@
+{
+ "report": "plain_bs1.nsys-rep",
+ "cycles": 578,
+ "scheduler_tid": 332091202865410,
+ "gpu_idle_us_per_cycle": 136.15466262973123,
+ "idle_by_innermost_function_us_per_cycle": {
+  "sglang.srt.managers.scheduler_components.batch_result_processor.SchedulerBatchResultProcessor.process_batch_result_decode": 57.71708650518989,
+  "sglang.srt.model_executor.runner.decode_cuda_graph_runner.DecodeCudaGraphRunner.load_batch": 20.481735294116483,
+  "sglang.srt.managers.scheduler.Scheduler.get_next_batch_to_run": 13.92288754325231,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch": 13.806410034601866,
+  "sglang.srt.model_executor.runner.decode_cuda_graph_runner.DecodeCudaGraphRunner.execute": 11.65010553633238,
+  "sglang.srt.managers.tp_worker.TpModelWorker.forward_batch_generation": 7.8833287197234485,
+  "(no annotated function)": 3.829927335640252,
+  "sglang.srt.model_executor.model_runner.ModelRunner.sample": 2.663875432525999,
+  "(outside trace ranges)": 1.2789965397923841,
+  "sglang.srt.model_executor.model_runner.ModelRunner.forward": 1.1282128027681564,
+  "sglang.srt.managers.scheduler.Scheduler.process_batch_result": 1.007591695501727,
+  "cub::DeviceScan::InclusiveScan": 0.7379930795847693,
+  "sglang.srt.managers.overlap_utils.FutureMap.resolve_seq_lens_cpu": 0.046512110726643636
+ },
+ "host_function_exposure_inclusive": {
+  "sglang.srt.managers.scheduler.Scheduler.run_batch": {
+   "host_us_per_cycle": 2081.4364567474017,
+   "exposed_us_per_cycle": 58.392025951556214,
+   "hidden_fraction": 0.9719462846140383
+  },
+  "sglang.srt.managers.tp_worker.TpModelWorker.forward_batch_generation": {
+   "host_us_per_cycle": 1599.4734948096902,
+   "exposed_us_per_cycle": 44.53910380622771,
+   "hidden_fraction": 0.9721538969224826
+  },
+  "sglang.srt.model_executor.model_runner.ModelRunner.forward": {
+   "host_us_per_cycle": 1224.3203321799317,
+   "exposed_us_per_cycle": 33.99804671280179,
+   "hidden_fraction": 0.9722310854282168
+  },
+  "sglang.srt.model_executor.runner.decode_cuda_graph_runner.DecodeCudaGraphRunner.execute": {
+   "host_us_per_cycle": 1185.3344221453278,
+   "exposed_us_per_cycle": 32.869833910033634,
+   "hidden_fraction": 0.9722695694177659
+  },
+  "sglang.srt.managers.scheduler.Scheduler.process_batch_result": {
+   "host_us_per_cycle": 767.0521003460209,
+   "exposed_us_per_cycle": 58.72467820069161,
+   "hidden_fraction": 0.9234410828492606
+  },
+  "sglang.srt.model_executor.runner.decode_cuda_graph_runner.DecodeCudaGraphRunner.load_batch": {
+   "host_us_per_cycle": 763.734643598615,
+   "exposed_us_per_cycle": 21.219728373701248,
+   "hidden_fraction": 0.9722158362835072
+  },
+  "sglang.srt.managers.scheduler_components.batch_result_processor.SchedulerBatchResultProcessor.process_batch_result_decode": {
+   "host_us_per_cycle": 735.318508650519,
+   "exposed_us_per_cycle": 57.71708650518989,
+   "hidden_fraction": 0.9215073660921249
+  },
+  "sglang.srt.managers.scheduler.Scheduler.get_next_batch_to_run": {
+   "host_us_per_cycle": 523.7778823529411,
+   "exposed_us_per_cycle": 13.92288754325231,
+   "hidden_fraction": 0.9734183362598146
+  },
+  "(no annotated function)": {
+   "host_us_per_cycle": 123.03939100346012,
+   "exposed_us_per_cycle": 3.829927335640252,
+   "hidden_fraction": 0.9688723480797093
+  },
+  "sglang.srt.model_executor.model_runner.ModelRunner.sample": {
+   "host_us_per_cycle": 94.143723183391,
+   "exposed_us_per_cycle": 2.663875432525999,
+   "hidden_fraction": 0.9717041631406823
+  },
+  "cub::DeviceScan::InclusiveScan": {
+   "host_us_per_cycle": 26.856083044982693,
+   "exposed_us_per_cycle": 0.7379930795847693,
+   "hidden_fraction": 0.9725204498977508
+  },
+  "sglang.srt.managers.overlap_utils.FutureMap.resolve_seq_lens_cpu": {
+   "host_us_per_cycle": 1.2613425605536337,
+   "exposed_us_per_cycle": 0.046512110726643636,
+   "hidden_fraction": 0.9631249177017952
+  }
+ },
+ "idle_by_call_path_us_per_cycle": {
+  "sglang.srt.managers.scheduler.Scheduler.process_batch_result > sglang.srt.managers.scheduler_components.batch_result_processor.SchedulerBatchResultProcessor.process_batch_result_decode": 57.71708650518989,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.managers.tp_worker.TpModelWorker.forward_batch_generation > sglang.srt.model_executor.model_runner.ModelRunner.forward > sglang.srt.model_executor.runner.decode_cuda_graph_runner.DecodeCudaGraphRunner.execute > sglang.srt.model_executor.runner.decode_cuda_graph_runner.DecodeCudaGraphRunner.load_batch": 20.481735294116483,
+  "sglang.srt.managers.scheduler.Scheduler.get_next_batch_to_run": 13.92288754325231,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch": 13.806410034601866,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.managers.tp_worker.TpModelWorker.forward_batch_generation > sglang.srt.model_executor.model_runner.ModelRunner.forward > sglang.srt.model_executor.runner.decode_cuda_graph_runner.DecodeCudaGraphRunner.execute": 11.65010553633238,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.managers.tp_worker.TpModelWorker.forward_batch_generation": 7.8833287197234485,
+  "(no annotated function)": 3.829927335640252,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.managers.tp_worker.TpModelWorker.forward_batch_generation > sglang.srt.model_executor.model_runner.ModelRunner.sample": 2.6577283737024695,
+  "(outside trace ranges)": 1.2789965397923841,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.managers.tp_worker.TpModelWorker.forward_batch_generation > sglang.srt.model_executor.model_runner.ModelRunner.forward": 1.1282128027681564,
+  "sglang.srt.managers.scheduler.Scheduler.process_batch_result": 1.007591695501727,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.managers.tp_worker.TpModelWorker.forward_batch_generation > sglang.srt.model_executor.model_runner.ModelRunner.forward > sglang.srt.model_executor.runner.decode_cuda_graph_runner.DecodeCudaGraphRunner.execute > sglang.srt.model_executor.runner.decode_cuda_graph_runner.DecodeCudaGraphRunner.load_batch > cub::DeviceScan::InclusiveScan": 0.7379930795847693,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.managers.overlap_utils.FutureMap.resolve_seq_lens_cpu": 0.046512110726643636,
+  "sglang.srt.model_executor.model_runner.ModelRunner.sample": 0.006147058823529412
+ }
+}
