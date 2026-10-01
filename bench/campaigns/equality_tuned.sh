@@ -66,6 +66,7 @@ PAIRS
 # Each arm with a numerics change against its matched stock reference (bench/README.md):
 # plain levers against plain c1, speculative levers against stock speculation with
 # the same drafter and steps (radix cache off). Third entry: the arm against plain c1.
+# Stock arms have no matched pair (null) and are listed for their rate against plain.
 cat > "$OUT/arms.json" <<'ARMS'
 [
   ["mtp-tuned", "mtp_s3 buffered vs stock verify radix-off c1", "mtp_s3 buffered verify radix-off vs plain c1"],
@@ -73,7 +74,8 @@ cat > "$OUT/arms.json" <<'ARMS'
   ["plain-tuned-triton", "plain radix-off triton vs plain c1", "plain radix-off triton vs plain c1"],
   ["plain-tuned-replayssm", "plain buffered decode radix-off vs plain c1", "plain buffered decode radix-off vs plain c1"],
   ["dflash-tuned-b16", "dflash b16 triton vs stock dflash b16 radix-off c1", "dflash b16 radix-off triton vs plain c1"],
-  ["dflash-tuned-b16-gdnverify-triton", "dflash b16 triton gdn-verify-triton vs stock dflash b16 radix-off c1", "dflash b16 radix-off triton gdn-verify-triton vs plain c1"]
+  ["dflash-tuned-b16-gdnverify-triton", "dflash b16 triton gdn-verify-triton vs stock dflash b16 radix-off c1", "dflash b16 radix-off triton gdn-verify-triton vs plain c1"],
+  ["mtp-stockverify", null, "mtp_s3 stock verify radix-off vs plain c1"]
 ]
 ARMS
 # Outputs of an earlier run must not pass for this one.

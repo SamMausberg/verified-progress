@@ -6,12 +6,12 @@ per-request output tokens/s including TTFT and y = output tokens/s on the GPU
 concurrency) and marks points that no other point beats on both axes.
 
 Each label carries its arm's exactness class (bench/arms.py): `stock`,
-`exact-up-to-floor`, `pending` or `lossy`, or `unclassified` when nothing says.
+`exact-up-to-rounding`, `pending` or `lossy`, or `unclassified` when nothing says.
 The class comes from the current arms.toml when the run's flags still match the
 arm there (a classification can land after the run), else from the run's
 manifest, else from its flags (a numerics-changing flag makes it `pending`);
 `--class LABEL=CLASS` overrides all three. The envelope is computed twice: over
-all arms, and over exact arms (`stock` or `exact-up-to-floor`).
+all arms, and over exact arms (`stock` or `exact-up-to-rounding`).
 
 Writes `points.csv` (one row per run and point), `frontier.csv` (mean, std,
 min and max over repeats), `envelope.csv` (the best arm at each concurrency,
@@ -196,14 +196,14 @@ def load_points(
 
 
 # Worst first: a label whose runs disagree takes the worst class among them.
-EXACTNESS_ORDER = ('unclassified', 'lossy', 'pending', 'exact-up-to-floor', 'stock')
+EXACTNESS_ORDER = ('unclassified', 'lossy', 'pending', 'exact-up-to-rounding', 'stock')
 
 
 def exactness(manifest: dict[str, Any]) -> str:
     """The run's exactness class (see the module docstring).
 
     The run's own flags are checked before anything it recorded: a recorded
-    `stock` or `exact-up-to-floor` class does not survive a numerics change in
+    `stock` or `exact-up-to-rounding` class does not survive a numerics change in
     the flags the run actually used.
     """
     arm = manifest.get('arm') or {}
@@ -218,7 +218,7 @@ def exactness(manifest: dict[str, Any]) -> str:
     changes = numerics_changes(args, env, model)
     note = str(arm.get('lossy') or '').strip()
     recorded = str(arm.get('exactness') or '')
-    if note and recorded in ('', 'stock', 'pending'):
+    if note and recorded in ('', 'stock', 'exact-up-to-rounding', 'pending'):
         return 'pending' if note.lower().startswith('pending') else 'lossy'
     if recorded in ('lossy', 'pending'):
         return recorded
@@ -349,7 +349,7 @@ def aggregate(rows: list[dict[str, Any]], baseline: str | None) -> list[dict[str
 
 def envelope(frontier: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Per concurrency, the arm with the highest mean y, the runner-up, and the
-    best exact arm (`stock` or `exact-up-to-floor`).
+    best exact arm (`stock` or `exact-up-to-rounding`).
 
     At a fixed client concurrency y is roughly c times x, so the arm with the
     highest y also gives (nearly) the best per-user rate; both are reported.
@@ -379,6 +379,9 @@ def envelope(frontier: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 'best_exact': exact['label'] if exact else '',
                 'best_exact_y_mean': exact['y_mean'] if exact else math.nan,
                 'best_exact_x_e2e_mean': exact['x_e2e_mean'] if exact else math.nan,
+                'best_exact_divergence_vs_plain_per_1k': (
+                    exact.get('divergence_vs_plain_per_1k', math.nan) if exact else math.nan
+                ),
             }
         )
     return rows
@@ -506,6 +509,14 @@ def write_pgfplots(frontier: list[dict[str, Any]], out_dir: Path) -> list[Path]:
     return paths
 
 
+def series_label(label: str, exactness: str, rate: float | None) -> str:
+    """Legend entry: the label, its class unless stock, its divergence rate if measured."""
+    notes = [] if exactness == 'stock' else [exactness]
+    if rate is not None and math.isfinite(rate):
+        notes.append(f'{rate:.1f}/1K vs plain')
+    return f'{label} ({", ".join(notes)})' if notes else label
+
+
 def plot(frontier: list[dict[str, Any]], path: Path, title: str) -> None:
     import matplotlib
 
@@ -514,6 +525,7 @@ def plot(frontier: list[dict[str, Any]], path: Path, title: str) -> None:
 
     labels = list(dict.fromkeys(entry['label'] for entry in frontier))
     status = {entry['label']: entry.get('exactness', 'unclassified') for entry in frontier}
+    rates = {entry['label']: entry.get('divergence_vs_plain_per_1k') for entry in frontier}
     fig, ax = plt.subplots(figsize=(7.5, 5.0), dpi=150)
     fig.patch.set_facecolor('#fcfcfb')
     ax.set_facecolor('#fcfcfb')
@@ -547,7 +559,7 @@ def plot(frontier: list[dict[str, Any]], path: Path, title: str) -> None:
             marker='o',
             markersize=5,
             capsize=2,
-            label=label if status[label] == 'stock' else f'{label} ({status[label]})',
+            label=series_label(label, status[label], rates.get(label)),
             zorder=2,
         )
         for entry, x, y in zip(entries, xs, ys, strict=True):
@@ -586,6 +598,12 @@ def main(argv: list[str] | None = None) -> int:
         default=[],
         metavar='RUN=SESSION',
         help='session (repeat) of a run directory without one in its manifest',
+    )
+    parser.add_argument(
+        '--divergence',
+        type=Path,
+        default=None,
+        help='classes.json from bench.divergence --arms: annotate arms with their rate',
     )
     parser.add_argument(
         '--class',
@@ -632,9 +650,16 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     frontier = aggregate(rows, args.baseline)
     status = label_exactness(launches, classes)
+    rates: dict[str, float] = {}
+    if args.divergence:
+        for record in json.loads(args.divergence.read_text()):
+            if 'vs_plain' in record:
+                rates[record['arm']] = float(record['vs_plain']['per_1k'])
     for entry in frontier:
         entry['status'] = args.status
         entry['exactness'] = status.get(entry['label'], 'unclassified')
+        # First greedy divergences per 1,000 tokens against plain c=1 (blank: not measured).
+        entry['divergence_vs_plain_per_1k'] = rates.get(entry['label'], math.nan)
     write_csv(frontier, args.out / 'frontier.csv')
     write_csv(envelope(frontier), args.out / 'envelope.csv')
     write_envelope_dat(pareto_envelope(frontier, exact_only=False), args.out / 'envelope-all.dat')

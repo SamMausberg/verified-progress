@@ -101,9 +101,10 @@ def test_every_arm_declares_a_consistent_exactness_class(tmp_path: Path) -> None
 
     for name in arm_names():
         arm = resolve_arm(name)
-        assert arm.exactness in ('stock', 'exact-up-to-floor', 'pending', 'lossy')
+        assert arm.exactness in ('stock', 'exact-up-to-rounding', 'pending', 'lossy')
     assert resolve_arm('plain-tuned').exactness == 'stock'
-    assert resolve_arm('plain-tuned-triton').exactness == 'pending'
+    assert resolve_arm('plain-tuned-triton').exactness == 'exact-up-to-rounding'
+    assert resolve_arm('plain-tuned-replayssm').exactness == 'lossy'
     assert resolve_arm('dflash-tuned-b16').exactness == 'pending'
     assert resolve_arm('dflash-tuned').exactness == 'stock'  # FA4 is draft-only
     # Any flag outside the neutral allowlist makes a stock arm pending, whatever
@@ -149,8 +150,11 @@ def test_every_arm_declares_a_consistent_exactness_class(tmp_path: Path) -> None
         ).exactness
         == 'stock'
     )
-    # A pending arm stays pending under overrides.
-    assert resolve_arm('mtp-tuned', {'cuda-graph-max-bs': 64}).exactness == 'pending'
+    # A pending arm stays pending under overrides; a classified arm keeps its class
+    # under a neutral override and becomes pending under a new numerics change.
+    assert resolve_arm('dflash-tuned-b16', {'cuda-graph-max-bs': 64}).exactness == 'pending'
+    assert resolve_arm('mtp-tuned', {'cuda-graph-max-bs': 64}).exactness == 'exact-up-to-rounding'
+    assert resolve_arm('mtp-tuned', {'kv-cache-dtype': 'fp8_e4m3'}).exactness == 'pending'
     head = '[defaults]\nmodel = "m"\nrevision = "r"\n'
     missing = tmp_path / 'missing.toml'
     missing.write_text(head + '[arms.a]\ndescription = "d"\n')
@@ -167,13 +171,23 @@ def test_every_arm_declares_a_consistent_exactness_class(tmp_path: Path) -> None
     unexplained.write_text(head + '[arms.a]\ndescription = "d"\nexactness = "pending"\n')
     with pytest.raises(ValueError, match='lossy note'):
         resolve_arm('a', path=unexplained)
+    exact = tmp_path / 'exact.toml'
+    exact.write_text(
+        head + '[arms.a]\ndescription = "d"\nexactness = "exact-up-to-rounding"\n'
+        'lossy = "x"\n[arms.a.args]\nenable-linear-replayssm = true\n'
+    )
+    with pytest.raises(ValueError, match='exactness_note, not lossy'):
+        resolve_arm('a', path=exact)
     # An arm built in code with a lossy note takes its class from the note.
     base = resolve_arm('plain').to_json()
     assert Arm(**{**base, 'lossy': 'FP8 KV cache'}).exactness == 'lossy'
     assert Arm(**{**base, 'lossy': 'pending: check'}).exactness == 'pending'
     # An explicit lossy note on an arm that inherited the pending class.
-    pending = resolve_arm('mtp-tuned').to_json()
+    pending = resolve_arm('dflash-tuned-b16').to_json()
     assert Arm(**{**pending, 'lossy': 'BF16 GDN state'}).exactness == 'lossy'
+    # Also on an arm whose base is exact-up-to-rounding (an env-only lever).
+    exact_base = resolve_arm('mtp-tuned').to_json()
+    assert Arm(**{**exact_base, 'lossy': 'BF16 GDN state'}).exactness == 'lossy'
 
 
 def test_repository_arms_resolve() -> None:
@@ -703,7 +717,7 @@ def test_runs_get_sessions_and_exactness_from_their_manifests(tmp_path: Path) ->
     plain = resolve_arm('plain-tuned').to_json()
     triton = resolve_arm('plain-tuned-triton').to_json()
     assert exactness({'arm': plain}) == 'stock'
-    assert exactness({'arm': triton}) == 'pending'
+    assert exactness({'arm': triton}) == 'exact-up-to-rounding'
     # Older manifests: no class recorded and flags no longer matching an arm.
     assert exactness({'arm': {'name': 'x', 'args': {'attention-backend': 'triton'}}}) == 'pending'
     assert exactness({'arm': {'name': 'x', 'args': {}, 'lossy': 'FP8 KV'}}) == 'lossy'
@@ -789,3 +803,43 @@ def test_sensitivity_arm_rule() -> None:
     assert {'arm': 'dflash-tuned-b4', 'concurrency': 32, 'missing_sessions': ['confirm-r1'],
             'invalid_in': ['confirm-r1']} in result['ineligible']  # fmt: skip
     assert result['sessions'] == list(sessions)
+
+
+def test_arm_classes_from_matched_references() -> None:
+    from bench.divergence import classify
+    from bench.pareto import series_label
+
+    def entry(pair: str, per_1k: float, **classes: int) -> dict[str, object]:
+        counts = {'tie': 10, 'one_ulp': 1, 'near': 1, 'large': 0, 'not_argmax': 0, **classes}
+        return {
+            'pair': pair,
+            'per_1k': per_1k,
+            'per_1k_95': [per_1k - 1, per_1k + 1],
+            'ratio_to_floor': per_1k / 3.42,
+            'ratio_to_floor_95': [0.9, 1.4],
+            'classes': counts,
+        }
+
+    entries = [
+        entry('buffered vs stock', 3.8),
+        entry('buffered vs plain', 4.2),
+        entry('decode vs plain', 3.9, large=1),
+        entry('stock vs plain', 4.4),
+    ]
+    arms: list[tuple[str, str | None, str]] = [
+        ('mtp-tuned', 'buffered vs stock', 'buffered vs plain'),
+        ('plain-tuned-replayssm', 'decode vs plain', 'decode vs plain'),
+        ('mtp-stockverify', None, 'stock vs plain'),
+    ]
+    classes = {record['arm']: record for record in classify(entries, arms)}
+    assert classes['mtp-tuned']['exactness'] == 'exact-up-to-rounding'
+    # The class comes from the matched reference, not from the comparison with plain.
+    assert classes['mtp-tuned']['vs_plain']['per_1k'] == 4.2
+    assert classes['plain-tuned-replayssm']['exactness'] == 'lossy'
+    assert classes['mtp-stockverify']['exactness'] == 'stock'
+    with pytest.raises(SystemExit, match='missing'):
+        classify(entries, [('x', 'absent', 'stock vs plain')])
+    assert series_label('mtp-tuned', 'exact-up-to-rounding', 4.2) == (
+        'mtp-tuned (exact-up-to-rounding, 4.2/1K vs plain)'
+    )
+    assert series_label('plain-tuned', 'stock', math.nan) == 'plain-tuned'

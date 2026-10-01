@@ -151,10 +151,47 @@ flashinfer attention backend (FA3 is unavailable on aarch64), `/metrics`, and a
 server capacity of 128 running requests with the GDN state cache sized for it. Any
 entry point accepts `--set flag=value`, `--unset flag`, `--env NAME=VALUE`,
 `--sglang-worktree PATH` (or `SGLANG_WORKTREE`) and `--max-concurrency N`, and
-records the resolved arm in its output. An arm that changes numerics (FP8 weights,
-FP8 KV cache, BF16 state) should say so in `lossy = "..."` and needs a quality run;
-an arm whose capacity exceeds its CUDA-graph range sets
-`require_full_graph_coverage = false`.
+records the resolved arm in its output. An arm whose capacity exceeds its
+CUDA-graph range sets `require_full_graph_coverage = false`.
+
+### Exactness classes
+
+Every arm declares `exactness` in `arms.toml`. A `pending` or `lossy` arm says what it
+changes numerically in `lossy = "..."`; an `exact-up-to-rounding` arm states the change
+and the comparison that classified it in `exactness_note`. A lossy note added in code
+(moonshot's levers) always turns the class into `lossy` or `pending`.
+
+The rule below was set by the coordinator on 2026-10-01 at 05:20 UTC, after the
+first equality results (`campaigns/equality_tuned.sh`) had been seen; it replaced
+a proposal that used rate intervals. It rests on the divergence classes of the state
+workstream's comparator (PR #37, `experiments/state_safety/compare.py`), which
+existed before these results: each prompt's first greedy divergence is a `tie`,
+`one_ulp`, `near`, `large` or `not_argmax` event according to the logit gap at that
+position. The comparisons use 320 prompts x 256 tokens at c=1 with top-5 logprobs.
+
+- `stock`: only arithmetic-neutral flags (`NEUTRAL_FLAGS` in `bench/arms.py`) and
+  FlashInfer target attention, with the reference model.
+- `exact-up-to-rounding`: every first divergence against the arm's matched stock
+  reference is a `tie`, `one_ulp` or `near` event. The matched reference is plain
+  decoding at c=1 for plain levers, and stock speculation with the same drafter and
+  steps (radix cache off) for speculative levers: buffered MTP against stock MTP s3,
+  Triton DFlash block 16 against stock DFlash block 16.
+- `lossy`: any `large` or `not_argmax` first divergence against the matched
+  reference; the arm needs the paired GSM8K run under the declared budget.
+- `pending`: a numerics change not yet compared.
+
+Each arm's divergence rate per 1,000 tokens, its ratio to the batch-shape floor
+(plain c=1 against c=32, 3.42 per 1,000) and its rate against plain c=1 are reported
+beside the class (`classes.json`), but are not pass/fail criteria: an interval that
+includes the floor is absence of evidence, and the intervals ignore that every pair
+shares the plain reference. The frontier's exact envelope covers `stock` and
+`exact-up-to-rounding` arms, each annotated with its rate against plain c=1.
+
+Stock speculation is itself not bit-identical to plain decoding. Stock MTP s3
+diverges from plain c=1 at 4.40 per 1,000 tokens (1.29 times the floor; 95% interval
+of the ratio 1.04-1.59), with every first divergence rounding-level. PR #37 traces
+the mechanism to layer 0's GDN recurrence, which runs different kernels in verify
+and in decode.
 
 ## Launch checks
 

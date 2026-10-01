@@ -6,17 +6,20 @@
 # flag and `false` removes one. `max_concurrency` is the highest client
 # concurrency the sweep will offer; the launcher refuses a server whose
 # effective max_running_requests is lower. Required per-arm key:
-#   exactness = "stock" | "exact-up-to-floor" | "pending" | "lossy"
+#   exactness = "stock" | "exact-up-to-rounding" | "pending" | "lossy"
 #                   how the arm's greedy outputs relate to plain decoding with the
 #                   default flags (bench/arms.py says what each class means).
 #                   A stock arm may only set flags in NEUTRAL_FLAGS
 #                   (bench/arms.py) and FlashInfer target attention; anything
 #                   else makes an arm pending until its outputs are classified
 #                   (bench/campaigns/equality_tuned.sh).
+#   exactness_note = "..."   for exact-up-to-rounding arms: what changes and the
+#                   comparison that classified it.
 # Optional per-arm keys:
-#   lossy = "..."   what the arm changes numerically (FP8 weights, FP8 KV, BF16
-#                   GDN state, ...); required unless the class is stock. Lossy
-#                   arms need a quality measurement.
+#   lossy = "..."   for pending and lossy arms (required there, not allowed on
+#                   stock or exact arms): what the arm changes numerically (FP8
+#                   weights, FP8 KV, BF16 GDN state, ...). Lossy arms need a
+#                   quality measurement.
 #   require_full_graph_coverage = false   allow capacity above the largest
 #                   decode/verify CUDA graph (large batches then run eagerly).
 
@@ -114,8 +117,8 @@ max-mamba-cache-size = 128
 
 [arms.plain-tuned-triton]
 description = "Arm A, tuned, Triton attention: matched baseline for Triton speculative arms."
-exactness = "pending"
-lossy = "pending: Triton target attention; greedy outputs classified against plain (bench/campaigns/equality_tuned.sh)"
+exactness = "exact-up-to-rounding"
+exactness_note = "Triton target attention; every first divergence against plain c1 is rounding-level (equality report, 2026-10-01)"
 [arms.plain-tuned-triton.args]
 disable-radix-cache = true
 max-mamba-cache-size = 128
@@ -124,8 +127,8 @@ attention-backend = "triton"
 [arms.plain-tuned-replayssm]
 description = """Arm A with SGLang's buffered GDN decode (ReplaySSM ring, full state \
 flushed every 16 tokens): faster at high concurrency, slower at low."""
-exactness = "pending"
-lossy = "pending: buffered GDN decode; greedy outputs classified against plain (bench/campaigns/equality_tuned.sh)"
+exactness = "lossy"
+lossy = "buffered GDN decode; one first divergence against plain c1 outside the rounding classes (equality report, 2026-10-01); paired GSM8K run in the quality holds"
 [arms.plain-tuned-replayssm.args]
 disable-radix-cache = true
 max-mamba-cache-size = 128
@@ -134,8 +137,8 @@ enable-linear-replayssm = true
 [arms.mtp-tuned]
 description = """Arm B, tuned for high concurrency: native MTP, 3-step chain, buffered \
 GDN verify (no per-draft-token state snapshots), FlashInfer attention."""
-exactness = "pending"
-lossy = "pending: buffered GDN verify; greedy outputs classified against plain (bench/campaigns/equality_tuned.sh)"
+exactness = "exact-up-to-rounding"
+exactness_note = "buffered GDN verify; every first divergence against stock MTP s3 (radix off) is rounding-level (equality report, 2026-10-01)"
 [arms.mtp-tuned.args]
 speculative-algorithm = "NEXTN"
 speculative-num-steps = 3
@@ -147,8 +150,8 @@ max-mamba-cache-size = 128
 
 [arms.mtp-tuned-triton]
 description = "Arm B, tuned for low concurrency: as mtp-tuned with Triton attention."
-exactness = "pending"
-lossy = "pending: buffered GDN verify and Triton target attention; greedy outputs classified against plain (bench/campaigns/equality_tuned.sh)"
+exactness = "exact-up-to-rounding"
+exactness_note = "buffered GDN verify and Triton target attention; every first divergence against stock MTP s3 (radix off) is rounding-level (equality report, 2026-10-01)"
 [arms.mtp-tuned-triton.args]
 speculative-algorithm = "NEXTN"
 speculative-num-steps = 3
@@ -189,7 +192,7 @@ description = """Arm C for low concurrency: DFlash block 16, Triton attention. I
 GDN verify states per request (~0.8 GB) cap capacity at 64."""
 max_concurrency = 64
 exactness = "pending"
-lossy = "pending: Triton target attention; greedy outputs classified against plain (bench/campaigns/equality_tuned.sh)"
+lossy = "pending: Triton target attention; greedy outputs classified against stock DFlash block 16, radix off (bench/campaigns/equality_tuned.sh)"
 [arms.dflash-tuned-b16.args]
 speculative-algorithm = "DFLASH"
 speculative-draft-model-path = "z-lab/Qwen3.5-4B-DFlash"
@@ -207,7 +210,7 @@ for the verify pass at block widths 64-256; its effect at block 16 is expected t
 small."""
 max_concurrency = 64
 exactness = "pending"
-lossy = "pending: Triton GDN verify kernel and Triton target attention; greedy outputs classified against plain (bench/campaigns/equality_tuned.sh)"
+lossy = "pending: Triton GDN verify kernel and Triton target attention; greedy outputs classified against stock DFlash block 16, radix off (bench/campaigns/equality_tuned.sh)"
 [arms.dflash-tuned-b16-gdnverify-triton.args]
 speculative-algorithm = "DFLASH"
 speculative-draft-model-path = "z-lab/Qwen3.5-4B-DFlash"

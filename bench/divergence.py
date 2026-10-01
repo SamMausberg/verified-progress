@@ -19,7 +19,8 @@ With `--arms`, it also classifies arms by the rule recorded in bench/README.md
 every first divergence against its matched stock reference falls in the rounding
 classes (tie, one_ulp, near), and `lossy` when any is `large` or `not_argmax`. The
 rate and its ratio to the floor are reported beside the class, never used as a
-test. The arms file lists [arm, matched-reference pair, plain-c1 pair].
+test. The arms file lists [arm, matched-reference pair, plain-c1 pair]; a stock
+arm has no matched pair (null) and is listed only to report its rate against plain.
 
     python -m bench.divergence ~/vp-data/bench/equality/summary.json --floor "floor plain c1 vs c32"
 """
@@ -92,27 +93,30 @@ ROUNDING_CLASSES = ('tie', 'one_ulp', 'near')
 
 
 def classify(
-    entries: list[dict[str, Any]], arms: list[tuple[str, str, str]]
+    entries: list[dict[str, Any]], arms: list[tuple[str, str | None, str]]
 ) -> list[dict[str, Any]]:
     """Class per arm from its matched-reference pair; rates reported beside it."""
     by_pair = {entry['pair']: entry for entry in entries}
     out = []
     for arm, matched, plain in arms:
-        if matched not in by_pair:
-            raise SystemExit(f'{arm}: matched pair {matched!r} missing from the summary')
-        reference = by_pair[matched]
-        rounding = all(
-            count == 0 for name, count in reference['classes'].items()
-            if name not in ROUNDING_CLASSES
-        )  # fmt: skip
-        record: dict[str, Any] = {
-            'arm': arm,
-            'exactness': 'exact-up-to-rounding' if rounding else 'lossy',
-            'matched_pair': matched,
-            'matched': {k: reference[k] for k in ('per_1k', 'per_1k_95', 'classes')},
-            'matched_ratio_to_floor': reference['ratio_to_floor'],
-            'matched_ratio_to_floor_95': reference['ratio_to_floor_95'],
-        }
+        record: dict[str, Any] = {'arm': arm, 'exactness': 'stock'}
+        if matched is not None:
+            if matched not in by_pair:
+                raise SystemExit(f'{arm}: matched pair {matched!r} missing from the summary')
+            reference = by_pair[matched]
+            rounding = all(
+                count == 0 for name, count in reference['classes'].items()
+                if name not in ROUNDING_CLASSES
+            )  # fmt: skip
+            record.update(
+                {
+                    'exactness': 'exact-up-to-rounding' if rounding else 'lossy',
+                    'matched_pair': matched,
+                    'matched': {k: reference[k] for k in ('per_1k', 'per_1k_95', 'classes')},
+                    'matched_ratio_to_floor': reference['ratio_to_floor'],
+                    'matched_ratio_to_floor_95': reference['ratio_to_floor_95'],
+                }
+            )
         if plain in by_pair:
             versus = by_pair[plain]
             record['plain_pair'] = plain

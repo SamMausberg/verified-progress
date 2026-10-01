@@ -16,11 +16,17 @@ for dir in ~/vp-data/bench/confirm/*/2026*; do
     "$dir/sweep.json")
   [ -n "$session" ] || SESSIONS+=(--session-of "$(basename "$dir")=confirm-r0")
 done
+# Divergence rates and classes from the equality check (evidence/bench/equality/).
+DIVERGENCE=()
+[ -s evidence/bench/equality/classes.json ] &&
+  DIVERGENCE=(--divergence evidence/bench/equality/classes.json)
 # The plot needs matplotlib, which the SGLang venv has.
-~/sglang/.venv/bin/python -m bench.pareto "${RUNS[@]}" "${SESSIONS[@]}" \
+~/sglang/.venv/bin/python -m bench.pareto "${RUNS[@]}" "${SESSIONS[@]}" "${DIVERGENCE[@]}" \
   --out evidence/bench/confirm --status confirmation --baseline plain-tuned \
   --title 'Qwen3.5-4B on one GH200: confirmation split' \
   --pair mtp-tuned:plain-tuned --pair mtp-stockverify:plain-tuned \
   --pair dflash-tuned:plain-tuned --pair dflash-tuned-b4:plain-tuned \
   --pair plain-tuned-replayssm:plain-tuned --pair plain-tuned-triton:plain-tuned \
-  --pair mtp-tuned-triton:plain-tuned-triton --pair dflash-tuned-b16:plain-tuned-triton
+  --pair mtp-tuned-triton:plain-tuned-triton --pair dflash-tuned-b16:plain-tuned-triton \
+  --pair dflash-tuned-b16-gdnverify-triton:plain-tuned-triton \
+  --pair dflash-tuned-b16-gdnverify-triton:dflash-tuned-b16
