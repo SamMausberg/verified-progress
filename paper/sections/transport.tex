@@ -6,7 +6,7 @@
 %    full table by tiling is tab:transport-full in Appendix C.
 %  - Drift scaling: a model extrapolation, labelled as such.
 \section{Transport and Why It Fails}\label{sec:transport}
-A drafter that projects through the target's head has already computed, for every tile of the vocabulary, the largest score and the sum of exponentiated scores at the drafter's own head input. \emph{Transport} carries these tile summaries to the target's head input with a bound on how far each score can move, so the verifier projects only the tiles whose bounds leave its decision open. This section proves the bound, derives from the weights how close the two head inputs must be for it to beat the int8 copy, and measures how close they are.
+A drafter that projects through the target's head has already computed, for every tile of the vocabulary, the largest score and the sum of exponentiated scores at the drafter's own head input. \emph{Transport} carries these tile summaries to the target's head input with a bound on how far each score can move, so the verifier projects only the tiles whose bounds leave its decision open. This section proves the bound, derives how close the two head inputs must be, and measures how close they are.
 
 \begin{figure*}[t]
 \centering
