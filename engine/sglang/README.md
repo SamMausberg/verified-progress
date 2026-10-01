@@ -229,7 +229,8 @@ The routing table is JSON from `experiments/backbone/make_table.py`. Measured
 greedy outputs against stock plain decoding on 320 prompts, where every switch off and the merge
 switch give the same token ids and top-5 logprobs at concurrency 1, and `--bf16-gemm-backend
 gemv` and the routing table (lever v1) are exact up to rounding; and paired serving of lever v1 against tuned plain decoding (3.4% faster at
-concurrency 1, 1.0% at 128). Serving against tuned MTP is pending.
+concurrency 1, 1.0% at 128). Against tuned MTP it gains nothing (0.9% slower at concurrency 1),
+and an nsys trace of plain decoding shows each route dispatching as tabled.
 
 ## hostgap (`patches/hostgap/0001-0005`, branch `engine/hostgap`)
 

@@ -1,0 +1,343 @@
+{
+ "command": "experiments/backbone/insitu_gemm.py --report A1=/home/ubuntu/vp-data/backbone/nsys/plain-A/plain_bs1.nsys-rep --report B1=/home/ubuntu/vp-data/backbone/nsys/plain-B/plain_bs1.nsys-rep --report A16=/home/ubuntu/vp-data/backbone/nsys/plain-A/plain_bs16.nsys-rep --report B16=/home/ubuntu/vp-data/backbone/nsys/plain-B/plain_bs16.nsys-rep --pair B1:A1 --pair B16:A16 --out evidence/backbone/served/insitu_gemm.json",
+ "reports": {
+  "A1": {
+   "report": "plain_bs1.nsys-rep",
+   "graph_id": 5801,
+   "replays": 573,
+   "replays_dropped": 3,
+   "kernels_per_replay": 428,
+   "span_us_median": 3474.944,
+   "span_us_p10": 3470.848,
+   "span_us_p90": 3481.824,
+   "kernel_us_median": {
+    "all_kernels": 3787.3410000000044,
+    "attn_o_proj_gemm/cublas": 81.376,
+    "attn_qkv_gemm/cublas": 135.232,
+    "gdn_in_proj_gemm/cublas": 874.6240000000001,
+    "gdn_out_proj_gemm/cublas": 248.64000000000004,
+    "head": 350.464,
+    "lm_head_gemm/cublas": 350.464,
+    "mlp_down_gemm/cublas": 560.5399999999998,
+    "mlp_gate_up_gemm/cublas": 934.2839999999999,
+    "other/attn_output_gate": 8.8,
+    "other/attn_qk_norm_rope_gate": 20.736,
+    "other/embedding": 1.92,
+    "other/full_attention": 132.22400000000002,
+    "other/gdn_conv": 54.20799999999999,
+    "other/gdn_gated_norm": 38.04800000000001,
+    "other/gdn_recurrent": 123.93599999999999,
+    "other/kv_cache_store": 10.592,
+    "other/logits_cast": 4.288,
+    "other/mlp_activation": 42.272000000000006,
+    "other/norm": 164.41600000000003,
+    "weight_gemms": 2835.3810000000008
+   },
+   "kernel_counts_first_replay": {
+    "attn_o_proj_gemm/cublas": 16,
+    "attn_qkv_gemm/cublas": 8,
+    "gdn_in_proj_gemm/cublas": 48,
+    "gdn_out_proj_gemm/cublas": 48,
+    "lm_head_gemm/cublas": 1,
+    "mlp_down_gemm/cublas": 64,
+    "mlp_gate_up_gemm/cublas": 32
+   },
+   "kernel_names_first_replay": {
+    "attn_o_proj_gemm/cublas": {
+     "nvjet_sm90_tst_64x8_64x16_4x1_v_bz_splitK_TNT": 8,
+     "splitKreduce_kernel": 8
+    },
+    "attn_qkv_gemm/cublas": {
+     "nvjet_sm90_tst_128x8_64x12_4x1_v_bz_TNT": 8
+    },
+    "gdn_in_proj_gemm/cublas": {
+     "nvjet_sm90_tst_64x8_64x16_1x1_h_bz_TNT": 24,
+     "nvjet_sm90_tst_64x8_64x16_4x1_v_bz_TNT": 24
+    },
+    "gdn_out_proj_gemm/cublas": {
+     "nvjet_sm90_tst_64x8_64x16_4x1_v_bz_splitK_TNT": 24,
+     "splitKreduce_kernel": 24
+    },
+    "lm_head_gemm/cublas": {
+     "nvjet_sm90_tst_512x8_64x3_2x1_v_bz_TNT": 1
+    },
+    "mlp_down_gemm/cublas": {
+     "nvjet_sm90_tst_64x8_64x16_4x1_v_bz_splitK_TNT": 32,
+     "splitKreduce_kernel": 32
+    },
+    "mlp_gate_up_gemm/cublas": {
+     "nvjet_sm90_tst_256x8_64x6_4x1_v_bz_TNT": 32
+    }
+   }
+  },
+  "B1": {
+   "report": "plain_bs1.nsys-rep",
+   "graph_id": 5801,
+   "replays": 589,
+   "replays_dropped": 3,
+   "kernels_per_replay": 364,
+   "span_us_median": 3373.024,
+   "span_us_p10": 3369.024,
+   "span_us_p90": 3378.688,
+   "kernel_us_median": {
+    "all_kernels": 3694.816000000002,
+    "attn_o_proj_gemm/gemv": 71.19999999999999,
+    "attn_qkv_gemm/gemv": 133.28,
+    "gdn_in_proj_gemm/gemv": 914.7519999999997,
+    "gdn_out_proj_gemm/gemv": 209.632,
+    "head": 358.56,
+    "lm_head_gemm/cublas": 358.56,
+    "mlp_down_gemm/gemv": 529.8879999999999,
+    "mlp_gate_up_gemm/gemv": 910.6559999999998,
+    "other/attn_output_gate": 9.088000000000001,
+    "other/attn_qk_norm_rope_gate": 18.304000000000002,
+    "other/embedding": 1.888,
+    "other/full_attention": 128.544,
+    "other/gdn_conv": 51.808,
+    "other/gdn_gated_norm": 37.63200000000001,
+    "other/gdn_recurrent": 123.64799999999998,
+    "other/kv_cache_store": 9.536000000000001,
+    "other/logits_cast": 4.064,
+    "other/mlp_activation": 42.528000000000006,
+    "other/norm": 140.06400000000005,
+    "weight_gemms": 2769.0240000000013
+   },
+   "kernel_counts_first_replay": {
+    "attn_o_proj_gemm/gemv": 8,
+    "attn_qkv_gemm/gemv": 8,
+    "gdn_in_proj_gemm/gemv": 48,
+    "gdn_out_proj_gemm/gemv": 24,
+    "lm_head_gemm/cublas": 1,
+    "mlp_down_gemm/gemv": 32,
+    "mlp_gate_up_gemm/gemv": 32
+   },
+   "kernel_names_first_replay": {
+    "attn_o_proj_gemm/gemv": {
+     "hopper_bf16_gemv_kernel": 8
+    },
+    "attn_qkv_gemm/gemv": {
+     "hopper_bf16_gemv_kernel": 8
+    },
+    "gdn_in_proj_gemm/gemv": {
+     "hopper_bf16_gemv_kernel": 48
+    },
+    "gdn_out_proj_gemm/gemv": {
+     "hopper_bf16_gemv_kernel": 24
+    },
+    "lm_head_gemm/cublas": {
+     "nvjet_sm90_tst_512x8_64x3_2x1_v_bz_TNT": 1
+    },
+    "mlp_down_gemm/gemv": {
+     "hopper_bf16_gemv_kernel": 32
+    },
+    "mlp_gate_up_gemm/gemv": {
+     "hopper_bf16_gemv_kernel": 32
+    }
+   }
+  },
+  "A16": {
+   "report": "plain_bs16.nsys-rep",
+   "graph_id": 5786,
+   "replays": 463,
+   "replays_dropped": 3,
+   "kernels_per_replay": 428,
+   "span_us_median": 4313.314,
+   "span_us_p10": 4273.186,
+   "span_us_p90": 4334.785,
+   "kernel_us_median": {
+    "all_kernels": 4678.453,
+    "attn_o_proj_gemm/cublas": 85.24799999999999,
+    "attn_qkv_gemm/cublas": 141.824,
+    "gdn_in_proj_gemm/cublas": 933.0560000000003,
+    "gdn_out_proj_gemm/cublas": 306.016,
+    "head": 358.016,
+    "lm_head_gemm/cublas": 358.016,
+    "mlp_down_gemm/cublas": 585.4979999999999,
+    "mlp_gate_up_gemm/cublas": 1088.855,
+    "other/attn_output_gate": 12.319999999999999,
+    "other/attn_qk_norm_rope_gate": 22.687999999999995,
+    "other/embedding": 10.528,
+    "other/full_attention": 241.504,
+    "other/gdn_conv": 70.304,
+    "other/gdn_gated_norm": 45.34400000000001,
+    "other/gdn_recurrent": 491.52000000000004,
+    "other/kv_cache_store": 10.815999999999999,
+    "other/logits_cast": 11.872,
+    "other/mlp_activation": 46.432,
+    "other/norm": 220.22400000000005,
+    "weight_gemms": 3140.3740000000003
+   },
+   "kernel_counts_first_replay": {
+    "attn_o_proj_gemm/cublas": 16,
+    "attn_qkv_gemm/cublas": 8,
+    "gdn_in_proj_gemm/cublas": 48,
+    "gdn_out_proj_gemm/cublas": 48,
+    "lm_head_gemm/cublas": 1,
+    "mlp_down_gemm/cublas": 64,
+    "mlp_gate_up_gemm/cublas": 32
+   },
+   "kernel_names_first_replay": {
+    "attn_o_proj_gemm/cublas": {
+     "nvjet_sm90_tst_64x16_64x16_4x1_v_bz_splitK_TNT": 8,
+     "splitKreduce_kernel": 8
+    },
+    "attn_qkv_gemm/cublas": {
+     "nvjet_sm90_tst_128x16_64x11_4x1_v_bz_TNT": 8
+    },
+    "gdn_in_proj_gemm/cublas": {
+     "nvjet_sm90_tst_64x16_64x16_4x1_v_bz_TNT": 24,
+     "nvjet_sm90_tst_64x8_64x16_1x2_h_bz_TNT": 24
+    },
+    "gdn_out_proj_gemm/cublas": {
+     "nvjet_sm90_tst_64x16_64x16_4x1_v_bz_splitK_TNT": 24,
+     "splitKreduce_kernel": 24
+    },
+    "lm_head_gemm/cublas": {
+     "nvjet_sm90_tst_512x16_64x3_2x1_v_bz_TNT": 1
+    },
+    "mlp_down_gemm/cublas": {
+     "nvjet_sm90_tst_64x16_64x16_4x1_v_bz_splitK_TNT": 32,
+     "splitKreduce_kernel": 32
+    },
+    "mlp_gate_up_gemm/cublas": {
+     "nvjet_sm90_tst_256x16_64x6_4x1_v_bz_TNT": 32
+    }
+   }
+  },
+  "B16": {
+   "report": "plain_bs16.nsys-rep",
+   "graph_id": 5786,
+   "replays": 466,
+   "replays_dropped": 3,
+   "kernels_per_replay": 364,
+   "span_us_median": 4268.594,
+   "span_us_p10": 4210.914,
+   "span_us_p90": 4315.49,
+   "kernel_us_median": {
+    "all_kernels": 6135.741999999998,
+    "attn_o_proj_gemm/triton": 83.03999999999999,
+    "attn_qkv_gemm/cublas": 141.024,
+    "gdn_in_proj_gemm/cublas": 142.592,
+    "gdn_in_proj_gemm/triton": 501.296,
+    "gdn_out_proj_gemm/triton": 292.12800000000004,
+    "head": 360.08050000000003,
+    "lm_head_gemm/cublas": 360.08050000000003,
+    "mlp_down_gemm/triton": 600.2570000000001,
+    "mlp_gate_up_gemm/triton": 1078.8649999999998,
+    "other/attn_output_gate": 12.319999999999999,
+    "other/attn_qk_norm_rope_gate": 22.656,
+    "other/embedding": 10.56,
+    "other/full_attention": 240.608,
+    "other/gdn_conv": 71.07199999999999,
+    "other/gdn_gated_norm": 45.855999999999995,
+    "other/gdn_recurrent": 492.6725,
+    "other/kv_cache_store": 10.336,
+    "other/logits_cast": 12.256,
+    "other/mlp_activation": 1016.0254999999997,
+    "other/norm": 1003.936,
+    "weight_gemms": 2839.231500000001
+   },
+   "kernel_counts_first_replay": {
+    "attn_o_proj_gemm/triton": 8,
+    "attn_qkv_gemm/cublas": 8,
+    "gdn_in_proj_gemm/cublas": 24,
+    "gdn_in_proj_gemm/triton": 24,
+    "gdn_out_proj_gemm/triton": 24,
+    "lm_head_gemm/cublas": 1,
+    "mlp_down_gemm/triton": 32,
+    "mlp_gate_up_gemm/triton": 32
+   },
+   "kernel_names_first_replay": {
+    "attn_o_proj_gemm/triton": {
+     "_bb_gemm_kernel": 8
+    },
+    "attn_qkv_gemm/cublas": {
+     "nvjet_sm90_tst_128x16_64x11_4x1_v_bz_TNT": 8
+    },
+    "gdn_in_proj_gemm/cublas": {
+     "nvjet_sm90_tst_64x8_64x16_1x2_h_bz_TNT": 24
+    },
+    "gdn_in_proj_gemm/triton": {
+     "_bb_gemm_kernel": 24
+    },
+    "gdn_out_proj_gemm/triton": {
+     "_bb_gemm_kernel": 24
+    },
+    "lm_head_gemm/cublas": {
+     "nvjet_sm90_tst_512x16_64x3_2x1_v_bz_TNT": 1
+    },
+    "mlp_down_gemm/triton": {
+     "_bb_gemm_kernel": 32
+    },
+    "mlp_gate_up_gemm/triton": {
+     "_bb_gemm_kernel": 32
+    }
+   }
+  }
+ },
+ "pairs": {
+  "B1:A1": {
+   "span_us_median_diff": -101.92000000000007,
+   "kernel_us_median_diff": {
+    "all_kernels": -92.52500000000236,
+    "attn_o_proj_gemm/cublas": -81.376,
+    "attn_o_proj_gemm/gemv": 71.19999999999999,
+    "attn_qkv_gemm/cublas": -135.232,
+    "attn_qkv_gemm/gemv": 133.28,
+    "gdn_in_proj_gemm/cublas": -874.6240000000001,
+    "gdn_in_proj_gemm/gemv": 914.7519999999997,
+    "gdn_out_proj_gemm/cublas": -248.64000000000004,
+    "gdn_out_proj_gemm/gemv": 209.632,
+    "head": 8.096000000000004,
+    "lm_head_gemm/cublas": 8.096000000000004,
+    "mlp_down_gemm/cublas": -560.5399999999998,
+    "mlp_down_gemm/gemv": 529.8879999999999,
+    "mlp_gate_up_gemm/cublas": -934.2839999999999,
+    "mlp_gate_up_gemm/gemv": 910.6559999999998,
+    "other/attn_output_gate": 0.28800000000000026,
+    "other/attn_qk_norm_rope_gate": -2.4319999999999986,
+    "other/embedding": -0.03200000000000003,
+    "other/full_attention": -3.680000000000007,
+    "other/gdn_conv": -2.3999999999999915,
+    "other/gdn_gated_norm": -0.4159999999999968,
+    "other/gdn_recurrent": -0.2880000000000109,
+    "other/kv_cache_store": -1.0559999999999992,
+    "other/logits_cast": -0.2240000000000002,
+    "other/mlp_activation": 0.2560000000000002,
+    "other/norm": -24.351999999999975,
+    "weight_gemms": -66.35699999999952
+   }
+  },
+  "B16:A16": {
+   "span_us_median_diff": -44.720000000000255,
+   "kernel_us_median_diff": {
+    "all_kernels": 1457.288999999998,
+    "attn_o_proj_gemm/cublas": -85.24799999999999,
+    "attn_o_proj_gemm/triton": 83.03999999999999,
+    "attn_qkv_gemm/cublas": -0.8000000000000114,
+    "gdn_in_proj_gemm/cublas": -790.4640000000003,
+    "gdn_in_proj_gemm/triton": 501.296,
+    "gdn_out_proj_gemm/cublas": -306.016,
+    "gdn_out_proj_gemm/triton": 292.12800000000004,
+    "head": 2.0645000000000095,
+    "lm_head_gemm/cublas": 2.0645000000000095,
+    "mlp_down_gemm/cublas": -585.4979999999999,
+    "mlp_down_gemm/triton": 600.2570000000001,
+    "mlp_gate_up_gemm/cublas": -1088.855,
+    "mlp_gate_up_gemm/triton": 1078.8649999999998,
+    "other/attn_output_gate": 0.0,
+    "other/attn_qk_norm_rope_gate": -0.031999999999996476,
+    "other/embedding": 0.03200000000000003,
+    "other/full_attention": -0.8959999999999866,
+    "other/gdn_conv": 0.7679999999999865,
+    "other/gdn_gated_norm": 0.5119999999999862,
+    "other/gdn_recurrent": 1.152499999999975,
+    "other/kv_cache_store": -0.47999999999999865,
+    "other/logits_cast": 0.38400000000000034,
+    "other/mlp_activation": 969.5934999999997,
+    "other/norm": 783.712,
+    "weight_gemms": -301.1424999999995
+   }
+  }
+ }
+}

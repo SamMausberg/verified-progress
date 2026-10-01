@@ -10,8 +10,8 @@ commands are in [`experiments/backbone/`](../../experiments/backbone/).
 Status: the kernel, merge, norm and skeleton results are **microbenchmarks** (measured) or
 calculations from them (**derived**). [Served results](#served-results) add the exactness class
 of each engine switch (greedy outputs against stock plain decoding) and paired serving runs of
-the routing table against tuned plain decoding. The paired runs against tuned MTP and a trace of
-which GEMM kernels the served engine dispatches are **pending**.
+the routing table against tuned plain and tuned MTP decoding, and a trace of which GEMM kernels
+the served engine dispatches. The exactness class of the routing table under MTP is **pending**.
 
 ## Setup
 
@@ -257,8 +257,9 @@ visible there.
 - **c = 8: 0.4% faster** in both pairs, just above the 0.26% spread. At M = 8 the Triton kernel
   with PDL serves `in_proj_qkvz`, `out_proj`/`o_proj`, `gate_up` and `down`. The isolated
   microbenchmarks give 98 us per step for those calls and the layer skeletons about 90 us; the
-  served decode step is 10 us shorter, about a tenth of that. Why is not known yet. A trace of
-  which GEMM kernels the served engine runs is pending (`experiments/backbone/insitu_gemm.py`).
+  served decode step is 10 us shorter, about a tenth of that. The in-situ trace below accounts
+  for part of the gap: at M = 16 the routed GEMMs keep 37% of their isolated gain on the GPU,
+  and an unprofiled step kept a third of that.
 - **c = 32: no claim.** The ratios (1.001-1.003) are about the spread. At M = 32 the table keeps
   every decode GEMM on cuBLAS and the packed projection is not used (cutoff 64), so only
   prefills change.
@@ -298,12 +299,71 @@ the unfused Triton kernel at M = 1 and doubles the MLP layer from M = 2. No fold
 here pays at any M from 1 to 16, so folding the norm or the SiLU into the GEMM prologue is closed
 as a negative result. The stock and Triton rows repeat hold 1's to within 1.4 us.
 
+### Paired serving: lever v1 against tuned MTP (hold 3)
+
+The same design in one exclusive hold (2026-10-01, 22:05-22:23 UTC): arm `mtp-tuned` (native MTP,
+three-step chain, buffered GDN verify, radix cache off, 128 GDN slots), both arms on the backbone
+engine, order B A A B with the sessions recorded by the harness (pairs (B1, A1) and (A2, B2)),
+c = 1, 8, 32 and 128. Foreign CPU load averaged 0.19-0.36 cores per point (largest single sample
+1.17), and no point is invalid ([`served/mtp_v1/`](served/mtp_v1/)).
+
+| c | A: tokens/s, two runs | B: tokens/s, two runs | B/A per pair | A1-A2 spread | Tokens per verify cycle, A and B |
+|---|---|---|---|---|---|
+| 1 | 456.6, 460.5 | 453.5, 455.6 | 0.993, 0.989 | 0.85% | 3.279, 3.273 |
+| 8 | 2,663.9, 2,698.7 | 2,676.7, 2,697.4 | 1.005, 1.000 | 1.30% | 3.272, 3.270 |
+| 32 | 6,488.0, 6,643.6 | 6,567.7, 6,635.6 | 1.012, 0.999 | 2.37% | 3.260, 3.261 |
+| 128 | 12,108.5, 12,207.4 | 12,064.3, 12,014.4 | 0.996, 0.984 | 0.82% | 3.257-3.258, 3.257-3.260 |
+
+- **No gain at any concurrency.** At c = 8 and 32 the two pairs straddle 1, and A's own rate rose
+  by 1.3-2.4% between its two runs (bench's `mtp-tuned` confirmation sessions differ by 2.2% at
+  c = 32, `evidence/bench/confirm/points.csv`). A's rates are within 1% of that confirmation's.
+- **c = 1: 0.9% slower** in both pairs (one of the two beyond the 0.85% spread). About 0.2% of it
+  is fewer tokens per verify cycle, 3.273 against 3.279 in both sessions: the routes change the
+  draft and verify passes' arithmetic, which moves acceptance at near ties. The rest is not
+  traced. In this arm the target verifies 4 rows per request (the Triton route at c = 1), and by
+  the table each draft step sends the MTP layer's projections, one row each, to the Hopper GEMV
+  (not traced).
+- **c = 128: no claim.** Both pairs are below 1 (0.996, 0.984), one beyond the 0.82% spread.
+- The exactness class of lever v1 on MTP was not measured; the frontier file marks it pending.
+
+### Which GEMM kernels the served engine runs (hold 3)
+
+Plain decoding (radix cache off, 128 GDN slots, running limit 128, stream interval 4), A then B on
+the backbone engine, under nsys with node-level CUDA-graph tracing, at c = 1 and 16 (16 rows is
+the DFlash block-16 verify at c = 1), one 2-second collected window per point after an
+unprofiled 5-second window (`experiments/profiling/run_profiles.py`). `insitu_gemm.py` labels
+every complete decode-graph replay of the window and names each GEMM kernel's implementation
+([`served/insitu_gemm.json`](served/insitu_gemm.json); the unprofiled windows'
+step times are in [`served/nsys_windows_plain_A.jsonl`](served/nsys_windows_plain_A.jsonl) and
+[`served/nsys_windows_plain_B.jsonl`](served/nsys_windows_plain_B.jsonl); foreign CPU 0.20-0.45
+cores).
+
+- **The routes are taken as tabled.** At M = 1 every projection GEMM of a step runs on the Hopper
+  GEMV: 152 calls (`in_proj_qkvz` and `in_proj_ba` 48, `out_proj` 24, `qkv_proj` 8, `o_proj` 8,
+  `gate_up` 32, `down` 32) in place of A's 216 cuBLAS kernels, split-K reductions included.
+  At M = 16 the Triton kernel serves 120 calls (`in_proj_qkvz` 24, `out_proj` 24, `o_proj` 8,
+  `gate_up` 32, `down` 32), and `qkv_proj` and `in_proj_ba` stay on cuBLAS. So the shortfall at
+  c = 8 is not a route that failed to dispatch.
+- **GPU time per step** (replay span, first kernel start to last kernel end, median over 573-589
+  and 463-466 complete replays): 3,474.9 to 3,373.0 us at M = 1 (-102 us, -2.9%) and 4,313.3 to
+  4,268.6 us at M = 16 (-45 us, -1.0%). The isolated microbenchmarks predict 197 us at M = 1 (the
+  table's GEMV calls; `in_proj_ba` runs on a side stream and is left out) and 120 us at M = 16.
+  In the served step the routes keep 52% of their isolated gain at M = 1 and 37% at M = 16.
+- **Kernel durations do not add up here.** With PDL, a norm or SiLU kernel launched early waits
+  inside the kernel until the Triton GEMM before it finishes: at M = 16 B's summed norm and SiLU
+  durations are 784 and 970 us longer than A's, while its span is shorter. `in_proj_ba` also
+  overlaps `in_proj_qkvz` on a side stream in both arms. Only the span compares steps.
+- **Step time, unprofiled** (one 5-second window per point): 3.454 to 3.342 ms at c = 1
+  (-111 us) and 4.311 to 4.296 ms at c = 16 (-15 us). At c = 1 the step shrinks by the whole GPU
+  saving; at c = 16 by a third of it, close to the served c = 8 result (-10 us). Where the
+  other two thirds go is not resolved: the span and the unprofiled step come from different
+  single windows.
+
 ## Pending
 
-- Paired serving of lever v1 against tuned MTP (B A A B at c = 1, 8, 32 and 128).
-- The in-situ trace: plain decoding under nsys at c = 1 and 16, with and without lever v1, read
-  by `insitu_gemm.py`, to see which GEMM kernels the served engine dispatches and why the c = 8
-  gain is a tenth of the isolated one.
+- The exactness class of lever v1 under MTP (greedy outputs against stock MTP).
+- Why the step at c = 16 keeps only a third of the GPU span's saving, and why MTP at c = 1 is
+  slower; neither is traced.
 
 ## Commands behind the served files
 
@@ -361,4 +421,29 @@ python -m bench.hostload record --out <hostload.json> -- python experiments/back
     --gemm-json evidence/backbone/gemm_microbench.json --m 1 2 4 8 16 --variants mlp_triton_pdl \
     mlp_act_pdl mlp_normscaled_pdl mlp_both_scaled_pdl gdn_triton_pdl gdn_normscaled_pdl \
     --out evidence/backbone/chain_fold_variants_microbench.json
+```
+
+Hold 3 (exclusive lock, repository commit 53e39a3, engine `59deb68e29`):
+
+```sh
+# Paired MTP serving, in the order B A A B; A is the same command without the --env switches.
+python -m bench.sweep --arm mtp-tuned --label backbone-mtp-v1-B --session abba-1 \
+    --sglang-worktree ~/sglang-wt/backbone --env SGLANG_BACKBONE_GEMM=1 --env SGLANG_BACKBONE_PDL=1 \
+    --env SGLANG_BACKBONE_MERGE_IN_PROJ=1 --env SGLANG_BACKBONE_GEMM_TABLE=<table> \
+    --concurrency 1 8 32 128 --repeats 1 --port 30471 --out ~/vp-data/backbone/e2e/mtp-v1
+M=~/vp-data/backbone/e2e/mtp-v1
+python -m bench.pareto $M/backbone-mtp-v1-B/20261001-220519 $M/backbone-mtp-v1-A/20261001-220946 \
+    $M/backbone-mtp-v1-A/20261001-221412 $M/backbone-mtp-v1-B/20261001-221836 --out <dir> \
+    --pair backbone-mtp-v1-B:backbone-mtp-v1-A --status paired --no-plot --class backbone-mtp-v1-B=pending
+# served/mtp_v1/ keeps points.csv, pairs.csv, launches.csv and frontier.csv from <dir>.
+# In-situ trace: A, then B with the four lever variables set in the environment.
+python experiments/profiling/run_profiles.py --arm plain --mode nsys --concurrency 1 16 \
+    --out-dir ~/vp-data/backbone/nsys/plain-A --port 30472 \
+    --extra-server-args "--disable-radix-cache --max-mamba-cache-size 128 --max-running-requests 128 --stream-interval 4"
+# served/nsys_windows_plain_{A,B}.jsonl are the runs' windows.jsonl. Then, at repository commit 43dd775:
+N=~/vp-data/backbone/nsys
+python experiments/backbone/insitu_gemm.py --report A1=$N/plain-A/plain_bs1.nsys-rep \
+    --report B1=$N/plain-B/plain_bs1.nsys-rep --report A16=$N/plain-A/plain_bs16.nsys-rep \
+    --report B16=$N/plain-B/plain_bs16.nsys-rep --pair B1:A1 --pair B16:A16 \
+    --out evidence/backbone/served/insitu_gemm.json
 ```
