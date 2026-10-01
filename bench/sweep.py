@@ -371,6 +371,7 @@ class Sweep:
         args = self.args
         manifest = {
             'label': args.label,
+            'session': args.session,
             'arm': self.server.arm.to_json(),
             'launch': self.server.launch_record,
             'checks': [asdict(check) for check in self.server.checks],
@@ -421,6 +422,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     add_arm_arguments(parser)
     parser.add_argument('--label', default=None, help='run label (default: arm name)')
+    parser.add_argument(
+        '--session',
+        default='',
+        help='repeat this run belongs to (bench.pareto pairs matched arms within a session)',
+    )
     parser.add_argument('--out', type=Path, default=Path.home() / 'vp-data/bench/runs')
     parser.add_argument('--workload', type=Path, default=DEFAULT_WORKLOAD)
     parser.add_argument('--warmup-pool', type=Path, default=DEFAULT_WARMUP_POOL)

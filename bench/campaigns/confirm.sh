@@ -9,7 +9,8 @@
 #   a: plain-tuned, mtp-tuned, dflash-tuned, dflash-tuned-b4 (FlashInfer, ~28 min)
 #   b: plain-tuned-triton, mtp-tuned-triton, dflash-tuned-b16 (Triton, ~18 min)
 # Run under: scripts/gpu_lock.sh -x bench/campaigns/confirm.sh <repeat index> [a|b|all]
-# (repeat 0 ran as one hold, in the order of `all`).
+# (repeat 0 ran as one hold, in the order of `all`, before runs recorded a session;
+# bench.pareto assigns it with --session-of).
 set -uo pipefail
 # shellcheck source=/dev/null
 source "$(dirname "$0")/../../scripts/sglang_env.sh"
@@ -45,7 +46,8 @@ run() {
   echo "=== $arm c=$levels"
   # shellcheck disable=SC2086 # levels is a space-separated list of integers
   python -m bench.sweep --out ~/vp-data/bench/confirm --port 30010 --osl 512 \
-    --quiet-cpu-wait 600 --arm "$arm" --label "$arm" --concurrency $levels 2>&1 |
+    --quiet-cpu-wait 600 --arm "$arm" --label "$arm" --session "confirm-r$repeat" \
+    --concurrency $levels 2>&1 |
     grep -E "^\[FAIL|^r0|Error|done" | tail -12
 }
 order=("${PLAN[@]}")

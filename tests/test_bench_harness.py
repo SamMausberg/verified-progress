@@ -65,7 +65,8 @@ def test_resolve_arm_merges_defaults_arm_and_overrides(tmp_path: Path) -> None:
     arms.write_text(
         '[defaults]\nmodel = "m"\nrevision = "r"\n'
         '[defaults.args]\nattention-backend = "flashinfer"\nenable-metrics = true\n'
-        '[arms.a]\ndescription = "d"\n[arms.a.args]\nspeculative-num-steps = 3\n'
+        '[arms.a]\ndescription = "d"\nexactness = "stock"\n'
+        '[arms.a.args]\nspeculative-num-steps = 3\n'
     )
     overrides = parse_overrides(
         ['speculative-num-steps=5', 'cuda-graph-bs=1,2,4'], ['enable-metrics']
@@ -93,6 +94,41 @@ def test_resolve_arm_merges_defaults_arm_and_overrides(tmp_path: Path) -> None:
         resolve_arm('a', {'port': 1}, path=arms)
     with pytest.raises(KeyError):
         resolve_arm('missing', path=arms)
+
+
+def test_every_arm_declares_a_consistent_exactness_class(tmp_path: Path) -> None:
+    from bench.arms import arm_names
+
+    for name in arm_names():
+        arm = resolve_arm(name)
+        assert arm.exactness in ('stock', 'exact-up-to-floor', 'pending', 'lossy')
+    assert resolve_arm('plain-tuned').exactness == 'stock'
+    assert resolve_arm('plain-tuned-triton').exactness == 'pending'
+    assert resolve_arm('dflash-tuned-b16').exactness == 'pending'
+    assert resolve_arm('dflash-tuned').exactness == 'stock'  # FA4 is draft-only
+    # A numerics-changing override makes a stock arm pending.
+    assert resolve_arm('plain', {'attention-backend': 'triton'}).exactness == 'pending'
+    assert resolve_arm('mtp', {'enable-linear-replayssm-spec': True}).exactness == 'pending'
+    head = '[defaults]\nmodel = "m"\nrevision = "r"\n'
+    missing = tmp_path / 'missing.toml'
+    missing.write_text(head + '[arms.a]\ndescription = "d"\n')
+    with pytest.raises(ValueError, match='exactness'):
+        resolve_arm('a', path=missing)
+    mislabelled = tmp_path / 'mislabelled.toml'
+    mislabelled.write_text(
+        head + '[arms.a]\ndescription = "d"\nexactness = "stock"\n'
+        '[arms.a.args]\nenable-linear-replayssm = true\n'
+    )
+    with pytest.raises(ValueError, match='stock but sets'):
+        resolve_arm('a', path=mislabelled)
+    unexplained = tmp_path / 'unexplained.toml'
+    unexplained.write_text(head + '[arms.a]\ndescription = "d"\nexactness = "pending"\n')
+    with pytest.raises(ValueError, match='lossy note'):
+        resolve_arm('a', path=unexplained)
+    # An arm built in code with a lossy note takes its class from the note.
+    base = resolve_arm('plain').to_json()
+    assert Arm(**{**base, 'lossy': 'FP8 KV cache'}).exactness == 'lossy'
+    assert Arm(**{**base, 'lossy': 'pending: check'}).exactness == 'pending'
 
 
 def test_repository_arms_resolve() -> None:
@@ -532,33 +568,84 @@ def test_host_load_attributes_short_lived_own_children_to_the_run() -> None:
     assert result['own_cores'] >= 0.35
 
 
-def test_envelope_and_paired_ratios() -> None:
-    from bench.pareto import envelope, exactness_class, paired_ratios, pareto_envelope
+def test_envelope_and_session_paired_ratios() -> None:
+    from bench.pareto import envelope, paired_ratios, pareto_envelope
 
-    def row(label: str, run: str, c: int, y: float) -> dict[str, object]:
-        return {'label': label, 'run': run, 'concurrency': c, 'x_e2e': y / c, 'y': y, 'failed': 0}
+    def row(label: str, session: str, c: int, y: float, invalid: str = '') -> dict[str, object]:
+        return {
+            'label': label,
+            'run': f'{label}-{session}',
+            'session': session,
+            'concurrency': c,
+            'x_e2e': y / c,
+            'y': y,
+            'failed': 0,
+            'invalid_reason': invalid,
+        }
 
     rows = [
-        row('plain', 'r1', 1, 100.0),
-        row('plain', 'r2', 1, 110.0),
-        row('spec', 'r3', 1, 200.0),
-        row('spec', 'r4', 1, 220.0),
-        row('plain', 'r1', 64, 1000.0),
-        row('spec', 'r3', 64, 800.0),
+        row('plain', 'r0', 1, 100.0),
+        row('plain', 'r1', 1, 110.0),
+        row('plain', 'r2', 1, 120.0, invalid='host_contention'),
+        row('spec', 'r0', 1, 200.0),
+        row('spec', 'r1', 1, 220.0, invalid='host_contention'),
+        row('spec', 'r2', 1, 300.0),
+        row('plain', 'r0', 64, 1000.0),
+        row('spec', 'r0', 64, 800.0),
+        row('spec', 'supp', 64, 900.0),
     ]
-    frontier = aggregate(rows, baseline=None)
+    frontier = aggregate([r for r in rows if not r['invalid_reason']], baseline=None)
     best = {e['concurrency']: e for e in envelope(frontier)}
     assert best[1]['best'] == 'spec' and best[64]['best'] == 'plain'
-    assert best[64]['lead'] == pytest.approx(0.25)
     for entry in frontier:
-        entry['exactness'] = 'pending' if entry['label'] == 'spec' else ''
+        entry['exactness'] = 'pending' if entry['label'] == 'spec' else 'stock'
     best = {e['concurrency']: e for e in envelope(frontier)}
-    assert best[1]['best_exactness'] == 'pending' and best[1]['best_stock'] == 'plain'
-    assert [e['label'] for e in pareto_envelope(frontier, stock_only=True)] == ['plain'] * 2
-    assert {e['label'] for e in pareto_envelope(frontier, stock_only=False)} == {'plain', 'spec'}
-    assert exactness_class('') == ''
-    assert exactness_class('pending: classification') == 'pending'
-    assert exactness_class('changes greedy outputs') == 'lossy'
+    assert best[1]['best_exactness'] == 'pending' and best[1]['best_exact'] == 'plain'
+    assert [e['label'] for e in pareto_envelope(frontier, exact_only=True)] == ['plain'] * 2
+    assert {e['label'] for e in pareto_envelope(frontier, exact_only=False)} == {'plain', 'spec'}
     ratios = {r['concurrency']: r for r in paired_ratios(rows, [('spec', 'plain')])}
-    assert ratios[1]['n'] == 2 and ratios[1]['y_ratio_mean'] == pytest.approx(2.0)
+    # Only r0 pairs at c=1: r1 and r2 each have an invalid side and are dropped, not
+    # re-paired with another session's run.
+    assert ratios[1]['n'] == 1 and ratios[1]['sessions'] == 'r0'
+    assert ratios[1]['dropped_invalid'] == 2
+    assert ratios[1]['y_ratio_mean'] == pytest.approx(2.0)
+    assert ratios[64]['n'] == 1 and ratios[64]['unmatched'] == 1
     assert ratios[64]['y_ratio_mean'] == pytest.approx(0.8)
+    with pytest.raises(ValueError, match='two runs'):
+        paired_ratios([*rows, row('plain', 'r0', 1, 105.0)], [('spec', 'plain')])
+
+
+def test_runs_get_sessions_and_exactness_from_their_manifests(tmp_path: Path) -> None:
+    from bench.pareto import exactness, load_points
+
+    def manifest(run: str, label: str, session: str = '') -> Path:
+        run_dir = tmp_path / label / run
+        run_dir.mkdir(parents=True)
+        point = {'concurrency': 1, 'x_e2e': 1.0, 'y': 1.0, 'failed': 0}
+        body = {'label': label, 'arm': {}, 'points': [point]}
+        if session:
+            body['session'] = session
+        (run_dir / 'sweep.json').write_text(json.dumps(body))
+        return run_dir
+
+    runs = [
+        manifest('20261001-020000', 'a'),
+        manifest('20261001-010000', 'a'),
+        manifest('20261001-030000', 'a', session='confirm-r1'),
+        manifest('20261001-040000', 'b'),
+    ]
+    rows = load_points(runs, {}, sessions={'20261001-040000': 'confirm-r0'})
+    sessions = {(r['label'], r['run']): r['session'] for r in rows}
+    assert sessions[('a', '20261001-010000')] == '#0'
+    assert sessions[('a', '20261001-020000')] == '#1'
+    assert sessions[('a', '20261001-030000')] == 'confirm-r1'
+    assert sessions[('b', '20261001-040000')] == 'confirm-r0'
+
+    plain = resolve_arm('plain-tuned').to_json()
+    triton = resolve_arm('plain-tuned-triton').to_json()
+    assert exactness({'arm': plain}) == 'stock'
+    assert exactness({'arm': triton}) == 'pending'
+    # Older manifests: no class recorded and flags no longer matching an arm.
+    assert exactness({'arm': {'name': 'x', 'args': {'attention-backend': 'triton'}}}) == 'pending'
+    assert exactness({'arm': {'name': 'x', 'args': {}, 'lossy': 'FP8 KV'}}) == 'lossy'
+    assert exactness({'arm': {'name': 'x', 'args': {}}}) == 'unclassified'

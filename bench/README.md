@@ -134,9 +134,11 @@ scripts/gpu_lock.sh -x python -m bench.server --arm mtp --port 30010 \
 scripts/gpu_lock.sh -x python -m bench.sweep --arm mtp --label mtp \
     --concurrency 1 2 4 8 16 32 64 128 --repeats 1
 
-# Frontier from any set of runs, with matched-flag ratios (pairs.csv) and the
-# envelope over all arms and over stock-arithmetic arms (envelope.csv, *.dat, PNG);
-# the plot needs matplotlib (in the SGLang venv)
+# Frontier from any set of runs, with matched-flag ratios per session (pairs.csv;
+# runs record their session with bench.sweep --session) and the envelope over all
+# arms and over exact arms (envelope.csv, envelope-*.dat, PNG); the plot needs
+# matplotlib (in the SGLang venv). Each label's exactness class comes from
+# arms.toml (see bench/arms.py); --class LABEL=CLASS overrides it.
 python -m bench.pareto ~/vp-data/bench/runs/plain/* ~/vp-data/bench/runs/mtp/* \
     --out evidence/bench/confirm --baseline plain --pair mtp:plain
 
