@@ -20,6 +20,7 @@ commands are shell strings; `{port}` and `{out}` are substituted. Run it under
 from __future__ import annotations
 
 import argparse
+import contextlib
 import fcntl
 import json
 import os
@@ -74,6 +75,19 @@ def git_revision(path: Path) -> str | None:
         return None
 
 
+def stop(server: subprocess.Popen) -> None:
+    """Stop the server's process group (it may already have exited)."""
+    try:
+        os.killpg(server.pid, signal.SIGTERM)
+        server.wait(timeout=60)
+    except ProcessLookupError:
+        pass
+    except subprocess.TimeoutExpired:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(server.pid, signal.SIGKILL)
+    server.wait()
+
+
 def wait_ready(port: int, process: subprocess.Popen, timeout: float) -> None:
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -105,6 +119,13 @@ def main() -> None:
     parser.add_argument('--env', action='append', default=[], help='NAME=VALUE')
     parser.add_argument('--client', action='append', default=[], help='shell command')
     parser.add_argument('--ready-timeout', type=float, default=900)
+    parser.add_argument(
+        '--startup-retries',
+        type=int,
+        default=30,
+        help='relaunches when start-up fails for lack of free GPU memory (other shared jobs)',
+    )
+    parser.add_argument('--retry-wait', type=float, default=60)
     args = parser.parse_args()
 
     args.out.mkdir(parents=True, exist_ok=True)
@@ -154,25 +175,47 @@ def main() -> None:
     }
     (args.out / 'launch.json').write_text(json.dumps(launch, indent=2) + '\n')
 
-    log = (args.out / 'server.log').open('w')
     # Start-up is serialized with other jobs' servers (the same lock file as
     # scripts/gpu_startup_lock.sh): SGLang sizes its pools from the free memory
     # it sees while loading, so concurrent start-ups race. The lock descriptor
     # is not inherited by the server (Popen closes fds) and is released once the
-    # server is healthy.
+    # server is healthy. If the pools do not fit because other shared jobs hold
+    # memory, the launch is retried after a wait (the lock is released meanwhile).
     lock_path = os.environ.get('GPU_LOCK_FILE', str(Path.home() / '.gpu.lock')) + '.startup'
-    startup_lock = open(lock_path, 'a')  # noqa: SIM115 (released before the clients run)
-    fcntl.flock(startup_lock, fcntl.LOCK_EX)
-    server = subprocess.Popen(
-        command, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True
-    )
-    status = 0
-    try:
+    attempt = 0
+    while True:
+        log = (args.out / 'server.log').open('w')
+        startup_lock = open(lock_path, 'a')  # noqa: SIM115 (released before the clients run)
+        fcntl.flock(startup_lock, fcntl.LOCK_EX)
+        server = subprocess.Popen(
+            command, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True
+        )
         try:
             wait_ready(args.port, server, args.ready_timeout)
+            break
+        except RuntimeError:
+            stop(server)
+            log.close()
+            text = (args.out / 'server.log').read_text(errors='replace')
+            if 'Not enough GPU memory' not in text or attempt >= args.startup_retries:
+                raise
+            attempt += 1
+            print(
+                f'[serve_run] start-up found too little free GPU memory; '
+                f'retry {attempt}/{args.startup_retries} in {args.retry_wait:.0f} s',
+                flush=True,
+            )
+        except BaseException:
+            stop(server)
+            raise
         finally:
             fcntl.flock(startup_lock, fcntl.LOCK_UN)
             startup_lock.close()
+        time.sleep(args.retry_wait)
+    launch['startup_attempts'] = attempt + 1
+    (args.out / 'launch.json').write_text(json.dumps(launch, indent=2) + '\n')
+    status = 0
+    try:
         with urllib.request.urlopen(
             f'http://127.0.0.1:{args.port}/server_info', timeout=30
         ) as response:
@@ -190,12 +233,7 @@ def main() -> None:
                 status = subprocess.run(text, shell=True).returncode or status
         (args.out / 'cpu_load.json').write_text(json.dumps(load.summary(), indent=2) + '\n')
     finally:
-        os.killpg(server.pid, signal.SIGTERM)
-        try:
-            server.wait(timeout=60)
-        except subprocess.TimeoutExpired:
-            os.killpg(server.pid, signal.SIGKILL)
-            server.wait()
+        stop(server)
         log.close()
     sys.exit(status)
 
