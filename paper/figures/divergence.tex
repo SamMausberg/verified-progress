@@ -10,7 +10,7 @@
 \begin{tikzpicture}[font=\footnotesize]
 \begin{axis}[x=0.33cm,y=1cm,xmin=-0.6,xmax=31.6,ymin=-0.55,ymax=2.05,clip=false,
   axis x line=bottom,axis y line=none,axis line style={ink!60,-},
-  xtick={0,4,8,12,16,20,24,28,31},tick align=outside,major tick length=0.1cm,
+  xtick={0,4,8,12,16,20,24,28,31},tick align=outside,major tick length=0.1cm,typeset ticklabels with strut,
   tick style={ink!60},
   xlabel={decoder layer (shaded: full attention; others: Gated DeltaNet)},
   visualization depends on={value \thisrow{count}\as\cnt}]

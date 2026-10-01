@@ -49,7 +49,7 @@
   ytick={0,0.2,0.4,0.6,0.8,1},yticklabels={0\%,20\%,40\%,60\%,80\%,100\%},
   title={\paneltitle{b}{Whole-batch fallback}},
   legend style={at={(0.02,0.98)},anchor=north west},legend image post style={xscale=0.8}]
-\fill[ink!6] (axis cs:16,0) rectangle (axis cs:256,1);
+\fill[wash] (axis cs:16,0) rectangle (axis cs:256,1);
 \node[annot,anchor=north west,align=center] at (axis cs:17.5,0.985) {beyond the\\capture's\\batches};
 \addplot[cfallback,thick,model cons,derived,domain=1:256,samples=120]{1-(1-\pcons)^x};
   \addlegendentry{conservative}
@@ -68,7 +68,7 @@
   xlabel={Positions per head call, $M$},ylabel={Time over the stock head},
   title={\paneltitle{c}{Head-only time (measured)}},
   legend style={at={(0.02,0.98)},anchor=north west},legend image post style={xscale=0.8}]
-\fill[ink!6] (axis cs:16,0.5) rectangle (axis cs:256,2.5);
+\fill[wash] (axis cs:16,0.5) rectangle (axis cs:256,2.5);
 \draw[cstock,semithick] (axis cs:1,1) -- (axis cs:256,1);
 \node[annot,anchor=south west] at (axis cs:1.1,1.01) {stock head and argmax};
 \addplot[ccert,thick,mark=*,mark size=1.5pt,
