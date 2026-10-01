@@ -1,0 +1,96 @@
+% Research notes: further analysis (moved unchanged from the paper's Appendices A, B and C, except
+% cross-references; owner: appendix editor).
+\section{Further analysis}\label{notes:analysis}
+These results were developed alongside the certified head and transport but support none of the paper's claims. The first two subsections take the decision beyond the head (P1, rejected); the next four concern sampled decisions, whose analysis the paper uses is in its Appendix~\paperref{app:sampling}; the last two concern transport's summaries and the conversion of skipped work into time.
+
+\subsection{The directional margin}\label{app:directional}
+When the information is about the hidden state rather than the logits, a box of logit bounds is loose; the certificate below uses the direction of each competitor instead.
+\begin{proposition}[Directional margin]\label{prop:directional}
+Let the logits be $z=Wh$ in real arithmetic and suppose $\norm{h-\tilde h}_2\le\varepsilon_h$ for a known $\tilde h$. Then $c$ is the strict argmax of $Wh$ for every such $h$ if and only if
+\[(w_c-w_j)^\top\tilde h>\norm{w_c-w_j}_2\,\varepsilon_h\quad\text{for all }j\neq c.\]
+This condition is implied by, and can be much weaker than, the box condition obtained from the row bounds $|z_j-w_j^\top\tilde h|\le\norm{w_j}_2\varepsilon_h$.
+\end{proposition}
+\begin{proof}
+For fixed $j$, $\min_{\norm e_2\le\varepsilon_h}(w_c-w_j)^\top(\tilde h+e)=(w_c-w_j)^\top\tilde h-\norm{w_c-w_j}_2\varepsilon_h$ by Cauchy--Schwarz, with equality at $e=-\varepsilon_h(w_c-w_j)/\norm{w_c-w_j}_2$. So $z_c>z_j$ throughout the ball exactly when the stated inequality holds. The box condition reads $(w_c-w_j)^\top\tilde h>(\norm{w_c}_2+\norm{w_j}_2)\varepsilon_h$, and $\norm{w_c-w_j}_2\le\norm{w_c}_2+\norm{w_j}_2$.
+\end{proof}
+The directional certificate is not free: it needs $\norm{w_c-w_j}_2$ for every competitor, which for all $j$ costs as much as a head pass. It is useful after a box screen has reduced the competitors to a few rows, and for the stock contract the gap condition of Theorem~\paperref{thm:stock} of the paper applies on top of it, as it does for the ladder. It is also a statement in real arithmetic; the floating-point terms of Appendix~\paperref{app:accumulation} of the paper turn it into an enclosure of computed values.
+
+\subsection{Beyond the head: a certified decoder tail (P1, rejected)}\label{app:tail}\label{sec:tail}\label{sec:skipped}
+Skipping a computation removes its cost only if nothing downstream needs its result, so every skipped result falls into one of three classes. It is \emph{dead} when it has no remaining consumer. It is \emph{deferred} when a later consumer needs it and a reconstruction path exists; the cost is moved, not removed, and must be charged where it lands. It is \emph{soundly enclosed} when a certificate bounds it well enough for every consumer that remains. A claimed saving should name its class, because early exits and approximations can borrow time from future tokens.
+
+The head is dead work in this sense: once a token is committed, no future computation reads the logits. In target-only decoding of Qwen3.5-4B the same is true of more. The last decoder layer is a full-attention layer; its attention writes the key--value cache before its MLP runs, and the final MLP, the final norm and the head have no consumer in future state. A certificate that decided the token before that tail could therefore remove about 1.41~GB of the 8.41~GB streamed per step (the head and the last layer's MLP, Table~\paperref{tab:bytes} of the paper), permanently. The cut does not transfer to speculation without re-analysis: the MTP layer and the DFlash drafter consume target hidden states, so work that is dead in plain decoding is deferred there.
+
+The hypothesis (P1) was that a cheap surrogate of that tail with a sound enclosure of the head input could let the commit rule decide the token before the tail runs. A one-shot surrogate that costs $C$ (surrogate plus certificate) and certifies a fraction $p$ of positions pays only if $C<p\,T_{\rm tail}$, and the ceiling for a tail that is a fraction $f$ of the step is $1/(1-f)$. The directional margin is the natural certificate when the surrogate predicts the head input with a radius. The kill test was deliberately optimistic: record the residual stream at the cut, the reference head input, the logits and the tokens; freeze an int8 surrogate of the tail; take the oracle radius $\norm{h-\tilde h}_2$; and apply the directional certificate with no overhead. If the oracle certification rate satisfied $p_{\rm oracle}T_{\rm tail}\le C_{\rm surrogate}$, the design was to be dropped; otherwise real bounds would be compared with the dense tail and with the certified head alone.
+
+The kill test rejects the design~\ev{tail}. It used 2,064 positions from 16 held-out prompts (four per domain), with the head input taken from a BF16 forward pass of a reference implementation on the CPU, teacher-forced on the engine's greedy outputs; that head input differs from the engine's captured one by a median 1.8\% in relative $\ell_2$ norm, and its argmax equals the engine's token at 99.5\% of positions. An int8 per-row copy of the final MLP moves the head input by a median 0.94\%. With that realized error as an oracle radius and no overhead, the directional certificate decides 85.4\% of positions when the head is exact and 71.8\% when the head is int8 as well, while the int8 head alone, with the exact MLP, decides 79.3\% without any re-scoring. The MLP is 0.142~GB of the tail's 1.413~GB, so an int8 surrogate can save at most 0.071~GB per token, and it lowers the rate at which the certified head decides on its own. Certifying the head alone is the part worth building.
+
+\subsection{Sampling before the scores are known}\label{app:commonmass}\label{sec:commonmass}
+A race needs the winner's interval to separate from every other. A different construction can emit a token with some probability before any candidate is separated, and finish the rest of the law after more computation. Let $\mathcal P(I)$ be the set of target laws compatible with the information $I$ held so far.
+
+\begin{proposition}[Common mass]\label{prop:commonmass}
+Consider procedures that, before acquiring more information, emit token $i$ with probability $r_i$ (the same for every $p\in\mathcal P(I)$) and otherwise continue until $p$ is known. Such a procedure outputs exactly $p$ for every $p\in\mathcal P(I)$ if and only if $r_i\le\inf_{p\in\mathcal P(I)}p_i$ for every $i$, and then it may finish by sampling the residual $(p-r)/(1-\alpha)$ with $\alpha=\sum_ir_i$. The largest immediate probability is
+\[\alpha^\ast(I)=\sum_i\inf_{p\in\mathcal P(I)}p_i.\]
+\end{proposition}
+\begin{proof}
+If the procedure is exact, the final probability of $i$ is at least the probability $r_i$ of emitting it immediately, for every compatible $p$, so $r_i\le\inf_pp_i$. Conversely, if $r_i\le\inf_pp_i$ then $p-r\ge0$ and sums to $1-\alpha$ for every compatible $p$, so the residual is a law, and the output law is $r+(1-\alpha)\cdot(p-r)/(1-\alpha)=p$.
+\end{proof}
+For two candidate laws $\mathcal P=\{p,q\}$, $\alpha^\ast=\sum_i\min(p_i,q_i)=1-\TV(p,q)$, the overlap of a maximal coupling, which is exactly the acceptance probability of speculative sampling~\cite{specdecode,chen2023specsampling}. The proposition says that the same idea applies to any set of laws the evidence leaves open, and that nothing can do better without more information.
+
+A two-token example shows that exact sampling can finish where greedy selection cannot. Suppose the evidence says only that the probability of token~1 lies in $[0.49,0.51]$. Then $\alpha^\ast=0.49+0.49=0.98$. Draw $U$ uniform on $[0,1)$: emit token~1 if $U<0.49$, token~0 if $U\ge0.51$, and otherwise compute $p$ and emit token~1 exactly when $U<p$, reusing the same $U$. The output has law $p$, and 98\% of draws never need the scores, whereas the greedy decision is undecided because the interval contains $1/2$. For two tokens this procedure is inverse-CDF sampling with bounds on the CDF. In general it gives equality in distribution, not seeded equality with a dense race.
+
+\begin{proposition}[Bounded logit error]\label{prop:boundedrange}
+Let $p=\softmax(z/T)$ and $q=\softmax(\tilde z/T)$, and suppose $\max_i(z_i-\tilde z_i)-\min_i(z_i-\tilde z_i)\le\Delta$. Then $p_i\ge e^{-\Delta/T}q_i$ for every $i$. Consequently, with $\alpha=e^{-\Delta/T}$:
+\begin{enumerate}
+\item sampling $q$ with probability $\alpha$, and otherwise computing $p$ and sampling $(p-\alpha q)/(1-\alpha)$, samples $p$ exactly;
+\item always sampling $q$ gives $\TV(p,q)\le1-\alpha$.
+\end{enumerate}
+\end{proposition}
+\begin{proof}
+Write $d_i=z_i-\tilde z_i$ with $m\le d_i\le M$ and $M-m\le\Delta$. Then $p_i/q_i=e^{d_i/T}/\sum_jq_je^{d_j/T}\ge e^{m/T}/e^{M/T}\ge e^{-\Delta/T}$. Part~1 is Proposition~\ref{prop:commonmass} with $r=\alpha q$. For part~2, $\TV(p,q)=\sum_i(q_i-p_i)_+\le\sum_i(1-\alpha)q_i=1-\alpha$.
+\end{proof}
+With self-evidence the range is at most twice the largest envelope half-width, so $\alpha\ge e^{-2\max_i\beta_i/T}$. The trade-off against the race differs: this sampler needs the cheap pass's full softmax and, with probability $1-\alpha$, the whole exact head, whereas the race re-scores a candidate set whose expected size grows like $e^{4\beta/T}$ (Proposition~\paperref{prop:candidates} of the paper) and returns the seeded token.
+
+\subsection{An approximate mode, and why it cannot be certified harmless}\label{app:approx}\label{sec:approx-mode}
+\begin{proposition}[Approximate mode: KL and sequence total variation]\label{prop:kl}
+Suppose that $\min_c\norm{z-\tilde z-c\mathbf 1}_\infty\le\varepsilon$ at temperature one; at temperature $T$, replace $\varepsilon$ by $\varepsilon/T$. Then $\KL(p\,\|\,q)\le\varepsilon^2/2$ and $\KL(q\,\|\,p)\le\varepsilon^2/2$, so $\TV(p,q)\le\varepsilon/2$. If an approximate decoder samples $q_t$ in place of $p_t$ at every position and the bound holds with $\varepsilon_t$ at every reachable prefix, the laws $P$ and $Q$ of the first $N$ tokens satisfy $\KL(P\,\|\,Q)\le\tfrac12\sum_t\varepsilon_t^2$ and
+\[\TV(P,Q)\le\tfrac12\Bigl(\sum_{t=1}^N\varepsilon_t^2\Bigr)^{1/2}.\]
+\end{proposition}
+\begin{proof}
+Let $d=z-\tilde z-c\mathbf 1$ with $\norm d_\infty\le\varepsilon$; the shift $c$ changes neither law. Then $p$ is $q$ tilted by $d$: $p_i=q_ie^{d_i}/\E_q[e^d]$. Let $\psi(\lambda)=\log\E_q[e^{\lambda d}]$, so $\psi(0)=0$ and $\KL(p\,\|\,q)=\E_p[d]-\psi(1)=\psi'(1)-\psi(1)=\int_0^1\lambda\psi''(\lambda)\,d\lambda$. Here $\psi''(\lambda)$ is the variance of $d$ under the tilted law $q^{(\lambda)}$, at most $(2\varepsilon)^2/4=\varepsilon^2$ because $d$ takes values in an interval of length $2\varepsilon$. Hence $\KL(p\,\|\,q)\le\varepsilon^2/2$; the reverse divergence follows by exchanging $p$ and $q$. Pinsker's inequality gives $\TV\le\sqrt{\KL/2}\le\varepsilon/2$. For sequences, the chain rule gives $\KL(P\,\|\,Q)=\sum_t\E_P[\KL(p_t\,\|\,q_t)]\le\sum_t\varepsilon_t^2/2$, and Pinsker's inequality again gives the total-variation bound.
+\end{proof}
+To guarantee a sequence total variation of at most $0.01$ over $N=1{,}024$ tokens with a uniform bound, the proposition needs a logit error, up to a common shift, of at most $\varepsilon=6.25\times10^{-4}$, far tighter than any int8 envelope of Section~\paperref{sec:selfevidence} of the paper. An approximate head is therefore a quality trade-off to be measured (Section~\ref{app:stacks}); these bounds cannot certify it as harmless over long outputs.
+
+\subsection{A demand frontier over a fixed protocol}\label{app:frontier}\label{sec:frontier}
+For a chain of $L$ proposals each head row is accepted, rejected or unresolved. The first certified rejection at position $r$ proves that no row after $r$ can affect the cycle's output, while earlier unresolved rows still matter because one of them may be the true first rejection.
+\begin{proposition}[Safe suppression after a certified rejection]\label{prop:frontier}
+If every issued certificate equals the decision of a fixed reference verifier on its row, the first true rejection is no later than the first certified rejection. Suppressing head work strictly after the latter does not change the reference output, provided completion and state commit use the actual first rejection.
+\end{proposition}
+\begin{proof}
+At the certified rejection the reference decision is rejection; an earlier unresolved row may also reject, and no later row can be the first rejection. All accepted outputs, the replacement token and the state prefix are determined by rows up to the first rejection.
+\end{proof}
+The statement is for chains. SGLang's trees share one coin across siblings and choose the next coin by the accepted node, so a tree frontier must follow the tree's paths. The target backbone has already run over every admitted position, so the frontier saves head work, not transformer layers.
+
+\subsection{A cheap decision is not a cheap verification}\label{app:synthetic}\label{sec:synthetic}
+A CPU experiment makes the point of Appendix~\paperref{app:guards} of the paper concrete. It constructs two families of $128\times8$ integer heads with 16-row tiles and 36 paired fixtures each: one clusters rows around separated centres, the control uses unstructured rows. For each fixture $h^t=h^d+d\,v$ with drift scale $d\in\{0,1,2,4\}$; proposals are sampled from the anchor head's law, and all probability arithmetic is exact rational. The experiment counts distinct target rows projected, which is work, not time~\ev{synthetic}.
+
+At zero drift the transported summaries describe the target exactly and the acceptance decision needs only its candidate row, an identity check rather than a forecast. At nonzero drift the unstructured head defeats greedy screening. More subtly, large drift makes rejection easy to certify, which lowers the rows needed for the decision while destroying acceptance itself, and completing the residual then erases the saving (Figure~\ref{fig:synthetic}). At drift four the clustered family decides with 11.4\% of the rows but needs 96.5\% once the dense residual is charged. The experiment does not test transport on trained heads (Section~\paperref{sec:transport-measured} of the paper does); it refutes the inference that a cheap acceptance decision means a cheap verification. Residual races answer it and remain unmeasured; fixed-noise verification avoids the residual altogether.
+
+\begin{figure}[htbp]
+\centering
+\input{figures/synthetic}
+\caption{Work counts on constructed heads, not timings~\ev{synthetic}. Solid lines count the rows needed to decide acceptance; dashed lines add a dense residual completion after each rejection. The thin line is the fraction of proposals accepted in the clustered family. Evidence production, bounds, bonus sampling and the backbone are excluded.}
+\label{fig:synthetic}
+\end{figure}
+
+\subsection{A summary that supports both selection and mass}\label{app:summary}
+For a set of labelled logits, keep its top $k$ items under descending score and then ascending token index, together with the mass of every discarded item. Two such summaries merge by taking the top $k$ of their retained union and adding the newly discarded mass to the two old tails.
+\begin{proposition}[Top-$k$ plus tail is a compositional summary]\label{prop:summary}
+For disjoint finite domains the merge produces the same top-$k$ items and tail mass as summarizing the union, and it is associative and commutative in exact arithmetic under the common total order.
+\end{proposition}
+\begin{proof}
+An item omitted from a local top-$k$ has at least $k$ locally superior items and cannot enter the union's top-$k$, so every possible winner is retained. The original tails and the newly discarded items partition the final tail, so summing them gives its mass without subtracting nearly equal totals. Every parenthesization and order represents the same union.
+\end{proof}
+This is a sufficient statistic built from familiar reductions, and floating-point tail masses are not associative. Its value is an interface: one epilogue can serve candidate generation, bounds and completion. The retained-tail mass bound that this interface supports is Equation~(\paperref{eq:tail}) of the paper.
+
+\subsection{From skipped work to time}\label{app:transport-work}
+A skipped tile saves time only if the GPU avoids the work. For each mechanism the replay counts the weight bytes read (refined tiles including their union over the real batch, gathered candidate rows, the low-precision pass), the metadata and evidence bytes, the sequential stages and the fallbacks, and converts them to predicted time with the kernel's measured primitive costs. The result would be a model prediction, not a timing, and it is \pend{geometry-work}.

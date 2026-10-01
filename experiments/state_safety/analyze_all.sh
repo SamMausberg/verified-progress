@@ -38,6 +38,14 @@ if [ -d "$pinned" ]; then
     --out-csv "$evidence/divergences_pinned.csv" --out-meta "$evidence/run_meta_pinned.json"
 fi
 
+# Token divergence conditional on perturbation, by onset (both run roots).
+nice -n 19 python perturbation.py --runs "$runs" --pairs pairs.json \
+  --out "$evidence/perturbation.json" > /dev/null
+if [ -d "$pinned" ]; then
+  nice -n 19 python perturbation.py --runs "$pinned" --pairs pairs_pinned.json \
+    --out "$evidence/perturbation_pinned.json" > /dev/null
+fi
+
 # One deliberate cross-regime pair: does the pool regime alone change batch-1 output?
 if [ -f "$pinned/plain/c1.jsonl" ] && [ -f "$runs/plain/c1.jsonl" ]; then
   nice -n 19 python compare.py --runs "$HOME/vp-data/state" --pairs pairs_cross_regime.json \

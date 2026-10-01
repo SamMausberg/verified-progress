@@ -1,0 +1,18 @@
+% Work counts on constructed heads (research notes, fig:synthetic); data: data/synthetic_drift.csv
+% (experiments/synthetic_drift.py). Moved unchanged from the paper's Appendix B; owner: figures.
+\begin{tikzpicture}
+\begin{axis}[width=.55\linewidth,height=5.2cm,xmin=-.2,xmax=4.2,ymin=0,ymax=1.05,xtick={0,1,2,4},
+  xlabel={Drift scale $d$},ylabel={Fraction of target rows projected},
+  grid=major,legend style={at={(1.03,.5)},anchor=west,cells={align=left}}]
+\addplot[thick,teal,mark=*,discard if not={family}{clustered},unbounded coords=discard] table[x=drift,y=accept_projected_fraction,col sep=comma]{../data/synthetic_drift.csv};
+\addlegendentry{Clustered: decision}
+\addplot[thick,teal,dashed,mark=o,mark options={solid},discard if not={family}{clustered},unbounded coords=discard] table[x=drift,y=decision_plus_residual_projected_fraction,col sep=comma]{../data/synthetic_drift.csv};
+\addlegendentry{Clustered: decision\\+ dense residual}
+\addplot[thick,ochre,mark=square*,discard if not={family}{unstructured},unbounded coords=discard] table[x=drift,y=accept_projected_fraction,col sep=comma]{../data/synthetic_drift.csv};
+\addlegendentry{Unstructured: decision}
+\addplot[thick,ochre,dashed,mark=square,mark options={solid},discard if not={family}{unstructured},unbounded coords=discard] table[x=drift,y=decision_plus_residual_projected_fraction,col sep=comma]{../data/synthetic_drift.csv};
+\addlegendentry{Unstructured: decision\\+ dense residual}
+\addplot[thin,muted,mark=triangle,discard if not={family}{clustered},unbounded coords=discard] table[x=drift,y=acceptance_fraction,col sep=comma]{../data/synthetic_drift.csv};
+\addlegendentry{Clustered: accepted}
+\end{axis}
+\end{tikzpicture}
