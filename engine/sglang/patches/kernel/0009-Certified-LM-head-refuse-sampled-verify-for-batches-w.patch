@@ -1,0 +1,43 @@
+From 9b5e82258d2d734ed04d62fc6071ee7b246dad27 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Thu, 1 Oct 2026 20:42:05 +0000
+Subject: [PATCH] Certified LM head: refuse sampled verify for batches with a
+ greedy row
+
+_fixed_noise_eligible required not is_all_greedy, so a batch mixing greedy
+and sampled requests was refused only because SGLang normalises a greedy
+request to top_k = 1, which sets need_top_k_sampling. Require not
+is_any_greedy instead, so no greedy row is ever Gumbel-sampled whatever the
+normalisation does.
+---
+ python/sglang/srt/layers/certified_head.py | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/python/sglang/srt/layers/certified_head.py b/python/sglang/srt/layers/certified_head.py
+index ec65b86370..59d755b842 100644
+--- a/python/sglang/srt/layers/certified_head.py
++++ b/python/sglang/srt/layers/certified_head.py
+@@ -427,13 +427,18 @@ def _greedy_eligible(forward_batch: ForwardBatch, observer: Any) -> bool:
+ 
+ def _fixed_noise_eligible(model_runner, forward_batch: ForwardBatch) -> bool:
+     """Fixed-noise sampled verify: EAGLE/MTP, every request seeded and sampled
+-    with temperature only (no top-k, top-p or min-p), no logit adjustments."""
++    with temperature only (no top-k, top-p or min-p), no logit adjustments.
++
++    A batch with any greedy row is refused outright: its rows must not be
++    Gumbel-sampled. (At this version a greedy request is also normalised to
++    top_k = 1, which sets need_top_k_sampling, but the contract should not rest
++    on that.)"""
+     from sglang.srt.runtime_context import get_spec
+ 
+     si = forward_batch.sampling_info
+     return (
+         si is not None
+-        and not si.is_all_greedy
++        and not si.is_any_greedy
+         and si.sampling_seed is not None
+         and not (si.need_top_k_sampling or si.need_top_p_sampling)
+         and not si.need_min_p_sampling
+-- 
+2.34.1
+

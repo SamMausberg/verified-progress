@@ -464,6 +464,34 @@ class CertifiedHead:
             logger.warning('certified head refused: %s; every batch takes the stock path', reason)
         return self.weight_check
 
+    def sibling(self, **kwargs: Any) -> CertifiedHead:
+        """A head sharing this one's weights and metadata, with its own buffers.
+
+        Use one per CUDA-graph family (decode, draft, verify): results are views
+        of per-instance buffers. ``kwargs`` override constructor options such as
+        ``max_batch``.
+        """
+        opts: dict[str, Any] = {
+            'wmax': self.wmax,
+            'group_size': self.group_size,
+            'reference': self.reference,
+            'ref_model': self.ref_model,
+            'capacity': self.capacity,
+            'max_batch': self.max_batch,
+            'selection': self.selection,
+            'refine_split': self.refine_split,
+        }
+        opts.update(kwargs)
+        head = CertifiedHead(self.weight, self.q, self.scale, self.coeff, self.dup_rep, **opts)
+        head.arith_for = self.arith_for
+        head.arith_config = self.arith_config
+        head.gemv_config = self.gemv_config
+        # Siblings share the weight and the quantization data, so they share the
+        # verdict on whether the data belongs to the weight: a refused head must
+        # not yield an accepted sibling.
+        head.weight_check = dict(self.weight_check)
+        return head
+
     @classmethod
     def from_checkpoint(
         cls, model_id: str = MODEL_ID, revision: str = MODEL_REVISION, **kwargs: Any
@@ -768,7 +796,11 @@ class CertifiedHead:
     # -- public API -------------------------------------------------------------
 
     def argmax(
-        self, hidden: torch.Tensor, *, fallback: bool | None = None
+        self,
+        hidden: torch.Tensor,
+        *,
+        fallback: bool | None = None,
+        gate: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, HeadStats]:
         """Greedy token ids equal to ``reference_argmax(hidden, weight, reference)``.
 
@@ -776,38 +808,67 @@ class CertifiedHead:
         ``fallback=False`` the undecided rows keep their best candidate and are
         marked in ``stats.status``; this is the only mode for ``real``.
         Returned tensors are views of internal buffers, overwritten by the next call.
+
+        ``gate`` (a 0-d CUDA bool tensor) makes the call conditional on the device:
+        when it is false nothing is computed and ``ids`` and ``stats`` are stale.
+        A caller can then choose per CUDA-graph replay between this head and its
+        own stock head. No conditional node is nested: the certified stages form
+        one node, and each fallback is its own top-level node whose flag is
+        cleared before the gated stages.
         """
         if fallback is None:
             fallback = self.reference != 'real'
         if fallback and self.reference == 'real':
             raise ValueError('the real-arithmetic contract has no dense fallback')
         m = self._check(hidden)
-        if not self._certifiable(m):
-            self._refuse(m)
-        else:
-            self._approximate(hidden, m)
-            self._refine(hidden, m)
-            self._decide(m)
+        cols = fallback and self.fallback_mode == 'columns' and m in self._column_batches
+
+        certifiable = self._certifiable(m)  # outside the gated node: may run the self-test
+
+        def stages() -> None:
+            if not certifiable:
+                self._refuse(m)
+            else:
+                self._approximate(hidden, m)
+                self._refine(hidden, m)
+                self._decide(m)
+            if cols:
+                K._route_kernel[(1,)](
+                    self._status,
+                    self._count,
+                    self._any_cols,
+                    self._any_dense,
+                    m,
+                    COLS_CAP,
+                    BLOCK=triton.next_power_of_2(m),
+                )
+
+        self._gated(gate, hidden, stages)
         ids = self._ids[:m]
         stats = HeadStats(self._count[:m], self._status[:m])
         if not fallback:
             return ids, stats
-        cols_ok = m in self._column_batches
-        if self.fallback_mode == 'batch' or not cols_ok:
+        if not cols:
             self._when(self._any, lambda: self._merge_fallback(hidden, ids, m))
         else:
-            K._route_kernel[(1,)](
-                self._status,
-                self._count,
-                self._any_cols,
-                self._any_dense,
-                m,
-                COLS_CAP,
-                BLOCK=triton.next_power_of_2(m),
-            )
             self._when(self._any_cols, lambda: self._column_fallback(hidden, ids, m))
             self._when(self._any_dense, lambda: self._merge_fallback(hidden, ids, m, cols=True))
         return ids, stats
+
+    def _gated(
+        self, gate: torch.Tensor | None, hidden: torch.Tensor, stages: Callable[[], None]
+    ) -> None:
+        """Run ``stages`` unconditionally, or under the device flag ``gate``."""
+        if gate is None:
+            stages()
+            return
+        if gate.dtype != torch.bool or gate.dim() != 0 or gate.device != hidden.device:
+            raise ValueError('gate must be a 0-d bool tensor on the hidden states device')
+        # The fallback flags are set only inside the gated stages, so clear them here.
+        self._any.zero_()
+        self._any_cols.zero_()
+        self._any_dense.zero_()
+        self._when(gate, stages)
 
     def column_invariance_self_test(
         self, batch_sizes: list[int], trials: int = 4, seed: int = 0
@@ -966,10 +1027,13 @@ class CertifiedHead:
         parts.append(rand.to(torch.bfloat16))
         return torch.cat(parts).contiguous()
 
-    def enable_column_fallback(self, batch_sizes: list[int]) -> dict[str, Any]:
+    def enable_column_fallback(
+        self, batch_sizes: list[int], *, extend: bool = False
+    ) -> dict[str, Any]:
         """Switch to ``fallback_mode='columns'`` only if the self-test passes for
         every batch size the caller will use; otherwise stay in ``batch`` mode.
-        Call it outside CUDA-graph capture, once at start-up.
+        Call it outside CUDA-graph capture, at start-up. With ``extend`` the
+        checked sizes are added to those already enabled (a failure adds none).
 
         Only for ``reference='bf16'``: the gathered GEMM and its self-test compute
         BF16-output logits, which the FP32 reference (``out_dtype=float32``) does
@@ -981,9 +1045,10 @@ class CertifiedHead:
                 'its gathered GEMM and self-test compute BF16-output logits'
             )
         report = self.column_invariance_self_test(batch_sizes)
-        self.fallback_mode = 'columns' if report['ok'] else 'batch'
         # Only the checked batch sizes use the column path; others keep 'batch'.
-        self._column_batches = set(batch_sizes) if report['ok'] else set()
+        passed = set(batch_sizes) if report['ok'] else set()
+        self._column_batches = (self._column_batches | passed) if extend else passed
+        self.fallback_mode = 'columns' if self._column_batches else 'batch'
         report['mode'] = self.fallback_mode
         return report
 
@@ -1020,6 +1085,7 @@ class CertifiedHead:
         temperatures: torch.Tensor,
         *,
         fallback: bool = True,
+        gate: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, HeadStats]:
         """Token ids equal to SGLang's seeded sampler on the same batch.
 
@@ -1033,7 +1099,7 @@ class CertifiedHead:
         temperature (a negative one reverses them); rows with any other value are
         marked ``temperature`` and take the stock chain. The stock seeded
         sampler with top-k, top-p or min-p keys its noise by sorted rank and is
-        not covered.
+        not covered. ``gate`` works as in :meth:`argmax`.
         """
         if self.reference == 'real' or self.selection != 'tiles':
             raise ValueError('Gumbel sampling needs a bf16 or fp32 reference and tile selection')
@@ -1047,31 +1113,34 @@ class CertifiedHead:
         ):
             if t.dtype != dtype or t.shape != (m,) or not t.is_contiguous():
                 raise ValueError(f'expected contiguous {dtype} of shape ({m},)')
-        certifiable = self._certifiable(m)  # may run the self-test; before _sampling
-        self._sampling = (seeds, positions, temperatures)
-        try:
+
+        certifiable = self._certifiable(m)  # outside the gated node: may run the self-test
+
+        def stages() -> None:
             if not certifiable:
-                self._refuse(m)
-            else:
+                self._refuse(m)  # the stock chain for every row; nothing to guard
+                return
+            self._sampling = (seeds, positions, temperatures)
+            try:
                 self._approximate(hidden, m)
                 self._refine(hidden, m)
                 self._decide(m)
-        finally:
-            self._sampling = None
-        # Device ops only, so the guards are graph-safe and need no host sync.
-        bad_t = ~(torch.isfinite(temperatures) & (temperatures > 0))
-        self._status[:m].bitwise_or_(bad_t.to(torch.int32) * STATUS_BITS['temperature'])
-        self._any.logical_or_(bad_t.any())
-        self._small_probability_guard(m)
+            finally:
+                self._sampling = None
+            # The guards check a decision, so they run only after one (a refused batch
+            # keeps the single status ``refused``), and inside the gated stages, so a
+            # batch the gate skips sets no flag. Device ops only: graph-safe, no sync.
+            bad_t = ~(torch.isfinite(temperatures) & (temperatures > 0))
+            self._status[:m].bitwise_or_(bad_t.to(torch.int32) * STATUS_BITS['temperature'])
+            self._any.logical_or_(bad_t.any())
+            self._small_probability_guard(m)
+
+        self._gated(gate, hidden, stages)
         ids = self._ids[:m]
         stats = HeadStats(self._count[:m], self._status[:m])
         if fallback:
             args = (hidden, self.weight, self.reference, seeds, positions, temperatures)
-            if torch.cuda.is_current_stream_capturing():
-                with _if_body(self._any):
-                    self._merge(ids, m, stock_seeded_sample(*args))
-            elif bool(self._any.item()):
-                self._merge(ids, m, stock_seeded_sample(*args))
+            self._when(self._any, lambda: self._merge(ids, m, stock_seeded_sample(*args)))
         return ids, stats
 
     def _small_probability_guard(self, m: int) -> None:

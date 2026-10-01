@@ -1,0 +1,63 @@
+From a3a4c8e99a15448bdd51574bd84995fd04295088 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Thu, 1 Oct 2026 21:07:50 +0000
+Subject: [PATCH] Certified LM head: check the row limit before staging sampled
+ verify
+
+before_replay staged the sampled-verify inputs (seeds, positions,
+temperatures) into buffers of _MAX_ROWS rows before set_gate checked the row
+limit, so a larger eligible batch (65 MTP requests give 260 verify rows)
+failed in the copy instead of taking the stock path. Both now use one check,
+_fits, and staging happens only when the batch fits.
+---
+ python/sglang/srt/layers/certified_head.py | 21 +++++++++++++++++----
+ 1 file changed, 17 insertions(+), 4 deletions(-)
+
+diff --git a/python/sglang/srt/layers/certified_head.py b/python/sglang/srt/layers/certified_head.py
+index 59d755b842..8f41f48451 100644
+--- a/python/sglang/srt/layers/certified_head.py
++++ b/python/sglang/srt/layers/certified_head.py
+@@ -354,14 +354,23 @@ def gated_draft_sample(
+     return True
+ 
+ 
++def _fits(path: str, rows: int) -> bool:
++    """Whether ``rows`` rows can be certified on ``path``: within the row limit,
++    and the padded graph for ``rows`` was captured with the certified head (so
++    also within the head's buffers, ``_MAX_ROWS``)."""
++    st = _state.get(path)
++    return st is not None and rows <= st.max_rows(
++        envs.SGLANG_CERTIFIED_HEAD_MAX_ROWS.get()
++    )
++
++
+ def set_gate(path: str, rows: int, eligible: bool = True) -> bool:
+     """Before a replay of the path's graph: certify iff eligible and the padded
+     graph for ``rows`` was captured with the certified head."""
+     st = _state.get(path)
+     if st is None:
+         return False
+-    limit = envs.SGLANG_CERTIFIED_HEAD_MAX_ROWS.get()
+-    certify = bool(eligible) and rows <= st.max_rows(limit)
++    certify = bool(eligible) and _fits(path, rows)
+     st.gate.fill_(certify)
+     st.valid.fill_(rows)
+     st.steps["certified" if certify else "stock_graph"] += 1
+@@ -481,8 +490,12 @@ def before_replay(
+     chosen = None
+     for path in paths:
+         if path == "sampled_verify":
+-            eligible = chosen is None and _fixed_noise_eligible(
+-                model_runner, forward_batch
++            # Check the row limit first: the staging buffers hold _MAX_ROWS rows, and
++            # a larger batch must take the stock path, not fail in the copy.
++            eligible = (
++                chosen is None
++                and _fits(path, rows)
++                and _fixed_noise_eligible(model_runner, forward_batch)
+             )
+             if eligible:
+                 _stage_sampling(_state[path], forward_batch, rows)
+-- 
+2.34.1
+

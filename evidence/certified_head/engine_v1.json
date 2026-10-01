@@ -1,0 +1,596 @@
+{
+ "root": "/home/ubuntu/vp-data/kernel/engine/v1/arms",
+ "arms": {
+  "dflash_check": {
+   "run_info": [
+    "arm=dflash_check date=2026-09-30T23:44:32+00:00",
+    "repo=8f4f3d7b1c1586bf1b1436757b92328f5c686f1b dirty=0",
+    "sglang=71c521dbd0bd3f7aad2ba917fc335cedd94513e9 dirty=0",
+    "flags=VERIFY=1 CHECK=1",
+    "args=--model-path Qwen/Qwen3.5-4B --revision 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a --attention-backend flashinfer --mm-attention-backend triton_attn --host 127.0.0.1 --port 30040 --mem-fraction-static 0.25 --random-seed 0 --max-running-requests 8 --speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash --speculative-draft-model-revision 9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf --speculative-dflash-block-size 16 --linear-attn-prefill-backend flashinfer --linear-attn-decode-backend flashinfer",
+    "concurrency=8 limit=64 max_new_tokens=256 temperature=0"
+   ],
+   "client": {
+    "prompts": 64,
+    "tokens": 14933,
+    "seconds": 35.853729248046875,
+    "temperature": 0.0,
+    "concurrency": 8,
+    "max_new_tokens": 256
+   },
+   "flags": {
+    "decode": false,
+    "verify": true,
+    "draft": false,
+    "sampled_verify": false,
+    "fallback": "batch",
+    "model": "conservative",
+    "check": true,
+    "stats": "/home/ubuntu/vp-data/kernel/engine/v1/arms/dflash_check/certified_stats.json"
+   },
+   "paths": {
+    "verify": {
+     "calls": 1809,
+     "rows": 56080,
+     "padding_rows": 0,
+     "fallback_rows": 2118,
+     "fallback_calls": 1154,
+     "mismatch_rows": 0,
+     "status_rows": {
+      "overflow": 80,
+      "ambiguous": 2053
+     },
+     "host_steps": {
+      "certified": 1809,
+      "stock_graph": 0,
+      "eager": 0
+     },
+     "graph_sizes_certified": [
+      16,
+      32
+     ],
+     "graph_sizes_stock_only": []
+    }
+   },
+   "column_reports": {}
+  },
+  "dflash_draft_check": {
+   "run_info": [
+    "arm=dflash_draft_check date=2026-09-30T23:48:14+00:00",
+    "repo=8f4f3d7b1c1586bf1b1436757b92328f5c686f1b dirty=0",
+    "sglang=71c521dbd0bd3f7aad2ba917fc335cedd94513e9 dirty=0",
+    "flags=DRAFT=1 CHECK=1",
+    "args=--model-path Qwen/Qwen3.5-4B --revision 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a --attention-backend flashinfer --mm-attention-backend triton_attn --host 127.0.0.1 --port 30040 --mem-fraction-static 0.25 --random-seed 0 --max-running-requests 8 --speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash --speculative-draft-model-revision 9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf --speculative-dflash-block-size 16 --linear-attn-prefill-backend flashinfer --linear-attn-decode-backend flashinfer",
+    "concurrency=8 limit=64 max_new_tokens=256 temperature=0"
+   ],
+   "client": {
+    "prompts": 64,
+    "tokens": 15111,
+    "seconds": 8.164350509643555,
+    "temperature": 0.0,
+    "concurrency": 8,
+    "max_new_tokens": 256
+   },
+   "flags": {
+    "decode": false,
+    "verify": false,
+    "draft": true,
+    "sampled_verify": false,
+    "fallback": "batch",
+    "model": "conservative",
+    "check": true,
+    "stats": "/home/ubuntu/vp-data/kernel/engine/v1/arms/dflash_draft_check/certified_stats.json"
+   },
+   "paths": {
+    "dflash_draft": {
+     "calls": 602,
+     "rows": 53820,
+     "padding_rows": 0,
+     "fallback_rows": 48212,
+     "fallback_calls": 541,
+     "mismatch_rows": 0,
+     "status_rows": {
+      "ambiguous": 1526,
+      "threshold": 47970
+     },
+     "host_steps": {
+      "certified": 603,
+      "stock_graph": 0,
+      "eager": 0
+     },
+     "graph_sizes_certified": [
+      15,
+      30,
+      45,
+      60,
+      75,
+      90,
+      105,
+      120
+     ],
+     "graph_sizes_stock_only": []
+    }
+   },
+   "column_reports": {}
+  },
+  "mtp_c1": {
+   "run_info": [
+    "arm=mtp_c1 date=2026-10-01T00:01:23+00:00",
+    "repo=8f4f3d7b1c1586bf1b1436757b92328f5c686f1b dirty=0",
+    "sglang=71c521dbd0bd3f7aad2ba917fc335cedd94513e9 dirty=0",
+    "flags=VERIFY=1",
+    "args=--model-path Qwen/Qwen3.5-4B --revision 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a --attention-backend flashinfer --mm-attention-backend triton_attn --host 127.0.0.1 --port 30040 --mem-fraction-static 0.25 --random-seed 0 --max-mamba-cache-size 24 --max-running-requests 8 --speculative-algorithm NEXTN --speculative-num-steps 3 --speculative-eagle-topk 1 --speculative-num-draft-tokens 4",
+    "concurrency=1 limit=64 max_new_tokens=256 temperature=0"
+   ],
+   "client": {
+    "prompts": 64,
+    "tokens": 14990,
+    "seconds": 52.37846660614014,
+    "temperature": 0.0,
+    "concurrency": 1,
+    "max_new_tokens": 256
+   },
+   "flags": {
+    "decode": false,
+    "verify": true,
+    "draft": false,
+    "sampled_verify": false,
+    "fallback": "batch",
+    "model": "conservative",
+    "check": false,
+    "stats": "/home/ubuntu/vp-data/kernel/engine/v1/arms/mtp_c1/certified_stats.json"
+   },
+   "paths": {
+    "verify": {
+     "calls": 4960,
+     "rows": 19840,
+     "padding_rows": 0,
+     "fallback_rows": 360,
+     "fallback_calls": 344,
+     "mismatch_rows": 0,
+     "status_rows": {
+      "overflow": 1,
+      "ambiguous": 359
+     },
+     "host_steps": {
+      "certified": 4960,
+      "stock_graph": 0,
+      "eager": 0
+     },
+     "graph_sizes_certified": [
+      4,
+      8,
+      12,
+      16
+     ],
+     "graph_sizes_stock_only": []
+    }
+   },
+   "column_reports": {}
+  },
+  "mtp_c1_stock": {
+   "run_info": [
+    "arm=mtp_c1_stock date=2026-10-01T00:03:22+00:00",
+    "repo=8f4f3d7b1c1586bf1b1436757b92328f5c686f1b dirty=0",
+    "sglang=71c521dbd0bd3f7aad2ba917fc335cedd94513e9 dirty=0",
+    "flags=",
+    "args=--model-path Qwen/Qwen3.5-4B --revision 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a --attention-backend flashinfer --mm-attention-backend triton_attn --host 127.0.0.1 --port 30040 --mem-fraction-static 0.25 --random-seed 0 --max-mamba-cache-size 24 --max-running-requests 8 --speculative-algorithm NEXTN --speculative-num-steps 3 --speculative-eagle-topk 1 --speculative-num-draft-tokens 4",
+    "concurrency=1 limit=64 max_new_tokens=256 temperature=0"
+   ],
+   "client": {
+    "prompts": 64,
+    "tokens": 14990,
+    "seconds": 36.028942823410034,
+    "temperature": 0.0,
+    "concurrency": 1,
+    "max_new_tokens": 256
+   }
+  },
+  "mtp_check": {
+   "run_info": [
+    "arm=mtp_check date=2026-09-30T23:33:00+00:00",
+    "repo=8f4f3d7b1c1586bf1b1436757b92328f5c686f1b dirty=0",
+    "sglang=71c521dbd0bd3f7aad2ba917fc335cedd94513e9 dirty=0",
+    "flags=VERIFY=1 CHECK=1",
+    "args=--model-path Qwen/Qwen3.5-4B --revision 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a --attention-backend flashinfer --mm-attention-backend triton_attn --host 127.0.0.1 --port 30040 --mem-fraction-static 0.25 --random-seed 0 --max-mamba-cache-size 24 --max-running-requests 8 --speculative-algorithm NEXTN --speculative-num-steps 3 --speculative-eagle-topk 1 --speculative-num-draft-tokens 4",
+    "concurrency=8 limit=64 max_new_tokens=256 temperature=0"
+   ],
+   "client": {
+    "prompts": 64,
+    "tokens": 15031,
+    "seconds": 27.778215885162354,
+    "temperature": 0.0,
+    "concurrency": 8,
+    "max_new_tokens": 256
+   },
+   "flags": {
+    "decode": false,
+    "verify": true,
+    "draft": false,
+    "sampled_verify": false,
+    "fallback": "batch",
+    "model": "conservative",
+    "check": true,
+    "stats": "/home/ubuntu/vp-data/kernel/engine/v1/arms/mtp_check/certified_stats.json"
+   },
+   "paths": {
+    "verify": {
+     "calls": 1278,
+     "rows": 19868,
+     "padding_rows": 0,
+     "fallback_rows": 345,
+     "fallback_calls": 288,
+     "mismatch_rows": 0,
+     "status_rows": {
+      "ambiguous": 345
+     },
+     "host_steps": {
+      "certified": 1278,
+      "stock_graph": 0,
+      "eager": 0
+     },
+     "graph_sizes_certified": [
+      4,
+      8,
+      12,
+      16
+     ],
+     "graph_sizes_stock_only": []
+    }
+   },
+   "column_reports": {}
+  },
+  "mtp_draft_check": {
+   "run_info": [
+    "arm=mtp_draft_check date=2026-09-30T23:46:30+00:00",
+    "repo=8f4f3d7b1c1586bf1b1436757b92328f5c686f1b dirty=0",
+    "sglang=71c521dbd0bd3f7aad2ba917fc335cedd94513e9 dirty=0",
+    "flags=DRAFT=1 CHECK=1",
+    "args=--model-path Qwen/Qwen3.5-4B --revision 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a --attention-backend flashinfer --mm-attention-backend triton_attn --host 127.0.0.1 --port 30040 --mem-fraction-static 0.25 --random-seed 0 --max-mamba-cache-size 24 --max-running-requests 8 --speculative-algorithm NEXTN --speculative-num-steps 3 --speculative-eagle-topk 1 --speculative-num-draft-tokens 4",
+    "concurrency=8 limit=64 max_new_tokens=256 temperature=0"
+   ],
+   "client": {
+    "prompts": 64,
+    "tokens": 15034,
+    "seconds": 32.046159982681274,
+    "temperature": 0.0,
+    "concurrency": 8,
+    "max_new_tokens": 256
+   },
+   "flags": {
+    "decode": false,
+    "verify": false,
+    "draft": true,
+    "sampled_verify": false,
+    "fallback": "batch",
+    "model": "conservative",
+    "check": true,
+    "stats": "/home/ubuntu/vp-data/kernel/engine/v1/arms/mtp_draft_check/certified_stats.json"
+   },
+   "paths": {
+    "draft": {
+     "calls": 2550,
+     "rows": 9936,
+     "padding_rows": 0,
+     "fallback_rows": 290,
+     "fallback_calls": 278,
+     "mismatch_rows": 0,
+     "status_rows": {
+      "overflow": 7,
+      "ambiguous": 285
+     },
+     "host_steps": {
+      "certified": 1275,
+      "stock_graph": 0,
+      "eager": 0
+     },
+     "graph_sizes_certified": [
+      1,
+      2,
+      3,
+      4
+     ],
+     "graph_sizes_stock_only": []
+    },
+    "draft_extend": {
+     "calls": 1275,
+     "rows": 4968,
+     "padding_rows": 0,
+     "fallback_rows": 118,
+     "fallback_calls": 112,
+     "mismatch_rows": 0,
+     "status_rows": {
+      "overflow": 1,
+      "ambiguous": 117
+     },
+     "host_steps": {
+      "certified": 1275,
+      "stock_graph": 0,
+      "eager": 0
+     },
+     "graph_sizes_certified": [
+      1,
+      2,
+      3,
+      4
+     ],
+     "graph_sizes_stock_only": []
+    }
+   },
+   "column_reports": {}
+  },
+  "mtp_sampled_check": {
+   "run_info": [
+    "arm=mtp_sampled_check date=2026-09-30T23:50:34+00:00",
+    "repo=8f4f3d7b1c1586bf1b1436757b92328f5c686f1b dirty=0",
+    "sglang=71c521dbd0bd3f7aad2ba917fc335cedd94513e9 dirty=0",
+    "flags=SAMPLED_VERIFY=1 CHECK=1",
+    "args=--model-path Qwen/Qwen3.5-4B --revision 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a --attention-backend flashinfer --mm-attention-backend triton_attn --host 127.0.0.1 --port 30040 --mem-fraction-static 0.25 --random-seed 0 --max-mamba-cache-size 24 --max-running-requests 8 --speculative-algorithm NEXTN --speculative-num-steps 3 --speculative-eagle-topk 1 --speculative-num-draft-tokens 4 --enable-deterministic-inference",
+    "concurrency=8 limit=64 max_new_tokens=256 temperature=0.7"
+   ],
+   "client": {
+    "prompts": 64,
+    "tokens": 14953,
+    "seconds": 11.436548233032227,
+    "temperature": 0.7,
+    "concurrency": 8,
+    "max_new_tokens": 256
+   },
+   "flags": {
+    "decode": false,
+    "verify": false,
+    "draft": false,
+    "sampled_verify": true,
+    "fallback": "batch",
+    "model": "conservative",
+    "check": true,
+    "stats": "/home/ubuntu/vp-data/kernel/engine/v1/arms/mtp_sampled_check/certified_stats.json"
+   },
+   "paths": {
+    "sampled_verify": {
+     "calls": 700,
+     "rows": 21016,
+     "padding_rows": 0,
+     "fallback_rows": 386,
+     "fallback_calls": 279,
+     "mismatch_rows": 0,
+     "status_rows": {
+      "overflow": 1,
+      "ambiguous": 385
+     },
+     "host_steps": {
+      "certified": 700,
+      "stock_graph": 5,
+      "eager": 0
+     },
+     "graph_sizes_certified": [
+      4,
+      8,
+      12,
+      16,
+      20,
+      24,
+      28,
+      32
+     ],
+     "graph_sizes_stock_only": []
+    }
+   },
+   "column_reports": {}
+  },
+  "plain_c1": {
+   "run_info": [
+    "arm=plain_c1 date=2026-09-30T23:56:54+00:00",
+    "repo=8f4f3d7b1c1586bf1b1436757b92328f5c686f1b dirty=0",
+    "sglang=71c521dbd0bd3f7aad2ba917fc335cedd94513e9 dirty=0",
+    "flags=DECODE=1",
+    "args=--model-path Qwen/Qwen3.5-4B --revision 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a --attention-backend flashinfer --mm-attention-backend triton_attn --host 127.0.0.1 --port 30040 --mem-fraction-static 0.25 --random-seed 0 --max-running-requests 16",
+    "concurrency=1 limit=64 max_new_tokens=256 temperature=0"
+   ],
+   "client": {
+    "prompts": 64,
+    "tokens": 14995,
+    "seconds": 90.00404453277588,
+    "temperature": 0.0,
+    "concurrency": 1,
+    "max_new_tokens": 256
+   },
+   "flags": {
+    "decode": true,
+    "verify": false,
+    "draft": false,
+    "sampled_verify": false,
+    "fallback": "batch",
+    "model": "conservative",
+    "check": false,
+    "stats": "/home/ubuntu/vp-data/kernel/engine/v1/arms/plain_c1/certified_stats.json"
+   },
+   "paths": {
+    "decode": {
+     "calls": 15004,
+     "rows": 15004,
+     "padding_rows": 0,
+     "fallback_rows": 178,
+     "fallback_calls": 178,
+     "mismatch_rows": 0,
+     "status_rows": {
+      "ambiguous": 178
+     },
+     "host_steps": {
+      "certified": 15004,
+      "stock_graph": 0,
+      "eager": 0
+     },
+     "graph_sizes_certified": [
+      1,
+      2,
+      4,
+      8,
+      12,
+      16
+     ],
+     "graph_sizes_stock_only": []
+    }
+   },
+   "column_reports": {}
+  },
+  "plain_c1_stock": {
+   "run_info": [
+    "arm=plain_c1_stock date=2026-09-30T23:59:26+00:00",
+    "repo=8f4f3d7b1c1586bf1b1436757b92328f5c686f1b dirty=0",
+    "sglang=71c521dbd0bd3f7aad2ba917fc335cedd94513e9 dirty=0",
+    "flags=",
+    "args=--model-path Qwen/Qwen3.5-4B --revision 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a --attention-backend flashinfer --mm-attention-backend triton_attn --host 127.0.0.1 --port 30040 --mem-fraction-static 0.25 --random-seed 0 --max-running-requests 16",
+    "concurrency=1 limit=64 max_new_tokens=256 temperature=0"
+   ],
+   "client": {
+    "prompts": 64,
+    "tokens": 14995,
+    "seconds": 54.52940058708191,
+    "temperature": 0.0,
+    "concurrency": 1,
+    "max_new_tokens": 256
+   }
+  },
+  "plain_check": {
+   "run_info": [
+    "arm=plain_check date=2026-09-30T23:28:36+00:00",
+    "repo=8f4f3d7b1c1586bf1b1436757b92328f5c686f1b dirty=0",
+    "sglang=71c521dbd0bd3f7aad2ba917fc335cedd94513e9 dirty=0",
+    "flags=DECODE=1 CHECK=1",
+    "args=--model-path Qwen/Qwen3.5-4B --revision 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a --attention-backend flashinfer --mm-attention-backend triton_attn --host 127.0.0.1 --port 30040 --mem-fraction-static 0.25 --random-seed 0 --max-running-requests 16",
+    "concurrency=16 limit=64 max_new_tokens=256 temperature=0"
+   ],
+   "client": {
+    "prompts": 64,
+    "tokens": 14957,
+    "seconds": 121.42405438423157,
+    "temperature": 0.0,
+    "concurrency": 16,
+    "max_new_tokens": 256
+   },
+   "flags": {
+    "decode": true,
+    "verify": false,
+    "draft": false,
+    "sampled_verify": false,
+    "fallback": "batch",
+    "model": "conservative",
+    "check": true,
+    "stats": "/home/ubuntu/vp-data/kernel/engine/v1/arms/plain_check/certified_stats.json"
+   },
+   "paths": {
+    "decode": {
+     "calls": 5085,
+     "rows": 14966,
+     "padding_rows": 0,
+     "fallback_rows": 184,
+     "fallback_calls": 180,
+     "mismatch_rows": 0,
+     "status_rows": {
+      "ambiguous": 184
+     },
+     "host_steps": {
+      "certified": 5085,
+      "stock_graph": 0,
+      "eager": 0
+     },
+     "graph_sizes_certified": [
+      1,
+      2,
+      3
+     ],
+     "graph_sizes_stock_only": []
+    }
+   },
+   "column_reports": {}
+  },
+  "plain_check_columns": {
+   "run_info": [
+    "arm=plain_check_columns date=2026-09-30T23:55:43+00:00",
+    "repo=8f4f3d7b1c1586bf1b1436757b92328f5c686f1b dirty=0",
+    "sglang=71c521dbd0bd3f7aad2ba917fc335cedd94513e9 dirty=0",
+    "flags=DECODE=1 CHECK=1 FALLBACK=columns",
+    "args=--model-path Qwen/Qwen3.5-4B --revision 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a --attention-backend flashinfer --mm-attention-backend triton_attn --host 127.0.0.1 --port 30040 --mem-fraction-static 0.25 --random-seed 0 --max-running-requests 16",
+    "concurrency=16 limit=64 max_new_tokens=256 temperature=0"
+   ],
+   "client": {
+    "prompts": 64,
+    "tokens": 14947,
+    "seconds": 8.943865537643433,
+    "temperature": 0.0,
+    "concurrency": 16,
+    "max_new_tokens": 256
+   },
+   "flags": {
+    "decode": true,
+    "verify": false,
+    "draft": false,
+    "sampled_verify": false,
+    "fallback": "columns",
+    "model": "conservative",
+    "check": true,
+    "stats": "/home/ubuntu/vp-data/kernel/engine/v1/arms/plain_check_columns/certified_stats.json"
+   },
+   "paths": {
+    "decode": {
+     "calls": 1039,
+     "rows": 14944,
+     "padding_rows": 549,
+     "fallback_rows": 209,
+     "fallback_calls": 189,
+     "mismatch_rows": 0,
+     "status_rows": {
+      "ambiguous": 209
+     },
+     "host_steps": {
+      "certified": 1039,
+      "stock_graph": 0,
+      "eager": 0
+     },
+     "graph_sizes_certified": [
+      1,
+      2,
+      4,
+      8,
+      12,
+      16
+     ],
+     "graph_sizes_stock_only": []
+    }
+   },
+   "column_reports": {
+    "decode": {
+     "batch_sizes": [
+      1,
+      2,
+      4,
+      8,
+      12,
+      16
+     ],
+     "failures": [],
+     "ok": true
+    }
+   }
+  }
+ },
+ "comparisons": {
+  "mtp_c1_vs_stock": {
+   "a": "/home/ubuntu/vp-data/kernel/engine/v1/arms/mtp_c1/outputs.jsonl",
+   "b": "/home/ubuntu/vp-data/kernel/engine/v1/arms/mtp_c1_stock/outputs.jsonl",
+   "prompts": 64,
+   "identical": 64,
+   "diverged": [],
+   "tokens_compared_before_divergence": 14990
+  },
+  "plain_c1_vs_stock": {
+   "a": "/home/ubuntu/vp-data/kernel/engine/v1/arms/plain_c1/outputs.jsonl",
+   "b": "/home/ubuntu/vp-data/kernel/engine/v1/arms/plain_c1_stock/outputs.jsonl",
+   "prompts": 64,
+   "identical": 64,
+   "diverged": [],
+   "tokens_compared_before_divergence": 14995
+  }
+ }
+}

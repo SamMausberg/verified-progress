@@ -1,0 +1,16 @@
+# experiments/certified_head/engine_validate.sh --check-only (repo f80f7d8) on x9e2's check arms
+=== plain_check
+certified calls decode 1036; rows differing from stock 0, refused rows 0, probe-tripped rows 0, expected paths without calls 0, enabled paths this arm does not run 0
+=== plain_check_columns
+certified calls decode 1042; rows differing from stock 0, refused rows 0, probe-tripped rows 0, expected paths without calls 0, enabled paths this arm does not run 0
+=== mtp_check
+certified calls verify 678; rows differing from stock 0, refused rows 0, probe-tripped rows 0, expected paths without calls 0, enabled paths this arm does not run 0
+=== dflash_check
+certified calls verify 603; rows differing from stock 0, refused rows 0, probe-tripped rows 0, expected paths without calls 0, enabled paths this arm does not run 0
+=== mtp_draft_check
+certified calls dflash_draft 0, draft 1354, draft_extend 677; rows differing from stock 0, refused rows 0, probe-tripped rows 0, expected paths without calls 0, enabled paths this arm does not run ['dflash_draft']
+=== dflash_draft_check
+certified calls dflash_draft 599, draft 0, draft_extend 0; rows differing from stock 0, refused rows 0, probe-tripped rows 0, expected paths without calls 0, enabled paths this arm does not run ['draft', 'draft_extend']
+=== mtp_sampled_check
+certified calls sampled_verify 700; rows differing from stock 0, refused rows 0, probe-tripped rows 0, expected paths without calls 0, enabled paths this arm does not run 0
+exit=0
