@@ -17,6 +17,9 @@ printed with its failures:
 6. in each document, every ``\\evitem`` and ``\\devitem`` of its register is cited there, so an
    entry that only the notes need does not stay in the paper's register;
 7. an entry in both registers lists the same files and producer in both.
+8. the two documents print their register IDs with different prefixes (empty in the paper,
+   ``N-`` in the notes), through ``\\regprefix`` in the register macros and in the notes'
+   ``\\evref`` and ``\\devref``, so that an ID such as E21 never means two things.
 
 A document's sources are its root file and every file it reaches through ``\\input``.
 
@@ -161,6 +164,39 @@ def tree_paths(rev: str) -> set[str]:
     return paths
 
 
+REGISTER_MACROS = 'sections/app_register_macros.tex'
+PREFIX_DEF = re.compile(r'\\(?:new|renew|provide)command\{\\regprefix\}\{([^}]*)\}')
+
+
+def prefix_failures(files: dict[str, list[str]]) -> list[str]:
+    """Each document's register-ID prefix, which must differ between the documents."""
+    failures: list[str] = []
+    macros = strip_comments((PAPER / REGISTER_MACROS).read_text())
+    for macro in ('evitem', 'devitem'):
+        body = macros[macros.find(f'\\newcommand{{\\{macro}}}') :].split('\n', 1)[0]
+        if '\\regprefix' not in body:
+            failures.append(f'{REGISTER_MACROS}: \\{macro} does not print \\regprefix')
+    prefixes: dict[str, str] = {}
+    for doc, names in files.items():
+        defined = [
+            m.group(1)
+            for name in names
+            for m in PREFIX_DEF.finditer(strip_comments((PAPER / name).read_text()))
+            if name != REGISTER_MACROS
+        ]
+        prefixes[doc] = defined[-1] if defined else ''
+    root = strip_comments((PAPER / DOCUMENTS['notes'][0]).read_text())
+    for macro in ('evref', 'devref'):
+        found = re.search(r'\\renewcommand\{\\' + macro + r'\}.*', root)
+        if not found or '\\regprefix' not in found.group(0):
+            failures.append(f'notes: \\{macro} is not redefined to print \\regprefix')
+    if prefixes['paper'] or not prefixes['notes'] or prefixes['paper'] == prefixes['notes']:
+        failures.append(
+            f'register prefixes paper {prefixes["paper"]!r}, notes {prefixes["notes"]!r}'
+        )
+    return failures
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--rev', default='origin/main', help='revision the evidence must exist at')
@@ -211,6 +247,8 @@ def main() -> int:
     failures['entries whose files or producer differ between the registers'] = sorted(
         key for key in set(paper_ev) & set(notes_ev) if paper_ev[key] != notes_ev[key]
     )
+
+    failures['register ID prefixes (paper none, notes distinct)'] = prefix_failures(files)
 
     counts = ', '.join(
         f'{doc}: {len(cited[doc])} cited keys, {len(registers[doc][0])} entries, '

@@ -22,6 +22,11 @@
 \usepackage{xr-hyper}
 \usepackage[hypertexnames=false]{hyperref}
 \input{macros}
+% The notes number their register and pending list apart from the paper's: their IDs read N-E21 and
+% N-D24, the paper's E21 and D7 (scripts/check_paper_references.py enforces the prefix).
+\newcommand{\regprefix}{N-}
+\renewcommand{\evref}[1]{\hyperref[ev:#1]{\regprefix E\ref*{ev:#1}}}
+\renewcommand{\devref}[1]{\hyperref[dev:#1]{\regprefix D\ref*{dev:#1}}}
 \renewcommand{\cite}[1]{\citep{#1}}
 \usetikzlibrary{shapes.geometric}
 % A reference into the paper: the paper's number for one of its labels, without a link.

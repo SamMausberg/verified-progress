@@ -30,6 +30,9 @@ The measurement uses a panel of 32 MATH-500 problems and the first 16 chat, 16 c
 
 \begin{table}[htbp]
 \small\centering
+\caption{Committed tokens per verify cycle for the public DFlash drafter on GH200 (greedy, thinking on, concurrency 1), pooled over cycles ($\tau$) and averaged over requests as the model card does ($\bar\tau_{\rm req}$). Measured in correctness runs~\ev{drafter-acc}; the survival form $1+\sum_kS(k)$ agrees with the pooled $\tau$ to within 0.013 in every column.}
+\label{tab:drafter-tau}
+\vskip 0.05in
 \begin{tabular}{@{}llrrrrr@{}}\toprule
 Block & Average & All & Chat & Code & GSM8K & MATH-500\\\midrule
 16 & $\tau$, over cycles & 6.18 & 3.98 & 7.63 & 6.72 & 7.55\\
@@ -38,8 +41,6 @@ Block & Average & All & Chat & Code & GSM8K & MATH-500\\\midrule
 8 & $\bar\tau_{\rm req}$, over requests & 5.34 & 3.80 & 5.76 & 5.45 & 5.84\\\midrule
 \multicolumn{2}{@{}l}{Requests (verify cycles at block 16)} & 80 (21,274) & 16 & 16 & 16 & 32\\\bottomrule
 \end{tabular}
-\caption{Committed tokens per verify cycle for the public DFlash drafter on GH200 (greedy, thinking on, concurrency 1), pooled over cycles ($\tau$) and averaged over requests as the model card does ($\bar\tau_{\rm req}$). Measured in correctness runs~\ev{drafter-acc}; the survival form $1+\sum_kS(k)$ agrees with the pooled $\tau$ to within 0.013 in every column.}
-\label{tab:drafter-tau}
 \end{table}
 
 A block of 16 commits 6.2 tokens per verify cycle and a block of 8 commits 5.0 (Table~\ref{tab:drafter-tau}). Acceptance depends strongly on the domain: chat commits about four tokens per cycle, GSM8K 6.7, and code and MATH-500 about 7.6. The per-request MATH-500 average, 7.8, sits near the 7.48 the card reports for that benchmark in the same convention~\cite{dflash4bcard}, but that is a cross-hardware reference, not a reproduction: the card used a B200 and a 4,096-token cap and does not state how many problems it used, where this panel uses a GH200, a 2,048-token cap and 32 sampled problems. A gate with the card's own settings on its MT-Bench prompts does reproduce its number within sampling noise~\ev{drafter-gate}: over the 80 MT-Bench first turns at block 16, greedy with thinking on, up to 4,096 new tokens and concurrency 1, the mean accepted length per request is 5.73 (bootstrap 95\% interval 5.36--6.13; 5.25 pooled over cycles) against the card's 5.93 on a B200, with 26 of the 80 responses reaching the token limit. The panel's low chat acceptance comes from its OASST1 prompts (4.06 per request over 14 prompts) rather than its two MT-Bench prompts (5.70).
@@ -95,14 +96,15 @@ The Triton kernel is a different numerical path. DFlash at block 16 with it comm
 
 \begin{table}[htbp]
 \small\centering
+\caption{Stage A with SGLang's Triton GDN verify kernel, over DFlash at block 16 on the same kernel: speedup in decode / end to end. Derived from measured verify-pass times; the $S_{\rm b}$ estimate bounds this kernel's state writes by their bytes. Pending an exactness classification of the kernel switch~\ev{repair-verify}.}
+\label{tab:stagea-triton}
+\vskip 0.05in
 \begin{tabular}{@{}rcccc@{}}\toprule
 $B$ & $S_{\rm a}$, free drafter & Perfect blocks, DFlash drafting & $S_{\rm b}$ estimate & $S_{\rm b}$ ceiling\\\midrule
 16 & 3.30 / 3.12 & 2.10 / 2.05 & 1.71 / 1.69 & 2.23 / 2.17\\
 64 & 7.98 / 6.84 & 5.81 / 5.21 & 4.30 / 3.99 & 6.17 / 5.49\\
 256 & 12.72 / 9.94 & 10.73 / 8.71 & 7.11 / 6.21 & 11.28 / 9.06\\\bottomrule
 \end{tabular}
-\caption{Stage A with SGLang's Triton GDN verify kernel, over DFlash at block 16 on the same kernel: speedup in decode / end to end. Derived from measured verify-pass times; the $S_{\rm b}$ estimate bounds this kernel's state writes by their bytes. Pending an exactness classification of the kernel switch~\ev{repair-verify}.}
-\label{tab:stagea-triton}
 \end{table}
 
 \paragraph{Test 2: Jacobi repair from DFlash windows}\label{sec:repair-jacobi} The second test asks how close exact repair from real DFlash windows gets, with no reference tokens. Every DFlash block $y^{(0)}$ is verified, and then $k$ further full target passes run from the same committed prefix: \emph{recycle} sweeps apply the Jacobi map, and \emph{keep} sweeps replace only the first mismatching token by the target's token and keep the rest of the draft. The pass on the original draft is then re-run and committed, so the trajectory is plain DFlash and each sweep's accepted length is measured on real windows. Re-running a verify pass on the same prefix needs the committed GDN convolution window restored first, because the verify kernel shifts it in place, and the probe checks that the re-run reproduces the first pass's argmax exactly. A sliding variant drafts each new block from the previous pass's suffix predictions and fills the rest with DFlash.
