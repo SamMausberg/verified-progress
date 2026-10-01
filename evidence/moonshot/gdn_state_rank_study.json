@@ -1,0 +1,101 @@
+{
+ "model": "Qwen/Qwen3.5-4B@851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+ "calibration_texts": 24,
+ "eval_texts": 8,
+ "eval_tokens_per_text": 2048,
+ "reference_nll_second_half": 1.7809061706066132,
+ "reference_retrieval_exact": 1.0,
+ "reference_retrieval_logprob": -0.08266724459826946,
+ "configs": [
+  {
+   "basis": "energy",
+   "rank": 32,
+   "state_bytes_fraction": 0.25,
+   "kl_mean": 0.4113417714834213,
+   "top1_agreement": 0.8598968833684921,
+   "retrieval_exact": 1.0,
+   "retrieval_logprob": -0.13039806733528772
+  },
+  {
+   "basis": "energy",
+   "rank": 64,
+   "state_bytes_fraction": 0.5,
+   "kl_mean": 0.2939207013696432,
+   "top1_agreement": 0.8991896137595177,
+   "retrieval_exact": 1.0,
+   "retrieval_logprob": -0.07719026463261495
+  },
+  {
+   "basis": "energy",
+   "rank": 96,
+   "state_bytes_fraction": 0.75,
+   "kl_mean": 0.13254717644304037,
+   "top1_agreement": 0.9382367730140686,
+   "retrieval_exact": 1.0,
+   "retrieval_logprob": -0.08714970956013228
+  },
+  {
+   "basis": "energy",
+   "rank": 128,
+   "state_bytes_fraction": 1.0,
+   "kl_mean": 0.008230870385887101,
+   "top1_agreement": 0.9850196912884712,
+   "retrieval_exact": 1.0,
+   "retrieval_logprob": -0.08253054538120826
+  },
+  {
+   "basis": "query",
+   "rank": 32,
+   "state_bytes_fraction": 0.25,
+   "kl_mean": 0.9395503997802734,
+   "top1_agreement": 0.7027259469032288,
+   "retrieval_exact": 0.16666666666666666,
+   "retrieval_logprob": -4.116851740671943
+  },
+  {
+   "basis": "query",
+   "rank": 64,
+   "state_bytes_fraction": 0.5,
+   "kl_mean": 0.6098790653049946,
+   "top1_agreement": 0.7849951088428497,
+   "retrieval_exact": 0.9166666666666666,
+   "retrieval_logprob": -0.3997061516080673
+  },
+  {
+   "basis": "query",
+   "rank": 96,
+   "state_bytes_fraction": 0.75,
+   "kl_mean": 0.37217461690306664,
+   "top1_agreement": 0.8680010214447975,
+   "retrieval_exact": 1.0,
+   "retrieval_logprob": -0.12207950442098081
+  },
+  {
+   "basis": "product",
+   "rank": 32,
+   "state_bytes_fraction": 0.25,
+   "kl_mean": 0.6516062766313553,
+   "top1_agreement": 0.8230599537491798,
+   "retrieval_exact": 1.0,
+   "retrieval_logprob": -0.1287205684153984
+  },
+  {
+   "basis": "product",
+   "rank": 64,
+   "state_bytes_fraction": 0.5,
+   "kl_mean": 0.5397072620689869,
+   "top1_agreement": 0.8332515060901642,
+   "retrieval_exact": 1.0,
+   "retrieval_logprob": -0.0794470861243705
+  },
+  {
+   "basis": "product",
+   "rank": 96,
+   "state_bytes_fraction": 0.75,
+   "kl_mean": 0.5006148256361485,
+   "top1_agreement": 0.840373307466507,
+   "retrieval_exact": 1.0,
+   "retrieval_logprob": -0.10116609975618
+  }
+ ]
+}
