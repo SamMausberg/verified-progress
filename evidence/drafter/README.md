@@ -130,19 +130,24 @@ top-1, 4 draft tokens). Tokens per cycle per request (pooled): DFlash 6.81 (6.11
 than DFlash (0.86, 0.79, 0.81), and DFlash keeps drafting to position 15.
 
 `panel_v2/equality_{zlab_b16,mtp3}.json`: first divergence of each output from plain decoding
-at concurrency 1, classified with the state workstream's convention
-(`experiments/state_safety/compare.py`, PR #37: tie, one_ulp, near, large). These runs
-recorded top-2 logprobs in the plain run only, so the classes are one-sided (`ref:` prefix,
-the plain run's margin between the two competing tokens; the speculative run's margin is
-unknown). DFlash: 77 of 80 sequences diverge somewhere in up to 2,048 tokens, 3.06 per 1,000
-compared tokens; the plain run's margin is an exact tie at 47 and within one BF16 spacing at
-28, and 2 are unknown because the speculative run's token is outside the plain run's top-2
-(math500 algebra/634 at position 1,168; oasst1-1a248423 at position 409). MTP: 77 of 80, 2.50
-per 1,000; 40 ties and 37 within one spacing on the plain side. For comparison, plain decoding
-at batch 1 against batch 32 diverges at 3.42 per 1,000, all within 0.375 nats (PR #37, which
-traced the MTP-versus-plain divergences to layer 0's GDN decode and verify kernels). These
-are observations about margins; the DFlash divergences have not been traced to a kernel. A
-rerun with top-5 logprobs on every run (`run_equality.sh`, queued) gives both margins.
+at concurrency 1, stock engine (bd66ce343e), with top-5 logprobs recorded in all three runs, so
+both margins are known at each first divergence. Classes follow the state workstream's
+convention (`experiments/state_safety/compare.py`, PR #37: `tie` if either run's margin
+between the two competing tokens is exactly zero, `one_ulp` if both are within one BF16
+spacing, then near, large). MTP: 77 of 80 sequences diverge somewhere in up to 2,048 tokens,
+2.50 per 1,000 compared tokens, all 77 ties (the plain run is tied at 40, the MTP run at 37).
+DFlash: 77 of 80, 2.88 per 1,000; 76 ties (plain tied at 48, DFlash at 28) and 1 one_ulp
+(math500 algebra/1936 at position 403, both margins 0.125). At every first divergence the
+larger of the two margins is within one BF16 spacing of the logits at that magnitude at 76
+of 77 for MTP and 72 of 77 for DFlash, and exactly two spacings at the rest (at most 0.25
+nats overall). No sequence is bitwise
+identical to plain decoding: the top-5 logprobs first differ at the second output token in
+all 80 sequences for both drafters (the first comes from the shared prefill). For comparison,
+plain decoding at batch 1 against batch 32 diverges at 3.42 per 1,000, all within 0.375 nats
+(PR #37, which traced the MTP-versus-plain divergences to layer 0's GDN decode and verify
+kernels). The DFlash divergences have not been traced to a kernel. Foreign CPU load was 2.4
+to 3.2 cores (`panel_v2/launch/`), which matters for the throughput column of the probe and
+not for the tokens or logprobs.
 
     scripts/gpu_lock.sh -s experiments/drafter/run_equality.sh
     python experiments/drafter/summarize_acceptance.py \
