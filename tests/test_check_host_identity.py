@@ -82,3 +82,12 @@ def test_staged_unusual_paths_and_type_changes_are_checked(tmp_path: Path) -> No
     odd.write_text('host 203-0-113-7\n')
     subprocess.run(['git', 'add', odd.name], cwd=repo, check=True)
     assert run(env, repo).returncode == 1
+
+
+def test_binary_files_are_scanned_too(tmp_path: Path) -> None:
+    env = fake_host(tmp_path, '203-0-113-7', '203.0.113.7')
+    (tmp_path / 'artifact.bin').write_bytes(b'%PDF\x00\x01binary\x00host=203.0.113.7\x00')
+    (tmp_path / 'clean.bin').write_bytes(b'\x00\x01\x02 nothing here \x00')
+    done = run(env, tmp_path, 'artifact.bin', 'clean.bin')
+    assert done.returncode == 1
+    assert 'artifact.bin' in done.stderr and 'clean.bin' not in done.stderr

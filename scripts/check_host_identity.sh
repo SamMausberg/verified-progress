@@ -8,7 +8,8 @@
 # With no arguments it checks the files staged for commit (pre-commit runs it that way, so the
 # config's evidence/ exclusion does not hide evidence files from it). It looks for the hostname
 # when that is an IP address in dashed form, and for every public IPv4 address `hostname -I`
-# reports, dotted and dashed. Matches are reported by file and line, without the value.
+# reports, dotted and dashed. Binary files are scanned as text too (a PDF or binary artifact
+# can embed the address). Matches are reported by file and line, without the value.
 set -euo pipefail
 
 patterns=()
@@ -40,10 +41,10 @@ status=0
 for f in "${files[@]}"; do
   # Staged content, not the working copy, when checking a commit.
   if [ -n "$staged" ]; then
-    hits="$(git cat-file blob ":$f" 2>/dev/null | grep -n -I -F "${args[@]}" | cut -d: -f1 | tr '\n' ' ' || true)"
+    hits="$(git cat-file blob ":$f" 2>/dev/null | grep -n -a -F "${args[@]}" | cut -d: -f1 | tr '\n' ' ' || true)"
   else
     [ -f "$f" ] || continue
-    hits="$(grep -n -I -F "${args[@]}" "$f" | cut -d: -f1 | tr '\n' ' ' || true)"
+    hits="$(grep -n -a -F "${args[@]}" "$f" | cut -d: -f1 | tr '\n' ' ' || true)"
   fi
   if [ -n "$hits" ]; then
     echo "$f: line(s) ${hits% } contain this machine's hostname or IP address" >&2
