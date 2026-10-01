@@ -1,4 +1,4 @@
-# Evidence: certified low-precision head (theory workstream)
+# Evidence: exact floating-point reference, Lean check and head constants
 
 CPU only; no GPU, no model inference. Machine: GH200 host, 64-core Grace (aarch64).
 Repository `.venv`: Python 3.13.15, NumPy 2.3.5. SGLang venv (for the weight-only calculation):
@@ -80,7 +80,7 @@ threshold is defined as follows: rho = `||h_t - h_d||_2 / ||h_t||_2` at the head
 final norm); for row i, transport's l2 half-width `r_c(i) ||Delta||_2` is narrower than the int8
 per-row round-to-nearest half-width `||e_i||_2 ||h_t||_2` if and only if rho < `||e_i||_2 / r_c(i)`,
 with `r_c(i)` the l2 radius about the mean of row i's 64-row tile of contiguous token ids. Its
-median over rows is 0.85% (p10 0.67%, p90 1.15%); in the manuscript's l_inf/l_1 family the median
+median over rows is 0.85% (p10 0.67%, p90 1.15%); in the paper's l_inf/l_1 family the median
 is 0.30%. It compares envelope width only, not certification rate or runtime. Quantiles are
 over all 248,320 rows. This is a derived calculation from the weights; no hidden states
 are involved, so it does not by itself decide whether either certificate is useful.
