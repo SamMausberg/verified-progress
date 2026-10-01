@@ -1,0 +1,63 @@
+{
+ "summary": {
+  "a": "tap/v4_hist_alone_mt_bench-0056",
+  "b": "tap/v4_hist_after_mt_bench-0056",
+  "prompts": 1,
+  "classes": {
+   "no_divergence": 1
+  },
+  "classes_hopper_model": {
+   "no_divergence": 1
+  },
+  "first_difference_module": {
+   "model.layers.3.attn": 1
+  },
+  "first_difference_modes": {
+   "DECODE vs DECODE": 1
+  },
+  "first_difference_output_index": {
+   "2": 1
+  },
+  "origin": {
+   "cache": 1
+  },
+  "first_cache_difference": {
+   "kv_k layer 3": 1
+  },
+  "no_hash_difference_before_divergence": 0
+ },
+ "cases": [
+  {
+   "id": "mt_bench-0056",
+   "prompt_len": 216,
+   "diverged_at": null,
+   "first_logprob_difference": 2,
+   "first_difference": {
+    "position": 217,
+    "module": "model.layers.3.attn",
+    "modules_differing_at_position": 475,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
+    "batch_a": 1,
+    "batch_b": 1,
+    "tokens_a": 1,
+    "tokens_b": 1,
+    "output_index": 2
+   },
+   "first_cache_difference": {
+    "entering_position": 217,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
+    "first": {
+     "cache": "kv_k",
+     "layer": 3,
+     "first_position": 3,
+     "positions_differing": 3
+    },
+    "caches_differing": 16
+   },
+   "origin": "cache",
+   "cls": "no_divergence"
+  }
+ ]
+}

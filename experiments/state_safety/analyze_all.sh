@@ -6,6 +6,10 @@
 #
 #   experiments/state_safety/analyze_all.sh
 #
+# Runs in the SGLang venv (sourced below from scripts/sglang_env.sh), which provides
+# SciPy for cycles.py's homogeneity test and first_cycle.py's Fisher test. The
+# repository's .venv has no SciPy, and its tests skip those calls.
+#
 # Two run roots: runs_pinned/ (pinned pools, the current matrix; *_pinned outputs)
 # and runs/ (the first, unpinned matrix; the unsuffixed outputs). Once runs_pinned/
 # exists, every pair in pairs_pinned.json must have both runs, or the script fails;
@@ -176,6 +180,14 @@ fi
 # Pools of both servers for every comparison in the evidence (team rule: equality
 # comparisons pin the pools; the earlier runs did not, so record what each had).
 nice -n 19 python pools.py --root "$HOME/vp-data/state" --evidence "$evidence"
+
+# The declared first-cycle test, once all five of its runs exist. If they are not the
+# declared runs the result is void: first_cycle.py exits non-zero and, under set -e,
+# stops this script.
+fresh="$HOME/vp-data/state/runs_fresh"
+if [ -f "$fresh/plain/c1.jsonl" ] && [ -f "$fresh/mtp_tree/c32.jsonl" ]; then
+  nice -n 19 python first_cycle.py --runs "$fresh" --out "$evidence/first_cycle_fresh.json"
+fi
 
 # Drift and divergences by rejection position, for every speculative config.
 for spec in mtp_s1 mtp_s3 mtp_s5 mtp_tree; do

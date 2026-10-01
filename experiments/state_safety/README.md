@@ -130,7 +130,18 @@ Tensor-level forensics (engine patch `engine/sglang/patches/state/0001-state-tap
 applied in `~/sglang-wt/state`): `tap_runs.py` serves tagged prompts with the tap on and
 `mechanism.py` compares two tapped runs (`--a`, `--b`), or the repeats of one prompt
 inside a run (`--repeat-of`). Both are run inside the GPU hold that collects the data;
-the exact commands are in `evidence/state_safety/README.md`. `tap_signature.py` (light,
+the exact commands are in `evidence/state_safety/README.md`.
+
+`run_tap_v4.sh` runs the cache-level checks of the tap v4 run in one shared hold:
+`tap_runs.py` sessions, then `mechanism.py`. Its tapped prompt lists and per-prompt
+token limits are committed in `tap_v4_inputs/`. Its summaries are committed as
+`cachecheck_v4_*.json`, `history_v4_*.json` and `repeats_v4_h44_*.json`. The run was
+made from a scratch copy of this script, which read the same input files from
+`~/vp-data/state/tap`, ran the sessions in a different order and named the outputs
+`mechanism_v4_*`. The committed summaries were regenerated from its tap data with the
+current `mechanism.py`.
+
+`tap_signature.py` (light,
 run by `analyze_all.sh`) finds where the v1 and v3 tapped sessions of the same
 configuration first part ways. `pools.py` (run by `analyze_all.sh`) writes
 `pools.json`, both servers' pools for every comparison in the evidence; it rebases
@@ -221,3 +232,66 @@ reason go in a new commit before the runs.
     exploratory effect.
 - **If supported.** Use the cache tap to compare the GDN state handed from prefill to
   the first verify forward with the state handed to the first plain decode step.
+- **Attestation.** `run_matrix.py` records only `repo_sha`, which does not show that
+  the checkout was clean. `attest_runner.py --watch` therefore runs outside the holds,
+  started before the first one.
+  - Whenever a `run_matrix.py` process writing to `runs_fresh/` appears or exits, it
+    records the checkout's HEAD, `git status --porcelain` and the SHA-256 of
+    `run_matrix.py`, `server.py` and `client.py` in
+    `runs_fresh/attest/<hold>-<before|after>.json`.
+  - The process table is polled every 2 s. An edit made and reverted inside that
+    window would not be seen.
+  - A hold's runs are void unless both of its records exist, are clean, are at
+    b918c8b and match b918c8b's files.
+  - Every run's `repo_sha` must be b918c8b.
+  - Every record must be complete, or the run is void:
+    - a normal finish, either `stop`, or `length` with exactly 256 output tokens
+      (a server abort or error is not one);
+    - `completion_tokens` equal to the output length;
+    - no client abort;
+    - top-5 logprobs at every output token.
+  - Both passes (c1 and c32) of a configuration must come from one server (equal
+    `server_id`).
+  - The server streams the cumulative verify count only in a response's last chunk,
+    so per-chunk counters cannot be checked. A prompt is excluded from every pair
+    unless all four MTP runs show:
+    - 0 in every chunk but the last;
+    - a last count equal to the chunk count and to `spec_verify_ct`;
+    - 1 to steps + 1 tokens in every chunk after the prefill token;
+    - a first chunk of exactly the prefill token, and chunks that cover every
+      output token.
+  - Each record also holds the observed `run_matrix.py` process's PID, its working
+    directory (`/proc/<pid>/cwd`) and the script it runs (its `/proc/<pid>/cmdline`
+    entry resolved against that directory), all read when the hold starts. A hold's
+    runs are void unless both records name one PID, and that process ran the attested
+    checkout's `experiments/state_safety/run_matrix.py` from that directory. Python
+    imports `server.py` and `client.py` from the script's own directory.
+  - Each record also holds the `--prompts` path the process was given (from its
+    command line, resolved against its directory) and that file's SHA-256 at the
+    time of the record. A hold's runs are void unless both records name the
+    canonical prompt file, the one checked against the frozen manifest, with its
+    current hash.
+  - As a cross-check, a run is void if any record's `prompt_tokens` differs from the
+    frozen prompt's length for that ID.
+  - The "after" record holds the SHA-256 of every `*.jsonl` and `*.meta.json` the hold
+    wrote. A run is void unless the analysed files still hash to those values.
+  - A run is also void unless its `started_at` lies between its hold's before and
+    after times.
+    - `started_at` is the host's local time (`run_matrix.py` uses `time.localtime`,
+      written without a zone).
+    - Each attestation records both `time_utc` and `time_local` (the same instant in
+      local time, in `started_at`'s format, with `local_utc_offset`).
+    - The check compares `started_at` with `time_local`, so both sides are in the
+      same zone. The host runs in UTC.
+  - The watcher for the declared runs runs a copy byte-identical to this commit's
+    `attest_runner.py`. It was restarted before either hold started, and each restart
+    is logged in `~/vp-data/state/logs/attest_first_cycle.out`.
+- **Environment.** `analyze_all.sh` and `first_cycle.py` run in the SGLang venv
+  (`scripts/sglang_env.sh`), which provides SciPy. The repository's `.venv` does not;
+  its tests skip the SciPy calls.
+- **No prompts left.** If every prompt is excluded, the result is void: no statistic
+  is computed, and the output records only the counts.
+- **Implementation.** `first_cycle.py` implements this analysis.
+  `tests/test_state_safety_first_cycle.py` tests it on synthetic runs, and
+  `analyze_all.sh` runs it once all five runs exist. Missing runs, unpinned pools or
+  other generation settings make the result void, and then no results are written.
