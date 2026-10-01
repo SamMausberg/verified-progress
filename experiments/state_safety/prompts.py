@@ -81,11 +81,11 @@ SELECTION = {
         'cnn_dailymail': range(0, 40),
     },
     'fresh': {
-        'gsm8k': range(80, 180),
+        'gsm8k': range(80, 560),
         'humaneval': range(60, 164),
         'mt_bench': range(0),
         'alpaca_eval': range(5, 805, 10),
-        'cnn_dailymail': range(40, 140),
+        'cnn_dailymail': range(40, 336),
     },
 }
 
