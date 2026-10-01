@@ -405,23 +405,25 @@ directory holds the run's `quality.json` (arm, launch checks, summary) and
 | dflash-tuned (stock) | 89.69% | 87.9-91.2 | 239 | 88 | 6,223 |
 | plain-tuned-replayssm (exact-up-to-rounding; lossy when run) | 91.05% | 89.4-92.5 | 226 | 74 | 6,106 |
 
-Paired against each plain run (`comparisons.json`, exact McNemar test on the problems
-only one run solved):
+Paired against each plain run (`comparisons.json`): the accuracy difference with its
+paired 95% interval (Wald, from the problems only one run solved;
+`bench.quality.paired_difference_interval`) and the exact McNemar p on those problems:
 
-| Arm | vs plain a: difference, p | vs plain b: difference, p |
+| Arm | vs plain a: difference (95%), p | vs plain b: difference (95%), p |
 |---|---|---|
-| plain-tuned, run b | +0.30 pt, 0.81 | - |
-| mtp-tuned | -0.45 pt, 0.70 | -0.76 pt, 0.47 |
-| mtp-stockverify | -1.06 pt, 0.30 | -1.36 pt, 0.18 |
-| dflash-tuned | -0.30 pt, 0.81 | -0.61 pt, 0.58 |
-| plain-tuned-replayssm | +1.06 pt, 0.27 | +0.76 pt, 0.47 |
+| plain-tuned, run b | +0.30 pt (-1.52 to +2.12), 0.81 | - |
+| mtp-tuned | -0.45 pt (-2.39 to +1.48), 0.70 | -0.76 pt (-2.63 to +1.11), 0.47 |
+| mtp-stockverify | -1.06 pt (-2.92 to +0.79), 0.30 | -1.36 pt (-3.27 to +0.54), 0.18 |
+| dflash-tuned | -0.30 pt (-2.14 to +1.53), 0.81 | -0.61 pt (-2.50 to +1.28), 0.58 |
+| plain-tuned-replayssm | +1.06 pt (-0.70 to +2.82), 0.27 | +0.76 pt (-1.10 to +2.61), 0.47 |
 
-No arm differs from plain decoding detectably. With about 150 discordant problems per
-pair, a difference below roughly 2.5 points would not reach p < 0.05 with 80%
-probability, so this check rules out large losses only. Buffered plain decoding was
-classed lossy when it ran and is the reason it was included; it is now
-`exact-up-to-rounding` (equality/), and its +1.06 and +0.76 points against the two
-plain runs show no loss either. Two sampled runs of the same arm agree on the final answer
+No arm differs from plain decoding detectably. The intervals say how much loss that
+excludes: every lower bound lies between -0.70 and -3.27 points, the weakest being
+`mtp-stockverify` against plain run b (-1.36 points, -3.27 to +0.54). A loss of more
+than about 3.3 points is therefore excluded for every arm, and smaller losses are not.
+Buffered plain decoding was classed lossy when it ran and is the reason it was
+included; it is now `exact-up-to-rounding` (equality/), and its intervals exclude a
+loss of more than 1.1 points. Two sampled runs of the same arm agree on the final answer
 for only 77% of problems, and none generated identical text, so a fixed request seed
 does not make sampled runs reproducible here. 17-19% of outputs in every arm reach the
 16,384-token limit (thinking loops; no answer counted). The sampled check compares

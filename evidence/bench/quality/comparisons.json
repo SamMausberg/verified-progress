@@ -8,6 +8,10 @@
   "accuracy_a": 0.8999241849886277,
   "accuracy_b": 0.9029567854435178,
   "accuracy_delta_b_minus_a": 0.0030326004548900665,
+  "accuracy_delta_95": [
+   -0.015166056728849764,
+   0.021231257638629902
+  ],
   "correct_only_a": 73,
   "correct_only_b": 77,
   "mcnemar_exact_p": 0.8065959963978487,
@@ -23,6 +27,10 @@
   "accuracy_a": 0.8999241849886277,
   "accuracy_b": 0.8953752843062927,
   "accuracy_delta_b_minus_a": -0.004548900682335044,
+  "accuracy_delta_95": [
+   -0.023922078774588604,
+   0.014824277409918398
+  ],
   "correct_only_a": 88,
   "correct_only_b": 82,
   "mcnemar_exact_p": 0.7014821003407138,
@@ -38,6 +46,10 @@
   "accuracy_a": 0.8999241849886277,
   "accuracy_b": 0.8893100833965125,
   "accuracy_delta_b_minus_a": -0.010614101592115177,
+  "accuracy_delta_95": [
+   -0.02916507202936754,
+   0.00793686884513706
+  ],
   "correct_only_a": 85,
   "correct_only_b": 71,
   "mcnemar_exact_p": 0.29793364454191906,
@@ -53,6 +65,10 @@
   "accuracy_a": 0.8999241849886277,
   "accuracy_b": 0.8968915845337376,
   "accuracy_delta_b_minus_a": -0.0030326004548900665,
+  "accuracy_delta_95": [
+   -0.02135219002653465,
+   0.015286989116754515
+  ],
   "correct_only_a": 78,
   "correct_only_b": 74,
   "mcnemar_exact_p": 0.8078463096035287,
@@ -68,6 +84,10 @@
   "accuracy_a": 0.8999241849886277,
   "accuracy_b": 0.910538286580743,
   "accuracy_delta_b_minus_a": 0.010614101592115288,
+  "accuracy_delta_95": [
+   -0.006958849039637543,
+   0.028187052223868022
+  ],
   "correct_only_a": 63,
   "correct_only_b": 77,
   "mcnemar_exact_p": 0.27184203624171227,
@@ -83,6 +103,10 @@
   "accuracy_a": 0.9029567854435178,
   "accuracy_b": 0.8953752843062927,
   "accuracy_delta_b_minus_a": -0.007581501137225111,
+  "accuracy_delta_95": [
+   -0.02625542560957192,
+   0.01109242333512158
+  ],
   "correct_only_a": 84,
   "correct_only_b": 74,
   "mcnemar_exact_p": 0.47410617678563144,
@@ -98,6 +122,10 @@
   "accuracy_a": 0.9029567854435178,
   "accuracy_b": 0.8893100833965125,
   "accuracy_delta_b_minus_a": -0.013646702047005244,
+  "accuracy_delta_95": [
+   -0.03266220036518947,
+   0.0053687962711788575
+  ],
   "correct_only_a": 91,
   "correct_only_b": 73,
   "mcnemar_exact_p": 0.184182042366839,
@@ -113,6 +141,10 @@
   "accuracy_a": 0.9029567854435178,
   "accuracy_b": 0.8968915845337376,
   "accuracy_delta_b_minus_a": -0.006065200909780133,
+  "accuracy_delta_95": [
+   -0.0249757323633958,
+   0.012845330543835527
+  ],
   "correct_only_a": 85,
   "correct_only_b": 77,
   "mcnemar_exact_p": 0.5824757301133328,
@@ -128,6 +160,10 @@
   "accuracy_a": 0.9029567854435178,
   "accuracy_b": 0.910538286580743,
   "accuracy_delta_b_minus_a": 0.007581501137225222,
+  "accuracy_delta_95": [
+   -0.010973800434473612,
+   0.02613680270892395
+  ],
   "correct_only_a": 73,
   "correct_only_b": 83,
   "mcnemar_exact_p": 0.47128610321960607,
