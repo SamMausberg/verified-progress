@@ -114,7 +114,7 @@ split size to FlashInfer's target-verify plan, as decode and extend already do. 
 does not make MTP speculation batch-invariant under `--enable-deterministic-inference`
 (see `evidence/state_safety/README.md`); it is kept because a committed run used it.
 
-## hostgap (`patches/hostgap/0001-0003`, branch `engine/hostgap`)
+## hostgap (`patches/hostgap/0001-0004`, branch `engine/hostgap`)
 
 The series applies in order to `bd66ce343e` on its own:
 
@@ -140,6 +140,7 @@ runs only).
 | 0001 | `SGLANG_HOSTGAP_VERIFY_PLAN=1`: the EAGLE/NEXTN target-verify CUDA-graph wrappers plan with `fast_verify_plan` (`srt/layers/attention/flashinfer_hostgap.py`), FlashInfer 0.6.18's `plan()` for fa2 in CUDA-graph mode with its four blocking reads (`segment_packbits`'s `.item()` and three `.to("cpu")`) replaced by host-computed qo/kv indptr, kv lengths and packed-mask size. A per-wrapper CUDA event orders reuse of FlashInfer's pinned plan buffer after its previous asynchronous copy, which the stock blocking reads used to guarantee (this also covers the draft-extend wrapper's `fast_prefill_plan`). | stock `plan()` |
 | 0002 | `SGLANG_HOSTGAP_DRAFT_INDPTR=1`: `FlashInferMultiStepDraftBackend.common_template` builds the per-step draft `kv_indptr` rows on the host instead of copying them back with `.cpu()`. | stock `.cpu()` |
 | 0003 | `SGLANG_HOSTGAP_DFLASH_DRAFT_PLAN=1`: the DFlash draft forward (the drafter's sliding-window and full-attention wrappers, no custom mask) plans with `fast_verify_plan` from the worker's exact host copy of the committed lengths; without that copy (compact draft cache, GPU-only backends) the stock `plan()` runs. | stock `plan()` |
+| 0004 | No new flag: the host-side plan inputs of 0001-0003 are computed with numpy, and `fast_verify_plan` uploads the custom-mask bit and byte offsets in one pinned copy instead of deriving them with about ten small device ops. Same integers, same packing kernel. | unchanged (only the flagged paths change) |
 
 Checks: `experiments/hostgap/plan_equivalence.py` compares FlashInfer's stock `plan()`
 with `fast_verify_plan` on the GPU (plan state, pinned bytes, device buffers and a replayed
