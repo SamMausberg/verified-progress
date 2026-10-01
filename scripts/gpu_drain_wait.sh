@@ -56,11 +56,13 @@ while true; do
   remaining=$((deadline - SECONDS))
   [ "$remaining" -ge 1 ] || remaining=1
   # The query, including timeout's KILL grace (1 s), must end within the remaining drain time.
+  # With under 2 s left there is no room for a bounded query: count the GPU as busy.
   smi_limit="${GPU_LOCK_SMI_TIMEOUT:-30}"
   [ "$smi_limit" -le "$((remaining - 1))" ] || smi_limit="$((remaining - 1))"
-  [ "$smi_limit" -ge 1 ] || smi_limit=1
   # --kill-after: a query that ignores TERM is killed 1 s later, so the limit really bounds it.
-  if raw="$(timeout --kill-after=1 "$smi_limit" nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null)"; then
+  if [ "$smi_limit" -lt 1 ]; then
+    pids="(no time left for a bounded GPU query)"
+  elif raw="$(timeout --kill-after=1 "$smi_limit" nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null)"; then
     pids="$(printf '%s\n' "$raw" | tr -d ' ' | grep -v '^$' || true)"
     # Under the exclusive lock any SGLang server is an orphan, even one that detached from
     # its job's process group and has not reached CUDA yet.

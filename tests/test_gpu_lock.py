@@ -29,6 +29,16 @@ def fake_smi(tmp_path: Path, script: str = '') -> dict[str, str]:
     )
 
 
+def alive(pid: int) -> bool:
+    """True if the process exists and is not a zombie (a reaped-late zombie counts as gone)."""
+    try:
+        with open(f'/proc/{pid}/stat') as f:
+            state = f.read().rsplit(')', 1)[1].split()[0]
+    except (FileNotFoundError, ProcessLookupError, IndexError):
+        return False
+    return state != 'Z'
+
+
 def lock_free(lock: Path, shared: bool = False) -> bool:
     """True if the lock can be taken right now (exclusive unless `shared`)."""
     with open(lock) as f:
@@ -56,7 +66,7 @@ def test_background_child_does_not_keep_the_lock(tmp_path: Path, mode: str) -> N
     assert done.returncode == 0
     child = int(pid_file.read_text())
     try:
-        os.kill(child, 0)  # the leftover process is still alive
+        assert alive(child)  # the leftover process is still alive
         deadline = time.time() + 5
         while not lock_free(lock) and time.time() < deadline:
             time.sleep(0.1)
@@ -123,7 +133,7 @@ def test_exclusive_waits_for_leftover_gpu_processes(tmp_path: Path) -> None:
 def test_exclusive_gives_up_if_the_gpu_stays_busy(tmp_path: Path) -> None:
     lock = tmp_path / 'gpu.lock'
     lock.touch()
-    env = dict(fake_smi(tmp_path, 'echo 4242'), GPU_LOCK_FILE=str(lock), GPU_LOCK_DRAIN_WAIT='1')
+    env = dict(fake_smi(tmp_path, 'echo 4242'), GPU_LOCK_FILE=str(lock), GPU_LOCK_DRAIN_WAIT='4')
     marker = tmp_path / 'ran'
     done = subprocess.run(
         ['bash', str(SCRIPT), '-x', 'touch', str(marker)],
@@ -141,7 +151,7 @@ def test_exclusive_gives_up_if_the_gpu_stays_busy(tmp_path: Path) -> None:
 def test_exclusive_fails_closed_when_the_gpu_query_fails(tmp_path: Path) -> None:
     lock = tmp_path / 'gpu.lock'
     lock.touch()
-    env = dict(fake_smi(tmp_path, 'exit 1'), GPU_LOCK_FILE=str(lock), GPU_LOCK_DRAIN_WAIT='1')
+    env = dict(fake_smi(tmp_path, 'exit 1'), GPU_LOCK_FILE=str(lock), GPU_LOCK_DRAIN_WAIT='4')
     marker = tmp_path / 'ran'
     done = subprocess.run(
         ['bash', str(SCRIPT), '-x', 'touch', str(marker)],
@@ -202,13 +212,9 @@ def test_killing_the_lock_holder_stops_a_starting_job(tmp_path: Path) -> None:
         assert holder, 'no flock process under gpu_lock.sh'
         os.kill(int(holder[0]), 9)  # the lock holder dies abruptly
         deadline = time.time() + 10
-        while time.time() < deadline:
-            try:
-                os.kill(child, 0)
-            except ProcessLookupError:
-                break
+        while alive(child) and time.time() < deadline:
             time.sleep(0.1)
-        else:
+        if alive(child):
             pytest.fail('the job outlived the lock holder')
         assert lock_free(lock)
     finally:
@@ -227,14 +233,11 @@ def test_leftover_group_members_are_stopped_when_the_job_ends(tmp_path: Path) ->
     assert done.returncode == 0
     left = int(pid_file.read_text())
     deadline = time.time() + 5
-    while time.time() < deadline:
-        try:
-            os.kill(left, 0)
-        except ProcessLookupError:
-            return
+    while alive(left) and time.time() < deadline:
         time.sleep(0.1)
-    os.kill(left, 9)
-    pytest.fail('a leftover process in the job group outlived the job')
+    if alive(left):
+        os.kill(left, 9)
+        pytest.fail('a leftover process in the job group outlived the job')
 
 
 def test_exclusive_waits_for_a_detached_server_that_has_not_reached_the_gpu(tmp_path: Path) -> None:
@@ -278,13 +281,10 @@ def test_a_job_that_ignores_term_is_killed_when_the_holder_dies(tmp_path: Path) 
         ).stdout.split()
         os.kill(int(holder[0]), 9)
         deadline = time.time() + 10
-        while time.time() < deadline:
-            try:
-                os.kill(child, 0)
-            except ProcessLookupError:
-                return
+        while alive(child) and time.time() < deadline:
             time.sleep(0.1)
-        pytest.fail('a TERM-ignoring job outlived the lock holder')
+        if alive(child):
+            pytest.fail('a TERM-ignoring job outlived the lock holder')
     finally:
         proc.kill()
 
@@ -298,7 +298,7 @@ def test_the_callers_own_command_line_is_not_an_orphan(tmp_path: Path) -> None:
         fake_smi(tmp_path),
         GPU_LOCK_FILE=str(lock),
         GPU_LOCK_ORPHAN_MODULE=module,
-        GPU_LOCK_DRAIN_WAIT='3',
+        GPU_LOCK_DRAIN_WAIT='5',
     )
     ran = tmp_path / 'ran'
     # The job is itself `python3 ... -m <module>`: gpu_lock.sh, flock, setpriv, env and gpu_job.sh
@@ -339,7 +339,7 @@ def test_decoys_that_only_mention_the_server_are_not_orphans(tmp_path: Path) -> 
             fake_smi(tmp_path),
             GPU_LOCK_FILE=str(lock),
             GPU_LOCK_ORPHAN_MODULE=module,
-            GPU_LOCK_DRAIN_WAIT='2',
+            GPU_LOCK_DRAIN_WAIT='5',
         )
         ran = tmp_path / 'ran'
         done = subprocess.run(
@@ -375,12 +375,9 @@ def test_an_ignored_term_in_the_caller_does_not_disable_holder_death_cleanup(
         ).stdout.split()
         os.kill(int(holder[0]), 9)
         deadline = time.time() + 10
-        while time.time() < deadline:
-            try:
-                os.kill(child, 0)
-            except ProcessLookupError:
-                return
+        while alive(child) and time.time() < deadline:
             time.sleep(0.1)
-        pytest.fail('an inherited ignored TERM let the job outlive the lock holder')
+        if alive(child):
+            pytest.fail('an inherited ignored TERM let the job outlive the lock holder')
     finally:
         proc.kill()
