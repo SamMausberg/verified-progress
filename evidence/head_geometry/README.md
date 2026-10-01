@@ -282,11 +282,16 @@ margin 1.7 logits over all verify rows against 7.3 on plain decode):
 
 | Rows | Head, envelope | Candidates mean | median | p99 | max | 1 candidate |
 |---|---|---|---|---|---|---|
-| verify, needed | int8 per-row, row CS | 1.57 | 1 | 8 | 22 | 75.9% |
-| verify, needed | int8 g128, blockwise | 1.35 | 1 | 6 | 17 | 81.6% |
-| verify, after the first rejection | int8 per-row, row CS | 4.03 | 3 | 20 | 31 | 28.4% |
-| draft, needed | int8 per-row, row CS | 1.28 | 1 | 4 | 13 | 80.8% |
-| draft, needed | int8 g128, blockwise | 1.17 | 1 | 3 | 7 | 86.0% |
+| verify, needed | int8 per-row, minimum envelope | 1.57 | 1 | 8 | 22 | 75.9% |
+| verify, needed | int8 g128, minimum envelope | 1.35 | 1 | 6 | 17 | 81.6% |
+| verify, after the first rejection | int8 per-row, minimum envelope | 4.03 | 3 | 20 | 31 | 28.4% |
+| draft, needed | int8 per-row, minimum envelope | 1.28 | 1 | 4 | 13 | 80.8% |
+| draft, needed | int8 g128, minimum envelope | 1.17 | 1 | 3 | 7 | 86.0% |
+
+"Minimum envelope" is the elementwise minimum of the rigorous per-row bounds the script computes
+(`quant['min']` in `experiments/head_geometry/analyze_selfevidence.py`), with the conservative
+tensor-core gamma 6.11e-4; the split by reached rows is written only for that envelope. Counts
+for each single envelope, over all rows of a set, are in the matching `selfevidence_*.csv`.
 
 On the rows the verifier needs, int8 behaves as on plain decode. The draft head needs even
 fewer candidates although its margins are small, because its input has a third of the
@@ -303,11 +308,16 @@ greedy verifier (every earlier draft accepted); 4,024 draft rows, 2,997 needed.
 
 | Rows | Head, envelope | Candidates mean | median | p99 | max | 1 candidate |
 |---|---|---|---|---|---|---|
-| verify, needed | int8 per-row, row CS | 1.51 | 1 | 7 | 18 | 76.1% |
-| verify, needed | int8 g128, blockwise | 1.33 | 1 | 5 | 12 | 80.9% |
-| verify, after the first rejection | int8 per-row, row CS | 2.44 | 2 | 11 | 22 | 49.1% |
-| draft, needed | int8 per-row, row CS | 2.44 | 1 | 15 | 38 | 57.4% |
-| draft, needed | int8 g128, blockwise | 1.80 | 1 | 10 | 29 | 67.3% |
+| verify, needed | int8 per-row, minimum envelope | 1.51 | 1 | 7 | 18 | 76.1% |
+| verify, needed | int8 g128, minimum envelope | 1.33 | 1 | 5 | 12 | 80.9% |
+| verify, after the first rejection | int8 per-row, minimum envelope | 2.44 | 2 | 11 | 22 | 49.1% |
+| draft, needed | int8 per-row, minimum envelope | 2.44 | 1 | 15 | 38 | 57.4% |
+| draft, needed | int8 g128, minimum envelope | 1.80 | 1 | 10 | 29 | 67.3% |
+
+"Minimum envelope" is the elementwise minimum of the rigorous per-row bounds the script computes
+(`quant['min']` in `experiments/head_geometry/analyze_selfevidence.py`), with the conservative
+tensor-core gamma 6.11e-4; the split by reached rows is written only for that envelope. Counts
+for each single envelope, over all rows of a set, are in the matching `selfevidence_*.csv`.
 
 On the verify rows the verifier needs, int8 behaves as on plain decode and on DFlash-4B. Unlike
 DFlash's, the MTP draft head needs more candidates than the verifier; its input keeps the
