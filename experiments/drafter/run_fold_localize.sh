@@ -64,7 +64,7 @@ serve() {
 }
 equal() { python "$here/compare_outputs.py" --ref "$out/$1/requests.jsonl" \
   --test "$out/$2/requests.jsonl" --out "$out/$2-vs-$1.json"; }
-loc() { python "$here/fold_localize.py" --a "$out/$1" --b "$2" --out "$out/$3.json"; }
+loc() { python "$here/fold_localize.py" --a "$out/$1" --b "$2" --out "$out/$3.json" "${@:4}"; }
 
 # A. c=1, radix on, traced.
 p1="--max-running-requests 2 --max-total-tokens 60630 --max-mamba-cache-size 10"
@@ -74,11 +74,10 @@ serve dflash off-p1 "$p1" 66 0 "$c1"
 serve dflash fold-p1 "$p1" 66 1 "$c1"
 serve dflash off-p2 "$p2" 66 0 "$c1"
 serve dflash fold-p2 "$p2" 66 1 "$c1"
-loc off-p1 "$check/c1-off" off-p1_vs_c1-off
-loc off-p1 "$out/fold-p1" off-p1_vs_fold-p1
+# The first check's c=1 runs were untraced: compare them by outputs only (--earlier).
+loc off-p1 "$out/fold-p1" off-p1_vs_fold-p1 --earlier "$check/c1-off" --earlier "$check/c1-fold"
 loc off-p2 "$out/fold-p2" off-p2_vs_fold-p2
 loc off-p1 "$out/off-p2" off-p1_vs_off-p2
-loc fold-p1 "$check/c1-fold" fold-p1_vs_c1-fold
 
 # B. Deterministic waves, radix off.
 panel="--workload $here/panel-v2.jsonl --per-domain 32"

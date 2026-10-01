@@ -208,14 +208,14 @@ def main() -> None:
                 values['L_sel'] = prefix_len(walk == truth)
                 # P9: correction g_{L+1} (index L) as the predecessor of slot L+2.
                 last = block - 2
-                index = engine_accept.clamp(max=last)
-                correction = truth.gather(1, index[:, None])[:, 0]
+                slot = engine_accept.clamp(max=last)
+                correction = truth.gather(1, slot[:, None])[:, 0]
                 supported = (
-                    top.gather(1, index[:, None, None].expand(-1, 1, top.shape[-1]))[:, 0]
+                    top.gather(1, slot[:, None, None].expand(-1, 1, top.shape[-1]))[:, 0]
                     == correction[:, None]
                 ).any(-1)
                 eligible = (engine_accept < block - 1) & supported
-                start = torch.where(eligible, engine_accept + 1, torch.full_like(index, block))
+                start = torch.where(eligible, engine_accept + 1, torch.full_like(slot, block))
                 corrected = greedy_walk(selector, top, top_logits, slot_hidden, correction, start)
             rewalk['rid'] += [rid] * len(rows)
             for name, tensor in (

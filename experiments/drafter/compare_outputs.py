@@ -147,9 +147,15 @@ def main() -> None:
             continue
         same_tokens = ref[rid]['output_ids'] == test[rid]['output_ids']
         diff = next((i for i, (x, y) in enumerate(zip(ta, tb, strict=False)) if x != y), None)
-        if diff is None and same_tokens and len(ta) == len(tb):
+        if diff is None and len(ta) != len(tb):
+            diff = min(len(ta), len(tb))  # one run's logprobs are a strict prefix
+        if diff is None and not same_tokens:
+            # Identical logprobs, different tokens (a tie broken differently): the
+            # sequences still differ, first at the first differing token.
+            diff = first_divergence(ref[rid]['output_ids'], test[rid]['output_ids'])
+        if diff is None:
             identical += 1
-        elif diff is not None:
+        else:
             first_logprob_difference[rid] = diff
     summary = {
         'ref': str(args.ref),

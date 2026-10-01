@@ -200,3 +200,58 @@ def test_ab_summary_reads_the_scheduler_running_limit(tmp_path: Path) -> None:
     pools = summary.server_pools(run)
     assert pools['effective_max_running_requests_per_dp'] == 64
     assert pools['max_total_num_tokens'] == 300000
+
+
+def test_bitwise_check_records_strict_prefix_logprobs(tmp_path: Path) -> None:
+    ref = tmp_path / 'ref.jsonl'
+    test = tmp_path / 'test.jsonl'
+    lp = [[[-0.1, 1], [-2.5, 9]], [[-0.2, 2], [-3.0, 9]], [[-0.3, 3], [-1.5, 9]]]
+    row = {'id': 'x', 'domain': 'chat', 'output_ids': [1, 2], 'top_logprobs': lp[:2]}
+    ref.write_text(json.dumps(row) + '\n')
+    test.write_text(json.dumps(dict(row, output_ids=[1, 2, 3], top_logprobs=lp)) + '\n')
+    out = tmp_path / 'eq.json'
+    compare = load('compare_outputs')
+    sys.argv = ['compare_outputs.py', '--ref', str(ref), '--test', str(test), '--out', str(out)]
+    compare.main()
+    summary = json.loads(out.read_text())
+    assert summary['bitwise_identical_sequences'] == 0
+    assert summary['first_logprob_difference'] == {'x': 2}
+
+
+def test_localize_skips_cycles_when_a_run_is_untraced(tmp_path: Path) -> None:
+    localize = load('fold_localize')
+    for name, traced in (('a', True), ('b', False)):
+        run = tmp_path / name
+        run.mkdir()
+        row = {'id': 'r', 'prompt_tokens': 4, 'output_ids': [1, 2], 'top_logprobs': [[0], [0]]}
+        (run / 'requests.jsonl').write_text(json.dumps(row) + '\n')
+        if traced:
+            record = {'rid': 'r', 'prefix_len': 4, 'draft': [1], 'target': [1], 'accept': 0}
+            (run / 'trace.1.jsonl').write_text(json.dumps(record) + '\n')
+    report = localize.compare(tmp_path / 'a', tmp_path / 'b')
+    assert report['r']['first_cycle_difference'] is None
+
+
+def test_ab_summary_excludes_invalid_points(tmp_path: Path) -> None:
+    summary = load('ab_timing_summary')
+    for label, y, failed in (
+        ('g-base-r1', 100.0, 0),
+        ('g-test-r1', 120.0, 0),
+        ('g-test-r2', 50.0, 3),
+    ):
+        run = tmp_path / label / '20261001-000000'
+        (run / 'r0' / 'c001').mkdir(parents=True)
+        (run / 'sweep.json').write_text('{}')
+        point = {
+            'concurrency': 1,
+            'completed': 64 - failed,
+            'requests': 64,
+            'failed': failed,
+            'y': y,
+            'x_e2e': y,
+            'aiperf_exit_code': 0,
+        }
+        (run / 'r0' / 'c001' / 'point.json').write_text(json.dumps(point))
+    entry = summary.compare(summary.collect(tmp_path), 'base', 'test')[0]
+    assert entry['ratio'] == 1.2
+    assert list(entry['invalid_points']) == ['g-test-r2/20261001-000000']

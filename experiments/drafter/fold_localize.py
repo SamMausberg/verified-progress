@@ -102,11 +102,14 @@ def pools(directory: Path) -> dict[str, Any]:
 def compare(a_dir: Path, b_dir: Path) -> dict[str, Any]:
     a_out, b_out = outputs(a_dir), outputs(b_dir)
     a_tr, b_tr = traces(a_dir), traces(b_dir)
+    # Cycles are compared only when both runs were traced; an untraced run has no
+    # cycles, which is missing instrumentation, not a divergence.
+    traced = bool(a_tr) and bool(b_tr)
     report: dict[str, Any] = {}
     for rid in sorted(set(a_out) & set(b_out)):
         prompt = a_out[rid]['prompt_tokens']
         logprob = first_logprob_difference(a_out[rid], b_out[rid])
-        cycle = first_cycle_difference(a_tr.get(rid, []), b_tr.get(rid, []))
+        cycle = first_cycle_difference(a_tr.get(rid, []), b_tr.get(rid, [])) if traced else None
         entry: dict[str, Any] = {
             'prompt_tokens': prompt,
             'first_logprob_difference': logprob,
@@ -144,6 +147,7 @@ def main() -> None:
         'a': str(args.a),
         'b': str(args.b),
         'pools': {'a': pools(args.a), 'b': pools(args.b)},
+        'cycles_compared': bool(traces(args.a)) and bool(traces(args.b)),
         'requests': compare(args.a, args.b),
     }
     print(f'pools a={result["pools"]["a"]} b={result["pools"]["b"]}')

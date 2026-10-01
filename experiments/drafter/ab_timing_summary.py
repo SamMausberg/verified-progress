@@ -6,8 +6,11 @@ b16-fold-r2 (run_fold_timing.sh) or sel-prefix-r1 (run_selector_timing.sh), and
 writes, per group and client concurrency, for every arm: the output throughput y
 (tokens/s/GPU) and per-user rate x of each run, tokens per verify cycle, and the
 mean y. For the pair --base/--test it adds the ratio test/base of the mean y and
-the smallest and largest ratio over all base-test run pairs. Points whose mean
-foreign CPU load exceeded 2 cores (bench's rule) are listed per entry. Each
+the smallest and largest ratio over all base-test run pairs. Only valid points
+enter the means and ratios, by bench's own rule (`bench.pareto.invalid_reason`:
+failed requests, a nonzero aiperf exit, outputs of the wrong length, an unflushed
+cache, unexpected prompts, or a mean foreign CPU load above 2 cores); invalid
+points are listed per entry with their reason. Each
 server's resolved pools (KV tokens, mamba slots, running limit) are recorded; the
 arms must share the running limit. In the fold A/B the fold arm needs no
 per-position GDN states, so SGLang gives it a larger KV pool from the same memory;
@@ -22,10 +25,13 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
-FOREIGN_CPU_LIMIT = 2.0
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from bench.pareto import invalid_reason
+
 POOL_KEYS = (
     'max_total_num_tokens',
     'max_running_requests',
@@ -58,7 +64,6 @@ def collect(root: Path) -> list[dict[str, Any]]:
         for point_path in sorted(run.glob('r*/c*/point.json')):
             point = json.loads(point_path.read_text())
             spec = point.get('spec') or {}
-            foreign = point.get('foreign_cpu_during_mean')
             rows.append(
                 {
                     'group': match['group'],
@@ -73,8 +78,8 @@ def collect(root: Path) -> list[dict[str, Any]]:
                     'y': point['y'],
                     'x_e2e': point['x_e2e'],
                     'accept_length': spec.get('accept_length'),
-                    'foreign_cpu_during_mean': foreign,
-                    'foreign_cpu_flag': (foreign or 0.0) > FOREIGN_CPU_LIMIT,
+                    'foreign_cpu_during_mean': point.get('foreign_cpu_during_mean'),
+                    'invalid_reason': invalid_reason(point),
                     'pools': pools,
                 }
             )
@@ -86,17 +91,20 @@ def compare(rows: list[dict[str, Any]], base: str, test: str) -> list[dict[str, 
     for group, conc in sorted({(r['group'], r['concurrency']) for r in rows}):
         sel = [r for r in rows if r['group'] == group and r['concurrency'] == conc]
         entry: dict[str, Any] = {'group': group, 'concurrency': conc, 'arms': {}}
+        valid = [r for r in sel if not r['invalid_reason']]
         for arm in sorted({r['arm'] for r in sel}):
-            runs = sorted((r for r in sel if r['arm'] == arm), key=lambda r: r['round'])
+            runs = sorted((r for r in valid if r['arm'] == arm), key=lambda r: r['round'])
             entry['arms'][arm] = {
                 'y': [round(r['y'], 1) for r in runs],
                 'x_e2e': [round(r['x_e2e'], 1) for r in runs],
                 'accept_length': [r['accept_length'] for r in runs],
-                'y_mean': round(sum(r['y'] for r in runs) / len(runs), 1),
+                'y_mean': round(sum(r['y'] for r in runs) / len(runs), 1) if runs else None,
             }
-        entry['foreign_cpu_flagged_runs'] = [r['run'] for r in sel if r['foreign_cpu_flag']]
-        base_runs = [r for r in sel if r['arm'] == base]
-        test_runs = [r for r in sel if r['arm'] == test]
+        entry['invalid_points'] = {
+            r['run']: r['invalid_reason'] for r in sel if r['invalid_reason']
+        }
+        base_runs = [r for r in valid if r['arm'] == base]
+        test_runs = [r for r in valid if r['arm'] == test]
         if base_runs and test_runs:
             mean_b = sum(r['y'] for r in base_runs) / len(base_runs)
             mean_t = sum(r['y'] for r in test_runs) / len(test_runs)
@@ -127,7 +135,6 @@ def main() -> None:
         'source': str(args.root),
         'base': args.base,
         'test': args.test,
-        'foreign_cpu_limit_cores': FOREIGN_CPU_LIMIT,
         'pools_by_run': pools,
         'running_limit_match': len(limits) == 1,
         'comparison': comparison,
