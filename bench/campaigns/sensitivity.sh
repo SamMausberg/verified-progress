@@ -2,7 +2,8 @@
 # Declared sensitivity workload (bench/README.md): natural per-prompt output lengths
 # on the confirmation split. One session per hold. The arms and their concurrencies
 # come from the plan that bench.sensitivity_arms derives from the confirmation
-# frontier (one "arm c [c ...]" line per arm, committed before the first session);
+# points (one "arm c [c ...]" line per arm); the script refuses a plan or selection
+# record that is untracked or differs from the committed version;
 # odd sessions run the plan in reverse order.
 # Run under:
 #   scripts/gpu_lock.sh -x bench/campaigns/sensitivity.sh <session> [plan file]
@@ -15,7 +16,18 @@ session=$1
 PLAN=${2:-evidence/bench/sensitivity/plan.txt}
 WORKLOAD=bench/workloads/mixed-v2-natural2048/confirm.jsonl
 [ -s "$WORKLOAD" ] || { echo "missing $WORKLOAD (run natural_lengths_confirm.sh)" >&2; exit 1; }
-[ -s "$PLAN" ] || { echo "missing $PLAN (run python -m bench.sensitivity_arms)" >&2; exit 1; }
+SELECTION=$(dirname "$PLAN")/selection.json
+# The plan must be the committed output of bench.sensitivity_arms, not a local edit.
+for file in "$PLAN" "$SELECTION"; do
+  if ! git ls-files --error-unmatch "$file" > /dev/null 2>&1; then
+    echo "$file is not tracked: commit the output of bench.sensitivity_arms first" >&2
+    exit 1
+  fi
+  if ! git diff --quiet HEAD -- "$file"; then
+    echo "$file differs from the committed version" >&2
+    exit 1
+  fi
+done
 mapfile -t entries < "$PLAN"
 if (( session % 2 == 1 )); then
   reversed=()

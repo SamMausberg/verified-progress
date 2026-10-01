@@ -748,24 +748,37 @@ def test_per_prompt_output_lengths(tmp_path: Path) -> None:
 def test_sensitivity_arm_rule() -> None:
     from bench.sensitivity_arms import select
 
-    def entry(label: str, c: int, y: float, n: int = 3) -> dict[str, object]:
-        return {'label': label, 'concurrency': c, 'y_mean': y, 'n': n}
+    sessions = ('confirm-r0', 'confirm-r1', 'confirm-r2')
 
-    frontier = [
-        entry('plain-tuned', 32, 6000.0),
-        entry('plain-tuned', 128, 14000.0),
-        entry('mtp-tuned', 32, 6900.0),
-        entry('mtp-tuned-triton', 32, 7000.0),  # within 2% of each other: both run
-        entry('mtp-tuned', 128, 13000.0),
-        entry('mtp-stockverify', 128, 9000.0),
-        entry('dflash-tuned-b16', 32, 5200.0),
-        entry('dflash-tuned', 32, 6900.0),
-        entry('dflash-tuned-b4', 32, 9999.0, n=0),  # every point invalid: ignored
-        entry('dflash-tuned', 128, 10500.0),
-        entry('dflash-tuned-b4', 128, 11400.0),
-    ]
-    plan = select(frontier)['plan']
-    assert plan == {
+    def runs(label: str, c: int, y: float, invalid_in: str = '') -> list[dict[str, object]]:
+        return [
+            {
+                'label': label,
+                'concurrency': c,
+                'session': session,
+                'y': y,
+                'invalid_reason': 'host_contention' if session == invalid_in else '',
+            }
+            for session in sessions
+        ]
+
+    points = [
+        *runs('plain-tuned', 32, 6000.0),
+        *runs('plain-tuned', 128, 14000.0),
+        *runs('mtp-tuned', 32, 6900.0),
+        *runs('mtp-tuned-triton', 32, 7000.0),  # within 2% of each other: both run
+        *runs('mtp-tuned', 128, 13000.0),
+        # Supplementary session only: never eligible, however fast.
+        {'label': 'mtp-stockverify', 'concurrency': 128, 'session': 'confirm-supp',
+         'y': 20000.0, 'invalid_reason': ''},
+        *runs('dflash-tuned-b16', 32, 5200.0),
+        *runs('dflash-tuned', 32, 6900.0),
+        *runs('dflash-tuned-b4', 32, 9999.0, invalid_in='confirm-r1'),  # one session invalid
+        *runs('dflash-tuned', 128, 10500.0),
+        *runs('dflash-tuned-b4', 128, 11400.0),
+    ]  # fmt: skip
+    result = select(points)
+    assert result['plan'] == {
         'dflash-tuned': [32],
         'dflash-tuned-b4': [128],
         'mtp-tuned': [32, 128],
@@ -773,3 +786,6 @@ def test_sensitivity_arm_rule() -> None:
         'plain-tuned': [32, 128],
         'plain-tuned-triton': [32],
     }
+    assert {'arm': 'dflash-tuned-b4', 'concurrency': 32, 'missing_sessions': ['confirm-r1'],
+            'invalid_in': ['confirm-r1']} in result['ineligible']  # fmt: skip
+    assert result['sessions'] == list(sessions)
