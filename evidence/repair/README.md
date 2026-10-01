@@ -589,8 +589,8 @@ not improve on fresh DFlash drafting.
 `jacobi_probe_progress.csv`, `jacobi_probe_summary.json` (measured). Session `runs/jacobi_probes.sh`
 under the exclusive lock on 2026-10-01, 21:53-22:05 UTC (exclusive for memory; nothing here is
 timed), repository commit `17bbeac` (on main) and engine build `5d8e00e3e1`, both clean, as each
-run's `run.json` records (`jacobi_probe_provenance.json` copies those records with the input and
-trace hashes). The probe follows the stock DFlash trajectory and, on
+run's `run.json` records (`jacobi_probe_provenance.json`, written and checked by
+`write_provenance.py`, copies those records with the input and trace hashes). The probe follows the stock DFlash trajectory and, on
 every block, runs four extra exact target passes from the same committed prefix of each kind: recycle
 sweeps (the Jacobi map: the next candidate takes the target's predictions from the previous pass,
 shifted by one) and keep sweeps (only the first mismatching draft token is replaced by the
@@ -644,7 +644,17 @@ python experiments/repair/analyze_jacobi.py ~/vp-data/repair/runs/probe1/probe_b
     ~/vp-data/repair/runs/probe1/probe_b32 --out-dir ~/vp-data/repair/analysis/jacobi
 cp ~/vp-data/repair/analysis/jacobi/jacobi_summary.json evidence/repair/jacobi_probe_summary.json
 cp ~/vp-data/repair/analysis/jacobi/jacobi_progress.csv evidence/repair/jacobi_probe_progress.csv
+python experiments/repair/write_provenance.py --result evidence/repair/jacobi_probe_summary.json \
+    evidence/repair/jacobi_probe_progress.csv --raw ~/vp-data/repair/analysis/jacobi/jacobi_summary.json \
+    ~/vp-data/repair/analysis/jacobi/jacobi_progress.csv \
+    --run-dir ~/vp-data/repair/runs/probe1/probe_b16 ~/vp-data/repair/runs/probe1/probe_b32 \
+    --worktree ~/vp-wt/repair --scripts experiments/repair/serve_probe.py experiments/repair/runs/jacobi_probes.sh \
+    --inputs ~/vp-data/repair/panel/checkpoints_probe_half.jsonl --out evidence/repair/jacobi_probe_provenance.json
 ```
+
+The analysis ran from main at `204c4cd`, whose `analyze_jacobi.py` is the same blob as at the
+run's commit `17bbeac`. The provenance file also checks that both runs' recorded `repo_sha` is
+the run worktree's HEAD and that their engine worktree was clean.
 
 ### P12 static screen on the compiled last-FFN dictionary
 
@@ -662,9 +672,10 @@ drafter workstream's block-16 panel (`drafter_b16_outputs.jsonl`, SHA-256
 `679240063371673782ca0fe6b7eeeb241c36bef2f183030bda3dcd9dceaffec4`, raw data outside git); 64-row
 tiles in token-id order, and the same tiles after sorting the rows by a random projection (a cheap
 clustering control, not k-means). Run under the shared lock on 2026-10-01, finishing at 18:51 UTC,
-at repository commit `a05df1d` (`p12_static_screen.provenance.json`): a local branch, never pushed,
-recovered from the run worktree's reflog (HEAD there from 10:04 UTC on, worktree clean, both
-scripts last modified at 08:28 UTC), since the JSON itself records no commit. Its
+at repository commit `a05df1d` (`p12_static_screen.provenance.json`, written and checked by
+`write_provenance.py`): a local branch, never pushed, recovered from the run worktree's reflog
+(HEAD there from 10:04 UTC on, worktree clean, both scripts last modified at 08:28 UTC), since the
+JSON itself records no commit. Its
 `p12_static_screen.py` (SHA-256 `7ca21067...`) and `runs/p12_screen.sh` (`c32c4c10...`) are
 byte-identical to the files at `694c0bc`, the commit on main that added them, which is the revision
 to rerun; the provenance file gives the full hashes.
@@ -690,7 +701,19 @@ to rerun; the provenance file gives the full hashes.
 ```sh
 scripts/gpu_lock.sh -s experiments/repair/runs/p12_screen.sh   # writes ~/vp-data/repair/p12/p12_static_screen.json
 cp ~/vp-data/repair/p12/p12_static_screen.json evidence/repair/p12_static_screen.json
+python experiments/repair/write_provenance.py --result evidence/repair/p12_static_screen.json \
+    --raw ~/vp-data/repair/p12/p12_static_screen.json --worktree ~/vp-wt/repair-p9 \
+    --scripts experiments/repair/p12_static_screen.py experiments/repair/runs/p12_screen.sh \
+    --same-at 694c0bc --inputs ~/vp-data/repair/panel/drafter_b16_outputs.jsonl \
+    --out evidence/repair/p12_static_screen.provenance.json
 ```
+
+`write_provenance.py` writes the provenance file only if its checks pass: the committed result
+equals the raw output, the run worktree is clean with HEAD unchanged since before the run, the
+scripts were last modified before it, and their blobs are the same at `694c0bc`. Rerunning it
+needs the run worktree and the raw output, which stay outside git; if they are removed, the
+commit, the reflog time and the modification times cannot be rechecked, while the scripts'
+hashes and blobs can still be checked against `694c0bc`.
 
 ## One-step recycling on the shared DFlash trace
 

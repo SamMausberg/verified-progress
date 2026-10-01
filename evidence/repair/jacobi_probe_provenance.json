@@ -1,24 +1,38 @@
 {
- "kind": "provenance of a measured result (copied from each run's run.json, plus input and trace hashes)",
- "results": [
-  "evidence/repair/jacobi_probe_summary.json",
-  "evidence/repair/jacobi_probe_progress.csv"
+ "kind": "provenance of a measured result, written and checked by write_provenance.py",
+ "results": {
+  "evidence/repair/jacobi_probe_summary.json": "ba499eb67b092bc40fd86ade1e25fce10828d1faa34c51342a619deab78b7581",
+  "evidence/repair/jacobi_probe_progress.csv": "1caf1b80501b966e61d9d8f0c20db0b000fd51b47397a69c1b4a40003441245a"
+ },
+ "raw_outputs": [
+  "/home/ubuntu/vp-data/repair/analysis/jacobi/jacobi_summary.json",
+  "/home/ubuntu/vp-data/repair/analysis/jacobi/jacobi_progress.csv"
  ],
- "lock": "scripts/gpu_lock.sh -x (exclusive, for memory; nothing timed), session 2026-10-01 21:53-22:05 UTC",
- "command": "experiments/repair/runs/jacobi_probes.sh",
- "repo_commit_on_main": true,
- "inputs": {
-  "~/vp-data/repair/panel/checkpoints_probe_half.jsonl": "5bb26409670cf3be159812c6003d3329781f04e5f7d575cfd50a51f4038b18b7"
+ "checked_against": "earliest run start 2026-10-01T21:53:41Z",
+ "repo_commit": "17bbeac5e601d2a335acffa2bf2da05284f0e3dd",
+ "head_unchanged_since_utc": "2026-10-01T06:51:59Z",
+ "worktree_clean": true,
+ "scripts": {
+  "experiments/repair/serve_probe.py": {
+   "sha256": "93d464066264846d77142e7929dfcca03cca41831a4773be37c86123525d19f9",
+   "git_blob": "82e8f9164be4b6ef59987a206c97324b9f16db99",
+   "modified_utc": "2026-10-01T03:28:33Z",
+   "same_blob_at": {}
+  },
+  "experiments/repair/runs/jacobi_probes.sh": {
+   "sha256": "603fb6ae9e6539daad348147a5477e7b63e5db773a62c0d3c8580976cf9a0c2f",
+   "git_blob": "a063b32f5f83078b5b92f7086fc985fe7b965de1",
+   "modified_utc": "2026-10-01T00:46:15Z",
+   "same_blob_at": {}
+  }
  },
  "runs": {
   "probe_b16": {
    "mode": "probe",
    "block": 16,
    "repo_sha": "17bbeac5e601d2a335acffa2bf2da05284f0e3dd",
-   "engine": "/home/ubuntu/sglang-wt/repair",
    "engine_sha": "5d8e00e3e121e980fa055c06f86e0845972cc712",
    "engine_dirty": false,
-   "requests": "/home/ubuntu/vp-data/repair/panel/checkpoints_probe_half.jsonl",
    "n_requests": 67,
    "max_new_tokens": 384,
    "probe_env": {
@@ -69,10 +83,8 @@
    "mode": "probe",
    "block": 32,
    "repo_sha": "17bbeac5e601d2a335acffa2bf2da05284f0e3dd",
-   "engine": "/home/ubuntu/sglang-wt/repair",
    "engine_sha": "5d8e00e3e121e980fa055c06f86e0845972cc712",
    "engine_dirty": false,
-   "requests": "/home/ubuntu/vp-data/repair/panel/checkpoints_probe_half.jsonl",
    "n_requests": 67,
    "max_new_tokens": 384,
    "probe_env": {
@@ -120,5 +132,7 @@
    "trace_sha256": "0f213c07fda52d4fe33c1c34dff4a6f18f8401629407e9b5f08fbfdddf9d3d0a"
   }
  },
- "repo_commit_note": "both runs recorded repo_sha 17bbeac; the run worktree (~/vp-wt/repair) was clean and its reflog shows HEAD at 17bbeac from 2026-10-01 06:51:59 UTC with no later entry; the engine worktree was clean at 5d8e00e3e1 (engine_dirty false)"
+ "inputs": {
+  "/home/ubuntu/vp-data/repair/panel/checkpoints_probe_half.jsonl": "5bb26409670cf3be159812c6003d3329781f04e5f7d575cfd50a51f4038b18b7"
+ }
 }

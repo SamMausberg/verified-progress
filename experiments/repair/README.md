@@ -35,5 +35,6 @@ probes need the repair patches `engine/sglang/patches/repair/` applied in an SGL
 | `p9_support_oracle.py` | P9's support oracle on the drafter's per-cycle candidate sets: upper bounds on what reuse could commit, at c = 1 (padded, measured-width and free verify) and at c > 1 | `p9_support_oracle.json`, `p9_support_oracle_c{8,16}{,_marginal}.json` |
 | `p9_program_cost.py` | GPU time of P9's fixed-shape reuse program (messages and greedy walk), eager and as a CUDA graph | `p9_program_cost.json` |
 | `p12_static_screen.py` | P12: a centre-plus-radius tile screen on the compiled last-FFN dictionary, with the winner's score known (an upper bound on skippable rows) | `p12_static_screen.json` |
+| `write_provenance.py` | Writes and checks the provenance record of a result that records no commit (or whose `run.json` stays outside git): run commit from the run worktree's reflog, script and input hashes | `p12_static_screen.provenance.json`, `jacobi_probe_provenance.json` |
 
-Tests: `tests/test_repair_stage_a.py` and `tests/test_repair_p9.py`.
+Tests: `tests/test_repair_stage_a.py`, `tests/test_repair_p9.py`, `tests/test_repair_nsys_kernels.py` and `tests/test_repair_provenance.py`.

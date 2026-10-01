@@ -1,36 +1,34 @@
 {
- "kind": "provenance of a measured result (written after the run from the run worktree and raw output)",
- "result": "evidence/repair/p12_static_screen.json",
- "result_sha256": "19f3a5beffbc32f96eb1fee2af23d398e35fc87b1c39e2251a2590c1ceb1bfc7",
- "raw_output": "~/vp-data/repair/p12/p12_static_screen.json (identical bytes)",
- "finished_utc": "2026-10-01T18:51:19Z (raw output mtime)",
- "lock": "scripts/gpu_lock.sh -s (shared), ticket arrival 1790839421898330706",
- "command": "experiments/repair/runs/p12_screen.sh",
+ "kind": "provenance of a measured result, written and checked by write_provenance.py",
+ "results": {
+  "evidence/repair/p12_static_screen.json": "19f3a5beffbc32f96eb1fee2af23d398e35fc87b1c39e2251a2590c1ceb1bfc7"
+ },
+ "raw_outputs": [
+  "/home/ubuntu/vp-data/repair/p12/p12_static_screen.json"
+ ],
+ "checked_against": "raw output written (run finished) 2026-10-01T18:51:19Z",
  "repo_commit": "a05df1dfe87c9792d4a1818501e4766fffe69bfc",
- "repo_commit_note": "local branch repair/p9, never pushed: the worktree reflog shows HEAD at this commit from 2026-10-01 10:04:30 UTC with no later entry, the worktree was clean, and both scripts were last modified at 08:28:51 UTC, before the run. Rerun from 694c0bc (the commit on main that added the scripts) or any later main commit with the same blobs.",
+ "head_unchanged_since_utc": "2026-10-01T10:04:30Z",
+ "worktree_clean": true,
  "scripts": {
   "experiments/repair/p12_static_screen.py": {
    "sha256": "7ca210679c10849c50bbca6e7655374212939cf2825958023c4bfb49a4939bbe",
    "git_blob": "938912752f1880e6e9070162ff235352384cad48",
+   "modified_utc": "2026-10-01T08:28:51Z",
    "same_blob_at": {
-    "694c0bc": true,
-    "d365673": true,
-    "origin/main": true
+    "694c0bc": true
    }
   },
   "experiments/repair/runs/p12_screen.sh": {
    "sha256": "c32c4c100e3a8752739551382410500b21067e07088b5a69384160e0b68c6621",
    "git_blob": "9c758efc151647ba748e8aca7425295a1582e6de",
+   "modified_utc": "2026-10-01T08:28:51Z",
    "same_blob_at": {
-    "694c0bc": true,
-    "d365673": true,
-    "origin/main": true
+    "694c0bc": true
    }
   }
  },
  "inputs": {
-  "~/vp-data/repair/panel/drafter_b16_outputs.jsonl": "679240063371673782ca0fe6b7eeeb241c36bef2f183030bda3dcd9dceaffec4"
- },
- "model": "Qwen/Qwen3.5-4B@851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a (Hugging Face, BF16 weights)",
- "hardware": "one NVIDIA GH200"
+  "/home/ubuntu/vp-data/repair/panel/drafter_b16_outputs.jsonl": "679240063371673782ca0fe6b7eeeb241c36bef2f183030bda3dcd9dceaffec4"
+ }
 }
