@@ -216,7 +216,8 @@ with this declaration):
   `b4b5b4e43b53f3c64083263113904868cccf23767aa0b3c5f1b45740c13130a6`.
 - Pools pinned identically in both arms (`p4_pools` lever): `--max-running-requests 128`,
   `--max-total-tokens 655360` (360,448 in the void first run, below), `--max-mamba-cache-size
-  128`; each server's resolved sizes are read from its log.
+  132` (128 in the two void attempts, below); each server's resolved sizes are read from its
+  log.
 - Validity (`validate_p4_ab.py`, before any ratio is computed): every arm ran the declared
   workload with the greedy request body, all 256 requests completed with AIPerf exit 0, the
   measured phase has at least 8 decode-log windows with exactly 128 requests running, the
@@ -259,6 +260,20 @@ with this declaration):
   synthetic inputs and cannot depend on a server's pools; the rerun stops unless the engine
   is still at c29a91692b and records the reuse in `p4b_<run id>.reused.json`. The server
   output probe and the A/B are rerun.
+- Second attempt void (run 20261001T104311Z, 10:43-10:47 UTC, repo 40064ea, engine
+  c29a91692b): the admission preflight stopped the job before the probe and the A/B. Both
+  arms peaked at 127 running in the profiling phase with the KV pool at 655,360 tokens (usage
+  0.40), so KV was not the limit. Its log shows the 128th request queued with
+  `mamba num: 127, mamba usage: 0.99`: prompts are admitted five at a time under chunked
+  prefill (8,192 tokens per pass), and the last admission found no schedulable mamba slot
+  while one of the 128 was free; bench's radix-off servers with 128 slots reached 128 because
+  their short prompts were all admitted in one pass. No results of this attempt are reported.
+- Mamba-slot amendment (2026-10-01 at 10:55 UTC, before any further run): the A/B arms pin
+  `--max-mamba-cache-size 132` (128 + 4 slots of headroom), identical in both arms, with
+  `--max-running-requests 128` and `--max-total-tokens 655360` unchanged;
+  `validate_p4_ab.py`'s pinned-pool constant reads 132 accordingly (no other validator
+  change). The admission preflight is run on its own first; the full job is queued only after
+  it shows 128 running in both arms.
 - Primary metric (amended on 2026-10-01 at 08:19 and 08:22 UTC, before the run started; the first
   version named bench's `logged_gen_tps_full_batch`, which averages windows with at least
   0.9 x the peak running count, i.e. 116-128 of 128): the server's decode rate at exactly
