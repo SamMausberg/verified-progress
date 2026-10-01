@@ -6,7 +6,7 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export SGLANG_WORKTREE="${SGLANG_WORKTREE:-$HOME/sglang-wt/drafter}"
 # shellcheck source=/dev/null
-source "$HOME/verified-progress/scripts/sglang_env.sh"
+source "$here/../../scripts/sglang_env.sh"
 out="${1:-$HOME/vp-data/drafter/trace}"
 SMOKE_DATA="${SMOKE_DATA-$HOME/vp-data/drafter/data/prompts-v1.jsonl}"
 shift || true

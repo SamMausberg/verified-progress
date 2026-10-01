@@ -1,0 +1,13 @@
+{
+  "ref": "/home/ubuntu/vp-data/drafter/phase-timing/stock/c8/requests.jsonl",
+  "test": "/home/ubuntu/vp-data/drafter/phase-timing/fold/c8/requests.jsonl",
+  "convention": "experiments/state_safety/compare.py (PR #37): tie, one_ulp, near (<=0.5 nats), large",
+  "requests": 66,
+  "sequences_diverged": 0,
+  "compared_tokens": 33792,
+  "divergences_per_1000_tokens": 0.0,
+  "classes": {},
+  "bitwise_identical_sequences": 0,
+  "first_logprob_difference": {},
+  "divergences": []
+}
