@@ -53,6 +53,8 @@ def build(config: str, args: argparse.Namespace) -> tuple[Any, list[str]]:
         # Verify graphs at hundreds of requests x draft tokens overflow the default
         # 384 MB FlashInfer workspace (bench: MTP s3 at 512 needed 670 MB).
         env['SGLANG_FLASHINFER_WORKSPACE_SIZE'] = str(1 << 30)
+    if args.stream_interval:
+        flags['stream-interval'] = args.stream_interval
     capacity = int(flags.get('max-running-requests') or 0)
     if capacity:
         points = [c for c in points if c <= capacity]
@@ -78,6 +80,10 @@ def build(config: str, args: argparse.Namespace) -> tuple[Any, list[str]]:
         '--waves', str(args.waves),
         '--repeats', str(args.repeats),
     ]  # fmt: skip
+    if args.workload:
+        argv += ['--workload', str(Path(args.workload).expanduser())]
+    if args.warmup_pool:
+        argv += ['--warmup-pool', str(Path(args.warmup_pool).expanduser())]
     return arm, argv
 
 
@@ -91,6 +97,11 @@ def main() -> None:
     parser.add_argument('--repeats', type=int, default=1)
     parser.add_argument('--capacity', type=int, default=0)
     parser.add_argument('--port', type=int, default=30070)
+    parser.add_argument(
+        '--stream-interval', type=int, default=0, help='server --stream-interval for every arm'
+    )
+    parser.add_argument('--workload', default=None, help='bench.sweep --workload')
+    parser.add_argument('--warmup-pool', default=None, help='bench.sweep --warmup-pool')
     args = parser.parse_args()
     import bench.server as bench_server
     import bench.sweep as bench_sweep

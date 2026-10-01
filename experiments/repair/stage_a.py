@@ -197,6 +197,12 @@ def main() -> None:
                 'S_b_ceiling_decode': B * cd / (ad * c_b_floor),
                 'S_b_ceiling_e2e': e2e(B * cd / (ad * c_b_floor)),
                 'S_b_ceiling_anchor_free_e2e': e2e(B * cd / (ad * (verify + commit))),
+                # How much cheaper the audit pass would have to be (e.g. a verifier without
+                # per-position state writes, its boundary replay uncharged) for the ceiling
+                # to reach the target.
+                'audit_saving_needed_for_target_us': (
+                    c_b_floor - B * cd / (ad * need_decode) if need_decode != float('inf') else None
+                ),
                 # Share of V(B) the per-position state writes would need to be for P3 to reach
                 # the target if both of its passes ran without per-position states (boundary
                 # replay, its cost not charged): 2 V (1 - s) + anchor write + commit = budget.

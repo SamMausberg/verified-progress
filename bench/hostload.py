@@ -37,9 +37,14 @@ CONTENTION_CORES = 2.0
 _TICK = os.sysconf('SC_CLK_TCK')
 
 
-def cpu_by_pid() -> dict[int, tuple[int, float]]:
-    """pid -> (parent pid, user+system CPU seconds so far), from /proc."""
-    table: dict[int, tuple[int, float]] = {}
+def cpu_by_pid() -> dict[int, tuple[int, float, float]]:
+    """pid -> (parent pid, own CPU seconds, CPU seconds of its reaped children).
+
+    When a process exits and its parent reaps it, the kernel adds its CPU time to
+    the parent's cutime/cstime, so (own + reaped children) summed over a process
+    tree is continuous across child exits.
+    """
+    table: dict[int, tuple[int, float, float]] = {}
     for entry in Path('/proc').iterdir():
         if not entry.name.isdigit():
             continue
@@ -47,9 +52,11 @@ def cpu_by_pid() -> dict[int, tuple[int, float]]:
             stat = (entry / 'stat').read_text()
         except OSError:
             continue
-        # After the command name: state ppid pgrp session ... utime(11) stime(12).
+        # After the command name: state ppid ... utime(11) stime(12) cutime(13) cstime(14).
         fields = stat.rsplit(')', 1)[-1].split()
-        table[int(entry.name)] = (int(fields[1]), (int(fields[11]) + int(fields[12])) / _TICK)
+        own = (int(fields[11]) + int(fields[12])) / _TICK
+        children = (int(fields[13]) + int(fields[14])) / _TICK
+        table[int(entry.name)] = (int(fields[1]), own, children)
     return table
 
 
@@ -60,10 +67,10 @@ def busy_cpu_seconds() -> float:
     return (sum(fields) - fields[3] - fields[4]) / _TICK
 
 
-def process_tree(root: int, table: dict[int, tuple[int, float]]) -> set[int]:
+def process_tree(root: int, table: dict[int, tuple[int, float, float]]) -> set[int]:
     """`root` and all of its descendants in `table`."""
     children: dict[int, list[int]] = {}
-    for pid, (ppid, _) in table.items():
+    for pid, (ppid, *_) in table.items():
         children.setdefault(ppid, []).append(pid)
     tree, frontier = {root}, [root]
     while frontier:
@@ -84,26 +91,35 @@ def title(pid: int) -> str:
 def sample(root: int, interval: float = 1.0) -> dict[str, Any]:
     """CPU cores used over `interval` s outside and inside the process tree of `root`.
 
-    Foreign load is the host's total busy CPU time (/proc/stat) minus the time of
-    the run's own processes, so processes that start and exit within the
-    interval (builds, hooks, compiles) are counted too. The per-process lists
-    only cover processes alive at both ends of the interval and are diagnostic.
+    Foreign load is the host's total busy CPU time (/proc/stat) minus the CPU time
+    of the run's own process tree, including its children reaped during the
+    interval, so short-lived foreign processes (builds, hooks, compiles) count as
+    foreign and short-lived processes of the run itself do not. The per-process
+    lists only cover processes alive at both ends and are diagnostic.
     """
     busy_before = busy_cpu_seconds()
     before = cpu_by_pid()
     time.sleep(interval)
     busy_after = busy_cpu_seconds()
     after = cpu_by_pid()
-    own = process_tree(root, after) | process_tree(root, before)
+    tree_before, tree_after = process_tree(root, before), process_tree(root, after)
+    own = tree_before | tree_after
+
+    def tree_cpu(table: dict[int, tuple[int, float, float]], tree: set[int]) -> float:
+        return sum(table[pid][1] + table[pid][2] for pid in tree if pid in table)
+
+    # Own CPU includes processes of the run that started or exited within the
+    # interval: their time is in a living ancestor's reaped-children counters.
+    own_cpu = max(0.0, tree_cpu(after, tree_after) - tree_cpu(before, tree_before))
     usage = {
         pid: max(0.0, (seconds - before[pid][1]) / interval)
-        for pid, (_, seconds) in after.items()
+        for pid, (_, seconds, _) in after.items()
         if pid in before
     }
     foreign = {pid: cores for pid, cores in usage.items() if pid not in own}
     mine = {pid: cores for pid, cores in usage.items() if pid in own}
     total = (busy_after - busy_before) / interval
-    foreign_total = max(0.0, total - sum(mine.values()))
+    foreign_total = max(0.0, total - own_cpu / interval)
 
     def top(items: dict[int, float], limit: int) -> list[dict[str, Any]]:
         ranked = sorted(items.items(), key=lambda item: -item[1])[:limit]
@@ -116,6 +132,7 @@ def sample(root: int, interval: float = 1.0) -> dict[str, Any]:
     return {
         'cores': round(foreign_total, 2),
         'host_busy_cores': round(total, 2),
+        'own_cores': round(own_cpu / interval, 2),
         'top': top(foreign, 5),
         'own': top(mine, 8),
     }

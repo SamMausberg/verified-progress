@@ -1,0 +1,62 @@
+From c29a91692b2f05365c186601c6c61a8e0eb5fc93 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Thu, 1 Oct 2026 03:17:11 +0000
+Subject: [PATCH 9/9] Exact replay: SGLANG_GDN_EXACT_REPLAY_BV selects the
+ value tile (default 32, as the packed decode)
+
+The value must be a positive power of two (tl.arange needs one, and 0 would divide by
+zero in the grid); anything else raises ValueError naming the variable.
+---
+ .../fla/fused_recurrent_exact_replay.py       | 22 ++++++++++++++++++-
+ 1 file changed, 21 insertions(+), 1 deletion(-)
+
+diff --git a/python/sglang/kernels/ops/attention/fla/fused_recurrent_exact_replay.py b/python/sglang/kernels/ops/attention/fla/fused_recurrent_exact_replay.py
+index 0d16d638fd..4dcc9de79f 100644
+--- a/python/sglang/kernels/ops/attention/fla/fused_recurrent_exact_replay.py
++++ b/python/sglang/kernels/ops/attention/fla/fused_recurrent_exact_replay.py
+@@ -30,6 +30,8 @@ ReplaySSM's, so the same pool plumbing drives it.
+ 
+ from __future__ import annotations
+ 
++import os
++from functools import lru_cache
+ from typing import Optional
+ 
+ import torch
+@@ -162,6 +164,21 @@ def gdn_exact_replay_decode_kernel(
+                 tl.store(ring_k + n_rec * K + o_k, b_k, mask=mask_k)
+ 
+ 
++@lru_cache(maxsize=None)
++def _value_tile_from_env() -> int:
++    """SGLANG_GDN_EXACT_REPLAY_BV: value-tile width, a positive power of two (default 32)."""
++    raw = os.environ.get("SGLANG_GDN_EXACT_REPLAY_BV", "32")
++    try:
++        bv = int(raw)
++    except ValueError:
++        bv = 0
++    if bv <= 0 or bv & (bv - 1):
++        raise ValueError(
++            f"SGLANG_GDN_EXACT_REPLAY_BV must be a positive power of two, got {raw!r}"
++        )
++    return bv
++
++
+ def fused_recurrent_gdn_exact_replay_decode(
+     mixed_qkv: torch.Tensor,
+     a: torch.Tensor,
+@@ -211,7 +228,10 @@ def fused_recurrent_gdn_exact_replay_decode(
+     BK = triton.next_power_of_2(K)
+     if BK != K:
+         raise ValueError("exact replay supports power-of-two K only (one K tile)")
+-    BV = min(triton.next_power_of_2(V), 32)
++    # The packed decode uses BV = 32; a narrower tile gives more programs (more latency
++    # hiding for the replay loop). Each row's K reduction is unchanged, but bit-equality
++    # with the packed decode must be re-checked for any other BV.
++    BV = min(triton.next_power_of_2(V), _value_tile_from_env())
+     grid = (triton.cdiv(V, BV), B * HV)
+     gdn_exact_replay_decode_kernel[grid](
+         mixed_qkv=mixed_qkv,
+-- 
+2.34.1
+

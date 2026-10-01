@@ -1,0 +1,21 @@
+{
+ "exact_output_words_differing": 0,
+ "exact_state_words_differing": 0,
+ "exact_output_max_abs": 0.0,
+ "exact_state_max_abs": 0.0,
+ "replayssm_output_max_abs": 0.00048828125,
+ "replayssm_output_words_differing": 465102,
+ "replayssm_state_max_rel_at_flush": 0.003837325144559145,
+ "replayssm_state_words_differing_at_flush": 12577813,
+ "state_words_compared": 201326592,
+ "output_words_compared": 1572864,
+ "batch": 8,
+ "steps": 48,
+ "ring_length": 4,
+ "forced_flush_rate": 0.1,
+ "layer": 0,
+ "seed": 0,
+ "bit_identical": true,
+ "gpu": "NVIDIA GH200 480GB",
+ "torch": "2.13.0+cu130"
+}

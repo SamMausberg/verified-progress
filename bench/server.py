@@ -273,7 +273,10 @@ def verify_launch(log_text: str, server_info: dict[str, Any], arm: Arm) -> list[
 
     algorithm = str(args.get('speculative-algorithm', '')).upper()
     if algorithm in ('NEXTN', 'EAGLE', 'EAGLE3'):
-        decode_keys = ['target verify', 'draft decode', 'draft extend']
+        # With one draft step the draft token comes from the draft-extend pass and
+        # there is no separate draft-decode graph.
+        steps = int(str(args.get('speculative-num-steps', 3)))
+        decode_keys = ['target verify', 'draft extend', *(['draft decode'] if steps > 1 else [])]
         prefill_keys = ['target prefill', 'draft prefill']
     elif arm.speculative:
         # Other drafters (DFLASH, ...) run one draft pass per block; require the

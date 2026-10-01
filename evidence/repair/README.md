@@ -56,12 +56,17 @@ pass only one read of the 8.41 GB of weights at the measured 3.83 TB/s read peak
 (`evidence/profiles/hbm_bandwidth.json`) plus the anchor cache at that rate, and the audit its
 measured V(B) + commit; with no anchor pass at all the two-pass design is S_a.
 
-- **P3 two-pass design: misses the pre-registered target at every width (refuted).** Even the
-  ceiling, which no implementation of a full anchor pass can beat, reaches 4.78x end to end at
-  B = 256. If both passes dropped the per-position states (a boundary-replay protocol whose
-  replay is not charged), P3 would reach the target at B = 256 only if those writes were at
-  least 50% of V(256); their bytes bound them at 9.6%. A measured no-state verify decides this
-  case (queued).
+- **P3 two-pass design: misses the pre-registered target at every width with SGLang's current
+  verifier (refuted for this verifier).** The ceiling charges the anchor pass one weight read
+  and the audit its measured V(B) + commit, and reaches 4.78x end to end at B = 256. That V(B)
+  includes the per-position FP32 state writes: an audit 2.33 ms cheaper (5.2% of V(256),
+  `audit_saving_needed_for_target_us`) would reach the target, and the writes' bytes bound them
+  at 4.29 ms (9.6%), so with a verifier that drops them and reconstructs only the accepted
+  boundary state at no charge the ceiling could reach 5.20x end to end. Such a verifier would
+  also make the DFlash baseline cheaper (16 per-position writes per cycle), so a fair rerun gives
+  both the same verifier. If both passes dropped the writes, the estimate (anchor pass = V(B)
+  without them) would need them to be at least 50% of V(256). The measured no-state verify
+  decides the ceiling case (queued). Stage B below refutes P3 independently of the verifier.
 - **P2 Arm A: 5x end to end only at B = 256 with zero drafting cost and every block accepted**
   (derived from measured V(B)): S_a = 5.01x end to end sits at the threshold; paying DFlash's
   own drafting cost at width B, perfect blocks reach 4.68x. Better drafting alone does not give
@@ -70,6 +75,81 @@ measured V(B) + commit; with no anchor pass at all the two-pass design is S_a.
   token, roughly five times what that token's GEMM work and 48 MiB per-position FP32 state
   write account for; the state commit is 0.11-0.14 ms at every width. Its decomposition
   (no-state verify, Nsight Systems at B = 64 and 256) is queued.
+
+### P3 Stage B: anchored residual evaluation on real DFlash blocks (block 16)
+
+`residual_eval_b16.json`, `residual_eval_b16.agree_by_distance.csv` (measured),
+`p3_gate_b16.json` (derived). Sam's critique (2026-09-30) names three claims that must hold
+separately: (1) fixed cheap operators stay accurate after candidate tokens change, (2) their
+errors stay below the decision margins after attention, nonlinearities, recurrence and later
+layers, (3) repair resolves enough positions at once to pay for the anchor, the sweeps and the
+audit. **Claim (1) fails first, and (2) and (3) fail with it.**
+
+Pre-registered criteria (Sam, 2026-09-30, P3 Stage B): "real DFlash proposals and real
+corrections (isolated and cascading), dev/held-out split, fixed bases fitted on dev only, full
+residual evaluator including full attention and GDN state; controls: full-target Jacobi from the
+same initialization, a comparable standalone compact drafter, and the initializer without
+repair. Key novelty ablation: does the anchored residual evaluator beat an ordinary compact
+drafter with the same storage and compute?", with the critique's required measurements: two
+cascading replays against the original anchor with R_i and actual disagreements, acceptance via
+hazards and prefix advance per sweep, a few exact Jacobi sweeps, and the economic gate
+mu_R / C_R > mu_0 / C_0 against tuned DFlash.
+
+Setup: the Hugging Face Qwen3.5-4B target (BF16, pinned revision) run block by block from an
+exact prefix cache; its argmax agrees with the engine's verify argmax on 99.1% of the
+development blocks' positions. Every linear operator (GDN in_proj and out_proj, attention
+q/k/v/o, MLP gate/up/down, tied head) is repaired as z-bar + (W U) U^T (x - x-bar) against the
+anchor pass over the DFlash draft y0, with all nonlinearities, the convolution, the GDN
+recurrence from the exact state and attention over the exact prefix run exactly. Bases are the
+leading principal components of the exact input changes of each operator on 120 development
+blocks (even-indexed requests); 80 held-out blocks come from odd-indexed requests. Blocks are
+real DFlash drafts with a rejection from the drafter workstream's shared trace. Two cascading
+replays against the original anchor: y1 = F(y0) and y2 = F(y1), both exact Jacobi iterates.
+
+- (1) Operator accuracy: on held-out exact changes the median relative error
+  ||W (I - U U^T) dx|| / ||W dx||, measured for the first projection that reads each operator
+  input (GDN in_proj_qkv or attention q_proj, out_proj or o_proj, gate_proj, down_proj, and the
+  head; the z, a, b, k, v and up projections share those inputs and bases but their own W is not
+  scored), is 0.76-0.90 at rank 16, 0.64-0.81 at rank 128 and 0.51-0.73 at rank 512 (by operator
+  class); on the development blocks themselves
+  rank 128 captures a median 51-64% of the change energy. The changes caused by token
+  corrections are not confined to a small fixed subspace.
+- (2) Decisions: on replay 1 the repaired argmax equals the exact argmax at 35% of the changed
+  positions with rank 0 (anchor outputs reused unchanged), 37% at rank 128 and 44% at rank 512;
+  at the corrected position itself 11-14%; on replay 2, 24-35%. The certificate ratio
+  R_i = 2 ||z~ - z||_inf / m_i is below 1 at 4.7% of positions (43 of 962), the same 43 positions
+  at every rank including rank 0: positions whose exact top-two margin is large (median 12
+  logits, against 1.3 over all replayed positions), where even reusing the anchor logits stays
+  within half the margin. These certificates are not earned by the repair; the median R_i is
+  13-16. Positions before the first change agree exactly in every block (harness check). The
+  corrected position's decision is right in 9 of 80 blocks at ranks 0-256 and 11 at rank 512.
+- (3) Progress: free-running repair from y1, audited exactly after every sweep, accepts 4.33
+  drafts after 0 sweeps and 4.33-4.44 after 4 sweeps at every rank, while exact Jacobi from the
+  same anchor accepts 2.98 (y0), 4.33, 5.35, 6.38, 7.34 and 8.30 after 0-5 exact passes: about one
+  token per exact sweep, which also bounds any faithful cheap evaluator.
+- Economic gate (Sam's mu_R / C_R > mu_0 / C_0 against DFlash-16; repair cost a bytes-only lower
+  bound, audit = measured V(16) + commit): the anchored evaluator reaches at most 0.28 of
+  DFlash's committed tokens per unit cost at any rank and sweep count. The faithful-evaluator
+  reference (exact Jacobi, rows `exact_jacobi_faithful_reference`, sweeps charged only the bytes
+  of reading the anchor cache and the GDN state) reaches 0.27, 0.47, 0.66, 0.85 and 1.03 after 0-4
+  sweeps, so even a faithful cheap evaluator, one that reproduces the target's sweep exactly at
+  that cost, would at best match DFlash after four sweeps. A non-faithful map could in principle
+  jump ahead, as consistency-trained models do, but that would be better drafting rather than
+  repair, and this evaluator does not. The rigorous bound (audit cost over the most tokens an attempt can add) does not reject
+  at B = 16; the measured progress does.
+- Controls: full-target Jacobi from the same initialization and the initializer without repair
+  (rank 0, anchor outputs reused) were run; the standalone compact drafter control and the novelty
+  ablation against it were not. They are unnecessary here: the evaluator's best case gains 0.11
+  accepted drafts over no repair in four sweeps, so there is no gain for a compact drafter with
+  the same storage and compute to explain.
+
+```sh
+scripts/gpu_lock.sh -s experiments/repair/runs/residual_b16.sh   # raw output in ~/vp-data/repair/residual/b16
+python experiments/repair/summarize_residual.py ~/vp-data/repair/residual/b16 \
+    --out evidence/repair/residual_eval_b16.json
+python experiments/repair/p3_gate.py --stage-a evidence/repair/stage_a_oracle.json \
+    --residual evidence/repair/residual_eval_b16.json --read-tbps 3.827 --out evidence/repair/p3_gate_b16.json
+```
 
 ### P2 Arm B (one step): recycling the target's suffix predictions
 

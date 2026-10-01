@@ -6,7 +6,30 @@
 % evidence/head_geometry/rho_dflash4b_quantiles.csv; the MTP-4B markers are the p10,
 % median and p90 of evidence/head_geometry/transport_mtp4b.json,
 % headline/dnorm2_over_htnorm2 (0.7666, 0.9541, 1.1756).
-\begin{tikzpicture}[x=0.0335cm,y=0.0335cm,font=\footnotesize]
+% Both panels are one picture: (b)'s plot area is centred on y = 0, (a)'s drawing is shifted
+% so that its vertical centre is also at y = 0, and (a)'s title is set on the same top line
+% and with the same font, text height and depth as (b)'s.
+\begin{tikzpicture}[font=\footnotesize,
+  paneltitle/.style={font=\footnotesize,text height=1.6ex,text depth=.4ex,inner sep=2pt}]
+% ---------------- (b) measured drift against the thresholds ----------------
+\begin{semilogxaxis}[name=b,at={(11.2cm,0)},anchor=center,
+  width=8.7cm,height=4.7cm,xmin=2e-3,xmax=1.6,ymin=0,ymax=1,
+  xlabel={Drift ratio $\rho$ of a pair, or per-row threshold $\delta^\ast_i$},ylabel={Cumulative share},grid=major,
+  title={(b) Measured drift against the thresholds},title style={paneltitle},xminorticks=false,
+  legend style={at={(0.5,-0.36)},anchor=north,legend columns=3,
+    /tikz/every even column/.append style={column sep=5pt}}]
+\addplot[thick,teal,dashed] table[x=threshold_int8_row,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};\addlegendentry{$\delta^\ast_i$, int8 per row}
+\addplot[thick,teal,densely dotted] table[x=threshold_int8_g128,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};\addlegendentry{$\delta^\ast_i$, int8 128 cols}
+\addplot[thick,ochre,dashdotted] table[x=threshold_int4_row,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};\addlegendentry{$\delta^\ast_i$, int4 per row}
+\addplot[very thick,ink] table[x=rho_all,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};\addlegendentry{$\rho$, DFlash-4B pairs}
+\addplot[only marks,mark=triangle*,mark size=2.6pt,brick] coordinates {(0.7666151341559915,0.1) (0.954136519993249,0.5) (1.1756316575526062,0.9)};\addlegendentry{$\rho$, MTP-4B p10, 50, 90}
+\draw[{Stealth[length=1.6mm]}-{Stealth[length=1.6mm]},muted] (axis cs:0.0095,0.5) -- (axis cs:0.84,0.5);
+\node[font=\scriptsize,text=ink,fill=white,inner sep=1pt] at (axis cs:0.037,0.5) {medians $\approx100\times$ apart};
+\end{semilogxaxis}
+% ---------------- (a) median DFlash-4B head inputs, to scale ----------------
+% The drawing spans y from -40 to 75 units (callout text to the rescaling note); its middle,
+% y = 17.5 units, is placed at y = 0, the centre of (b)'s plot area.
+\begin{scope}[x=0.032cm,y=0.032cm,shift={(0,-17.5)}]
 \pgfmathsetmacro{\Lt}{159.2}
 \pgfmathsetmacro{\Ld}{50.596}
 \pgfmathsetmacro{\Cth}{0.408}
@@ -15,8 +38,7 @@
 \coordinate (T) at (\Lt,0);
 \coordinate (D) at ({\Ld*\Cth},{\Ld*\Sth});
 \coordinate (F) at ({\Lt*\Cth*\Cth},{\Lt*\Cth*\Sth});
-\path[use as bounding box] (-40,-40) rectangle (176,104);
-\node[anchor=north,font=\footnotesize] at (68,104) {(a) Median DFlash-4B head inputs, to scale};
+\coordinate (amid) at (68,0);
 % the line through h^d and the foot of the perpendicular from h^t (best rescaling of h^d)
 \draw[muted,densely dotted] (O) -- ($(O)!1.18!(F)$);
 \draw[muted,densely dotted] (T) -- (F);
@@ -33,21 +55,9 @@
 % the ball inside which transport would beat int8: radius 0.00854*159.2 = 1.36 units, to scale
 \fill[ochre] (T) circle[radius={0.00854*\Lt}];
 \draw[ochre,thin] (T) circle[radius=2.6pt];
-\draw[ochre,thin] (T) -- (152,-14);
-\node[note,text=ochre,anchor=north,align=center] at (150,-14) {transport beats int8 only\\inside the dot in this circle:\\radius $0.0085\norm{h^t}_2$};
-\end{tikzpicture}\hfill
-\begin{tikzpicture}
-\begin{semilogxaxis}[width=8.9cm,height=4.7cm,xmin=2e-3,xmax=1.6,ymin=0,ymax=1,
-  xlabel={Drift ratio $\rho$ of a pair, or per-row threshold $\delta^\ast_i$},ylabel={Cumulative share},grid=major,
-  title={(b) Measured drift against the thresholds},xminorticks=false,
-  legend style={at={(0.5,-0.36)},anchor=north,legend columns=3,
-    /tikz/every even column/.append style={column sep=5pt}}]
-\addplot[thick,teal,dashed] table[x=threshold_int8_row,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};\addlegendentry{$\delta^\ast_i$, int8 per row}
-\addplot[thick,teal,densely dotted] table[x=threshold_int8_g128,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};\addlegendentry{$\delta^\ast_i$, int8 128 cols}
-\addplot[thick,ochre,dashdotted] table[x=threshold_int4_row,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};\addlegendentry{$\delta^\ast_i$, int4 per row}
-\addplot[very thick,ink] table[x=rho_all,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};\addlegendentry{$\rho$, DFlash-4B pairs}
-\addplot[only marks,mark=triangle*,mark size=2.6pt,brick] coordinates {(0.7666151341559915,0.1) (0.954136519993249,0.5) (1.1756316575526062,0.9)};\addlegendentry{$\rho$, MTP-4B p10, 50, 90}
-\draw[{Stealth[length=1.6mm]}-{Stealth[length=1.6mm]},muted] (axis cs:0.0095,0.5) -- (axis cs:0.84,0.5);
-\node[font=\scriptsize,text=ink,fill=white,inner sep=1pt] at (axis cs:0.037,0.5) {medians $\approx100\times$ apart};
-\end{semilogxaxis}
+\draw[ochre,thin] (T) -- (148,-14);
+\node[note,text=ochre,anchor=north,align=center] at (146,-14) {transport beats int8 only\\inside the dot in this circle:\\radius $0.0085\norm{h^t}_2$};
+\end{scope}
+% (a)'s title on (b)'s title line
+\node[paneltitle,anchor=north] at (amid |- b.outer north) {(a) Median DFlash-4B head inputs, to scale};
 \end{tikzpicture}

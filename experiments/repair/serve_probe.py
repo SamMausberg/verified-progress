@@ -36,7 +36,6 @@ import os
 import signal
 import subprocess
 import sys
-import threading
 import time
 import urllib.error
 import urllib.request
@@ -50,7 +49,7 @@ DRAFT_REVISION = '9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf'
 HOME = Path.home()
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
-from bench.server import foreign_cpu, wait_for_quiet_cpu
+from bench.hostload import HostLoadSampler, wait_for_quiet
 
 ENGINE_WORKTREE = HOME / 'sglang-wt' / 'repair'
 
@@ -81,45 +80,6 @@ def http_json(url: str, payload: Any = None, timeout: float = 30.0) -> Any:
     req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode())
-
-
-class CpuWatch:
-    """Sample CPU use by processes outside this run's sessions while requests are served."""
-
-    def __init__(self, own_sessions: set[int], period_s: float = 5.0):
-        self.own = own_sessions
-        self.period = period_s
-        self.samples: list[float] = []
-        self.top: list[dict[str, Any]] = []
-        self._stop = threading.Event()
-        self._thread = threading.Thread(target=self._run, daemon=True)
-
-    def _run(self) -> None:
-        while not self._stop.is_set():
-            sample = foreign_cpu(self.own, interval=2.0)
-            self.samples.append(sample['cores'])
-            if sample['cores'] > 2.0:
-                self.top.append(sample)
-            self._stop.wait(self.period)
-
-    def __enter__(self) -> CpuWatch:
-        self._thread.start()
-        return self
-
-    def __exit__(self, *exc: object) -> None:
-        self._stop.set()
-        self._thread.join(timeout=30)
-
-    def summary(self) -> dict[str, Any]:
-        n = len(self.samples)
-        mean = sum(self.samples) / n if n else None
-        return {
-            'samples': n,
-            'mean_cores': mean,
-            'max_cores': max(self.samples) if n else None,
-            'contaminated': bool(mean is not None and mean > 2.0),
-            'busy_samples_top': self.top[:5],
-        }
 
 
 @contextlib.contextmanager
@@ -437,12 +397,10 @@ def main() -> int:
             stream_generate(
                 base, request['input_ids'], min(args.max_new_tokens, 256), args.ignore_eos
             )
-        own = {os.getsid(0), proc.pid}
-        # Timed runs wait (up to 10 min) for other jobs' CPU use to fall below 2 cores.
+        # Timed runs wait (up to 10 min) for other jobs' CPU use to fall below 2 cores; the load
+        # of everything outside this process tree (the server included) is sampled at 1 Hz.
         quiet_wait = 600 if args.timing else 0
-        run_info['foreign_cpu_before'] = wait_for_quiet_cpu(
-            own, max_cores=2.0, max_wait_s=quiet_wait
-        )
+        run_info['foreign_cpu_before'] = wait_for_quiet(max_cores=2.0, max_wait_s=quiet_wait)
         if args.nsys is not None:
             subprocess.run(
                 [
@@ -457,7 +415,7 @@ def main() -> int:
                 ],
                 check=True,
             )
-        watch = CpuWatch(own)
+        watch = HostLoadSampler()
         with watch, open(out / 'results.jsonl', 'w') as results:
             for request in requests:
                 gen = generate_with_logprobs if args.logprobs else stream_generate
