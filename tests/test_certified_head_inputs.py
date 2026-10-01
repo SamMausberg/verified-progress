@@ -98,7 +98,14 @@ def test_sampled_rows_need_a_finite_positive_temperature(monkeypatch: pytest.Mon
     monkeypatch.setattr(head, '_certifiable', lambda _m: True)
     for stage in ('_approximate', '_refine'):
         monkeypatch.setattr(head, stage, lambda *_a: None)
-    monkeypatch.setattr(head, '_decide', lambda m: head._status[:m].zero_())
+
+    def decide(m: int) -> None:  # every row decided, its winner at the row's top
+        head._status[:m].zero_()
+        head._count[:m] = 1
+        head._ymax[:m] = 0.0
+        head._rlo64[:m, 0] = 0.0
+
+    monkeypatch.setattr(head, '_decide', decide)
     h = torch.zeros(6, 256, dtype=torch.bfloat16)
     seeds = torch.arange(6, dtype=torch.int64)
     temps = torch.tensor([0.7, -0.7, 0.0, float('inf'), float('nan'), 1.0])
@@ -124,3 +131,42 @@ def test_column_fallback_needs_the_bf16_reference(reference: Reference) -> None:
     with pytest.raises(ValueError, match="reference='bf16' only"):
         head.enable_column_fallback([1, 8])
     assert head.fallback_mode == 'batch'
+
+
+def test_a_sampled_winner_that_might_have_zero_probability_falls_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A token whose stock probability rounds to zero has score -inf, but its lower
+    bound stays finite; if the top token's noise is the clamped -709.8 (hash 0), such
+    a token can hold the best lower bound and would be certified although stock never
+    returns it. A winner whose lower bound is at most ymax - 64 must fall back. The
+    kernel stages are stubbed with the buffers such a call leaves."""
+    gen = torch.Generator().manual_seed(3)
+    w = (torch.randn(64, 256, generator=gen) * 0.02).to(torch.bfloat16)
+    head = CertifiedHead.from_quantized(
+        w, build_quantized_head(w), device='cpu', max_batch=8, capacity=16
+    )
+    ymax = 40.0
+    # Row 0: the winner's lower bound sits 70 below ymax (a zero-probability token
+    # carrying the largest noise); row 1: an ordinary winner; row 2: just inside the
+    # gap (head.ZERO_PROBABILITY_GAP = 64); row 3: just outside it.
+    best = [ymax - 70.0, ymax - 1.5, ymax - 64.0, ymax - 63.9]
+
+    def decide(m: int) -> None:
+        head._status[:m].zero_()
+        head._count[:m] = 2
+        head._ymax[:m] = ymax
+        head._rlo64[:m, 0] = torch.tensor(best, dtype=torch.float64)
+        head._rlo64[:m, 1] = torch.tensor(best, dtype=torch.float64) - 5.0
+        head._rlo64[:m, 2:] = 1e9  # beyond the count: must be ignored
+
+    monkeypatch.setattr(head, '_certifiable', lambda _m: True)
+    for stage in ('_approximate', '_refine'):
+        monkeypatch.setattr(head, stage, lambda *_a: None)
+    monkeypatch.setattr(head, '_decide', decide)
+    h = torch.zeros(4, 256, dtype=torch.bfloat16)
+    seeds = torch.arange(4, dtype=torch.int64)
+    _, stats = head.gumbel_sample(h, seeds, seeds, torch.full((4,), 0.7), fallback=False)
+    assert stats.fallback.tolist() == [True, False, True, False]
+    assert bool(head._any)
+    assert bool((stats.status[stats.fallback] == STATUS_BITS['zero_probability']).all())

@@ -249,7 +249,10 @@ def stock_score_bounds(z_lo, z_hi, t, zmax, ymax, g):
     ``m``) can round up by a factor 2, so its upper bound gets one more unit.
     ``2^-30`` covers the FP64 addition of ``g`` and any last-bit difference in
     ``g`` between kernels. Returns FP64 ``(lo, hi)`` enclosing ``x_i`` minus the
-    common shift, and ``y_hi``.
+    common shift, and ``y_hi``, with one exception: a probability that rounds to
+    zero (``y_i`` more than 87.3 below ``m``) makes the stock score ``-inf``, below
+    the finite ``lo``. ``CertifiedHead.gumbel_sample`` therefore refuses a winner
+    that might be such a token (``ZERO_PROBABILITY_GAP``); ``hi`` stays valid.
     """
     y_lo = tl.math.div_rn(z_lo, t).to(tl.float64)
     y_hi = tl.math.div_rn(z_hi, t).to(tl.float64)

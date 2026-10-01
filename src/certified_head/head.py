@@ -63,9 +63,22 @@ STATUS_BITS = {
     'refused': K.STATUS_REFUSED.value,
     'probe': K.STATUS_PROBE.value,
     'temperature': 256,
+    'zero_probability': 512,
 }
-"""Status bits. ``temperature`` is set on the host side (device ops, no kernel): a
-sampled row whose temperature is not finite and positive takes the stock path."""
+"""Status bits. ``temperature`` and ``zero_probability`` are set on the host side
+(device ops, no kernel): a sampled row whose temperature is not finite and
+positive, or whose winner might have a zero stock probability, takes the stock
+path."""
+
+ZERO_PROBABILITY_GAP = 64.0
+"""A sampled winner whose score lower bound is at most ``ymax - 64`` might have a
+zero stock probability, and is not certified. Stock's FP32 softmax rounds a
+probability to zero only if ``expf(y - m)`` is subnormal (a normal ``expf`` divided
+by ``S < 2^19`` is at least ``2^-145``), so only if ``y < m - 87.33``; its score is
+then ``log 0 = -inf``, while ``stock_score_bounds`` keeps a finite lower bound
+``lo <= y + g``. Gumbel noise is at most ``32 ln 2 = 22.18``, so such a token has
+``lo < m - 65.1 <= ymax - 65.1``. The lower bound matters only for the winner:
+every other token is excluded through its upper bound, which stays valid."""
 
 Fallback = Literal['batch', 'columns']
 """How undecided greedy rows are completed.
@@ -1040,10 +1053,11 @@ class CertifiedHead:
                 self._decide(m)
         finally:
             self._sampling = None
-        # Device ops only, so the guard is graph-safe and needs no host sync.
+        # Device ops only, so the guards are graph-safe and need no host sync.
         bad_t = ~(torch.isfinite(temperatures) & (temperatures > 0))
         self._status[:m].bitwise_or_(bad_t.to(torch.int32) * STATUS_BITS['temperature'])
         self._any.logical_or_(bad_t.any())
+        self._zero_probability_guard(m)
         ids = self._ids[:m]
         stats = HeadStats(self._count[:m], self._status[:m])
         if fallback:
@@ -1054,6 +1068,17 @@ class CertifiedHead:
             elif bool(self._any.item()):
                 self._merge(ids, m, stock_seeded_sample(*args))
         return ids, stats
+
+    def _zero_probability_guard(self, m: int) -> None:
+        """Send a sampled row to the stock chain if its winner might have a zero
+        stock probability (see :data:`ZERO_PROBABILITY_GAP`): its finite lower
+        bound would then not bound the stock score, ``-inf``."""
+        rows = self._rlo64[:m]
+        valid = torch.arange(rows.shape[1], device=rows.device)[None, :] < self._count[:m, None]
+        best = torch.where(valid, rows, float('-inf')).amax(dim=1)
+        phantom = best <= self._ymax[:m].to(torch.float64) - ZERO_PROBABILITY_GAP
+        self._status[:m].bitwise_or_(phantom.to(torch.int32) * STATUS_BITS['zero_probability'])
+        self._any.logical_or_(phantom.any())
 
     def _merge_fallback(
         self, hidden: torch.Tensor, ids: torch.Tensor, m: int, cols: bool = False

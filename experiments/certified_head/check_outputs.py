@@ -34,8 +34,8 @@ def errors_in(obj: Any, path: str = '') -> list[str]:
     return found
 
 
-MIN_TESTS = 156
-"""Tests the tests step must pass: 121 GPU and 35 CPU tests when this check was
+MIN_TESTS = 157
+"""Tests the tests step must pass: 121 GPU and 36 CPU tests when this check was
 added (x8s2 ran 145, before the later CPU tests). Raise it when tests are added,
 so that a test file dropped from the step shows as a shortfall."""
 
