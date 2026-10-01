@@ -148,17 +148,28 @@ verdict restated. The Triton figures carry that README's pending-exactness label
 verify kernel.
 
 Measured on the block-16 panel-v1 trace (`support/zlab_b16_panel_v1_survival.csv`), DFlash's
-conditional acceptance by position is 0.80 to 0.91 (mean 0.889 over positions 5-15), and the
-top-16 support bound U_16 (the target's token is among the drafter's top-16 candidates at every
-position so far) is 0.99 at position 1 and 0.91 to 0.92 from position 4 on (mean 0.914 over
-positions 5-15). So the miss rate per position must fall from about 11% to 0.15% (B = 64) or
-0.6% (B = 256). The frozen candidate sets alone miss the target's token at about 8.6% of
-positions once the first few are past, so no selector over them (P6) comes close: a hypothetical
-drafter holding U_16's tail rate of 0.914 at every position would commit 11.6 tokens per cycle
-at B = 64 and 11.7 at B = 256, against 61 and 132 needed. The gap is in what the drafter
-proposes, not in which of its candidates is picked.
+conditional acceptance by position is 0.80 to 0.91 (mean 0.889 over positions 5-15). For a
+drafter with the same rate at every position, the miss rate per position would have to fall from
+about 11% to 0.15% (B = 64) or 0.6% (B = 256).
+
+What this says about selection over the drafter's candidates (P6) is narrower. At the anchors the
+stock block-16 trajectory visited, the top-16 support bound U_16 (the target's token is among the
+drafter's top-16 candidates at every position so far) is 0.99 at position 1 and 0.91 to 0.92 from
+position 4 on (mean 0.914 over positions 5-15): there, the candidate sets miss the target's token
+at about 8.6% of positions after the first few, whatever picks among them. Two limits apply.
+Greedy verification commits the target's own tokens, so a different selector changes where
+cycles start, not the text, but those anchors are a different sample of positions and U_16 has
+not been measured on them. And the block-16 drafter proposes 15 tokens; a selector over a
+wide-block drafter's candidates has no measured support at all. As an illustration only, a
+hypothetical drafter holding 0.914 at every position would commit 11.6 tokens per cycle at
+B = 64 and 11.7 at B = 256, against 61 and 132 needed. On the stock trajectory, the shortfall is
+in the candidates the drafter proposes rather than in the choice among them; whether that holds
+on a selector's own anchors or for wide blocks is not established here.
 
     python experiments/drafter/drafting_requirement.py --out evidence/drafter/drafting_requirement.json
+
+`repo_commit` in the JSON is the commit the generator ran at; a rerun from a later commit
+changes only that field, and `sha256` pins the generator and its three inputs.
 
 ## Card-reproduction gate (MT-Bench)
 

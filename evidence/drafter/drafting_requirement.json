@@ -1,6 +1,12 @@
 {
  "kind": "derived from committed measurements (no new runs)",
- "repo_commit": "aa773bc9b20e01974b30422194164a5bc256f78d",
+ "repo_commit": "5c664e8732d114efea861a2bc36711dfb582d444",
+ "sha256": {
+  "experiments/drafter/drafting_requirement.py": "1b19d048a983c2b4493d102a9d302eb55504198f6ad6a4827244196a23a8b4c2",
+  "evidence/repair/stage_a_oracle.json": "5da7e63cf3595528920ff084e81c1a22620addf843c5d9be4ebf615619d8395d",
+  "evidence/repair/stage_a_oracle_triton.json": "48d176ef3f94043a577f4791896b298d09e3a6005d7f2b2b4b3e38371c73b06c",
+  "evidence/drafter/support/zlab_b16_panel_v1_survival.csv": "fc7a3a83f58a7034346bca3fed1f63f0052f687fd50b234da13006a19478b613"
+ },
  "target_e2e": 5.0,
  "verifiers": {
   "flashinfer": {
