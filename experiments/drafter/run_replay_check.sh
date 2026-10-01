@@ -3,7 +3,9 @@
 # panel-v2, block 16, greedy, top-5 logprobs, concurrency 1 and 8, same engine
 # build (patches drafter/0001-0003). Arms: stock (off), the compact circular replay
 # (--enable-linear-replayssm-spec, patch 0002) and fold-every-commit
-# (+ SGLANG_GDN_REPLAYSSM_FOLD=1, patch 0003).
+# (+ SGLANG_GDN_REPLAYSSM_FOLD=1, patch 0003). At concurrency 8 a second stock
+# run (off2, last) measures how often stock differs from itself when batch
+# composition changes between runs.
 # Correctness only (shared slot):
 #   scripts/gpu_lock.sh -s experiments/drafter/run_replay_check.sh [OUT]
 set -euo pipefail
@@ -13,13 +15,15 @@ export SGLANG_WORKTREE="${SGLANG_WORKTREE:-$HOME/sglang-wt/drafter}"
 source "$here/../../scripts/sglang_env.sh"
 out="${1:-$HOME/vp-data/drafter/replay-check}"
 for conc in 1 8; do
-  for arm in off circular fold; do
+  arms=(off circular fold)
+  if [ "$conc" = 8 ]; then arms+=(off2); fi
+  for arm in "${arms[@]}"; do
     # Both buffered arms and the stock arm use the Triton GDN decode/verify
     # backend (bench's shared default; buffered verify refuses
     # --linear-attn-decode-backend flashinfer).
     extra="--linear-attn-decode-backend triton"
     env=()
-    if [ "$arm" != off ]; then extra="$extra --enable-linear-replayssm-spec"; fi
+    case "$arm" in circular | fold) extra="$extra --enable-linear-replayssm-spec" ;; esac
     if [ "$arm" = fold ]; then env=(--env SGLANG_GDN_REPLAYSSM_FOLD=1); fi
     python "$here/serve_run.py" --arm dflash --block 16 --port 30086 --out "$out/c$conc-$arm" \
       --mem 0.25 --max-running 8 --extra="$extra" "${env[@]}" \
@@ -27,7 +31,7 @@ for conc in 1 8; do
         --per-domain 32 --max-new-tokens 2048 --concurrency $conc --logprobs \
         --label c$conc-$arm --out {out}"
   done
-  for arm in circular fold; do
+  for arm in "${arms[@]:1}"; do
     python "$here/compare_outputs.py" --ref "$out/c$conc-off/requests.jsonl" \
       --test "$out/c$conc-$arm/requests.jsonl" --out "$out/c$conc-$arm-equality.json"
   done
