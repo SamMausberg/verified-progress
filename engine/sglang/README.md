@@ -129,7 +129,7 @@ setting the variable reproduces).
 | `SGLANG_STATE_TAP_PERTURB` | 0001 | module whose output gets a one-ulp change (positive control) |
 | `SGLANG_STATE_VERIFY_FIXED_SPLIT` | 0002 | `1`: fixed KV split in the verify plan under deterministic inference |
 
-## kernel (`patches/kernel/0001-0007`, branch `engine/kernel`)
+## kernel (`patches/kernel/0001-0008`, branch `engine/kernel`)
 
 The certified LM head (`src/certified_head/`, PR #45) on SGLang's head paths. The
 engine imports the package from `SGLANG_CERTIFIED_HEAD_SRC`; it is not copied into
@@ -159,6 +159,7 @@ deterministic inference) run the stock head.
 | 0005 | Records the row counts of certified steps in the stats file. | unchanged unless `_STATS` is set |
 | 0006 | With `--enable-deterministic-inference` the head's stock GEMM is SGLang's batch-invariant `matmul_persistent` (DeepGEMM's BF16 GEMM at the pin's defaults, a Triton kernel as fallback), not cuBLAS; `SGLANG_CERTIFIED_HEAD_MODEL=hopper-wgmma` (derived for cuBLAS) then keeps the stock head with a warning. | unchanged unless set |
 | 0007 | The MTP draft and DFlash draft paths also write their counters after each graph replay (before, only the next replay's gate read them, so the last replay was never written). | unchanged unless `_STATS` is set |
+| 0008 | In check mode the counters are written again after the sampled-verify comparison with SGLang's seeded sampler, which runs after the replay's own write, so a mismatch on the last replay is recorded. | unchanged unless `_STATS` and `_CHECK` are set |
 
 Validation: `experiments/certified_head/engine_validate.sh` (check mode per path and
 one request at a time against the stock server; results in

@@ -191,9 +191,15 @@ commit 7f8079f; `tma_candidates.json`, `tma_candidates.py`, commit 4a54503):
   In these minimal kernels the fault therefore needs the int8 operand, a 64-byte
   TMA box and the BF16 conversion together; the second fault below shows that a
   128-byte box is not enough to rule a TMA tile out. The host descriptors are standard (`TensorDescriptor` over
-  int8 `[V, K]`, strides `[K, 1]`, block `[block_v, block_k]`); whether a
-  descriptor constraint is violated or the fault lies in the generated code is not
-  established.
+  int8 `[V, K]`, strides `[K, 1]`, block `[block_v, block_k]`). The follow-up
+  investigation in [`../triton_tma/README.md`](../triton_tma/README.md) places
+  the 64-byte fault in the toolchain: across seven builds, this kernel was clean
+  only with both Triton 3.8.0 or newer and `ptxas` 13.3 or newer, either alone
+  still failing. That pattern matches the closed triton-lang/triton#9433, a
+  hazard on a register-operand `wgmma` whose fix has a Triton half (3.8.0) and a
+  `ptxas` half (CUDA 13.3); the SASS was not inspected, so the attribution rests
+  on the version pattern. The SGLang environment here uses Triton 3.7.1, so the
+  64-byte refusal stays.
 - In the pass itself, which variant is wrong depends on the compiled epilogue:
   at TMA 128x64x64 the raw product (epilogue 0) was wrong by up to 2.4 (about twice
   the envelope's half-width) while the envelope epilogues happened to enclose. The
@@ -279,7 +285,8 @@ varies between identical runs points to a race; that is not established.
 `tma_m128_neighbourhood.json` checks all 32 of its neighbours (block_v 64 and
 128, block_m 64 and 128, 4 and 8 warps, 3 and 4 stages, TMA and pointer loads)
 at M = 128 and 256.
-Neither fault's mechanism is known, so the defaults' clean record (the checks
+Neither fault's mechanism is established (the first matches a known Triton
+hazard by version pattern only, above), so the defaults' clean record (the checks
 above, the self-test at every batch size, 0 differing rows in the SGLang checks)
 is empirical, and a rare intermittent miss could pass 8 probe rows per call:
 `stress_defaults.json` checks every default configuration of every pass, at

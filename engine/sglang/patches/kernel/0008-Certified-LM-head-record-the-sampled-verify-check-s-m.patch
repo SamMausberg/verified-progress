@@ -1,0 +1,32 @@
+From a28946e0d46dc96d260858fb0600a70d2beb6fbd Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Thu, 1 Oct 2026 19:50:28 +0000
+Subject: [PATCH] Certified LM head: record the sampled-verify check's
+ mismatches
+
+In check mode, attach_ids writes the counters after the verify replay, but
+the fixed-noise comparison with SGLang's seeded sampler (check_fixed_noise)
+runs afterwards in eagle_sample and only then adds its mismatches. A mismatch
+on the last sampled replay never reached the stats file. Write the counters
+again after the comparison.
+---
+ python/sglang/srt/layers/certified_head.py | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/python/sglang/srt/layers/certified_head.py b/python/sglang/srt/layers/certified_head.py
+index 375bc16985..ec65b86370 100644
+--- a/python/sglang/srt/layers/certified_head.py
++++ b/python/sglang/srt/layers/certified_head.py
+@@ -535,6 +535,9 @@ def check_fixed_noise(next_token_logits: torch.Tensor, ids: torch.Tensor) -> Non
+         next_token_logits[:n], st.seeds[:n], st.positions[:n], st.temps[:n]
+     )
+     _heads.get("sampled_verify").add_mismatches(ids, stock)
++    # attach_ids wrote the counters before this comparison: write them again, or a
++    # mismatch on the last sampled replay never reaches the stats file.
++    _maybe_dump()
+ 
+ 
+ def take_ids(logits_output: LogitsProcessorOutput) -> Optional[torch.Tensor]:
+-- 
+2.34.1
+

@@ -184,3 +184,23 @@ def test_engine_flags_reject_unknown_modes() -> None:
     with pytest.raises(ValueError, match='MODEL'):
         Flags(decode=True, model='hopper')
     assert Flags(decode=True, fallback='columns', model='hopper-wgmma').any
+
+
+def test_a_refused_sampled_batch_keeps_the_refused_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The sampling guards check a decision; a refused batch (no decision, already
+    on the stock chain) must keep exactly the status ``refused`` whatever stale
+    values the head's buffers hold."""
+    gen = torch.Generator().manual_seed(4)
+    w = (torch.randn(64, 256, generator=gen) * 0.02).to(torch.bfloat16)
+    head = CertifiedHead.from_quantized(
+        w, build_quantized_head(w), device='cpu', max_batch=8, capacity=16
+    )
+    monkeypatch.setattr(head, '_certifiable', lambda _m: False)
+    head._ymax.fill_(0.0)  # stale values: the guard would flag a refused row
+    h = torch.zeros(4, 256, dtype=torch.bfloat16)
+    seeds = torch.arange(4, dtype=torch.int64)
+    temps = torch.tensor([0.7, -1.0, 1.0, 0.5])
+    _, stats = head.gumbel_sample(h, seeds, seeds, temps, fallback=False)
+    assert stats.status.tolist() == [STATUS_BITS['refused']] * 4

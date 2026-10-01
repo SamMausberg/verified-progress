@@ -1117,18 +1117,19 @@ class CertifiedHead:
         certifiable = self._certifiable(m)  # outside the gated node: may run the self-test
 
         def stages() -> None:
+            if not certifiable:
+                self._refuse(m)  # the stock chain for every row; nothing to guard
+                return
             self._sampling = (seeds, positions, temperatures)
             try:
-                if not certifiable:
-                    self._refuse(m)
-                else:
-                    self._approximate(hidden, m)
-                    self._refine(hidden, m)
-                    self._decide(m)
+                self._approximate(hidden, m)
+                self._refine(hidden, m)
+                self._decide(m)
             finally:
                 self._sampling = None
-            # Inside the gated stages, so a batch the gate skips sets no flag. Device
-            # ops only, so the guards are graph-safe and need no host sync.
+            # The guards check a decision, so they run only after one (a refused batch
+            # keeps the single status ``refused``), and inside the gated stages, so a
+            # batch the gate skips sets no flag. Device ops only: graph-safe, no sync.
             bad_t = ~(torch.isfinite(temperatures) & (temperatures > 0))
             self._status[:m].bitwise_or_(bad_t.to(torch.int32) * STATUS_BITS['temperature'])
             self._any.logical_or_(bad_t.any())
