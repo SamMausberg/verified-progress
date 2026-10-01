@@ -31,6 +31,7 @@ measured ratio is multiplied. Each saving is a range [low, high]:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import subprocess
@@ -109,6 +110,9 @@ def main() -> None:
     penalty = GDN_LAYERS * (VERIFY_WITHOUT_SNAPSHOTS_US - VERIFY_WITH_SNAPSHOTS_US) / 1e3
     out: dict[str, Any] = {
         'repo_commit': commit,
+        'inputs': {
+            str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in (args.ceiling, args.gemm)
+        },
         'formula': 'ratio = T / (T - sum of savings), savings in ms, low and high ends separately',
         'f_bytes_removed_per_request': BLOCK * GDN_STATE,
         'f_low_penalty_ms': penalty,

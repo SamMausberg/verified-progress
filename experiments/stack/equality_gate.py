@@ -66,6 +66,32 @@ TOP_K = 5  # top logprobs requested at every position by the equality runs
 TABLE = 'backbone_table_v1.json'
 S0_COMMIT = 'bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824'  # the paper's SGLang pin
 PACKAGES = ('torch', 'triton', 'flashinfer-python', 'sgl-kernel', 'transformers')
+# Environment variables that can change an engine's arithmetic or kernels; holds clear them
+# (arms.sh), so only ENV_ALLOWED may remain in the identity.
+ENV_PREFIXES = ('SGLANG_', 'TORCH_', 'PYTORCH_', 'TRITON_', 'FLASHINFER_', 'NCCL_', 'CUDA_')
+ENV_ALLOWED = ('CUDA_HOME',)
+# The equality runs the plan declares (hold_equality.sh), and the environment each lever adds.
+CORE_RUNS = ('S0', 'B0', 'F', 'G', 'FG')
+H_RUNS = ('B0_tokens', 'H_tokens', 'FGH_tokens')
+LEVER_ENV = {
+    'F': ('SGLANG_GDN_REPLAYSSM_FOLD',),
+    'G': (
+        'SGLANG_BACKBONE_GEMM',
+        'SGLANG_BACKBONE_PDL',
+        'SGLANG_BACKBONE_MERGE_IN_PROJ',
+        'SGLANG_BACKBONE_GEMM_TABLE',
+    ),
+    'H': (
+        'SGLANG_CERTIFIED_HEAD_VERIFY',
+        'SGLANG_CERTIFIED_HEAD_SRC',
+        'SGLANG_CERTIFIED_HEAD_FALLBACK',
+        'SGLANG_CERTIFIED_HEAD_MODEL',
+        'SGLANG_CERTIFIED_HEAD_MAX_ROWS',
+        'SGLANG_CERTIFIED_HEAD_CHECK',
+        'SGLANG_CERTIFIED_HEAD_STATS',
+    ),
+}
+FOLD_FLAG = '--enable-linear-replayssm-spec'
 
 
 class GateError(Exception):
@@ -204,6 +230,12 @@ def package_versions() -> dict[str, str | None]:
     return out
 
 
+def engine_env() -> dict[str, str]:
+    import os
+
+    return {k: v for k, v in sorted(os.environ.items()) if k.startswith(ENV_PREFIXES)}
+
+
 def identity(repo: Path, s0: Path, stack_engine: Path) -> dict[str, Any]:
     """What a timed run's numbers depend on outside the gate's own files."""
     return {
@@ -211,6 +243,7 @@ def identity(repo: Path, s0: Path, stack_engine: Path) -> dict[str, Any]:
         's0': tree_state(s0, 'python'),
         'stack_engine': tree_state(stack_engine, 'python'),
         'packages': package_versions(),
+        'env': engine_env(),
     }
 
 
@@ -225,6 +258,9 @@ def require_clean(ident: dict[str, Any], stack_tree: str) -> None:
         problems.append(f's0 is at {ident["s0"]["head"]}, not the pin {S0_COMMIT}')
     if ident['stack_engine']['tree'] != stack_tree:
         problems.append(f'composed tree {ident["stack_engine"]["tree"]} is not {stack_tree}')
+    stray = sorted(set(ident['env']) - set(ENV_ALLOWED))
+    if stray:
+        problems.append(f'engine environment variables set: {stray}')
     if problems:
         raise GateError('; '.join(problems))
 
@@ -237,8 +273,9 @@ def identity_changes(old: dict[str, Any], new: dict[str, Any]) -> list[str]:
         for f in ('head', 'tree', 'dirty')
         if old[k][f] != new[k][f]
     ]
-    if old['packages'] != new['packages']:
-        diffs.append('packages')
+    for key in ('packages', 'env'):
+        if old[key] != new[key]:
+            diffs.append(key)
     return diffs
 
 
@@ -263,18 +300,62 @@ def runs_provenance(run: Path, ident: dict[str, Any]) -> list[str]:
             )
         if model is None or meta.get('model_revision') != model:
             problems.append(f'{ref}: model {meta.get("model_revision")}, S0 ran {model}')
-    for meta_path in sorted((run / 'runs').glob('plain__stack_*/c1.meta.json')):
+    plan_path = run / 'plan.jsonl'
+    if not plan_path.is_file():
+        return [*problems, 'no plan.jsonl (the declared equality runs)']
+    plan = {}
+    for line in plan_path.read_text().splitlines():
+        row = json.loads(line)
+        if row['run'] in plan:
+            problems.append(f'{row["run"]}: declared twice')
+        plan[row['run']] = row
+    declared = {f'plain__stack_{t}' for t in CORE_RUNS}
+    h_runs = {f'plain__stack_{t}' for t in H_RUNS}
+    missing = sorted(declared - set(plan))
+    if missing:
+        problems.append(f'plan lacks {missing}')
+    if set(plan) & h_runs and not h_runs <= set(plan):
+        problems.append(f'plan has only part of the certified-head runs {sorted(h_runs)}')
+    undeclared = sorted(set(plan) - declared - h_runs)
+    if undeclared:
+        problems.append(f'plan has runs the hold does not declare: {undeclared}')
+    present = {p.name for p in (run / 'runs').glob('plain__stack_*') if p.is_dir()}
+    if present - set(plan):
+        problems.append(f'runs not in the plan: {sorted(present - set(plan))}')
+    for name, row in sorted(plan.items()):
+        tag = name.removeprefix('plain__stack_')
+        levers = tag.removesuffix('_tokens') if tag not in ('S0', 'B0', 'B0_tokens') else ''
+        want_env = sorted(e for lever in levers for e in LEVER_ENV[lever])
+        if row['env'] != want_env:
+            problems.append(f'{name}: declared environment {row["env"]}, lever wants {want_env}')
+        if (FOLD_FLAG in row['flags']) != ('F' in levers):
+            problems.append(f'{name}: fold flag does not match the lever')
+        want_engine = 's0' if tag == 'S0' else 'stack_engine'
+        if row['engine'] != want_engine:
+            problems.append(f'{name}: declared on {row["engine"]}, not {want_engine}')
+        meta_path = run / 'runs' / name / 'c1.meta.json'
+        if not meta_path.is_file():
+            problems.append(f'{name}: no run record')
+            continue
         meta = json.loads(meta_path.read_text())
-        name = meta_path.parent.name
-        want = ident['s0']['head'] if name == 'plain__stack_S0' else ident['stack_engine']['head']
+        want = ident[want_engine]['head']
         if meta.get('sglang_sha') != want or meta.get('sglang_dirty') is not False:
             problems.append(
                 f'{name}: engine {meta.get("sglang_sha")} dirty={meta.get("sglang_dirty")}'
             )
         if meta.get('repo_sha') != ident['repo']['head']:
             problems.append(f'{name}: repository {meta.get("repo_sha")}')
-    if not problems and not any((run / 'runs').glob('plain__stack_*/c1.meta.json')):
-        problems.append('no equality run records')
+        expect = {
+            'flags': row['flags'],
+            'top_logprobs_num': row['top_logprobs'],
+            'num_prompts': PROMPTS,
+            'pass': 'c1',
+            'concurrency': 1,
+            'model_revision': model,
+        }
+        for key, value in expect.items():
+            if meta.get(key) != value:
+                problems.append(f'{name}: {key} {meta.get(key)!r}, declared {value!r}')
     return problems
 
 
@@ -441,10 +522,15 @@ def main() -> int:
     _engine_args(c)
     f = sub.add_parser('fingerprint', help='print the certified_head package fingerprint')
     f.add_argument('src', type=Path)
+    e = sub.add_parser('env', help='record the ambient engine environment (ENV_PREFIXES)')
+    e.add_argument('--out', type=Path, required=True)
     args = ap.parse_args()
     try:
         if args.cmd == 'fingerprint':
             print(fingerprint(args.src))
+            return 0
+        if args.cmd == 'env':
+            args.out.write_text(json.dumps(engine_env(), indent=1) + '\n')
             return 0
         ident = identity(args.repo, args.s0, args.stack_engine)
         if args.cmd == 'preflight':

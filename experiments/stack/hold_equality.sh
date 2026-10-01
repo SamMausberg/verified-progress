@@ -54,6 +54,16 @@ DFLASH_B16="--speculative-algorithm DFLASH --speculative-draft-model-path z-lab/
 run_eq() {
   local tag=$1 worktree=$2 flags=$3 logprobs=$4
   shift 4
+  # The declared run, for the gate's check of every run record against the plan.
+  python - "$OUT/plan.jsonl" "$tag" "$worktree" "$logprobs" "$flags" "$@" <<'PY' || failed+=("$tag-plan")
+import json, shlex, sys
+out, tag, worktree, logprobs, flags, *env = sys.argv[1:]
+row = {'run': f'plain__{tag}', 'engine': 'stack_engine' if worktree else 's0',
+       'flags': shlex.split(flags), 'top_logprobs': int(logprobs),
+       'env': sorted(kv.split('=', 1)[0] for kv in env)}
+with open(out, 'a') as f:
+    f.write(json.dumps(row) + '\n')
+PY
   (
     if [ -n "$worktree" ]; then export SGLANG_WORKTREE=$worktree; else unset SGLANG_WORKTREE; fi
     # shellcheck source=/dev/null

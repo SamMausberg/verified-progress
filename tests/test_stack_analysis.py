@@ -34,7 +34,9 @@ IDENT = {
     's0': {'path': '/s', 'head': gate.S0_COMMIT, 'tree': 'd' * 40, 'dirty': []},
     'stack_engine': {'path': '/e', 'head': 'e' * 40, 'tree': TREE, 'dirty': []},
     'packages': {'torch': '2.13.0'},
+    'env': {'CUDA_HOME': '/cuda'},
 }
+BASE_FLAGS = ['--speculative-algorithm', 'DFLASH', '--attention-backend', 'triton']
 ceiling = _load('ceiling')
 phases = _load('phases')
 
@@ -59,11 +61,22 @@ def _points(path: Path, rows: list[dict], levers: str = 'FG') -> None:
         (run_dir / 'server').mkdir(parents=True, exist_ok=True)
         (run_dir / 'stack_gate.json').write_text(json.dumps(digest))
         engine = IDENT['s0' if r['label'] == 'stack-S0' else 'stack_engine']['head']
+        arm = r['label'].removeprefix('stack-')
+        env = {
+            k: (v if v is not None else '/src')
+            for k, v in analyze.expected_env(arm, run / gate.TABLE).items()
+        }
+        command = ['python', '-m', 'sglang.launch_server'] + (
+            ['--enable-linear-replayssm-spec'] if 'F' in arm else []
+        )
         launch = {
             'repo': {'head': IDENT['repo']['head'], 'dirty_files': []},
             'sglang_source': {'head': engine, 'dirty_files': []},
+            'env_overrides': env,
+            'command': command,
         }
         (run_dir / 'server' / 'launch.json').write_text(json.dumps(launch))
+        (run_dir / 'stack_env.json').write_text(json.dumps(IDENT['env']))
 
 
 def test_full_stack_ratio_pairs_both_launches_with_both_baselines(tmp_path, monkeypatch):
@@ -242,27 +255,49 @@ def _outputs(lp: float = -0.5) -> list[dict]:
     ]
 
 
-def _write_runs(run: Path, b0_low_entry: float = -0.5) -> None:
-    """Raw run files: S0, B0 and F identical; G and FG with other logprobs."""
+def _plan_row(tag: str) -> dict:
+    levers = tag.removesuffix('_tokens') if tag not in ('S0', 'B0', 'B0_tokens') else ''
+    flags = BASE_FLAGS + ([gate.FOLD_FLAG] if 'F' in levers else [])
+    env = sorted(e for lever in levers for e in gate.LEVER_ENV[lever])
+    return {
+        'run': f'plain__stack_{tag}',
+        'engine': 's0' if tag == 'S0' else 'stack_engine',
+        'flags': flags,
+        'top_logprobs': 0 if tag.endswith('_tokens') else 5,
+        'env': env,
+    }
+
+
+def _meta(row: dict) -> dict:
+    return {
+        'sglang_sha': IDENT[row['engine']]['head'],
+        'sglang_dirty': False,
+        'repo_sha': IDENT['repo']['head'],
+        'model_revision': 'm' * 40,
+        'flags': row['flags'],
+        'top_logprobs_num': row['top_logprobs'],
+        'num_prompts': gate.PROMPTS,
+        'pass': 'c1',
+        'concurrency': 1,
+    }
+
+
+def _write_runs(run: Path, b0_low_entry: float = -0.5, h: bool = False) -> None:
+    """Raw run files and records: S0, B0 and F identical; G and FG with other logprobs;
+    the declared plan (plain.jsonl) with the certified-head runs when `h`."""
     runs = run / 'runs'
-    for name, lp in (
-        ('S0', -0.5),
-        ('B0', b0_low_entry),
-        ('F', b0_low_entry),
-        ('G', -0.6),
-        ('FG', -0.6),
-    ):
+    tags = [('S0', -0.5), ('B0', b0_low_entry), ('F', b0_low_entry), ('G', -0.6), ('FG', -0.6)]
+    if h:
+        tags += [(t, -0.5) for t in gate.H_RUNS]
+    plan = []
+    for name, lp in tags:
         d = runs / f'plain__stack_{name}'
         d.mkdir(parents=True, exist_ok=True)
         (d / 'c1.jsonl').write_text('\n'.join(json.dumps(r) for r in _outputs(lp)) + '\n')
-        engine = IDENT['s0' if name == 'S0' else 'stack_engine']['head']
-        meta = {
-            'sglang_sha': engine,
-            'sglang_dirty': False,
-            'repo_sha': IDENT['repo']['head'],
-            'model_revision': 'm' * 40,
-        }
-        (d / 'c1.meta.json').write_text(json.dumps(meta))
+        row = _plan_row(name)
+        plan.append(row)
+        (d / 'c1.meta.json').write_text(json.dumps(_meta(row)))
+    (run / 'plan.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in plan))
     for ref in gate.REFERENCES:
         d = runs / ref
         d.mkdir(parents=True, exist_ok=True)
@@ -286,7 +321,7 @@ def _build(
 ) -> tuple[int, Path]:
     run = tmp_path / 'run'
     run.mkdir(exist_ok=True)
-    _write_runs(run, b0_low_entry)
+    _write_runs(run, b0_low_entry, h=bool(stats))
     (run / 'summary.json').write_text(json.dumps({'pairs': pairs}))
     (run / gate.TABLE).write_text('{"2560,4096": []}')
     for n in stats:
@@ -960,3 +995,204 @@ def test_tree_state_sees_tracked_edits_and_untracked_engine_files(tmp_path):
     assert gate.tree_state(repo, None)['dirty'] == []
     (repo / 'python' / 'mod.py').write_text('a = 2\n')
     assert ' M python/mod.py' in gate.tree_state(repo, None)['dirty']
+
+
+@pytest.mark.parametrize('n', [0, 1, 2])
+def test_decision_incomplete_for_n_below_three(n):
+    out = analyze.interval([math.log(1.2 + 0.01 * i) for i in range(n)])
+    assert out['decision'] == 'incomplete (n < 3)'
+    assert 'lo' not in out or n >= 2
+
+
+def _plan_rows():
+    rows = []
+    for s_name in ('stack-s1',):
+        for i, arm in enumerate(['S0', 'FG', 'F', 'G', 'B0', 'FG', 'S0']):
+            rows.append(
+                {
+                    'label': f'stack-{arm}',
+                    'run': f'{s_name}-{i}',
+                    'session': s_name,
+                    'concurrency': '1',
+                    'x_e2e': 100.0,
+                    'y': 100.0,
+                }
+            )
+    return rows
+
+
+def _run_analysis(tmp_path, monkeypatch, rows, spoil=None):
+    pts = tmp_path / 'points.csv'
+    _points(pts, rows)
+    if spoil:
+        spoil(tmp_path)
+    out = tmp_path / 'out.json'
+    monkeypatch.setattr(
+        sys,
+        'argv',
+        [
+            'analyze',
+            '--points',
+            str(pts),
+            '--out',
+            str(out),
+            '--campaign',
+            str(tmp_path / 'campaign_gate.json'),
+            '--runs-root',
+            str(tmp_path),
+        ],
+    )
+    analyze.main()
+    return json.loads(out.read_text())
+
+
+def _launch_edit(tmp_path, label, run, **changes):
+    path = tmp_path / label / run / 'server' / 'launch.json'
+    launch = json.loads(path.read_text())
+    launch.update(changes)
+    path.write_text(json.dumps(launch))
+
+
+ANALYSIS_REFUSALS = {
+    'undeclared arm': lambda rows: [*rows, {**rows[2], 'label': 'stack-GF', 'run': 'x'}],
+    'undeclared concurrency': lambda rows: [*rows, {**rows[0], 'concurrency': '3', 'run': 'y'}],
+    'session name': lambda rows: [{**r, 'session': 'warmup'} for r in rows],
+}
+
+
+@pytest.mark.parametrize('case', sorted(ANALYSIS_REFUSALS))
+def test_analysis_refuses_rows_outside_the_plan(tmp_path, monkeypatch, case):
+    with pytest.raises(SystemExit):
+        _run_analysis(tmp_path, monkeypatch, ANALYSIS_REFUSALS[case](_plan_rows()))
+
+
+SERVER_REFUSALS = {
+    'extra variable': lambda t: _launch_edit(
+        t,
+        'stack-G',
+        'stack-s1-3',
+        env_overrides={
+            **json.loads((t / 'stack-G' / 'stack-s1-3' / 'server' / 'launch.json').read_text())[
+                'env_overrides'
+            ],
+            'SGLANG_SIMULATE_ACC_LEN': '16',
+        },
+    ),
+    'missing variable': lambda t: _launch_edit(t, 'stack-F', 'stack-s1-2', env_overrides={}),
+    'other table': lambda t: _launch_edit(
+        t,
+        'stack-G',
+        'stack-s1-3',
+        env_overrides={
+            **json.loads((t / 'stack-G' / 'stack-s1-3' / 'server' / 'launch.json').read_text())[
+                'env_overrides'
+            ],
+            'SGLANG_BACKBONE_GEMM_TABLE': '/elsewhere.json',
+        },
+    ),
+    'fold flag missing': lambda t: _launch_edit(t, 'stack-F', 'stack-s1-2', command=['python']),
+    'fold flag on B0': lambda t: _launch_edit(
+        t, 'stack-B0', 'stack-s1-4', command=['--enable-linear-replayssm-spec']
+    ),
+    'ambient environment': lambda t: (t / 'stack-B0' / 'stack-s1-4' / 'stack_env.json').write_text(
+        json.dumps({'CUDA_HOME': '/cuda', 'SGLANG_SIMULATE_ACC_LEN': '16'})
+    ),
+    'no environment record': lambda t: (t / 'stack-B0' / 'stack-s1-4' / 'stack_env.json').unlink(),
+}
+
+
+@pytest.mark.parametrize('case', sorted(SERVER_REFUSALS))
+def test_analysis_refuses_servers_outside_the_declared_arm(tmp_path, monkeypatch, case):
+    (tmp_path / 'ok').mkdir()
+    _run_analysis(tmp_path / 'ok', monkeypatch, _plan_rows())  # the unspoilt campaign passes
+    with pytest.raises(SystemExit):
+        _run_analysis(tmp_path, monkeypatch, _plan_rows(), SERVER_REFUSALS[case])
+
+
+def _spoil_plan(run, case):
+    plan = [json.loads(x) for x in (run / 'plan.jsonl').read_text().splitlines()]
+    if case == 'declared run missing':
+        plan = [r for r in plan if r['run'] != 'plain__stack_G']
+    if case == 'run record missing':
+        (run / 'runs' / 'plain__stack_F' / 'c1.meta.json').unlink()
+    if case == 'extra run':
+        (run / 'runs' / 'plain__stack_GF').mkdir()
+    if case == 'flags differ':
+        meta_path = run / 'runs' / 'plain__stack_G' / 'c1.meta.json'
+        meta = json.loads(meta_path.read_text())
+        meta['flags'] = [*meta['flags'], '--enable-linear-replayssm-spec']
+        meta_path.write_text(json.dumps(meta))
+    if case == 'fewer prompts':
+        meta_path = run / 'runs' / 'plain__stack_B0' / 'c1.meta.json'
+        meta = json.loads(meta_path.read_text())
+        meta['num_prompts'] = 300
+        meta_path.write_text(json.dumps(meta))
+    if case == 'lever environment':
+        for r in plan:
+            if r['run'] == 'plain__stack_FG':
+                r['env'] = r['env'][:-1]
+    if case == 'part of the certified-head runs':
+        plan.append(_plan_row('H_tokens'))
+        d = run / 'runs' / 'plain__stack_H_tokens'
+        d.mkdir()
+        (d / 'c1.meta.json').write_text(json.dumps(_meta(_plan_row('H_tokens'))))
+    (run / 'plan.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in plan))
+
+
+@pytest.mark.parametrize(
+    'case',
+    [
+        'declared run missing',
+        'run record missing',
+        'extra run',
+        'flags differ',
+        'fewer prompts',
+        'lever environment',
+        'part of the certified-head runs',
+    ],
+)
+def test_build_validates_every_declared_equality_run(tmp_path, monkeypatch, case):
+    run = tmp_path / 'run'
+    run.mkdir()
+    _write_runs(run)
+    _spoil_plan(run, case)
+    (run / 'summary.json').write_text(json.dumps({'pairs': _passing()}))
+    (run / gate.TABLE).write_text('{}')
+    (run / 'identity.json').write_text(json.dumps(IDENT))
+    assert gate.build(run, run / gate.TABLE, None, IDENT, TREE) == 1
+    assert json.loads((run / 'gate.json').read_text())['provenance_problems']
+
+
+def test_require_clean_refuses_ambient_engine_variables():
+    ident = json.loads(json.dumps(IDENT))
+    ident['env']['SGLANG_SIMULATE_ACC_LEN'] = '16'
+    with pytest.raises(gate.GateError):
+        gate.require_clean(ident, TREE)
+
+
+def test_arms_sh_clears_engine_variables():
+    import subprocess
+
+    env = {
+        'PATH': '/usr/bin:/bin',
+        'HOME': '/tmp',
+        'VIRTUAL_ENV': '/v',
+        'CUDA_HOME': '/cuda',
+        'SGLANG_SIMULATE_ACC_LEN': '16',
+        'TORCH_BLAS_PREFER_CUBLASLT': '1',
+        'CUDA_VISIBLE_DEVICES': '1',
+        'TRITON_CACHE_DIR': '/t',
+        'KEEP_ME': 'x',
+    }
+    script = f'source {ROOT / "experiments" / "stack" / "arms.sh"}; env'
+    out = subprocess.run(
+        ['bash', '-c', script], env=env, capture_output=True, text=True, check=True
+    ).stdout.splitlines()
+    names = {line.split('=', 1)[0] for line in out}
+    assert {'CUDA_HOME', 'KEEP_ME'} <= names
+    assert not names & {
+        'SGLANG_SIMULATE_ACC_LEN',
+        'TORCH_BLAS_PREFER_CUBLASLT',
+        'CUDA_VISIBLE_DEVICES',
+        'TRITON_CACHE_DIR',
+    }

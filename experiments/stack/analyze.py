@@ -19,6 +19,11 @@ declared in evidence/stack/README.md ("Composition plan"):
   A point that bench marks invalid (failed requests, wrong lengths, foreign CPU load
   above 2 cores, ...) drops that session at that concurrency for the arms it touches
   (an invalid S0 launch, for every arm).
+* Every row must be a declared arm of the campaign (S0, B0, the full stack, each lever and
+  shorter cumulative stack), a declared concurrency (1, 2, 4, 8) and a session named
+  stack-s<k>; its server's environment overrides must be exactly the arm's declared
+  variables (and the fold flag present exactly for arms with F), and the ambient engine
+  environment the session recorded beside the run must equal the gate's.
 * Every row's launch record (the run's server/launch.json, written by bench.server when
   the server started) must show the engine the gate recorded, S0's checkout for S0 and
   the composed worktree's commit for every other arm, and the gate's repository commit,
@@ -47,6 +52,7 @@ import csv
 import importlib.util
 import json
 import math
+import re
 import statistics
 from collections import defaultdict
 from pathlib import Path
@@ -55,30 +61,35 @@ from typing import Any
 # Two-sided 95% Student t quantiles by degrees of freedom.
 T95 = {1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365, 8: 2.306}
 METRICS = ('x_e2e', 'y')
+DECLARED_C = (1, 2, 4, 8)  # the plan's concurrencies
+SESSION_RE = re.compile(r'^stack-s[1-9][0-9]*$')
 MIN_SESSIONS = 3  # the declared plan's minimum of valid sessions for a decision
 
 
 def interval(logs: list[float]) -> dict[str, Any]:
-    """Geometric mean and 95% t interval of ratios given their logs."""
+    """Geometric mean and 95% t interval of ratios given their logs, and the declared
+    decision, which needs at least MIN_SESSIONS valid sessions (otherwise incomplete)."""
     n = len(logs)
     out: dict[str, Any] = {'n': n, 'sessions': [round(math.exp(v), 5) for v in logs]}
+    if n < MIN_SESSIONS:
+        out['decision'] = f'incomplete (n < {MIN_SESSIONS})'
     if n == 0:
         return out
     mean = statistics.fmean(logs)
     out['ratio'] = round(math.exp(mean), 5)
-    if n >= 2:
-        half = T95[n - 1] * statistics.stdev(logs) / math.sqrt(n)
-        lo, hi = mean - half, mean + half  # decide on the unrounded log bounds
-        if n < MIN_SESSIONS:
-            out['decision'] = f'incomplete (n < {MIN_SESSIONS})'
-        elif lo > 0:
+    if n < 2:
+        return out
+    half = T95[n - 1] * statistics.stdev(logs) / math.sqrt(n)
+    lo, hi = mean - half, mean + half
+    out['lo'] = round(math.exp(lo), 5)  # rounded for display only
+    out['hi'] = round(math.exp(hi), 5)
+    if n >= MIN_SESSIONS:  # decide on the unrounded log bounds
+        if lo > 0:
             out['decision'] = 'speedup'
         elif hi < 0:
             out['decision'] = 'slowdown'
         else:
             out['decision'] = 'no detectable change'
-        out['lo'] = round(math.exp(lo), 5)
-        out['hi'] = round(math.exp(hi), 5)
     return out
 
 
@@ -90,6 +101,37 @@ def _gate_module():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def declared_arms(full: str) -> set[str]:
+    """Every arm a session of this campaign launches (hold_session.sh's order)."""
+    arms = {'S0', 'B0', full}
+    if len(full) > 1:
+        arms |= set(full) | {full[:j] for j in range(2, len(full))}
+    return arms
+
+
+def expected_env(arm: str, table: Path) -> dict[str, str | None]:
+    """The environment bench passes to arm's server (arms.sh); None: any value."""
+    env: dict[str, str | None] = {}
+    if 'F' in arm:
+        env['SGLANG_GDN_REPLAYSSM_FOLD'] = '1'
+    if 'G' in arm:
+        env.update(
+            SGLANG_BACKBONE_GEMM='1',
+            SGLANG_BACKBONE_PDL='1',
+            SGLANG_BACKBONE_MERGE_IN_PROJ='1',
+            SGLANG_BACKBONE_GEMM_TABLE=str(table),
+        )
+    if 'H' in arm:
+        env.update(
+            SGLANG_CERTIFIED_HEAD_VERIFY='1',
+            SGLANG_CERTIFIED_HEAD_SRC=None,
+            SGLANG_CERTIFIED_HEAD_FALLBACK='columns',
+            SGLANG_CERTIFIED_HEAD_MODEL='conservative',
+            SGLANG_CERTIFIED_HEAD_MAX_ROWS='64',
+        )
+    return env
 
 
 def launches_expected(arm: str, full: str) -> int:
@@ -153,10 +195,17 @@ def main() -> None:
     invalid: list[dict[str, str]] = []
     touched: set[tuple[str, int, str]] = set()  # (session, c, arm) with an invalid point
     rows_in = load(args.points)
-    # Domains from every row, so an arm or concurrency with only invalid points still
-    # appears (with n = 0) instead of vanishing.
-    all_arms = {r['label'].removeprefix('stack-') for r in rows_in}
-    all_c = {int(r['concurrency']) for r in rows_in}
+    if not rows_in:
+        raise SystemExit('no stack rows in the points file')
+    # Every row must belong to the declared plan; the domains are the declared ones, so a
+    # missing arm or concurrency shows n = 0 instead of vanishing.
+    declared = declared_arms(args.full)
+    for r in rows_in:
+        arm, c = r['label'].removeprefix('stack-'), int(r['concurrency'])
+        if arm not in declared or c not in DECLARED_C or not SESSION_RE.match(r['session']):
+            raise SystemExit(f'row outside the plan: {r["label"]} c={c} session {r["session"]!r}')
+    all_arms = declared
+    all_c = set(DECLARED_C)
     for r in rows_in:
         arm = r['label'].removeprefix('stack-')
         c = int(r['concurrency'])
@@ -170,7 +219,9 @@ def main() -> None:
         vals['accept_length'] = float(r['accept_length'] or 'nan')
         data[r['session']][c][arm].append((r['run'], vals))
 
-    ident = _gate_module().pinned_gate(args.campaign)['identity']
+    gate = _gate_module().pinned_gate(args.campaign)
+    ident = gate['identity']
+    table = Path(pin['run']) / 'backbone_table_v1.json'
     for r in rows_in:
         launch_path = args.runs_root / r['label'] / r['run'] / 'server' / 'launch.json'
         if not launch_path.is_file():
@@ -189,6 +240,16 @@ def main() -> None:
                 f'(dirty {repo.get("dirty_files")}) on engine {source.get("head")} '
                 f"(dirty {source.get('dirty_files')}), not the gate's"
             )
+        arm = r['label'].removeprefix('stack-')
+        want = expected_env(arm, table)
+        got = launch.get('env_overrides') or {}
+        if set(got) != set(want) or any(v is not None and got[k] != v for k, v in want.items()):
+            raise SystemExit(f'run {r["label"]}/{r["run"]}: environment {got}, declared {want}')
+        if ('--enable-linear-replayssm-spec' in (launch.get('command') or [])) != ('F' in arm):
+            raise SystemExit(f'run {r["label"]}/{r["run"]}: fold flag does not match the arm')
+        env_path = args.runs_root / r['label'] / r['run'] / 'stack_env.json'
+        if not env_path.is_file() or json.loads(env_path.read_text()) != ident['env']:
+            raise SystemExit(f'run {r["label"]}/{r["run"]}: ambient engine environment differs')
     for r in rows_in:
         record = args.runs_root / r['label'] / r['run'] / 'stack_gate.json'
         if not record.is_file():

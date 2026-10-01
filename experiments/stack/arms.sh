@@ -13,14 +13,28 @@
 #   FG     F + G; any other combination of the letters F, G, H likewise
 #   FGH    F + G + H
 #
-# STACK_ENGINE    composed SGLang worktree (default ~/sglang-wt/stack)
+# STACK_ENGINE    composed SGLang worktree (~/sglang-wt/stack)
 # STACK_TABLE     backbone routing table: built by stack_table in the equality hold's own
 #                 directory; timed holds use the one behind the current gate (gate_plan)
 # STACK_CERT_SRC  directory holding the certified_head package; H arms exist only if set
 
 # The holds that source this file run the SGLang venv's python (scripts/sglang_env.sh).
 [ -n "${VIRTUAL_ENV:-}" ] || { echo "arms.sh: source scripts/sglang_env.sh first" >&2; exit 1; }
-STACK_ENGINE=${STACK_ENGINE:-$HOME/sglang-wt/stack}
+# Every server inherits this shell's environment (bench and the state runner pass it
+# through), so engine variables from the caller (SGLANG_*, TORCH_*, CUDA_*, ...) would
+# change arms silently. Remove all of them except CUDA_HOME, which sglang_env.sh sets; the
+# arms add exactly their declared variables, and the gate records what remains.
+stack_sanitize_env() {
+  local v
+  for v in $(compgen -e); do
+    case $v in
+      CUDA_HOME) ;;
+      SGLANG_* | TORCH_* | PYTORCH_* | TRITON_* | FLASHINFER_* | NCCL_* | CUDA_*) unset "$v" ;;
+    esac
+  done
+}
+stack_sanitize_env
+STACK_ENGINE=$HOME/sglang-wt/stack
 # Tree of the composed engine (experiments/stack/build_engine.sh); every hold checks it.
 # shellcheck disable=SC2034 # read by the scripts that source this file
 STACK_TREE=628f650ea031b0fc8a68233ff10d8878eb22686d
@@ -30,7 +44,7 @@ STACK_ARM=dflash-tuned-b16
 STACK_CURRENT=$HOME/vp-data/stack/equality/current
 STACK_PIN=$HOME/vp-data/stack/campaign_gate.json
 # The stock SGLang checkout S0 imports (the editable install in the venv).
-STACK_S0=${SGLANG_DIR:-$HOME/sglang}
+STACK_S0=$HOME/sglang
 
 # The checkouts every gate command fingerprints (equality_gate.py preflight/build/check).
 engine_args() {
