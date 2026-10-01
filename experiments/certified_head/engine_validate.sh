@@ -132,6 +132,8 @@ run_arm() {
   local kv
   for kv in "${flags[@]}"; do export "SGLANG_CERTIFIED_HEAD_$kv"; done
   export SGLANG_CERTIFIED_HEAD_STATS="$dir/certified_stats.json"
+  # Write the counters after every call, so the last replay of every path is recorded.
+  export SGLANG_CERTIFIED_HEAD_STATS_EVERY=1
   trap 'stop_server' EXIT
   mkdir -p "$dir"
   rm -f "$dir/certified_stats.json"

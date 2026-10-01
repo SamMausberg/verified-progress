@@ -171,3 +171,16 @@ def test_a_sampled_winner_near_the_small_probabilities_falls_back(
     assert stats.fallback.tolist() == [True, False, True, False]
     assert bool(head._any)
     assert bool((stats.status[stats.fallback] == STATUS_BITS['small_probability']).all())
+
+
+def test_engine_flags_reject_unknown_modes() -> None:
+    """The SGLang glue builds Flags directly, so every construction must validate:
+    a misspelled fallback or error model fails start-up instead of running another
+    mode under the wrong name."""
+    from certified_head.engine import Flags
+
+    with pytest.raises(ValueError, match='FALLBACK'):
+        Flags(decode=True, fallback='colums')
+    with pytest.raises(ValueError, match='MODEL'):
+        Flags(decode=True, model='hopper')
+    assert Flags(decode=True, fallback='columns', model='hopper-wgmma').any

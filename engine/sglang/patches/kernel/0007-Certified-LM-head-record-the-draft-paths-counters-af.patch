@@ -1,0 +1,64 @@
+From af363a3beedf63e78c8192179880eb7308986273 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Thu, 1 Oct 2026 19:41:47 +0000
+Subject: [PATCH] Certified LM head: record the draft paths' counters after
+ each replay
+
+The MTP draft and DFlash draft projection run the head inside their graphs,
+and their only statistics dump was set_gate before a replay, which reads the
+counters of earlier replays. The last replay's calls and mismatches therefore
+never reached the stats file. Dump after each draft graph replay as well:
+after_replay on the draft model runner (DFlash) and after_draft_replay after
+the MTP draft graph.
+---
+ python/sglang/srt/layers/certified_head.py       | 14 ++++++++++++++
+ python/sglang/srt/speculative/eagle_worker_v2.py |  1 +
+ 2 files changed, 15 insertions(+)
+
+diff --git a/python/sglang/srt/layers/certified_head.py b/python/sglang/srt/layers/certified_head.py
+index 1beb765454..375bc16985 100644
+--- a/python/sglang/srt/layers/certified_head.py
++++ b/python/sglang/srt/layers/certified_head.py
+@@ -378,6 +378,13 @@ def attach_ids(path: str, logits_output: LogitsProcessorOutput, rows: int) -> No
+     _maybe_dump()
+ 
+ 
++def after_draft_replay() -> None:
++    """After an MTP draft graph replay: record the draft path's counters, which
++    set_gate before the next replay would otherwise be the first to read."""
++    if _heads is not None and "draft" in _state:
++        _maybe_dump()
++
++
+ def mtp_draft_eligible(topk: int) -> bool:
+     """MTP drafting is greedy top-1 whatever the requests' sampling parameters,
+     unless draft proposals are sampled for rejection sampling."""
+@@ -503,6 +510,13 @@ def after_replay(
+     model_runner, forward_batch: ForwardBatch, logits_output: LogitsProcessorOutput
+ ) -> None:
+     """Copy the certified ids out of the head's buffer before the next replay."""
++    if _heads is None:
++        return
++    if model_runner.is_draft_worker:
++        # The DFlash draft projection runs inside this graph and has no later
++        # attach_ids: record its counters now, or the last replay is never written.
++        _maybe_dump()
++        return
+     path = getattr(forward_batch, "certified_path", None)
+     if path is not None:
+         attach_ids(path, logits_output, forward_batch.certified_rows)
+diff --git a/python/sglang/srt/speculative/eagle_worker_v2.py b/python/sglang/srt/speculative/eagle_worker_v2.py
+index 256ae53385..65b7a62c91 100644
+--- a/python/sglang/srt/speculative/eagle_worker_v2.py
++++ b/python/sglang/srt/speculative/eagle_worker_v2.py
+@@ -652,6 +652,7 @@ class EagleDraftWorker(EagleDraftWorkerBase):
+                 parent_list, top_scores_index, draft_tokens, draft_probs = (
+                     self.cuda_graph_runner.execute(forward_batch)
+                 )
++                certified_head.after_draft_replay()
+                 if draft_probs is not None:
+                     # draft_probs is the one graph output read after the target
+                     # forward rather than by it, and it points into the graph's
+-- 
+2.34.1
+

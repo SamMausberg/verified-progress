@@ -48,6 +48,10 @@ PATH_FLAG = {
 }
 """Engine paths (one CUDA-graph family each) and the flag that enables them."""
 PATHS = tuple(PATH_FLAG)
+# _count_kernel counts bit b of the status word as the b-th STATUS_BITS entry.
+if any(bit != 1 << i for i, bit in enumerate(STATUS_BITS.values())):
+    raise ImportError('certified_head.engine needs STATUS_BITS in bit order (1 << i)')
+
 COUNTERS = (
     'calls',
     'rows',
@@ -76,14 +80,20 @@ class Flags:
     check: bool = False
     stats: str | None = None
 
+    def __post_init__(self) -> None:
+        # Every construction is checked (the SGLang glue builds Flags directly), so
+        # a misspelled value fails start-up instead of running another mode.
+        if self.fallback not in ('batch', 'columns'):
+            raise ValueError(f'SGLANG_CERTIFIED_HEAD_FALLBACK={self.fallback!r}: batch or columns')
+        if self.model not in ('conservative', 'hopper-wgmma'):
+            raise ValueError(
+                f'SGLANG_CERTIFIED_HEAD_MODEL={self.model!r}: conservative or hopper-wgmma'
+            )
+
     @classmethod
     def from_env(cls) -> Flags:
         fallback = os.environ.get('SGLANG_CERTIFIED_HEAD_FALLBACK', 'batch')
         model = os.environ.get('SGLANG_CERTIFIED_HEAD_MODEL', 'conservative')
-        if fallback not in ('batch', 'columns'):
-            raise ValueError(f'SGLANG_CERTIFIED_HEAD_FALLBACK={fallback!r}')
-        if model not in ('conservative', 'hopper-wgmma'):
-            raise ValueError(f'SGLANG_CERTIFIED_HEAD_MODEL={model!r}')
         return cls(
             decode=_flag('SGLANG_CERTIFIED_HEAD_DECODE'),
             verify=_flag('SGLANG_CERTIFIED_HEAD_VERIFY'),
