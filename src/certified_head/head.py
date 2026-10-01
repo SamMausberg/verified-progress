@@ -20,7 +20,9 @@ rows are reported in ``stats.status`` instead of being recomputed.
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -197,6 +199,17 @@ class HeadStats:
         }
 
 
+def weight_sha256(weight: torch.Tensor, chunk_rows: int = 16384) -> str:
+    """SHA-256 of a contiguous BF16 weight's bytes, equal to
+    :func:`certified_head.quantize.head_sha256` of the same values, read from the
+    device in chunks of ``chunk_rows`` rows so the host holds one chunk at a time."""
+    digest = hashlib.sha256()
+    bits = weight.view(torch.int16)
+    for r0 in range(0, bits.shape[0], chunk_rows):
+        digest.update(bits[r0 : r0 + chunk_rows].cpu().numpy().tobytes())
+    return digest.hexdigest()
+
+
 def _if_body(pred: torch.Tensor) -> Any:
     from torch._higher_order_ops.cudagraph_conditional_nodes import _if_body as body
 
@@ -230,6 +243,11 @@ class CertifiedHead:
             raise ValueError('inconsistent head shapes')
         if k % group_size:
             raise ValueError('group_size must divide the hidden size')
+        for name, t in (('weight', weight), ('q', q), ('scale', scale)):
+            if not t.is_contiguous():
+                # The kernels index these as flat row-major storage, while the
+                # stock fallback would honour the strides: refuse a mismatch.
+                raise ValueError(f'{name} must be contiguous')
         self.weight = weight
         self.q = q
         self.scale = scale
@@ -308,6 +326,14 @@ class CertifiedHead:
         self._probes = K.PROBES
         self.unsafe = False
         """True once runtime probes are disabled: not a certified head any more."""
+        self.weight_check: dict[str, Any] = {
+            'ok': True,
+            'checked': False,
+            'reason': 'constructed directly: the caller supplies quantization data '
+            'that belongs to this weight (from_quantized checks it)',
+        }
+        """Whether the quantization data is known to belong to ``weight``; if not,
+        every batch takes the stock path (status ``refused``)."""
         c = self.const
         const64 = [0.0] * 3
         const64[K.CONST_SUMSQ_INFLATE.value] = c.sumsq_inflate
@@ -353,7 +379,7 @@ class CertifiedHead:
             for a in ARITH_CODES
         }
         wmax = f32_up(float(sqrt_upper_f32(qh.w_sumsq.sum(axis=1) * (1 + 2**-40)).max()))
-        return cls(
+        head = cls(
             weight.to(device),
             qh.q.to(device),
             qh.scale.to(device),
@@ -365,6 +391,36 @@ class CertifiedHead:
             ref_model=ref_model,
             **kwargs,
         )
+        head.check_weight(qh.info.get('head_sha256'))
+        return head
+
+    def check_weight(self, expected: str | None) -> dict[str, Any]:
+        """Check that the quantization data was built from this weight: its
+        ``head_sha256`` must equal the SHA-256 of ``self.weight``. The codes,
+        scales and error norms bound the approximation error only for the weight
+        they came from, and the self-test and probes check a few rows, not this.
+        On a mismatch, or with no digest, the head fails closed: every batch takes
+        the stock path (status ``refused``). The time taken is recorded."""
+        t0 = time.perf_counter()
+        digest = weight_sha256(self.weight) if expected else None
+        ok = expected is not None and digest == expected
+        if ok:
+            reason = 'digest matches'
+        elif expected is None:
+            reason = 'the quantization data carries no head_sha256'
+        else:
+            reason = 'the weight differs from the one the quantization data was built from'
+        self.weight_check = {
+            'ok': ok,
+            'checked': True,
+            'reason': reason,
+            'expected': expected,
+            'digest': digest,
+            'seconds': time.perf_counter() - t0,
+        }
+        if not ok:
+            logger.warning('certified head refused: %s; every batch takes the stock path', reason)
+        return self.weight_check
 
     @classmethod
     def from_checkpoint(
@@ -646,9 +702,12 @@ class CertifiedHead:
         return self._variant_ids[key]
 
     def _certifiable(self, m: int) -> bool:
-        """Whether batch size ``m`` may be certified: its variant has passed the
+        """Whether batch size ``m`` may be certified: the quantization data belongs
+        to the weight (:meth:`check_weight`), and the variant has passed the
         self-test at ``m`` (run now on first eager use; never under capture, where
         an untested size takes the stock path) and has not failed it."""
+        if not self.weight_check['ok']:
+            return False
         if self._in_self_test:
             return True
         key = self._variant_key(m)

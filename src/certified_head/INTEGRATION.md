@@ -20,7 +20,15 @@ ids, stats = head.gumbel_sample(H, seeds, positions, temps)  # seeded, temperatu
   `embed_tokens.weight` for Qwen3.5), so that rescoring and the fallback read the
   bytes the stock head reads. `quantize.load_or_build()` builds the int8 codes
   and metadata once and caches them under `~/vp-data/kernel/`, keyed by the
-  head's SHA-256.
+  head's SHA-256. `from_quantized` checks that digest against `W` itself
+  (`head.weight_check`, timed; the weight is read from the device in row chunks):
+  on a mismatch, or with no digest, the head fails closed and every batch takes
+  the stock path (status `refused`). The codes, scales and error norms bound the
+  approximation error only for the weight they were built from, which the
+  self-test and probes cannot establish for every row. The plain constructor
+  trusts its caller on this.
+- `W`, the codes and the scales must be contiguous (the kernels index them as
+  flat row-major storage); the constructor rejects strided tensors.
 - `H` is BF16 `[M, 2560]`, contiguous, the post-final-norm hidden states that the
   logits processor receives; `M <= max_batch`.
 - Extra GPU memory: 636 MB of int8 codes, about 3 MB of per-row metadata, tile

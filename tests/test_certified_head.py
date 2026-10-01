@@ -834,6 +834,67 @@ def test_p8_witness_interior_bf16_values() -> None:
 # --- fail-closed behaviour and the enclosure self-test -------------------------
 
 
+def test_quantization_data_must_belong_to_the_weight(checkpoint: tuple[Any, Any]) -> None:
+    """from_quantized checks the quantization data's head_sha256 against the
+    supplied weight; a weight one bit off, or data without a digest, makes every
+    batch take the stock path (status ``refused``)."""
+    import dataclasses
+
+    w, qh = checkpoint
+    head = CertifiedHead.from_quantized(w, qh, max_batch=8, capacity=64)
+    assert head.weight_check['ok'] and head.weight_check['checked']
+    print(
+        f'weight digest check: {head.weight_check["seconds"]:.2f} s for {w.numel() * 2 / 1e9:.2f} GB'
+    )
+    gen = torch.Generator(device='cuda').manual_seed(3)
+    h = (torch.randn(8, w.shape[1], device='cuda', generator=gen) * 2).to(torch.bfloat16)
+    _, ok_stats = head.argmax(h)
+    assert not bool((ok_stats.status == STATUS_BITS['refused']).any())
+
+    w2 = w.clone()
+    w2.view(torch.int16)[1234, 56] ^= 1  # one element, one bit
+    no_digest = dataclasses.replace(
+        qh, info={k: v for k, v in qh.info.items() if k != 'head_sha256'}
+    )
+    for weight, data in ((w2, qh), (w, no_digest)):
+        bad = CertifiedHead.from_quantized(weight, data, max_batch=8, capacity=64)
+        assert not bad.weight_check['ok'], bad.weight_check
+        ids, stats = bad.argmax(h)
+        assert bool((stats.status == STATUS_BITS['refused']).all())
+        assert torch.equal(ids, reference_argmax(h, bad.weight, 'bf16'))
+        seeds = torch.arange(8, dtype=torch.int64, device='cuda')
+        temps = torch.full((8,), 0.7, dtype=torch.float32, device='cuda')
+        _, s_stats = bad.gumbel_sample(h, seeds, seeds + 3, temps)
+        assert bool((s_stats.status == STATUS_BITS['refused']).all())
+
+
+def test_noncontiguous_inputs_are_rejected(checkpoint: tuple[Any, Any]) -> None:
+    """The kernels index weight, q and scale as flat row-major storage."""
+    w, qh = checkpoint
+    base = CertifiedHead.from_quantized(w, qh, max_batch=8, capacity=64)
+    strided = [
+        (base.weight.t().contiguous().t(), base.q, base.scale),
+        (base.weight, base.q.t().contiguous().t(), base.scale),
+        (base.weight, base.q, torch.repeat_interleave(base.scale, 2)[::2]),
+    ]
+    for weight, q, scale in strided:
+        assert torch.equal(weight, base.weight) and torch.equal(q, base.q)
+        assert torch.equal(scale, base.scale)
+        with pytest.raises(ValueError, match='contiguous'):
+            CertifiedHead(
+                weight,
+                q,
+                scale,
+                base.coeff,
+                base.dup_rep,
+                wmax=base.wmax,
+                group_size=base.group_size,
+                max_batch=8,
+                capacity=64,
+            )
+        del weight, q, scale
+
+
 def _modified_head(base: CertifiedHead, scale: torch.Tensor, coeff: dict[Any, torch.Tensor]) -> Any:
     return CertifiedHead(
         base.weight,
