@@ -251,10 +251,13 @@ DFlash's next accepted length). A gated program may choose fresh DFlash on suppo
 where reuse is unfavourable, which the always-reuse table does not allow. Taking, per supported
 boundary, the better of oracle reuse and fresh drafting gives a Delta that is >= 0 and >= the
 always-reuse Delta by construction, so it rejects nothing. It bounds from above P9's program with
-any gate over the same candidate sets with a padded verify, and its excess over always-reuse is the
-most a perfect gate could add (same resamples as the table, so the intervals are paired):
+any gate over the same candidate sets with a padded verify, and its Delta is the upper bound to
+quote for them (same resamples as the table, so the intervals are paired). The last column, its
+excess over the always-reuse oracle, is only the gain from gating the oracle's reuse arm: a real
+program's reuse arm is no better than the oracle's, so gating it can gain more, and the column does
+not bound that gain.
 
-| K | gate reuses at | Delta (95% CI) | gain over always-reuse |
+| K | gate reuses at | Delta (95% CI) | gain from gating the oracle reuse arm |
 |---|---|---|---|
 | 1 | 0.7% | +0.01 (+0.01, +0.01) | +0.05 |
 | 2 | 24.9% | +0.45 (+0.42, +0.49) | +1.12 |
@@ -267,12 +270,13 @@ bounds P9's program with any gate, at any verify width whose non-verify phases c
 block-16 values: +0.04 (+0.03, +0.05) at K = 1, +1.47 (+1.35, +1.61) at 2, +2.54 (+2.35, +2.76) at
 4, +3.47 (+3.24, +3.73) at 8 and +4.35 (+4.09, +4.64) at 16.
 
-A perfect gate would add 1.06 to 1.33 tokens per post-rejection boundary at the tested K from 2 to
-16 (2, 4, 8 and 16). A real gate decides before the second cycle and does not see fresh DFlash's
-outcome, so a gate is worth building only if features known at decision time (the correction
-position J, the remaining horizon m, the old sets' probabilities at the remaining positions) predict
-which boundaries those are. The supported suffix length U_K - J is not one of them: it needs the
-greedy tokens after the correction, so it is an oracle target that such features might predict.
+Gating the oracle's reuse arm adds 1.06 to 1.33 tokens per post-rejection boundary at the tested K
+from 2 to 16 (2, 4, 8 and 16). A real gate decides before the second cycle and does not see fresh
+DFlash's outcome, so it pays off only if features known at decision time (the correction position J,
+the remaining horizon m, the old sets' probabilities at the remaining positions) predict the
+boundaries where its own reuse arm loses to fresh drafting. The supported suffix length U_K - J is
+not one of them: it needs the greedy tokens after the correction, so it is an oracle target that
+such features might predict.
 
 Assumptions of this oracle, stated plainly: (1) the candidate sets are the offline recomputation,
 whose top-1 token matches the engine's drafted token at 97.4% of positions, not the engine's own

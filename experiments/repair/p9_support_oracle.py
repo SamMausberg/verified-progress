@@ -39,7 +39,9 @@ DFlash on supported boundaries it judges unfavourable. The omniscient-gate oracl
 supported boundary, the better of reuse and fresh, max(0, (G2_R - G2_F) - r_F (T2_R - T2_F)),
 knowing G2_F in advance. It is >= 0 and >= the always-reuse Delta by construction (so it can
 reject nothing); it bounds P9's program with any gate over the same candidate sets with a
-padded verify, and its excess over always-reuse is the most a perfect gate could add.
+padded verify. Its excess over the always-reuse oracle is only the gain from gating the
+oracle's reuse arm: a real program's reuse arm is no better than the oracle's, so gating it can
+gain more, and this excess does not bound that gain.
 
 A program could also verify only the m + 1 positions left after the correction instead of a
 padded block. `free_verify_always_reuse` charges the reused cycle no verify at all (the lower
@@ -317,13 +319,15 @@ def main() -> None:
             'delta_oracle_at_overall_dflash_rate_ci95': [lo_o, hi_o],
             'by_domain': by_domain,
             # Oracle: the gate knows G2_F; an upper bound for gated programs, rejects nothing.
+            # gain_from_gating_oracle_reuse: gated minus always-reuse oracle, the gain from gating
+            # the oracle's reuse arm (not a bound on what gating adds to a real program).
             'omniscient_gate_oracle': {
                 'reuse_rate': statistics.fmean(
                     dg_i - r_f * dt_i > 0 for dg_i, dt_i in zip(comp[2], comp[3], strict=True)
                 ),
                 'delta': d_gate,
                 'delta_ci95': [lo_g, hi_g],
-                'gain_over_always_reuse': d_gate - d,
+                'gain_from_gating_oracle_reuse': d_gate - d,
             },
             # Reused verify costs 0, other phases at block 16 (see FREE_VERIFY_SCOPE).
             'free_verify_always_reuse': {

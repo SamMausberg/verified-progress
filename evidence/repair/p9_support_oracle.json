@@ -64,7 +64,7 @@
      0.008070884356941053,
      0.012727200068213582
     ],
-    "gain_over_always_reuse": 0.05308495831330279
+    "gain_from_gating_oracle_reuse": 0.05308495831330279
    },
    "free_verify_always_reuse": {
     "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values; not for every implementation",
@@ -134,7 +134,7 @@
      0.4162422675081178,
      0.48931274373981587
     ],
-    "gain_over_always_reuse": 1.1164305525774356
+    "gain_from_gating_oracle_reuse": 1.1164305525774356
    },
    "free_verify_always_reuse": {
     "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values; not for every implementation",
@@ -204,7 +204,7 @@
      0.8463156601594094,
      0.9770907490601375
     ],
-    "gain_over_always_reuse": 1.3256868500568841
+    "gain_from_gating_oracle_reuse": 1.3256868500568841
    },
    "free_verify_always_reuse": {
     "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values; not for every implementation",
@@ -274,7 +274,7 @@
      1.3474649957229952,
      1.5336139302079843
     ],
-    "gain_over_always_reuse": 1.2116059866187758
+    "gain_from_gating_oracle_reuse": 1.2116059866187758
    },
    "free_verify_always_reuse": {
     "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values; not for every implementation",
@@ -344,7 +344,7 @@
      1.9316169100372456,
      2.177787707515622
     ],
-    "gain_over_always_reuse": 1.06228903680835
+    "gain_from_gating_oracle_reuse": 1.06228903680835
    },
    "free_verify_always_reuse": {
     "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values; not for every implementation",

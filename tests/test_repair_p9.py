@@ -172,7 +172,7 @@ def test_gated_oracle_dominates_always_reuse(
         assert gated['delta_ci95'][0] >= v['delta_oracle_ci95'][0] - 1e-12
         assert gated['delta_ci95'][1] >= v['delta_oracle_ci95'][1] - 1e-12
         assert gated['delta_ci95'][0] >= 0
-        assert gated['gain_over_always_reuse'] >= -1e-12
+        assert gated['gain_from_gating_oracle_reuse'] >= -1e-12
         assert gated['reuse_rate'] <= v['corrected_prefix_supported_rate']
         strictly_better |= gated['delta'] > v['delta_oracle'] + 1e-9
     # The fixture has a supported boundary where fresh drafting commits far more (L' = 8).
