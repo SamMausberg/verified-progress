@@ -71,6 +71,55 @@ measured V(B) + commit; with no anchor pass at all the two-pass design is S_a.
   write account for; the state commit is 0.11-0.14 ms at every width. Its decomposition
   (no-state verify, Nsight Systems at B = 64 and 256) is queued.
 
+### P3 Stage B: anchored residual evaluation on real DFlash blocks (block 16)
+
+`residual_eval_b16.json`, `residual_eval_b16.agree_by_distance.csv` (measured),
+`p3_gate_b16.json` (derived). Sam's critique (2026-09-30) names three claims that must hold
+separately: (1) fixed cheap operators stay accurate after candidate tokens change, (2) their
+errors stay below the decision margins after attention, nonlinearities, recurrence and later
+layers, (3) repair resolves enough positions at once to pay for the anchor, the sweeps and the
+audit. **Claim (1) fails first, and (2) and (3) fail with it.**
+
+Setup: the Hugging Face Qwen3.5-4B target (BF16, pinned revision) run block by block from an
+exact prefix cache; its argmax agrees with the engine's verify argmax on 99.1% of the
+development blocks' positions. Every linear operator (GDN in_proj and out_proj, attention
+q/k/v/o, MLP gate/up/down, tied head) is repaired as z-bar + (W U) U^T (x - x-bar) against the
+anchor pass over the DFlash draft y0, with all nonlinearities, the convolution, the GDN
+recurrence from the exact state and attention over the exact prefix run exactly. Bases are the
+leading principal components of the exact input changes of each operator on 120 development
+blocks (even-indexed requests); 80 held-out blocks come from odd-indexed requests. Blocks are
+real DFlash drafts with a rejection from the drafter workstream's shared trace. Two cascading
+replays against the original anchor: y1 = F(y0) and y2 = F(y1), both exact Jacobi iterates.
+
+- (1) Operator accuracy: on held-out exact changes the median relative error
+  ||W (I - U U^T) dx|| / ||W dx|| over operator inputs is 0.76-0.90 at rank 16, 0.64-0.81 at
+  rank 128 and 0.51-0.73 at rank 512 (by operator class); on the development blocks themselves
+  rank 128 captures a median 51-64% of the change energy. The changes caused by token
+  corrections are not confined to a small fixed subspace.
+- (2) Decisions: on replay 1 the repaired argmax equals the exact argmax at 35% of the changed
+  positions with rank 0 (anchor outputs reused unchanged), 37% at rank 128 and 44% at rank 512;
+  at the corrected position itself 11-14%; on replay 2, 24-35%. The certificate ratio
+  R_i = 2 ||z~ - z||_inf / m_i is below 1 at 4.7% of positions at every rank (median 13-16).
+  Positions before the first change agree exactly in every block (harness check).
+- (3) Progress: free-running repair from y1, audited exactly after every sweep, accepts 4.33
+  drafts after 0 sweeps and 4.33-4.44 after 4 sweeps at every rank, while exact Jacobi from the
+  same anchor accepts 2.98 (y0), 4.33, 5.35, 6.38, 7.34 and 8.30 after 0-5 exact passes: about one
+  token per exact sweep, which also bounds any faithful cheap evaluator.
+- Economic gate (Sam's mu_R / C_R > mu_0 / C_0 against DFlash-16; repair cost a bytes-only lower
+  bound, audit = measured V(16) + commit): the anchored evaluator reaches at most 0.28 of
+  DFlash's committed tokens per unit cost at any rank and sweep count; exact Jacobi with sweeps
+  charged only their anchor and state reads reaches 0.27, 0.47, 0.66, 0.85 and 1.03 after 0-4
+  sweeps. The rigorous bound (audit cost over the most tokens an attempt can add) does not reject
+  at B = 16; the measured progress does.
+
+```sh
+scripts/gpu_lock.sh -s experiments/repair/runs/residual_b16.sh   # raw output in ~/vp-data/repair/residual/b16
+python experiments/repair/summarize_residual.py ~/vp-data/repair/residual/b16 \
+    --out evidence/repair/residual_eval_b16.json
+python experiments/repair/p3_gate.py --stage-a evidence/repair/stage_a_oracle.json \
+    --residual evidence/repair/residual_eval_b16.json --read-tbps 3.827 --out evidence/repair/p3_gate_b16.json
+```
+
 ### P2 Arm B (one step): recycling the target's suffix predictions
 
 Measured, offline, on the drafter workstream's shared trace (`one_step_recycling.json`,
