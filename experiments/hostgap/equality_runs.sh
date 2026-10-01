@@ -46,6 +46,10 @@ else
   MODE_ARGS=(--min-free-gb "${EQ_MIN_FREE_GB:-90}")
   C=(1 8 32)
 fi
+# EQ_EXTRA: further launch overrides for every variant (e.g. a binding
+# --set max-total-tokens=... when the KV pool is memory-limited).
+read -ra EXTRA <<<"${EQ_EXTRA:-}"
+TUNED+=("${EXTRA[@]}")
 case "$config" in
   mtp) ARM=(--arm mtp --set enable-linear-replayssm-spec=true "${TUNED[@]}") ;;
   dflash) ARM=(--arm dflash "${TUNED[@]}" --no-strict) ;;

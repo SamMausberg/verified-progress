@@ -111,9 +111,18 @@ def summarize_label(label_dir: Path) -> dict[str, Any]:
         counted = [
             r
             for r in rows
-            if r['window_kind'] in ('unprofiled', 'uncollected') and not r.get('invalid_reason')
+            if r['window_kind'] in ('unprofiled', 'uncollected')
+            and not r.get('invalid_reason')
+            and not (r.get('hostload') or {}).get('contended')
         ]
-        entry: dict[str, Any] = {'counter_windows': counter_summary(counted)}
+        entry: dict[str, Any] = {
+            'counter_windows': counter_summary(counted),
+            'excluded_windows': [
+                {'repeat': r.get('repeat'), 'reason': r.get('invalid_reason') or 'host contention'}
+                for r in rows
+                if r['window_kind'] in ('unprofiled', 'uncollected') and r not in counted
+            ],
+        }
         for r in rows:
             if r['window_kind'] == 'pyspy' and Path(r['output']).exists():
                 entry['pyspy'] = pyspy_shares(Path(r['output']))
