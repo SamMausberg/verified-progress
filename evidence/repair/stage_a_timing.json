@@ -1,0 +1,1536 @@
+[
+  {
+    "run": "/home/ubuntu/vp-data/repair/runs/timing1/force_b128",
+    "mode": "force",
+    "block": 128,
+    "engine_sha": "101e52731b360436ba585a3537539db757bfb1f6",
+    "engine_dirty": false,
+    "repo_sha": "397071df79984ec9778fdba9d0bb325f0c4bba80",
+    "command": [
+      "/home/ubuntu/sglang/.venv/bin/python",
+      "-m",
+      "sglang.launch_server",
+      "--model-path",
+      "Qwen/Qwen3.5-4B",
+      "--revision",
+      "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "--attention-backend",
+      "flashinfer",
+      "--mm-attention-backend",
+      "triton_attn",
+      "--speculative-algorithm",
+      "DFLASH",
+      "--speculative-draft-model-path",
+      "z-lab/Qwen3.5-4B-DFlash",
+      "--speculative-draft-model-revision",
+      "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
+      "--linear-attn-prefill-backend",
+      "flashinfer",
+      "--linear-attn-decode-backend",
+      "flashinfer",
+      "--random-seed",
+      "0",
+      "--stream-interval",
+      "4",
+      "--speculative-dflash-block-size",
+      "128",
+      "--max-running-requests",
+      "1",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "30093"
+    ],
+    "probe_env": {
+      "SGLANG_SIMULATE_ACC_LEN": "128",
+      "SGLANG_SIMULATE_ACC_METHOD": "match-expected",
+      "SGLANG_SIMULATE_ACC_TOKEN_MODE": "real-draft-token",
+      "SGLANG_REPAIR_TIMING_LOG": "/home/ubuntu/vp-data/repair/runs/timing1/force_b128/timing.jsonl"
+    },
+    "requests_recorded": 8,
+    "request_groups_in_log": 11,
+    "phase_us": {
+      "draft": {
+        "n": 136,
+        "median": 2706.465,
+        "mean": 2711.942279411765,
+        "p25": 2661.6,
+        "p75": 2737.15,
+        "p10": 2624.51,
+        "p90": 2799.87
+      },
+      "verify": {
+        "n": 136,
+        "median": 28096.864999999998,
+        "mean": 28096.618970588235,
+        "p25": 28064.51,
+        "p75": 28126.98,
+        "p10": 28038.08,
+        "p90": 28157.95
+      },
+      "accept": {
+        "n": 136,
+        "median": 99.75999999999999,
+        "mean": 100.83007352941176,
+        "p25": 98.59,
+        "p75": 103.65,
+        "p10": 97.34,
+        "p90": 105.15
+      },
+      "commit": {
+        "n": 136,
+        "median": 119.68,
+        "mean": 128.92492647058825,
+        "p25": 116.0,
+        "p75": 145.31,
+        "p10": 114.11,
+        "p90": 147.14
+      },
+      "append": {
+        "n": 136,
+        "median": 113.485,
+        "mean": 113.86602941176471,
+        "p25": 111.52,
+        "p75": 115.74,
+        "p10": 110.56,
+        "p90": 118.11
+      }
+    },
+    "gpu_busy_us": {
+      "n": 136,
+      "median": 31143.184999999998,
+      "mean": 31152.182279411765,
+      "p25": 31096.190000000002,
+      "p75": 31187.39,
+      "p10": 31055.46,
+      "p90": 31247.52
+    },
+    "cycle_period_us": {
+      "n": 128,
+      "median": 31316.40625,
+      "mean": 31329.076766967773,
+      "p25": 31270.01953125,
+      "p75": 31366.69921875,
+      "p10": 31211.9140625,
+      "p90": 31463.37890625
+    },
+    "commit_per_cycle": {
+      "n": 136,
+      "median": 128.0,
+      "mean": 128.0,
+      "p25": 128,
+      "p75": 128,
+      "p10": 128,
+      "p90": 128
+    },
+    "gpu_decode_tok_s": {
+      "n": 8,
+      "median": 4084.6646534711635,
+      "mean": 4085.6684180904335,
+      "p25": 4080.9157557271215,
+      "p75": 4090.3637663336945,
+      "p10": 4080.820463724291,
+      "p90": 4091.856196410471
+    },
+    "client_decode_tok_s": {
+      "n": 8,
+      "median": 4084.2494633047104,
+      "mean": 4085.1536105060277,
+      "p25": 4082.367807329487,
+      "p75": 4086.854396647712,
+      "p10": 4080.448853864151,
+      "p90": 4090.690222548502
+    },
+    "client_e2e_tok_s": {
+      "n": 8,
+      "median": 3598.661332470334,
+      "mean": 3614.973546721178,
+      "p25": 3590.061305130581,
+      "p75": 3613.286731387075,
+      "p10": 3581.7811519384077,
+      "p90": 3619.410752121406
+    },
+    "unaffected_fraction": {
+      "n": 8,
+      "median": 0.11867455372219471,
+      "mean": 0.11520602729918422,
+      "p25": 0.11695656984309832,
+      "p75": 0.12025992394329144,
+      "p10": 0.11586637576627246,
+      "p90": 0.12433676891557821
+    },
+    "per_request": [
+      {
+        "cycles": 17,
+        "seq_start": 73,
+        "tokens": 2176,
+        "gpu_decode_tok_s": 4083.7706224475246,
+        "decode_span_s": 0.501497314453125
+      },
+      {
+        "cycles": 17,
+        "seq_start": 136,
+        "tokens": 2176,
+        "gpu_decode_tok_s": 4078.3246048862447,
+        "decode_span_s": 0.5021669921875
+      },
+      {
+        "cycles": 17,
+        "seq_start": 73,
+        "tokens": 2176,
+        "gpu_decode_tok_s": 4085.558684494802,
+        "decode_span_s": 0.50127783203125
+      },
+      {
+        "cycles": 17,
+        "seq_start": 40,
+        "tokens": 2176,
+        "gpu_decode_tok_s": 4091.856196410471,
+        "decode_span_s": 0.50050634765625
+      },
+      {
+        "cycles": 17,
+        "seq_start": 389,
+        "tokens": 2176,
+        "gpu_decode_tok_s": 4090.3637663336945,
+        "decode_span_s": 0.50068896484375
+      },
+      {
+        "cycles": 17,
+        "seq_start": 67,
+        "tokens": 2176,
+        "gpu_decode_tok_s": 4080.9157557271215,
+        "decode_span_s": 0.50184814453125
+      },
+      {
+        "cycles": 17,
+        "seq_start": 45,
+        "tokens": 2176,
+        "gpu_decode_tok_s": 4093.73725069932,
+        "decode_span_s": 0.5002763671875
+      },
+      {
+        "cycles": 17,
+        "seq_start": 94,
+        "tokens": 2176,
+        "gpu_decode_tok_s": 4080.820463724291,
+        "decode_span_s": 0.50185986328125
+      }
+    ],
+    "us_per_token": 244.659423828125
+  },
+  {
+    "run": "/home/ubuntu/vp-data/repair/runs/timing1/force_b16",
+    "mode": "force",
+    "block": 16,
+    "engine_sha": "101e52731b360436ba585a3537539db757bfb1f6",
+    "engine_dirty": false,
+    "repo_sha": "397071df79984ec9778fdba9d0bb325f0c4bba80",
+    "command": [
+      "/home/ubuntu/sglang/.venv/bin/python",
+      "-m",
+      "sglang.launch_server",
+      "--model-path",
+      "Qwen/Qwen3.5-4B",
+      "--revision",
+      "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "--attention-backend",
+      "flashinfer",
+      "--mm-attention-backend",
+      "triton_attn",
+      "--speculative-algorithm",
+      "DFLASH",
+      "--speculative-draft-model-path",
+      "z-lab/Qwen3.5-4B-DFlash",
+      "--speculative-draft-model-revision",
+      "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
+      "--linear-attn-prefill-backend",
+      "flashinfer",
+      "--linear-attn-decode-backend",
+      "flashinfer",
+      "--random-seed",
+      "0",
+      "--stream-interval",
+      "4",
+      "--speculative-dflash-block-size",
+      "16",
+      "--max-running-requests",
+      "1",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "30093"
+    ],
+    "probe_env": {
+      "SGLANG_SIMULATE_ACC_LEN": "16",
+      "SGLANG_SIMULATE_ACC_METHOD": "match-expected",
+      "SGLANG_SIMULATE_ACC_TOKEN_MODE": "real-draft-token",
+      "SGLANG_REPAIR_TIMING_LOG": "/home/ubuntu/vp-data/repair/runs/timing1/force_b16/timing.jsonl"
+    },
+    "requests_recorded": 8,
+    "request_groups_in_log": 11,
+    "phase_us": {
+      "draft": {
+        "n": 1032,
+        "median": 2396.8,
+        "mean": 2401.3945058139534,
+        "p25": 2376.9,
+        "p75": 2416.16,
+        "p10": 2361.02,
+        "p90": 2443.78
+      },
+      "verify": {
+        "n": 1032,
+        "median": 4783.475,
+        "mean": 4788.87402131783,
+        "p25": 4764.35,
+        "p75": 4806.82,
+        "p10": 4748.19,
+        "p90": 4835.07
+      },
+      "accept": {
+        "n": 1032,
+        "median": 38.18,
+        "mean": 38.29109496124031,
+        "p25": 37.6,
+        "p75": 38.98,
+        "p10": 37.02,
+        "p90": 39.68
+      },
+      "commit": {
+        "n": 1032,
+        "median": 114.3,
+        "mean": 115.57864341085272,
+        "p25": 112.99,
+        "p75": 115.94,
+        "p10": 111.55,
+        "p90": 117.89
+      },
+      "append": {
+        "n": 1032,
+        "median": 99.71,
+        "mean": 99.85418604651163,
+        "p25": 98.37,
+        "p75": 101.54,
+        "p10": 96.93,
+        "p90": 102.98
+      }
+    },
+    "gpu_busy_us": {
+      "n": 1032,
+      "median": 7431.57,
+      "mean": 7443.992451550387,
+      "p25": 7403.67,
+      "p75": 7469.05,
+      "p10": 7377.18,
+      "p90": 7524.83
+    },
+    "cycle_period_us": {
+      "n": 1024,
+      "median": 7601.5625,
+      "mean": 7612.743854522705,
+      "p25": 7567.3828125,
+      "p75": 7646.484375,
+      "p10": 7539.0625,
+      "p90": 7700.1953125
+    },
+    "commit_per_cycle": {
+      "n": 1032,
+      "median": 16.0,
+      "mean": 16.0,
+      "p25": 16,
+      "p75": 16,
+      "p10": 16,
+      "p90": 16
+    },
+    "gpu_decode_tok_s": {
+      "n": 8,
+      "median": 2101.8665111558066,
+      "mean": 2101.7442322041934,
+      "p25": 2100.565418805559,
+      "p75": 2103.5520571338297,
+      "p10": 2100.144706206344,
+      "p90": 2104.885348771386
+    },
+    "client_decode_tok_s": {
+      "n": 8,
+      "median": 2102.0429162074106,
+      "mean": 2101.5944455898757,
+      "p25": 2101.2350794940317,
+      "p75": 2103.2836323252445,
+      "p10": 2099.710944063244,
+      "p90": 2103.721070260029
+    },
+    "client_e2e_tok_s": {
+      "n": 8,
+      "median": 2004.74017188033,
+      "mean": 2006.591525536621,
+      "p25": 2003.5904007305012,
+      "p75": 2014.7373690262712,
+      "p10": 1997.8563995851014,
+      "p90": 2015.3994249187756
+    },
+    "unaffected_fraction": {
+      "n": 8,
+      "median": 0.04620099656092724,
+      "mean": 0.045274919516035766,
+      "p25": 0.043210180831643186,
+      "p75": 0.04685976042824558,
+      "p10": 0.041990108675303284,
+      "p90": 0.047496070173057015
+    },
+    "per_request": [
+      {
+        "cycles": 129,
+        "seq_start": 73,
+        "tokens": 2064,
+        "gpu_decode_tok_s": 2101.638999263427,
+        "decode_span_s": 0.9744775390625
+      },
+      {
+        "cycles": 129,
+        "seq_start": 136,
+        "tokens": 2064,
+        "gpu_decode_tok_s": 2103.5520571338297,
+        "decode_span_s": 0.97359130859375
+      },
+      {
+        "cycles": 129,
+        "seq_start": 73,
+        "tokens": 2064,
+        "gpu_decode_tok_s": 2106.418133368689,
+        "decode_span_s": 0.9722666015625
+      },
+      {
+        "cycles": 129,
+        "seq_start": 40,
+        "tokens": 2064,
+        "gpu_decode_tok_s": 2104.885348771386,
+        "decode_span_s": 0.972974609375
+      },
+      {
+        "cycles": 129,
+        "seq_start": 389,
+        "tokens": 2064,
+        "gpu_decode_tok_s": 2094.655171036125,
+        "decode_span_s": 0.9777265625
+      },
+      {
+        "cycles": 129,
+        "seq_start": 67,
+        "tokens": 2064,
+        "gpu_decode_tok_s": 2102.0940230481865,
+        "decode_span_s": 0.9742666015625
+      },
+      {
+        "cycles": 129,
+        "seq_start": 45,
+        "tokens": 2064,
+        "gpu_decode_tok_s": 2100.565418805559,
+        "decode_span_s": 0.9749755859375
+      },
+      {
+        "cycles": 129,
+        "seq_start": 94,
+        "tokens": 2064,
+        "gpu_decode_tok_s": 2100.144706206344,
+        "decode_span_s": 0.9751708984375
+      }
+    ],
+    "us_per_token": 475.09765625
+  },
+  {
+    "run": "/home/ubuntu/vp-data/repair/runs/timing1/force_b256",
+    "mode": "force",
+    "block": 256,
+    "engine_sha": "101e52731b360436ba585a3537539db757bfb1f6",
+    "engine_dirty": false,
+    "repo_sha": "397071df79984ec9778fdba9d0bb325f0c4bba80",
+    "command": [
+      "/home/ubuntu/sglang/.venv/bin/python",
+      "-m",
+      "sglang.launch_server",
+      "--model-path",
+      "Qwen/Qwen3.5-4B",
+      "--revision",
+      "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "--attention-backend",
+      "flashinfer",
+      "--mm-attention-backend",
+      "triton_attn",
+      "--speculative-algorithm",
+      "DFLASH",
+      "--speculative-draft-model-path",
+      "z-lab/Qwen3.5-4B-DFlash",
+      "--speculative-draft-model-revision",
+      "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
+      "--linear-attn-prefill-backend",
+      "flashinfer",
+      "--linear-attn-decode-backend",
+      "flashinfer",
+      "--random-seed",
+      "0",
+      "--stream-interval",
+      "4",
+      "--speculative-dflash-block-size",
+      "256",
+      "--max-running-requests",
+      "1",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "30093"
+    ],
+    "probe_env": {
+      "SGLANG_SIMULATE_ACC_LEN": "256",
+      "SGLANG_SIMULATE_ACC_METHOD": "match-expected",
+      "SGLANG_SIMULATE_ACC_TOKEN_MODE": "real-draft-token",
+      "SGLANG_REPAIR_TIMING_LOG": "/home/ubuntu/vp-data/repair/runs/timing1/force_b256/timing.jsonl"
+    },
+    "requests_recorded": 8,
+    "request_groups_in_log": 11,
+    "phase_us": {
+      "draft": {
+        "n": 72,
+        "median": 3206.8450000000003,
+        "mean": 3224.7975,
+        "p25": 3157.09,
+        "p75": 3257.86,
+        "p10": 3127.81,
+        "p90": 3362.75
+      },
+      "verify": {
+        "n": 72,
+        "median": 44823.854999999996,
+        "mean": 44819.711111111115,
+        "p25": 44756.64,
+        "p75": 44872.03,
+        "p10": 44728.77,
+        "p90": 44918.33
+      },
+      "accept": {
+        "n": 72,
+        "median": 154.03500000000003,
+        "mean": 153.04930555555555,
+        "p25": 151.2,
+        "p75": 155.2,
+        "p10": 147.71,
+        "p90": 156.45
+      },
+      "commit": {
+        "n": 72,
+        "median": 144.20999999999998,
+        "mean": 142.67402777777778,
+        "p25": 142.5,
+        "p75": 145.86,
+        "p10": 126.91,
+        "p90": 147.49
+      },
+      "append": {
+        "n": 72,
+        "median": 135.78,
+        "mean": 135.88055555555556,
+        "p25": 134.4,
+        "p75": 137.63,
+        "p10": 132.19,
+        "p90": 139.55
+      }
+    },
+    "gpu_busy_us": {
+      "n": 72,
+      "median": 48456.79,
+      "mean": 48476.1125,
+      "p25": 48376.22,
+      "p75": 48541.95,
+      "p10": 48346.81,
+      "p90": 48609.030000000006
+    },
+    "cycle_period_us": {
+      "n": 64,
+      "median": 48622.802734375,
+      "mean": 48654.178619384766,
+      "p25": 48544.43359375,
+      "p75": 48725.830078125,
+      "p10": 48510.7421875,
+      "p90": 48865.72265625
+    },
+    "commit_per_cycle": {
+      "n": 72,
+      "median": 256.0,
+      "mean": 256.0,
+      "p25": 256,
+      "p75": 256,
+      "p10": 256,
+      "p90": 256
+    },
+    "gpu_decode_tok_s": {
+      "n": 8,
+      "median": 5261.479851045988,
+      "mean": 5261.631567156432,
+      "p25": 5257.13010829981,
+      "p75": 5264.338760874012,
+      "p10": 5256.9489095191,
+      "p90": 5267.188072956696
+    },
+    "client_decode_tok_s": {
+      "n": 8,
+      "median": 5262.6382310224035,
+      "mean": 5261.921463825422,
+      "p25": 5254.645067104286,
+      "p75": 5268.710964110951,
+      "p10": 5249.392939884377,
+      "p90": 5271.6074575263
+    },
+    "client_e2e_tok_s": {
+      "n": 8,
+      "median": 4295.278658693522,
+      "mean": 4339.155053522763,
+      "p25": 4281.6244592640105,
+      "p75": 4309.341265219473,
+      "p10": 4277.335231858375,
+      "p90": 4310.216583175538
+    },
+    "unaffected_fraction": {
+      "n": 8,
+      "median": 0.1839867001461371,
+      "mean": 0.1753101276211625,
+      "p25": 0.18025810419875532,
+      "p75": 0.18679106412072166,
+      "p10": 0.17925612952280678,
+      "p90": 0.18799273222728263
+    },
+    "per_request": [
+      {
+        "cycles": 9,
+        "seq_start": 73,
+        "tokens": 2304,
+        "gpu_decode_tok_s": 5257.13010829981,
+        "decode_span_s": 0.389566162109375
+      },
+      {
+        "cycles": 9,
+        "seq_start": 136,
+        "tokens": 2304,
+        "gpu_decode_tok_s": 5267.188072956696,
+        "decode_span_s": 0.388822265625
+      },
+      {
+        "cycles": 9,
+        "seq_start": 73,
+        "tokens": 2304,
+        "gpu_decode_tok_s": 5251.5976521024895,
+        "decode_span_s": 0.3899765625
+      },
+      {
+        "cycles": 9,
+        "seq_start": 40,
+        "tokens": 2304,
+        "gpu_decode_tok_s": 5263.136496591255,
+        "decode_span_s": 0.38912158203125
+      },
+      {
+        "cycles": 9,
+        "seq_start": 389,
+        "tokens": 2304,
+        "gpu_decode_tok_s": 5259.823205500719,
+        "decode_span_s": 0.38936669921875
+      },
+      {
+        "cycles": 9,
+        "seq_start": 67,
+        "tokens": 2304,
+        "gpu_decode_tok_s": 5272.889331407372,
+        "decode_span_s": 0.38840185546875
+      },
+      {
+        "cycles": 9,
+        "seq_start": 45,
+        "tokens": 2304,
+        "gpu_decode_tok_s": 5256.9489095191,
+        "decode_span_s": 0.38957958984375
+      },
+      {
+        "cycles": 9,
+        "seq_start": 94,
+        "tokens": 2304,
+        "gpu_decode_tok_s": 5264.338760874012,
+        "decode_span_s": 0.38903271484375
+      }
+    ],
+    "us_per_token": 189.93282318115234
+  },
+  {
+    "run": "/home/ubuntu/vp-data/repair/runs/timing1/force_b32",
+    "mode": "force",
+    "block": 32,
+    "engine_sha": "101e52731b360436ba585a3537539db757bfb1f6",
+    "engine_dirty": false,
+    "repo_sha": "397071df79984ec9778fdba9d0bb325f0c4bba80",
+    "command": [
+      "/home/ubuntu/sglang/.venv/bin/python",
+      "-m",
+      "sglang.launch_server",
+      "--model-path",
+      "Qwen/Qwen3.5-4B",
+      "--revision",
+      "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "--attention-backend",
+      "flashinfer",
+      "--mm-attention-backend",
+      "triton_attn",
+      "--speculative-algorithm",
+      "DFLASH",
+      "--speculative-draft-model-path",
+      "z-lab/Qwen3.5-4B-DFlash",
+      "--speculative-draft-model-revision",
+      "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
+      "--linear-attn-prefill-backend",
+      "flashinfer",
+      "--linear-attn-decode-backend",
+      "flashinfer",
+      "--random-seed",
+      "0",
+      "--stream-interval",
+      "4",
+      "--speculative-dflash-block-size",
+      "32",
+      "--max-running-requests",
+      "1",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "30093"
+    ],
+    "probe_env": {
+      "SGLANG_SIMULATE_ACC_LEN": "32",
+      "SGLANG_SIMULATE_ACC_METHOD": "match-expected",
+      "SGLANG_SIMULATE_ACC_TOKEN_MODE": "real-draft-token",
+      "SGLANG_REPAIR_TIMING_LOG": "/home/ubuntu/vp-data/repair/runs/timing1/force_b32/timing.jsonl"
+    },
+    "requests_recorded": 8,
+    "request_groups_in_log": 11,
+    "phase_us": {
+      "draft": {
+        "n": 520,
+        "median": 2514.0150000000003,
+        "mean": 2519.631615384615,
+        "p25": 2493.95,
+        "p75": 2533.5,
+        "p10": 2478.98,
+        "p90": 2568.54
+      },
+      "verify": {
+        "n": 520,
+        "median": 7295.985,
+        "mean": 7300.322442307692,
+        "p25": 7278.5,
+        "p75": 7319.58,
+        "p10": 7259.71,
+        "p90": 7340.35
+      },
+      "accept": {
+        "n": 520,
+        "median": 45.7,
+        "mean": 45.68305769230769,
+        "p25": 44.9,
+        "p75": 46.37,
+        "p10": 44.29,
+        "p90": 47.3
+      },
+      "commit": {
+        "n": 520,
+        "median": 118.14,
+        "mean": 120.46161538461538,
+        "p25": 116.35,
+        "p75": 120.13,
+        "p10": 115.36,
+        "p90": 139.23
+      },
+      "append": {
+        "n": 520,
+        "median": 102.82,
+        "mean": 102.86092307692307,
+        "p25": 100.83,
+        "p75": 104.74,
+        "p10": 99.68,
+        "p90": 106.3
+      }
+    },
+    "gpu_busy_us": {
+      "n": 520,
+      "median": 10077.48,
+      "mean": 10088.959653846154,
+      "p25": 10049.56,
+      "p75": 10114.210000000001,
+      "p10": 10019.53,
+      "p90": 10166.88
+    },
+    "cycle_period_us": {
+      "n": 512,
+      "median": 10249.0234375,
+      "mean": 10260.833740234375,
+      "p25": 10212.890625,
+      "p75": 10294.921875,
+      "p10": 10185.546875,
+      "p90": 10346.19140625
+    },
+    "commit_per_cycle": {
+      "n": 520,
+      "median": 32.0,
+      "mean": 32.0,
+      "p25": 32,
+      "p75": 32,
+      "p10": 32,
+      "p90": 32
+    },
+    "gpu_decode_tok_s": {
+      "n": 8,
+      "median": 3119.834601987236,
+      "mean": 3118.6708397108073,
+      "p25": 3118.9471602088665,
+      "p75": 3121.6909794581725,
+      "p10": 3118.2839826685345,
+      "p90": 3123.467050332282
+    },
+    "client_decode_tok_s": {
+      "n": 8,
+      "median": 3120.149056042129,
+      "mean": 3118.5624930019007,
+      "p25": 3117.316991943134,
+      "p75": 3123.38727666855,
+      "p10": 3115.3492753620226,
+      "p90": 3123.4824473955664
+    },
+    "client_e2e_tok_s": {
+      "n": 8,
+      "median": 2902.7498784944655,
+      "mean": 2902.577325602061,
+      "p25": 2895.3456995466818,
+      "p75": 2915.316007392031,
+      "p10": 2891.225905113782,
+      "p90": 2916.1118294012904
+    },
+    "unaffected_fraction": {
+      "n": 8,
+      "median": 0.06999040184484823,
+      "mean": 0.06929200651797793,
+      "p25": 0.0671677029491271,
+      "p75": 0.0720827294549603,
+      "p10": 0.06542604959411447,
+      "p90": 0.07240410819370569
+    },
+    "per_request": [
+      {
+        "cycles": 65,
+        "seq_start": 73,
+        "tokens": 2080,
+        "gpu_decode_tok_s": 3101.2246509526663,
+        "decode_span_s": 0.66038427734375
+      },
+      {
+        "cycles": 65,
+        "seq_start": 136,
+        "tokens": 2080,
+        "gpu_decode_tok_s": 3120.262755585974,
+        "decode_span_s": 0.65635498046875
+      },
+      {
+        "cycles": 65,
+        "seq_start": 73,
+        "tokens": 2080,
+        "gpu_decode_tok_s": 3126.083690091465,
+        "decode_span_s": 0.6551328125
+      },
+      {
+        "cycles": 65,
+        "seq_start": 40,
+        "tokens": 2080,
+        "gpu_decode_tok_s": 3119.4064483884977,
+        "decode_span_s": 0.65653515625
+      },
+      {
+        "cycles": 65,
+        "seq_start": 389,
+        "tokens": 2080,
+        "gpu_decode_tok_s": 3121.6909794581725,
+        "decode_span_s": 0.6560546875
+      },
+      {
+        "cycles": 65,
+        "seq_start": 67,
+        "tokens": 2080,
+        "gpu_decode_tok_s": 3123.467050332282,
+        "decode_span_s": 0.655681640625
+      },
+      {
+        "cycles": 65,
+        "seq_start": 45,
+        "tokens": 2080,
+        "gpu_decode_tok_s": 3118.2839826685345,
+        "decode_span_s": 0.656771484375
+      },
+      {
+        "cycles": 65,
+        "seq_start": 94,
+        "tokens": 2080,
+        "gpu_decode_tok_s": 3118.9471602088665,
+        "decode_span_s": 0.6566318359375
+      }
+    ],
+    "us_per_token": 320.281982421875
+  },
+  {
+    "run": "/home/ubuntu/vp-data/repair/runs/timing1/force_b64",
+    "mode": "force",
+    "block": 64,
+    "engine_sha": "101e52731b360436ba585a3537539db757bfb1f6",
+    "engine_dirty": false,
+    "repo_sha": "397071df79984ec9778fdba9d0bb325f0c4bba80",
+    "command": [
+      "/home/ubuntu/sglang/.venv/bin/python",
+      "-m",
+      "sglang.launch_server",
+      "--model-path",
+      "Qwen/Qwen3.5-4B",
+      "--revision",
+      "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "--attention-backend",
+      "flashinfer",
+      "--mm-attention-backend",
+      "triton_attn",
+      "--speculative-algorithm",
+      "DFLASH",
+      "--speculative-draft-model-path",
+      "z-lab/Qwen3.5-4B-DFlash",
+      "--speculative-draft-model-revision",
+      "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
+      "--linear-attn-prefill-backend",
+      "flashinfer",
+      "--linear-attn-decode-backend",
+      "flashinfer",
+      "--random-seed",
+      "0",
+      "--stream-interval",
+      "4",
+      "--speculative-dflash-block-size",
+      "64",
+      "--max-running-requests",
+      "1",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "30093"
+    ],
+    "probe_env": {
+      "SGLANG_SIMULATE_ACC_LEN": "64",
+      "SGLANG_SIMULATE_ACC_METHOD": "match-expected",
+      "SGLANG_SIMULATE_ACC_TOKEN_MODE": "real-draft-token",
+      "SGLANG_REPAIR_TIMING_LOG": "/home/ubuntu/vp-data/repair/runs/timing1/force_b64/timing.jsonl"
+    },
+    "requests_recorded": 8,
+    "request_groups_in_log": 11,
+    "phase_us": {
+      "draft": {
+        "n": 264,
+        "median": 2530.575,
+        "mean": 2539.4473484848486,
+        "p25": 2509.82,
+        "p75": 2554.02,
+        "p10": 2490.75,
+        "p90": 2583.78
+      },
+      "verify": {
+        "n": 264,
+        "median": 15621.215,
+        "mean": 15627.649393939393,
+        "p25": 15605.44,
+        "p75": 15640.93,
+        "p10": 15596.13,
+        "p90": 15664.32
+      },
+      "accept": {
+        "n": 264,
+        "median": 62.27,
+        "mean": 62.358030303030304,
+        "p25": 61.54,
+        "p75": 62.98,
+        "p10": 60.99,
+        "p90": 64.19
+      },
+      "commit": {
+        "n": 264,
+        "median": 115.185,
+        "mean": 120.4782196969697,
+        "p25": 113.79,
+        "p75": 119.17,
+        "p10": 112.83,
+        "p90": 140.61
+      },
+      "append": {
+        "n": 264,
+        "median": 104.29,
+        "mean": 104.43556818181818,
+        "p25": 101.86,
+        "p75": 107.14,
+        "p10": 100.26,
+        "p90": 108.51
+      }
+    },
+    "gpu_busy_us": {
+      "n": 264,
+      "median": 18437.78,
+      "mean": 18454.36856060606,
+      "p25": 18407.3,
+      "p75": 18475.23,
+      "p10": 18384.75,
+      "p90": 18526.3
+    },
+    "cycle_period_us": {
+      "n": 256,
+      "median": 18610.3515625,
+      "mean": 18628.268241882324,
+      "p25": 18575.1953125,
+      "p75": 18652.83203125,
+      "p10": 18548.095703125,
+      "p90": 18720.21484375
+    },
+    "commit_per_cycle": {
+      "n": 264,
+      "median": 64.0,
+      "mean": 64.0,
+      "p25": 64,
+      "p75": 64,
+      "p10": 64,
+      "p90": 64
+    },
+    "gpu_decode_tok_s": {
+      "n": 8,
+      "median": 3436.209237875146,
+      "mean": 3435.642518036349,
+      "p25": 3435.5407717693392,
+      "p75": 3438.701029321943,
+      "p10": 3430.102817935177,
+      "p90": 3439.0224504169737
+    },
+    "client_decode_tok_s": {
+      "n": 8,
+      "median": 3435.373671177651,
+      "mean": 3435.010728641806,
+      "p25": 3434.3078045071916,
+      "p75": 3436.0977800320725,
+      "p10": 3432.921266837328,
+      "p90": 3438.453797707114
+    },
+    "client_e2e_tok_s": {
+      "n": 8,
+      "median": 3144.0949845376576,
+      "mean": 3148.1364154978096,
+      "p25": 3133.6076428406855,
+      "p75": 3152.004307289365,
+      "p10": 3127.2473606924464,
+      "p90": 3165.358323453689
+    },
+    "unaffected_fraction": {
+      "n": 8,
+      "median": 0.0851979880349037,
+      "mean": 0.08367990766931055,
+      "p25": 0.08226147039245124,
+      "p75": 0.08788518285380587,
+      "p10": 0.07949010499530196,
+      "p90": 0.08993259311269852
+    },
+    "per_request": [
+      {
+        "cycles": 33,
+        "seq_start": 73,
+        "tokens": 2112,
+        "gpu_decode_tok_s": 3430.102817935177,
+        "decode_span_s": 0.597066650390625
+      },
+      {
+        "cycles": 33,
+        "seq_start": 136,
+        "tokens": 2112,
+        "gpu_decode_tok_s": 3436.2810238293814,
+        "decode_span_s": 0.5959931640625
+      },
+      {
+        "cycles": 33,
+        "seq_start": 73,
+        "tokens": 2112,
+        "gpu_decode_tok_s": 3439.0224504169737,
+        "decode_span_s": 0.59551806640625
+      },
+      {
+        "cycles": 33,
+        "seq_start": 40,
+        "tokens": 2112,
+        "gpu_decode_tok_s": 3429.6863053900393,
+        "decode_span_s": 0.59713916015625
+      },
+      {
+        "cycles": 33,
+        "seq_start": 389,
+        "tokens": 2112,
+        "gpu_decode_tok_s": 3436.1374519209107,
+        "decode_span_s": 0.59601806640625
+      },
+      {
+        "cycles": 33,
+        "seq_start": 67,
+        "tokens": 2112,
+        "gpu_decode_tok_s": 3435.5407717693392,
+        "decode_span_s": 0.59612158203125
+      },
+      {
+        "cycles": 33,
+        "seq_start": 45,
+        "tokens": 2112,
+        "gpu_decode_tok_s": 3438.701029321943,
+        "decode_span_s": 0.59557373046875
+      },
+      {
+        "cycles": 33,
+        "seq_start": 94,
+        "tokens": 2112,
+        "gpu_decode_tok_s": 3439.6682937070277,
+        "decode_span_s": 0.59540625
+      }
+    ],
+    "us_per_token": 290.7867431640625
+  },
+  {
+    "run": "/home/ubuntu/vp-data/repair/runs/timing1/fresh_b16",
+    "mode": "fresh",
+    "block": 16,
+    "engine_sha": "101e52731b360436ba585a3537539db757bfb1f6",
+    "engine_dirty": false,
+    "repo_sha": "397071df79984ec9778fdba9d0bb325f0c4bba80",
+    "command": [
+      "/home/ubuntu/sglang/.venv/bin/python",
+      "-m",
+      "sglang.launch_server",
+      "--model-path",
+      "Qwen/Qwen3.5-4B",
+      "--revision",
+      "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "--attention-backend",
+      "flashinfer",
+      "--mm-attention-backend",
+      "triton_attn",
+      "--speculative-algorithm",
+      "DFLASH",
+      "--speculative-draft-model-path",
+      "z-lab/Qwen3.5-4B-DFlash",
+      "--speculative-draft-model-revision",
+      "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
+      "--linear-attn-prefill-backend",
+      "flashinfer",
+      "--linear-attn-decode-backend",
+      "flashinfer",
+      "--random-seed",
+      "0",
+      "--stream-interval",
+      "4",
+      "--speculative-dflash-block-size",
+      "16",
+      "--max-running-requests",
+      "1",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "30093"
+    ],
+    "probe_env": {
+      "SGLANG_REPAIR_TIMING_LOG": "/home/ubuntu/vp-data/repair/runs/timing1/fresh_b16/timing.jsonl"
+    },
+    "requests_recorded": 8,
+    "request_groups_in_log": 11,
+    "phase_us": {
+      "draft": {
+        "n": 2094,
+        "median": 2327.65,
+        "mean": 2330.85852913085,
+        "p25": 2307.84,
+        "p75": 2349.34,
+        "p10": 2291.17,
+        "p90": 2371.04
+      },
+      "verify": {
+        "n": 2094,
+        "median": 4734.27,
+        "mean": 4737.347091690544,
+        "p25": 4716.67,
+        "p75": 4754.3,
+        "p10": 4700.38,
+        "p90": 4774.94
+      },
+      "accept": {
+        "n": 2094,
+        "median": 22.88,
+        "mean": 22.886002865329512,
+        "p25": 22.53,
+        "p75": 23.2,
+        "p10": 22.24,
+        "p90": 23.52
+      },
+      "commit": {
+        "n": 2094,
+        "median": 109.63,
+        "mean": 110.30202483285578,
+        "p25": 108.51,
+        "p75": 110.91,
+        "p10": 107.62,
+        "p90": 112.1
+      },
+      "append": {
+        "n": 2094,
+        "median": 99.71,
+        "mean": 99.76145654250239,
+        "p25": 97.86,
+        "p75": 101.66,
+        "p10": 96.58,
+        "p90": 103.17
+      }
+    },
+    "gpu_busy_us": {
+      "n": 2094,
+      "median": 7296.45,
+      "mean": 7301.155105062082,
+      "p25": 7264.77,
+      "p75": 7327.670000000001,
+      "p10": 7238.12,
+      "p90": 7360.990000000001
+    },
+    "cycle_period_us": {
+      "n": 2086,
+      "median": 7457.03125,
+      "mean": 7462.27290006292,
+      "p25": 7419.921875,
+      "p75": 7493.1640625,
+      "p10": 7388.671875,
+      "p90": 7533.203125
+    },
+    "commit_per_cycle": {
+      "n": 2094,
+      "median": 6.0,
+      "mean": 7.675262655205349,
+      "p25": 3,
+      "p75": 13,
+      "p10": 2,
+      "p90": 16
+    },
+    "gpu_decode_tok_s": {
+      "n": 8,
+      "median": 970.7791334062479,
+      "mean": 1037.2854841897429,
+      "p25": 959.772967851468,
+      "p75": 1165.7525567523005,
+      "p10": 941.3989047806758,
+      "p90": 1175.8054791486525
+    },
+    "client_decode_tok_s": {
+      "n": 8,
+      "median": 969.5822637857598,
+      "mean": 1035.5152514587658,
+      "p25": 958.4476780901424,
+      "p75": 1163.130989569686,
+      "p10": 940.1965691338145,
+      "p90": 1172.6171033743653
+    },
+    "client_e2e_tok_s": {
+      "n": 8,
+      "median": 951.5161543557008,
+      "mean": 1012.1784207981458,
+      "p25": 934.3133170294203,
+      "p75": 1134.0573137511199,
+      "p10": 920.4483671731172,
+      "p90": 1142.3854670697501
+    },
+    "unaffected_fraction": {
+      "n": 8,
+      "median": 0.022795757950059725,
+      "mean": 0.022785884452323088,
+      "p25": 0.02114771365032253,
+      "p75": 0.025288631913783166,
+      "p10": 0.019316563396071906,
+      "p90": 0.025937829922899724
+    },
+    "per_request": [
+      {
+        "cycles": 296,
+        "seq_start": 73,
+        "tokens": 2051,
+        "gpu_decode_tok_s": 928.716294276094,
+        "decode_span_s": 2.20411767578125
+      },
+      {
+        "cycles": 235,
+        "seq_start": 136,
+        "tokens": 2065,
+        "gpu_decode_tok_s": 1175.8054791486525,
+        "decode_span_s": 1.746037109375
+      },
+      {
+        "cycles": 233,
+        "seq_start": 73,
+        "tokens": 2058,
+        "gpu_decode_tok_s": 1185.2794038962568,
+        "decode_span_s": 1.7320810546875
+      },
+      {
+        "cycles": 287,
+        "seq_start": 40,
+        "tokens": 2067,
+        "gpu_decode_tok_s": 960.4299340483658,
+        "decode_span_s": 2.135501953125
+      },
+      {
+        "cycles": 293,
+        "seq_start": 389,
+        "tokens": 2054,
+        "gpu_decode_tok_s": 941.3989047806758,
+        "decode_span_s": 2.1776103515625
+      },
+      {
+        "cycles": 232,
+        "seq_start": 67,
+        "tokens": 1655,
+        "gpu_decode_tok_s": 959.772967851468,
+        "decode_span_s": 1.72332421875
+      },
+      {
+        "cycles": 281,
+        "seq_start": 45,
+        "tokens": 2054,
+        "gpu_decode_tok_s": 981.1283327641299,
+        "decode_span_s": 2.087392578125
+      },
+      {
+        "cycles": 237,
+        "seq_start": 94,
+        "tokens": 2068,
+        "gpu_decode_tok_s": 1165.7525567523005,
+        "decode_span_s": 1.760236328125
+      }
+    ],
+    "us_per_token": 971.5669137319562
+  },
+  {
+    "run": "/home/ubuntu/vp-data/repair/runs/timing1/fresh_b8",
+    "mode": "fresh",
+    "block": 8,
+    "engine_sha": "101e52731b360436ba585a3537539db757bfb1f6",
+    "engine_dirty": false,
+    "repo_sha": "397071df79984ec9778fdba9d0bb325f0c4bba80",
+    "command": [
+      "/home/ubuntu/sglang/.venv/bin/python",
+      "-m",
+      "sglang.launch_server",
+      "--model-path",
+      "Qwen/Qwen3.5-4B",
+      "--revision",
+      "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "--attention-backend",
+      "flashinfer",
+      "--mm-attention-backend",
+      "triton_attn",
+      "--speculative-algorithm",
+      "DFLASH",
+      "--speculative-draft-model-path",
+      "z-lab/Qwen3.5-4B-DFlash",
+      "--speculative-draft-model-revision",
+      "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
+      "--linear-attn-prefill-backend",
+      "flashinfer",
+      "--linear-attn-decode-backend",
+      "flashinfer",
+      "--random-seed",
+      "0",
+      "--stream-interval",
+      "4",
+      "--speculative-dflash-block-size",
+      "8",
+      "--max-running-requests",
+      "1",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "30093"
+    ],
+    "probe_env": {
+      "SGLANG_REPAIR_TIMING_LOG": "/home/ubuntu/vp-data/repair/runs/timing1/fresh_b8/timing.jsonl"
+    },
+    "requests_recorded": 8,
+    "request_groups_in_log": 11,
+    "phase_us": {
+      "draft": {
+        "n": 2919,
+        "median": 2318.37,
+        "mean": 2321.617142857143,
+        "p25": 2298.43,
+        "p75": 2339.36,
+        "p10": 2282.14,
+        "p90": 2359.62
+      },
+      "verify": {
+        "n": 2919,
+        "median": 4164.03,
+        "mean": 4166.288369304556,
+        "p25": 4145.95,
+        "p75": 4182.56,
+        "p10": 4129.57,
+        "p90": 4202.59
+      },
+      "accept": {
+        "n": 2919,
+        "median": 18.14,
+        "mean": 18.171312093182596,
+        "p25": 17.89,
+        "p75": 18.43,
+        "p10": 17.7,
+        "p90": 18.72
+      },
+      "commit": {
+        "n": 2919,
+        "median": 107.49,
+        "mean": 107.92205549845836,
+        "p25": 106.27,
+        "p75": 108.67,
+        "p10": 105.22,
+        "p90": 109.82
+      },
+      "append": {
+        "n": 2919,
+        "median": 101.6,
+        "mean": 101.38574854402192,
+        "p25": 100.06,
+        "p75": 103.01,
+        "p10": 98.14,
+        "p90": 104.26
+      }
+    },
+    "gpu_busy_us": {
+      "n": 2919,
+      "median": 6710.68,
+      "mean": 6715.384628297362,
+      "p25": 6679.8,
+      "p75": 6740.64,
+      "p10": 6653.21,
+      "p90": 6774.55
+    },
+    "cycle_period_us": {
+      "n": 2911,
+      "median": 6866.2109375,
+      "mean": 6872.567064448428,
+      "p25": 6835.44921875,
+      "p75": 6899.4140625,
+      "p10": 6809.5703125,
+      "p90": 6933.59375
+    },
+    "commit_per_cycle": {
+      "n": 2919,
+      "median": 7,
+      "mean": 5.634806440561836,
+      "p25": 3,
+      "p75": 8,
+      "p10": 2,
+      "p90": 8
+    },
+    "gpu_decode_tok_s": {
+      "n": 8,
+      "median": 796.1903440615176,
+      "mean": 829.3882301633159,
+      "p25": 774.128199922482,
+      "p75": 875.8026288066711,
+      "p10": 771.1440341629444,
+      "p90": 958.9369033140875
+    },
+    "client_decode_tok_s": {
+      "n": 8,
+      "median": 795.1812332181564,
+      "mean": 828.3795460920876,
+      "p25": 773.8199794121342,
+      "p75": 873.8353141296926,
+      "p10": 770.2274848703275,
+      "p90": 958.1083097557317
+    },
+    "client_e2e_tok_s": {
+      "n": 8,
+      "median": 782.8630471957704,
+      "mean": 813.4086330143518,
+      "p25": 760.5217206185596,
+      "p75": 856.3386645804637,
+      "p10": 756.3435126837555,
+      "p90": 939.0919901934611
+    },
+    "unaffected_fraction": {
+      "n": 8,
+      "median": 0.01790582018454867,
+      "mean": 0.018283120665015903,
+      "p25": 0.016461500854915267,
+      "p75": 0.020216525240389083,
+      "p10": 0.01638008207809616,
+      "p90": 0.02031442608957501
+    },
+    "per_request": [
+      {
+        "cycles": 388,
+        "seq_start": 73,
+        "tokens": 2056,
+        "gpu_decode_tok_s": 771.1440341629444,
+        "decode_span_s": 2.658387939453125
+      },
+      {
+        "cycles": 342,
+        "seq_start": 136,
+        "tokens": 2054,
+        "gpu_decode_tok_s": 875.8026288066711,
+        "decode_span_s": 2.34299365234375
+      },
+      {
+        "cycles": 312,
+        "seq_start": 73,
+        "tokens": 2057,
+        "gpu_decode_tok_s": 958.9369033140875,
+        "decode_span_s": 2.1367412109375
+      },
+      {
+        "cycles": 374,
+        "seq_start": 40,
+        "tokens": 2050,
+        "gpu_decode_tok_s": 798.4166718723098,
+        "decode_span_s": 2.56382421875
+      },
+      {
+        "cycles": 432,
+        "seq_start": 389,
+        "tokens": 2057,
+        "gpu_decode_tok_s": 691.4272193841739,
+        "decode_span_s": 2.963435546875
+      },
+      {
+        "cycles": 386,
+        "seq_start": 67,
+        "tokens": 2056,
+        "gpu_decode_tok_s": 774.128199922482,
+        "decode_span_s": 2.645556640625
+      },
+      {
+        "cycles": 377,
+        "seq_start": 45,
+        "tokens": 2060,
+        "gpu_decode_tok_s": 793.9640162507255,
+        "decode_span_s": 2.5845
+      },
+      {
+        "cycles": 308,
+        "seq_start": 94,
+        "tokens": 2058,
+        "gpu_decode_tok_s": 971.2861675931333,
+        "decode_span_s": 2.110603515625
+      }
+    ],
+    "us_per_token": 1218.5353676168836
+  }
+]

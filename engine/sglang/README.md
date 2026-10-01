@@ -114,3 +114,31 @@ analyse it.
 split size to FlashInfer's target-verify plan, as decode and extend already do. It
 does not make MTP speculation batch-invariant under `--enable-deterministic-inference`
 (see `evidence/state_safety/README.md`); it is kept because a committed run used it.
+
+## repair (`patches/repair/0001-0002`, branch `engine/repair`, head `5d8e00e3e1`)
+
+```sh
+scripts/sglang_worktree.sh repair
+git -C ~/sglang-wt/repair am "$PWD"/engine/sglang/patches/repair/*.patch
+SGLANG_WORKTREE=~/sglang-wt/repair source scripts/sglang_env.sh
+```
+
+`0001` adds `sglang/srt/speculative/repair_probe.py` and hooks in the DFlash worker
+(`dflash_worker_v2.py`) for the long-window repair oracles in `experiments/repair/`. Nothing
+changes unless one of these variables is set:
+
+| Variable | Effect |
+|---|---|
+| `SGLANG_REPAIR_TIMING_LOG=<path>` | one JSON line per decode cycle: GPU phase times from CUDA events (draft, verify, accept, commit, append) and the cycle start on the GPU timeline, resolved lazily without host syncs |
+| `SGLANG_REPAIR_ORACLE=<json>` | each block's draft tokens are replaced by the request's reference continuation; the target still verifies them |
+| `SGLANG_REPAIR_POLICY=recycle\|keep`, `SGLANG_REPAIR_MAX_PASSES=r` | after a rejection the next block is drafted from the previous pass's target predictions (a sliding Jacobi step) or from the previous draft's tail, falling back to the fresh draft; greedy only |
+| `SGLANG_REPAIR_SWEEPS=k` with `SGLANG_REPAIR_TRACE=<path>` | probe mode: k extra full verify passes per block (Jacobi and correct-one sweeps) from the same committed prefix, then the original draft's pass is re-run and committed, so the trajectory is plain DFlash; the committed GDN conv and SSM states are restored before every extra pass and the re-run must reproduce the first pass's argmax |
+| `SGLANG_REPAIR_TRACE=<path>` | one JSON line per request per cycle: prefix length, fresh draft, verified block, target argmax at every position, accepted length, sweeps (syncs the host; no timing from traced runs) |
+
+`0002` adds one variable to the FlashInfer GDN verify kernel:
+
+| Variable | Effect |
+|---|---|
+| `SGLANG_REPAIR_DROP_VERIFY_STATES=1` | the verify kernel skips the per-position FP32 state writes. Timing with forced acceptance only: the commit then copies stale scratch into the request's state, so it corrupts the committed state and every token after the first cycle |
+
+Forced full acceptance uses SGLang's existing `SGLANG_SIMULATE_ACC_LEN`.

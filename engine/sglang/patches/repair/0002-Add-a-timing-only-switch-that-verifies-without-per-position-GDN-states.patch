@@ -1,0 +1,42 @@
+From 5d8e00e3e121e980fa055c06f86e0845972cc712 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <sam@findtensor.com>
+Date: Thu, 1 Oct 2026 00:40:45 +0000
+Subject: [PATCH] Add a timing-only switch that verifies without per-position
+ GDN states
+
+SGLANG_REPAIR_DROP_VERIFY_STATES=1 makes the FlashInfer GDN verify kernel skip
+the per-position FP32 state writes. The committed state is then not advanced,
+so it is only for timing the verify pass with forced acceptance.
+---
+ .../srt/layers/attention/linear/kernels/gdn_flashinfer.py | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/python/sglang/srt/layers/attention/linear/kernels/gdn_flashinfer.py b/python/sglang/srt/layers/attention/linear/kernels/gdn_flashinfer.py
+index e66cee0ab5..ef6b89c950 100644
+--- a/python/sglang/srt/layers/attention/linear/kernels/gdn_flashinfer.py
++++ b/python/sglang/srt/layers/attention/linear/kernels/gdn_flashinfer.py
+@@ -28,6 +28,9 @@ if TYPE_CHECKING:
+     from sglang.srt.layers.attention.mamba.mamba2_metadata import ForwardMetadata
+     from sglang.srt.model_executor.forward_batch_info import ForwardBatch
+ 
++# Timing oracle only (repair workstream): verify without per-position SSM states.
++_REPAIR_DROP_VERIFY_STATES = os.environ.get("SGLANG_REPAIR_DROP_VERIFY_STATES") == "1"
++
+ logger = logging.getLogger(__name__)
+ 
+ _FLASHINFER_GDN_ALIGNMENT = 32
+@@ -621,6 +624,11 @@ class FlashInferGDNKernel(LinearAttnKernelBase):
+                 "FlashInfer GDN MTP kernel requires a, b, A_log, dt_bias."
+             )
+ 
++        if _REPAIR_DROP_VERIFY_STATES:
++            # Timing oracle only (repair workstream): verify without per-position states.
++            # The committed GDN state is then not advanced; outputs after the first
++            # cycle are meaningless.
++            intermediate_states_buffer = None
+         intermediate_states_buffer_mtp = intermediate_states_buffer
+         copy_verify_intermediate_back = False
+         if self.use_state_pool and intermediate_states_buffer is not None:
+-- 
+2.34.1
+

@@ -9,6 +9,6 @@ prompts="${1:-$HOME/vp-data/drafter/data/prompts-v2.jsonl}"
 out="${2:-$HOME/vp-data/drafter/data/targets-v2.jsonl}"
 log_dir="$HOME/vp-data/drafter/runs/gen-$(date +%Y%m%d-%H%M%S)"
 python "$here/serve_run.py" --arm plain --port 30081 --out "$log_dir" \
-  --mem 0.25 --max-running 96 --extra "--disable-radix-cache" \
+  --mem 0.25 --max-running 160 --extra "--disable-radix-cache" \
   --client "python $here/gen_targets.py --port {port} --prompts $prompts --out $out \
-    --max-new-tokens 3072 --concurrency 96 --deadline 1350"
+    --max-new-tokens 3072 --concurrency 160 --deadline 1350"

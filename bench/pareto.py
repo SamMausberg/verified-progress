@@ -9,9 +9,11 @@ concurrency) and marks points that no other point beats on both axes.
         --out evidence/bench/confirm --baseline plain
 
 Writes `points.csv` (one row per run and point), `frontier.csv` (mean, std,
-min and max over repeats), `launches.csv` (one row per server launch: capacity,
-graph range, memory split, failed checks, source commits), one `<label>.dat` per
-label for PGFPlots, and `pareto.png` for a quick look.
+min and max over repeats), `envelope.csv` (the best arm at each concurrency),
+`pairs.csv` with `--pair TEST:BASELINE` (per-repeat ratios of matched-flag arms),
+`launches.csv` (one row per server launch: capacity, graph range, memory split,
+failed checks, source commits), one `<label>.dat` per label for PGFPlots, and
+`pareto.png` for a quick look.
 """
 
 from __future__ import annotations
@@ -54,6 +56,8 @@ POINT_FIELDS = (
     'isl_mean',
     'span_s',
     'foreign_cpu_max',
+    'max_running_logged',
+    'kv_retractions',
 )
 AGGREGATED = ('x_e2e', 'x_decode', 'y', 'y_steady', 'ttft_p50_ms', 'itl_p50_ms', 'accept_length')
 # Reference categorical order (dataviz palette, light surface), assigned per label in order.
@@ -114,6 +118,11 @@ def point_row(label: str, run: str, point: dict[str, Any], status: str = '') -> 
         'accept_length': spec.get('accept_length'),
         'accept_rate': spec.get('accept_rate'),
         'decode_graph_fraction': counters.get('decode_graph_fraction'),
+        # Largest running batch in the scheduler log and KV retractions during the
+        # point (blank: not recorded); below-concurrency batches or retractions mean
+        # the KV pool, not the client, limited the batch.
+        'max_running_logged': (point.get('server_log') or {}).get('max_running_logged'),
+        'kv_retractions': (point.get('server_log') or {}).get('kv_retractions'),
         'isl_mean': point.get('isl_mean'),
         'span_s': point.get('span_s'),
         # CPU cores used by other processes during the point (blank: not recorded).
@@ -239,6 +248,78 @@ def aggregate(rows: list[dict[str, Any]], baseline: str | None) -> list[dict[str
     return frontier
 
 
+def envelope(frontier: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Per concurrency, the arm with the highest mean y, and the runner-up.
+
+    At a fixed client concurrency y is roughly c times x, so the arm with the
+    highest y also gives (nearly) the best per-user rate; both are reported.
+    """
+    by_c: dict[int, list[dict[str, Any]]] = defaultdict(list)
+    for entry in frontier:
+        if entry['n'] > 0 and _finite(entry['y_mean']):
+            by_c[int(entry['concurrency'])].append(entry)
+    rows = []
+    for concurrency in sorted(by_c):
+        ranked = sorted(by_c[concurrency], key=lambda e: -e['y_mean'])
+        best = ranked[0]
+        second = ranked[1] if len(ranked) > 1 else None
+        rows.append(
+            {
+                'concurrency': concurrency,
+                'best': best['label'],
+                'y_mean': best['y_mean'],
+                'y_std': best['y_std'],
+                'x_e2e_mean': best['x_e2e_mean'],
+                'n': best['n'],
+                'runner_up': second['label'] if second else '',
+                'runner_up_y_mean': second['y_mean'] if second else math.nan,
+                'lead': best['y_mean'] / second['y_mean'] - 1 if second else math.nan,
+            }
+        )
+    return rows
+
+
+def paired_ratios(rows: list[dict[str, Any]], pairs: list[tuple[str, str]]) -> list[dict[str, Any]]:
+    """Ratios of a test arm to its matched baseline, pairing runs by repeat order.
+
+    Runs of each label are taken in time order (run directory names are
+    timestamps), so the i-th run of the test arm is paired with the i-th run of
+    the baseline: both come from the same confirmation repeat. Invalid points
+    are skipped.
+    """
+    index: dict[tuple[str, int], dict[str, dict[str, Any]]] = defaultdict(dict)
+    for row in rows:
+        if not row.get('invalid_reason'):
+            index[(row['label'], int(row['concurrency']))][row['run']] = row
+    out = []
+    for test, base in pairs:
+        levels = sorted(
+            {c for (label, c) in index if label == test}
+            & {c for (label, c) in index if label == base}
+        )
+        for concurrency in levels:
+            t_runs = [index[(test, concurrency)][r] for r in sorted(index[(test, concurrency)])]
+            b_runs = [index[(base, concurrency)][r] for r in sorted(index[(base, concurrency)])]
+            matched = list(zip(t_runs, b_runs, strict=False))
+            entry: dict[str, Any] = {
+                'test': test,
+                'baseline': base,
+                'concurrency': concurrency,
+                'n': len(matched),
+            }
+            for field in ('y', 'x_e2e'):
+                ratios = [
+                    float(t[field]) / float(b[field])
+                    for t, b in matched
+                    if _finite(t[field]) and _finite(b[field]) and float(b[field]) > 0
+                ]
+                entry[f'{field}_ratio_mean'] = statistics.fmean(ratios) if ratios else math.nan
+                entry[f'{field}_ratio_min'] = min(ratios) if ratios else math.nan
+                entry[f'{field}_ratio_max'] = max(ratios) if ratios else math.nan
+            out.append(entry)
+    return out
+
+
 def _finite(value: Any) -> bool:
     try:
         return value is not None and math.isfinite(float(value))
@@ -348,6 +429,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--title', default='Qwen3.5-4B on one GH200: latency-throughput')
     parser.add_argument('--no-plot', action='store_true')
     parser.add_argument(
+        '--pair',
+        action='append',
+        default=[],
+        metavar='TEST:BASELINE',
+        help='matched-flag comparison to report as per-repeat ratios (repeatable)',
+    )
+    parser.add_argument(
         '--status',
         default='',
         help='status written into every row, e.g. feasibility-probe or confirmation',
@@ -371,6 +459,10 @@ def main(argv: list[str] | None = None) -> int:
     for entry in frontier:
         entry['status'] = args.status
     write_csv(frontier, args.out / 'frontier.csv')
+    write_csv(envelope(frontier), args.out / 'envelope.csv')
+    if args.pair:
+        pairs = [tuple(item.split(':', 1)) for item in args.pair]
+        write_csv(paired_ratios(rows, pairs), args.out / 'pairs.csv')
     write_pgfplots(frontier, args.out)
     if not args.no_plot:
         plot(frontier, args.out / 'pareto.png', args.title)

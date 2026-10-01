@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Evaluation-panel baselines (panel-v2, greedy, concurrency 1, up to 2,048 new
-# tokens; correctness only, shared slot, stock engine):
-#   - plain decoding with top-2 logprobs (reference for output equality),
+# tokens, top-5 logprobs on every run; correctness only, shared slot, stock engine):
+#   - plain decoding (the reference for output equality),
 #   - native MTP (3 steps) for acceptance by position,
 #   - the public DFlash drafter at block 16,
 # then token-level comparison of MTP and DFlash against plain decoding.
@@ -11,12 +11,12 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 unset SGLANG_WORKTREE
 # shellcheck source=/dev/null
 source "$HOME/verified-progress/scripts/sglang_env.sh"
-out="${1:-$HOME/vp-data/drafter/eval}"
+out="${1:-$HOME/vp-data/drafter/eval-logprobs}"
 panel="$here/panel-v2.jsonl"
 probe="python $here/accept_probe.py --port {port} --workload $panel --per-domain 32 \
-  --max-new-tokens 2048 --concurrency 1 --out {out}"
+  --max-new-tokens 2048 --concurrency 1 --logprobs --out {out}"
 python "$here/serve_run.py" --arm plain --port 30082 --out "$out/plain" --mem 0.25 \
-  --max-running 4 --client "$probe --logprobs --label plain"
+  --max-running 4 --client "$probe --label plain"
 python "$here/serve_run.py" --arm mtp --port 30082 --out "$out/mtp3" --mem 0.25 \
   --max-running 4 --client "$probe --label mtp3"
 python "$here/serve_run.py" --arm dflash --block 16 --port 30082 --out "$out/zlab/b16" \

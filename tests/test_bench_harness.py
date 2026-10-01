@@ -288,6 +288,8 @@ def test_log_segment_stats() -> None:
         'Decode batch, #running-req: 5, #full token: 1, cuda graph: False, '
         'gen throughput (token/s): 12.0, #queue-req: 0\n'
         'Prefill batch, #new-seq: 1\n'
+        'KV cache pool is full. Retract requests. #retracted_reqs: 2, #new_tokens_gained: 594\n'
+        'KV cache pool is full. Retract requests. #retracted_reqs: 1, #new_tokens_gained: 318\n'
     )
     stats = log_segment_stats(text)
     assert stats['decode_log_lines'] == 2
@@ -295,6 +297,7 @@ def test_log_segment_stats() -> None:
     assert stats['max_running_logged'] == 5
     assert stats['logged_accept_len_mean'] == pytest.approx(3.0)
     assert stats['prefill_log_lines'] == 1
+    assert stats['kv_retractions'] == 3
 
 
 def test_frontier_dominance_and_aggregation() -> None:
@@ -426,7 +429,7 @@ def test_quality_comparison_fails_closed_without_the_task_set(tmp_path: Path) ->
 def test_host_load_tree_and_contention_summary() -> None:
     from bench.hostload import CONTENTION_CORES, process_tree, summarise
 
-    table = {1: (0, 0.0), 10: (1, 0.0), 11: (10, 0.0), 12: (11, 0.0), 20: (1, 0.0)}
+    table = {pid: (ppid, 0.0, 0.0) for pid, ppid in {1: 0, 10: 1, 11: 10, 12: 11, 20: 1}.items()}
     assert process_tree(10, table) == {10, 11, 12}
     quiet = [{'cores': 0.5, 'top': [], 'own': []}] * 3
     busy = [{'cores': 3.0, 'top': [{'cmd': 'analysis', 'cores': 3.0}], 'own': []}] * 3
@@ -470,3 +473,83 @@ def test_host_load_counts_short_lived_foreign_processes() -> None:
         root.kill()
     assert result['cores'] >= 0.25
     assert all('while time.time()' not in proc['cmd'] for proc in result['top'])
+
+
+def test_single_step_mtp_needs_no_draft_decode_graph() -> None:
+    log = SPEC_LOG.replace('Capture draft decode CUDA graph', 'x')
+    state = spec_state(speculative_num_steps=1, speculative_num_draft_tokens=2)
+    one_step = spec_arm(**{'speculative-num-steps': 1, 'speculative-num-draft-tokens': 2})
+    checks = {c.name: c for c in verify_launch(log, state, one_step)}
+    assert checks['cuda_graph_decode'].ok
+    assert not {c.name: c for c in verify_launch(log, spec_state(), spec_arm())}[
+        'cuda_graph_decode'
+    ].ok
+
+
+def test_divergence_rates_and_ratio_to_floor() -> None:
+    from bench.divergence import rate_interval, ratio_interval, report
+
+    rate, low, high = rate_interval(100, 50_000)
+    assert rate == pytest.approx(2.0) and low < 2.0 < high
+    assert rate_interval(0, 50_000)[2] > 0
+    ratio, rlow, rhigh = ratio_interval(200, 50_000, 100, 50_000)
+    assert ratio == pytest.approx(2.0) and rlow < 2.0 < rhigh
+    pairs = {
+        'floor': {
+            'prompts': 10,
+            'diverged': 100,
+            'exposure_tokens': 50_000,
+            'classes': {'tie': 100},
+        },
+        'arm': {'prompts': 10, 'diverged': 100, 'exposure_tokens': 50_000, 'classes': {'large': 1}},
+    }
+    rows = {row['pair']: row for row in report(pairs, 'floor')}
+    assert rows['floor']['rounding_level_only'] and not rows['arm']['rounding_level_only']
+    with pytest.raises(SystemExit):
+        report(pairs, 'missing')
+
+
+def test_host_load_attributes_short_lived_own_children_to_the_run() -> None:
+    import subprocess
+    import sys
+
+    from bench.hostload import sample
+
+    # The root starts a busy child after the first snapshot and reaps it before the
+    # second; its CPU must count as the run's own, not as foreign load.
+    code = (
+        'import subprocess, sys, time\n'
+        'time.sleep(0.2)\n'
+        'busy = "import time\\nt = time.time()\\nwhile time.time() - t < 0.7:\\n    pass"\n'
+        'subprocess.run([sys.executable, "-c", busy], check=True)\n'
+        'time.sleep(5)\n'
+    )
+    root = subprocess.Popen([sys.executable, '-c', code])
+    try:
+        result = sample(root.pid, interval=1.5)
+    finally:
+        root.kill()
+    assert result['own_cores'] >= 0.35
+
+
+def test_envelope_and_paired_ratios() -> None:
+    from bench.pareto import envelope, paired_ratios
+
+    def row(label: str, run: str, c: int, y: float) -> dict[str, object]:
+        return {'label': label, 'run': run, 'concurrency': c, 'x_e2e': y / c, 'y': y, 'failed': 0}
+
+    rows = [
+        row('plain', 'r1', 1, 100.0),
+        row('plain', 'r2', 1, 110.0),
+        row('spec', 'r3', 1, 200.0),
+        row('spec', 'r4', 1, 220.0),
+        row('plain', 'r1', 64, 1000.0),
+        row('spec', 'r3', 64, 800.0),
+    ]
+    frontier = aggregate(rows, baseline=None)
+    best = {e['concurrency']: e for e in envelope(frontier)}
+    assert best[1]['best'] == 'spec' and best[64]['best'] == 'plain'
+    assert best[64]['lead'] == pytest.approx(0.25)
+    ratios = {r['concurrency']: r for r in paired_ratios(rows, [('spec', 'plain')])}
+    assert ratios[1]['n'] == 2 and ratios[1]['y_ratio_mean'] == pytest.approx(2.0)
+    assert ratios[64]['y_ratio_mean'] == pytest.approx(0.8)
