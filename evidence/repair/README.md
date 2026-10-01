@@ -237,6 +237,27 @@ session as `fresh_b16`), so these thresholds are not settled by the data here; a
 phase over widths 2 to 16 at c = 1 is queued. The top-8 and top-16 verdicts (not rejected) hold for
 either implementation.
 
+Omniscient-gate oracle (`omniscient_gate_oracle` in the JSON; an oracle, since its gate knows fresh
+DFlash's next accepted length). A gated program may choose fresh DFlash on supported boundaries
+where reuse is unfavourable, which the always-reuse table does not allow. Taking, per supported
+boundary, the better of oracle reuse and fresh drafting gives a Delta that is >= 0 and >= the
+always-reuse Delta by construction, so it rejects nothing. It bounds from above gated programs over
+the same candidate sets with a padded verify, and its excess over always-reuse is the most a perfect
+gate could add (same resamples as the table, so the intervals are paired):
+
+| K | gate reuses at | Delta (95% CI) | gain over always-reuse |
+|---|---|---|---|
+| 1 | 0.7% | +0.01 (+0.01, +0.01) | +0.05 |
+| 2 | 24.9% | +0.45 (+0.42, +0.49) | +1.12 |
+| 4 | 41.6% | +0.91 (+0.85, +0.98) | +1.33 |
+| 8 | 53.9% | +1.44 (+1.35, +1.53) | +1.21 |
+| 16 | 62.9% | +2.05 (+1.93, +2.18) | +1.06 |
+
+A perfect gate would add about one token per post-rejection boundary at every K from 2 to 16. A
+real gate decides before the second cycle and does not see fresh DFlash's outcome, so a gate is
+worth building only if features known at decision time (the correction position, the supported
+suffix length, the drafter's confidence) predict which boundaries those are.
+
 Assumptions of this oracle, stated plainly: (1) the candidate sets are the offline recomputation,
 whose top-1 token matches the engine's drafted token at 97.4% of positions, not the engine's own
 sets; (2) the costs are the c = 1 phases of one DFlash-16 run (`fresh_b16`, the drafter workstream's
@@ -247,7 +268,8 @@ cache are not priced; (4) the oracle knows the true token wherever it lies in th
 so it bounds from above every real program over the same candidate sets with a padded verify that
 reuses at every supported boundary; (5) it reuses at every supported boundary, so it does not bound
 a gated program, one that falls back to fresh DFlash on supported boundaries it judges unfavourable,
-and its negative intervals cannot reject such a program.
+and its negative intervals cannot reject such a program (the omniscient-gate oracle above bounds
+those).
 
 - **Verdict at c = 1, for always-reuse policies with a padded block-16 verify over the
   offline-recomputed sets: reuse is not rejected for top-8 and top-16 candidate sets; top-1 to top-4
@@ -256,8 +278,9 @@ and its negative intervals cannot reject such a program.
   2.33 ms draft, and come out ahead by about one token per post-rejection boundary. For always-reuse
   with a padded verify this is an upper bound: a real program must select the token (the unary
   control shows that the old top-1 choices fail), and its compile, conditioning and retention costs
-  (A) are charged against the same margin. The c = 8 and 16 draft shares, which set T2_R - T2_F
-  beyond c = 1, are queued.
+  (A) are charged against the same margin. For gated programs the omniscient-gate oracle gives an
+  upper bound of +2.05 (+1.93, +2.18) at top-16, and nothing is rejected. The c = 8 and 16 draft
+  shares, which set T2_R - T2_F beyond c = 1, are queued.
 
 ```sh
 python experiments/repair/p9_support_oracle.py --cycles ~/vp-data/drafter/support/zlab_b16_cycles/cycles.pt \

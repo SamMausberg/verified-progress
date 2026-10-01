@@ -27,9 +27,17 @@ same boundaries as Delta (each bootstrap replicate and each domain gets its own)
 from the measured DFlash-16 phases (`evidence/repair/stage_a_timing.json`, run fresh_b16):
 a reused cycle skips the draft phase and pays the rest of the cycle; the oracle's extra
 first-cycle cost A and conditioning cost are 0, so the oracle is an upper bound for every
-real program. The unchanged cached unary control ("keep": the old draft's tail after the
-corrected token) is scored the same way. Confidence intervals: request-level bootstrap.
-Reject this finite-window reuse at the tested configuration if Delta's upper bound <= 0.
+real program that verifies a padded block of 16 and reuses at every supported boundary. The
+unchanged cached unary control ("keep": the old draft's tail after the corrected token) is
+scored the same way. Confidence intervals: request-level bootstrap. Reject this finite-window
+reuse at the tested configuration if Delta's upper bound <= 0.
+
+The always-reuse oracle above cannot speak for a gated program, one that may choose fresh
+DFlash on supported boundaries it judges unfavourable. The omniscient-gate oracle takes, per
+supported boundary, the better of reuse and fresh, max(0, (G2_R - G2_F) - r_F (T2_R - T2_F)),
+knowing G2_F in advance. It is >= 0 and >= the always-reuse Delta by construction (so it can
+reject nothing); it bounds gated programs over the same candidate sets with a padded verify, and
+its excess over always-reuse is the most a perfect gate could add.
 
     python experiments/repair/p9_support_oracle.py --cycles ~/vp-data/drafter/support/zlab_b16_cycles/cycles.pt \\
         --timing evidence/repair/stage_a_timing.json --out evidence/repair/p9_support_oracle.json
@@ -156,18 +164,21 @@ def components(
 
 
 def estimate(
-    comp: Components, idx: list[int], rate_per_us: float | None = None
+    comp: Components, idx: list[int], rate_per_us: float | None = None, gate: bool = False
 ) -> tuple[float, float]:
     """(r_F in tokens per us, Delta) over the boundaries idx.
 
     r_F = E[G1 + G2_F] / E[T1 + T2_F] is computed on the same boundaries as Delta, so a
     bootstrap replicate or a domain gets its own rate; `rate_per_us` fixes it instead (e.g.
-    DFlash's overall rate A_D / C_D from the timing run, taken as a constant)."""
+    DFlash's overall rate A_D / C_D from the timing run, taken as a constant). With `gate`,
+    each boundary contributes the better of reuse and fresh drafting (the omniscient gate)."""
     g1, g2f, dg, dt, t_f = comp
     n = len(idx)
     r_f = (
         rate_per_us if rate_per_us is not None else sum(g1[i] + g2f[i] for i in idx) / (2 * t_f * n)
     )
+    if gate:
+        return r_f, sum(max(0.0, dg[i] - r_f * dt[i]) for i in idx) / n
     return r_f, sum(dg[i] for i in idx) / n - r_f * sum(dt[i] for i in idx) / n
 
 
@@ -177,8 +188,11 @@ def bootstrap(
     n: int,
     seed: int,
     rate_per_us: float | None = None,
+    gate: bool = False,
 ) -> tuple[float, float]:
-    """95% interval of Delta over request-level resamples, re-estimating r_F in each replicate."""
+    """95% interval of Delta over request-level resamples, re-estimating r_F in each replicate.
+
+    The same seed draws the same resamples, so a gated and an ungated call are paired."""
     by_rid: dict[str, list[int]] = collections.defaultdict(list)
     for i, r in enumerate(rows):
         by_rid[r['rid']].append(i)
@@ -187,7 +201,7 @@ def bootstrap(
     deltas = []
     for _ in range(n):
         idx = [i for _ in rids for i in by_rid[rids[rng.randrange(len(rids))]]]
-        deltas.append(estimate(comp, idx, rate_per_us)[1])
+        deltas.append(estimate(comp, idx, rate_per_us, gate)[1])
     deltas.sort()
     return deltas[int(0.025 * n)], deltas[int(0.975 * n) - 1]
 
@@ -249,6 +263,8 @@ def main() -> None:
         comp = components(rows, g2r, supported, ph, extra_us=0.0)
         r_f, d = estimate(comp, everything)
         lo, hi = bootstrap(rows, comp, args.bootstrap, seed=k)
+        _, d_gate = estimate(comp, everything, gate=True)
+        lo_g, hi_g = bootstrap(rows, comp, args.bootstrap, seed=k, gate=True)
         _, d_overall = estimate(comp, everything, overall_rate)
         lo_o, hi_o = bootstrap(rows, comp, args.bootstrap, seed=100 + k, rate_per_us=overall_rate)
         by_domain = {}
@@ -279,6 +295,15 @@ def main() -> None:
             'delta_oracle_at_overall_dflash_rate': d_overall,
             'delta_oracle_at_overall_dflash_rate_ci95': [lo_o, hi_o],
             'by_domain': by_domain,
+            # Oracle: the gate knows G2_F; an upper bound for gated programs, rejects nothing.
+            'omniscient_gate_oracle': {
+                'reuse_rate': statistics.fmean(
+                    dg_i - r_f * dt_i > 0 for dg_i, dt_i in zip(comp[2], comp[3], strict=True)
+                ),
+                'delta': d_gate,
+                'delta_ci95': [lo_g, hi_g],
+                'gain_over_always_reuse': d_gate - d,
+            },
         }
     # Unchanged cached unary control: reuse the old drafted tail wherever the horizon remains.
     reuse = [r['m'] >= 1 for r in rows]
