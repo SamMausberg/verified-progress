@@ -85,7 +85,7 @@ def boundaries(cycles: list[dict[str, Any]], ks: list[int]) -> list[dict[str, An
             J = L + 1
             m = H - J
             truth = as_list(cur['truth'])
-            drafted = as_list(cur['drafted'])
+            drafted = as_list(cur['engine_draft'])
             # keep control: the old drafted tail after the corrected token, scored on the truth
             keep = 0
             for j in range(J, H):
@@ -113,13 +113,19 @@ def delta(
     reuse: list[bool],
     ph: dict[str, float],
     extra_us: float,
+    rate_per_us: float | None = None,
 ) -> tuple[float, float, list[float]]:
-    """(r_F in tokens per ms, Delta, per-boundary contributions)."""
+    """(r_F in tokens per ms, Delta, per-boundary contributions).
+
+    r_F is Sam's two-cycle rate over these boundaries unless `rate_per_us` gives another
+    value of time (e.g. DFlash's overall rate A_D / C_D)."""
     t_f = ph['cycle']
     t_r = ph['cycle'] - ph['draft'] + extra_us
     g1 = [1 + r['L'] for r in rows]
     g2f = [1 + r['next_L'] for r in rows]
     r_f = (sum(g1) + sum(g2f)) / (2 * t_f * len(rows))  # tokens per us of fresh DFlash
+    if rate_per_us is not None:
+        r_f = rate_per_us
     dg = [(a - b) if u else 0.0 for a, b, u in zip(g2r, g2f, reuse, strict=True)]
     dt = [(t_r - t_f) if u else 0.0 for u in reuse]
     per = [x - r_f * y for x, y in zip(dg, dt, strict=True)]
@@ -157,12 +163,17 @@ def main() -> None:
     cycles = load_cycles(args.cycles)
     ph = phases(args.timing, args.baseline_run)
     rows = boundaries(cycles, args.ks)
+    # DFlash's overall rate on the timing panel, A_D / C_D, as an alternative value of time.
+    timing_rows = {Path(r['run']).name: r for r in json.loads(args.timing.read_text())}
+    base = timing_rows[args.baseline_run]
+    overall_rate = base['commit_per_cycle']['mean'] / base['cycle_period_us']['median']
     result: dict[str, Any] = {
         'kind': 'derived: exact per-cycle support (drafter support screen) and measured c = 1 phases',
         'cycles': len(cycles),
         'post_rejection_boundaries': len(rows),
         'requests': len({r['rid'] for r in rows}),
         'phases_us': ph,
+        'overall_dflash_tokens_per_ms': overall_rate * 1e3,
         'fresh_next_accept_mean': statistics.fmean(r['next_L'] for r in rows),
         'by_k': {},
     }
@@ -177,6 +188,18 @@ def main() -> None:
         ]
         r_f, d, per = delta(rows, g2r, supported, ph, extra_us=0.0)
         lo, hi = bootstrap(rows, per, args.bootstrap, seed=k)
+        _, d_overall, per_overall = delta(
+            rows, g2r, supported, ph, extra_us=0.0, rate_per_us=overall_rate
+        )
+        lo_o, hi_o = bootstrap(rows, per_overall, args.bootstrap, seed=100 + k)
+        by_domain = {}
+        for dom in sorted({str(r['domain']) for r in rows}):
+            idx = [i for i, r in enumerate(rows) if str(r['domain']) == dom]
+            by_domain[dom] = {
+                'boundaries': len(idx),
+                'supported_rate': statistics.fmean(supported[i] for i in idx),
+                'delta_oracle': statistics.fmean(per[i] for i in idx),
+            }
         result['by_k'][str(k)] = {
             'corrected_prefix_supported_rate': statistics.fmean(supported),
             'mean_supported_suffix_when_supported': statistics.fmean(suffix) if suffix else None,
@@ -192,6 +215,9 @@ def main() -> None:
             'delta_oracle': d,
             'delta_oracle_ci95': [lo, hi],
             'rejected': hi <= 0,
+            'delta_oracle_at_overall_dflash_rate': d_overall,
+            'delta_oracle_at_overall_dflash_rate_ci95': [lo_o, hi_o],
+            'by_domain': by_domain,
         }
     # Unchanged cached unary control: reuse the old drafted tail wherever the horizon remains.
     reuse = [r['m'] >= 1 for r in rows]
