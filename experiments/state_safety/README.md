@@ -241,6 +241,12 @@ reason go in a new commit before the runs.
     - 0 in every chunk but the last;
     - a last count equal to the chunk count and to `spec_verify_ct`;
     - 1 to steps + 1 tokens in every chunk after the prefill token.
+  - The watcher for the declared runs was restarted at the fixed `attest_runner.py`
+    (back-to-back holds), from a copy byte-identical to this commit's file, before
+    either hold started. The time is in `~/vp-data/state/logs/attest_first_cycle.out`.
+- **Environment.** `analyze_all.sh` and `first_cycle.py` run in the SGLang venv
+  (`scripts/sglang_env.sh`), which provides SciPy. The repository's `.venv` does not;
+  its tests skip the SciPy calls.
 - **Implementation.** `first_cycle.py` implements this analysis.
   `tests/test_state_safety_first_cycle.py` tests it on synthetic runs, and
   `analyze_all.sh` runs it once all five runs exist. Missing runs, unpinned pools or

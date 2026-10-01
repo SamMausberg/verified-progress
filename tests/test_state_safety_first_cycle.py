@@ -318,3 +318,22 @@ def test_attest_runner_records_and_detects_only_the_python_process(tmp_path, mon
     assert attest_runner.running_hold(runs) is None
     monkeypatch.setattr(attest_runner.subprocess, 'run', lambda *a, **k: Out(started + '\n'))
     assert attest_runner.running_hold(runs) == 'mtp'
+
+
+def test_watch_attests_back_to_back_holds(monkeypatch, tmp_path):
+    import attest_runner
+
+    # The plain hold ends and the MTP hold starts within one poll.
+    seen = iter([None, 'plain', 'plain', 'mtp', 'mtp', None])
+    monkeypatch.setattr(attest_runner, 'running_hold', lambda runs: next(seen))
+    written = []
+    monkeypatch.setattr(
+        attest_runner, 'write', lambda runs, hold, when, checkout: written.append((hold, when))
+    )
+    attest_runner.watch(tmp_path, tmp_path, poll=0)
+    assert written == [
+        ('plain', 'before'),
+        ('plain', 'after'),
+        ('mtp', 'before'),
+        ('mtp', 'after'),
+    ]

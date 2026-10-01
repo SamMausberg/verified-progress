@@ -6,6 +6,10 @@
 #
 #   experiments/state_safety/analyze_all.sh
 #
+# Runs in the SGLang venv (sourced below from scripts/sglang_env.sh), which provides
+# SciPy for cycles.py's homogeneity test and first_cycle.py's Fisher test. The
+# repository's .venv has no SciPy, and its tests skip those calls.
+#
 # Two run roots: runs_pinned/ (pinned pools, the current matrix; *_pinned outputs)
 # and runs/ (the first, unpinned matrix; the unsuffixed outputs). Once runs_pinned/
 # exists, every pair in pairs_pinned.json must have both runs, or the script fails;

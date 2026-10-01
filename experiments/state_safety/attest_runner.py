@@ -68,19 +68,20 @@ def running_hold(runs: Path) -> str | None:
     return None
 
 
-def watch(checkout: Path, runs: Path) -> None:
+def watch(checkout: Path, runs: Path, poll: float = 2.0) -> None:
     done: set[str] = set()
     current: str | None = None
     while len(done) < len(HOLDS):
         hold = running_hold(runs)
-        if hold is not None and current is None:
+        if hold != current:
+            # A hold ended, another started, or both within one poll.
+            if current is not None:
+                write(runs, current, 'after', checkout)
+                done.add(current)
+            if hold is not None:
+                write(runs, hold, 'before', checkout)
             current = hold
-            write(runs, hold, 'before', checkout)
-        elif hold is None and current is not None:
-            write(runs, current, 'after', checkout)
-            done.add(current)
-            current = None
-        time.sleep(2)
+        time.sleep(poll)
 
 
 def main() -> None:
