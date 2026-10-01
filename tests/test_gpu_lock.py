@@ -128,3 +128,21 @@ def test_exclusive_gives_up_if_the_gpu_stays_busy(tmp_path: Path) -> None:
     assert done.returncode == 75
     assert not marker.exists()
     assert '4242' in done.stderr
+
+
+def test_exclusive_fails_closed_when_the_gpu_query_fails(tmp_path: Path) -> None:
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    env = dict(fake_smi(tmp_path, 'exit 1'), GPU_LOCK_FILE=str(lock), GPU_LOCK_DRAIN_WAIT='1')
+    marker = tmp_path / 'ran'
+    done = subprocess.run(
+        ['bash', str(SCRIPT), '-x', 'touch', str(marker)],
+        env=env,
+        timeout=60,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert done.returncode == 75
+    assert not marker.exists()
+    assert 'query failed' in done.stderr

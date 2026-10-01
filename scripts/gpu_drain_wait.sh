@@ -12,10 +12,19 @@ set -euo pipefail
 limit="${GPU_LOCK_DRAIN_WAIT:-600}"
 deadline=$((SECONDS + limit))
 reported=""
+if ! command -v nvidia-smi >/dev/null 2>&1; then
+  echo "gpu_drain_wait: no nvidia-smi on PATH; nothing to drain" >&2
+  exit 0
+fi
 while true; do
-  pids="$(nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null | tr -d ' ' | grep -v '^$' || true)"
-  if [ -z "$pids" ]; then
-    exit 0
+  # A failed query is not an empty GPU: treat it as busy (fail closed) until the deadline.
+  if raw="$(nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null)"; then
+    pids="$(printf '%s\n' "$raw" | tr -d ' ' | grep -v '^$' || true)"
+    if [ -z "$pids" ]; then
+      exit 0
+    fi
+  else
+    pids="(nvidia-smi query failed)"
   fi
   if [ "$pids" != "$reported" ]; then
     echo "gpu_drain_wait: waiting for compute processes left on the GPU: $(echo "$pids" | tr '\n' ' ')" >&2
