@@ -61,6 +61,8 @@ def write_inputs(tmp_path: Path) -> tuple[Path, Path, Path]:
             [
                 {
                     'run': '/runs/fresh_b16',
+                    'mode': 'fresh',
+                    'block': 16,
                     'phase_us': {
                         p: {'median': v}
                         for p, v in (
@@ -141,3 +143,94 @@ def test_partial_rewalk_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyP
     with pytest.raises(SystemExit, match='lacks 1 of'):
         oracle.main()
     assert not (tmp_path / 'out.json').exists()
+
+
+def test_gated_oracle_dominates_always_reuse(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    oracle = load('p9_support_oracle')
+    cycles, _, timing = write_inputs(tmp_path)
+    out = tmp_path / 'out.json'
+    argv = [
+        'p9_support_oracle.py',
+        '--cycles',
+        str(cycles),
+        '--timing',
+        str(timing),
+        '--bootstrap',
+        '50',
+        '--out',
+        str(out),
+    ]
+    monkeypatch.setattr(sys, 'argv', argv)
+    oracle.main()
+    data = json.loads(out.read_text())
+    strictly_better = False
+    for v in data['by_k'].values():
+        gated = v['omniscient_gate_oracle']
+        assert gated['delta'] >= v['delta_oracle'] - 1e-12
+        assert gated['delta'] >= 0
+        # Paired resamples: the gated interval dominates the always-reuse one, end by end.
+        assert gated['delta_ci95'][0] >= v['delta_oracle_ci95'][0] - 1e-12
+        assert gated['delta_ci95'][1] >= v['delta_oracle_ci95'][1] - 1e-12
+        assert gated['delta_ci95'][0] >= 0
+        assert gated['gain_from_gating_oracle_reuse'] >= -1e-12
+        assert gated['reuse_rate'] <= v['corrected_prefix_supported_rate']
+        strictly_better |= gated['delta'] > v['delta_oracle'] + 1e-9
+    # The fixture has a supported boundary where fresh drafting commits far more (L' = 8).
+    assert strictly_better
+
+
+def test_gate_takes_the_better_arm_per_boundary() -> None:
+    oracle = load('p9_support_oracle')
+    # Three boundaries: reuse gains 2 tokens, reuse loses 3 tokens, no reuse; T_F = 1000 us.
+    comp = ([2.0, 2.0, 2.0], [2.0, 2.0, 2.0], [2.0, -3.0, 0.0], [-500.0, -500.0, 0.0], 1000.0)
+    r_f, always = oracle.estimate(comp, [0, 1, 2])
+    _, gated = oracle.estimate(comp, [0, 1, 2], gate=True)
+    assert r_f == pytest.approx(4.0 / 2000.0)
+    assert always == pytest.approx((2.0 - 3.0) / 3 + r_f * 1000.0 / 3)
+    assert gated == pytest.approx((2.0 + r_f * 500.0) / 3)
+
+
+def test_free_verify_shifts_delta_by_the_saved_verify(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    oracle = load('p9_support_oracle')
+    cycles, _, timing = write_inputs(tmp_path)
+    out = tmp_path / 'out.json'
+    argv = ['p9_support_oracle.py', '--cycles', str(cycles), '--timing', str(timing)]
+    argv += ['--bootstrap', '50', '--out', str(out)]
+    monkeypatch.setattr(sys, 'argv', argv)
+    oracle.main()
+    data = json.loads(out.read_text())
+    verify_ms = data['phases_us']['verify'] / 1e3
+    for v in data['by_k'].values():
+        free = v['free_verify_always_reuse']
+        saved = v['r_F_tokens_per_ms'] * v['corrected_prefix_supported_rate'] * verify_ms
+        assert free['delta'] == pytest.approx(v['delta_oracle'] + saved)
+        # Paired resamples: a free verify can only raise each replicate's Delta.
+        assert free['delta_ci95'][0] >= v['delta_oracle_ci95'][0] - 1e-12
+        assert free['delta_ci95'][1] >= v['delta_oracle_ci95'][1] - 1e-12
+        # The gate over free-verify scoring dominates both the gate and the free verify alone.
+        both = v['omniscient_gate_free_verify']
+        for other in (free, v['omniscient_gate_oracle']):
+            assert both['delta'] >= other['delta'] - 1e-12
+            assert both['delta_ci95'][0] >= other['delta_ci95'][0] - 1e-12
+            assert both['delta_ci95'][1] >= other['delta_ci95'][1] - 1e-12
+
+
+def test_baseline_must_be_fresh_block16(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    oracle = load('p9_support_oracle')
+    cycles, _, timing = write_inputs(tmp_path)
+    runs = json.loads(timing.read_text())
+    for name, mode, block in (('fresh_b8', 'fresh', 8), ('force_b16', 'force', 16)):
+        runs.append({**runs[0], 'run': f'/runs/{name}', 'mode': mode, 'block': block})
+    timing.write_text(json.dumps(runs))
+    for name in ('fresh_b8', 'force_b16'):
+        out = tmp_path / f'{name}.json'
+        argv = ['p9_support_oracle.py', '--cycles', str(cycles), '--timing', str(timing)]
+        argv += ['--baseline-run', name, '--bootstrap', '20', '--out', str(out)]
+        monkeypatch.setattr(sys, 'argv', argv)
+        with pytest.raises(SystemExit, match='fresh block-16 run'):
+            oracle.main()
+        assert not out.exists()
