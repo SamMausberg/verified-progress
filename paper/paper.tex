@@ -41,7 +41,7 @@
 % and no correspondence address to print). Hyperref's footnote anchor is switched off for it.
 \makeatletter
 {\let\thefootnote\relax\let\@footnotetext\H@@footnotetext
-\footnotetext{\hspace*{-\footnotesep}Code, exact references, committed evidence, research notes and the source of this paper:\newline\repourl.\par AI use: the earlier draft was prepared with GPT-6 Astra Pro (OpenAI) and this version with Claude Code (Claude Opus 5.5 agents); the author directed the work and reviewed it as it progressed, including in discussions of specific points with Claude and with OpenAI models, and is responsible for its claims; Appendix~\ref{app:attribution} gives details.\par\Notice@String}}
+\footnotetext{\hspace*{-\footnotesep}Code, exact references, committed evidence, research notes and the source of this paper:\newline\repourl.\par Bracketed tags cite the evidence register (Appendix~\ref{app:register}): [E$n$] names the committed files behind a result, and [pending D$n$] marks a result not yet measured.\par AI use: the earlier draft was prepared with GPT-6 Astra Pro (OpenAI) and this version with Claude Code (Claude Opus 5.5 agents); the author directed the work and reviewed it as it progressed, including in discussions of specific points with Claude and with OpenAI models, and is responsible for its claims; Appendix~\ref{app:attribution} gives details.\par\Notice@String}}
 \makeatother
 
 \input{sections/intro}
@@ -52,6 +52,9 @@
 \input{sections/related}
 \input{sections/discussion}
 
+% The notes of the reference entries come from the literature review's citation audit;
+% the preamble says once what they record.
+\renewcommand{\bibpreamble}{\small Each entry's note records when the source was read for this paper, or that only its bibliographic record was checked; the literature review behind them is committed \ev{litreview}.\par\medskip}
 {\raggedright
 \bibliography{references}
 \bibliographystyle{mlsys2025}

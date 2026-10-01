@@ -3,7 +3,7 @@
 % sources/ (arXiv versions, code at named commits); performance figures of other work are
 % the authors' own and were not reproduced.
 \section{Related Work}\label{sec:related}\label{sec:prior}
-Descriptions follow our literature review \ev{litreview}; numbers quoted from other work are the authors' own.
+Descriptions of other work follow a committed literature review \ev{litreview}; numbers quoted from it are its authors' own.
 
 \paragraph{Certified low-precision heads}\label{sec:prior-certified} The greedy form of the certified head is public several times over. sparkpipe screens with an E4M3 shadow whose per-group certificate covers CUDA-core FMA accumulation and recomputes the survivors exactly, for decode and MTP argmax positions of a model with the same 248,320-entry vocabulary~\cite{sparkpipehead}. dgpp bounds logits from the high bit planes of an int8 head and takes the quantized head as its reference~\cite{dgpphead}; a Metal implementation recomputes with a replica of the stock kernel~\cite{lagunaprune}; knlp reports an argmax match of 0.998 at 14B parameters~\cite{knlphead}. Du et al.\ show why the reference must be named: BF16 and FP16 greedy decoding diverge on 49--100\% of prompts~\cite{precisioninvariant}.
 
