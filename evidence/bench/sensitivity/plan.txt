@@ -1,0 +1,6 @@
+dflash-tuned 32
+dflash-tuned-b4 128
+mtp-tuned 32 128
+mtp-tuned-triton 32
+plain-tuned 32 128
+plain-tuned-triton 32

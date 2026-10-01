@@ -1,0 +1,117 @@
+{
+ "rule": "bench/README.md, declared sensitivity workload (b028c6c, refined 6b25b9f)",
+ "sessions": [
+  "confirm-r0",
+  "confirm-r1",
+  "confirm-r2"
+ ],
+ "within": 0.02,
+ "decisions": [
+  {
+   "family": "mtp",
+   "concurrency": 32,
+   "ranking": [
+    {
+     "arm": "mtp-tuned-triton",
+     "y_mean": 6687.8
+    },
+    {
+     "arm": "mtp-tuned",
+     "y_mean": 6556.4
+    }
+   ],
+   "chosen": [
+    "mtp-tuned-triton",
+    "mtp-tuned"
+   ],
+   "baselines": [
+    "plain-tuned",
+    "plain-tuned-triton"
+   ]
+  },
+  {
+   "family": "mtp",
+   "concurrency": 128,
+   "ranking": [
+    {
+     "arm": "mtp-tuned",
+     "y_mean": 12002.6
+    }
+   ],
+   "chosen": [
+    "mtp-tuned"
+   ],
+   "baselines": [
+    "plain-tuned"
+   ]
+  },
+  {
+   "family": "dflash",
+   "concurrency": 32,
+   "ranking": [
+    {
+     "arm": "dflash-tuned",
+     "y_mean": 6844.2
+    },
+    {
+     "arm": "dflash-tuned-b4",
+     "y_mean": 6160.9
+    },
+    {
+     "arm": "dflash-tuned-b16",
+     "y_mean": 5039.0
+    }
+   ],
+   "chosen": [
+    "dflash-tuned"
+   ],
+   "baselines": [
+    "plain-tuned"
+   ]
+  },
+  {
+   "family": "dflash",
+   "concurrency": 128,
+   "ranking": [
+    {
+     "arm": "dflash-tuned-b4",
+     "y_mean": 11581.9
+    },
+    {
+     "arm": "dflash-tuned",
+     "y_mean": 10546.4
+    }
+   ],
+   "chosen": [
+    "dflash-tuned-b4"
+   ],
+   "baselines": [
+    "plain-tuned"
+   ]
+  }
+ ],
+ "ineligible": [],
+ "plan": {
+  "dflash-tuned": [
+   32
+  ],
+  "dflash-tuned-b4": [
+   128
+  ],
+  "mtp-tuned": [
+   32,
+   128
+  ],
+  "mtp-tuned-triton": [
+   32
+  ],
+  "plain-tuned": [
+   32,
+   128
+  ],
+  "plain-tuned-triton": [
+   32
+  ]
+ },
+ "points": "evidence/bench/confirm/points.csv"
+}
