@@ -34,10 +34,14 @@
   xticklabels={1,10,$10^2$,$10^3$,$10^4$,$V$},
   ytick={1,0.1,0.01,0.001,0.0001},yticklabels={100\%,10\%,1\%,0.1\%,0.01\%},
   minor tick num=0,xminorticks=false,yminorticks=false,
-  legend style={at={(0.95,0.02)},anchor=south east},legend image post style={xscale=0.6}]
-\addplot[copy int8 row] table[x=k,y=plain_int8_row_greedy,col sep=comma]{\ccdf};\addlegendentry{int8, per entry}
-\addplot[copy int8 g128] table[x=k,y=plain_int8_g128_greedy,col sep=comma]{\ccdf};\addlegendentry{int8, 128 columns}
-\addplot[ccert,only marks,mark=o,mark size=1.5pt] table[x=k,y=plain_int8_g128_gumbel_t1.0,col sep=comma]{\ccdf};\addlegendentry{race at $T{=}1$}
+  % the legend sits right of the FP8 line's end (k = 256) and left of the int4 line's drop at V;
+  % short line samples keep it narrow without squashing the circle
+  legend style={at={(axis cs:158000,1.1e-4)},anchor=south east},
+  legend image code/.code={\draw[mark repeat=2,mark phase=2,#1] plot coordinates {(0cm,0cm) (0.2cm,0cm) (0.4cm,0cm)};}]
+\addlegendimage{empty legend}\addlegendentry{int8 copies:}
+\addplot[copy int8 row] table[x=k,y=plain_int8_row_greedy,col sep=comma]{\ccdf};\addlegendentry{per entry}
+\addplot[copy int8 g128] table[x=k,y=plain_int8_g128_greedy,col sep=comma]{\ccdf};\addlegendentry{128 columns}
+\addplot[ccert,only marks,mark=o,mark size=1.5pt] table[x=k,y=plain_int8_g128_gumbel_t1.0,col sep=comma]{\ccdf};\addlegendentry{same, $T{=}1$}
 \addplot[copy fp8,forget plot] table[x=k,y=plain_fp8_row_greedy,col sep=comma]{\ccdf};
 \node[annot,anchor=west] at (axis cs:60,0.045) {FP8, per entry};
 \addplot[copy int4,forget plot] table[x=k,y=plain_int4_g128_greedy,col sep=comma]{\ccdf};
