@@ -37,9 +37,16 @@ fi
 for entry in "${entries[@]}"; do
   read -r arm levels <<< "$entry"
   echo "=== $arm c=$levels"
+  log=$(mktemp)
   # shellcheck disable=SC2086 # levels is a space-separated list of integers
   python -m bench.sweep --out ~/vp-data/bench/sensitivity --port 30010 \
     --workload "$WORKLOAD" --quiet-cpu-wait 600 --arm "$arm" --label "$arm" \
-    --session "natural-s$session" --concurrency $levels 2>&1 |
-    grep -E "^\[FAIL|^r0|Error|done" | tail -6
+    --session "natural-s$session" --concurrency $levels > "$log" 2>&1
+  status=$?
+  grep -E "^\[FAIL|^r0|[Ee]rror|done" "$log" | tail -6
+  if [ "$status" -ne 0 ]; then
+    echo "sweep for $arm exited $status:"
+    tail -3 "$log"
+  fi
+  rm -f "$log"
 done

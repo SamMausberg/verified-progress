@@ -44,11 +44,18 @@ esac
 run() {
   local arm=$1 levels=$2
   echo "=== $arm c=$levels"
+  log=$(mktemp)
   # shellcheck disable=SC2086 # levels is a space-separated list of integers
   python -m bench.sweep --out ~/vp-data/bench/confirm --port 30010 --osl 512 \
     --quiet-cpu-wait 600 --arm "$arm" --label "$arm" --session "confirm-r$repeat" \
-    --concurrency $levels 2>&1 |
-    grep -E "^\[FAIL|^r0|Error|done" | tail -12
+    --concurrency $levels > "$log" 2>&1
+  status=$?
+  grep -E "^\[FAIL|^r0|[Ee]rror|done" "$log" | tail -12
+  if [ "$status" -ne 0 ]; then
+    echo "sweep for $arm exited $status:"
+    tail -3 "$log"
+  fi
+  rm -f "$log"
 }
 order=("${PLAN[@]}")
 if (( repeat % 2 == 1 )); then
