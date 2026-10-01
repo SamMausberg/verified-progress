@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Wait until no compute process is left on the GPU, then exit 0.
+# Wait until no compute process is left on the GPU and no SGLang server process is left on
+# the host, then exit 0.
 #
 # gpu_lock.sh -x runs this after taking the exclusive lock and before the job's command.
 # Holding the exclusive lock means no shared or exclusive holder is running, so any
@@ -19,8 +20,18 @@ fi
 while true; do
   # A failed or hung query (GPU_LOCK_SMI_TIMEOUT, default 30 s) is not an empty GPU: treat it as busy (fail
   # closed) until the deadline.
-  if raw="$(timeout "${GPU_LOCK_SMI_TIMEOUT:-30}" nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null)"; then
+  remaining=$((deadline - SECONDS))
+  [ "$remaining" -ge 1 ] || remaining=1
+  smi_limit="${GPU_LOCK_SMI_TIMEOUT:-30}"
+  [ "$smi_limit" -le "$remaining" ] || smi_limit="$remaining"
+  if raw="$(timeout "$smi_limit" nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null)"; then
     pids="$(printf '%s\n' "$raw" | tr -d ' ' | grep -v '^$' || true)"
+    # Under the exclusive lock any SGLang server is an orphan, even one that detached from
+    # its job's process group and has not reached CUDA yet.
+    servers="$(pgrep -f -- "${GPU_LOCK_ORPHAN_PATTERN:-sglang[.]launch_server|sglang::}" 2>/dev/null | tr '\n' ' ' || true)"
+    if [ -n "$servers" ]; then
+      pids="${pids:+$pids }sglang:${servers% }"
+    fi
     if [ -z "$pids" ]; then
       exit 0
     fi

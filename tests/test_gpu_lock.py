@@ -20,7 +20,12 @@ def fake_smi(tmp_path: Path, script: str = '') -> dict[str, str]:
     smi = bin_dir / 'nvidia-smi'
     smi.write_text('#!/usr/bin/env bash\n' + script + '\n')
     smi.chmod(0o755)
-    return dict(os.environ, PATH=f'{bin_dir}:{os.environ["PATH"]}')
+    # A marker no real process carries, so live SGLang servers on the host do not stall tests.
+    return dict(
+        os.environ,
+        PATH=f'{bin_dir}:{os.environ["PATH"]}',
+        GPU_LOCK_ORPHAN_PATTERN=f'gpu-lock-test-orphan-{os.getpid()}-never',
+    )
 
 
 def lock_free(lock: Path, shared: bool = False) -> bool:
@@ -229,3 +234,53 @@ def test_leftover_group_members_are_stopped_when_the_job_ends(tmp_path: Path) ->
         time.sleep(0.1)
     os.kill(left, 9)
     pytest.fail('a leftover process in the job group outlived the job')
+
+
+def test_exclusive_waits_for_a_detached_server_that_has_not_reached_the_gpu(tmp_path: Path) -> None:
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    marker = f'gpu-lock-test-server-{os.getpid()}'
+    orphan = subprocess.Popen(['bash', '-c', f'exec -a {marker} sleep 3'], start_new_session=True)
+    try:
+        env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock), GPU_LOCK_ORPHAN_PATTERN=marker)
+        ran = tmp_path / 'ran'
+        start = time.time()
+        done = subprocess.run(
+            ['bash', str(SCRIPT), '-x', 'touch', str(ran)], env=env, timeout=60, check=False
+        )
+        assert done.returncode == 0 and ran.exists()
+        assert orphan.poll() is not None, 'the job started while the detached server was alive'
+        assert time.time() - start >= 2
+    finally:
+        orphan.kill()
+
+
+def test_a_job_that_ignores_term_is_killed_when_the_holder_dies(tmp_path: Path) -> None:
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    pid_file = tmp_path / 'child.pid'
+    env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock), GPU_JOB_KILL_GRACE='1')
+    job = f"trap '' TERM; echo $$ > {pid_file}; sleep 60 & wait"
+    proc = subprocess.Popen(['bash', str(SCRIPT), '-x', 'bash', '-c', job], env=env)
+    try:
+        deadline = time.time() + 10
+        while not pid_file.exists() and time.time() < deadline:
+            time.sleep(0.05)
+        child = int(pid_file.read_text())
+        holder = subprocess.run(
+            ['pgrep', '-P', str(proc.pid), '-x', 'flock'],
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout.split()
+        os.kill(int(holder[0]), 9)
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            try:
+                os.kill(child, 0)
+            except ProcessLookupError:
+                return
+            time.sleep(0.1)
+        pytest.fail('a TERM-ignoring job outlived the lock holder')
+    finally:
+        proc.kill()
