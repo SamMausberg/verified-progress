@@ -17,7 +17,9 @@ logprobs, the class is one-sided ("ref:<class>", margin_test unknown), and a
 test token outside the reference's top-k is "unknown". The rate is first
 divergences per 1,000 compared tokens (a sequence contributes the tokens up to
 and including its first divergence, or all of them), comparable with #37's
-plain batch-1 versus batch-32 floor.
+plain batch-1 versus batch-32 floor. When both runs recorded logprobs it also
+counts sequences that are bitwise identical (tokens and top-k logprobs) and
+the first position where the logprobs differ.
 
     python experiments/drafter/compare_outputs.py --ref RUN_A/requests.jsonl \
         --test RUN_B/requests.jsonl --out equality.json
@@ -42,7 +44,12 @@ def state_compare() -> ModuleType:
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules['state_safety_compare'] = module
-    spec.loader.exec_module(module)
+    # compare.py imports its sibling server.py (stdlib only) by bare name.
+    sys.path.insert(0, str(path.parent))
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.remove(str(path.parent))
     return module
 
 
@@ -130,6 +137,26 @@ def main() -> None:
                 **detail,
             }
         )
+    # Bitwise check: identical tokens and identical top-k logprobs at every position
+    # (meaningful only between runs that recorded logprobs on both sides).
+    identical = 0
+    first_logprob_difference: dict[str, int] = {}
+    for rid in shared:
+        ta, tb = top_logprobs(ref[rid]), top_logprobs(test[rid])
+        if not ta or not tb:
+            continue
+        same_tokens = ref[rid]['output_ids'] == test[rid]['output_ids']
+        diff = next((i for i, (x, y) in enumerate(zip(ta, tb, strict=False)) if x != y), None)
+        if diff is None and len(ta) != len(tb):
+            diff = min(len(ta), len(tb))  # one run's logprobs are a strict prefix
+        if diff is None and not same_tokens:
+            # Identical logprobs, different tokens (a tie broken differently): the
+            # sequences still differ, first at the first differing token.
+            diff = first_divergence(ref[rid]['output_ids'], test[rid]['output_ids'])
+        if diff is None:
+            identical += 1
+        else:
+            first_logprob_difference[rid] = diff
     summary = {
         'ref': str(args.ref),
         'test': str(args.test),
@@ -139,12 +166,15 @@ def main() -> None:
         'compared_tokens': compared,
         'divergences_per_1000_tokens': 1000 * len(divergences) / compared if compared else None,
         'classes': classes,
+        'bitwise_identical_sequences': identical,
+        'first_logprob_difference': first_logprob_difference,
         'divergences': divergences,
     }
     args.out.write_text(json.dumps(summary, indent=2) + '\n')
     print(
         f'{len(divergences)}/{len(shared)} sequences diverge, '
-        f'{summary["divergences_per_1000_tokens"]:.2f} per 1000 compared tokens; classes {classes}'
+        f'{summary["divergences_per_1000_tokens"]:.2f} per 1000 compared tokens; classes {classes};'
+        f' bitwise identical (tokens and top-k logprobs) {identical}/{len(shared)}'
     )
 
 

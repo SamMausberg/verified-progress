@@ -1,0 +1,424 @@
+{
+  "ref": "/home/ubuntu/vp-data/drafter/phase-timing/stock/c16/requests.jsonl",
+  "test": "/home/ubuntu/vp-data/drafter/phase-timing/circular/c16/requests.jsonl",
+  "convention": "experiments/state_safety/compare.py (PR #37): tie, one_ulp, near (<=0.5 nats), large",
+  "requests": 66,
+  "sequences_diverged": 51,
+  "compared_tokens": 18685,
+  "divergences_per_1000_tokens": 2.7294621354027293,
+  "classes": {
+    "unknown": 51
+  },
+  "bitwise_identical_sequences": 0,
+  "first_logprob_difference": {},
+  "divergences": [
+    {
+      "id": "gsm8k-train-0436",
+      "domain": "math",
+      "position": 62,
+      "ref_token": 310,
+      "test_token": 321,
+      "class": "unknown"
+    },
+    {
+      "id": "gsm8k-train-0661",
+      "domain": "math",
+      "position": 192,
+      "ref_token": 7145,
+      "test_token": 19892,
+      "class": "unknown"
+    },
+    {
+      "id": "gsm8k-train-0739",
+      "domain": "math",
+      "position": 87,
+      "ref_token": 4935,
+      "test_token": 17355,
+      "class": "unknown"
+    },
+    {
+      "id": "gsm8k-train-1527",
+      "domain": "math",
+      "position": 316,
+      "ref_token": 20,
+      "test_token": 16,
+      "class": "unknown"
+    },
+    {
+      "id": "gsm8k-train-1947",
+      "domain": "math",
+      "position": 402,
+      "ref_token": 220,
+      "test_token": 318,
+      "class": "unknown"
+    },
+    {
+      "id": "gsm8k-train-2033",
+      "domain": "math",
+      "position": 282,
+      "ref_token": 421,
+      "test_token": 279,
+      "class": "unknown"
+    },
+    {
+      "id": "gsm8k-train-2351",
+      "domain": "math",
+      "position": 51,
+      "ref_token": 1936,
+      "test_token": 220,
+      "class": "unknown"
+    },
+    {
+      "id": "gsm8k-train-2406",
+      "domain": "math",
+      "position": 309,
+      "ref_token": 1165,
+      "test_token": 353,
+      "class": "unknown"
+    },
+    {
+      "id": "gsm8k-train-2620",
+      "domain": "math",
+      "position": 113,
+      "ref_token": 188912,
+      "test_token": 6,
+      "class": "unknown"
+    },
+    {
+      "id": "gsm8k-train-3476",
+      "domain": "math",
+      "position": 487,
+      "ref_token": 17162,
+      "test_token": 13428,
+      "class": "unknown"
+    },
+    {
+      "id": "gsm8k-train-3731",
+      "domain": "math",
+      "position": 139,
+      "ref_token": 13909,
+      "test_token": 220,
+      "class": "unknown"
+    },
+    {
+      "id": "gsm8k-train-3732",
+      "domain": "math",
+      "position": 137,
+      "ref_token": 3050,
+      "test_token": 3750,
+      "class": "unknown"
+    },
+    {
+      "id": "gsm8k-train-4939",
+      "domain": "math",
+      "position": 480,
+      "ref_token": 314,
+      "test_token": 3018,
+      "class": "unknown"
+    },
+    {
+      "id": "gsm8k-train-5685",
+      "domain": "math",
+      "position": 112,
+      "ref_token": 3925,
+      "test_token": 4935,
+      "class": "unknown"
+    },
+    {
+      "id": "gsm8k-train-6884",
+      "domain": "math",
+      "position": 371,
+      "ref_token": 1809,
+      "test_token": 1118,
+      "class": "unknown"
+    },
+    {
+      "id": "humaneval-126",
+      "domain": "code",
+      "position": 13,
+      "ref_token": 314,
+      "test_token": 369,
+      "class": "unknown"
+    },
+    {
+      "id": "humaneval-25",
+      "domain": "code",
+      "position": 125,
+      "ref_token": 694,
+      "test_token": 3384,
+      "class": "unknown"
+    },
+    {
+      "id": "humaneval-81",
+      "domain": "code",
+      "position": 331,
+      "ref_token": 361,
+      "test_token": 369,
+      "class": "unknown"
+    },
+    {
+      "id": "humaneval-99",
+      "domain": "code",
+      "position": 82,
+      "ref_token": 220,
+      "test_token": 4625,
+      "class": "unknown"
+    },
+    {
+      "id": "mbpp-127",
+      "domain": "code",
+      "position": 71,
+      "ref_token": 25,
+      "test_token": 13,
+      "class": "unknown"
+    },
+    {
+      "id": "mbpp-246",
+      "domain": "code",
+      "position": 393,
+      "ref_token": 830,
+      "test_token": 958,
+      "class": "unknown"
+    },
+    {
+      "id": "mbpp-283",
+      "domain": "code",
+      "position": 381,
+      "ref_token": 11,
+      "test_token": 421,
+      "class": "unknown"
+    },
+    {
+      "id": "mbpp-296",
+      "domain": "code",
+      "position": 164,
+      "ref_token": 8,
+      "test_token": 681,
+      "class": "unknown"
+    },
+    {
+      "id": "mbpp-315",
+      "domain": "code",
+      "position": 14,
+      "ref_token": 6966,
+      "test_token": 279,
+      "class": "unknown"
+    },
+    {
+      "id": "mbpp-428",
+      "domain": "code",
+      "position": 344,
+      "ref_token": 29,
+      "test_token": 835,
+      "class": "unknown"
+    },
+    {
+      "id": "mbpp-44",
+      "domain": "code",
+      "position": 388,
+      "ref_token": 6558,
+      "test_token": 1987,
+      "class": "unknown"
+    },
+    {
+      "id": "mbpp-447",
+      "domain": "code",
+      "position": 266,
+      "ref_token": 1103,
+      "test_token": 411,
+      "class": "unknown"
+    },
+    {
+      "id": "mbpp-452",
+      "domain": "code",
+      "position": 236,
+      "ref_token": 3765,
+      "test_token": 5394,
+      "class": "unknown"
+    },
+    {
+      "id": "mbpp-503",
+      "domain": "code",
+      "position": 487,
+      "ref_token": 25,
+      "test_token": 1608,
+      "class": "unknown"
+    },
+    {
+      "id": "mbpp-70",
+      "domain": "code",
+      "position": 350,
+      "ref_token": 5555,
+      "test_token": 869,
+      "class": "unknown"
+    },
+    {
+      "id": "mbpp-89",
+      "domain": "code",
+      "position": 305,
+      "ref_token": 3284,
+      "test_token": 24508,
+      "class": "unknown"
+    },
+    {
+      "id": "mtbench-108",
+      "domain": "chat",
+      "position": 359,
+      "ref_token": 3467,
+      "test_token": 1640,
+      "class": "unknown"
+    },
+    {
+      "id": "mtbench-134",
+      "domain": "chat",
+      "position": 254,
+      "ref_token": 348,
+      "test_token": 57597,
+      "class": "unknown"
+    },
+    {
+      "id": "oasst1-09131bad-35ab-4d07-aff0-bd8765353ae9",
+      "domain": "chat",
+      "position": 129,
+      "ref_token": 13,
+      "test_token": 11,
+      "class": "unknown"
+    },
+    {
+      "id": "oasst1-14184b30-4701-4c24-8d3c-67c8b1a41aec",
+      "domain": "chat",
+      "position": 105,
+      "ref_token": 3437,
+      "test_token": 1946,
+      "class": "unknown"
+    },
+    {
+      "id": "oasst1-1856fc52-e9c9-4ae3-b9e5-32ebe3a4fd45",
+      "domain": "chat",
+      "position": 500,
+      "ref_token": 39,
+      "test_token": 34,
+      "class": "unknown"
+    },
+    {
+      "id": "oasst1-1abf2e68-0d8e-4dd2-b2ab-17170f998d78",
+      "domain": "chat",
+      "position": 300,
+      "ref_token": 1459,
+      "test_token": 2688,
+      "class": "unknown"
+    },
+    {
+      "id": "oasst1-22169860-f7b4-4394-b35e-d1390dcfcaa4",
+      "domain": "chat",
+      "position": 183,
+      "ref_token": 8343,
+      "test_token": 5357,
+      "class": "unknown"
+    },
+    {
+      "id": "oasst1-2405a9c6-16d4-4560-9df1-cd9bdfb43830",
+      "domain": "chat",
+      "position": 74,
+      "ref_token": 6043,
+      "test_token": 279,
+      "class": "unknown"
+    },
+    {
+      "id": "oasst1-2b43223b-fd85-4068-b3a1-3559a46886c5",
+      "domain": "chat",
+      "position": 41,
+      "ref_token": 9378,
+      "test_token": 19865,
+      "class": "unknown"
+    },
+    {
+      "id": "oasst1-39a7c6e5-70f4-487f-a9fb-11b47f7f5157",
+      "domain": "chat",
+      "position": 105,
+      "ref_token": 310,
+      "test_token": 264,
+      "class": "unknown"
+    },
+    {
+      "id": "oasst1-50ea6cdf-9531-41c5-8f42-c42e60193104",
+      "domain": "chat",
+      "position": 39,
+      "ref_token": 318,
+      "test_token": 314,
+      "class": "unknown"
+    },
+    {
+      "id": "oasst1-76781464-34d9-4c37-8678-5d9ec37990bc",
+      "domain": "chat",
+      "position": 53,
+      "ref_token": 15352,
+      "test_token": 2923,
+      "class": "unknown"
+    },
+    {
+      "id": "oasst1-7cf046b4-d31b-461b-ab59-224423f56a50",
+      "domain": "chat",
+      "position": 89,
+      "ref_token": 5802,
+      "test_token": 369,
+      "class": "unknown"
+    },
+    {
+      "id": "oasst1-7f1ea859-0f8e-443a-9376-8ead20663f53",
+      "domain": "chat",
+      "position": 43,
+      "ref_token": 279,
+      "test_token": 5753,
+      "class": "unknown"
+    },
+    {
+      "id": "oasst1-af04d707-6006-4447-a797-8134c6f13272",
+      "domain": "chat",
+      "position": 355,
+      "ref_token": 12497,
+      "test_token": 1622,
+      "class": "unknown"
+    },
+    {
+      "id": "oasst1-b55a3e33-1c87-4fde-9e58-c486903a8f06",
+      "domain": "chat",
+      "position": 116,
+      "ref_token": 11,
+      "test_token": 1245,
+      "class": "unknown"
+    },
+    {
+      "id": "oasst1-c82d0c8c-9652-4427-bc3c-f4bdf662cf28",
+      "domain": "chat",
+      "position": 199,
+      "ref_token": 1061,
+      "test_token": 353,
+      "class": "unknown"
+    },
+    {
+      "id": "oasst1-dcc403e9-f3a6-4414-9c5e-daa3139115e9",
+      "domain": "chat",
+      "position": 10,
+      "ref_token": 421,
+      "test_token": 25,
+      "class": "unknown"
+    },
+    {
+      "id": "oasst1-df7b6768-0aed-4275-aa8d-8c852b207e03",
+      "domain": "chat",
+      "position": 140,
+      "ref_token": 2972,
+      "test_token": 348,
+      "class": "unknown"
+    },
+    {
+      "id": "oasst1-e41fdaa8-77d0-4aea-b02b-56a4038b7161",
+      "domain": "chat",
+      "position": 370,
+      "ref_token": 8311,
+      "test_token": 13273,
+      "class": "unknown"
+    }
+  ]
+}

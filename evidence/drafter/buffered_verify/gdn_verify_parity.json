@@ -1,0 +1,446 @@
+{
+  "shape": {
+    "H": 16,
+    "HV": 32,
+    "K": 128,
+    "V": 128,
+    "T": 16
+  },
+  "results": [
+    {
+      "batch": 1,
+      "seed": 0,
+      "accept_lens": [
+        9
+      ],
+      "stock_verify_tile": [
+        4,
+        1
+      ],
+      "ring_verify_tile": [
+        32,
+        1
+      ],
+      "checks": [
+        {
+          "tensor": "fold verify output",
+          "bitwise_equal": true,
+          "mismatched_elements": 0,
+          "elements": 65536,
+          "max_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        {
+          "tensor": "fold committed state",
+          "bitwise_equal": true,
+          "mismatched_elements": 0,
+          "elements": 524288,
+          "max_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        {
+          "tensor": "circular verify output",
+          "bitwise_equal": false,
+          "mismatched_elements": 13007,
+          "elements": 65536,
+          "max_abs_diff": 0.000244140625,
+          "max_rel_diff": 0.004926108289510012
+        }
+      ]
+    },
+    {
+      "batch": 1,
+      "seed": 1,
+      "accept_lens": [
+        16
+      ],
+      "stock_verify_tile": [
+        4,
+        1
+      ],
+      "ring_verify_tile": [
+        32,
+        1
+      ],
+      "checks": [
+        {
+          "tensor": "fold verify output",
+          "bitwise_equal": true,
+          "mismatched_elements": 0,
+          "elements": 65536,
+          "max_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        {
+          "tensor": "fold committed state",
+          "bitwise_equal": true,
+          "mismatched_elements": 0,
+          "elements": 524288,
+          "max_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        {
+          "tensor": "circular verify output",
+          "bitwise_equal": false,
+          "mismatched_elements": 12598,
+          "elements": 65536,
+          "max_abs_diff": 0.000244140625,
+          "max_rel_diff": 0.0044843051582574844
+        }
+      ]
+    },
+    {
+      "batch": 1,
+      "seed": 2,
+      "accept_lens": [
+        1
+      ],
+      "stock_verify_tile": [
+        4,
+        1
+      ],
+      "ring_verify_tile": [
+        32,
+        1
+      ],
+      "checks": [
+        {
+          "tensor": "fold verify output",
+          "bitwise_equal": true,
+          "mismatched_elements": 0,
+          "elements": 65536,
+          "max_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        {
+          "tensor": "fold committed state",
+          "bitwise_equal": true,
+          "mismatched_elements": 0,
+          "elements": 524288,
+          "max_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        {
+          "tensor": "circular verify output",
+          "bitwise_equal": false,
+          "mismatched_elements": 13381,
+          "elements": 65536,
+          "max_abs_diff": 0.000244140625,
+          "max_rel_diff": 0.005154639016836882
+        }
+      ]
+    },
+    {
+      "batch": 8,
+      "seed": 0,
+      "accept_lens": [
+        9,
+        9,
+        4,
+        8,
+        8,
+        16,
+        1,
+        11
+      ],
+      "stock_verify_tile": [
+        4,
+        1
+      ],
+      "ring_verify_tile": [
+        32,
+        1
+      ],
+      "checks": [
+        {
+          "tensor": "fold verify output",
+          "bitwise_equal": true,
+          "mismatched_elements": 0,
+          "elements": 524288,
+          "max_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        {
+          "tensor": "fold committed state",
+          "bitwise_equal": true,
+          "mismatched_elements": 0,
+          "elements": 4194304,
+          "max_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        {
+          "tensor": "circular verify output",
+          "bitwise_equal": false,
+          "mismatched_elements": 104482,
+          "elements": 524288,
+          "max_abs_diff": 0.000244140625,
+          "max_rel_diff": 0.0033333334140479565
+        }
+      ]
+    },
+    {
+      "batch": 8,
+      "seed": 1,
+      "accept_lens": [
+        16,
+        12,
+        2,
+        7,
+        16,
+        8,
+        14,
+        12
+      ],
+      "stock_verify_tile": [
+        4,
+        1
+      ],
+      "ring_verify_tile": [
+        32,
+        1
+      ],
+      "checks": [
+        {
+          "tensor": "fold verify output",
+          "bitwise_equal": true,
+          "mismatched_elements": 0,
+          "elements": 524288,
+          "max_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        {
+          "tensor": "fold committed state",
+          "bitwise_equal": true,
+          "mismatched_elements": 0,
+          "elements": 4194304,
+          "max_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        {
+          "tensor": "circular verify output",
+          "bitwise_equal": false,
+          "mismatched_elements": 106399,
+          "elements": 524288,
+          "max_abs_diff": 0.000244140625,
+          "max_rel_diff": 0.003846153849735856
+        }
+      ]
+    },
+    {
+      "batch": 8,
+      "seed": 2,
+      "accept_lens": [
+        1,
+        4,
+        15,
+        3,
+        3,
+        16,
+        3,
+        12
+      ],
+      "stock_verify_tile": [
+        4,
+        1
+      ],
+      "ring_verify_tile": [
+        32,
+        1
+      ],
+      "checks": [
+        {
+          "tensor": "fold verify output",
+          "bitwise_equal": true,
+          "mismatched_elements": 0,
+          "elements": 524288,
+          "max_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        {
+          "tensor": "fold committed state",
+          "bitwise_equal": true,
+          "mismatched_elements": 0,
+          "elements": 4194304,
+          "max_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        {
+          "tensor": "circular verify output",
+          "bitwise_equal": false,
+          "mismatched_elements": 105493,
+          "elements": 524288,
+          "max_abs_diff": 0.000244140625,
+          "max_rel_diff": 0.002923976629972458
+        }
+      ]
+    },
+    {
+      "batch": 16,
+      "seed": 0,
+      "accept_lens": [
+        9,
+        9,
+        4,
+        8,
+        8,
+        16,
+        1,
+        11,
+        15,
+        5,
+        3,
+        6,
+        3,
+        3,
+        15,
+        3
+      ],
+      "stock_verify_tile": [
+        4,
+        1
+      ],
+      "ring_verify_tile": [
+        32,
+        1
+      ],
+      "checks": [
+        {
+          "tensor": "fold verify output",
+          "bitwise_equal": true,
+          "mismatched_elements": 0,
+          "elements": 1048576,
+          "max_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        {
+          "tensor": "fold committed state",
+          "bitwise_equal": true,
+          "mismatched_elements": 0,
+          "elements": 8388608,
+          "max_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        {
+          "tensor": "circular verify output",
+          "bitwise_equal": false,
+          "mismatched_elements": 210386,
+          "elements": 1048576,
+          "max_abs_diff": 0.000244140625,
+          "max_rel_diff": 0.0033333334140479565
+        }
+      ]
+    },
+    {
+      "batch": 16,
+      "seed": 1,
+      "accept_lens": [
+        16,
+        12,
+        2,
+        7,
+        16,
+        8,
+        14,
+        12,
+        16,
+        10,
+        14,
+        9,
+        5,
+        16,
+        9,
+        6
+      ],
+      "stock_verify_tile": [
+        4,
+        1
+      ],
+      "ring_verify_tile": [
+        32,
+        1
+      ],
+      "checks": [
+        {
+          "tensor": "fold verify output",
+          "bitwise_equal": true,
+          "mismatched_elements": 0,
+          "elements": 1048576,
+          "max_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        {
+          "tensor": "fold committed state",
+          "bitwise_equal": true,
+          "mismatched_elements": 0,
+          "elements": 8388608,
+          "max_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        {
+          "tensor": "circular verify output",
+          "bitwise_equal": false,
+          "mismatched_elements": 211767,
+          "elements": 1048576,
+          "max_abs_diff": 0.000244140625,
+          "max_rel_diff": 0.002923976629972458
+        }
+      ]
+    },
+    {
+      "batch": 16,
+      "seed": 2,
+      "accept_lens": [
+        1,
+        4,
+        15,
+        3,
+        3,
+        16,
+        3,
+        12,
+        10,
+        9,
+        14,
+        9,
+        10,
+        16,
+        8,
+        5
+      ],
+      "stock_verify_tile": [
+        4,
+        1
+      ],
+      "ring_verify_tile": [
+        32,
+        1
+      ],
+      "checks": [
+        {
+          "tensor": "fold verify output",
+          "bitwise_equal": true,
+          "mismatched_elements": 0,
+          "elements": 1048576,
+          "max_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        {
+          "tensor": "fold committed state",
+          "bitwise_equal": true,
+          "mismatched_elements": 0,
+          "elements": 8388608,
+          "max_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        {
+          "tensor": "circular verify output",
+          "bitwise_equal": false,
+          "mismatched_elements": 210944,
+          "elements": 1048576,
+          "max_abs_diff": 0.000244140625,
+          "max_rel_diff": 0.0029069767333567142
+        }
+      ]
+    }
+  ]
+}

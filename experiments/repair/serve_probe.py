@@ -29,6 +29,7 @@ Request files are JSONL with `id`, `input_ids` and optionally `continuation`.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import contextlib
 import fcntl
 import json
@@ -220,6 +221,7 @@ def main() -> int:
     )
     ap.add_argument('--mem-fraction', type=float, default=None)
     ap.add_argument('--max-running-requests', type=int, default=2)
+    ap.add_argument('--concurrency', type=int, default=1, help='requests kept in flight')
     ap.add_argument('--timing', action='store_true', help='log per-cycle GPU phase times')
     ap.add_argument(
         '--trace', action='store_true', help='log per-cycle drafts and target argmax (syncs)'
@@ -319,10 +321,6 @@ def main() -> int:
             'cuda,nvtx',
             '--cuda-graph-trace',
             'node',
-            '--sample',
-            'none',
-            '--cpuctxsw',
-            'none',
         ]
     cmd += [sys.executable, '-m', 'sglang.launch_server']
     for key, value in server_args.items():
@@ -357,6 +355,7 @@ def main() -> int:
         'requests': str(args.requests),
         'n_requests': len(requests),
         'max_new_tokens': args.max_new_tokens,
+        'concurrency': args.concurrency,
         'ignore_eos': args.ignore_eos,
         'started': time.strftime('%Y-%m-%dT%H:%M:%S%z'),
     }
@@ -412,41 +411,45 @@ def main() -> int:
                     str(args.nsys),
                     '--force-overwrite',
                     'true',
+                    '--sample',
+                    'none',
+                    '--cpuctxsw',
+                    'none',
                 ],
                 check=True,
             )
         watch = HostLoadSampler()
-        with watch, open(out / 'results.jsonl', 'w') as results:
-            for request in requests:
-                gen = generate_with_logprobs if args.logprobs else stream_generate
-                rec = gen(base, request['input_ids'], args.max_new_tokens, args.ignore_eos)
-                row = {
-                    'id': request['id'],
-                    'domain': request.get('domain'),
-                    **summarize(rec),
-                    'output_ids': rec['output_ids'],
-                }
-                if 'top2' in rec:
-                    row['top2'] = rec['top2']
-                if 'continuation' in request:
-                    ref = request['continuation']
-                    got = rec['output_ids']
-                    match = 0
-                    while match < min(len(ref), len(got)) and ref[match] == got[match]:
-                        match += 1
-                    row['ref_match_prefix'] = match
-                row['meta_info'] = rec['meta_info']
+        gen = generate_with_logprobs if args.logprobs else stream_generate
+
+        def one(request: dict[str, Any]) -> dict[str, Any]:
+            rec = gen(base, request['input_ids'], args.max_new_tokens, args.ignore_eos)
+            row = {
+                'id': request['id'],
+                'domain': request.get('domain'),
+                **summarize(rec),
+                'output_ids': rec['output_ids'],
+            }
+            if 'top2' in rec:
+                row['top2'] = rec['top2']
+            if 'continuation' in request:
+                ref = request['continuation']
+                got = rec['output_ids']
+                match = 0
+                while match < min(len(ref), len(got)) and ref[match] == got[match]:
+                    match += 1
+                row['ref_match_prefix'] = match
+            row['meta_info'] = rec['meta_info']
+            return row
+
+        # Concurrency c keeps c requests in flight (closed loop), so steady cycles run at bs = c.
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=args.concurrency)
+        with watch, pool, open(out / 'results.jsonl', 'w') as results:
+            for row in pool.map(one, requests):
                 results.write(json.dumps(row) + '\n')
-                print(
-                    json.dumps(
-                        {
-                            k: v
-                            for k, v in row.items()
-                            if k not in ('output_ids', 'meta_info', 'top2')
-                        }
-                    ),
-                    flush=True,
-                )
+                brief = {
+                    k: v for k, v in row.items() if k not in ('output_ids', 'meta_info', 'top2')
+                }
+                print(json.dumps(brief), flush=True)
         # A short trailing request lets the engine flush the timing records of
         # the last recorded request (they are resolved lazily).
         stream_generate(base, requests[0]['input_ids'], 64, args.ignore_eos)

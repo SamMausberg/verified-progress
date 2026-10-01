@@ -1,0 +1,69 @@
+{
+  "ref": "~/vp-data/drafter/replay-check/c1-off/requests.jsonl",
+  "test": "~/vp-data/drafter/replay-check/c1-fold/requests.jsonl",
+  "convention": "experiments/state_safety/compare.py (PR #37): tie, one_ulp, near (<=0.5 nats), large",
+  "requests": 80,
+  "sequences_diverged": 4,
+  "compared_tokens": 131366,
+  "divergences_per_1000_tokens": 0.030449279113316994,
+  "classes": {
+    "tie": 4
+  },
+  "bitwise_identical_sequences": 76,
+  "first_logprob_difference": {
+    "gsm8k-train-3454": 3,
+    "gsm8k-train-7247": 3,
+    "math500-test/counting_and_probability/14.json": 2,
+    "math500-test/prealgebra/846.json": 2
+  },
+  "divergences": [
+    {
+      "id": "gsm8k-train-3454",
+      "domain": "math",
+      "position": 455,
+      "ref_token": 348,
+      "test_token": 8852,
+      "class": "tie",
+      "margin_ref": 0.0,
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
+    },
+    {
+      "id": "gsm8k-train-7247",
+      "domain": "math",
+      "position": 1325,
+      "ref_token": 13634,
+      "test_token": 45593,
+      "class": "tie",
+      "margin_ref": 0.0,
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
+    },
+    {
+      "id": "math500-test/counting_and_probability/14.json",
+      "domain": "math500",
+      "position": 472,
+      "ref_token": 393,
+      "test_token": 579,
+      "class": "tie",
+      "margin_ref": 0.0,
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
+    },
+    {
+      "id": "math500-test/prealgebra/846.json",
+      "domain": "math500",
+      "position": 1190,
+      "ref_token": 1467,
+      "test_token": 1042,
+      "class": "tie",
+      "margin_ref": 0.125,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
+      "ulp": 0.125
+    }
+  ]
+}

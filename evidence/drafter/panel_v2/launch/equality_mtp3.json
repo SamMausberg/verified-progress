@@ -1,0 +1,67 @@
+{
+  "launch": {
+    "command": [
+      "~/sglang/.venv/bin/python",
+      "-m",
+      "sglang.launch_server",
+      "--model-path",
+      "Qwen/Qwen3.5-4B",
+      "--revision",
+      "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "30082",
+      "--attention-backend",
+      "flashinfer",
+      "--mm-attention-backend",
+      "triton_attn",
+      "--random-seed",
+      "0",
+      "--enable-metrics",
+      "--stream-interval",
+      "4",
+      "--speculative-algorithm",
+      "NEXTN",
+      "--speculative-num-steps",
+      "3",
+      "--speculative-eagle-topk",
+      "1",
+      "--speculative-num-draft-tokens",
+      "4",
+      "--mem-fraction-static",
+      "0.25",
+      "--max-running-requests",
+      "4"
+    ],
+    "env": {},
+    "sglang_worktree": "~/sglang",
+    "sglang_revision": "bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824",
+    "sglang_dirty": false,
+    "repo_revision": "b6c52de03cc0c8e7896b56bf264d8b30c8d3a80b",
+    "clients": [
+      "python ~/vp-wt/drafter/experiments/drafter/accept_probe.py --port {port} --workload ~/vp-wt/drafter/experiments/drafter/panel-v2.jsonl --per-domain 32   --max-new-tokens 2048 --concurrency 1 --logprobs --out {out} --label mtp3"
+    ],
+    "started": "2026-10-01T04:22:59+0000",
+    "startup_attempts": 1
+  },
+  "cpu_load": {
+    "interval_s": 1.0,
+    "samples": 531,
+    "foreign_cores_mean": 2.368,
+    "foreign_cores_max": 8.75,
+    "contended": true,
+    "contention_threshold_cores": 2.0,
+    "top_foreign_mean_cores": {
+      "sglang::scheduler": 0.98,
+      "~/.rustup/toolchains/stable-aarch64-unknown-linux-gnu/bin/rustc --crate-name sglang_server --edition=2024 sgl": 0.24,
+      "claude --dangerously-skip-permissions": 0.1,
+      "~/.cursor-server/bin/linux-arm64/e44a49c17e334d442e58bbde931d791200f014a0/node --dns-result-order=ipv4first -": 0.09,
+      "python build_freq_map.py --size 32768 --out qwen3_5_ultrachat_freq_32768.pt": 0.07
+    },
+    "own_peak_cores": {
+      "python ~/vp-wt/drafter/experiments/drafter/accept": 4.86,
+      "sglang::scheduler": 1.04
+    }
+  }
+}

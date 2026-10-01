@@ -18,6 +18,8 @@ runs with the backbone engine worktree on the path.
 | `lt_algos.cpp` | cuBLASLt heuristic enumeration and execution of any returned algorithm (built by `gemm_bench.py` with `torch.utils.cpp_extension`) |
 | `make_table.py` | The engine's routing table (JSON) from a `gemm` result |
 | `summarize.py` | Markdown tables from the results |
+| `bitwise_runs.py` | Counts the prompts whose greedy outputs two state-safety runs reproduce bit for bit (output token ids and every top-k logprob array), for the served exactness classes |
+| `insitu_gemm.py` | From nsys reports of served plain decoding (`experiments/profiling/run_profiles.py`, node-level graph trace): which weight-GEMM kernels each decode-graph replay runs (cuBLAS, the Triton kernel or the Hopper GEMV), per projection, with their median summed time and the replay span |
 
 GPU tests of the kernel: `tests/test_backbone_gemm.py` (skip without CUDA or the patch).
 

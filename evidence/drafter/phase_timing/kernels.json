@@ -1,0 +1,37 @@
+{
+  "stock": {
+    "fused_qkv_split_gdn_prefill_kernel": 48,
+    "fused_gdn_gating_kernel": 48,
+    "fused_sigmoid_gating_delta_rule_update_kernel": 48,
+    "kernel_cutlass_kernel_flashinfergdn_kernelsdelta_rule_dsldelta_rule_cp_sm90CPDeltaRuleTPrecomputeSm90_object_at__CopyAto": 24,
+    "kernel_cutlass_kernel_flashinfergdn_kernelsdelta_rule_dsldelta_rule_cp_sm90CPDeltaRuleMNPrecomputeSm90_object_at__tensor": 24,
+    "kernel_cutlass_kernel_flashinfergdn_kernelsdelta_rule_dsldelta_rule_cp_sm90CPDeltaRuleFixupHmmaSm90_object_at__CopyAtom_": 24,
+    "kernel_cutlass_kernel_flashinfergdn_kernelsdelta_rule_dsldelta_rule_cp_sm90CPDeltaRulePrefillSm90_object_at__tensorptrf3": 24,
+    "kernel_cutlass_kernel_flashinfergdn_kernelsdelta_rule_dsldelta_rule_sm90_FullyFusedDeltaRuleSm90_object_at__tensorptrf32": 24,
+    "_fused_mamba_state_scatter_with_mask_kernel": 2
+  },
+  "circular": {
+    "fused_qkv_split_gdn_prefill_kernel": 48,
+    "fused_gdn_gating_kernel": 48,
+    "gdn_replayssm_spec_circular_kernel": 48,
+    "kernel_cutlass_kernel_flashinfergdn_kernelsdelta_rule_dsldelta_rule_cp_sm90CPDeltaRuleTPrecomputeSm90_object_at__CopyAto": 24,
+    "kernel_cutlass_kernel_flashinfergdn_kernelsdelta_rule_dsldelta_rule_cp_sm90CPDeltaRuleMNPrecomputeSm90_object_at__tensor": 24,
+    "kernel_cutlass_kernel_flashinfergdn_kernelsdelta_rule_dsldelta_rule_cp_sm90CPDeltaRuleFixupHmmaSm90_object_at__CopyAtom_": 24,
+    "kernel_cutlass_kernel_flashinfergdn_kernelsdelta_rule_dsldelta_rule_cp_sm90CPDeltaRulePrefillSm90_object_at__tensorptrf3": 24,
+    "kernel_cutlass_kernel_flashinfergdn_kernelsdelta_rule_dsldelta_rule_sm90_FullyFusedDeltaRuleSm90_object_at__tensorptrf32": 24,
+    "_advance_gdn_spec_cursors_kernel": 2,
+    "gdn_replayssm_compact_commit_kernel": 2,
+    "_finish_gdn_replayssm_circular_fold_kernel": 2
+  },
+  "fold": {
+    "fused_qkv_split_gdn_prefill_kernel": 48,
+    "fused_gdn_gating_kernel": 48,
+    "fused_sigmoid_gating_delta_rule_update_kernel": 48,
+    "kernel_cutlass_kernel_flashinfergdn_kernelsdelta_rule_dsldelta_rule_cp_sm90CPDeltaRuleTPrecomputeSm90_object_at__CopyAto": 24,
+    "kernel_cutlass_kernel_flashinfergdn_kernelsdelta_rule_dsldelta_rule_cp_sm90CPDeltaRuleMNPrecomputeSm90_object_at__tensor": 24,
+    "kernel_cutlass_kernel_flashinfergdn_kernelsdelta_rule_dsldelta_rule_cp_sm90CPDeltaRuleFixupHmmaSm90_object_at__CopyAtom_": 24,
+    "kernel_cutlass_kernel_flashinfergdn_kernelsdelta_rule_dsldelta_rule_cp_sm90CPDeltaRulePrefillSm90_object_at__tensorptrf3": 24,
+    "kernel_cutlass_kernel_flashinfergdn_kernelsdelta_rule_dsldelta_rule_sm90_FullyFusedDeltaRuleSm90_object_at__tensorptrf32": 24,
+    "gdn_replayssm_exact_fold_kernel": 2
+  }
+}

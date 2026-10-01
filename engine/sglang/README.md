@@ -67,7 +67,7 @@ Every change is off unless its flag or environment variable is set.
 Tests: `tests/test_moonshot_levers.py` and `tests/test_gdn_exact_replay.py` (the engine
 tests run in the SGLang venv with the worktree on `PYTHONPATH` and skip elsewhere).
 
-## drafter (`patches/drafter/0001`, branch `engine/drafter`)
+## drafter (`patches/drafter/0001-0004`, branch `engine/drafter`)
 
 ```sh
 scripts/sglang_worktree.sh drafter
@@ -78,6 +78,9 @@ SGLANG_WORKTREE=~/sglang-wt/drafter source scripts/sglang_env.sh
 | Patch | What it changes | Default behaviour |
 |---|---|---|
 | 0001 | `SGLANG_DFLASH_TRACE_PATH=<prefix>`: the DFLASH worker appends one JSON line per request per greedy verify cycle to `<prefix>.<pid>.jsonl` (request id, prefix length, the drafted block with the anchor first, the target's argmax at every block row, accepted length). Used for the per-cycle traces in `evidence/drafter/` (`experiments/drafter/run_trace.sh`). It copies to the host every cycle, a stream sync, so traced runs give tokens and acceptance, not timings. | unchanged unless the variable is set |
+| 0002 | `--enable-linear-replayssm-spec` for DFLASH on GDN models (Qwen3.5): the GDN circular-ring ReplaySSM commit in `update_mamba_state_after_mtp_verify`, which DFLASH calls directly (the same kernels, order and index sets as the GDN branch of `spec_utils.commit_mamba_states_after_verify` used by EAGLE/MTP), and the KDA-only refusal relaxed for DFLASH on GDN. The verify then writes compact per-token records to a ring instead of one FP32 GDN state per block position. Not bitwise: the circular verify output differs from the recurrent kernel's in about 20% of BF16 words (at most 2.4e-4 absolute), and served outputs diverge at ties (0/80 sequences bitwise at c=1 and 8; `experiments/drafter/run_replay_check.sh`). | refused without the patch; unchanged unless the flag is set |
+| 0003 | `SGLANG_GDN_REPLAYSSM_FOLD=1` with `--enable-linear-replayssm-spec`: the fold-every-commit protocol for GDN pools (verify with the recurrent kernel, which also writes the raw window to a ring; on commit, a bitwise clone of the recurrent update replays the accepted prefix into the checkpoint). SGLang implements it for GDN but enabled it only for KDA. The DFLASH commit hook routes to it, and EAGLE/MTP reach it through `spec_utils`. Validation (`experiments/drafter/run_replay_check.sh`, `evidence/drafter/README.md`): the verify output and the folded state are bitwise equal to the stock verify at the kernel level (batch 1, 8 and 16). With pools pinned identically in both arms (`run_fold_localize.sh`), served outputs are bitwise equal to stock (tokens and top-5 logprobs): DFlash at c=1 with the per-cycle trace also identical cycle by cycle, DFlash in deterministic waves of 4 and MTP s3 in waves of 8 on all 80 panel-v2 sequences, and MTP s3 at c=1 on all 80 in the first check. Per-phase split at c=8 and 16 (`run_phase_timing.sh`): the held-batch cycle is 8.6% and 11.9% shorter than stock's. Served on the bench's tuned DFlash arms (`run_fold_timing.sh`, one session): 3.2% slower than stock at c=1 on block 16 (1.4% on block 8), about 6% faster at c=8 and 12% at c=32. | unchanged unless the variable is set |
+| 0004 | Gates the DFLASH ReplaySSM commit hook of 0002/0003 on `--enable-linear-replayssm-spec`: plain `--enable-linear-replayssm` also allocates replay rings, and without the gate a DFLASH server with only that flag would commit through a ring its verify never wrote instead of the stock scatter. No effect on any configuration measured here (either both ReplaySSM spec flags are on, or no ReplaySSM flag is set); the evidence was produced at 0003 (31bda3e674). | unchanged unless `--enable-linear-replayssm` is set without `-spec` |
 
 The drafter's timed runs use the stock engine; trained drafters load through SGLang's
 unmodified `DFlashDraftModel` and `DFlash2DraftModel`.
@@ -218,9 +221,12 @@ does on CUDA).
 | 0007 | The packed-projection row cutoff of 0004 applies only with the merge switch (Qwen4-Exp's own packed weights keep the original gate), and also on the deferred-norm branch | `SGLANG_BACKBONE_MERGE_IN_PROJ` | unchanged |
 | 0008 | A table entry of mode `gemv` calls the Hopper GEMV only on Hopper (CUDA compute capability 9.x; HIP excluded, since ROCm reports gfx94x as 9.x), as SGLang's own gemv backend requires; elsewhere the call falls back to cuBLAS | with `SGLANG_BACKBONE_GEMM` | unchanged |
 
-The routing table is JSON from `experiments/backbone/make_table.py`. Measured so far: the kernels
-and fusions in isolation and in layer skeletons (`evidence/backbone/README.md`). The exactness
-class and serving effect of the switches are pending.
+The routing table is JSON from `experiments/backbone/make_table.py`. Measured
+(`evidence/backbone/README.md`): the kernels and fusions in isolation and in layer skeletons;
+greedy outputs against stock plain decoding on 320 prompts, where every switch off and the merge
+switch give the same token ids and top-5 logprobs at concurrency 1, and `--bf16-gemm-backend
+gemv` and the routing table (lever v1) are exact up to rounding; and paired serving of lever v1 against tuned plain decoding (3.4% faster at
+concurrency 1, 1.0% at 128). Serving against tuned MTP is pending.
 
 ## hostgap (`patches/hostgap/0001-0005`, branch `engine/hostgap`)
 

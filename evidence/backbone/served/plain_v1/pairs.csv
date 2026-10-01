@@ -1,0 +1,5 @@
+test,baseline,concurrency,n,sessions,dropped_invalid,unmatched,y_ratio_mean,y_ratio_min,y_ratio_max,x_e2e_ratio_mean,x_e2e_ratio_min,x_e2e_ratio_max
+backbone-plain-v1-B,backbone-plain-v1-A,1,2,abba-1 abba-2,0,0,1.0345,1.0336,1.0353,1.0345,1.0337,1.0354
+backbone-plain-v1-B,backbone-plain-v1-A,8,2,abba-1 abba-2,0,0,1.0039,1.0037,1.0042,1.0039,1.0036,1.0042
+backbone-plain-v1-B,backbone-plain-v1-A,32,2,abba-1 abba-2,0,0,1.0020,1.0013,1.0027,1.0020,1.0014,1.0027
+backbone-plain-v1-B,backbone-plain-v1-A,128,2,abba-1 abba-2,0,0,1.0100,1.0098,1.0102,1.0100,1.0098,1.0102
