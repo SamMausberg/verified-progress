@@ -246,13 +246,14 @@ with this declaration):
   0.99, KV usage about 0.73, no retractions), so the 128th request was never admitted. The
   likely limit is SGLang's admission budget: with ignore_eos it reserves each request's full
   512 output tokens and charges a shared-mamba cost per request in token units, which the
-  128 x 2,560 sizing ignored. Earlier steps of that run passed (kernel checks at tiles 32
-  and 16, tile-16 kernel bench, FlashInfer verify timing, output probe "no difference").
-- Rerun amendment (2026-10-01 at 10:11 UTC, before the rerun; the validator is unchanged):
+  128 x 2,560 sizing ignored. Its kernel-level steps passed (kernel checks at tiles 32 and
+  16, tile-16 kernel bench, FlashInfer verify timing); its other results are not reported.
+- Rerun amendment (2026-10-01 at 10:11 and 10:16 UTC, before the rerun; the validator is unchanged):
   the pinned KV pool is 655,360 tokens in both arms; a required admission preflight starts
   each A/B arm's server with the pinned pools, sends 128 long prompts at the A/B's output
   length (512, so the scheduler reserves the same tokens per request) and stops the job
-  unless its log shows `#running-req: 128` (`check_admission.py`). The kernel checks at tiles
+  unless its log shows `#running-req: 128` inside the measured point's AIPerf profiling phase
+  (`check_admission.py`; bench's server warm-up at a short output length does not count). The kernel checks at tiles
   32 and 16, the tile-16 kernel bench and the FlashInfer verify timing are reused from run
   20261001T082738Z (repo e67feb1, engine c29a91692b): they run one layer's kernels on
   synthetic inputs and cannot depend on a server's pools; the rerun stops unless the engine
