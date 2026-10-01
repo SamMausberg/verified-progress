@@ -8,8 +8,10 @@
 # With no arguments it checks the files staged for commit (pre-commit runs it that way, so the
 # config's evidence/ exclusion does not hide evidence files from it). It looks for the hostname
 # when that is an IP address in dashed form, and for every public IPv4 address `hostname -I`
-# reports, dotted and dashed. Binary files are scanned as text too (a PDF or binary artifact
-# can embed the address). Matches are reported by file and line, without the value.
+# reports, dotted and dashed, and for every global IPv6 address it reports. Binary files are
+# scanned as text too (a PDF or binary artifact can embed the address); a compressed stream
+# can still hide it, so check generated archives at the source. Matches are reported by file
+# and line, without the value.
 set -euo pipefail
 
 patterns=()
@@ -19,7 +21,12 @@ if [[ $host =~ ^[0-9]{1,3}(-[0-9]{1,3}){3}$ ]]; then
 fi
 for addr in $(hostname -I 2>/dev/null || true); do
   case "$addr" in
-    *:* | 127.* | 10.* | 192.168.* | 169.254.*) continue ;;
+    ::1 | [fF][eE]80:* | [fF][cCdD]*:*) continue ;; # IPv6 loopback, link-local, unique local
+    *:*)
+      patterns+=("$addr")
+      continue
+      ;;
+    127.* | 10.* | 192.168.* | 169.254.*) continue ;;
     172.1[6-9].* | 172.2[0-9].* | 172.3[01].*) continue ;;
   esac
   patterns+=("$addr" "${addr//./-}")

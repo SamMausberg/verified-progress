@@ -91,3 +91,12 @@ def test_binary_files_are_scanned_too(tmp_path: Path) -> None:
     done = run(env, tmp_path, 'artifact.bin', 'clean.bin')
     assert done.returncode == 1
     assert 'artifact.bin' in done.stderr and 'clean.bin' not in done.stderr
+
+
+def test_global_ipv6_addresses_are_patterns_but_local_ones_are_not(tmp_path: Path) -> None:
+    env = fake_host(tmp_path, 'ubuntu', '2001:db8::7 fe80::1 fd00::2')
+    (tmp_path / 'global.txt').write_text('peer 2001:db8::7\n')
+    (tmp_path / 'local.txt').write_text('peer fe80::1 and fd00::2\n')
+    done = run(env, tmp_path, 'global.txt', 'local.txt')
+    assert done.returncode == 1
+    assert 'global.txt' in done.stderr and 'local.txt' not in done.stderr
