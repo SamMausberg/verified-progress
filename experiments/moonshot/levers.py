@@ -67,7 +67,9 @@ LEVERS: dict[str, Lever] = {
         },
         note='rounding-preserving live replay (patch 0007): FP32 anchor written every 4 '
         'steps, ring of the packed decode operands; meant to be bit-identical',
-        env={'SGLANG_GDN_EXACT_REPLAY': '1'},
+        # The value tile is pinned here (not inherited from the caller's shell): 32 is the
+        # packed decode's tile, the configuration the bit-exactness check covers.
+        env={'SGLANG_GDN_EXACT_REPLAY': '1', 'SGLANG_GDN_EXACT_REPLAY_BV': '32'},
         conflicts=('replayssm', 'bf16_state', 'fp16_state', 'fp8_state'),
     ),
     # P4's served A/B pins the pools identically in both arms (BRIEF: equal running limit,

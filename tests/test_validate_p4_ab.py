@@ -60,6 +60,7 @@ def make_run(
     order: list[tuple[str, str]] = ORDER,
     manifest: dict[str, Any] = MANIFEST,
     pool_log: str = POOL_LOG,
+    tile: str = '32',
     **overrides: Any,
 ) -> Path:
     """A synthetic A/B directory; `overrides` apply to the first exact-replay arm's point,
@@ -79,6 +80,8 @@ def make_run(
         (run / 'sweep.json').write_text(json.dumps(sweep))
         log = 'GDN decode: exact replay kernel, ring length 4\n' if exact else 'decode\n'
         (run / 'server/server.log').write_text(pool_log + log)
+        env = {'SGLANG_GDN_EXACT_REPLAY': '1', 'SGLANG_GDN_EXACT_REPLAY_BV': tile} if exact else {}
+        (run / 'server/launch.json').write_text(json.dumps({'env_overrides': env}))
     (root / 'lever_sweep_log.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in records))
     return root
 
@@ -149,3 +152,7 @@ def test_unpinned_pools_fail(tmp_path: Path) -> None:
 def test_small_kv_pool_fails(tmp_path: Path) -> None:
     pool_log = POOL_LOG.replace('max_total_num_tokens=360448', 'max_total_num_tokens=300000')
     assert run(make_run(tmp_path, pool_log=pool_log)).returncode == 1
+
+
+def test_other_value_tile_fails(tmp_path: Path) -> None:
+    assert run(make_run(tmp_path, tile='16')).returncode == 1

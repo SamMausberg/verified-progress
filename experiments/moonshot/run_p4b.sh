@@ -24,6 +24,9 @@ export SGLANG_WORKTREE=~/sglang-wt/moonshot
 cd "$(dirname "$(readlink -f "$0")")/../.." || exit 1
 REPO=$(pwd)
 RUN_ID=$(date -u +%Y%m%dT%H%M%SZ)
+# The exact-replay value tile is pinned to 32 (the packed decode's tile) for every step and
+# server unless a step overrides it explicitly; the exact_replay lever also sets it per server.
+export SGLANG_GDN_EXACT_REPLAY_BV=32
 DATA=~/vp-data/moonshot
 OPTIONAL_FAILED=()
 
@@ -44,6 +47,7 @@ step() {  # step <required|optional> <name> <command...>
   fi
 }
 
+echo "SGLANG_GDN_EXACT_REPLAY_BV=$SGLANG_GDN_EXACT_REPLAY_BV"
 echo "P4b run $RUN_ID, engine $(git -C "$SGLANG_WORKTREE" rev-parse --short HEAD), repo $REPO at $(git rev-parse --short HEAD)"
 git status --short -- experiments bench | sed 's/^/uncommitted: /'
 export PYTHONPATH=$SGLANG_WORKTREE/python

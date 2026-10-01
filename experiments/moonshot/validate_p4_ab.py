@@ -14,7 +14,9 @@ Reads one fresh lever_sweep output directory and checks, for this run only:
     128, max_mamba_cache_size 128 and a KV pool (max_total_num_tokens; 360,448 requested)
     of at least 327,680 tokens (128 x 2,560), identical in all eight arms;
   - every exact-replay server log shows the exact-replay kernel dispatch line, and no
-    dense server log does;
+    dense server log does; every exact-replay server was launched with
+    SGLANG_GDN_EXACT_REPLAY_BV=32 (bench's launch.json records the arm's environment,
+    which overrides anything inherited);
   - the run forms exactly four complete dense/exact pairs (labels r1-r4).
 Any failed check prints FAILED and exits 1. Otherwise it prints, per pair, the exact / dense
 ratio of the primary metric (`server_log.logged_gen_tps_full_batch`) and of client y, the
@@ -158,6 +160,12 @@ def main() -> None:
             dispatched = DISPATCH in text
             if dispatched != (arm == EXACT):
                 fail(f'{label}: exact-replay dispatch line present={dispatched}')
+            if arm == EXACT:
+                launch_json = server_log.parent / 'launch.json'
+                launch = json.loads(launch_json.read_text()) if launch_json.exists() else {}
+                tile = (launch.get('env_overrides') or {}).get('SGLANG_GDN_EXACT_REPLAY_BV')
+                if tile != '32':
+                    fail(f'{label}: launched with SGLANG_GDN_EXACT_REPLAY_BV={tile!r}, not 32')
             row[f'{key}_pools'] = resolved_pools(label, server_log)
             row[f'{key}_server_tps'] = float(point['server_log']['logged_gen_tps_full_batch'])
             row[f'{key}_client_y'] = float(point['y'])
