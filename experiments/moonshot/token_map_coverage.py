@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import sys
 from pathlib import Path
 
@@ -24,7 +25,19 @@ if str(REPO_DIR) not in sys.path:
 
 MAPS = Path.home() / 'vp-data/bench/token_map'
 DEFAULT_MAPS = ['hot4096_tune', 'hot8192_tune', 'hot16384_tune', 'hot32k_tune']
-SOURCE = 'mixed-v2 confirm plain sweep (c=1/32/128, OSL 512)'
+
+
+def describe_run(run: Path) -> str:
+    """Source label from the run's sweep.json, e.g. 'mixed-v2 confirm plain sweep (c=1/32/128,
+    OSL 512)'. Raises when the run has no sweep.json (pass --source then)."""
+    sweep_json = run / 'sweep.json'
+    if not sweep_json.exists():
+        raise SystemExit(f'{run} has no sweep.json; pass --source to describe it')
+    data = json.loads(sweep_json.read_text())
+    workload = Path(data['workload']['file'])
+    concurrency = '/'.join(str(c) for c in data['concurrency'])
+    osl = f'OSL {data["osl"]}' if data.get('ignore_eos') else 'natural stop'
+    return f'{workload.parent.name} {workload.stem} {data["label"]} sweep (c={concurrency}, {osl})'
 
 
 def main() -> None:
@@ -32,7 +45,11 @@ def main() -> None:
     parser.add_argument('run', type=Path, help='sweep run directory with the confirm outputs')
     parser.add_argument('--maps', nargs='+', default=DEFAULT_MAPS)
     parser.add_argument('--map-dir', type=Path, default=MAPS)
-    parser.add_argument('--source', default=SOURCE, help='description written to the CSV')
+    parser.add_argument(
+        '--source',
+        default=None,
+        help="description written to the CSV (default: from the run's sweep.json)",
+    )
     parser.add_argument('--out', type=Path, required=True)
     args = parser.parse_args()
 
@@ -40,6 +57,7 @@ def main() -> None:
 
     from bench.token_map import count_tokens, coverage
 
+    source = args.source or describe_run(args.run)
     counts, _ = count_tokens([args.run])
     output_tokens = sum(counts.values())
     rows = []
@@ -51,7 +69,7 @@ def main() -> None:
                 'rows': len(hot),
                 'held_out_coverage': f'{coverage(counts, set(hot)):.4f}',
                 'output_tokens': output_tokens,
-                'source_run': args.source,
+                'source_run': source,
             }
         )
     args.out.parent.mkdir(parents=True, exist_ok=True)
