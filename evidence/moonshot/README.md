@@ -225,7 +225,7 @@ with this declaration):
   dispatch line appears only in exact-replay logs, and the arms ran
   in the declared order. A failed check voids the run; it is repeated and its numbers are
   not reported.
-- Primary metric (amended on 2026-10-01 at 08:19 and 08:23 UTC, before the run started; the first
+- Primary metric (amended on 2026-10-01 at 08:19 and 08:22 UTC, before the run started; the first
   version named bench's `logged_gen_tps_full_batch`, which averages windows with at least
   0.9 x the peak running count, i.e. 116-128 of 128): the server's decode rate at exactly
   128 running requests in the measured phase. The scheduler logs one `gen throughput` per 40
