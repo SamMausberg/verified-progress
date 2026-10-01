@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gzip
+import hashlib
 import json
 import subprocess
 import sys
@@ -86,19 +87,34 @@ def decode_log(rate: float, running_in_phase: int = 128, prefill_at: int | None 
     return '\n'.join(lines) + '\n'
 
 
-def aiperf_raw(path: Path) -> None:
+# A declared workload that repeats texts, like long2048.jsonl (91 distinct among 512).
+WORKLOAD_TEXTS = [f'long prompt {i % 30}' for i in range(512)]
+
+
+def write_workload(root: Path) -> Path:
+    path = root / 'workload.jsonl'
+    rows = [{'id': f'long2048-{i:04d}', 'text': t} for i, t in enumerate(WORKLOAD_TEXTS)]
+    path.write_text(''.join(json.dumps(r) + '\n' for r in rows))
+    return path
+
+
+def message(text: str) -> dict[str, Any]:
+    return {'messages': [{'role': 'user', 'content': text}]}
+
+
+def aiperf_raw(path: Path, sent: list[str]) -> None:
     path.mkdir(parents=True)
     records = []
-    for _ in range(128):  # warm-up wave before the phase
+    for i in range(128):  # warm-up wave before the phase, from the warm-up pool
         meta = {'benchmark_phase': 'warmup', 'request_start_ns': (PHASE_START - 30) * 10**9,
                 'request_end_ns': (PHASE_START - 1) * 10**9}  # fmt: skip
-        records.append({'metadata': meta})
-    for i in range(256):
+        records.append({'metadata': meta, 'payload': message(f'warm-up prompt {i}')})
+    for i, text in enumerate(sent):
         start = PHASE_START + (0 if i < 128 else 25)
         end = PHASE_END if i >= 128 else PHASE_START + 25
         meta = {'benchmark_phase': 'profiling', 'request_start_ns': start * 10**9,
                 'request_end_ns': end * 10**9}  # fmt: skip
-        records.append({'metadata': meta})
+        records.append({'metadata': meta, 'payload': message(text)})
     with gzip.open(path / 'profile_export_raw.jsonl.gz', 'wt') as handle:
         handle.writelines(json.dumps(r) + '\n' for r in records)
 
@@ -116,10 +132,17 @@ def make_run(
     probe: str = 'no difference',
     running_in_phase: int = 128,
     prefill_at: int | None = None,
+    sent: list[str] | None = None,
     **overrides: Any,
 ) -> Path:
     """A synthetic A/B directory; `overrides` apply to the first exact-replay arm's point,
     `manifest` and `pool_log` to every arm."""
+    workload = write_workload(root)
+    workload_sha = hashlib.sha256(workload.read_bytes()).hexdigest()
+    (root / 'workload.sha256').write_text(workload_sha)
+    if manifest['workload'].get('sha256') == MANIFEST['workload']['sha256']:
+        manifest = {**manifest, 'workload': {**manifest['workload'], 'sha256': workload_sha}}
+    manifest = {**manifest, 'workload': {**manifest['workload'], 'file': str(workload)}}
     records = []
     first_exact = True
     for arm, pair in order:
@@ -137,7 +160,8 @@ def make_run(
         (run / 'server/server.log').write_text(
             pool_log + log + decode_log(rate, running_in_phase, prefill_at)
         )
-        aiperf_raw(run / 'r0/c128/aiperf')
+        # Sent in another order than the file (the closed loop reorders), same multiset.
+        aiperf_raw(run / 'r0/c128/aiperf', sent or WORKLOAD_TEXTS[:256][::-1])
         env = {'SGLANG_GDN_EXACT_REPLAY': '1', 'SGLANG_GDN_EXACT_REPLAY_BV': tile} if exact else {}
         launch = {
             'env_overrides': env,
@@ -164,16 +188,25 @@ def make_run(
 
 
 def run(root: Path) -> subprocess.CompletedProcess[str]:
-    command = [
-        sys.executable,
-        str(SCRIPT),
-        str(root),
-        '--provenance',
-        str(root / 'provenance.json'),
-        '--output-probe',
-        str(root / 'output_probe.json'),
-    ]
-    return subprocess.run(command, capture_output=True, text=True, check=False)
+    """Run the validator's main() in a subprocess with the declared workload hash set to the
+    synthetic workload's (the module's constant names long2048.jsonl)."""
+    argv = [
+        str(SCRIPT), str(root),
+        '--provenance', str(root / 'provenance.json'),
+        '--output-probe', str(root / 'output_probe.json'),
+    ]  # fmt: skip
+    code = '\n'.join(
+        [
+            'import importlib.util, sys',
+            f'spec = importlib.util.spec_from_file_location("validate_p4_ab", {str(SCRIPT)!r})',
+            'module = importlib.util.module_from_spec(spec)',
+            'spec.loader.exec_module(module)',
+            f'module.WORKLOAD_SHA256 = {(root / "workload.sha256").read_text()!r}',
+            f'sys.argv = {argv!r}',
+            'module.main()',
+        ]
+    )
+    return subprocess.run([sys.executable, '-c', code], capture_output=True, text=True, check=False)
 
 
 def test_complete_run_is_decided(tmp_path: Path) -> None:
@@ -196,9 +229,10 @@ def test_aiperf_error_fails(tmp_path: Path) -> None:
     assert result.returncode == 1
 
 
-def test_unexpected_prompts_fail(tmp_path: Path) -> None:
-    result = run(make_run(tmp_path, prompts_as_expected=False))
-    assert result.returncode == 1
+def test_bench_id_flag_does_not_decide(tmp_path: Path) -> None:
+    # bench's id-based prompts_as_expected is False for repeated texts even when the content
+    # sent is exactly the declared set; the content comparison decides.
+    assert run(make_run(tmp_path, prompts_as_expected=False)).returncode == 0
 
 
 def test_wrong_order_fails(tmp_path: Path) -> None:
@@ -305,3 +339,21 @@ def test_post_prefill_window_is_excluded(tmp_path: Path) -> None:
     pair = json.loads(result.stdout)['pairs'][0]
     assert abs(pair['dense_server_tps'] - 10_010.0) < 0.5
     assert pair['dense_windows_excluded'] == 1
+
+
+def test_repeated_texts_in_another_order_pass(tmp_path: Path) -> None:
+    # 256 prompts from 30 distinct texts, sent in reverse order: same multiset, passes.
+    assert run(make_run(tmp_path)).returncode == 0
+
+
+def test_wrong_prompt_fails(tmp_path: Path) -> None:
+    sent = [*WORKLOAD_TEXTS[:255], 'a prompt that is not in the declared file']
+    result = run(make_run(tmp_path, sent=sent))
+    assert result.returncode == 1
+    assert 'sent prompts differ' in result.stdout
+
+
+def test_wrong_counts_of_repeated_texts_fail(tmp_path: Path) -> None:
+    # Same set of distinct texts, but one text sent once too often and another once too few.
+    sent = [*WORKLOAD_TEXTS[:255], WORKLOAD_TEXTS[0]]
+    assert run(make_run(tmp_path, sent=sent)).returncode == 1
