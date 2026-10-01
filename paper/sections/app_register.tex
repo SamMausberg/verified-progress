@@ -155,13 +155,7 @@ Each entry is designed work without a committed result, with the place its evide
 \toprule Entry & Pending result (where its evidence is to be committed)\\\midrule\endfirsthead
 \toprule Entry & Pending result (where its evidence is to be committed)\\\midrule\endhead
 \bottomrule\endlastfoot
-\devitem{kernel-impl}{The certified-head implementation and its tests}{\nolinkurl{src/certified_head/}, \nolinkurl{tests/}}
-\devitem{kernel-error}{The stock head GEMM's kernel per batch size and its measured accumulation error against both error models}{\nolinkurl{evidence/certified_head/stock_invariance.json}}
-\devitem{kernel-invariance}{Row-wise and column-subset bitwise invariance of the stock head GEMM}{\nolinkurl{evidence/certified_head/stock_invariance.json}}
-\devitem{kernel-rowwise}{Cost of the invariance-checked row-wise fallback at $M=32$ to 256}{\nolinkurl{evidence/certified_head/micro_head.json}}
 \devitem{kernel-union}{Weight traffic of a kernel that reads only the batch union of candidate rows; the implemented W8A16 pass reads the whole int8 head per call}{\nolinkurl{evidence/certified_head/}}
-\devitem{kernel-path}{Head-path time against the stock chain for $M=1$ to 256, per error model}{\nolinkurl{evidence/certified_head/head_path_time.csv}}
-\devitem{kernel-seeded}{The seeded race's slack derivation; agreement with the stock seeded sampler on replayed steps; acceptance against the stock speculative sampler}{\nolinkurl{evidence/certified_head/}}
 \devitem{kernel-seeded-engine}{Acceptance of fixed-noise verification with the certified sampler against the stock speculative sampler in the engine}{\nolinkurl{evidence/certified_head/}}
 \devitem{geometry-work}{Work counts per mechanism converted to predicted time with the kernel's primitive costs}{\nolinkurl{evidence/head_geometry/work_model.json}}
 \devitem{geometry-accept}{Race candidates on speculative states at $T=1$ and 0.7; mass enclosure and $P_?$ of the standard rule on real drafts; decisions resolved before re-scoring; fixed-noise against standard acceptance}{\nolinkurl{evidence/head_geometry/}, \nolinkurl{evidence/certified_head/}}
