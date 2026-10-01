@@ -80,7 +80,7 @@ def main() -> None:
     )
 
     # Record the (value tile, warps) each verify call actually selects, rather than
-    # predicting it: the selection rule differs between engine builds (patch 0004).
+    # predicting it: the selection rule differs between engine builds (patch drafter/0005).
     selected: list[tuple[int, int]] = []
     choose = fsg._select_recurrent_launch_config
 
