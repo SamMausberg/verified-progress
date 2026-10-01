@@ -1,0 +1,602 @@
+From 138b6b6c30856bf0c806d7bc7985e142c0e41cda Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Wed, 30 Sep 2026 23:28:08 +0000
+Subject: [PATCH 1/3] hostgap: sync-free FlashInfer plan for EAGLE target
+ verify
+
+FlashInfer's BatchPrefillWithPagedKVCacheWrapper.plan blocks the host four
+times per EAGLE verify replay: segment_packbits sizes the packed custom
+mask with .item(), then qo_indptr, paged_kv_indptr and last_page_len are
+read back with .to("cpu"). Each read waits for the draft graph, so the
+host plans while the GPU idles. Every value they return follows from the
+batch's seq_lens_cpu and draft_token_num, which the host already holds.
+
+SGLANG_HOSTGAP_VERIFY_PLAN=1 swaps fast_verify_plan onto the CUDA-graph
+verify wrappers at their first replay (capture-time plans stay stock). It
+mirrors plan() step by step for the fa2 backend with those values computed
+on the host, so plan_info, the pinned plan bytes and every device buffer
+the graph reads are the ones plan() would produce. A per-wrapper event
+orders reuse of the pinned plan buffer after its previous copy, which the
+stock blocking reads used to guarantee (also for the draft-extend
+wrapper's fast_prefill_plan). SGLANG_HOSTGAP_VALIDATE=1 runs the stock
+plan alongside and raises on any difference. Both flags default to off.
+---
+ python/sglang/srt/environ.py                  |   6 +
+ .../layers/attention/flashinfer_backend.py    | 114 +++++-
+ .../layers/attention/flashinfer_hostgap.py    | 387 ++++++++++++++++++
+ 3 files changed, 486 insertions(+), 21 deletions(-)
+ create mode 100644 python/sglang/srt/layers/attention/flashinfer_hostgap.py
+
+diff --git a/python/sglang/srt/environ.py b/python/sglang/srt/environ.py
+index f3571906ff..8dfd8fdcfe 100644
+--- a/python/sglang/srt/environ.py
++++ b/python/sglang/srt/environ.py
+@@ -1363,6 +1363,12 @@ class Envs:
+     # Speculative decoding
+     # ===================================================================
+     SGLANG_ENABLE_OVERLAP_PLAN_STREAM = EnvBool(False)
++    # hostgap (srt/layers/attention/flashinfer_hostgap.py): plan FlashInfer's
++    # EAGLE target verify from host-known lengths instead of blocking
++    # device-to-host reads; VALIDATE also runs the stock reads and raises on any
++    # difference (synchronizes; correctness runs only).
++    SGLANG_HOSTGAP_VERIFY_PLAN = EnvBool(False)
++    SGLANG_HOSTGAP_VALIDATE = EnvBool(False)
+     # Experimental: allow pipeline parallelism x speculative decoding
+     # (EAGLE/MTP). Off by default; see the PP+spec RFC for constraints
+     # (non-overlap schedule, no DP attention).
+diff --git a/python/sglang/srt/layers/attention/flashinfer_backend.py b/python/sglang/srt/layers/attention/flashinfer_backend.py
+index e4d318207c..98a53f51cc 100644
+--- a/python/sglang/srt/layers/attention/flashinfer_backend.py
++++ b/python/sglang/srt/layers/attention/flashinfer_backend.py
+@@ -29,6 +29,7 @@ from sglang.kernels.ops.attention.utils import (
+ )
+ from sglang.srt.dllm.config import DllmConfig
+ from sglang.srt.environ import envs
++from sglang.srt.layers.attention import flashinfer_hostgap as hostgap
+ from sglang.srt.layers.attention.base_attn_backend import AttentionBackend
+ from sglang.srt.layers.quantization.fp4_kv_cache_quant_method import (
+     KVCacheAttentionAccessKind,
+@@ -737,6 +738,25 @@ class FlashInferAttnBackend(AttentionBackend):
+         if in_capture:
+             num_tokens = forward_batch.positions.numel()
+             self._prepare_cuda_graph_metadata(bs, num_tokens, forward_mode, spec_info)
++        elif (
++            hostgap.VERIFY_PLAN
++            and forward_mode.is_target_verify()
++            and spec_info is not None
++            and spec_info.spec_input_type == SpecInputType.EAGLE_VERIFY
++            and self.prefill_backend == "fa2"
++            and self.dispatch_reason is None
++        ):
++            # hostgap: replays of the EAGLE verify graph plan with
++            # fast_verify_plan (plan() with its device reads replaced by values
++            # derived from seq_lens_cpu). Installed at the first replay, so the
++            # capture-time plans stay exactly the stock ones; EAGLE verify keeps
++            # its custom mask and therefore cannot take fast_prefill_plan.
++            for w in self.prefill_cuda_graph_metadata[bs]:
++                if (
++                    getattr(w.begin_forward, "func", None)
++                    is not hostgap.fast_verify_plan
++                ):
++                    w.begin_forward = partial(hostgap.fast_verify_plan, w)
+ 
+         if forward_mode.is_decode_or_idle():
+             self.indices_updater_decode.update(
+@@ -1775,6 +1795,8 @@ class FlashInferIndicesUpdaterDecode:
+         )
+ 
+         if wrapper_uses_fast_decode_plan:
++            if hostgap.GUARD:
++                hostgap.PlanGuard.before(wrapper)
+             # When begin_forward is replaced with fast_decode_plan, pass global_override_indptr_cpu
+             wrapper.begin_forward(
+                 kv_indptr,
+@@ -1793,6 +1815,8 @@ class FlashInferIndicesUpdaterDecode:
+                 ),
+                 global_override_indptr_cpu=global_override_indptr_cpu,
+             )
++            if hostgap.GUARD:
++                hostgap.PlanGuard.after(wrapper)
+         else:
+             # When using original begin_forward, don't pass global_override_indptr_cpu
+             wrapper.begin_forward(
+@@ -2265,7 +2289,20 @@ class FlashInferIndicesUpdaterPrefill:
+             hasattr(wrapper_paged.begin_forward, "func")
+             and wrapper_paged.begin_forward.func is fast_prefill_plan
+         )
+-        if uses_fast_prefill:
++        uses_fast_verify = (
++            hasattr(wrapper_paged.begin_forward, "func")
++            and wrapper_paged.begin_forward.func is hostgap.fast_verify_plan
++        )
++        if uses_fast_verify:
++            assert seq_lens_cpu is not None, (
++                "hostgap verify plan needs host-known seq_lens_cpu (got None)"
++            )
++            assert spec_info is not None
++            assert spec_info.spec_input_type == SpecInputType.EAGLE_VERIFY
++            paged_plan_kwargs = hostgap.eagle_verify_plan_kwargs(
++                seq_lens_cpu, spec_info.draft_token_num, bs
++            )
++        elif uses_fast_prefill:
+             assert seq_lens_cpu is not None, (
+                 "fast_prefill_plan replay requires host-known seq_lens_cpu (got None)"
+             )
+@@ -2297,26 +2334,61 @@ class FlashInferIndicesUpdaterPrefill:
+             # selects the module with the per-element window mask compiled in
+             paged_plan_kwargs["window_left"] = window_left
+ 
+-        wrapper_paged.begin_forward(
+-            qo_indptr,
+-            kv_indptr,
+-            kv_indices,
+-            self.kv_last_page_len[:bs],
+-            self.num_qo_heads,
+-            self.num_kv_heads,
+-            self.head_dim,
+-            1,
+-            q_data_type=self.q_data_type,
+-            kv_data_type=self.data_type,
+-            custom_mask=use_custom_mask,
+-            non_blocking=True,
+-            fixed_split_size=fixed_split_size,
+-            prefix_len_ptr=prefix_len_ptr,
+-            token_pos_in_items_ptr=token_pos_in_items_ptr,
+-            token_pos_in_items_len=token_pos_in_items_len,
+-            max_item_len_ptr=max_item_len_ptr,
+-            **paged_plan_kwargs,
+-        )
++        guarded = hostgap.GUARD and (uses_fast_prefill or uses_fast_verify)
++        if guarded:
++            hostgap.PlanGuard.before(wrapper_paged)
++        if uses_fast_verify and hostgap.VALIDATE:
++            hostgap.validated_verify_plan(
++                wrapper_paged,
++                (
++                    qo_indptr,
++                    kv_indptr,
++                    kv_indices,
++                    self.kv_last_page_len[:bs],
++                    self.num_qo_heads,
++                    self.num_kv_heads,
++                    self.head_dim,
++                    1,
++                ),
++                dict(
++                    q_data_type=self.q_data_type,
++                    kv_data_type=self.data_type,
++                    custom_mask=use_custom_mask,
++                    non_blocking=True,
++                    fixed_split_size=fixed_split_size,
++                    prefix_len_ptr=prefix_len_ptr,
++                    token_pos_in_items_ptr=token_pos_in_items_ptr,
++                    token_pos_in_items_len=token_pos_in_items_len,
++                    max_item_len_ptr=max_item_len_ptr,
++                    **{
++                        k: v for k, v in paged_plan_kwargs.items() if k == "window_left"
++                    },
++                ),
++                {k: v for k, v in paged_plan_kwargs.items() if k != "window_left"},
++            )
++        else:
++            wrapper_paged.begin_forward(
++                qo_indptr,
++                kv_indptr,
++                kv_indices,
++                self.kv_last_page_len[:bs],
++                self.num_qo_heads,
++                self.num_kv_heads,
++                self.head_dim,
++                1,
++                q_data_type=self.q_data_type,
++                kv_data_type=self.data_type,
++                custom_mask=use_custom_mask,
++                non_blocking=True,
++                fixed_split_size=fixed_split_size,
++                prefix_len_ptr=prefix_len_ptr,
++                token_pos_in_items_ptr=token_pos_in_items_ptr,
++                token_pos_in_items_len=token_pos_in_items_len,
++                max_item_len_ptr=max_item_len_ptr,
++                **paged_plan_kwargs,
++            )
++        if guarded:
++            hostgap.PlanGuard.after(wrapper_paged)
+ 
+ 
+ class FlashInferMultiStepDraftBackend:
+diff --git a/python/sglang/srt/layers/attention/flashinfer_hostgap.py b/python/sglang/srt/layers/attention/flashinfer_hostgap.py
+new file mode 100644
+index 0000000000..a03ae79e5c
+--- /dev/null
++++ b/python/sglang/srt/layers/attention/flashinfer_hostgap.py
+@@ -0,0 +1,387 @@
++"""Sync-free FlashInfer planning for the speculative decoding cycle (hostgap).
++
++Two host round trips leave the GPU idle once per speculative cycle on the
++EAGLE/NEXTN path with FlashInfer attention (this module removes the first; the
++second is handled by the draft patch that follows it):
++
++* target verify: ``BatchPrefillWithPagedKVCacheWrapper.plan`` reads the
++  qo/kv indptr and last-page lengths back from the device and calls
++  ``segment_packbits``, whose ``.item()`` sizes the packed custom mask. Each of
++  these blocks the host until the draft graph has finished.
++* draft decode: ``FlashInferMultiStepDraftBackend.common_template`` copies the
++  per-step ``kv_indptr`` rows to the host with ``.cpu()``.
++
++Every value those reads return is a function of the batch's committed sequence
++lengths, which the overlap scheduler already holds on the host
++(``seq_lens_cpu``). The helpers below compute the same values on the host and
++feed them to exactly the planning calls the stock code makes, so the device
++buffers, the pinned plan buffer and ``plan_info`` are identical and the
++captured graphs replay the same work.
++
++Flags (all off by default; unset means the stock code path runs unchanged):
++
++``SGLANG_HOSTGAP_VERIFY_PLAN=1``
++    EAGLE target-verify graphs use :func:`fast_verify_plan`.
++``SGLANG_HOSTGAP_VALIDATE=1``
++    Diagnostic: also run the stock read-back path and raise if any planned
++    value, device buffer or pinned plan byte differs. It synchronizes, so use
++    it for correctness runs only.
++
++With the verify flag on, :class:`PlanGuard` also protects every
++sync-free plan: FlashInfer's C++ plan writes a per-wrapper pinned host buffer
++and copies it to the device with ``cudaMemcpyAsync`` without waiting. The stock
++blocking reads guaranteed that the previous copy had executed before the next
++plan overwrote the pinned buffer; without them the guard waits on an event
++recorded after the wrapper's previous plan (normally already complete).
++"""
++
++from __future__ import annotations
++
++import logging
++from typing import Optional
++
++import torch
++
++from sglang.srt.environ import envs
++
++logger = logging.getLogger(__name__)
++
++VERIFY_PLAN = envs.SGLANG_HOSTGAP_VERIFY_PLAN.get()
++VALIDATE = envs.SGLANG_HOSTGAP_VALIDATE.get()
++# The guard is required whenever a hostgap flag removes a blocking read.
++GUARD = VERIFY_PLAN
++
++if VERIFY_PLAN or VALIDATE:
++    logger.info("hostgap: verify_plan=%s validate=%s", VERIFY_PLAN, VALIDATE)
++
++
++class PlanGuard:
++    """Per-wrapper event that orders pinned-buffer reuse after the previous copy."""
++
++    waits = 0
++    calls = 0
++
++    @staticmethod
++    def before(wrapper) -> None:
++        event = getattr(wrapper, "_hostgap_plan_event", None)
++        if event is None:
++            return
++        PlanGuard.calls += 1
++        if not event.query():
++            PlanGuard.waits += 1
++            event.synchronize()
++
++    @staticmethod
++    def after(wrapper) -> None:
++        event = getattr(wrapper, "_hostgap_plan_event", None)
++        if event is None:
++            event = torch.cuda.Event()
++            wrapper._hostgap_plan_event = event
++        event.record(torch.cuda.current_stream())
++
++
++def _segment_packbits_known_nnz(
++    x: torch.Tensor, indptr: torch.Tensor, output_nnzs: int
++) -> tuple[torch.Tensor, torch.Tensor]:
++    """``flashinfer.segment_packbits(x, indptr, "little")`` without the ``.item()``.
++
++    The same device ops in the same order as FlashInfer 0.6.18
++    (``quantization/packbits.py``); only the output length comes from the
++    caller, who computes it from host-known segment lengths.
++    """
++    from flashinfer.quantization.packbits import get_quantization_module
++
++    seglen = indptr[1:] - indptr[:-1]
++    packed_len = (seglen + 7) // 8
++    indptr_new = torch.zeros(len(indptr), dtype=indptr.dtype, device=indptr.device)
++    indptr_new[1:] = torch.cumsum(packed_len, 0)
++    indptr = indptr.to(torch.int32)
++    indptr_new = indptr_new.to(torch.int32)
++    y = torch.empty(output_nnzs, dtype=torch.uint8, device=x.device)
++    get_quantization_module().segment_packbits(x, indptr, indptr_new, "little", y)
++    return y, indptr_new
++
++
++def _pinned_kv_lens(wrapper, kv_lens_host: torch.Tensor) -> torch.Tensor:
++    """Stage kv_lens in a per-wrapper pinned buffer so the H2D copy never syncs."""
++    staging = getattr(wrapper, "_hostgap_kv_lens_pinned", None)
++    n = kv_lens_host.numel()
++    if staging is None or staging.numel() < n:
++        staging = torch.empty(
++            max(n, wrapper._kv_lens_buffer.shape[0]), dtype=torch.int32
++        ).pin_memory()
++        wrapper._hostgap_kv_lens_pinned = staging
++    staging[:n].copy_(kv_lens_host)
++    return staging[:n]
++
++
++def fast_verify_plan(
++    self,
++    qo_indptr: torch.Tensor,
++    paged_kv_indptr: torch.Tensor,
++    paged_kv_indices: torch.Tensor,
++    paged_kv_last_page_len: torch.Tensor,
++    num_qo_heads: int,
++    num_kv_heads: int,
++    head_dim_qk: int,
++    page_size: int,
++    head_dim_vo: Optional[int] = None,
++    custom_mask: Optional[torch.Tensor] = None,
++    causal: bool = False,
++    window_left: int = -1,
++    q_data_type="float16",
++    kv_data_type=None,
++    o_data_type=None,
++    non_blocking: bool = True,
++    fixed_split_size: Optional[int] = None,
++    prefix_len_ptr: Optional[torch.Tensor] = None,
++    token_pos_in_items_ptr: Optional[torch.Tensor] = None,
++    token_pos_in_items_len: int = 0,
++    max_item_len_ptr: Optional[torch.Tensor] = None,
++    *,
++    qo_indptr_host: torch.Tensor,
++    kv_indptr_host: torch.Tensor,
++    kv_lens_host: torch.Tensor,
++    max_q_len: int,
++    max_kv_len: int,
++    packed_mask_nnz: Optional[int] = None,
++) -> None:
++    """Sync-free ``BatchPrefillWithPagedKVCacheWrapper.plan`` for EAGLE target verify.
++
++    Mirrors FlashInfer 0.6.18's ``plan`` for the fa2 backend in CUDA-graph mode,
++    step by step, with the three device-to-host reads and the ``segment_packbits``
++    ``.item()`` replaced by host-known values (``*_host``, ``max_*_len`` and
++    ``packed_mask_nnz``). Installed on the per-batch-size verify wrappers after
++    their capture-time ``plan`` resolved ``_cached_module``.
++    """
++    from flashinfer.prefill import _compute_page_mask_indptr
++    from flashinfer.utils import canonicalize_torch_dtype
++
++    assert self.is_cuda_graph_enabled, "fast_verify_plan is cuda-graph only"
++    assert getattr(self, "_backend", None) == "fa2", "fast_verify_plan is fa2 only"
++    assert getattr(self, "_cached_module", None) is not None
++
++    q_data_type = canonicalize_torch_dtype(q_data_type)
++    kv_data_type = canonicalize_torch_dtype(
++        kv_data_type if kv_data_type is not None else q_data_type
++    )
++    o_data_type = canonicalize_torch_dtype(
++        o_data_type if o_data_type is not None else q_data_type
++    )
++    logits_soft_cap = 0.0
++    if head_dim_vo is None:
++        head_dim_vo = head_dim_qk
++    if fixed_split_size is None:
++        fixed_split_size = -1
++
++    batch_size = len(qo_indptr) - 1
++    self._batch_size = batch_size
++    self._num_qo_heads = num_qo_heads
++    self._num_kv_heads = num_kv_heads
++    packed_custom_mask = None
++    if custom_mask is not None:
++        assert packed_mask_nnz is not None
++        mask_indptr = _compute_page_mask_indptr(
++            qo_indptr, paged_kv_indptr, paged_kv_last_page_len, page_size
++        )
++        packed_custom_mask, mask_indptr = _segment_packbits_known_nnz(
++            custom_mask.contiguous().view(-1),
++            mask_indptr.to(custom_mask.device),
++            packed_mask_nnz,
++        )
++
++    self._prefix_len_ptr = prefix_len_ptr
++    self._token_pos_in_items_ptr = token_pos_in_items_ptr
++    self._token_pos_in_items_len = token_pos_in_items_len
++    self._max_item_len_ptr = max_item_len_ptr
++
++    self._qo_indptr_last = int(qo_indptr_host[-1])
++    total_num_rows = self._qo_indptr_last
++    self._max_q_len = max_q_len
++    required_size = kv_lens_host.numel()
++    assert required_size <= self._kv_lens_buffer.shape[0]
++    self._kv_lens_buffer[:required_size].copy_(
++        _pinned_kv_lens(self, kv_lens_host), non_blocking=non_blocking
++    )
++    self._max_kv_len = max_kv_len
++
++    if self._max_total_num_rows is None:
++        self._max_total_num_rows = total_num_rows
++    elif total_num_rows > self._max_total_num_rows:
++        raise ValueError(
++            f"qo rows {total_num_rows} exceed the captured {self._max_total_num_rows}"
++        )
++    if batch_size != self._fixed_batch_size:
++        raise ValueError(
++            f"batch size {batch_size} differs from the captured {self._fixed_batch_size}"
++        )
++    if len(paged_kv_indices) > len(self._paged_kv_indices_buf):
++        raise ValueError("paged_kv_indices exceeds the allocated buffer")
++
++    self._qo_indptr_buf.copy_(qo_indptr, non_blocking=non_blocking)
++    self._paged_kv_indptr_buf.copy_(paged_kv_indptr, non_blocking=non_blocking)
++    self._paged_kv_last_page_len_buf.copy_(
++        paged_kv_last_page_len, non_blocking=non_blocking
++    )
++    self._paged_kv_indices_buf[: len(paged_kv_indices)].copy_(
++        paged_kv_indices,
++        non_blocking=(paged_kv_indices.device == self.device) and non_blocking,
++    )
++    if packed_custom_mask is not None:
++        self._custom_mask_buf[: len(packed_custom_mask)].copy_(
++            packed_custom_mask,
++            non_blocking=(packed_custom_mask.device == self.device) and non_blocking,
++        )
++        self._mask_indptr_buf.copy_(mask_indptr, non_blocking=non_blocking)
++
++    self._cached_q_data_type = q_data_type
++    self._cached_kv_data_type = kv_data_type
++    self._cached_o_data_type = o_data_type
++    self._block_tables = None
++
++    self._plan_info = self._cached_module.plan(
++        self._float_workspace_buffer,
++        self._int_workspace_buffer,
++        self._pin_memory_int_workspace_buffer,
++        qo_indptr_host,
++        kv_indptr_host,
++        kv_lens_host,
++        self._max_total_num_rows or total_num_rows,
++        batch_size,
++        num_qo_heads,
++        num_kv_heads,
++        page_size,
++        self.is_cuda_graph_enabled,
++        head_dim_qk,
++        head_dim_vo,
++        causal,
++        window_left,
++        fixed_split_size or -1,
++        False,  # disable_split_kv (SGLang's verify call never sets it)
++        0,  # num_colocated_ctas
++        0,  # uniform_q_len
++    )
++
++    self._causal = causal
++    self._pos_encoding_mode = "NONE"
++    self._use_fp16_qk_reduction = False
++    self._window_left = window_left
++    self._logits_soft_cap = logits_soft_cap
++    self._sm_scale = None
++    self._rope_scale = None
++    self._rope_theta = None
++    self._seq_lens_kv = None
++    self._seq_lens_q = None
++
++
++def eagle_verify_plan_kwargs(
++    seq_lens_cpu: torch.Tensor, draft_token_num: int, bs: int
++) -> dict:
++    """Host-known plan inputs for an EAGLE verify batch of ``bs`` (padded) rows.
++
++    ``EagleVerifyInput.generate_attn_arg_prefill`` builds qo_indptr as a stride
++    of ``draft_token_num`` and kv lengths as ``seq_lens + draft_token_num``
++    (page size 1, so the last page holds one token), and FlashInfer packs a
++    custom-mask segment of ``qo_len * kv_len`` bits per request into
++    ``ceil(bits / 8)`` bytes.
++    """
++    kv_lens = seq_lens_cpu[:bs].to(torch.int32) + draft_token_num
++    kv_indptr = torch.zeros(bs + 1, dtype=torch.int32)
++    kv_indptr[1:] = torch.cumsum(kv_lens, dim=0)
++    qo_indptr = torch.arange(
++        0, (bs + 1) * draft_token_num, step=draft_token_num, dtype=torch.int32
++    )
++    packed = (draft_token_num * kv_lens.to(torch.int64) + 7) // 8
++    return dict(
++        qo_indptr_host=qo_indptr,
++        kv_indptr_host=kv_indptr,
++        kv_lens_host=kv_lens,
++        max_q_len=draft_token_num,
++        max_kv_len=int(kv_lens.max()),
++        packed_mask_nnz=int(packed.sum()),
++    )
++
++
++def check_equal(name: str, expected: torch.Tensor, actual: torch.Tensor) -> None:
++    if expected.shape != actual.shape or not torch.equal(expected.cpu(), actual.cpu()):
++        raise AssertionError(
++            f"hostgap validation: {name} differs\nstock: {expected}\nhostgap: {actual}"
++        )
++
++
++def _verify_plan_state(wrapper, host_kwargs: dict) -> dict:
++    """Everything a replay of the captured verify graph reads from a plan."""
++    n_kv = host_kwargs["kv_lens_host"].numel()
++    state = {
++        "plan_info": torch.tensor(list(wrapper._plan_info), dtype=torch.int64),
++        "pinned_int_workspace": wrapper._pin_memory_int_workspace_buffer.clone(),
++        "qo_indptr_buf": wrapper._qo_indptr_buf.cpu(),
++        "paged_kv_indptr_buf": wrapper._paged_kv_indptr_buf.cpu(),
++        "paged_kv_last_page_len_buf": wrapper._paged_kv_last_page_len_buf.cpu(),
++        "paged_kv_indices_buf": wrapper._paged_kv_indices_buf[
++            : int(host_kwargs["kv_indptr_host"][-1])
++        ].cpu(),
++        "kv_lens_buffer": wrapper._kv_lens_buffer[:n_kv].cpu(),
++        "scalars": torch.tensor(
++            [wrapper._qo_indptr_last, wrapper._max_q_len, wrapper._max_kv_len]
++        ),
++    }
++    if wrapper._custom_mask_buf is not None:
++        nnz = host_kwargs["packed_mask_nnz"]
++        state["custom_mask_buf"] = wrapper._custom_mask_buf[:nnz].cpu()
++        state["mask_indptr_buf"] = wrapper._mask_indptr_buf.cpu()
++    return state
++
++
++class ValidationStats:
++    verify_plans = 0
++
++    @classmethod
++    def log(cls) -> None:
++        total = cls.verify_plans
++        if total and (total & (total - 1)) == 0:
++            logger.info(
++                "hostgap validation: %d verify plans matched the stock path; "
++                "plan guard waited %d of %d times",
++                cls.verify_plans,
++                PlanGuard.waits,
++                PlanGuard.calls,
++            )
++
++
++def validated_verify_plan(wrapper, args: tuple, kwargs: dict, host_kwargs: dict):
++    """Run the stock ``plan`` and then :func:`fast_verify_plan`; raise on any difference.
++
++    The stock plan runs first so its device-to-host reads can check the host
++    values directly; both plans then leave their full state for comparison.
++    """
++    from flashinfer.prefill import BatchPrefillWithPagedKVCacheWrapper
++
++    stream = torch.cuda.current_stream()
++    qo_indptr, kv_indptr, _, last_page_len = args[:4]
++    check_equal("qo_indptr", qo_indptr.cpu(), host_kwargs["qo_indptr_host"])
++    check_equal("kv_indptr", kv_indptr.cpu(), host_kwargs["kv_indptr_host"])
++    kv_lens = (kv_indptr[1:] - kv_indptr[:-1] - 1) + last_page_len
++    check_equal("kv_lens", kv_lens.cpu(), host_kwargs["kv_lens_host"])
++
++    # Zero the pinned plan buffer before each plan so the comparison covers
++    # exactly the bytes each plan writes (the .cpu() reads above synchronized
++    # the stream, so no earlier copy still reads it).
++    wrapper._pin_memory_int_workspace_buffer.zero_()
++    BatchPrefillWithPagedKVCacheWrapper.plan(wrapper, *args, **kwargs)
++    stream.synchronize()
++    stock = _verify_plan_state(wrapper, host_kwargs)
++    if "custom_mask_buf" in stock:
++        check_equal(
++            "packed mask length",
++            stock["mask_indptr_buf"][-1:].to(torch.int64),
++            torch.tensor([host_kwargs["packed_mask_nnz"]]),
++        )
++    wrapper._pin_memory_int_workspace_buffer.zero_()
++    fast_verify_plan(wrapper, *args, **kwargs, **host_kwargs)
++    stream.synchronize()
++    fast = _verify_plan_state(wrapper, host_kwargs)
++    for key, value in stock.items():
++        check_equal(f"verify plan {key}", value, fast[key])
++    ValidationStats.verify_plans += 1
++    ValidationStats.log()
+-- 
+2.34.1
+
