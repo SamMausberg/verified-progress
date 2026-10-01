@@ -62,9 +62,10 @@ The main line of the paper:
   below a threshold whose median over 64-row tiles is 0.85%
   (`evidence/precision/head_constants.json`). On 40,000 held-out pairs each from
   the public DFlash-4B drafter and the native MTP layer, that drift has a median
-  of 0.92 and 0.95, and for every bound family and tiling tested certified
-  transport skips at most 0.65% of the vocabulary on average, no more than a
-  static screen (`evidence/head_geometry/`).
+  of 0.92 and 0.95. On 4,020 DFlash-4B and 16,016 MTP-4B held-out pairs, for
+  every bound family and tiling tested, certified transport skips at most 0.65%
+  of the vocabulary on average, no more than a static screen
+  (`evidence/head_geometry/`).
 - **Self-evidence certifies on real states.** On 6,005 plain-decode head inputs
   captured from the engine, an int8 copy of the head certifies the
   real-arithmetic winner with 1.3-1.6 candidate rows per decision on average.
