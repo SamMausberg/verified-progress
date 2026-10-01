@@ -189,9 +189,18 @@ shares the plain reference. The frontier's exact envelope covers `stock` and
 
 Stock speculation is itself not bit-identical to plain decoding. Stock MTP s3
 diverges from plain c=1 at 4.40 per 1,000 tokens (1.29 times the floor; 95% interval
-of the ratio 1.04-1.59), with every first divergence rounding-level. PR #37 traces
-the mechanism to layer 0's GDN recurrence, which runs different kernels in verify
-and in decode.
+of the ratio 1.04-1.59) and stock DFlash block 16 at 4.39 (1.28 times; 1.04-1.58),
+with every first divergence rounding-level in both. PR #37 traces the mechanism to
+layer 0's GDN recurrence, which runs different kernels in verify and in decode.
+
+Applied on 2026-10-01 (`evidence/bench/equality/classes.json`): `mtp-tuned` and
+`mtp-tuned-triton` against stock MTP s3, `dflash-tuned-b16` against stock DFlash
+block 16, and `plain-tuned-triton` against plain c=1 are `exact-up-to-rounding`;
+`plain-tuned-replayssm` is `lossy` (one `large` first divergence) and has a GSM8K run.
+`--linear-attn-verify-backend triton` is not an arm: at this pin the GDN verify kernel
+already defaults to Triton when decode uses Triton (every server log reports
+`verify=triton`), and DFlash block 16 with the flag produced the same tokens as
+without it on all 320 prompts.
 
 ## Launch checks
 

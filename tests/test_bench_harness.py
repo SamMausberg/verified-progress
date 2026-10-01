@@ -105,7 +105,7 @@ def test_every_arm_declares_a_consistent_exactness_class(tmp_path: Path) -> None
     assert resolve_arm('plain-tuned').exactness == 'stock'
     assert resolve_arm('plain-tuned-triton').exactness == 'exact-up-to-rounding'
     assert resolve_arm('plain-tuned-replayssm').exactness == 'lossy'
-    assert resolve_arm('dflash-tuned-b16').exactness == 'pending'
+    assert resolve_arm('dflash-tuned-b16').exactness == 'exact-up-to-rounding'
     assert resolve_arm('dflash-tuned').exactness == 'stock'  # FA4 is draft-only
     # Any flag outside the neutral allowlist makes a stock arm pending, whatever
     # its class: state dtype, compilation, kernel backends, precision, model dtype,
@@ -152,7 +152,9 @@ def test_every_arm_declares_a_consistent_exactness_class(tmp_path: Path) -> None
     )
     # A pending arm stays pending under overrides; a classified arm keeps its class
     # under a neutral override and becomes pending under a new numerics change.
-    assert resolve_arm('dflash-tuned-b16', {'cuda-graph-max-bs': 64}).exactness == 'pending'
+    assert resolve_arm('plain', {'quantization': 'fp8', 'cuda-graph-max-bs': 64}).exactness == (
+        'pending'
+    )
     assert resolve_arm('mtp-tuned', {'cuda-graph-max-bs': 64}).exactness == 'exact-up-to-rounding'
     assert resolve_arm('mtp-tuned', {'kv-cache-dtype': 'fp8_e4m3'}).exactness == 'pending'
     head = '[defaults]\nmodel = "m"\nrevision = "r"\n'
@@ -183,7 +185,7 @@ def test_every_arm_declares_a_consistent_exactness_class(tmp_path: Path) -> None
     assert Arm(**{**base, 'lossy': 'FP8 KV cache'}).exactness == 'lossy'
     assert Arm(**{**base, 'lossy': 'pending: check'}).exactness == 'pending'
     # An explicit lossy note on an arm that inherited the pending class.
-    pending = resolve_arm('dflash-tuned-b16').to_json()
+    pending = resolve_arm('plain', {'quantization': 'fp8'}).to_json()
     assert Arm(**{**pending, 'lossy': 'BF16 GDN state'}).exactness == 'lossy'
     # Also on an arm whose base is exact-up-to-rounding (an env-only lever).
     exact_base = resolve_arm('mtp-tuned').to_json()

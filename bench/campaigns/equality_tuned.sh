@@ -4,7 +4,9 @@
 # 256 tokens, top-5 logprobs, c=1). Correctness only: shared GPU lock.
 #   scripts/gpu_lock.sh -s bench/campaigns/equality_tuned.sh
 # Numerics-changing flags: buffered GDN verify and decode (replayssm), and Triton
-# target attention (the reference is FlashInfer), the Triton GDN verify kernel.
+# target attention (the reference is FlashInfer), and --linear-attn-verify-backend
+# triton (which at this pin resolves to the default verify kernel when decode uses
+# Triton; its outputs matched dflash b16 triton bit for bit).
 # DFlash block 16 runs on the plain configuration with the DFlash flags appended, so
 # its runs are named plain__; it runs with capacity 4 (the runner's 16 leaves no KV
 # memory at its 0.25 memory fraction once 16 verify states per request are
@@ -74,7 +76,6 @@ cat > "$OUT/arms.json" <<'ARMS'
   ["plain-tuned-triton", "plain radix-off triton vs plain c1", "plain radix-off triton vs plain c1"],
   ["plain-tuned-replayssm", "plain buffered decode radix-off vs plain c1", "plain buffered decode radix-off vs plain c1"],
   ["dflash-tuned-b16", "dflash b16 triton vs stock dflash b16 radix-off c1", "dflash b16 radix-off triton vs plain c1"],
-  ["dflash-tuned-b16-gdnverify-triton", "dflash b16 triton gdn-verify-triton vs stock dflash b16 radix-off c1", "dflash b16 radix-off triton gdn-verify-triton vs plain c1"],
   ["mtp-stockverify", null, "mtp_s3 stock verify radix-off vs plain c1"]
 ]
 ARMS

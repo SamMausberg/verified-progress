@@ -27,6 +27,4 @@ DIVERGENCE=()
   --pair mtp-tuned:plain-tuned --pair mtp-stockverify:plain-tuned \
   --pair dflash-tuned:plain-tuned --pair dflash-tuned-b4:plain-tuned \
   --pair plain-tuned-replayssm:plain-tuned --pair plain-tuned-triton:plain-tuned \
-  --pair mtp-tuned-triton:plain-tuned-triton --pair dflash-tuned-b16:plain-tuned-triton \
-  --pair dflash-tuned-b16-gdnverify-triton:plain-tuned-triton \
-  --pair dflash-tuned-b16-gdnverify-triton:dflash-tuned-b16
+  --pair mtp-tuned-triton:plain-tuned-triton --pair dflash-tuned-b16:plain-tuned-triton

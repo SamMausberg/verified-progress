@@ -191,8 +191,8 @@ max-mamba-cache-size = 128
 description = """Arm C for low concurrency: DFlash block 16, Triton attention. Its 16 \
 GDN verify states per request (~0.8 GB) cap capacity at 64."""
 max_concurrency = 64
-exactness = "pending"
-lossy = "pending: Triton target attention; greedy outputs classified against stock DFlash block 16, radix off (bench/campaigns/equality_tuned.sh)"
+exactness = "exact-up-to-rounding"
+exactness_note = "Triton target attention; every first divergence against stock DFlash block 16 (FlashInfer, radix off) is rounding-level (equality report, 2026-10-01)"
 [arms.dflash-tuned-b16.args]
 speculative-algorithm = "DFLASH"
 speculative-draft-model-path = "z-lab/Qwen3.5-4B-DFlash"
@@ -202,25 +202,6 @@ disable-radix-cache = true
 max-mamba-cache-size = 64
 max-running-requests = 64
 attention-backend = "triton"
-
-[arms.dflash-tuned-b16-gdnverify-triton]
-description = """Supplementary: dflash-tuned-b16 with SGLang's Triton GDN verify kernel \
-(--linear-attn-verify-backend triton), which repair's #89 measured 2.06-2.34x faster \
-for the verify pass at block widths 64-256; its effect at block 16 is expected to be \
-small."""
-max_concurrency = 64
-exactness = "pending"
-lossy = "pending: Triton GDN verify kernel and Triton target attention; greedy outputs classified against stock DFlash block 16, radix off (bench/campaigns/equality_tuned.sh)"
-[arms.dflash-tuned-b16-gdnverify-triton.args]
-speculative-algorithm = "DFLASH"
-speculative-draft-model-path = "z-lab/Qwen3.5-4B-DFlash"
-speculative-draft-model-revision = "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf"
-speculative-dflash-block-size = 16
-disable-radix-cache = true
-max-mamba-cache-size = 64
-max-running-requests = 64
-attention-backend = "triton"
-linear-attn-verify-backend = "triton"
 
 [arms.dflash-tuned-b4]
 description = """Arm C for high concurrency: DFlash block 4, FlashInfer attention. On the \

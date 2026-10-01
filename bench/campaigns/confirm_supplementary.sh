@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
-# Supplementary confirmation arms, run once on the confirmation split, in two holds
-# that each start with their own matched plain baseline (pairs stay within a session):
-#   a (session confirm-supp, ~28 min): MTP with SGLang's stock (snapshot) GDN verify,
-#     the exact-stack MTP denominator if buffered verify does not classify; MTP with
-#     buffered verify below c=32 to complete its curve; buffered plain decoding at
-#     high concurrency; baseline plain-tuned.
-#   b (session confirm-supp-triton, ~10 min): DFlash block 16 with and without the
-#     Triton GDN verify kernel (repair's #89) at c=1, 8, 32; baseline
-#     plain-tuned-triton.
-# Run under: scripts/gpu_lock.sh -x bench/campaigns/confirm_supplementary.sh a|b
+# Supplementary confirmation arms, run once on the confirmation split in one hold
+# (session confirm-supp, ~28 min) that starts with its own matched plain baseline:
+# MTP with SGLang's stock (snapshot) GDN verify, the stock MTP arm; MTP with
+# buffered verify below c=32 to complete its curve; buffered plain decoding at high
+# concurrency. (A planned second hold timing --linear-attn-verify-backend triton on
+# DFlash block 16 was dropped: at this SGLang pin the GDN verify kernel already
+# defaults to Triton when decode uses Triton, so the flag changes nothing; the
+# equality check found bit-identical outputs.)
+# Run under: scripts/gpu_lock.sh -x bench/campaigns/confirm_supplementary.sh [a]
 set -uo pipefail
 # shellcheck source=/dev/null
 source "$(dirname "$0")/../../scripts/sglang_env.sh"
@@ -30,10 +29,5 @@ case $part in
     run confirm-supp mtp-tuned "1 2 4 8 16"
     run confirm-supp plain-tuned-replayssm "32 48 64 96 128"
     ;;
-  b)
-    run confirm-supp-triton plain-tuned-triton "1 8 32"
-    run confirm-supp-triton dflash-tuned-b16 "1 8 32"
-    run confirm-supp-triton dflash-tuned-b16-gdnverify-triton "1 8 32"
-    ;;
-  *) echo "usage: $0 a|b" >&2; exit 64 ;;
+  *) echo "usage: $0 [a]" >&2; exit 64 ;;
 esac
