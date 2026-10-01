@@ -136,50 +136,38 @@ def paired(args: argparse.Namespace) -> None:
     write_csv(summary, args.out)
 
 
-_SERVER_DECODE = re.compile(
-    r'Decode batch, #running-req: (\d+).*?gen throughput \(token/s\): ([\d.]+)'
-)
+def server_decode_rate(point: dict[str, Any]) -> float | None:
+    """The server's logged decode rate during one point, with (nearly) the full batch running.
 
-
-def server_decode_rates(server_log: Path, concurrencies: list[int]) -> dict[int, float]:
-    """Median server-logged decode throughput while ~c requests run, per concurrency c.
-
-    The scheduler logs `gen throughput` for every decode logging interval. Intervals
-    with between 0.9 c and c running requests are attributed to concurrency c (the
-    server warmup runs at the top concurrency and falls into that point's regime).
-    This is the GPU-side decode rate, so a client throughput well below it points at
-    the front end.
+    bench.sweep cuts the server log at each point's boundaries and keeps the median
+    `gen throughput` over decode log lines with at least 0.9x the point's peak running
+    count (`server_log.logged_gen_tps_full_batch_p50`). This is the GPU-side decode rate,
+    so a client throughput well below it points at the front end. Parsing the whole log
+    instead would let drain-phase intervals of a high-concurrency point count towards a
+    lower concurrency.
     """
-    if not server_log.exists():
-        return {}
-    samples: dict[int, list[float]] = {c: [] for c in concurrencies}
-    for line in server_log.read_text(errors='replace').splitlines():
-        match = _SERVER_DECODE.search(line)
-        if not match:
-            continue
-        running, rate = int(match.group(1)), float(match.group(2))
-        for c in concurrencies:
-            if 0.9 * c <= running <= c:
-                samples[c].append(rate)
-    return {c: statistics.median(v) for c, v in samples.items() if v}
+    value = (point.get('server_log') or {}).get('logged_gen_tps_full_batch_p50')
+    return float(value) if value is not None else None
+
+
+def latency_stat(plist: list[dict[str, Any]], metric: str, stat: str) -> float | str:
+    """Mean over runs of each run's per-request latency statistic (e.g. TTFT p50)."""
+    values = [float(p[metric][stat]) for p in plist if (p.get(metric) or {}).get(stat) is not None]
+    return round(statistics.fmean(values), 2) if values else ''
 
 
 def sweeps(args: argparse.Namespace) -> None:
     root = Path(args.path).expanduser()
     points: dict[tuple[str, int], list[dict[str, Any]]] = {}
-    server_rates: dict[tuple[str, int], list[float]] = {}
     for sweep_json in sorted(root.glob('*/*/sweep.json')):
         data = json.loads(sweep_json.read_text())
-        concs = sorted({p['concurrency'] for p in data.get('points', [])})
-        rates = server_decode_rates(sweep_json.parent / 'server/server.log', concs)
-        for c, rate in rates.items():
-            server_rates.setdefault((data['label'], c), []).append(rate)
         for point in data.get('points', []):
             points.setdefault((data['label'], point['concurrency']), []).append(point)
     rows = []
     for (label, conc), plist in sorted(points.items()):
         ys = [float(p['y']) for p in plist if p.get('y')]
         xs = [float(p['x_e2e']) for p in plist if p.get('x_e2e')]
+        rates = [r for r in map(server_decode_rate, plist) if r is not None]
         spec = [
             float(p['spec']['accept_length'])
             for p in plist
@@ -194,17 +182,11 @@ def sweeps(args: argparse.Namespace) -> None:
                 'y_tok_s_gpu': round(statistics.fmean(ys), 1) if ys else '',
                 'y_std': round(statistics.stdev(ys), 1) if len(ys) > 1 else '',
                 'accept_len': round(statistics.fmean(spec), 3) if spec else '',
-                'ttft_p50_ms': round(
-                    statistics.fmean(
-                        [float(p['ttft_ms']['p50']) for p in plist if p.get('ttft_ms')]
-                    ),
-                    1,
-                )
-                if any(p.get('ttft_ms') for p in plist)
-                else '',
-                'server_decode_tok_s': round(statistics.fmean(server_rates[(label, conc)]), 1)
-                if server_rates.get((label, conc))
-                else '',
+                'ttft_p50_ms': latency_stat(plist, 'ttft_ms', 'p50'),
+                'ttft_p99_ms': latency_stat(plist, 'ttft_ms', 'p99'),
+                'itl_p50_ms': latency_stat(plist, 'itl_ms', 'p50'),
+                'itl_p99_ms': latency_stat(plist, 'itl_ms', 'p99'),
+                'server_decode_tok_s': round(statistics.fmean(rates), 1) if rates else '',
                 'foreign_cpu_mean': round(
                     statistics.fmean(float(p.get('foreign_cpu_during_mean') or 0) for p in plist),
                     2,

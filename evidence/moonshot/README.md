@@ -222,8 +222,10 @@ That recovers 18% at c = 1, against the up-to-27% idle share the profile workstr
 Exactness differs between the two arms: Triton attention for the draft only changes which
 tokens are proposed, never the target's decisions, so it is exact; Triton attention for the
 target changes the target's attention arithmetic, so its class waits for bench's equality
-classification (the first Triton MTP pair diverged 3.80 times per 1,000 tokens against the
-3.42 floor of stock MTP, ratio 1.11 with interval 0.90-1.37; not yet final).
+classification. Bench's first related pair does not isolate Triton: it ran Triton attention
+together with ReplaySSM-spec (buffered verify) and diverged 3.80 times per 1,000 tokens,
+against a floor of 3.42 per 1,000 that is plain decoding at client concurrency 1 against 32
+(ratio 1.11, interval 0.90-1.37; not final).
 The plan-stream arm fails at the first verify: the hybrid GDN backend does not implement
 `update_verify_buffers_to_fill_after_draft` (`base_attn_backend.py:258`,
 NotImplementedError), so the plan stream cannot be used with Qwen3.5 MTP at this commit.
@@ -265,7 +267,7 @@ to the measured noise floor); "lossy" changes them and needs the quality budget 
 | # | lever | end | class | ceiling (derived) or measured | quality cost | effort | status / owner |
 |---|---|---|---|---|---|---|---|
 | 1 | Public DFlash-4B drafter (z-lab) | latency | exact | drafter measured tau 6.18 at c=1, block 16 (`evidence/drafter/acceptance_summary.csv`); model card 3.4-4.6x on B200 | none | serving works | drafter owns baseline; I stack levers on it |
-| 2 | Remove the speculative host gap (MTP/DFlash, c=1-4) | latency | `--attention-backend triton`: class pending bench's equality classification (it changes the target's attention arithmetic; first Triton MTP pair 3.80/1K vs the 3.42/1K floor); `--speculative-draft-attention-backend triton`: exact (draft only) | measured: Triton for target and draft 1.18x at c=1, 1.14x at c=4; draft only 1.08x / 1.06x (2d) | none for draft-only | flag; engine fix by hostgap | DFlash + Triton attention queued |
+| 2 | Remove the speculative host gap (MTP/DFlash, c=1-4) | latency | `--attention-backend triton`: class pending bench's equality classification (it changes the target's attention arithmetic; bench's first pair, 3.80/1K against the 3.42/1K plain c=1-vs-32 floor, combines Triton with ReplaySSM-spec, so it does not isolate Triton); `--speculative-draft-attention-backend triton`: exact (draft only) | measured: Triton for target and draft 1.18x at c=1, 1.14x at c=4; draft only 1.08x / 1.06x (2d) | none for draft-only | flag; engine fix by hostgap | DFlash + Triton attention queued |
 | 3 | FP16 GDN state + capacity lift (radix off, 256-1,024) | throughput | lossy, likely near-lossless | measured 1.24x at c=128; derived ceiling 1.46x | pending (DAMP: FP16 near-lossless, BF16 not) | flags only | quality and c>=256 sweeps queued |
 | 4 | Strict write-avoiding replay (P4, patch 0007) | throughput | bit-identical to the packed decode at kernel level (synthetic activations, one layer; 2c); end-to-end probe queued | kernel 1.22x at B=128/256 (L=4); traffic-only ceiling 1.18x at B=128 (f = 0.416); derived ~1.08x end to end, below the pre-registered 1.10x gate | none | built | server A/B pending (run_p4b.sh) |
 | 5 | MTP + ReplaySSM-spec at high batch | throughput | class pending measurement; mechanism suggests lossy (verify outputs from a chunked UT transform on TF32 tensor cores) | derived 34.3k vs plain 23.7k (FP32) | none | flags only | queued |
