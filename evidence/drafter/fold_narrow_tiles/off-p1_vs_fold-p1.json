@@ -1,0 +1,111 @@
+{
+  "a": "/home/ubuntu/vp-data/drafter/fold-check/localize/off-p1",
+  "b": "/home/ubuntu/vp-data/drafter/fold-check/localize/fold-p1",
+  "pools": {
+    "a": {
+      "max_total_num_tokens": 60630,
+      "max_mamba_cache_size": 10,
+      "effective_max_running_requests_per_dp": 2
+    },
+    "b": {
+      "max_total_num_tokens": 60630,
+      "max_mamba_cache_size": 10,
+      "effective_max_running_requests_per_dp": 2
+    }
+  },
+  "cycles_compared": true,
+  "requests": {
+    "gsm8k-train-3454": {
+      "prompt_tokens": 146,
+      "first_logprob_difference": null,
+      "first_token_difference": null,
+      "first_cycle_difference": null
+    },
+    "gsm8k-train-5345": {
+      "prompt_tokens": 89,
+      "first_logprob_difference": null,
+      "first_token_difference": null,
+      "first_cycle_difference": null
+    },
+    "gsm8k-train-7247": {
+      "prompt_tokens": 106,
+      "first_logprob_difference": null,
+      "first_token_difference": null,
+      "first_cycle_difference": null
+    },
+    "humaneval-78": {
+      "prompt_tokens": 343,
+      "first_logprob_difference": null,
+      "first_token_difference": null,
+      "first_cycle_difference": null
+    },
+    "math500-test/counting_and_probability/14.json": {
+      "prompt_tokens": 84,
+      "first_logprob_difference": null,
+      "first_token_difference": null,
+      "first_cycle_difference": null
+    },
+    "math500-test/prealgebra/846.json": {
+      "prompt_tokens": 81,
+      "first_logprob_difference": null,
+      "first_token_difference": null,
+      "first_cycle_difference": null
+    },
+    "math500-test/precalculus/989.json": {
+      "prompt_tokens": 78,
+      "first_logprob_difference": null,
+      "first_token_difference": null,
+      "first_cycle_difference": null
+    },
+    "mtbench-106": {
+      "prompt_tokens": 86,
+      "first_logprob_difference": null,
+      "first_token_difference": null,
+      "first_cycle_difference": null
+    }
+  },
+  "reproduces:/home/ubuntu/vp-data/drafter/replay-check/c1-off": {
+    "/home/ubuntu/vp-data/drafter/fold-check/localize/off-p1": {
+      "math500-test/precalculus/989.json": null,
+      "math500-test/counting_and_probability/14.json": null,
+      "math500-test/prealgebra/846.json": null,
+      "mtbench-106": null,
+      "humaneval-78": null,
+      "gsm8k-train-3454": null,
+      "gsm8k-train-5345": null,
+      "gsm8k-train-7247": null
+    },
+    "/home/ubuntu/vp-data/drafter/fold-check/localize/fold-p1": {
+      "math500-test/precalculus/989.json": null,
+      "math500-test/counting_and_probability/14.json": null,
+      "math500-test/prealgebra/846.json": null,
+      "mtbench-106": null,
+      "humaneval-78": null,
+      "gsm8k-train-3454": null,
+      "gsm8k-train-5345": null,
+      "gsm8k-train-7247": null
+    }
+  },
+  "reproduces:/home/ubuntu/vp-data/drafter/replay-check/c1-fold": {
+    "/home/ubuntu/vp-data/drafter/fold-check/localize/off-p1": {
+      "math500-test/precalculus/989.json": null,
+      "math500-test/counting_and_probability/14.json": 2,
+      "math500-test/prealgebra/846.json": 2,
+      "mtbench-106": null,
+      "humaneval-78": null,
+      "gsm8k-train-3454": 3,
+      "gsm8k-train-5345": null,
+      "gsm8k-train-7247": 3
+    },
+    "/home/ubuntu/vp-data/drafter/fold-check/localize/fold-p1": {
+      "math500-test/precalculus/989.json": null,
+      "math500-test/counting_and_probability/14.json": 2,
+      "math500-test/prealgebra/846.json": 2,
+      "mtbench-106": null,
+      "humaneval-78": null,
+      "gsm8k-train-3454": 3,
+      "gsm8k-train-5345": null,
+      "gsm8k-train-7247": 3
+    }
+  }
+}

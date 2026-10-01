@@ -450,3 +450,32 @@ foreign CPU load averaged 0.27-0.83 cores per point.
 
     scripts/gpu_lock.sh -x experiments/drafter/run_fold_timing.sh
     # its last step: ab_timing_summary.py ~/vp-data/drafter/fold-timing --base stock --test fold
+
+## Buffered GDN verify: narrow value tiles for the fold's verify (patch drafter/0005)
+
+The served A/B above found the fold slower than stock at c = 1-2. At the pin, SGLang's recurrent
+GDN kernel picks value tiles of 4 on sm_90 for at most 64 sequences only when it writes
+per-position states; the ring-writing verify the fold uses kept tiles of 32, so at small
+batches it launched 8x fewer blocks than the stock verify it replaces. Patch 0005 treats the
+ring-writing verify as a target verify in that selection (engine `engine/drafter` 9292abd874 =
+bd66ce343e + 0001-0005).
+
+Exactness (`run_fold_check.sh`, one shared slot, 2026-10-01 22:27-23:15 UTC, repository at
+e8a9e6c, engine 9292abd874; `fold_narrow_tiles/`, resolved pools and foreign CPU load per run in
+`fold_narrow_tiles/launch/`, foreign load 0.22-0.63 cores):
+
+- **Kernel** (`gdn_verify_parity.json`, which now records the tile each verify actually selects):
+  both the stock and the ring-writing verify run with value tiles of 4 at batch 1, 8 and 16, and
+  the fold's verify output and committed state are bitwise equal to stock in all nine cases
+  (`fold_bitwise_in_every_case`).
+- **Served, matched pools** (`run_fold_localize.sh` as before): DFlash at c = 1 with the per-cycle
+  trace, eight requests at two pinned pool sizes, identical in every token, top-5 logprob and
+  cycle (`off-p*_vs_fold-p*.json`); deterministic waves, radix cache off: DFlash in waves of 4 and
+  MTP s3 in waves of 8 bitwise equal to stock on 80 of 80 sequences, as are the stock reruns
+  (`*-vs-*.json`).
+- **Patch 0004's gate:** DFlash with decode-only ReplaySSM (`--enable-linear-replayssm` without
+  `-spec`) in the same waves of 4 is bitwise equal to stock DFlash on 80 of 80 sequences
+  (`dflash-w4-replayssm-decode-vs-off.json`), so that combination commits through the stock
+  scatter as intended.
+
+    scripts/gpu_lock.sh -s experiments/drafter/run_fold_check.sh
