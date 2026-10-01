@@ -5,7 +5,9 @@ Reads one fresh lever_sweep output directory and checks, for this run only:
     A B B A A B B A order, each with status 'exit 0';
   - every configuration has exactly one sweep.json with one concurrency-128 point that ran
     the configured number of requests (256) to completion: requests == completed == 256,
-    failed 0, AIPerf exit code 0, the prompts sent as expected and no output-length
+    failed 0, AIPerf exit code 0, the prompts sent as declared (the multiset of SHA-256
+    hashes of the prompt texts in the profiling phase of the raw AIPerf stream equals that of
+    the declared file's first 256 prompts; see check_sent_prompts) and no output-length
     mismatch; and whose measured phase has at least MIN_WINDOWS server decode-log windows
     with exactly 128 requests running (see the primary metric below);
   - every arm ran the declared workload (long2048.jsonl and its warm-up pool by SHA-256,
@@ -56,11 +58,13 @@ from __future__ import annotations
 
 import argparse
 import gzip
+import hashlib
 import json
 import math
 import re
 import statistics
 import sys
+from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -117,6 +121,46 @@ def check_manifest(label: str, data: dict[str, Any]) -> None:
         fail(f'{label}: osl {data.get("osl")}, ignore_eos {data.get("ignore_eos")}')
     if body.get('temperature') != 0.0 or body.get('ignore_eos') is not True:
         fail(f'{label}: request body is not greedy with ignore_eos: {body}')
+
+
+def sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def check_sent_prompts(label: str, point_dir: Path, workload_file: Path) -> None:
+    """The profiling phase sent exactly the declared prompts: the multiset of SHA-256 hashes
+    of the prompt texts in the raw AIPerf stream equals that of the declared file's first
+    REQUESTS prompts, counts included.
+
+    This compares content, not ids. The declared file repeats texts (91 distinct among 512),
+    and bench's prompt_index keeps one id per text hash, so its id-based
+    `prompts_as_expected` is False for a correct run with repeated texts.
+    """
+    if not workload_file.exists():
+        fail(f'{label}: declared workload {workload_file} missing')
+    if hashlib.sha256(workload_file.read_bytes()).hexdigest() != WORKLOAD_SHA256:
+        fail(f'{label}: {workload_file} is not the declared long2048.jsonl')
+    lines = [line for line in workload_file.read_text().splitlines() if line.strip()]
+    expected = Counter(sha256_text(json.loads(line)['text']) for line in lines[:REQUESTS])
+    raws = sorted((point_dir / 'aiperf').glob('profile_export_raw.jsonl*'))
+    if len(raws) != 1:
+        fail(f'{label}: expected one profile_export_raw, found {len(raws)}')
+    opener = gzip.open if raws[0].suffix == '.gz' else open
+    sent: Counter[str] = Counter()
+    with opener(raws[0], 'rt') as handle:
+        for line in handle:
+            record = json.loads(line)
+            if (record.get('metadata') or {}).get('benchmark_phase') != 'profiling':
+                continue
+            messages = (record.get('payload') or {}).get('messages') or [{}]
+            content = messages[-1].get('content', '')
+            sent[sha256_text(content if isinstance(content, str) else json.dumps(content))] += 1
+    if sent != expected:
+        missing, extra = expected - sent, sent - expected
+        fail(
+            f'{label}: sent prompts differ from the declared first {REQUESTS}: '
+            f'{sum(missing.values())} declared not sent, {sum(extra.values())} sent not declared'
+        )
 
 
 def resolved_pools(label: str, server_log: Path) -> dict[str, int]:
@@ -239,8 +283,7 @@ def point_of(out: Path, label: str) -> tuple[dict[str, Any], Path]:
         )
     if point.get('aiperf_exit_code') != 0:
         fail(f'{label}: AIPerf exit code {point.get("aiperf_exit_code")}')
-    if point.get('prompts_as_expected') is not True:
-        fail(f'{label}: prompts not as expected')
+    check_sent_prompts(label, runs[0].parent / 'r0/c128', Path(data['workload']['file']))
     if int(point.get('osl_mismatch') or 0) != 0:
         fail(f'{label}: {point.get("osl_mismatch")} outputs with the wrong length')
     if not 2040 <= float(point.get('isl_mean') or 0) <= 2049:
