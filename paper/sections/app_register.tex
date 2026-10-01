@@ -126,54 +126,54 @@ Results transfer & New prompts, a second model or a second GPU & \pend{transfer}
 \end{longtable}}
 
 \subsection{Pending results}\label{app:devrecord}
-Each entry is designed work without a committed result. The text marks it \mbox{[pending D$n$]} and says beside the marker what the result will decide; no number stands in for it.
+Each entry is designed work without a committed result, with the place its evidence is to be committed. The text marks it \mbox{[pending D$n$]} and says beside the marker what the result will decide; no number stands in for it.
 
 \newcounter{devitem}
-\newcommand{\devitem}[3]{\refstepcounter{devitem}\label{dev:#1}D\thedevitem & #2\ifblank{#3}{}{\par\vspace{1pt}{\footnotesize\color{muted}To be committed in #3.\par}}\vspace{2pt}\\}
+\newcommand{\devitem}[3]{\refstepcounter{devitem}\label{dev:#1}D\thedevitem & #2\ifblank{#3}{}{ {\footnotesize\color{muted}(#3)}}\\}
 {\small
 \begin{longtable}{@{}P{.9cm}P{15.6cm}@{}}
-\toprule Entry & Pending result, and where its evidence is to be committed\\\midrule\endfirsthead
-\toprule Entry & Pending result, and where its evidence is to be committed\\\midrule\endhead
+\toprule Entry & Pending result (where its evidence is to be committed)\\\midrule\endfirsthead
+\toprule Entry & Pending result (where its evidence is to be committed)\\\midrule\endhead
 \bottomrule\endlastfoot
-\devitem{kernel-impl}{The certified-head implementation, with its tests}{\nolinkurl{src/certified_head/}, \nolinkurl{tests/}}
-\devitem{kernel-error}{The cuBLAS kernel selected per batch size, whether disabling reduced-precision reduction changes its output, and its observed accumulation error against both error models; decides whether the modelled $G_i$ covers the stock kernel at the served shapes}{\nolinkurl{evidence/certified_head/stock_invariance.json}}
-\devitem{kernel-invariance}{Row-wise and column-subset bitwise invariance of the stock head GEMM by batch size, which the row-wise fallback needs}{\nolinkurl{evidence/certified_head/stock_invariance.json}}
-\devitem{kernel-replay}{Undecided rows and batches by error model and fallback mode on decode steps replayed through the kernel}{\nolinkurl{evidence/certified_head/replay_decisions.json}}
+\devitem{kernel-impl}{The certified-head implementation and its tests}{\nolinkurl{src/certified_head/}, \nolinkurl{tests/}}
+\devitem{kernel-error}{The stock head GEMM's kernel per batch size and its measured accumulation error against both error models}{\nolinkurl{evidence/certified_head/stock_invariance.json}}
+\devitem{kernel-invariance}{Row-wise and column-subset bitwise invariance of the stock head GEMM}{\nolinkurl{evidence/certified_head/stock_invariance.json}}
+\devitem{kernel-replay}{Undecided rows and batches by error model and fallback mode on replayed decode steps}{\nolinkurl{evidence/certified_head/replay_decisions.json}}
 \devitem{kernel-rowwise}{Cost of the invariance-checked row-wise fallback at $M=32$ to 256}{\nolinkurl{evidence/certified_head/micro_head.json}}
-\devitem{kernel-micro}{Per-$M$ times of the int8, integer and BF16 passes; stage times; the int8 pass's effective bandwidth; primitive costs; batch-union traffic}{\nolinkurl{evidence/certified_head/micro_head.json}, \nolinkurl{head_primitives.json}}
-\devitem{kernel-path}{Complete head-path time and variance for $M=1$ to 256, certified against the stock chain, per error model; decides whether fewer bytes means less time (H3)}{\nolinkurl{evidence/certified_head/head_path_time.csv}}
-\devitem{kernel-seeded}{The written slack derivation for the seeded race with its tests; token-for-token agreement with the stock seeded sampler on replayed steps; acceptance against the stock speculative sampler}{\nolinkurl{evidence/certified_head/}}
-\devitem{geometry-work}{Work counts per mechanism converted to predicted time with the kernel's primitive costs (model predictions)}{\nolinkurl{evidence/head_geometry/work_model.json}}
-\devitem{geometry-accept}{Race candidate counts on speculative states at $T=1$ and 0.7; mass-enclosure ratios and $P_?$ for the standard rule on real drafts; decisions resolved before re-scoring; acceptance under fixed-noise coupling against standard verification}{\nolinkurl{evidence/head_geometry/}, \nolinkurl{evidence/certified_head/}}
-\devitem{state-mech}{Whether the caches entering the first differing module agree for plain decoding at concurrency 1 against 32, for the 127 plain-versus-MTP prompts not rerun with the cache-hashing tap, and for the four tap-changed prompts the history test does not reproduce; whether the pools contributed to the plain-versus-MTP divergences after the first; the prefix-cache-off history control for MTP; the remaining pinned pairs (prefix cache and overlap off, deterministic mode and the FP32 head for plain decoding and MTP, the log-probabilities-off control, retraction, a fresh-server repeat of MTP, and the FlashInfer and ReplaySSM decode paths of the recurrent state)}{\nolinkurl{evidence/state_safety/}}
-\devitem{state-targeted}{The remaining targeted state tests of Appendix~\ref{app:state} (H5): checkpoint reuse at the 256-token tracking interval, aborts with slot reuse on a four-slot pool, chunked prefill at 200 and 256 tokens and run-to-run repeats}{\nolinkurl{evidence/state_safety/targeted.json}}
-\devitem{state-firstcycle}{The first-cycle test declared in \nolinkurl{experiments/state_safety/README.md} (``Declared follow-up'') on 960 fresh prompts (MTP with five steps and the tree against plain decoding at concurrency 1, with their concurrency 1 against 32 pairs as selection control); decides whether a first-cycle excess specific to speculation is supported or the result is inconclusive, unless the run is void}{\nolinkurl{evidence/state_safety/first_cycle_fresh.json}}
-\devitem{moonshot-repeat}{Repeated engine-only and served measurements up to $B=1{,}024$ per state and weight format, a paired rerun of the FP16-state lever, and the levers that fail or regress, with mechanisms}{\nolinkurl{evidence/moonshot/}}
-\devitem{moonshot-state}{MTP with and without replayed verification at concurrency 128 to 1,024; logit-probe KL, divergence rate and GSM8K for FP32, FP16, BF16 and FP8 state, with and without replay}{\nolinkurl{evidence/moonshot/lever_sweeps_hc.csv}, \nolinkurl{lever_quality.csv}}
-\devitem{moonshot-rank}{Rank and observability audit of captured $q$, $k$, $\alpha$ and $\beta$ traces, by exact or modular rank}{\nolinkurl{evidence/moonshot/}}
-\devitem{moonshot-p4}{P4: the server output probe (greedy tokens and top-20 log-probabilities against dense decoding) and the served paired timing at batch 128 with 2,048-token prompts, with the design, metric and decision rule declared before the first run and the corrected prompt check}{\nolinkurl{evidence/moonshot/}}
-\devitem{p7b}{P7b: certified block-parallel GDN verification against strict replay on a captured GDN trace, with arms for the reference, strict replay, certified fast, unchecked fast and reduced precision}{\nolinkurl{evidence/moonshot/}}
-\devitem{p10-split}{P10's first test: the share of the speculative cycle spent in SGLang's exact GDN fold at concurrency 8 and 16; anchor-fused replay is built only if it is at least 9.09\%}{\nolinkurl{evidence/drafter/}}
+\devitem{kernel-micro}{Times of the int8, integer and BF16 passes per $M$, stage times, effective bandwidth, primitive costs and batch-union traffic}{\nolinkurl{evidence/certified_head/micro_head.json}, \nolinkurl{head_primitives.json}}
+\devitem{kernel-path}{Head-path time against the stock chain for $M=1$ to 256, per error model}{\nolinkurl{evidence/certified_head/head_path_time.csv}}
+\devitem{kernel-seeded}{The seeded race's slack derivation; agreement with the stock seeded sampler on replayed steps; acceptance against the stock speculative sampler}{\nolinkurl{evidence/certified_head/}}
+\devitem{geometry-work}{Work counts per mechanism converted to predicted time with the kernel's primitive costs}{\nolinkurl{evidence/head_geometry/work_model.json}}
+\devitem{geometry-accept}{Race candidates on speculative states at $T=1$ and 0.7; mass enclosure and $P_?$ of the standard rule on real drafts; decisions resolved before re-scoring; fixed-noise against standard acceptance}{\nolinkurl{evidence/head_geometry/}, \nolinkurl{evidence/certified_head/}}
+\devitem{state-mech}{Caches entering the first differing module for the concurrency pair, for the 127 plain-versus-MTP prompts not rerun with the cache-hashing tap and for the four tap-changed prompts the history test does not reproduce; the pools' part in plain-versus-MTP divergences after the first; the prefix-cache-off history control for MTP; the remaining pinned pairs (Appendix~\ref{app:divergence})}{\nolinkurl{evidence/state_safety/}}
+\devitem{state-targeted}{Checkpoint reuse, aborts with slot reuse, chunked prefill and run-to-run repeats (H5)}{\nolinkurl{evidence/state_safety/targeted.json}}
+\devitem{state-firstcycle}{The declared first-cycle test on 960 fresh prompts: supported, inconclusive or void}{\nolinkurl{evidence/state_safety/first_cycle_fresh.json}}
+\devitem{moonshot-repeat}{Repeated engine-only and served lever measurements up to $B=1{,}024$, the paired FP16-state rerun, and the mechanisms of levers that fail}{\nolinkurl{evidence/moonshot/}}
+\devitem{moonshot-state}{Replayed verification at concurrency 128 to 1,024; KL, divergence rate and GSM8K by state precision}{\nolinkurl{evidence/moonshot/lever_sweeps_hc.csv}, \nolinkurl{lever_quality.csv}}
+\devitem{moonshot-rank}{Rank and observability audit of captured GDN traces}{\nolinkurl{evidence/moonshot/}}
+\devitem{moonshot-p4}{P4's server output probe and served paired timing at batch 128}{\nolinkurl{evidence/moonshot/}}
+\devitem{p7b}{P7b: certified block-parallel GDN verification against strict replay on a captured trace}{\nolinkurl{evidence/moonshot/}}
+\devitem{p10-split}{P10's first test: the exact GDN fold's share of the speculative cycle at concurrency 8 and 16}{\nolinkurl{evidence/drafter/}}
 \devitem{moonshot-patches}{Measured effect of the reduced draft head and the relaxed greedy rule, and the rule's quality curve}{\nolinkurl{evidence/moonshot/}}
-\devitem{moonshot-frontiers}{The interaction matrix and the exact and lossy frontiers, one server launch per arm, with the lossy stack's quality}{\nolinkurl{evidence/moonshot/interactions.csv}, \nolinkurl{frontier_exact.csv}, \nolinkurl{frontier_lossy.csv}}
-\devitem{backbone-served}{The exactness class of each backbone switch (the packed GDN input projection, the Hopper GEMV backend and the combined routing, with every switch off as a control), from greedy outputs against stock plain decoding at concurrency 1 compared with the noise floor, and paired serving runs against the tuned plain and MTP arms at concurrency 1, 8, 32 and 128}{\nolinkurl{evidence/backbone/}}
+\devitem{moonshot-frontiers}{The interaction matrix and the exact and lossy frontiers, with the lossy stack's quality}{\nolinkurl{evidence/moonshot/interactions.csv}, \nolinkurl{frontier_exact.csv}, \nolinkurl{frontier_lossy.csv}}
+\devitem{backbone-served}{The exactness class of each backbone switch against stock plain decoding at concurrency 1, and paired serving runs against the tuned plain and MTP arms at concurrency 1 to 128}{\nolinkurl{evidence/backbone/}}
 \devitem{hostgap-served}{Interleaved serving sweeps of the host-gap patches against stock for MTP and DFlash at concurrency 1 to 32; validation of the two later patches; stock host traces retaken with the same window driver}{\nolinkurl{evidence/hostgap/}}
-\devitem{drafter-cycle}{The split of a DFlash cycle at batch 1, 4, 16 and 64 into draft forward, draft head, verification, state commit, cache update and host time, from an untraced run; decides whether the longer block pays for itself}{\nolinkurl{evidence/drafter/cycle_split.csv}}
-\devitem{drafter-mechanism}{Two-sided margins at the DFlash and MTP divergences from plain decoding, from a rerun that records the top five log-probabilities in every run, and a trace of the DFlash divergences to their first differing kernel}{\nolinkurl{evidence/drafter/panel_v2/}}
+\devitem{drafter-cycle}{The DFlash cycle split at batch 1, 4, 16 and 64, from an untraced run}{\nolinkurl{evidence/drafter/cycle_split.csv}}
+\devitem{drafter-mechanism}{Two-sided margins at the DFlash and MTP divergences and a trace of the DFlash divergences to their first differing kernel}{\nolinkurl{evidence/drafter/panel_v2/}}
 \devitem{drafter-train}{Which limitation of the drafter the measurements support, and the decision on training}{\nolinkurl{evidence/drafter/}}
-\devitem{drafter-p6}{P6: the rate-trained selector against the same selector with the strongest matched objective, at fixed width}{\nolinkurl{evidence/drafter/}}
-\devitem{repair-verifier}{A kernel trace of the verify pass at $B=64$ and 256, a same-session control of the three verify variants, the exactness classification of the Triton GDN verify kernel against plain decoding (with the FlashInfer configuration as a further control), and the acceptance of the reference continuation per width}{\nolinkurl{evidence/repair/}}
-\devitem{repair-jacobi}{Accepted drafts against the number of full sweeps in the engine, recycle and keep, per block width, and P2's verdict}{\nolinkurl{evidence/repair/jacobi_progress.csv}}
-\devitem{repair-p9-program}{P9: the cost-charged two-cycle test with a real conditioned program and a matched autoregressive refiner over the same cached information, the verify time at widths 2 to 16 at concurrency 1, and the draft shares at concurrency 8 and 16}{\nolinkurl{evidence/repair/}}
-\devitem{bench-capacity}{Capacity limits per arm at default settings, from the server logs}{\nolinkurl{evidence/bench/}}
-\devitem{bench-equality}{Greedy outputs of the arms that replay the recurrent state (replayed verification and replayed decoding) or run the target's attention under Triton, classified against plain decoding}{\nolinkurl{evidence/bench/}}
+\devitem{drafter-p6}{P6's rate-trained selector against the strongest matched objective at fixed width}{\nolinkurl{evidence/drafter/}}
+\devitem{repair-verifier}{Verify-pass kernel trace at $B=64$ and 256, a same-session control, the Triton verify kernel's exactness class and the reference continuation's acceptance per width}{\nolinkurl{evidence/repair/}}
+\devitem{repair-jacobi}{Accepted drafts against full sweeps in the engine, recycle and keep, per width; P2's verdict}{\nolinkurl{evidence/repair/jacobi_progress.csv}}
+\devitem{repair-p9-program}{P9's cost-charged two-cycle test with a real program and a matched refiner; verify time at widths 2 to 16; draft shares at concurrency 8 and 16}{\nolinkurl{evidence/repair/}}
+\devitem{bench-capacity}{Capacity limits per arm at default settings}{\nolinkurl{evidence/bench/}}
+\devitem{bench-equality}{Greedy outputs of the arms that replay the recurrent state or run the target's attention under Triton, against plain decoding}{\nolinkurl{evidence/bench/}}
 \devitem{bench-quality}{GSM8K accuracy for arms A, B and C with intervals and paired tests}{\nolinkurl{evidence/bench/quality/}}
-\devitem{bench-frontier}{Frontier plot, frontier table, within-session speedups and run-to-run variance for arms A, B and C over three confirmation sessions, with the envelopes over all arms and over exact arms}{\nolinkurl{evidence/bench/confirm/}}
-\devitem{bench-sensitivity}{The declared natural-length sensitivity workload at concurrency 32 and 128, with the selected arms and their matched baselines}{\nolinkurl{evidence/bench/sensitivity/}}
-\devitem{bench-mtp}{Served MTP speculation against plain decoding on the confirmation split, with and without replayed GDN verification, and where the two cross}{\nolinkurl{evidence/bench/}}
-\devitem{bench-cert}{Before-and-after frontiers for the certified head in drafting, verification and plain decoding, with output equality at the same batch shape (H4)}{\nolinkurl{evidence/bench/}}
-\devitem{bench-frontend}{Frontend behaviour above concurrency 256 on a quiet host, and repeats of the single-point diagnosis}{\nolinkurl{evidence/bench/frontend/}}
-\devitem{transfer}{Transfer to new prompts, a second model (the public DFlash~2 pair for Qwen3.8-27B) or a second GPU; not scheduled}{}
+\devitem{bench-frontier}{Frontier plot and table, within-session speedups and run-to-run variance over three sessions, with both envelopes}{\nolinkurl{evidence/bench/confirm/}}
+\devitem{bench-sensitivity}{The natural-length sensitivity workload at concurrency 32 and 128}{\nolinkurl{evidence/bench/sensitivity/}}
+\devitem{bench-mtp}{Where served MTP and plain decoding cross on the confirmation split, with and without replayed verification}{\nolinkurl{evidence/bench/}}
+\devitem{bench-cert}{Before-and-after frontiers for the certified head, with output equality at the same batch shape (H4)}{\nolinkurl{evidence/bench/}}
+\devitem{bench-frontend}{Frontend behaviour above concurrency 256 on a quiet host, and repeats of the diagnosis}{\nolinkurl{evidence/bench/frontend/}}
+\devitem{transfer}{Transfer to new prompts, a second model or a second GPU; not scheduled}{}
 \end{longtable}}
 
 \subsection{Reproduction}\label{app:repro}
