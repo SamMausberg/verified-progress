@@ -8,6 +8,19 @@ without the leading dashes. Values map to the command line as follows:
 - `true` adds a bare flag, `false` (or `--unset`) removes it;
 - a list adds one flag followed by several values;
 - anything else adds the flag followed by its string value.
+
+Every arm declares an exactness class (`EXACTNESS_CLASSES`): how its greedy outputs
+relate to plain decoding with the default flags. `stock` keeps the reference
+arithmetic (FlashInfer target attention, stock GDN state handling); speculative
+arms with stock verify are `stock`, and draft-only kernels do not change the
+class. Stock arms may set only flags in `NEUTRAL_FLAGS` (an allowlist) and
+FlashInfer target attention. `pending` arms change something else
+(`numerics_changes`) and wait for classification of their outputs against the
+batch-shape floor;
+`exact-up-to-floor` arms passed it; `lossy` arms did not, or change the model's
+arithmetic by design, and need a quality measurement. An arm without a class, or
+a `stock` arm in arms.toml that sets a numerics-changing flag, is an error. A
+`--set` override that adds such a flag to a `stock` arm makes it `pending`.
 """
 
 from __future__ import annotations
@@ -18,6 +31,51 @@ from pathlib import Path
 from typing import Any
 
 ARMS_FILE = Path(__file__).with_name('arms.toml')
+
+EXACTNESS_CLASSES = ('stock', 'exact-up-to-floor', 'pending', 'lossy')
+# Classes whose outputs match plain decoding as closely as batch shape allows.
+EXACT_CLASSES = frozenset({'stock', 'exact-up-to-floor'})
+# Flags known to leave the target's arithmetic as in the reference configuration
+# (plain decoding, FlashInfer target attention, stock GDN state handling). Any other
+# flag, any environment variable outside NEUTRAL_ENV, a target attention backend
+# other than FlashInfer, or another model or revision counts as a numerics change.
+NEUTRAL_FLAGS = frozenset(
+    {
+        # capacity and memory
+        'max-running-requests',
+        'max-mamba-cache-size',
+        'mem-fraction-static',
+        'max-total-tokens',
+        # prefix cache (the workload flushes it before every point)
+        'disable-radix-cache',
+        # CUDA graphs replay the same kernels; padding a batch to a captured size
+        # changes batch shape only, which the batch-shape floor covers
+        'cuda-graph-max-bs',
+        'cuda-graph-bs',
+        # observability, seeding (greedy decoding draws no random numbers), frontend
+        'enable-metrics',
+        'random-seed',
+        'stream-interval',
+        'incremental-streaming-output',
+        'tokenizer-worker-num',
+        'detokenizer-worker-num',
+        # the vision encoder, which text requests never reach
+        'mm-attention-backend',
+        # speculation with SGLang's stock verify; draft-side kernels never change
+        # which tokens the target accepts under greedy verification
+        'speculative-algorithm',
+        'speculative-num-steps',
+        'speculative-eagle-topk',
+        'speculative-num-draft-tokens',
+        'speculative-draft-model-path',
+        'speculative-draft-model-revision',
+        'speculative-dflash-block-size',
+        'speculative-draft-attention-backend',
+        'speculative-adaptive',
+    }
+)
+NEUTRAL_ENV = frozenset({'SGLANG_FLASHINFER_WORKSPACE_SIZE'})
+REFERENCE_ATTENTION_BACKEND = 'flashinfer'
 
 ArgValue = str | int | float | bool | list[str | int | float]
 
@@ -40,10 +98,21 @@ class Arm:
     # weights, FP8 KV, BF16 GDN state, ...); empty for arms that keep the model's
     # arithmetic. Reports must pair a lossy arm with a quality measurement.
     lossy: str = ''
+    # One of EXACTNESS_CLASSES (see the module docstring).
+    exactness: str = ''
     # Decode/verify CUDA graphs must cover every batch size up to capacity. An arm
     # whose capacity exceeds the graph range it can afford sets this to false and
     # then runs its largest batches eagerly (reported, not hidden).
     require_full_graph_coverage: bool = True
+
+    def __post_init__(self) -> None:
+        # An arm built in code with a lossy note but no class, or with the stock or
+        # pending class inherited from its base arm, takes its class from the note.
+        if self.lossy and self.exactness in ('', 'stock', 'pending'):
+            note = self.lossy.lower()
+            object.__setattr__(
+                self, 'exactness', 'pending' if note.startswith('pending') else 'lossy'
+            )
 
     @property
     def speculative(self) -> bool:
@@ -59,6 +128,7 @@ class Arm:
             'env': dict(self.env),
             'max_concurrency': self.max_concurrency,
             'lossy': self.lossy,
+            'exactness': self.exactness,
             'require_full_graph_coverage': self.require_full_graph_coverage,
         }
 
@@ -95,6 +165,33 @@ def parse_overrides(sets: list[str], unsets: list[str]) -> dict[str, ArgValue]:
     return overrides
 
 
+def numerics_changes(
+    args: dict[str, Any],
+    env: dict[str, str] | None = None,
+    model: tuple[str, str] | None = None,
+    path: Path = ARMS_FILE,
+) -> list[str]:
+    """What in a configuration may change the target's arithmetic (see NEUTRAL_FLAGS).
+
+    `model` is (model, revision); it counts when it differs from [defaults].
+    """
+    changes = []
+    for flag, value in args.items():
+        if value is None or value is False:
+            continue
+        if flag == 'attention-backend':
+            if value != REFERENCE_ATTENTION_BACKEND:
+                changes.append(f'attention-backend={value}')
+        elif flag not in NEUTRAL_FLAGS:
+            changes.append(flag if value is True else f'{flag}={value}')
+    changes += [f'env {name}' for name in (env or {}) if name not in NEUTRAL_ENV]
+    if model is not None:
+        defaults = load_arms(path).get('defaults', {})
+        if tuple(model) != (defaults.get('model'), defaults.get('revision')):
+            changes.append(f'model {model[0]}@{model[1]}')
+    return changes
+
+
 def load_arms(path: Path = ARMS_FILE) -> dict[str, Any]:
     with path.open('rb') as handle:
         return tomllib.load(handle)
@@ -126,6 +223,28 @@ def resolve_arm(
             args[flag] = value
     args = {flag: value for flag, value in args.items() if value is not False}
     env = {**defaults.get('env', {}), **entry.get('env', {}), **(env_overrides or {})}
+    exactness = str(entry.get('exactness', ''))
+    lossy = str(entry.get('lossy', '')).strip()
+    if exactness not in EXACTNESS_CLASSES:
+        raise ValueError(f'arm {name!r}: exactness must be one of {EXACTNESS_CLASSES}')
+    if exactness != 'stock' and not lossy:
+        raise ValueError(f'arm {name!r}: a {exactness} arm needs a lossy note saying why')
+    model = (
+        str(entry.get('model', defaults['model'])),
+        str(entry.get('revision', defaults['revision'])),
+    )
+    own_env = {**defaults.get('env', {}), **entry.get('env', {})}
+    own = numerics_changes(
+        {**defaults.get('args', {}), **entry.get('args', {})}, own_env, model, path
+    )
+    if exactness == 'stock' and own:
+        raise ValueError(f'arm {name!r} is stock but sets {", ".join(own)}')
+    changes = numerics_changes(args, env, model, path)
+    added = [change for change in changes if change not in own]
+    if added and exactness in EXACT_CLASSES:
+        # A classification holds for the arm's own flags only.
+        exactness = 'pending'
+        lossy = f'pending: override sets {", ".join(added)}'
     return Arm(
         name=name,
         description=str(entry.get('description', '')).strip(),
@@ -134,7 +253,8 @@ def resolve_arm(
         args=args,
         env={key: str(value) for key, value in env.items()},
         max_concurrency=int(entry.get('max_concurrency', defaults.get('max_concurrency', 128))),
-        lossy=str(entry.get('lossy', '')).strip(),
+        lossy=lossy,
+        exactness=exactness,
         require_full_graph_coverage=bool(entry.get('require_full_graph_coverage', True)),
     )
 

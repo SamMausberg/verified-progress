@@ -33,17 +33,19 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 | infra | GPU lock (FIFO queue), SGLang worktrees, PR tooling, this list | done (PR #1, #2, #8, #10) |
 | lit | Literature review, novelty assessment, citation audit | done (PR #6) |
 | bench | Baseline server arms, aiperf Pareto harness, quality baseline, spec tuning | active |
-| profile | nsys/ncu profiles and critical-path attribution | active |
-| geometry | Real-head replay: transport versus self-evidence bounds | active (PR #16 merged; H2 drift pending) |
+| profile | nsys/ncu profiles and critical-path attribution | done (PR #13, #54); Nsight Compute and DFlash attribution queued |
+| geometry | Real-head replay: transport versus self-evidence bounds | done (PR #16, #35, #47, #62) |
 | kernel | Certified low-precision head kernels and microbenchmarks | active |
 | theory | Floating-point certificate proofs, exact references, Lean | done (PR #7) |
 | state | Speculative-decoding state safety and output-equality tests | active |
 | moonshot | Reformulations and approximations aimed at order-of-magnitude gains, with measured quality costs | active |
 | drafter | Public DFlash-4B drafter: serve, characterize, train only against a measured limitation | active (PR #22 merged) |
-| repair | Long-window exact repair and target-anchored residual decoding (H8) | active |
-| integrate | SGLang integration of the certified head (draft, verify, decode) | todo |
+| repair | Long-window exact repair and target-anchored residual decoding (H8) | active: P3 refuted (PR #56, #58); now P9 |
+| hostgap | Host-side idle in the speculative cycle (verify planning, draft index copy) | active |
+| backbone | Backbone GEMMs below the head GEMM's bandwidth and RMSNorm fusion | active |
+| integrate | SGLang integration of the certified head (draft, verify, decode) | review (kernel; PR #52) |
 | paper | Manuscript revision as results land | done (milestones PRs #21, #30, #32, #36; editorial PR #49) |
-| author, appendix | Focused MLSys-format paper: main text, and appendices with the evidence register | active |
+| author, appendix | Focused MLSys-format paper: main text, and appendices with the evidence register | done (PR #53); results folded in as they merge |
 | review | Independent review of every PR before merge | active |
 
 ## Task list
@@ -55,25 +57,26 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 
 ### Baselines and measurement
 - [x] Frozen workload and aiperf sweep harness producing the concurrency Pareto curve (bench; PR #17)
-- [ ] Baseline arms: plain decode and native-MTP speculation, CUDA graphs and overlap confirmed (bench)
-- [ ] Tune the speculative baseline (steps, draft tokens, backend) so the denominator is strong (bench; depth tuning running with priority)
-- [x] Diagnose the c>=256 throughput cap (bench; PR #46 in review): CPU contention from other jobs; on a quiet host the tokenizer manager saturates with one-token chunks, fixed by --stream-interval 4 as a shared default; host CPU load now recorded for every timed run
+- [x] Baseline arms: plain decode and native-MTP speculation, CUDA graphs and overlap confirmed (bench; PR #57)
+- [x] Tune the speculative baseline (steps, draft tokens, backend) so the denominator is strong (bench; PR #57: tuned plain, MTP and DFlash arms per concurrency region)
+- [ ] Confirmation sweeps with declared exactness classes and session-paired ratios, plus a natural-output-length sensitivity workload at c = 32 and 128 declared before any run (bench; PR #66 in review)
+- [x] Diagnose the c>=256 throughput cap (bench; PR #46): CPU contention from other jobs; on a quiet host the tokenizer manager saturates with one-token chunks, fixed by --stream-interval 4 as a shared default; host CPU load now recorded for every timed run
 - [ ] Add the public DFlash drafter (`z-lab/Qwen3.5-4B-DFlash@9a1996c`, block 4/8/16) as the strongest existing speculative baseline (bench, drafter; served on sm_90, block 16 mean accept 6.18 on the pilot panel)
 - [ ] Quality baseline on a fixed task set (bench)
-- [ ] nsys attribution of head, backbone, sampling and host gaps for decode and MTP (profile)
+- [x] nsys attribution of head, backbone, sampling and host gaps for decode and MTP (profile; PR #13, roofline field corrected in PR #54): the head takes 10.3% / 6.1% of a plain step at batch 1 / 128 and 17.2% of an MTP cycle at batch 1; the GDN recurrent kernel (FP32 state read and written every step) takes 41.6% of a plain step at batch 128. Nsight Compute on the head and GDN kernels is queued
 
 ### Mechanism
-- [ ] Capture aligned draft/target hidden states at the head boundary for MTP-4B and DFlash-4B (geometry; capture patch merged in PR #16, held-out captures running)
+- [x] Capture aligned draft/target hidden states at the head boundary for MTP-4B and DFlash-4B (geometry; PR #16, #35, #47, #62): MTP-4B drift ratio median 0.954 on 40,000 held-out pairs
 - [x] Measure transport bounds against logit margins on DFlash-4B, held-out (geometry; PR #35): H2 refuted under the tested families, tilings and drafter. Median drift ratio rho 0.917 (draft head-input norm 50.6 against about 159), transport skips a mean of 0.59% of rows (p90 0.77%), the verify-batch union is 99.48-100% of the vocabulary, and sampled acceptance is undecided with mean probability 0.935 at T = 1. MTP-4B pending (new PR)
 - [x] Measure self-evidence bounds on plain decode (geometry; PR #16): int8 heads certify with 1.3-1.6 candidate rows on average at about half the head bytes, no envelope violations; FP8 and int4 alone fail; the stock kernel is needed at 0.35% (gamma 1.19e-4) to 1.40% (gamma 6.11e-4) of positions under the bucket-exact R-stock rule
 - [x] Rigorous floating-point envelope for the low-precision head and the certified decisions (theory; PR #7)
 - [x] Exact CPU reference and tests for the new certificates (theory; PR #7: 20 methods, 39,761 checks, Lean lemmas)
 - [ ] Triton kernels: low-precision head with bound epilogue, candidate compaction, exact refinement, graph-safe fallback (kernel; PR #45 in review: 65 GPU tests, R-stock contract, fixed-noise sampling, invariance self-test)
 - [ ] Kernel correctness and microbenchmarks against the stock head plus argmax (kernel; partial table in PR #45; final rows pending GPU session)
-- [ ] SGLang integration of the certified head behind per-path flags, bitwise-equal to stock at the same shapes (kernel, started)
+- [ ] SGLang integration of the certified head behind per-path flags, bitwise-equal to stock at the same shapes (kernel; PR #52 in review, check-mode counts at the batch sizes observed; a larger-batch run is queued)
 
 ### Moonshots (H7)
-- [ ] Measure the ceilings: HBM bandwidth, bytes per step by component, GDN state dtype and the 133-request cap (moonshot, profile)
+- [ ] Measure the ceilings: HBM bandwidth, bytes per step by component, GDN state dtype and the 133-request cap (moonshot, profile; bandwidth and bytes per step in PR #13)
 - [ ] Quick-test existing levers with a quality proxy: FP8 weights, FP8 KV, state precision, deeper MTP, draft trees, n-gram drafting, hot-vocab draft head (moonshot)
 - [ ] Ranked portfolio of reformulations with ceilings and quality costs (moonshot)
 - [ ] Throughput: reformulate GDN state handling and lift the concurrency cap (moonshot, M1)
@@ -84,25 +87,32 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 - [ ] Full-stack arms: exact stack and lossy stack, each with ablations, Pareto sweeps and quality checks (bench, moonshot, integrate)
 
 ### Repair and progressive evaluation (H8, Sam's proposals P1-P3)
-- [ ] Wide-block verification with perfect continuations: V(B), GDN/KV state-commit cost, oracle speedup for an ideal drafter and for the two-pass anchor-plus-audit design (repair)
-- [ ] Full-target Jacobi repair from DFlash-initialized windows: committed tokens per target pass (repair)
-- [ ] Correction locality: activation changes after real corrections, fixed-basis capture on held-out corrections (repair)
-- [ ] Go/no-go on the residual evaluator prototype against its controls (repair)
+- [x] Wide-block verification with perfect continuations: V(B), GDN/KV state-commit cost, oracle speedup for an ideal drafter and for the two-pass anchor-plus-audit design (repair; PR #56, qualified in #58): V(B) is 4.78 ms at B = 16 and 44.82 ms at B = 256 at c = 1; an ideal free drafter reaches 5x end to end only at B = 256; the two-pass design misses 5x with this verifier
+- [ ] Full-target Jacobi repair from DFlash-initialized windows: committed tokens per target pass (repair; offline, about one token per exact sweep in PR #58; in-engine probes queued)
+- [x] Correction locality and go/no-go on the residual evaluator (repair; PR #58): no-go; with fixed PCA bases the repaired argmax equals the exact one at 35-44% of changed positions and free-running repair adds no accepted drafts
+- [ ] P9: correction-closed drafting, a cached finite-window program reused once after a rejection; support oracle on the post-rejection boundaries, then the cost-charged two-cycle test (repair, with the drafter's support screen)
+- [ ] P12: static screen of the compiled classifier dictionary through the last FFN, CPU check (repair, low priority)
 - [x] State-safe tail oracle: INT8 final FFN plus head versus certified head-only (geometry): rejected, the FFN surrogate lowers certification and saves at most 0.071 GB per token (PR #16)
 - [ ] Theory in the paper: contracts, common-mass bound, bounded-range sampling, dead/deferred/enclosed accounting (paper)
 
-- [ ] P4: bit-exact live replay of recurrent state at batch 128, pre-registered 1.10x threshold; rank/observability audit on captured traces (moonshot)
+- [ ] P4: bit-exact live replay of recurrent state at batch 128, pre-registered 1.10x threshold; rank/observability audit on captured traces (moonshot; PR #60: bit-exact at kernel level on synthetic activations, kernel 1.22x at B = 128 and 256, derived about 1.08x end to end, below the threshold; server A/B queued)
 - [x] P5: first-layer token projection table rejected by its pre-registered 1% criterion: layer 0's input projections take 0.60% / 0.52% / 0.33% of a plain decode step at batch 1 / 32 / 128, ceiling 1.006x (profile; evidence in PR #13)
 - [x] Reproduce the P4/P5 counterexamples as exact tests (paper; PR #20)
-- [ ] P6: zero-training candidate-support screen for DFlash, then a rate-trained selector against the same selector trained with the strongest matched objective, pre-registered 1.25x (drafter)
-- [ ] P7: certified block-parallel GDN verification against strict replay on a captured trace (reference, strict, certified fast, unchecked fast, reduced precision) (moonshot)
+- [x] P6: zero-training candidate-support screen for DFlash (drafter; PR #51): the screen does not rule P6 out
+- [ ] P6: rate-trained selector against the same selector trained with the strongest matched objective, pre-registered 1.25x (drafter)
+- [ ] P7: certified block-parallel GDN verification against strict replay on a captured trace (reference, strict, certified fast, unchecked fast, reduced precision) (moonshot; PR #60: SGLang's chunked kernel is not a usable fast path, synthetic inputs at one request)
+- [ ] P10: anchor-fused exact replay of the accepted GDN tail inside the next verify; first the per-phase split with SGLang's exact GDN fold at c = 8 and 16, build only if the fold phase is at least 9.09% of the cycle (drafter, then a dedicated agent)
+- [x] P11: restartable prefix-demand verification, dropped in favour of P10 (Sam's revision); its free-boundary oracle stays as a P10 control
+- [ ] P13: GDN state reduction chosen for future output distortion, a training-free test against the lossy-stack quality budget (moonshot)
 - [ ] P7: five-contract framing of every exactness claim in the paper, counterexamples reproduced as tests (paper)
 
 ### Engine
-- [ ] Differential output-equality tests: MTP versus plain decode, rejection positions, aborts, prefix reuse (state)
+- [ ] Differential output-equality tests: MTP versus plain decode, rejection positions, aborts, prefix reuse (state; PR #59: truncation and stop tokens at every in-cycle index bitwise identical; with the radix cache on, a request's logprobs depend on which request computed its shared prefix; cache hashing pending)
 - [x] Explain every stock divergence by mechanism (state; PR #37 merged): the tie rule and head GEMM cause none; first differing outputs are layer 0's GDN recurrence (plain vs MTP) and gated RMSNorm, FlashInfer decode and prefill down_proj (batch 1 vs 32); the flip classes are reported under two named accumulation models; cache-state hashing and the radix-race test pending
 - [ ] Exactness contract for the certified head: the stock head kernel's decision at the same batch shape, with fallback to that kernel when the gap condition fails (kernel, theory)
-- [ ] Integrate the certified head into the MTP draft, verification and plain decode paths (integrate)
+- [ ] Snapshot-free GDN verify for DFlash and MTP (branch drafter/buffered-verify: patch 0002 circular replay, patch 0003 SGLang's exact GDN fold): bitwise-equality check against stock verify before any timing (drafter)
+- [ ] Remove host-side idle in the speculative cycle with bitwise-equal outputs (hostgap)
+- [ ] Backbone GEMMs below the head GEMM's bandwidth (split-K `out_proj` and `o_proj`, MLP down) and RMSNorm fusion, each classified against the stock noise floor and measured end to end (backbone)
 - [ ] Before/after Pareto sweeps with acceptance and output-equality checks (bench, integrate)
 
 ### Paper and deliverables
@@ -112,6 +122,6 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 - [x] Paper milestone 2: workstream methods, merged geometry, bench and contract evidence, P7 contracts, P6 objectives with verified prior art (paper; PR #30)
 - [x] Paper milestone 3: DFlash-4B acceptance by position (paper; PR #32)
 - [x] Editorial revision organized around the certified head and the stock-kernel contract, with H2's refutation, divergence mechanisms and an evidence register (editor; PR #49)
-- [ ] Focused MLSys-format paper: 10-page main text on the certified head and transport's negative result, terminology and numerical-assumptions tables, secondary investigations in appendices (author, appendix)
-- [ ] Integrate remaining results as they merge: certified-head runtime (#45), profile attribution (#13), bench MTP-versus-plain crossover, serving frontiers, drafter, repair, hostgap (author, appendix)
+- [x] Focused MLSys-format paper: 10-page main text on the certified head and transport's negative result, terminology and numerical-assumptions tables, secondary investigations in appendices (author, appendix; PR #53)
+- [ ] Integrate remaining results as they merge: certified-head runtime (#45), engine integration (#52), bench MTP-versus-plain crossover, serving frontiers, drafter, repair, hostgap (author, appendix)
 - [ ] README and RUNBOOK with exact reproduction commands (paper, infra; rewritten in PR #21, final pass after the serving results)

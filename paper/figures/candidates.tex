@@ -1,0 +1,38 @@
+% Figure fig:candidates. (a) reads evidence/head_geometry/selfevidence_plain4b_ccdf.csv.
+% (b) is derived: 1-(1-p)^B with the per-row interval-form shares of
+% evidence/head_geometry/rstock_plain4b.json (rules/gamma_1.19e-4/bucket/
+% positions_needing_stock_kernel = 0.0034970857618651123 and rules/tensor_core_model/
+% bucket/positions_needing_stock_kernel = 0.013988343047460449); the markers are the
+% measured step shares of the same file (capture_batches_with_one_or_more = 0.028 and
+% 0.10933333333333334) at the mean of 8.006666666666666 held-out rows per step
+% (evidence/head_geometry/selfevidence_plain4b.json, batch_unions mean_rows_per_batch).
+\pgfmathsetmacro{\phop}{0.0034970857618651123}
+\pgfmathsetmacro{\pcons}{0.013988343047460449}
+\begin{tikzpicture}
+\begin{groupplot}[group style={group size=2 by 1,horizontal sep=1.6cm},
+  width=8.1cm,height=4.6cm,grid=major,
+  legend style={at={(0.5,-0.36)},anchor=north,legend columns=2,
+    /tikz/every even column/.append style={column sep=6pt}}]
+\nextgroupplot[xmode=log,ymode=log,xmin=1,xmax=248320,ymin=1e-4,ymax=1.4,
+  xlabel={Candidate rows $k$},ylabel={Positions needing $\ge k$},
+  title={(a) Candidates per decision (measured)},unbounded coords=discard,
+  xtick={1,10,100,1000,10000,100000},xminorticks=false,yminorticks=false]
+\addplot[thick,ink] table[x=k,y=plain_int8_row_greedy,col sep=comma]{../evidence/head_geometry/selfevidence_plain4b_ccdf.csv};\addlegendentry{int8, per row}
+\addplot[thick,dashed,teal] table[x=k,y=plain_int8_g128_greedy,col sep=comma]{../evidence/head_geometry/selfevidence_plain4b_ccdf.csv};\addlegendentry{int8, 128 cols}
+\addplot[semithick,teal,only marks,mark=o,mark size=1.7pt] table[x=k,y=plain_int8_g128_gumbel_t1.0,col sep=comma]{../evidence/head_geometry/selfevidence_plain4b_ccdf.csv};\addlegendentry{int8, 128 cols, race $T=1$}
+\addplot[thick,dashdotted,ochre] table[x=k,y=plain_fp8_row_greedy,col sep=comma]{../evidence/head_geometry/selfevidence_plain4b_ccdf.csv};\addlegendentry{FP8, per row}
+\addplot[thick,densely dotted,muted] table[x=k,y=plain_int4_g128_greedy,col sep=comma]{../evidence/head_geometry/selfevidence_plain4b_ccdf.csv};\addlegendentry{int4, 128 cols}
+\nextgroupplot[xmode=log,log basis x=2,xmin=1,xmax=256,ymin=0,ymax=1,
+  xtick={1,2,4,8,16,32,64,128,256},xticklabels={1,2,4,8,16,32,64,128,256},
+  xlabel={Rows in the batch $B$},ylabel={Batches with a fallback},
+  yticklabel={\pgfmathparse{100*\tick}\pgfmathprintnumber[fixed,precision=0]{\pgfmathresult}\%},
+  title={(b) Whole-batch fallback (derived)}]
+\addplot[thick,dashed,ochre,domain=1:256,samples=120]{1-(1-\pcons)^x};\addlegendentry{\modelcons, $p=1.40\%$}
+\addplot[thick,ink,domain=1:256,samples=120]{1-(1-\phop)^x};\addlegendentry{\modelhopper, $p=0.35\%$}
+\addplot[only marks,mark=square*,mark size=1.9pt,ochre] coordinates {(8.006666666666666,0.10933333333333334)};\addlegendentry{measured, \modelcons}
+\addplot[only marks,mark=*,mark size=1.9pt,ink] coordinates {(8.006666666666666,0.028)};\addlegendentry{measured, \modelhopper}
+\draw[muted,densely dotted] (axis cs:128,0) -- (axis cs:128,1);
+\node[font=\scriptsize,anchor=south east,text=ochre] at (axis cs:122,0.84) {84\%};
+\node[font=\scriptsize,anchor=north west,text=ink] at (axis cs:134,0.36) {36\%};
+\end{groupplot}
+\end{tikzpicture}

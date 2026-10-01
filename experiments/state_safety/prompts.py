@@ -70,11 +70,53 @@ def _rows(name: str) -> list[dict[str, Any]]:
     return data
 
 
-def build_messages() -> list[dict[str, Any]]:
+# Row ranges per prompt set. 'main' is the original 320-prompt set; 'fresh' is a
+# disjoint set for declared follow-up tests (MT-Bench has no unused questions).
+SELECTION = {
+    'main': {
+        'gsm8k': range(0, 80),
+        'humaneval': range(0, 60),
+        'mt_bench': range(0, 80),
+        'alpaca_eval': range(0, 600, 10),
+        'cnn_dailymail': range(0, 40),
+    },
+    'fresh': {
+        'gsm8k': range(80, 560),
+        'humaneval': range(60, 164),
+        'mt_bench': range(0),
+        'alpaca_eval': range(5, 805, 10),
+        'cnn_dailymail': range(40, 336),
+    },
+}
+
+
+# The original manifest's wording, kept so that `--set main` regenerates the
+# committed main manifest byte for byte.
+MAIN_SELECTION_TEXT = {
+    'gsm8k': 'test rows 0-79',
+    'humaneval': 'test rows 0-59',
+    'mt_bench': 'first turn of questions 0-79',
+    'alpaca_eval': 'rows 0, 10, ..., 590',
+    'cnn_dailymail': 'test rows 0-39',
+}
+
+
+def _describe(r: range) -> str:
+    if not len(r):
+        return 'none'
+    if r.step == 1:
+        return f'rows {r.start}-{r.stop - 1}'
+    return f'rows {r.start}, {r.start + r.step}, ..., {r[-1]}'
+
+
+def build_messages(prompt_set: str = 'main') -> list[dict[str, Any]]:
     """Return prompt records (without token IDs) in a fixed order."""
+    sel = SELECTION[prompt_set]
     items: list[dict[str, Any]] = []
 
-    for row_index, row in enumerate(_rows('gsm8k')[:80]):
+    gsm8k = _rows('gsm8k')
+    for row_index in sel['gsm8k']:
+        row = gsm8k[row_index]
         items.append(
             {
                 'source': 'gsm8k',
@@ -82,7 +124,9 @@ def build_messages() -> list[dict[str, Any]]:
                 'text': f'{row["question"]}\nSolve the problem step by step.',
             }
         )
-    for row_index, row in enumerate(_rows('humaneval')[:60]):
+    humaneval = _rows('humaneval')
+    for row_index in sel['humaneval']:
+        row = humaneval[row_index]
         items.append(
             {
                 'source': 'humaneval',
@@ -91,14 +135,19 @@ def build_messages() -> list[dict[str, Any]]:
                 f'```python\n{row["prompt"]}```',
             }
         )
-    for row_index, row in enumerate(_rows('mt_bench')[:80]):
-        items.append({'source': 'mt_bench', 'row': row_index, 'text': row['prompt'][0]})
+    mt_bench = _rows('mt_bench')
+    for row_index in sel['mt_bench']:
+        items.append(
+            {'source': 'mt_bench', 'row': row_index, 'text': mt_bench[row_index]['prompt'][0]}
+        )
     alpaca = _rows('alpaca_eval')
-    for row_index in range(0, 600, 10):
+    for row_index in sel['alpaca_eval']:
         items.append(
             {'source': 'alpaca_eval', 'row': row_index, 'text': alpaca[row_index]['instruction']}
         )
-    for row_index, row in enumerate(_rows('cnn_dailymail')[:40]):
+    cnn = _rows('cnn_dailymail')
+    for row_index in sel['cnn_dailymail']:
+        row = cnn[row_index]
         items.append(
             {
                 'source': 'cnn_dailymail',
@@ -142,13 +191,55 @@ def ids_digest(items: list[dict[str, Any]]) -> str:
     return h.hexdigest()
 
 
+def build_manifest(items: list[dict[str, Any]], prompt_set: str) -> dict[str, Any]:
+    """The manifest of a tokenized prompt set.
+
+    The main set keeps its original layout (no prompt_set key, the original
+    selection wording), so the committed manifest regenerates byte for byte.
+    """
+    lengths = sorted(len(item['input_ids']) for item in items)
+    counts: dict[str, int] = {}
+    for item in items:
+        counts[item['source']] = counts.get(item['source'], 0) + 1
+    if prompt_set == 'main':
+        selection: dict[str, str] = dict(MAIN_SELECTION_TEXT)
+    else:
+        selection = {name: _describe(r) for name, r in SELECTION[prompt_set].items()}
+    selection['thinking'] = 'every third prompt of each source (index % 3 == 2)'
+    manifest: dict[str, Any] = {
+        'model': MODEL,
+        'model_revision': MODEL_REVISION,
+        'sources': {
+            name: {'repo': repo, 'revision': rev, 'file': fn}
+            for name, (repo, rev, fn) in SOURCES.items()
+        },
+    }
+    if prompt_set != 'main':
+        manifest['prompt_set'] = prompt_set
+    manifest.update(
+        selection=selection,
+        num_prompts=len(items),
+        per_source=counts,
+        num_thinking=sum(item['thinking'] for item in items),
+        input_tokens={
+            'min': lengths[0],
+            'median': lengths[len(lengths) // 2],
+            'max': lengths[-1],
+            'total': sum(lengths),
+        },
+        input_ids_sha256=ids_digest(items),
+    )
+    return manifest
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--out', type=Path, required=True)
     ap.add_argument('--manifest', type=Path, required=True)
+    ap.add_argument('--set', choices=sorted(SELECTION), default='main', dest='prompt_set')
     args = ap.parse_args()
 
-    items = build_messages()
+    items = build_messages(args.prompt_set)
     tokenize(items)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with args.out.open('w') as f:
@@ -158,36 +249,7 @@ def main() -> None:
             )
             f.write('\n')
 
-    lengths = sorted(len(item['input_ids']) for item in items)
-    counts: dict[str, int] = {}
-    for item in items:
-        counts[item['source']] = counts.get(item['source'], 0) + 1
-    manifest = {
-        'model': MODEL,
-        'model_revision': MODEL_REVISION,
-        'sources': {
-            name: {'repo': repo, 'revision': rev, 'file': fn}
-            for name, (repo, rev, fn) in SOURCES.items()
-        },
-        'selection': {
-            'gsm8k': 'test rows 0-79',
-            'humaneval': 'test rows 0-59',
-            'mt_bench': 'first turn of questions 0-79',
-            'alpaca_eval': 'rows 0, 10, ..., 590',
-            'cnn_dailymail': 'test rows 0-39',
-            'thinking': 'every third prompt of each source (index % 3 == 2)',
-        },
-        'num_prompts': len(items),
-        'per_source': counts,
-        'num_thinking': sum(item['thinking'] for item in items),
-        'input_tokens': {
-            'min': lengths[0],
-            'median': lengths[len(lengths) // 2],
-            'max': lengths[-1],
-            'total': sum(lengths),
-        },
-        'input_ids_sha256': ids_digest(items),
-    }
+    manifest = build_manifest(items, args.prompt_set)
     args.manifest.parent.mkdir(parents=True, exist_ok=True)
     args.manifest.write_text(json.dumps(manifest, indent=2) + '\n')
     print(json.dumps(manifest, indent=2))

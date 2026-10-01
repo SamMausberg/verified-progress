@@ -67,8 +67,29 @@ LEVERS: dict[str, Lever] = {
         },
         note='rounding-preserving live replay (patch 0007): FP32 anchor written every 4 '
         'steps, ring of the packed decode operands; meant to be bit-identical',
-        env={'SGLANG_GDN_EXACT_REPLAY': '1'},
+        # The value tile is pinned here (not inherited from the caller's shell): 32 is the
+        # packed decode's tile, the configuration the bit-exactness check covers.
+        env={'SGLANG_GDN_EXACT_REPLAY': '1', 'SGLANG_GDN_EXACT_REPLAY_BV': '32'},
         conflicts=('replayssm', 'bf16_state', 'fp16_state', 'fp8_state'),
+    ),
+    # P4's served A/B pins the pools identically in both arms (BRIEF: equal running limit,
+    # KV tokens and mamba slots): 128 requests x (2,048 prompt + 512 output) = 327,680 KV
+    # tokens, plus headroom for chunked prefill.
+    'p4_pools': Lever(
+        {
+            'max-running-requests': 128,
+            # 360,448 admitted only 127 (run 20261001T082738Z, void): with ignore_eos the
+            # scheduler reserves each request's full 512 output tokens and charges a
+            # shared-mamba cost per request in token units.
+            'max-total-tokens': 655360,
+            # 128 slots admitted only 127 long prompts (runs 20261001T082738Z and
+            # 20261001T104311Z): with chunked prefill the last admission saw no schedulable
+            # mamba slot while one was free. 132 leaves headroom; the running limit stays 128.
+            'max-mamba-cache-size': 132,
+            'mamba-ssm-dtype': 'float32',
+        },
+        note='pinned pools for the P4 A/B: 128 running, 655,360 KV tokens, 132 mamba slots, '
+        'FP32 state stated explicitly',
     ),
     'replayssm_spec': Lever(
         {'enable-linear-replayssm-spec': True},
@@ -227,6 +248,12 @@ LEVERS: dict[str, Lever] = {
         {'speculative-token-map': str(BENCH_TOKEN_MAPS / 'hot8192_tune.pt')},
         note='draft head restricted to 8,192 frequent rows (MTP: patch 0001; DFlash: 0005)',
         conflicts=('hot16k',),
+    ),
+    'hot23k': Lever(
+        {'speculative-token-map': str(BENCH_TOKEN_MAPS / 'hot32k_tune.pt')},
+        note='draft head restricted to the 22,936 tokens seen in the tune outputs '
+        '(held-out coverage 97.5%, evidence/moonshot/token_map_coverage.csv)',
+        conflicts=('hot8k', 'hot16k'),
     ),
     'hot16k': Lever(
         {'speculative-token-map': str(BENCH_TOKEN_MAPS / 'hot16384_tune.pt')},

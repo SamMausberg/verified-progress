@@ -1,0 +1,43 @@
+{
+ "layer": 0,
+ "blocks": 4,
+ "points": [
+  {
+   "block_tokens": 2,
+   "words": 262144,
+   "bf16_disagreements": 136531,
+   "disagreement_rate": 0.5208244323730469,
+   "max_error_bf16_ulps": 1769696.0,
+   "abs_error_p50": 1.9073486328125e-06,
+   "abs_error_p99_99": 0.000244140625
+  },
+  {
+   "block_tokens": 4,
+   "words": 524288,
+   "bf16_disagreements": 280178,
+   "disagreement_rate": 0.5343971252441406,
+   "max_error_bf16_ulps": 2293888.0,
+   "abs_error_p50": 2.246815711259842e-06,
+   "abs_error_p99_99": 0.000244140625
+  },
+  {
+   "block_tokens": 8,
+   "words": 1048576,
+   "bf16_disagreements": 566421,
+   "disagreement_rate": 0.5401811599731445,
+   "max_error_bf16_ulps": 212115.0,
+   "abs_error_p50": 2.86102294921875e-06,
+   "abs_error_p99_99": 0.00048828125
+  },
+  {
+   "block_tokens": 16,
+   "words": 2097152,
+   "bf16_disagreements": 1144949,
+   "disagreement_rate": 0.5459542274475098,
+   "max_error_bf16_ulps": 246916.0,
+   "abs_error_p50": 3.814697265625e-06,
+   "abs_error_p99_99": 0.00048828125
+  }
+ ],
+ "qkv_width": 8192
+}

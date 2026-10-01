@@ -1,0 +1,21 @@
+pair,run_a,run_b,prompts,diverged,exposure_tokens,per_1k_tokens,tie,one_ulp,near,large,not_argmax,length_mismatch,max_margin_median,max_margin_max,drift_p99,drift_max,same_server,pools_identical,pinned_a,pinned_b
+"repeat session, plain c1",plain/c1,plain__rep/c1,320,0,70042,0,0,0,0,0,0,0,,,0,0,False,True,True,True
+"repeat session, plain c32",plain/c32,plain__rep/c32,320,4,69712,0.05738,4,0,0,0,0,0,0.125,0.125,0.1545,0.2183,False,True,True,True
+"concurrency 1 vs 32 (cap 8), plain",plain/c1,plain/c32,320,41,64845,0.6323,39,2,0,0,0,0,0.125,0.25,0.3463,0.5717,True,True,True,True
+"concurrency 1 vs 32 (cap 8), mtp_s1",mtp_s1/c1,mtp_s1/c32,320,165,47501,3.474,157,7,1,0,0,0,0.125,0.375,0.3218,0.6168,True,True,True,True
+"concurrency 1 vs 32 (cap 8), mtp_s3",mtp_s3/c1,mtp_s3/c32,320,156,48040,3.247,146,9,1,0,0,0,0.125,0.25,0.3619,0.6168,True,True,True,True
+"concurrency 1 vs 32 (cap 8), mtp_s5",mtp_s5/c1,mtp_s5/c32,320,152,49539,3.068,143,8,1,0,0,0,0.125,0.25,0.3222,0.3524,True,True,True,True
+"concurrency 1 vs 32 (cap 8), mtp_tree",mtp_tree/c1,mtp_tree/c32,320,156,50156,3.11,150,6,0,0,0,0,0.125,0.25,0.3658,0.4596,True,True,True,True
+"same server repeat c1, plain",plain/c1,plain/c1_warm,320,17,67049,0.2535,16,1,0,0,0,0,0.125,0.25,0.2453,0.346,True,True,True,True
+"same server repeat c32, plain",plain/c32,plain/c32_warm,320,4,69712,0.05738,4,0,0,0,0,0,0.125,0.125,0.1949,0.2267,True,True,True,True
+"spec vs plain c1, mtp_s1",plain/c1,mtp_s1/c1,320,170,46547,3.652,159,9,2,0,0,0,0.125,0.25,0.3556,0.6167,False,True,True,True
+"spec vs plain c1, mtp_s3",plain/c1,mtp_s3/c1,320,171,46473,3.68,163,7,1,0,0,0,0.125,0.25,0.3533,0.6167,False,True,True,True
+"spec vs plain c1, mtp_s5",plain/c1,mtp_s5/c1,320,164,46756,3.508,156,8,0,0,0,0,0.125,0.25,0.3509,0.4356,False,True,True,True
+"spec vs plain c1, mtp_tree",plain/c1,mtp_tree/c1,320,170,46184,3.681,163,7,0,0,0,0,0.125,0.25,0.2926,0.3668,False,True,True,True
+"spec vs plain c32, mtp_s1",plain/c32,mtp_s1/c32,320,175,45295,3.864,166,7,2,0,0,0,0.125,0.25,0.3335,0.3596,False,True,True,True
+"spec vs plain c32, mtp_s3",plain/c32,mtp_s3/c32,320,181,45650,3.965,169,11,1,0,0,0,0.125,0.25,0.3511,0.4573,False,True,True,True
+"spec vs plain c32, mtp_s5",plain/c32,mtp_s5/c32,320,166,46437,3.575,159,6,1,0,0,0,0.125,0.25,0.3379,0.3656,False,True,True,True
+"spec vs plain c32, mtp_tree",plain/c32,mtp_tree/c32,320,167,47349,3.527,162,4,1,0,0,0,0.125,0.25,0.3686,0.462,False,True,True,True
+"spec vs spec c1, mtp_s1 vs mtp_s3",mtp_s1/c1,mtp_s3/c1,320,92,60041,1.532,89,3,0,0,0,0,0.125,0.25,0.2455,0.3193,False,True,True,True
+"spec vs spec c1, mtp_s3 vs mtp_s5",mtp_s3/c1,mtp_s5/c1,320,170,46007,3.695,164,6,0,0,0,0,0.125,0.25,0.3222,0.4697,False,True,True,True
+"spec vs spec c1, mtp_s3 vs mtp_tree",mtp_s3/c1,mtp_tree/c1,320,163,46691,3.491,155,8,0,0,0,0,0.125,0.25,0.288,0.3668,False,True,True,True

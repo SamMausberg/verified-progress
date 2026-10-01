@@ -1,0 +1,664 @@
+{
+ "summary": {
+  "a": "tap/v4_plain_c1",
+  "b": "tap/v4_plain_noradix_c1",
+  "prompts": 40,
+  "classes": {
+   "no_divergence": 38,
+   "rounding_flip": 1,
+   "accumulator_ambiguous": 1
+  },
+  "classes_hopper_model": {
+   "no_divergence": 38,
+   "rounding_flip": 1,
+   "order_flip": 1
+  },
+  "first_difference_module": {
+   "model.layers.0.linear_attn.gdn_core": 6
+  },
+  "first_difference_modes": {
+   "EXTEND vs EXTEND": 6
+  },
+  "first_difference_output_index": {
+   "prompt": 6
+  },
+  "origin": {
+   "none": 34,
+   "module": 6
+  },
+  "first_cache_difference": {
+   "ssm layer 0": 6
+  },
+  "no_hash_difference_before_divergence": 0,
+  "tap_check": {
+   "untapped_run": "runs/plain/c1.jsonl",
+   "prompts": 40,
+   "tokens_and_logprobs_bitwise_equal": 35,
+   "mismatched_ids": [
+    "alpaca_eval-0450",
+    "alpaca_eval-0500",
+    "mt_bench-0053",
+    "mt_bench-0056",
+    "mt_bench-0059"
+   ]
+  }
+ },
+ "cases": [
+  {
+   "id": "alpaca_eval-0000",
+   "prompt_len": 27,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0010",
+   "prompt_len": 32,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0020",
+   "prompt_len": 19,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0030",
+   "prompt_len": 19,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0040",
+   "prompt_len": 18,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0050",
+   "prompt_len": 20,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0060",
+   "prompt_len": 21,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0070",
+   "prompt_len": 38,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0080",
+   "prompt_len": 33,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0090",
+   "prompt_len": 26,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0100",
+   "prompt_len": 63,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0110",
+   "prompt_len": 51,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0120",
+   "prompt_len": 23,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0130",
+   "prompt_len": 34,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0150",
+   "prompt_len": 52,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0160",
+   "prompt_len": 29,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0170",
+   "prompt_len": 20,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0180",
+   "prompt_len": 68,
+   "diverged_at": 81,
+   "first_logprob_difference": 0,
+   "first_difference": {
+    "position": 1,
+    "module": "model.layers.0.linear_attn.gdn_core",
+    "modules_differing_at_position": 502,
+    "mode_a": "EXTEND",
+    "mode_b": "EXTEND",
+    "batch_a": 1,
+    "batch_b": 1,
+    "tokens_a": 68,
+    "tokens_b": 68,
+    "output_index": null
+   },
+   "first_cache_difference": {
+    "entering_position": 68,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
+    "first": {
+     "cache": "ssm",
+     "layer": 0
+    },
+    "caches_differing": 63
+   },
+   "origin": "module",
+   "argmax_a": 303,
+   "argmax_b": 3428,
+   "bf16_logits_a": [
+    24.625,
+    24.625
+   ],
+   "bf16_logits_b": [
+    24.5,
+    24.625
+   ],
+   "logits_bitwise_equal": false,
+   "head_input_bitwise_equal": false,
+   "exact_logits_a": [
+    24.596371885545523,
+    24.682250708108768
+   ],
+   "exact_logits_b": [
+    24.542595922051987,
+    24.62653742544353
+   ],
+   "head_input_max_abs_diff": 0.25,
+   "exact_gap_a": -0.0858788225632452,
+   "exact_gap_b": -0.08394150339154294,
+   "bf16_gap_a": 0.0,
+   "bf16_gap_b": -0.125,
+   "abs_products_a": 140.12521041867512,
+   "abs_products_b": 140.18955708955036,
+   "model_conservative": {
+    "gap_bound_a": 0.08557787371361618,
+    "gap_bound_b": 0.08561717179036911,
+    "accumulator_order_source": [
+     "float64",
+     "bf16"
+    ],
+    "float64_contradicts_bf16": false,
+    "cls": "rounding_flip",
+    "run_against_accumulator_order": "a"
+   },
+   "model_hopper": {
+    "gap_bound_a": 0.01667490003982234,
+    "gap_bound_b": 0.016682557293656496,
+    "accumulator_order_source": [
+     "float64",
+     "bf16"
+    ],
+    "float64_contradicts_bf16": false,
+    "cls": "rounding_flip",
+    "run_against_accumulator_order": "a"
+   },
+   "cls": "rounding_flip"
+  },
+  {
+   "id": "alpaca_eval-0200",
+   "prompt_len": 18,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0210",
+   "prompt_len": 18,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0220",
+   "prompt_len": 27,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0230",
+   "prompt_len": 36,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0240",
+   "prompt_len": 23,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0250",
+   "prompt_len": 44,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0260",
+   "prompt_len": 24,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0270",
+   "prompt_len": 39,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0280",
+   "prompt_len": 36,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0290",
+   "prompt_len": 58,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0300",
+   "prompt_len": 56,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0320",
+   "prompt_len": 37,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0330",
+   "prompt_len": 19,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0340",
+   "prompt_len": 20,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0350",
+   "prompt_len": 15,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0360",
+   "prompt_len": 24,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0380",
+   "prompt_len": 15,
+   "diverged_at": null,
+   "first_logprob_difference": null,
+   "first_difference": null,
+   "first_cache_difference": null,
+   "origin": "none",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0450",
+   "prompt_len": 68,
+   "diverged_at": 216,
+   "first_logprob_difference": 0,
+   "first_difference": {
+    "position": 1,
+    "module": "model.layers.0.linear_attn.gdn_core",
+    "modules_differing_at_position": 502,
+    "mode_a": "EXTEND",
+    "mode_b": "EXTEND",
+    "batch_a": 1,
+    "batch_b": 1,
+    "tokens_a": 68,
+    "tokens_b": 68,
+    "output_index": null
+   },
+   "first_cache_difference": {
+    "entering_position": 68,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
+    "first": {
+     "cache": "ssm",
+     "layer": 0
+    },
+    "caches_differing": 63
+   },
+   "origin": "module",
+   "argmax_a": 73005,
+   "argmax_b": 10778,
+   "bf16_logits_a": [
+    23.875,
+    23.75
+   ],
+   "bf16_logits_b": [
+    23.75,
+    23.75
+   ],
+   "logits_bitwise_equal": false,
+   "head_input_bitwise_equal": false,
+   "exact_logits_a": [
+    23.821075512096286,
+    23.78640682529658
+   ],
+   "exact_logits_b": [
+    23.709343885071576,
+    23.786772145482246
+   ],
+   "head_input_max_abs_diff": 0.1796875,
+   "exact_gap_a": 0.03466868679970503,
+   "exact_gap_b": -0.07742826041067019,
+   "bf16_gap_a": 0.125,
+   "bf16_gap_b": 0.0,
+   "abs_products_a": 127.37637165747583,
+   "abs_products_b": 127.29740433295956,
+   "model_conservative": {
+    "gap_bound_a": 0.07779184784260158,
+    "gap_bound_b": 0.07774362057710979,
+    "accumulator_order_source": [
+     "bf16",
+     "ambiguous"
+    ],
+    "float64_contradicts_bf16": false,
+    "cls": "accumulator_ambiguous"
+   },
+   "model_hopper": {
+    "gap_bound_a": 0.015157788227239625,
+    "gap_bound_b": 0.015148391115622188,
+    "accumulator_order_source": [
+     "bf16",
+     "float64"
+    ],
+    "float64_contradicts_bf16": false,
+    "cls": "order_flip"
+   },
+   "cls": "accumulator_ambiguous"
+  },
+  {
+   "id": "alpaca_eval-0500",
+   "prompt_len": 67,
+   "diverged_at": null,
+   "first_logprob_difference": 0,
+   "first_difference": {
+    "position": 1,
+    "module": "model.layers.0.linear_attn.gdn_core",
+    "modules_differing_at_position": 502,
+    "mode_a": "EXTEND",
+    "mode_b": "EXTEND",
+    "batch_a": 1,
+    "batch_b": 1,
+    "tokens_a": 67,
+    "tokens_b": 67,
+    "output_index": null
+   },
+   "first_cache_difference": {
+    "entering_position": 67,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
+    "first": {
+     "cache": "ssm",
+     "layer": 0
+    },
+    "caches_differing": 63
+   },
+   "origin": "module",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "mt_bench-0053",
+   "prompt_len": 225,
+   "diverged_at": null,
+   "first_logprob_difference": 0,
+   "first_difference": {
+    "position": 1,
+    "module": "model.layers.0.linear_attn.gdn_core",
+    "modules_differing_at_position": 502,
+    "mode_a": "EXTEND",
+    "mode_b": "EXTEND",
+    "batch_a": 1,
+    "batch_b": 1,
+    "tokens_a": 225,
+    "tokens_b": 225,
+    "output_index": null
+   },
+   "first_cache_difference": {
+    "entering_position": 225,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
+    "first": {
+     "cache": "ssm",
+     "layer": 0
+    },
+    "caches_differing": 63
+   },
+   "origin": "module",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "mt_bench-0056",
+   "prompt_len": 216,
+   "diverged_at": null,
+   "first_logprob_difference": 0,
+   "first_difference": {
+    "position": 1,
+    "module": "model.layers.0.linear_attn.gdn_core",
+    "modules_differing_at_position": 502,
+    "mode_a": "EXTEND",
+    "mode_b": "EXTEND",
+    "batch_a": 1,
+    "batch_b": 1,
+    "tokens_a": 216,
+    "tokens_b": 216,
+    "output_index": null
+   },
+   "first_cache_difference": {
+    "entering_position": 216,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
+    "first": {
+     "cache": "ssm",
+     "layer": 0
+    },
+    "caches_differing": 63
+   },
+   "origin": "module",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "mt_bench-0059",
+   "prompt_len": 353,
+   "diverged_at": null,
+   "first_logprob_difference": 0,
+   "first_difference": {
+    "position": 1,
+    "module": "model.layers.0.linear_attn.gdn_core",
+    "modules_differing_at_position": 502,
+    "mode_a": "EXTEND",
+    "mode_b": "EXTEND",
+    "batch_a": 1,
+    "batch_b": 1,
+    "tokens_a": 353,
+    "tokens_b": 353,
+    "output_index": null
+   },
+   "first_cache_difference": {
+    "entering_position": 353,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
+    "first": {
+     "cache": "ssm",
+     "layer": 0
+    },
+    "caches_differing": 63
+   },
+   "origin": "module",
+   "cls": "no_divergence"
+  }
+ ]
+}

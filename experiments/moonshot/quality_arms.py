@@ -73,8 +73,9 @@ def parse_config(text: str) -> tuple[str, list[str]]:
 
 
 def launch(config: str, out_dir: Path, port: int, extra: dict[str, object]):
+    from server_env import RecordingServer as Server
+
     from bench.arms import Arm, resolve_arm
-    from bench.server import Server
 
     base, levers = parse_config(config)
     lever_flags = compose(levers, base)
@@ -82,7 +83,9 @@ def launch(config: str, out_dir: Path, port: int, extra: dict[str, object]):
     shared = SHARED_FLAGS['speculative' if speculative else 'plain']
     flags = {**lever_flags, **shared, **extra}
     if flags.get('disable-radix-cache'):
-        flags.pop('max-mamba-cache-size', None)
+        # One slot per request: drop the arm default's slot count (640 FP32 slots
+        # would not fit a shared-mode budget), and size the pool by max-running.
+        flags['max-mamba-cache-size'] = False
     arm = resolve_arm(base, flags)
     model = target_model(levers)
     arm = Arm(
@@ -123,12 +126,16 @@ def probe(
 
 
 def compare(reference: Path, candidate: Path) -> dict[str, object]:
+    """logit_probe.py compare: exit 0 if identical, 3 if the runs differ (both are results,
+    with `identical` and `first_difference` in the summary); anything else is an error."""
     result = subprocess.run(
         [sys.executable, str(HERE / 'logit_probe.py'), 'compare', str(reference), str(candidate)],
-        check=True,
+        check=False,
         capture_output=True,
         text=True,
     )
+    if result.returncode not in (0, 3):
+        raise RuntimeError(f'compare exited {result.returncode}: {result.stderr[-2000:]}')
     parsed: dict[str, object] = json.loads(result.stdout)
     return parsed
 
@@ -203,6 +210,18 @@ def main() -> None:
         summary[config] = entry
         summary_path.write_text(json.dumps(summary, indent=1))
         print(json.dumps({config: entry}, indent=1), flush=True)
+    # Exit non-zero when any configuration of this invocation failed or lacks its comparison.
+    failed = [
+        config
+        for config in args.configs
+        if 'error' in summary[config]
+        or (
+            config != args.reference
+            and not all(m in summary[config] for m in ('generate', 'score'))
+        )
+    ]
+    if failed:
+        sys.exit(f'quality_arms: failed or incomplete configurations: {failed}')
 
 
 if __name__ == '__main__':

@@ -1,0 +1,111 @@
+{
+ "run": "tap/v4_h44_noflush",
+ "prompt": "humaneval-0044",
+ "reference": "humaneval-0044-r0",
+ "repeats": [
+  {
+   "repeat": "humaneval-0044-r1",
+   "tokens_equal": true,
+   "logprobs_equal": false,
+   "first_difference": {
+    "position": 1,
+    "module": "model.layers.0.linear_attn.gdn_core",
+    "modules_differing_at_position": 502,
+    "mode_a": "EXTEND",
+    "mode_b": "EXTEND",
+    "batch_a": 1,
+    "batch_b": 1,
+    "tokens_a": 128,
+    "tokens_b": 128
+   },
+   "first_cache_difference": {
+    "entering_position": 128,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
+    "first": {
+     "cache": "ssm",
+     "layer": 0
+    },
+    "caches_differing": 63
+   }
+  },
+  {
+   "repeat": "humaneval-0044-r2",
+   "tokens_equal": false,
+   "logprobs_equal": false,
+   "first_difference": {
+    "position": 64,
+    "module": "model.layers.0.linear_attn.gdn_core",
+    "modules_differing_at_position": 502,
+    "mode_a": "EXTEND",
+    "mode_b": "EXTEND",
+    "batch_a": 1,
+    "batch_b": 1,
+    "tokens_a": 128,
+    "tokens_b": 64
+   },
+   "first_cache_difference": {
+    "entering_position": 128,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
+    "first": {
+     "cache": "ssm",
+     "layer": 0
+    },
+    "caches_differing": 63
+   }
+  },
+  {
+   "repeat": "humaneval-0044-r3",
+   "tokens_equal": false,
+   "logprobs_equal": false,
+   "first_difference": {
+    "position": 64,
+    "module": "model.layers.0.linear_attn.gdn_core",
+    "modules_differing_at_position": 502,
+    "mode_a": "EXTEND",
+    "mode_b": "EXTEND",
+    "batch_a": 1,
+    "batch_b": 1,
+    "tokens_a": 128,
+    "tokens_b": 64
+   },
+   "first_cache_difference": {
+    "entering_position": 128,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
+    "first": {
+     "cache": "ssm",
+     "layer": 0
+    },
+    "caches_differing": 63
+   }
+  },
+  {
+   "repeat": "humaneval-0044-r4",
+   "tokens_equal": false,
+   "logprobs_equal": false,
+   "first_difference": {
+    "position": 64,
+    "module": "model.layers.0.linear_attn.gdn_core",
+    "modules_differing_at_position": 502,
+    "mode_a": "EXTEND",
+    "mode_b": "EXTEND",
+    "batch_a": 1,
+    "batch_b": 1,
+    "tokens_a": 128,
+    "tokens_b": 64
+   },
+   "first_cache_difference": {
+    "entering_position": 128,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
+    "first": {
+     "cache": "ssm",
+     "layer": 0
+    },
+    "caches_differing": 63
+   }
+  }
+ ]
+}

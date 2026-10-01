@@ -118,3 +118,160 @@ python -m bench.pareto ~/vp-data/bench/frontend/fe-plain*/2026* --out evidence/b
     --status frontend-diagnostic --points-only
 ```
 `frontend_summary.json` holds the per-point comparison and process peaks.
+
+## tuning/
+
+Configuration search on the `mixed-v2` tune split (never used for reported results):
+client concurrency 1, 8, 32 and 128, `max(32, 4c)` measured requests per point, 512
+output tokens, one run per configuration, base flags plus `--stream-interval 4`.
+`frontier.csv` has one row per configuration and concurrency (n = 1). Accept length
+in the tables is the value at c=32; it varies by at most 0.09 across concurrency for a
+given configuration, except DFlash block 16 (0.22 with FlashInfer and 0.24 under Triton,
+both from a lower value at c=1 over 32 requests) and adaptive depth. `points.csv` also
+carries the largest running batch in the scheduler log (`max_running_logged`) and,
+for runs after this column was added, the KV retractions during the point.
+
+Host load. Mean foreign CPU load per point ranged 0.26-1.26 cores in T1, 0.38-2.81 in
+T2 and 0.39-3.45 in T3; three points exceed the 2-core threshold and are invalid (listed
+under T2 and T3). These tuning slots used a sampler that charged the CPU time of the
+run's own short-lived processes (aiperf services, `nvidia-smi`) to foreign load when
+they exited within a one-second interval. That is why `foreign_cpu_max` reads about 10
+cores at every c>=32 point, where aiperf starts and stops more processes. Recorded
+means are therefore upper bounds on foreign load, and the three invalid points may be
+false positives; they stay excluded. The sampler now counts the run's reaped children
+as its own (commit 567ef70), and the confirmation runs use it.
+
+KV cache cap. Runs before commit 31e8eee had no `--max-total-tokens` cap: all of T1, and
+in T2 `plain` (radix off), `plain + --enable-linear-replayssm` and MTP s3 + replayssm-spec
+under Triton. Uncapped pools ranged from 54,077 tokens (MTP s5 with the radix
+cache) to 2.12M; with the radix cache on, the KV pool shrank with draft depth (663K
+tokens at s2, 460K at s3, 257K at s4, 54K at s5) as the GDN state buffers grew. The
+largest logged use in any tuning run was about 77K tokens. One point was KV-limited:
+MTP s5 with the radix cache at c=128, whose scheduler logged at most 123 running
+requests and three retraction events ("KV cache pool is full", four requests retracted).
+Its 8,719 tok/s measures a KV-limited server, not depth 5. The tuned arms all run
+with the 1M cap.
+
+Slot T1 (MTP depth and state handling), y in tok/s:
+
+| Config | c=1 | c=8 | c=32 | c=128 | Accept length |
+|---|---|---|---|---|---|
+| plain | 282 | 1,982 | 6,087 | 13,421 | - |
+| MTP s2 | 385 | 2,288 | 5,455 | 9,153 | 2.67 |
+| MTP s3 | 461 | 2,482 | 5,839 | 9,593 | 3.28 |
+| MTP s4 | 465 | 2,608 | 5,761 | 9,276 | 3.72 |
+| MTP s5 | 468 | 2,575 | 5,684 | 8,719 (KV-limited) | 4.11 |
+| MTP s3, radix cache off | 466 | 2,534 | 6,127 | 10,106 | 3.27 |
+| MTP s5, radix cache off | 481 | 2,699 | 6,087 | 9,456 | 4.14 |
+| MTP s7, radix cache off | 465 | 2,514 | 5,690 | 8,493 | 4.62 |
+| MTP s3, `--enable-linear-replayssm-spec` | 446 | 2,646 | 6,469 | 11,941 | 3.28 |
+| MTP s5, `--enable-linear-replayssm-spec` | 462 | 2,666 | 6,502 | 11,186 | 4.11 |
+
+Rejected by launch checks: MTP s1 (the check required a draft-decode graph that a
+one-step chain does not capture; the check is fixed). It was not rerun: s2 already
+trails s3 at every concurrency. Reading:
+MTP s3 delivers 1.64x plain's y at c=1 (461 against 282 tok/s; 1.65x in x) but falls
+behind from c~32. Its verify pass writes one GDN state snapshot (50.3 MB, 48 MiB, in
+FP32) per draft token per request, a cost that grows with batch; SGLang's buffered GDN verify (`--enable-linear-replayssm-spec`, chains only)
+removes those snapshots and recovers 24% at c=128 for three steps at a 3% cost at c=1.
+At c=1 depth matters little (steps 3-5 within 4%); at c=8 deeper chains lead depth 3
+by up to 6.5% (s5 against s3 with the radix cache off, 2,699 against 2,534; s4 against
+s3 with it on, 2,608 against 2,482, 5.1%). At c=128 depth 3
+beat depth 4 and 5 in every pair not limited by KV: s3 against s4 with the radix cache
+(9,593 against 9,276), s3 against s5 with it off (10,106 against 9,456) and with
+replayssm-spec (11,941 against 11,186).
+
+```sh
+GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x bench/campaigns/tuning_depth.sh
+GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x bench/campaigns/tuning_knobs_dflash.sh
+GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x bench/campaigns/tuning_backend_dflash.sh
+python -m bench.pareto $(for d in ~/vp-data/bench/tuning/tune-*/2026*; do \
+    [ -f $d/r0/c001/point.json ] && echo $d; done) --out evidence/bench/tuning --status tuning --no-plot
+```
+
+Slot T2 (state handling, backends, adaptive depth, DFlash); radix cache off, KV cache
+capped at 1M tokens except where noted above, y in tok/s. The radix-cache comparison
+for plain (13,844 here against 13,421 in T1, +3%) spans two sessions and is therefore
+weaker than the same-session MTP comparisons:
+
+| Config | c=1 | c=8 | c=32 | c=128 | Accept length |
+|---|---|---|---|---|---|
+| plain | 282 | 2,004 | (invalid) | 13,844 | - |
+| plain, Triton attention | 286 | 2,018 | 6,241 | 13,846 | - |
+| plain + `--enable-linear-replayssm` | 244 | 1,807 | 5,909 | 14,981 | - |
+| MTP s3 + replayssm-spec | 456 | 2,667 | 6,925 | 13,011 | 3.29 |
+| MTP s3 + replayssm-spec, Triton attention | 535 | 3,093 | 7,103 | 11,353 | 3.27 |
+| MTP adaptive depth + replayssm-spec | 474 | 2,603 | 5,968 | 10,010 | 1.97 (3.89 at c=1, 1.00 at c=128) |
+| DFlash block 8 | 686 | 3,443 | 6,727 | 10,226 | 4.75 |
+
+Invalid point: plain at c=32 (mean foreign load 2.8 cores from another workstream's
+analysis scripts); the Triton twin at c=32 is valid and plain is otherwise indifferent
+to the backend. Rejected at launch, so not performance results: DFlash with
+replayssm-spec (SGLang refuses buffered verify for DFLASH on non-KDA models), MTP
+replayssm-spec with FlashInfer GDN decode (NotImplementedError), and the first MTP
+replayssm-spec runs without the radix cache (out of memory in prefill before the KV
+cap existed; rerun as the row above). Adaptive depth drops to zero draft steps at
+c=128 yet stays below plain there, so the speculative worker's per-step overhead
+remains. DFlash block 8 is the strongest speculator at c<=8; plain is best at c=128.
+
+Slot T3 (attention backend for DFlash, block sizes, FA4 draft attention, MTP depth 4
+under Triton); radix cache off, y in tok/s:
+
+| Config | c=1 | c=8 | c=32 | c=64 or 128 | Accept length |
+|---|---|---|---|---|---|
+| DFlash b8, Triton | 807 | 3,613 | 6,307 | 8,957 (128) | 4.75 |
+| DFlash b8, FA4 draft attention | 769 | (invalid) | 6,983 | 10,594 (128) | 4.75 |
+| DFlash b4 | 498 | 2,682 | 6,380 | 11,477 (128) | 3.28 |
+| DFlash b16, capacity 64 | (invalid) | 3,398 | 5,386 | 6,737 (64) | 5.71 |
+| DFlash b16, capacity 64, Triton | 851 | 3,639 | 5,199 | 6,397 (64) | 5.72 |
+| MTP s4 + replayssm-spec, Triton | 552 | 3,104 | 6,958 | 10,804 (128) | 3.73 |
+
+Invalid points (host contention, mean foreign load above 2 cores): FA4 at c=8 (3.5
+cores), b16 FlashInfer at c=1 (2.1), and plain at c=32 in T2 (2.8). FA4 draft attention
+runs on sm_90 and improved block 8 at each valid point. Triton attention helps every
+speculative family at low concurrency and hurts at high concurrency; plain decoding is
+indifferent.
+
+**Chosen configurations** (`bench/arms.toml`), all with the radix cache off:
+`plain-tuned` (and `plain-tuned-triton` as the matched baseline for Triton arms),
+`mtp-tuned` (NEXTN s3, top-1, `--enable-linear-replayssm-spec`, FlashInfer; high
+concurrency) and `mtp-tuned-triton` (the same under Triton; low concurrency),
+`dflash-tuned` (block 8, FA4 draft attention, FlashInfer; all concurrencies),
+`dflash-tuned-b16` (block 16, Triton, capacity 64; low concurrency) and
+`dflash-tuned-b4` (block 4, FlashInfer; high concurrency), plus
+`mtp-stockverify` and `plain-tuned-replayssm` as the exactness fallback and the
+buffered-decode variant. Depth 3 beat depth 4 and 5 at c=128 in the three pairs not
+limited by KV, was within 4% at c=1 and trailed by up to 6.5% at c=8 (stock verify).
+In the configuration of the low-concurrency arm (buffered verify, Triton), depth 4 led
+depth 3 by 3.2% at c=1 (552 against 535) and 0.4% at c=8 and trailed by 2% at c=32, so
+one depth serves both MTP arms. Within DFlash, block 4 leads at
+c=128 (11,477 against 10,594 tok/s for `dflash-tuned`, +8%) and trails at c<=32 (c=64
+was not measured), so it is the high-concurrency DFlash arm; FA4 draft attention was not tried with block 4.
+Against its matched Triton plain baseline, block 16 under Triton gives 3.35x the
+per-user rate at c=1 (957 against 286 tok/s/user in x). Arms with buffered GDN state are
+pending classification of their greedy outputs against plain
+(`bench/campaigns/equality_tuned.sh`).
+
+**GDN verify snapshot traffic (derived, not measured).** Speculative verify keeps one
+intermediate recurrent state per draft token per request so a rejected suffix can be
+rolled back: SGLang allocates `intermediate_ssm_state_cache` with that shape (13.69 GiB
+for 73 requests x 4 draft tokens in the first MTP launch). One snapshot is the FP32 SSM
+state of the 24 GDN layers, 24 x 32 heads x 128 x 128 x 4 B = 50.3 MB (48 MiB); the conv
+windows add about 0.5 MB. If every draft token's snapshot is written once per verify
+cycle, the write rate is c x D x cycles/s, with D draft tokens per request and
+cycles/s = y / (c x accept length) from the measured points. At c=128 that gives
+
+| Config | D | y (tok/s) | Accept | Cycles/s | Snapshots/s | Snapshot writes |
+|---|---|---|---|---|---|---|
+| MTP s2 | 3 | 9,153 | 2.66 | 26.9 | 10,325 | 520 GB/s |
+| MTP s3 | 4 | 9,593 | 3.26 | 23.0 | 11,773 | 593 GB/s |
+| MTP s4 | 5 | 9,276 | 3.72 | 19.5 | 12,464 | 627 GB/s |
+| MTP s5 (KV-limited) | 6 | 8,719 | 4.07 | 16.7 | 12,851 | 647 GB/s |
+| MTP s7, radix off | 8 | 8,493 | 4.56 | 14.6 | 14,909 | 750 GB/s |
+
+For comparison, plain decoding reads and writes each request's state once per token:
+13,421 tok/s x 2 x 50.3 MB = 1.35 TB/s of state traffic at c=128 (same assumption).
+Buffered verify (`--enable-linear-replayssm-spec`) replaces the per-draft snapshots with
+a window of raw inputs folded into the checkpoint at commit; the measured effect is the
+c=128 difference between the replayssm-spec rows and their plain-verify counterparts
+(35 ms against 43 ms per cycle for three steps).
