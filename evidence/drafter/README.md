@@ -474,7 +474,9 @@ e8a9e6c, engine 9292abd874; `fold_narrow_tiles/`, resolved pools and foreign CPU
   `trace_coverage`; regenerated from the job's traces with `fold_localize.py --require-identical`
   after the coverage rule was added; #133's c = 1 runs also pass it); deterministic waves, radix cache off: DFlash in waves of 4 and
   MTP s3 in waves of 8 bitwise equal to stock on 80 of 80 sequences, as are the stock reruns
-  (`*-vs-*.json`).
+  (`*-vs-*.json`, regenerated with `compare_outputs.py --require-bitwise`, which also requires
+  a full top-5 logprob entry for every output token on both sides; every comparison passes,
+  as do #133's runs).
 - **Patch 0004's gate:** DFlash with decode-only ReplaySSM (`--enable-linear-replayssm` without
   `-spec`) in the same waves of 4 is bitwise equal to stock DFlash on 80 of 80 sequences
   (`dflash-w4-replayssm-decode-vs-off.json`), so that combination commits through the stock

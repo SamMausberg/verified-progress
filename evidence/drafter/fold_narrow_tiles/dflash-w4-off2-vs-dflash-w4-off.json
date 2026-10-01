@@ -9,5 +9,7 @@
   "classes": {},
   "bitwise_identical_sequences": 80,
   "first_logprob_difference": {},
-  "divergences": []
+  "divergences": [],
+  "requests_in_one_run_only": [],
+  "requests_without_full_logprob_coverage": []
 }
