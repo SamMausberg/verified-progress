@@ -203,9 +203,11 @@ run at M = 1 to 8 and reach the Triton route
 
 - **Off** is the no-op check of the series: all 320 outputs match stock in every token and
   top-5 logprob.
-- **Merge** is bitwise in served outputs where it acts at concurrency 1: the 198 prompts of 64 or
-  more tokens are prefilled through the packed GEMM, and every output equals stock's, as the
-  per-GEMM microbenchmark predicted. Decode at concurrency 1 stays below the 64-row cutoff, so
+- **Merge** is bitwise in served outputs where it acts at concurrency 1: every prompt of 64 or
+  more tokens, more than half of the set (the median prompt has 78 tokens,
+  [`../state_safety/prompt_manifest.json`](../state_safety/prompt_manifest.json)), is prefilled
+  through the packed GEMM, and every output equals stock's, as the per-GEMM microbenchmark
+  predicted. Decode at concurrency 1 stays below the 64-row cutoff, so
   this run does not cover the packed GEMM in decode.
 - **Gemv and lever v1** change exact ties. Every first divergence is rounding-level (the largest
   margin is 0.25 nats; the one near event in each lever pass, `mt_bench-0079`, is two BF16 steps
