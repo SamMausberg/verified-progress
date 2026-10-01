@@ -112,6 +112,7 @@ def boundaries(
                 keep += 1
             rec = {
                 'rid': rid,
+                'prefix_len': int(cur['prefix_len']),
                 'domain': cur.get('domain'),
                 'L': L,
                 'J': J,
@@ -295,7 +296,19 @@ def main() -> None:
     if rewalk is not None:
         # The real refiner reuses exactly where the oracle at K = 16 could: the correction is
         # supported, which is observable when the decision is made.
-        reuse16 = [r['U16'] >= r['J'] and r['m'] >= 1 and 'rewalk_accept' in r for r in rows]
+        reuse16 = [r['U16'] >= r['J'] and r['m'] >= 1 for r in rows]
+        # Fail closed: every boundary the top-16 oracle would reuse needs a walk, or a partial
+        # artifact would score its missing boundaries as fresh DFlash.
+        missing = [
+            (r['rid'], r['prefix_len'])
+            for r, u in zip(rows, reuse16, strict=True)
+            if u and 'rewalk_accept' not in r
+        ]
+        if missing:
+            raise SystemExit(
+                f'--rewalk lacks {len(missing)} of {sum(reuse16)} top-16-supported boundaries '
+                f'(rid, prefix_len), e.g. {missing[:5]}'
+            )
         g2w = [
             (1 + r['rewalk_accept']) if u else (1 + r['next_L'])
             for r, u in zip(rows, reuse16, strict=True)

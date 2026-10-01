@@ -109,3 +109,35 @@ def test_rewalk_adds_top16_when_ks_omits_it(
     # A re-walk that follows the truth wherever it is supported is the top-16 oracle itself.
     assert data['rewalk_refiner']['delta'] == pytest.approx(data['by_k']['16']['delta_oracle'])
     assert data['keep_control']['mean_accept'] == 0
+
+
+def test_partial_rewalk_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    oracle = load('p9_support_oracle')
+    cycles, rewalk, timing = write_inputs(tmp_path)
+    walks = torch.load(rewalk, weights_only=False)
+    partial = tmp_path / 'partial.pt'
+    torch.save(
+        {
+            'rid': walks['rid'][1:],
+            'prefix_len': walks['prefix_len'][1:],
+            'rewalk': walks['rewalk'][1:],
+        },
+        partial,
+    )
+    argv = [
+        'p9_support_oracle.py',
+        '--cycles',
+        str(cycles),
+        '--timing',
+        str(timing),
+        '--rewalk',
+        str(partial),
+        '--bootstrap',
+        '20',
+        '--out',
+        str(tmp_path / 'out.json'),
+    ]
+    monkeypatch.setattr(sys, 'argv', argv)
+    with pytest.raises(SystemExit, match='lacks 1 of'):
+        oracle.main()
+    assert not (tmp_path / 'out.json').exists()
