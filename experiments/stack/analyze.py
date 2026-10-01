@@ -13,13 +13,16 @@ declared in evidence/stack/README.md ("Composition plan"):
 * Across sessions: the geometric mean of the session ratios with a 95% t interval on
   their logs (n - 1 degrees of freedom).
 * Decision at each concurrency and metric: "speedup" if the interval's lower end is
-  above 1, "slowdown" if its upper end is below 1, otherwise "no detectable change".
+  above 1, "slowdown" if its upper end is below 1, otherwise "no detectable change";
+  with fewer than three valid sessions the decision is withheld ("incomplete") and the
+  plan requires another session.
   A point that bench marks invalid (failed requests, wrong lengths, foreign CPU load
   above 2 cores, ...) drops that session at that concurrency for the arms it touches
   (an invalid S0 launch, for every arm).
-* Every row's launch record (bench.pareto's launches.csv) must show the engine the gate
-  recorded, S0's checkout for S0 and the composed worktree's commit for every other arm,
-  with no uncommitted changes, launched from the gate's repository commit.
+* Every row's launch record (the run's server/launch.json, written by bench.server when
+  the server started) must show the engine the gate recorded, S0's checkout for S0 and
+  the composed worktree's commit for every other arm, and the gate's repository commit,
+  each with no uncommitted changes.
 * The gate comes only from the campaign pin (`--campaign`, the campaign_gate.json the
   first session wrote): its pinned files must be unchanged, and the full stack is that
   gate's timed levers. Every session must have run under it: each session hold copies
@@ -34,7 +37,6 @@ declared in evidence/stack/README.md ("Composition plan"):
 
     python experiments/stack/analyze.py --points ~/vp-data/stack/pareto/points.csv \
         --campaign ~/vp-data/stack/campaign_gate.json --runs-root ~/vp-data/stack/runs/<campaign> \
-        --launches ~/vp-data/stack/pareto/launches.csv \
         --out evidence/stack/composition.json --csv evidence/stack/composition.csv
 """
 
@@ -53,6 +55,7 @@ from typing import Any
 # Two-sided 95% Student t quantiles by degrees of freedom.
 T95 = {1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365, 8: 2.306}
 METRICS = ('x_e2e', 'y')
+MIN_SESSIONS = 3  # the declared plan's minimum of valid sessions for a decision
 
 
 def interval(logs: list[float]) -> dict[str, Any]:
@@ -66,7 +69,9 @@ def interval(logs: list[float]) -> dict[str, Any]:
     if n >= 2:
         half = T95[n - 1] * statistics.stdev(logs) / math.sqrt(n)
         lo, hi = mean - half, mean + half  # decide on the unrounded log bounds
-        if lo > 0:
+        if n < MIN_SESSIONS:
+            out['decision'] = f'incomplete (n < {MIN_SESSIONS})'
+        elif lo > 0:
             out['decision'] = 'speedup'
         elif hi < 0:
             out['decision'] = 'slowdown'
@@ -132,12 +137,6 @@ def main() -> None:
         required=True,
         help='the bench.sweep --out directory of the campaign (runs at <label>/<run>)',
     )
-    ap.add_argument(
-        '--launches',
-        type=Path,
-        required=True,
-        help="bench.pareto's launches.csv for the same runs (engine and repository state)",
-    )
     ap.add_argument('--out', type=Path, required=True)
     ap.add_argument('--csv', type=Path, help='one row per arm, concurrency and metric')
     args = ap.parse_args()
@@ -172,22 +171,23 @@ def main() -> None:
         data[r['session']][c][arm].append((r['run'], vals))
 
     ident = _gate_module().pinned_gate(args.campaign)['identity']
-    with args.launches.open() as f:
-        launches = {(x['label'], x['run']): x for x in csv.DictReader(f)}
     for r in rows_in:
-        launch = launches.get((r['label'], r['run']))
-        if launch is None:
-            raise SystemExit(f'no launch record for run {r["label"]}/{r["run"]}')
+        launch_path = args.runs_root / r['label'] / r['run'] / 'server' / 'launch.json'
+        if not launch_path.is_file():
+            raise SystemExit(f'no launch record for run {r["label"]}/{r["run"]} ({launch_path})')
+        launch = json.loads(launch_path.read_text())
         engine = ident['s0'] if r['label'] == 'stack-S0' else ident['stack_engine']
+        repo, source = launch.get('repo') or {}, launch.get('sglang_source') or {}
         if (
-            launch['sglang_dirty'] != 'False'
-            or launch['sglang_head'] != engine['head']
-            or launch['repo_head'] != ident['repo']['head']
+            repo.get('head') != ident['repo']['head']
+            or repo.get('dirty_files') != []
+            or source.get('head') != engine['head']
+            or source.get('dirty_files') != []
         ):
             raise SystemExit(
-                f'run {r["label"]}/{r["run"]} ran on engine {launch["sglang_head"]} '
-                f'(dirty {launch["sglang_dirty"]}) from repository {launch["repo_head"]}, '
-                "not the gate's"
+                f'run {r["label"]}/{r["run"]} ran from repository {repo.get("head")} '
+                f'(dirty {repo.get("dirty_files")}) on engine {source.get("head")} '
+                f"(dirty {source.get('dirty_files')}), not the gate's"
             )
     for r in rows_in:
         record = args.runs_root / r['label'] / r['run'] / 'stack_gate.json'

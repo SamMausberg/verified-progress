@@ -79,5 +79,7 @@ for i in "${!order[@]}"; do
   done < <(comm -13 <(printf '%s\n' "$before") \
     <(find "$OUT/stack-$name" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort))
 done
+# The same preconditions must still hold at the end (nothing was edited mid-session).
+gate_plan || failed+=("end-of-session gate check")
 echo "session s$k end $(date -Is) ($(( ($(date +%s) - start) / 60 )) min) failed=${failed[*]:-none}"
 (( ${#failed[@]} == 0 ))

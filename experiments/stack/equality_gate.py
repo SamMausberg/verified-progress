@@ -242,9 +242,27 @@ def identity_changes(old: dict[str, Any], new: dict[str, Any]) -> list[str]:
     return diffs
 
 
+REFERENCES = ('ref_dflash_b16', 'ref_dflash_b16_triton')  # bench's stock runs, reused
+
+
 def runs_provenance(run: Path, ident: dict[str, Any]) -> list[str]:
-    """Each stack equality run's own record names the identity's engine, clean."""
+    """Each stack equality run's own record names the identity's engine, clean; bench's
+    reused stock references name the pinned stock commit, clean, and the same model."""
     problems = []
+    s0_meta = run / 'runs' / 'plain__stack_S0' / 'c1.meta.json'
+    model = json.loads(s0_meta.read_text()).get('model_revision') if s0_meta.is_file() else None
+    for ref in REFERENCES:
+        meta_path = run / 'runs' / ref / 'c1.meta.json'
+        if not meta_path.is_file():
+            problems.append(f'{ref}: no run record')
+            continue
+        meta = json.loads(meta_path.read_text())
+        if meta.get('sglang_sha') != ident['s0']['head'] or meta.get('sglang_dirty') is not False:
+            problems.append(
+                f'{ref}: engine {meta.get("sglang_sha")} dirty={meta.get("sglang_dirty")}'
+            )
+        if model is None or meta.get('model_revision') != model:
+            problems.append(f'{ref}: model {meta.get("model_revision")}, S0 ran {model}')
     for meta_path in sorted((run / 'runs').glob('plain__stack_*/c1.meta.json')):
         meta = json.loads(meta_path.read_text())
         name = meta_path.parent.name
@@ -271,6 +289,11 @@ def evaluate(
         'table_sha256': table_sha,
         'identity': ident,
         'provenance_problems': runs_provenance(run, ident),
+        'references_sha256': {
+            ref: sha256_file(run / 'runs' / ref / 'c1.jsonl')
+            for ref in REFERENCES
+            if (run / 'runs' / ref / 'c1.jsonl').is_file()
+        },
     }
     gate['ok'] = bool(
         gate['b0_bitwise_to_s0']

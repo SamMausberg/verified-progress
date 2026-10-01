@@ -54,26 +54,16 @@ def _points(path: Path, rows: list[dict], levers: str = 'FG') -> None:
     (run / 'summary.json').write_text('{}')
     digest = gate.campaign_digest(run / 'gate.json')
     (path.parent / 'campaign_gate.json').write_text(json.dumps(digest))
-    with (path.parent / 'launches.csv').open('w', newline='') as f:
-        w = csv.DictWriter(
-            f, fieldnames=['label', 'run', 'sglang_head', 'sglang_dirty', 'repo_head']
-        )
-        w.writeheader()
-        for r in rows:
-            engine = IDENT['s0' if r['label'] == 'stack-S0' else 'stack_engine']['head']
-            w.writerow(
-                {
-                    'label': r['label'],
-                    'run': r['run'],
-                    'sglang_head': engine,
-                    'sglang_dirty': 'False',
-                    'repo_head': IDENT['repo']['head'],
-                }
-            )
     for r in rows:
         run_dir = path.parent / r['label'] / r['run']
-        run_dir.mkdir(parents=True, exist_ok=True)
+        (run_dir / 'server').mkdir(parents=True, exist_ok=True)
         (run_dir / 'stack_gate.json').write_text(json.dumps(digest))
+        engine = IDENT['s0' if r['label'] == 'stack-S0' else 'stack_engine']['head']
+        launch = {
+            'repo': {'head': IDENT['repo']['head'], 'dirty_files': []},
+            'sglang_source': {'head': engine, 'dirty_files': []},
+        }
+        (run_dir / 'server' / 'launch.json').write_text(json.dumps(launch))
 
 
 def test_full_stack_ratio_pairs_both_launches_with_both_baselines(tmp_path, monkeypatch):
@@ -108,8 +98,6 @@ def test_full_stack_ratio_pairs_both_launches_with_both_baselines(tmp_path, monk
             str(out),
             '--runs-root',
             str(tmp_path),
-            '--launches',
-            str(tmp_path / 'launches.csv'),
         ],
     )
     analyze.main()
@@ -162,8 +150,6 @@ def test_invalid_point_drops_the_session_for_that_arm(tmp_path, monkeypatch):
             str(out),
             '--runs-root',
             str(tmp_path),
-            '--launches',
-            str(tmp_path / 'launches.csv'),
         ],
     )
     analyze.main()
@@ -270,7 +256,23 @@ def _write_runs(run: Path, b0_low_entry: float = -0.5) -> None:
         d.mkdir(parents=True, exist_ok=True)
         (d / 'c1.jsonl').write_text('\n'.join(json.dumps(r) for r in _outputs(lp)) + '\n')
         engine = IDENT['s0' if name == 'S0' else 'stack_engine']['head']
-        meta = {'sglang_sha': engine, 'sglang_dirty': False, 'repo_sha': IDENT['repo']['head']}
+        meta = {
+            'sglang_sha': engine,
+            'sglang_dirty': False,
+            'repo_sha': IDENT['repo']['head'],
+            'model_revision': 'm' * 40,
+        }
+        (d / 'c1.meta.json').write_text(json.dumps(meta))
+    for ref in gate.REFERENCES:
+        d = runs / ref
+        d.mkdir(parents=True, exist_ok=True)
+        (d / 'c1.jsonl').write_text('\n'.join(json.dumps(r) for r in _outputs()) + '\n')
+        meta = {
+            'sglang_sha': gate.S0_COMMIT,
+            'sglang_dirty': False,
+            'repo_sha': 'r' * 40,
+            'model_revision': 'm' * 40,
+        }
         (d / 'c1.meta.json').write_text(json.dumps(meta))
     pairs = [['B0 vs S0', 'plain__stack_S0/c1', 'plain__stack_B0/c1']]
     pairs += [
@@ -448,8 +450,6 @@ def test_interaction_skips_a_session_with_one_invalid_full_launch(tmp_path, monk
             str(out),
             '--runs-root',
             str(tmp_path),
-            '--launches',
-            str(tmp_path / 'launches.csv'),
         ],
     )
     analyze.main()
@@ -489,8 +489,6 @@ def test_all_invalid_full_stays_visible_with_n_zero(tmp_path, monkeypatch):
             str(out),
             '--runs-root',
             str(tmp_path),
-            '--launches',
-            str(tmp_path / 'launches.csv'),
         ],
     )
     analyze.main()
@@ -543,8 +541,6 @@ def test_analysis_takes_the_full_arm_from_the_gate(tmp_path, monkeypatch):
             str(out),
             '--runs-root',
             str(tmp_path),
-            '--launches',
-            str(tmp_path / 'launches.csv'),
         ],
     )
     analyze.main()
@@ -585,8 +581,6 @@ def test_analysis_refuses_sessions_under_different_gates(tmp_path, monkeypatch):
             str(out),
             '--runs-root',
             str(tmp_path),
-            '--launches',
-            str(tmp_path / 'launches.csv'),
         ],
     )
     with pytest.raises(SystemExit):
@@ -627,8 +621,6 @@ def test_analysis_refuses_a_changed_pinned_gate(tmp_path, monkeypatch):
             str(tmp_path / 'campaign_gate.json'),
             '--runs-root',
             str(tmp_path),
-            '--launches',
-            str(tmp_path / 'launches.csv'),
         ],
     )
     with pytest.raises(SystemExit):
@@ -746,8 +738,6 @@ def test_each_declared_cell_rule(tmp_path, monkeypatch, spoil, void):
             str(tmp_path / 'campaign_gate.json'),
             '--runs-root',
             str(tmp_path),
-            '--launches',
-            str(tmp_path / 'launches.csv'),
         ],
     )
     analyze.main()
@@ -867,7 +857,14 @@ def test_build_refuses_an_identity_that_changed_during_the_hold(tmp_path, monkey
 
 
 @pytest.mark.parametrize(
-    'spoil', [{'sglang_dirty': 'True'}, {'sglang_head': 'f' * 40}, {'repo_head': 'f' * 40}, None]
+    'spoil',
+    [
+        ('repo', 'dirty_files', [' M bench/sweep.py']),
+        ('repo', 'head', 'f' * 40),
+        ('sglang_source', 'dirty_files', [' M python/sglang/srt/server_args.py']),
+        ('sglang_source', 'head', 'f' * 40),
+        None,
+    ],
 )
 def test_analysis_refuses_runs_on_other_engines(tmp_path, monkeypatch, spoil):
     rows = [
@@ -883,15 +880,14 @@ def test_analysis_refuses_runs_on_other_engines(tmp_path, monkeypatch, spoil):
     ]
     pts = tmp_path / 'points.csv'
     _points(pts, rows)
-    launches = list(csv.DictReader((tmp_path / 'launches.csv').open()))
+    launch_path = tmp_path / 'stack-FG' / 's1-1' / 'server' / 'launch.json'
     if spoil is None:
-        launches = launches[1:]  # a run with no launch record
+        launch_path.unlink()  # a run with no launch record
     else:
-        launches[1].update(spoil)
-    with (tmp_path / 'launches.csv').open('w', newline='') as f:
-        w = csv.DictWriter(f, fieldnames=list(launches[0].keys()))
-        w.writeheader()
-        w.writerows(launches)
+        part, field, value = spoil
+        launch = json.loads(launch_path.read_text())
+        launch[part][field] = value
+        launch_path.write_text(json.dumps(launch))
     out = tmp_path / 'out.json'
     monkeypatch.setattr(
         sys,
@@ -906,12 +902,44 @@ def test_analysis_refuses_runs_on_other_engines(tmp_path, monkeypatch, spoil):
             str(tmp_path / 'campaign_gate.json'),
             '--runs-root',
             str(tmp_path),
-            '--launches',
-            str(tmp_path / 'launches.csv'),
         ],
     )
     with pytest.raises(SystemExit):
         analyze.main()
+
+
+def test_decision_is_withheld_below_three_sessions():
+    two = analyze.interval([math.log(1.10), math.log(1.11)])
+    assert two['decision'].startswith('incomplete')
+    three = analyze.interval([math.log(1.10), math.log(1.11), math.log(1.105)])
+    assert three['decision'] == 'speedup'
+
+
+@pytest.mark.parametrize(
+    ('ref', 'field', 'value'),
+    [
+        ('ref_dflash_b16', 'sglang_sha', 'f' * 40),
+        ('ref_dflash_b16_triton', 'sglang_dirty', True),
+        ('ref_dflash_b16_triton', 'model_revision', 'n' * 40),
+        ('ref_dflash_b16', None, None),
+    ],
+)
+def test_build_checks_the_reused_stock_references(tmp_path, monkeypatch, ref, field, value):
+    run = tmp_path / 'run'
+    run.mkdir()
+    _write_runs(run)
+    meta_path = run / 'runs' / ref / 'c1.meta.json'
+    if field is None:
+        meta_path.unlink()
+    else:
+        meta = json.loads(meta_path.read_text())
+        meta[field] = value
+        meta_path.write_text(json.dumps(meta))
+    (run / 'summary.json').write_text(json.dumps({'pairs': _passing()}))
+    (run / gate.TABLE).write_text('{}')
+    (run / 'identity.json').write_text(json.dumps(IDENT))
+    assert gate.build(run, run / gate.TABLE, None, IDENT, TREE) == 1
+    assert any(ref in p for p in json.loads((run / 'gate.json').read_text())['provenance_problems'])
 
 
 def test_tree_state_sees_tracked_edits_and_untracked_engine_files(tmp_path):

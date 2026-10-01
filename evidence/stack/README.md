@@ -199,9 +199,12 @@ trees and the SGLang venv's torch, Triton, FlashInfer, sgl-kernel and transforme
 versions), requires it unchanged between the equality hold's start and the gate's
 construction, and requires each equality run's own record to name those engine and
 repository commits with a clean tree. Every timed hold's check refuses a session whose
-current identity differs from the gate's in any of these, and the analysis refuses any
-run whose launch record (bench's `launches.csv`) shows another engine commit, a dirty
-engine or another repository commit. The repository commit pins the harness, the arm
+current identity differs from the gate's in any of these, at its start and again at its
+end, and the analysis refuses any run whose launch record (`server/launch.json`) shows
+another engine commit or repository commit, or uncommitted changes in either. Bench's two
+stock DFlash block-16 runs that the equality step reuses as references must name the
+pinned stock commit with a clean tree and the same model revision as S0's run, and their
+outputs are recorded in the gate by SHA-256. The repository commit pins the harness, the arm
 definitions, the hold scripts and the workload files; so that the sessions can use the
 gate, the hold worktree stays at the equality hold's commit for the whole campaign.
 
@@ -225,7 +228,8 @@ upper end is below 1, otherwise "no detectable change". A point bench marks inva
 removes that session at that c for the arms it touches (for every arm if it is an S0
 launch); a retried launch of the same arm does not stand in for it, and a cell with more
 or fewer launches than the declared order is void too; if fewer than three sessions
-remain valid for FULL against S0 at any c, one more session runs (at most two more). The
+remain valid for FULL against S0 at any c, one more session runs (at most two more), and
+until then the analysis withholds the decision at that c ("incomplete"). The
 headline is FULL against S0: the per-user rate at c = 1 (P2's latency question) and
 throughput at c = 8, each with the exactness class from step 1. F and G are also read in
 the four-way pattern on the composed tree (B0, F, G, FG), with the interaction
@@ -309,7 +313,6 @@ python -m bench.pareto ~/vp-data/stack/runs/<campaign>/stack-*/2026* --out ~/vp-
     --points-only --status stack
 python experiments/stack/analyze.py --points ~/vp-data/stack/pareto/points.csv \
     --campaign ~/vp-data/stack/campaign_gate.json --runs-root ~/vp-data/stack/runs/<campaign> \
-    --launches ~/vp-data/stack/pareto/launches.csv \
     --out evidence/stack/composition.json --csv evidence/stack/composition.csv
 scripts/gpu_lock.sh -x experiments/stack/hold_oracle.sh             # diagnostic, after the sessions
 ```
