@@ -106,3 +106,37 @@ def test_serve_run_startup_lock_uses_the_script(tmp_path: Path) -> None:
     lock.acquire()
     assert held()
     lock.release()
+
+
+def test_probe_waves_send_one_batched_request() -> None:
+    import argparse
+
+    probe = load('accept_probe')
+    args = argparse.Namespace(max_new_tokens=8, ignore_eos=False, logprobs=True, timeout=1)
+    rows = [{'id': 'a', 'domain': 'x'}, {'id': 'b', 'domain': 'y'}]
+    sent = []
+
+    def fake_post(url: str, body: dict, timeout: float) -> list[dict]:
+        sent.append(body)
+        return [
+            {
+                'output_ids': [i, i],
+                'meta_info': {
+                    'prompt_tokens': 3,
+                    'completion_tokens': 2,
+                    'finish_reason': {'type': 'length'},
+                    'output_top_logprobs': [[[-0.1, i, None]], [[-0.2, i, None]]],
+                },
+            }
+            for i in range(len(body['rid']))
+        ]
+
+    probe.post = fake_post  # type: ignore[attr-defined]
+    records = probe.run_wave(1, rows, [[1, 2, 3], [4, 5, 6]], args)
+    assert len(sent) == 1
+    assert sent[0]['rid'] == ['a', 'b'] and sent[0]['input_ids'] == [[1, 2, 3], [4, 5, 6]]
+    assert sent[0]['top_logprobs_num'] == 5
+    assert [r['id'] for r in records] == ['a', 'b'] and records[1]['output_ids'] == [1, 1]
+    assert records[1]['top_logprobs'] == [[[-0.1, 1]], [[-0.2, 1]]]
+    single = probe.request_body(rows[:1], [[7]], args)
+    assert single['rid'] == 'a' and single['input_ids'] == [7]
