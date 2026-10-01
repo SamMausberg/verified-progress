@@ -335,8 +335,9 @@ class CertifiedHead:
         """Whether the quantization data is known to belong to ``weight``; if not,
         every batch takes the stock path (status ``refused``)."""
         c = self.const
-        const64 = [0.0] * 3
+        const64 = [0.0] * 4
         const64[K.CONST_SUMSQ_INFLATE.value] = c.sumsq_inflate
+        const64[K.CONST_SUMSQ_TOTAL_INFLATE.value] = c.sumsq_total_inflate
         const64[K.CONST_SQRT_INFLATE.value] = c.sqrt_inflate
         const64[K.CONST_REFINE_RADIUS.value] = c.refine_radius
         self._const64 = torch.tensor(const64, dtype=torch.float64, device=dev)

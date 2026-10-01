@@ -50,6 +50,7 @@ MODES = {'bf16': 0, 'fp32': 1, 'real': 2}
 CONST_SUMSQ_INFLATE = tl.constexpr(0)
 CONST_SQRT_INFLATE = tl.constexpr(1)
 CONST_REFINE_RADIUS = tl.constexpr(2)
+CONST_SUMSQ_TOTAL_INFLATE = tl.constexpr(3)
 
 # --- directed-rounding primitives -------------------------------------------
 
@@ -322,6 +323,7 @@ def _prep_kernel(
 ):
     m = tl.program_id(0)
     sumsq_inflate = tl.load(const64_ptr + CONST_SUMSQ_INFLATE)
+    total_inflate = tl.load(const64_ptr + CONST_SUMSQ_TOTAL_INFLATE)
     sqrt_inflate = tl.load(const64_ptr + CONST_SQRT_INFLATE)
     total = tl.zeros((), dtype=tl.float64)
     for g in tl.static_range(G):
@@ -334,7 +336,8 @@ def _prep_kernel(
         r = mul_ru64(sqrt_ru64(mul_ru64(s, sumsq_inflate)), sqrt_inflate)
         tl.store(b_ptr + m * BSTRIDE + g, f64_to_f32_ru(r))
     finite = total < float('inf')  # False for inf and NaN
-    norm = mul_ru64(sqrt_ru64(mul_ru64(total, sumsq_inflate)), sqrt_inflate)
+    # ``total`` adds G group sums: its factor covers all K terms, not one group.
+    norm = mul_ru64(sqrt_ru64(mul_ru64(total, total_inflate)), sqrt_inflate)
     tl.store(hnorm_ptr + m, f64_to_f32_ru(norm))
     tl.store(lower_ptr + m, float('-inf'))
     tl.store(ymax_ptr + m, float('-inf'))

@@ -384,6 +384,34 @@ margin in every check (0 envelope misses), so on those inputs it cannot fall in
 that band unless epilogue 3's arithmetic differs from the other epilogues'. The
 GPU tests at a9f1793 and later rerun the self-test under the new rule.
 
+**The row norm for seeded sampling (Codex, fixed after 78b3bb3).** `_prep_kernel`
+bounds each row's norm ||h||, which seeded sampling uses in
+`logit_magnitude_bound` to cap its score-error allowance, by multiplying the FP64
+sum of all K squares by an inflation factor. Until the fix that factor covered
+one group of `group_size` terms, not the additions across groups; it now covers
+all K terms (`sumsq_total_inflate`). A CPU test
+(`test_row_norm_bound_covers_the_additions_across_groups`) builds rows on which
+every addition across groups loses half an ulp: with 200 groups of 128 the old
+factor fails and the new one holds; with 20 groups (K = 2560) the old one still
+held in the kernel's summation order. Which recorded results used the affected
+path:
+
+- With the default `group_size = K` there is one group, and the two factors are
+  the same number. Every evidence result here used it: the replay
+  (`replay_decisions.json`), the microbenchmark (`micro_head.json`), the stress
+  test and the SGLang engine checks build the head with `group_size = K = 2560`,
+  which the first two record in their configuration. The sampled rows of the
+  micro and the sampled-verify engine check therefore ran exactly the fixed
+  arithmetic.
+- Smaller groups (128 and 512) ran only in GPU tests, which passed.
+- Even with smaller groups, our reading of the bounds is that the old factor
+  could not have changed a decision at K = 2560: the sum of squares could be
+  low by at most gamma_{K-1}, about 2.8e-13 relative, while
+  `logit_magnitude_bound` multiplies the norm product by 1 + 2^-6, about 1.1%
+  more than its derivation needs (the conservative stock accumulation error
+  6.1e-4, BF16 rounding 2^-8 and the FP32 division). That is an argument from
+  the code's stated bounds, not a measurement.
+
 **GPU tests** (`gpu_tests.log`, d2712cb): 119 passed. x8s reruns them at
 2d1794a, with the CPU tests of the margin rule (`tests/test_enclosure_margin.py`).
 

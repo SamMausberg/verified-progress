@@ -196,7 +196,11 @@ class KernelConstants:
     refine_radius: float
     """Coefficient ``c`` such that ``c * ah`` bounds ``|xh - s_ref|`` in FP64."""
     sumsq_inflate: float
-    """FP64 factor turning an FP64 sum of squares of ``n`` terms into an upper bound."""
+    """FP64 factor turning an FP64 sum of the squares of one group (``max_group``
+    terms) into an upper bound."""
+    sumsq_total_inflate: float
+    """The same for the sum over all ``k`` coordinates (every group, plus the
+    additions across groups), in any order."""
     sqrt_inflate: float
     """FP64 factor covering the rounding of ``sqrt`` in FP64."""
 
@@ -210,11 +214,15 @@ def kernel_constants(
     refine = (g64 + gref) / (1 - g64)
     # Squares add one rounding each: sum of n squares has relative error gamma_{n+1}.
     sumsq = 1 + gamma(max_group + 1, U_FP64)
+    # The row's whole norm sums all k squares (each group's sum, then the groups):
+    # the per-group factor does not cover the additions across groups.
+    sumsq_total = 1 + gamma(k + 1, U_FP64)
     return KernelConstants(
         rel_scale=f32_up(U_FP32 / (1 - U_FP32)),
         abs_floor=ABS_FLOOR,
         refine_radius=float_up(refine),
         sumsq_inflate=float_up(sumsq),
+        sumsq_total_inflate=float_up(sumsq_total),
         sqrt_inflate=float_up(1 + 2 * U_FP64),
     )
 

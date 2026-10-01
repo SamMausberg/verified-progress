@@ -147,6 +147,45 @@ def test_kernel_constants_are_upper_bounds() -> None:
     assert real.refine_radius < 1e-12
 
 
+def _prep_norm_sq_bound(h: np.ndarray, group: int, factor: float) -> Fraction:
+    """The prep kernel's bound on ``||h||^2``, in its order: each group's squares
+    summed in FP64 (exact here), the group sums added one after another in FP64,
+    then multiplied by ``factor`` (rounded up; taken exactly here, which only
+    helps the bound)."""
+    total = 0.0
+    for g in range(0, h.size, group):
+        s = 0.0
+        for x in h[g : g + group]:
+            s += float(x) * float(x)
+        total += s
+    return Fraction(total) * Fraction(factor)
+
+
+def test_row_norm_bound_covers_the_additions_across_groups() -> None:
+    """The row norm ``_prep_kernel`` writes sums all groups, so its factor must
+    cover all k terms: the per-group factor does not. Adversarial rows: one group
+    holds 1.0, every other group one square just below half an ulp of 1.0, so
+    each addition across groups rounds the running total down and loses it."""
+    group = 128
+    x = np.float32(np.ldexp(1.4140625, -27))  # a BF16 value; x^2 is just under 2^-53
+    assert float(x) * float(x) < 2.0**-53
+    for groups in (20, 200):
+        k = group * groups
+        h = np.zeros(k, dtype=np.float64)
+        h[0] = 1.0
+        h[group::group] = float(x)
+        exact = sum((Fraction(float(v)) ** 2 for v in h), Fraction(0))
+        c = kernel_constants('bf16', k, group)
+        assert _prep_norm_sq_bound(h, group, c.sumsq_total_inflate) >= exact
+        old = _prep_norm_sq_bound(h, group, c.sumsq_inflate)
+        if groups == 20:
+            # 19 lost additions: the old per-group factor (129 roundings) still covers
+            # them in this order, which is why K = 2560 with 128-wide groups held.
+            assert old >= exact
+        else:
+            assert old < exact  # 199 lost additions: the old factor fails
+
+
 @pytest.mark.parametrize('bad', [(100, 128, 128), (2560, 128, 384)])
 def test_envelope_group_validation(bad: tuple[int, int, int]) -> None:
     k, base, group = bad
