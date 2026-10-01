@@ -131,8 +131,8 @@ def log_odds(t: np.ndarray) -> np.ndarray:
     return np.log((a + 0.5) * (f0 - c + 0.5) / ((f1 - a + 0.5) * (c + 0.5)))
 
 
-def declared_prompt_ids(prompts: Path, manifest: Path) -> tuple[set[str] | None, str | None]:
-    """The fresh set's IDs, after checking the prompt file against the frozen manifest."""
+def declared_prompt_ids(prompts: Path, manifest: Path) -> tuple[dict[str, int] | None, str | None]:
+    """The fresh set's prompt lengths by ID, after checking the file against the manifest."""
     if not prompts.exists():
         return None, f'{prompts}: missing'
     items = [json.loads(line) for line in prompts.read_text().splitlines() if line.strip()]
@@ -144,7 +144,7 @@ def declared_prompt_ids(prompts: Path, manifest: Path) -> tuple[set[str] | None,
         return None, f'{prompts}: does not match the frozen manifest'
     if len(items) != DECLARED_PROMPTS:
         return None, f'{prompts}: {len(items)} prompts, declared {DECLARED_PROMPTS}'
-    return {it['id'] for it in items}, None
+    return {it['id']: len(it['input_ids']) for it in items}, None
 
 
 def declaration_hashes() -> dict[str, str]:
@@ -161,7 +161,9 @@ def declaration_hashes() -> dict[str, str]:
     return out
 
 
-def attestation_problems(root: Path, hold: str, expected: dict[str, str]) -> list[str]:
+def attestation_problems(
+    root: Path, hold: str, expected: dict[str, str], prompts: Path | None = None
+) -> list[str]:
     """Why the checkout attested around a hold was not the clean declaration commit."""
     recs = {}
     for when in ('before', 'after'):
@@ -178,6 +180,12 @@ def attestation_problems(root: Path, hold: str, expected: dict[str, str]) -> lis
             problems.append(
                 f'hold {hold}: run_matrix process not in the attested checkout ({when})'
             )
+        # The run read the canonical, manifest-checked prompt file, unchanged.
+        if prompts is not None and (
+            r.get('process_prompts') != str(prompts.resolve())
+            or r.get('prompts_sha256') != hashlib.sha256(prompts.read_bytes()).hexdigest()
+        ):
+            problems.append(f'hold {hold}: run was not given the frozen prompt file ({when})')
         # The script itself must be the attested one: its directory supplies the imports.
         if r.get('process_script') != f'{r.get("runner_dir")}/run_matrix.py':
             problems.append(f'hold {hold}: run_matrix process ran another script ({when})')
@@ -302,11 +310,19 @@ def void_reasons(
             )
         if ids is not None:
             run_ids = {r['id'] for r in records.values()}
-            if run_ids != ids:
+            if run_ids != set(ids):
                 reasons.append(
                     f'{run}: prompt IDs differ from the declared set '
-                    f'({len(ids - run_ids)} missing, {len(run_ids - ids)} extra)'
+                    f'({len(set(ids) - run_ids)} missing, {len(run_ids - set(ids))} extra)'
                 )
+            # Each request's prompt length matches the frozen prompt's.
+            wrong = sum(
+                1
+                for r in records.values()
+                if r['id'] in ids and r.get('prompt_tokens') != ids[r['id']]
+            )
+            if wrong:
+                reasons.append(f'{run}: {wrong} records with a prompt length unlike the frozen set')
     # The c1 and c32 passes of a configuration come from one server.
     for config in ('mtp_s5', 'mtp_tree'):
         ids_ = []
@@ -319,7 +335,7 @@ def void_reasons(
     # The checkout around each hold (attest_runner.py).
     expected = declaration_hashes()
     for hold in sorted(set(HOLD_OF.values())):
-        reasons.extend(attestation_problems(root, hold, expected))
+        reasons.extend(attestation_problems(root, hold, expected, prompts if ids else None))
     return reasons
 
 

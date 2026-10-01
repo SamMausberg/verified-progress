@@ -12,9 +12,10 @@ and match the declaration commit's files.
         --checkout ~/vp-wt/state-fc --runs ~/vp-data/state/runs_fresh
 
 Each record also holds the PID of the observed run_matrix.py process, its working
-directory (/proc/<pid>/cwd) and the run_matrix.py path it runs (its
-/proc/<pid>/cmdline entry resolved against that directory), all read when the hold
-starts, so first_cycle.py can check that the runs came from the attested files.
+directory (/proc/<pid>/cwd), the run_matrix.py path it runs and the --prompts file
+it was given (both from /proc/<pid>/cmdline, resolved against that directory, read
+when the hold starts), and that prompt file's SHA-256 at the time of the record, so
+first_cycle.py can check that the runs came from the attested files and prompts.
 The "after" record also holds the SHA-256 of every run file the hold wrote, and
 each record holds its time in UTC and in local time (run_matrix.py's started_at is
 local time), so the analysis can check that it reads those files and that each
@@ -60,25 +61,57 @@ def process_cwd(pid: int) -> str | None:
         return None
 
 
-def process_script(pid: int, cwd: str | None) -> str | None:
-    """The run_matrix.py path the process runs (its argv entry, resolved against cwd)."""
+def _resolve(arg: str, cwd: str | None) -> str | None:
+    path = Path(arg)
+    if not path.is_absolute():
+        if cwd is None:
+            return None
+        path = Path(cwd) / path
+    return str(path.resolve())
+
+
+def _argv(pid: int) -> list[str] | None:
     try:
-        argv = Path(f'/proc/{pid}/cmdline').read_bytes().split(b'\0')
+        return [a.decode() for a in Path(f'/proc/{pid}/cmdline').read_bytes().split(b'\0')]
     except OSError:
         return None
-    for arg in (a.decode() for a in argv[1:]):
+
+
+def process_script(pid: int, cwd: str | None) -> str | None:
+    """The run_matrix.py path the process runs (its argv entry, resolved against cwd)."""
+    argv = _argv(pid)
+    for arg in argv[1:] if argv else []:
         if arg.endswith('run_matrix.py'):
-            path = Path(arg)
-            if not path.is_absolute():
-                if cwd is None:
-                    return None
-                path = Path(cwd) / path
-            return str(path.resolve())
+            return _resolve(arg, cwd)
     return None
 
 
+def process_prompts(pid: int, cwd: str | None) -> str | None:
+    """The --prompts file the process was given (resolved against cwd), if any."""
+    argv = _argv(pid) or []
+    for i, arg in enumerate(argv):
+        if arg == '--prompts' and i + 1 < len(argv):
+            return _resolve(argv[i + 1], cwd)
+        if arg.startswith('--prompts='):
+            return _resolve(arg.split('=', 1)[1], cwd)
+    return None
+
+
+def file_sha256(path: str | None) -> str | None:
+    if path is None:
+        return None
+    try:
+        return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
 def attest(
-    checkout: Path, pid: int | None = None, cwd: str | None = None, script: str | None = None
+    checkout: Path,
+    pid: int | None = None,
+    cwd: str | None = None,
+    script: str | None = None,
+    prompts: str | None = None,
 ) -> dict[str, Any]:
     def git(*args: str) -> str:
         out = subprocess.run(
@@ -101,6 +134,9 @@ def attest(
         # Python puts the script's own directory first on sys.path, so this is where
         # server.py and client.py were imported from.
         'process_script': script,
+        # The prompt file the run was given, and its content at this moment.
+        'process_prompts': prompts,
+        'prompts_sha256': file_sha256(prompts),
         'runner_dir': str(base.resolve()),
         'head': git('rev-parse', 'HEAD').strip(),
         'porcelain': git('status', '--porcelain'),
@@ -116,10 +152,11 @@ def write(
     pid: int | None,
     cwd: str | None,
     script: str | None,
+    prompts: str | None,
 ) -> None:
     out = runs / 'attest'
     out.mkdir(parents=True, exist_ok=True)
-    rec = attest(checkout, pid, cwd, script)
+    rec = attest(checkout, pid, cwd, script, prompts)
     if when == 'after':
         # Ties the analysed files to this hold: they must still hash to these values.
         rec['outputs'] = output_hashes(runs, hold)
@@ -146,18 +183,21 @@ def watch(checkout: Path, runs: Path, poll: float = 2.0) -> None:
     current: tuple[str, int] | None = None
     cwd: str | None = None
     script: str | None = None
+    prompts: str | None = None
     while len(done) < len(HOLDS):
         seen = running_hold(runs)
         if seen != current:
             # A hold ended, another started, or both within one poll.
             if current is not None:
-                # The process has exited; its PID, cwd and script were read at the start.
-                write(runs, current[0], 'after', checkout, current[1], cwd, script)
+                # The process has exited; its PID, cwd, script and prompt path were read
+                # at the start (the prompt file is hashed again now).
+                write(runs, current[0], 'after', checkout, current[1], cwd, script, prompts)
                 done.add(current[0])
             if seen is not None:
                 cwd = process_cwd(seen[1])
                 script = process_script(seen[1], cwd)
-                write(runs, seen[0], 'before', checkout, seen[1], cwd, script)
+                prompts = process_prompts(seen[1], cwd)
+                write(runs, seen[0], 'before', checkout, seen[1], cwd, script, prompts)
             current = seen
         time.sleep(poll)
 
@@ -177,7 +217,8 @@ def main() -> None:
         pid = seen[1] if seen and seen[0] == args.hold else None
         cwd = process_cwd(pid) if pid is not None else None
         script = process_script(pid, cwd) if pid is not None else None
-        write(args.runs, args.hold, args.when, args.checkout, pid, cwd, script)
+        prompts = process_prompts(pid, cwd) if pid is not None else None
+        write(args.runs, args.hold, args.when, args.checkout, pid, cwd, script, prompts)
     else:
         raise SystemExit('give --watch, or --hold and --when')
 

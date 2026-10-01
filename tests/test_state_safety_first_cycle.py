@@ -1,5 +1,6 @@
 """The declared first-cycle analysis on synthetic runs (CPU only)."""
 
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -84,7 +85,6 @@ def test_decision_supported_only_when_both_bounds_hold():
 
 def _write_declared(tmp_path, ids):
     """Five declared runs over ids, plus the matching prompt file and manifest."""
-    import hashlib
 
     tmp_path.mkdir(parents=True, exist_ok=True)
     prompts = tmp_path / 'prompts.jsonl'
@@ -106,6 +106,7 @@ def _write_declared(tmp_path, ids):
                 'top_logprobs': [[[-0.1, 1], [-0.2, 2]]] * 2,
                 'finish_reason': {'type': 'length'},
                 'completion_tokens': 2,
+                'prompt_tokens': 1,
                 'aborted_by_client': False,
             }
             for i in ids
@@ -156,6 +157,8 @@ def _write_declared(tmp_path, ids):
                 'process_cwd': '/w/experiments/state_safety',
                 'process_script': '/w/experiments/state_safety/run_matrix.py',
                 'runner_dir': '/w/experiments/state_safety',
+                'process_prompts': str(prompts.resolve()),
+                'prompts_sha256': hashlib.sha256(prompts.read_bytes()).hexdigest(),
                 'time_local': window[hold][k],
             }
             if when == 'after':
@@ -281,6 +284,24 @@ def test_each_departure_from_the_declaration_makes_the_result_void(tmp_path, mon
         rec['process_script'] = '/elsewhere/experiments/state_safety/run_matrix.py'
         path.write_text(json.dumps(rec))
 
+    def other_prompt_file(runs, prompts, manifest):
+        path = runs / 'attest' / 'plain-before.json'
+        rec = json.loads(path.read_text())
+        rec['process_prompts'] = '/tmp/other_prompts.jsonl'
+        path.write_text(json.dumps(rec))
+
+    def prompt_file_changed_during_hold(runs, prompts, manifest):
+        path = runs / 'attest' / 'mtp-after.json'
+        rec = json.loads(path.read_text())
+        rec['prompts_sha256'] = '0' * 64
+        path.write_text(json.dumps(rec))
+
+    def prompt_length_differs(runs, prompts, manifest):
+        path = runs / 'mtp_tree/c32.jsonl'
+        rows = [json.loads(x) for x in path.read_text().splitlines()]
+        rows[0]['prompt_tokens'] = 7
+        path.write_text(''.join(json.dumps(r) + '\n' for r in rows))
+
     def stale_file(runs, prompts, manifest):
         path = runs / 'mtp_s5/c32.jsonl'
         path.write_text(path.read_text() + '\n')
@@ -334,6 +355,9 @@ def test_each_departure_from_the_declaration_makes_the_result_void(tmp_path, mon
         other_process_after: 'hold mtp: attestations not bound to one run_matrix process',
         process_in_other_checkout: 'hold plain: run_matrix process not in the attested checkout',
         script_elsewhere: 'hold mtp: run_matrix process ran another script (before)',
+        other_prompt_file: 'hold plain: run was not given the frozen prompt file (before)',
+        prompt_file_changed_during_hold: 'hold mtp: run was not given the frozen prompt file (after)',
+        prompt_length_differs: 'mtp_tree/c32: 1 records with a prompt length unlike the frozen set',
         stale_file: 'mtp_s5/c32: mtp_s5/c32.jsonl is not the file hold mtp wrote',
         started_outside_hold: 'plain/c1: started_at 2026-10-01T13:00:00 outside hold plain',
         unfinished_record: 'mtp_tree/c1: 1 incomplete records',
@@ -417,11 +441,14 @@ def test_watch_attests_back_to_back_holds(monkeypatch, tmp_path):
     monkeypatch.setattr(attest_runner, 'running_hold', lambda runs: next(seen))
     monkeypatch.setattr(attest_runner, 'process_cwd', lambda pid: f'/proc/{pid}')
     monkeypatch.setattr(attest_runner, 'process_script', lambda pid, cwd: f'{cwd}/run_matrix.py')
+    monkeypatch.setattr(attest_runner, 'process_prompts', lambda pid, cwd: '/p.jsonl')
     written = []
     monkeypatch.setattr(
         attest_runner,
         'write',
-        lambda runs, hold, when, checkout, pid, cwd, script: written.append((hold, when, pid, cwd)),
+        lambda runs, hold, when, checkout, pid, cwd, script, prompts: written.append(
+            (hold, when, pid, cwd)
+        ),
     )
     attest_runner.watch(tmp_path, tmp_path, poll=0)
     assert written == [
@@ -450,7 +477,14 @@ def test_process_script_resolves_the_run_matrix_argument(tmp_path, monkeypatch):
     assert attest_runner.process_script(7, '/w/experiments/state_safety') == str(
         real_path('/w/experiments/state_safety/run_matrix.py').resolve()
     )
+    (proc / '7' / 'cmdline').write_bytes(
+        b'python\0run_matrix.py\0--prompts\0../p/fresh.jsonl\0--configs\0plain\0'
+    )
+    assert attest_runner.process_prompts(7, '/w/experiments/state_safety') == str(
+        real_path('/w/experiments/p/fresh.jsonl').resolve()
+    )
     (proc / '7' / 'cmdline').write_bytes(b'python\0/elsewhere/run_matrix.py\0--configs\0plain\0')
+    assert attest_runner.process_prompts(7, '/w') is None
     assert (
         attest_runner.process_script(7, '/w/experiments/state_safety') == '/elsewhere/run_matrix.py'
     )

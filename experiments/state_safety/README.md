@@ -252,6 +252,13 @@ reason go in a new commit before the runs.
     runs are void unless both records name one PID, and that process ran the attested
     checkout's `experiments/state_safety/run_matrix.py` from that directory. Python
     imports `server.py` and `client.py` from the script's own directory.
+  - Each record also holds the `--prompts` path the process was given (from its
+    command line, resolved against its directory) and that file's SHA-256 at the
+    time of the record. A hold's runs are void unless both records name the
+    canonical prompt file, the one checked against the frozen manifest, with its
+    current hash.
+  - As a cross-check, a run is void if any record's `prompt_tokens` differs from the
+    frozen prompt's length for that ID.
   - The "after" record holds the SHA-256 of every `*.jsonl` and `*.meta.json` the hold
     wrote. A run is void unless the analysed files still hash to those values.
   - A run is also void unless its `started_at` lies between its hold's before and
