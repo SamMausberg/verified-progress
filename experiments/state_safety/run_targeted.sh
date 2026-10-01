@@ -4,7 +4,7 @@
 #
 #   experiments/state_safety/run_targeted.sh [group...]
 #
-# Groups: exact (truncation, stops), prefix, abort_repeat, prefill (default: all).
+# Groups: exact (truncation, stops), prefix, abort_repeat, prefill, history (default: all).
 # Outputs: ~/vp-data/state/targeted/<test>__<config>[__tag].json
 set -euo pipefail
 
@@ -37,23 +37,27 @@ group() {
         "truncation --config plain --block 1" "stops --config plain --block 1"
       ;;
     prefix)
-      t_hold "prefix --config mtp_s3 --num-prompts 12" "prefix --config mtp_tree --num-prompts 12"
-      t_hold "prefix --config plain --num-prompts 12"
+      t_hold "prefix --config mtp_s3 --num-prompts 12" "prefix --config mtp_tree --num-prompts 8" \
+        "prefix --config plain --num-prompts 8"
       ;;
     abort_repeat)
       t_hold "abort --config mtp_s3 --extra-flags '$small_pool' --tag smallpool" \
         "abort --config mtp_s3 --extra-flags '$small_pool_radix' --tag smallpool_radix" \
-        "abort --config mtp_s3_det --extra-flags '$small_pool' --tag smallpool" \
         "abort --config plain_det --extra-flags '$small_pool' --tag smallpool" \
         "repeat --config plain --num-prompts 40" "repeat --config mtp_s3 --num-prompts 40"
       ;;
     prefill)
       t_hold "prefill --config mtp_s3" \
         "prefill --config mtp_s3 --extra-flags '--chunked-prefill-size 256' --tag chunk256" \
-        "prefill --config mtp_s3 --extra-flags '--chunked-prefill-size 200' --tag chunk200" \
-        "prefill --config plain" \
-        "prefill --config plain --extra-flags '--chunked-prefill-size 256' --tag chunk256" \
-        "prefill --config plain --extra-flags '--chunked-prefill-size 200' --tag chunk200"
+        "prefill --config mtp_s3 --extra-flags '--chunked-prefill-size 200' --tag chunk200"
+      ;;
+    history)
+      ids=mt_bench-0053,mt_bench-0056,mt_bench-0059,alpaca_eval-0450,alpaca_eval-0500
+      ids=$ids,gsm8k-0002,gsm8k-0010,humaneval-0008,humaneval-0021,cnn_dailymail-0014
+      ids=$ids,mt_bench-0012,alpaca_eval-0020
+      t_hold "history --config plain --history-ids $ids --full-len 64" \
+        "history --config plain_noradix --history-ids $ids --full-len 64" \
+        "history --config mtp_s3 --history-ids $ids --full-len 64"
       ;;
     *)
       echo "unknown group $1" >&2
@@ -63,7 +67,7 @@ group() {
 }
 
 if [ "$#" -eq 0 ]; then
-  set -- exact prefix abort_repeat prefill
+  set -- exact prefix abort_repeat prefill history
 fi
 for g in "$@"; do
   group "$g"
