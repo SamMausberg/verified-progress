@@ -8,6 +8,10 @@
 # defaults to Triton when decode uses Triton, so the flag changes nothing; the
 # equality check found bit-identical outputs.)
 # Run under: scripts/gpu_lock.sh -x bench/campaigns/confirm_supplementary.sh [a]
+# Rerun of points invalidated by host contention, in a fresh session that holds each
+# rerun point's matched baseline too (arm:levels, levels comma-separated):
+#   scripts/gpu_lock.sh -x bench/campaigns/confirm_supplementary.sh rerun <session> \
+#       plain-tuned:2 mtp-stockverify:2
 set -uo pipefail
 # shellcheck source=/dev/null
 source "$(dirname "$0")/../../scripts/sglang_env.sh"
@@ -36,5 +40,14 @@ case $part in
     run confirm-supp mtp-tuned "1 2 4 8 16"
     run confirm-supp plain-tuned-replayssm "32 48 64 96 128"
     ;;
-  *) echo "usage: $0 [a]" >&2; exit 64 ;;
+  rerun)
+    [ "$#" -ge 3 ] || { echo "usage: $0 rerun <session> arm:levels ..." >&2; exit 64; }
+    session=$2
+    shift 2
+    for entry in "$@"; do
+      levels=${entry#*:}
+      run "$session" "${entry%%:*}" "${levels//,/ }"
+    done
+    ;;
+  *) echo "usage: $0 [a | rerun <session> arm:levels ...]" >&2; exit 64 ;;
 esac
