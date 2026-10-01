@@ -359,7 +359,7 @@ final shared-lock hold, x8s2, reran the correctness checks at 9f7f369
 | Steps | Commit | Run | Why the result stands |
 |---|---|---|---|
 | compile, GPU and CPU tests, stress, TMA neighbourhood, SASS statistics | 9f7f369 | x8s2 | run at this commit |
-| CPU tests of the digest check, the refused tiles, the temperature guard and the column-fallback refusal | 2ab57df, 09bf64e, 3b137c0 | CPU only | add host-side refusals; the kernels and every default path are unchanged since 9f7f369, so x8s2's results stand |
+| CPU tests of the digest check, the refused tiles, the temperature and zero-probability guards and the column-fallback refusal | 2ab57df, 09bf64e, 3b137c0, ec46d55 | CPU only | add host-side refusals; the kernels and every default path are unchanged since 9f7f369, so x8s2's results stand |
 | micro, summarize, check_outputs | 46bcc84 | x7c | run at this commit; see below for the commits after it |
 | tune_w8a16, primitives, ncu, ncu_export | d2712cb | x7 | the package's code and data are unchanged from d2712cb to 46bcc84; `bench/tune_gemv.py` was refactored after d2712cb (c01d905: it also records the fastest TMA and pointer-load configurations, with the same winner selection), and x7c's own W8A16 sweep (`pointer_vs_tma_w8a16.json`) picks the same winners except at M = 256 (3 instead of 4 stages, within 0.2%) |
 | replay, invariance, tune_w8a8 | fff72dc | x6 | `kernels.py` is unchanged since; the replay's batches have at most 16 rows, whose tiles did not change; the invariance check runs only the stock head; the W8A8 sweep times every candidate tile explicitly |
@@ -377,7 +377,7 @@ factor for all K squares (eb6ef57), the weight digest recorded in a freshly
 built head (647427e), and the refusal of hidden sizes the kernels do not tile
 (9f7f369). x8s2 reran the GPU and CPU tests, the stress test of every default
 under the margin rule, the TMA neighbourhood and the SASS statistics at 9f7f369;
-its results are below. Three commits follow x8s2 and change package code.
+its results are below. Four commits follow x8s2 and change package code.
 2ab57df: `build_quantized_head` refuses a supplied `head_sha256` that is not the
 digest of the weight it quantizes, and `check_gemv_config` refuses int8 TMA
 tiles with `block_m >= 128` (see "The whole neighbourhood"). 09bf64e:
@@ -385,11 +385,16 @@ tiles with `block_m >= 128` (see "The whole neighbourhood"). 09bf64e:
 SGLang's chain (status `temperature`), since its score bounds assume T > 0.
 3b137c0: `enable_column_fallback` refuses any reference but `bf16`, since the
 column fallback computes BF16-output logits (no evidence used it with `fp32`).
-All three add refusals only, so they were checked by CPU tests alone
-(`tests/test_certified_head_inputs.py`, 14 passed; 7 fail without 2ab57df, 1
-without 09bf64e and 2 without 3b137c0). From 3b137c0, `run_all.sh` runs all four
-test files and `check_outputs.py` requires at least 156 passed tests and none
-failed or skipped. None of these commits changes the
+ec46d55: `gumbel_sample` sends a row to SGLang's chain (status
+`zero_probability`) when its winner's refined lower bound is at most `ymax - 64`.
+A token whose stock FP32 probability rounds to zero has score `-inf`, but its
+lower bound stays finite and is below `ymax - 65.1`; only the winner's lower
+bound enters the decision (`ZERO_PROBABILITY_GAP` in `head.py` gives the
+derivation). All four add refusals only, in host code, so they were checked by
+CPU tests alone (`tests/test_certified_head_inputs.py`, 15 passed; 7 fail
+without 2ab57df, 1 without 09bf64e, 2 without 3b137c0 and 1 without ec46d55).
+From 3b137c0, `run_all.sh` runs all four test files, and `check_outputs.py`
+requires at least 157 passed tests and none failed or skipped. None of these commits changes the
 W8A16 pass's default tiles or kernels, so x7c's timings stand for the W8A16
 path. (A first attempt at this
 hold, x8s, ran under the system Python, without the SGLang environment, and
