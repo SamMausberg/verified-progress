@@ -23,15 +23,16 @@ workload (`bench/`, mixed-v2 confirm split, 512 output tokens). Labels as elsewh
   Stage A over FlashInfer's GDN verify is not available on top of it), CUDA graphs, the
   overlap scheduler and `--stream-interval 4`. Of the exact levers outside it, only two
   have evidence of a gain large enough to time: the snapshot-free GDN verify (F,
-  derived: about 5% of the c = 1 cycle and about 20% at c = 8, sign at c = 1 open) and the
-  backbone GEMM routing table (G, derived: about 1.5% at c = 1, about 1% at c = 4-8).
-  The certified head (H) is a derived loss on the DFlash verify with whole-batch
-  fallback and at most about 3% at c = 1 with column fallback, and the package version
-  its engine checks ran is not yet citable. The host-gap patches do nothing on these
-  arms. None of F, G or H has a served end-to-end measurement on DFlash yet.
-- **Expected composed result** (derived, declared below): 0.97-1.07x the tuned DFlash
-  per-user rate at c = 1 and 1.1-1.25x at c = 8. That leaves a factor of 4 to 5 to the
-  goal at every concurrency.
+  derived: it removes 0.21 ms of state writes per request per cycle, 4% of the c = 1
+  cycle and 17% at c = 8, against a possible launch-configuration penalty that leaves
+  its sign at c = 1 open) and the backbone GEMM routing table (G, derived from
+  microbenchmarks: at most 2.6% at c = 1 and 1-2% at c = 4-8). The certified head (H)
+  enters only through its equality gate; its expected effect is left out because its
+  inputs are on unmerged pull requests (#45, #52). The host-gap patches do nothing on
+  these arms. None of F, G or H has a served end-to-end measurement on DFlash yet.
+- **Expected composed result** (derived, declared below, `expected.json`): 0.97-1.07x
+  the tuned DFlash per-user rate at c = 1 and 1.15-1.22x at c = 8. That leaves a factor
+  of 4.1 to 4.7 to the goal.
 - **Ceilings** (`ceiling.json`, derived): an engine running the current drafter at the
   HBM bandwidth floor, with no host idle and no per-position state, would decode 1.81x
   faster than tuned DFlash-16 at c = 1 and 3.26x at c = 8, at the measured 5.7 tokens per
@@ -49,7 +50,9 @@ measured effect as measured (never multiplied with another lever's), the kind of
 microbenchmark, offline oracle, or derived) with its n, where it is, the exactness class
 against stock decoding and its source, the engine series and switch, what blocks it, and
 whether it enters the composed run. "c" is client concurrency. Where a cited file is on an
-open pull request rather than on `main`, the row names the pull request.
+open pull request rather than on `main`, the row names the pull request and its numbers
+are marked pending until it merges; the one exception is bench's confirmation frontier
+(PR #131), which this directory depends on and which merges first.
 
 Baselines (measured, bench confirmation, n = 3 sessions each, `evidence/bench/confirm/frontier.csv`
 from PR #131): the best tuned DFlash arm of an exact class is `dflash-tuned-b16` (block
@@ -64,10 +67,10 @@ At c = 1-8 on tuned DFlash:
 |---|---|---|---|---|
 | Block 16 with Triton attention (D1) | 1.21x per-user rate over block 8 at c = 1, 1.02x at c = 8; 0.96x throughput at c = 8 | served, n = 3 | exact-up-to-rounding | baseline S0 |
 | Triton GDN verify kernel (D2) | already the default verify kernel; 1.05x the FlashInfer GDN verify pass at B = 16, 2.06x at B = 64 | forced-acceptance phases | default | in every arm |
-| Snapshot-free GDN verify, fold every commit (D3) | none served; derived 0.27 ms per request-cycle of state writes removed | kernel bitwise; derived | bitwise at kernel level; served DFlash pending | F |
-| Backbone GEMM table v1 (D4) | 0.88-0.97x cuBLAS per GEMM at M = 16; derived ~1.5% at c = 1 | microbenchmark; derived | pending | G |
-| Certified head on the verify (D5) | none served; derived -80 us (batch fallback) to +150 us (column fallback) per c = 1 cycle | microbenchmark; check-mode counters | stock-kernel contract (0 differing rows) | H, if citable |
-| Certified head on the draft projection (D6) | 89.6% of rows fall back | check-mode counters | stock-kernel contract | no |
+| Snapshot-free GDN verify, fold every commit (D3) | none served; derived 0.21 ms per request-cycle of state writes removed | derived; kernel check pending (#133) | pending (#133) | F |
+| Backbone GEMM table v1 (D4) | 0.88-0.97x cuBLAS per GEMM at M = 16; derived at most 2.6% at c = 1 | microbenchmark; derived | pending | G |
+| Certified head on the verify (D5) | pending (#45, #52) | pending | pending (#45, #52) | H, if its gate passes |
+| Certified head on the draft projection (D6) | pending (#52) | pending | pending (#52) | no |
 | Hot-vocabulary draft head (D7) | derived about break-even (0.3 ms saved, ~7% fewer accepted tokens) | derived | exact (draft side) | no: derived net < 1% |
 | FA4 draft attention under Triton target (D8) | untested at block 16 | - | exact (draft side) | no |
 | Host-gap patches (D9) | no-op on these arms; MTP cycle -2.7% to -4.8% | held-batch windows | bitwise | applied, off |
@@ -187,13 +190,28 @@ log(FG/B0) - log(F/B0) - log(G/B0); isolated ratios are never multiplied into a 
 estimate. Against `dflash-tuned` (block 8), the better arm at c = 8 by throughput, the
 comparison uses bench's three confirmation sessions and is labelled cross-session.
 
-**Expected result** (derived before any run, from the inventory): F between 0.95x and
-1.05x at c = 1 (its writes are about 5% of the cycle, but its verify launches another
-tile configuration) and 1.10-1.20x at c = 8; G about 1.015x at c = 1, 1.00x at c = 2 and
-about 1.01x at c = 4-8; H, if it runs, 0.97-1.03x at c = 1. FULL: 0.97-1.07x at c = 1,
-1.10-1.25x at c = 8. At the top of those ranges FULL is 4.7x short of 5x at c = 1 and 4.0x
-at c = 8. A result above 1.25x at any c would mean the derivations missed a mechanism and
-is checked against the phase diagnostic before it is reported.
+**Expected result** (derived before any run, `experiments/stack/expected.py` ->
+`expected.json`). Model: each lever saves time in its own part of the cycle, so savings
+in milliseconds add, and an arm's expected ratio is T / (T - sum of its savings) with T
+the tuned cycle at that c (5.29, 5.95, 7.40 and 10.19 ms at c = 1, 2, 4, 8). This
+additivity is what the composed arms test; no measured ratio is multiplied. Savings, low
+to high: F removes c x 16 states of 50.3 MB at 3.79 TB/s (0.212 ms per request), less, at
+the low end, the 0.38 ms per cycle by which SGLang's Triton verify ran slower without a
+snapshot buffer at one request (moonshot's P7 bench: 92 against 76 us per layer, 24
+layers); G is 0 at the low end and, at the high end, the microbenchmark time the routing
+table saves at the verify's and draft's 16 c rows (0.14 ms at c = 1, none at c = 2, 0.12
+and 0.13 ms from the merged in_proj at c = 4 and 8). H is left out: its inputs are only on
+unmerged pull requests (#45, #52), so its expected effect is pending.
+
+| c | F | G | FULL = FG | FG short of 5x (top) |
+|---|---|---|---|---|
+| 1 | 0.97-1.04 | 1.00-1.03 | 0.97-1.07 | 4.7x |
+| 2 | 1.01-1.08 | 1.00 | 1.01-1.08 | 4.6x |
+| 4 | 1.07-1.13 | 1.00-1.02 | 1.07-1.15 | 4.3x |
+| 8 | 1.15-1.20 | 1.00-1.01 | 1.15-1.22 | 4.1x |
+
+A result outside these ranges means the derivation missed a mechanism and is checked
+against the phase diagnostic before it is reported.
 
 ## Derived ceilings and the gap to 5x (`ceiling.json`)
 
@@ -236,6 +254,7 @@ follows once the sessions have run.
 |---|---|---|
 | `levers.csv` | the lever inventory | compiled by hand from the cited evidence |
 | `ceiling.json` | derived floors, ceilings and required tokens per cycle | `python experiments/stack/ceiling.py --frontier evidence/bench/confirm/frontier.csv --stage-a evidence/repair/stage_a_timing.json --support evidence/drafter/support/zlab_b16_panel_v1_summary.json --out evidence/stack/ceiling.json` |
+| `expected.json` | the declared expected ratios of F, G and FULL per concurrency | `python experiments/stack/expected.py --ceiling evidence/stack/ceiling.json --gemm evidence/backbone/gemm_microbench.json --out evidence/stack/expected.json` |
 
 Commands for the pending holds (one exclusive hold at a time, through the FIFO queue):
 
