@@ -136,17 +136,20 @@ def paired(args: argparse.Namespace) -> None:
     write_csv(summary, args.out)
 
 
-def server_decode_rate(point: dict[str, Any]) -> float | None:
+def server_decode_rate(point: dict[str, Any], kind: str) -> float | None:
     """The server's logged decode rate during one point, with (nearly) the full batch running.
 
-    bench.sweep cuts the server log at each point's boundaries and keeps the median
-    `gen throughput` over decode log lines with at least 0.9x the point's peak running
-    count (`server_log.logged_gen_tps_full_batch_p50`). This is the GPU-side decode rate,
-    so a client throughput well below it points at the front end. Parsing the whole log
-    instead would let drain-phase intervals of a high-concurrency point count towards a
-    lower concurrency.
+    bench.sweep cuts the server log at each point's boundaries and keeps the decode log
+    lines with at least 0.9x the point's peak running count. `kind='weighted'` reads the
+    token-weighted rate over those windows (`logged_gen_tps_full_batch`, bench from
+    8f885eb on: each segment's first line, which spans the idle gap before the point, is
+    left out); `kind='p50'` reads the median window rate, which drops prefill-heavy windows
+    and so flatters speculation. Both are diagnostics beside the client throughput.
     """
-    value = (point.get('server_log') or {}).get('logged_gen_tps_full_batch_p50')
+    log = point.get('server_log') or {}
+    value = log.get(
+        'logged_gen_tps_full_batch' if kind == 'weighted' else 'logged_gen_tps_full_batch_p50'
+    )
     return float(value) if value is not None else None
 
 
@@ -167,7 +170,8 @@ def sweeps(args: argparse.Namespace) -> None:
     for (label, conc), plist in sorted(points.items()):
         ys = [float(p['y']) for p in plist if p.get('y')]
         xs = [float(p['x_e2e']) for p in plist if p.get('x_e2e')]
-        rates = [r for r in map(server_decode_rate, plist) if r is not None]
+        rates = [r for p in plist if (r := server_decode_rate(p, 'p50')) is not None]
+        weighted = [r for p in plist if (r := server_decode_rate(p, 'weighted')) is not None]
         spec = [
             float(p['spec']['accept_length'])
             for p in plist
@@ -186,6 +190,7 @@ def sweeps(args: argparse.Namespace) -> None:
                 'ttft_p99_ms': latency_stat(plist, 'ttft_ms', 'p99'),
                 'itl_p50_ms': latency_stat(plist, 'itl_ms', 'p50'),
                 'itl_p99_ms': latency_stat(plist, 'itl_ms', 'p99'),
+                'server_full_batch_tps': round(statistics.fmean(weighted), 1) if weighted else '',
                 'server_decode_tok_s': round(statistics.fmean(rates), 1) if rates else '',
                 'foreign_cpu_mean': round(
                     statistics.fmean(float(p.get('foreign_cpu_during_mean') or 0) for p in plist),

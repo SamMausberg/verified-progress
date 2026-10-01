@@ -77,19 +77,23 @@ LEVERS: dict[str, Lever] = {
     # tokens, plus headroom for chunked prefill.
     'p4_pools': Lever(
         {
-            'max-running-requests': 128,
-            # 360,448 admitted only 127 (run 20261001T082738Z, void): with ignore_eos the
-            # scheduler reserves each request's full 512 output tokens and charges a
-            # shared-mamba cost per request in token units.
+            # 129 at concurrency 128 (amendment of 2026-10-01, README 2c): at the pinned
+            # engine a prefill pass that carries a chunked request's tail stops admitting one
+            # request early, because that request counts both in the pass and in the rows it
+            # already holds; with --max-running-requests 128 every wave stopped at 127
+            # (admission_plateaus.py). The client still sends at most 128 at a time.
+            'max-running-requests': 129,
+            # Raised from 360,448 after the void first run (20261001T082738Z), whose 127
+            # plateau was blamed on the KV budget; that run's plateaus match the chunked-tail
+            # count above instead. Kept at 655,360 so only the running limit changes.
             'max-total-tokens': 655360,
-            # 128 slots admitted only 127 long prompts (runs 20261001T082738Z and
-            # 20261001T104311Z): with chunked prefill the last admission saw no schedulable
-            # mamba slot while one was free. 132 leaves headroom; the running limit stays 128.
+            # 132 slots (amendment of 10:55 UTC) did not lift the 127 plateau, so the mamba
+            # slots were not the limit; kept at 132 so only the running limit changes.
             'max-mamba-cache-size': 132,
             'mamba-ssm-dtype': 'float32',
         },
-        note='pinned pools for the P4 A/B: 128 running, 655,360 KV tokens, 132 mamba slots, '
-        'FP32 state stated explicitly',
+        note='pinned pools for the P4 A/B: running limit 129 (128 sent), 655,360 KV tokens, '
+        '132 mamba slots, FP32 state stated explicitly',
     ),
     'replayssm_spec': Lever(
         {'enable-linear-replayssm-spec': True},
@@ -100,6 +104,29 @@ LEVERS: dict[str, Lever] = {
     'no_radix': Lever(
         {'disable-radix-cache': True},
         note='one GDN state slot per request instead of five (no prefix reuse)',
+    ),
+    'tuned_noradix': Lever(
+        {'disable-radix-cache': True, 'max-mamba-cache-size': 128},
+        note="bench's tuned arms: radix off with one state slot per request (128 slots)",
+        conflicts=('no_radix',),
+    ),
+    'gdn_triton': Lever(
+        {'linear-attn-decode-backend': 'triton', 'linear-attn-verify-backend': 'triton'},
+        note='Triton GDN decode and verify kernels, pinned so arms on different engines match',
+        conflicts=('gdn_verify_triton', 'dflash'),
+    ),
+    # Exact buffered verify (GDN fold-every-commit): the verify runs the recurrent kernel and
+    # writes the raw window to a ring; the commit replays the accepted prefix with a bitwise
+    # clone of the recurrent update. It needs the drafter workstream's engine patch, which is
+    # not on main yet. On an engine without it the flag alone runs stock ReplaySSM-spec, so
+    # check the engine HEAD in each launch record. Exactness is the drafter's claim until its
+    # evidence merges.
+    'fold': Lever(
+        {'enable-linear-replayssm-spec': True},
+        note='GDN fold-every-commit buffered verify (exact by construction)',
+        arm='mtp',
+        conflicts=('replayssm', 'replayssm_spec', 'tree'),
+        env={'SGLANG_GDN_REPLAYSSM_FOLD': '1'},
     ),
     # --- weights and KV ---
     'fp8_weights': Lever(
@@ -156,6 +183,28 @@ LEVERS: dict[str, Lever] = {
         note='SGLang adaptive steps: candidate depths chosen by batch size and acceptance',
         arm='mtp',
     ),
+    # Arrival batching (scheduling only). At c = 128 a held MTP batch cycles in ~21 ms but
+    # the served cycle was estimated at ~35 ms; the hypothesis (untested) is that each
+    # arrival's prefill pass interrupts decode. The delayer holds prefill until
+    # min(running / 16, N) requests wait (5 s cap), so one pass admits several arrivals.
+    # Costs TTFT; report it beside throughput.
+    'prefill_delay4': Lever(
+        {
+            'enable-prefill-delayer': True,
+            'prefill-delayer-queue-min-ratio': 0.0625,
+            'prefill-max-requests': 4,
+        },
+        note='prefill delayer: batch arrivals, up to 4 per prefill pass',
+    ),
+    'prefill_delay8': Lever(
+        {
+            'enable-prefill-delayer': True,
+            'prefill-delayer-queue-min-ratio': 0.0625,
+            'prefill-max-requests': 8,
+        },
+        note='prefill delayer: batch arrivals, up to 8 per prefill pass',
+        conflicts=('prefill_delay4',),
+    ),
     # Host-overhead levers for the speculative cycle (profile: MTP at B=1 idles the
     # GPU ~25% of the cycle while the host prepares verify).
     'plan_stream': Lever(
@@ -210,6 +259,13 @@ LEVERS: dict[str, Lever] = {
         note='public BF16 DFlash block drafter (z-lab); the target verifies, so exact',
         arm='plain',
         env={'SGLANG_ENABLE_OVERLAP_PLAN_STREAM': '1'},
+    ),
+    'gdn_verify_triton': Lever(
+        {'linear-attn-verify-backend': 'triton'},
+        note='GDN target verify on the Triton recurrent kernel instead of FlashInfer MTP '
+        '(repair, evidence/repair/stage_a_timing.json: DFlash verify pass at one request '
+        '4.78 -> 4.55 ms at B=16, 15.62 -> 7.58 at 64, 44.82 -> 19.18 at 256); class pending '
+        "bench's equality classification (it changes the target's GDN verify kernel)",
     ),
     'dflash_nota': Lever(
         {

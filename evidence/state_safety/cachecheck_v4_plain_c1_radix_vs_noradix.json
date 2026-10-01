@@ -281,8 +281,8 @@
     "run_against_accumulator_order": "a"
    },
    "model_hopper": {
-    "gap_bound_a": 0.01667490003982234,
-    "gap_bound_b": 0.016682557293656496,
+    "gap_bound_a": 0.01670521792057349,
+    "gap_bound_b": 0.01671288909663255,
     "accumulator_order_source": [
      "float64",
      "bf16"
@@ -529,8 +529,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.015157788227239625,
-    "gap_bound_b": 0.015148391115622188,
+    "gap_bound_a": 0.015185347733733047,
+    "gap_bound_b": 0.015175933536525368,
     "accumulator_order_source": [
      "bf16",
      "float64"

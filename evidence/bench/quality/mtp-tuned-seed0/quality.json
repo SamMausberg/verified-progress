@@ -1,0 +1,197 @@
+{
+  "label": "mtp-tuned-seed0",
+  "arm": {
+    "name": "mtp-tuned",
+    "description": "Arm B, tuned for high concurrency: native MTP, 3-step chain, buffered GDN verify (no per-draft-token state snapshots), FlashInfer attention.",
+    "model": "Qwen/Qwen3.5-4B",
+    "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+    "args": {
+      "attention-backend": "flashinfer",
+      "mm-attention-backend": "triton_attn",
+      "max-running-requests": 128,
+      "max-mamba-cache-size": 128,
+      "mem-fraction-static": 0.85,
+      "max-total-tokens": 1000000,
+      "enable-metrics": true,
+      "random-seed": 0,
+      "stream-interval": 4,
+      "speculative-algorithm": "NEXTN",
+      "speculative-num-steps": 3,
+      "speculative-eagle-topk": 1,
+      "speculative-num-draft-tokens": 4,
+      "enable-linear-replayssm-spec": true,
+      "disable-radix-cache": true
+    },
+    "env": {},
+    "max_concurrency": 128,
+    "lossy": "",
+    "exactness": "exact-up-to-rounding",
+    "exactness_note": "buffered GDN verify; every first divergence against stock MTP s3 (radix off) is rounding-level (equality report, 2026-10-01)",
+    "require_full_graph_coverage": true
+  },
+  "launch_checks": [
+    {
+      "name": "cuda_graph_decode",
+      "ok": true,
+      "required": true,
+      "detail": "captured: target prefill (breakable), target verify (full), draft prefill (breakable), draft decode (full), draft extend (full)"
+    },
+    {
+      "name": "cuda_graph_prefill",
+      "ok": true,
+      "required": true,
+      "detail": "captured"
+    },
+    {
+      "name": "cuda_graph_covers_capacity",
+      "ok": true,
+      "required": true,
+      "detail": "target verify graph batch sizes up to 128; server capacity 128"
+    },
+    {
+      "name": "overlap_scheduler",
+      "ok": true,
+      "required": true,
+      "detail": "scheduler disable_overlap_schedule=False"
+    },
+    {
+      "name": "capacity",
+      "ok": true,
+      "required": true,
+      "detail": "effective max_running_requests=128, target 128"
+    },
+    {
+      "name": "attention_backend",
+      "ok": true,
+      "required": true,
+      "detail": "scheduler attention_backend=flashinfer, requested flashinfer"
+    },
+    {
+      "name": "speculative_config",
+      "ok": true,
+      "required": true,
+      "detail": "resolved: speculative_algorithm=EAGLE, speculative_num_steps=3, speculative_eagle_topk=1, speculative_num_draft_tokens=4"
+    }
+  ],
+  "server_version": "0.5.21.dev861+gbd66ce343",
+  "sglang_source": {
+    "module_file": "/home/ubuntu/sglang/python/sglang/__init__.py",
+    "path": "/home/ubuntu/sglang",
+    "head": "bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824",
+    "branch": "verified-progress",
+    "dirty_files": []
+  },
+  "repo": {
+    "path": "/home/ubuntu/vp-wt/bench",
+    "head": "2b7e9075e672fc203abab199039eb2fc98b8aa8e",
+    "branch": "bench/confirm",
+    "dirty_files": []
+  },
+  "task_file": "/home/ubuntu/vp-wt/bench/bench/quality/gsm8k_test.jsonl",
+  "task_sha256": "01680346c8530cfc7edaf42642adc5367750de72e24ba6b2420b8a1073a8a704",
+  "task_problems": 1319,
+  "generation": {
+    "temperature": 0.6,
+    "top_p": 0.95,
+    "extra_body": {
+      "top_k": 20
+    },
+    "max_tokens": 16384,
+    "chat_template_kwargs": {
+      "enable_thinking": true
+    },
+    "prompt": "sgl-eval gsm8k default (NeMo-Skills generic/math, zero-shot)",
+    "seed": 0,
+    "threads": 128
+  },
+  "sgl_eval_command": [
+    "/home/ubuntu/sglang/.venv/bin/python",
+    "-m",
+    "bench.quality",
+    "sgl-eval",
+    "--extra-body",
+    "{\"top_k\": 20}",
+    "run",
+    "gsm8k",
+    "--base-url",
+    "http://127.0.0.1:30010/v1",
+    "--model",
+    "Qwen/Qwen3.5-4B",
+    "--from-dataset",
+    "/home/ubuntu/vp-wt/bench/bench/quality/gsm8k_test.jsonl",
+    "--temperature",
+    "0.6",
+    "--top-p",
+    "0.95",
+    "--max-tokens",
+    "16384",
+    "--chat-template-kwarg",
+    "enable_thinking=true",
+    "--num-threads",
+    "128",
+    "--seed",
+    "0",
+    "--out-dir",
+    "/home/ubuntu/vp-data/bench/quality/mtp-tuned-seed0/20261001-075328/sgl_eval"
+  ],
+  "sgl_eval_exit_code": 0,
+  "wall_s": 807.8542697429657,
+  "host_load": {
+    "interval_s": 1.0,
+    "samples": 781,
+    "foreign_cores_mean": 0.421,
+    "foreign_cores_max": 2.62,
+    "contended": false,
+    "contention_threshold_cores": 2.0,
+    "top_foreign_mean_cores": {
+      "/home/ubuntu/.cursor-server/bin/linux-arm64/e44a49c17e334d442e58bbde931d791200f014a0/node --dns-result-order=ipv4first -": 0.09,
+      "claude --dangerously-skip-permissions": 0.05,
+      "python experiments/certified_head/compile_check.py": 0.04,
+      "/home/ubuntu/sglang/.venv/lib/python3.12/site-packages/triton/backends/nvidia/bin/ptxas -lineinfo -v --regAllocOptLevel ": 0.02
+    },
+    "own_peak_cores": {
+      "/home/ubuntu/sglang/.venv/bin/python -m bench.quality sgl-ev": 5.12,
+      "sglang::scheduler": 1.03,
+      "/home/ubuntu/sglang/.venv/bin/python -m sglang.launch_server": 0.14
+    }
+  },
+  "server_counters": {
+    "generation_tokens": 7960827.0,
+    "prompt_tokens": 124279.0,
+    "spec_verify_calls": 2391169.0,
+    "decode_graph_passes": 21623.0,
+    "decode_eager_passes": 0,
+    "prefill_graph_passes": 1157.0,
+    "prefill_eager_passes": 0.0,
+    "num_requests": 1319.0,
+    "retracted_requests": 0,
+    "server_accept_length": 3.3292615452943726,
+    "decode_graph_fraction": 1.0
+  },
+  "avg_spec_accept_length_since_start": 3.3292574911521498,
+  "gpu": [
+    "NVIDIA GH200 480GB",
+    "570.195.03",
+    "97871 MiB",
+    "4 MiB",
+    "345 MHz",
+    "2619 MHz",
+    "1980 MHz",
+    "2619 MHz",
+    "900.00 W",
+    "38",
+    "Enabled"
+  ],
+  "problems": 1319,
+  "correct": 1181,
+  "accuracy": 0.8953752843062927,
+  "accuracy_wilson95": [
+    0.8776933352267594,
+    0.9107608530902697
+  ],
+  "no_answer": 93,
+  "truncated": 232,
+  "completion_tokens_mean": 6035.501895375284,
+  "completion_tokens_p50": 3992,
+  "completion_tokens_max": 16384
+}

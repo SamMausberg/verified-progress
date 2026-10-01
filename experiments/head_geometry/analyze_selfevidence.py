@@ -48,11 +48,12 @@ F64 = torch.float64
 DECISIONS = ('greedy', 'gumbel_t1.0', 'gumbel_t0.7')
 GAMMAS = ('tensor_core', 'fp32_tree')
 # gamma values for the stock cuBLAS pre-rounding error G_i = gamma * sum_j |w_ij h_j| in the
-# R-stock gap condition: the reference tensor-core model, a tighter wgmma model, and the
-# reference IEEE FP32 tree.
+# R-stock gap condition: the reference tensor-core model, the Hopper wgmma model (its
+# derived value rounded up, 1.19216e-4; the key keeps its name for the evidence's
+# readers), and the reference IEEE FP32 tree.
 RSTOCK_GAMMAS = {
     'tensor_core_model': B.accumulation_gamma(2560, 'tensor_core'),
-    'gamma_1.19e-4': 1.19e-4,
+    'gamma_1.19e-4': B.hopper_gamma(2560),
     'fp32_tree_model': B.accumulation_gamma(2560, 'fp32_tree'),
 }
 

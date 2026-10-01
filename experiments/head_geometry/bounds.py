@@ -568,6 +568,17 @@ def accumulation_gamma(dim: int, model: str) -> float:
     return max(float(ref.gamma(a.depth(dim) + 1, a.node_roundoff)) for a in accs)
 
 
+def hopper_gamma(dim: int) -> float:
+    """gamma of the Hopper wgmma model for the stock BF16 head GEMM (no scale multiply).
+
+    The exact ``precision_reference.hopper_wgmma_gamma`` rounded up to binary64, so the
+    replays never use less than the derived value (1.19216e-4 at D = 2560).
+    """
+    import precision_reference as ref
+
+    return ref.float_up(ref.hopper_wgmma_gamma(dim))
+
+
 # ---------------------------------------------------------------------------
 # Certified argmax and Gumbel-max candidate sets
 # ---------------------------------------------------------------------------

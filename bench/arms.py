@@ -15,10 +15,11 @@ arithmetic (FlashInfer target attention, stock GDN state handling); speculative
 arms with stock verify are `stock`, and draft-only kernels do not change the
 class. Stock arms may set only flags in `NEUTRAL_FLAGS` (an allowlist) and
 FlashInfer target attention. `pending` arms change something else
-(`numerics_changes`) and wait for classification of their outputs against the
-batch-shape floor;
-`exact-up-to-floor` arms passed it; `lossy` arms did not, or change the model's
-arithmetic by design, and need a quality measurement. An arm without a class, or
+(`numerics_changes`) and wait for classification of their greedy outputs against
+their matched stock reference (bench/README.md, "Exactness classes"):
+`exact-up-to-rounding` arms diverge from it only at rounding-level positions;
+`lossy` arms do not, or change the model's arithmetic by design, and need a
+quality measurement. An arm without a class, or
 a `stock` arm in arms.toml that sets a numerics-changing flag, is an error. A
 `--set` override that adds such a flag to a `stock` arm makes it `pending`.
 """
@@ -32,9 +33,9 @@ from typing import Any
 
 ARMS_FILE = Path(__file__).with_name('arms.toml')
 
-EXACTNESS_CLASSES = ('stock', 'exact-up-to-floor', 'pending', 'lossy')
+EXACTNESS_CLASSES = ('stock', 'exact-up-to-rounding', 'pending', 'lossy')
 # Classes whose outputs match plain decoding as closely as batch shape allows.
-EXACT_CLASSES = frozenset({'stock', 'exact-up-to-floor'})
+EXACT_CLASSES = frozenset({'stock', 'exact-up-to-rounding'})
 # Flags known to leave the target's arithmetic as in the reference configuration
 # (plain decoding, FlashInfer target attention, stock GDN state handling). Any other
 # flag, any environment variable outside NEUTRAL_ENV, a target attention backend
@@ -98,17 +99,21 @@ class Arm:
     # weights, FP8 KV, BF16 GDN state, ...); empty for arms that keep the model's
     # arithmetic. Reports must pair a lossy arm with a quality measurement.
     lossy: str = ''
-    # One of EXACTNESS_CLASSES (see the module docstring).
+    # One of EXACTNESS_CLASSES (see the module docstring), and for an
+    # exact-up-to-rounding arm the evidence for that class. `lossy` stays empty on
+    # stock and exact arms, so a lossy note added in code always changes the class.
     exactness: str = ''
+    exactness_note: str = ''
     # Decode/verify CUDA graphs must cover every batch size up to capacity. An arm
     # whose capacity exceeds the graph range it can afford sets this to false and
     # then runs its largest batches eagerly (reported, not hidden).
     require_full_graph_coverage: bool = True
 
     def __post_init__(self) -> None:
-        # An arm built in code with a lossy note but no class, or with the stock or
-        # pending class inherited from its base arm, takes its class from the note.
-        if self.lossy and self.exactness in ('', 'stock', 'pending'):
+        # An arm built in code with a lossy note but no class, or with a stock,
+        # exact or pending class inherited from its base arm, takes its class from
+        # the note.
+        if self.lossy and self.exactness in ('', 'stock', 'exact-up-to-rounding', 'pending'):
             note = self.lossy.lower()
             object.__setattr__(
                 self, 'exactness', 'pending' if note.startswith('pending') else 'lossy'
@@ -129,6 +134,7 @@ class Arm:
             'max_concurrency': self.max_concurrency,
             'lossy': self.lossy,
             'exactness': self.exactness,
+            'exactness_note': self.exactness_note,
             'require_full_graph_coverage': self.require_full_graph_coverage,
         }
 
@@ -227,8 +233,13 @@ def resolve_arm(
     lossy = str(entry.get('lossy', '')).strip()
     if exactness not in EXACTNESS_CLASSES:
         raise ValueError(f'arm {name!r}: exactness must be one of {EXACTNESS_CLASSES}')
-    if exactness != 'stock' and not lossy:
+    exactness_note = str(entry.get('exactness_note', '')).strip()
+    if exactness in ('pending', 'lossy') and not lossy:
         raise ValueError(f'arm {name!r}: a {exactness} arm needs a lossy note saying why')
+    if exactness in EXACT_CLASSES and lossy:
+        raise ValueError(f'arm {name!r}: a {exactness} arm takes exactness_note, not lossy')
+    if exactness == 'exact-up-to-rounding' and not exactness_note:
+        raise ValueError(f'arm {name!r}: exact-up-to-rounding needs an exactness_note')
     model = (
         str(entry.get('model', defaults['model'])),
         str(entry.get('revision', defaults['revision'])),
@@ -255,6 +266,7 @@ def resolve_arm(
         max_concurrency=int(entry.get('max_concurrency', defaults.get('max_concurrency', 128))),
         lossy=lossy,
         exactness=exactness,
+        exactness_note=exactness_note if exactness == 'exact-up-to-rounding' else '',
         require_full_graph_coverage=bool(entry.get('require_full_graph_coverage', True)),
     )
 

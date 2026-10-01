@@ -41,14 +41,23 @@ case $part in
   all) PLAN=("${PART_A[@]}" "${PART_B[@]}" "$B4") ;;
   *) echo "unknown part $part" >&2; exit 64 ;;
 esac
+failed=()
 run() {
   local arm=$1 levels=$2
   echo "=== $arm c=$levels"
+  log=$(mktemp)
   # shellcheck disable=SC2086 # levels is a space-separated list of integers
   python -m bench.sweep --out ~/vp-data/bench/confirm --port 30010 --osl 512 \
     --quiet-cpu-wait 600 --arm "$arm" --label "$arm" --session "confirm-r$repeat" \
-    --concurrency $levels 2>&1 |
-    grep -E "^\[FAIL|^r0|Error|done" | tail -12
+    --concurrency $levels > "$log" 2>&1
+  status=$?
+  grep -E "^\[FAIL|^r0|[Ee]rror|done" "$log" | tail -12
+  if [ "$status" -ne 0 ]; then
+    echo "sweep for $arm exited $status:"
+    tail -3 "$log"
+    failed+=("$arm")
+  fi
+  rm -f "$log"
 }
 order=("${PLAN[@]}")
 if (( repeat % 2 == 1 )); then
@@ -56,3 +65,7 @@ if (( repeat % 2 == 1 )); then
   for (( i=${#PLAN[@]}-1; i>=0; i-- )); do order+=("${PLAN[$i]}"); done
 fi
 for entry in "${order[@]}"; do run "${entry%%:*}" "${entry#*:}"; done
+if [ "${#failed[@]}" -gt 0 ]; then
+  echo "sweeps that failed: ${failed[*]}" >&2
+  exit 1
+fi

@@ -25,6 +25,7 @@ anything timed).
 | `build_train_prompts.py` | Training prompts (chat, code, maths) from permissive public sources; fails unless they are disjoint (text and id) from every bench split of mixed-v1 and mixed-v2, the panel and MT-Bench |
 | `gen_targets.py`, `run_gen_segment.sh` | The target's own greedy thinking-mode responses to the training prompts, generated with SGLang in resumable segments |
 | `train_dflash.py` | Fine-tunes a DFlash or DFlash 2 drafter against the frozen target in resumable time-boxed segments; exports a checkpoint SGLang loads unchanged |
+| `drafting_requirement.py` | Derived, no GPU: the tokens per cycle and the constant per-position acceptance a block drafter needs for a 5x end-to-end gain at each width, from the repair workstream's measured cycle periods, against the measured block-16 acceptance and its top-16 support bound |
 
 ## Engine patch
 
