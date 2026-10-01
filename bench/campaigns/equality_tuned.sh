@@ -42,6 +42,7 @@ run_missing() {
 }
 run_missing mtp_s3,mtp_s3_replayssm,plain_replayssm bench_noradix "--disable-radix-cache"
 run_missing mtp_s3_replayssm,plain bench_noradix_triton "--disable-radix-cache --attention-backend triton"
+run_missing plain bench_dflash_b16 "$DFLASH_B16 --disable-radix-cache"
 run_missing plain bench_dflash_b16_triton "$DFLASH_B16 --disable-radix-cache --attention-backend triton"
 run_missing plain bench_dflash_b16_triton_gdnverify \
   "$DFLASH_B16 --disable-radix-cache --attention-backend triton --linear-attn-verify-backend triton"
@@ -55,16 +56,35 @@ cat > "$OUT/pairs.json" <<'PAIRS'
   ["plain radix-off triton vs plain c1", "plain/c1", "plain__bench_noradix_triton/c1"],
   ["dflash b16 radix-off triton vs plain c1", "plain/c1", "plain__bench_dflash_b16_triton/c1"],
   ["dflash b16 radix-off triton gdn-verify-triton vs plain c1", "plain/c1", "plain__bench_dflash_b16_triton_gdnverify/c1"],
-  ["mtp_s3 buffered vs stock verify radix-off c1", "mtp_s3__bench_noradix/c1", "mtp_s3_replayssm__bench_noradix/c1"]
+  ["mtp_s3 buffered vs stock verify radix-off c1", "mtp_s3__bench_noradix/c1", "mtp_s3_replayssm__bench_noradix/c1"],
+  ["mtp_s3 buffered triton vs stock verify radix-off c1", "mtp_s3__bench_noradix/c1", "mtp_s3_replayssm__bench_noradix_triton/c1"],
+  ["dflash b16 stock radix-off vs plain c1", "plain/c1", "plain__bench_dflash_b16/c1"],
+  ["dflash b16 triton vs stock dflash b16 radix-off c1", "plain__bench_dflash_b16/c1", "plain__bench_dflash_b16_triton/c1"],
+  ["dflash b16 triton gdn-verify-triton vs stock dflash b16 radix-off c1", "plain__bench_dflash_b16/c1", "plain__bench_dflash_b16_triton_gdnverify/c1"]
 ]
 PAIRS
+# Each arm with a numerics change against its matched stock reference (bench/README.md):
+# plain levers against plain c1, speculative levers against stock speculation with
+# the same drafter and steps (radix cache off). Third entry: the arm against plain c1.
+cat > "$OUT/arms.json" <<'ARMS'
+[
+  ["mtp-tuned", "mtp_s3 buffered vs stock verify radix-off c1", "mtp_s3 buffered verify radix-off vs plain c1"],
+  ["mtp-tuned-triton", "mtp_s3 buffered triton vs stock verify radix-off c1", "mtp_s3 buffered verify radix-off triton vs plain c1"],
+  ["plain-tuned-triton", "plain radix-off triton vs plain c1", "plain radix-off triton vs plain c1"],
+  ["plain-tuned-replayssm", "plain buffered decode radix-off vs plain c1", "plain buffered decode radix-off vs plain c1"],
+  ["dflash-tuned-b16", "dflash b16 triton vs stock dflash b16 radix-off c1", "dflash b16 radix-off triton vs plain c1"],
+  ["dflash-tuned-b16-gdnverify-triton", "dflash b16 triton gdn-verify-triton vs stock dflash b16 radix-off c1", "dflash b16 radix-off triton gdn-verify-triton vs plain c1"]
+]
+ARMS
 # Outputs of an earlier run must not pass for this one.
-rm -f "$OUT/summary.json" "$OUT/report.json" "$OUT/divergences.csv" "$OUT/table.csv"
+rm -f "$OUT/summary.json" "$OUT/report.json" "$OUT/classes.json" "$OUT/divergences.csv" \
+  "$OUT/table.csv"
 python experiments/state_safety/compare.py --runs "$RUNS" --pairs "$OUT/pairs.json" \
   --out-json "$OUT/summary.json" --out-csv "$OUT/divergences.csv" \
   --out-table "$OUT/table.csv" | tee "$OUT/compare.log"
 compare_status=${PIPESTATUS[0]}
-python -m bench.divergence "$OUT/summary.json" --out "$OUT/report.json"
+python -m bench.divergence "$OUT/summary.json" --out "$OUT/report.json" \
+  --arms "$OUT/arms.json" --classes-out "$OUT/classes.json"
 divergence_status=$?
 status=0
 if [ "$compare_status" -ne 0 ] || [ "$divergence_status" -ne 0 ]; then

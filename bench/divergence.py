@@ -14,6 +14,13 @@ pair seen here. Both members of a ratio share the plain c=1 reference run, so th
 ratio interval ignores that correlation and is conservative in neither direction;
 it is a screen, not a test of equivalence.
 
+With `--arms`, it also classifies arms by the rule recorded in bench/README.md
+(2026-10-01, set after the first results): an arm is `exact-up-to-rounding` when
+every first divergence against its matched stock reference falls in the rounding
+classes (tie, one_ulp, near), and `lossy` when any is `large` or `not_argmax`. The
+rate and its ratio to the floor are reported beside the class, never used as a
+test. The arms file lists [arm, matched-reference pair, plain-c1 pair].
+
     python -m bench.divergence ~/vp-data/bench/equality/summary.json --floor "floor plain c1 vs c32"
 """
 
@@ -81,11 +88,49 @@ def report(pairs: dict[str, dict[str, Any]], floor_label: str) -> list[dict[str,
     return out
 
 
+ROUNDING_CLASSES = ('tie', 'one_ulp', 'near')
+
+
+def classify(
+    entries: list[dict[str, Any]], arms: list[tuple[str, str, str]]
+) -> list[dict[str, Any]]:
+    """Class per arm from its matched-reference pair; rates reported beside it."""
+    by_pair = {entry['pair']: entry for entry in entries}
+    out = []
+    for arm, matched, plain in arms:
+        if matched not in by_pair:
+            raise SystemExit(f'{arm}: matched pair {matched!r} missing from the summary')
+        reference = by_pair[matched]
+        rounding = all(
+            count == 0 for name, count in reference['classes'].items()
+            if name not in ROUNDING_CLASSES
+        )  # fmt: skip
+        record: dict[str, Any] = {
+            'arm': arm,
+            'exactness': 'exact-up-to-rounding' if rounding else 'lossy',
+            'matched_pair': matched,
+            'matched': {k: reference[k] for k in ('per_1k', 'per_1k_95', 'classes')},
+            'matched_ratio_to_floor': reference['ratio_to_floor'],
+            'matched_ratio_to_floor_95': reference['ratio_to_floor_95'],
+        }
+        if plain in by_pair:
+            versus = by_pair[plain]
+            record['plain_pair'] = plain
+            record['vs_plain'] = {
+                k: versus[k]
+                for k in ('per_1k', 'per_1k_95', 'ratio_to_floor', 'ratio_to_floor_95', 'classes')
+            }
+        out.append(record)
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('summary', type=Path, help='compare.py --out-json file')
     parser.add_argument('--floor', default='floor plain c1 vs c32')
     parser.add_argument('--out', type=Path, default=None)
+    parser.add_argument('--arms', type=Path, default=None, help='[[arm, matched, plain], ...]')
+    parser.add_argument('--classes-out', type=Path, default=None)
     args = parser.parse_args(argv)
     pairs = json.loads(args.summary.read_text())['pairs']
     result = report(pairs, args.floor)
@@ -93,6 +138,12 @@ def main(argv: list[str] | None = None) -> int:
     print(text)
     if args.out:
         args.out.write_text(text + '\n')
+    if args.arms:
+        arms = [tuple(item) for item in json.loads(args.arms.read_text())]
+        classes = classify(result, arms)
+        print(json.dumps(classes, indent=2))
+        if args.classes_out:
+            args.classes_out.write_text(json.dumps(classes, indent=2) + '\n')
     return 0
 
 
