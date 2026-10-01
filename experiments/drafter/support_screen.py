@@ -57,6 +57,12 @@ def main() -> None:
     parser.add_argument('--panel', type=Path, required=True)
     parser.add_argument('--draft', required=True)
     parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument(
+        '--save-cycles',
+        action='store_true',
+        help='also write cycles.pt: per-cycle accepted lengths, U_K, the realized '
+        'continuation, the engine draft and the top-16 candidate ids and logits',
+    )
     args = parser.parse_args()
 
     from transformers import AutoTokenizer
@@ -84,6 +90,7 @@ def main() -> None:
     totals: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
     survival: dict[tuple[str, str], list[float]] = defaultdict(lambda: [0.0] * block)
     agree = [0, 0]
+    saved: dict[str, list] = defaultdict(list)
     for index, (rid, rows) in enumerate(sorted(cycles.items())):
         text = tokenizer.apply_chat_template(
             [{'role': 'user', 'content': panel[rid]['text']}],
@@ -106,12 +113,12 @@ def main() -> None:
             draft, target.model.embed_tokens, features, ids, anchors, block, mask_token
         )
         # Top-K through the tied head in chunks ([n, B-1, vocab] logits would be GBs).
-        top = torch.cat(
-            [
-                (chunk.to(head.dtype) @ head.T).topk(max(KS), dim=-1).indices
-                for chunk in hidden[:, 1:].split(64)
-            ]
-        )  # sorted, top[..., 0] = argmax
+        tops = [
+            (chunk.to(head.dtype) @ head.T).topk(max(KS), dim=-1)
+            for chunk in hidden[:, 1:].split(64)
+        ]
+        top = torch.cat([t.indices for t in tops])  # sorted, top[..., 0] = argmax
+        top_logits = torch.cat([t.values for t in tops])
         truth = ids[0, anchors[:, None] + torch.arange(1, block, device=device)]  # g_1..g_{B-1}
         engine_draft = torch.tensor([r['draft'][1:] for r in rows], device=device)
         agree[0] += int((top[..., 0] == engine_draft).sum())
@@ -121,6 +128,18 @@ def main() -> None:
         for k in KS:
             values[f'U_{k}'] = prefix_len((top[..., :k] == truth[..., None]).any(-1))
         domain = panel[rid]['domain']
+        if args.save_cycles:
+            saved['rid'] += [rid] * len(rows)
+            saved['domain'] += [domain] * len(rows)
+            for name, tensor in (
+                ('prefix_len', anchors),
+                ('candidates', top),
+                ('candidate_logits', top_logits.to(torch.bfloat16)),
+                ('truth', truth),
+                ('engine_draft', engine_draft),
+                *values.items(),
+            ):
+                saved[name].append(tensor.cpu())
         for group in (domain, 'all'):
             totals[group]['cycles'] += len(rows)
             for name, value in values.items():
@@ -131,6 +150,24 @@ def main() -> None:
             print(f'{index + 1}/{len(cycles)} requests', flush=True)
 
     args.out.mkdir(parents=True, exist_ok=True)
+    if args.save_cycles:
+        torch.save(
+            {
+                **{
+                    name: torch.cat(parts) if name not in ('rid', 'domain') else parts
+                    for name, parts in saved.items()
+                },
+                'meta': {
+                    'draft': args.draft,
+                    'trace': str(args.trace),
+                    'note': 'one row per kept verify cycle; slot k = 1..B-1 in the last '
+                    'dimension; candidates sorted by drafter logit (top-16 through the '
+                    'tied head, bf16 logits); truth = realized greedy continuation; '
+                    'cycles whose block runs past the output end are excluded',
+                },
+            },
+            args.out / 'cycles.pt',
+        )
     summary = {
         'draft': args.draft,
         'trace': str(args.trace),
