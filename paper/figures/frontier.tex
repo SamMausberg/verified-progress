@@ -6,8 +6,12 @@
 % than three sessions are hollow; they do not rank on the frontier (evidence/bench/README.md). Drafter colours follow Figure
 % fig:rho (DFlash ink, MTP purple); plain decoding is the grey baseline. Each curve runs
 % from c = 1 (lower right) to c = 128 (upper left); the caption says so.
-\pgfplotsset{only if n at least/.style={x filter/.append code={%
-  \ifnum\thisrow{n}<#1\relax\def\pgfmathresult{inf}\fi}}}
+% Keep only points with at least #1 sessions, or with fewer than #1.
+\pgfplotsset{
+  only if n at least/.style={x filter/.append code={%
+    \ifnum\thisrow{n}<#1\relax\def\pgfmathresult{inf}\fi}},
+  only if n below/.style={x filter/.append code={%
+    \ifnum\thisrow{n}<#1\relax\else\def\pgfmathresult{inf}\fi}}}
 \begin{tikzpicture}
 \begin{axis}[xmode=log,ymode=log,width=\columnwidth,height=4.25cm,
   xmin=80,xmax=1150,ymin=220,ymax=18000,grid=major,
@@ -20,9 +24,9 @@
 \addplot[thick,muted,mark=*,discard if not={label}{plain-tuned}] table[x=x_e2e_mean,y=y_mean,col sep=comma]{../evidence/bench/confirm/frontier.csv};
 \addplot[thick,vppurple,mark=none,forget plot,discard if not={label}{mtp-tuned}] table[x=x_e2e_mean,y=y_mean,col sep=comma]{../evidence/bench/confirm/frontier.csv};
 \addplot[only marks,vppurple,mark=triangle*,discard if not={label}{mtp-tuned},only if n at least=3] table[x=x_e2e_mean,y=y_mean,col sep=comma]{../evidence/bench/confirm/frontier.csv};
-\addplot[only marks,vppurple,mark=triangle,forget plot,discard if not={label}{mtp-tuned}] table[x=x_e2e_mean,y=y_mean,col sep=comma]{../evidence/bench/confirm/frontier.csv};
+\addplot[only marks,vppurple,mark=triangle,forget plot,discard if not={label}{mtp-tuned},only if n below=3] table[x=x_e2e_mean,y=y_mean,col sep=comma]{../evidence/bench/confirm/frontier.csv};
 \addplot[thick,ink,mark=diamond*,discard if not={label}{dflash-tuned}] table[x=x_e2e_mean,y=y_mean,col sep=comma]{../evidence/bench/confirm/frontier.csv};
-\addplot[thick,ink,dashed,mark=square,mark options={solid},discard if not={label}{dflash-tuned-b16}] table[x=x_e2e_mean,y=y_mean,col sep=comma]{../evidence/bench/confirm/frontier.csv};
+\addplot[thick,ink,dashed,mark=square*,mark options={solid},discard if not={label}{dflash-tuned-b16}] table[x=x_e2e_mean,y=y_mean,col sep=comma]{../evidence/bench/confirm/frontier.csv};
 \node[annot,text=black,anchor=east] at (axis cs:255,600) {plain};
 \node[annot,text=black,anchor=west] at (axis cs:475,500) {MTP, 3 steps};
 \node[annot,text=black,anchor=south] at (axis cs:330,7600) {DFlash, block 8};
