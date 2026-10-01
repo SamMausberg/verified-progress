@@ -4,6 +4,7 @@
     "repeat session, plain c1": {
       "prompts": 320,
       "bitwise_identical": 320,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -38,6 +39,7 @@
     "repeat session, plain c32": {
       "prompts": 320,
       "bitwise_identical": 312,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -77,6 +79,7 @@
     "concurrency 1 vs 32 (cap 8), plain": {
       "prompts": 320,
       "bitwise_identical": 245,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -119,6 +122,7 @@
     "concurrency 1 vs 32 (cap 8), mtp_s1": {
       "prompts": 320,
       "bitwise_identical": 0,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -162,6 +166,7 @@
     "concurrency 1 vs 32 (cap 8), mtp_s3": {
       "prompts": 320,
       "bitwise_identical": 0,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -205,6 +210,7 @@
     "concurrency 1 vs 32 (cap 8), mtp_s5": {
       "prompts": 320,
       "bitwise_identical": 0,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -251,6 +257,7 @@
     "concurrency 1 vs 32 (cap 8), mtp_tree": {
       "prompts": 320,
       "bitwise_identical": 0,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -296,6 +303,7 @@
     "same server repeat c1, plain": {
       "prompts": 320,
       "bitwise_identical": 285,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -338,6 +346,7 @@
     "same server repeat c32, plain": {
       "prompts": 320,
       "bitwise_identical": 311,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -378,6 +387,7 @@
     "radix off c1, mtp_s3": {
       "prompts": 320,
       "bitwise_identical": 122,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -420,6 +430,7 @@
     "radix off c32, mtp_s3": {
       "prompts": 320,
       "bitwise_identical": 111,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -463,6 +474,7 @@
     "radix off, mtp_s3 c1 vs c32": {
       "prompts": 320,
       "bitwise_identical": 0,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -506,6 +518,7 @@
     "overlap off c1, mtp_s3": {
       "prompts": 320,
       "bitwise_identical": 28,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -550,6 +563,7 @@
     "overlap off vs radix off c1, mtp_s3": {
       "prompts": 320,
       "bitwise_identical": 136,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -592,6 +606,7 @@
     "overlap off, mtp_s3 c1 vs c32": {
       "prompts": 320,
       "bitwise_identical": 0,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -634,6 +649,7 @@
     "spec vs plain c1, mtp_s1": {
       "prompts": 320,
       "bitwise_identical": 0,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -675,6 +691,7 @@
     "spec vs plain c1, mtp_s3": {
       "prompts": 320,
       "bitwise_identical": 0,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -716,6 +733,7 @@
     "spec vs plain c1, mtp_s5": {
       "prompts": 320,
       "bitwise_identical": 0,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -757,6 +775,7 @@
     "spec vs plain c1, mtp_tree": {
       "prompts": 320,
       "bitwise_identical": 0,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -798,6 +817,7 @@
     "spec vs plain c32, mtp_s1": {
       "prompts": 320,
       "bitwise_identical": 0,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -840,6 +860,7 @@
     "spec vs plain c32, mtp_s3": {
       "prompts": 320,
       "bitwise_identical": 0,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -882,6 +903,7 @@
     "spec vs plain c32, mtp_s5": {
       "prompts": 320,
       "bitwise_identical": 0,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -924,6 +946,7 @@
     "spec vs plain c32, mtp_tree": {
       "prompts": 320,
       "bitwise_identical": 0,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -966,6 +989,7 @@
     "spec vs spec c1, mtp_s1 vs mtp_s3": {
       "prompts": 320,
       "bitwise_identical": 79,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -1010,6 +1034,7 @@
     "spec vs spec c1, mtp_s3 vs mtp_s5": {
       "prompts": 320,
       "bitwise_identical": 0,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -1051,6 +1076,7 @@
     "spec vs spec c1, mtp_s3 vs mtp_tree": {
       "prompts": 320,
       "bitwise_identical": 0,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -1092,6 +1118,7 @@
     "deterministic, mtp_s3 c1 vs c32": {
       "prompts": 320,
       "bitwise_identical": 0,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -1133,6 +1160,7 @@
     "fp32 head, mtp_s3 c1 vs c32": {
       "prompts": 320,
       "bitwise_identical": 0,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,

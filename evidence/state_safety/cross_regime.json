@@ -4,6 +4,7 @@
     "pinned (cap 8) vs unpinned (cap 16) plain c1": {
       "prompts": 320,
       "bitwise_identical": 319,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,

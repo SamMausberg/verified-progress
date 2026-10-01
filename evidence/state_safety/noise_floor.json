@@ -4,6 +4,7 @@
     "repeat session, plain c1": {
       "prompts": 320,
       "bitwise_identical": 320,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -38,6 +39,7 @@
     "repeat session, plain c32": {
       "prompts": 320,
       "bitwise_identical": 278,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -79,6 +81,7 @@
     "concurrency 1 vs 32 (cap 16), plain": {
       "prompts": 320,
       "bitwise_identical": 0,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -125,6 +128,7 @@
     "same server repeat c1, plain": {
       "prompts": 320,
       "bitwise_identical": 319,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -161,6 +165,7 @@
     "same server repeat c32, plain": {
       "prompts": 320,
       "bitwise_identical": 319,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -197,6 +202,7 @@
     "deterministic, plain c1 vs c8 (8-prompt validation)": {
       "prompts": 8,
       "bitwise_identical": 8,
+      "logprobs_compared": 8,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 3,
@@ -231,6 +237,7 @@
     "deterministic, mtp_s3 c1 vs c8 (8-prompt validation)": {
       "prompts": 8,
       "bitwise_identical": 0,
+      "logprobs_compared": 8,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 3,
@@ -269,6 +276,7 @@
     "deterministic + verify KV split patch, mtp_s3 c1 vs c32 (96 prompts)": {
       "prompts": 96,
       "bitwise_identical": 0,
+      "logprobs_compared": 96,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 22,

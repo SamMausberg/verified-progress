@@ -4,6 +4,7 @@
     "pinned (cap 8) vs bench unpinned (cap 16) radix-off mtp_s3 c1": {
       "prompts": 320,
       "bitwise_identical": 320,
+      "logprobs_compared": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
