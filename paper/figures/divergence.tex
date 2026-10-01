@@ -9,7 +9,7 @@
 \vpsum{\divtable}{pair}{plain_c1_vs_mtp_s3_c1}{count}{\nmtp}%
 \vpsum{\divtable}{pair}{plain_c1_vs_c32}{count}{\nconc}%
 \begin{tikzpicture}[font=\footnotesize]
-\begin{axis}[x=0.33cm,y=1cm,xmin=-0.6,xmax=31.6,ymin=-0.55,ymax=2.05,clip=false,
+\begin{axis}[x=0.33cm,y=1cm,xmin=-0.6,xmax=31.6,ymin=-0.55,ymax=2.2,clip=false,
   axis x line=bottom,axis y line=none,axis line style={ink!60,-},
   xtick={0,4,8,12,16,20,24,28,31},tick align=outside,major tick length=0.1cm,typeset ticklabels with strut,
   tick style={ink!60},
@@ -17,18 +17,18 @@
   visualization depends on={value \thisrow{count}\as\cnt}]
 % full-attention layer columns, above the axis line (no macro parameter: the figure is an
 % argument of \datafigure)
-\fill[wash] (axis cs:2.55,-0.5) rectangle (axis cs:3.45,2.05);\fill[wash] (axis cs:6.55,-0.5) rectangle (axis cs:7.45,2.05);
-\fill[wash] (axis cs:10.55,-0.5) rectangle (axis cs:11.45,2.05);\fill[wash] (axis cs:14.55,-0.5) rectangle (axis cs:15.45,2.05);
-\fill[wash] (axis cs:18.55,-0.5) rectangle (axis cs:19.45,2.05);\fill[wash] (axis cs:22.55,-0.5) rectangle (axis cs:23.45,2.05);
-\fill[wash] (axis cs:26.55,-0.5) rectangle (axis cs:27.45,2.05);\fill[wash] (axis cs:30.55,-0.5) rectangle (axis cs:31.45,2.05);
+\fill[wash] (axis cs:2.55,-0.5) rectangle (axis cs:3.45,1.8);\fill[wash] (axis cs:6.55,-0.5) rectangle (axis cs:7.45,1.8);
+\fill[wash] (axis cs:10.55,-0.5) rectangle (axis cs:11.45,1.8);\fill[wash] (axis cs:14.55,-0.5) rectangle (axis cs:15.45,1.8);
+\fill[wash] (axis cs:18.55,-0.5) rectangle (axis cs:19.45,1.8);\fill[wash] (axis cs:22.55,-0.5) rectangle (axis cs:23.45,1.8);
+\fill[wash] (axis cs:26.55,-0.5) rectangle (axis cs:27.45,1.8);\fill[wash] (axis cs:30.55,-0.5) rectangle (axis cs:31.45,1.8);
 \draw[ink!15] (axis cs:-0.6,1.5) -- (axis cs:31.6,1.5);\draw[ink!15] (axis cs:-0.6,0.3) -- (axis cs:31.6,0.3);
 \node[anchor=east,align=right] at (axis cs:-1,1.5) {plain vs MTP\\(batch 1, \nmtp)};
 \node[anchor=east,align=right] at (axis cs:-1,0.3) {concurrency 1 vs 32\\(plain, \nconc)};
-% plain vs MTP: the GDN recurrence (decode kernel against target-verify kernel)
-\addplot[only marks,mark=*,mark size=2.6pt,ink,discard if not={kind}{gdn_core},
-  nodes near coords={all \cnt: GDN recurrence (decode kernel vs target-verify kernel)},
-  every node near coord/.append style={anchor=west,xshift=0.12cm,font=\figsmall}]
+% plain vs MTP: the GDN recurrence (decode kernel against target-verify kernel); its label sits
+% above the shaded columns, which stop at 1.8
+\addplot[only marks,mark=*,mark size=2.6pt,ink,discard if not={kind}{gdn_core}]
   table[x=layer,y expr=1.5,col sep=comma]{../evidence/state_safety/first_difference_by_module.csv};
+\node[anchor=south west,font=\figsmall,text=black,inner sep=1pt] at (axis cs:-0.45,1.82) {all \nmtp: GDN recurrence (decode kernel vs target-verify kernel)};
 % concurrency 1 vs 32: gated RMSNorm of GDN layers, a full-attention layer's output, and the
 % MLP down-projection of a batched prefill; the count of prompts above each mark
 \addplot[only marks,mark=square*,mark size=2.3pt,ink,discard if not={kind}{gated_norm},

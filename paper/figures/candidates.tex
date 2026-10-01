@@ -8,13 +8,11 @@
 %     batch_fallback_rate and hopper_batch_fallback_rate); the shares printed at M = 128 are
 %     these measured values, read from the same file.
 % (c) evidence/certified_head/head_path_time.csv, a microbenchmark of the head alone with probes
-%     on: time per call over the stock head and argmax (stock_us). Decided batch (w8a16_us,
-%     whiskers w8a16_p10_us and w8a16_p90_us) is measured; the other series are expected times
-%     computed from measured times and the measured fallback rates of (b): whole-batch fallback
-%     under each model (w8a16_expected_us, hopper_w8a16_expected_us) and per-position fallback
-%     under each model (columns_expected_us, hopper_columns_expected_us). Whole batch: filled
-%     markers; per position: hollow markers; Hopper solid with circles, conservative dashed with
-%     squares.
+%     on: time per call over the stock head and argmax (stock_us). The decided batch (w8a16_us,
+%     median over 30 graph replays; whiskers w8a16_p10_us, w8a16_p90_us) is measured; the other two
+%     series are expected times under the conservative model, computed from measured times and the
+%     measured fallback rates of (b): per-position fallback (columns_expected_us) and whole-batch
+%     fallback (w8a16_expected_us).
 % In (b) and (c), batches above M = 16 are consecutive capture rows, not engine batches: the
 % capture's engine batches held at most 16 requests (evidence/certified_head/README.md). Both
 % panels shade that region; (b) names it, and (c)'s legend leaves no room to repeat the label.
@@ -42,11 +40,11 @@
   legend style={at={(axis cs:132000,1.1e-4)},anchor=south east,cells={align=left}},
   legend image code/.code={\draw[mark repeat=2,mark phase=2,#1] plot coordinates {(0cm,0cm) (0.2cm,0cm) (0.4cm,0cm)};}]
 \addlegendimage{empty legend}\addlegendentry{int8 copies:}
-\addplot[copy int8 row] table[x=k,y=plain_int8_row_greedy,col sep=comma]{\ccdf};\addlegendentry{per row}
+\addplot[copy int8 row] table[x=k,y=plain_int8_row_greedy,col sep=comma]{\ccdf};\addlegendentry{per entry}
 \addplot[copy int8 g128] table[x=k,y=plain_int8_g128_greedy,col sep=comma]{\ccdf};\addlegendentry{128 columns}
 \addplot[ccert,only marks,mark=o,mark size=1.5pt] table[x=k,y=plain_int8_g128_gumbel_t1.0,col sep=comma]{\ccdf};\addlegendentry{128 columns,\\race at $T{=}1$}
 \addplot[copy fp8,forget plot] table[x=k,y=plain_fp8_row_greedy,col sep=comma]{\ccdf};
-\node[annot,anchor=west] at (axis cs:60,0.045) {FP8, per row};
+\node[annot,anchor=west] at (axis cs:60,0.045) {FP8, per entry};
 \addplot[copy int4,forget plot] table[x=k,y=plain_int4_g128_greedy,col sep=comma]{\ccdf};
 \node[annot,anchor=north] at (axis cs:1500,0.5) {int4, 128 columns};
 % ---------------- (b) whole-batch fallback ----------------
@@ -64,35 +62,37 @@
   \addlegendentry{Hopper}
 \addplot[cfallback,only marks,mark=square*,mark size=1.4pt] table[x=M,y=batch_fallback_rate,col sep=comma]{\headtime};
 \addplot[cfallback,only marks,mark=*,mark size=1.5pt] table[x=M,y=hopper_batch_fallback_rate,col sep=comma]{\headtime};
-\node[annot,anchor=north west,align=left] at (axis cs:1.1,0.64) {lines: derived\\marks: measured};
+\node[annot,anchor=north west,align=left] at (axis cs:1.1,0.64) {lines: derived\\marks: kernel replay,\\measured};
 \draw[ink!50,densely dotted] (axis cs:128,0) -- (axis cs:128,1);
 % the measured shares at M = 128, beside their markers
 \node[annot,anchor=west] at (axis cs:136,\fbconsmeas) {\vppct{0}{100*\fbconsmeas}};
 \node[annot,anchor=west] at (axis cs:136,\fbhopmeas) {\vppct{0}{100*\fbhopmeas}};
 % ---------------- (c) head-only time ----------------
-\nextgroupplot[xmode=log,log basis x=2,xmin=1,xmax=256,ymin=0.5,ymax=3.5,
+% Three series: the measured decided batch and the expected times with each fallback under the
+% conservative model. Under the Hopper model, whose fallback rates are lower, both expected times
+% lie between these lines and the decided batch at every M (checked against the CSV); the caption
+% says so. The p10-p90 whiskers span at most 0.05 below M = 256 and hide behind the marker.
+\nextgroupplot[xmode=log,log basis x=2,xmin=1,xmax=256,ymin=0.5,ymax=2.5,
   xtick={1,4,16,64,256},xticklabels={1,4,16,64,256},
-  ytick={0.5,1,1.5,2,2.5,3,3.5},yticklabels={0.5,1,1.5,2,2.5,3,3.5},
+  ytick={0.5,1,1.5,2,2.5},yticklabels={0.5,1,1.5,2,2.5},
   xlabel={Positions per head call, $M$},ylabel={Time over the stock head},
-  title={\paneltitle{c}{Head-only time (measured)}},
-  legend style={at={(0.02,0.98)},anchor=north west},legend image post style={xscale=0.8}]
-\fill[wash] (axis cs:16,0.5) rectangle (axis cs:256,3.5);
+  title={\paneltitle{c}{Head-only time (measured, expected)}},
+  % right-aligned to the axis so the longer title stays inside the text width
+  title style={at={(1,1)},anchor=south east,xshift=0pt},
+  legend style={at={(0.02,0.98)},anchor=north west},
+  legend image code/.code={\draw[mark repeat=2,mark phase=2,#1] plot coordinates {(0cm,0cm) (0.25cm,0cm) (0.5cm,0cm)};}]
+\fill[wash] (axis cs:16,0.5) rectangle (axis cs:256,2.5);
 \draw[cstock,semithick] (axis cs:1,1) -- (axis cs:256,1);
 \node[annot,anchor=south west] at (axis cs:1.1,1.01) {stock head};
-\addplot[ccert,thick,mark=*,mark size=1.5pt,
+\addplot[ccert,thick,mark=*,mark size=1.6pt,
   error bars/.cd,y dir=both,y explicit,error bar style={ccert,semithick}]
   table[x=M,y expr={\thisrow{w8a16_us}/\thisrow{stock_us}},
     y error plus expr={(\thisrow{w8a16_p90_us}-\thisrow{w8a16_us})/\thisrow{stock_us}},
     y error minus expr={(\thisrow{w8a16_us}-\thisrow{w8a16_p10_us})/\thisrow{stock_us}},col sep=comma]{\headtime};
-  \addlegendentry{all certified}
-\addlegendimage{empty legend}\addlegendentry{expected:}
-\addplot[cfallback,thick,model hopper] table[x=M,y expr={\thisrow{hopper_w8a16_expected_us}/\thisrow{stock_us}},col sep=comma]{\headtime};
-  \addlegendentry{Hopper, whole batch}
-\addplot[cfallback,thick,model cons] table[x=M,y expr={\thisrow{w8a16_expected_us}/\thisrow{stock_us}},col sep=comma]{\headtime};
-  \addlegendentry{cons., whole batch}
-\addplot[cfallback,thick,model hopper,mark=o,mark options={solid,fill=white}] table[x=M,y expr={\thisrow{hopper_columns_expected_us}/\thisrow{stock_us}},col sep=comma]{\headtime};
-  \addlegendentry{Hopper, per position}
-\addplot[cfallback,thick,model cons,mark=square,mark options={solid,fill=white}] table[x=M,y expr={\thisrow{columns_expected_us}/\thisrow{stock_us}},col sep=comma]{\headtime};
-  \addlegendentry{cons., per position}
+  \addlegendentry{all certified, measured}
+\addplot[cfallback,thick,densely dotted,mark=square,mark size=1.5pt,mark options={solid,fill=white}] table[x=M,y expr={\thisrow{columns_expected_us}/\thisrow{stock_us}},col sep=comma]{\headtime};
+  \addlegendentry{per position, expected}
+\addplot[cfallback,thick,dashed,mark=square*,mark size=1.5pt,mark options={solid}] table[x=M,y expr={\thisrow{w8a16_expected_us}/\thisrow{stock_us}},col sep=comma]{\headtime};
+  \addlegendentry{whole batch, expected}
 \end{groupplot}
 \end{tikzpicture}

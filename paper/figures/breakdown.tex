@@ -11,9 +11,12 @@
 % (head + draft_head) / step from the microseconds of evidence/profiles/step_share.csv,
 % which round as the README's table does (the rounded percentages of breakdown.csv would
 % give 12.5% instead of 12.4% for MTP at B = 32).
-% Colours follow style.tex: the stock output head in ink (the stock engine), the drafter's heads
-% in purple, every other component in two clearly different greys, idle time hatched. The column
-% at the right is the share of all heads, the target's and the drafter's.
+% Colours follow style.tex: the target's head in ink (the stock engine), the drafter's heads in
+% purple, every other component in two clearly different greys, idle time patterned. The MTP
+% idle segments have their own pattern and legend entry because tracing inflates them (the caption
+% gives the untraced shares). The column at the right gives the target head's share and, for MTP,
+% the drafter's heads' share separately (target + draft), each from the microseconds of
+% step_share.csv; the legend sits below the axis to leave room for the column's header.
 \vpreadcsv{\breakdowntable}{../evidence/profiles/breakdown.csv}
 \vpreadcsv{\stepsharetable}{../evidence/profiles/step_share.csv}
 \def\vpsplitconfig#1-#2\relax{\gdef\vparm{#1}\gdef\vpbatchsize{#2}}
@@ -23,11 +26,14 @@
   \vplookupthree{\stepsharetable}{arm}{\vparm}{batch}{\vpbatchsize}{component}{head}{us_per_step}{\vphead}%
   \vplookupthree{\stepsharetable}{arm}{\vparm}{batch}{\vpbatchsize}{component}{draft_head}{us_per_step}{\vpdraft}%
   \vplookupthree{\stepsharetable}{arm}{\vparm}{batch}{\vpbatchsize}{component}{head}{step_us}{\vpstep}%
-  \pgfmathsetmacro{\vpshare}{(\vphead+\vpdraft)/\vpstep*100}%
-  \global\expandafter\let\csname vpheadshare\row\endcsname\vpshare}
+  \pgfmathsetmacro{\vpshare}{\vphead/\vpstep*100}%
+  \pgfmathsetmacro{\vpdshare}{\vpdraft/\vpstep*100}%
+  \global\expandafter\let\csname vpheadshare\row\endcsname\vpshare
+  \global\expandafter\let\csname vpdraftshare\row\endcsname\vpdshare}
 \def\vpbatch#1-#2\relax{$B{=}#2$}
+\def\vppc#1{\pgfmathprintnumber[fixed,precision=1,fixed zerofill]{#1}}
 \begin{tikzpicture}
-\begin{axis}[xbar stacked,y dir=reverse,scale only axis,width=5.9cm,height=2.05cm,
+\begin{axis}[xbar stacked,y dir=reverse,scale only axis,width=5.2cm,height=2.05cm,
   bar width=5.2pt,xmin=0,xmax=100,ymin=-0.6,ymax=7.2,
   xlabel={Share of the profiled step or cycle},xlabel style={yshift=2pt},
   xtick={0,20,40,60,80,100},xticklabels={0\%,20\%,40\%,60\%,80\%,100\%},
@@ -35,27 +41,33 @@
     \expandafter\vpbatch\pgfplotsretval\relax},
   major y tick style={draw=none},xmajorgrids,clip=false,
   every axis plot/.append style={draw=white,line width=.4pt},
-  legend style={at={(-0.02,1.03)},anchor=south west,legend columns=3,fill=none,fill opacity=1,
-    /tikz/every even column/.append style={column sep=3pt}},
+  legend style={at={(0.5,-0.42)},anchor=north,legend columns=3,fill=none,fill opacity=1,
+    /tikz/every even column/.append style={column sep=4pt}},
   area legend]
 \addplot[fill=cstock] table[x=head,y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
-  \addlegendentry{output head}
+  \addlegendentry{target head}
 \addplot[fill=cdraft] table[x=draft_head,y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
   \addlegendentry{draft heads}
 \addplot[fill=ccontext!85] table[x=weight_gemms,y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
   \addlegendentry{target GEMMs}
 \addplot[fill=ccontext!20] table[x expr={\thisrow{gdn_state}+\thisrow{attention}+\thisrow{small_kernels}+\thisrow{draft_model}},y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
   \addlegendentry{other kernels}
-\addplot[fill=white,draw=ccontext,pattern=north east lines,pattern color=ccontext!80] table[x=idle,y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
+\addplot[fill=white,draw=ccontext,pattern=north east lines,pattern color=ccontext!80] table[x expr={(\thisrow{x}>3)?0:\thisrow{idle}},y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
   \addlegendentry{GPU idle}
-\pgfplotsinvokeforeach{0,...,6}{%
-  \node[annot,anchor=west] at (axis cs:100.5,{#1+0.6*(#1>3)})
-    {\pgfmathprintnumber[fixed,precision=1,fixed zerofill]{\csname vpheadshare#1\endcsname}\%};}
+\addplot[fill=white,draw=ccontext,pattern=crosshatch dots,pattern color=ccontext!80] table[x expr={(\thisrow{x}>3)?\thisrow{idle}:0},y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
+  \addlegendentry{GPU idle, inflated by tracing}
+% head shares at the right: target alone for plain decoding, target + draft for MTP
+\pgfplotsinvokeforeach{0,...,3}{%
+  \node[annot,anchor=west] at (axis cs:100.5,#1)
+    {\vppc{\csname vpheadshare#1\endcsname}\%};}
+\pgfplotsinvokeforeach{4,...,6}{%
+  \node[annot,anchor=west] at (axis cs:100.5,{#1+0.6})
+    {\vppc{\csname vpheadshare#1\endcsname}${}+{}$\vppc{\csname vpdraftshare#1\endcsname}\%};}
+\node[annot,anchor=south west,align=left] at (axis cs:100.5,-0.6) {heads:\\target + draft};
 % group labels, rotated, left of the batch-size tick labels
 \draw[ink!60] ([xshift=-0.98cm]axis cs:0,-0.3) -- ([xshift=-0.98cm]axis cs:0,3.3)
   ([xshift=-0.98cm]axis cs:0,4.3) -- ([xshift=-0.98cm]axis cs:0,6.9);
 \node[annot,rotate=90,anchor=south] at ([xshift=-1.0cm]axis cs:0,1.5) {plain};
 \node[annot,rotate=90,anchor=south] at ([xshift=-1.0cm]axis cs:0,5.6) {MTP};
-\node[annot,anchor=south west,align=left] at (axis cs:100.5,-0.6) {all heads};
 \end{axis}
 \end{tikzpicture}
