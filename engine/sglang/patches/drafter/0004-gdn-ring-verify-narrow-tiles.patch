@@ -1,0 +1,53 @@
+From 6b6407ebb36e597988149c4ebde5f3716430de70 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Thu, 1 Oct 2026 18:41:50 +0000
+Subject: [PATCH] GDN: narrow value tiles for the ReplaySSM ring-writing verify
+ on sm_90
+
+The recurrent GDN verify selects value tiles of 4 for at most 64 sequences on
+sm_90 only when it writes per-position intermediate states. The ReplaySSM
+ring-writing verify (cache_ring, used by the fold-every-commit protocol) kept
+tiles of 32, so at small batches it launched 8x fewer blocks and was slower
+than the stock verify it replaces. Treat the ring-writing verify as a target
+verify in the launch-config selection. On sm_90 the two tilings give bitwise
+equal outputs and states for this kernel, so the arithmetic is unchanged; KDA
+and non-sm_90 devices are unaffected.
+---
+ .../fla/fused_sigmoid_gating_recurrent.py          | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
+
+diff --git a/python/sglang/kernels/ops/attention/fla/fused_sigmoid_gating_recurrent.py b/python/sglang/kernels/ops/attention/fla/fused_sigmoid_gating_recurrent.py
+index 1fdfe7df1c..efd57a9f62 100644
+--- a/python/sglang/kernels/ops/attention/fla/fused_sigmoid_gating_recurrent.py
++++ b/python/sglang/kernels/ops/attention/fla/fused_sigmoid_gating_recurrent.py
+@@ -43,8 +43,10 @@ def _select_recurrent_launch_config(
+         and _is_sm90
+     ):
+         # BV=4 and n <= 64 measured on H100/H200. SM90 only: Blackwell is faster
+-        # with narrow tiles but not bit-identical to BV=32. Only the dense
+-        # intermediate-state verify sets target_verify; cache_ring keeps BV=32.
++        # with narrow tiles but not bit-identical to BV=32. Both target verifies
++        # set target_verify: the dense intermediate-state verify and the GDN
++        # ReplaySSM ring-writing verify (cache_ring), whose output and fold are
++        # bitwise equal at BV=4 and BV=32 on SM90.
+         return 4, 1
+     return min(triton.next_power_of_2(v), 32), 1
+ 
+@@ -444,7 +446,13 @@ def fused_sigmoid_gating_delta_rule_update(
+     HV = v.shape[2]
+     N = B if cu_seqlens is None else len(cu_seqlens) - 1
+     BV, num_warps = _select_recurrent_launch_config(
+-        N, H, HV, K, V, is_kda, target_verify=intermediate_states_buffer is not None
++        N,
++        H,
++        HV,
++        K,
++        V,
++        is_kda,
++        target_verify=intermediate_states_buffer is not None or cache_ring,
+     )
+     BK = triton.next_power_of_2(K)
+     NK, NV = triton.cdiv(K, BK), triton.cdiv(V, BV)
+-- 
+2.34.1
+

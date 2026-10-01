@@ -79,17 +79,21 @@ def main() -> None:
         commit_gdn_replayssm_fold_all_layers,
     )
 
+    # Record the (value tile, warps) each verify call actually selects, rather than
+    # predicting it: the selection rule differs between engine builds (patch 0004).
+    selected: list[tuple[int, int]] = []
+    choose = fsg._select_recurrent_launch_config
+
+    def recording_choose(*a: Any, **kw: Any) -> tuple[int, int]:
+        config = choose(*a, **kw)
+        selected.append(config)
+        return config
+
+    fsg._select_recurrent_launch_config = recording_choose
+
     device = torch.device('cuda')
     results: list[dict[str, Any]] = []
     for batch in args.batches:
-        configs = {
-            'stock_verify_tile': fsg._select_recurrent_launch_config(
-                batch, H, HV, K, V, False, target_verify=True
-            ),
-            'ring_verify_tile': fsg._select_recurrent_launch_config(
-                batch, H, HV, K, V, False, target_verify=False
-            ),
-        }
         for seed in args.seeds:
             x = inputs(batch, seed, device)
             slots = torch.arange(1, batch + 1, dtype=torch.int32, device=device)
@@ -113,6 +117,7 @@ def main() -> None:
             # Stock: intermediate state after every block position.
             state_stock = x['state'].clone()
             inter = torch.zeros(batch + 3, T, HV, K, V, device=device, dtype=torch.float32)
+            selected.clear()
             out_stock = fsg.fused_sigmoid_gating_delta_rule_update(
                 initial_state_source=state_stock,
                 intermediate_states_buffer=inter,
@@ -128,6 +133,8 @@ def main() -> None:
                 'g': torch.zeros(1, batch + 3, HV, T, device=device, dtype=torch.float32),
                 'beta': torch.zeros(1, batch + 3, HV, T, device=device, dtype=torch.float32),
             }
+            stock_tile = selected[-1]
+            selected.clear()
             out_fold = fsg.fused_sigmoid_gating_delta_rule_update(
                 initial_state_source=state_fold,
                 cache_ring=True,
@@ -137,6 +144,8 @@ def main() -> None:
                 replayssm_beta=rings['beta'][0],
                 **common,
             )
+            ring_tile = selected[-1]
+            configs = {'stock_verify_tile': stock_tile, 'ring_verify_tile': ring_tile}
             gen = torch.Generator(device='cpu').manual_seed(100 + seed)
             accept = torch.randint(1, T + 1, (batch,), generator=gen).to(
                 device=device, dtype=torch.int32
