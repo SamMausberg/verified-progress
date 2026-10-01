@@ -60,10 +60,10 @@ a batch-dependent cache write) would first show up in the module that reads it. 
 current tap therefore also hashes, before every tapped forward, the caches that
 forward reads (KV per cached position and attention layer, through the request's
 `req_to_token` row; GDN convolution and SSM state per layer), and `mechanism.py`
-reports the first forward whose entering caches differ. The results below were
-collected before cache hashing was added, so they name first differing module
-outputs; the cache-level check is **pending** (a queued run repeats them with the cache
-hashes). At the token divergence the analysis also recomputes, in float64, the exact
+reports the first forward whose entering caches differ. The 167- and 40-prompt
+results below were collected before cache hashing was added, so they name first
+differing module outputs. The cache-level checks of the tap v4 run are in "Cache-level
+checks (tap v4)" below. At the token divergence the analysis also recomputes, in float64, the exact
 logits of the two competing tokens from each run's saved head input and the BF16 head
 weights.
 
@@ -146,10 +146,10 @@ concurrency comparison below, generated up to two tokens past their known diverg
 
 - In all 167 prompts the first differing module output is layer 0's GDN recurrence
   output at the first speculative cycle, while its immediate input, the causal
-  convolution output, is bitwise equal. Whether the recurrent state entering that cycle
-  is also equal is **pending** the cache-hash rerun; if it is, the plain-decode and
-  target-verify recurrent kernels produce different bits from identical inputs and
-  state. At this commit decode calls
+  convolution output, is bitwise equal. In the cache-hash rerun (40 of these prompts,
+  below), every cache entering every forward up to that point is identical, so the
+  plain-decode and target-verify recurrent kernels produce different bits from
+  identical inputs and state. At this commit decode calls
   `fused_recurrent_gated_delta_rule_packed_decode` (`kernels/ops/attention/fla/fused_recurrent.py`)
   and target verify calls `fused_sigmoid_gating_delta_rule_update`
   (`fla/fused_sigmoid_gating_recurrent.py`): separate Triton kernels that fuse the
@@ -198,7 +198,8 @@ reproduction, whose batches differ from the matrix run's).
   besides the attention kernel's dependence on the batch. For the other 34, every
   attention output before the first difference is identical.
 
-In words, subject to the pending cache-level check: the configurations first produce
+In words (for the plain-vs-MTP pair the caches are confirmed below; for c1 vs c32 the
+cache check has not been run): the configurations first produce
 different module outputs at a kernel that is not invariant to the batch or to the
 decode/verify path; the difference is carried forward through the recurrent state and
 the later layers; and it changes the chosen token only where the two leading logits
@@ -243,8 +244,8 @@ concurrencies, and every logprob except those of one prompt (`humaneval-0044`, a
 128-token prompt), which differ from its prefill onward in both repeats. A fresh
 server at batch 1 reproduces the first pass bitwise on all 320 prompts, that one
 included, so its difference in the same-server repeat comes from what the radix tree
-already held (see the history dependence below); a tapped test of which op changes is
-queued. A fresh server at concurrency 32 reproduces 296 of 320 sequences. Request
+already held. The tapped repeats below locate it in the GDN prefill ("Cache-level
+checks"). A fresh server at concurrency 32 reproduces 296 of 320 sequences. Request
 arrival timing, and with it batch composition, differs between sessions, but these two
 sessions also differ in their pools: their servers allocated 97,672 and 133,885 KV
 tokens and 122 and 167 GDN slots, with the same cap of 16 running requests
@@ -433,11 +434,69 @@ from which the switch shows could depend on timing.
 The values involved are valid by the code path, and we found no case where this
 produced more than a near-tie flip. No token changed in the history test, and where
 the tap changed tokens the top-2 gap was 0 or 0.125 in both runs. We do not consider
-it state corruption. The KV-level confirmation (hashes of every cached position
-entering each step) is **pending**. The first cache-hashing run crashed on long SSM
-rows, and the fixed tap is queued. It now includes both history pairs, each prompt
-served alone and after its predecessor on fresh servers, and radix on vs off for the
-five tap-changed prompts.
+it state corruption. For the two history pairs the KV-level check is done, and it
+confirms the repoint ("Cache-level checks" below). For the other four tap-changed
+prompts it has not been run.
+
+## Cache-level checks (tap v4)
+
+These were run with the cache-hashing tap, at batch 1, on plain decoding with the
+unpinned flags of the first matrix (`cachecheck_v4_*.json`, `history_v4_*.json`,
+`repeats_v4_h44_*.json`).
+- **Fresh prefills are not compared.** A prefill with no cached prefix reads no
+  earlier state, so `mechanism.py` does not compare caches at such a forward.
+  - The tap hashes the caches before the forward runs (`state_tap.begin`). The engine
+    zeroes a fresh GDN slot only inside the forward (`clear_slots`, deferred by
+    `mamba_needs_clear`). So the hash of a fresh slot still shows an earlier
+    request's leftover state.
+  - The forward then reads zeros. The SSM chunk prefill reads the zeroed slot, and
+    the convolution reads no initial state (`has_initial_state` is false).
+  - The run bears this out. Before the change, all 38 cases with a "cache" origin
+    were at such a forward, in GDN state only, with no cached positions and no KV.
+    31 of the radix pairs were identical throughout despite differing leftover
+    state, and the other 7 cases were identical at the first prompt position.
+
+- **Plain vs MTP steps 3 (40 prompts).** In all 40, every cache entering every forward
+  up to the first differing module output is identical. That first difference is layer
+  0's GDN recurrence at output index 1, the first verify forward against the first
+  decode step. The first cache to differ is layer 0's SSM state, which that kernel
+  writes. The two recurrent kernels therefore produce different bits from identical
+  inputs and state.
+- **History pairs, KV level.** We served each prompt on a fresh server, alone and right
+  after its predecessor, for `mt_bench-0056` after `mt_bench-0054` and
+  `humaneval-0008` after `humaneval-0000`.
+  - In both, the first differing module output is layer 3's attention at output
+    index 2, and the KV entering that step differs.
+  - In all 8 attention layers, keys and values differ at cached positions 3-5 for
+    `mt_bench-0056` (6 shared tokens) and at 3-21 for `humaneval-0008` (22 shared
+    tokens).
+  - The caches entering decode step 1 are identical.
+  - This confirms the repoint for both prompts: from decode step 2 the request reads
+    the earlier request's copy of the shared prefix.
+  - Positions 0-2 are bitwise equal in both copies.
+- **Radix cache on vs off (plain, 40 prompts).**
+  - The 34 prompts of at most 63 tokens are identical throughout.
+  - All 6 prompts longer than 64 tokens differ in the prefill, from prompt position
+    1, at layer 0's GDN recurrence. No cache is read before that point.
+  - So the radix setting changes the chunked GDN prefill for prompts longer than one
+    64-token chunk. Their first logprob difference is at output index 0, while the
+    other 34 have none (`first_logprob_difference` per case).
+  - From reading the code, with the radix cache on the extend kernel also tracks
+    states for checkpoints (`track_state`, `state_checkpoint_*`). That is the likely
+    difference; it has not been verified.
+  - This is not KV provenance. It means radix-off runs differ from radix-on runs from
+    the first output token for prompts longer than 64 tokens.
+- **Same-server repeats of `humaneval-0044` (128 tokens).**
+  - With the cache flushed between repeats, 4 of 4 repeats are bitwise identical.
+  - Without a flush, the second request also prefills all 128 tokens, but differs from
+    prompt position 1 at layer 0's GDN recurrence.
+  - The third to fifth requests reuse a 64-token cached prefix, prefill the other 64
+    and differ from position 64.
+  - So that prompt's same-server difference comes from the GDN prefill, which depends
+    on what the radix tree already holds. This is a second history mechanism, separate
+    from the KV repoint, and it shows from the first output token.
+- **Tap neutrality.** The v4 tap changes the same five prompts as v3, relative to the
+  untapped matrix run (`tap_check` in both cachecheck files).
 
 ## Deterministic inference
 

@@ -64,3 +64,28 @@ def test_slots_not_written_for_every_token_are_ignored():
     ra = {0: _row([1, 5], [1, 4], tokens=4)}
     rb = {0: _row([2, 5], [1, 4], tokens=4)}
     assert first_hash_difference(ra, rb, names, names, upto=0) is None
+
+
+def test_cache_difference_ignores_a_fresh_prefill():
+    from mechanism import first_cache_difference
+
+    def entry(cached, conv):
+        return {
+            'mode': 'EXTEND' if cached == 0 else 'DECODE',
+            'cached': cached,
+            'attn_layers': [],
+            'gdn_layers': [0],
+            'k': None,
+            'v': None,
+            'conv': np.array([conv]),
+            'ssm': np.array([0]),
+        }
+
+    # Stale slot contents at a fresh prefill differ but are not read: ignored.
+    a = {0: entry(0, 1), 5: entry(5, 7)}
+    b = {0: entry(0, 2), 5: entry(5, 7)}
+    assert first_cache_difference(a, b, upto=10) is None
+    # A difference entering a forward that does read the cache is reported.
+    b[5] = entry(5, 8)
+    res = first_cache_difference(a, b, upto=10)
+    assert res is not None and res['entering_position'] == 5
