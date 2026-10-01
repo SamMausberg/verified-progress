@@ -1295,3 +1295,89 @@ def test_analysis_refuses_sessions_beyond_the_declared_five(tmp_path, monkeypatc
     rows = [{**r, 'session': session} for r in _plan_rows()]
     with pytest.raises(SystemExit):
         _run_analysis(tmp_path, monkeypatch, rows)
+
+
+def _campaign_rows(valid: dict[str, set[int]], fg: dict[str, float] | None = None) -> list[dict]:
+    """Every declared launch of each session at c = 1, 2, 4, 8; the first S0 launch is
+    marked invalid at each concurrency not in `valid[session]`."""
+    rows = []
+    for s_name, ok in valid.items():
+        x_fg = (fg or {}).get(s_name, 110.0)
+        for c in analyze.DECLARED_C:
+            order = ['S0', 'FG', 'F', 'G', 'B0', 'FG', 'S0']
+            for i, arm in enumerate(order):
+                x = x_fg if arm == 'FG' else 100.0
+                bad = i == 0 and c not in ok
+                rows.append(
+                    {
+                        'label': f'stack-{arm}',
+                        'run': f'{s_name}-c{c}-{i}',
+                        'session': s_name,
+                        'concurrency': str(c),
+                        'x_e2e': x,
+                        'y': x,
+                        'invalid_reason': 'foreign CPU load' if bad else '',
+                    }
+                )
+    return rows
+
+
+ALL_C = set(analyze.DECLARED_C)
+
+
+@pytest.mark.parametrize(
+    'valid',
+    [
+        # s1-s3 already give three valid ratios at every c: s4 is not a replacement.
+        {'stack-s1': ALL_C, 'stack-s2': ALL_C, 'stack-s3': ALL_C, 'stack-s4': ALL_C},
+        # s4 filled the only shortfall (c = 8), so s5 is not a replacement.
+        {
+            'stack-s1': ALL_C - {8},
+            'stack-s2': ALL_C,
+            'stack-s3': ALL_C,
+            'stack-s4': ALL_C,
+            'stack-s5': ALL_C,
+        },
+        # A replacement before the declared three all ran.
+        {'stack-s1': ALL_C, 'stack-s2': ALL_C, 'stack-s4': ALL_C},
+        # s5 without s4.
+        {'stack-s1': ALL_C - {1}, 'stack-s2': ALL_C, 'stack-s3': ALL_C, 'stack-s5': ALL_C},
+    ],
+)
+def test_analysis_refuses_sessions_that_replace_nothing(tmp_path, monkeypatch, valid):
+    with pytest.raises(SystemExit):
+        _run_analysis(tmp_path, monkeypatch, _campaign_rows(valid))
+
+
+def test_replacement_counts_only_where_the_earlier_sessions_fell_short(tmp_path, monkeypatch):
+    valid = {'stack-s1': ALL_C - {8}, 'stack-s2': ALL_C, 'stack-s3': ALL_C, 'stack-s4': ALL_C}
+    res = _run_analysis(tmp_path, monkeypatch, _campaign_rows(valid, fg={'stack-s4': 150.0}))
+    assert res['sessions_admitted']['8'] == ['stack-s1', 'stack-s2', 'stack-s3', 'stack-s4']
+    for c in (1, 2, 4):
+        assert res['sessions_admitted'][str(c)] == ['stack-s1', 'stack-s2', 'stack-s3']
+        # s4's very different ratio does not enter a concurrency that had three sessions.
+        fg = res['arms']['FG'][str(c)]['x_e2e']
+        assert fg['n'] == 3
+        assert math.isclose(fg['ratio'], 1.10, rel_tol=1e-6)
+        assert res['arms']['F'][str(c)]['x_e2e']['n'] == 3
+        assert res['interaction_FG'][str(c)]['x_e2e']['n'] == 3
+    fg8 = res['arms']['FG']['8']['x_e2e']
+    assert fg8['n'] == 3  # s2, s3 and the replacement s4
+    assert sorted(fg8['sessions']) == [1.1, 1.1, 1.5]
+
+
+def test_second_replacement_only_where_the_first_did_not_fill_the_gap(tmp_path, monkeypatch):
+    valid = {
+        'stack-s1': ALL_C - {8},
+        'stack-s2': ALL_C - {2},
+        'stack-s3': ALL_C,
+        'stack-s4': ALL_C - {8},
+        'stack-s5': ALL_C,
+    }
+    res = _run_analysis(tmp_path, monkeypatch, _campaign_rows(valid))
+    adm = res['sessions_admitted']
+    assert adm['1'] == adm['4'] == ['stack-s1', 'stack-s2', 'stack-s3']
+    assert adm['2'] == ['stack-s1', 'stack-s2', 'stack-s3', 'stack-s4']
+    assert adm['8'] == ['stack-s1', 'stack-s2', 'stack-s3', 'stack-s4', 'stack-s5']
+    assert res['arms']['FG']['8']['x_e2e']['n'] == 3  # s2, s3, s5
+    assert res['arms']['FG']['2']['x_e2e']['n'] == 3  # s1, s3, s4
