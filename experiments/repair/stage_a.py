@@ -59,6 +59,15 @@ def anchor_values_per_token() -> dict[str, int]:
     return {'inputs': inputs, 'outputs': outputs, 'total': inputs + outputs}
 
 
+def verifier_of(row: dict[str, Any]) -> str:
+    """GDN verify kernel of a run: SGLang follows the decode backend (FlashInfer here) unless
+    --linear-attn-verify-backend overrides it."""
+    cmd = list(row.get('command') or [])
+    if '--linear-attn-verify-backend' in cmd:
+        return str(cmd[cmd.index('--linear-attn-verify-backend') + 1])
+    return 'flashinfer'
+
+
 def med(row: dict[str, Any], *path: str) -> float | None:
     cur: Any = row
     for key in path:
@@ -82,6 +91,13 @@ def main() -> None:
     ap.add_argument(
         '--baseline', default='fresh_b16', help='run directory name of the real DFlash baseline'
     )
+    ap.add_argument(
+        '--verifier',
+        choices=['flashinfer', 'triton'],
+        default='flashinfer',
+        help='GDN verify kernel of the forced-acceptance rows (the baseline should use the same)',
+    )
+    ap.add_argument('--suffix', default='', help='appended to the output file names')
     ap.add_argument(
         '--cd-us', type=float, default=None, help='override the baseline cycle cost C_D (us)'
     )
@@ -131,10 +147,10 @@ def main() -> None:
     nostate = {
         int(r['block']): med(r, 'phase_us', 'verify', 'median')
         for r in by_name.values()
-        if r['mode'] == 'force' and no_state(r)
+        if r['mode'] == 'force' and no_state(r) and verifier_of(r) == args.verifier
     }
     for name, row in sorted(by_name.items(), key=lambda kv: (kv[1]['mode'], kv[1]['block'])):
-        if row['mode'] != 'force' or no_state(row):
+        if row['mode'] != 'force' or no_state(row) or verifier_of(row) != args.verifier:
             continue
         B = int(row['block'])
         replay_protocol = 'enable-linear-replayssm-spec' in ' '.join(row.get('command') or [])
@@ -219,6 +235,7 @@ def main() -> None:
         )
     out = {
         'kind': 'derived from measured phase times (analyze_timing.py) and kernel microbenchmarks',
+        'verifier': args.verifier,
         'baseline': {
             'run': args.baseline,
             'C_D_us': cd,
@@ -235,9 +252,9 @@ def main() -> None:
         'rows': table,
     }
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    (args.out_dir / 'stage_a_oracle.json').write_text(json.dumps(out, indent=2))
+    (args.out_dir / f'stage_a_oracle{args.suffix}.json').write_text(json.dumps(out, indent=2))
     if table:
-        with open(args.out_dir / 'stage_a_oracle.csv', 'w', newline='') as fh:
+        with open(args.out_dir / f'stage_a_oracle{args.suffix}.csv', 'w', newline='') as fh:
             w = csv.DictWriter(fh, fieldnames=list(table[0]))
             w.writeheader()
             w.writerows(table)

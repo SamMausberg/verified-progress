@@ -61,20 +61,72 @@ measured V(B) + commit; with no anchor pass at all the two-pass design is S_a.
   and the audit its measured V(B) + commit, and reaches 4.78x end to end at B = 256. That V(B)
   includes the per-position FP32 state writes: an audit 2.33 ms cheaper (5.2% of V(256),
   `audit_saving_needed_for_target_us`) would reach the target, and the writes' bytes bound them
-  at 4.29 ms (9.6%), so with a verifier that drops them and reconstructs only the accepted
-  boundary state at no charge the ceiling could reach 5.20x end to end. Such a verifier would
+  at 4.29 ms (9.6%); measured, they are 4.10 ms (next section), so with a verifier that drops
+  them and reconstructs only the accepted boundary state at no charge the ceiling could reach
+  5.18x end to end. Such a verifier would
   also make the DFlash baseline cheaper (16 per-position writes per cycle), so a fair rerun gives
   both the same verifier. If both passes dropped the writes, the estimate (anchor pass = V(B)
-  without them) would need them to be at least 50% of V(256). The measured no-state verify
-  decides the ceiling case (queued). Stage B below refutes P3 independently of the verifier.
+  without them) would need them to be at least 50% of V(256). With SGLang's Triton verify kernel
+  P3 passes Stage A at B = 256 (next section). Stage B below refutes P3 independently of the
+  verifier.
 - **P2 Arm A: 5x end to end only at B = 256 with zero drafting cost and every block accepted**
   (derived from measured V(B)): S_a = 5.01x end to end sits at the threshold; paying DFlash's
   own drafting cost at width B, perfect blocks reach 4.68x. Better drafting alone does not give
-  5x with this verifier.
-- The verifier is the binding constraint. Past B = 16, V(B) grows by about 0.167 ms per extra
-  token, roughly five times what that token's GEMM work and 48 MiB per-position FP32 state
-  write account for; the state commit is 0.11-0.14 ms at every width. Its decomposition
-  (no-state verify, Nsight Systems at B = 64 and 256) is queued.
+  5x with this verifier; with SGLang's Triton verify kernel it would, from B = 64 (next section).
+- With this verifier the verify pass is the binding constraint. Past B = 16, V(B) grows by about
+  0.167 ms per extra token, roughly five times what that token's GEMM work and 48 MiB
+  per-position FP32 state write account for; the state commit is 0.11-0.14 ms at every width.
+  The next section attributes most of it to the FlashInfer GDN verify kernel.
+
+### What the wide-block verify pass spends its time on (measured)
+
+`stage_a_timing.json` (runs `force_nostate_b*`, `force_tritonverify_b*`, `fresh_tritonverify_b16`),
+`stage_a_oracle.{json,csv}` (FlashInfer verify kernel, now with measured state writes at
+B = 16, 64, 256) and `stage_a_oracle_triton.{json,csv}` (Triton verify kernel). Session
+`experiments/repair/runs/decomposition.sh` under the exclusive lock, 2026-10-01 04:49-05:12
+UTC, same panel and flags as Stage A; foreign CPU load below 0.5 cores; p10-p90 of every
+cycle period within 1.3% of its median.
+
+With `--linear-attn-decode-backend flashinfer` SGLang verifies GDN layers with FlashInfer's
+`gated_delta_rule_mtp`. Two runs separate its parts:
+
+| B | V(B), FlashInfer kernel | same, per-position states dropped | V(B), Triton kernel |
+|---|---|---|---|
+| 16 | 4.78 | 4.53 | 4.55 |
+| 64 | 15.62 | 14.36 | 7.58 |
+| 256 | 44.82 | 40.73 | 19.18 |
+
+(ms, forced full acceptance; dropping the states uses engine patch 0002 and is timing only.)
+The per-position FP32 state writes cost 0.26, 1.26 and 4.10 ms (5.3%, 8.1% and 9.1% of V(B)),
+close to their bytes at 3 TB/s (0.27, 1.07, 4.29 ms). The larger cost is the FlashInfer verify
+kernel itself: selecting SGLang's Triton GDN verify kernel instead
+(`--linear-attn-verify-backend triton`, a stock option) makes the whole pass 2.06x faster at
+B = 64 and 2.34x faster at B = 256, as predicted from its sequential walk over the positions
+(512 CTAs per layer at one request, cache key per T). Stock DFlash at block 16 with the Triton
+verify kernel runs 7.302 ms per cycle for 7.603 tokens (1,041 tokens/s pooled, against 1,029
+with FlashInfer), so the baseline gains about 1% and the wide blocks gain 2x.
+
+Stage A with the Triton verify kernel and the DFlash baseline on the same kernel
+(`stage_a_oracle_triton.csv`; f = 2.39%, so 5x end to end needs 5.54x in decode; decode / end
+to end):
+
+| B | S_a ideal free drafter | perfect blocks with DFlash drafting | S_b estimate | S_b ceiling |
+|---|---|---|---|---|
+| 16 | 3.30 / 3.12 | 2.10 / 2.05 | 1.71 / 1.69 | 2.23 / 2.17 |
+| 64 | 7.98 / 6.84 | 5.81 / 5.21 | 4.30 / 3.99 | 6.17 / 5.49 |
+| 256 | 12.72 / 9.94 | 10.73 / 8.71 | 7.11 / 6.21 | 11.28 / 9.06 |
+
+(S_b estimate bounds the Triton kernel's state writes by their bytes; no no-state Triton run.)
+
+- **The Stage A verdicts depend on the verify kernel.** With the Triton kernel, perfect
+  B-token blocks reach the 5x target at B = 64 even paying DFlash's drafting cost, and P3's
+  two-pass design reaches it at B = 256 (and its ceiling at B = 64). With the default FlashInfer
+  kernel, neither does (above). With the FlashInfer kernel and its measured state writes, P3's
+  ceiling with a state-free audit and an uncharged boundary replay would also reach it at
+  B = 256 (writes 4.10 ms against the 2.33 ms needed).
+- P2 therefore turns on drafting: a 5x gain needs blocks of 64 or more tokens accepted almost
+  entirely, and the repair mechanisms tested here do not produce them (one-step recycling below;
+  exact Jacobi about one token per pass, Stage B). P3 stays refuted by Stage B.
 
 ### P3 Stage B: anchored residual evaluation on real DFlash blocks (block 16)
 
@@ -215,11 +267,21 @@ GPU timeline between consecutive cycle starts.
 
 ```sh
 scripts/gpu_lock.sh -x experiments/repair/runs/stage_a.sh   # raw runs in ~/vp-data/repair/runs/timing1
+scripts/gpu_lock.sh -x experiments/repair/runs/decomposition.sh   # raw runs in ~/vp-data/repair/runs/nsys1
 python experiments/repair/analyze_timing.py ~/vp-data/repair/runs/timing1/force_b* \
-    ~/vp-data/repair/runs/timing1/fresh_b* --out evidence/repair/stage_a_timing.json
+    ~/vp-data/repair/runs/timing1/fresh_b* ~/vp-data/repair/runs/nsys1/force_nostate_b* \
+    ~/vp-data/repair/runs/nsys1/force_tritonverify_b* ~/vp-data/repair/runs/nsys1/fresh_tritonverify_b16 \
+    --out evidence/repair/stage_a_timing.json
 python experiments/repair/stage_a.py --timing evidence/repair/stage_a_timing.json \
-    --baseline fresh_b16 --state-bytes-bound --out-dir evidence/repair
+    --baseline fresh_b16 --verifier flashinfer --state-bytes-bound --out-dir evidence/repair
+python experiments/repair/stage_a.py --timing evidence/repair/stage_a_timing.json \
+    --baseline fresh_tritonverify_b16 --verifier triton --state-bytes-bound --suffix _triton \
+    --out-dir evidence/repair
 ```
+
+The decomposition session's two Nsight Systems runs failed at launch (an `nsys launch` option
+that only `nsys start` accepts); the Triton-versus-FlashInfer runs answer the attribution
+question causally.
 
 The ReplaySSM spec protocol does not start with DFlash on this GDN model ("requires a KDA
 model"), and the session's GDN kernel microbenchmark was stopped after 16 minutes of CPU-bound
