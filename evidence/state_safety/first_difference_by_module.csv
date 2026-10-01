@@ -1,0 +1,17 @@
+pair,module,layer,kind,count
+plain_c1_vs_c32,model.layers.3.attn,3,attn,6
+plain_c1_vs_c32,model.layers.0.mlp.down_proj,0,mlp_down_proj,5
+plain_c1_vs_c32,model.layers.18.linear_attn.norm,18,gated_norm,4
+plain_c1_vs_c32,model.layers.28.linear_attn.norm,28,gated_norm,4
+plain_c1_vs_c32,model.layers.25.linear_attn.norm,25,gated_norm,3
+plain_c1_vs_c32,model.layers.14.linear_attn.norm,14,gated_norm,3
+plain_c1_vs_c32,model.layers.0.linear_attn.norm,0,gated_norm,3
+plain_c1_vs_c32,model.layers.21.linear_attn.norm,21,gated_norm,3
+plain_c1_vs_c32,model.layers.20.linear_attn.norm,20,gated_norm,2
+plain_c1_vs_c32,model.layers.29.linear_attn.norm,29,gated_norm,2
+plain_c1_vs_c32,model.layers.16.linear_attn.norm,16,gated_norm,1
+plain_c1_vs_c32,model.layers.26.linear_attn.norm,26,gated_norm,1
+plain_c1_vs_c32,model.layers.10.linear_attn.norm,10,gated_norm,1
+plain_c1_vs_c32,model.layers.5.linear_attn.norm,5,gated_norm,1
+plain_c1_vs_c32,model.layers.24.linear_attn.norm,24,gated_norm,1
+plain_c1_vs_mtp_s3_c1,model.layers.0.linear_attn.gdn_core,0,gdn_core,167
