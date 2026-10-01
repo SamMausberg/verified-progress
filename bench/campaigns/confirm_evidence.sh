@@ -3,7 +3,9 @@
 # Repeat 0 ran before bench.sweep recorded sessions; its runs are the ones whose
 # manifest has no session, and they are assigned confirm-r0 here. Matched pairs:
 # FlashInfer speculative arms against plain-tuned, Triton arms against
-# plain-tuned-triton, and the Triton plain arm against plain-tuned.
+# plain-tuned-triton, and the Triton plain arm against plain-tuned. Only points with
+# three valid sessions (the declared repeats) rank or lie on the envelope; points
+# with fewer stay in frontier.csv and are drawn hollow.
 #   bench/campaigns/confirm_evidence.sh
 set -euo pipefail
 cd "$(dirname "$0")/../.." || exit 1
@@ -22,7 +24,7 @@ DIVERGENCE=()
   DIVERGENCE=(--divergence evidence/bench/equality/classes.json)
 # The plot needs matplotlib, which the SGLang venv has.
 ~/sglang/.venv/bin/python -m bench.pareto "${RUNS[@]}" "${SESSIONS[@]}" "${DIVERGENCE[@]}" \
-  --out evidence/bench/confirm --status confirmation --baseline plain-tuned \
+  --out evidence/bench/confirm --status confirmation --baseline plain-tuned --envelope-min-n 3 \
   --title 'Qwen3.5-4B on one GH200: confirmation split' \
   --pair mtp-tuned:plain-tuned --pair mtp-stockverify:plain-tuned \
   --pair dflash-tuned:plain-tuned --pair dflash-tuned-b4:plain-tuned \

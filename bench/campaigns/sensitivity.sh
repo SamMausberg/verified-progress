@@ -34,6 +34,7 @@ if (( session % 2 == 1 )); then
   for (( i=${#entries[@]}-1; i>=0; i-- )); do reversed+=("${entries[$i]}"); done
   entries=("${reversed[@]}")
 fi
+failed=()
 for entry in "${entries[@]}"; do
   read -r arm levels <<< "$entry"
   echo "=== $arm c=$levels"
@@ -47,6 +48,11 @@ for entry in "${entries[@]}"; do
   if [ "$status" -ne 0 ]; then
     echo "sweep for $arm exited $status:"
     tail -3 "$log"
+    failed+=("$arm")
   fi
   rm -f "$log"
 done
+if [ "${#failed[@]}" -gt 0 ]; then
+  echo "sweeps that failed: ${failed[*]}" >&2
+  exit 1
+fi

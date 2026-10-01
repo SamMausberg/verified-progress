@@ -875,6 +875,28 @@ def test_arm_classes_from_matched_references() -> None:
     assert series_label('plain-tuned', 'stock', math.nan) == 'plain-tuned'
 
 
+def test_envelope_ranks_only_points_with_enough_repeats() -> None:
+    from bench.pareto import envelope, pareto_envelope
+
+    def entry(label: str, n: int, x: float, y: float) -> dict[str, object]:
+        return {
+            'label': label,
+            'concurrency': 128,
+            'n': n,
+            'x_e2e_mean': x,
+            'y_mean': y,
+            'y_std': 0.0,
+            'exactness': 'stock',
+        }
+
+    frontier = [entry('plain', 3, 100.0, 1000.0), entry('single', 1, 110.0, 1100.0)]
+    (row,) = envelope(frontier, min_n=3)
+    assert row['best'] == 'plain' and row['n'] == 3
+    assert row['best_below_min_n'] == 'single' and row['best_below_min_n_n'] == 1
+    assert [e['label'] for e in pareto_envelope(frontier, exact_only=False, min_n=3)] == ['plain']
+    assert envelope(frontier)[0]['best'] == 'single'  # default: every point ranks
+
+
 def test_series_styles_share_a_hue_per_family() -> None:
     from bench.pareto import SERIES_COLOURS, series_styles
 
