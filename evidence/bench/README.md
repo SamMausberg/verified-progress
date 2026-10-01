@@ -201,6 +201,52 @@ python -m bench.divergence evidence/bench/equality/summary.json --out /dev/null 
 `divergences.csv` lists every first divergence (prompt, position, tokens, logit gap,
 class). `table.csv` and `compare.log` are the comparator's own outputs.
 
+## quality/
+
+GSM8K test, all 1,319 problems (`bench/quality/gsm8k_test.jsonl`), scored with
+sgl-eval's GSM8K grader. Settings: thinking on, temperature 0.6, top-p 0.95, top-k 20,
+request seed 0, natural stopping at 16,384 tokens, one server per arm. The two plain
+runs (a and b) are the same arm launched twice and give the run-to-run spread. Each
+directory holds the run's `quality.json` (arm, launch checks, summary) and
+`problems.csv` (per-problem answer, correctness, length, finish reason).
+
+| Arm (class) | Accuracy | 95% (Wilson) | Truncated at 16K | No answer | Mean output tokens |
+|---|---|---|---|---|---|
+| plain-tuned, run a (stock) | 89.99% | 88.3-91.5 | 219 | 85 | 6,010 |
+| plain-tuned, run b (stock) | 90.30% | 88.6-91.8 | 235 | 84 | 6,165 |
+| mtp-tuned (exact-up-to-rounding) | 89.54% | 87.8-91.1 | 232 | 93 | 6,036 |
+| mtp-stockverify (stock) | 88.93% | 87.1-90.5 | 250 | 100 | 6,241 |
+| dflash-tuned (stock) | 89.69% | 87.9-91.2 | 239 | 88 | 6,223 |
+| plain-tuned-replayssm (lossy) | 91.05% | 89.4-92.5 | 226 | 74 | 6,106 |
+
+Paired against each plain run (`comparisons.json`, exact McNemar test on the problems
+only one run solved):
+
+| Arm | vs plain a: difference, p | vs plain b: difference, p |
+|---|---|---|
+| plain-tuned, run b | +0.30 pt, 0.81 | - |
+| mtp-tuned | -0.45 pt, 0.70 | -0.76 pt, 0.47 |
+| mtp-stockverify | -1.06 pt, 0.30 | -1.36 pt, 0.18 |
+| dflash-tuned | -0.30 pt, 0.81 | -0.61 pt, 0.58 |
+| plain-tuned-replayssm | +1.06 pt, 0.27 | +0.76 pt, 0.47 |
+
+No arm differs from plain decoding detectably. With about 150 discordant problems per
+pair, a difference below roughly 2.5 points would not reach p < 0.05 with 80%
+probability, so this check rules out large losses only. In particular, it rules out a
+large loss for buffered plain decoding, the one lossy arm (+1.06 and +0.76 points
+against the two plain runs). Two sampled runs of the same arm agree on the final answer
+for only 77% of problems, and none generated identical text, so a fixed request seed
+does not make sampled runs reproducible here. 17-19% of outputs in every arm reach the
+16,384-token limit (thinking loops; no answer counted). The sampled check compares
+accuracy distributions. It cannot show that greedy outputs are unchanged; the equality
+check above does that.
+
+```sh
+scripts/gpu_lock.sh -x bench/campaigns/quality.sh 0 plain-tuned:plain-tuned-a mtp-tuned plain-tuned:plain-tuned-b
+scripts/gpu_lock.sh -x bench/campaigns/quality.sh 0 dflash-tuned mtp-stockverify plain-tuned-replayssm
+python bench/campaigns/quality_compare.py evidence/bench/quality/comparisons.json
+```
+
 ## tuning/
 
 Configuration search on the `mixed-v2` tune split (never used for reported results):
