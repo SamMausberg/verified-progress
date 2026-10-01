@@ -23,6 +23,7 @@ PLAN=(
   "plain-tuned-triton:$LOW"
   "mtp-tuned-triton:$LOW_MID"
   "dflash-tuned-b16:$LOW_MID"
+  "dflash-tuned-b4:$HIGH"
 )
 run() {
   local arm=$1 levels=$2

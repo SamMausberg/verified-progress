@@ -426,7 +426,7 @@ def test_quality_comparison_fails_closed_without_the_task_set(tmp_path: Path) ->
 def test_host_load_tree_and_contention_summary() -> None:
     from bench.hostload import CONTENTION_CORES, process_tree, summarise
 
-    table = {1: (0, 0.0), 10: (1, 0.0), 11: (10, 0.0), 12: (11, 0.0), 20: (1, 0.0)}
+    table = {pid: (ppid, 0.0, 0.0) for pid, ppid in {1: 0, 10: 1, 11: 10, 12: 11, 20: 1}.items()}
     assert process_tree(10, table) == {10, 11, 12}
     quiet = [{'cores': 0.5, 'top': [], 'own': []}] * 3
     busy = [{'cores': 3.0, 'top': [{'cmd': 'analysis', 'cores': 3.0}], 'own': []}] * 3
@@ -481,3 +481,49 @@ def test_single_step_mtp_needs_no_draft_decode_graph() -> None:
     assert not {c.name: c for c in verify_launch(log, spec_state(), spec_arm())}[
         'cuda_graph_decode'
     ].ok
+
+
+def test_divergence_rates_and_ratio_to_floor() -> None:
+    from bench.divergence import rate_interval, ratio_interval, report
+
+    rate, low, high = rate_interval(100, 50_000)
+    assert rate == pytest.approx(2.0) and low < 2.0 < high
+    assert rate_interval(0, 50_000)[2] > 0
+    ratio, rlow, rhigh = ratio_interval(200, 50_000, 100, 50_000)
+    assert ratio == pytest.approx(2.0) and rlow < 2.0 < rhigh
+    pairs = {
+        'floor': {
+            'prompts': 10,
+            'diverged': 100,
+            'exposure_tokens': 50_000,
+            'classes': {'tie': 100},
+        },
+        'arm': {'prompts': 10, 'diverged': 100, 'exposure_tokens': 50_000, 'classes': {'large': 1}},
+    }
+    rows = {row['pair']: row for row in report(pairs, 'floor')}
+    assert rows['floor']['rounding_level_only'] and not rows['arm']['rounding_level_only']
+    with pytest.raises(SystemExit):
+        report(pairs, 'missing')
+
+
+def test_host_load_attributes_short_lived_own_children_to_the_run() -> None:
+    import subprocess
+    import sys
+
+    from bench.hostload import sample
+
+    # The root starts a busy child after the first snapshot and reaps it before the
+    # second; its CPU must count as the run's own, not as foreign load.
+    code = (
+        'import subprocess, sys, time\n'
+        'time.sleep(0.2)\n'
+        'busy = "import time\\nt = time.time()\\nwhile time.time() - t < 0.7:\\n    pass"\n'
+        'subprocess.run([sys.executable, "-c", busy], check=True)\n'
+        'time.sleep(5)\n'
+    )
+    root = subprocess.Popen([sys.executable, '-c', code])
+    try:
+        result = sample(root.pid, interval=1.5)
+    finally:
+        root.kill()
+    assert result['own_cores'] >= 0.35
