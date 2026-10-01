@@ -16,6 +16,8 @@
 # To rerun only some steps: RUN_ALL_ONLY=step1,step2 runs those (check_outputs
 # always runs); RUN_ALL_REUSE=DIR copies every other step's outputs from an earlier
 # run if that run recorded the step as ok, and records it with that run's commit.
+# A reused step's fifth column says why its result does not depend on the default
+# tile configurations (if it does not) and whether the kernel source changed since.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="${1:-$HOME/vp-data/kernel/runs/latest}"
@@ -41,10 +43,18 @@ declare -A OUTPUTS=(
   [summarize]="summarize.log head_path_time.csv head_path_table.md"
 )
 
-record() {  # name status code [commit]
+# Steps whose result does not depend on default_gemv_config, so an earlier run's
+# result stands after a change of default tiles (not after a kernel change).
+declare -A TILE_INDEPENDENT=(
+  [replay]="batches of at most 16 rows (the capture ran 16 requests at most)"
+  [invariance]="stock BF16 head only, no certified kernel"
+  [tune_w8a8]="times every candidate tile explicitly, not the defaults"
+)
+
+record() {  # name status code [commit [note]]
   STATUS[$1]=$2
-  printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "${4:-$COMMIT}" >>"$OUT/steps.tsv"
-  echo "=== $1 $2 exit=$3 ${4:-$COMMIT} $(date +%T)"
+  printf '%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "${4:-$COMMIT}" "${5:-}" >>"$OUT/steps.tsv"
+  echo "=== $1 $2 exit=$3 ${4:-$COMMIT} $(date +%T)${5:+ ($5)}"
 }
 
 want() {
@@ -63,11 +73,15 @@ reuse() {  # name: copy an earlier run's ok outputs, or record the step as not r
     [ -e "$REUSE/$f" ] && cp -p "$REUSE/$f" "$OUT/$f"
   done
   if [ "$src" = "?" ]; then
-    src="reused:$(head -1 "$REUSE/commit.txt" | cut -c1-7)"
-  else
-    src="reused:$src"
+    src=$(head -1 "$REUSE/commit.txt" | cut -c1-7)
   fi
-  record "$name" ok 0 "$src"
+  local note="${TILE_INDEPENDENT[$name]:-depends on the default tiles}"
+  if git diff --quiet "$src" HEAD -- src/certified_head/kernels.py 2>/dev/null; then
+    note="$note; kernels.py unchanged since $src"
+  else
+    note="$note; kernels.py CHANGED since $src"
+  fi
+  record "$name" ok 0 "reused:$src" "$note"
 }
 
 step() {  # name timeout command...
