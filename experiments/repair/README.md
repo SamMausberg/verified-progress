@@ -2,7 +2,8 @@
 
 Kill tests for three proposals about committing more tokens per target pass with the DFlash-4B
 drafter: long-window exact repair (P2), target-anchored residual decoding (P3) and reusing a
-cached window once after a rejection (P9). Each test first bounds what the idea could gain with
+cached window once after a rejection (P9), and a screen of a cheaper greedy head compiled through
+the last FFN (P12). Each test first bounds what the idea could gain with
 an oracle or a measured ceiling, before anything is built. Results, verdicts and the exact
 commands are in [`evidence/repair/README.md`](../../evidence/repair/README.md). The served
 probes need the repair patches `engine/sglang/patches/repair/` applied in an SGLang worktree
@@ -27,12 +28,12 @@ probes need the repair patches `engine/sglang/patches/repair/` applied in an SGL
 | `stage_a.py` | Derived Stage A oracle speedups per block width from the measured times | `stage_a_oracle.{json,csv}`, `stage_a_oracle_triton.{json,csv}` |
 | `gdn_state_bench.py` | Microbenchmark of GDN state handling in a B-token verify pass | none: its run in the Stage A session was stopped without output, so `stage_a.py` bounds the state writes by their bytes |
 | `nsys_kernels.py` | Kernel time per verify cycle by category from Nsight Systems reports | `verify_kernels_b256.json` (the decomposition session's two Nsight runs failed at launch) |
-| `analyze_jacobi.py` | Jacobi progress, one-step recycling against fresh drafts and per-position hazards, from probe traces or the drafter's shared trace | `one_step_recycling.json`, `draft_source_accuracy.csv` |
+| `analyze_jacobi.py` | Jacobi progress, one-step recycling against fresh drafts and per-position hazards, from probe traces or the drafter's shared trace | `one_step_recycling.json`, `draft_source_accuracy.csv`, `jacobi_probe_{summary.json,progress.csv}` |
 | `residual_eval.py` | The anchored residual evaluator on the Hugging Face model, block by block from an exact prefix cache (P3 Stage B) | raw output |
 | `summarize_residual.py` | Decision agreement, certificate ratios, hazards and progress per basis rank from one evaluator run | `residual_eval_b16.json`, `residual_eval_b16.agree_by_distance.csv` |
 | `p3_gate.py` | P3's economic gate from the measured progress and costs | `p3_gate_b16.json` |
 | `p9_support_oracle.py` | P9's support oracle on the drafter's per-cycle candidate sets: upper bounds on what reuse could commit, at c = 1 (padded, measured-width and free verify) and at c > 1 | `p9_support_oracle.json`, `p9_support_oracle_c{8,16}{,_marginal}.json` |
 | `p9_program_cost.py` | GPU time of P9's fixed-shape reuse program (messages and greedy walk), eager and as a CUDA graph | `p9_program_cost.json` |
-| `p12_static_screen.py` | P12: a centre-plus-radius tile screen on the compiled last-FFN dictionary, with the winner's score known (an upper bound on skippable rows) | none yet: queued |
+| `p12_static_screen.py` | P12: a centre-plus-radius tile screen on the compiled last-FFN dictionary, with the winner's score known (an upper bound on skippable rows) | `p12_static_screen.json` |
 
 Tests: `tests/test_repair_stage_a.py` and `tests/test_repair_p9.py`.
