@@ -4,6 +4,8 @@
    "positions": 2448,
    "fragile": 203,
    "divergences": 16,
+   "fragile_divergences": 16,
+   "nonfragile_divergences": 0,
    "drift_max": 0.3556373119354248,
    "drift_mean": 0.03268112770301999,
    "divergences_per_1k": 6.5359477124183005,
@@ -13,6 +15,8 @@
    "positions": 1896,
    "fragile": 145,
    "divergences": 16,
+   "fragile_divergences": 16,
+   "nonfragile_divergences": 0,
    "drift_max": 0.4154059886932373,
    "drift_mean": 0.03240873171569157,
    "divergences_per_1k": 8.438818565400844,
@@ -22,6 +26,8 @@
    "positions": 21652,
    "fragile": 896,
    "divergences": 72,
+   "fragile_divergences": 72,
+   "nonfragile_divergences": 0,
    "drift_max": 0.3612947463989258,
    "drift_mean": 0.0186620641112554,
    "divergences_per_1k": 3.325327914280436,
@@ -31,6 +37,8 @@
    "positions": 19635,
    "fragile": 707,
    "divergences": 64,
+   "fragile_divergences": 64,
+   "nonfragile_divergences": 0,
    "drift_max": 0.6166682243347168,
    "drift_mean": 0.01659130181644169,
    "divergences_per_1k": 3.259485612426789,
@@ -40,6 +48,8 @@
    "positions": 320,
    "fragile": 7,
    "divergences": 2,
+   "fragile_divergences": 2,
+   "nonfragile_divergences": 0,
    "drift_max": 0.19206881523132324,
    "drift_mean": 0.017679489536714565,
    "divergences_per_1k": 6.25,
@@ -49,6 +59,8 @@
    "positions": 276,
    "fragile": 15,
    "divergences": 0,
+   "fragile_divergences": 0,
+   "nonfragile_divergences": 0,
    "drift_max": 0.24265408515930176,
    "drift_mean": 0.015015859346815852,
    "divergences_per_1k": 0.0,
@@ -58,6 +70,8 @@
    "positions": 320,
    "fragile": 34,
    "divergences": 0,
+   "fragile_divergences": 0,
+   "nonfragile_divergences": 0,
    "drift_max": 0.0,
    "drift_mean": 0.0,
    "divergences_per_1k": 0.0,
@@ -70,21 +84,25 @@
  "by_commit_length": {
   "by_length": {
    "1": {
-    "divergences": 32,
+    "fragile_divergences": 32,
     "fragile": 348,
-    "divergences_per_fragile": 0.092
+    "divergences_per_fragile": 0.092,
+    "nonfragile_divergences": 0
    },
    "2": {
-    "divergences": 136,
+    "fragile_divergences": 136,
     "fragile": 1603,
-    "divergences_per_fragile": 0.0848
+    "divergences_per_fragile": 0.0848,
+    "nonfragile_divergences": 0
    }
   },
   "first_cycle_after_prefill": {
-   "divergences": 2,
+   "fragile_divergences": 2,
    "fragile": 22,
-   "divergences_per_fragile": 0.0909
+   "divergences_per_fragile": 0.0909,
+   "nonfragile_divergences": 0
   },
+  "nonfragile_divergences": 0,
   "homogeneity_chi2": {
    "lengths": 2,
    "chi2": 0.105,

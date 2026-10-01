@@ -69,17 +69,23 @@ def analyse(run_a: dict[str, Any], run_b: dict[str, Any]) -> dict[str, Any]:
                         'positions': 0,
                         'fragile': 0,
                         'divergences': 0,
+                        'fragile_divergences': 0,
+                        'nonfragile_divergences': 0,
                         'drift_sum': 0.0,
                         'drift_max': 0.0,
                     },
                 )
                 bk['positions'] += 1
+                fragile = False
                 if i < len(a['top_logprobs']):
                     ref_top = sorted((lp for lp, _ in a['top_logprobs'][i]), reverse=True)
-                    if len(ref_top) > 1 and ref_top[0] - ref_top[1] <= FRAGILE_GAP:
-                        bk['fragile'] += 1
+                    fragile = len(ref_top) > 1 and ref_top[0] - ref_top[1] <= FRAGILE_GAP
+                    bk['fragile'] += fragile
                 if i == d:
                     bk['divergences'] += 1
+                    # A divergence where the reference was not near a tie is the strong
+                    # sign of a state error; it is counted apart from the fragile ones.
+                    bk['fragile_divergences' if fragile else 'nonfragile_divergences'] += 1
                 elif i < len(a['top_logprobs']) and i < len(b['top_logprobs']):
                     dr = position_drift(a['top_logprobs'][i], b['top_logprobs'][i])
                     bk['drift_sum'] += dr
@@ -93,7 +99,9 @@ def analyse(run_a: dict[str, Any], run_b: dict[str, Any]) -> dict[str, Any]:
         compared = bk['positions'] - bk['divergences']
         bk['drift_mean'] = bk.pop('drift_sum') / compared if compared else None
         bk['divergences_per_1k'] = 1000.0 * bk['divergences'] / bk['positions']
-        bk['divergences_per_fragile'] = bk['divergences'] / bk['fragile'] if bk['fragile'] else None
+        bk['divergences_per_fragile'] = (
+            bk['fragile_divergences'] / bk['fragile'] if bk['fragile'] else None
+        )
     return {'buckets': dict(sorted(buckets.items())), 'skipped_prompts': skipped}
 
 
@@ -104,29 +112,32 @@ def by_commit_length(buckets: dict[str, dict[str, Any]]) -> dict[str, Any]:
     A rollback error for one accept length would raise that length's rate; the test
     asks whether the observed rates are consistent with one common rate.
     """
+    # Per length: [divergences at fragile positions, fragile positions, divergences at
+    # non-fragile positions]. The rate and the test use only the first two.
     rows: dict[str, list[int]] = {}
-    after_prefill = [0, 0]
+    after_prefill = [0, 0, 0]
     for key, v in buckets.items():
         length = key.split('/')[0]
+        counts = (v['fragile_divergences'], v['fragile'], v['nonfragile_divergences'])
         if not length.isdigit():
             # The prefill token and the first verify cycle have no previous verify
             # cycle, so they belong to no commit length.
             if length == 'prefill' and '/' in key:
-                after_prefill[0] += v['divergences']
-                after_prefill[1] += v['fragile']
+                after_prefill = [x + y for x, y in zip(after_prefill, counts, strict=True)]
             continue
-        r = rows.setdefault(length, [0, 0])
-        r[0] += v['divergences']
-        r[1] += v['fragile']
-    table: dict[str, dict[str, Any]] = {
-        k: {
-            'divergences': d,
+        r = rows.setdefault(length, [0, 0, 0])
+        rows[length] = [x + y for x, y in zip(r, counts, strict=True)]
+
+    def entry(d: int, f: int, nf: int) -> dict[str, Any]:
+        return {
+            'fragile_divergences': d,
             'fragile': f,
             'divergences_per_fragile': round(d / f, 4) if f else None,
+            'nonfragile_divergences': nf,
         }
-        for k, (d, f) in sorted(rows.items(), key=lambda x: int(x[0]))
-    }
-    used = [(d, f - d) for d, f in rows.values() if f > 0]
+
+    table = {k: entry(*v) for k, v in sorted(rows.items(), key=lambda x: int(x[0]))}
+    used = [(d, f - d) for d, f, _ in rows.values() if f > 0]
     test: dict[str, Any] = {'lengths': len(used)}
     if used and (sum(d for d, _ in used) == 0 or sum(r for _, r in used) == 0):
         # No divergence at all (or every fragile position diverged): one common rate
@@ -137,13 +148,12 @@ def by_commit_length(buckets: dict[str, dict[str, Any]]) -> dict[str, Any]:
 
         chi2, p, dof, _ = chi2_contingency(used)
         test.update(chi2=round(float(chi2), 3), dof=int(dof), p=round(float(p), 4))
-    d, f = after_prefill
-    first_cycle = {
-        'divergences': d,
-        'fragile': f,
-        'divergences_per_fragile': round(d / f, 4) if f else None,
+    return {
+        'by_length': table,
+        'first_cycle_after_prefill': entry(*after_prefill),
+        'nonfragile_divergences': sum(v[2] for v in rows.values()) + after_prefill[2],
+        'homogeneity_chi2': test,
     }
-    return {'by_length': table, 'first_cycle_after_prefill': first_cycle, 'homogeneity_chi2': test}
 
 
 def main() -> None:

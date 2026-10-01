@@ -293,16 +293,19 @@ Setup section. Rates are per 1,000 compared tokens
 - **Speculation against plain decoding.** Every MTP configuration diverges from plain
   decoding at 3.5 to 4.0 per 1,000 tokens, as often as from itself at another
   concurrency (3.1 to 3.5), and only at near ties.
-- **By rejection position.** Divergences per fragile position (one where the plain
-  reference's top-2 gap is at most 0.25 nats), by the previous cycle's commit length,
-  including full acceptance (`cycles_*_pinned.json`):
+- **By rejection position.** Divergences at fragile positions (where the plain
+  reference's top-2 gap is at most 0.25 nats) per fragile position, by the previous
+  cycle's commit length, including full acceptance (`cycles_*_pinned.json`,
+  `by_commit_length`). Divergences at non-fragile positions are counted separately.
+  A divergence where the reference was not near a tie would be the strong sign of a
+  state error. There are none at any commit length, in any configuration.
 
-  | Configuration | Commit length 1, 2, 3, ... (full acceptance last) | All lengths | First cycle after prefill |
-  |---|---|---|---|
-  | MTP steps 1 | 0.092, 0.085 | 0.086 | 2/22 |
-  | MTP steps 3 | 0.089, 0.098, 0.088, 0.079 | 0.086 | 3/32 |
-  | MTP steps 5 | 0.064, 0.074, 0.097, 0.061, 0.080, 0.082 | 0.077 | 7/40 |
-  | MTP tree | 0.085, 0.075, 0.063, 0.090 | 0.081 | 6/33 |
+  | Configuration | Commit length 1, 2, 3, ... (full acceptance last) | All lengths | First cycle after prefill | Non-fragile divergences |
+  |---|---|---|---|---|
+  | MTP steps 1 | 0.092, 0.085 | 0.086 | 2/22 | 0 |
+  | MTP steps 3 | 0.089, 0.098, 0.088, 0.079 | 0.086 | 3/32 | 0 |
+  | MTP steps 5 | 0.064, 0.074, 0.097, 0.061, 0.080, 0.082 | 0.077 | 7/40 | 0 |
+  | MTP tree | 0.085, 0.075, 0.063, 0.090 | 0.081 | 6/33 | 0 |
 
   A state error at one rejection position (a wrong rollback for one accept length)
   would raise that position's rate. No length stands out. The rates are compatible
