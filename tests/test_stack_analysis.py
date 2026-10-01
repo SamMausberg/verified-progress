@@ -27,6 +27,14 @@ def _load(name: str):
 
 analyze = _load('analyze')
 gate = _load('equality_gate')
+
+TREE = 'c' * 40
+IDENT = {
+    'repo': {'path': '/r', 'head': 'a' * 40, 'tree': 'b' * 40, 'dirty': []},
+    's0': {'path': '/s', 'head': gate.S0_COMMIT, 'tree': 'd' * 40, 'dirty': []},
+    'stack_engine': {'path': '/e', 'head': 'e' * 40, 'tree': TREE, 'dirty': []},
+    'packages': {'torch': '2.13.0'},
+}
 ceiling = _load('ceiling')
 phases = _load('phases')
 
@@ -42,10 +50,26 @@ def _points(path: Path, rows: list[dict], levers: str = 'FG') -> None:
             w.writerow({'invalid_reason': '', 'accept_length': '5.7', **r})
     run = path.parent / 'campaign_run'
     run.mkdir(exist_ok=True)
-    (run / 'gate.json').write_text(json.dumps({'timed_levers': list(levers)}))
+    (run / 'gate.json').write_text(json.dumps({'timed_levers': list(levers), 'identity': IDENT}))
     (run / 'summary.json').write_text('{}')
     digest = gate.campaign_digest(run / 'gate.json')
     (path.parent / 'campaign_gate.json').write_text(json.dumps(digest))
+    with (path.parent / 'launches.csv').open('w', newline='') as f:
+        w = csv.DictWriter(
+            f, fieldnames=['label', 'run', 'sglang_head', 'sglang_dirty', 'repo_head']
+        )
+        w.writeheader()
+        for r in rows:
+            engine = IDENT['s0' if r['label'] == 'stack-S0' else 'stack_engine']['head']
+            w.writerow(
+                {
+                    'label': r['label'],
+                    'run': r['run'],
+                    'sglang_head': engine,
+                    'sglang_dirty': 'False',
+                    'repo_head': IDENT['repo']['head'],
+                }
+            )
     for r in rows:
         run_dir = path.parent / r['label'] / r['run']
         run_dir.mkdir(parents=True, exist_ok=True)
@@ -84,6 +108,8 @@ def test_full_stack_ratio_pairs_both_launches_with_both_baselines(tmp_path, monk
             str(out),
             '--runs-root',
             str(tmp_path),
+            '--launches',
+            str(tmp_path / 'launches.csv'),
         ],
     )
     analyze.main()
@@ -136,6 +162,8 @@ def test_invalid_point_drops_the_session_for_that_arm(tmp_path, monkeypatch):
             str(out),
             '--runs-root',
             str(tmp_path),
+            '--launches',
+            str(tmp_path / 'launches.csv'),
         ],
     )
     analyze.main()
@@ -241,6 +269,9 @@ def _write_runs(run: Path, b0_low_entry: float = -0.5) -> None:
         d = runs / f'plain__stack_{name}'
         d.mkdir(parents=True, exist_ok=True)
         (d / 'c1.jsonl').write_text('\n'.join(json.dumps(r) for r in _outputs(lp)) + '\n')
+        engine = IDENT['s0' if name == 'S0' else 'stack_engine']['head']
+        meta = {'sglang_sha': engine, 'sglang_dirty': False, 'repo_sha': IDENT['repo']['head']}
+        (d / 'c1.meta.json').write_text(json.dumps(meta))
     pairs = [['B0 vs S0', 'plain__stack_S0/c1', 'plain__stack_B0/c1']]
     pairs += [
         [f'{x} vs B0', 'plain__stack_B0/c1', f'plain__stack_{x}/c1'] for x in ('F', 'G', 'FG')
@@ -258,11 +289,12 @@ def _build(
     (run / gate.TABLE).write_text('{"2560,4096": []}')
     for n in stats:
         (run / f'certified_stats_{n}.json').write_text(json.dumps(STATS))
-    argv = ['gate', 'build', str(run), '--table', str(run / gate.TABLE)]
-    if cert:
-        argv += ['--cert-src', str(cert)]
-    monkeypatch.setattr(sys, 'argv', argv)
-    return gate.main(), run / 'gate.json'
+    (run / 'identity.json').write_text(json.dumps(IDENT))
+    return gate.build(run, run / gate.TABLE, cert, IDENT, TREE), run / 'gate.json'
+
+
+def _check(path, cert, pin=None, ident=None):
+    return gate.check(path, cert, pin, ident or IDENT, TREE)
 
 
 def _package(tmp_path, text='x = 1') -> Path:
@@ -275,11 +307,11 @@ def _package(tmp_path, text='x = 1') -> Path:
 def test_gate_check_passes_fg_and_fgh(tmp_path, monkeypatch):
     status, path = _build(tmp_path, monkeypatch, _passing())
     assert status == 0
-    full, table = gate.check(path, None)
+    full, table = _check(path, None)
     assert full == 'FG' and table.name == gate.TABLE
     src = _package(tmp_path)
     status, path = _build(tmp_path, monkeypatch, _passing(h=True), ('H', 'FGH'), src)
-    assert gate.check(path, src)[0] == 'FGH'
+    assert _check(path, src)[0] == 'FGH'
 
 
 def _unknown(p):
@@ -313,7 +345,7 @@ def test_gate_check_refuses_every_failed_equality(tmp_path, monkeypatch, spoil):
     status, path = _build(tmp_path, monkeypatch, pairs)
     assert status == 1  # build reports a rejected gate; the hold then fails and keeps current
     with pytest.raises(gate.GateError):
-        gate.check(path, None)
+        _check(path, None)
 
 
 def test_bitwise_compares_complete_logprob_arrays(tmp_path, monkeypatch):
@@ -322,19 +354,19 @@ def test_bitwise_compares_complete_logprob_arrays(tmp_path, monkeypatch):
     g = json.loads(path.read_text())
     assert not g['b0_bitwise_to_s0'] and not g['ok']
     with pytest.raises(gate.GateError):
-        gate.check(path, None)
+        _check(path, None)
 
 
 def test_campaign_pin_refuses_a_second_gate(tmp_path, monkeypatch):
     pin = tmp_path / 'campaign.json'
     _, path = _build(tmp_path, monkeypatch, _passing())
-    assert gate.check(path, None, pin)[0] == 'FG'
-    assert gate.check(path, None, pin)[0] == 'FG'
+    assert _check(path, None, pin)[0] == 'FG'
+    assert _check(path, None, pin)[0] == 'FG'
     other = _passing()
     other['G vs B0'] = _pair(4, 0.2, tie=4)
     _, path = _build(tmp_path, monkeypatch, other)  # a new gate with the same levers
     with pytest.raises(gate.GateError):
-        gate.check(path, None, pin)
+        _check(path, None, pin)
 
 
 def test_decision_uses_unrounded_bounds():
@@ -345,25 +377,25 @@ def test_decision_uses_unrounded_bounds():
 
 def test_gate_check_refuses_changed_files_and_missing_package(tmp_path, monkeypatch):
     with pytest.raises(gate.GateError):
-        gate.check(tmp_path / 'nowhere' / 'gate.json', None)
+        _check(tmp_path / 'nowhere' / 'gate.json', None)
     src = _package(tmp_path)
     _, path = _build(tmp_path, monkeypatch, _passing(h=True), ('H', 'FGH'), src)
     with pytest.raises(gate.GateError):  # H passed, but no package named
-        gate.check(path, None)
+        _check(path, None)
     _package(tmp_path, 'x = 2')
     with pytest.raises(gate.GateError):  # a different package
-        gate.check(path, src)
+        _check(path, src)
     _package(tmp_path, 'x = 1')
-    assert gate.check(path, src)[0] == 'FGH'
+    assert _check(path, src)[0] == 'FGH'
     (path.parent / gate.TABLE).write_text('{}')
     with pytest.raises(gate.GateError):  # the routing table changed
-        gate.check(path, src)
+        _check(path, src)
     _, path = _build(tmp_path, monkeypatch, _passing())
     edited = json.loads(path.read_text())
     edited['timed_levers'] = ['F', 'G', 'H']
     path.write_text(json.dumps(edited))
     with pytest.raises(gate.GateError):  # gate.json no longer matches its run
-        gate.check(path, src)
+        _check(path, src)
 
 
 @pytest.mark.parametrize(
@@ -375,7 +407,7 @@ def test_certified_head_needs_every_check(tmp_path, monkeypatch, drop):
     stats = ('H',) if drop == 'stats' else ('H', 'FGH')
     src = None if drop == 'package' else _package(tmp_path)
     _, path = _build(tmp_path, monkeypatch, pairs, stats, src)
-    assert gate.check(path, src)[0] == 'FG'
+    assert _check(path, src)[0] == 'FG'
 
 
 def test_interaction_skips_a_session_with_one_invalid_full_launch(tmp_path, monkeypatch):
@@ -416,6 +448,8 @@ def test_interaction_skips_a_session_with_one_invalid_full_launch(tmp_path, monk
             str(out),
             '--runs-root',
             str(tmp_path),
+            '--launches',
+            str(tmp_path / 'launches.csv'),
         ],
     )
     analyze.main()
@@ -455,6 +489,8 @@ def test_all_invalid_full_stays_visible_with_n_zero(tmp_path, monkeypatch):
             str(out),
             '--runs-root',
             str(tmp_path),
+            '--launches',
+            str(tmp_path / 'launches.csv'),
         ],
     )
     analyze.main()
@@ -507,6 +543,8 @@ def test_analysis_takes_the_full_arm_from_the_gate(tmp_path, monkeypatch):
             str(out),
             '--runs-root',
             str(tmp_path),
+            '--launches',
+            str(tmp_path / 'launches.csv'),
         ],
     )
     analyze.main()
@@ -547,6 +585,8 @@ def test_analysis_refuses_sessions_under_different_gates(tmp_path, monkeypatch):
             str(out),
             '--runs-root',
             str(tmp_path),
+            '--launches',
+            str(tmp_path / 'launches.csv'),
         ],
     )
     with pytest.raises(SystemExit):
@@ -587,6 +627,8 @@ def test_analysis_refuses_a_changed_pinned_gate(tmp_path, monkeypatch):
             str(tmp_path / 'campaign_gate.json'),
             '--runs-root',
             str(tmp_path),
+            '--launches',
+            str(tmp_path / 'launches.csv'),
         ],
     )
     with pytest.raises(SystemExit):
@@ -599,7 +641,7 @@ def test_failed_check_never_writes_the_pin(tmp_path, monkeypatch):
     pairs['B0 vs S0'] = _pair(1, 0.1, tie=1)
     _, path = _build(tmp_path, monkeypatch, pairs)
     with pytest.raises(gate.GateError):
-        gate.check(path, None, pin)
+        _check(path, None, pin)
     assert not pin.exists()
 
 
@@ -704,6 +746,8 @@ def test_each_declared_cell_rule(tmp_path, monkeypatch, spoil, void):
             str(tmp_path / 'campaign_gate.json'),
             '--runs-root',
             str(tmp_path),
+            '--launches',
+            str(tmp_path / 'launches.csv'),
         ],
     )
     analyze.main()
@@ -753,3 +797,138 @@ def _identical_case(tmp_path, spoil: str) -> bool:
 )
 def test_bitwise_needs_full_top5_coverage(tmp_path, spoil, identical):
     assert _identical_case(tmp_path, spoil) is identical
+
+
+def _ident(**changes) -> dict:
+    ident = json.loads(json.dumps(IDENT))
+    for key, value in changes.items():
+        part, field = key.split('__')
+        if part == 'packages':
+            ident['packages'][field] = value
+        else:
+            ident[part][field] = value
+    return ident
+
+
+@pytest.mark.parametrize(
+    'changes',
+    [
+        {'repo__dirty': [' M bench/sweep.py']},
+        {'s0__dirty': ['?? python/sglang/extra.py']},
+        {'s0__head': 'f' * 40},
+        {'stack_engine__dirty': [' M python/sglang/srt/server_args.py']},
+        {'stack_engine__tree': 'f' * 40},
+    ],
+)
+def test_require_clean_refuses_dirty_or_wrong_checkouts(changes):
+    with pytest.raises(gate.GateError):
+        gate.require_clean(_ident(**changes), TREE)
+    gate.require_clean(IDENT, TREE)
+
+
+@pytest.mark.parametrize(
+    'changes',
+    [
+        {'repo__head': 'f' * 40},
+        {'stack_engine__head': 'f' * 40},
+        {'packages__torch': '2.14.0'},
+    ],
+)
+def test_check_refuses_a_session_on_other_engines(tmp_path, monkeypatch, changes):
+    _, path = _build(tmp_path, monkeypatch, _passing())
+    assert _check(path, None)[0] == 'FG'
+    with pytest.raises(gate.GateError):
+        _check(path, None, ident=_ident(**changes))
+
+
+@pytest.mark.parametrize('field', ['sglang_sha', 'sglang_dirty', 'repo_sha'])
+def test_build_rejects_equality_runs_on_other_engines(tmp_path, monkeypatch, field):
+    run = tmp_path / 'run'
+    run.mkdir()
+    _write_runs(run)
+    meta_path = run / 'runs' / 'plain__stack_G' / 'c1.meta.json'
+    meta = json.loads(meta_path.read_text())
+    meta[field] = True if field == 'sglang_dirty' else 'f' * 40
+    meta_path.write_text(json.dumps(meta))
+    (run / 'summary.json').write_text(json.dumps({'pairs': _passing()}))
+    (run / gate.TABLE).write_text('{}')
+    (run / 'identity.json').write_text(json.dumps(IDENT))
+    assert gate.build(run, run / gate.TABLE, None, IDENT, TREE) == 1
+    assert json.loads((run / 'gate.json').read_text())['provenance_problems']
+
+
+def test_build_refuses_an_identity_that_changed_during_the_hold(tmp_path, monkeypatch):
+    run = tmp_path / 'run'
+    run.mkdir()
+    (run / gate.TABLE).write_text('{}')
+    (run / 'identity.json').write_text(json.dumps(_ident(stack_engine__head='f' * 40)))
+    with pytest.raises(gate.GateError):
+        gate.build(run, run / gate.TABLE, None, IDENT, TREE)
+
+
+@pytest.mark.parametrize(
+    'spoil', [{'sglang_dirty': 'True'}, {'sglang_head': 'f' * 40}, {'repo_head': 'f' * 40}, None]
+)
+def test_analysis_refuses_runs_on_other_engines(tmp_path, monkeypatch, spoil):
+    rows = [
+        {
+            'label': f'stack-{arm}',
+            'run': f's1-{i}',
+            'session': 'stack-s1',
+            'concurrency': '1',
+            'x_e2e': 100.0,
+            'y': 100.0,
+        }
+        for i, arm in enumerate(['S0', 'FG', 'FG', 'S0'])
+    ]
+    pts = tmp_path / 'points.csv'
+    _points(pts, rows)
+    launches = list(csv.DictReader((tmp_path / 'launches.csv').open()))
+    if spoil is None:
+        launches = launches[1:]  # a run with no launch record
+    else:
+        launches[1].update(spoil)
+    with (tmp_path / 'launches.csv').open('w', newline='') as f:
+        w = csv.DictWriter(f, fieldnames=list(launches[0].keys()))
+        w.writeheader()
+        w.writerows(launches)
+    out = tmp_path / 'out.json'
+    monkeypatch.setattr(
+        sys,
+        'argv',
+        [
+            'analyze',
+            '--points',
+            str(pts),
+            '--out',
+            str(out),
+            '--campaign',
+            str(tmp_path / 'campaign_gate.json'),
+            '--runs-root',
+            str(tmp_path),
+            '--launches',
+            str(tmp_path / 'launches.csv'),
+        ],
+    )
+    with pytest.raises(SystemExit):
+        analyze.main()
+
+
+def test_tree_state_sees_tracked_edits_and_untracked_engine_files(tmp_path):
+    import subprocess
+
+    repo = tmp_path / 'g'
+    (repo / 'python').mkdir(parents=True)
+    (repo / 'python' / 'mod.py').write_text('a = 1\n')
+    for args in (
+        ['init', '-q'],
+        ['add', '-A'],
+        ['-c', 'user.name=t', '-c', 'user.email=nobody@example.invalid', 'commit', '-qm', 'x'],
+    ):
+        subprocess.run(['git', '-C', str(repo), *args], check=True)
+    assert gate.tree_state(repo, 'python')['dirty'] == []
+    (repo / 'python' / 'new.py').write_text('')
+    assert gate.tree_state(repo, 'python')['dirty'] == ['?? python/new.py']
+    assert gate.tree_state(repo, None)['dirty'] == []
+    (repo / 'python' / 'mod.py').write_text('a = 2\n')
+    assert ' M python/mod.py' in gate.tree_state(repo, None)['dirty']

@@ -54,6 +54,11 @@ base=$(git -C "$wt" merge-base HEAD bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824)
 if [ "$(git -C "$wt" rev-parse HEAD)" = "$base" ]; then
   git -C "$wt" am -3 -q "${series[@]}"
 fi
+if [ -n "$(git -C "$wt" status --porcelain --untracked-files=no)" ] ||
+  git -C "$wt" status --porcelain --untracked-files=all -- python | grep -q '^??'; then
+  echo "$wt has uncommitted changes" >&2
+  exit 1
+fi
 tree=$(git -C "$wt" rev-parse 'HEAD^{tree}')
 if [ "$tree" != "$EXPECTED_TREE" ]; then
   echo "tree $tree differs from the expected $EXPECTED_TREE" >&2

@@ -29,6 +29,13 @@ STACK_ARM=dflash-tuned-b16
 # first session pins the campaign to that gate, and later sessions refuse another.
 STACK_CURRENT=$HOME/vp-data/stack/equality/current
 STACK_PIN=$HOME/vp-data/stack/campaign_gate.json
+# The stock SGLang checkout S0 imports (the editable install in the venv).
+STACK_S0=${SGLANG_DIR:-$HOME/sglang}
+
+# The checkouts every gate command fingerprints (equality_gate.py preflight/build/check).
+engine_args() {
+  printf '%s\n' --repo "$PWD" --s0 "$STACK_S0" --stack-engine "$STACK_ENGINE" --stack-tree "$STACK_TREE"
+}
 
 # Build the routing table backbone's hold 2 used (lever v1) from committed data into
 # $STACK_TABLE (the equality hold does this once, in its own directory).
@@ -43,8 +50,10 @@ stack_table() {
 gate_plan() {
   local plan cert=()
   [ -n "${STACK_CERT_SRC:-}" ] && cert=(--cert-src "$STACK_CERT_SRC")
+  local engine
+  mapfile -t engine < <(engine_args)
   plan=$(python experiments/stack/equality_gate.py check --gate "$STACK_CURRENT/gate.json" \
-    --pin "${1:-$STACK_PIN}" "${cert[@]}") || return 1
+    --pin "${1:-$STACK_PIN}" "${cert[@]}" "${engine[@]}") || return 1
   # shellcheck disable=SC2034 # FULL is read by the hold scripts that source this file
   FULL=$(sed -n 's/^full=//p' <<< "$plan")
   STACK_TABLE=$(sed -n 's/^table=//p' <<< "$plan")

@@ -17,6 +17,9 @@ declared in evidence/stack/README.md ("Composition plan"):
   A point that bench marks invalid (failed requests, wrong lengths, foreign CPU load
   above 2 cores, ...) drops that session at that concurrency for the arms it touches
   (an invalid S0 launch, for every arm).
+* Every row's launch record (bench.pareto's launches.csv) must show the engine the gate
+  recorded, S0's checkout for S0 and the composed worktree's commit for every other arm,
+  with no uncommitted changes, launched from the gate's repository commit.
 * The gate comes only from the campaign pin (`--campaign`, the campaign_gate.json the
   first session wrote): its pinned files must be unchanged, and the full stack is that
   gate's timed levers. Every session must have run under it: each session hold copies
@@ -31,6 +34,7 @@ declared in evidence/stack/README.md ("Composition plan"):
 
     python experiments/stack/analyze.py --points ~/vp-data/stack/pareto/points.csv \
         --campaign ~/vp-data/stack/campaign_gate.json --runs-root ~/vp-data/stack/runs/<campaign> \
+        --launches ~/vp-data/stack/pareto/launches.csv \
         --out evidence/stack/composition.json --csv evidence/stack/composition.csv
 """
 
@@ -128,6 +132,12 @@ def main() -> None:
         required=True,
         help='the bench.sweep --out directory of the campaign (runs at <label>/<run>)',
     )
+    ap.add_argument(
+        '--launches',
+        type=Path,
+        required=True,
+        help="bench.pareto's launches.csv for the same runs (engine and repository state)",
+    )
     ap.add_argument('--out', type=Path, required=True)
     ap.add_argument('--csv', type=Path, help='one row per arm, concurrency and metric')
     args = ap.parse_args()
@@ -161,6 +171,24 @@ def main() -> None:
         vals['accept_length'] = float(r['accept_length'] or 'nan')
         data[r['session']][c][arm].append((r['run'], vals))
 
+    ident = _gate_module().pinned_gate(args.campaign)['identity']
+    with args.launches.open() as f:
+        launches = {(x['label'], x['run']): x for x in csv.DictReader(f)}
+    for r in rows_in:
+        launch = launches.get((r['label'], r['run']))
+        if launch is None:
+            raise SystemExit(f'no launch record for run {r["label"]}/{r["run"]}')
+        engine = ident['s0'] if r['label'] == 'stack-S0' else ident['stack_engine']
+        if (
+            launch['sglang_dirty'] != 'False'
+            or launch['sglang_head'] != engine['head']
+            or launch['repo_head'] != ident['repo']['head']
+        ):
+            raise SystemExit(
+                f'run {r["label"]}/{r["run"]} ran on engine {launch["sglang_head"]} '
+                f'(dirty {launch["sglang_dirty"]}) from repository {launch["repo_head"]}, '
+                "not the gate's"
+            )
     for r in rows_in:
         record = args.runs_root / r['label'] / r['run'] / 'stack_gate.json'
         if not record.is_file():

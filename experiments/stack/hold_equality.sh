@@ -38,8 +38,11 @@ mkdir -p "$RUNS"
 exec >>"$OUT/hold.log" 2>&1
 echo "hold_equality start $(date -Is) repo $(git rev-parse HEAD) dirty=$(git status --porcelain --untracked-files=no | wc -l)"
 echo "engine $(git -C "$STACK_ENGINE" rev-parse HEAD) tree $(git -C "$STACK_ENGINE" rev-parse 'HEAD^{tree}') cert_src=${STACK_CERT_SRC:-none}"
-[ "$(git -C "$STACK_ENGINE" rev-parse 'HEAD^{tree}')" = "$STACK_TREE" ] ||
-  { echo "composed engine tree is not the declared one"; exit 1; }
+# Every checkout clean, S0 at the pin, the composed tree declared; the identity recorded
+# here must still hold when the gate is built.
+mapfile -t ENGINE < <(engine_args)
+python experiments/stack/equality_gate.py preflight "${ENGINE[@]}" --out "$OUT/identity.json" ||
+  { echo "preflight failed"; exit 1; }
 export GPU_STARTUP_MIN_FREE_GB=${GPU_STARTUP_MIN_FREE_GB:-60}
 
 DFLASH_B16="--speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash \
@@ -104,8 +107,8 @@ else
   [ -n "${STACK_CERT_SRC:-}" ] && cert=(--cert-src "$STACK_CERT_SRC")
   # Non-zero when the gate is rejected (ok false): then current is not moved and the
   # hold fails.
-  python experiments/stack/equality_gate.py build "$OUT" --table "$STACK_TABLE" "${cert[@]}" ||
-    failed+=(gate)
+  python experiments/stack/equality_gate.py build "$OUT" --table "$STACK_TABLE" "${cert[@]}" \
+    "${ENGINE[@]}" || failed+=(gate)
 fi
 # The gate is current only if every equality run, the comparison and the gate succeeded.
 if (( ${#failed[@]} == 0 )); then

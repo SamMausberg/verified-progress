@@ -190,6 +190,21 @@ arrays, prompt by prompt, and requires all five top-logprob entries at every out
 position in both runs (missing or truncated logprobs fail). The same hold runs a phase diagnostic: B0 and FG with the repair probe at
 c = 1 and 8 (`phases.py`).
 
+Engine provenance is part of the gate. Every hold starts with `equality_gate.py
+preflight`, which refuses to run unless the repository running the hold, the stock
+SGLang checkout that S0 imports (`~/sglang`, required at the pin `bd66ce343e`) and the
+composed worktree (required at `STACK_TREE`) all have no uncommitted changes to tracked
+files and no untracked files under `python/`. The gate records that identity (commits,
+trees and the SGLang venv's torch, Triton, FlashInfer, sgl-kernel and transformers
+versions), requires it unchanged between the equality hold's start and the gate's
+construction, and requires each equality run's own record to name those engine and
+repository commits with a clean tree. Every timed hold's check refuses a session whose
+current identity differs from the gate's in any of these, and the analysis refuses any
+run whose launch record (bench's `launches.csv`) shows another engine commit, a dirty
+engine or another repository commit. The repository commit pins the harness, the arm
+definitions, the hold scripts and the workload files; so that the sessions can use the
+gate, the hold worktree stays at the equality hold's commit for the whole campaign.
+
 **Step 2, timing** (`hold_session.sh <k>`, sessions s1, s2, s3, one exclusive hold each).
 Each session launches every arm once through `bench.sweep` at c = 1, 2, 4, 8 (64 measured
 requests per point after a warm-up wave, the confirm split, 512 output tokens with
@@ -294,6 +309,7 @@ python -m bench.pareto ~/vp-data/stack/runs/<campaign>/stack-*/2026* --out ~/vp-
     --points-only --status stack
 python experiments/stack/analyze.py --points ~/vp-data/stack/pareto/points.csv \
     --campaign ~/vp-data/stack/campaign_gate.json --runs-root ~/vp-data/stack/runs/<campaign> \
+    --launches ~/vp-data/stack/pareto/launches.csv \
     --out evidence/stack/composition.json --csv evidence/stack/composition.csv
 scripts/gpu_lock.sh -x experiments/stack/hold_oracle.sh             # diagnostic, after the sessions
 ```

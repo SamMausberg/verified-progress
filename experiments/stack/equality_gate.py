@@ -25,10 +25,23 @@ The decision is all or nothing:
   package's SHA-256 (over its files) is recorded. A session whose gate includes H must
   name that exact package.
 
+Engine provenance is part of the gate. Every hold first runs `preflight`: the repository
+running it, the stock SGLang checkout S0 runs (~/sglang, which must be at the pin
+bd66ce343e) and the composed worktree (whose tree must be STACK_TREE) must all have no
+uncommitted changes to tracked files and no untracked files under python/. `build`
+records that identity (commits, trees, the SGLang venv's key package versions) in
+gate.json, requires it unchanged since the hold's preflight, and requires every equality
+run's own record to name those commits with a clean tree. `check` refuses a session
+whose current identity differs from the gate's in any field.
+
+    python experiments/stack/equality_gate.py preflight --repo . --s0 ~/sglang \
+        --stack-engine ~/sglang-wt/stack --stack-tree <tree> --out <run>/identity.json
     python experiments/stack/equality_gate.py build ~/vp-data/stack/equality/<run> \
-        --table <run>/backbone_table_v1.json [--cert-src ~/vp-wt/stack-cert/src]
+        --table <run>/backbone_table_v1.json [--cert-src ~/vp-wt/stack-cert/src] \
+        --repo . --s0 ~/sglang --stack-engine ~/sglang-wt/stack --stack-tree <tree>
     python experiments/stack/equality_gate.py check --gate ~/vp-data/stack/equality/current/gate.json \
-        [--cert-src ~/vp-wt/stack-cert/src] [--pin ~/vp-data/stack/campaign_gate.json]
+        [--cert-src ~/vp-wt/stack-cert/src] [--pin ~/vp-data/stack/campaign_gate.json] \
+        --repo . --s0 ~/sglang --stack-engine ~/sglang-wt/stack --stack-tree <tree>
 
 `--pin` binds a campaign of sessions to one gate: the first check that passes every
 precondition writes the gate's and its comparison summary's SHA-256 and the run
@@ -40,7 +53,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.metadata
 import json
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -49,6 +64,8 @@ EXACT_CLASSES = ('tie', 'one_ulp', 'near')
 PROMPTS = 320
 TOP_K = 5  # top logprobs requested at every position by the equality runs
 TABLE = 'backbone_table_v1.json'
+S0_COMMIT = 'bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824'  # the paper's SGLang pin
+PACKAGES = ('torch', 'triton', 'flashinfer-python', 'sgl-kernel', 'transformers')
 
 
 class GateError(Exception):
@@ -153,18 +170,113 @@ def fingerprint(src: Path) -> str:
     return h.hexdigest()
 
 
-def evaluate(run: Path, table_sha: str | None, package_sha: str | None) -> dict[str, Any]:
+def _git(path: Path, *args: str) -> str:
+    out = subprocess.run(['git', '-C', str(path), *args], capture_output=True, text=True)
+    if out.returncode != 0:
+        raise GateError(f'git {" ".join(args)} failed in {path}: {out.stderr.strip()}')
+    return out.stdout.rstrip('\n')  # keep porcelain's leading status columns
+
+
+def tree_state(path: Path, untracked_under: str | None) -> dict[str, Any]:
+    """HEAD, tree and every uncommitted change of a checkout (tracked files, plus
+    untracked files under `untracked_under`, which the engine would import)."""
+    dirty = _git(path, 'status', '--porcelain', '--untracked-files=no').splitlines()
+    if untracked_under:
+        listing = _git(
+            path, 'status', '--porcelain', '--untracked-files=all', '--', untracked_under
+        )
+        dirty += [line for line in listing.splitlines() if line.startswith('??')]
+    return {
+        'path': str(path),
+        'head': _git(path, 'rev-parse', 'HEAD'),
+        'tree': _git(path, 'rev-parse', 'HEAD^{tree}'),
+        'dirty': sorted(set(dirty)),
+    }
+
+
+def package_versions() -> dict[str, str | None]:
+    out: dict[str, str | None] = {}
+    for name in PACKAGES:
+        try:
+            out[name] = importlib.metadata.version(name)
+        except importlib.metadata.PackageNotFoundError:
+            out[name] = None
+    return out
+
+
+def identity(repo: Path, s0: Path, stack_engine: Path) -> dict[str, Any]:
+    """What a timed run's numbers depend on outside the gate's own files."""
+    return {
+        'repo': tree_state(repo, None),
+        's0': tree_state(s0, 'python'),
+        'stack_engine': tree_state(stack_engine, 'python'),
+        'packages': package_versions(),
+    }
+
+
+def require_clean(ident: dict[str, Any], stack_tree: str) -> None:
+    """The absolute conditions: no checkout dirty, S0 at the pin, the composed tree declared."""
+    problems = [
+        f'{k} has uncommitted changes {ident[k]["dirty"][:5]}'
+        for k in ('repo', 's0', 'stack_engine')
+        if ident[k]['dirty']
+    ]
+    if ident['s0']['head'] != S0_COMMIT:
+        problems.append(f's0 is at {ident["s0"]["head"]}, not the pin {S0_COMMIT}')
+    if ident['stack_engine']['tree'] != stack_tree:
+        problems.append(f'composed tree {ident["stack_engine"]["tree"]} is not {stack_tree}')
+    if problems:
+        raise GateError('; '.join(problems))
+
+
+def identity_changes(old: dict[str, Any], new: dict[str, Any]) -> list[str]:
+    """Fields (other than checkout paths) in which two identities differ."""
+    diffs = [
+        f'{k}.{f}'
+        for k in ('repo', 's0', 'stack_engine')
+        for f in ('head', 'tree', 'dirty')
+        if old[k][f] != new[k][f]
+    ]
+    if old['packages'] != new['packages']:
+        diffs.append('packages')
+    return diffs
+
+
+def runs_provenance(run: Path, ident: dict[str, Any]) -> list[str]:
+    """Each stack equality run's own record names the identity's engine, clean."""
+    problems = []
+    for meta_path in sorted((run / 'runs').glob('plain__stack_*/c1.meta.json')):
+        meta = json.loads(meta_path.read_text())
+        name = meta_path.parent.name
+        want = ident['s0']['head'] if name == 'plain__stack_S0' else ident['stack_engine']['head']
+        if meta.get('sglang_sha') != want or meta.get('sglang_dirty') is not False:
+            problems.append(
+                f'{name}: engine {meta.get("sglang_sha")} dirty={meta.get("sglang_dirty")}'
+            )
+        if meta.get('repo_sha') != ident['repo']['head']:
+            problems.append(f'{name}: repository {meta.get("repo_sha")}')
+    if not problems and not any((run / 'runs').glob('plain__stack_*/c1.meta.json')):
+        problems.append('no equality run records')
+    return problems
+
+
+def evaluate(
+    run: Path, table_sha: str | None, package_sha: str | None, ident: dict[str, Any]
+) -> dict[str, Any]:
     """The gate decision for an equality run directory (pure: reads only that directory)."""
     pairs = json.loads((run / 'summary.json').read_text())['pairs']
     gate: dict[str, Any] = {
         'b0_bitwise_to_s0': bitwise(pairs.get('B0 vs S0')) and runs_identical(run, 'B0 vs S0'),
         'classes': {x: lever_class(run, pairs, x) for x in ('F', 'G', 'FG')},
         'table_sha256': table_sha,
+        'identity': ident,
+        'provenance_problems': runs_provenance(run, ident),
     }
     gate['ok'] = bool(
         gate['b0_bitwise_to_s0']
         and all(c != 'not exact' for c in gate['classes'].values())
         and table_sha
+        and not gate['provenance_problems']
     )
     timed = ['F', 'G'] if gate['ok'] else []
     checks = [certified_check(run / f'certified_stats_{n}.json') for n in ('H', 'FGH')]
@@ -187,14 +299,30 @@ def evaluate(run: Path, table_sha: str | None, package_sha: str | None) -> dict[
     return gate
 
 
-def check(gate_path: Path, cert_src: Path | None, pin: Path | None = None) -> tuple[str, Path]:
-    """Every precondition of a timed run; returns (full arm, routing table) or raises."""
+def check(
+    gate_path: Path,
+    cert_src: Path | None,
+    pin: Path | None,
+    ident: dict[str, Any],
+    stack_tree: str,
+) -> tuple[str, Path]:
+    """Every precondition of a timed run; returns (full arm, routing table) or raises.
+    `ident` is the identity of the checkouts this run would use, measured now."""
+    require_clean(ident, stack_tree)
     if not gate_path.is_file():
         raise GateError(f'no gate at {gate_path}')
     stored = json.loads(gate_path.read_text())
     run = gate_path.resolve().parent
+    if 'identity' not in stored:
+        raise GateError('the gate records no engine identity')
+    changed = identity_changes(stored['identity'], ident)
+    if changed:
+        raise GateError(f'engine identity differs from the equality run in {changed}')
     recomputed = evaluate(
-        run, stored.get('table_sha256'), stored.get('certified', {}).get('package_sha256')
+        run,
+        stored.get('table_sha256'),
+        stored.get('certified', {}).get('package_sha256'),
+        stored['identity'],
     )
     if recomputed != stored:
         raise GateError('gate.json does not match the decision recomputed from its run')
@@ -241,36 +369,69 @@ def pinned_gate(pin: Path) -> dict[str, Any]:
     return gate
 
 
+def build(
+    run: Path, table: Path, cert_src: Path | None, ident: dict[str, Any], stack_tree: str
+) -> int:
+    """Write gate.json for an equality run; 1 if the gate is rejected."""
+    require_clean(ident, stack_tree)
+    if table.resolve() != (run / TABLE).resolve():
+        raise GateError(f'the table must be {run / TABLE}')
+    preflight = run / 'identity.json'
+    if not preflight.is_file():
+        raise GateError(f'no preflight identity at {preflight}')
+    changed = identity_changes(json.loads(preflight.read_text()), ident)
+    if changed:
+        raise GateError(f'engine identity changed during the hold in {changed}')
+    package = fingerprint(cert_src) if cert_src else None
+    gate = evaluate(run, sha256_file(table), package, ident)
+    # Written either way so a rejected gate can be inspected; check() refuses it.
+    (run / 'gate.json').write_text(json.dumps(gate, indent=1) + '\n')
+    print(json.dumps(gate))
+    if not gate['ok']:
+        print('gate: rejected (ok is false)', file=sys.stderr)
+        return 1
+    return 0
+
+
+def _engine_args(p: argparse.ArgumentParser) -> None:
+    p.add_argument('--repo', type=Path, required=True, help='the repository running the hold')
+    p.add_argument('--s0', type=Path, required=True, help='the stock SGLang checkout (~/sglang)')
+    p.add_argument('--stack-engine', type=Path, required=True, help='the composed worktree')
+    p.add_argument('--stack-tree', required=True, help='the declared composed tree (STACK_TREE)')
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest='cmd', required=True)
+    pf = sub.add_parser('preflight', help='check the checkouts and record their identity')
+    _engine_args(pf)
+    pf.add_argument('--out', type=Path, required=True)
     b = sub.add_parser('build', help='write gate.json for an equality run directory')
     b.add_argument('run', type=Path)
     b.add_argument('--table', type=Path, required=True, help='the routing table G ran with')
     b.add_argument('--cert-src', type=Path, help='certified_head source dir the H runs used')
+    _engine_args(b)
     c = sub.add_parser('check', help='verify every precondition of a timed run')
     c.add_argument('--gate', type=Path, required=True)
     c.add_argument('--cert-src', type=Path)
     c.add_argument('--pin', type=Path, help='campaign file binding sessions to one gate')
+    _engine_args(c)
     f = sub.add_parser('fingerprint', help='print the certified_head package fingerprint')
     f.add_argument('src', type=Path)
     args = ap.parse_args()
     try:
         if args.cmd == 'fingerprint':
             print(fingerprint(args.src))
+            return 0
+        ident = identity(args.repo, args.s0, args.stack_engine)
+        if args.cmd == 'preflight':
+            require_clean(ident, args.stack_tree)
+            args.out.write_text(json.dumps(ident, indent=1) + '\n')
+            print(json.dumps(ident))
         elif args.cmd == 'build':
-            if args.table.resolve() != (args.run / TABLE).resolve():
-                raise GateError(f'the table must be {args.run / TABLE}')
-            package = fingerprint(args.cert_src) if args.cert_src else None
-            gate = evaluate(args.run, sha256_file(args.table), package)
-            # Written either way so a rejected gate can be inspected; check() refuses it.
-            (args.run / 'gate.json').write_text(json.dumps(gate, indent=1) + '\n')
-            print(json.dumps(gate))
-            if not gate['ok']:
-                print('gate: rejected (ok is false)', file=sys.stderr)
-                return 1
+            return build(args.run, args.table, args.cert_src, ident, args.stack_tree)
         else:
-            full, table = check(args.gate, args.cert_src, args.pin)
+            full, table = check(args.gate, args.cert_src, args.pin, ident, args.stack_tree)
             print(f'full={full}')
             print(f'table={table}')
     except (GateError, OSError, KeyError, ValueError) as err:
