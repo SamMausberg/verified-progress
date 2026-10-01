@@ -155,6 +155,9 @@ class PathHead:
         self.path = path
         self.head = head
         self.flags = flags
+        if head.unsafe:
+            # Runtime probes off: measurement only, never served.
+            raise ValueError('the certified head has its runtime probes disabled (unsafe)')
         self.counters = torch.zeros(len(COUNTERS), dtype=torch.int64, device=head.weight.device)
         self._mismatch = torch.zeros(head.max_batch, dtype=torch.bool, device=head.weight.device)
         self.column_report: dict[str, Any] | None = None

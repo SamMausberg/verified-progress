@@ -17,6 +17,9 @@ variant the head uses at that batch size:
 
 from __future__ import annotations
 
+import contextlib
+import sys
+from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
 import torch
@@ -29,6 +32,28 @@ if TYPE_CHECKING:
     from .head import CertifiedHead
 
 CHUNK = 16384
+
+
+@contextlib.contextmanager
+def native_fp64_matmul() -> Iterator[None]:
+    """Use PyTorch's own matmul for the FP64 references.
+
+    SGLang's ``--enable-deterministic-inference`` replaces ``aten::mm`` with
+    batch-invariant kernels that have no FP64 path (the self-test failed closed
+    with ``KeyError: torch.float64``). While the exact references are computed
+    the override is switched off and then on again; the stock references (BF16
+    head, seeded sampler) run outside this block, on the engine's own kernels.
+    The package does not import SGLang: the override is found in ``sys.modules``.
+    """
+    mod = sys.modules.get('sglang.srt.batch_invariant_ops.batch_invariant_ops')
+    if mod is None or not mod.is_batch_invariant_mode_enabled():
+        yield
+        return
+    mod.disable_batch_invariant_mode()
+    try:
+        yield
+    finally:
+        mod.enable_batch_invariant_mode()
 
 
 def raw_reference(
@@ -107,9 +132,11 @@ def _check_variants(head: CertifiedHead, h: torch.Tensor) -> dict[str, Any]:
     m = h.shape[0]
     arith = head.arith_for(m)
     out: dict[str, Any] = {}
-    x = exact_logits_fp64(h, head.weight)
+    with native_fp64_matmul():
+        x = exact_logits_fp64(h, head.weight)
     head._prep(h, m)
-    ref, tol = raw_reference(head, arith, h)
+    with native_fp64_matmul():
+        ref, tol = raw_reference(head, arith, h)
     zt = head.approx_logits(h).double()
     out['raw_outside_bound'] = int((~((zt - ref).abs() <= tol)).sum())
     del ref, tol, zt

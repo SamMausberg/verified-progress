@@ -291,8 +291,9 @@ class CertifiedHead:
         self._probe_trips = torch.zeros(1, dtype=torch.int64, device=dev)
         self._probe_tripped = torch.zeros(MAX_VARIANTS, dtype=torch.int32, device=dev)
         self._probe_trips_logged = 0
-        self.probes = K.PROBES
-        """Probe rows per call (0 disables the runtime probes; benchmarks only)."""
+        self._probes = K.PROBES
+        self.unsafe = False
+        """True once runtime probes are disabled: not a certified head any more."""
         c = self.const
         const64 = [0.0] * 3
         const64[K.CONST_SUMSQ_INFLATE.value] = c.sumsq_inflate
@@ -412,7 +413,7 @@ class CertifiedHead:
             CH=self.chunk,
             BSTRIDE=2 * self.groups,
         )
-        if self.probes:
+        if self._probes:
             self._run_probe(hidden, m)
         if self.arith_for(m) == 'w8a8':
             K._quantize_hidden_kernel[(m,)](
@@ -427,6 +428,20 @@ class CertifiedHead:
                 CH=self.chunk,
             )
 
+    @property
+    def probes(self) -> int:
+        """Probe rows checked per call. The certificate assumes this is positive."""
+        return self._probes
+
+    def disable_probes_for_measurement(self) -> None:
+        """Compile the runtime probes out, to measure their cost. Measurement only:
+        the head is marked ``unsafe``, no longer meets the certificate's assumption
+        (the probes check the compiled kernel on every call), and engine glue must
+        refuse it."""
+        logger.warning('certified head: runtime probes disabled; this head is unsafe')
+        self._probes = 0
+        self.unsafe = True
+
     def _run_probe(self, hidden: torch.Tensor, m: int) -> None:
         """Exact FP64 logits of ``K.PROBES`` vocabulary rows (new rows every call);
         reads ``PROBES`` weight rows and the batch's hidden states."""
@@ -438,7 +453,7 @@ class CertifiedHead:
             self._probe_counter,
             self.vocab,
             K=self.hidden,
-            P=self.probes,
+            P=self._probes,
             CH=256,
         )
 
@@ -504,7 +519,7 @@ class CertifiedHead:
             BLOCK_V=cfg.block_v,
             BLOCK_M=cfg.block_m,
             BLOCK_K=cfg.block_k,
-            P=self.probes,
+            P=self._probes,
             num_warps=cfg.num_warps,
             num_stages=cfg.num_stages,
         )
