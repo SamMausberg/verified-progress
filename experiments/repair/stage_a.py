@@ -59,6 +59,48 @@ def anchor_values_per_token() -> dict[str, int]:
     return {'inputs': inputs, 'outputs': outputs, 'total': inputs + outputs}
 
 
+def flag_value(cmd: list[str], flag: str) -> str | None:
+    """Value of a launch flag given as `--flag value` or `--flag=value` (the last one wins)."""
+    value = None
+    for i, item in enumerate(cmd):
+        if item == flag and i + 1 < len(cmd):
+            value = str(cmd[i + 1])
+        elif item.startswith(flag + '='):
+            value = item[len(flag) + 1 :]
+    return value
+
+
+def verifier_of(row: dict[str, Any]) -> str:
+    """GDN verify kernel of a run, resolved the way SGLang does at the pin
+    (`layers/attention/linear/utils.py`): an explicit --linear-attn-verify-backend wins;
+    otherwise the verifier is FlashInfer when the decode backend (--linear-attn-decode-backend,
+    else --linear-attn-backend, else its default, triton) is FlashInfer, and Triton otherwise."""
+    cmd = [str(x) for x in (row.get('command') or [])]
+    # ReplaySSM spec verify replaces the per-position-state kernels on the GDN verify path.
+    if '--enable-linear-replayssm-spec' in cmd or flag_value(
+        cmd, '--enable-linear-replayssm-spec'
+    ) in (
+        'true',
+        'True',
+        '1',
+    ):
+        return 'replayssm_spec'
+    verify = flag_value(cmd, '--linear-attn-verify-backend')
+    if verify is not None:
+        return verify
+    decode = (
+        flag_value(cmd, '--linear-attn-decode-backend')
+        or flag_value(cmd, '--linear-attn-backend')
+        or 'triton'
+    )
+    return 'flashinfer' if decode == 'flashinfer' else 'triton'
+
+
+def no_state(row: dict[str, Any]) -> bool:
+    """Engine patch 0002 drops the per-position states only when the variable equals "1"."""
+    return str((row.get('probe_env') or {}).get('SGLANG_REPAIR_DROP_VERIFY_STATES')) == '1'
+
+
 def med(row: dict[str, Any], *path: str) -> float | None:
     cur: Any = row
     for key in path:
@@ -82,6 +124,13 @@ def main() -> None:
     ap.add_argument(
         '--baseline', default='fresh_b16', help='run directory name of the real DFlash baseline'
     )
+    ap.add_argument(
+        '--verifier',
+        choices=['flashinfer', 'triton', 'replayssm_spec'],
+        default='flashinfer',
+        help='GDN verify kernel of the forced-acceptance rows (the baseline should use the same)',
+    )
+    ap.add_argument('--suffix', default='', help='appended to the output file names')
     ap.add_argument(
         '--cd-us', type=float, default=None, help='override the baseline cycle cost C_D (us)'
     )
@@ -107,8 +156,21 @@ def main() -> None:
 
     rows = json.loads(args.timing.read_text())
     gdn = json.loads(args.gdn.read_text()) if args.gdn else {'blocks': {}}
-    by_name = {Path(r['run']).name: r for r in rows}
+    names = [Path(r['run']).name for r in rows]
+    duplicates = sorted({n for n in names if names.count(n) > 1})
+    if duplicates:
+        raise SystemExit(f'run names must be unique in the timing input; repeated: {duplicates}')
+    by_name = dict(zip(names, rows, strict=True))
     base = by_name.get(args.baseline)
+    overridden = args.cd_us is not None and args.ad is not None and args.f is not None
+    if base is not None and not overridden and base['mode'] != 'fresh':
+        raise SystemExit(
+            f'baseline {args.baseline} is a {base["mode"]} run, not a stock DFlash (fresh) run'
+        )
+    if base is not None and not overridden and verifier_of(base) != args.verifier:
+        raise SystemExit(
+            f'baseline {args.baseline} uses the {verifier_of(base)} verify kernel, not {args.verifier}'
+        )
     cd = args.cd_us if args.cd_us is not None else med(base or {}, 'cycle_period_us', 'median')
     ad = args.ad if args.ad is not None else med(base or {}, 'commit_per_cycle', 'mean')
     f = args.f if args.f is not None else med(base or {}, 'unaffected_fraction', 'median')
@@ -125,19 +187,32 @@ def main() -> None:
 
     table = []
 
-    def no_state(r: dict[str, Any]) -> bool:
-        return 'SGLANG_REPAIR_DROP_VERIFY_STATES' in (r.get('probe_env') or {})
+    # Comparators that only one verify kernel honours. SGLANG_REPAIR_DROP_VERIFY_STATES (engine
+    # patch 0002) acts only inside FlashInfer's GDN verify kernel, and gdn_state_bench.py times
+    # only FlashInfer's gated_delta_rule_mtp; neither describes another verify kernel.
+    for r in rows:
+        if no_state(r) and verifier_of(r) != 'flashinfer':
+            raise SystemExit(
+                f'run {Path(r["run"]).name} sets SGLANG_REPAIR_DROP_VERIFY_STATES but verifies with '
+                f'the {verifier_of(r)} kernel, where the variable has no effect (it acts only in '
+                "FlashInfer's GDN verify kernel), so it is not a no-state run"
+            )
+    if args.gdn is not None and args.verifier != 'flashinfer':
+        raise SystemExit(
+            f"--gdn times FlashInfer's gated_delta_rule_mtp and cannot describe the {args.verifier} "
+            'verify kernel'
+        )
 
     nostate = {
         int(r['block']): med(r, 'phase_us', 'verify', 'median')
         for r in by_name.values()
-        if r['mode'] == 'force' and no_state(r)
+        if r['mode'] == 'force' and no_state(r) and verifier_of(r) == args.verifier
     }
     for name, row in sorted(by_name.items(), key=lambda kv: (kv[1]['mode'], kv[1]['block'])):
-        if row['mode'] != 'force' or no_state(row):
+        if row['mode'] != 'force' or no_state(row) or verifier_of(row) != args.verifier:
             continue
         B = int(row['block'])
-        replay_protocol = 'enable-linear-replayssm-spec' in ' '.join(row.get('command') or [])
+        replay_protocol = verifier_of(row) == 'replayssm_spec'
         g = gdn['blocks'].get(str(B), {})
         verify = med(row, 'phase_us', 'verify', 'median')
         commit = med(row, 'phase_us', 'commit', 'median')
@@ -197,11 +272,24 @@ def main() -> None:
                 'S_b_ceiling_decode': B * cd / (ad * c_b_floor),
                 'S_b_ceiling_e2e': e2e(B * cd / (ad * c_b_floor)),
                 'S_b_ceiling_anchor_free_e2e': e2e(B * cd / (ad * (verify + commit))),
+                # The ceiling if the audit also dropped its per-position state writes (as measured
+                # or bounded above) and its boundary replay were free.
+                'S_b_ceiling_stateless_audit_e2e': e2e(B * cd / (ad * (c_b_floor - states)))
+                if not replay_protocol
+                else None,
                 # How much cheaper the audit pass would have to be (e.g. a verifier without
                 # per-position state writes, its boundary replay uncharged) for the ceiling
                 # to reach the target.
+                # Clamped at 0: where the ceiling already reaches the target no saving is needed.
                 'audit_saving_needed_for_target_us': (
-                    c_b_floor - B * cd / (ad * need_decode) if need_decode != float('inf') else None
+                    max(0.0, c_b_floor - B * cd / (ad * need_decode))
+                    if need_decode != float('inf')
+                    else None
+                ),
+                'S_b_ceiling_meets_target': (
+                    c_b_floor <= B * cd / (ad * need_decode)
+                    if need_decode != float('inf')
+                    else False
                 ),
                 # Share of V(B) the per-position state writes would need to be for P3 to reach
                 # the target if both of its passes ran without per-position states (boundary
@@ -217,8 +305,15 @@ def main() -> None:
                 'gate_rejects': (verify + commit) / B >= per_token_base,
             }
         )
+    if not table:
+        # Fail before writing, so no output file is left half-updated.
+        raise SystemExit(
+            f'no forced-acceptance rows with complete phase times for the {args.verifier} verify kernel '
+            'in the timing input; nothing written'
+        )
     out = {
         'kind': 'derived from measured phase times (analyze_timing.py) and kernel microbenchmarks',
+        'verifier': args.verifier,
         'baseline': {
             'run': args.baseline,
             'C_D_us': cd,
@@ -234,13 +329,13 @@ def main() -> None:
         'hbm_read_TBps': gdn.get('hbm_1GiB', {}).get('read_TBps_median'),
         'rows': table,
     }
+    # Both files are always written together from the same table.
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    (args.out_dir / 'stage_a_oracle.json').write_text(json.dumps(out, indent=2))
-    if table:
-        with open(args.out_dir / 'stage_a_oracle.csv', 'w', newline='') as fh:
-            w = csv.DictWriter(fh, fieldnames=list(table[0]))
-            w.writeheader()
-            w.writerows(table)
+    (args.out_dir / f'stage_a_oracle{args.suffix}.json').write_text(json.dumps(out, indent=2))
+    with open(args.out_dir / f'stage_a_oracle{args.suffix}.csv', 'w', newline='') as fh:
+        w = csv.DictWriter(fh, fieldnames=list(table[0]))
+        w.writeheader()
+        w.writerows(table)
     print(json.dumps({k: v for k, v in out.items() if k != 'rows'}, indent=1))
     for r in table:
         print(
