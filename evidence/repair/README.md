@@ -107,8 +107,11 @@ real DFlash drafts with a rejection from the drafter workstream's shared trace. 
 replays against the original anchor: y1 = F(y0) and y2 = F(y1), both exact Jacobi iterates.
 
 - (1) Operator accuracy: on held-out exact changes the median relative error
-  ||W (I - U U^T) dx|| / ||W dx|| over operator inputs is 0.76-0.90 at rank 16, 0.64-0.81 at
-  rank 128 and 0.51-0.73 at rank 512 (by operator class); on the development blocks themselves
+  ||W (I - U U^T) dx|| / ||W dx||, measured for the first projection that reads each operator
+  input (GDN in_proj_qkv or attention q_proj, out_proj or o_proj, gate_proj, down_proj, and the
+  head; the z, a, b, k, v and up projections share those inputs and bases but their own W is not
+  scored), is 0.76-0.90 at rank 16, 0.64-0.81 at rank 128 and 0.51-0.73 at rank 512 (by operator
+  class); on the development blocks themselves
   rank 128 captures a median 51-64% of the change energy. The changes caused by token
   corrections are not confined to a small fixed subspace.
 - (2) Decisions: on replay 1 the repaired argmax equals the exact argmax at 35% of the changed
@@ -126,11 +129,13 @@ replays against the original anchor: y1 = F(y0) and y2 = F(y1), both exact Jacob
   token per exact sweep, which also bounds any faithful cheap evaluator.
 - Economic gate (Sam's mu_R / C_R > mu_0 / C_0 against DFlash-16; repair cost a bytes-only lower
   bound, audit = measured V(16) + commit): the anchored evaluator reaches at most 0.28 of
-  DFlash's committed tokens per unit cost at any rank and sweep count; exact Jacobi with sweeps
-  charged only their anchor and state reads reaches 0.27, 0.47, 0.66, 0.85 and 1.03 after 0-4
-  sweeps. That exact-Jacobi line charges each sweep only the bytes of reading the anchor cache
-  and the GDN state, so even a perfect cheap evaluator would at best match DFlash after four
-  sweeps. The rigorous bound (audit cost over the most tokens an attempt can add) does not reject
+  DFlash's committed tokens per unit cost at any rank and sweep count. The faithful-evaluator
+  reference (exact Jacobi, rows `exact_jacobi_faithful_reference`, sweeps charged only the bytes
+  of reading the anchor cache and the GDN state) reaches 0.27, 0.47, 0.66, 0.85 and 1.03 after 0-4
+  sweeps, so even a faithful cheap evaluator, one that reproduces the target's sweep exactly at
+  that cost, would at best match DFlash after four sweeps. A non-faithful map could in principle
+  jump ahead, as consistency-trained models do, but that would be better drafting rather than
+  repair, and this evaluator does not. The rigorous bound (audit cost over the most tokens an attempt can add) does not reject
   at B = 16; the measured progress does.
 - Controls: full-target Jacobi from the same initialization and the initializer without repair
   (rank 0, anchor outputs reused) were run; the standalone compact drafter control and the novelty

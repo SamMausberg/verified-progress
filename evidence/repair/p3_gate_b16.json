@@ -20,7 +20,7 @@
  },
  "rows": [
   {
-   "evaluator": "exact_jacobi_ceiling",
+   "evaluator": "exact_jacobi_faithful_reference",
    "rank": null,
    "sweeps": 0,
    "extra_tokens": 1.35,
@@ -30,7 +30,7 @@
    "ratio_to_dflash": 0.2666525702399333
   },
   {
-   "evaluator": "exact_jacobi_ceiling",
+   "evaluator": "exact_jacobi_faithful_reference",
    "rank": null,
    "sweeps": 1,
    "extra_tokens": 2.3749999999999996,
@@ -40,7 +40,7 @@
    "ratio_to_dflash": 0.46630048494218157
   },
   {
-   "evaluator": "exact_jacobi_ceiling",
+   "evaluator": "exact_jacobi_faithful_reference",
    "rank": null,
    "sweeps": 2,
    "extra_tokens": 3.4,
@@ -50,7 +50,7 @@
    "ratio_to_dflash": 0.6635704021008998
   },
   {
-   "evaluator": "exact_jacobi_ceiling",
+   "evaluator": "exact_jacobi_faithful_reference",
    "rank": null,
    "sweeps": 3,
    "extra_tokens": 4.362500000000001,
@@ -60,7 +60,7 @@
    "ratio_to_dflash": 0.8463787859516925
   },
   {
-   "evaluator": "exact_jacobi_ceiling",
+   "evaluator": "exact_jacobi_faithful_reference",
    "rank": null,
    "sweeps": 4,
    "extra_tokens": 5.325000000000001,

@@ -94,11 +94,12 @@ def main() -> None:
     rows = []
     exact = res['exact_jacobi_mean_accept_by_sweep']
     for k in range(1, len(exact)):
-        # Faithful ceiling: exact sweeps, charged as if each cost only a rank-0 byte stream.
+        # Faithful-evaluator reference: exact Jacobi sweeps, each charged only the bytes of
+        # reading the anchor cache and the GDN state (a rank-0 byte stream).
         repair_us = (anchor_bytes_block + GDN_STATE_BYTES) / (read_tbps * 1e12) * 1e6
         rows.append(
             {
-                'evaluator': 'exact_jacobi_ceiling',
+                'evaluator': 'exact_jacobi_faithful_reference',
                 'rank': None,
                 'sweeps': k - 1,
                 **attempt(exact[k] - a0, k - 1, repair_us),
