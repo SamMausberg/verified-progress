@@ -225,19 +225,19 @@ Scope: padded verify. The table charges every reused cycle the full block-16 ver
 implementation that pads the remainder to the block width would pay. After a correction at J only
 m = 15 - J old positions remain, so a program could verify m + 1 positions instead, and a narrower
 verify that costs less lowers T2_R and raises Delta at every K. For a variable-width verify the
-oracle is therefore not an upper bound, and the rejections of top-1 to top-4 do not follow. With V_R
-the mean verify time of a reused cycle in place of 4.73 ms, and everything else unchanged,
+oracle is therefore not an upper bound, and the rejections of top-1, top-2 and top-4 do not follow.
+With V_R the mean verify time of a reused cycle in place of 4.73 ms, and everything else unchanged,
 Delta = Delta_padded + r_F p_K (4.73 ms - V_R), where p_K is the supported rate in the table. With
 the variable-width verify cost at its lower bound of zero (V_R = 0, every other phase still charged;
 `free_verify_always_reuse` in the JSON, the same request-level bootstrap and resamples as the
 table), Delta would be +0.01 (+0.00, +0.02) at K = 1, +0.89 (+0.81, +0.98) at 2, +1.88
 (+1.75, +2.05) at 4, +2.89 (+2.71, +3.10) at 8 and +3.86 (+3.64, +4.11) at 16. These bound
-always-reuse programs at any verify width from above, and no K would be rejected. On the point
-estimates (no intervals), top-1, top-2 and top-4 stay negative only while V_R exceeds 0.89, 2.71 and
-3.87 ms. The only measured verify below width 16 at c = 1 is 4.16 ms at width 8 (`fresh_b8`, same
-session as `fresh_b16`), so these thresholds are not settled by the data here; a sweep of the verify
-phase over widths 2 to 16 at c = 1 is queued. The top-8 and top-16 verdicts (not rejected) hold for
-either implementation.
+always-reuse programs at any verify width from above, and none of the tested K would be rejected. On
+the point estimates (no intervals), top-1, top-2 and top-4 stay negative only while V_R exceeds
+0.89, 2.71 and 3.87 ms. The only measured verify below width 16 at c = 1 is 4.16 ms at width 8
+(`fresh_b8`, same session as `fresh_b16`), so these thresholds are not settled by the data here; a
+sweep of the verify phase over widths 2 to 16 at c = 1 is queued. The top-8 and top-16 verdicts (not
+rejected) hold for either implementation.
 
 Omniscient-gate oracle (`omniscient_gate_oracle` in the JSON; an oracle, since its gate knows fresh
 DFlash's next accepted length). A gated program may choose fresh DFlash on supported boundaries
@@ -255,10 +255,10 @@ gate could add (same resamples as the table, so the intervals are paired):
 | 8 | 53.9% | +1.44 (+1.35, +1.53) | +1.21 |
 | 16 | 62.9% | +2.05 (+1.93, +2.18) | +1.06 |
 
-A perfect gate would add about one token per post-rejection boundary at every K from 2 to 16. A
-real gate decides before the second cycle and does not see fresh DFlash's outcome, so a gate is
-worth building only if features known at decision time (the correction position, the supported
-suffix length, the drafter's confidence) predict which boundaries those are.
+A perfect gate would add about one token per post-rejection boundary at each tested K from 2 to 16
+(2, 4, 8 and 16). A real gate decides before the second cycle and does not see fresh DFlash's
+outcome, so a gate is worth building only if features known at decision time (the correction
+position, the supported suffix length, the drafter's confidence) predict which boundaries those are.
 
 Assumptions of this oracle, stated plainly: (1) the candidate sets are the offline recomputation,
 whose top-1 token matches the engine's drafted token at 97.4% of positions, not the engine's own
@@ -274,15 +274,15 @@ and its negative intervals cannot reject such a program (the omniscient-gate ora
 those).
 
 - **Verdict at c = 1, for always-reuse policies with a padded block-16 verify over the
-  offline-recomputed sets: reuse is not rejected for top-8 and top-16 candidate sets; top-1 to top-4
-  are rejected for this class only.** A program that always found the true token inside the old
-  top-16 sets would commit slightly fewer tokens than fresh DFlash (5.08 against 5.55) but skip the
-  2.33 ms draft, and come out ahead by about one token per post-rejection boundary. For always-reuse
-  with a padded verify this is an upper bound: a real program must select the token (the unary
-  control shows that the old top-1 choices fail), and its compile, conditioning and retention costs
-  (A) are charged against the same margin. For gated programs the omniscient-gate oracle gives an
-  upper bound of +2.05 (+1.93, +2.18) at top-16, and nothing is rejected. The c = 8 and 16 draft
-  shares, which set T2_R - T2_F beyond c = 1, are queued.
+  offline-recomputed sets: reuse is not rejected for top-8 and top-16 candidate sets; top-1, top-2
+  and top-4 are rejected for this class only.** A program that always found the true token inside
+  the old top-16 sets would commit slightly fewer tokens than fresh DFlash (5.08 against 5.55) but
+  skip the 2.33 ms draft, and come out ahead by about one token per post-rejection boundary. For
+  always-reuse with a padded verify this is an upper bound: a real program must select the token
+  (the unary control shows that the old top-1 choices fail), and its compile, conditioning and
+  retention costs (A) are charged against the same margin. For gated programs the omniscient-gate
+  oracle gives an upper bound of +2.05 (+1.93, +2.18) at top-16, and no tested K is rejected. The
+  c = 8 and 16 draft shares, which set T2_R - T2_F beyond c = 1, are queued.
 
 ```sh
 python experiments/repair/p9_support_oracle.py --cycles ~/vp-data/drafter/support/zlab_b16_cycles/cycles.pt \
