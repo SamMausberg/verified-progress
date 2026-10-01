@@ -1,6 +1,44 @@
 {
   "pairs": {
-    "batch c1 vs c32, plain": {
+    "repeat session, plain c1": {
+      "prompts": 320,
+      "diverged": 0,
+      "identical": 320,
+      "length_mismatch": 0,
+      "exposure_tokens": 70042,
+      "per_1k_tokens": 0.0,
+      "classes": {},
+      "max_margin_median": null,
+      "max_margin_p90": null,
+      "max_margin_max": null,
+      "drift_median": 0.0,
+      "drift_p99": 0.0,
+      "drift_max": 0.0,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain/c1",
+      "run_b": "plain__rep/c1"
+    },
+    "repeat session, plain c32": {
+      "prompts": 320,
+      "diverged": 24,
+      "identical": 296,
+      "length_mismatch": 0,
+      "exposure_tokens": 68322,
+      "per_1k_tokens": 0.3512777728989198,
+      "classes": {
+        "tie": 24
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.25,
+      "drift_median": 0.0,
+      "drift_p99": 0.23725366592407227,
+      "drift_max": 0.3272993564605713,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain/c32",
+      "run_b": "plain__rep/c32"
+    },
+    "concurrency 1 vs 32 (cap 16), plain": {
       "prompts": 320,
       "diverged": 167,
       "identical": 153,
@@ -123,8 +161,18 @@
       "not_argmax": 0,
       "worst_gap": 0.0
     },
+    "plain__rep/c1": {
+      "positions": 70042,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
     "plain/c32": {
       "positions": 70060,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain__rep/c32": {
+      "positions": 70077,
       "not_argmax": 0,
       "worst_gap": 0.0
     },

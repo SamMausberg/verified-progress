@@ -68,7 +68,8 @@ the GDN checkpointing kept is served from the cache.
 
 - `truncation`: `max_new_tokens` chosen so the request ends after every
   possible number of tokens of its final verify cycle. The output must equal
-  the prefix of an untruncated run on the same server, bitwise.
+  the prefix of an untruncated run on the same server, token for token (and, from the
+  runs after the first two, in the top-5 logprobs as well).
 - `stops`: a stop token that is first generated at every possible index
   inside a verify cycle, so drafts after it were accepted and folded into the
   GDN state before the stop was detected. The output must equal the untruncated
@@ -97,15 +98,16 @@ python experiments/state_safety/prompts.py \
 experiments/state_safety/run_all.sh          # differential matrix, about 2 h of GPU time
 experiments/state_safety/run_targeted.sh     # targeted tests, about 1 h
 
-cd experiments/state_safety
-python compare.py --pairs pairs.json \
-    --out-json ../../evidence/state_safety/noise_floor.json \
-    --out-table ../../evidence/state_safety/noise_floor.csv \
-    --out-csv ../../evidence/state_safety/divergences.csv
-python cycles.py --ref plain/c1 --spec mtp_s3/c1 \
-    --out ../../evidence/state_safety/cycles_mtp_s3.json
-python summarize_targeted.py --out ../../evidence/state_safety/targeted.json
+experiments/state_safety/analyze_all.sh     # noise floor, rejection-position drift, targeted summary, tap checks
 ```
+
+Tensor-level forensics (engine patch `engine/sglang/patches/state/0001-state-tap.patch`
+applied in `~/sglang-wt/state`): `tap_runs.py` serves tagged prompts with the tap on and
+`mechanism.py` compares two tapped runs (`--a`, `--b`), or the repeats of one prompt
+inside a run (`--repeat-of`). Both are run inside the GPU hold that collects the data;
+the exact commands are in `evidence/state_safety/README.md`. `tap_signature.py` (light,
+run by `analyze_all.sh`) finds where the v1 and v3 tapped sessions of the same
+configuration first part ways.
 
 Raw outputs stay in `~/vp-data/state/` (`runs/`, `targeted/`); each run has a
 `.meta.json` with the flags, resolved server settings, and the repository and

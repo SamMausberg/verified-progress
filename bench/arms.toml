@@ -5,9 +5,18 @@
 # are sglang.launch_server flags without the leading dashes; `true` adds a bare
 # flag and `false` removes one. `max_concurrency` is the highest client
 # concurrency the sweep will offer; the launcher refuses a server whose
-# effective max_running_requests is lower. Optional per-arm keys:
+# effective max_running_requests is lower. Required per-arm key:
+#   exactness = "stock" | "exact-up-to-floor" | "pending" | "lossy"
+#                   how the arm's greedy outputs relate to plain decoding with the
+#                   default flags (bench/arms.py says what each class means).
+#                   A stock arm may only set flags in NEUTRAL_FLAGS
+#                   (bench/arms.py) and FlashInfer target attention; anything
+#                   else makes an arm pending until its outputs are classified
+#                   (bench/campaigns/equality_tuned.sh).
+# Optional per-arm keys:
 #   lossy = "..."   what the arm changes numerically (FP8 weights, FP8 KV, BF16
-#                   GDN state, ...); such arms need a quality measurement.
+#                   GDN state, ...); required unless the class is stock. Lossy
+#                   arms need a quality measurement.
 #   require_full_graph_coverage = false   allow capacity above the largest
 #                   decode/verify CUDA graph (large batches then run eagerly).
 
@@ -32,6 +41,12 @@ mm-attention-backend = "triton_attn"
 max-running-requests = 128
 max-mamba-cache-size = 640
 mem-fraction-static = 0.85
+# Cap the KV cache at 1M tokens (a full batch of 128 at 7.8K tokens each, well
+# above the sweeps' ~600 and the quality runs' mean ~5.4K). Without a cap, a
+# configuration that needs little state memory (radix cache off, buffered verify)
+# hands ~2M tokens to the target KV cache, SGLang then allocates the draft's KV for
+# the same token count outside the static pool, and prefill runs out of memory.
+max-total-tokens = 1000000
 # /metrics: token, verify-call and CUDA-graph pass counters per sweep point.
 enable-metrics = true
 random-seed = 0
@@ -46,11 +61,13 @@ stream-interval = 4
 
 [arms.plain]
 description = "Arm A: ordinary autoregressive decoding (no speculation)."
+exactness = "stock"
 
 [arms.mtp]
 description = """Arm B, untuned starting point: native MTP (the checkpoint's one \
 MTP layer, loaded implicitly) with the SGLang cookbook's Qwen3.5 settings, a \
 three-step chain with one draft per step."""
+exactness = "stock"
 
 [arms.mtp.args]
 speculative-algorithm = "NEXTN"
@@ -70,9 +87,128 @@ speculative-num-draft-tokens = 4
 [arms.dflash]
 description = """DFlash block drafter, block size 8 (the model card's serving \
 default)."""
+exactness = "stock"
 
 [arms.dflash.args]
 speculative-algorithm = "DFLASH"
 speculative-draft-model-path = "z-lab/Qwen3.5-4B-DFlash"
 speculative-draft-model-revision = "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf"
 speculative-dflash-block-size = 8
+
+# ---------------------------------------------------------------------------
+# Tuned arms (chosen on the tune split; evidence/bench/tuning/). All run without
+# the radix cache: this workload has no prefix reuse, and it frees the GDN state
+# memory that deeper drafts and buffered verify need at capacity 128. Each
+# speculative family has a Triton-attention arm for low concurrency, where
+# Triton is faster for speculative verify, and a FlashInfer arm for high
+# concurrency; plain decoding is indifferent to the backend (both measured), and
+# its Triton arm is the matched baseline for the Triton speculative arms.
+# ---------------------------------------------------------------------------
+
+[arms.plain-tuned]
+description = "Arm A, tuned: plain decoding, radix cache off, FlashInfer attention."
+exactness = "stock"
+[arms.plain-tuned.args]
+disable-radix-cache = true
+max-mamba-cache-size = 128
+
+[arms.plain-tuned-triton]
+description = "Arm A, tuned, Triton attention: matched baseline for Triton speculative arms."
+exactness = "pending"
+lossy = "pending: Triton target attention; greedy outputs classified against plain (bench/campaigns/equality_tuned.sh)"
+[arms.plain-tuned-triton.args]
+disable-radix-cache = true
+max-mamba-cache-size = 128
+attention-backend = "triton"
+
+[arms.plain-tuned-replayssm]
+description = """Arm A with SGLang's buffered GDN decode (ReplaySSM ring, full state \
+flushed every 16 tokens): faster at high concurrency, slower at low."""
+exactness = "pending"
+lossy = "pending: buffered GDN decode; greedy outputs classified against plain (bench/campaigns/equality_tuned.sh)"
+[arms.plain-tuned-replayssm.args]
+disable-radix-cache = true
+max-mamba-cache-size = 128
+enable-linear-replayssm = true
+
+[arms.mtp-tuned]
+description = """Arm B, tuned for high concurrency: native MTP, 3-step chain, buffered \
+GDN verify (no per-draft-token state snapshots), FlashInfer attention."""
+exactness = "pending"
+lossy = "pending: buffered GDN verify; greedy outputs classified against plain (bench/campaigns/equality_tuned.sh)"
+[arms.mtp-tuned.args]
+speculative-algorithm = "NEXTN"
+speculative-num-steps = 3
+speculative-eagle-topk = 1
+speculative-num-draft-tokens = 4
+enable-linear-replayssm-spec = true
+disable-radix-cache = true
+max-mamba-cache-size = 128
+
+[arms.mtp-tuned-triton]
+description = "Arm B, tuned for low concurrency: as mtp-tuned with Triton attention."
+exactness = "pending"
+lossy = "pending: buffered GDN verify and Triton target attention; greedy outputs classified against plain (bench/campaigns/equality_tuned.sh)"
+[arms.mtp-tuned-triton.args]
+speculative-algorithm = "NEXTN"
+speculative-num-steps = 3
+speculative-eagle-topk = 1
+speculative-num-draft-tokens = 4
+enable-linear-replayssm-spec = true
+disable-radix-cache = true
+max-mamba-cache-size = 128
+attention-backend = "triton"
+
+[arms.mtp-stockverify]
+description = """Arm B with SGLang's stock (snapshot) GDN verify: the exact-stack MTP \
+denominator if buffered verify does not classify as rounding-level."""
+exactness = "stock"
+[arms.mtp-stockverify.args]
+speculative-algorithm = "NEXTN"
+speculative-num-steps = 3
+speculative-eagle-topk = 1
+speculative-num-draft-tokens = 4
+disable-radix-cache = true
+max-mamba-cache-size = 128
+
+[arms.dflash-tuned]
+description = """Arm C, tuned: DFlash block 8 with FA4 draft attention (runs on sm_90 \
+and was faster at every concurrency), FlashInfer target attention, capacity 128."""
+exactness = "stock"
+[arms.dflash-tuned.args]
+speculative-algorithm = "DFLASH"
+speculative-draft-model-path = "z-lab/Qwen3.5-4B-DFlash"
+speculative-draft-model-revision = "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf"
+speculative-dflash-block-size = 8
+speculative-draft-attention-backend = "fa4"
+disable-radix-cache = true
+max-mamba-cache-size = 128
+
+[arms.dflash-tuned-b16]
+description = """Arm C for low concurrency: DFlash block 16, Triton attention. Its 16 \
+GDN verify states per request (~0.8 GB) cap capacity at 64."""
+max_concurrency = 64
+exactness = "pending"
+lossy = "pending: Triton target attention; greedy outputs classified against plain (bench/campaigns/equality_tuned.sh)"
+[arms.dflash-tuned-b16.args]
+speculative-algorithm = "DFLASH"
+speculative-draft-model-path = "z-lab/Qwen3.5-4B-DFlash"
+speculative-draft-model-revision = "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf"
+speculative-dflash-block-size = 16
+disable-radix-cache = true
+max-mamba-cache-size = 64
+max-running-requests = 64
+attention-backend = "triton"
+
+[arms.dflash-tuned-b4]
+description = """Arm C for high concurrency: DFlash block 4, FlashInfer attention. On the \
+tune split it beat block 8 by 8% at c=128 (11,477 against 10,594 tok/s) and lost \
+at c<=32 (c=64 not measured)."""
+exactness = "stock"
+[arms.dflash-tuned-b4.args]
+speculative-algorithm = "DFLASH"
+speculative-draft-model-path = "z-lab/Qwen3.5-4B-DFlash"
+speculative-draft-model-revision = "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf"
+speculative-dflash-block-size = 4
+disable-radix-cache = true
+max-mamba-cache-size = 128
