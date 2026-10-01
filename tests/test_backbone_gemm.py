@@ -132,3 +132,51 @@ def test_deferred_norm_linear_writes_the_stock_residual() -> None:
         assert torch.equal(z, xs) and torch.equal(r_out2, rs)
     finally:
         bg.TABLE.pop((18432, HIDDEN), None)
+
+
+def test_deferred_norm_respects_the_merge_cutoff(monkeypatch: Any) -> None:
+    """With the merge switch, a deferred norm below MERGE_MIN_M rows goes through
+    the separate qkvz and ba projections, and from the cutoff through the packed
+    weight; both give the stock norm's projections bit for bit (patch 0007)."""
+    if not hasattr(bg, 'DeferredNormInput'):
+        pytest.skip('engine patch without the norm fusion')
+    from types import SimpleNamespace
+
+    import torch.nn.functional as F
+    from sgl_kernel import gemma_fused_add_rmsnorm
+
+    q = pytest.importorskip('sglang.srt.models.qwen3_5')
+    monkeypatch.setattr(bg, 'MERGE_IN_PROJ', True)
+    monkeypatch.setattr(bg, 'MERGE_MIN_M', 64)
+    monkeypatch.setattr(q, 'get_is_capture_mode', lambda: False)
+    monkeypatch.setattr(q, 'check_cuda_graph_backend', lambda *a, **k: False)
+    torch.manual_seed(6)
+    wq, wb = _rand(12288, HIDDEN, scale=0.02), _rand(64, HIDDEN, scale=0.02)
+    calls: list[str] = []
+
+    def proj(w: Any, name: str) -> Any:
+        def call(x: Any) -> Any:
+            calls.append(name)
+            return F.linear(x, w), None
+
+        return call
+
+    gdn = SimpleNamespace(
+        _fused_in_proj_weight=torch.cat([wq, wb]).contiguous(),
+        _fused_in_proj_qkvz_width=12288,
+        alt_stream=None,
+        in_proj_qkvz=proj(wq, 'qkvz'),
+        in_proj_ba=proj(wb, 'ba'),
+        _fused_input_proj_cpu_enabled=SimpleNamespace(value=False),
+    )
+    g = _rand(HIDDEN, scale=0.1)
+    for m, separate in ((8, True), (64, False)):
+        calls.clear()
+        x, r = _rand(m, HIDDEN), _rand(m, HIDDEN, scale=4.0)
+        deferred = bg.DeferredNormInput(x, r, g, 1e-6, torch.empty_like(r))
+        qkvz, ba = q.Qwen3_5GatedDeltaNet._forward_input_proj(gdn, deferred)
+        assert calls == (['qkvz', 'ba'] if separate else [])
+        xs, rs = x.clone(), r.clone()
+        gemma_fused_add_rmsnorm(xs, rs, g, 1e-6)
+        assert torch.equal(deferred.residual_out, rs)
+        assert torch.equal(qkvz, F.linear(xs, wq)) and torch.equal(ba, F.linear(xs, wb))
