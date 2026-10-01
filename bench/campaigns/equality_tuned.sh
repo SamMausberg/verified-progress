@@ -4,8 +4,11 @@
 # 256 tokens, top-5 logprobs, c=1). Correctness only: shared GPU lock.
 #   scripts/gpu_lock.sh -s bench/campaigns/equality_tuned.sh
 # Numerics-changing flags: buffered GDN verify and decode (replayssm), and Triton
-# target attention (the reference is FlashInfer). DFlash block 16 runs on the
-# plain configuration with the DFlash flags appended, so its run is named plain__.
+# target attention (the reference is FlashInfer), the Triton GDN verify kernel.
+# DFlash block 16 runs on the plain configuration with the DFlash flags appended, so
+# its runs are named plain__; it runs with capacity 4 (the runner's 16 leaves no KV
+# memory at its 0.25 memory fraction once 16 verify states per request are
+# reserved; a c=1 pass never batches more than one request).
 # Pair labels avoid commas: compare.py writes its pair table without CSV quoting.
 # The reference (plain c=1) and the floor (plain c=1 vs c=32) are the state
 # workstream's runs, linked into the runs directory. Configurations whose c=1 run
@@ -21,7 +24,7 @@ mkdir -p "$RUNS"
 ln -sfn ~/vp-data/state/runs/plain "$RUNS/plain"
 DFLASH_B16="--speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash \
 --speculative-draft-model-revision 9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf \
---speculative-dflash-block-size 16"
+--speculative-dflash-block-size 16 --max-running-requests 4"
 failed=()
 # run_matrix.py parses --extra-flags with argparse, so the value must be attached
 # with '=' (a separate value that starts with '--' is read as a new option).
@@ -40,6 +43,8 @@ run_missing() {
 run_missing mtp_s3,mtp_s3_replayssm,plain_replayssm bench_noradix "--disable-radix-cache"
 run_missing mtp_s3_replayssm,plain bench_noradix_triton "--disable-radix-cache --attention-backend triton"
 run_missing plain bench_dflash_b16_triton "$DFLASH_B16 --disable-radix-cache --attention-backend triton"
+run_missing plain bench_dflash_b16_triton_gdnverify \
+  "$DFLASH_B16 --disable-radix-cache --attention-backend triton --linear-attn-verify-backend triton"
 cat > "$OUT/pairs.json" <<'PAIRS'
 [
   ["floor plain c1 vs c32", "plain/c1", "plain/c32"],
@@ -49,6 +54,7 @@ cat > "$OUT/pairs.json" <<'PAIRS'
   ["plain buffered decode radix-off vs plain c1", "plain/c1", "plain_replayssm__bench_noradix/c1"],
   ["plain radix-off triton vs plain c1", "plain/c1", "plain__bench_noradix_triton/c1"],
   ["dflash b16 radix-off triton vs plain c1", "plain/c1", "plain__bench_dflash_b16_triton/c1"],
+  ["dflash b16 radix-off triton gdn-verify-triton vs plain c1", "plain/c1", "plain__bench_dflash_b16_triton_gdnverify/c1"],
   ["mtp_s3 buffered vs stock verify radix-off c1", "mtp_s3__bench_noradix/c1", "mtp_s3_replayssm__bench_noradix/c1"]
 ]
 PAIRS
