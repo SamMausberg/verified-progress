@@ -239,16 +239,20 @@ def chunk_counters_ok(rec: dict[str, Any], max_commit: int) -> bool:
 
 def record_shape_problems(run: dict[str, dict[str, Any]]) -> int:
     """Records that are incomplete: top-k logprobs missing at an output token or with
-    fewer than 2 candidates, no finish reason, a completion count that differs from
-    the output length, or an abort by the client."""
+    fewer than 2 candidates, a finish other than a stop or the 256-token limit (an
+    abort or error), a completion count that differs from the output length, or an
+    abort by the client."""
     bad = 0
     for r in run.values():
         top = r.get('top_logprobs') or []
         n = len(r['output_ids'])
+        finish = (r.get('finish_reason') or {}).get('type')
         if (
             len(top) != n
             or any(len(t) < 2 for t in top)
-            or not r.get('finish_reason')
+            # A normal end: a stop token, or the declared 256-token limit reached.
+            or finish not in ('stop', 'length')
+            or (finish == 'length' and n != 256)
             or r.get('completion_tokens') != n
             or r.get('aborted_by_client')
         ):

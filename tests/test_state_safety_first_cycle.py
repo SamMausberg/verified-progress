@@ -104,7 +104,7 @@ def _write_declared(tmp_path, ids):
                 'id': i,
                 'output_ids': [1, 2],
                 'top_logprobs': [[[-0.1, 1], [-0.2, 2]]] * 2,
-                'finish_reason': {'type': 'length'},
+                'finish_reason': {'type': 'stop'},
                 'completion_tokens': 2,
                 'prompt_tokens': 1,
                 'aborted_by_client': False,
@@ -324,6 +324,18 @@ def test_each_departure_from_the_declaration_makes_the_result_void(tmp_path, mon
         rows[2]['completion_tokens'] = 5
         path.write_text(''.join(json.dumps(r) + '\n' for r in rows))
 
+    def server_abort(runs, prompts, manifest):
+        path = runs / 'plain/c1.jsonl'
+        rows = [json.loads(x) for x in path.read_text().splitlines()]
+        rows[0]['finish_reason'] = {'type': 'abort', 'message': 'server error'}
+        path.write_text(''.join(json.dumps(r) + '\n' for r in rows))
+
+    def length_finish_short(runs, prompts, manifest):
+        path = runs / 'mtp_s5/c1.jsonl'
+        rows = [json.loads(x) for x in path.read_text().splitlines()]
+        rows[1]['finish_reason'] = {'type': 'length'}  # but only 2 tokens, not 256
+        path.write_text(''.join(json.dumps(r) + '\n' for r in rows))
+
     def aborted_by_client(runs, prompts, manifest):
         path = runs / 'mtp_s5/c32.jsonl'
         rows = [json.loads(x) for x in path.read_text().splitlines()]
@@ -363,6 +375,8 @@ def test_each_departure_from_the_declaration_makes_the_result_void(tmp_path, mon
         unfinished_record: 'mtp_tree/c1: 1 incomplete records',
         completion_count_differs: 'plain/c1: 1 incomplete records',
         aborted_by_client: 'mtp_s5/c32: 1 incomplete records',
+        server_abort: 'plain/c1: 1 incomplete records',
+        length_finish_short: 'mtp_s5/c1: 1 incomplete records',
         no_after_attestation: 'hold mtp: no after attestation',
         dirty_checkout: 'hold plain: checkout not clean (before)',
         edited_runner_file: 'hold mtp: runner files differ',

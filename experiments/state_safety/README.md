@@ -233,9 +233,12 @@ reason go in a new commit before the runs.
   - A hold's runs are void unless both of its records exist, are clean, are at
     b918c8b and match b918c8b's files.
   - Every run's `repo_sha` must be b918c8b.
-  - Every record must be complete: a finish reason, `completion_tokens` equal to the
-    output length, no client abort, and top-5 logprobs at every output token.
-    Otherwise the run is void.
+  - Every record must be complete, or the run is void:
+    - a normal finish, either `stop`, or `length` with exactly 256 output tokens
+      (a server abort or error is not one);
+    - `completion_tokens` equal to the output length;
+    - no client abort;
+    - top-5 logprobs at every output token.
   - Both passes (c1 and c32) of a configuration must come from one server (equal
     `server_id`).
   - The server streams the cumulative verify count only in a response's last chunk,
