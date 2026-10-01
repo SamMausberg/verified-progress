@@ -31,12 +31,15 @@ would show up as drift even without a token divergence.
 from __future__ import annotations
 
 import argparse
+import csv
 import itertools
 import json
 import math
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
+
+from server import log_time_span, pools_known, resolved_pools
 
 NEAR_NATS = 0.5
 LARGE_DRIFT_NATS = 0.5
@@ -219,6 +222,45 @@ def summarize(rows: Iterable[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def pass_server(root: Path, run: str) -> tuple[str | None, dict[str, Any] | None]:
+    """The server that ran a pass, and its pools, from the pass's own metadata.
+
+    New runs record a server id and the allocated pools per pass. For older runs
+    the session's server.log (overwritten by each new server) is used only if the
+    pass started inside that log's time span, i.e. that server ran it; otherwise
+    both are unknown.
+    """
+    meta_path = root / f'{run}.meta.json'
+    if not meta_path.exists():
+        return None, None
+    meta = json.loads(meta_path.read_text())
+    info = meta.get('server_info', {})
+    if info.get('server_id') and 'resolved_pools' in info:
+        return info['server_id'], info['resolved_pools']
+    log = (root / run).parent / 'server.log'
+    span = log_time_span(log) if log.exists() else None
+    started = str(meta.get('started_at', '')).replace('T', ' ')
+    if span and span[0] <= started <= span[1]:
+        return f'log:{log}:{span[0]}', resolved_pools(log)
+    return None, None
+
+
+def pools_match(root: Path, ra: str, rb: str) -> tuple[bool, bool | None]:
+    """(same server, pools identical); identical is None when either is unknown."""
+    (ka, pa), (kb, pb) = pass_server(root, ra), pass_server(root, rb)
+    same = ka is not None and ka == kb
+    if not (pools_known(pa) and pools_known(pb)):
+        return same, None
+    return same, pa == pb
+
+
+def pinned(meta_path: Path) -> bool | None:
+    """Whether a run had pinned pools (None if it has no meta file)."""
+    if not meta_path.exists():
+        return None
+    return json.loads(meta_path.read_text()).get('pool_pin') is not None
+
+
 def run_meta(root: Path, runs: list[str]) -> dict[str, Any]:
     """Flags, resolved server settings, commits and acceptance for each run."""
     out: dict[str, Any] = {}
@@ -244,6 +286,10 @@ def run_meta(root: Path, runs: list[str]) -> dict[str, Any]:
                 'started_at',
             )
         }
+        if 'resolved_pools' not in info:
+            # Runs from before the pools were recorded: from the log of the server
+            # that ran this pass, if it can be identified (else None).
+            info['resolved_pools'] = pass_server(root, name)[1]
         entry['server_info'] = info
         run = load_run(root / f'{name}.jsonl')
         verify = sum(r.get('spec_verify_ct') or 0 for r in run.values())
@@ -278,9 +324,15 @@ def write_table(path: str, summary: dict[str, Any]) -> None:
         'max_margin_max',
         'drift_p99',
         'drift_max',
+        'same_server',
+        'pools_identical',
+        'pinned_a',
+        'pinned_b',
     ]
-    with open(path, 'w') as f:
-        f.write(','.join(cols) + '\n')
+    with open(path, 'w', newline='') as f:
+        # Pair labels contain commas, so fields are quoted where needed.
+        w = csv.writer(f, lineterminator='\n')
+        w.writerow(cols)
         for label, s in summary.items():
             row = {**s, **s['classes'], 'pair': label}
             vals = []
@@ -291,12 +343,22 @@ def write_table(path: str, summary: dict[str, Any]) -> None:
                 if isinstance(v, float):
                     v = f'{v:.4g}'
                 vals.append('' if v is None else str(v))
-            f.write(','.join(vals) + '\n')
+            w.writerow(vals)
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument('--runs', default=str(Path.home() / 'vp-data/state/runs'))
+    ap.add_argument(
+        '--runs', required=True, help='run root: ~/vp-data/state/runs_pinned (or runs, unpinned)'
+    )
+    ap.add_argument(
+        '--require-all', action='store_true', help='exit non-zero if any pair has a missing run'
+    )
+    ap.add_argument(
+        '--allow-mixed-pins',
+        action='store_true',
+        help='compare a pinned-pool run with an unpinned one (flagged, not refused)',
+    )
     ap.add_argument('--pairs', required=True, help='JSON file: list of [label, run_a, run_b]')
     ap.add_argument('--out-json', required=True)
     ap.add_argument('--out-csv', required=True, help='one row per divergence event')
@@ -309,11 +371,29 @@ def main() -> None:
     summary = {}
     events = []
     consistency: dict[str, Any] = {}
+    # Validate before writing anything, so a refused run leaves earlier outputs intact.
+    missing: list[str] = []
+    mixed: list[str] = []
     for label, ra, rb in pairs:
         pa, pb = root / f'{ra}.jsonl', root / f'{rb}.jsonl'
         if not (pa.exists() and pb.exists()):
             print(f'skip {label}: missing {pa if not pa.exists() else pb}')
+            missing.append(label)
             continue
+        pins = [pinned(root / f'{r}.meta.json') for r in (ra, rb)]
+        if None not in pins and pins[0] != pins[1]:
+            mixed.append(label)
+    if args.require_all and missing:
+        raise SystemExit(f'{len(missing)} pairs have missing runs under {root}: {missing}')
+    if mixed and not args.allow_mixed_pins:
+        raise SystemExit(
+            f'{len(mixed)} pairs compare a pinned-pool run with an unpinned one: {mixed} '
+            '(--allow-mixed-pins to report them anyway)'
+        )
+    for label, ra, rb in pairs:
+        if label in missing:
+            continue
+        pa, pb = root / f'{ra}.jsonl', root / f'{rb}.jsonl'
         run_a, run_b = load_run(pa), load_run(pb)
         for name, run in ((ra, run_a), (rb, run_b)):
             if name not in consistency:
@@ -321,6 +401,9 @@ def main() -> None:
         rows = compare_pair(run_a, run_b)
         s = summarize(rows)
         s.update(run_a=ra, run_b=rb)
+        s['pinned_a'], s['pinned_b'] = (pinned(root / f'{r}.meta.json') for r in (ra, rb))
+        # Pools of the servers that ran each pass (None: unknown).
+        s['same_server'], s['pools_identical'] = pools_match(root, ra, rb)
         summary[label] = s
         for r in rows:
             if r['diverged'] or r['length_mismatch'] or r['max_drift'] > LARGE_DRIFT_NATS:
@@ -337,7 +420,17 @@ def main() -> None:
         runs = sorted({r for _, ra, rb in pairs for r in (ra, rb)})
         Path(args.out_meta).write_text(json.dumps(run_meta(root, runs), indent=1) + '\n')
     Path(args.out_json).write_text(
-        json.dumps({'pairs': summary, 'self_consistency': consistency}, indent=2) + '\n'
+        json.dumps(
+            {
+                'runs': str(root),
+                'pairs': summary,
+                'missing_pairs': missing,
+                'mixed_pin_pairs': mixed,
+                'self_consistency': consistency,
+            },
+            indent=2,
+        )
+        + '\n'
     )
     cols = [
         'pair',
@@ -358,8 +451,9 @@ def main() -> None:
         'prev_cycle_len_b',
         'cycles_ok_b',
     ]
-    with open(args.out_csv, 'w') as f:
-        f.write(','.join(cols) + '\n')
+    with open(args.out_csv, 'w', newline='') as f:
+        w = csv.writer(f, lineterminator='\n')
+        w.writerow(cols)
         for e in events:
             cyc = e.get('cycle_b') or {}
             e = {
@@ -367,7 +461,7 @@ def main() -> None:
                 'cycle_offset_b': cyc.get('offset'),
                 'prev_cycle_len_b': cyc.get('prev_cycle_len'),
             }
-            f.write(','.join('' if e.get(c) is None else str(e.get(c)) for c in cols) + '\n')
+            w.writerow('' if e.get(c) is None else str(e.get(c)) for c in cols)
 
 
 if __name__ == '__main__':

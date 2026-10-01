@@ -42,7 +42,12 @@
    "mem_fraction_static": 0.25,
    "random_seed": 0,
    "effective_max_running_requests": 16,
-   "max_total_num_tokens": null
+   "max_total_num_tokens": null,
+   "resolved_pools": {
+    "max_total_tokens": 55800,
+    "max_running_requests": 16,
+    "max_mamba_cache_size": 16
+   }
   },
   "spec_accept_length": 3.531,
   "cycles_one_chunk_each": 8,
@@ -93,7 +98,12 @@
    "mem_fraction_static": 0.25,
    "random_seed": 0,
    "effective_max_running_requests": 16,
-   "max_total_num_tokens": null
+   "max_total_num_tokens": null,
+   "resolved_pools": {
+    "max_total_tokens": 55800,
+    "max_running_requests": 16,
+    "max_mamba_cache_size": 16
+   }
   },
   "spec_accept_length": 3.5068,
   "cycles_one_chunk_each": 8,
@@ -144,7 +154,12 @@
    "mem_fraction_static": 0.25,
    "random_seed": 0,
    "effective_max_running_requests": 16,
-   "max_total_num_tokens": null
+   "max_total_num_tokens": null,
+   "resolved_pools": {
+    "max_total_tokens": 299772,
+    "max_running_requests": 16,
+    "max_mamba_cache_size": 16
+   }
   },
   "spec_accept_length": 3.4583,
   "cycles_one_chunk_each": 96,
@@ -196,7 +211,12 @@
    "mem_fraction_static": 0.25,
    "random_seed": 0,
    "effective_max_running_requests": 16,
-   "max_total_num_tokens": null
+   "max_total_num_tokens": null,
+   "resolved_pools": {
+    "max_total_tokens": 299772,
+    "max_running_requests": 16,
+    "max_mamba_cache_size": 16
+   }
   },
   "spec_accept_length": 3.4633,
   "cycles_one_chunk_each": 96,
@@ -238,7 +258,12 @@
    "mem_fraction_static": 0.25,
    "random_seed": 0,
    "effective_max_running_requests": 16,
-   "max_total_num_tokens": null
+   "max_total_num_tokens": null,
+   "resolved_pools": {
+    "max_total_tokens": 97672,
+    "max_running_requests": 16,
+    "max_mamba_cache_size": 122
+   }
   },
   "finish": {
    "length": 216,
@@ -278,7 +303,12 @@
    "mem_fraction_static": 0.25,
    "random_seed": 0,
    "effective_max_running_requests": 16,
-   "max_total_num_tokens": null
+   "max_total_num_tokens": null,
+   "resolved_pools": {
+    "max_total_tokens": 97672,
+    "max_running_requests": 16,
+    "max_mamba_cache_size": 122
+   }
   },
   "finish": {
    "length": 216,
@@ -318,7 +348,12 @@
    "mem_fraction_static": 0.25,
    "random_seed": 0,
    "effective_max_running_requests": 16,
-   "max_total_num_tokens": null
+   "max_total_num_tokens": null,
+   "resolved_pools": {
+    "max_total_tokens": 97672,
+    "max_running_requests": 16,
+    "max_mamba_cache_size": 122
+   }
   },
   "finish": {
    "length": 217,
@@ -358,7 +393,12 @@
    "mem_fraction_static": 0.25,
    "random_seed": 0,
    "effective_max_running_requests": 16,
-   "max_total_num_tokens": null
+   "max_total_num_tokens": null,
+   "resolved_pools": {
+    "max_total_tokens": 97672,
+    "max_running_requests": 16,
+    "max_mamba_cache_size": 122
+   }
   },
   "finish": {
    "length": 217,
@@ -398,7 +438,12 @@
    "mem_fraction_static": 0.25,
    "random_seed": 0,
    "effective_max_running_requests": 16,
-   "max_total_num_tokens": null
+   "max_total_num_tokens": null,
+   "resolved_pools": {
+    "max_total_tokens": 133885,
+    "max_running_requests": 16,
+    "max_mamba_cache_size": 167
+   }
   },
   "finish": {
    "length": 216,
@@ -438,7 +483,12 @@
    "mem_fraction_static": 0.25,
    "random_seed": 0,
    "effective_max_running_requests": 16,
-   "max_total_num_tokens": null
+   "max_total_num_tokens": null,
+   "resolved_pools": {
+    "max_total_tokens": 133885,
+    "max_running_requests": 16,
+    "max_mamba_cache_size": 167
+   }
   },
   "finish": {
    "length": 217,
@@ -479,7 +529,12 @@
    "max_mamba_cache_size": null,
    "mem_fraction_static": 0.25,
    "random_seed": 0,
-   "effective_max_running_requests": null
+   "effective_max_running_requests": null,
+   "resolved_pools": {
+    "max_total_tokens": 125547,
+    "max_running_requests": 69,
+    "max_mamba_cache_size": 69
+   }
   },
   "finish": {
    "length": 8
@@ -519,7 +574,12 @@
    "max_mamba_cache_size": null,
    "mem_fraction_static": 0.25,
    "random_seed": 0,
-   "effective_max_running_requests": null
+   "effective_max_running_requests": null,
+   "resolved_pools": {
+    "max_total_tokens": 125547,
+    "max_running_requests": 69,
+    "max_mamba_cache_size": 69
+   }
   },
   "finish": {
    "length": 8

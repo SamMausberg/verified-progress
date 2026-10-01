@@ -14,8 +14,8 @@ higher after rejections even without any state error. Each bucket therefore
 also counts fragile positions (reference top-2 gap at most FRAGILE_GAP) and
 reports divergences per fragile position, which removes that confound.
 
-    python experiments/state_safety/cycles.py --ref plain/c1 --spec mtp_s3/c1 \
-        --out evidence/state_safety/cycles_mtp_s3.json
+    python experiments/state_safety/cycles.py --runs ~/vp-data/state/runs_pinned \
+        --ref plain/c1 --spec mtp_s3/c1 --out evidence/state_safety/cycles_mtp_s3_pinned.json
 """
 
 from __future__ import annotations
@@ -98,7 +98,7 @@ def analyse(run_a: dict[str, Any], run_b: dict[str, Any]) -> dict[str, Any]:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument('--runs', default=str(Path.home() / 'vp-data/state/runs'))
+    ap.add_argument('--runs', required=True, help='run root (runs_pinned or runs)')
     ap.add_argument('--ref', required=True, help='reference run, e.g. plain/c1')
     ap.add_argument('--spec', required=True, help='speculative run, e.g. mtp_s3/c1')
     ap.add_argument('--out', required=True)
