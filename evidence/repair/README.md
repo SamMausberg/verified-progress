@@ -47,12 +47,13 @@ Derived (`stage_a_oracle.csv`; decode speedup over DFlash-16 / end to end):
 |---|---|---|---|---|
 | 16 | 3.17 / 3.02 | 2.04 / 2.00 | 1.65 / 1.62 | 2.19 / 2.13 |
 | 32 | 4.19 / 3.91 | 3.03 / 2.90 | 2.19 / 2.13 | 3.22 / 3.07 |
-| 64 | 3.95 / 3.70 | 3.34 / 3.17 | 2.05 / 2.00 | 3.45 / 3.27 |
+| 64 | 3.95 / 3.70 | 3.34 / 3.17 | 2.06 / 2.01 | 3.45 / 3.27 |
 | 128 | 4.41 / 4.09 | 3.97 / 3.72 | 2.29 / 2.22 | 4.07 / 3.80 |
-| 256 | 5.53 / 5.01 | 5.12 / 4.68 | 2.90 / 2.78 | 5.24 / 4.78 |
+| 256 | 5.53 / 5.01 | 5.12 / 4.68 | 2.89 / 2.77 | 5.24 / 4.78 |
 
-S_b estimate charges the anchor pass V(B) minus the per-position state writes bounded by their
-bytes (12.9 GB at B = 256 at 3.0 TB/s) plus writing the anchor cache (every operator's input
+S_b estimate charges the anchor pass V(B) minus the per-position state writes (measured at
+B = 16, 64 and 256 in the decomposition session below, bounded by their bytes at 3.0 TB/s at
+B = 32 and 128) plus writing the anchor cache (every operator's input
 and output at every block position, BF16, 3.95 MB per token). S_b ceiling charges the anchor
 pass only one read of the 8.41 GB of weights at the measured 3.83 TB/s read peak
 (`evidence/profiles/hbm_bandwidth.json`) plus the anchor cache at that rate, and the audit its
