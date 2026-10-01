@@ -131,9 +131,8 @@ B = 64 because of per-step host overhead): B = 512 FP32 state 26.9 ms (19.0k tok
 
 ## 2b. Speculation at high concurrency: byte arithmetic (derived)
 
-*Pending bench's PR #57 (its tuning evidence is not merged yet; the inputs below are from
-`evidence/bench/tuning/` on that branch).* Bench's depth tuning measured MTP
-three steps at c = 128: 9.59k tok/s stock and 11.94k with `--enable-linear-replayssm-spec`,
+Bench's depth tuning (`evidence/bench/tuning/points.csv`) measured MTP three steps at
+c = 128: 9.59k tok/s stock and 11.94k with `--enable-linear-replayssm-spec`,
 against 13.42k for plain decode, with 3.26 tokens per verify cycle. The implied cycle is
 128 x 3.26 / y = **43.5 ms stock, 35.0 ms with ReplaySSM-spec** (plain: 9.5 ms per step).
 Assumptions for the components below: 3.8 TB/s, 650 TFLOPS BF16, context ~400 tokens.
