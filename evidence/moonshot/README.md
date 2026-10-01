@@ -230,9 +230,9 @@ with this declaration):
   as expected" in all eight arms. That check used bench's id-based `prompts_as_expected`,
   which is wrong for this workload: `long2048.jsonl` holds 91 distinct texts among its 512
   prompts (each repeated about 6 times; `make_long_prompts.py` cycles the source split and
-  its cursor returns to the same offsets), and bench's `prompt_index` keeps one id per text
-  hash, so the ids it records differ from the declared ones even when the right texts are
-  sent. The corrected check compares content exactly: the multiset of SHA-256 hashes of the
+  its cursor returns to the same offsets), bench's `prompt_index` keeps one id per text
+  hash, and the warm-up pool reuses the same id names (`long2048-0000` to `-0255`), so the
+  ids bench records differ from the declared ones even when the right texts are sent. The corrected check compares content exactly: the multiset of SHA-256 hashes of the
   prompt texts in the profiling phase of the raw AIPerf stream must equal that of the
   declared file's first 256 prompts, counts included (`check_sent_prompts`). It passes in all
   eight arms of `p4_ab_20261001T082738Z`. The repeats have no caching effect: the radix
