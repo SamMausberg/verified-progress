@@ -118,7 +118,16 @@ and nothing else:
   confirmation sessions at that concurrency, invalid points excluded, each with its
   matched plain baseline (`plain-tuned` for FlashInfer arms, `plain-tuned-triton`
   for Triton arms). If the family's second arm is within 2% of the best, both run.
-  Plain decoding runs as both the baseline and an arm.
+  Plain decoding runs as both the baseline and an arm. (Refined on 2026-10-01 in
+  commit 6b25b9f, 03:47 UTC, before any sensitivity run: the declaration in b028c6c
+  said "highest confirmation y"; the refinement fixed it as the mean over the three
+  sessions with invalid points excluded and added the 2% rule.) The arm list is
+  not written by hand: `python -m bench.sensitivity_arms` applies the rule to the
+  confirmation `points.csv`, using only sessions confirm-r0, -r1 and -r2 and only
+  arms with a valid point in all three (so `mtp-stockverify`, run only in the
+  supplementary hold, is not eligible). It writes `plan.txt` and `selection.json`,
+  which are committed with the sensitivity evidence; `campaigns/sensitivity.sh`
+  runs only a committed, unmodified plan.
 - Repeats: three sessions, each launching every selected arm with its matched
   baseline in the same exclusive hold, in alternating order, with the sweep's
   foreign-load recording and quiet-host wait.

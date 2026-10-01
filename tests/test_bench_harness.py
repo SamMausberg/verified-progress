@@ -743,3 +743,49 @@ def test_per_prompt_output_lengths(tmp_path: Path) -> None:
         row['prompt_id'] = f'p{index}'
     summary = summarise_point(rows, {'p0': 4, 'p1': 5}, concurrency=2)
     assert summary['osl_mismatch'] == 1
+
+
+def test_sensitivity_arm_rule() -> None:
+    from bench.sensitivity_arms import select
+
+    sessions = ('confirm-r0', 'confirm-r1', 'confirm-r2')
+
+    def runs(label: str, c: int, y: float, invalid_in: str = '') -> list[dict[str, object]]:
+        return [
+            {
+                'label': label,
+                'concurrency': c,
+                'session': session,
+                'y': y,
+                'invalid_reason': 'host_contention' if session == invalid_in else '',
+            }
+            for session in sessions
+        ]
+
+    points = [
+        *runs('plain-tuned', 32, 6000.0),
+        *runs('plain-tuned', 128, 14000.0),
+        *runs('mtp-tuned', 32, 6900.0),
+        *runs('mtp-tuned-triton', 32, 7000.0),  # within 2% of each other: both run
+        *runs('mtp-tuned', 128, 13000.0),
+        # Supplementary session only: never eligible, however fast.
+        {'label': 'mtp-stockverify', 'concurrency': 128, 'session': 'confirm-supp',
+         'y': 20000.0, 'invalid_reason': ''},
+        *runs('dflash-tuned-b16', 32, 5200.0),
+        *runs('dflash-tuned', 32, 6900.0),
+        *runs('dflash-tuned-b4', 32, 9999.0, invalid_in='confirm-r1'),  # one session invalid
+        *runs('dflash-tuned', 128, 10500.0),
+        *runs('dflash-tuned-b4', 128, 11400.0),
+    ]  # fmt: skip
+    result = select(points)
+    assert result['plan'] == {
+        'dflash-tuned': [32],
+        'dflash-tuned-b4': [128],
+        'mtp-tuned': [32, 128],
+        'mtp-tuned-triton': [32],
+        'plain-tuned': [32, 128],
+        'plain-tuned-triton': [32],
+    }
+    assert {'arm': 'dflash-tuned-b4', 'concurrency': 32, 'missing_sessions': ['confirm-r1'],
+            'invalid_in': ['confirm-r1']} in result['ineligible']  # fmt: skip
+    assert result['sessions'] == list(sessions)
