@@ -8,6 +8,13 @@
 \section{Measurements on the Engine's States}\label{sec:measure}\label{sec:setup}
 Numbers labelled baseline are the stock engine's; all others are the certified head's, replayed offline unless marked as a microbenchmark.
 
+\begin{figure*}[t]
+\centering
+\input{figures/candidates}
+\caption{What the certified head costs on captured positions. \textbf{(a)}~Share of the 6,005 held-out plain-decoding positions that need at least $k$ candidates, for five low-precision copies of the head, greedy unless marked (replayed \ev{ccdf}). \textbf{(b)}~Share of head calls of $M$ positions with an open position, which sends the whole batch to the stock head: lines if positions fell back independently at the held-out shares of Table~\ref{tab:rstock} (derived) \ev{rstock}; markers measured by the GPU kernel on consecutive positions of the first 60,000 captured \ev{kernel-path}. \textbf{(c)}~Time per call over the stock head and argmax, head alone: all positions certified (median, whiskers p10--p90), and the expected time with each fallback, from measured times and the rates of (b) \ev{kernel-path}. Shaded: above 16 positions the calls are consecutive capture positions, not engine batches, which held at most 16 requests.}
+\label{fig:candidates}\label{fig:geometry-candidates}
+\end{figure*}
+
 \subsection{Setup}\label{sec:transport-capture}
 \paragraph{System} One NVIDIA GH200 with SGLang~\cite{sglangpaper} at commit \sourcepin{}, PyTorch 2.13 for CUDA 13.0 and the FlashInfer attention backend (Appendix~\ref{app:pins} lists every pin). The target is Qwen3.5-4B at revision \modelpin~\cite{qwencard}; 24 of its 32 layers are Gated DeltaNet (GDN) linear attention~\cite{gdn}, and it has one native MTP layer. The drafters are the MTP layer (four draft steps, top-$k$ 1) and the public DFlash block drafter for this target, \code{z-lab/Qwen3.5-4B-DFlash} at revision \code{9a1996cc}~\cite{dflashpaper,dflash4bcard}, which drafts blocks of 16 tokens and projects them through the target's head.
 
@@ -20,13 +27,6 @@ No error bound was violated on these positions, and the exact winner was always 
 
 \subsection{Fallback and Agreement}\label{sec:rstock-share}
 Table~\ref{tab:rstock} in Appendix~\ref{app:candidates} gives how often the contract leaves a position to the stock kernel. The gap condition has a floor near 2\%; the interval form has none. Under the \modelhopper{} the interval form leaves 0.35\% of the held-out positions to the stock kernel, and under the \modelcons{} 1.40\%. For every model in that table, no position the interval form certified had a token different from the one the engine returned at the capture's batch shape \ev{rstock}. That is consistent with the error models on these positions, not a proof that cuBLAS stays within the smallest of them. The GPU kernel itself, replayed at each engine step's own shape on the first 60,000 capture positions (all splits), leaves 0.28\% and 1.46\% of them to the stock kernel under the two models, and with the fallback every token equals the engine's \ev{kernel-replay}.
-
-\begin{figure*}[t]
-\centering
-\input{figures/candidates}
-\caption{What the certified head costs on captured positions. \textbf{(a)}~Share of the 6,005 held-out plain-decoding positions that need at least $k$ candidates, for five low-precision copies of the head, greedy unless marked (replayed \ev{ccdf}). \textbf{(b)}~Share of head calls of $M$ positions with an open position, which sends the whole batch to the stock head: lines if positions fell back independently at the held-out shares of Table~\ref{tab:rstock} (derived) \ev{rstock}; markers measured by the GPU kernel on consecutive positions of the first 60,000 captured \ev{kernel-path}. \textbf{(c)}~Time per call over the stock head and argmax, head alone: all positions certified (median, whiskers p10--p90), and the expected time with each fallback, from measured times and the rates of (b) \ev{kernel-path}. Shaded: above 16 positions the calls are consecutive capture positions, not engine batches, which held at most 16 requests.}
-\label{fig:candidates}\label{fig:geometry-candidates}
-\end{figure*}
 
 Fallback grows with the batch, because one undecided position is enough to send a whole batch to the stock head. If positions fell back independently with probability $p$, a call of $M$ positions would contain an undecided one with probability $1-(1-p)^M$. At the capture's 8.0 positions per step this matches the measured share of steps with a fallback, 2.8\% under the \modelhopper{} and 10.9\% under the \modelcons. At $M=128$ it predicts 36\% and 84\%, and the kernel measures 27\% and 77\% on calls of 128 consecutive capture positions (Figure~\ref{fig:candidates}b). A whole-batch fallback would therefore run the stock head for most large batches, so at serving batch sizes the certified head depends on the per-position fallback.
 
