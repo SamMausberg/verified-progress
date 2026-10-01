@@ -21,7 +21,10 @@ the primary minus the pooled control log odds ratio is above 0. One prompt
 resample per replicate is shared by all four pairs (10,000 replicates,
 numpy.random.default_rng(0)). Secondary: a one-sided Fisher exact test on the
 pooled primary table. Supported only if (a) and (b) both hold; otherwise
-inconclusive. Runs that are missing or not pinned make the result void.
+inconclusive. The result is void, and no results are written, unless all five
+runs exist and are the declared runs: the declared configurations and
+concurrencies with the radix cache and overlap scheduler on, the pinned pools,
+256 tokens with top-5 logprobs, and exactly the 960 frozen fresh prompts.
 
     python experiments/state_safety/first_cycle.py \
         --runs ~/vp-data/state/runs_fresh --out evidence/state_safety/first_cycle_fresh.json
@@ -30,6 +33,7 @@ inconclusive. Runs that are missing or not pinned make the result void.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import sys
@@ -57,6 +61,18 @@ CONTROL = {
 }
 REPLICATES = 10_000
 SEED = 0
+HERE = Path(__file__).resolve().parent
+FRESH_MANIFEST = HERE.parents[1] / 'evidence' / 'state_safety' / 'prompt_manifest_fresh.json'
+FRESH_PROMPTS = Path.home() / 'vp-data' / 'state' / 'prompts' / 'prompts_fresh.jsonl'
+DECLARED_PROMPTS = 960
+# run -> (speculative algorithm, steps, top-k, concurrency), as declared
+DECLARED: dict[str, tuple[str | None, int | None, int | None, int]] = {
+    'plain/c1': (None, None, None, 1),
+    'mtp_s5/c1': ('EAGLE', 5, 1, 1),
+    'mtp_s5/c32': ('EAGLE', 5, 1, 32),
+    'mtp_tree/c1': ('EAGLE', 3, 2, 1),
+    'mtp_tree/c32': ('EAGLE', 3, 2, 32),
+}
 
 
 def counts(r: dict[str, Any], c: dict[str, Any], lab: dict[str, Any]) -> list[int]:
@@ -93,23 +109,64 @@ def log_odds(t: np.ndarray) -> np.ndarray:
     return np.log((a + 0.5) * (f0 - c + 0.5) / ((f1 - a + 0.5) * (c + 0.5)))
 
 
-def void_reasons(root: Path) -> list[str]:
+def declared_prompt_ids(prompts: Path, manifest: Path) -> tuple[set[str] | None, str | None]:
+    """The fresh set's IDs, after checking the prompt file against the frozen manifest."""
+    if not prompts.exists():
+        return None, f'{prompts}: missing'
+    items = [json.loads(line) for line in prompts.read_text().splitlines() if line.strip()]
+    h = hashlib.sha256()
+    for it in items:
+        h.update(json.dumps([it['id'], it['input_ids']]).encode())
+    m = json.loads(manifest.read_text())
+    if h.hexdigest() != m['input_ids_sha256'] or len(items) != m['num_prompts']:
+        return None, f'{prompts}: does not match the frozen manifest'
+    if len(items) != DECLARED_PROMPTS:
+        return None, f'{prompts}: {len(items)} prompts, declared {DECLARED_PROMPTS}'
+    return {it['id'] for it in items}, None
+
+
+def void_reasons(
+    root: Path, prompts: Path = FRESH_PROMPTS, manifest: Path = FRESH_MANIFEST
+) -> list[str]:
+    """Why the runs are not the declared runs (an empty list: they are)."""
     reasons = []
+    ids, why = declared_prompt_ids(prompts, manifest)
+    if why:
+        reasons.append(why)
+    pin = expected_pools(pool_flags())
     for run in RUNS:
         meta = root / f'{run}.meta.json'
         if not (root / f'{run}.jsonl').exists() or not meta.exists():
             reasons.append(f'{run}: missing')
             continue
         m = json.loads(meta.read_text())
-        pin = expected_pools(pool_flags())
-        if m.get('pool_pin') != pin or m['server_info'].get('resolved_pools') != POOL_PIN:
+        info = m.get('server_info', {})
+        if m.get('pool_pin') != pin or info.get('resolved_pools') != POOL_PIN:
             reasons.append(f'{run}: pools not pinned as declared')
         if m.get('max_new_tokens') != 256 or m.get('top_logprobs_num') != 5:
             reasons.append(f'{run}: generation settings differ from the declaration')
+        algo, steps, topk, conc = DECLARED[run]
+        got = (
+            info.get('speculative_algorithm'),
+            info.get('speculative_num_steps') if algo else None,
+            info.get('speculative_eagle_topk') if algo else None,
+            m.get('concurrency'),
+        )
+        if got != (algo, steps, topk, conc):
+            reasons.append(f'{run}: configuration {got}, declared {(algo, steps, topk, conc)}')
+        if info.get('disable_radix_cache') or info.get('disable_overlap_schedule'):
+            reasons.append(f'{run}: radix cache or overlap scheduler off, declared on')
+        if ids is not None:
+            run_ids = {r['id'] for r in load_run(root / f'{run}.jsonl').values()}
+            if run_ids != ids:
+                reasons.append(
+                    f'{run}: prompt IDs differ from the declared set '
+                    f'({len(ids - run_ids)} missing, {len(run_ids - ids)} extra)'
+                )
     return reasons
 
 
-def analyse(runs: dict[str, dict[str, dict[str, Any]]]) -> dict[str, Any]:
+def analyse(runs: dict[str, dict[str, dict[str, Any]]], fisher: bool = True) -> dict[str, Any]:
     ids = sorted(set.intersection(*(set(runs[r]) for r in RUNS)))
     included = [p for p in ids if all(spec_cycles_consistent(runs[r][p]) for r in MTP_RUNS)]
     per: dict[str, np.ndarray] = {}
@@ -143,18 +200,18 @@ def analyse(runs: dict[str, dict[str, dict[str, Any]]]) -> dict[str, Any]:
         }
 
     p_tab = prim.sum(0).astype(int)
-    try:
+    fisher_p = None
+    if fisher:  # always on the evidence path; the tests' environment has no SciPy
         from scipy.stats import fisher_exact
-    except ImportError:  # the repository's test environment has no SciPy
-        fisher = None
-    else:
-        fisher = float(
+
+        fisher_p = float(
             fisher_exact(
                 [[p_tab[0], p_tab[1] - p_tab[0]], [p_tab[2], p_tab[3] - p_tab[2]]],
                 alternative='greater',
             )[1]
         )
     return {
+        'prompts_declared': DECLARED_PROMPTS,
         'prompts_common': len(ids),
         'prompts_excluded_chunking': len(ids) - n,
         'prompts_included': n,
@@ -170,7 +227,7 @@ def analyse(runs: dict[str, dict[str, dict[str, Any]]]) -> dict[str, Any]:
         'b_lower_bound_log_odds_difference': round(lower_d, 4),
         'a_holds': bool(a_holds),
         'b_holds': bool(b_holds),
-        'secondary_fisher_one_sided_p': None if fisher is None else round(fisher, 4),
+        'secondary_fisher_one_sided_p': None if fisher_p is None else round(fisher_p, 4),
         'decision': 'supported' if a_holds and b_holds else 'inconclusive',
     }
 
@@ -179,9 +236,10 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--runs', required=True, help='~/vp-data/state/runs_fresh')
     ap.add_argument('--out', required=True)
+    ap.add_argument('--prompts', default=str(FRESH_PROMPTS))
     args = ap.parse_args()
     root = Path(args.runs)
-    reasons = void_reasons(root)
+    reasons = void_reasons(root, Path(args.prompts))
     if reasons:
         # A void run reports no results.
         Path(args.out).write_text(json.dumps({'void': reasons}, indent=1) + '\n')

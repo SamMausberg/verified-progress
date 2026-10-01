@@ -177,7 +177,9 @@ fi
 # comparisons pin the pools; the earlier runs did not, so record what each had).
 nice -n 19 python pools.py --root "$HOME/vp-data/state" --evidence "$evidence"
 
-# The declared first-cycle test, once all five of its runs exist (void otherwise).
+# The declared first-cycle test, once all five of its runs exist. If they are not the
+# declared runs the result is void: first_cycle.py exits non-zero and, under set -e,
+# stops this script.
 fresh="$HOME/vp-data/state/runs_fresh"
 if [ -f "$fresh/plain/c1.jsonl" ] && [ -f "$fresh/mtp_tree/c32.jsonl" ]; then
   nice -n 19 python first_cycle.py --runs "$fresh" --out "$evidence/first_cycle_fresh.json"

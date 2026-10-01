@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'experiments' / 'state_safety'))
 
 import numpy as np
-from first_cycle import RUNS, analyse, counts, log_odds, void_reasons
+from first_cycle import DECLARED, RUNS, analyse, counts, log_odds, void_reasons
 from server import POOL_PIN
 
 FRAGILE = [[-0.6, 1], [-0.7, 2]]  # top-2 gap 0.1 nats
@@ -62,27 +62,118 @@ def test_decision_supported_only_when_both_bounds_hold():
                 out[f'{cfg}/c32'][p] = rec(c32, FRAGILE, chunks=[1, 3, 3, 3])
         return out
 
-    res = analyse(runs(True))
+    res = analyse(runs(True), fisher=False)
     assert res['prompts_included'] == 200
     assert res['a_holds'] and res['b_holds'] and res['decision'] == 'supported'
-    res = analyse(runs(False))
+    res = analyse(runs(False), fisher=False)
     assert not res['a_holds'] and res['decision'] == 'inconclusive'
 
 
-def test_missing_or_unpinned_runs_make_the_result_void(tmp_path):
-    assert any('missing' in r for r in void_reasons(tmp_path))
+def _write_declared(tmp_path, ids):
+    """Five declared runs over ids, plus the matching prompt file and manifest."""
+    import hashlib
+
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    prompts = tmp_path / 'prompts.jsonl'
+    items = [{'id': i, 'input_ids': [k]} for k, i in enumerate(ids)]
+    prompts.write_text(''.join(json.dumps(it) + '\n' for it in items))
+    h = hashlib.sha256()
+    for it in items:
+        h.update(json.dumps([it['id'], it['input_ids']]).encode())
+    manifest = tmp_path / 'manifest.json'
+    manifest.write_text(json.dumps({'input_ids_sha256': h.hexdigest(), 'num_prompts': len(ids)}))
+    runs = tmp_path / 'runs'
     for run in RUNS:
-        path = tmp_path / f'{run}.jsonl'
+        path = runs / f'{run}.jsonl'
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text('')
+        path.write_text(''.join(json.dumps({'id': i}) + '\n' for i in ids))
+        algo, steps, topk, conc = DECLARED[run]
         meta = {
+            'concurrency': conc,
             'pool_pin': POOL_PIN,
-            'server_info': {'resolved_pools': POOL_PIN},
             'max_new_tokens': 256,
             'top_logprobs_num': 5,
+            'server_info': {
+                'resolved_pools': POOL_PIN,
+                'speculative_algorithm': algo,
+                'speculative_num_steps': steps,
+                'speculative_eagle_topk': topk,
+                'disable_radix_cache': False,
+                'disable_overlap_schedule': False,
+            },
         }
-        (tmp_path / f'{run}.meta.json').write_text(json.dumps(meta))
-    assert void_reasons(tmp_path) == []
-    meta['server_info'] = {'resolved_pools': {**POOL_PIN, 'max_total_tokens': 1}}
-    (tmp_path / 'plain/c1.meta.json').write_text(json.dumps(meta))
-    assert void_reasons(tmp_path) == ['plain/c1: pools not pinned as declared']
+        (runs / f'{run}.meta.json').write_text(json.dumps(meta))
+    return runs, prompts, manifest
+
+
+def _edit_meta(runs, run, **info):
+    path = runs / f'{run}.meta.json'
+    meta = json.loads(path.read_text())
+    for k, v in info.items():
+        if k == 'concurrency':
+            meta[k] = v
+        else:
+            meta['server_info'][k] = v
+    path.write_text(json.dumps(meta))
+
+
+def test_declared_runs_are_not_void(tmp_path, monkeypatch):
+    import first_cycle
+
+    monkeypatch.setattr(first_cycle, 'DECLARED_PROMPTS', 3)
+    runs, prompts, manifest = _write_declared(tmp_path, ['a', 'b', 'c'])
+    assert void_reasons(runs, prompts, manifest) == []
+
+
+def test_each_departure_from_the_declaration_makes_the_result_void(tmp_path, monkeypatch):
+    import first_cycle
+
+    monkeypatch.setattr(first_cycle, 'DECLARED_PROMPTS', 3)
+
+    def reasons(edit):
+        runs, prompts, manifest = _write_declared(tmp_path / edit.__name__, ['a', 'b', 'c'])
+        edit(runs, prompts, manifest)
+        return void_reasons(runs, prompts, manifest)
+
+    def missing_run(runs, prompts, manifest):
+        (runs / 'mtp_tree/c32.jsonl').unlink()
+
+    def unpinned(runs, prompts, manifest):
+        _edit_meta(runs, 'plain/c1', resolved_pools={**POOL_PIN, 'max_total_tokens': 1})
+
+    def plain_is_speculative(runs, prompts, manifest):
+        _edit_meta(runs, 'plain/c1', speculative_algorithm='EAGLE')
+
+    def wrong_steps(runs, prompts, manifest):
+        _edit_meta(runs, 'mtp_s5/c1', speculative_num_steps=3)
+
+    def wrong_tree_topk(runs, prompts, manifest):
+        _edit_meta(runs, 'mtp_tree/c32', speculative_eagle_topk=1)
+
+    def wrong_concurrency(runs, prompts, manifest):
+        _edit_meta(runs, 'mtp_s5/c32', concurrency=8)
+
+    def radix_off(runs, prompts, manifest):
+        _edit_meta(runs, 'mtp_tree/c1', disable_radix_cache=True)
+
+    def missing_prompt(runs, prompts, manifest):
+        path = runs / 'mtp_s5/c1.jsonl'
+        path.write_text(''.join(path.read_text().splitlines(keepends=True)[:2]))
+
+    def prompts_not_frozen(runs, prompts, manifest):
+        prompts.write_text(prompts.read_text().replace('"input_ids": [0]', '"input_ids": [9]'))
+
+    expected = {
+        missing_run: 'mtp_tree/c32: missing',
+        unpinned: 'plain/c1: pools not pinned',
+        plain_is_speculative: 'plain/c1: configuration',
+        wrong_steps: 'mtp_s5/c1: configuration',
+        wrong_tree_topk: 'mtp_tree/c32: configuration',
+        wrong_concurrency: 'mtp_s5/c32: configuration',
+        radix_off: 'mtp_tree/c1: radix cache or overlap',
+        missing_prompt: 'mtp_s5/c1: prompt IDs differ',
+        prompts_not_frozen: 'does not match the frozen manifest',
+    }
+    for edit, text in expected.items():
+        got = reasons(edit)
+        assert any(text in r for r in got), (edit.__name__, got)
