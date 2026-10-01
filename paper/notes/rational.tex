@@ -1,0 +1,29 @@
+% Research notes: instances of the exact rational reference (moved unchanged from the paper's
+% Appendix A.10; owner: appendix editor).
+\section{The exact rational reference}\label{notes:rational}
+The second exact reference of Appendix~\paperref{app:checked} of the paper, with bounded integer heads and base-2 masses represented as rationals, passes its 18 decision and 3 race test methods on the instances of Table~\ref{tab:tests}~\ev{inherited}.
+
+\begin{table}[htbp]
+\small\centering
+\begin{tabular}{@{}lrl@{}}\toprule
+Check & Instances & What agrees\\\midrule
+Top-$k$ plus tail composition & 250 & Exact union and associative merge (Proposition~\ref{prop:summary})\\
+Transported tile bounds & 300 heads, 1,048 tiles & 3,787 weight rows enclosed (Theorem~\paperref{thm:transport} of the paper, Hölder form)\\
+Greedy certified screening & 250 & Same winner under a deterministic total order\\
+Retained-tail tightening & 565 tiles & Exact mass enclosed; bounds never looser (Equation~\papereqref{eq:tail} of the paper)\\
+Acceptance guards & 1,600 & Certified bits agree with the complete mass (Theorem~\paperref{thm:guards} of the paper)\\
+Unresolved-interval measure & 160 & Exact agreement with $P_?$ of Theorem~\paperref{thm:guards} of the paper\\
+Lazy acceptance & 500 & With and without retained seeds; finite completion\\
+Coupled one-step sampling & 200 & Same output with exact residual fallback\\
+Rejection-correction identity & 300 pairs & Includes zero-probability support entries\\
+Demand frontier & 1,092 partial states & 5,460 complete decision assignments (Proposition~\ref{prop:frontier})\\
+Exclusion-aware race summaries & 300 & Exact maxima after support exclusions\\
+Target priority race & 250 & Same token as a dense priority race\\
+Sparse-support residual race & 250 & Bounded and dense races agree (Theorem~\paperref{thm:residualrace} of the paper)\\
+Finite-map execution & 400 & Scan, walk and composition agree (Proposition~\ref{prop:maps})\\
+Gated-delta replay & 150 trajectories & 868 accepted-prefix replay checks (Proposition~\ref{prop:gdn})\\
+Lease reuse & 300 schedules & Sequential epoch and base-prefix guards\\\bottomrule
+\end{tabular}
+\caption{Instances checked by the exact rational reference for decisions and races~\ev{inherited}. It also contains counterexamples for biased depth selection, graph-cost cliffs, batch unions, invalid numerical bounds, support truncation and stale namespaces. No GPU code is exercised.}
+\label{tab:tests}
+\end{table}

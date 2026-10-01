@@ -1,0 +1,8 @@
+% Macros of the evidence register and the pending list, shared by the paper (sections/app_register.tex)
+% and the research notes (notes/register.tex); owner: appendix editor. \ev{key} and \pend{key} (macros.tex)
+% link to the entries these macros label.
+\newcounter{evitem}
+\newcommand{\evgroup}[1]{\multicolumn{2}{@{}l}{\emph{#1}}\\*[1pt]}
+\newcommand{\evitem}[4]{\refstepcounter{evitem}\label{ev:#1}E\theevitem & #2\par\vspace{1pt}{\footnotesize\color{muted}#3\ifblank{#4}{}{; produced by #4}.\par}\vspace{2pt}\\}
+\newcounter{devitem}
+\newcommand{\devitem}[3]{\refstepcounter{devitem}\label{dev:#1}D\thedevitem & #2\ifblank{#3}{}{ {\footnotesize\color{muted}(#3)}}\\}
