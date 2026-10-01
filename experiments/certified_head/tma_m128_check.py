@@ -38,12 +38,15 @@ from certified_head.selftest import raw_reference
 from real_states import plain_decode_steps
 
 
-def configs() -> list[GemvConfig]:
+def configs(only: list[str] | None = None) -> list[GemvConfig]:
+    """The neighbourhood, or only the tiles named ``BVxBMxBK`` in ``only``."""
     out = []
     for bv, bm, warps, stages, tma in itertools.product(
         (64, 128), (64, 128), (4, 8), (3, 4), (True, False)
     ):
         if stages * (bv * 128 + 2 * 128 * bm) > 200 * 1024:
+            continue
+        if only and f'{bv}x{bm}x128' not in only:
             continue
         out.append(GemvConfig(bv, bm, 128, warps, stages, tma=tma))
     return out
@@ -107,6 +110,7 @@ def main() -> None:
     )
     ap.add_argument('--batches', type=int, nargs='*', default=[128, 256])
     ap.add_argument('--repeats', type=int, default=3)
+    ap.add_argument('--configs', nargs='*', default=None, help='only these BVxBMxBK tiles')
     ap.add_argument('--out', type=Path, required=True)
     args = ap.parse_args()
     w, qh = load_or_build()
@@ -118,7 +122,7 @@ def main() -> None:
         inputs = {'sweep_random': sweep_rows(head.hidden, m), 'real': real[:m].cuda()}
         for name, h in inputs.items():
             x = exact_logits_fp64(h, head.weight)
-            for cfg in configs():
+            for cfg in configs(args.configs):
                 head.gemv_config = functools.partial(_fixed, cfg)
                 runs = []
                 for _ in range(args.repeats):
