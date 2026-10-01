@@ -27,7 +27,7 @@ Exclusive GPU lock for anything timed; raw outputs stay in `~/vp-data/backbone/`
 
 ```sh
 scripts/sglang_worktree.sh backbone
-git -C ~/sglang-wt/backbone am "$PWD"/engine/sglang/patches/backbone/000[1-3]-*.patch
+git -C ~/sglang-wt/backbone am "$PWD"/engine/sglang/patches/backbone/000[1-3]-*.patch  # the hold-1 tree
 SGLANG_WORKTREE=~/sglang-wt/backbone source scripts/sglang_env.sh
 R=~/vp-data/backbone/runs/h1
 scripts/gpu_lock.sh -x python -m pytest -q tests/test_backbone_gemm.py
@@ -36,13 +36,15 @@ scripts/gpu_lock.sh -x python experiments/backbone/gemm_bench.py gemm \
 scripts/gpu_lock.sh -x python experiments/backbone/gemm_bench.py norm --out evidence/backbone/norm_microbench.json
 scripts/gpu_lock.sh -x python experiments/backbone/gemm_bench.py merge --out evidence/backbone/merge_microbench.json
 scripts/gpu_lock.sh -x python experiments/backbone/gemm_bench.py chain \
-    --gemm-json $R/gemm_full.json --out evidence/backbone/chain_microbench.json
+    --gemm-json evidence/backbone/gemm_microbench.json --out evidence/backbone/chain_microbench.json
 python experiments/backbone/summarize.py --gemm evidence/backbone/gemm_microbench.json \
     --norm evidence/backbone/norm_microbench.json --merge evidence/backbone/merge_microbench.json \
     --chain evidence/backbone/chain_microbench.json > evidence/backbone/tables.md
-python experiments/backbone/make_table.py --gemm-json $R/gemm_full.json --gemv-m1 --pdl --max-m 16 \
-    --out <table.json>
+python experiments/backbone/make_table.py --gemm-json evidence/backbone/gemm_microbench.json \
+    --gemv-m1 --pdl --max-m 16 --out <table.json>
 ```
 
 `gemm --evidence` writes the committed form (screened configurations reduced to counts and
-timings); `--out` keeps everything.
+timings); `--out` keeps everything. Both carry the same `summary`, which is all `chain` and
+`make_table.py` read, so they rebuild from the committed file (the hold-1 chain run read the full
+file; the routing table built from either is byte-identical).
