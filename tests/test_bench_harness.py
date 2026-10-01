@@ -650,7 +650,7 @@ def test_host_load_attributes_short_lived_own_children_to_the_run() -> None:
 
 
 def test_envelope_and_session_paired_ratios() -> None:
-    from bench.pareto import envelope, paired_ratios, pareto_envelope
+    from bench.pareto import PAIR_FIELDS, envelope, paired_ratios, pareto_envelope
 
     def row(label: str, session: str, c: int, y: float, invalid: str = '') -> dict[str, object]:
         return {
@@ -685,6 +685,7 @@ def test_envelope_and_session_paired_ratios() -> None:
     assert [e['label'] for e in pareto_envelope(frontier, exact_only=True)] == ['plain'] * 2
     assert {e['label'] for e in pareto_envelope(frontier, exact_only=False)} == {'plain', 'spec'}
     ratios = {r['concurrency']: r for r in paired_ratios(rows, [('spec', 'plain')])}
+    assert all(tuple(r) == PAIR_FIELDS for r in ratios.values())
     # Only r0 pairs at c=1: r1 and r2 each have an invalid side and are dropped, not
     # re-paired with another session's run.
     assert ratios[1]['n'] == 1 and ratios[1]['sessions'] == 'r0'
@@ -867,6 +868,10 @@ def test_arm_classes_from_matched_references() -> None:
     assert classes['mtp-tuned']['vs_plain']['per_1k'] == 4.2
     assert classes['plain-tuned-replayssm']['exactness'] == 'lossy'
     assert classes['mtp-stockverify']['exactness'] == 'stock'
+    # An output that stops early after an identical prefix has no class but is not rounding.
+    truncated = {**entry('buffered vs stock', 3.8), 'length_mismatch': 1}
+    (record,) = classify([truncated], [('mtp-tuned', 'buffered vs stock', 'absent')])
+    assert record['exactness'] == 'lossy' and record['matched']['length_mismatch'] == 1
     with pytest.raises(SystemExit, match='missing'):
         classify(entries, [('x', 'absent', 'stock vs plain')])
     assert series_label('mtp-tuned', 'exact-up-to-rounding', 4.2) == (
@@ -875,8 +880,8 @@ def test_arm_classes_from_matched_references() -> None:
     assert series_label('plain-tuned', 'stock', math.nan) == 'plain-tuned'
 
 
-def test_envelope_ranks_only_points_with_enough_repeats() -> None:
-    from bench.pareto import envelope, pareto_envelope
+def test_envelope_ranks_only_points_with_enough_repeats(tmp_path: Path) -> None:
+    from bench.pareto import ENVELOPE_FIELDS, envelope, pareto_envelope, write_csv
 
     def entry(label: str, n: int, x: float, y: float) -> dict[str, object]:
         return {
@@ -895,6 +900,12 @@ def test_envelope_ranks_only_points_with_enough_repeats() -> None:
     assert row['best_below_min_n'] == 'single' and row['best_below_min_n_n'] == 1
     assert [e['label'] for e in pareto_envelope(frontier, exact_only=False, min_n=3)] == ['plain']
     assert envelope(frontier)[0]['best'] == 'single'  # default: every point ranks
+    assert tuple(row) == ENVELOPE_FIELDS
+    # No point has enough repeats yet: envelope.csv is written as a header only.
+    assert envelope(frontier, min_n=4) == []
+    path = tmp_path / 'envelope.csv'
+    write_csv([], path, list(ENVELOPE_FIELDS))
+    assert path.read_text().strip() == ','.join(ENVELOPE_FIELDS)
 
 
 def test_series_styles_share_a_hue_per_family() -> None:

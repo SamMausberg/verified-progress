@@ -18,7 +18,10 @@ test of equivalence.
 With `--arms`, it also classifies arms by the rule recorded in bench/README.md
 (2026-10-01, set after the first results): an arm is `exact-up-to-rounding` when
 every first divergence against its matched stock reference falls in the rounding
-classes (tie, one_ulp, near), and `lossy` when any is `large` or `not_argmax`. The
+classes (tie, one_ulp, near) and no prompt has a length mismatch, and `lossy` when any
+is `large` or `not_argmax` or a prompt's outputs differ in length after an identical
+prefix (one run stopped where the other went on: compare.py counts it in
+`length_mismatch` and gives it no class). The
 rate and its ratio to the floor are reported beside the class, never used as a
 test. The arms file lists [arm, matched-reference pair, plain-c1 pair]; a stock
 arm has no matched pair (null) and is listed only to report its rate against plain.
@@ -84,7 +87,9 @@ def report(pairs: dict[str, dict[str, Any]], floor_label: str) -> list[dict[str,
                 'classes': classes,
                 'length_mismatch': int(entry.get('length_mismatch', 0)),
                 'prompts_with_large_drift': entry.get('prompts_with_large_drift'),
-                'rounding_level_only': classes['large'] == 0 and classes['not_argmax'] == 0,
+                'rounding_level_only': classes['large'] == 0
+                and classes['not_argmax'] == 0
+                and int(entry.get('length_mismatch', 0)) == 0,
             }
         )
     return out
@@ -105,15 +110,22 @@ def classify(
             if matched not in by_pair:
                 raise SystemExit(f'{arm}: matched pair {matched!r} missing from the summary')
             reference = by_pair[matched]
+            # A length mismatch has no class but is not rounding either: one run
+            # stopped where the other continued after an identical prefix.
             rounding = all(
                 count == 0 for name, count in reference['classes'].items()
                 if name not in ROUNDING_CLASSES
-            )  # fmt: skip
+            ) and int(reference.get('length_mismatch', 0)) == 0  # fmt: skip
             record.update(
                 {
                     'exactness': 'exact-up-to-rounding' if rounding else 'lossy',
                     'matched_pair': matched,
-                    'matched': {k: reference[k] for k in ('per_1k', 'per_1k_95', 'classes')},
+                    'matched': {
+                        'per_1k': reference['per_1k'],
+                        'per_1k_95': reference['per_1k_95'],
+                        'classes': reference['classes'],
+                        'length_mismatch': int(reference.get('length_mismatch', 0)),
+                    },
                     'matched_ratio_to_floor': reference['ratio_to_floor'],
                     'matched_ratio_to_floor_95': reference['ratio_to_floor_95'],
                 }

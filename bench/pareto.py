@@ -91,6 +91,40 @@ AGGREGATED = (
     'accept_length',
     'server_full_batch_tps',
 )
+ENVELOPE_FIELDS = (
+    'concurrency',
+    'best',
+    'best_exactness',
+    'y_mean',
+    'y_std',
+    'x_e2e_mean',
+    'n',
+    'runner_up',
+    'runner_up_y_mean',
+    'lead',
+    'best_exact',
+    'best_exact_y_mean',
+    'best_exact_x_e2e_mean',
+    'best_exact_divergence_vs_plain_per_1k',
+    'best_below_min_n',
+    'best_below_min_n_y_mean',
+    'best_below_min_n_n',
+)
+PAIR_FIELDS = (
+    'test',
+    'baseline',
+    'concurrency',
+    'n',
+    'sessions',
+    'dropped_invalid',
+    'unmatched',
+    'y_ratio_mean',
+    'y_ratio_min',
+    'y_ratio_max',
+    'x_e2e_ratio_mean',
+    'x_e2e_ratio_min',
+    'x_e2e_ratio_max',
+)
 # Reference categorical order (dataviz palette, light surface), assigned per label in order.
 SERIES_COLOURS = ('#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7')
 # Hue encodes the family (first word of the label: plain, mtp, dflash); line style and
@@ -516,7 +550,11 @@ def _format(value: Any) -> Any:
 
 
 def write_csv(rows: list[dict[str, Any]], path: Path, fields: list[str] | None = None) -> None:
-    fields = fields or list(rows[0])
+    """Write rows under `fields` (default: the first row's keys); no rows gives a header only."""
+    if fields is None:
+        if not rows:
+            raise SystemExit(f'{path.name}: no rows to write and no field list')
+        fields = list(rows[0])
     with path.open('w', newline='') as handle:
         writer = csv.DictWriter(handle, fieldnames=fields, extrasaction='ignore')
         writer.writeheader()
@@ -743,7 +781,8 @@ def main(argv: list[str] | None = None) -> int:
         entry['divergence_vs_plain_per_1k'] = rates.get(entry['label'], math.nan)
     write_csv(frontier, args.out / 'frontier.csv')
     min_n = args.envelope_min_n
-    write_csv(envelope(frontier, min_n), args.out / 'envelope.csv')
+    # No point may have enough repeats yet (e.g. before the last session): header only.
+    write_csv(envelope(frontier, min_n), args.out / 'envelope.csv', list(ENVELOPE_FIELDS))
     write_envelope_dat(
         pareto_envelope(frontier, exact_only=False, min_n=min_n), args.out / 'envelope-all.dat'
     )
@@ -752,7 +791,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     if args.pair:
         pairs = [tuple(item.split(':', 1)) for item in args.pair]
-        write_csv(paired_ratios(rows, pairs), args.out / 'pairs.csv')
+        write_csv(paired_ratios(rows, pairs), args.out / 'pairs.csv', list(PAIR_FIELDS))
     write_pgfplots(frontier, args.out)
     if not args.no_plot:
         plot(frontier, args.out / 'pareto.png', args.title, min_n)
