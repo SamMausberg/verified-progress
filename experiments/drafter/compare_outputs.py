@@ -62,6 +62,18 @@ def top_logprobs(row: dict[str, Any]) -> list[list[list[float]]]:
     return row.get('top_logprobs') or row.get('top2') or []
 
 
+def full_logprob_coverage(row: dict[str, Any], top_k: int) -> bool:
+    """One top-k logprob entry per output token, each with exactly top_k candidates."""
+    ids, tops = row.get('output_ids'), row.get('top_logprobs')
+    return (
+        isinstance(ids, list)
+        and isinstance(tops, list)
+        and len(ids) > 0
+        and len(tops) == len(ids)
+        and all(isinstance(t, list) and len(t) == top_k for t in tops)
+    )
+
+
 def first_divergence(a: list[int], b: list[int]) -> int | None:
     """First position where two greedy outputs differ, or None if they are equal.
 
@@ -114,8 +126,10 @@ def main() -> None:
         '--require-bitwise',
         action='store_true',
         help='exit 1 unless both runs have the same requests and every one is bitwise '
-        'identical (tokens and top-k logprobs); the report is written either way',
+        'identical (tokens and top-k logprobs) with a full top-k entry for every output token '
+        'on both sides; the report is written either way',
     )
+    parser.add_argument('--top-k', type=int, default=5, help='logprob candidates per position')
     args = parser.parse_args()
 
     sc = state_compare()
@@ -178,6 +192,15 @@ def main() -> None:
     }
     missing = sorted(set(ref) ^ set(test))
     summary['requests_in_one_run_only'] = missing
+    partial = [
+        rid
+        for rid in shared
+        if not (
+            full_logprob_coverage(ref[rid], args.top_k)
+            and full_logprob_coverage(test[rid], args.top_k)
+        )
+    ]
+    summary['requests_without_full_logprob_coverage'] = partial
     args.out.write_text(json.dumps(summary, indent=2) + '\n')
     rate = 1000 * len(divergences) / compared if compared else None
     print(
@@ -185,10 +208,11 @@ def main() -> None:
         f'{rate if rate is None else round(rate, 2)} per 1000 compared tokens; classes {classes};'
         f' bitwise identical (tokens and top-k logprobs) {identical}/{len(shared)}'
     )
-    if args.require_bitwise and (missing or not shared or identical != len(shared)):
+    if args.require_bitwise and (missing or partial or not shared or identical != len(shared)):
         raise SystemExit(
             f'NOT BITWISE: {len(shared) - identical} of {len(shared)} shared requests differ, '
-            f'{len(missing)} requests are in one run only ({args.test} vs {args.ref})'
+            f'{len(partial)} lack full top-{args.top_k} logprobs, {len(missing)} are in one '
+            f'run only ({args.test} vs {args.ref})'
         )
 
 

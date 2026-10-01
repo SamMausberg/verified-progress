@@ -321,6 +321,8 @@ def test_compare_require_bitwise_exit_status(tmp_path: Path) -> None:
             '--out',
             str(out),
             '--require-bitwise',
+            '--top-k',
+            '1',
         ]
         if fails:
             with pytest.raises(SystemExit) as exc:
@@ -359,6 +361,8 @@ def test_localize_require_identical_exit_status(tmp_path: Path) -> None:
             '--out',
             str(out),
             '--require-identical',
+            '--top-k',
+            '1',
         ]
         if fails:
             with pytest.raises(SystemExit) as exc:
@@ -450,7 +454,74 @@ def test_localize_trace_coverage_per_request(tmp_path: Path) -> None:
         traced = [dict(c, rid='r') for c in full] + [dict(c, rid='s') for c in full[:2]]
         (run / 'trace.1.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in traced))
     sys.argv = ['fold_localize.py', '--a', str(tmp_path / 'a'), '--b', str(tmp_path / 'b')]
-    sys.argv += ['--out', str(tmp_path / 'loc.json'), '--require-identical']
+    sys.argv += ['--out', str(tmp_path / 'loc.json'), '--require-identical', '--top-k', '1']
     with pytest.raises(SystemExit) as exc:
         localize.main()
     assert 'not fully traced' in str(exc.value.code)
+
+
+def _tops(n: int, k: int = 5) -> list[list[list[float]]]:
+    return [[[-0.1 * (j + 1), j] for j in range(k)] for _ in range(n)]
+
+
+def test_strict_checks_require_full_logprob_coverage(tmp_path: Path) -> None:
+    import pytest
+
+    compare = load('compare_outputs')
+    localize = load('fold_localize')
+    ids = [1, 2, 3]
+    full = _tops(3)
+    # (ref top_logprobs, test top_logprobs, passes)
+    cases = [
+        ('full on both sides', full, full, True),
+        ('truncated on one side', full, full[:2], False),
+        ('both sides equally truncated', full[:1], full[:1], False),
+        ('fewer than k candidates on both sides', _tops(3, 4), _tops(3, 4), False),
+        ('no logprobs on either side', [], [], False),
+    ]
+    record = {'rid': 'r', 'prefix_len': 4, 'draft': [0, 0, 0], 'target': [0, 0, 0], 'accept': 2}
+    for name, ref_tops, test_tops, passes in cases:
+        assert compare.full_logprob_coverage({'output_ids': ids, 'top_logprobs': ref_tops}, 5) == (
+            name == 'full on both sides' or ref_tops is full
+        )
+        runs = {}
+        for side, tops in (('a', ref_tops), ('b', test_tops)):
+            run = tmp_path / name.replace(' ', '-') / side
+            run.mkdir(parents=True)
+            row = {'id': 'r', 'domain': 'chat', 'prompt_tokens': 4, 'output_ids': ids}
+            row['top_logprobs'] = tops
+            (run / 'requests.jsonl').write_text(json.dumps(row) + '\n')
+            (run / 'trace.1.jsonl').write_text(json.dumps(record) + '\n')
+            runs[side] = run
+        checks = [
+            (
+                compare,
+                [
+                    'compare_outputs.py',
+                    '--ref',
+                    str(runs['a'] / 'requests.jsonl'),
+                    '--test',
+                    str(runs['b'] / 'requests.jsonl'),
+                    '--require-bitwise',
+                ],
+            ),
+            (
+                localize,
+                [
+                    'fold_localize.py',
+                    '--a',
+                    str(runs['a']),
+                    '--b',
+                    str(runs['b']),
+                    '--require-identical',
+                ],
+            ),
+        ]
+        for module, argv in checks:
+            sys.argv = [*argv, '--out', str(tmp_path / 'report.json')]
+            if passes:
+                module.main()
+            else:
+                with pytest.raises(SystemExit) as exc:
+                    module.main()
+                assert exc.value.code not in (None, 0), (name, argv[0])

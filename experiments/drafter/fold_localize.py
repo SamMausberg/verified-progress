@@ -16,8 +16,12 @@ from __future__ import annotations
 import argparse
 import itertools
 import json
+import sys
 from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from compare_outputs import full_logprob_coverage
 
 
 def outputs(directory: Path) -> dict[str, dict[str, Any]]:
@@ -179,8 +183,10 @@ def main() -> None:
         '--require-identical',
         action='store_true',
         help='exit 1 unless both runs traced the same requests and every one is identical in '
-        'tokens, top-5 logprobs and every cycle; the report is written either way',
+        'tokens, top-k logprobs and every cycle, fully traced, with a full top-k entry for every '
+        'output token on both sides; the report is written either way',
     )
+    parser.add_argument('--top-k', type=int, default=5, help='logprob candidates per position')
     args = parser.parse_args()
     result: dict[str, Any] = {
         'a': str(args.a),
@@ -228,10 +234,20 @@ def main() -> None:
             for rid, entry in result['requests'].items()
             if any(problem is not None for problem in entry['trace_coverage'].values())
         ]
-        if differing or uncovered or only_one or not result['requests']:
+        a_rows, b_rows = outputs(args.a), outputs(args.b)
+        partial = [
+            rid
+            for rid in result['requests']
+            if not (
+                full_logprob_coverage(a_rows[rid], args.top_k)
+                and full_logprob_coverage(b_rows[rid], args.top_k)
+            )
+        ]
+        if differing or uncovered or partial or only_one or not result['requests']:
             raise SystemExit(
                 f'NOT IDENTICAL: {len(differing)} requests differ, {len(uncovered)} not fully '
-                f'traced, {len(only_one)} in one run only ({args.a} vs {args.b})'
+                f'traced, {len(partial)} lack full top-{args.top_k} logprobs, {len(only_one)} '
+                f'in one run only ({args.a} vs {args.b})'
             )
 
 
