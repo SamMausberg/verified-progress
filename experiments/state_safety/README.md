@@ -98,14 +98,16 @@ python experiments/state_safety/prompts.py \
 experiments/state_safety/run_all.sh          # differential matrix, about 2 h of GPU time
 experiments/state_safety/run_targeted.sh     # targeted tests, about 1 h
 
-experiments/state_safety/analyze_all.sh     # noise floor, rejection-position drift, targeted summary, tap check
+experiments/state_safety/analyze_all.sh     # noise floor, rejection-position drift, targeted summary, tap checks
 ```
 
 Tensor-level forensics (engine patch `engine/sglang/patches/state/0001-state-tap.patch`
 applied in `~/sglang-wt/state`): `tap_runs.py` serves tagged prompts with the tap on and
 `mechanism.py` compares two tapped runs (`--a`, `--b`), or the repeats of one prompt
 inside a run (`--repeat-of`). Both are run inside the GPU hold that collects the data;
-the exact commands are in `evidence/state_safety/README.md`.
+the exact commands are in `evidence/state_safety/README.md`. `tap_signature.py` (light,
+run by `analyze_all.sh`) finds where the v1 and v3 tapped sessions of the same
+configuration first part ways.
 
 Raw outputs stay in `~/vp-data/state/` (`runs/`, `targeted/`); each run has a
 `.meta.json` with the flags, resolved server settings, and the repository and
