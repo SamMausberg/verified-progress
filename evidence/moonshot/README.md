@@ -159,6 +159,86 @@ Assumptions for the components below: 3.8 TB/s, 650 TFLOPS BF16, context ~400 to
 - The cheapest frontier gain meanwhile is scheduling: choose plain decode above the batch
   size where MTP stops paying (`--speculative-adaptive`, measured in the next sweep).
 
+## 2c. Strict write-avoiding GDN decode (proposal P4, patch 0007)
+
+**Bit-exactness (measured, one layer, kernel level).** `gdn_exact_replay_check.py check`
+runs SGLang's packed decode and the exact-replay kernel side by side for 48 steps at batch
+8 with the checkpoint's A_log/dt_bias (layers 0 and 20) and random activations, rows
+flushing at staggered phases (forced flushes at rate 0.1). Before every real step it runs
+the same token on a copy with a forced flush, so the reconstructed state is written out
+and compared at every step, not only at flushes. Result: **0 of 201,326,592 state words
+and 0 of 1,572,864 output words differ** at ring length 4 and 16, and at layer 20
+(`gdn_exact_replay_check_L4.json`, `_L16.json`, `_L4_layer20.json`;
+`tests/test_gdn_exact_replay.py`: 3 passed). SGLang's ReplaySSM run on the same inputs
+differs in 465,102 output words and in nearly every state word at a flush (largest state
+deviation 0.38% of the state's largest entry), confirming it is an approximation.
+
+**Kernel time (measured, one layer, CUDA-graph replay, state pool 4x the batch so L2 is
+cold; `gdn_exact_replay_bench.json`).** Mean over the L cursor phases:
+
+| batch | packed decode | exact L=2 | exact L=4 | exact L=8 | exact L=16 |
+|---|---|---|---|---|---|
+| 32 | 45.9 us | 40.2 | 40.7 | 49.2 | 69.2 |
+| 128 | 161.5 us | 133.9 | **132.9 (1.215x)** | 165.3 | 243.6 |
+| 256 | 312.7 us | 257.6 | **254.8 (1.227x)** | 312.8 | 463.2 |
+
+The state traffic falls from 2D to 1.25D at L = 4 (1.6x fewer bytes), but the kernel gains
+1.22x: replaying up to three rank-one updates per step in registers costs compute, and longer
+rings lose more than they save. With the GDN kernel at 41.6% of a B = 128 step (profile),
+1.22x on the kernel predicts about **1.08x end to end** at B = 128 (derived; less with the
+pre-registered 2,048-token prompts, where attention takes a larger share). The pre-registered
+claim was >= 1.10x; the end-to-end paired A/B is queued (the first attempt with
+`sglang.benchmark.one_batch` aborted: a single 262,144-token prefill hits an illegal memory
+access in `fused_qk_gemma_rmsnorm_rope_gate`, so the A/B now runs through the server with
+chunked prefill).
+
+## 2d. Speculative host gap: configuration-level levers (measured, single runs)
+
+MTP three steps (bench `mtp` arm, `--stream-interval 4`), c = 1 and 4 (`host_levers.csv`;
+foreign CPU 0.2-0.4 cores per point):
+
+| config | c=1 x (tok/s/user) | c=4 y (tok/s) | accept length |
+|---|---|---|---|
+| mtp | 448.7 | 1,484.5 | 3.23 |
+| + `--speculative-draft-attention-backend triton` | 483.3 (1.08x) | 1,577.9 (1.06x) | 3.23 |
+| + `--attention-backend triton` (target and draft) | **529.1 (1.18x)** | **1,687.1 (1.14x)** | 3.22 |
+| + `SGLANG_ENABLE_OVERLAP_PLAN_STREAM=1` + `SGLANG_ENABLE_METADATA_GLUE_GRAPH=1` | failed | failed | - |
+
+With Triton attention for target and draft, both backends declare
+`needs_cpu_seq_lens = False`, so the overlap scheduler stops copying sequence lengths to the
+host and no FlashInfer `plan()` runs in the cycle: the host can run ahead of the GPU again.
+That recovers 18% at c = 1, against the up-to-27% idle share the profile workstream derived.
+The plan-stream arm fails at the first verify: the hybrid GDN backend does not implement
+`update_verify_buffers_to_fill_after_draft` (`base_attn_backend.py:258`,
+NotImplementedError), so the plan stream cannot be used with Qwen3.5 MTP at this commit.
+The engine-level fix (sync-free FlashInfer planning) belongs to the hostgap workstream.
+
+## 2e. Block-parallel GDN verification (proposal P7, first rejection tests)
+
+`gdn_fast_verify_check.py`, one layer, synthetic activations with the checkpoint's gates.
+
+- **BF16 disagreement of the unchecked fast path** (`p7_fast_verify_check.json`): SGLang's
+  chunked GDN kernel (`chunk_gated_delta_rule`, the (I + A) U = R form on tensor cores) run
+  over a block of D tokens disagrees with D packed-decode steps in **52-55% of BF16 output
+  words** for D = 2-16 (median absolute error 2-4e-6, p99.99 2.4-4.9e-4). A boundary
+  certificate could emit the fast value for only a minority of words.
+- **Speed at one request** (`p7_verify_width_bench.json`, per layer):
+
+| block width T | Triton recurrent verify, FP32 snapshot per position | same, no snapshots | chunked |
+|---|---|---|---|
+| 4 | 75 us | 74 us | 990 us |
+| 16 | 76 us | 92 us | 983 us |
+| 64 | 137 us | 212 us | 842 us |
+| 128 | 219 us | 369 us | 842 us |
+| 256 | 378 us | 672 us | 815 us |
+
+At one request SGLang's chunked kernel is slower than the recurrent verify at every width
+up to 256 (its cost is launch- and setup-bound and nearly flat), so even the unchecked fast
+path does not beat the recurrent path; by P7's own rejection rule the design is rejected
+with this kernel. (The recurrent kernel without snapshots is slower than with them because
+the wrapper picks a different launch configuration when no snapshot buffer is passed.) The
+FlashInfer MTP verify kernel that the DFlash baseline uses is not in this table yet.
+
 ## 3. Ranked portfolio
 
 Ranking by measured or derived gain at the relevant end, times the probability it holds,
@@ -168,9 +248,9 @@ to the measured noise floor); "lossy" changes them and needs the quality budget 
 | # | lever | end | class | ceiling (derived) or measured | quality cost | effort | status / owner |
 |---|---|---|---|---|---|---|---|
 | 1 | Public DFlash-4B drafter (z-lab) | latency | exact | drafter measured tau 6.18 at c=1, block 16 (`evidence/drafter/acceptance_summary.csv`); model card 3.4-4.6x on B200 | none | serving works | drafter owns baseline; I stack levers on it |
-| 2 | Remove the speculative host gap (MTP/DFlash, c=1-4) | latency | exact | GPU idle 21% / 20% / 15% of the unprofiled MTP cycle at B = 1 / 8 / 32 (derived by the profile workstream, `evidence/profiles/README.md`), i.e. up to 1.27x at B = 1 | none | medium-high (sync removal; hostgap workstream) | config-level levers queued (Triton attention, plan stream, glue graph) |
+| 2 | Remove the speculative host gap (MTP/DFlash, c=1-4) | latency | exact | measured: `--attention-backend triton` 1.18x at c=1, 1.14x at c=4 over MTP (2d); up to 1.27x if all idle went | none | flag (Triton attention); engine fix by hostgap | DFlash + Triton attention queued |
 | 3 | FP16 GDN state + capacity lift (radix off, 256-1,024) | throughput | lossy, likely near-lossless | measured 1.24x at c=128; derived ceiling 1.46x | pending (DAMP: FP16 near-lossless, BF16 not) | flags only | quality and c>=256 sweeps queued |
-| 4 | Strict write-avoiding replay (P4, patch 0007) | throughput | designed to be bit-identical; validation pending | derived 1.19x at B=128 (2D -> 1.25D) | none if the check passes | built | one-layer kernel check (every output and state word) and the end-to-end bitwise probe queued, then the pre-registered paired A/B (>=1.10x at B=128, 2,048-token prompts) |
+| 4 | Strict write-avoiding replay (P4, patch 0007) | throughput | bit-identical to the packed decode (kernel check, 2c) | kernel 1.22x at B=128/256 (L=4); derived ~1.08x end to end at B=128 | none | built | pre-registered server A/B (>=1.10x at B=128, 2,048-token prompts) queued; likely rejected by the derived estimate |
 | 5 | MTP + ReplaySSM-spec at high batch | throughput | class pending measurement; mechanism suggests lossy (verify outputs from a chunked UT transform on TF32 tensor cores) | derived 34.3k vs plain 23.7k (FP32) | none | flags only | queued |
 | 6 | INT4 QAD target (nota-ai) with its INT4 DFlash drafter | latency | lossy | verify weight bytes 8.4 -> 3.3 GB (2.6x fewer, derived from the safetensors headers); arXiv 2607.04244 reports 6.98x over its baseline on an A10G | the same report: MMLU-Pro 0.690 -> 0.659, IFEval 0.857 -> 0.845, GPQA-D 0.700 -> 0.667; GSM8K here pending | checkpoints local | load test queued |
 | 7 | Hot-vocab draft head (patches 0001 MTP, 0005 DFlash) | latency | exact | MTP cycle floor -26% at c=1 | none | built | queued |

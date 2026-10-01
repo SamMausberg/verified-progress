@@ -1,0 +1,42 @@
+{
+ "layer": 0,
+ "requests": 1,
+ "points": [
+  {
+   "width": 4,
+   "requests": 1,
+   "recurrent_snapshots_us": 74.97599720954895,
+   "recurrent_us": 73.66400212049484,
+   "chunked_us": 989.8880124092102
+  },
+  {
+   "width": 16,
+   "requests": 1,
+   "recurrent_snapshots_us": 75.68000257015228,
+   "recurrent_us": 92.44800359010696,
+   "chunked_us": 983.3279848098755
+  },
+  {
+   "width": 64,
+   "requests": 1,
+   "recurrent_snapshots_us": 137.43999600410461,
+   "recurrent_us": 212.19199895858765,
+   "chunked_us": 841.8560028076172
+  },
+  {
+   "width": 128,
+   "requests": 1,
+   "recurrent_snapshots_us": 219.42399442195892,
+   "recurrent_us": 369.1520094871521,
+   "chunked_us": 841.5359854698181
+  },
+  {
+   "width": 256,
+   "requests": 1,
+   "recurrent_snapshots_us": 377.6639997959137,
+   "recurrent_us": 671.999990940094,
+   "chunked_us": 815.2639865875244
+  }
+ ],
+ "qkv_width": 8192
+}
