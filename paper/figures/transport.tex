@@ -23,7 +23,7 @@
 \begin{tikzpicture}[font=\footnotesize]
 % ---------------- (b) measured drift against the thresholds ----------------
 \begin{semilogxaxis}[name=b,at={(11.2cm,0)},anchor=center,
-  width=8.7cm,height=4.15cm,xmin=1e-3,xmax=1.6,ymin=0,ymax=1,
+  width=8.7cm,height=3.95cm,xmin=1e-3,xmax=1.6,ymin=0,ymax=1,
   xlabel={Drift ratio $\rho$ of a pair, or per-row threshold $\delta^\ast_i$},ylabel={Cumulative share},grid=major,
   ytick={0,0.25,0.5,0.75,1},yticklabels={0,0.25,0.5,0.75,1},
   title={\paneltitle{b}{Measured drift against derived thresholds}},xminorticks=false]
@@ -43,7 +43,7 @@
 % ---------------- (a) median DFlash-4B head inputs, to scale ----------------
 % The drawing spans y from about -41 units (the callout text) to 62 (the line through h^d);
 % it is shifted down 17 units so that its top stays below the shared title line.
-\begin{scope}[x=0.031cm,y=0.031cm,shift={(0,-17)}]
+\begin{scope}[x=0.0295cm,y=0.0295cm,shift={(0,-17)}]
 \coordinate (O) at (0,0);
 \coordinate (T) at (\figHt,0);
 \coordinate (D) at ({\figHd*\figCos},{\figHd*\figSin});
