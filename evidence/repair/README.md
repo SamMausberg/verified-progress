@@ -261,9 +261,9 @@ most a perfect gate could add (same resamples as the table, so the intervals are
 | 16 | 62.9% | +2.05 (+1.93, +2.18) | +1.06 |
 
 The same gate applied to the free-verify scoring (`omniscient_gate_free_verify`, same resamples)
-bounds gated programs at any verify width, with the other phases charged as above: +0.04
-(+0.03, +0.05) at K = 1, +1.47 (+1.35, +1.61) at 2, +2.54 (+2.35, +2.76) at 4, +3.47 (+3.24, +3.73)
-at 8 and +4.35 (+4.09, +4.64) at 16.
+bounds P9's program with any gate, at any verify width, with the other phases charged as above:
++0.04 (+0.03, +0.05) at K = 1, +1.47 (+1.35, +1.61) at 2, +2.54 (+2.35, +2.76) at 4, +3.47
+(+3.24, +3.73) at 8 and +4.35 (+4.09, +4.64) at 16.
 
 A perfect gate would add 1.06 to 1.33 tokens per post-rejection boundary at the tested K from 2 to
 16 (2, 4, 8 and 16). A real gate decides before the second cycle and does not see fresh DFlash's

@@ -44,9 +44,9 @@ padded verify, and its excess over always-reuse is the most a perfect gate could
 A program could also verify only the m + 1 positions left after the correction instead of a
 padded block. `free_verify_always_reuse` charges the reused cycle no verify at all (the lower
 bound of any width's verify cost, every other phase still charged at its block-16 value), so its
-Delta bounds always-reuse programs at any verify width from above. `omniscient_gate_free_verify`
-applies the omniscient gate to that free-verify scoring and bounds gated programs at any verify
-width.
+Delta bounds P9's always-reuse program at any verify width from above.
+`omniscient_gate_free_verify` applies the omniscient gate to that free-verify scoring and bounds
+P9's program with any gate, at any verify width.
 
     python experiments/repair/p9_support_oracle.py --cycles ~/vp-data/drafter/support/zlab_b16_cycles/cycles.pt \\
         --timing evidence/repair/stage_a_timing.json --out evidence/repair/p9_support_oracle.json
@@ -325,7 +325,7 @@ def main() -> None:
                 'delta_ci95': [lo_f, hi_f],
                 'rejected': hi_f <= 0,
             },
-            # Oracle: gate and free verify together; bounds gated programs at any verify width.
+            # Oracle: gate and free verify together; bounds P9's program with any gate, any width.
             'omniscient_gate_free_verify': {
                 'delta': d_gate_free,
                 'delta_ci95': [lo_gf, hi_gf],
