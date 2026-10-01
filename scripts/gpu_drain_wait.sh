@@ -23,12 +23,15 @@ while [ -n "$p" ] && [ "$p" -gt 1 ]; do
 done
 # SGLang server processes, matched structurally rather than by text: a process whose name
 # (comm) starts with GPU_LOCK_ORPHAN_COMM (default "sglang::", SGLang's scheduler and
-# detokenizer), or a python process whose argv holds the tokens "-m GPU_LOCK_ORPHAN_MODULE"
-# (default sglang.launch_server). Shells, monitors and waiting lock clients that only mention
-# the name do not match, nor do this script's ancestors.
+# detokenizer), a python process whose argv holds the tokens "-m GPU_LOCK_ORPHAN_MODULE"
+# (default sglang.launch_server), or a profiler launcher named in GPU_LOCK_ORPHAN_LAUNCHERS
+# (default "nsys ncu") whose argv holds "python... -m GPU_LOCK_ORPHAN_MODULE", which is about to
+# start that server. Shells, monitors and waiting lock clients that only mention the name do
+# not match, nor do this script's ancestors.
 orphan_servers() {
   local comm_prefix="${GPU_LOCK_ORPHAN_COMM:-sglang::}" module="${GPU_LOCK_ORPHAN_MODULE:-sglang.launch_server}"
-  local d pid stat comm prev tok argv0 found
+  local launchers=" ${GPU_LOCK_ORPHAN_LAUNCHERS:-nsys ncu} "
+  local d pid stat comm p1 p2 tok argv0 found launched
   for d in /proc/[0-9]*; do
     pid="${d#/proc/}"
     case "$ancestors" in *" $pid "*) continue ;; esac
@@ -41,13 +44,19 @@ orphan_servers() {
       printf '%s ' "$pid"
       continue
     fi
-    argv0="" prev="" found=0
+    argv0="" p1="" p2="" found=0 launched=0
     while IFS= read -r -d '' tok; do
       [ -n "$argv0" ] || argv0="${tok##*/}"
-      if [ "$prev" = "-m" ] && [ "$tok" = "$module" ]; then found=1; break; fi
-      prev="$tok"
+      if [ "$p1" = "-m" ] && [ "$tok" = "$module" ]; then
+        found=1
+        case "${p2##*/}" in python*) launched=1 ;; esac
+      fi
+      p2="$p1" p1="$tok"
     done < "$d/cmdline" 2>/dev/null
-    case "$argv0" in python*) [ "$found" = 1 ] && printf '%s ' "$pid" ;; esac
+    case "$argv0" in
+      python*) [ "$found" = 1 ] && printf '%s ' "$pid" ;;
+      *) case "$launchers" in *" $argv0 "*) [ "$launched" = 1 ] && printf '%s ' "$pid" ;; esac ;;
+    esac
   done
 }
 if ! command -v nvidia-smi >/dev/null 2>&1; then

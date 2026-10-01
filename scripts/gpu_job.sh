@@ -15,6 +15,16 @@
 # would stop it with SIGTTIN): when stdin is a terminal, the command reads /dev/null instead.
 set -uo pipefail
 
+# setpriv installs the parent-death signal only after flock has forked this process, so a holder
+# that died in between sends no signal: this process was reparented before it started. Its
+# parent must still be the flock that holds the lock, or the job does not run.
+holder=""
+{ read -r holder <"/proc/$PPID/comm"; } 2>/dev/null || true
+if [ "$holder" != flock ]; then
+  echo "gpu_job.sh: the lock holder is gone (parent $PPID is '${holder:-none}', not flock)" >&2
+  exit 75
+fi
+
 mode="$1"
 shift
 if [ "$mode" = -x ]; then

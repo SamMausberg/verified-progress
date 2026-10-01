@@ -335,6 +335,10 @@ def test_decoys_that_only_mention_the_server_are_not_orphans(tmp_path: Path) -> 
         ),  # one token mentions it
         subprocess.Popen(['bash', '-c', f'exec -a bash sleep 5 -x python3 -m {module}']),
         subprocess.Popen(['sleep', '5', '-m', module]),  # the tokens, but not a python process
+        # A profiler launcher whose argv has the tokens, but not after a python interpreter.
+        subprocess.Popen(
+            ['bash', '-c', f'exec -a nsys python3 -c "import time; time.sleep(5)" -m {module}']
+        ),
     ]
     try:
         env = dict(
@@ -478,3 +482,45 @@ def test_a_job_started_from_a_terminal_reads_end_of_input_instead_of_stopping(
         assert out.read_text().strip() == 'read=1'
     finally:
         os.close(fd)
+
+
+def test_exclusive_waits_for_a_detached_profiler_launcher(tmp_path: Path) -> None:
+    """nsys started with start_new_session has not spawned the server yet, but it is about to."""
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    module = f'gpu_lock_test_launcher_{os.getpid()}'
+    launcher = subprocess.Popen(
+        [
+            'bash',
+            '-c',
+            f'exec -a nsys python3 -c "import time; time.sleep(3)" profile python3 -m {module}',
+        ],
+        start_new_session=True,
+    )
+    try:
+        env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock), GPU_LOCK_ORPHAN_MODULE=module)
+        ran = tmp_path / 'ran'
+        start = time.time()
+        done = subprocess.run(
+            ['bash', str(SCRIPT), '-x', 'touch', str(ran)], env=env, timeout=60, check=False
+        )
+        assert done.returncode == 0 and ran.exists()
+        assert launcher.poll() is not None, 'the job started while the detached launcher was alive'
+        assert time.time() - start >= 2
+    finally:
+        launcher.kill()
+
+
+def test_the_job_does_not_run_once_the_holder_is_gone(tmp_path: Path) -> None:
+    """A job whose parent is not the flock holding the lock (it was reparented) must not run."""
+    ticket = tmp_path / 'ticket'
+    ticket.touch()
+    ran = tmp_path / 'ran'
+    done = subprocess.run(
+        ['bash', str(SCRIPT.parent / 'gpu_job.sh'), '-s', str(ticket), 'touch', str(ran)],
+        env=fake_smi(tmp_path),
+        timeout=60,
+        check=False,
+    )
+    assert done.returncode == 75
+    assert not ran.exists()
