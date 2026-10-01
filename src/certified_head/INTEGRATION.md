@@ -59,13 +59,16 @@ arithmetic (`s (q . h)` with FP32 accumulation within gamma, or the exact int32
 product for W8A8). This is checked per compiled variant at start-up and by runtime
 probes, not proved:
 
-- call `head.enclosure_self_test(batch_sizes)` at start-up, outside capture, for
-  every batch size the engine will use: each tile configuration is checked (raw
-  product, envelope, tile summaries, decisions) on shipped real rows against FP64,
-  and a failing configuration's batch sizes take the stock path (logged);
-- every call checks 8 exactly computed vocabulary rows against the production
-  kernel's own bounds; a violation sends the batch to the stock path and latches
-  that batch size for the process (`head.probe_stats()`).
+- the self-test is mandatory: a batch size is certified only after its tile
+  configuration passed `head.enclosure_self_test` at that size (raw product,
+  envelope, tile summaries, decisions, on shipped real rows against FP64). The
+  first eager call at a new size runs it, so warm every graph size eagerly before
+  capture (or call it with all sizes at start-up); a size first seen under capture
+  takes the stock path. A failing configuration is refused at every size (logged);
+- every call checks 8 exactly computed vocabulary rows (new rows every call)
+  against the production kernel's own bounds; a violation sends the batch to the
+  stock path and latches that tile configuration for the process
+  (`head.probe_stats()`).
 
 A measured violation: TMA loads of the int8 weight tile with a 64-byte box
 (`block_k = 64`) feeding the BF16 conversion and `tl.dot` returned wrong products

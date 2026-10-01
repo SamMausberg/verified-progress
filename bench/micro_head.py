@@ -350,7 +350,8 @@ def main() -> None:
     status_sizes = sorted({*args.batches, min(256, head.max_batch), pool.shape[0] % 256 or 256})
     status_sizes = [m for m in status_sizes if m <= head.max_batch]
     self_tests = {'w8a16': head.enclosure_self_test(status_sizes)}
-    head_cols._refused = set(head._refused)
+    head_cols._verified = set(head._verified)  # same tiles; columns change only the fallback
+    head_cols._failed_variants = set(head._failed_variants)
     status = {'w8a16': row_status(head, pool, 'argmax'), 'sample': row_status(head, pool, 'sample')}
     # The same kernels under the Hopper wgmma error model: only the fallback rate changes.
     hopper = CertifiedHead.from_quantized(

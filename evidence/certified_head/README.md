@@ -175,13 +175,14 @@ commit 7f8079f; `tma_candidates.json`, `tma_candidates.py`, commit 4a54503):
 
 - A minimal Triton kernel with no envelope code (TMA load of the int8 weight tile,
   conversion to BF16, `tl.dot`, FP32 store) returns wrong products against FP64
-  for every configuration whose int8 tile is loaded by TMA with block_k = 64, a
+  (tested at M = 1, 16, 64, 128 and 256) for every configuration whose int8 tile is loaded by TMA with block_k = 64, a
   64-byte inner box: 128x128x64 with 4 warps (NaN and Inf among them) and with 8,
   128x64x64 (absolute errors up to 4,672) and 64x128x64 (wrong at M = 16, 128 and
   256, right at M = 1 and 64).
 - The same tiles with pointer loads, and TMA with block_k = 128 (a 128-byte box),
   are exact to FP32 rounding. A BF16 operand through a 64-byte box and an int8 x
-  int8 `tl.dot` through a 64-byte box (no conversion) are exact at M = 1 to 256.
+  int8 `tl.dot` through a 64-byte box (no conversion) are exact at M = 1, 16, 64
+  and 256.
   The fault therefore needs the int8 operand, a 64-byte TMA box and the BF16
   conversion together. The host descriptors are standard (`TensorDescriptor` over
   int8 `[V, K]`, strides `[K, 1]`, block `[block_v, block_k]`); whether a
@@ -217,35 +218,45 @@ those results stay empirical and are rerun on the new defaults.
 
 - Defaults: W8A16 uses TMA tiles with block_k = 128 at every batch size (128x16,
   128x32, 128x64, 128x128 by M); all W8A16, W8A8 and BF16 defaults were checked
-  on real rows at M = 1 to 256, twice, for the raw product, the envelope, the tile
+  on real rows at M = 1, 16, 17, 32, 33, 64, 65, 128, 200 and 256, twice, for the raw product, the envelope, the tile
   summaries and both decision paths, with 0 violations (`tma_candidates.json`).
 - Int8 TMA boxes narrower than 128 bytes are refused for both int8 passes.
 - Fail-closed on non-finite values: a row with any non-finite approximate logit,
   radius or bound (sampling scores: NaN) is marked `nonfinite`, and so is a row
   with a non-finite lower bound.
-- Start-up self-test (`CertifiedHead.enclosure_self_test`,
-  `certified_head/selftest.py`): every tile configuration the dispatcher selects
-  is run at the smallest and largest batch size using it, on probe rows (64 real
-  decode rows shipped with the package, plus peaked and random rows): the raw
-  product within its accumulation bound, the envelope and the tile summaries
-  against FP64 logits, and the greedy and sampling decisions against stock. A
-  failing configuration's batch sizes take the stock path (status `refused`), with
-  a logged warning.
-- Runtime probes: every call computes 8 vocabulary rows (a hash of a per-call
-  device counter, so different rows on every call and every graph replay) exactly
-  in FP64 for every batch row, and the production kernel checks that its own lower
-  and upper bounds contain them. Any violation sends the whole batch to the stock
-  path (status `probe`), latches that batch size (its compiled variant) to the
-  stock path for the process, and is counted (`probe_stats()`, logged in eager
-  mode). The failing configuration above would have tripped on every call.
+- Mandatory kernel self-test (`CertifiedHead.enclosure_self_test`,
+  `certified_head/selftest.py`): a batch size is certified only after the variant
+  it uses (arithmetic and tile configuration) passed the self-test at that batch
+  size. The first eager call at a new batch size runs it; under CUDA-graph capture
+  an untested batch size takes the stock path (status `refused`). Each check runs
+  on probe rows (64 real decode rows shipped with the package, see
+  `src/certified_head/data/probe_rows.json`, plus peaked and random rows) tiled to
+  the batch size: the raw product within its accumulation bound, the envelope and
+  the tile summaries against FP64 logits, and the greedy and sampling decisions
+  against stock. A failing variant is refused at every batch size, latched like a
+  probe failure, and logged. The report records the time of each check.
+- Runtime probes: every call computes 8 vocabulary rows exactly in FP64 for every
+  batch row. The rows are MurmurHash3 (the sampler's hash) of the head's call
+  counter, a device int64 that the decision kernel increments once per call, and
+  the probe index, modulo the vocabulary size: they change on every call, including
+  CUDA-graph replays, so coverage accumulates across the vocabulary. The production
+  kernel checks that its own lower and upper bounds contain them. Any violation
+  sends the whole batch to the stock path (status `probe`), latches that tile
+  configuration to the stock path for the process at every batch size that uses
+  it, and is counted (`probe_stats()`, logged in eager mode). The failing
+  configuration above would have tripped on every call.
 - `bench/tune_gemv.py` lets a configuration win only if it passes the same
   variant checks.
 - GPU tests: real-row enclosure and certification rates for every pass at its
-  default tiles for M = 1 to 256; NaN and Inf injected into the scales and
+  default tiles for M = 1, 16, 64, 96, 128, 200 and 256; NaN and Inf injected into
+  the scales and
   envelope coefficients (greedy and sampling); the self-test passing the defaults
   and refusing a too-narrow envelope and the refused tiles, also in a CUDA graph;
-  a finite wrong envelope (zeroed scales) caught by the runtime probes and latched,
-  and no probe trip on a correct head over 50 calls.
+  every batch size checked, with its time; an untested batch size refused under
+  capture; a finite wrong envelope (zeroed scales) caught by the runtime probes and
+  latched; a latch at one batch size covering the other batch sizes of the same
+  tiles; no probe trip on a correct head over 50 calls, with new probe rows on
+  every call and every graph replay.
 
 ## Pending in this PR
 
@@ -260,9 +271,9 @@ commit in one exclusive hold and committed here with their commands.
 |---|---|---|
 | `stock_invariance.json` | stock GEMM kernel per M, reduced-precision flag test, row/column-subset invariance, observed accumulation error, library versions | `python experiments/certified_head/stock_invariance.py --out evidence/certified_head/stock_invariance.json` (commit fd0fd4a, GPU) |
 | `fallback_vs_model.json` | undecided fraction versus the stock error bound, 60,000 rows, with the check of tokens outside the top 64 | `python experiments/certified_head/fallback_vs_model.py --rows 60000 --threads 32 --out evidence/certified_head/fallback_vs_model.json` (CPU, shared lock; branch between 0c0bb7a and 90cc31a, see above) |
-| `large_m_check.json`, `large_m_tests.log` | W8A16 at seven tile configurations and M = 16 to 256 on real rows: enclosure, decisions, status bits; the real-row rate test at the old defaults | `python experiments/certified_head/large_m_check.py --out ...`, then `pytest tests/test_certified_head.py -k real_row_certification_rate` (commit d990b3b, GPU, shared lock) |
+| `large_m_check.json`, `large_m_tests.log` | W8A16 at seven tile configurations and M = 16, 64, 96, 128, 200 and 256 on real rows: enclosure, decisions, status bits; the real-row rate test at the old defaults | `python experiments/certified_head/large_m_check.py --out ...`, then `pytest tests/test_certified_head.py -k real_row_certification_rate` (commit d990b3b, GPU, shared lock) |
 | `tma_repro.json` | the raw W8A16 product (standalone kernel and the pass's epilogue 0) per tile configuration, and the failing envelope's violations by class | `python experiments/certified_head/tma_repro.py --out ...` (commit 7f8079f, GPU, shared lock) |
-| `tma_candidates.json` | every pass's candidate default tiles at M = 1 to 256, twice: raw product, envelope, tile summaries, decisions; minimal kernels isolating the fault | `python experiments/certified_head/tma_candidates.py --out ...` (commit 4a54503, GPU, shared lock) |
+| `tma_candidates.json` | every pass's candidate default tiles at M = 1, 16, 17, 32, 33, 64, 65, 128, 200 and 256, twice; isolation kernels at M = 1, 16, 64 and 256: raw product, envelope, tile summaries, decisions; minimal kernels isolating the fault | `python experiments/certified_head/tma_candidates.py --out ...` (commit 4a54503, GPU, shared lock) |
 
 Real head inputs come from the geometry workstream's plain-decode capture
 (SGLang `bd66ce34` with its capture patch, `--disable-cuda-graph`,

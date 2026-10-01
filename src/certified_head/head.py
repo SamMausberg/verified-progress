@@ -83,6 +83,8 @@ epilogue and scan only those (``M x V / BLOCK_V x TOP`` entries).
 """
 
 TOP = 4
+MAX_VARIANTS = 64
+"""Tile configurations a head can latch (runtime probes) independently."""
 MIN_BLOCK_V = 64
 COLS_CAP = 64
 """Candidate slots per row that the column fallback gathers (larger lists use ``batch``)."""
@@ -125,7 +127,8 @@ def default_gemv_config(m: int) -> GemvConfig:
     TMA loads of the int8 weights with ``block_k = 64`` (a 64-byte box) fed to the
     BF16 conversion and ``tl.dot`` returned wrong products on GH200 (Triton 3.7.1,
     ``experiments/certified_head/tma_repro.py``); these configurations were checked
-    on real rows at M = 1 to 256 (``tma_candidates.py``) and are refused otherwise,
+    on real rows at M = 1, 16, 17, 32, 33, 64, 65, 128, 200 and 256
+    (``tma_candidates.py``); the 64-byte-box tiles are refused,
     see :func:`check_gemv_config`.
     """
     if m <= 16:
@@ -270,7 +273,13 @@ class CertifiedHead:
         self.fallback_mode: Fallback = 'batch'
         self._column_batches: set[int] = set()
         # Batch sizes whose tile configuration failed the enclosure self-test.
-        self._refused: set[int] = set()
+        # Kernel-variant self-test (see enclosure_self_test). A variant is an
+        # (arithmetic, tile configuration); a batch size is certified only after its
+        # variant passed the self-test at that size, otherwise it takes the stock path.
+        self._verified: set[tuple[tuple[Any, ...], int]] = set()
+        self._failed_variants: set[tuple[Any, ...]] = set()
+        self._variant_ids: dict[tuple[Any, ...], int] = {}
+        self._in_self_test = False
         self.enclosure_report: dict[str, Any] | None = None
         # Runtime probes (see kernels._probe_kernel).
         self._probe_idx = torch.zeros(K.PROBES, dtype=torch.int32, device=dev)
@@ -278,7 +287,7 @@ class CertifiedHead:
         self._probe_counter = torch.zeros(1, dtype=torch.int64, device=dev)
         self._probe_fail = torch.zeros(1, dtype=torch.int32, device=dev)
         self._probe_trips = torch.zeros(1, dtype=torch.int64, device=dev)
-        self._probe_tripped = torch.zeros(mb + 1, dtype=torch.int32, device=dev)
+        self._probe_tripped = torch.zeros(MAX_VARIANTS, dtype=torch.int32, device=dev)
         self._probe_trips_logged = 0
         c = self.const
         const64 = [0.0] * 3
@@ -555,7 +564,7 @@ class CertifiedHead:
             self._probe_trips,
             self._probe_counter,
             self.capacity,
-            m,
+            self._variant_id(m),
             MODE=self.mode,
             SAMPLE=sample,
             CAP_P2=self.capacity_p2,
@@ -567,22 +576,56 @@ class CertifiedHead:
     def _log_probe_trips(self) -> None:
         trips = int(self._probe_trips.item())
         if trips > self._probe_trips_logged:
-            latched = (self._probe_tripped > 0).nonzero().flatten().tolist()
             logger.warning(
                 'certified head: runtime probe found an exact logit outside the envelope '
-                '(%d calls so far); batch sizes %s now take the stock path',
+                '(%d calls so far); tile configurations %s now take the stock path',
                 trips,
-                latched,
+                self.probe_stats()['latched_variants'],
             )
             self._probe_trips_logged = trips
 
     def probe_stats(self) -> dict[str, Any]:
         """Calls whose runtime probe failed, and the batch sizes latched to stock."""
+        latched = set((self._probe_tripped > 0).nonzero().flatten().tolist())
         return {
             'calls_with_probe_violation': int(self._probe_trips.item()),
-            'latched_batch_sizes': (self._probe_tripped > 0).nonzero().flatten().tolist(),
+            'latched_variants': [
+                {'arith': key[0], 'config': key[1:]}
+                for key, i in self._variant_ids.items()
+                if i in latched
+            ],
             'probe_rows_per_call': K.PROBES,
         }
+
+    def _variant_key(self, m: int) -> tuple[Any, ...]:
+        """The compiled variant used at batch size ``m``: arithmetic and tiles."""
+        arith = self.arith_for(m)
+        cfg = self.gemv_config(m) if arith == 'w8a16' else self.arith_config(arith, m)
+        return (arith, *cfg.__dict__.values())
+
+    def _variant_id(self, m: int) -> int:
+        key = self._variant_key(m)
+        if key not in self._variant_ids:
+            if len(self._variant_ids) >= MAX_VARIANTS:
+                raise ValueError(f'more than {MAX_VARIANTS} tile configurations')
+            self._variant_ids[key] = len(self._variant_ids)
+        return self._variant_ids[key]
+
+    def _certifiable(self, m: int) -> bool:
+        """Whether batch size ``m`` may be certified: its variant has passed the
+        self-test at ``m`` (run now on first eager use; never under capture, where
+        an untested size takes the stock path) and has not failed it."""
+        if self._in_self_test:
+            return True
+        key = self._variant_key(m)
+        if key in self._failed_variants:
+            return False
+        if (key, m) in self._verified:
+            return True
+        if torch.cuda.is_current_stream_capturing():
+            return False
+        self.enclosure_self_test([m])
+        return (key, m) in self._verified
 
     # -- public API -------------------------------------------------------------
 
@@ -601,7 +644,7 @@ class CertifiedHead:
         if fallback and self.reference == 'real':
             raise ValueError('the real-arithmetic contract has no dense fallback')
         m = self._check(hidden)
-        if m in self._refused:
+        if not self._certifiable(m):
             self._refuse(m)
         else:
             self._approximate(hidden, m)
@@ -673,67 +716,83 @@ class CertifiedHead:
     def enclosure_self_test(
         self, batch_sizes: list[int], probe: torch.Tensor | None = None
     ) -> dict[str, Any]:
-        """Check, for every tile configuration the dispatcher selects at these
-        batch sizes, every compiled kernel variant the head uses
+        """Check every compiled kernel variant used at each of these batch sizes
         (:func:`certified_head.selftest.check_variants`: the raw product within
-        its accumulation bound, the envelope and the tile summaries against the
-        exact logits, and the greedy and sampling decisions against stock).
+        its accumulation bound, the envelope and the tile summaries against FP64
+        logits, and the greedy and sampling decisions against stock).
 
-        Each distinct (arithmetic, tile configuration) is run at the smallest and
-        largest batch size that selects it, on probe rows (real decode rows shipped
-        with the package, plus peaked and random rows) tiled to that size, against
-        FP64 logits of the BF16 head. A configuration that raises or fails makes
-        all its batch sizes take the stock path (status ``refused``). Call it
-        outside CUDA-graph capture, at start-up; returns a report.
+        Mandatory: a batch size is certified only after its variant (arithmetic and
+        tile configuration) passed this test at that batch size; the first eager
+        call at a new batch size runs it, and under CUDA-graph capture an untested
+        size takes the stock path. Every batch size passed in is checked, on probe
+        rows (64 real decode rows shipped with the package, plus peaked and random
+        rows) tiled to that size. A failing variant is refused at every batch size
+        (status ``refused``) and latched like a runtime probe failure; the refusal is
+        logged. Returns a report with the time of each check.
         """
+        import time
+
         from certified_head.selftest import check_variants
 
         rows = probe if probe is not None else self._probe_rows()
-        groups: dict[tuple[str, tuple[Any, ...]], list[int]] = {}
+        report: dict[str, Any] = {'checks': [], 'refused_batch_sizes': [], 'seconds': 0.0}
         for m in sorted({m for m in batch_sizes if 0 < m <= self.max_batch}):
-            ar = self.arith_for(m)
-            cfg = self.gemv_config(m) if ar == 'w8a16' else self.arith_config(ar, m)
-            groups.setdefault((ar, tuple(cfg.__dict__.values())), []).append(m)
-        report: dict[str, Any] = {'configs': [], 'refused_batch_sizes': []}
-        for (arith, cfg_key), sizes in groups.items():
+            key = self._variant_key(m)
             entry: dict[str, Any] = {
-                'arith': arith,
-                'config': dict(zip(GemvConfig.__dataclass_fields__, cfg_key, strict=True)),
-                'batch_sizes': sizes,
-                'checked_at': sorted({sizes[0], sizes[-1]}),
-                'ok': True,
+                'batch_size': m,
+                'arith': key[0],
+                'config': dict(zip(GemvConfig.__dataclass_fields__, key[1:], strict=True)),
             }
-            for m in entry['checked_at']:
+            if key in self._failed_variants:
+                entry.update(ok=False, failure='variant failed earlier')
+            elif (key, m) in self._verified:
+                entry.update(ok=True, cached=True)
+            else:
                 reps = -(-m // rows.shape[0])
                 h = rows.repeat(reps, 1)[:m].contiguous()
+                t0 = time.perf_counter()
+                self._in_self_test = True
                 try:
                     res = check_variants(self, h)
                     ok = bool(res.pop('ok'))
-                    entry.setdefault('checks', {})[str(m)] = res
+                    entry['checks'] = res
                     if not ok:
-                        entry['failure'] = f'kernel variant check failed at M={m}: {res}'
+                        entry['failure'] = f'kernel variant check failed: {res}'
                 except Exception as exc:  # a refused or failing configuration
                     ok = False
                     entry['failure'] = f'{type(exc).__name__}: {exc}'[:200]
-                if not ok:
-                    entry['ok'] = False
-                    break
+                finally:
+                    self._in_self_test = False
+                torch.cuda.synchronize()
+                entry['seconds'] = time.perf_counter() - t0
+                report['seconds'] += entry['seconds']
+                entry['ok'] = ok
+                if ok:
+                    self._verified.add((key, m))
+                else:
+                    self._failed_variants.add(key)
+                    self._probe_tripped[self._variant_id(m)] = 1
+                    logger.warning(
+                        'certified head: %s tiles %s failed the kernel self-test at M=%d '
+                        '(%s); every batch size using them takes the stock path',
+                        key[0],
+                        entry['config'],
+                        m,
+                        entry.get('failure'),
+                    )
             if not entry['ok']:
-                self._refused.update(sizes)
-                report['refused_batch_sizes'].extend(sizes)
-                logger.warning(
-                    'certified head: %s tiles %s failed the enclosure self-test (%s); '
-                    'batch sizes %s take the stock path',
-                    arith,
-                    entry['config'],
-                    entry.get('failure'),
-                    sizes,
-                )
-            report['configs'].append(entry)
+                report['refused_batch_sizes'].append(m)
+            report['checks'].append(entry)
         report['ok'] = not report['refused_batch_sizes']
         torch.cuda.empty_cache()
         self.enclosure_report = report
         return report
+
+    def _assume_verified(self, batch_sizes: list[int]) -> None:
+        """Mark batch sizes as self-tested without running the test. For tests of
+        the fail-closed mechanisms only (they need a head that certifies)."""
+        for m in batch_sizes:
+            self._verified.add((self._variant_key(m), m))
 
     def _probe_rows(self) -> torch.Tensor:
         """Real decode rows shipped with the package, plus peaked and random rows."""
@@ -822,9 +881,10 @@ class CertifiedHead:
         ):
             if t.dtype != dtype or t.shape != (m,) or not t.is_contiguous():
                 raise ValueError(f'expected contiguous {dtype} of shape ({m},)')
+        certifiable = self._certifiable(m)  # may run the self-test; before _sampling
         self._sampling = (seeds, positions, temperatures)
         try:
-            if m in self._refused:
+            if not certifiable:
                 self._refuse(m)
             else:
                 self._approximate(hidden, m)

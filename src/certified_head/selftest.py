@@ -95,6 +95,15 @@ def summary_violations(head: CertifiedHead, block_v: int, h: torch.Tensor, x: to
 
 def check_variants(head: CertifiedHead, h: torch.Tensor) -> dict[str, Any]:
     """Check every kernel variant the head uses at batch size ``len(h)``."""
+    previous = head._in_self_test
+    head._in_self_test = True  # the head's own calls below must not recurse
+    try:
+        return _check_variants(head, h)
+    finally:
+        head._in_self_test = previous
+
+
+def _check_variants(head: CertifiedHead, h: torch.Tensor) -> dict[str, Any]:
     m = h.shape[0]
     arith = head.arith_for(m)
     out: dict[str, Any] = {}

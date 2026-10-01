@@ -866,6 +866,7 @@ def test_nonfinite_envelope_fails_closed(
     else:
         coeff['w8a16'][token, 0] = value
     head = _modified_head(base, scale, coeff)
+    head._assume_verified([8])  # test the in-kernel guard, not the self-test
     h = peaked_hidden(w, 8)
     seeds = torch.arange(8, dtype=torch.int64, device='cuda') + 3
     positions = torch.arange(8, dtype=torch.int64, device='cuda') + 50
@@ -887,9 +888,12 @@ def test_nonfinite_envelope_fails_closed(
 def test_enclosure_self_test_passes_the_default_tiles(checkpoint: tuple[Any, Any]) -> None:
     w, qh = checkpoint
     head = CertifiedHead.from_quantized(w, qh, max_batch=256, capacity=256)
-    report = head.enclosure_self_test([1, 2, 8, 16, 24, 32, 48, 64, 96, 128, 200, 256])
-    print({tuple(c['checked_at']): (c['config'], c['ok']) for c in report['configs']})
+    sizes = [1, 2, 3, 8, 16, 17, 24, 32, 33, 48, 64, 65, 96, 128, 200, 256]
+    report = head.enclosure_self_test(sizes)
     assert report['ok'], report
+    assert [c['batch_size'] for c in report['checks']] == sizes  # every size, not endpoints
+    times = {c['batch_size']: round(c['seconds'], 3) for c in report['checks']}
+    print(f'self-test seconds per batch size {times}, total {report["seconds"]:.2f}')
 
 
 def test_enclosure_self_test_refuses_a_bad_configuration(checkpoint: tuple[Any, Any]) -> None:
@@ -925,7 +929,7 @@ def test_enclosure_self_test_refuses_a_bad_configuration(checkpoint: tuple[Any, 
     head.gemv_config = lambda _m: GemvConfig(128, 128, 64, 4, 3, tma=True)
     report = head.enclosure_self_test([96, 128])
     assert sorted(report['refused_batch_sizes']) == [96, 128]
-    assert 'refused' in report['configs'][0]['failure']
+    assert 'refused' in report['checks'][0]['failure']
 
 
 def test_runtime_probe_catches_a_finite_wrong_envelope(checkpoint: tuple[Any, Any]) -> None:
@@ -938,12 +942,13 @@ def test_runtime_probe_catches_a_finite_wrong_envelope(checkpoint: tuple[Any, An
     bad = _modified_head(
         base, torch.zeros_like(base.scale), {a: c.clone() for a, c in base.coeff.items()}
     )
+    bad._assume_verified([8])  # test the runtime probes, not the start-up self-test
     # Random rows: |exact logit| exceeds the zero envelope's radius on most probes.
     h = random_hidden(8)
     _, stats = bad.argmax(h, fallback=False)
     assert bool(((stats.status & STATUS_BITS['probe']) != 0).all())
     report = bad.probe_stats()
-    assert report['calls_with_probe_violation'] == 1 and report['latched_batch_sizes'] == [8]
+    assert report['calls_with_probe_violation'] == 1 and len(report['latched_variants']) == 1
     ids, _ = bad.argmax(h)
     assert torch.equal(ids, reference_argmax(h, w, 'bf16'))
     static_h = h.clone()
@@ -963,6 +968,60 @@ def test_runtime_probe_catches_a_finite_wrong_envelope(checkpoint: tuple[Any, An
         torch.cuda.synchronize()
         assert torch.equal(out, reference_argmax(other, w, 'bf16'))
     # A correct head: many calls, varying probe rows, no trip.
+    seen = set()
     for _ in range(50):
         base.argmax(torch.cat([peaked_hidden(w, 8), random_hidden(8)]))
+        seen.update(base._probe_idx.tolist())
     assert base.probe_stats()['calls_with_probe_violation'] == 0
+    assert len(seen) > 300  # 8 new rows per call (up to rare hash collisions)
+    # The rows also change between CUDA-graph replays.
+    rows = []
+    for _ in range(3):
+        graph.replay()
+        torch.cuda.synchronize()
+        rows.append(tuple(bad._probe_idx.tolist()))
+    assert len(set(rows)) == 3
+
+
+def test_probe_latch_covers_every_batch_size_of_the_variant(checkpoint: tuple[Any, Any]) -> None:
+    """A probe trip latches the tile configuration: other batch sizes using the same
+    configuration go to stock, batch sizes using another configuration do not."""
+    w, qh = checkpoint
+    head = CertifiedHead.from_quantized(w, qh, max_batch=32, capacity=64)
+    assert head._variant_key(8) == head._variant_key(4) != head._variant_key(32)
+    head._probe_tripped[head._variant_id(8)] = 1  # as if a call at M = 8 had tripped
+    h4, h32 = peaked_hidden(w, 4), peaked_hidden(w, 32)
+    _, stats = head.argmax(h4, fallback=False)
+    assert bool(((stats.status & STATUS_BITS['probe']) != 0).all())
+    ids, _ = head.argmax(h4)
+    assert torch.equal(ids, reference_argmax(h4, w, 'bf16'))
+    _, stats = head.argmax(h32, fallback=False)
+    assert not bool(((stats.status & STATUS_BITS['probe']) != 0).any())
+
+
+def test_untested_batch_size_is_refused_under_capture(checkpoint: tuple[Any, Any]) -> None:
+    """The self-test is mandatory: a batch size first seen inside a CUDA-graph
+    capture (where it cannot run) takes the stock path."""
+    w, qh = checkpoint
+    head = CertifiedHead.from_quantized(w, qh, max_batch=8, capacity=64)
+    static_h = peaked_hidden(w, 8)
+    out = torch.zeros(8, dtype=torch.int64, device='cuda')
+    stream = torch.cuda.Stream()
+    stream.wait_stream(torch.cuda.current_stream())
+    with torch.cuda.stream(stream):
+        reference_argmax(static_h, w, 'bf16')  # cuBLAS handles, not the head
+    torch.cuda.current_stream().wait_stream(stream)
+    graph = torch.cuda.CUDAGraph()
+    with torch.cuda.graph(graph):
+        ids, stats = head.argmax(static_h)
+        out.copy_(ids)
+    other = peaked_hidden(w, 8)
+    static_h.copy_(other)
+    graph.replay()
+    torch.cuda.synchronize()
+    assert torch.equal(out, reference_argmax(other, w, 'bf16'))
+    assert bool((stats.status == STATUS_BITS['refused']).all())
+    # Eagerly, the first call runs the self-test and certifies.
+    _, stats = head.argmax(other, fallback=False)
+    assert (head._variant_key(8), 8) in head._verified
+    assert int(stats.fallback.sum()) == 0

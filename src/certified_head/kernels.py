@@ -755,7 +755,7 @@ def _decide_kernel(
     trips_ptr,
     counter_ptr,
     CAP,
-    M,
+    VARIANT,
     MODE: tl.constexpr,
     SAMPLE: tl.constexpr,
     CAP_P2: tl.constexpr,
@@ -801,15 +801,16 @@ def _decide_kernel(
     status = status | tl.where(thr_ok, 0, STATUS_THRESHOLD)
     status = status | tl.where(cnt == 0, STATUS_EMPTY, 0)
     status = status | tl.where(lower_ok, 0, STATUS_NONFINITE)
-    # A probe violation anywhere in the batch, now or in an earlier call at this
-    # batch size (the compiled variant is latched as refused), fails every row.
+    # A probe violation anywhere in the batch, now or in an earlier call with this
+    # tile configuration (latched for the process, at every batch size that uses
+    # it), fails every row.
     failed = tl.load(probe_fail_ptr) != 0
-    latched = tl.load(tripped_ptr + M) != 0
+    latched = tl.load(tripped_ptr + VARIANT) != 0
     status = status | tl.where(failed | latched, STATUS_PROBE, 0)
     if m == 0:
         tl.store(counter_ptr, tl.load(counter_ptr) + 1)
         if failed:
-            tl.store(tripped_ptr + M, 1)
+            tl.store(tripped_ptr + VARIANT, 1)
             tl.store(trips_ptr, tl.load(trips_ptr) + 1)
     tl.store(status_ptr + m, status)
     tl.store(ids_ptr + m, tl.where(cnt > 0, k_id, 0).to(tl.int64))
