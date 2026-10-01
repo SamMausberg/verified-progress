@@ -119,6 +119,61 @@ python -m bench.pareto ~/vp-data/bench/frontend/fe-plain*/2026* --out evidence/b
 ```
 `frontend_summary.json` holds the per-point comparison and process peaks.
 
+## equality/
+
+Greedy output comparison of every arm that changes the target's arithmetic against its
+matched stock reference, with the state workstream's runner and comparator (PR #37:
+`experiments/state_safety/run_matrix.py`, `compare.py`): 320 prompts, 256 tokens,
+top-5 logprobs, c=1, memory fraction 0.25 under the shared GPU lock. The reference
+runs (plain at c=1 and c=32) are the state workstream's; the others ran in
+`bench/campaigns/equality_tuned.sh` on 2026-10-01. Each prompt contributes at most one
+event, its first divergence, classified by the logit gap there (#37: `tie`,
+`one_ulp`, `near`, `large`, `not_argmax`); the exposure is the number of tokens compared
+up to the first divergence or the end. Rates are first divergences per 1,000 tokens of
+exposure with 95% intervals; the ratio is to the floor (plain c=1 against c=32).
+
+| Pair | Diverged prompts | Exposure | Per 1,000 (95%) | Ratio to floor (95%) | tie / one_ulp / near / large / not_argmax |
+|---|---|---|---|---|---|
+| floor: plain c=1 vs c=32 | 167 | 48,816 | 3.42 (2.94-3.98) | 1.00 | 151 / 14 / 2 / 0 / 0 |
+| stock MTP s3, radix off vs plain | 186 | 42,274 | 4.40 (3.81-5.08) | 1.29 (1.04-1.58) | 169 / 14 / 3 / 0 / 0 |
+| stock DFlash b16, radix off vs plain | 186 | 42,419 | 4.38 (3.80-5.06) | 1.28 (1.04-1.58) | 174 / 9 / 3 / 0 / 0 |
+| `mtp-tuned` vs stock MTP s3 | 171 | 45,091 | 3.79 (3.26-4.41) | 1.11 (0.90-1.37) | 161 / 8 / 2 / 0 / 0 |
+| `mtp-tuned` vs plain | 183 | 43,558 | 4.20 (3.63-4.86) | 1.23 (1.00-1.51) | 166 / 15 / 2 / 0 / 0 |
+| `mtp-tuned-triton` vs stock MTP s3 | 179 | 44,155 | 4.05 (3.50-4.69) | 1.19 (0.96-1.46) | 169 / 8 / 2 / 0 / 0 |
+| `mtp-tuned-triton` vs plain | 174 | 45,758 | 3.80 (3.28-4.41) | 1.11 (0.90-1.37) | 162 / 7 / 5 / 0 / 0 |
+| `dflash-tuned-b16` vs stock DFlash b16 | 173 | 45,274 | 3.82 (3.29-4.43) | 1.12 (0.90-1.38) | 161 / 11 / 1 / 0 / 0 |
+| `dflash-tuned-b16` vs plain | 176 | 44,617 | 3.94 (3.40-4.57) | 1.15 (0.93-1.43) | 167 / 7 / 2 / 0 / 0 |
+| `plain-tuned-triton` vs plain | 179 | 43,817 | 4.08 (3.53-4.73) | 1.19 (0.97-1.47) | 170 / 7 / 2 / 0 / 0 |
+| `plain-tuned-replayssm` vs plain | 175 | 45,360 | 3.86 (3.33-4.47) | 1.13 (0.91-1.39) | 160 / 13 / 1 / **1** / 0 |
+
+Classes (`classes.json`, rule in `bench/README.md` "Exactness classes", set by the
+coordinator after these results were seen): `mtp-tuned`, `mtp-tuned-triton`,
+`dflash-tuned-b16` and `plain-tuned-triton` are `exact-up-to-rounding`, since every first
+divergence against their matched reference is rounding-level. `plain-tuned-replayssm` is
+`lossy`, from one `large` first divergence, and has a paired GSM8K run. The rates and
+ratios sit beside the classes but do not decide them. The ratio intervals ignore that
+every pair shares the plain reference.
+
+Stock speculation diverges from plain decoding more often than batch shape alone does:
+1.29 times the floor for MTP s3 and 1.28 times for DFlash block 16, with both intervals
+above 1 and every event rounding-level. PR #37 attributes this to layer 0's GDN
+recurrence running different kernels in verify and in decode.
+
+DFlash block 16 with `--linear-attn-verify-backend triton` (rows in `report.json`)
+produced the same tokens as without it on all 320 prompts. At this SGLang pin, verify
+already defaults to Triton when decode uses Triton (`verify=triton` in every server
+log), so the flag is not an arm. The first DFlash attempt failed at launch: at a 0.25
+memory fraction, 16 requests' verify states left no KV memory. Its runs use capacity
+4, which is enough for a c=1 pass.
+
+```sh
+scripts/gpu_lock.sh -s bench/campaigns/equality_tuned.sh
+python -m bench.divergence evidence/bench/equality/summary.json --out /dev/null \
+    --arms evidence/bench/equality/arms.json --classes-out evidence/bench/equality/classes.json
+```
+`divergences.csv` lists every first divergence (prompt, position, tokens, logit gap,
+class). `table.csv` and `compare.log` are the comparator's own outputs.
+
 ## tuning/
 
 Configuration search on the `mixed-v2` tune split (never used for reported results):

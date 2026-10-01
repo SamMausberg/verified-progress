@@ -1,0 +1,246 @@
+[
+  {
+    "arm": "mtp-tuned",
+    "exactness": "exact-up-to-rounding",
+    "matched_pair": "mtp_s3 buffered vs stock verify radix-off c1",
+    "matched": {
+      "per_1k": 3.792,
+      "per_1k_95": [
+        3.264,
+        4.406
+      ],
+      "classes": {
+        "tie": 161,
+        "one_ulp": 8,
+        "near": 2,
+        "large": 0,
+        "not_argmax": 0
+      }
+    },
+    "matched_ratio_to_floor": 1.109,
+    "matched_ratio_to_floor_95": [
+      0.896,
+      1.372
+    ],
+    "plain_pair": "mtp_s3 buffered verify radix-off vs plain c1",
+    "vs_plain": {
+      "per_1k": 4.201,
+      "per_1k_95": [
+        3.635,
+        4.856
+      ],
+      "ratio_to_floor": 1.228,
+      "ratio_to_floor_95": [
+        0.996,
+        1.515
+      ],
+      "classes": {
+        "tie": 166,
+        "one_ulp": 15,
+        "near": 2,
+        "large": 0,
+        "not_argmax": 0
+      }
+    }
+  },
+  {
+    "arm": "mtp-tuned-triton",
+    "exactness": "exact-up-to-rounding",
+    "matched_pair": "mtp_s3 buffered triton vs stock verify radix-off c1",
+    "matched": {
+      "per_1k": 4.054,
+      "per_1k_95": [
+        3.501,
+        4.693
+      ],
+      "classes": {
+        "tie": 169,
+        "one_ulp": 8,
+        "near": 2,
+        "large": 0,
+        "not_argmax": 0
+      }
+    },
+    "matched_ratio_to_floor": 1.185,
+    "matched_ratio_to_floor_95": [
+      0.96,
+      1.463
+    ],
+    "plain_pair": "mtp_s3 buffered verify radix-off triton vs plain c1",
+    "vs_plain": {
+      "per_1k": 3.803,
+      "per_1k_95": [
+        3.278,
+        4.412
+      ],
+      "ratio_to_floor": 1.112,
+      "ratio_to_floor_95": [
+        0.899,
+        1.374
+      ],
+      "classes": {
+        "tie": 162,
+        "one_ulp": 7,
+        "near": 5,
+        "large": 0,
+        "not_argmax": 0
+      }
+    }
+  },
+  {
+    "arm": "plain-tuned-triton",
+    "exactness": "exact-up-to-rounding",
+    "matched_pair": "plain radix-off triton vs plain c1",
+    "matched": {
+      "per_1k": 4.085,
+      "per_1k_95": [
+        3.528,
+        4.73
+      ],
+      "classes": {
+        "tie": 170,
+        "one_ulp": 7,
+        "near": 2,
+        "large": 0,
+        "not_argmax": 0
+      }
+    },
+    "matched_ratio_to_floor": 1.194,
+    "matched_ratio_to_floor_95": [
+      0.967,
+      1.474
+    ],
+    "plain_pair": "plain radix-off triton vs plain c1",
+    "vs_plain": {
+      "per_1k": 4.085,
+      "per_1k_95": [
+        3.528,
+        4.73
+      ],
+      "ratio_to_floor": 1.194,
+      "ratio_to_floor_95": [
+        0.967,
+        1.474
+      ],
+      "classes": {
+        "tie": 170,
+        "one_ulp": 7,
+        "near": 2,
+        "large": 0,
+        "not_argmax": 0
+      }
+    }
+  },
+  {
+    "arm": "plain-tuned-replayssm",
+    "exactness": "lossy",
+    "matched_pair": "plain buffered decode radix-off vs plain c1",
+    "matched": {
+      "per_1k": 3.858,
+      "per_1k_95": [
+        3.327,
+        4.474
+      ],
+      "classes": {
+        "tie": 160,
+        "one_ulp": 13,
+        "near": 1,
+        "large": 1,
+        "not_argmax": 0
+      }
+    },
+    "matched_ratio_to_floor": 1.128,
+    "matched_ratio_to_floor_95": [
+      0.912,
+      1.394
+    ],
+    "plain_pair": "plain buffered decode radix-off vs plain c1",
+    "vs_plain": {
+      "per_1k": 3.858,
+      "per_1k_95": [
+        3.327,
+        4.474
+      ],
+      "ratio_to_floor": 1.128,
+      "ratio_to_floor_95": [
+        0.912,
+        1.394
+      ],
+      "classes": {
+        "tie": 160,
+        "one_ulp": 13,
+        "near": 1,
+        "large": 1,
+        "not_argmax": 0
+      }
+    }
+  },
+  {
+    "arm": "dflash-tuned-b16",
+    "exactness": "exact-up-to-rounding",
+    "matched_pair": "dflash b16 triton vs stock dflash b16 radix-off c1",
+    "matched": {
+      "per_1k": 3.821,
+      "per_1k_95": [
+        3.292,
+        4.435
+      ],
+      "classes": {
+        "tie": 161,
+        "one_ulp": 11,
+        "near": 1,
+        "large": 0,
+        "not_argmax": 0
+      }
+    },
+    "matched_ratio_to_floor": 1.117,
+    "matched_ratio_to_floor_95": [
+      0.903,
+      1.382
+    ],
+    "plain_pair": "dflash b16 radix-off triton vs plain c1",
+    "vs_plain": {
+      "per_1k": 3.945,
+      "per_1k_95": [
+        3.403,
+        4.573
+      ],
+      "ratio_to_floor": 1.153,
+      "ratio_to_floor_95": [
+        0.933,
+        1.425
+      ],
+      "classes": {
+        "tie": 167,
+        "one_ulp": 7,
+        "near": 2,
+        "large": 0,
+        "not_argmax": 0
+      }
+    }
+  },
+  {
+    "arm": "mtp-stockverify",
+    "exactness": "stock",
+    "plain_pair": "mtp_s3 stock verify radix-off vs plain c1",
+    "vs_plain": {
+      "per_1k": 4.4,
+      "per_1k_95": [
+        3.811,
+        5.08
+      ],
+      "ratio_to_floor": 1.286,
+      "ratio_to_floor_95": [
+        1.044,
+        1.585
+      ],
+      "classes": {
+        "tie": 169,
+        "one_ulp": 14,
+        "near": 3,
+        "large": 0,
+        "not_argmax": 0
+      }
+    }
+  }
+]

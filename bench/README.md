@@ -189,7 +189,7 @@ shares the plain reference. The frontier's exact envelope covers `stock` and
 
 Stock speculation is itself not bit-identical to plain decoding. Stock MTP s3
 diverges from plain c=1 at 4.40 per 1,000 tokens (1.29 times the floor; 95% interval
-of the ratio 1.04-1.59) and stock DFlash block 16 at 4.39 (1.28 times; 1.04-1.58),
+of the ratio 1.04-1.58) and stock DFlash block 16 at 4.38 (1.28 times; 1.04-1.58),
 with every first divergence rounding-level in both. PR #37 traces the mechanism to
 layer 0's GDN recurrence, which runs different kernels in verify and in decode.
 

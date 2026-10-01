@@ -1,0 +1,392 @@
+[
+  {
+    "pair": "floor plain c1 vs c32",
+    "runs": [
+      "plain/c1",
+      "plain/c32"
+    ],
+    "prompts": 320,
+    "diverged_prompts": 167,
+    "exposure_tokens": 48816,
+    "per_1k": 3.421,
+    "per_1k_95": [
+      2.94,
+      3.981
+    ],
+    "ratio_to_floor": 1.0,
+    "ratio_to_floor_95": [
+      0.807,
+      1.239
+    ],
+    "classes": {
+      "tie": 151,
+      "one_ulp": 14,
+      "near": 2,
+      "large": 0,
+      "not_argmax": 0
+    },
+    "length_mismatch": 0,
+    "prompts_with_large_drift": 1,
+    "rounding_level_only": true
+  },
+  {
+    "pair": "mtp_s3 stock verify radix-off vs plain c1",
+    "runs": [
+      "plain/c1",
+      "mtp_s3__bench_noradix/c1"
+    ],
+    "prompts": 320,
+    "diverged_prompts": 186,
+    "exposure_tokens": 42274,
+    "per_1k": 4.4,
+    "per_1k_95": [
+      3.811,
+      5.08
+    ],
+    "ratio_to_floor": 1.286,
+    "ratio_to_floor_95": [
+      1.044,
+      1.585
+    ],
+    "classes": {
+      "tie": 169,
+      "one_ulp": 14,
+      "near": 3,
+      "large": 0,
+      "not_argmax": 0
+    },
+    "length_mismatch": 0,
+    "prompts_with_large_drift": 0,
+    "rounding_level_only": true
+  },
+  {
+    "pair": "mtp_s3 buffered verify radix-off vs plain c1",
+    "runs": [
+      "plain/c1",
+      "mtp_s3_replayssm__bench_noradix/c1"
+    ],
+    "prompts": 320,
+    "diverged_prompts": 183,
+    "exposure_tokens": 43558,
+    "per_1k": 4.201,
+    "per_1k_95": [
+      3.635,
+      4.856
+    ],
+    "ratio_to_floor": 1.228,
+    "ratio_to_floor_95": [
+      0.996,
+      1.515
+    ],
+    "classes": {
+      "tie": 166,
+      "one_ulp": 15,
+      "near": 2,
+      "large": 0,
+      "not_argmax": 0
+    },
+    "length_mismatch": 0,
+    "prompts_with_large_drift": 0,
+    "rounding_level_only": true
+  },
+  {
+    "pair": "mtp_s3 buffered verify radix-off triton vs plain c1",
+    "runs": [
+      "plain/c1",
+      "mtp_s3_replayssm__bench_noradix_triton/c1"
+    ],
+    "prompts": 320,
+    "diverged_prompts": 174,
+    "exposure_tokens": 45758,
+    "per_1k": 3.803,
+    "per_1k_95": [
+      3.278,
+      4.412
+    ],
+    "ratio_to_floor": 1.112,
+    "ratio_to_floor_95": [
+      0.899,
+      1.374
+    ],
+    "classes": {
+      "tie": 162,
+      "one_ulp": 7,
+      "near": 5,
+      "large": 0,
+      "not_argmax": 0
+    },
+    "length_mismatch": 0,
+    "prompts_with_large_drift": 3,
+    "rounding_level_only": true
+  },
+  {
+    "pair": "plain buffered decode radix-off vs plain c1",
+    "runs": [
+      "plain/c1",
+      "plain_replayssm__bench_noradix/c1"
+    ],
+    "prompts": 320,
+    "diverged_prompts": 175,
+    "exposure_tokens": 45360,
+    "per_1k": 3.858,
+    "per_1k_95": [
+      3.327,
+      4.474
+    ],
+    "ratio_to_floor": 1.128,
+    "ratio_to_floor_95": [
+      0.912,
+      1.394
+    ],
+    "classes": {
+      "tie": 160,
+      "one_ulp": 13,
+      "near": 1,
+      "large": 1,
+      "not_argmax": 0
+    },
+    "length_mismatch": 0,
+    "prompts_with_large_drift": 0,
+    "rounding_level_only": false
+  },
+  {
+    "pair": "plain radix-off triton vs plain c1",
+    "runs": [
+      "plain/c1",
+      "plain__bench_noradix_triton/c1"
+    ],
+    "prompts": 320,
+    "diverged_prompts": 179,
+    "exposure_tokens": 43817,
+    "per_1k": 4.085,
+    "per_1k_95": [
+      3.528,
+      4.73
+    ],
+    "ratio_to_floor": 1.194,
+    "ratio_to_floor_95": [
+      0.967,
+      1.474
+    ],
+    "classes": {
+      "tie": 170,
+      "one_ulp": 7,
+      "near": 2,
+      "large": 0,
+      "not_argmax": 0
+    },
+    "length_mismatch": 0,
+    "prompts_with_large_drift": 3,
+    "rounding_level_only": true
+  },
+  {
+    "pair": "dflash b16 radix-off triton vs plain c1",
+    "runs": [
+      "plain/c1",
+      "plain__bench_dflash_b16_triton/c1"
+    ],
+    "prompts": 320,
+    "diverged_prompts": 176,
+    "exposure_tokens": 44617,
+    "per_1k": 3.945,
+    "per_1k_95": [
+      3.403,
+      4.573
+    ],
+    "ratio_to_floor": 1.153,
+    "ratio_to_floor_95": [
+      0.933,
+      1.425
+    ],
+    "classes": {
+      "tie": 167,
+      "one_ulp": 7,
+      "near": 2,
+      "large": 0,
+      "not_argmax": 0
+    },
+    "length_mismatch": 0,
+    "prompts_with_large_drift": 4,
+    "rounding_level_only": true
+  },
+  {
+    "pair": "dflash b16 radix-off triton gdn-verify-triton vs plain c1",
+    "runs": [
+      "plain/c1",
+      "plain__bench_dflash_b16_triton_gdnverify/c1"
+    ],
+    "prompts": 320,
+    "diverged_prompts": 176,
+    "exposure_tokens": 44617,
+    "per_1k": 3.945,
+    "per_1k_95": [
+      3.403,
+      4.573
+    ],
+    "ratio_to_floor": 1.153,
+    "ratio_to_floor_95": [
+      0.933,
+      1.425
+    ],
+    "classes": {
+      "tie": 167,
+      "one_ulp": 7,
+      "near": 2,
+      "large": 0,
+      "not_argmax": 0
+    },
+    "length_mismatch": 0,
+    "prompts_with_large_drift": 4,
+    "rounding_level_only": true
+  },
+  {
+    "pair": "mtp_s3 buffered vs stock verify radix-off c1",
+    "runs": [
+      "mtp_s3__bench_noradix/c1",
+      "mtp_s3_replayssm__bench_noradix/c1"
+    ],
+    "prompts": 320,
+    "diverged_prompts": 171,
+    "exposure_tokens": 45091,
+    "per_1k": 3.792,
+    "per_1k_95": [
+      3.264,
+      4.406
+    ],
+    "ratio_to_floor": 1.109,
+    "ratio_to_floor_95": [
+      0.896,
+      1.372
+    ],
+    "classes": {
+      "tie": 161,
+      "one_ulp": 8,
+      "near": 2,
+      "large": 0,
+      "not_argmax": 0
+    },
+    "length_mismatch": 0,
+    "prompts_with_large_drift": 1,
+    "rounding_level_only": true
+  },
+  {
+    "pair": "mtp_s3 buffered triton vs stock verify radix-off c1",
+    "runs": [
+      "mtp_s3__bench_noradix/c1",
+      "mtp_s3_replayssm__bench_noradix_triton/c1"
+    ],
+    "prompts": 320,
+    "diverged_prompts": 179,
+    "exposure_tokens": 44155,
+    "per_1k": 4.054,
+    "per_1k_95": [
+      3.501,
+      4.693
+    ],
+    "ratio_to_floor": 1.185,
+    "ratio_to_floor_95": [
+      0.96,
+      1.463
+    ],
+    "classes": {
+      "tie": 169,
+      "one_ulp": 8,
+      "near": 2,
+      "large": 0,
+      "not_argmax": 0
+    },
+    "length_mismatch": 0,
+    "prompts_with_large_drift": 0,
+    "rounding_level_only": true
+  },
+  {
+    "pair": "dflash b16 stock radix-off vs plain c1",
+    "runs": [
+      "plain/c1",
+      "plain__bench_dflash_b16/c1"
+    ],
+    "prompts": 320,
+    "diverged_prompts": 186,
+    "exposure_tokens": 42419,
+    "per_1k": 4.385,
+    "per_1k_95": [
+      3.798,
+      5.063
+    ],
+    "ratio_to_floor": 1.282,
+    "ratio_to_floor_95": [
+      1.04,
+      1.58
+    ],
+    "classes": {
+      "tie": 174,
+      "one_ulp": 9,
+      "near": 3,
+      "large": 0,
+      "not_argmax": 0
+    },
+    "length_mismatch": 0,
+    "prompts_with_large_drift": 0,
+    "rounding_level_only": true
+  },
+  {
+    "pair": "dflash b16 triton vs stock dflash b16 radix-off c1",
+    "runs": [
+      "plain__bench_dflash_b16/c1",
+      "plain__bench_dflash_b16_triton/c1"
+    ],
+    "prompts": 320,
+    "diverged_prompts": 173,
+    "exposure_tokens": 45274,
+    "per_1k": 3.821,
+    "per_1k_95": [
+      3.292,
+      4.435
+    ],
+    "ratio_to_floor": 1.117,
+    "ratio_to_floor_95": [
+      0.903,
+      1.382
+    ],
+    "classes": {
+      "tie": 161,
+      "one_ulp": 11,
+      "near": 1,
+      "large": 0,
+      "not_argmax": 0
+    },
+    "length_mismatch": 0,
+    "prompts_with_large_drift": 0,
+    "rounding_level_only": true
+  },
+  {
+    "pair": "dflash b16 triton gdn-verify-triton vs stock dflash b16 radix-off c1",
+    "runs": [
+      "plain__bench_dflash_b16/c1",
+      "plain__bench_dflash_b16_triton_gdnverify/c1"
+    ],
+    "prompts": 320,
+    "diverged_prompts": 173,
+    "exposure_tokens": 45274,
+    "per_1k": 3.821,
+    "per_1k_95": [
+      3.292,
+      4.435
+    ],
+    "ratio_to_floor": 1.117,
+    "ratio_to_floor_95": [
+      0.903,
+      1.382
+    ],
+    "classes": {
+      "tie": 161,
+      "one_ulp": 11,
+      "near": 1,
+      "large": 0,
+      "not_argmax": 0
+    },
+    "length_mismatch": 0,
+    "prompts_with_large_drift": 0,
+    "rounding_level_only": true
+  }
+]
