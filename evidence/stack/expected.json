@@ -1,5 +1,5 @@
 {
- "repo_commit": "d8189ae5d06010185b33e94c910c7efe5827d907",
+ "repo_commit": "5d862d8cdccc1942a4ba1fce62787e57c8a0f73b",
  "inputs": {
   "evidence/stack/ceiling.json": "4d2c3a50b866c0b0dc0dc72c8fed0d80f7f18c27869015b924a25ca04cf14a24",
   "evidence/backbone/gemm_microbench.json": "f001afa814cdeae6f3fa2fdf459bfae6d47098f107bf4c0bf8fb608bc404160f"
@@ -7,7 +7,7 @@
  "formula": "ratio = T / (T - sum of savings), savings in ms, low and high ends separately",
  "f_bytes_removed_per_request": 805306368,
  "f_low_penalty_ms": 0.384,
- "h": "left out: inputs only on unmerged PRs #45 and #52 (pending)",
+ "h": "left out of the declared range: served effect on DFlash not measured; evidence/certified_head gives a range from a loss (whole-batch fallback) to a gain (column fallback)",
  "by_concurrency": {
   "1": {
    "cycle_ms": 5.294,

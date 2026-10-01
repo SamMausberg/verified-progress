@@ -22,14 +22,17 @@ workload (`bench/`, mixed-v2 confirm split, 512 output tokens). Labels as elsewh
   Triton GDN verify kernel (SGLang's default verify kernel on sm_90, so the 2x of repair's
   Stage A over FlashInfer's GDN verify is not available on top of it), CUDA graphs, the
   overlap scheduler and `--stream-interval 4`. Of the exact levers outside it, only two
-  have evidence of a gain large enough to time: the snapshot-free GDN verify (F,
-  derived: it removes 0.21 ms of state writes per request per cycle, 4% of the c = 1
-  cycle and 17% at c = 8, against a possible launch-configuration penalty that leaves
-  its sign at c = 1 open) and the backbone GEMM routing table (G, derived from
-  microbenchmarks: at most 2.6% at c = 1 and 1-2% at c = 4-8). The certified head (H)
-  enters only through its equality gate; its expected effect is left out because its
-  inputs are on unmerged pull requests (#45, #52). The host-gap patches do nothing on
-  these arms. None of F, G or H has a served end-to-end measurement on DFlash yet.
+  have evidence of a gain large enough to time: the snapshot-free GDN verify (F, bitwise
+  with matched pools; derived to remove 0.21 ms of state writes per request per cycle,
+  and measured by the drafter workstream on the tuned arm at 0.968x throughput at c = 1
+  and 1.061x at c = 8 in one session) and the backbone GEMM routing table (G, derived
+  from microbenchmarks: at most 2.6% at c = 1 and 1-2% at c = 4-8). The certified head
+  (H) enters only through its equality gate; its expected effect is left out because its
+  served effect on DFlash is unmeasured and the certified-head evidence spans a loss
+  (whole-batch fallback, which 90% of DFlash verify calls would take) to a gain (column
+  fallback). The host-gap patches do nothing on these arms. Only F has a served
+  end-to-end measurement on DFlash, and it falls short of the declared range (amendment
+  below).
 - **Expected composed result** (derived, declared below, `expected.json`): 0.97-1.07x
   the tuned DFlash per-user rate at c = 1 and 1.15-1.22x at c = 8. That leaves a factor
   of 4.1 to 4.7 to the goal.
@@ -65,10 +68,10 @@ At c = 1-8 on tuned DFlash:
 |---|---|---|---|---|
 | Block 16 with Triton attention (D1) | 1.21x per-user rate over block 8 at c = 1, 1.02x at c = 8; 0.96x throughput at c = 8 | served, n = 3 | exact-up-to-rounding | baseline S0 |
 | Triton GDN verify kernel (D2) | already the default verify kernel; 1.05x the FlashInfer GDN verify pass at B = 16, 2.06x at B = 64 | forced-acceptance phases | default | in every arm |
-| Snapshot-free GDN verify, fold every commit (D3) | none served; derived 0.21 ms per request-cycle of state writes removed | derived; kernel check pending (#133) | pending (#133) | F |
-| Backbone GEMM table v1 (D4) | 0.88-0.97x cuBLAS per GEMM at M = 16; derived at most 2.6% at c = 1 | microbenchmark; derived | pending | G |
-| Certified head on the verify (D5) | pending (#45, #52) | pending | pending (#45, #52) | H, if its gate passes |
-| Certified head on the draft projection (D6) | pending (#52) | pending | pending (#52) | no |
+| Snapshot-free GDN verify, fold every commit (D3) | served A/B (drafter): 0.968x throughput at c = 1, 0.983x at 2, 1.005x at 4, 1.061x at 8; held batch of 8: cycle 10.83 to 9.90 ms | served, one session, 2 runs per arm; held-batch phases | bitwise (kernel; served with matched pools) | F |
+| Backbone GEMM table v1 (D4) | 0.88-0.97x cuBLAS per GEMM at M = 16; derived at most 0.14 ms (2.6%) at c = 1, none at c = 2, 0.12-0.13 ms at c = 4-8; served plain decoding: +0.4% at c = 8 | microbenchmark; derived; served on plain | exact-up-to-rounding (served plain); untested on DFlash | G |
+| Certified head on the verify (D5) | no served timing on DFlash; head path at M = 16: stock 395.1 us, certified pass 256.9 us; DFlash verify falls back on 3.99% of rows and 90.0% of calls | microbenchmark; engine check | stock-kernel contract (0 rows differing) | H, if its gate passes |
+| Certified head on the draft projection (D6) | falls back on 3.96% of rows and 87.6% of calls | engine check | stock-kernel contract (0 rows differing) | no |
 | Hot-vocabulary draft head (D7) | derived about break-even (0.3 ms saved, ~7% fewer accepted tokens) | derived | exact (draft side) | no: derived net < 1% |
 | FA4 draft attention under Triton target (D8) | untested at block 16 | - | exact (draft side) | no |
 | Host-gap patches (D9) | no-op on these arms; MTP cycle -2.7% to -4.8% | held-batch windows | bitwise | applied, off |
@@ -91,10 +94,10 @@ this order, with every switch off by default.
 
 | Order | Series | Base it was made for | Applies on the stack |
 |---|---|---|---|
-| 1 | drafter 0001-0003 (PR #133): trace hook, buffered GDN verify for DFLASH, exact fold | bd66ce343e | cleanly |
+| 1 | drafter 0001-0003 (`main`): trace hook, buffered GDN verify for DFLASH, exact fold | bd66ce343e | cleanly |
 | 2 | moonshot 0001-0009 (`main`): token maps, relaxed acceptance, FP8 state, exact replay | bd66ce343e | with three-way merges, no conflict |
 | 3 | backbone 0001-0008 (`main`): GEMM routing, merged in_proj, prologues | bd66ce343e | cleanly |
-| 4 | kernel 0001, 0004-0006 (PR #52) and `engine/sglang/patches/stack/0001-0002` in place of kernel 0002-0003 | bd66ce343e | 0002 and 0003 conflict in `dflash_worker_v2.py` and are rebased |
+| 4 | kernel 0001, 0004-0006 (`main`) and `engine/sglang/patches/stack/0001-0002` in place of kernel 0002-0003 | bd66ce343e | 0002 and 0003 conflict in `dflash_worker_v2.py` and are rebased |
 | 5 | hostgap 0001-0005 (`main`) | bd66ce343e | cleanly |
 | 6 | repair 0001 (`main`): CUDA-event phase probe | bd66ce343e | cleanly |
 | 7 | `engine/sglang/patches/stack/0003` | the stack | refuses moonshot's relaxed EAGLE acceptance with the certified head |
@@ -108,8 +111,8 @@ off for DFlash). Patch `stack/0003` adds the same refusal on the EAGLE/MTP chain
 where moonshot's relaxed rule would otherwise read logits the certified head never
 computed. The resulting tree is `628f650ea031b0fc8a68233ff10d8878eb22686d`; the
 build script and every hold script check it. Commit hashes differ between builds because
-`git am` stamps new dates. Until PR #52 and PR #133 merge, the build needs their patch
-directories.
+`git am` stamps new dates. Every series it applies is on `main`. Kernel 0007-0010 are not in the composed engine: they
+change only the draft paths' counters and the sampled verify, neither of which the stack uses.
 
 ## Composition plan
 
@@ -264,8 +267,9 @@ the low end, the 0.38 ms per cycle by which SGLang's Triton verify ran slower wi
 snapshot buffer at one request (moonshot's P7 bench: 92 against 76 us per layer, 24
 layers); G is 0 at the low end and, at the high end, the microbenchmark time the routing
 table saves at the verify's and draft's 16 c rows (0.14 ms at c = 1, none at c = 2, 0.12
-and 0.13 ms from the merged in_proj at c = 4 and 8). H is left out: its inputs are only on
-unmerged pull requests (#45, #52), so its expected effect is pending.
+and 0.13 ms from the merged in_proj at c = 4 and 8). H is left out: when the plan was
+declared its inputs were on unmerged pull requests (#45, #52); both have since merged, and
+amendment 1 gives the current reason.
 
 | c | F | G | FULL = FG | FG short of 5x (top) |
 |---|---|---|---|---|
@@ -276,6 +280,45 @@ unmerged pull requests (#45, #52), so its expected effect is pending.
 
 A result outside these ranges means the derivation missed a mechanism and is checked
 against the phase diagnostic before it is reported.
+
+### Amendments
+
+**1. 2026-10-01, after the equality hold started (21:24 UTC, repository at `84717d2`).**
+A review of the hold scripts changed validation, not the runs. No arm, flag, order,
+expected range or decision rule changes.
+
+- Certified-head package. The gate's identity now fingerprints the package at preflight,
+  before the H runs, and requires the same fingerprint when the gate is built. The
+  equality hold runs `84717d2`'s scripts, which fingerprint it once, when the gate is
+  built. For that hold the analysis checks after the fact that the package checkout
+  stayed at `01502cc` with no uncommitted changes, that no file in it changed after the
+  hold started, and that the gate's fingerprint equals one taken after the hold. If any
+  of these fails, the H runs are repeated before H counts.
+- References. Bench's two reference runs are checked against their whole declared
+  configuration (flags, pass, concurrency, output length, and prompts and prompt tokens
+  against S0's run), not only their commit and model revision. Every equality run now
+  gets the prompt file explicitly, and the gate records its SHA-256. It is the file the
+  runner read by default at `84717d2`. Both checks read files the hold writes, so for
+  this hold they apply at analysis.
+- Sessions. The analysis accepts `stack-s1` to `stack-s5` only: the plan's three and at
+  most two more.
+- H's expected effect. #45 and #52 have merged. H stays out of the expected range because
+  its served effect on DFlash is unmeasured and `evidence/certified_head` spans a loss to
+  a gain. At M = 16 the head path takes 395.1 us stock and 256.9 us for the certified pass.
+  But DFlash's greedy verify fell back on 90.0% of calls in the engine check, which turns
+  into a loss under whole-batch fallback, and column fallback (H's mode) has run in the
+  engine only on plain decoding.
+- F, measured elsewhere. The drafter workstream timed F alone on `dflash-tuned-b16`
+  (stock, fold, fold, stock in one hold; `evidence/drafter/README.md`,
+  `evidence/drafter/fold_timing/summary.json`). Its throughput ratios were 0.968, 0.983,
+  1.005 and 1.061 at c = 1, 2, 4 and 8, against declared F ranges of 0.969-1.042,
+  1.007-1.077, 1.067-1.130 and 1.148-1.200. That is the low end at c = 1 (the four run
+  pairs span 0.966-0.970) and below the range at c = 2, 4 and 8, so the derivation's
+  prediction for F is refuted. The declared ranges stand, and the sessions are reported
+  against them. The drafter's per-phase split at a held batch of 8 locates the miss: the
+  verify phase shortens by 1.10 ms, not the derived 1.70 ms (8 requests x 0.212 ms), and
+  the fold's commit adds 0.22 ms that the derivation did not charge. The stack sessions
+  remain the measurement of F on the composed tree.
 
 ## Derived ceilings and the gap to 5x (`ceiling.json`)
 
