@@ -274,6 +274,59 @@ with this declaration):
   `validate_p4_ab.py`'s pinned-pool constant reads 132 accordingly (no other validator
   change). The admission preflight is run on its own first; the full job is queued only after
   it shows 128 running in both arms.
+- Third attempt void (admission preflight 20261001T115146Z, 11:51-11:55 UTC, repo 5207b02,
+  engine c29a91692b): both arms again peaked at 127 running with one request queued, now with
+  132 mamba slots (`mamba num: 127`, 5 free) and KV usage 0.40. Neither pool was the limit.
+  The full job was not queued; nothing from this attempt is reported.
+- Cause of the 127 plateau (read from the engine source and checked against every wave of the
+  three attempts; it replaces the KV-budget and mamba-slot explanations recorded above, which
+  were never tested). Line numbers are at `bd66ce343e`; the moonshot patches do not touch the
+  lines cited. A prefill pass stops taking requests from the queue once
+  `len(adder.can_run_list) >= get_num_allocatable_reqs(running_bs)`
+  (`managers/scheduler.py:3971`), and that limit is
+  `min(max_running_requests - running_bs, req_to_token_pool.available_size())`
+  (`scheduler.py:3784-3802`). A chunked request whose tail runs in the pass is appended to
+  `can_run_list` (`managers/schedule_policy.py:1166`) and keeps the `req_to_token` row it
+  took with its first chunk (`ChunkCache.cache_unfinished_req` frees nothing,
+  `mem_cache/chunk_cache.py:82-87`; `ReqToTokenPool.alloc` reuses held rows,
+  `mem_cache/memory_pool.py:317-327`), but `running_bs` excludes it
+  (`scheduler.py:3660-3663`). It is counted twice. With M = max_running_requests, R running
+  requests and a continuing chunk (C = 1), the limit is M - R - C while the pass already holds
+  C + n requests (n new), so admission stops at R + C + n = M - C = 127 and sets
+  `batch_is_full` (`scheduler.py:3976`). The flag is cleared only when a running request finishes
+  (`scheduler.py:4193-4197`, `4268-4269`) or a prefill batch shrinks (`3702-3703`); until
+  then the pass is skipped (`3846-3849`). The comment at `scheduler.py:3865-3867` assumes the
+  chunked request's row was released between chunks, which this version does not do. P4b's
+  waves are synchronised: each AIPerf phase is one wave of 128 requests with `ignore_eos` and
+  512 output tokens, nothing finishes while the wave is admitted, and with 2,046-2,048-token
+  prompts in 8,192-token passes the last pass of every wave carried a chunk tail. In all 56
+  wave plateaus of the three attempts (12 server logs: the eight A/B arms of the first, the two
+  preflight arms of the second and third; bench's server warm-up, AIPerf's warm-up and the
+  measured waves) the last pass had C = 1 and the batch stopped at 127 with one request
+  queued, as predicted (`p4_admission_plateaus.csv`). The 128th request then decoded alone
+  after the wave: in the third attempt it ended 1.8 s (dense) and 2.1 s (exact replay) after
+  the 127th, in profiling phases of 11.1 and 11.4 s. Ruled out by the same logs: the client
+  (AIPerf sent all 128; the server shows the 128th queued), the decode CUDA graphs (captured
+  up to 128), speculation (off), the KV pool (usage 0.40), the mamba slots (127 of 132) and
+  the overlap scheduler (the plateau held for whole 40-pass log windows).
+- Running-limit amendment (2026-10-01 at 14:29 UTC, before any further run): both arms
+  set `--max-running-requests 129` with the client at concurrency 128, so at most 128
+  requests are ever in the server. The limit at the last pass becomes 129 - R - 1, and the
+  wave reaches 129 - C = 128 with a chunk tail and min(129, 128) = 128 without one. The
+  amended preflight therefore predicts a peak of 128 running in both arms and no
+  single-request tail after the wave. The other pins are unchanged (655,360 KV tokens, 132
+  mamba slots, FP32 state). Side effects, from the code: the request-to-token pool has 129
+  rows; `resolve_max_num_reqs` gives min(129, 655,360 / 2, 132 / 1) = 129
+  (`mem_cache/kv_cache_configurator.py:2317-2348`; one mamba slot per request with the radix
+  cache off, `2257-2259`), so the mamba pin does not bind; the decode graph list gains a
+  batch-129 entry (`model_executor/runner/base_cuda_graph_runner.py:73-93`) that a batch of
+  128 never replays (it replays the batch-128 graph, as before). `validate_p4_ab.py`'s
+  pinned-pool constant reads 129 accordingly; `check_admission.py` and the rest of the
+  validator are unchanged. Rejected alternatives: disabling chunked prefill changes the
+  prefill schedule and, with the radix cache off, the cache class (`ChunkCache` is built only
+  with chunked prefill on, `mem_cache/registry.py:90-94`); concurrency 127 changes the declared
+  batch. The admission preflight (`run_p4_admission.sh`) runs on its own first; the full job
+  is queued only if it shows 128 running in both arms.
 - Primary metric (amended on 2026-10-01 at 08:19 and 08:22 UTC, before the run started; the first
   version named bench's `logged_gen_tps_full_batch`, which averages windows with at least
   0.9 x the peak running count, i.e. 116-128 of 128): the server's decode rate at exactly
@@ -438,6 +491,17 @@ python experiments/moonshot/ceilings.py --out evidence/moonshot/ceilings.json \
 python experiments/moonshot/token_map_coverage.py \
   ~/vp-data/moonshot/sweeps/plain/20260930-200640 \
   --out evidence/moonshot/token_map_coverage.csv
+```
+
+`p4_admission_plateaus.csv` (2c, the 127 plateau) is read from the server logs of the three
+void P4b attempts on CPU, by `admission_plateaus.py` at commit f84ef6c:
+
+```sh
+python experiments/moonshot/admission_plateaus.py \
+  ~/vp-data/moonshot/p4_ab_20261001T082738Z \
+  ~/vp-data/moonshot/p4_admission_20261001T104311Z \
+  ~/vp-data/moonshot/p4_admission_20261001T115146Z \
+  --csv evidence/moonshot/p4_admission_plateaus.csv
 ```
 
 Lever definitions (flags and environment per lever, lossy labels, conflicts):
