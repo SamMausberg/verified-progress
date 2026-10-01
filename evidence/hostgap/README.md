@@ -48,6 +48,11 @@ values, formula given), **pending** (queued, not yet run).
 | DFlash arm | bench `dflash` (block 8) + `--disable-radix-cache --max-mamba-cache-size 128 --max-total-tokens 1000000` |
 | Patch flags | `SGLANG_HOSTGAP_VERIFY_PLAN=1 SGLANG_HOSTGAP_DRAFT_INDPTR=1 SGLANG_HOSTGAP_DFLASH_DRAFT_PLAN=1` |
 
+The MTP arm resolves to the same server flags as bench's `mtp-tuned` arm on main. Bench's
+`dflash-tuned` arm differs from the DFlash arm here: it runs the draft with FA4 attention, so
+the FlashInfer draft planning that patch 0003 targets does not occur there (FA4's own host
+path was not examined).
+
 **Windows.** `cycle_profile.py` holds a batch of exactly B requests in decode: every window
 starts B fresh streaming greedy requests (prompts from the bench tune split, thinking on,
 `ignore_eos`, at most 4,096 tokens), waits until all decode, settles 1 s and measures, so no
