@@ -78,3 +78,72 @@ def test_self_consistency_flags_non_argmax_commit():
     run = {'p': rec([1, 2], [[[-0.1, 1], [-2.0, 2]], [[-0.1, 3], [-2.0, 2]]])}
     out = self_consistency(run)
     assert out['positions'] == 2 and out['not_argmax'] == 1
+
+
+def test_first_logprob_difference_without_a_token_change():
+    a = {'p': {'output_ids': [1, 2, 3], 'top_logprobs': [[[-0.1, 1]], [[-0.2, 2]], [[-0.3, 3]]]}}
+    b = {'p': {'output_ids': [1, 2, 3], 'top_logprobs': [[[-0.1, 1]], [[-0.2, 2]], [[-0.4, 3]]]}}
+    (row,) = compare_pair(a, b)
+    assert not row['diverged']
+    assert row['first_logprob_diff'] == 2
+    (same,) = compare_pair(a, a)
+    assert same['first_logprob_diff'] is None
+
+
+def test_commit_length_homogeneity_with_no_divergences():
+    from cycles import by_commit_length
+
+    zero = {'fragile_divergences': 0, 'nonfragile_divergences': 0}
+    buckets = {
+        '1/0': {**zero, 'fragile': 10},
+        '2/1': {**zero, 'fragile': 5},
+        'prefill_token': {**zero, 'fragile': 3},
+    }
+    res = by_commit_length(buckets)
+    assert res['by_length']['1'] == {
+        'fragile_divergences': 0,
+        'fragile': 10,
+        'divergences_per_fragile': 0.0,
+        'nonfragile_divergences': 0,
+    }
+    assert 'not_applicable' in res['homogeneity_chi2']
+
+
+def test_first_verify_cycle_is_not_counted_as_commit_length_one():
+    from cycles import analyse, by_commit_length
+
+    top = [[-0.6, 1], [-0.7, 2]]  # fragile everywhere (top-2 gap 0.1)
+    ref = {'p': {'output_ids': [1, 1, 1, 1, 1, 1], 'top_logprobs': [top] * 6}}
+    # Chunks: the prefill token, a first verify cycle of 3, then a cycle of 2.
+    spec = {
+        'p': {
+            'output_ids': [1, 1, 1, 1, 1, 1],
+            'top_logprobs': [top] * 6,
+            'chunks': [[1, None], [3, None], [2, None]],
+            'spec_verify_ct': 2,
+        }
+    }
+    buckets = analyse(ref, spec)['buckets']
+    assert set(buckets) == {'prefill_token', 'prefill/0', 'prefill/1', 'prefill/2', '3/0', '3/1'}
+    res = by_commit_length(buckets)
+    assert set(res['by_length']) == {'3'}
+    assert res['first_cycle_after_prefill']['fragile'] == 3
+
+
+def test_divergence_at_a_non_fragile_position_is_counted_apart():
+    from cycles import analyse, by_commit_length
+
+    sure = [[-0.01, 1], [-5.0, 2]]  # reference top-2 gap 4.99 nats: not fragile
+    ref = {'p': {'output_ids': [1, 1, 1, 1], 'top_logprobs': [sure] * 4}}
+    spec = {
+        'p': {
+            'output_ids': [1, 1, 1, 2],
+            'top_logprobs': [sure] * 3 + [[[-0.01, 2], [-5.0, 1]]],
+            'chunks': [[1, None], [2, None], [1, None]],
+            'spec_verify_ct': 2,
+        }
+    }
+    res = by_commit_length(analyse(ref, spec)['buckets'])
+    assert res['by_length']['2']['nonfragile_divergences'] == 1
+    assert res['by_length']['2']['fragile_divergences'] == 0
+    assert res['nonfragile_divergences'] == 1

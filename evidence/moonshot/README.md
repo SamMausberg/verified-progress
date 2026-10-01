@@ -193,14 +193,120 @@ cold; `gdn_exact_replay_bench.json`).** Mean over the L cursor phases:
 The state traffic falls from 2D to 1.25D at L = 4 (1.6x fewer bytes), but the kernel gains
 1.22x: replaying up to three rank-one updates per step in registers costs compute, and longer
 rings lose more than they save. With the GDN kernel at 41.6% of a B = 128 step (profile),
-1.22x on the kernel predicts about **1.08x end to end** at B = 128 (derived; less with the
+1.22x on the kernel predicts about **1.08x per decode step** at B = 128 (derived; less with the
 pre-registered 2,048-token prompts, where attention takes a larger share). The pre-registered
-claim was >= 1.10x; the end-to-end paired A/B is queued. The first attempt, with
+claim was >= 1.10x; the served paired A/B is queued. The first attempt, with
 `sglang.benchmark.one_batch`, aborted in both arms (base r0-r2 and exact_replay_l4 r0-r2):
 a single 262,144-token prefill hits an illegal memory access in
 `fused_qk_gemma_rmsnorm_rope_gate`. Both arms ran on the patched engine (patches
 0001-0009, exact replay off in the base arm); it has not been tried on stock `bd66ce343e`.
 The A/B now runs through the server with chunked prefill (run_p4b.sh).
+
+**Analysis of the served A/B, declared on 2026-10-01 at 07:12 UTC, before the run started**
+(agreed with the coordinator; the run script is `experiments/moonshot/run_p4b.sh`, committed
+with this declaration):
+
+- Design: batch 128, 2,048-token prompts (`long2048.jsonl`), 512 generated tokens, greedy,
+  FP32 state, no speculation, radix off, `--stream-interval 4`. Dense decode (A) against
+  exact replay at L = 4 (B), one server launch per arm, four pairs in A B B A A B B A order
+  (labels r1-r4).
+- Workload (by SHA-256; the files are in `~/vp-data/moonshot/workloads/`, made by
+  `make_long_prompts.py` from mixed-v2 confirm and warm-up): `long2048.jsonl` `db376fa3aadf75a30933a649b5ded1dfcafac8289b8e2aed1dde7201afd2659c`
+  (512 prompts, 91 distinct texts, templated length 2,046-2,048), warm-up pool `long2048_warmup.jsonl`
+  `b4b5b4e43b53f3c64083263113904868cccf23767aa0b3c5f1b45740c13130a6`.
+- Pools pinned identically in both arms (`p4_pools` lever): `--max-running-requests 128`,
+  `--max-total-tokens 655360` (360,448 in the void first run, below), `--max-mamba-cache-size
+  132` (128 in the two void attempts, below); each server's resolved sizes are read from its
+  log.
+- Validity (`validate_p4_ab.py`, before any ratio is computed): every arm ran the declared
+  workload with the greedy request body, all 256 requests completed with AIPerf exit 0, the
+  measured phase has at least 8 decode-log windows with exactly 128 requests running, the
+  pools resolved to the pinned
+  sizes (KV pool identical in all arms and at least 327,680 tokens), the exact-replay
+  dispatch line appears only in exact-replay logs, and the arms ran
+  in the declared order. A failed check voids the run; it is repeated and its numbers are
+  not reported.
+- Prompt check (corrected on 2026-10-01 at 10:05 UTC, after the run of 08:27-09:03 UTC and
+  before its verdict was computed or looked at): the run failed validation at "prompts not
+  as expected" in all eight arms. That check used bench's id-based `prompts_as_expected`,
+  which is wrong for this workload: `long2048.jsonl` holds 91 distinct texts among its 512
+  prompts (each repeated about 6 times; `make_long_prompts.py` cycles the source split and
+  its cursor returns to the same offsets), bench's `prompt_index` keeps one id per text
+  hash, and the warm-up pool reuses the same id names (`long2048-0000` to `-0255`), so the
+  ids bench records differ from the declared ones even when the right texts are sent. The corrected check compares content exactly: the multiset of SHA-256 hashes of the
+  prompt texts in the profiling phase of the raw AIPerf stream must equal that of the
+  declared file's first 256 prompts, counts included (`check_sent_prompts`). It passes in all
+  eight arms of `p4_ab_20261001T082738Z`. The repeats have no caching effect: the radix
+  cache is off in both arms. No other check changed.
+- First run void (run 20261001T082738Z, 08:27-09:03 UTC, repo e67feb1, engine c29a91692b).
+  The validator (run once at 10:08 UTC from e37eed1, identical to main 3982f1d) stopped at
+  "plain+no_radix+p4_pools_r1: at most 127 requests running"; no ratio was computed and no
+  verdict exists. In all eight arms the resolved pools were exactly as pinned
+  (max_running_requests 128, max_total_num_tokens 360,448, max_mamba_cache_size 128), the
+  batch peaked at 127 running with one request queued (44 decode windows each, mamba usage
+  0.99, KV usage about 0.73, no retractions), so the 128th request was never admitted. The
+  likely limit is SGLang's admission budget: with ignore_eos it reserves each request's full
+  512 output tokens and charges a shared-mamba cost per request in token units, which the
+  128 x 2,560 sizing ignored. Its kernel-level steps passed (kernel checks at tiles 32 and
+  16, tile-16 kernel bench, FlashInfer verify timing); its other results are not reported.
+- Rerun amendment (2026-10-01 at 10:11 and 10:16 UTC, before the rerun; the validator is unchanged):
+  the pinned KV pool is 655,360 tokens in both arms; a required admission preflight starts
+  each A/B arm's server with the pinned pools, sends 128 long prompts at the A/B's output
+  length (512, so the scheduler reserves the same tokens per request) and stops the job
+  unless its log shows `#running-req: 128` inside the measured point's AIPerf profiling phase
+  (`check_admission.py`; bench's server warm-up at a short output length does not count). The kernel checks at tiles
+  32 and 16, the tile-16 kernel bench and the FlashInfer verify timing are reused from run
+  20261001T082738Z (repo e67feb1, engine c29a91692b): they run one layer's kernels on
+  synthetic inputs and cannot depend on a server's pools; the rerun stops unless the engine
+  is still at c29a91692b and records the reuse in `p4b_<run id>.reused.json`. The server
+  output probe and the A/B are rerun.
+- Second attempt void (run 20261001T104311Z, 10:43-10:47 UTC, repo 40064ea, engine
+  c29a91692b): the admission preflight stopped the job before the probe and the A/B. Both
+  arms peaked at 127 running in the profiling phase with the KV pool at 655,360 tokens (usage
+  0.40), so KV was not the limit. Its log shows the 128th request queued with
+  `mamba num: 127, mamba usage: 0.99`: prompts are admitted five at a time under chunked
+  prefill (8,192 tokens per pass), and the last admission found no schedulable mamba slot
+  while one of the 128 was free; bench's radix-off servers with 128 slots reached 128 because
+  their short prompts were all admitted in one pass. No results of this attempt are reported.
+- Mamba-slot amendment (2026-10-01 at 10:55 UTC, before any further run): the A/B arms pin
+  `--max-mamba-cache-size 132` (128 + 4 slots of headroom), identical in both arms, with
+  `--max-running-requests 128` and `--max-total-tokens 655360` unchanged;
+  `validate_p4_ab.py`'s pinned-pool constant reads 132 accordingly (no other validator
+  change). The admission preflight is run on its own first; the full job is queued only after
+  it shows 128 running in both arms.
+- Primary metric (amended on 2026-10-01 at 08:19 and 08:22 UTC, before the run started; the first
+  version named bench's `logged_gen_tps_full_batch`, which averages windows with at least
+  0.9 x the peak running count, i.e. 116-128 of 128): the server's decode rate at exactly
+  128 running requests in the measured phase. The scheduler logs one `gen throughput` per 40
+  decode passes; a window counts when it shows `#running-req: 128`, the previous decode line
+  also shows 128, no `Prefill batch` line lies between the two (a window containing a prefill
+  pass mixes prefill time into its rate), and both lines fall inside the AIPerf profiling
+  phase (first request start to last request end), which excludes the AIPerf warm-up wave
+  and the ramp and drain; the excluded windows at 128 are counted and recorded. Windows carry
+  equal token counts (128 per pass, no speculation), so the rate is the harmonic mean of the
+  window rates; fewer than 8 such windows in any arm voids the run. Bench's
+  `logged_gen_tps_full_batch` is recorded beside it as a diagnostic. The metric measures
+  decode only, which is what the lever changes; the client throughput y includes the
+  2,048-token prefills, and client y and its ratio are reported beside it.
+- Statistic: per pair, the ratio B / A; the mean of the four log ratios with a t interval,
+  t(3) = 3.182, exponentiated to a 95% interval for the ratio.
+- Decision (pre-registered threshold 1.10x): rejected if the interval's upper end is below
+  1.10; supported if its lower end is at or above 1.10; otherwise inconclusive. A supported
+  result is worded "served decode throughput at 128 running requests 1.xx times", never as an end-to-end
+  speedup, with client y and its ratio beside it.
+- Server output probe: greedy tokens and top-20 logprobs at concurrency 1, exact replay
+  against dense. A difference refutes end-to-end exactness; a pass does not establish it
+  (the probe sees only the emitted tokens and the top-20 logprobs, not the state or the
+  hidden outputs). Bit-exactness is shown only at kernel level (above). Every exact-replay
+  server log must show the exact-replay kernel dispatch line. A second dense server
+  (`plain+no_radix#2`) against the same reference is the noise control: if it differs, the
+  probe is undecided.
+- How the two combine (`output_probe.py`, `validate_p4_ab.py`): the verdict always states
+  both, as "throughput <supported|rejected|inconclusive>; <probe outcome>". If the probe
+  refuted exactness, it reads "end-to-end exactness REFUTED by the output probe; P4 exact
+  claim not supported", whatever the throughput interval says; it never reads as plain
+  support.
+- Derived expectation before the run: about 1.08x at a 418-token context, less at 2,048.
 
 ## 2d. Speculative host gap: configuration-level levers (measured, single runs)
 
@@ -291,7 +397,7 @@ to the measured noise floor); "lossy" changes them and needs the quality budget 
 | 1 | Public DFlash-4B drafter (z-lab) | latency | exact | drafter measured tau 6.18 at c=1, block 16 (`evidence/drafter/acceptance_summary.csv`); model card 3.4-4.6x on B200 | none | serving works | drafter owns baseline; I stack levers on it |
 | 2 | Remove the speculative host gap (MTP/DFlash, c=1-4) | latency | `--attention-backend triton`: class pending bench's equality classification (it changes the target's attention arithmetic; bench's first pair, 3.80/1K against the 3.42/1K plain c=1-vs-32 floor, combines Triton with ReplaySSM-spec, so it does not isolate Triton); `--speculative-draft-attention-backend triton`: exact (draft only) | measured: Triton for target and draft 1.18x at c=1, 1.14x at c=4; draft only 1.08x / 1.06x (2d) | none for draft-only | flag; engine fix by hostgap | DFlash + Triton attention queued |
 | 3 | FP16 GDN state + capacity lift (radix off, 256-1,024) | throughput | lossy, likely near-lossless | measured 1.24x at c=128; derived ceiling 1.46x | pending (DAMP: FP16 near-lossless, BF16 not) | flags only | quality and c>=256 sweeps queued |
-| 4 | Strict write-avoiding replay (P4, patch 0007) | throughput | bit-identical to the packed decode at kernel level (synthetic activations, one layer; 2c); end-to-end probe queued | kernel 1.22x at B=128/256 (L=4); traffic-only ceiling 1.18x at B=128 (f = 0.416); derived ~1.08x end to end, below the pre-registered 1.10x gate | none | built | server A/B pending (run_p4b.sh) |
+| 4 | Strict write-avoiding replay (P4, patch 0007) | throughput | bit-identical to the packed decode at kernel level (synthetic activations, one layer; 2c); end-to-end probe queued | kernel 1.22x at B=128/256 (L=4); traffic-only ceiling 1.18x at B=128 (f = 0.416); derived ~1.08x per decode step, below the pre-registered 1.10x gate | none | built | server A/B pending (run_p4b.sh) |
 | 5 | MTP + ReplaySSM-spec at high batch | throughput | class pending measurement; mechanism suggests lossy (verify outputs from a chunked UT transform on TF32 tensor cores) | derived 34.3k vs plain 23.7k (FP32) | none | flags only | queued |
 | 6 | INT4 QAD target (nota-ai) with its INT4 DFlash drafter | latency | lossy | verify weight bytes 8.4 -> 3.3 GB (2.6x fewer, derived from the safetensors headers); arXiv 2607.04244 reports 6.98x over its baseline on an A10G | the same report: MMLU-Pro 0.690 -> 0.659, IFEval 0.857 -> 0.845, GPQA-D 0.700 -> 0.667; GSM8K here pending | checkpoints local | load test queued |
 | 7 | Hot-vocab draft head (patches 0001 MTP, 0005 DFlash) | latency | exact | MTP cycle floor -26% at c=1 | none | built | queued |
