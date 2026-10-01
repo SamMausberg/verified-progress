@@ -14,7 +14,7 @@
 \term{main}{Enclosure, interval $[lo_i,hi_i]$}{An interval that contains the value it encloses, given the stated assumptions, computed with outward rounding.}
 \term{main}{Candidate}{A vocabulary entry the screen cannot exclude; it is recomputed from its BF16 row.}
 \term{main}{Certified position}{A position whose \Rstock{} token the intervals fix for every accumulator value the error model admits.}
-\term{main}{Fallback}{The stock head at the same batch shape, for a position the intervals cannot decide: on the whole batch, or per position over its gathered candidates (the column fallback in the evidence).}
+\term{main}{Fallback}{The stock head at the same batch shape, for a position the intervals cannot decide: on the whole batch, or per position over its gathered candidates, the per-position fallback (called the column fallback in the evidence files).}
 \term{main}{Capture, replay}{Head inputs recorded bit for bit from the running engine; their offline re-evaluation (Section~\ref{sec:transport-capture}).}
 \term{main}{Held-out}{From prompts that no choice of head, bound or threshold was fitted on.}
 \term{main}{Transport; tile summary}{Bounds carried from a drafter's per-tile summaries to the target's head input; the largest score and the sum of exponentiated scores of a tile of vocabulary entries at the drafter's head input.}

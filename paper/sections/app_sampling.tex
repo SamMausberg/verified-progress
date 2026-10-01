@@ -2,6 +2,7 @@
 % States and proves Theorems race and fixednoise (Definition srace); Proposition coupling and
 % Theorems guards, residualrace and residualself with their proofs. None of the alternatives
 % to fixed-noise verification is implemented on the GPU.
+\appneedspace{10\baselineskip}
 \section{Sampled decisions: further analysis}\label{app:sampling}
 The engine path of Section~\ref{sec:decisions} verifies sampled drafts with a fixed noise field, which turns every sampled decision into a race. This appendix states and proves the two theorems behind that choice, the certified race and fixed-noise verification (Appendix~\ref{app:fixednoise}), and develops what the choice avoids: the standard acceptance rule evaluated with enclosures, residual races and adaptive verification depth. Every statement takes enclosures of the logits as input and does not depend on the mechanism that produced them, so it applies to transport as well as to the int8 copy. None of these alternatives is implemented on the GPU. The research notes treat sampling before the scores are known, an approximate mode, a demand frontier over a fixed protocol and a CPU experiment that shows why the alternatives were not built (their Sections~\notessec{app:commonmass}{7.4} to~\notessec{app:synthetic}{7.7}).
 

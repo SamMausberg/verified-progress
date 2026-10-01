@@ -3,6 +3,7 @@
 % static, summary are stated and proved here.
 % Evidence: register entries head-constants, rho, transport, transport-mtp, rho-mtp, stats-mtp, stats-dflash,
 % selfevidence-dflash; numbers read from the committed JSON and CSV files named there.
+\appneedspace{10\baselineskip}
 \section{Transport: supplementary analysis and results}\label{app:transport}
 Section~\ref{sec:transport} states the transport bound, the condition under which it can be tighter than the int8 copy's error bound, and its measured failure on both drafters. This appendix gives the geometry a transport bound can use, the proofs behind the crossover, the full weight-only constants, how the draft and target pairs were captured and checked, and the measurements the main text summarizes: the drift by block position, outcome, domain and context, certification by bound family, sampled acceptance, batch unions, and the drift-scaling extrapolation. Throughout, $W$ is the tied head, $h^d$ and $h^t$ are the draft and target head inputs behind the same verified draft token, $\Delta=h^t-h^d$, and a tile $c$ has centre $\mu_c$ and radius $r_c$ as in Theorem~\ref{thm:transport}.
 
