@@ -57,9 +57,10 @@ def proxy(s_d: list[float], horizon: int, decayed: bool) -> list[float]:
         if m < n:
             out.append(max(s_d[m - 1], s_d[m] / s_d[0]))
         elif m == n:
-            # S_D(16) is not measured: extend the slot-1-conditioned form by DFlash's own
-            # acceptance at position 15.
-            out.append(max(s_d[n - 1], s_d[n - 1] / s_d[0] * alphas[n - 1]))
+            # S_D(16) is not measured: take S_D(16) = S_D(15) (no further decay) or, in the
+            # decayed variant, S_D(15) times the mean late acceptance.
+            s_d16 = s_d[n - 1] * (late if decayed else 1.0)
+            out.append(max(s_d[n - 1], s_d16 / s_d[0]))
         else:
             out.append(out[-1] * (late if decayed else 1.0))
     return out
