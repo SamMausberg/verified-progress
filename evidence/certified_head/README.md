@@ -160,7 +160,13 @@ device, the rows whose token differs; the emitted tokens are the certified ones.
 For fixed-noise sampled verify the comparison is with SGLang's seeded sampler
 (`div_(T)`, FP32 softmax and log, `multinomial_with_seed`) applied to the same
 verify logits, outside the graph, under `--enable-deterministic-inference`; this is
-that path's contract, not plain seeded decoding.
+that path's contract, not plain seeded decoding. In that mode SGLang replaces
+`aten::mm` with its batch-invariant Triton matmul (FP32 accumulation over 64- or
+32-wide K tiles, no split-K, BF16 round-to-nearest output), so the sampled arm's
+stock head, and the certified head's fallback, which calls the same `torch.matmul`,
+run that kernel instead of cuBLAS. The sampled arm used the conservative error
+model, which covers any FP32 accumulation; the Hopper model is validated for the
+cuBLAS head only, and patch 0006 refuses it under deterministic inference.
 
 Setup: shared GPU lock, `--mem-fraction-static 0.25`, 64 prompts (every fifth of
 the geometry workstream's public prompt set), up to 256 new tokens, greedy except
@@ -216,8 +222,8 @@ move a seeded token, while the BF16 logits and FP32 softmax together do.
 | File | What | Command |
 |---|---|---|
 | `stock_invariance.json` | stock GEMM kernel per M, reduced-precision flag test, row/column-subset invariance, observed accumulation error, library versions | `python experiments/certified_head/stock_invariance.py --out evidence/certified_head/stock_invariance.json` (commit fd0fd4a, GPU) |
-| `engine_v1.json` | per-arm counters, client summaries and comparisons of the SGLang validation | `scripts/gpu_lock.sh -s experiments/certified_head/engine_validate.sh OUT plain_check mtp_check dflash_check mtp_draft_check dflash_draft_check mtp_sampled_check plain_check_columns plain_c1 plain_c1_stock mtp_c1 mtp_c1_stock`, then `python experiments/certified_head/engine_summary.py OUT --out evidence/certified_head/engine_v1.json` (repo 8f4f3d7, engine 71c521db = patches 0001-0004) |
-| `p8_witnesses.json` | seeded-token differences between SGLang's chain, an FP64 log and exact arithmetic on 60,000 real rows, with the first witnesses | `python experiments/certified_head/p8_witness_search.py --rows 60000 --out evidence/certified_head/p8_witnesses.json` (commit ab507a9, GPU, shared lock) |
+| `engine_v1.json` | per-arm counters, client summaries and comparisons of the SGLang validation | `scripts/gpu_lock.sh -s experiments/certified_head/engine_validate.sh OUT plain_check mtp_check dflash_check mtp_draft_check dflash_draft_check mtp_sampled_check plain_check_columns plain_c1 plain_c1_stock mtp_c1 mtp_c1_stock`, then `python experiments/certified_head/engine_summary.py OUT --out evidence/certified_head/engine_v1.json` (repo 8f4f3d7, tag `kernel-engine-v1`; rebased twin c58a859 has identical `src/certified_head`, `experiments/certified_head`, tests and patches; engine 71c521db = patches 0001-0004) |
+| `p8_witnesses.json` | seeded-token differences between SGLang's chain, an FP64 log and exact arithmetic on 60,000 real rows, with the first witnesses | `python experiments/certified_head/p8_witness_search.py --rows 60000 --out evidence/certified_head/p8_witnesses.json` (commit ab507a9, tag `kernel-p8-witness-search`; rebased twin 24e213a has an identical search script and the modules it imports; GPU, shared lock) |
 | `fallback_vs_model.json` | undecided fraction versus the stock error bound | `python experiments/certified_head/fallback_vs_model.py --rows 20000 --out evidence/certified_head/fallback_vs_model.json` (CPU) |
 
 Real head inputs come from the geometry workstream's plain-decode capture

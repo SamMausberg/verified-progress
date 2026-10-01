@@ -1,0 +1,45 @@
+From a630d715c45c1df7673a872f27f155e5568396e9 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Thu, 1 Oct 2026 00:35:52 +0000
+Subject: [PATCH] Certified LM head: keep the Hopper model to the cuBLAS head
+
+--enable-deterministic-inference replaces aten::mm with SGLang's
+batch-invariant Triton matmul (FP32 accumulation over BLOCK_K tiles, no
+split-K), so the head's stock GEMM is no longer cuBLAS. The conservative
+error model covers any FP32 accumulation; the hopper-wgmma model was derived
+and checked for the cuBLAS kernels only, so that combination now keeps the
+stock head with a warning.
+---
+ python/sglang/srt/layers/certified_head.py | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/python/sglang/srt/layers/certified_head.py b/python/sglang/srt/layers/certified_head.py
+index b93ab2d361..e96cb820cc 100644
+--- a/python/sglang/srt/layers/certified_head.py
++++ b/python/sglang/srt/layers/certified_head.py
+@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Set, Tuple
+ import torch
+ 
+ from sglang.srt.environ import envs
++from sglang.srt.runtime_context import get_exec
+ 
+ if TYPE_CHECKING:
+     from sglang.srt.layers.logits_processor import LogitsProcessorOutput
+@@ -115,6 +116,14 @@ def _unsupported(model_runner) -> Optional[str]:
+         return "SGLANG_SANITIZE_NAN_LOGITS changes the stock argmax on nonfinite logits"
+     if envs.SGLANG_ENABLE_ASYNC_ASSERT.get():
+         return "SGLANG_ENABLE_ASYNC_ASSERT reads the logits a certified step skips"
++    if (
++        envs.SGLANG_CERTIFIED_HEAD_MODEL.get() == "hopper-wgmma"
++        and get_exec().deterministic.enable_deterministic_inference
++    ):
++        # Deterministic inference replaces aten::mm with a batch-invariant Triton
++        # matmul; the Hopper model describes the cuBLAS head and is not checked
++        # for that kernel. The conservative model covers any FP32 accumulation.
++        return "the hopper-wgmma model is validated only for the cuBLAS head"
+     return None
+ 
+ 
+-- 
+2.34.1
+

@@ -163,6 +163,21 @@ run_arm() {
     || rc=$?
   stop_server
   grep -E "Certified LM head|Traceback|Error" "$dir/server.log" | head -20 >"$dir/server_notes.txt" || true
+  # A check arm fails if any certified row differed from the stock row, or if the
+  # server wrote no counters (the head was not installed).
+  if [[ $arm == *_check* ]] && [ "$rc" -eq 0 ]; then
+    python - "$dir/certified_stats.json" <<'PY' || rc=1
+import json, sys
+try:
+    paths = json.load(open(sys.argv[1]))['paths']
+except (OSError, ValueError, KeyError) as exc:
+    sys.exit(f'no certified counters: {exc}')
+bad = {p: v['mismatch_rows'] for p, v in paths.items() if v['mismatch_rows']}
+calls = sum(v['calls'] for v in paths.values())
+print(f'certified calls {calls}, rows differing from stock {bad or 0}')
+sys.exit(1 if bad or not calls else 0)
+PY
+  fi
   return "$rc"
 }
 

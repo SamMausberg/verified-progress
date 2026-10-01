@@ -114,7 +114,7 @@ split size to FlashInfer's target-verify plan, as decode and extend already do. 
 does not make MTP speculation batch-invariant under `--enable-deterministic-inference`
 (see `evidence/state_safety/README.md`); it is kept because a committed run used it.
 
-## kernel (`patches/kernel/0001-0005`, branch `engine/kernel`)
+## kernel (`patches/kernel/0001-0006`, branch `engine/kernel`)
 
 The certified LM head (`src/certified_head/`, PR #45) on SGLang's head paths. The
 engine imports the package from `SGLANG_CERTIFIED_HEAD_SRC`; it is not copied into
@@ -132,7 +132,8 @@ on that path captures the certified head under a device flag and SGLang's own he
 under its negation; the host sets the flag per replay only for batches that need no
 logits, so other batches, eager forwards and unsupported configurations (TP or PP > 1,
 DP attention, quantized, LoRA, FP32, scaled or softcapped heads, padded vocabularies,
-`SGLANG_SANITIZE_NAN_LOGITS`, `SGLANG_ENABLE_ASYNC_ASSERT`) run the stock head.
+`SGLANG_SANITIZE_NAN_LOGITS`, `SGLANG_ENABLE_ASYNC_ASSERT`, the Hopper model under
+deterministic inference) run the stock head.
 
 | Patch | What it changes | Default behaviour |
 |---|---|---|
@@ -141,6 +142,7 @@ DP attention, quantized, LoRA, FP32, scaled or softcapped heads, padded vocabula
 | 0003 | `SGLANG_CERTIFIED_HEAD_DRAFT=1`: MTP draft top-1 (draft steps inside the draft graph and the draft-extend token) and DFlash's greedy draft projection. | unchanged unless set |
 | 0004 | `SGLANG_CERTIFIED_HEAD_SAMPLED_VERIFY=1`: fixed-noise sampled verify for EAGLE/MTP with seeded temperature-only sampling (`--enable-deterministic-inference`); accepts a draft iff it equals SGLang's seeded sample of the verify row. It replaces the stock rejection-sampling verify. | unchanged unless set |
 | 0005 | Records the row counts of certified steps in the stats file. | unchanged unless `_STATS` is set |
+| 0006 | With `--enable-deterministic-inference` the head's stock GEMM is SGLang's batch-invariant Triton matmul, not cuBLAS; `SGLANG_CERTIFIED_HEAD_MODEL=hopper-wgmma` (derived for cuBLAS) then keeps the stock head with a warning. | unchanged unless set |
 
 Validation: `experiments/certified_head/engine_validate.sh` (check mode per path and
 one request at a time against the stock server; results in

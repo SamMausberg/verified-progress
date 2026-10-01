@@ -57,7 +57,7 @@ All are off by default; with none set the patched engine runs its stock code.
 
 ## The SGLang patch series
 
-`engine/sglang/patches/kernel/0001-0005` apply in order to `bd66ce34`:
+`engine/sglang/patches/kernel/0001-0006` apply in order to `bd66ce34`:
 
 ```sh
 scripts/sglang_worktree.sh kernel
@@ -73,11 +73,17 @@ export SGLANG_CERTIFIED_HEAD_SRC="$PWD/src" SGLANG_CERTIFIED_HEAD_DECODE=1
 | 0003 | MTP draft top-1 (draft steps in the draft graph, and the draft-extend token) and DFlash's greedy draft projection | `DRAFT` |
 | 0004 | fixed-noise sampled verify for EAGLE/MTP (seeded, temperature only; needs `--enable-deterministic-inference`) | `SAMPLED_VERIFY` |
 | 0005 | the stats file records the row counts of certified steps | `STATS` |
+| 0006 | keeps the stock head if `hopper-wgmma` is combined with deterministic inference | `MODEL` |
 
 Patch 0004 needs `--enable-deterministic-inference`, which is what gives every
 request a seed; its reference is stock SGLang in that mode (a different engine
 configuration from the default), namely SGLang's seeded sampler applied to the
-verify pass's own logits. It replaces the stock rejection-sampling verify, so
+verify pass's own logits. That mode also replaces `aten::mm` with SGLang's
+batch-invariant Triton matmul, so the stock head (and the certified head's
+fallback, which calls the same `torch.matmul`) is that kernel, not cuBLAS: use the
+conservative error model there. Patch 0006 refuses `hopper-wgmma` under
+deterministic inference, since that model was derived and checked for the cuBLAS
+head only. It replaces the stock rejection-sampling verify, so
 its outputs are equal in law to target sampling but are not compared token by
 token with default-mode stock outputs.
 

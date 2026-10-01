@@ -25,8 +25,6 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
-import requests
-
 MODEL = 'Qwen/Qwen3.5-4B'
 REVISION = '851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a'
 PROMPTS = Path('~/vp-data/geometry/prompts.jsonl').expanduser()
@@ -43,6 +41,7 @@ def render(tokenizer: Any, prompt: dict[str, Any]) -> str:
 
 
 def run(args: argparse.Namespace) -> None:
+    import requests
     from transformers import AutoTokenizer
 
     tokenizer = AutoTokenizer.from_pretrained(MODEL, revision=REVISION)
@@ -100,8 +99,10 @@ def load(path: Path) -> dict[int, list[int]]:
 
 
 def compare(args: argparse.Namespace) -> None:
+    """Exit 1 if any prompt's tokens differ or a prompt is missing from either run."""
     a, b = load(args.a), load(args.b)
     common = sorted(set(a) & set(b))
+    only_a, only_b = sorted(set(a) - set(b)), sorted(set(b) - set(a))
     diverged = []
     compared = 0
     for pid in common:
@@ -119,11 +120,15 @@ def compare(args: argparse.Namespace) -> None:
         'prompts': len(common),
         'identical': len(common) - len(diverged),
         'diverged': diverged,
+        'only_in_a': only_a,
+        'only_in_b': only_b,
         'tokens_compared_before_divergence': compared,
     }
     print(json.dumps(report, indent=1))
     if args.out:
         args.out.write_text(json.dumps(report, indent=1) + '\n')
+    if diverged or only_a or only_b:
+        raise SystemExit(1)
 
 
 def main() -> None:
