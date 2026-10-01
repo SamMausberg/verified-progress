@@ -1,0 +1,3572 @@
+{
+ "t371": {
+  "env": {
+   "repo_commit": "deb77cf5af8a93150efa102aab47d18c7293b9a4",
+   "repo_dirty": false,
+   "triton": "3.7.1",
+   "torch": "2.13.0+cu130",
+   "cuda_runtime": "13.0",
+   "ptxas_sm90": {
+    "path": "/home/ubuntu/sglang/.venv/lib/python3.12/site-packages/triton/backends/nvidia/bin/ptxas",
+    "version": "12.8"
+   },
+   "ptxas_override_vars": {
+    "TRITON_PTXAS_PATH": null,
+    "TRITON_PTXAS_BLACKWELL_PATH": null
+   },
+   "gpu_and_driver": "NVIDIA GH200 480GB, 570.195.03"
+  },
+  "totals": {
+   "head": {
+    "cases": 150,
+    "cases_wrong": 72
+   },
+   "minimal": {
+    "cases": 150,
+    "cases_wrong": 0
+   }
+  },
+  "table": [
+   {
+    "kernel": "head",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 6,
+    "wrong_entries": 321122,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 6
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 8,
+    "wrong_entries": 976033,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 8
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 10,
+    "wrong_entries": 3116484,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 10
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 10,
+    "wrong_entries": 14441936,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 10
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 10,
+    "wrong_entries": 222674,
+    "cases_with_nan_or_inf": 10,
+    "repeats_differ": 10
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 10,
+    "wrong_entries": 727432,
+    "cases_with_nan_or_inf": 10,
+    "repeats_differ": 9
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 8,
+    "wrong_entries": 67946,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 8
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 10,
+    "wrong_entries": 315035,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 10
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   }
+  ]
+ },
+ "t371_ptxas134": {
+  "env": {
+   "repo_commit": "deb77cf5af8a93150efa102aab47d18c7293b9a4",
+   "repo_dirty": false,
+   "triton": "3.7.1",
+   "torch": "2.13.0+cu130",
+   "cuda_runtime": "13.0",
+   "ptxas_sm90": {
+    "path": "/home/ubuntu/vp-data/upstream/triton/venv-main/lib/python3.12/site-packages/triton/backends/nvidia/bin/ptxas-blackwell",
+    "version": "13.4"
+   },
+   "ptxas_override_vars": {
+    "TRITON_PTXAS_PATH": "/home/ubuntu/vp-data/upstream/triton/venv-main/lib/python3.12/site-packages/triton/backends/nvidia/bin/ptxas-blackwell",
+    "TRITON_PTXAS_BLACKWELL_PATH": null
+   },
+   "gpu_and_driver": "NVIDIA GH200 480GB, 570.195.03"
+  },
+  "totals": {
+   "head": {
+    "cases": 150,
+    "cases_wrong": 65
+   },
+   "minimal": {
+    "cases": 150,
+    "cases_wrong": 0
+   }
+  },
+  "table": [
+   {
+    "kernel": "head",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 6,
+    "wrong_entries": 194247,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 6
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 8,
+    "wrong_entries": 761106,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 8
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 10,
+    "wrong_entries": 997394,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 10
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 10,
+    "wrong_entries": 4464884,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 10
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 3,
+    "wrong_entries": 11084,
+    "cases_with_nan_or_inf": 1,
+    "repeats_differ": 3
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 8,
+    "wrong_entries": 29666,
+    "cases_with_nan_or_inf": 7,
+    "repeats_differ": 8
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 10,
+    "wrong_entries": 3775958,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 10
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 10,
+    "wrong_entries": 14856913,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 10
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   }
+  ]
+ },
+ "t380": {
+  "env": {
+   "repo_commit": "deb77cf5af8a93150efa102aab47d18c7293b9a4",
+   "repo_dirty": false,
+   "triton": "3.8.0",
+   "torch": "2.13.0+cu130",
+   "cuda_runtime": "13.0",
+   "ptxas_sm90": {
+    "path": "/home/ubuntu/vp-data/upstream/triton/venv-3.8.0/lib/python3.12/site-packages/triton/backends/nvidia/bin/ptxas",
+    "version": "12.9"
+   },
+   "ptxas_override_vars": {
+    "TRITON_PTXAS_PATH": null,
+    "TRITON_PTXAS_BLACKWELL_PATH": null
+   },
+   "gpu_and_driver": "NVIDIA GH200 480GB, 570.195.03"
+  },
+  "totals": {
+   "head": {
+    "cases": 150,
+    "cases_wrong": 55
+   },
+   "minimal": {
+    "cases": 150,
+    "cases_wrong": 0
+   }
+  },
+  "table": [
+   {
+    "kernel": "head",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 10,
+    "wrong_entries": 224969,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 10
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 10,
+    "wrong_entries": 1106355,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 10
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 7,
+    "wrong_entries": 9642,
+    "cases_with_nan_or_inf": 3,
+    "repeats_differ": 7
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 8,
+    "wrong_entries": 20137,
+    "cases_with_nan_or_inf": 7,
+    "repeats_differ": 7
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 10,
+    "wrong_entries": 248769,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 10
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 10,
+    "wrong_entries": 1031178,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 10
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   }
+  ]
+ },
+ "t380_ptxas133": {
+  "env": {
+   "repo_commit": "deb77cf5af8a93150efa102aab47d18c7293b9a4",
+   "repo_dirty": false,
+   "triton": "3.8.0",
+   "torch": "2.13.0+cu130",
+   "cuda_runtime": "13.0",
+   "ptxas_sm90": {
+    "path": "/home/ubuntu/vp-data/upstream/triton/venv-3.8.0/lib/python3.12/site-packages/triton/backends/nvidia/bin/ptxas-blackwell",
+    "version": "13.3"
+   },
+   "ptxas_override_vars": {
+    "TRITON_PTXAS_PATH": "/home/ubuntu/vp-data/upstream/triton/venv-3.8.0/lib/python3.12/site-packages/triton/backends/nvidia/bin/ptxas-blackwell",
+    "TRITON_PTXAS_BLACKWELL_PATH": null
+   },
+   "gpu_and_driver": "NVIDIA GH200 480GB, 570.195.03"
+  },
+  "totals": {
+   "head": {
+    "cases": 150,
+    "cases_wrong": 0
+   },
+   "minimal": {
+    "cases": 150,
+    "cases_wrong": 0
+   }
+  },
+  "table": [
+   {
+    "kernel": "head",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   }
+  ]
+ },
+ "t380_ptxas134": {
+  "env": {
+   "repo_commit": "deb77cf5af8a93150efa102aab47d18c7293b9a4",
+   "repo_dirty": false,
+   "triton": "3.8.0",
+   "torch": "2.13.0+cu130",
+   "cuda_runtime": "13.0",
+   "ptxas_sm90": {
+    "path": "/home/ubuntu/vp-data/upstream/triton/venv-main/lib/python3.12/site-packages/triton/backends/nvidia/bin/ptxas-blackwell",
+    "version": "13.4"
+   },
+   "ptxas_override_vars": {
+    "TRITON_PTXAS_PATH": "/home/ubuntu/vp-data/upstream/triton/venv-main/lib/python3.12/site-packages/triton/backends/nvidia/bin/ptxas-blackwell",
+    "TRITON_PTXAS_BLACKWELL_PATH": null
+   },
+   "gpu_and_driver": "NVIDIA GH200 480GB, 570.195.03"
+  },
+  "totals": {
+   "head": {
+    "cases": 150,
+    "cases_wrong": 0
+   },
+   "minimal": {
+    "cases": 150,
+    "cases_wrong": 0
+   }
+  },
+  "table": [
+   {
+    "kernel": "head",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   }
+  ]
+ },
+ "tmain": {
+  "env": {
+   "repo_commit": "deb77cf5af8a93150efa102aab47d18c7293b9a4",
+   "repo_dirty": false,
+   "triton": "3.9.0",
+   "torch": "2.13.0+cu130",
+   "cuda_runtime": "13.0",
+   "ptxas_sm90": {
+    "path": "/home/ubuntu/vp-data/upstream/triton/venv-main/lib/python3.12/site-packages/triton/backends/nvidia/bin/ptxas-blackwell",
+    "version": "13.4"
+   },
+   "ptxas_override_vars": {
+    "TRITON_PTXAS_PATH": null,
+    "TRITON_PTXAS_BLACKWELL_PATH": null
+   },
+   "gpu_and_driver": "NVIDIA GH200 480GB, 570.195.03"
+  },
+  "totals": {
+   "head": {
+    "cases": 150,
+    "cases_wrong": 0
+   },
+   "minimal": {
+    "cases": 150,
+    "cases_wrong": 0
+   }
+  },
+  "table": [
+   {
+    "kernel": "head",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   }
+  ]
+ },
+ "tmain_ptxas129": {
+  "env": {
+   "repo_commit": "deb77cf5af8a93150efa102aab47d18c7293b9a4",
+   "repo_dirty": false,
+   "triton": "3.9.0",
+   "torch": "2.13.0+cu130",
+   "cuda_runtime": "13.0",
+   "ptxas_sm90": {
+    "path": "/home/ubuntu/vp-data/upstream/triton/venv-3.8.0/lib/python3.12/site-packages/triton/backends/nvidia/bin/ptxas",
+    "version": "12.9"
+   },
+   "ptxas_override_vars": {
+    "TRITON_PTXAS_PATH": null,
+    "TRITON_PTXAS_BLACKWELL_PATH": "/home/ubuntu/vp-data/upstream/triton/venv-3.8.0/lib/python3.12/site-packages/triton/backends/nvidia/bin/ptxas"
+   },
+   "gpu_and_driver": "NVIDIA GH200 480GB, 570.195.03"
+  },
+  "totals": {
+   "head": {
+    "cases": 150,
+    "cases_wrong": 46
+   },
+   "minimal": {
+    "cases": 150,
+    "cases_wrong": 0
+   }
+  },
+  "table": [
+   {
+    "kernel": "head",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 7,
+    "wrong_entries": 191322,
+    "cases_with_nan_or_inf": 6,
+    "repeats_differ": 7
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 8,
+    "wrong_entries": 1242922,
+    "cases_with_nan_or_inf": 6,
+    "repeats_differ": 8
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 4,
+    "wrong_entries": 2467,
+    "cases_with_nan_or_inf": 2,
+    "repeats_differ": 4
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 6,
+    "wrong_entries": 8567,
+    "cases_with_nan_or_inf": 5,
+    "repeats_differ": 6
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 1,
+    "wrong_entries": 1024,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 1
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 10,
+    "wrong_entries": 22253416,
+    "cases_with_nan_or_inf": 10,
+    "repeats_differ": 10
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 10,
+    "wrong_entries": 93796674,
+    "cases_with_nan_or_inf": 10,
+    "repeats_differ": 10
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "head",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     64,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     64,
+     64,
+     4,
+     4
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     64,
+     8,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 8192,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 65536,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   },
+   {
+    "kernel": "minimal",
+    "tile": [
+     128,
+     128,
+     128,
+     4,
+     3
+    ],
+    "rows": 248320,
+    "cases": 10,
+    "cases_wrong": 0,
+    "wrong_entries": 0,
+    "cases_with_nan_or_inf": 0,
+    "repeats_differ": 0
+   }
+  ]
+ }
+}
