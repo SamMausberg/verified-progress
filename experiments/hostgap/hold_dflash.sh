@@ -42,3 +42,6 @@ else
 fi
 echo "=== hold end $(date -u +%FT%TZ) ($((SECONDS - T0)) s)"
 nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader
+# A failed equality or validation check fails the hold (the steps above still ran
+# the stock profiles, so the hold's output is usable for the stock side).
+[ "$OK" = 1 ] || { echo "=== hold failed: DFlash equality or validation did not pass"; exit 1; }
