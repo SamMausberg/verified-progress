@@ -82,3 +82,98 @@ speculative-algorithm = "DFLASH"
 speculative-draft-model-path = "z-lab/Qwen3.5-4B-DFlash"
 speculative-draft-model-revision = "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf"
 speculative-dflash-block-size = 8
+
+# ---------------------------------------------------------------------------
+# Tuned arms (chosen on the tune split; evidence/bench/tuning/). All run without
+# the radix cache: this workload has no prefix reuse, and it frees the GDN state
+# memory that deeper drafts and buffered verify need at capacity 128. Each
+# speculative family has a Triton-attention arm for low concurrency, where
+# Triton is faster for speculative verify, and a FlashInfer arm for high
+# concurrency; plain decoding is indifferent to the backend (both measured), and
+# its Triton arm is the matched baseline for the Triton speculative arms.
+# ---------------------------------------------------------------------------
+
+[arms.plain-tuned]
+description = "Arm A, tuned: plain decoding, radix cache off, FlashInfer attention."
+[arms.plain-tuned.args]
+disable-radix-cache = true
+max-mamba-cache-size = 128
+
+[arms.plain-tuned-triton]
+description = "Arm A, tuned, Triton attention: matched baseline for Triton speculative arms."
+[arms.plain-tuned-triton.args]
+disable-radix-cache = true
+max-mamba-cache-size = 128
+attention-backend = "triton"
+
+[arms.plain-tuned-replayssm]
+description = """Arm A with SGLang's buffered GDN decode (ReplaySSM ring, full state \
+flushed every 16 tokens): faster at high concurrency, slower at low."""
+lossy = "pending: greedy outputs classified against plain (bench/campaigns/equality_tuned.sh)"
+[arms.plain-tuned-replayssm.args]
+disable-radix-cache = true
+max-mamba-cache-size = 128
+enable-linear-replayssm = true
+
+[arms.mtp-tuned]
+description = """Arm B, tuned for high concurrency: native MTP, 3-step chain, buffered \
+GDN verify (no per-draft-token state snapshots), FlashInfer attention."""
+lossy = "pending: greedy outputs classified against plain (bench/campaigns/equality_tuned.sh)"
+[arms.mtp-tuned.args]
+speculative-algorithm = "NEXTN"
+speculative-num-steps = 3
+speculative-eagle-topk = 1
+speculative-num-draft-tokens = 4
+enable-linear-replayssm-spec = true
+disable-radix-cache = true
+max-mamba-cache-size = 128
+
+[arms.mtp-tuned-triton]
+description = "Arm B, tuned for low concurrency: as mtp-tuned with Triton attention."
+lossy = "pending: greedy outputs classified against plain (bench/campaigns/equality_tuned.sh)"
+[arms.mtp-tuned-triton.args]
+speculative-algorithm = "NEXTN"
+speculative-num-steps = 3
+speculative-eagle-topk = 1
+speculative-num-draft-tokens = 4
+enable-linear-replayssm-spec = true
+disable-radix-cache = true
+max-mamba-cache-size = 128
+attention-backend = "triton"
+
+[arms.mtp-stockverify]
+description = """Arm B with SGLang's stock (snapshot) GDN verify: the exact-stack MTP \
+denominator if buffered verify does not classify as rounding-level."""
+[arms.mtp-stockverify.args]
+speculative-algorithm = "NEXTN"
+speculative-num-steps = 3
+speculative-eagle-topk = 1
+speculative-num-draft-tokens = 4
+disable-radix-cache = true
+max-mamba-cache-size = 128
+
+[arms.dflash-tuned]
+description = """Arm C, tuned: DFlash block 8 with FA4 draft attention (runs on sm_90 \
+and was faster at every concurrency), FlashInfer target attention, capacity 128."""
+[arms.dflash-tuned.args]
+speculative-algorithm = "DFLASH"
+speculative-draft-model-path = "z-lab/Qwen3.5-4B-DFlash"
+speculative-draft-model-revision = "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf"
+speculative-dflash-block-size = 8
+speculative-draft-attention-backend = "fa4"
+disable-radix-cache = true
+max-mamba-cache-size = 128
+
+[arms.dflash-tuned-b16]
+description = """Arm C for low concurrency: DFlash block 16, Triton attention. Its 16 \
+GDN verify states per request (~0.8 GB) cap capacity at 64."""
+max_concurrency = 64
+[arms.dflash-tuned-b16.args]
+speculative-algorithm = "DFLASH"
+speculative-draft-model-path = "z-lab/Qwen3.5-4B-DFlash"
+speculative-draft-model-revision = "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf"
+speculative-dflash-block-size = 16
+disable-radix-cache = true
+max-mamba-cache-size = 64
+max-running-requests = 64
+attention-backend = "triton"
