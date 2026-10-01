@@ -10,10 +10,15 @@ Every prompt starts at a source row no earlier prompt started at, so the texts a
 (the first version cycled the split and its cursor returned to earlier start rows:
 long2048.jsonl holds 91 distinct texts among 512). Ids carry the split name, so a workload
 and a warm-up pool built from different splits never share an id. The script refuses to
-write a file with repeated texts.
+write a file with repeated texts, and it does not overwrite an existing --out without
+--force.
+
+`~/vp-data/moonshot/workloads/long2048.jsonl` and `long2048_warmup.jsonl` are P4's declared
+workload (SHA-256 in evidence/moonshot/README.md 2c), made by the first version; they must
+not be regenerated. Write new workloads under new names, for example:
 
     python experiments/moonshot/make_long_prompts.py --split confirm --tokens 2048 \
-        --count 512 --out ~/vp-data/moonshot/workloads/long2048.jsonl
+        --count 512 --out ~/vp-data/moonshot/workloads/long2048_confirm_v2.jsonl
 """
 
 from __future__ import annotations
@@ -31,7 +36,10 @@ def main() -> None:
     parser.add_argument('--tokens', type=int, default=2048)
     parser.add_argument('--count', type=int, default=512)
     parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument('--force', action='store_true', help='overwrite an existing --out')
     args = parser.parse_args()
+    if args.out.exists() and not args.force:
+        raise SystemExit(f'{args.out} exists; refusing to overwrite it without --force')
     from transformers import AutoTokenizer
 
     tok = AutoTokenizer.from_pretrained(MODEL, revision=REVISION)
