@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import gzip
 import json
 import subprocess
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -59,6 +61,43 @@ def point(rate: float, **overrides: Any) -> dict[str, Any]:
     return base
 
 
+PHASE_START = 1_790_812_810  # 2026-10-01 00:00:10 UTC
+PHASE_END = PHASE_START + 50
+
+
+def decode_log(rate: float, running_in_phase: int = 128) -> str:
+    """Decode-log lines every 2 s from 10 s before the profiling phase to 10 s after it."""
+    lines = []
+    for t in range(PHASE_START - 10, PHASE_END + 11, 2):
+        stamp = datetime.fromtimestamp(t, UTC).strftime('%Y-%m-%d %H:%M:%S')
+        inside = PHASE_START <= t <= PHASE_END
+        running = running_in_phase if inside else 128
+        # Outside the phase (warm-up wave, drain) the rate is deliberately off.
+        shown = rate if inside else rate / 3
+        lines.append(
+            f'[{stamp}] Decode batch, #running-req: {running}, #token: 1, '
+            f'gen throughput (token/s): {shown:.2f}, #queue-req: 0'
+        )
+    return '\n'.join(lines) + '\n'
+
+
+def aiperf_raw(path: Path) -> None:
+    path.mkdir(parents=True)
+    records = []
+    for _ in range(128):  # warm-up wave before the phase
+        meta = {'benchmark_phase': 'warmup', 'request_start_ns': (PHASE_START - 30) * 10**9,
+                'request_end_ns': (PHASE_START - 1) * 10**9}  # fmt: skip
+        records.append({'metadata': meta})
+    for i in range(256):
+        start = PHASE_START + (0 if i < 128 else 25)
+        end = PHASE_END if i >= 128 else PHASE_START + 25
+        meta = {'benchmark_phase': 'profiling', 'request_start_ns': start * 10**9,
+                'request_end_ns': end * 10**9}  # fmt: skip
+        records.append({'metadata': meta})
+    with gzip.open(path / 'profile_export_raw.jsonl.gz', 'wt') as handle:
+        handle.writelines(json.dumps(r) + '\n' for r in records)
+
+
 def make_run(
     root: Path,
     order: list[tuple[str, str]] = ORDER,
@@ -70,6 +109,7 @@ def make_run(
     extra_env: dict[str, str] | None = None,
     state_dtype: str = 'float32',
     probe: str = 'no difference',
+    running_in_phase: int = 128,
     **overrides: Any,
 ) -> Path:
     """A synthetic A/B directory; `overrides` apply to the first exact-replay arm's point,
@@ -88,7 +128,8 @@ def make_run(
         sweep = {**manifest, 'points': [point(rate, **extra)]}
         (run / 'sweep.json').write_text(json.dumps(sweep))
         log = 'GDN decode: exact replay kernel, ring length 4\n' if exact else 'decode\n'
-        (run / 'server/server.log').write_text(pool_log + log)
+        (run / 'server/server.log').write_text(pool_log + log + decode_log(rate, running_in_phase))
+        aiperf_raw(run / 'r0/c128/aiperf')
         env = {'SGLANG_GDN_EXACT_REPLAY': '1', 'SGLANG_GDN_EXACT_REPLAY_BV': tile} if exact else {}
         launch = {
             'env_overrides': env,
@@ -234,3 +275,17 @@ def test_missing_probe_outcome_fails(tmp_path: Path) -> None:
     root = make_run(tmp_path)
     (root / 'output_probe.json').unlink()
     assert run(root).returncode == 1
+
+
+def test_primary_metric_uses_only_windows_at_128_in_the_phase(tmp_path: Path) -> None:
+    result = run(make_run(tmp_path))
+    pair = json.loads(result.stdout)['pairs'][0]
+    # Windows outside the phase run at a third of the rate; they must not count.
+    assert abs(pair['dense_server_tps'] - 10_010.0) < 0.5
+    assert pair['dense_windows_at_128'] >= 8
+
+
+def test_too_few_windows_at_128_fail(tmp_path: Path) -> None:
+    result = run(make_run(tmp_path, running_in_phase=127))
+    assert result.returncode == 1
+    assert 'exactly 128' in result.stdout

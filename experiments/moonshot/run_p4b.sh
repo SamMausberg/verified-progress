@@ -10,7 +10,8 @@
 #     configuration fails or lacks its comparison.
 #  4. Pre-registered A/B: batch 128, 2,048-token prompts, 512 generated, greedy, FP32 state,
 #     no speculation; dense vs exact replay L=4, four pairs in A B B A A B B A order; primary
-#     metric the token-weighted server full-batch decode rate, client y secondary. Pools are
+#     metric the server decode rate in windows at exactly 128 running requests during the
+#     measured phase, client y secondary. Pools are
 #     pinned in both arms (128 running, 360,448 KV tokens, 128 mamba slots). The run stops
 #     unless all eight arms of this run completed on the declared workload at batch 128 with
 #     the pinned pools and form four dense/exact pairs (validate_p4_ab.py).
