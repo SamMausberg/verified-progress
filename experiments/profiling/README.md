@@ -9,10 +9,11 @@ byte model to check the traces against. The results, their method and caveats ar
 ## Commands
 
 `run_all.sh` runs the GPU steps, each under its own exclusive lock, and `analyze_all.sh`
-regenerates the evidence from the raw reports (CPU only, so like any CPU-heavy job it runs under
+regenerates the rest of the evidence from the raw reports (CPU only, so like any CPU-heavy job it runs under
 `scripts/gpu_lock.sh -s`; see `RUNBOOK.md`). `run_all.sh` names the exact
 `run_profiles.py` command of each step, and `analyze_all.sh` the analysis command behind each
-evidence file:
+evidence file. The `microbench`, `gdn` and `ncu` steps write their results straight into
+`evidence/profiles/`, so running them replaces the committed copies:
 
 ```sh
 experiments/profiling/run_all.sh plain mtp baseline host dflash
@@ -24,8 +25,8 @@ scripts/gpu_lock.sh -s experiments/profiling/analyze_all.sh
 
 | File | Role | Evidence it writes |
 |---|---|---|
-| `run_all.sh` | GPU steps: `microbench`, `plain`, `mtp`, `baseline`, `startprofile`, `graphtrace`, `eager`, `host`, `dflash`, `gdn`, `ncu` | raw reports in `$VP_DATA` |
-| `analyze_all.sh` | Every analysis below, in order. Most steps skip when their raw runs are missing, but the bytes model needs the window files of both `plain_nsys/` and `mtp_nsys/`, so the script stops without the `plain` and `mtp` runs | everything in `evidence/profiles/` except the microbenchmark files (`hbm_bandwidth.json`, `head_microbench*.json`, `microbench_clocks.json`) |
+| `run_all.sh` | GPU steps: `microbench`, `plain`, `mtp`, `baseline`, `startprofile`, `graphtrace`, `eager`, `host`, `dflash`, `gdn`, `ncu` | raw reports in `$VP_DATA`; the `microbench`, `gdn` and `ncu` steps also write `hbm_bandwidth.json`, `head_microbench.json`, `microbench_clocks.json`, `gdn_kernel_bench.json` and `ncu_key_kernels.json` directly |
+| `analyze_all.sh` | The analyses of the raw runs, in order: `attribute.py`, `collect_run.py`, `bytes_model.py`, `check_labels.py`, `layer0_share.py`, `validate_labels.py`, `host_gaps.py`, `pyspy_summary.py`, `graph_level.py`, `ncu_summary.py`, `summarize.py`. Most steps skip when their raw runs are missing, but the bytes model needs the window files of both `plain_nsys/` and `mtp_nsys/`, so the script stops without the `plain` and `mtp` runs | the rest of `evidence/profiles/`, and `ncu_key_kernels.json` again from the reports; not the other files `run_all.sh` writes directly, nor `head_microbench_kernels.json` |
 | `run_profiles.py` | Launches one server arm (plain, MTP, DFlash block 16 or 8, eager diagnostic arms), profiles steady-state windows under nsys (or none, for throughput), stops the server | raw reports, client windows |
 | `drive_decode.py` | The client: holds C concurrent greedy generations so the batch is exactly C during the profiled window, then aborts them | used by `run_profiles.py` |
 | `host_functions.json` | Host functions wrapped in NVTX ranges for the host-gap diagnostic (`run_profiles.py --host-trace`) | input |
@@ -46,7 +47,7 @@ scripts/gpu_lock.sh -s experiments/profiling/analyze_all.sh
 | `head_kernel_names.py` | The kernels behind each microbenchmark variant, run by hand on the trace `run_microbench.sh` leaves in `$VP_DATA` | `head_microbench_kernels.json` |
 | `clock_summary.py` | SM and memory clocks and power sampled during the microbenchmark | `microbench_clocks.json` (pending) |
 | `gdn_kernel_bench.py` | SGLang's GDN decode and verify kernels at the model's shapes, with and without per-position state saves | `gdn_kernel_bench.json` (pending) |
-| `run_ncu.sh` | Nsight Compute on the head GEMM and the two GDN kernels | raw `.ncu-rep` reports |
+| `run_ncu.sh` | Nsight Compute on the head GEMM and the two GDN kernels, then `ncu_summary.py` | raw `.ncu-rep` reports, `ncu_key_kernels.json` (pending) |
 | `ncu_summary.py` | DRAM traffic, throughput and stall reasons from those reports | `ncu_key_kernels.json` (pending) |
 
 "Pending" marks outputs whose GPU runs are listed as pending in the evidence README; the scripts
