@@ -1,7 +1,8 @@
 % Figure: where equivalent stock configurations first produce different module outputs, by
 % decoder layer. Drawn from evidence/state_safety/first_difference_by_module.csv (one row per
 % pair, first differing module, layer, kind and count). Full-attention layers are every fourth
-% layer (3, 7, ..., 31); the rest are Gated DeltaNet layers.
+% layer (3, 7, ..., 31); the rest are Gated DeltaNet layers. The module kinds have no paper-wide
+% colour, so every mark is ink and the kinds differ by marker shape; each mark's count is printed.
 \datafigure{../evidence/state_safety/first_difference_by_module.csv}{%
 \vpreadcsv{\divtable}{../evidence/state_safety/first_difference_by_module.csv}%
 \vpsum{\divtable}{pair}{plain_c1_vs_mtp_s3_c1}{count}{\nmtp}%
@@ -12,41 +13,37 @@
   xtick={0,4,8,12,16,20,24,28,31},tick align=outside,major tick length=0.1cm,
   tick style={ink!60},
   xlabel={decoder layer (shaded: full attention; others: Gated DeltaNet)},
-  visualization depends on={value \thisrow{count}\as\cnt},
-  visualization depends on={2.6+1.6*\thisrow{count}\as\msz}]
-% full-attention layer columns (no macro parameter: the figure is an argument of \datafigure)
-\fill[wash] (axis cs:2.55,-0.55) rectangle (axis cs:3.45,2.05);\fill[wash] (axis cs:6.55,-0.55) rectangle (axis cs:7.45,2.05);
-\fill[wash] (axis cs:10.55,-0.55) rectangle (axis cs:11.45,2.05);\fill[wash] (axis cs:14.55,-0.55) rectangle (axis cs:15.45,2.05);
-\fill[wash] (axis cs:18.55,-0.55) rectangle (axis cs:19.45,2.05);\fill[wash] (axis cs:22.55,-0.55) rectangle (axis cs:23.45,2.05);
-\fill[wash] (axis cs:26.55,-0.55) rectangle (axis cs:27.45,2.05);\fill[wash] (axis cs:30.55,-0.55) rectangle (axis cs:31.45,2.05);
+  visualization depends on={value \thisrow{count}\as\cnt}]
+% full-attention layer columns, above the axis line (no macro parameter: the figure is an
+% argument of \datafigure)
+\fill[wash] (axis cs:2.55,-0.5) rectangle (axis cs:3.45,2.05);\fill[wash] (axis cs:6.55,-0.5) rectangle (axis cs:7.45,2.05);
+\fill[wash] (axis cs:10.55,-0.5) rectangle (axis cs:11.45,2.05);\fill[wash] (axis cs:14.55,-0.5) rectangle (axis cs:15.45,2.05);
+\fill[wash] (axis cs:18.55,-0.5) rectangle (axis cs:19.45,2.05);\fill[wash] (axis cs:22.55,-0.5) rectangle (axis cs:23.45,2.05);
+\fill[wash] (axis cs:26.55,-0.5) rectangle (axis cs:27.45,2.05);\fill[wash] (axis cs:30.55,-0.5) rectangle (axis cs:31.45,2.05);
 \draw[ink!15] (axis cs:-0.6,1.5) -- (axis cs:31.6,1.5);\draw[ink!15] (axis cs:-0.6,0.3) -- (axis cs:31.6,0.3);
 \node[anchor=east,align=right] at (axis cs:-1,1.5) {plain vs MTP\\(batch 1, \nmtp)};
 \node[anchor=east,align=right] at (axis cs:-1,0.3) {concurrency 1 vs 32\\(plain, \nconc)};
 % plain vs MTP: the GDN recurrence (decode kernel against target-verify kernel)
-\addplot[only marks,mark=*,mark size=5.5pt,draw=brick,fill=brick,discard if not={kind}{gdn_core},
+\addplot[only marks,mark=*,mark size=2.6pt,ink,discard if not={kind}{gdn_core},
   nodes near coords={all \cnt: GDN recurrence (decode kernel vs target-verify kernel)},
-  every node near coord/.append style={anchor=west,xshift=0.25cm}]
+  every node near coord/.append style={anchor=west,xshift=0.12cm,font=\scriptsize}]
   table[x=layer,y expr=1.5,col sep=comma]{../evidence/state_safety/first_difference_by_module.csv};
-% concurrency 1 vs 32: gated RMSNorm of GDN layers; square side 2.6pt + 1.6pt per prompt
-\addplot[only marks,mark=none,discard if not={kind}{gated_norm},nodes near coords={},
-  every node near coord/.style={draw=teal,fill=teal!35,rectangle,minimum size=\msz pt,inner sep=0pt,anchor=center}]
+% concurrency 1 vs 32: gated RMSNorm of GDN layers, a full-attention layer's output, and the
+% MLP down-projection of a batched prefill; the count of prompts above each mark
+\addplot[only marks,mark=square*,mark size=2.3pt,ink,discard if not={kind}{gated_norm},
+  nodes near coords={\cnt},every node near coord/.append style={font=\scriptsize,anchor=south,yshift=1pt}]
   table[x=layer,y expr=0.3,col sep=comma]{../evidence/state_safety/first_difference_by_module.csv};
-\addplot[only marks,mark=none,discard if not={kind}{gated_norm},nodes near coords={\cnt},
-  every node near coord/.append style={font=\scriptsize,anchor=center,yshift=0.42cm}]
+\addplot[only marks,mark=triangle*,mark size=2.9pt,ink,discard if not={kind}{attn},
+  nodes near coords={\cnt},every node near coord/.append style={font=\scriptsize,anchor=south,yshift=1pt}]
   table[x=layer,y expr=0.3,col sep=comma]{../evidence/state_safety/first_difference_by_module.csv};
-% concurrency 1 vs 32: a full-attention layer's output
-\addplot[only marks,mark=triangle*,mark size=5pt,draw=ink,fill=ink!40,discard if not={kind}{attn},
-  nodes near coords={\cnt},every node near coord/.append style={font=\scriptsize,anchor=center,yshift=0.42cm}]
-  table[x=layer,y expr=0.3,col sep=comma]{../evidence/state_safety/first_difference_by_module.csv};
-% concurrency 1 vs 32: the MLP down-projection of a batched prefill
-\addplot[only marks,mark=diamond*,mark size=3.6pt,draw=ochre,fill=ochre!40,discard if not={kind}{mlp_down_proj},
-  nodes near coords={\cnt},every node near coord/.append style={anchor=west,font=\scriptsize,xshift=3pt}]
-  table[x=layer,y expr=-0.12,col sep=comma]{../evidence/state_safety/first_difference_by_module.csv};
+\addplot[only marks,mark=diamond*,mark size=2.9pt,ink,discard if not={kind}{mlp_down_proj},
+  nodes near coords={\cnt},every node near coord/.append style={font=\scriptsize,anchor=west,xshift=2pt}]
+  table[x=layer,y expr=-0.15,col sep=comma]{../evidence/state_safety/first_difference_by_module.csv};
 \end{axis}
-% legend, in absolute centimetres below the axis
+% key, in absolute centimetres below the axis
 \begin{scope}[shift={(0.2cm,-1.45cm)}]
-\node[draw=teal,fill=teal!35,rectangle,minimum size=5pt,inner sep=0pt] at (0,0) {};\node[anchor=west] at (0.15,0) {gated RMSNorm, decode};
-\node[draw=ink,fill=ink!40,regular polygon,regular polygon sides=3,minimum size=7pt,inner sep=0pt] at (4.2,0) {};\node[anchor=west] at (4.35,0) {attention output, decode};
-\node[draw=ochre,fill=ochre!40,diamond,minimum size=6pt,inner sep=0pt] at (8.5,0) {};\node[anchor=west] at (8.65,0) {MLP down-projection, batched prefill};
+\fill[ink] (-0.07,-0.07) rectangle (0.07,0.07);\node[anchor=west] at (0.15,0) {gated RMSNorm, decode};
+\fill[ink] (4.2,0.09) -- (4.12,-0.06) -- (4.28,-0.06) -- cycle;\node[anchor=west] at (4.35,0) {attention output, decode};
+\fill[ink] (8.5,0.09) -- (8.59,0) -- (8.5,-0.09) -- (8.41,0) -- cycle;\node[anchor=west] at (8.65,0) {MLP down-projection, batched prefill};
 \end{scope}
 \end{tikzpicture}}{First differing module output by decoder layer for two configuration pairs.}

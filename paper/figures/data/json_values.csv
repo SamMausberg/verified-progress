@@ -1,0 +1,4 @@
+key,value,source,json_path
+fallback_share_hopper,0.0034970857618651123,evidence/head_geometry/rstock_plain4b.json,rules/gamma_1.19e-4/bucket/positions_needing_stock_kernel
+fallback_share_conservative,0.013988343047460449,evidence/head_geometry/rstock_plain4b.json,rules/tensor_core_model/bucket/positions_needing_stock_kernel
+dflash4b_cos_hd_ht_median,0.40811888453704215,evidence/head_geometry/stats_dflash4b.json,pairs/cos_hd_ht/all/q50
