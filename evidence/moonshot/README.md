@@ -465,9 +465,9 @@ P4's declared workload (2c, sha256
 (sha256 `e68930de7103193e52291e1235d393ad9032c47da6d8de97370324b23c6aeaa0`, 48 texts) was
 made on 2026-10-01 at 03:29 UTC by `python make_long_prompts.py --split tune --count 48 --out
 ~/vp-data/moonshot/workloads/long2048_tune.jsonl`, run in `experiments/moonshot` at repo
-`ed4682d`. That `make_long_prompts.py` is the version main carried from `f349045` to
-`8585e67`. The current version (from #101 on) writes distinct texts with split-prefixed ids,
-so it would not reproduce these bytes. The 24 calibration texts and the 8 evaluation texts
+`ed4682d`. That `make_long_prompts.py` is the version main carried from `f349045` until
+#101 (`8d55367`), which made it write distinct texts with split-prefixed ids, so the current
+version would not reproduce these bytes. The 24 calibration texts and the 8 evaluation texts
 are distinct, and no text appears in both sets.
 
 The study compares each configuration with the same rule at full rank (U = I), which isolates
