@@ -320,6 +320,16 @@ expected range or decision rule changes.
   the fold's commit adds 0.22 ms that the derivation did not charge. The stack sessions
   remain the measurement of F on the composed tree.
 
+**2. 2026-10-01, before any session's data was analysed (sessions s1-s3 queued).** The
+replacement clause ("one more session runs, at most two more") now says exactly which
+sessions count, so that a session can never be added after an inconclusive interval.
+`stack-s4` is accepted only if s1-s3 all ran and leave fewer than three valid FULL against
+S0 ratios at some c, and `stack-s5` only if that still holds after s4; any other s4 or s5
+stops the analysis. A replacement counts only at the concurrencies where the sessions
+before it fell short, for every arm and the four-way pattern, so the FULL against S0
+decision at each c uses the first three valid sessions in order. The analysis records the sessions it
+admitted at each c (`analyze.py`, `admitted_sessions`).
+
 ## Derived ceilings and the gap to 5x (`ceiling.json`)
 
 `experiments/stack/ceiling.py`, from bench's confirmation frontier (`evidence/bench/confirm/frontier.csv`), repair's
