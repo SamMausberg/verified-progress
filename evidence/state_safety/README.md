@@ -222,9 +222,10 @@ is layer 3's attention (the first full-attention layer), while its `qkv_proj` ou
 every earlier module output are identical: the attention read different KV.
 
 The stock code path that does this, at this commit: after a request's prefill,
-`UnifiedRadixCache.cache_unfinished_req` inserts the request's prefix into the tree,
-matches it again, and overwrites the request's `req_to_token` row with the tree's
-indices (`req_to_token_pool.write(...)`), freeing the request's own duplicate KV slots.
+`UnifiedRadixCache.cache_unfinished_req` (`srt/mem_cache/unified_radix_cache.py:1161`)
+inserts the request's prefix into the tree, matches it again, and overwrites the
+request's `req_to_token` row with the tree's indices (`req_to_token_pool.write`, line
+1263), freeing the request's own duplicate KV slots.
 For tokens the tree already held, such as a chat-template prefix shared with an
 earlier request, the request attends from then on over the earlier request's copy of
 that KV: valid values for the same tokens at the same positions, but computed in a
@@ -234,7 +235,8 @@ shows from output index 2.
 
 A deterministic reproduction on stock SGLang (`targeted.json`, `history__*` entries,
 `targeted.py history`): each of 12 prompts is served on an empty cache, and again right
-after the earlier prompt that shares the longest prefix with it.
+after the earlier prompt that shares the longest prefix with it (one request in flight,
+64 new tokens, otherwise the common flags).
 
 | Configuration | Logprobs identical | Tokens identical | First logprob difference |
 |---|---|---|---|
@@ -261,7 +263,8 @@ Passing the deterministic KV split to FlashInfer's target-verify plan
 (`engine/sglang/patches/state/0002-verify-kv-split-deterministic.patch`) did not change
 that: 28 of 96 prompts still diverged between concurrency 1 and 32 (at most 16 running), 1.55 per 1,000 compared
 tokens, all at exact ties (`noise_floor.csv`, row `deterministic + verify KV split
-patch`). A plausible reason, not yet tested: the
+patch`; that run predates the patch's `SGLANG_STATE_VERIFY_FIXED_SPLIT` gate and had
+the change on unconditionally). A plausible reason, not yet tested: the
 draft is not batch-invariant, so acceptance lengths, and with them the offset of a
 position inside its verify block, differ between batch sizes. **Pending**: the full
 deterministic-mode pairs.
@@ -269,10 +272,14 @@ deterministic-mode pairs.
 ## Targeted state tests
 
 Results so far (`targeted.json`; each test's command in
-`experiments/state_safety/run_targeted.sh`; 40 prompts per test):
+`experiments/state_safety/run_targeted.sh`). Configuration for every count below: native
+MTP (`--speculative-algorithm EAGLE`, top-k 1) with 3 or 5 steps as stated, radix cache on
+with the default `extra_buffer` GDN strategy, overlap scheduler and CUDA graphs on, the
+common flags of the Setup section, one request in flight, 40 prompts per test (the first
+40 of the prompt set):
 
 - **Truncation inside a verify cycle** (`max_new_tokens` ending after every possible
-  number of tokens of the final cycle): MTP steps 3, 157/157 truncated runs bitwise
+  number of tokens of the final cycle; flushed cache before every request): MTP steps 3, 157/157 truncated runs bitwise
   equal to the untruncated run's prefix, for 1 to 4 tokens kept; MTP steps 5, 240/240,
   for 1 to 6 kept.
 - **Stop token at every index of a verify cycle**: MTP steps 3, 160/160 outputs bitwise
@@ -280,10 +287,10 @@ Results so far (`targeted.json`; each test's command in
   after it were accepted and folded into the GDN state before the stop was detected);
   MTP steps 5, 240/240 (200 inside the block). None of the committed post-stop state
   reaches the output. Extending each stopped conversation with a new user turn, served
-  warm (radix cache) and cold (after a flush), gives identical continuations in 139/160
-  and 210/240 cases; the rest diverge at exact ties (19 and 30) or within one BF16 step
-  (2), as expected from the warm path restoring the prompt's GDN checkpoint and from the
-  history dependence above.
+  warm (radix cache on, so the prompt's GDN checkpoint is restored) and cold (after a
+  flush), gives identical continuations in 139/160 and 210/240 cases; the rest diverge at
+  exact ties (19 and 30) or within one BF16 step (2), consistent with the warm path's
+  different prefill computation and with the history dependence above.
 
 **Pending** (queued): the same two tests for the top-k 2 tree and for plain decode, GDN
 checkpoint reuse at the 256-token tracking interval including checkpoints taken in the

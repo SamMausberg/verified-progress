@@ -8,11 +8,12 @@
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-evidence="$here/../../evidence/state_safety"
+repo="$(cd "$here/../.." && pwd)"
+evidence="$repo/evidence/state_safety"
 runs="$HOME/vp-data/state/runs"
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
 # shellcheck source=/dev/null
-source "$HOME/verified-progress/scripts/sglang_env.sh"
+source "$repo/scripts/sglang_env.sh"
 cd "$here"
 
 nice -n 19 python compare.py --pairs pairs.json \

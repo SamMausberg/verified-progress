@@ -1,6 +1,6 @@
-From d8568201cb937a985ffd4520dc81c12f341b73e0 Mon Sep 17 00:00:00 2001
+From 7d41d4a7d3980fb213a504f6c4ca52f8958ec622 Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <sam@findtensor.com>
-Date: Thu, 1 Oct 2026 03:16:15 +0000
+Date: Thu, 1 Oct 2026 03:40:42 +0000
 Subject: [PATCH 1/2] Add a bit-exact tensor tap for divergence forensics
 
 With SGLANG_STATE_TAP_DIR set, forward hooks on the target model, plus
