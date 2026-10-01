@@ -555,3 +555,106 @@ def test_a_holder_death_before_the_job_pid_is_known_still_stops_the_job(tmp_path
             pytest.fail('a signal before pid was set let the job outlive the lock holder')
     finally:
         proc.kill()
+
+
+def _holder_of(proc: subprocess.Popen[bytes]) -> int:
+    holder = subprocess.run(
+        ['pgrep', '-P', str(proc.pid), '-x', 'flock'], capture_output=True, text=True, check=False
+    ).stdout.split()
+    assert holder, 'no flock process under gpu_lock.sh'
+    return int(holder[0])
+
+
+def _wait_for(path: Path, seconds: float = 10) -> None:
+    deadline = time.time() + seconds
+    while not path.exists() and time.time() < deadline:
+        time.sleep(0.05)
+    assert path.exists(), f'{path.name} never appeared'
+
+
+def test_next_exclusive_job_waits_while_the_old_job_is_still_being_stopped(tmp_path: Path) -> None:
+    """flock releases the lock when it dies, before the wrapper's kill grace has stopped the job."""
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    a_pid = tmp_path / 'a.pid'
+    env = dict(
+        fake_smi(tmp_path),
+        GPU_LOCK_FILE=str(lock),
+        GPU_JOB_KILL_GRACE='3',
+        GPU_LOCK_DRAIN_WAIT='30',
+    )
+    a = subprocess.Popen(
+        [
+            'bash',
+            str(SCRIPT),
+            '-x',
+            'bash',
+            '-c',
+            f'trap "" TERM; echo $$ > {a_pid}; exec sleep 60',
+        ],
+        env=env,
+    )
+    try:
+        _wait_for(a_pid)
+        job = int(a_pid.read_text())
+        os.kill(_holder_of(a), 9)  # the lock is free now; the job ignores TERM
+        out = tmp_path / 'b.out'
+        check = f'if kill -0 {job} 2>/dev/null; then echo overlap; else echo clean; fi > {out}'
+        b = subprocess.run(
+            ['bash', str(SCRIPT), '-x', 'bash', '-c', check], env=env, timeout=60, check=False
+        )
+        assert b.returncode == 0
+        assert out.read_text().strip() == 'clean', 'the next job started while the old one ran'
+    finally:
+        a.kill()
+
+
+def test_next_exclusive_job_waits_for_a_job_whose_wrapper_was_killed(tmp_path: Path) -> None:
+    """If the holder and the wrapper die together, the job's group is still recorded."""
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    a_pid = tmp_path / 'a.pid'
+    env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock), GPU_LOCK_DRAIN_WAIT='30')
+    a = subprocess.Popen(
+        ['bash', str(SCRIPT), '-x', 'bash', '-c', f'echo $$ > {a_pid}; exec sleep 4'], env=env
+    )
+    try:
+        _wait_for(a_pid)
+        job = int(a_pid.read_text())
+        holder = _holder_of(a)
+        wrapper = subprocess.run(
+            ['pgrep', '-P', str(holder)], capture_output=True, text=True, check=False
+        ).stdout.split()
+        assert wrapper, 'no wrapper under flock'
+        os.kill(int(wrapper[0]), 9)
+        os.kill(holder, 9)
+        out = tmp_path / 'b.out'
+        check = f'if kill -0 {job} 2>/dev/null; then echo overlap; else echo clean; fi > {out}'
+        b = subprocess.run(
+            ['bash', str(SCRIPT), '-x', 'bash', '-c', check], env=env, timeout=60, check=False
+        )
+        assert b.returncode == 0
+        assert out.read_text().strip() == 'clean', 'the next job started while the old one ran'
+    finally:
+        a.kill()
+
+
+def test_a_stale_registry_entry_does_not_block_and_is_removed(tmp_path: Path) -> None:
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    registry = tmp_path / 'gpu.lock.jobs'
+    registry.mkdir()
+    dead = subprocess.Popen(['true'])
+    dead.wait()
+    stale = registry / str(dead.pid)
+    stale.write_text(f'1 {dead.pid} 1\n')  # wrapper and group both gone
+    env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock), GPU_LOCK_DRAIN_WAIT='5')
+    ran = tmp_path / 'ran'
+    start = time.time()
+    done = subprocess.run(
+        ['bash', str(SCRIPT), '-x', 'touch', str(ran)], env=env, timeout=60, check=False
+    )
+    assert done.returncode == 0 and ran.exists()
+    assert time.time() - start < 4
+    assert not stale.exists()
+    assert list(registry.iterdir()) == [], 'the job left its own entry behind'

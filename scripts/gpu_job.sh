@@ -37,6 +37,20 @@ else
   exit 64
 fi
 
+# Every running job has an entry in the registry next to the lock, named by this wrapper's pid:
+# "<wrapper start> [<job pgid> <pgid leader start>]" (start times in clock ticks since boot,
+# from /proc/<pid>/stat). The entry outlives the lock when the holder dies: flock releases the
+# lock at once, while this wrapper may still be in its kill grace, and the next exclusive
+# job's drain (gpu_drain_wait.sh) waits while the wrapper or the job's group is still running.
+registry="${GPU_LOCK_FILE:-$HOME/.gpu.lock}.jobs"
+entry="$registry/$$"
+start_time() {
+  local s f
+  { read -r s <"/proc/$1/stat"; } 2>/dev/null || return 0
+  read -r -a f <<<"${s##*) }"
+  echo "${f[19]}"
+}
+
 set -m # background jobs get their own process group, so the whole group can be signalled
 pid=""
 # TERM the job's process group, then KILL whatever is still there after a grace period, so a
@@ -76,10 +90,15 @@ on_signal() {
   exit 143
 }
 trap on_signal TERM INT HUP
+mkdir -p "$registry"
+start_time $$ >"$entry"
+trap 'rm -f "$entry"' EXIT # after stop_group: every exit path below stops the group first
+if [ -n "$pending" ]; then exit 143; fi
 if [ -t 0 ]; then "$@" </dev/null & else "$@" & fi
 # Tests widen the window between the fork and pid=$! to deliver a signal inside it.
 if [ -n "${GPU_JOB_TEST_SPAWN_DELAY:-}" ]; then sleep "$GPU_JOB_TEST_SPAWN_DELAY"; fi
 pid=$!
+echo "$(start_time $$) $pid $(start_time "$pid")" >"$entry"
 if [ -n "$pending" ]; then
   stop_group
   exit 143

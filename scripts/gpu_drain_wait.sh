@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Wait until no compute process is left on the GPU and no SGLang server process is left on
-# the host, then exit 0.
+# Wait until no compute process is left on the GPU, no SGLang server process is left on the
+# host and no earlier job recorded by gpu_job.sh is still running, then exit 0.
 #
 # gpu_lock.sh -x runs this after taking the exclusive lock and before the job's command.
 # Holding the exclusive lock means no shared or exclusive holder is running, so any
@@ -59,6 +59,50 @@ orphan_servers() {
     esac
   done
 }
+# Jobs that gpu_job.sh recorded and that are still running: the wrapper itself (still stopping
+# its job after the holder died), or a non-zombie member of the job's process group (the wrapper
+# was killed too). Under the exclusive lock no other job's wrapper can be running, so any such
+# entry belongs to a job whose lock holder is gone. Entries whose wrapper and group are both
+# gone are removed. A start time that no longer matches means the pid was reused.
+registry="${GPU_LOCK_FILE:-$HOME/.gpu.lock}.jobs"
+proc_state() { # prints "<state> <pgrp> <start time>" for pid $1, nothing if it is gone
+  local s f
+  { read -r s <"/proc/$1/stat"; } 2>/dev/null || return 0
+  read -r -a f <<<"${s##*) }"
+  echo "${f[0]} ${f[2]} ${f[19]}"
+}
+group_running() { # pgid $1, leader start $2 (may be empty)
+  local d s f
+  # A leader of that pgid with another start time is a new group: the old one is gone.
+  if { read -r s <"/proc/$1/stat"; } 2>/dev/null; then
+    read -r -a f <<<"${s##*) }"
+    if [ -n "$2" ] && [ "${f[2]}" = "$1" ] && [ "${f[19]}" != "$2" ]; then return 1; fi
+  fi
+  for d in /proc/[0-9]*; do
+    { read -r s <"$d/stat"; } 2>/dev/null || continue
+    read -r -a f <<<"${s##*) }"
+    if [ "${f[2]}" = "$1" ] && [ "${f[0]}" != Z ]; then return 0; fi
+  done
+  return 1
+}
+leftover_jobs() {
+  local e w wstart pgid pstart st _pg start
+  for e in "$registry"/*; do
+    [ -e "$e" ] || continue
+    w="${e##*/}"
+    case "$ancestors" in *" $w "*) continue ;; esac
+    wstart="" pgid="" pstart=""
+    read -r wstart pgid pstart <"$e" 2>/dev/null || true
+    read -r st _pg start <<<"$(proc_state "$w")"
+    if [ -n "$st" ] && [ "$st" != Z ] && [ -n "$wstart" ] && [ "$start" = "$wstart" ]; then
+      printf 'wrapper%s ' "$w"
+    elif [ -n "$pgid" ] && group_running "$pgid" "$pstart"; then
+      printf 'group%s ' "$pgid"
+    else
+      rm -f "$e"
+    fi
+  done
+}
 if ! command -v nvidia-smi >/dev/null 2>&1; then
   echo "gpu_drain_wait: no nvidia-smi on PATH; nothing to drain" >&2
   exit 0
@@ -82,6 +126,10 @@ while true; do
     servers="$(orphan_servers)"
     if [ -n "$servers" ]; then
       pids="${pids:+$pids }sglang:${servers% }"
+    fi
+    jobs="$(leftover_jobs)"
+    if [ -n "$jobs" ]; then
+      pids="${pids:+$pids }jobs:${jobs% }"
     fi
     if [ -z "$pids" ]; then
       exit 0

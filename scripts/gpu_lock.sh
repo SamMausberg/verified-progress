@@ -22,8 +22,9 @@
 # killing the flock process releases the lock and (via gpu_job.sh) terminates the
 # job's process group. An exclusive job also waits
 # (scripts/gpu_drain_wait.sh, up to GPU_LOCK_DRAIN_WAIT s, default 600) until no compute
-# process is left on the GPU, so a killed job's surviving children cannot share an
-# exclusive run; it exits 75 if the GPU stays busy. GPU_LOCK_WAIT (seconds, default
+# process, SGLang server or earlier job (one still being stopped after its holder died) is
+# left, so a killed job's surviving children cannot share an exclusive run; it exits 75 if
+# the GPU stays busy. GPU_LOCK_WAIT (seconds, default
 # 12 h) bounds each wait; a timeout exits 75. To extend a wait without losing your place, cancel
 # the waiting job and resubmit it with GPU_LOCK_ARRIVAL set to the arrival time
 # (nanoseconds) in its old ticket name; it must not lie in the future.
