@@ -215,8 +215,8 @@ with this declaration):
   (512 prompts, 91 distinct texts, templated length 2,046-2,048), warm-up pool `long2048_warmup.jsonl`
   `b4b5b4e43b53f3c64083263113904868cccf23767aa0b3c5f1b45740c13130a6`.
 - Pools pinned identically in both arms (`p4_pools` lever): `--max-running-requests 128`,
-  `--max-total-tokens 360448`, `--max-mamba-cache-size 128`; each server's resolved sizes
-  are read from its log.
+  `--max-total-tokens 655360` (360,448 in the void first run, below), `--max-mamba-cache-size
+  128`; each server's resolved sizes are read from its log.
 - Validity (`validate_p4_ab.py`, before any ratio is computed): every arm ran the declared
   workload with the greedy request body, all 256 requests completed with AIPerf exit 0, the
   measured phase has at least 8 decode-log windows with exactly 128 requests running, the
@@ -237,6 +237,28 @@ with this declaration):
   declared file's first 256 prompts, counts included (`check_sent_prompts`). It passes in all
   eight arms of `p4_ab_20261001T082738Z`. The repeats have no caching effect: the radix
   cache is off in both arms. No other check changed.
+- First run void (run 20261001T082738Z, 08:27-09:03 UTC, repo e67feb1, engine c29a91692b).
+  The validator (run once at 10:08 UTC from e37eed1, identical to main 3982f1d) stopped at
+  "plain+no_radix+p4_pools_r1: at most 127 requests running"; no ratio was computed and no
+  verdict exists. In all eight arms the resolved pools were exactly as pinned
+  (max_running_requests 128, max_total_num_tokens 360,448, max_mamba_cache_size 128), the
+  batch peaked at 127 running with one request queued (44 decode windows each, mamba usage
+  0.99, KV usage about 0.73, no retractions), so the 128th request was never admitted. The
+  likely limit is SGLang's admission budget: with ignore_eos it reserves each request's full
+  512 output tokens and charges a shared-mamba cost per request in token units, which the
+  128 x 2,560 sizing ignored. Its kernel-level steps passed (kernel checks at tiles 32 and
+  16, tile-16 kernel bench, FlashInfer verify timing); its other results are not reported.
+- Rerun amendment (2026-10-01 at 10:11 and 10:16 UTC, before the rerun; the validator is unchanged):
+  the pinned KV pool is 655,360 tokens in both arms; a required admission preflight starts
+  each A/B arm's server with the pinned pools, sends 128 long prompts at the A/B's output
+  length (512, so the scheduler reserves the same tokens per request) and stops the job
+  unless its log shows `#running-req: 128` inside the measured point's AIPerf profiling phase
+  (`check_admission.py`; bench's server warm-up at a short output length does not count). The kernel checks at tiles
+  32 and 16, the tile-16 kernel bench and the FlashInfer verify timing are reused from run
+  20261001T082738Z (repo e67feb1, engine c29a91692b): they run one layer's kernels on
+  synthetic inputs and cannot depend on a server's pools; the rerun stops unless the engine
+  is still at c29a91692b and records the reuse in `p4b_<run id>.reused.json`. The server
+  output probe and the A/B are rerun.
 - Primary metric (amended on 2026-10-01 at 08:19 and 08:22 UTC, before the run started; the first
   version named bench's `logged_gen_tps_full_batch`, which averages windows with at least
   0.9 x the peak running count, i.e. 116-128 of 128): the server's decode rate at exactly
