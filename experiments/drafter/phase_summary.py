@@ -7,6 +7,11 @@ reports, per arm and steady batch size (cycles whose batch equals the client
 concurrency), the mean and median phase times, the cycle period (difference of
 consecutive cycle start times on the GPU timeline, so it includes host gaps),
 tokens committed per request per cycle, and each phase's share of the period.
+With --segments C1 C2 ... the log is first split into client runs at gaps of at
+least --gap-ms between consecutive cycle starts (runs shorter than --min-cycles,
+such as the server's start-up warm-up, are dropped); the k-th run must be the
+client at concurrency C_k, and only its cycles at that batch size are used, so a
+later client's ramp or drain through the same batch size is not mixed in.
 The commit phase is the GDN state commit (scatter of the accepted snapshot,
 circular ring commit, or fold), i.e. what P10 could remove. It also lists the
 GDN kernels found in each run's torch-profiler trace.
@@ -44,20 +49,49 @@ def gdn_kernels(directory: Path) -> dict[str, int]:
     return dict(counts.most_common(12))
 
 
-def summarize(label: str, directory: Path, batch_sizes: list[int]) -> list[dict[str, Any]]:
+def client_runs(
+    records: list[dict[str, Any]], gap_ms: float, min_cycles: int
+) -> list[list[dict[str, Any]]]:
+    """Split cycle records into client runs at idle gaps on the GPU timeline."""
+    runs: list[list[dict[str, Any]]] = []
+    for record in records:
+        if runs and record['t0_ms'] - runs[-1][-1]['t0_ms'] < gap_ms:
+            runs[-1].append(record)
+        else:
+            runs.append([record])
+    return [run for run in runs if len(run) >= min_cycles]
+
+
+def summarize(
+    label: str,
+    directory: Path,
+    batch_sizes: list[int],
+    segments: list[int] | None = None,
+    gap_ms: float = 1000.0,
+    min_cycles: int = 50,
+) -> list[dict[str, Any]]:
     records = [
         json.loads(line)
         for line in (directory / 'timing.jsonl').read_text().splitlines()
         if line.startswith('{') and '"bs"' in line
     ]
+    by_bs: dict[int, list[dict[str, Any]]] = {}
+    if segments:
+        runs = client_runs(records, gap_ms, min_cycles)
+        if len(runs) != len(segments):
+            sizes = [len(run) for run in runs]
+            raise SystemExit(f'{label}: {len(runs)} client runs {sizes}, expected {segments}')
+        by_bs = dict(zip(segments, runs, strict=True))
+        batch_sizes = [bs for bs in batch_sizes if bs in by_bs]
     rows = []
     for bs in batch_sizes:
-        steady = [r for r in records if r['bs'] == bs]
+        source = by_bs[bs] if segments else records
+        steady = [r for r in source if r['bs'] == bs]
         if len(steady) < 10:
             continue
         periods = [
             b['t0_ms'] - a['t0_ms']
-            for a, b in itertools.pairwise(records)
+            for a, b in itertools.pairwise(source)
             if a['bs'] == bs and b['bs'] == bs
         ]
         period_us = 1000 * statistics.median(periods)
@@ -85,6 +119,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=(__doc__ or '').split('\n\n')[0])
     parser.add_argument('--run', action='append', required=True, help='LABEL:DIR')
     parser.add_argument('--batch-sizes', type=int, nargs='+', default=[8, 16])
+    parser.add_argument(
+        '--segments',
+        type=int,
+        nargs='+',
+        help='client concurrency of each client run in log order (splits the log at gaps)',
+    )
+    parser.add_argument('--gap-ms', type=float, default=1000.0)
+    parser.add_argument('--min-cycles', type=int, default=50)
     parser.add_argument('--out', type=Path, required=True, help='output path prefix')
     args = parser.parse_args()
 
@@ -92,7 +134,9 @@ def main() -> None:
     kernels: dict[str, dict[str, int]] = {}
     for spec in args.run:
         label, directory = spec.split(':', 1)
-        rows += summarize(label, Path(directory), args.batch_sizes)
+        rows += summarize(
+            label, Path(directory), args.batch_sizes, args.segments, args.gap_ms, args.min_cycles
+        )
         kernels[label] = gdn_kernels(Path(directory))
     args.out.parent.mkdir(parents=True, exist_ok=True)
     fields: list[str] = []

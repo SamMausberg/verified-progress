@@ -255,3 +255,14 @@ def test_ab_summary_excludes_invalid_points(tmp_path: Path) -> None:
     entry = summary.compare(summary.collect(tmp_path), 'base', 'test')[0]
     assert entry['ratio'] == 1.2
     assert list(entry['invalid_points']) == ['g-test-r2/20261001-000000']
+
+
+def test_phase_summary_splits_client_runs_at_gaps() -> None:
+    phase = load('phase_summary')
+    warmup = [{'t0_ms': 0.0, 'bs': 1}]
+    c8 = [{'t0_ms': 5000.0 + 10 * i, 'bs': 8} for i in range(60)]
+    c16 = [{'t0_ms': 20000.0 + 12 * i, 'bs': 16 if i < 55 else 8} for i in range(60)]
+    runs = phase.client_runs(warmup + c8 + c16, gap_ms=1000.0, min_cycles=50)
+    assert [len(run) for run in runs] == [60, 60]
+    # The second run's drain through bs = 8 stays out of the first run.
+    assert sum(1 for r in runs[0] if r['bs'] == 8) == 60

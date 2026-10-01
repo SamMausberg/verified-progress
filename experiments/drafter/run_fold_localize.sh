@@ -46,6 +46,9 @@ PY
 serve() {
   local spec="$1" run="$2" pools="$3" min_free="$4" fold="$5"
   shift 5
+  # The tracer appends to trace.<pid>.jsonl: start every run from an empty directory
+  # so a rerun into the same OUT cannot mix in an earlier run's cycles.
+  rm -rf "${out:?}/$run"
   local extra="--linear-attn-decode-backend triton $pools"
   local env=()
   if [ "$spec" = dflash ]; then
