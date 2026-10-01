@@ -1,0 +1,138 @@
+"""Locate where two DFlash runs of the same requests first differ, cycle by cycle.
+
+Reads the per-cycle traces (SGLANG_DFLASH_TRACE_PATH, patch drafter/0001) and the
+probe outputs (accept_probe.py --logprobs) of two runs, and reports per request:
+the first output index whose top-5 logprobs differ, the first cycle whose draft
+tokens, target argmax or accepted length differ, and that cycle's prefix length
+(prompt plus committed tokens), so a difference can be placed in the cycle that
+first computed it. Also checks each run against an earlier run of the same
+requests (--earlier) to see whether a difference reproduces.
+
+    python experiments/drafter/fold_localize.py --a DIR --b DIR [--earlier DIR] --out OUT.json
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+from typing import Any
+
+
+def outputs(directory: Path) -> dict[str, dict[str, Any]]:
+    rows = [json.loads(line) for line in (directory / 'requests.jsonl').read_text().splitlines()]
+    return {row['id']: row for row in rows}
+
+
+def traces(directory: Path) -> dict[str, list[dict[str, Any]]]:
+    cycles: dict[str, list[dict[str, Any]]] = {}
+    for path in sorted(directory.glob('trace.*.jsonl')):
+        for line in path.read_text().splitlines():
+            record = json.loads(line)
+            cycles.setdefault(str(record['rid']), []).append(record)
+    return cycles
+
+
+def first_logprob_difference(a: dict[str, Any], b: dict[str, Any]) -> int | None:
+    for index, (x, y) in enumerate(zip(a['top_logprobs'], b['top_logprobs'], strict=False)):
+        if x != y:
+            return index
+    return None
+
+
+def first_token_difference(a: dict[str, Any], b: dict[str, Any]) -> int | None:
+    for index, (x, y) in enumerate(zip(a['output_ids'], b['output_ids'], strict=False)):
+        if x != y:
+            return index
+    return None
+
+
+def first_cycle_difference(
+    a: list[dict[str, Any]], b: list[dict[str, Any]]
+) -> dict[str, Any] | None:
+    for index, (x, y) in enumerate(zip(a, b, strict=False)):
+        parts = [key for key in ('prefix_len', 'draft', 'target', 'accept') if x[key] != y[key]]
+        if parts:
+            draft_index = next(
+                (k for k, (p, q) in enumerate(zip(x['draft'], y['draft'], strict=True)) if p != q),
+                None,
+            )
+            return {
+                'cycle': index,
+                'prefix_len': x['prefix_len'],
+                'differs': parts,
+                'first_draft_slot': draft_index,
+                'a': {key: x[key] for key in ('prefix_len', 'draft', 'target', 'accept')},
+                'b': {key: y[key] for key in ('prefix_len', 'draft', 'target', 'accept')},
+            }
+    return None
+
+
+def compare(a_dir: Path, b_dir: Path) -> dict[str, Any]:
+    a_out, b_out = outputs(a_dir), outputs(b_dir)
+    a_tr, b_tr = traces(a_dir), traces(b_dir)
+    report: dict[str, Any] = {}
+    for rid in sorted(set(a_out) & set(b_out)):
+        prompt = a_out[rid]['prompt_tokens']
+        logprob = first_logprob_difference(a_out[rid], b_out[rid])
+        cycle = first_cycle_difference(a_tr.get(rid, []), b_tr.get(rid, []))
+        entry: dict[str, Any] = {
+            'prompt_tokens': prompt,
+            'first_logprob_difference': logprob,
+            'first_token_difference': first_token_difference(a_out[rid], b_out[rid]),
+            'first_cycle_difference': cycle,
+        }
+        if logprob is not None:
+            # The cycle that computed output index `logprob`. Output index i is the
+            # token at position prompt + i (index 0 comes from prefill). A cycle with
+            # anchor position p (prefix_len) predicts position p + r + 1 in verify row
+            # r and commits rows 0..accept.
+            position = prompt + logprob
+            for index, record in enumerate(a_tr.get(rid, [])):
+                start = record['prefix_len']
+                if start < position <= start + record['accept'] + 1:
+                    entry['logprob_cycle_a'] = {
+                        'cycle': index,
+                        'prefix_len': start,
+                        'row': position - start - 1,
+                        'accept': record['accept'],
+                    }
+                    break
+        report[rid] = entry
+    return report
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=(__doc__ or '').split('\n\n')[0])
+    parser.add_argument('--a', type=Path, required=True)
+    parser.add_argument('--b', type=Path, required=True)
+    parser.add_argument('--earlier', type=Path, action='append', default=[])
+    parser.add_argument('--out', type=Path, required=True)
+    args = parser.parse_args()
+    result: dict[str, Any] = {
+        'a': str(args.a),
+        'b': str(args.b),
+        'requests': compare(args.a, args.b),
+    }
+    for earlier in args.earlier:
+        result[f'reproduces:{earlier}'] = {
+            str(run): {
+                rid: first_logprob_difference(row, outputs(earlier)[rid])
+                for rid, row in outputs(run).items()
+                if rid in outputs(earlier)
+            }
+            for run in (args.a, args.b)
+        }
+    args.out.write_text(json.dumps(result, indent=2) + '\n')
+    for rid, entry in result['requests'].items():
+        cycle = entry['first_cycle_difference']
+        print(
+            f'{rid:48s} prompt={entry["prompt_tokens"]:4d} '
+            f'logprob@{entry["first_logprob_difference"]} token@{entry["first_token_difference"]} '
+            f'cycle@{None if cycle is None else (cycle["cycle"], cycle["prefix_len"], cycle["differs"])} '
+            f'computed-in={entry.get("logprob_cycle_a")}'
+        )
+
+
+if __name__ == '__main__':
+    main()
