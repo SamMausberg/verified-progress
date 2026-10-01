@@ -53,6 +53,26 @@ fresh_b16 395.11 us), so it is not a bound for every implementation.
 `omniscient_gate_free_verify` applies the omniscient gate to that free-verify scoring and
 bounds P9's program with any gate, at any verify width, under the same condition.
 
+`--width-timing` prices that narrower verify with measured costs instead of zero: forced
+full acceptance at widths B = 2..16 in one session (`runs/p9_verify_widths.sh`). A reused
+cycle after a correction at J verifies B = m + 1 positions and is charged the baseline cycle
+minus its draft phase minus the verify that width saves against the same session's B = 16
+run, V(16) - V(m + 1); every other phase stays at its block-16 value
+(`measured_width_verify`, and `omniscient_gate_measured_width` with the gate). This is a c = 1
+measurement, so it needs a c = 1 baseline.
+
+At concurrency c > 1 (`--baseline-run` a fresh block-16 run at c, analyze_timing.py's batched
+summary) the cycle is the batch period and the draft phase is the batch's, draft(c). When one
+request reuses, the batch drafts one row fewer and its period shortens by some s, which every
+request in the batch gains: the batch commits c r_F tokens per unit time (r_F per request), so
+the reuse is worth c r_F s tokens, which is the c = 1 formula with T2_R - T2_F = -c s. By default
+s = draft(c) / c, the request's even share of the batched draft, so T2_R - T2_F = -draft(c); that
+share bounds s from above when the draft's cost is concave in the number of rows, so the result
+is an upper bound under that condition. `--draft-saving-us` sets s instead, for example the
+measured growth of the batched draft per added request, which bounds one reusing request's s from
+above under the same condition. The acceptance is still the c = 1 trace's. The free-verify
+fields at c > 1 also credit the request's even share of the batched verify.
+
     python experiments/repair/p9_support_oracle.py --cycles ~/vp-data/drafter/support/zlab_b16_cycles/cycles.pt \\
         --timing evidence/repair/stage_a_timing.json --out evidence/repair/p9_support_oracle.json
 """
@@ -99,7 +119,18 @@ def phases(timing: Path, run: str) -> dict[str, float]:
         p: row['phase_us'][p]['median'] for p in ('draft', 'verify', 'accept', 'commit', 'append')
     }
     ph['cycle'] = row['cycle_period_us']['median']
+    ph['concurrency'] = int(row.get('concurrency', 1))
+    ph['draft_saved'] = ph['draft']  # what a reused cycle saves; --draft-saving-us overrides
     return ph
+
+
+def verify_by_width(timing: Path) -> dict[int, float]:
+    """Median verify phase (us) of each forced-acceptance width in one session's summary."""
+    out = {}
+    for row in json.loads(timing.read_text()):
+        if row.get('mode') == 'force':
+            out[int(row['block'])] = row['phase_us']['verify']['median']
+    return out
 
 
 def load_rewalk(path: Path) -> dict[tuple[str, int], list[int]]:
@@ -173,15 +204,18 @@ def components(
     g2r: list[float],
     reuse: list[bool],
     ph: dict[str, float],
-    extra_us: float,
+    extra_us: float | list[float],
 ) -> Components:
-    """Per-boundary G1, G2_F, G2_R - G2_F and T2_R - T2_F (us), and the fresh cycle time T_F."""
+    """Per-boundary G1, G2_F, G2_R - G2_F and T2_R - T2_F (us), and the fresh cycle time T_F.
+
+    A reused cycle costs the fresh cycle minus the saved draft (ph['draft_saved'], the draft
+    phase unless overridden) plus extra_us (one value for every boundary, or one per boundary)."""
     t_f = ph['cycle']
-    t_r = ph['cycle'] - ph['draft'] + extra_us
+    extra = extra_us if isinstance(extra_us, list) else [extra_us] * len(rows)
     g1 = [1.0 + r['L'] for r in rows]
     g2f = [1.0 + r['next_L'] for r in rows]
     dg = [(a - b) if u else 0.0 for a, b, u in zip(g2r, g2f, reuse, strict=True)]
-    dt = [(t_r - t_f) if u else 0.0 for u in reuse]
+    dt = [(e - ph['draft_saved']) if u else 0.0 for e, u in zip(extra, reuse, strict=True)]
     return g1, g2f, dg, dt, t_f
 
 
@@ -214,16 +248,35 @@ def bootstrap(
 ) -> tuple[float, float]:
     """95% interval of Delta over request-level resamples, re-estimating r_F in each replicate.
 
-    The same seed draws the same resamples, so a gated and an ungated call are paired."""
+    The same seed draws the same resamples, so a gated and an ungated call are paired. A
+    replicate draws as many requests as there are, with replacement, and weights each boundary
+    by how often its request was drawn: the same value `estimate` gives on the concatenated
+    boundaries, computed with numpy."""
+    import numpy as np
+
     by_rid: dict[str, list[int]] = collections.defaultdict(list)
     for i, r in enumerate(rows):
         by_rid[r['rid']].append(i)
     rids = list(by_rid)
+    request_of = np.empty(len(rows), dtype=np.int64)
+    for j, rid in enumerate(rids):
+        request_of[by_rid[rid]] = j
+    g1, g2f, dg, dt, t_f = comp
+    g = np.asarray(g1, dtype=np.float64) + np.asarray(g2f, dtype=np.float64)
+    dg_a = np.asarray(dg, dtype=np.float64)
+    dt_a = np.asarray(dt, dtype=np.float64)
     rng = random.Random(seed)
     deltas = []
     for _ in range(n):
-        idx = [i for _ in rids for i in by_rid[rids[rng.randrange(len(rids))]]]
-        deltas.append(estimate(comp, idx, rate_per_us, gate)[1])
+        picks = [rng.randrange(len(rids)) for _ in rids]
+        weight = np.bincount(picks, minlength=len(rids))[request_of].astype(np.float64)
+        total = float(weight.sum())
+        r_f = rate_per_us if rate_per_us is not None else float(weight @ g) / (2 * t_f * total)
+        if gate:
+            delta = float(weight @ np.maximum(0.0, dg_a - r_f * dt_a)) / total
+        else:
+            delta = float(weight @ dg_a) / total - r_f * float(weight @ dt_a) / total
+        deltas.append(delta)
     deltas.sort()
     return deltas[int(0.025 * n)], deltas[int(0.975 * n) - 1]
 
@@ -250,19 +303,55 @@ def main() -> None:
         default=0.0,
         help='extra cost of one re-walk (charged as A + conditioning on every reused cycle)',
     )
+    ap.add_argument(
+        '--draft-saving-us',
+        type=float,
+        default=None,
+        help='s: how much one reused cycle shortens the (batch) cycle, in place of draft(c) / c (us)',
+    )
+    ap.add_argument(
+        '--width-timing',
+        type=Path,
+        default=None,
+        help='analyze_timing.py summary of forced-acceptance runs at widths 2..16 from one '
+        'session (runs/p9_verify_widths.sh): price the m + 1 verify of a reused cycle',
+    )
     args = ap.parse_args()
     if args.rewalk is not None and 16 not in args.ks:
         # The re-walk reuses exactly where the top-16 oracle could, which needs U_16.
         args.ks = sorted({*args.ks, 16})
     cycles = load_cycles(args.cycles)
     ph = phases(args.timing, args.baseline_run)
+    if args.draft_saving_us is not None:
+        # s shortens the batch period for all c requests (see the module docstring).
+        ph['draft_saved'] = args.draft_saving_us * ph['concurrency']
+    widths = verify_by_width(args.width_timing) if args.width_timing is not None else None
+    if widths is not None:
+        if ph['concurrency'] != 1:
+            raise SystemExit('--width-timing is a c = 1 measurement; use a c = 1 --baseline-run')
+        # A reused cycle verifies m + 1 = 2..15 positions; block 16 is the session's reference.
+        missing_widths = sorted(set(range(2, H + 2)) - set(widths))
+        if missing_widths:
+            raise SystemExit(f'--width-timing lacks forced-acceptance widths {missing_widths}')
     rewalk = load_rewalk(args.rewalk) if args.rewalk is not None else None
     rows = boundaries(cycles, args.ks, rewalk)
-    # DFlash's overall rate on the timing panel, A_D / C_D, as an alternative value of time.
+    # DFlash's overall rate on the timing panel, A_D / C_D, as an alternative value of time
+    # (per request: a batched run commits commit_per_cycle_batch over its c requests).
     timing_rows = {Path(r['run']).name: r for r in json.loads(args.timing.read_text())}
     base = timing_rows[args.baseline_run]
-    overall_rate = base['commit_per_cycle']['mean'] / base['cycle_period_us']['median']
+    per_request_commit = (
+        base['commit_per_cycle']['mean']
+        if 'commit_per_cycle' in base
+        else base['commit_per_cycle_batch']['mean'] / ph['concurrency']
+    )
+    overall_rate = per_request_commit / base['cycle_period_us']['median']
     everything = list(range(len(rows)))
+    # Verify saved by a reused cycle's m + 1 positions against the same session's block 16.
+    saved_verify = (
+        [widths[H + 1] - widths[r['m'] + 1] if r['m'] >= 1 else 0.0 for r in rows]
+        if widths is not None
+        else None
+    )
     free_scope = (
         'upper bound for P9 always-reuse programs at any verify width whose non-verify phases '
         f'cost at least their block-16 values in {args.baseline_run} '
@@ -270,15 +359,20 @@ def main() -> None:
         'not for every implementation'
     )
     result: dict[str, Any] = {
-        'kind': 'derived: exact per-cycle support (drafter support screen) and measured c = 1 phases',
+        'kind': 'derived: exact per-cycle support (drafter support screen) and measured phases',
+        'baseline_run': args.baseline_run,
         'cycles': len(cycles),
         'post_rejection_boundaries': len(rows),
         'requests': len({r['rid'] for r in rows}),
         'phases_us': ph,
+        'draft_share_of_cycle': ph['draft'] / ph['cycle'],
         'overall_dflash_tokens_per_ms': overall_rate * 1e3,
         'fresh_next_accept_mean': statistics.fmean(r['next_L'] for r in rows),
         'by_k': {},
     }
+    if widths is not None:
+        result['width_timing'] = str(args.width_timing)
+        result['verify_us_by_width'] = {str(b): widths[b] for b in sorted(widths)}
     for k in args.ks:
         supported = [r[f'U{k}'] >= r['J'] and r['m'] >= 1 for r in rows]
         suffix = [
@@ -354,6 +448,29 @@ def main() -> None:
                 'delta_ci95': [lo_gf, hi_gf],
             },
         }
+        if saved_verify is not None and widths is not None:
+            # Measured m + 1 verify: the reused cycle saves V(16) - V(m + 1) of the same session.
+            comp_w = components(rows, g2r, supported, ph, extra_us=[-s for s in saved_verify])
+            _, d_w = estimate(comp_w, everything)
+            lo_w, hi_w = bootstrap(rows, comp_w, args.bootstrap, seed=k)
+            _, d_gw = estimate(comp_w, everything, gate=True)
+            lo_gw, hi_gw = bootstrap(rows, comp_w, args.bootstrap, seed=k, gate=True)
+            saved_reused = [s for s, u in zip(saved_verify, supported, strict=True) if u]
+            result['by_k'][str(k)]['measured_width_verify'] = {
+                'scope': 'P9 always-reuse program verifying the m + 1 positions with the '
+                'session-measured verify of that width; non-verify phases at block-16 values',
+                'mean_saved_verify_us_when_reused': statistics.fmean(saved_reused)
+                if saved_reused
+                else None,
+                'delta': d_w,
+                'delta_ci95': [lo_w, hi_w],
+                'rejected': hi_w <= 0,
+            }
+            result['by_k'][str(k)]['omniscient_gate_measured_width'] = {
+                'scope': 'P9 program with any gate; otherwise as measured_width_verify',
+                'delta': d_gw,
+                'delta_ci95': [lo_gw, hi_gw],
+            }
     # Unchanged cached unary control: reuse the old drafted tail wherever the horizon remains.
     reuse = [r['m'] >= 1 for r in rows]
     g2k = [

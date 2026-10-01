@@ -1,0 +1,86 @@
+{
+ "m": 64,
+ "inner_calls": 5,
+ "call_output_mib": {
+  "bf16": 30.3125,
+  "fp32": 60.625
+ },
+ "start": {
+  "allocated_mib": 1213,
+  "reserved_mib": 1216
+ },
+ "rows": [
+  {
+   "graph": "plain",
+   "capture": 0,
+   "allocated_mib": 1245,
+   "reserved_mib": 1248
+  },
+  {
+   "graph": "plain",
+   "capture": 1,
+   "allocated_mib": 1245,
+   "reserved_mib": 1248
+  },
+  {
+   "graph": "plain",
+   "capture": 2,
+   "allocated_mib": 1245,
+   "reserved_mib": 1248
+  },
+  {
+   "graph": "plain",
+   "capture": 3,
+   "allocated_mib": 1245,
+   "reserved_mib": 1248
+  },
+  {
+   "graph": "conditional",
+   "capture": 0,
+   "allocated_mib": 1405,
+   "reserved_mib": 1878
+  },
+  {
+   "graph": "conditional",
+   "capture": 1,
+   "allocated_mib": 1565,
+   "reserved_mib": 2508
+  },
+  {
+   "graph": "conditional",
+   "capture": 2,
+   "allocated_mib": 1725,
+   "reserved_mib": 3138
+  },
+  {
+   "graph": "conditional",
+   "capture": 3,
+   "allocated_mib": 1885,
+   "reserved_mib": 3768
+  },
+  {
+   "graph": "conditional, one shared pool",
+   "capture": 0,
+   "allocated_mib": 2045,
+   "reserved_mib": 4398
+  },
+  {
+   "graph": "conditional, one shared pool",
+   "capture": 1,
+   "allocated_mib": 2205,
+   "reserved_mib": 5028
+  },
+  {
+   "graph": "conditional, one shared pool",
+   "capture": 2,
+   "allocated_mib": 2365,
+   "reserved_mib": 5658
+  },
+  {
+   "graph": "conditional, one shared pool",
+   "capture": 3,
+   "allocated_mib": 2525,
+   "reserved_mib": 6288
+  }
+ ]
+}

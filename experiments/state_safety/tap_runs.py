@@ -29,8 +29,19 @@ import aiohttp
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from client import generate, load_prompts
-from server import CONFIGS, flush_cache, git_sha, launch_with_retry
+from server import (
+    CONFIGS,
+    expected_pools,
+    flush_cache,
+    git_dirty,
+    git_sha,
+    launch_with_retry,
+    min_free_gb,
+    pool_flags,
+)
 from server import sglang_source_dir as sglang_dir
+
+REPO = Path(__file__).resolve().parents[2]
 
 
 async def serve(
@@ -74,6 +85,12 @@ def main() -> None:
     ap.add_argument('--repeats', type=int, default=1, help='send every prompt this many times')
     ap.add_argument('--limits', help='JSON {prompt id: max_new_tokens} for tapped prompts')
     ap.add_argument('--flush-each', action='store_true', help='flush the cache before each request')
+    ap.add_argument(
+        '--pin',
+        action='store_true',
+        help='pin the pools (server.POOL_PIN, overridden by pool flags in --extra-flags) and '
+        'restart the server until it allocates exactly those sizes',
+    )
     args = ap.parse_args()
 
     tap = {line.strip() for line in Path(args.tap_ids).read_text().splitlines() if line.strip()}
@@ -84,10 +101,17 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     os.environ['SGLANG_STATE_TAP_DIR'] = str(out_dir / 'tap')
     os.environ['SGLANG_STATE_TAP_RID_PREFIX'] = 'tap-'
-    flags = CONFIGS[args.config] + args.extra_flags.split()
+    # Extra flags come last, so pool sizes given there override the pinned defaults.
+    flags = CONFIGS[args.config] + (pool_flags() if args.pin else []) + args.extra_flags.split()
+    expect = expected_pools(flags) if args.pin else None
     t0 = time.time()
     with launch_with_retry(
-        flags, args.port, out_dir / 'server.log', require_full_batch=args.concurrency > 1
+        flags,
+        args.port,
+        out_dir / 'server.log',
+        require_full_batch=args.concurrency > 1,
+        expect_pools=expect,
+        min_free=min_free_gb(flags) if args.pin else None,
     ) as srv:
         records = asyncio.run(serve(srv['base_url'], prompts, tap, args))
     with (out_dir / 'client.jsonl').open('w') as f:
@@ -99,7 +123,10 @@ def main() -> None:
         'concurrency': args.concurrency,
         'load_all': args.load_all,
         'tapped': len(tap),
+        'pool_pin': expect,
         'server_info': srv['server_info'],
+        'repo_sha': git_sha(REPO),
+        'repo_dirty': git_dirty(REPO),
         'sglang_dir': str(sglang_dir()),
         'sglang_sha': git_sha(sglang_dir()),
         'wall_s': round(time.time() - t0, 1),

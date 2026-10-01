@@ -1,0 +1,13 @@
+compile	ok	0	reused:d2712cb	depends on the default tiles; src/certified_head (code and data) unchanged since d2712cb
+tests	ok	0	reused:d2712cb	depends on the default tiles; src/certified_head (code and data) unchanged since d2712cb
+stress	ok	0	46bcc84	
+replay	ok	0	reused:fff72dc	batches of at most 16 rows (the capture ran 16 requests at most); kernels.py unchanged since fff72dc (the package changed)
+invariance	ok	0	reused:fff72dc	stock BF16 head only, no certified kernel; kernels.py unchanged since fff72dc (the package changed)
+tune_w8a16	ok	0	reused:d2712cb	depends on the default tiles; src/certified_head (code and data) unchanged since d2712cb
+tune_w8a8	ok	0	reused:fff72dc	times every candidate tile explicitly, not the defaults; kernels.py unchanged since fff72dc (the package changed)
+micro	ok	0	46bcc84	
+primitives	ok	0	reused:d2712cb	depends on the default tiles; src/certified_head (code and data) unchanged since d2712cb
+ncu	ok	0	reused:d2712cb	depends on the default tiles; src/certified_head (code and data) unchanged since d2712cb
+ncu_export	ok	0	reused:d2712cb	depends on the default tiles; src/certified_head (code and data) unchanged since d2712cb
+summarize	ok	0	46bcc84	
+check_outputs	ok	0	46bcc84	

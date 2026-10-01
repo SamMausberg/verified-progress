@@ -1,0 +1,6 @@
+pair,run_a,run_b,prompts,diverged,exposure_tokens,per_1k_tokens,tie,one_ulp,near,large,not_argmax,length_mismatch,max_margin_median,max_margin_max,drift_p99,drift_max,same_server,pools_identical,pinned_a,pinned_b
+stock c1 vs fresh-server repeat (floor),plain/c1,plain__rep/c1,320,0,70042,0,0,0,0,0,0,0,,,0,0,False,True,True,True
+stock c32 vs fresh-server repeat (floor),plain/c32,plain__rep/c32,320,4,69712,0.05738,4,0,0,0,0,0,0.125,0.125,0.1545,0.2183,False,True,True,True
+"stock c1 vs stock c32, one server (floor)",plain/c1,plain/c32,320,41,64845,0.6323,39,2,0,0,0,0,0.125,0.25,0.3463,0.5717,True,True,True,True
+stock c1 vs lever_v1 c1,plain/c1,plain__bb_lever_v1/c1,320,161,47294,3.404,157,3,1,0,0,0,0.125,0.25,0.3512,0.3685,False,True,True,True
+stock c32 vs lever_v1 c32,plain/c32,plain__bb_lever_v1/c32,320,174,45544,3.82,167,6,1,0,0,0,0.125,0.25,0.3592,0.3872,False,True,True,True

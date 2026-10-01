@@ -1,0 +1,82 @@
+{
+  "launch": {
+    "command": [
+      "/home/ubuntu/sglang/.venv/bin/python",
+      "-m",
+      "sglang.launch_server",
+      "--model-path",
+      "Qwen/Qwen3.5-4B",
+      "--revision",
+      "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "30083",
+      "--attention-backend",
+      "flashinfer",
+      "--mm-attention-backend",
+      "triton_attn",
+      "--random-seed",
+      "0",
+      "--enable-metrics",
+      "--stream-interval",
+      "4",
+      "--speculative-algorithm",
+      "DFLASH",
+      "--speculative-draft-model-path",
+      "z-lab/Qwen3.5-4B-DFlash",
+      "--speculative-draft-model-revision",
+      "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
+      "--linear-attn-prefill-backend",
+      "flashinfer",
+      "--linear-attn-decode-backend",
+      "flashinfer",
+      "--speculative-dflash-block-size",
+      "16",
+      "--max-running-requests",
+      "4"
+    ],
+    "env": {
+      "SGLANG_ENABLE_OVERLAP_PLAN_STREAM": "1"
+    },
+    "sglang_worktree": "/home/ubuntu/sglang",
+    "sglang_revision": "bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824",
+    "sglang_dirty": false,
+    "repo_revision": "5f3b27ecc5efe22e77c7683443922f03d4cb48a1",
+    "clients": [
+      "python /home/ubuntu/vp-wt/drafter/experiments/drafter/accept_probe.py --port {port} --workload /home/ubuntu/vp-wt/drafter/experiments/drafter/panel-v1.jsonl       --per-domain 32 --max-new-tokens 2048 --concurrency 1 --label timed-b16 --out {out}"
+    ],
+    "started": "2026-10-01T02:18:48+0000"
+  },
+  "server_info_subset": {
+    "speculative_algorithm": "DFLASH",
+    "speculative_num_draft_tokens": 16,
+    "speculative_draft_model_path": "z-lab/Qwen3.5-4B-DFlash",
+    "speculative_draft_model_revision": "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
+    "speculative_draft_attention_backend": "flashinfer",
+    "attention_backend": "flashinfer",
+    "linear_attn_prefill_backend": "flashinfer",
+    "linear_attn_decode_backend": "flashinfer",
+    "disable_cuda_graph": false,
+    "disable_overlap_schedule": false,
+    "max_running_requests": 4,
+    "mem_fraction_static": 0.8150999999999999,
+    "stream_interval": 4
+  },
+  "cpu_load": {
+    "interval_s": 1.0,
+    "samples": 164,
+    "foreign_cores_mean": 0.175,
+    "foreign_cores_max": 1.28,
+    "contended": false,
+    "contention_threshold_cores": 2.0,
+    "top_foreign_mean_cores": {
+      "/home/ubuntu/.cursor-server/bin/linux-arm64/e44a49c17e334d442e58bbde931d791200f014a0/node --dns-result-order=ipv4first -": 0.07,
+      "claude --dangerously-skip-permissions": 0.01
+    },
+    "own_peak_cores": {
+      "python /home/ubuntu/vp-wt/drafter/experiments/drafter/accept": 5.18,
+      "sglang::scheduler": 1.03
+    }
+  }
+}

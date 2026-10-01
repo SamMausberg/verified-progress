@@ -20,7 +20,7 @@ commands are shell strings; `{port}` and `{out}` are substituted. Run it under
 from __future__ import annotations
 
 import argparse
-import fcntl
+import contextlib
 import json
 import os
 import shlex
@@ -31,6 +31,7 @@ import time
 import urllib.request
 from pathlib import Path
 
+LOCK_SCRIPT = Path(__file__).resolve().parents[2] / 'scripts' / 'gpu_startup_lock.sh'
 MODEL = 'Qwen/Qwen3.5-4B'
 REVISION = '851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a'
 DFLASH = 'z-lab/Qwen3.5-4B-DFlash'
@@ -74,6 +75,71 @@ def git_revision(path: Path) -> str | None:
         return None
 
 
+class StartupLock:
+    """The team's server start-up lock, held through scripts/gpu_startup_lock.sh.
+
+    The script runs a placeholder command that reports when it holds the lock
+    (after the optional free-memory gate) and then waits for its stdin to close.
+    """
+
+    def __init__(self, env: dict[str, str]) -> None:
+        self.env = env
+        self.process: subprocess.Popen | None = None
+
+    def acquire(self) -> None:
+        self.process = subprocess.Popen(
+            [str(LOCK_SCRIPT), 'sh', '-c', 'echo locked; exec cat > /dev/null'],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            text=True,
+            env=self.env,
+        )
+        assert self.process.stdout is not None
+        if self.process.stdout.readline().strip() != 'locked':
+            code = self.release()
+            raise RuntimeError(f'start-up lock not acquired (gpu_startup_lock.sh exit {code})')
+
+    def release(self) -> int | None:
+        if self.process is None:
+            return None
+        process, self.process = self.process, None
+        assert process.stdin is not None
+        with contextlib.suppress(BrokenPipeError):
+            process.stdin.close()
+        return process.wait(timeout=60)
+
+
+POOL_KEYS = (
+    'max_total_num_tokens',
+    'max_mamba_cache_size',
+    'max_running_requests',
+    'effective_max_running_requests_per_dp',
+    'mamba_ssm_dtype',
+    'disable_radix_cache',
+)
+
+
+def resolved_pools(server_info: Path) -> dict[str, object]:
+    """Pool sizes and running limits from /server_info (top level and internal state)."""
+    info = json.loads(server_info.read_text())
+    internal = info.get('internal_states') or [{}]
+    merged = {**info, **(internal[0] if isinstance(internal, list) else internal)}
+    return {key: merged.get(key) for key in POOL_KEYS}
+
+
+def stop(server: subprocess.Popen) -> None:
+    """Stop the server's process group (it may already have exited)."""
+    try:
+        os.killpg(server.pid, signal.SIGTERM)
+        server.wait(timeout=60)
+    except ProcessLookupError:
+        pass
+    except subprocess.TimeoutExpired:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(server.pid, signal.SIGKILL)
+    server.wait()
+
+
 def wait_ready(port: int, process: subprocess.Popen, timeout: float) -> None:
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -105,6 +171,18 @@ def main() -> None:
     parser.add_argument('--env', action='append', default=[], help='NAME=VALUE')
     parser.add_argument('--client', action='append', default=[], help='shell command')
     parser.add_argument('--ready-timeout', type=float, default=900)
+    parser.add_argument(
+        '--startup-retries',
+        type=int,
+        default=30,
+        help='relaunches when start-up fails for lack of free GPU memory (other shared jobs)',
+    )
+    parser.add_argument('--retry-wait', type=float, default=60)
+    parser.add_argument(
+        '--min-free-gb',
+        type=float,
+        help='start only when this much GPU memory is free (GPU_STARTUP_MIN_FREE_GB)',
+    )
     args = parser.parse_args()
 
     args.out.mkdir(parents=True, exist_ok=True)
@@ -154,29 +232,63 @@ def main() -> None:
     }
     (args.out / 'launch.json').write_text(json.dumps(launch, indent=2) + '\n')
 
-    log = (args.out / 'server.log').open('w')
-    # Start-up is serialized with other jobs' servers (the same lock file as
-    # scripts/gpu_startup_lock.sh): SGLang sizes its pools from the free memory
-    # it sees while loading, so concurrent start-ups race. The lock descriptor
-    # is not inherited by the server (Popen closes fds) and is released once the
-    # server is healthy.
-    lock_path = os.environ.get('GPU_LOCK_FILE', str(Path.home() / '.gpu.lock')) + '.startup'
-    startup_lock = open(lock_path, 'a')  # noqa: SIM115 (released before the clients run)
-    fcntl.flock(startup_lock, fcntl.LOCK_EX)
-    server = subprocess.Popen(
-        command, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True
-    )
-    status = 0
-    try:
+    # Start-up is serialized with other jobs' servers through
+    # scripts/gpu_startup_lock.sh: SGLang sizes its pools from the free memory it
+    # sees while loading, so concurrent start-ups race. With --min-free-gb (or
+    # GPU_STARTUP_MIN_FREE_GB) the script also waits until that much GPU memory is
+    # free. The lock is held by the script, not by this process, so the server
+    # cannot inherit it; it is released once the server is healthy. If the pools
+    # still do not fit (memory taken after the check), the launch is retried after
+    # a wait with the lock released.
+    lock_env = dict(os.environ)
+    if args.min_free_gb is not None:
+        lock_env['GPU_STARTUP_MIN_FREE_GB'] = str(args.min_free_gb)
+    attempt = 0
+    while True:
+        log = (args.out / 'server.log').open('w')
+        startup_lock = StartupLock(lock_env)
+        startup_lock.acquire()
+        try:
+            server = subprocess.Popen(
+                command, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True
+            )
+        except BaseException:
+            startup_lock.release()
+            raise
         try:
             wait_ready(args.port, server, args.ready_timeout)
+            break
+        except RuntimeError:
+            stop(server)
+            log.close()
+            text = (args.out / 'server.log').read_text(errors='replace')
+            if 'Not enough GPU memory' not in text or attempt >= args.startup_retries:
+                raise
+            attempt += 1
+            print(
+                f'[serve_run] start-up found too little free GPU memory; '
+                f'retry {attempt}/{args.startup_retries} in {args.retry_wait:.0f} s',
+                flush=True,
+            )
+        except BaseException:
+            stop(server)
+            raise
         finally:
-            fcntl.flock(startup_lock, fcntl.LOCK_UN)
-            startup_lock.close()
+            startup_lock.release()
+        time.sleep(args.retry_wait)
+    launch['startup_attempts'] = attempt + 1
+    (args.out / 'launch.json').write_text(json.dumps(launch, indent=2) + '\n')
+    status = 0
+    try:
         with urllib.request.urlopen(
             f'http://127.0.0.1:{args.port}/server_info', timeout=30
         ) as response:
             (args.out / 'server_info.json').write_bytes(response.read())
+        # The pools SGLang resolved (from free memory unless pinned) and the running
+        # limit they imply: two arms are comparable only if these match.
+        launch['pools'] = resolved_pools(args.out / 'server_info.json')
+        (args.out / 'launch.json').write_text(json.dumps(launch, indent=2) + '\n')
+        print(f'[serve_run] pools {launch["pools"]}', flush=True)
         # Foreign CPU load while the clients run (bench.hostload: everything outside
         # this process tree, i.e. outside the server and the clients); a mean above
         # two cores marks the run as contended.
@@ -190,12 +302,7 @@ def main() -> None:
                 status = subprocess.run(text, shell=True).returncode or status
         (args.out / 'cpu_load.json').write_text(json.dumps(load.summary(), indent=2) + '\n')
     finally:
-        os.killpg(server.pid, signal.SIGTERM)
-        try:
-            server.wait(timeout=60)
-        except subprocess.TimeoutExpired:
-            os.killpg(server.pid, signal.SIGKILL)
-            server.wait()
+        stop(server)
         log.close()
     sys.exit(status)
 

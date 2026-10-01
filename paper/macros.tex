@@ -90,8 +90,9 @@
 \newcommand{\datafigure}[3]{\IfFileExists{#1}{#2}{\pendingfigure{#3}{#1}}}
 % ---------------------------------------------------------------------------
 % Terminology. paper/terminology.tex declares every term once with
-% \term{<scope>}{<term>}{<definition>}, scope main (printed in the main text's Table
-% tab:terms) or app (terms used only in the appendices). \termrows{<scope>} expands to the
+% \term{<scope>}{<term>}{<definition>}, scope main (terms the main text relies on) or app
+% (terms used only in the appendices); the glossary (Appendix app:glossary) prints both
+% scopes. \termrows{<scope>} expands to the
 % rows "term & definition \\" of that scope, for use inside a two-column tabular.
 \makeatletter
 \@namedef{termrows@main}{}
