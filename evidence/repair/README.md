@@ -177,8 +177,10 @@ Delta = E[G2_R - G2_F] - r_F E[A + T2_R - T2_F], r_F = E[G1 + G2_F] / E[T1 + T2_
 this finite-window reuse at the tested configuration if its upper confidence bound is <= 0".
 
 Input: the drafter workstream's per-cycle support table for its shared block-16 DFlash trace
-(`~/vp-data/drafter/support/zlab_b16_cycles/cycles.pt`, SHA-256 `a587d952...dc36b`; 21,067 cycles
-of 80 requests; 207 cycles whose block runs past the output end are excluded by the producer). Per
+(`~/vp-data/drafter/support/zlab_b16_cycles/cycles.pt`, SHA-256 `a587d952...dc36b`, raw data
+outside git; its summary matches the committed `evidence/drafter/support/zlab_b16_panel_v1_summary.json`;
+21,067 cycles of 80 requests; 207 cycles whose block runs past the output end are excluded by
+the producer). Per
 cycle it holds the engine's accepted length L, the realized greedy continuation (the committed
 stream, which after a rejection follows the target given the corrected prefix), the engine's
 drafted tokens and the leading supported length U_K of the continuation inside the drafter's top-K
@@ -209,6 +211,15 @@ Valuing the saved time at DFlash's overall rate (1.029 tokens per ms) instead gi
 and +1.70 (K = 16). By domain at K = 16: chat +1.44, code +1.11, maths +0.82, MATH-500 +0.55. The
 unchanged cached unary control (the old draft's tail after the correction, no fresh fill) accepts
 0.83 drafts and gives Delta = -1.93 (-2.34, -1.59): rejected.
+
+Assumptions of this oracle, stated plainly: (1) the candidate sets are the offline
+recomputation, whose top-1 token matches the engine's drafted token at 97.4% of positions, not
+the engine's own sets; (2) the costs are the c = 1 phases of one DFlash-16 run (`fresh_b16`, the
+drafter workstream's configuration), and a reused cycle is charged exactly a fresh cycle without
+its draft phase; (3) the oracle's extra first-cycle cost A is 0: compiling the program, retaining
+the candidate sets, conditioning on the correction and catching up the draft cache are not
+priced; (4) the oracle knows the true token wherever it lies in the old candidate set, so it
+bounds every real program from above.
 
 - **Verdict at c = 1: reuse is not rejected for top-8 and top-16 candidate sets.** A program that
   always found the true token inside the old top-16 sets would commit slightly fewer tokens than
