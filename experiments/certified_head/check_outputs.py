@@ -33,6 +33,52 @@ def errors_in(obj: Any, path: str = '') -> list[str]:
     return found
 
 
+# Each micro_head arm timed on a batch its head decides, the arm that times the
+# same head with a row forced to fall back, and whether that fallback runs the
+# whole-batch stock head (column fallbacks run a small gathered GEMM instead).
+DECIDED_ARMS = {
+    'certified': ('certified_fallback', True),
+    'certified_no_probe': ('certified_fallback', True),
+    'certified_columns_mode': ('certified_columns_fallback', False),
+    'certified_sample': ('certified_sample_fallback', True),
+    'certified_sample_no_probe': ('certified_sample_fallback', True),
+    'certified_w8a8': ('certified_w8a8_fallback', True),
+    'certified_bf16': ('certified_bf16_fallback', True),
+}
+
+
+def micro_problems(micro: dict[str, Any]) -> list[str]:
+    """A decided arm must time a batch its own head decides (statuses under
+    ``batch_stats``), and its fallback arm must cost more: at least half the stock
+    GEMM (``bf16_gemm``) more for a whole-batch fallback, which runs that GEMM on
+    top of the decided path. x7's W8A8 arm at M = 32 timed the fallback on a batch
+    chosen at other tiles: 679 us, against 228 us at M = 16."""
+    found = []
+    for m, entry in micro['batches'].items():
+        stats = entry.get('batch_stats')
+        if stats is None:
+            found.append(f'micro_head/{m}: no batch statuses')
+            continue
+        gemm = entry.get('bf16_gemm', {}).get('warm', {}).get('median_us', 0.0)
+        for arm, (fb_arm, dense) in DECIDED_ARMS.items():
+            if arm not in entry:
+                continue
+            if arm not in stats:
+                found.append(f'micro_head/{m}/{arm}: no batch status')
+            elif stats[arm]['fallback_rows']:
+                found.append(f'micro_head/{m}/{arm}: batch not decided: {stats[arm]}')
+            t, t_fb = entry[arm].get('warm'), entry.get(fb_arm, {}).get('warm')
+            if t is None or t_fb is None:
+                continue
+            margin = 0.5 * gemm if dense else 0.0
+            if t_fb['median_us'] - t['median_us'] <= margin:
+                found.append(
+                    f'micro_head/{m}/{arm}: {t["median_us"]:.1f} us, within {margin:.1f} us '
+                    f'of {fb_arm} ({t_fb["median_us"]:.1f} us): did it time its fallback?'
+                )
+    return found
+
+
 MIN_CERTIFIED_SHARE = 0.5
 MIN_CERTIFIED_ROWS = 1000
 
@@ -109,6 +155,7 @@ def main() -> None:
     micro = load('micro_head.json')
     if micro is not None:
         problems += [f'micro_head{e}' for e in errors_in(micro['batches'])]
+        problems += micro_problems(micro)
         for head, report in micro.get('enclosure_self_test', {}).items():
             if not report.get('ok'):
                 problems.append(

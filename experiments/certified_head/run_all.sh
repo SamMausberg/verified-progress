@@ -17,7 +17,8 @@
 # always runs); RUN_ALL_REUSE=DIR copies every other step's outputs from an earlier
 # run if that run recorded the step as ok, and records it with that run's commit.
 # A reused step's fifth column says why its result does not depend on the default
-# tile configurations (if it does not) and whether the kernel source changed since.
+# tile configurations (if it does not) and whether the package or its kernel
+# source changed since.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="${1:-$HOME/vp-data/kernel/runs/latest}"
@@ -75,9 +76,12 @@ reuse() {  # name: copy an earlier run's ok outputs, or record the step as not r
   if [ "$src" = "?" ]; then
     src=$(head -1 "$REUSE/commit.txt" | cut -c1-7)
   fi
+  src=${src#reused:}  # a step the earlier run itself reused keeps its own commit
   local note="${TILE_INDEPENDENT[$name]:-depends on the default tiles}"
-  if git diff --quiet "$src" HEAD -- src/certified_head/kernels.py 2>/dev/null; then
-    note="$note; kernels.py unchanged since $src"
+  if git diff --quiet "$src" HEAD -- src/certified_head/ 2>/dev/null; then
+    note="$note; src/certified_head unchanged since $src"
+  elif git diff --quiet "$src" HEAD -- src/certified_head/kernels.py 2>/dev/null; then
+    note="$note; kernels.py unchanged since $src (the package changed)"
   else
     note="$note; kernels.py CHANGED since $src"
   fi

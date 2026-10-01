@@ -1,9 +1,12 @@
 """Microbenchmarks of the certified int8 LM head against SGLang's BF16 head.
 
-Every arm is captured in a CUDA graph with ``--inner`` back-to-back calls and
-timed with CUDA events over ``--trials`` replays; the per-call time is the
-replay time divided by ``--inner``. Warm L2 repeats the same inputs; cold L2
-inserts a 256 MB write between calls and subtracts a flush-only graph.
+Every arm is captured in a CUDA graph with ``--inner`` back-to-back calls (at
+most 1,280 batch rows per graph: 10 calls at M = 128, 5 at 256; ``inner`` in each
+batch size's entry) and timed with CUDA events over ``--trials`` replays; the
+per-call time is the replay time divided by the calls per graph. Warm L2 repeats
+the same inputs; cold L2 inserts a 256 MB write between calls and subtracts a
+flush-only graph. Batch sizes above 32 each run in a fresh process
+(:func:`run_isolated`).
 
 Arms (per batch size M):
 
@@ -28,6 +31,20 @@ Arms (per batch size M):
                      (no top-k/top-p): the certified path with its fallback node,
                      and the stock chain (GEMM, FP32 copy, ``div_``, softmax, log,
                      ``multinomial_with_seed``).
+``certified_no_probe`` / ``certified_sample_no_probe`` the ``certified`` and
+                     ``certified_sample`` arms' kernels with the runtime probes
+                     compiled out (measurement only: such a head is unsafe).
+``certified_w8a8`` / ``certified_bf16`` (and ``*_fallback``) the integer W8A8 and
+                     the BF16 pass, on a decided batch and with one row forced to
+                     fall back.
+
+Every "decided" arm runs on real rows that its own head decides at this batch
+size's tiles: candidate rows come from statuses computed in 256-row batches, and
+a batch size with other tiles (another ``block_v``) can leave some of them
+undecided, so each arm's batch is formed and checked at its own batch size, and
+the statuses are written under ``batch_stats``. ``check_outputs.py`` fails a run
+in which a decided arm's batch has an undecided row or a decided arm is slower
+than its own fallback arm.
 
 Stage times of the certified path are differences of graphs that run growing
 prefixes of the pipeline. Run under the exclusive lock::
@@ -64,6 +81,12 @@ from real_states import plain_decode_steps
 
 BATCHES = [1, 2, 4, 8, 16, 32, 64, 128, 256]
 
+# Batch sizes measured in one process (the rest get a process each): see
+# run_isolated.
+SHARED_PROCESS_MAX_M = 32
+# Batch rows per captured graph at most: M = 64 keeps 20 calls, 128 has 10, 256 has 5.
+INNER_ROWS = 1280
+
 
 def time_graph(
     fn: Callable[[], Any], inner: int, trials: int, flush: torch.Tensor | None
@@ -92,7 +115,8 @@ def time_graph(
         end.record()
         end.synchronize()
         out.append(start.elapsed_time(end) * 1000.0 / inner)
-    # Each captured graph keeps a private memory pool; release it before the next one.
+    # A graph's private pool is released when it is deleted, except what its
+    # conditional nodes' bodies allocated (see run_isolated).
     del graph
     gc.collect()
     torch.cuda.empty_cache()
@@ -112,14 +136,24 @@ def summarize(samples: list[float], base: list[float] | None = None) -> dict[str
     }
 
 
+def inner_calls(args: argparse.Namespace, m: int) -> int:
+    """Calls per captured graph: ``--inner``, but at most ``INNER_ROWS // m``.
+
+    Each call's conditional fallback body leaks its allocations when the graph is
+    deleted (see run_isolated), so the graphs of large batch sizes hold fewer calls;
+    at those sizes one call takes over 0.5 ms, so a replay still lasts milliseconds.
+    """
+    return max(1, min(args.inner, INNER_ROWS // m))
+
+
 def measure(
-    fn: Callable[[], Any], args: argparse.Namespace, flush: torch.Tensor
+    fn: Callable[[], Any], args: argparse.Namespace, flush: torch.Tensor, inner: int
 ) -> dict[str, dict[str, float]]:
-    warm = time_graph(fn, args.inner, args.trials, None)
+    warm = time_graph(fn, inner, args.trials, None)
     res = {'warm': summarize(warm)}
     if args.cold:
-        cold = time_graph(fn, args.inner, args.trials, flush)
-        base = time_graph(lambda: None, args.inner, args.trials, flush)
+        cold = time_graph(fn, inner, args.trials, flush)
+        base = time_graph(lambda: None, inner, args.trials, flush)
         res['cold'] = summarize(cold, base)
     return res
 
@@ -149,16 +183,17 @@ def sample_inputs(idx: torch.Tensor, temp: float = 0.7) -> tuple[torch.Tensor, .
     return seeds, positions, temps
 
 
-def row_status(head: CertifiedHead, pool: torch.Tensor, kind: str) -> torch.Tensor:
-    """Certificate status of every pool row (0 = decided).
+def row_status(head: CertifiedHead, pool: torch.Tensor, kind: str, size: int = 256) -> torch.Tensor:
+    """Certificate status (0 = decided) of the first ``len(pool) // size * size``
+    pool rows, computed in batches of ``size``.
 
     A row's status does not depend on the rest of its batch (the envelope,
-    selection and decision are per row), so batches of any size can be formed
-    from these statuses.
+    selection and decision are per row), but it can depend on the tiles and so on
+    the batch size: :func:`statuses` computes it once per tile configuration.
     """
     out = []
-    for s0 in range(0, pool.shape[0], 256):
-        h = pool[s0 : s0 + 256].contiguous()
+    for s0 in range(0, pool.shape[0] // size * size, size):
+        h = pool[s0 : s0 + size].contiguous()
         if kind == 'argmax':
             _, stats = head.argmax(h, fallback=False)
         else:
@@ -168,12 +203,63 @@ def row_status(head: CertifiedHead, pool: torch.Tensor, kind: str) -> torch.Tens
     return torch.cat(out)
 
 
-def decided_batch(status: torch.Tensor, m: int) -> torch.Tensor:
-    """Indices of the first ``m`` decided rows."""
-    idx = (status == 0).nonzero().flatten()
-    if idx.numel() < m:
-        raise RuntimeError(f'only {idx.numel()} decided rows for a batch of {m}')
-    return idx[:m]
+def tiles_key(head: CertifiedHead, m: int) -> tuple[Any, ...]:
+    arith = head.arith_for(m)
+    cfg = head.gemv_config(m) if arith == 'w8a16' else head.arith_config(arith, m)
+    return (arith, *sorted(cfg.__dict__.items()))
+
+
+def statuses(
+    head: CertifiedHead, pool: torch.Tensor, kind: str, batches: list[int]
+) -> dict[int, torch.Tensor]:
+    """Row statuses for each batch size, computed once per tile configuration (in
+    batches of the largest of these sizes that uses it)."""
+    groups: dict[tuple[Any, ...], list[int]] = {}
+    for m in batches:
+        groups.setdefault(tiles_key(head, m), []).append(m)
+    out: dict[int, torch.Tensor] = {}
+    for ms in groups.values():
+        st = row_status(head, pool, kind, max(ms))
+        out.update(dict.fromkeys(ms, st))
+    return out
+
+
+def decided_at_own_tiles(
+    status: torch.Tensor, m: int, run: Callable[[torch.Tensor], Any]
+) -> tuple[torch.Tensor, dict[str, Any]]:
+    """The first ``m`` rows that the arm's head decides in batches of ``m``.
+
+    ``status`` (at this batch size's tiles) gives the candidates; ``run(idx)``
+    returns the head's stats for those pool rows at batch size ``m``, which
+    checks each batch again. Returns the indices and their stats summary.
+    """
+    pending = (status == 0).nonzero().flatten()
+    chosen: list[torch.Tensor] = []
+    have = 0
+    for s0 in range(0, pending.numel() - m + 1, m):
+        idx = pending[s0 : s0 + m]
+        ok = run(idx).status == 0
+        chosen.append(idx[ok])
+        have += int(ok.sum())
+        if have >= m:
+            break
+    if have < m:
+        raise RuntimeError(f'only {have} rows decided at batch size {m}')
+    idx = torch.cat(chosen)[:m]
+    summary = run(idx).summary()
+    if summary['fallback_rows']:
+        raise RuntimeError(f'batch of {m} not decided on recheck: {summary}')
+    return idx, summary
+
+
+def argmax_stats(head: CertifiedHead, pool: torch.Tensor) -> Callable[[torch.Tensor], Any]:
+    return lambda idx: head.argmax(pool[idx].contiguous(), fallback=False)[1]
+
+
+def sample_stats(head: CertifiedHead, pool: torch.Tensor) -> Callable[[torch.Tensor], Any]:
+    return lambda idx: head.gumbel_sample(
+        pool[idx].contiguous(), *sample_inputs(idx), fallback=False
+    )[1]
 
 
 def ambiguous_row(status: torch.Tensor, pool: torch.Tensor) -> torch.Tensor:
@@ -314,7 +400,14 @@ def main() -> None:
     )
     ap.add_argument('--w8a8-configs', type=Path, default=None)
     ap.add_argument('--bf16-configs', type=Path, default=None)
+    ap.add_argument('--one-process', action='store_true', help=argparse.SUPPRESS)
     args = ap.parse_args()
+    groups = [[m for m in args.batches if m <= SHARED_PROCESS_MAX_M]]
+    groups += [[m] for m in args.batches if m > SHARED_PROCESS_MAX_M]
+    groups = [g for g in groups if g]
+    if not args.one_process and len(groups) > 1:
+        run_isolated(args, groups)
+        return
     args.arith_configs = {'w8a8': args.w8a8_configs, 'bf16': args.bf16_configs}
 
     torch.backends.cuda.matmul.allow_tf32 = False
@@ -347,8 +440,7 @@ def main() -> None:
     # Every configuration timed or used for row statuses must enclose the exact
     # logits; a refused configuration's batch sizes run the stock path, so its
     # times and rates would be the fallback's and are reported as such.
-    status_sizes = sorted({*args.batches, min(256, head.max_batch), pool.shape[0] % 256 or 256})
-    status_sizes = [m for m in status_sizes if m <= head.max_batch]
+    status_sizes = [m for m in args.batches if m <= head.max_batch]
     self_tests = {'w8a16': head.enclosure_self_test(status_sizes)}
     head_cols._verified = set(head._verified)  # same tiles; columns change only the fallback
     # The same head without runtime probes, to measure their cost.
@@ -364,7 +456,11 @@ def main() -> None:
     head_np.disable_probes_for_measurement()
     head_np._verified = set(head._verified)
     head_cols._failed_variants = set(head._failed_variants)
-    status = {'w8a16': row_status(head, pool, 'argmax'), 'sample': row_status(head, pool, 'sample')}
+    # Row statuses per batch size, at the tiles each batch size uses.
+    status = {
+        'w8a16': statuses(head, pool, 'argmax', status_sizes),
+        'sample': statuses(head, pool, 'sample', status_sizes),
+    }
     # The same kernels under the Hopper wgmma error model: only the fallback rate changes.
     hopper = CertifiedHead.from_quantized(
         w,
@@ -375,11 +471,11 @@ def main() -> None:
         capacity=args.capacity,
         max_batch=max(args.batches),
     )
+    hopper.gemv_config = head.gemv_config
     self_tests['w8a16_hopper'] = hopper.enclosure_self_test(status_sizes)
-    status['w8a16_hopper'] = row_status(hopper, pool, 'argmax')
-    status['sample_hopper'] = row_status(hopper, pool, 'sample')
+    status['w8a16_hopper'] = statuses(hopper, pool, 'argmax', status_sizes)
+    status['sample_hopper'] = statuses(hopper, pool, 'sample', status_sizes)
     del hopper
-    amb_row = ambiguous_row(status['w8a16'], pool)
     heads_by_arith = {}
     for arith in ('w8a8', 'bf16'):
         other = CertifiedHead.from_quantized(
@@ -397,7 +493,7 @@ def main() -> None:
                 other.arith_config = table_fn
         heads_by_arith[arith] = other
         self_tests[arith] = other.enclosure_self_test(status_sizes)
-        status[arith] = row_status(other, pool, 'argmax')
+        status[arith] = statuses(other, pool, 'argmax', status_sizes)
     for name, rep in self_tests.items():
         if not rep['ok']:
             print(f'{name}: refused batch sizes {rep["refused_batch_sizes"]}', file=sys.stderr)
@@ -434,47 +530,145 @@ def main() -> None:
         'batches': {},
     }
     for m in args.batches:
-        h = pool[decided_batch(status['w8a16'], m)].contiguous()
-        _, stats = head.argmax(h, fallback=False)
-        cand = stats.summary()
+        # Each decided arm's batch is decided by that arm's head at this batch size.
+        batch_stats: dict[str, Any] = {}
+        idx, cand = decided_at_own_tiles(status['w8a16'][m], m, argmax_stats(head, pool))
+        h = pool[idx].contiguous()
+        batch_stats['certified'] = cand
+        batch_stats['certified_no_probe'] = head_np.argmax(h, fallback=False)[1].summary()
+        batch_stats['certified_columns_mode'] = head_cols.argmax(h, fallback=False)[1].summary()
         h_fb = h.clone()
         h_fb[0] = float('inf')  # nonfinite row forces the dense fallback
         h_amb = h.clone()
-        h_amb[0] = amb_row
+        h_amb[0] = ambiguous_row(status['w8a16'][m], pool)
+        batch_stats['certified_fallback'] = head.argmax(h_fb, fallback=False)[1].summary()
+        batch_stats['certified_columns_fallback'] = head_cols.argmax(h_amb, fallback=False)[
+            1
+        ].summary()
         arms = build_arms(head, w, h, h_fb, marlin, scale_bf16 if has_int8pack else None)
         # The identical certified kernel with the runtime probes compiled out.
         arms['certified_no_probe'] = functools.partial(head_np.argmax, h)
         arms['certified_columns_mode'] = functools.partial(head_cols.argmax, h)
-        s_idx = decided_batch(status['sample'], m)
+        s_idx, batch_stats['certified_sample'] = decided_at_own_tiles(
+            status['sample'][m], m, sample_stats(head, pool)
+        )
         arms.update(sampling_arms(head, w, pool[s_idx].contiguous(), s_idx))
+        s_args = (pool[s_idx].contiguous(), *sample_inputs(s_idx))
+        arms['certified_sample_no_probe'] = functools.partial(head_np.gumbel_sample, *s_args)
+        batch_stats['certified_sample_no_probe'] = head_np.gumbel_sample(*s_args, fallback=False)[
+            1
+        ].summary()
         for arith in ('w8a8', 'bf16'):
             other = heads_by_arith[arith]
-            h_a = pool[decided_batch(status[arith], m)].contiguous()
+            a_idx, batch_stats[f'certified_{arith}'] = decided_at_own_tiles(
+                status[arith][m], m, argmax_stats(other, pool)
+            )
+            h_a = pool[a_idx].contiguous()
+            h_a_fb = h_a.clone()
+            h_a_fb[0] = float('inf')
+            batch_stats[f'certified_{arith}_fallback'] = other.argmax(h_a_fb, fallback=False)[
+                1
+            ].summary()
             arms[f'certified_{arith}'] = functools.partial(other.argmax, h_a)
+            arms[f'certified_{arith}_fallback'] = functools.partial(other.argmax, h_a_fb)
             arms[f'{arith}_envelope'] = functools.partial(_envelope_pass, other, h_a)
         arms['certified_columns_fallback'] = functools.partial(head_cols.argmax, h_amb)
         if args.arms:
             arms = {n: f for n, f in arms.items() if n in args.arms}
         entry: dict[str, Any] = {
+            'inner': inner_calls(args, m),
             'certified_batch_stats': cand,
-            'fallback_rate_real': fallback_rate(status['w8a16'], m),
-            'fallback_rate_by_config': {k: fallback_rate(v, m) for k, v in status.items()},
+            'batch_stats': batch_stats,
+            'fallback_rate_real': fallback_rate(status['w8a16'][m], m),
+            'fallback_rate_by_config': {k: fallback_rate(v[m], m) for k, v in status.items()},
         }
         for name, fn in arms.items():
             try:
-                entry[name] = measure(fn, args, flush)
+                entry[name] = measure(fn, args, flush, entry['inner'])
             except Exception as exc:  # one failing arm must not lose the others
                 entry[name] = {'error': f'{type(exc).__name__}: {exc}'[:300]}
                 print(f'M={m:4d} {name:20s} failed: {entry[name]["error"]}', flush=True)
                 continue
             print(f'M={m:4d} {name:20s} {entry[name]["warm"]["median_us"]:9.1f} us', flush=True)
-        result['batches'][str(m)] = entry
-        if args.out:  # write after every batch size so a failure keeps what was measured
-            args.out.parent.mkdir(parents=True, exist_ok=True)
-            args.out.write_text(json.dumps(result, indent=1) + '\n')
         del arms
         gc.collect()
         torch.cuda.empty_cache()
+        # Device memory left after this batch size's graphs are gone.
+        entry['memory_mib'] = {
+            'allocated': round(torch.cuda.memory_allocated() / 2**20),
+            'reserved': round(torch.cuda.memory_reserved() / 2**20),
+        }
+        result['batches'][str(m)] = entry
+        result['max_memory_allocated_mib'] = round(torch.cuda.max_memory_allocated() / 2**20)
+        if args.out:  # write after every batch size so a failure keeps what was measured
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            args.out.write_text(json.dumps(result, indent=1) + '\n')
+
+
+def _passthrough(args: argparse.Namespace) -> list[str]:
+    out = [
+        f'--inner={args.inner}',
+        f'--trials={args.trials}',
+        f'--capacity={args.capacity}',
+        f'--group-size={args.group_size}',
+        f'--pool-rows={args.pool_rows}',
+    ]
+    out += ['--cold'] if args.cold else []
+    out += ['--int8pack'] if args.int8pack else []
+    out += ['--arms', *args.arms] if args.arms else []
+    for flag, path in (
+        ('--gemv-configs', args.gemv_configs),
+        ('--w8a8-configs', args.w8a8_configs),
+        ('--bf16-configs', args.bf16_configs),
+    ):
+        out += [flag, str(path)] if path is not None else []
+    return out
+
+
+def run_isolated(args: argparse.Namespace, groups: list[list[int]]) -> None:
+    """Measure each group of batch sizes in its own process and merge the results.
+
+    A CUDA graph with a conditional node does not give back what the node's body
+    allocated when the graph is deleted, with or without a shared memory pool
+    (x7diag: about 160 MiB allocated and 630 MiB reserved per capture and delete
+    of five M = 64 stock-GEMM bodies; none without the node). Every certified arm
+    captures its fallback in such a node, so one process for all batch sizes
+    filled the GPU at M = 128 (x7: 91 GiB allocated). Batch sizes up to
+    ``SHARED_PROCESS_MAX_M`` share a process; each larger one gets its own.
+    """
+    import tempfile
+
+    merged: dict[str, Any] = {}
+    with tempfile.TemporaryDirectory() as tmp:
+        for i, group in enumerate(groups):
+            part = Path(tmp) / f'part{i}.json'
+            cmd = [sys.executable, str(Path(__file__).resolve()), '--one-process']
+            cmd += ['--batches', *map(str, group), '--out', str(part), *_passthrough(args)]
+            print(f'process {i + 1} of {len(groups)}: batch sizes {group}', flush=True)
+            subprocess.run(cmd, check=True)
+            data = json.loads(part.read_text())
+            proc = {
+                'batches': group,
+                'column_self_test': data['column_self_test'],
+                'read_peak_tbps_1p27GB': data['read_peak_tbps_1p27GB'],
+                'max_memory_allocated_mib': data.get('max_memory_allocated_mib'),
+            }
+            if not merged:
+                merged = data
+                merged['processes'] = [proc]
+            else:
+                merged['processes'].append(proc)
+                merged['batches'].update(data['batches'])
+                merged['config']['gemv_configs'].update(data['config']['gemv_configs'])
+                for name, rep in data['enclosure_self_test'].items():
+                    into = merged['enclosure_self_test'][name]
+                    into['checks'] += rep['checks']
+                    into['refused_batch_sizes'] += rep['refused_batch_sizes']
+                    into['seconds'] += rep['seconds']
+                    into['ok'] = into['ok'] and rep['ok']
+            if args.out:
+                args.out.parent.mkdir(parents=True, exist_ok=True)
+                args.out.write_text(json.dumps(merged, indent=1) + '\n')
 
 
 def build_arms(
