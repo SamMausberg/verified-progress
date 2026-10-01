@@ -203,7 +203,8 @@ a single 262,144-token prefill hits an illegal memory access in
 The A/B now runs through the server with chunked prefill (run_p4b.sh).
 
 **Analysis of the served A/B, declared on 2026-10-01 at 07:12 UTC, before the run started**
-(agreed with the coordinator; the run script is `~/vp-data/moonshot/run_p4b.sh`):
+(agreed with the coordinator; the run script is `experiments/moonshot/run_p4b.sh`, committed
+with this declaration):
 
 - Design: batch 128, 2,048-token prompts (`long2048.jsonl`), 512 generated tokens, greedy,
   FP32 state, no speculation, radix off, `--stream-interval 4`. Dense decode (A) against
@@ -219,9 +220,11 @@ The A/B now runs through the server with chunked prefill (run_p4b.sh).
   1.10; supported if its lower end is at or above 1.10; otherwise inconclusive. A supported
   result is worded "full-batch served decode throughput 1.xx times", never as an end-to-end
   speedup, with client y and its ratio beside it.
-- Bit-exactness through the server: greedy tokens and top-20 logprobs at concurrency 1,
-  exact replay against dense; one differing token or logprob means not bit-exact end to end.
-  Every exact-replay server log must show the exact-replay kernel dispatch line.
+- Server output probe: greedy tokens and top-20 logprobs at concurrency 1, exact replay
+  against dense. A difference refutes end-to-end exactness; a pass does not establish it
+  (the probe sees only the emitted tokens and the top-20 logprobs, not the state or the
+  hidden outputs). Bit-exactness is shown only at kernel level (above). Every exact-replay
+  server log must show the exact-replay kernel dispatch line.
 - Derived expectation before the run: about 1.08x at a 418-token context, less at 2,048.
 
 ## 2d. Speculative host gap: configuration-level levers (measured, single runs)
