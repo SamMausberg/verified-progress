@@ -3,9 +3,9 @@
 % cos(h^d, h^t) = 0.408 (evidence/head_geometry/stats_dflash4b.json, pairs/cos_hd_ht/all
 % q50), and the median threshold delta* = 0.00854 (evidence/precision/head_constants.json,
 % tiles/contiguous/euclid_int8_row_threshold/p50). (b) reads
-% evidence/head_geometry/rho_dflash4b_quantiles.csv; the MTP-4B markers are the p10,
-% median and p90 of evidence/head_geometry/transport_mtp4b.json,
-% headline/dnorm2_over_htnorm2 (0.7666, 0.9541, 1.1756).
+% evidence/head_geometry/rho_dflash4b_quantiles.csv (DFlash-4B drift and the per-row
+% thresholds) and evidence/head_geometry/rho_mtp4b_quantiles.csv (MTP-4B drift); both
+% hold 40,000 held-out pairs.
 % Both panels are one picture: (b)'s plot area is centred on y = 0, (a)'s drawing is shifted
 % so that its vertical centre is also at y = 0, and (a)'s title is set on the same top line
 % and with the same font, text height and depth as (b)'s.
@@ -22,7 +22,7 @@
 \addplot[thick,teal,densely dotted] table[x=threshold_int8_g128,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};\addlegendentry{$\delta^\ast_i$, int8 128 cols}
 \addplot[thick,ochre,dashdotted] table[x=threshold_int4_row,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};\addlegendentry{$\delta^\ast_i$, int4 per row}
 \addplot[very thick,ink] table[x=rho_all,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};\addlegendentry{$\rho$, DFlash-4B pairs}
-\addplot[only marks,mark=triangle*,mark size=2.6pt,brick] coordinates {(0.7666151341559915,0.1) (0.954136519993249,0.5) (1.1756316575526062,0.9)};\addlegendentry{$\rho$, MTP-4B p10, 50, 90}
+\addplot[very thick,brick,mark=triangle*,mark size=1.9pt,mark repeat=25,mark phase=13] table[x=rho_all,y=q,col sep=comma]{../evidence/head_geometry/rho_mtp4b_quantiles.csv};\addlegendentry{$\rho$, MTP-4B pairs}
 \draw[{Stealth[length=1.6mm]}-{Stealth[length=1.6mm]},muted] (axis cs:0.0095,0.5) -- (axis cs:0.84,0.5);
 \node[font=\scriptsize,text=ink,fill=white,inner sep=1pt] at (axis cs:0.037,0.5) {medians $\approx100\times$ apart};
 \end{semilogxaxis}
