@@ -312,7 +312,7 @@ c = 1, 8, 32 and 128. Foreign CPU load averaged 0.19-0.36 cores per point (large
 | 1 | 456.6, 460.5 | 453.5, 455.6 | 0.993, 0.989 | 0.85% | 3.279, 3.273 |
 | 8 | 2,663.9, 2,698.7 | 2,676.7, 2,697.4 | 1.005, 1.000 | 1.30% | 3.272, 3.270 |
 | 32 | 6,488.0, 6,643.6 | 6,567.7, 6,635.6 | 1.012, 0.999 | 2.37% | 3.260, 3.261 |
-| 128 | 12,108.5, 12,207.4 | 12,064.3, 12,014.4 | 0.996, 0.984 | 0.82% | 3.257-3.258, 3.257-3.260 |
+| 128 | 12,108.5, 12,207.4 | 12,064.3, 12,014.4 | 0.996, 0.984 | 0.81% | 3.257-3.258, 3.257-3.260 |
 
 - **No gain at any concurrency.** At c = 8 and 32 the two pairs straddle 1, and A's own rate rose
   by 1.3-2.4% between its two runs (bench's `mtp-tuned` confirmation sessions differ by 2.2% at
@@ -323,7 +323,7 @@ c = 1, 8, 32 and 128. Foreign CPU load averaged 0.19-0.36 cores per point (large
   traced. In this arm the target verifies 4 rows per request (the Triton route at c = 1), and by
   the table each draft step sends the MTP layer's projections, one row each, to the Hopper GEMV
   (not traced).
-- **c = 128: no claim.** Both pairs are below 1 (0.996, 0.984), one beyond the 0.82% spread.
+- **c = 128: no claim.** Both pairs are below 1 (0.996, 0.984), one beyond the 0.81% spread.
 - The exactness class of lever v1 on MTP was not measured; the frontier file marks it pending.
 
 ### Which GEMM kernels the served engine runs (hold 3)
@@ -401,13 +401,18 @@ for regime in unpinned pinned; do
   python experiments/backbone/bitwise_runs.py --runs ~/vp-data/backbone/compare/$regime \
       --pairs evidence/backbone/served/exactness_pairs_$regime.json --out evidence/backbone/served/bitwise_$tag.json
 done
-# Paired serving: one exclusive hold, in the order B A A B (A: the same command without the --env
-# switches, label backbone-plain-v1-A), repository commit 50978e2.
-python -m bench.sweep --arm plain --set disable-radix-cache=true --set max-mamba-cache-size=128 \
-    --set max-total-tokens=1000000 --label backbone-plain-v1-B --sglang-worktree ~/sglang-wt/backbone \
-    --env SGLANG_BACKBONE_GEMM=1 --env SGLANG_BACKBONE_PDL=1 --env SGLANG_BACKBONE_MERGE_IN_PROJ=1 \
-    --env SGLANG_BACKBONE_GEMM_TABLE=<table> --concurrency 1 8 32 128 --repeats 1 --port 30471 \
-    --out ~/vp-data/backbone/e2e/plain-v1
+# Paired serving: four sweeps in one exclusive hold, in the order B A A B, repository commit
+# 50978e2. B sets the four lever variables; A runs the same engine without them.
+LEVER=(--env SGLANG_BACKBONE_GEMM=1 --env SGLANG_BACKBONE_PDL=1 --env SGLANG_BACKBONE_MERGE_IN_PROJ=1
+       --env SGLANG_BACKBONE_GEMM_TABLE=<table>)
+for lab in B A A B; do
+  sw=(); [ $lab = B ] && sw=("${LEVER[@]}")
+  python -m bench.sweep --arm plain --set disable-radix-cache=true --set max-mamba-cache-size=128 \
+      --set max-total-tokens=1000000 --label backbone-plain-v1-$lab --sglang-worktree ~/sglang-wt/backbone \
+      "${sw[@]}" --concurrency 1 8 32 128 --repeats 1 --port 30471 --out ~/vp-data/backbone/e2e/plain-v1
+done
+# The runs carry no session; bench.pareto below assigns them by run directory (B1, A1: abba-1;
+# A2, B2: abba-2).
 E=~/vp-data/backbone/e2e/plain-v1
 python -m bench.pareto $E/backbone-plain-v1-B/20261001-174115 $E/backbone-plain-v1-A/20261001-174617 \
     $E/backbone-plain-v1-A/20261001-175126 $E/backbone-plain-v1-B/20261001-175633 --out <dir> \
@@ -427,20 +432,30 @@ python -m bench.hostload record --out <hostload.json> -- python experiments/back
 Hold 3 (exclusive lock, repository commit 53e39a3, engine `59deb68e29`):
 
 ```sh
-# Paired MTP serving, in the order B A A B; A is the same command without the --env switches.
-python -m bench.sweep --arm mtp-tuned --label backbone-mtp-v1-B --session abba-1 \
-    --sglang-worktree ~/sglang-wt/backbone --env SGLANG_BACKBONE_GEMM=1 --env SGLANG_BACKBONE_PDL=1 \
-    --env SGLANG_BACKBONE_MERGE_IN_PROJ=1 --env SGLANG_BACKBONE_GEMM_TABLE=<table> \
-    --concurrency 1 8 32 128 --repeats 1 --port 30471 --out ~/vp-data/backbone/e2e/mtp-v1
+# Paired MTP serving: four sweeps in the order B A A B; runs 1-2 are session abba-1, runs 3-4
+# abba-2. B sets the four lever variables (LEVER as above); A runs the same engine without them.
+i=0
+for lab in B A A B; do
+  i=$((i + 1)); session=abba-$(((i + 1) / 2))
+  sw=(); [ $lab = B ] && sw=("${LEVER[@]}")
+  python -m bench.sweep --arm mtp-tuned --label backbone-mtp-v1-$lab --session $session \
+      --sglang-worktree ~/sglang-wt/backbone "${sw[@]}" --concurrency 1 8 32 128 --repeats 1 \
+      --port 30471 --out ~/vp-data/backbone/e2e/mtp-v1
+done
 M=~/vp-data/backbone/e2e/mtp-v1
 python -m bench.pareto $M/backbone-mtp-v1-B/20261001-220519 $M/backbone-mtp-v1-A/20261001-220946 \
     $M/backbone-mtp-v1-A/20261001-221412 $M/backbone-mtp-v1-B/20261001-221836 --out <dir> \
     --pair backbone-mtp-v1-B:backbone-mtp-v1-A --status paired --no-plot --class backbone-mtp-v1-B=pending
 # served/mtp_v1/ keeps points.csv, pairs.csv, launches.csv and frontier.csv from <dir>.
-# In-situ trace: A, then B with the four lever variables set in the environment.
-python experiments/profiling/run_profiles.py --arm plain --mode nsys --concurrency 1 16 \
-    --out-dir ~/vp-data/backbone/nsys/plain-A --port 30472 \
-    --extra-server-args "--disable-radix-cache --max-mamba-cache-size 128 --max-running-requests 128 --stream-interval 4"
+# In-situ trace: A, then B, which sets the four lever variables in run_profiles.py's environment
+# (its server inherits them).
+for lab in A B; do
+  sw=(); [ $lab = B ] && sw=(SGLANG_BACKBONE_GEMM=1 SGLANG_BACKBONE_PDL=1 SGLANG_BACKBONE_MERGE_IN_PROJ=1
+                              SGLANG_BACKBONE_GEMM_TABLE=<table>)
+  env "${sw[@]}" python experiments/profiling/run_profiles.py --arm plain --mode nsys --concurrency 1 16 \
+      --out-dir ~/vp-data/backbone/nsys/plain-$lab --port 30472 \
+      --extra-server-args "--disable-radix-cache --max-mamba-cache-size 128 --max-running-requests 128 --stream-interval 4"
+done
 # served/nsys_windows_plain_{A,B}.jsonl are the runs' windows.jsonl. Then, at repository commit 43dd775:
 N=~/vp-data/backbone/nsys
 python experiments/backbone/insitu_gemm.py --report A1=$N/plain-A/plain_bs1.nsys-rep \

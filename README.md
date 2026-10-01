@@ -121,9 +121,10 @@ Secondary investigations and supporting material:
   concurrency 8 it gains 0.4%, a tenth of the microbenchmark prediction. An
   nsys trace shows the routes dispatch as tabled but keep only 37-52% of their
   isolated GPU gain in the served step. On tuned MTP the table gains nothing
-  (0.9% slower at concurrency 1). The packed projection alone gives the same
-  tokens and top-5 logprobs as stock on 320 prompts at concurrency 1. Folding
-  the norm and SiLU into the GEMM, as implemented, is a measured loss
+  (0.9% slower at concurrency 1 in both pairs, only one of them beyond the
+  session's spread). The packed projection alone gives the same tokens and
+  top-5 logprobs as stock on 320 prompts at concurrency 1. Folding the norm
+  and SiLU into the GEMM, as implemented, is a measured loss
   (`evidence/backbone/`).
 - **Exact witnesses.** `tests/test_state_structure.py` and
   `tests/test_contracts.py` check in exact arithmetic why the recurrent state
