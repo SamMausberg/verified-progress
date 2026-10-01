@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from bench.arms import Arm, flag_tokens, parse_overrides, resolve_arm, server_command
+from bench.arms import ArgValue, Arm, flag_tokens, parse_overrides, resolve_arm, server_command
 from bench.pareto import aggregate, dominated
 from bench.results import counter_deltas, load_requests, parse_prometheus, summarise_point
 from bench.server import (
@@ -65,7 +65,8 @@ def test_resolve_arm_merges_defaults_arm_and_overrides(tmp_path: Path) -> None:
     arms.write_text(
         '[defaults]\nmodel = "m"\nrevision = "r"\n'
         '[defaults.args]\nattention-backend = "flashinfer"\nenable-metrics = true\n'
-        '[arms.a]\ndescription = "d"\n[arms.a.args]\nspeculative-num-steps = 3\n'
+        '[arms.a]\ndescription = "d"\nexactness = "stock"\n'
+        '[arms.a.args]\nspeculative-num-steps = 3\n'
     )
     overrides = parse_overrides(
         ['speculative-num-steps=5', 'cuda-graph-bs=1,2,4'], ['enable-metrics']
@@ -93,6 +94,86 @@ def test_resolve_arm_merges_defaults_arm_and_overrides(tmp_path: Path) -> None:
         resolve_arm('a', {'port': 1}, path=arms)
     with pytest.raises(KeyError):
         resolve_arm('missing', path=arms)
+
+
+def test_every_arm_declares_a_consistent_exactness_class(tmp_path: Path) -> None:
+    from bench.arms import arm_names
+
+    for name in arm_names():
+        arm = resolve_arm(name)
+        assert arm.exactness in ('stock', 'exact-up-to-floor', 'pending', 'lossy')
+    assert resolve_arm('plain-tuned').exactness == 'stock'
+    assert resolve_arm('plain-tuned-triton').exactness == 'pending'
+    assert resolve_arm('dflash-tuned-b16').exactness == 'pending'
+    assert resolve_arm('dflash-tuned').exactness == 'stock'  # FA4 is draft-only
+    # Any flag outside the neutral allowlist makes a stock arm pending, whatever
+    # its class: state dtype, compilation, kernel backends, precision, model dtype,
+    # verify mode, buffered GDN state, FP8.
+    changing: list[tuple[str, ArgValue]] = [
+        ('attention-backend', 'triton'),
+        ('decode-attention-backend', 'triton'),
+        ('prefill-attention-backend', 'triton'),
+        ('mamba-ssm-dtype', 'float16'),
+        ('enable-torch-compile', True),
+        ('linear-attn-prefill-backend', 'triton'),
+        ('linear-attn-decode-backend', 'flashinfer'),
+        ('enable-tf32-matmul', True),
+        ('bf16-gemm-backend', 'cublas'),
+        ('dtype', 'float16'),
+        ('speculative-attention-mode', 'decode'),
+        ('rl-on-policy-target', 'fsdp'),
+        ('enable-linear-replayssm', True),
+        ('enable-linear-replayssm-spec', True),
+        ('kv-cache-dtype', 'fp8_e4m3'),
+        ('quantization', 'fp8'),
+        ('chunked-prefill-size', 4096),
+    ]
+    for flag, value in changing:
+        arm = resolve_arm('plain-tuned', {flag: value})
+        assert arm.exactness == 'pending', flag
+    assert resolve_arm('plain-tuned', env_overrides={'SGLANG_X': '1'}).exactness == 'pending'
+    # Neutral flags keep the class.
+    neutral: list[tuple[str, ArgValue]] = [
+        ('stream-interval', 1),
+        ('cuda-graph-max-bs', 64),
+        ('max-running-requests', 64),
+        ('speculative-num-steps', 4),
+        ('speculative-draft-attention-backend', 'fa4'),
+        ('attention-backend', 'flashinfer'),
+    ]
+    for flag, value in neutral:
+        assert resolve_arm('plain-tuned', {flag: value}).exactness == 'stock', flag
+    assert (
+        resolve_arm(
+            'plain-tuned', env_overrides={'SGLANG_FLASHINFER_WORKSPACE_SIZE': '1'}
+        ).exactness
+        == 'stock'
+    )
+    # A pending arm stays pending under overrides.
+    assert resolve_arm('mtp-tuned', {'cuda-graph-max-bs': 64}).exactness == 'pending'
+    head = '[defaults]\nmodel = "m"\nrevision = "r"\n'
+    missing = tmp_path / 'missing.toml'
+    missing.write_text(head + '[arms.a]\ndescription = "d"\n')
+    with pytest.raises(ValueError, match='exactness'):
+        resolve_arm('a', path=missing)
+    mislabelled = tmp_path / 'mislabelled.toml'
+    mislabelled.write_text(
+        head + '[arms.a]\ndescription = "d"\nexactness = "stock"\n'
+        '[arms.a.args]\nenable-linear-replayssm = true\n'
+    )
+    with pytest.raises(ValueError, match='stock but sets'):
+        resolve_arm('a', path=mislabelled)
+    unexplained = tmp_path / 'unexplained.toml'
+    unexplained.write_text(head + '[arms.a]\ndescription = "d"\nexactness = "pending"\n')
+    with pytest.raises(ValueError, match='lossy note'):
+        resolve_arm('a', path=unexplained)
+    # An arm built in code with a lossy note takes its class from the note.
+    base = resolve_arm('plain').to_json()
+    assert Arm(**{**base, 'lossy': 'FP8 KV cache'}).exactness == 'lossy'
+    assert Arm(**{**base, 'lossy': 'pending: check'}).exactness == 'pending'
+    # An explicit lossy note on an arm that inherited the pending class.
+    pending = resolve_arm('mtp-tuned').to_json()
+    assert Arm(**{**pending, 'lossy': 'BF16 GDN state'}).exactness == 'lossy'
 
 
 def test_repository_arms_resolve() -> None:
@@ -298,6 +379,20 @@ def test_log_segment_stats() -> None:
     assert stats['logged_accept_len_mean'] == pytest.approx(3.0)
     assert stats['prefill_log_lines'] == 1
     assert stats['kv_retractions'] == 3
+    # Only the 5-request window is at >= 0.9 x the largest batch.
+    assert stats['logged_gen_tps_full_batch_p50'] == pytest.approx(12.0)
+    assert stats['logged_gen_tps_full_batch'] == pytest.approx(12.0)
+    two = (
+        # The first line spans the gap before the segment and is ignored.
+        'Decode batch, #running-req: 10, accept len: 2.00, cuda graph: True, '
+        'gen throughput (token/s): 1.0\n'
+        'Decode batch, #running-req: 10, accept len: 2.00, cuda graph: True, '
+        'gen throughput (token/s): 100.0\n'
+        'Decode batch, #running-req: 10, accept len: 4.00, cuda graph: True, '
+        'gen throughput (token/s): 400.0\n'
+    )
+    # Window tokens 20 and 40 at 100 and 400 tok/s: 60 tokens in 0.3 s.
+    assert log_segment_stats(two)['logged_gen_tps_full_batch'] == pytest.approx(200.0)
 
 
 def test_frontier_dominance_and_aggregation() -> None:
@@ -532,24 +627,119 @@ def test_host_load_attributes_short_lived_own_children_to_the_run() -> None:
     assert result['own_cores'] >= 0.35
 
 
-def test_envelope_and_paired_ratios() -> None:
-    from bench.pareto import envelope, paired_ratios
+def test_envelope_and_session_paired_ratios() -> None:
+    from bench.pareto import envelope, paired_ratios, pareto_envelope
 
-    def row(label: str, run: str, c: int, y: float) -> dict[str, object]:
-        return {'label': label, 'run': run, 'concurrency': c, 'x_e2e': y / c, 'y': y, 'failed': 0}
+    def row(label: str, session: str, c: int, y: float, invalid: str = '') -> dict[str, object]:
+        return {
+            'label': label,
+            'run': f'{label}-{session}',
+            'session': session,
+            'concurrency': c,
+            'x_e2e': y / c,
+            'y': y,
+            'failed': 0,
+            'invalid_reason': invalid,
+        }
 
     rows = [
-        row('plain', 'r1', 1, 100.0),
-        row('plain', 'r2', 1, 110.0),
-        row('spec', 'r3', 1, 200.0),
-        row('spec', 'r4', 1, 220.0),
-        row('plain', 'r1', 64, 1000.0),
-        row('spec', 'r3', 64, 800.0),
+        row('plain', 'r0', 1, 100.0),
+        row('plain', 'r1', 1, 110.0),
+        row('plain', 'r2', 1, 120.0, invalid='host_contention'),
+        row('spec', 'r0', 1, 200.0),
+        row('spec', 'r1', 1, 220.0, invalid='host_contention'),
+        row('spec', 'r2', 1, 300.0),
+        row('plain', 'r0', 64, 1000.0),
+        row('spec', 'r0', 64, 800.0),
+        row('spec', 'supp', 64, 900.0),
     ]
-    frontier = aggregate(rows, baseline=None)
+    frontier = aggregate([r for r in rows if not r['invalid_reason']], baseline=None)
     best = {e['concurrency']: e for e in envelope(frontier)}
     assert best[1]['best'] == 'spec' and best[64]['best'] == 'plain'
-    assert best[64]['lead'] == pytest.approx(0.25)
+    for entry in frontier:
+        entry['exactness'] = 'pending' if entry['label'] == 'spec' else 'stock'
+    best = {e['concurrency']: e for e in envelope(frontier)}
+    assert best[1]['best_exactness'] == 'pending' and best[1]['best_exact'] == 'plain'
+    assert [e['label'] for e in pareto_envelope(frontier, exact_only=True)] == ['plain'] * 2
+    assert {e['label'] for e in pareto_envelope(frontier, exact_only=False)} == {'plain', 'spec'}
     ratios = {r['concurrency']: r for r in paired_ratios(rows, [('spec', 'plain')])}
-    assert ratios[1]['n'] == 2 and ratios[1]['y_ratio_mean'] == pytest.approx(2.0)
+    # Only r0 pairs at c=1: r1 and r2 each have an invalid side and are dropped, not
+    # re-paired with another session's run.
+    assert ratios[1]['n'] == 1 and ratios[1]['sessions'] == 'r0'
+    assert ratios[1]['dropped_invalid'] == 2
+    assert ratios[1]['y_ratio_mean'] == pytest.approx(2.0)
+    assert ratios[64]['n'] == 1 and ratios[64]['unmatched'] == 1
     assert ratios[64]['y_ratio_mean'] == pytest.approx(0.8)
+    with pytest.raises(ValueError, match='two runs'):
+        paired_ratios([*rows, row('plain', 'r0', 1, 105.0)], [('spec', 'plain')])
+
+
+def test_runs_get_sessions_and_exactness_from_their_manifests(tmp_path: Path) -> None:
+    from bench.pareto import exactness, load_points
+
+    def manifest(run: str, label: str, session: str = '') -> Path:
+        run_dir = tmp_path / label / run
+        run_dir.mkdir(parents=True)
+        point = {'concurrency': 1, 'x_e2e': 1.0, 'y': 1.0, 'failed': 0}
+        body = {'label': label, 'arm': {}, 'points': [point]}
+        if session:
+            body['session'] = session
+        (run_dir / 'sweep.json').write_text(json.dumps(body))
+        return run_dir
+
+    runs = [
+        manifest('20261001-020000', 'a'),
+        manifest('20261001-010000', 'a'),
+        manifest('20261001-030000', 'a', session='confirm-r1'),
+        manifest('20261001-040000', 'b'),
+    ]
+    rows = load_points(runs, {}, sessions={'20261001-040000': 'confirm-r0'})
+    sessions = {(r['label'], r['run']): r['session'] for r in rows}
+    assert sessions[('a', '20261001-010000')] == '#0'
+    assert sessions[('a', '20261001-020000')] == '#1'
+    assert sessions[('a', '20261001-030000')] == 'confirm-r1'
+    assert sessions[('b', '20261001-040000')] == 'confirm-r0'
+
+    plain = resolve_arm('plain-tuned').to_json()
+    triton = resolve_arm('plain-tuned-triton').to_json()
+    assert exactness({'arm': plain}) == 'stock'
+    assert exactness({'arm': triton}) == 'pending'
+    # Older manifests: no class recorded and flags no longer matching an arm.
+    assert exactness({'arm': {'name': 'x', 'args': {'attention-backend': 'triton'}}}) == 'pending'
+    assert exactness({'arm': {'name': 'x', 'args': {}, 'lossy': 'FP8 KV'}}) == 'lossy'
+    assert exactness({'arm': {'name': 'x', 'args': {}}}) == 'unclassified'
+    reference = {'model': plain['model'], 'revision': plain['revision']}
+    # A recorded stock class does not survive the run's own numerics flags.
+    recorded = {'name': 'x', 'args': {'mamba-ssm-dtype': 'float16'}, 'exactness': 'stock'}
+    assert exactness({'arm': {**recorded, **reference}}) == 'pending'
+    neutral = {'name': 'x', 'args': {'stream-interval': 4}, **reference}
+    assert exactness({'arm': neutral}) == 'stock'
+    other_model = {'name': 'x', 'args': {}, 'model': 'm-fp8', 'revision': 'r'}
+    assert exactness({'arm': other_model}) == 'pending'
+
+
+def test_per_prompt_output_lengths(tmp_path: Path) -> None:
+    from bench.natural_workload import build
+    from bench.sweep import load_prompts, request_record
+
+    workload = [
+        {'id': 'a', 'domain': 'chat', 'text': 'x'},
+        {'id': 'b', 'domain': 'code', 'text': 'y'},
+    ]
+    records = build(workload, {'a': (300, 'stop'), 'b': (2048, 'length')}, cap=2048)
+    assert [r['output_length'] for r in records] == [300, 2048]
+    assert request_record(records[0]) == {'text': 'x', 'output_length': 300}
+    assert request_record(workload[0]) == {'text': 'x'}
+    with pytest.raises(SystemExit, match='no natural length'):
+        build(workload, {'a': (300, 'stop')}, cap=2048)
+    path = tmp_path / 'mixed.jsonl'
+    path.write_text(json.dumps(records[0]) + '\n' + json.dumps(workload[1]) + '\n')
+    with pytest.raises(ValueError, match='output_length on 1 of 2'):
+        load_prompts(path)
+    # Per-prompt targets are matched by prompt id.
+    _write_run(tmp_path)
+    rows = load_requests(tmp_path)
+    for index, row in enumerate(rows):
+        row['prompt_id'] = f'p{index}'
+    summary = summarise_point(rows, {'p0': 4, 'p1': 5}, concurrency=2)
+    assert summary['osl_mismatch'] == 1

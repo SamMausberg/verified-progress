@@ -164,7 +164,7 @@ Slot T1 (MTP depth and state handling), y in tok/s:
 | MTP s3, radix cache off | 466 | 2,534 | 6,127 | 10,106 | 3.27 |
 | MTP s5, radix cache off | 481 | 2,699 | 6,087 | 9,456 | 4.14 |
 | MTP s7, radix cache off | 465 | 2,514 | 5,690 | 8,493 | 4.62 |
-| MTP s3, `--enable-linear-replayssm-spec` | 447 | 2,646 | 6,469 | 11,941 | 3.28 |
+| MTP s3, `--enable-linear-replayssm-spec` | 446 | 2,646 | 6,469 | 11,941 | 3.28 |
 | MTP s5, `--enable-linear-replayssm-spec` | 462 | 2,666 | 6,502 | 11,186 | 4.11 |
 
 Rejected by launch checks: MTP s1 (the check required a draft-decode graph that a
@@ -174,7 +174,9 @@ MTP s3 delivers 1.64x plain's y at c=1 (461 against 282 tok/s; 1.65x in x) but f
 behind from c~32. Its verify pass writes one GDN state snapshot (50.3 MB, 48 MiB, in
 FP32) per draft token per request, a cost that grows with batch; SGLang's buffered GDN verify (`--enable-linear-replayssm-spec`, chains only)
 removes those snapshots and recovers 24% at c=128 for three steps at a 3% cost at c=1.
-Depth matters little at low concurrency (steps 3-5 within ~4%). At c=128 depth 3
+At c=1 depth matters little (steps 3-5 within 4%); at c=8 deeper chains lead depth 3
+by up to 6.5% (s5 against s3 with the radix cache off, 2,699 against 2,534; s4 against
+s3 with it on, 2,608 against 2,482, 5.1%). At c=128 depth 3
 beat depth 4 and 5 in every pair not limited by KV: s3 against s4 with the radix cache
 (9,593 against 9,276), s3 against s5 with it off (10,106 against 9,456) and with
 replayssm-spec (11,941 against 11,186).
@@ -220,7 +222,7 @@ under Triton); radix cache off, y in tok/s:
 | DFlash b8, Triton | 807 | 3,613 | 6,307 | 8,957 (128) | 4.75 |
 | DFlash b8, FA4 draft attention | 769 | (invalid) | 6,983 | 10,594 (128) | 4.75 |
 | DFlash b4 | 498 | 2,682 | 6,380 | 11,477 (128) | 3.28 |
-| DFlash b16, capacity 64 | (invalid) | 3,398 | 5,387 | 6,737 (64) | 5.71 |
+| DFlash b16, capacity 64 | (invalid) | 3,398 | 5,386 | 6,737 (64) | 5.71 |
 | DFlash b16, capacity 64, Triton | 851 | 3,639 | 5,199 | 6,397 (64) | 5.72 |
 | MTP s4 + replayssm-spec, Triton | 552 | 3,104 | 6,958 | 10,804 (128) | 3.73 |
 
@@ -239,7 +241,10 @@ concurrency) and `mtp-tuned-triton` (the same under Triton; low concurrency),
 `dflash-tuned-b4` (block 4, FlashInfer; high concurrency), plus
 `mtp-stockverify` and `plain-tuned-replayssm` as the exactness fallback and the
 buffered-decode variant. Depth 3 beat depth 4 and 5 at c=128 in the three pairs not
-limited by KV and was within 4% at low concurrency, so one depth serves both MTP arms. Within DFlash, block 4 leads at
+limited by KV, was within 4% at c=1 and trailed by up to 6.5% at c=8 (stock verify).
+In the configuration of the low-concurrency arm (buffered verify, Triton), depth 4 led
+depth 3 by 3.2% at c=1 (552 against 535) and 0.4% at c=8 and trailed by 2% at c=32, so
+one depth serves both MTP arms. Within DFlash, block 4 leads at
 c=128 (11,477 against 10,594 tok/s for `dflash-tuned`, +8%) and trails at c<=32 (c=64
 was not measured), so it is the high-concurrency DFlash arm; FA4 draft attention was not tried with block 4.
 Against its matched Triton plain baseline, block 16 under Triton gives 3.35x the

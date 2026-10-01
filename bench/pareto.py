@@ -5,11 +5,18 @@ per-request output tokens/s including TTFT and y = output tokens/s on the GPU
 (bench/results.py defines both). The frontier aggregates repeats per (label,
 concurrency) and marks points that no other point beats on both axes.
 
-    python -m bench.pareto ~/vp-data/bench/runs/plain/* ~/vp-data/bench/runs/mtp-s3/* \\
-        --out evidence/bench/confirm --baseline plain
+Each label carries its arm's exactness class (bench/arms.py): `stock`,
+`exact-up-to-floor`, `pending` or `lossy`, or `unclassified` when nothing says.
+The class comes from the current arms.toml when the run's flags still match the
+arm there (a classification can land after the run), else from the run's
+manifest, else from its flags (a numerics-changing flag makes it `pending`);
+`--class LABEL=CLASS` overrides all three. The envelope is computed twice: over
+all arms, and over exact arms (`stock` or `exact-up-to-floor`).
 
 Writes `points.csv` (one row per run and point), `frontier.csv` (mean, std,
-min and max over repeats), `envelope.csv` (the best arm at each concurrency),
+min and max over repeats), `envelope.csv` (the best arm at each concurrency,
+overall and among exact arms), `envelope-all.dat` and `envelope-exact.dat` (the
+Pareto envelopes for PGFPlots),
 `pairs.csv` with `--pair TEST:BASELINE` (per-repeat ratios of matched-flag arms),
 `launches.csv` (one row per server launch: capacity, graph range, memory split,
 failed checks, source commits), one `<label>.dat` per label for PGFPlots, and
@@ -27,6 +34,13 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from bench.arms import (
+    EXACT_CLASSES,
+    EXACTNESS_CLASSES,
+    load_arms,
+    numerics_changes,
+    resolve_arm,
+)
 from bench.hostload import CONTENTION_CORES
 
 POINT_FIELDS = (
@@ -58,8 +72,20 @@ POINT_FIELDS = (
     'foreign_cpu_max',
     'max_running_logged',
     'kv_retractions',
+    'session',
+    'server_full_batch_tps_p50',
+    'server_full_batch_tps',
 )
-AGGREGATED = ('x_e2e', 'x_decode', 'y', 'y_steady', 'ttft_p50_ms', 'itl_p50_ms', 'accept_length')
+AGGREGATED = (
+    'x_e2e',
+    'x_decode',
+    'y',
+    'y_steady',
+    'ttft_p50_ms',
+    'itl_p50_ms',
+    'accept_length',
+    'server_full_batch_tps',
+)
 # Reference categorical order (dataviz palette, light surface), assigned per label in order.
 SERIES_COLOURS = ('#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7')
 
@@ -122,6 +148,12 @@ def point_row(label: str, run: str, point: dict[str, Any], status: str = '') -> 
         # point (blank: not recorded); below-concurrency batches or retractions mean
         # the KV pool, not the client, limited the batch.
         'max_running_logged': (point.get('server_log') or {}).get('max_running_logged'),
+        # Scheduler-logged generation rate with at least 0.9 x the largest logged
+        # batch running: a diagnostic of what the GPU sustains, not seen by clients.
+        'server_full_batch_tps_p50': (point.get('server_log') or {}).get(
+            'logged_gen_tps_full_batch_p50'
+        ),
+        'server_full_batch_tps': (point.get('server_log') or {}).get('logged_gen_tps_full_batch'),
         'kv_retractions': (point.get('server_log') or {}).get('kv_retractions'),
         'isl_mean': point.get('isl_mean'),
         'span_s': point.get('span_s'),
@@ -131,18 +163,84 @@ def point_row(label: str, run: str, point: dict[str, Any], status: str = '') -> 
 
 
 def load_points(
-    run_dirs: list[Path], relabel: dict[str, str], status: str = ''
+    run_dirs: list[Path],
+    relabel: dict[str, str],
+    status: str = '',
+    sessions: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
-    rows = []
+    """Point rows of every run, each tagged with its run's session.
+
+    The session names the repeat a run belongs to (`bench.sweep --session`, or
+    `sessions` keyed by run directory name, which takes precedence). Runs with
+    neither get `#i`, their time order among the label's other such runs.
+    """
+    sessions = sessions or {}
+    manifests = []
     for run_dir in run_dirs:
         manifest_path = run_dir / 'sweep.json'
-        if not manifest_path.exists():
-            continue
-        manifest = json.loads(manifest_path.read_text())
+        if manifest_path.exists():
+            manifests.append((run_dir.name, json.loads(manifest_path.read_text())))
+    unnamed: dict[str, int] = defaultdict(int)
+    rows = []
+    for run, manifest in sorted(manifests, key=lambda item: item[0]):
         label = relabel.get(manifest['label'], manifest['label'])
+        session = sessions.get(run) or manifest.get('session') or ''
+        if not session:
+            session = f'#{unnamed[label]}'
+            unnamed[label] += 1
         for point in manifest.get('points', []):
-            rows.append(point_row(label, run_dir.name, point, status))
+            row = point_row(label, run, point, status)
+            row['session'] = session
+            rows.append(row)
     return rows
+
+
+# Worst first: a label whose runs disagree takes the worst class among them.
+EXACTNESS_ORDER = ('unclassified', 'lossy', 'pending', 'exact-up-to-floor', 'stock')
+
+
+def exactness(manifest: dict[str, Any]) -> str:
+    """The run's exactness class (see the module docstring).
+
+    The run's own flags are checked before anything it recorded: a recorded
+    `stock` or `exact-up-to-floor` class does not survive a numerics change in
+    the flags the run actually used.
+    """
+    arm = manifest.get('arm') or {}
+    name = arm.get('name')
+    args = arm.get('args') or {}
+    env = arm.get('env') or {}
+    if name and name in load_arms().get('arms', {}):
+        current = resolve_arm(str(name))
+        if current.args == args and current.env == env:
+            return current.exactness
+    model = (str(arm.get('model')), str(arm.get('revision'))) if arm.get('model') else None
+    changes = numerics_changes(args, env, model)
+    note = str(arm.get('lossy') or '').strip()
+    recorded = str(arm.get('exactness') or '')
+    if note and recorded in ('', 'stock', 'pending'):
+        return 'pending' if note.lower().startswith('pending') else 'lossy'
+    if recorded in ('lossy', 'pending'):
+        return recorded
+    if changes:
+        return 'pending'
+    if recorded in EXACT_CLASSES:
+        return recorded
+    # Every flag neutral and the reference model: stock by the rule in bench/arms.py.
+    return 'stock' if model is not None else 'unclassified'
+
+
+def label_exactness(
+    launches: list[dict[str, Any]], overrides: dict[str, str] | None = None
+) -> dict[str, str]:
+    """Worst exactness class over each label's launches, then command-line overrides."""
+    status: dict[str, str] = {}
+    for row in launches:
+        new = row.get('exactness') or 'unclassified'
+        old = status.get(row['label'], new)
+        status[row['label']] = min(old, new, key=EXACTNESS_ORDER.index)
+    status.update(overrides or {})
+    return status
 
 
 def launch_row(label: str, run: str, manifest: dict[str, Any]) -> dict[str, Any]:
@@ -160,6 +258,7 @@ def launch_row(label: str, run: str, manifest: dict[str, Any]) -> dict[str, Any]
         'arm': (manifest.get('arm') or {}).get('name'),
         'args': json.dumps((manifest.get('arm') or {}).get('args'), sort_keys=True),
         'env': json.dumps((manifest.get('arm') or {}).get('env'), sort_keys=True),
+        'exactness': exactness(manifest),
         'max_running_requests': limits.get('max_running_requests'),
         'max_total_num_tokens': limits.get('max_total_num_tokens'),
         'graph_max_batch': max(step.get('sizes') or [0]),
@@ -249,7 +348,8 @@ def aggregate(rows: list[dict[str, Any]], baseline: str | None) -> list[dict[str
 
 
 def envelope(frontier: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Per concurrency, the arm with the highest mean y, and the runner-up.
+    """Per concurrency, the arm with the highest mean y, the runner-up, and the
+    best exact arm (`stock` or `exact-up-to-floor`).
 
     At a fixed client concurrency y is roughly c times x, so the arm with the
     highest y also gives (nearly) the best per-user rate; both are reported.
@@ -263,10 +363,12 @@ def envelope(frontier: list[dict[str, Any]]) -> list[dict[str, Any]]:
         ranked = sorted(by_c[concurrency], key=lambda e: -e['y_mean'])
         best = ranked[0]
         second = ranked[1] if len(ranked) > 1 else None
+        exact = next((e for e in ranked if e.get('exactness') in EXACT_CLASSES), None)
         rows.append(
             {
                 'concurrency': concurrency,
                 'best': best['label'],
+                'best_exactness': best.get('exactness', ''),
                 'y_mean': best['y_mean'],
                 'y_std': best['y_std'],
                 'x_e2e_mean': best['x_e2e_mean'],
@@ -274,23 +376,51 @@ def envelope(frontier: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 'runner_up': second['label'] if second else '',
                 'runner_up_y_mean': second['y_mean'] if second else math.nan,
                 'lead': best['y_mean'] / second['y_mean'] - 1 if second else math.nan,
+                'best_exact': exact['label'] if exact else '',
+                'best_exact_y_mean': exact['y_mean'] if exact else math.nan,
+                'best_exact_x_e2e_mean': exact['x_e2e_mean'] if exact else math.nan,
             }
         )
     return rows
 
 
-def paired_ratios(rows: list[dict[str, Any]], pairs: list[tuple[str, str]]) -> list[dict[str, Any]]:
-    """Ratios of a test arm to its matched baseline, pairing runs by repeat order.
+def pareto_envelope(frontier: list[dict[str, Any]], exact_only: bool) -> list[dict[str, Any]]:
+    """Frontier entries no other selected entry beats on both axes, by rising x."""
+    chosen = [
+        e
+        for e in frontier
+        if e['n'] > 0 and (not exact_only or e.get('exactness') in EXACT_CLASSES)
+    ]
+    means = [(e['x_e2e_mean'], e['y_mean']) for e in chosen]
+    front = [e for e in chosen if not dominated((e['x_e2e_mean'], e['y_mean']), means)]
+    return sorted(front, key=lambda e: e['x_e2e_mean'])
 
-    Runs of each label are taken in time order (run directory names are
-    timestamps), so the i-th run of the test arm is paired with the i-th run of
-    the baseline: both come from the same confirmation repeat. Invalid points
-    are skipped.
+
+def write_envelope_dat(front: list[dict[str, Any]], path: Path) -> None:
+    lines = ['x y concurrency label']
+    for e in front:
+        lines.append(
+            f'{_format(e["x_e2e_mean"])} {_format(e["y_mean"])} {e["concurrency"]} {e["label"]}'
+        )
+    path.write_text('\n'.join(lines) + '\n')
+
+
+def paired_ratios(rows: list[dict[str, Any]], pairs: list[tuple[str, str]]) -> list[dict[str, Any]]:
+    """Ratios of a test arm to its matched baseline, pairing runs by session.
+
+    A test run is paired with the baseline run of the same session (repeat) at
+    each concurrency. A pair with an invalid point on either side is dropped and
+    counted, never replaced by another run. Two runs of one label in the same
+    session at the same concurrency are an error.
     """
     index: dict[tuple[str, int], dict[str, dict[str, Any]]] = defaultdict(dict)
     for row in rows:
-        if not row.get('invalid_reason'):
-            index[(row['label'], int(row['concurrency']))][row['run']] = row
+        key = (row['label'], int(row['concurrency']))
+        if row['session'] in index[key]:
+            raise ValueError(
+                f'two runs of {row["label"]} in session {row["session"]} at c={key[1]}'
+            )
+        index[key][row['session']] = row
     out = []
     for test, base in pairs:
         levels = sorted(
@@ -298,14 +428,21 @@ def paired_ratios(rows: list[dict[str, Any]], pairs: list[tuple[str, str]]) -> l
             & {c for (label, c) in index if label == base}
         )
         for concurrency in levels:
-            t_runs = [index[(test, concurrency)][r] for r in sorted(index[(test, concurrency)])]
-            b_runs = [index[(base, concurrency)][r] for r in sorted(index[(base, concurrency)])]
-            matched = list(zip(t_runs, b_runs, strict=False))
+            tests, bases = index[(test, concurrency)], index[(base, concurrency)]
+            shared = sorted(set(tests) & set(bases))
+            matched = [
+                (tests[s], bases[s])
+                for s in shared
+                if not tests[s].get('invalid_reason') and not bases[s].get('invalid_reason')
+            ]
             entry: dict[str, Any] = {
                 'test': test,
                 'baseline': base,
                 'concurrency': concurrency,
                 'n': len(matched),
+                'sessions': ' '.join(t['session'] for t, _ in matched),
+                'dropped_invalid': len(shared) - len(matched),
+                'unmatched': len(set(tests) ^ set(bases)),
             }
             for field in ('y', 'x_e2e'):
                 ratios = [
@@ -376,9 +513,24 @@ def plot(frontier: list[dict[str, Any]], path: Path, title: str) -> None:
     import matplotlib.pyplot as plt
 
     labels = list(dict.fromkeys(entry['label'] for entry in frontier))
+    status = {entry['label']: entry.get('exactness', 'unclassified') for entry in frontier}
     fig, ax = plt.subplots(figsize=(7.5, 5.0), dpi=150)
     fig.patch.set_facecolor('#fcfcfb')
     ax.set_facecolor('#fcfcfb')
+    envelopes = [(pareto_envelope(frontier, exact_only=False), 'envelope, all arms', '-')]
+    if any(value not in EXACT_CLASSES for value in status.values()):
+        envelopes.append((pareto_envelope(frontier, exact_only=True), 'envelope, exact arms', ':'))
+    for front, name, style in envelopes:
+        ax.plot(
+            [e['x_e2e_mean'] for e in front],
+            [e['y_mean'] for e in front],
+            color='#2f2e2b',
+            linewidth=4,
+            linestyle=style,
+            alpha=0.25,
+            label=name,
+            zorder=1,
+        )
     for index, label in enumerate(labels):
         colour = SERIES_COLOURS[index % len(SERIES_COLOURS)]
         entries = [entry for entry in frontier if entry['label'] == label]
@@ -390,11 +542,13 @@ def plot(frontier: list[dict[str, Any]], path: Path, title: str) -> None:
             xerr=[entry['x_e2e_std'] for entry in entries],
             yerr=[entry['y_std'] for entry in entries],
             color=colour,
-            linewidth=2,
+            linewidth=2 if status[label] in EXACT_CLASSES else 1.5,
+            linestyle='-' if status[label] in EXACT_CLASSES else '--',
             marker='o',
             markersize=5,
             capsize=2,
-            label=label,
+            label=label if status[label] == 'stock' else f'{label} ({status[label]})',
+            zorder=2,
         )
         for entry, x, y in zip(entries, xs, ys, strict=True):
             if entry['concurrency'] in (1, 8, 32, 128):
@@ -426,6 +580,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         '--relabel', action='append', default=[], metavar='OLD=NEW', help='rename a label'
     )
+    parser.add_argument(
+        '--session-of',
+        action='append',
+        default=[],
+        metavar='RUN=SESSION',
+        help='session (repeat) of a run directory without one in its manifest',
+    )
+    parser.add_argument(
+        '--class',
+        dest='classes',
+        action='append',
+        default=[],
+        metavar='LABEL=CLASS',
+        help='exactness class for a label, overriding arms.toml and the manifests',
+    )
     parser.add_argument('--title', default='Qwen3.5-4B on one GH200: latency-throughput')
     parser.add_argument('--no-plot', action='store_true')
     parser.add_argument(
@@ -447,19 +616,29 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     relabel = dict(item.split('=', 1) for item in args.relabel)
-    rows = load_points(args.runs, relabel, args.status)
+    classes = dict(item.split('=', 1) for item in args.classes)
+    for label, value in classes.items():
+        if value not in EXACTNESS_CLASSES:
+            parser.error(f'--class {label}={value}: class must be one of {EXACTNESS_CLASSES}')
+    sessions = dict(item.split('=', 1) for item in args.session_of)
+    rows = load_points(args.runs, relabel, args.status, sessions)
     if not rows:
         raise SystemExit('no sweep points found')
     args.out.mkdir(parents=True, exist_ok=True)
     write_csv(rows, args.out / 'points.csv', list(POINT_FIELDS))
-    write_csv(load_launches(args.runs, relabel), args.out / 'launches.csv')
+    launches = load_launches(args.runs, relabel)
+    write_csv(launches, args.out / 'launches.csv')
     if args.points_only:
         return 0
     frontier = aggregate(rows, args.baseline)
+    status = label_exactness(launches, classes)
     for entry in frontier:
         entry['status'] = args.status
+        entry['exactness'] = status.get(entry['label'], 'unclassified')
     write_csv(frontier, args.out / 'frontier.csv')
     write_csv(envelope(frontier), args.out / 'envelope.csv')
+    write_envelope_dat(pareto_envelope(frontier, exact_only=False), args.out / 'envelope-all.dat')
+    write_envelope_dat(pareto_envelope(frontier, exact_only=True), args.out / 'envelope-exact.dat')
     if args.pair:
         pairs = [tuple(item.split(':', 1)) for item in args.pair]
         write_csv(paired_ratios(rows, pairs), args.out / 'pairs.csv')
