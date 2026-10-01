@@ -35,8 +35,8 @@ workload (`bench/`, mixed-v2 confirm split, 512 output tokens). Labels as elsewh
   of 4.1 to 4.7 to the goal.
 - **Ceilings** (`ceiling.json`, derived): an engine running the current drafter at the
   HBM bandwidth floor, with no host idle and no per-position state, would decode 1.81x
-  faster than tuned DFlash-16 at c = 1 and 3.26x at c = 8, at the measured 5.7 tokens per
-  cycle. At c = 1, 5x needs 15.7 of a block-16 cycle's 16 tokens at that floor, or about
+  faster than tuned DFlash-16 at c = 1 and 3.15x at c = 8, at the measured 5.7 tokens per
+  cycle. At c = 1, 5x needs 15.8 of a block-16 cycle's 16 tokens at that floor, or about
   50 tokens per cycle at the measured cost of a 64-token Triton verify. Drafting quality,
   not the engine, is the binding constraint; the measurements below can only confirm the
   size of the engine-side part.
@@ -191,10 +191,12 @@ position in both runs (missing or truncated logprobs fail). The same hold runs a
 c = 1 and 8 (`phases.py`).
 
 Engine provenance is part of the gate. Every hold starts with `equality_gate.py
-preflight`, which refuses to run unless the repository running the hold, the stock
-SGLang checkout that S0 imports (`~/sglang`, required at the pin `bd66ce343e`) and the
-composed worktree (required at `STACK_TREE`) all have no uncommitted changes to tracked
-files and no untracked files under `python/`. The gate records that identity (commits,
+preflight`, which refuses to run unless the repository running the hold has no
+uncommitted changes and no untracked files outside `.gitignore` (a stray module such as a
+`sitecustomize.py` would be imported by every hold process), and the stock SGLang checkout
+that S0 imports (`~/sglang`, required at the pin `bd66ce343e`) and the composed worktree
+(required at `STACK_TREE`) have no uncommitted changes to tracked files and no untracked
+files under `python/`. The gate records that identity (commits,
 trees and the SGLang venv's torch, Triton, FlashInfer, sgl-kernel and transformers
 versions), requires it unchanged between the equality hold's start and the gate's
 construction, and requires each equality run's own record to name those engine and
@@ -282,15 +284,17 @@ forced-acceptance runs (`evidence/repair/stage_a_timing.json`) and the drafter's
 screen (`evidence/drafter/support/zlab_b16_panel_v1_summary.json`); the file records the
 SHA-256 of each input. The floor reads every weight byte of the target (8.41 GB) and the
 drafter (2.54 GB with its fc and the tied head) once per cycle, plus per request the FP32
-GDN state and the KV of an assumed 350-token context, at 3.79 TB/s; it ignores launches,
+GDN state traffic (19 states with stock verify: one read, 16 snapshots and the commit
+copy's read and write; 3 with a snapshot-free verify: one read and the fold's read and
+write) and the KV of an assumed 350-token context, at 3.79 TB/s; it ignores launches,
 host work and compute (all below the memory time at c <= 8).
 
 | c | tuned DFlash-16 cycle (tau) | floor, stock verify / snapshot-free | decode ceiling at measured tau | tau for 5x at the floor | selector bound at the floor | 16-token blocks at the floor |
 |---|---|---|---|---|---|---|
-| 1 | 5.29 ms (5.70) | 3.14 / 2.92 ms | 1.81x | 15.7 | 2.96x | 5.09x |
-| 2 | 5.95 ms (5.69) | 3.40 / 2.95 ms | 2.02x | 14.1 | 3.30x | 5.67x |
-| 4 | 7.40 ms (5.68) | 3.91 / 3.01 ms | 2.46x | 11.5 | 4.02x | 6.93x |
-| 8 | 10.19 ms (5.77) | 4.93 / 3.13 ms | 3.26x | 8.9 | 5.33x | 9.04x |
+| 1 | 5.29 ms (5.70) | 3.14 / 2.93 ms | 1.81x | 15.8 | 2.95x | 5.07x |
+| 2 | 5.95 ms (5.69) | 3.40 / 2.98 ms | 2.00x | 14.2 | 3.27x | 5.62x |
+| 4 | 7.40 ms (5.68) | 3.91 / 3.06 ms | 2.42x | 11.7 | 3.95x | 6.81x |
+| 8 | 10.19 ms (5.77) | 4.93 / 3.23 ms | 3.15x | 9.2 | 5.15x | 8.74x |
 
 Multiples are of the baseline's per-user decode rate (x_decode, which leaves out the time
 to first token; with it, 5x is harder still). The selector bound applies the support
