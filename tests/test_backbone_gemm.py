@@ -43,6 +43,9 @@ def test_gemm_matches_float64_and_repeats(cfg: Any, n: int, k: int) -> None:
     for m in (1, 3, 16, 33, 128):
         if not cfg.valid_for(m, n, k):
             continue
+        gx, _, gz = cfg.grid(m, n)
+        if cfg.split_k > 1 and gx * gz * cfg.split_k * cfg.block_m * cfg.block_n > 8 << 20:
+            continue  # beyond the default split-K workspace (the kernel refuses it)
         x = _rand(m, k)
         ref = x.double() @ w.double().T
         mass = x.double().abs() @ w.double().abs().T
@@ -114,7 +117,7 @@ def test_deferred_norm_linear_writes_the_stock_residual() -> None:
     w = _rand(18432, HIDDEN, scale=0.02)
     g = _rand(HIDDEN, scale=0.1)
     cfg = bg.GemmConfig(16, 64, 128, 1, True, 4, 3)
-    bg.TABLE[(18432, HIDDEN)] = ((16, cfg),)
+    bg.TABLE[(18432, HIDDEN)] = ((16, cfg, 'gemm'),)
     try:
         x, r = _rand(8, HIDDEN), _rand(8, HIDDEN, scale=4.0)
         xs, rs = x.clone(), r.clone()
