@@ -7,8 +7,9 @@
 % envelope over the points with at least three valid sessions, grey band). Points with fewer
 % than three sessions are hollow; they do not rank on the frontier (evidence/bench/README.md).
 % Colours follow style.tex: plain decoding, the stock baseline, in ink; the drafter arms in
-% purple, told apart by marker and dash pattern. Each curve runs from c = 1 (lower right) to
-% c = 128 (upper left); the plain curve's ends are labelled. Error bars are one standard
+% purple, told apart by marker and dash pattern and named in the legend (MTP in the lighter purple
+% of Figure fig:rho). Each curve runs from c = 1 (lower right) to c = 128 (upper left); the plain
+% curve's ends are labelled. Error bars are one standard
 % deviation over sessions (x_e2e_std, y_std); every one is below 2% of its mean and hidden by
 % its marker, which the caption says. No arm uses the certified head.
 % Keep only points with at least #1 sessions, or with fewer than #1.
@@ -24,31 +25,35 @@
   xmin=80,xmax=1150,ymin=220,ymax=18000,grid=major,
   xlabel={Per-request rate $x$ (output tokens/s)},
   ylabel={Throughput $y$ (output tokens/s)},
+  title={Stock serving frontier (measured; no certified head)},
   xtick={100,200,500,1000},xticklabels={100,200,500,1000},
   ytick={300,1000,3000,10000},yticklabels={300,1k,3k,10k},
-  every axis plot/.append style={mark size=1.6pt},
+  every axis plot/.append style={mark size=1.8pt},
+  % the legend fills the empty lower-left corner (no point lies below y = 280 left of x = 280)
+  legend style={at={(0.015,0.03)},anchor=south west,font=\figsmall,row sep=0pt},
+  legend image code/.code={\draw[mark repeat=2,mark phase=2,#1] plot coordinates {(0cm,0cm) (0.3cm,0cm) (0.6cm,0cm)};},
   % one standard deviation over sessions; keep last in a plot's options (it changes key path)
   sd bars/.style={error bars/.cd,x dir=both,x explicit,y dir=both,y explicit,error bar style={thin}}]
 \addplot[line width=4pt,ccontext!25,forget plot,no markers]
   table[x=x,y=y]{../evidence/bench/confirm/envelope-all.dat};
 \addplot[cstock,thick,mark=*,discard if not={label}{plain-tuned},sd bars]
   table[x=x_e2e_mean,y=y_mean,x error=x_e2e_std,y error=y_std,col sep=comma]{../evidence/bench/confirm/frontier.csv};
-\addplot[cdraft,thick,dashdotted,mark=none,forget plot,discard if not={label}{mtp-tuned}]
+  \addlegendentry{plain decoding}
+\addplot[cdraft,very thick,mark=diamond*,mark size=2.2pt,discard if not={label}{dflash-tuned},sd bars]
+  table[x=x_e2e_mean,y=y_mean,x error=x_e2e_std,y error=y_std,col sep=comma]{../evidence/bench/confirm/frontier.csv};
+  \addlegendentry{DFlash, block 8}
+\addplot[cdraft,thick,dashed,mark=square*,mark size=1.6pt,mark options={solid},discard if not={label}{dflash-tuned-b16},sd bars]
+  table[x=x_e2e_mean,y=y_mean,x error=x_e2e_std,y error=y_std,col sep=comma]{../evidence/bench/confirm/frontier.csv};
+  \addlegendentry{DFlash, block 16}
+% MTP: the lighter purple line of Figure fig:rho, dash-dot; triangles filled in full purple where
+% three or more sessions are valid, open (white-filled, heavy outline) where only one is
+\addplot[cdraft!60,thick,dashdotted,mark=triangle*,mark size=2.3pt,mark options={solid,fill=cdraft,draw=cdraft},discard if not={label}{mtp-tuned},sd bars]
+  table[x=x_e2e_mean,y=y_mean,x error=x_e2e_std,y error=y_std,col sep=comma]{../evidence/bench/confirm/frontier.csv};
+  \addlegendentry{MTP, 3 steps}
+\addplot[only marks,mark=triangle*,mark size=2.3pt,mark options={solid,fill=white,draw=cdraft,line width=0.9pt},forget plot,discard if not={label}{mtp-tuned},only if n below=3]
   table[x=x_e2e_mean,y=y_mean,col sep=comma]{../evidence/bench/confirm/frontier.csv};
-\addplot[cdraft,only marks,mark=triangle*,mark size=1.9pt,discard if not={label}{mtp-tuned},only if n at least=3,sd bars]
-  table[x=x_e2e_mean,y=y_mean,x error=x_e2e_std,y error=y_std,col sep=comma]{../evidence/bench/confirm/frontier.csv};
-\addplot[cdraft,only marks,mark=triangle,mark size=1.9pt,forget plot,discard if not={label}{mtp-tuned},only if n below=3]
-  table[x=x_e2e_mean,y=y_mean,col sep=comma]{../evidence/bench/confirm/frontier.csv};
-\addplot[cdraft,thick,mark=diamond*,mark size=1.9pt,discard if not={label}{dflash-tuned},sd bars]
-  table[x=x_e2e_mean,y=y_mean,x error=x_e2e_std,y error=y_std,col sep=comma]{../evidence/bench/confirm/frontier.csv};
-\addplot[cdraft,thick,dashed,mark=square*,mark size=1.4pt,mark options={solid},discard if not={label}{dflash-tuned-b16},sd bars]
-  table[x=x_e2e_mean,y=y_mean,x error=x_e2e_std,y error=y_std,col sep=comma]{../evidence/bench/confirm/frontier.csv};
-\node[annot,text=black,anchor=east] at (axis cs:255,600) {plain};
-\node[annot,text=black,anchor=west] at (axis cs:475,500) {MTP, 3 steps};
-\node[annot,text=black,anchor=south] at (axis cs:330,7600) {DFlash, block 8};
-\node[annot,text=black,anchor=north west] at (axis cs:116,4400) {block 16};
 \node[annot,text=black,anchor=west] at (axis cs:300,282) {$c{=}1$};
 \node[annot,text=black,anchor=west] at (axis cs:112,15500) {$c{=}128$};
-\node[annot,text=black,anchor=south west,align=left] at (axis cs:84,240) {stock arms, measured;\\no certified head};
+\node[note,anchor=south west,align=left] at (axis cs:560,255) {open triangles:\\one session};
 \end{axis}
 \end{tikzpicture}
