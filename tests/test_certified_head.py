@@ -369,6 +369,46 @@ def test_argmax_matches_engine_on_real_states(head_bf16: CertifiedHead) -> None:
     print(f'real rows {n}, fallback rows {fallback}')
 
 
+def real_rows(n: int) -> torch.Tensor:
+    rows = torch.cat([as_bf16(rec['hidden']) for rec in load_real_hidden(limit=600)])
+    if rows.shape[0] < n:
+        pytest.skip(f'only {rows.shape[0]} real rows')
+    return rows[:n].cuda()
+
+
+@pytest.mark.parametrize('arith', ['w8a16', 'w8a8', 'bf16'])
+@pytest.mark.parametrize('m', [1, 16, 64, 96, 128, 200, 256])
+def test_real_row_certification_rate_at_default_tiles(
+    checkpoint: tuple[Any, Any], arith: str, m: int
+) -> None:
+    """On real decode rows every arithmetic, at its default tiles for this batch
+    size, decides nearly every row, and its envelope encloses the exact logits.
+
+    A row's status does not depend on the batch, so the undecided share should
+    be the same at every M (about 1.5% on these rows under the conservative
+    model, more for W8A8). A tile configuration that computes a wrong or
+    over-wide envelope shows up here as a jump in fallbacks or an enclosure
+    violation.
+    """
+    w, qh = checkpoint
+    head = CertifiedHead.from_quantized(w, qh, reference='bf16', max_batch=256, capacity=256)
+    head.arith_for = lambda _m: arith  # type: ignore[assignment,return-value]
+    h = real_rows(256)[:m].contiguous()
+    lo, hi, _ = head.envelope(h)
+    x = exact_logits_fp64(h, w)
+    slack = 1e-9 * (1 + x.abs())
+    assert bool((lo.double() <= x - slack).all()), (arith, m, 'lo')
+    assert bool((hi.double() >= x + slack).all()), (arith, m, 'hi')
+    del lo, hi, x
+    ids, stats = head.argmax(h, fallback=False)
+    undecided = int(stats.fallback.sum())
+    decided = ~stats.fallback
+    assert torch.equal(ids[decided], reference_argmax(h, w, 'bf16')[decided])
+    limit = max(2, int(0.15 * m)) if arith == 'w8a8' else max(2, int(0.08 * m))
+    print(f'{arith} M={m} tiles {head.gemv_config(m)}: undecided {undecided}/{m}')
+    assert undecided <= limit, (arith, m, undecided)
+
+
 def near_tie_batch(w: torch.Tensor, pairs: int, gaps: torch.Tensor) -> tuple[torch.Tensor, int]:
     """Hidden states for which two rows ``a, b`` lead with a prescribed real gap.
 
