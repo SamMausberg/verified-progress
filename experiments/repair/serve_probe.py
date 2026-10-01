@@ -278,6 +278,12 @@ def main() -> int:
     )
     ap.add_argument('--env', action='append', default=[], help='extra environment NAME=VALUE')
     ap.add_argument('--engine', type=Path, default=ENGINE_WORKTREE)
+    ap.add_argument(
+        '--nsys',
+        type=Path,
+        default=None,
+        help='profile the recorded requests with Nsight Systems (report path without extension)',
+    )
     args = ap.parse_args()
 
     out: Path = args.out
@@ -341,7 +347,24 @@ def main() -> int:
     for name in ('timing.jsonl', 'trace.jsonl', 'results.jsonl'):
         (out / name).unlink(missing_ok=True)
 
-    cmd = [sys.executable, '-m', 'sglang.launch_server']
+    nsys_session = f'repair{os.getpid()}'
+    cmd = []
+    if args.nsys is not None:
+        cmd = [
+            'nsys',
+            'launch',
+            '--session-new',
+            nsys_session,
+            '--trace',
+            'cuda,nvtx',
+            '--cuda-graph-trace',
+            'node',
+            '--sample',
+            'none',
+            '--cpuctxsw',
+            'none',
+        ]
+    cmd += [sys.executable, '-m', 'sglang.launch_server']
     for key, value in server_args.items():
         cmd.append(f'--{key}')
         if value != 'true':
@@ -420,6 +443,20 @@ def main() -> int:
         run_info['foreign_cpu_before'] = wait_for_quiet_cpu(
             own, max_cores=2.0, max_wait_s=quiet_wait
         )
+        if args.nsys is not None:
+            subprocess.run(
+                [
+                    'nsys',
+                    'start',
+                    '--session',
+                    nsys_session,
+                    '--output',
+                    str(args.nsys),
+                    '--force-overwrite',
+                    'true',
+                ],
+                check=True,
+            )
         watch = CpuWatch(own)
         with watch, open(out / 'results.jsonl', 'w') as results:
             for request in requests:
@@ -455,6 +492,8 @@ def main() -> int:
         # A short trailing request lets the engine flush the timing records of
         # the last recorded request (they are resolved lazily).
         stream_generate(base, requests[0]['input_ids'], 64, args.ignore_eos)
+        if args.nsys is not None:
+            subprocess.run(['nsys', 'stop', '--session', nsys_session], check=True)
         run_info['foreign_cpu_during'] = watch.summary()
         run_info['ready_s'] = ready_s
         run_info['finished'] = time.strftime('%Y-%m-%dT%H:%M:%S%z')
