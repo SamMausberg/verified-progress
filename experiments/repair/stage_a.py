@@ -59,13 +59,27 @@ def anchor_values_per_token() -> dict[str, int]:
     return {'inputs': inputs, 'outputs': outputs, 'total': inputs + outputs}
 
 
+def flag_value(cmd: list[str], flag: str) -> str | None:
+    if flag in cmd and cmd.index(flag) + 1 < len(cmd):
+        return str(cmd[cmd.index(flag) + 1])
+    return None
+
+
 def verifier_of(row: dict[str, Any]) -> str:
-    """GDN verify kernel of a run: SGLang follows the decode backend (FlashInfer here) unless
-    --linear-attn-verify-backend overrides it."""
-    cmd = list(row.get('command') or [])
-    if '--linear-attn-verify-backend' in cmd:
-        return str(cmd[cmd.index('--linear-attn-verify-backend') + 1])
-    return 'flashinfer'
+    """GDN verify kernel of a run, resolved the way SGLang does at the pin
+    (`layers/attention/linear/utils.py`): an explicit --linear-attn-verify-backend wins;
+    otherwise the verifier is FlashInfer when the decode backend (--linear-attn-decode-backend,
+    else --linear-attn-backend, else its default, triton) is FlashInfer, and Triton otherwise."""
+    cmd = [str(x) for x in (row.get('command') or [])]
+    verify = flag_value(cmd, '--linear-attn-verify-backend')
+    if verify is not None:
+        return verify
+    decode = (
+        flag_value(cmd, '--linear-attn-decode-backend')
+        or flag_value(cmd, '--linear-attn-backend')
+        or 'triton'
+    )
+    return 'flashinfer' if decode == 'flashinfer' else 'triton'
 
 
 def med(row: dict[str, Any], *path: str) -> float | None:
