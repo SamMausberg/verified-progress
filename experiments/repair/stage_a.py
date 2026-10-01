@@ -60,9 +60,14 @@ def anchor_values_per_token() -> dict[str, int]:
 
 
 def flag_value(cmd: list[str], flag: str) -> str | None:
-    if flag in cmd and cmd.index(flag) + 1 < len(cmd):
-        return str(cmd[cmd.index(flag) + 1])
-    return None
+    """Value of a launch flag given as `--flag value` or `--flag=value` (the last one wins)."""
+    value = None
+    for i, item in enumerate(cmd):
+        if item == flag and i + 1 < len(cmd):
+            value = str(cmd[i + 1])
+        elif item.startswith(flag + '='):
+            value = item[len(flag) + 1 :]
+    return value
 
 
 def verifier_of(row: dict[str, Any]) -> str:
@@ -139,7 +144,8 @@ def main() -> None:
     gdn = json.loads(args.gdn.read_text()) if args.gdn else {'blocks': {}}
     by_name = {Path(r['run']).name: r for r in rows}
     base = by_name.get(args.baseline)
-    if base is not None and verifier_of(base) != args.verifier:
+    overridden = args.cd_us is not None and args.ad is not None and args.f is not None
+    if base is not None and not overridden and verifier_of(base) != args.verifier:
         raise SystemExit(
             f'baseline {args.baseline} uses the {verifier_of(base)} verify kernel, not {args.verifier}'
         )

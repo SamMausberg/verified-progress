@@ -101,6 +101,15 @@ and 3.131 against 3.207 ms at B = 256), so differences of a few percent between 
 within drift; a
 same-session control (all three variants at B = 16 and 256) is queued.
 
+Which verify kernel the baseline used: at the pin SGLang's GDN verify kernel follows the decode
+backend unless `--linear-attn-verify-backend` overrides it (FlashInfer if the decode backend is
+FlashInfer, Triton otherwise). All Stage A runs, like the drafter workstream's shared trace,
+use the DFlash model card's `--linear-attn-decode-backend flashinfer`, so they verify with
+FlashInfer; with SGLang's default linear-attention backend (Triton, as in the bench arms) the
+verifier is already Triton and `--linear-attn-verify-backend triton` changes nothing. The
+comparison below is therefore FlashInfer verify against Triton verify, with everything else as
+on the card.
+
 With `--linear-attn-decode-backend flashinfer` SGLang verifies GDN layers with FlashInfer's
 `gated_delta_rule_mtp` (code reading: at one request it runs its inline kernel with a value
 tile of 8, so 512 CTAs per layer walk the T block positions one after another, and it compiles
@@ -312,6 +321,8 @@ question causally.
 
 The ReplaySSM spec protocol does not start with DFlash on this GDN model ("requires a KDA
 model"), and the session's GDN kernel microbenchmark was stopped after 16 minutes of CPU-bound
-kernel compilation without output, so this table bounds the per-position state writes inside
-V(B) by their bytes at 3.0 TB/s (labelled `state_writes_source`); measured no-state verify
-times replace the bound when the decomposition session lands.
+kernel compilation without output. The per-position state writes inside V(B) are therefore
+measured (forced acceptance without them, decomposition session) at B = 16, 64 and 256 and
+bounded by their bytes at 3.0 TB/s at B = 32 and 128 in `stage_a_oracle.{json,csv}`, and bounded
+by their bytes at every width in `stage_a_oracle_triton.{json,csv}`; `state_writes_source`
+labels each row.
