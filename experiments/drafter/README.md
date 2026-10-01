@@ -25,6 +25,7 @@ anything timed).
 | `build_train_prompts.py` | Training prompts (chat, code, maths) from permissive public sources; fails unless they are disjoint (text and id) from every bench split of mixed-v1 and mixed-v2, the panel and MT-Bench |
 | `gen_targets.py`, `run_gen_segment.sh` | The target's own greedy thinking-mode responses to the training prompts, generated with SGLang in resumable segments |
 | `train_dflash.py` | Fine-tunes a DFlash or DFlash 2 drafter against the frozen target in resumable time-boxed segments; exports a checkpoint SGLang loads unchanged |
+| `run_selector_timing.sh` | P6 end to end: the rate-trained selector against the strongest matched control and stock DFlash on the `dflash-tuned-b16` flags, c = 1-8, order stock, control, prefix, prefix, control, stock; exclusive hold |
 
 ## Engine patch
 

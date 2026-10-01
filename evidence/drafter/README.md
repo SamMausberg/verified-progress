@@ -123,6 +123,54 @@ in every number.
     #     --draft z-lab/Qwen3.5-4B-DFlash@9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf \
     #     --out ~/vp-data/drafter/support/zlab_b16_cycles --save-cycles
 
+## P6: declared analysis (committed before any selector result)
+
+P6 asks whether training a predecessor-conditioned selector over the frozen drafter's
+candidates for emitted tokens per unit time (the rate objective) beats the strongest
+matched objective by 1.25x end to end. This section fixes the arms, the selection of the
+control and the decision rule before training finishes; results will be added below it.
+
+- **Backbone and candidates.** `z-lab/Qwen3.5-4B-DFlash@9a1996c`, frozen, block 16; at each
+  slot the top 16 tokens through the target's tied head. Selector: DFlash 2's low-rank
+  transition score (SpecForge's `CandidateSelector`, rank 256, the parameters SGLang's
+  `DFlash2DraftModel` loads); greedy decoding walks the argmax with the chosen token as the
+  next predecessor, in training evaluation and in SGLang alike.
+- **Data.** The target's own greedy thinking-mode responses to `prompts-v2`
+  (`gen_targets.py`), frozen when training starts as the first N rows (N >= 2,000) of the
+  generation file, with its SHA-256 recorded. Rows whose id hashes to the held-out bucket
+  (`is_heldout`, modulus 50) are excluded from training; the first 64 of them are the
+  held-out evaluation set.
+- **Arms.** One `train_selector.py` run trains four selectors side by side from identical
+  initialisation, on the same sequences, anchors (256 per sequence) and candidates:
+  `prefix` (the rate objective: minus the expected accepted length of the sampled path,
+  which at a fixed block size is R - lambda C up to a constant, because the cycle cost does
+  not depend on the selector), and the matched controls `ce` (position-weighted
+  cross-entropy, gamma 7), `dpace` (D-PACE weights, alpha 0.5) and `vat` (VAT weights,
+  gamma 7). Budget: 1,200 optimizer steps of 8 sequences, AdamW at 1e-3 with 50 warm-up
+  steps and cosine decay to 0.1, gradient clipping 1.0, seed 0.
+- **Strongest matched objective.** The control arm with the highest held-out greedy-walk
+  tokens per cycle (`eval/<objective>/walk_tau` in `eval.csv`) at the final step. It is
+  chosen from the training run's own held-out evaluation, before any served run.
+- **Served acceptance (correctness, shared slot).** Panel-v2 at c = 1, block 16, for stock
+  DFlash and the `prefix` and control checkpoints (`run_eval_panel.sh`): tokens per cycle
+  and output comparison with plain decoding. A selector changes only the drafts, so outputs
+  must stay in stock DFlash's exactness class (tie and one-ulp divergences only).
+- **End to end (primary).** `run_selector_timing.sh`: the bench's `dflash-tuned-b16` flags
+  with only the draft checkpoint changed, bench confirm split, 512 output tokens, c = 1, 2,
+  4 and 8, one exclusive hold in the order stock, control, prefix, prefix, control, stock.
+  Statistic per concurrency: R_c = mean y(prefix) / mean y(control), with its range over
+  the four prefix-control run pairs. Two runs per arm do not support a confidence interval,
+  so the pairwise range stands in for it.
+- **Decision.** At each c separately: the rate objective's 1.25x claim is rejected if the
+  largest pairwise ratio is below 1.25, and supported only if the smallest is at least 1.25;
+  anything between is undecided at that c. Points whose foreign CPU load averaged above 2
+  cores are rerun before a decision. Reported alongside, without a threshold: each selector
+  against stock DFlash (the lever another workstream may compose).
+- **What is already known.** At the anchors the stock trajectory visited, any selector over
+  these candidates commits at most 10.14 tokens per cycle against stock's 6.20 (the support
+  screen above), so a 1.25x gain of `prefix` over a control would have to come from a large
+  share of that headroom going to one objective and not the other.
+
 ## Card-reproduction gate (MT-Bench)
 
 `card_gate_mtbench.json`, `launch/zlab_b16_card_gate.json`: the 80 MT-Bench first turns with
