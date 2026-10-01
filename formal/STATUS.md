@@ -41,6 +41,51 @@ Scores are integers after clearing a common positive denominator.
   `K^n (|computed - exact| + sum|t|) <= (K+1)^n sum|t|`, i.e. the gamma_n bound
   `|error| <= ((1 + 1/K)^n - 1) sum|t|`.
 
+## `drafting/`: three drafting proposals (supplied by the author, fixed and checked here)
+
+Lean sources for three drafting proposals (innovation-clock drafting, prefix-isolated sparse
+planning, causal defect drafting), supplied by the author and first committed as supplied.
+Checked on 2026-10-01 with Lean 4.19.0 after two mechanical fixes, in their own commit:
+`Nat.strong_induction_on` (a Mathlib name, absent from core and Std) became core's
+`Nat.strongRecOn` with its case name `ind`, and a binder named `prefix` (a keyword) became
+`«prefix»`. No theorem statement changed apart from that binder's spelling. All three files
+then elaborate with no errors and no `sorry`; `#print axioms` on all 33 theorems reports only
+`propext`, `Quot.sound` and `Classical.choice`. The only warnings are two unused
+`[DecidableEq α]` section variables in `InnovationDrafting.lean`. The experiments in
+`experiments/frontier/` rely on two of these results: `teacher_forced_prefix_iff` (a
+deterministic causal proposal's free-running accepted prefix equals its teacher-forced one,
+so acceptance can be computed offline exactly) and `oracle_clipping`.
+
+- `InnovationDrafting.lean`. Commands KEEP (take the interpreter's token) and PUT(x)
+  (override): the canonical code reconstructs any continuation (`decode_encode`) with
+  exactly as many overrides as there are innovations, positions where the interpreter is
+  wrong on the true prefix (`writes_encode`); no command program producing that
+  continuation uses fewer (`minimum_override_cost`); a prefix is reachable within a budget
+  if and only if its innovation count fits (`realizable_iff`, `prefix_realizable_iff`).
+  Greedy auditing of any proposed string publishes only the reference continuation
+  (`audit_exact`, `interpreted_program_exact`). `execution_potential_bound` and
+  `terminal_cost_lower_bound` are a generic Bellman-potential lower bound on execution
+  cost; they construct no oracle.
+- `PrefixIsolatedPlanning.lean`. If an expander is isolated (a planning token affects only
+  its own and later positions) and clamped (it emits each planning token at its anchor),
+  then its first mismatch with planning tokens z is the minimum of its first mismatch with
+  the true anchors and the first wrong anchor (`oracle_clipping`, `committed_clipping`). A
+  causal deterministic planner's first teacher-forced error equals its first free-running
+  error (`teacher_forced_first_error`). Greedy verification keeps the target's prefix and
+  bonus (`verified_prefix_sound`, `verified_bonus_sound`). The expected-progress formula,
+  sampled proposals and the uniform-target obstruction are not formalized.
+- `CausalDefect.lean`. `weighted_depth` and `causal_defect_converges`: in an abstract
+  triangular sweep whose cheap part reads only earlier new-sweep values and whose defect
+  part reads only old-sweep values, a position of weighted depth d is settled after d + 1
+  sweeps. Caveat: the premises require exact locality. For a real target the defect F - G
+  depends on every earlier position, so the depth of position i is i and the bound is one
+  sweep per position, the bound of plain Jacobi iteration; it gives no one-sweep result for
+  a real model. `guarded_unique_winner` (with `margin_pair`, `bias_cancels`,
+  `anchored_error_identity`): an additive error whose oscillation is below the target's
+  margin keeps the winner, in integer scores. `verified_prefix`, `first_correction` and
+  `teacher_forced_prefix_iff`: audit soundness and the exact offline acceptance of a
+  deterministic causal proposal map.
+
 ## What is not formalized
 
 IEEE-754 rounding itself and the bridge from floating-point values to these

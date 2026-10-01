@@ -3,9 +3,9 @@ import Std
 /-
 Prefix-isolated sparse planning: deterministic logical core.
 
-STATUS: NOT COMPILED IN THIS SESSION. Intended toolchain: Lean 4.19.0.
-There are no placeholder proof terms or added axioms in this source. It must
-be elaborated locally before being described as machine-checked.
+Proposal source supplied by the author, fixed and checked here with Lean 4.19.0
+(formal/STATUS.md: the two mechanical fixes, what is proved and the caveats).
+There are no placeholder proof terms or added axioms in this source.
 
 Formalized below:
 * first-mismatch uniqueness;
@@ -14,9 +14,10 @@ Formalized below:
 * equality of the first teacher-forced and free-running planner errors;
 * finite-sample oracle dominance.
 
-Not formalized: probability/integration, the neural architecture's compliance
-with isolation, floating-point arithmetic, compiled GPU kernels, state-cache
-restoration, model accuracy, or measured performance.
+Not formalized: the expected-progress formula, sampled proposals and the
+uniform-target obstruction (probability/integration), the neural
+architecture's compliance with isolation, floating-point arithmetic, compiled
+GPU kernels, state-cache restoration, model accuracy, or measured performance.
 
 Indices in this file are ZERO BASED. The first mismatch k equals the number
 of matching draft tokens. A cycle commits k+1 including the correction/bonus.
@@ -206,5 +207,16 @@ theorem pooled_oracle_dominance (xs : List (Nat × Nat)) :
 #print axioms verified_bonus_sound
 #print axioms teacher_forced_first_error
 #print axioms pooled_oracle_dominance
+
+-- Axioms of every theorem (formal/STATUS.md).
+#print axioms PrefixIsolatedPlanning.firstMismatch_unique
+#print axioms PrefixIsolatedPlanning.expander_eq_before
+#print axioms PrefixIsolatedPlanning.wrong_anchor_fails
+#print axioms PrefixIsolatedPlanning.oracle_clipping
+#print axioms PrefixIsolatedPlanning.committed_clipping
+#print axioms PrefixIsolatedPlanning.verified_prefix_sound
+#print axioms PrefixIsolatedPlanning.verified_bonus_sound
+#print axioms PrefixIsolatedPlanning.teacher_forced_first_error
+#print axioms PrefixIsolatedPlanning.pooled_oracle_dominance
 
 end PrefixIsolatedPlanning

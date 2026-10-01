@@ -3,15 +3,15 @@ import Std
 /-!
 # Causal innovation coding and exact publication
 
-Intended toolchain: Lean 4.19.0, matching verified-progress.
-STATUS: source written here, but NOT compiler-checked: this environment has no
-Lean executable and the attempted toolchain download was unavailable.
+Proposal source supplied by the author, fixed and checked here with Lean 4.19.0
+(formal/STATUS.md: the two mechanical fixes, what is proved and the caveats).
 
 This file supplies proof terms, not placeholder declarations. It does not model
 IEEE-754, GPU kernels, learned-model accuracy, wall-clock speed, real probability,
-or the finite-alphabet counting theorem. Those scopes are kept separate in the
-research note. In particular, `next` must denote an already specified,
-prefix-consistent reference; this file does not establish that property of SGLang.
+or the finite-alphabet counting theorem; those are not formalized here. In
+particular, `next` must denote an already specified, prefix-consistent
+reference; this file does not establish that property of SGLang. The Bellman
+section is a generic potential lower bound: it constructs no oracle.
 
 History is stored MOST RECENT TOKEN FIRST, to make its update `x :: h`.
 Generated continuations and command streams remain chronological.
@@ -244,5 +244,21 @@ theorem terminal_cost_lower_bound {State : Type u}
 #print axioms prefix_realizable_iff
 #print axioms common_program_prefix
 #print axioms interpreted_program_exact
+
+-- Axioms of every theorem (formal/STATUS.md).
+#print axioms InnovationDrafting.decode_encode
+#print axioms InnovationDrafting.writes_encode
+#print axioms InnovationDrafting.innovations_decode_le
+#print axioms InnovationDrafting.minimum_override_cost
+#print axioms InnovationDrafting.realizable_iff
+#print axioms InnovationDrafting.prefix_realizable_iff
+#print axioms InnovationDrafting.decode_append_prefix
+#print axioms InnovationDrafting.common_program_prefix
+#print axioms InnovationDrafting.audit_follows
+#print axioms InnovationDrafting.follows_eq_rollout
+#print axioms InnovationDrafting.audit_exact
+#print axioms InnovationDrafting.interpreted_program_exact
+#print axioms InnovationDrafting.execution_potential_bound
+#print axioms InnovationDrafting.terminal_cost_lower_bound
 
 end InnovationDrafting

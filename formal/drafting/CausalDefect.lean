@@ -1,7 +1,7 @@
 /-
-Causal defect drafting: proposed Lean 4.19-compatible formalization.
-STATUS: NOT COMPILED in the authoring environment (no Lean executable available).
-Run: lean CausalDefect.lean
+Causal defect drafting.
+Proposal source supplied by the author, fixed and checked here with Lean 4.19.0
+(formal/STATUS.md: the two mechanical fixes, what is proved and the caveats).
 
 No additional axioms or admitted proofs are introduced. This file formalizes:
   * weighted causal-depth convergence for an abstract triangular sweep;
@@ -10,8 +10,12 @@ No additional axioms or admitted proofs are introduced. This file formalizes:
   * soundness of audited prefixes and the first correction.
 It does not formalize Qwen, IEEE rounding, GPU costs, sampling laws, learned
 response accuracy, or the existence of a cheap response model. The sweep's
-triangular score equation is an explicit premise; existence/uniqueness is
-established by forward recursion in the accompanying mathematical proof.
+triangular score equation is an explicit premise; existence/uniqueness
+follows by forward recursion and is not formalized here.
+Caveat: `weighted_depth` assumes exact locality. For a real target the defect
+F - G depends on every earlier position, so every position has depth equal to
+its index and the bound is one sweep per position, the bound of plain Jacobi
+iteration; the one-sweep claim rests on the margin lemma instead.
 -/
 import Std
 
@@ -220,5 +224,17 @@ theorem teacher_forced_prefix_iff
 #print axioms verified_prefix
 #print axioms first_correction
 #print axioms teacher_forced_prefix_iff
+
+-- Axioms of every theorem (formal/STATUS.md).
+#print axioms CausalDefect.weighted_depth
+#print axioms CausalDefect.settles_from_locality
+#print axioms CausalDefect.causal_defect_converges
+#print axioms CausalDefect.bias_cancels
+#print axioms CausalDefect.anchored_error_identity
+#print axioms CausalDefect.margin_pair
+#print axioms CausalDefect.guarded_unique_winner
+#print axioms CausalDefect.verified_prefix
+#print axioms CausalDefect.first_correction
+#print axioms CausalDefect.teacher_forced_prefix_iff
 
 end CausalDefect
