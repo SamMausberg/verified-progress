@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import json
 import statistics
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -302,6 +303,8 @@ def main() -> None:
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(json.dumps(result, indent=1) + '\n')
+    if args.command == 'check' and not result['bit_identical']:
+        sys.exit('exact replay differs from the packed decode (see the counts above)')
 
 
 if __name__ == '__main__':

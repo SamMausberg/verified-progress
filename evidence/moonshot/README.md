@@ -202,6 +202,52 @@ a single 262,144-token prefill hits an illegal memory access in
 0001-0009, exact replay off in the base arm); it has not been tried on stock `bd66ce343e`.
 The A/B now runs through the server with chunked prefill (run_p4b.sh).
 
+**Analysis of the served A/B, declared on 2026-10-01 at 07:12 UTC, before the run started**
+(agreed with the coordinator; the run script is `experiments/moonshot/run_p4b.sh`, committed
+with this declaration):
+
+- Design: batch 128, 2,048-token prompts (`long2048.jsonl`), 512 generated tokens, greedy,
+  FP32 state, no speculation, radix off, `--stream-interval 4`. Dense decode (A) against
+  exact replay at L = 4 (B), one server launch per arm, four pairs in A B B A A B B A order
+  (labels r1-r4).
+- Workload (by SHA-256; the files are in `~/vp-data/moonshot/workloads/`, made by
+  `make_long_prompts.py` from mixed-v2 confirm and warm-up): `long2048.jsonl` `db376fa3aadf75a30933a649b5ded1dfcafac8289b8e2aed1dde7201afd2659c`
+  (512 prompts, templated length 2,046-2,048), warm-up pool `long2048_warmup.jsonl`
+  `b4b5b4e43b53f3c64083263113904868cccf23767aa0b3c5f1b45740c13130a6`.
+- Pools pinned identically in both arms (`p4_pools` lever): `--max-running-requests 128`,
+  `--max-total-tokens 360448`, `--max-mamba-cache-size 128`; each server's resolved sizes
+  are read from its log.
+- Validity (`validate_p4_ab.py`, before any ratio is computed): every arm ran the declared
+  workload with the greedy request body, all 256 requests completed with AIPerf exit 0, the
+  full-batch rate was measured with 128 requests running, the pools resolved to the pinned
+  sizes (KV pool identical in all arms and at least 327,680 tokens), the exact-replay
+  dispatch line appears only in exact-replay logs, and the arms ran
+  in the declared order. A failed check voids the run; it is repeated and its numbers are
+  not reported.
+- Primary metric: the token-weighted server full-batch decode rate per point (bench's
+  `server_log.logged_gen_tps_full_batch`). It measures decode only, which is what the lever
+  changes; the client throughput y includes the 2,048-token prefills. Client y and its ratio
+  are reported beside it.
+- Statistic: per pair, the ratio B / A; the mean of the four log ratios with a t interval,
+  t(3) = 3.182, exponentiated to a 95% interval for the ratio.
+- Decision (pre-registered threshold 1.10x): rejected if the interval's upper end is below
+  1.10; supported if its lower end is at or above 1.10; otherwise inconclusive. A supported
+  result is worded "full-batch served decode throughput 1.xx times", never as an end-to-end
+  speedup, with client y and its ratio beside it.
+- Server output probe: greedy tokens and top-20 logprobs at concurrency 1, exact replay
+  against dense. A difference refutes end-to-end exactness; a pass does not establish it
+  (the probe sees only the emitted tokens and the top-20 logprobs, not the state or the
+  hidden outputs). Bit-exactness is shown only at kernel level (above). Every exact-replay
+  server log must show the exact-replay kernel dispatch line. A second dense server
+  (`plain+no_radix#2`) against the same reference is the noise control: if it differs, the
+  probe is undecided.
+- How the two combine (`output_probe.py`, `validate_p4_ab.py`): the verdict always states
+  both, as "throughput <supported|rejected|inconclusive>; <probe outcome>". If the probe
+  refuted exactness, it reads "end-to-end exactness REFUTED by the output probe; P4 exact
+  claim not supported", whatever the throughput interval says; it never reads as plain
+  support.
+- Derived expectation before the run: about 1.08x at a 418-token context, less at 2,048.
+
 ## 2d. Speculative host gap: configuration-level levers (measured, single runs)
 
 MTP three steps (bench `mtp` arm, `--stream-interval 4`), c = 1 and 4 (`host_levers.csv`;

@@ -33,6 +33,7 @@ import hashlib
 import json
 import math
 import statistics
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -202,6 +203,22 @@ def percentile(values: list[float], q: float) -> float:
     return ordered[min(len(ordered) - 1, int(q * len(ordered)))]
 
 
+def first_difference(ref: dict[str, Any], cand: dict[str, Any]) -> dict[str, Any] | None:
+    """First (sequence, position) where the emitted token or any top-k entry (token id or
+    log-probability, compared exactly) differs, or where the lengths differ; None if the
+    two runs are identical in everything the probe records."""
+    for i, (r, c) in enumerate(zip(ref['sequences'], cand['sequences'], strict=True)):
+        for j in range(min(len(r['tokens']), len(c['tokens']))):
+            if r['tokens'][j] != c['tokens'][j]:
+                return {'sequence': i, 'position': j, 'kind': 'token'}
+            if r['top'][j] != c['top'][j]:
+                return {'sequence': i, 'position': j, 'kind': 'top-k'}
+        if len(r['tokens']) != len(c['tokens']):
+            n = min(len(r['tokens']), len(c['tokens']))
+            return {'sequence': i, 'position': n, 'kind': 'length'}
+    return None
+
+
 def compare_runs(ref: dict[str, Any], cand: dict[str, Any]) -> dict[str, Any]:
     if ref['prompt_ids'] != cand['prompt_ids']:
         raise SystemExit('runs use different prompt sets')
@@ -249,6 +266,9 @@ def compare_runs(ref: dict[str, Any], cand: dict[str, Any]) -> dict[str, Any]:
         'kl_p99': percentile(kls, 0.99),
         'kl_max': max(kls) if kls else math.nan,
     }
+    difference = first_difference(ref, cand)
+    summary['identical'] = difference is None
+    summary['first_difference'] = difference
     if cand['mode'] == 'score':
         summary['argmax_agreement'] = agree / total if total else math.nan
         summary['argmax_disagreements'] = total - agree
@@ -273,10 +293,16 @@ def compare_runs(ref: dict[str, Any], cand: dict[str, Any]) -> dict[str, Any]:
     return summary
 
 
+DIFFERENT = 3  # exit status of `compare` when the runs differ (errors exit 1 or 2)
+
+
 def cmd_compare(args: argparse.Namespace) -> None:
     ref = json.loads(Path(args.reference).read_text())
     cand = json.loads(Path(args.candidate).read_text())
-    print(json.dumps(compare_runs(ref, cand), indent=1))
+    summary = compare_runs(ref, cand)
+    print(json.dumps(summary, indent=1))
+    if not summary['identical']:
+        sys.exit(DIFFERENT)
 
 
 def main() -> None:

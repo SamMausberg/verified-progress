@@ -67,8 +67,23 @@ LEVERS: dict[str, Lever] = {
         },
         note='rounding-preserving live replay (patch 0007): FP32 anchor written every 4 '
         'steps, ring of the packed decode operands; meant to be bit-identical',
-        env={'SGLANG_GDN_EXACT_REPLAY': '1'},
+        # The value tile is pinned here (not inherited from the caller's shell): 32 is the
+        # packed decode's tile, the configuration the bit-exactness check covers.
+        env={'SGLANG_GDN_EXACT_REPLAY': '1', 'SGLANG_GDN_EXACT_REPLAY_BV': '32'},
         conflicts=('replayssm', 'bf16_state', 'fp16_state', 'fp8_state'),
+    ),
+    # P4's served A/B pins the pools identically in both arms (BRIEF: equal running limit,
+    # KV tokens and mamba slots): 128 requests x (2,048 prompt + 512 output) = 327,680 KV
+    # tokens, plus headroom for chunked prefill.
+    'p4_pools': Lever(
+        {
+            'max-running-requests': 128,
+            'max-total-tokens': 360448,
+            'max-mamba-cache-size': 128,
+            'mamba-ssm-dtype': 'float32',
+        },
+        note='pinned pools for the P4 A/B: 128 running, 360,448 KV tokens, 128 mamba slots, '
+        'FP32 state stated explicitly',
     ),
     'replayssm_spec': Lever(
         {'enable-linear-replayssm-spec': True},
