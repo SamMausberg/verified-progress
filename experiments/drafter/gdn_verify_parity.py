@@ -215,13 +215,29 @@ def main() -> None:
                     f'mismatch={check["mismatched_elements"]}/{check["elements"]} '
                     f'max_abs={check["max_abs_diff"]:.3e} max_rel={check["max_rel_diff"]:.3e}'
                 )
+    # The fold must be bitwise equal to stock; the circular replay is expected to
+    # differ, so its comparison is informational. A fold mismatch is still written
+    # (it is a result), and the exit status reports it.
+    fold_bitwise = all(
+        check['bitwise_equal']
+        for result in results
+        for check in result['checks']
+        if check['tensor'].startswith('fold ')
+    )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(
         json.dumps(
-            {'shape': {'H': H, 'HV': HV, 'K': K, 'V': V, 'T': T}, 'results': results}, indent=2
+            {
+                'shape': {'H': H, 'HV': HV, 'K': K, 'V': V, 'T': T},
+                'fold_bitwise_in_every_case': fold_bitwise,
+                'results': results,
+            },
+            indent=2,
         )
         + '\n'
     )
+    if not fold_bitwise:
+        raise SystemExit('fold verify is not bitwise equal to stock in every case')
 
 
 if __name__ == '__main__':

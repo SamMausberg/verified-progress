@@ -19,10 +19,12 @@ source "$here/../../scripts/sglang_env.sh"
 out="${1:-$HOME/vp-data/drafter/replay-check}"
 # Kernel-level parity first (seconds): stock vs fold vs circular GDN verify on
 # random inputs at the Qwen3.5-4B shape, with the launch tiles each path selects.
-# A failed check leaves no JSON behind (an older one would pass for this run's).
+# Remove an older JSON first, so the file present afterwards is this run's. The
+# check exits nonzero (and records fold_bitwise_in_every_case = false) if the fold
+# is not bitwise equal to stock, or without a JSON if it crashed.
 rm -f "$out/gdn_verify_parity.json"
 python "$here/gdn_verify_parity.py" --out "$out/gdn_verify_parity.json" ||
-  echo "[replay-check] kernel parity failed (no gdn_verify_parity.json); continuing with the served check"
+  echo "[replay-check] KERNEL PARITY FAILED; continuing with the served check"
 for conc in 1 8; do
   arms=(off circular fold)
   if [ "$conc" = 8 ]; then arms+=(off2); fi
