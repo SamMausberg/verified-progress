@@ -1,0 +1,129 @@
+{
+ "repo_commit": "51c181917f7c1d75db75655cc14cd35ef2169433",
+ "assumptions": {
+  "hbm_read_bytes_per_s": 3790000000000.0,
+  "target_weight_bytes": 8409579520,
+  "draft_weight_bytes": 2540175360,
+  "gdn_state_bytes_per_request": 50331648,
+  "kv_bytes_per_context_token": 32768,
+  "mean_context_tokens": 350.0,
+  "block": 16,
+  "selector_bound_tau_ratio": 1.6342
+ },
+ "inputs": {
+  "evidence/bench/confirm/frontier.csv": "734533588d7c20f60f2c476b693b5a52f38b8330a31a0f05f429bed8b06c40e9",
+  "evidence/repair/stage_a_timing.json": "68c122e89b052f365e2bb6c78f43061f1a462d677f2a0da31985788dfc192e50",
+  "evidence/drafter/support/zlab_b16_panel_v1_summary.json": "e20782d9edabecfeffe491e9913d0af1a288468044086e55c21b9bea6f5fcfc3"
+ },
+ "by_concurrency": {
+  "1": {
+   "baseline": {
+    "label": "dflash-tuned-b16",
+    "n": 3,
+    "x_e2e": 986.8883,
+    "x_decode": 1076.7762,
+    "y": 874.3724,
+    "tau": 5.7008,
+    "exactness": "exact-up-to-rounding"
+   },
+   "cycle_ms": 5.294,
+   "floor_ms_stock_verify": 3.144,
+   "decode_ceiling_x_stock_verify": 1.684,
+   "tau_for_5x_at_floor_stock_verify": 16.93,
+   "floor_ms_snapshot_free": 2.919,
+   "decode_ceiling_x_snapshot_free": 1.814,
+   "tau_for_5x_at_floor_snapshot_free": 15.71,
+   "tau_for_5x_at_measured_cycle": 28.5,
+   "selector_bound_tau": 9.32,
+   "selector_bound_at_floor_x": 2.964,
+   "full_blocks_at_floor_x": 5.091,
+   "tau_max_block16": 16
+  },
+  "2": {
+   "baseline": {
+    "label": "dflash-tuned-b16",
+    "n": 3,
+    "x_e2e": 876.3993,
+    "x_decode": 956.8598,
+    "y": 1509.8409,
+    "tau": 5.6928,
+    "exactness": "exact-up-to-rounding"
+   },
+   "cycle_ms": 5.949,
+   "floor_ms_stock_verify": 3.4,
+   "decode_ceiling_x_stock_verify": 1.75,
+   "tau_for_5x_at_floor_stock_verify": 16.27,
+   "floor_ms_snapshot_free": 2.948,
+   "decode_ceiling_x_snapshot_free": 2.018,
+   "tau_for_5x_at_floor_snapshot_free": 14.11,
+   "tau_for_5x_at_measured_cycle": 28.46,
+   "selector_bound_tau": 9.3,
+   "selector_bound_at_floor_x": 3.298,
+   "full_blocks_at_floor_x": 5.672,
+   "tau_max_block16": 16
+  },
+  "4": {
+   "baseline": {
+    "label": "dflash-tuned-b16",
+    "n": 3,
+    "x_e2e": 712.9608,
+    "x_decode": 767.4612,
+    "y": 2433.2531,
+    "tau": 5.682,
+    "exactness": "exact-up-to-rounding"
+   },
+   "cycle_ms": 7.404,
+   "floor_ms_stock_verify": 3.911,
+   "decode_ceiling_x_stock_verify": 1.893,
+   "tau_for_5x_at_floor_stock_verify": 15.01,
+   "floor_ms_snapshot_free": 3.007,
+   "decode_ceiling_x_snapshot_free": 2.462,
+   "tau_for_5x_at_floor_snapshot_free": 11.54,
+   "tau_for_5x_at_measured_cycle": 28.41,
+   "selector_bound_tau": 9.29,
+   "selector_bound_at_floor_x": 4.023,
+   "full_blocks_at_floor_x": 6.932,
+   "tau_max_block16": 16
+  },
+  "8": {
+   "baseline": {
+    "label": "dflash-tuned-b16",
+    "n": 3,
+    "x_e2e": 529.9601,
+    "x_decode": 566.144,
+    "y": 3501.521,
+    "tau": 5.766,
+    "exactness": "exact-up-to-rounding"
+   },
+   "cycle_ms": 10.185,
+   "floor_ms_stock_verify": 4.932,
+   "decode_ceiling_x_stock_verify": 2.065,
+   "tau_for_5x_at_floor_stock_verify": 13.96,
+   "floor_ms_snapshot_free": 3.126,
+   "decode_ceiling_x_snapshot_free": 3.258,
+   "tau_for_5x_at_floor_snapshot_free": 8.85,
+   "tau_for_5x_at_measured_cycle": 28.83,
+   "selector_bound_tau": 9.42,
+   "selector_bound_at_floor_x": 5.325,
+   "full_blocks_at_floor_x": 9.041,
+   "tau_max_block16": 16
+  }
+ },
+ "perfect_block_oracle_triton_verify_c1": {
+  "16": {
+   "us_per_token": 456.3751220703125,
+   "tokens_per_s": 2191.2,
+   "vs_tuned_c1_x_decode": 2.035
+  },
+  "256": {
+   "us_per_token": 89.4622802734375,
+   "tokens_per_s": 11177.9,
+   "vs_tuned_c1_x_decode": 10.381
+  },
+  "64": {
+   "us_per_token": 165.38238525390625,
+   "tokens_per_s": 6046.6,
+   "vs_tuned_c1_x_decode": 5.615
+  }
+ }
+}
