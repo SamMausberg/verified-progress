@@ -15,9 +15,9 @@
 #   experiments/stack/build_engine.sh [name]     # -> ~/sglang-wt/<name> (default stack)
 #
 # The result is checked against the tree the stack's runs used (EXPECTED_TREE); commit
-# hashes differ between builds because git am stamps new commit dates. The kernel and
-# drafter series come from their own pull requests (#52 and #133); until both are on
-# main this script stops and names the missing directory.
+# hashes differ between builds because git am stamps new commit dates. Every series is on
+# main (kernel 0007-0010 and drafter 0004-0005 are later patches the composed engine does
+# not include); the script stops and names any missing patch file.
 set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 P="$repo/engine/sglang/patches"

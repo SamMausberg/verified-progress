@@ -92,6 +92,23 @@ LEVER_ENV = {
     ),
 }
 FOLD_FLAG = '--enable-linear-replayssm-spec'
+# Bench's reference configuration for DFlash block 16 (bench/campaigns/equality_tuned.sh):
+# the two reused stock runs and every stack equality run (plus its lever flags) use it.
+DFLASH_B16_FLAGS = [
+    '--speculative-algorithm', 'DFLASH',
+    '--speculative-draft-model-path', 'z-lab/Qwen3.5-4B-DFlash',
+    '--speculative-draft-model-revision', '9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf',
+    '--speculative-dflash-block-size', '16',
+    '--max-running-requests', '4',
+    '--disable-radix-cache',
+]  # fmt: skip
+TRITON_FLAGS = ['--attention-backend', 'triton']
+REF_FLAGS = {
+    'ref_dflash_b16': DFLASH_B16_FLAGS,
+    'ref_dflash_b16_triton': DFLASH_B16_FLAGS + TRITON_FLAGS,
+}
+# The pass every equality run makes (state's runner): one request at a time, fresh cache.
+RUN_SETTINGS = {'pass': 'c1', 'concurrency': 1, 'max_new_tokens': 256, 'warm': False}
 
 
 class GateError(Exception):
@@ -236,9 +253,12 @@ def engine_env() -> dict[str, str]:
     return {k: v for k, v in sorted(os.environ.items()) if k.startswith(ENV_PREFIXES)}
 
 
-def identity(repo: Path, s0: Path, stack_engine: Path) -> dict[str, Any]:
+def identity(
+    repo: Path, s0: Path, stack_engine: Path, cert_src: Path | None = None
+) -> dict[str, Any]:
     """What a timed run's numbers depend on outside the gate's own files."""
     return {
+        'cert_package': fingerprint(cert_src) if cert_src else None,
         # Any untracked file in the repository (a stray sitecustomize.py, a local module)
         # can be imported by every hold process.
         'repo': tree_state(repo, '.'),
@@ -275,7 +295,7 @@ def identity_changes(old: dict[str, Any], new: dict[str, Any]) -> list[str]:
         for f in ('head', 'tree', 'dirty')
         if old[k][f] != new[k][f]
     ]
-    for key in ('packages', 'env'):
+    for key in ('packages', 'env', 'cert_package'):
         if old[key] != new[key]:
             diffs.append(key)
     return diffs
@@ -284,18 +304,46 @@ def identity_changes(old: dict[str, Any], new: dict[str, Any]) -> list[str]:
 REFERENCES = ('ref_dflash_b16', 'ref_dflash_b16_triton')  # bench's stock runs, reused
 
 
-def runs_provenance(run: Path, ident: dict[str, Any]) -> list[str]:
-    """Each stack equality run's own record names the identity's engine, clean; bench's
-    reused stock references name the pinned stock commit, clean, and the same model."""
+def _prompt_tokens(path: Path) -> dict[str, Any]:
+    """id -> prompt token count of a run's records."""
+    return {r['id']: r.get('prompt_tokens') for r in load_run(path).values()}
+
+
+def runs_provenance(
+    run: Path, ident: dict[str, Any], prompt_ids: set[str] | None = None
+) -> list[str]:
+    """Each declared equality run and each reused reference: its record matches the
+    declared configuration (engine commit, clean tree, flags, pass, logprobs, prompt set
+    and model), and every run answered exactly the declared prompts with the same prompt
+    token counts as S0's run."""
     problems = []
     s0_meta = run / 'runs' / 'plain__stack_S0' / 'c1.meta.json'
     model = json.loads(s0_meta.read_text()).get('model_revision') if s0_meta.is_file() else None
+    s0_out = run / 'runs' / 'plain__stack_S0' / 'c1.jsonl'
+    s0_tokens = _prompt_tokens(s0_out) if s0_out.is_file() else {}
+    if prompt_ids is None or set(s0_tokens) != prompt_ids:
+        problems.append('S0 did not answer exactly the declared prompts')
+
+    def same_prompts(name: str, out_path: Path) -> None:
+        if not out_path.is_file() or _prompt_tokens(out_path) != s0_tokens:
+            problems.append(f'{name}: prompts or prompt token counts differ from S0')
+
     for ref in REFERENCES:
         meta_path = run / 'runs' / ref / 'c1.meta.json'
         if not meta_path.is_file():
             problems.append(f'{ref}: no run record')
             continue
         meta = json.loads(meta_path.read_text())
+        expect = {
+            **RUN_SETTINGS,
+            'flags': REF_FLAGS[ref],
+            'top_logprobs_num': TOP_K,
+            'num_prompts': PROMPTS,
+        }
+        for key, value in expect.items():
+            if meta.get(key) != value:
+                problems.append(f'{ref}: {key} {meta.get(key)!r}, declared {value!r}')
+        same_prompts(ref, run / 'runs' / ref / 'c1.jsonl')
         if meta.get('sglang_sha') != ident['s0']['head'] or meta.get('sglang_dirty') is not False:
             problems.append(
                 f'{ref}: engine {meta.get("sglang_sha")} dirty={meta.get("sglang_dirty")}'
@@ -348,22 +396,31 @@ def runs_provenance(run: Path, ident: dict[str, Any]) -> list[str]:
         if meta.get('repo_sha') != ident['repo']['head']:
             problems.append(f'{name}: repository {meta.get("repo_sha")}')
         expect = {
+            **RUN_SETTINGS,
             'flags': row['flags'],
             'top_logprobs_num': row['top_logprobs'],
             'num_prompts': PROMPTS,
-            'pass': 'c1',
-            'concurrency': 1,
             'model_revision': model,
         }
         for key, value in expect.items():
             if meta.get(key) != value:
                 problems.append(f'{name}: {key} {meta.get(key)!r}, declared {value!r}')
+        same_prompts(name, run / 'runs' / name / 'c1.jsonl')
+        base = DFLASH_B16_FLAGS + TRITON_FLAGS
+        if row['flags'][: len(base)] != base or set(row['flags'][len(base) :]) - {FOLD_FLAG}:
+            problems.append(f'{name}: declared flags are not the reference configuration')
     return problems
 
 
 def evaluate(
-    run: Path, table_sha: str | None, package_sha: str | None, ident: dict[str, Any]
+    run: Path,
+    table_sha: str | None,
+    package_sha: str | None,
+    ident: dict[str, Any],
+    prompts: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """`prompts`: {'sha256': ..., 'ids': [...]} of the declared prompt file (recorded in
+    gate.json; check() passes the recorded value back)."""
     """The gate decision for an equality run directory (pure: reads only that directory)."""
     pairs = json.loads((run / 'summary.json').read_text())['pairs']
     gate: dict[str, Any] = {
@@ -371,7 +428,10 @@ def evaluate(
         'classes': {x: lever_class(run, pairs, x) for x in ('F', 'G', 'FG')},
         'table_sha256': table_sha,
         'identity': ident,
-        'provenance_problems': runs_provenance(run, ident),
+        'prompts': prompts,
+        'provenance_problems': runs_provenance(
+            run, ident, set(prompts['ids']) if prompts else None
+        ),
         'references_sha256': {
             ref: sha256_file(run / 'runs' / ref / 'c1.jsonl')
             for ref in REFERENCES
@@ -429,6 +489,7 @@ def check(
         stored.get('table_sha256'),
         stored.get('certified', {}).get('package_sha256'),
         stored['identity'],
+        stored.get('prompts'),
     )
     if recomputed != stored:
         raise GateError('gate.json does not match the decision recomputed from its run')
@@ -475,8 +536,20 @@ def pinned_gate(pin: Path) -> dict[str, Any]:
     return gate
 
 
+def prompt_record(path: Path) -> dict[str, Any]:
+    ids = [json.loads(line)['id'] for line in path.read_text().splitlines() if line.strip()]
+    if len(ids) != PROMPTS or len(set(ids)) != PROMPTS:
+        raise GateError(f'{path} does not hold {PROMPTS} distinct prompts')
+    return {'path': str(path), 'sha256': sha256_file(path), 'ids': ids}
+
+
 def build(
-    run: Path, table: Path, cert_src: Path | None, ident: dict[str, Any], stack_tree: str
+    run: Path,
+    table: Path,
+    cert_src: Path | None,
+    ident: dict[str, Any],
+    stack_tree: str,
+    prompts: Path,
 ) -> int:
     """Write gate.json for an equality run; 1 if the gate is rejected."""
     require_clean(ident, stack_tree)
@@ -485,11 +558,14 @@ def build(
     preflight = run / 'identity.json'
     if not preflight.is_file():
         raise GateError(f'no preflight identity at {preflight}')
-    changed = identity_changes(json.loads(preflight.read_text()), ident)
+    before = json.loads(preflight.read_text())
+    changed = identity_changes(before, ident)  # includes the certified-head package
     if changed:
         raise GateError(f'engine identity changed during the hold in {changed}')
-    package = fingerprint(cert_src) if cert_src else None
-    gate = evaluate(run, sha256_file(table), package, ident)
+    record = prompt_record(prompts)
+    if before.get('prompts_sha256') != record['sha256']:
+        raise GateError('the equality prompts changed during the hold')
+    gate = evaluate(run, sha256_file(table), ident['cert_package'], ident, record)
     # Written either way so a rejected gate can be inspected; check() refuses it.
     (run / 'gate.json').write_text(json.dumps(gate, indent=1) + '\n')
     print(json.dumps(gate))
@@ -512,10 +588,13 @@ def main() -> int:
     pf = sub.add_parser('preflight', help='check the checkouts and record their identity')
     _engine_args(pf)
     pf.add_argument('--out', type=Path, required=True)
+    pf.add_argument('--cert-src', type=Path, help='certified_head source dir, if H runs')
+    pf.add_argument('--prompts', type=Path, help='the equality prompt file (equality hold only)')
     b = sub.add_parser('build', help='write gate.json for an equality run directory')
     b.add_argument('run', type=Path)
     b.add_argument('--table', type=Path, required=True, help='the routing table G ran with')
     b.add_argument('--cert-src', type=Path, help='certified_head source dir the H runs used')
+    b.add_argument('--prompts', type=Path, required=True, help='the equality prompt file')
     _engine_args(b)
     c = sub.add_parser('check', help='verify every precondition of a timed run')
     c.add_argument('--gate', type=Path, required=True)
@@ -534,13 +613,16 @@ def main() -> int:
         if args.cmd == 'env':
             args.out.write_text(json.dumps(engine_env(), indent=1) + '\n')
             return 0
-        ident = identity(args.repo, args.s0, args.stack_engine)
+        ident = identity(args.repo, args.s0, args.stack_engine, args.cert_src)
         if args.cmd == 'preflight':
             require_clean(ident, args.stack_tree)
-            args.out.write_text(json.dumps(ident, indent=1) + '\n')
-            print(json.dumps(ident))
+            record = dict(ident)
+            if args.prompts:
+                record['prompts_sha256'] = prompt_record(args.prompts)['sha256']
+            args.out.write_text(json.dumps(record, indent=1) + '\n')
+            print(json.dumps(record))
         elif args.cmd == 'build':
-            return build(args.run, args.table, args.cert_src, ident, args.stack_tree)
+            return build(args.run, args.table, args.cert_src, ident, args.stack_tree, args.prompts)
         else:
             full, table = check(args.gate, args.cert_src, args.pin, ident, args.stack_tree)
             print(f'full={full}')

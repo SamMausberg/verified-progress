@@ -21,8 +21,11 @@ measured ratio is multiplied. Each saving is a range [low, high]:
   evidence/backbone/gemm_microbench.json), plus the merged GDN in_proj from M = 64 (its
   cuBLAS time against the two separate projections'): high. Low is 0 (microbenchmark gains
   that do not survive in the graph).
-* H, certified verify head: left out. Its inputs (fallback rates, path times) come from
-  pull requests #45 and #52, which are not merged; its expectation is pending.
+* H, certified verify head: left out of the declared range. It was declared without an
+  expectation because its inputs were then unmerged; evidence/certified_head now gives the
+  head-path times and DFlash verify fallback rates, from which its saving on DFlash spans a
+  loss (whole-batch fallback) and a gain (column fallback), and its served effect on DFlash
+  has not been measured.
 
     python experiments/stack/expected.py --ceiling evidence/stack/ceiling.json \
         --gemm evidence/backbone/gemm_microbench.json --out evidence/stack/expected.json
@@ -116,7 +119,9 @@ def main() -> None:
         'formula': 'ratio = T / (T - sum of savings), savings in ms, low and high ends separately',
         'f_bytes_removed_per_request': BLOCK * GDN_STATE,
         'f_low_penalty_ms': penalty,
-        'h': 'left out: inputs only on unmerged PRs #45 and #52 (pending)',
+        'h': 'left out of the declared range: served effect on DFlash not measured; '
+        'evidence/certified_head gives a range from a loss (whole-batch fallback) to a gain '
+        '(column fallback)',
         'by_concurrency': {},
     }
     for c_str, row in ceiling['by_concurrency'].items():

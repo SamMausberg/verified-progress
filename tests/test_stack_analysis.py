@@ -8,6 +8,7 @@ import json
 import math
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -29,14 +30,15 @@ analyze = _load('analyze')
 gate = _load('equality_gate')
 
 TREE = 'c' * 40
-IDENT = {
+IDENT: dict[str, Any] = {
     'repo': {'path': '/r', 'head': 'a' * 40, 'tree': 'b' * 40, 'dirty': []},
     's0': {'path': '/s', 'head': gate.S0_COMMIT, 'tree': 'd' * 40, 'dirty': []},
     'stack_engine': {'path': '/e', 'head': 'e' * 40, 'tree': TREE, 'dirty': []},
     'packages': {'torch': '2.13.0'},
     'env': {'CUDA_HOME': '/cuda'},
+    'cert_package': None,
 }
-BASE_FLAGS = ['--speculative-algorithm', 'DFLASH', '--attention-backend', 'triton']
+BASE_FLAGS = gate.DFLASH_B16_FLAGS + gate.TRITON_FLAGS
 ceiling = _load('ceiling')
 phases = _load('phases')
 
@@ -276,6 +278,7 @@ def _plan_row(tag: str) -> dict:
 
 def _meta(row: dict) -> dict:
     return {
+        **gate.RUN_SETTINGS,
         'sglang_sha': IDENT[row['engine']]['head'],
         'sglang_dirty': False,
         'repo_sha': IDENT['repo']['head'],
@@ -309,10 +312,14 @@ def _write_runs(run: Path, b0_low_entry: float = -0.5, h: bool = False) -> None:
         d.mkdir(parents=True, exist_ok=True)
         (d / 'c1.jsonl').write_text('\n'.join(json.dumps(r) for r in _outputs()) + '\n')
         meta = {
+            **gate.RUN_SETTINGS,
             'sglang_sha': gate.S0_COMMIT,
             'sglang_dirty': False,
             'repo_sha': 'r' * 40,
             'model_revision': 'm' * 40,
+            'flags': gate.REF_FLAGS[ref],
+            'top_logprobs_num': gate.TOP_K,
+            'num_prompts': gate.PROMPTS,
         }
         (d / 'c1.meta.json').write_text(json.dumps(meta))
     pairs = [['B0 vs S0', 'plain__stack_S0/c1', 'plain__stack_B0/c1']]
@@ -332,12 +339,32 @@ def _build(
     (run / gate.TABLE).write_text('{"2560,4096": []}')
     for n in stats:
         (run / f'certified_stats_{n}.json').write_text(json.dumps(STATS))
-    (run / 'identity.json').write_text(json.dumps(IDENT))
-    return gate.build(run, run / gate.TABLE, cert, IDENT, TREE), run / 'gate.json'
+    prompts = _prompts(tmp_path)
+    ident = {**IDENT, 'cert_package': gate.fingerprint(cert) if cert else None}
+    (run / 'identity.json').write_text(
+        json.dumps({**ident, 'prompts_sha256': gate.sha256_file(prompts)})
+    )
+    return gate.build(run, run / gate.TABLE, cert, ident, TREE, prompts), run / 'gate.json'
+
+
+def _prompts(tmp_path) -> Path:
+    path = tmp_path / 'prompts.jsonl'
+    path.write_text(''.join(json.dumps({'id': f'p{i}'}) + '\n' for i in range(gate.PROMPTS)))
+    return path
 
 
 def _check(path, cert, pin=None, ident=None):
-    return gate.check(path, cert, pin, ident or IDENT, TREE)
+    # As the CLI does, the identity includes the named package's fingerprint.
+    current = {**(ident or IDENT), 'cert_package': gate.fingerprint(cert) if cert else None}
+    return gate.check(path, cert, pin, current, TREE)
+
+
+def _direct_build(tmp_path, run, before=None, cert=None) -> int:
+    prompts = _prompts(tmp_path)
+    ident = {**IDENT, 'cert_package': gate.fingerprint(cert) if cert else None}
+    record = before or {**ident, 'prompts_sha256': gate.sha256_file(prompts)}
+    (run / 'identity.json').write_text(json.dumps(record))
+    return gate.build(run, run / gate.TABLE, cert, ident, TREE, prompts)
 
 
 def _package(tmp_path, text='x = 1') -> Path:
@@ -883,8 +910,7 @@ def test_build_rejects_equality_runs_on_other_engines(tmp_path, monkeypatch, fie
     meta_path.write_text(json.dumps(meta))
     (run / 'summary.json').write_text(json.dumps({'pairs': _passing()}))
     (run / gate.TABLE).write_text('{}')
-    (run / 'identity.json').write_text(json.dumps(IDENT))
-    assert gate.build(run, run / gate.TABLE, None, IDENT, TREE) == 1
+    assert _direct_build(tmp_path, run) == 1
     assert json.loads((run / 'gate.json').read_text())['provenance_problems']
 
 
@@ -892,9 +918,11 @@ def test_build_refuses_an_identity_that_changed_during_the_hold(tmp_path, monkey
     run = tmp_path / 'run'
     run.mkdir()
     (run / gate.TABLE).write_text('{}')
-    (run / 'identity.json').write_text(json.dumps(_ident(stack_engine__head='f' * 40)))
+    prompts = _prompts(tmp_path)
+    before = {**_ident(stack_engine__head='f' * 40), 'prompts_sha256': gate.sha256_file(prompts)}
+    (run / 'identity.json').write_text(json.dumps(before))
     with pytest.raises(gate.GateError):
-        gate.build(run, run / gate.TABLE, None, IDENT, TREE)
+        gate.build(run, run / gate.TABLE, None, IDENT, TREE, prompts)
 
 
 @pytest.mark.parametrize(
@@ -978,8 +1006,7 @@ def test_build_checks_the_reused_stock_references(tmp_path, monkeypatch, ref, fi
         meta_path.write_text(json.dumps(meta))
     (run / 'summary.json').write_text(json.dumps({'pairs': _passing()}))
     (run / gate.TABLE).write_text('{}')
-    (run / 'identity.json').write_text(json.dumps(IDENT))
-    assert gate.build(run, run / gate.TABLE, None, IDENT, TREE) == 1
+    assert _direct_build(tmp_path, run) == 1
     assert any(ref in p for p in json.loads((run / 'gate.json').read_text())['provenance_problems'])
 
 
@@ -1170,8 +1197,7 @@ def test_build_validates_every_declared_equality_run(tmp_path, monkeypatch, case
     _spoil_plan(run, case)
     (run / 'summary.json').write_text(json.dumps({'pairs': _passing()}))
     (run / gate.TABLE).write_text('{}')
-    (run / 'identity.json').write_text(json.dumps(IDENT))
-    assert gate.build(run, run / gate.TABLE, None, IDENT, TREE) == 1
+    assert _direct_build(tmp_path, run) == 1
     assert json.loads((run / 'gate.json').read_text())['provenance_problems']
 
 
@@ -1208,3 +1234,64 @@ def test_arms_sh_clears_engine_variables():
         'CUDA_VISIBLE_DEVICES',
         'TRITON_CACHE_DIR',
     }
+
+
+def test_build_needs_the_preflight_package_and_prompts(tmp_path, monkeypatch):
+    run = tmp_path / 'run'
+    run.mkdir()
+    _write_runs(run, h=True)
+    (run / 'summary.json').write_text(json.dumps({'pairs': _passing(h=True)}))
+    (run / gate.TABLE).write_text('{}')
+    src = _package(tmp_path)
+    prompts = _prompts(tmp_path)
+    # Fingerprinted before the runs, then the package changed: refused.
+    before = {
+        **IDENT,
+        'cert_package': gate.fingerprint(src),
+        'prompts_sha256': gate.sha256_file(prompts),
+    }
+    _package(tmp_path, 'x = 2')
+    with pytest.raises(gate.GateError):
+        _direct_build(tmp_path, run, before=before, cert=src)
+    # The prompts changed during the hold: refused.
+    _package(tmp_path, 'x = 1')
+    before = {**IDENT, 'cert_package': gate.fingerprint(src), 'prompts_sha256': 'f' * 64}
+    with pytest.raises(gate.GateError):
+        _direct_build(tmp_path, run, before=before, cert=src)
+
+
+@pytest.mark.parametrize(
+    ('ref', 'field', 'value'),
+    [
+        ('ref_dflash_b16', 'flags', gate.DFLASH_B16_FLAGS + gate.TRITON_FLAGS),
+        ('ref_dflash_b16_triton', 'flags', gate.DFLASH_B16_FLAGS),
+        ('ref_dflash_b16', 'max_new_tokens', 512),
+        ('ref_dflash_b16_triton', 'concurrency', 32),
+        ('ref_dflash_b16', 'top_logprobs_num', 2),
+        ('ref_dflash_b16_triton', 'warm', True),
+        ('ref_dflash_b16', 'outputs', 'fewer prompts'),
+    ],
+)
+def test_build_checks_the_references_full_configuration(tmp_path, monkeypatch, ref, field, value):
+    run = tmp_path / 'run'
+    run.mkdir()
+    _write_runs(run)
+    if field == 'outputs':
+        out = run / 'runs' / ref / 'c1.jsonl'
+        out.write_text(''.join(out.read_text().splitlines(keepends=True)[1:]))
+    else:
+        meta_path = run / 'runs' / ref / 'c1.meta.json'
+        meta = json.loads(meta_path.read_text())
+        meta[field] = value
+        meta_path.write_text(json.dumps(meta))
+    (run / 'summary.json').write_text(json.dumps({'pairs': _passing()}))
+    (run / gate.TABLE).write_text('{}')
+    assert _direct_build(tmp_path, run) == 1
+    assert any(ref in p for p in json.loads((run / 'gate.json').read_text())['provenance_problems'])
+
+
+@pytest.mark.parametrize('session', ['stack-s6', 'stack-s0', 'stack-s10'])
+def test_analysis_refuses_sessions_beyond_the_declared_five(tmp_path, monkeypatch, session):
+    rows = [{**r, 'session': session} for r in _plan_rows()]
+    with pytest.raises(SystemExit):
+        _run_analysis(tmp_path, monkeypatch, rows)

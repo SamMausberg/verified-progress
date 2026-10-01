@@ -39,10 +39,14 @@ exec >>"$OUT/hold.log" 2>&1
 echo "hold_equality start $(date -Is) repo $(git rev-parse HEAD) dirty=$(git status --porcelain --untracked-files=no | wc -l)"
 echo "engine $(git -C "$STACK_ENGINE" rev-parse HEAD) tree $(git -C "$STACK_ENGINE" rev-parse 'HEAD^{tree}') cert_src=${STACK_CERT_SRC:-none}"
 # Every checkout clean, S0 at the pin, the composed tree declared; the identity recorded
-# here must still hold when the gate is built.
+# here (including the certified-head package's fingerprint, taken before its runs, and the
+# prompt file's hash) must still hold when the gate is built.
+PROMPTS=$HOME/vp-data/state/prompts/prompts.jsonl
+CERT=()
+[ -n "${STACK_CERT_SRC:-}" ] && CERT=(--cert-src "$STACK_CERT_SRC")
 mapfile -t ENGINE < <(engine_args)
-python experiments/stack/equality_gate.py preflight "${ENGINE[@]}" --out "$OUT/identity.json" ||
-  { echo "preflight failed"; exit 1; }
+python experiments/stack/equality_gate.py preflight "${ENGINE[@]}" "${CERT[@]}" \
+  --prompts "$PROMPTS" --out "$OUT/identity.json" || { echo "preflight failed"; exit 1; }
 export GPU_STARTUP_MIN_FREE_GB=${GPU_STARTUP_MIN_FREE_GB:-60}
 
 DFLASH_B16="--speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash \
@@ -71,7 +75,8 @@ PY
     for kv in "$@"; do export "${kv?}"; done
     echo "=== $tag $(date -Is) worktree=${worktree:-stock} env=$* top_logprobs=$logprobs"
     python experiments/state_safety/run_matrix.py --passes c1 --port 30062 --out-dir "$RUNS" \
-      --no-pin --configs plain --tag "$tag" --top-logprobs "$logprobs" "--extra-flags=$flags"
+      --no-pin --configs plain --tag "$tag" --top-logprobs "$logprobs" --prompts "$PROMPTS" \
+      "--extra-flags=$flags"
     status=$?
     echo "exit $status $(date -Is)"
     exit "$status"
@@ -113,12 +118,10 @@ python experiments/state_safety/compare.py --runs "$RUNS" --pairs "$OUT/pairs.js
 if [[ " ${failed[*]} " == *" compare "* ]]; then
   rm -f "$OUT/summary.json"
 else
-  cert=()
-  [ -n "${STACK_CERT_SRC:-}" ] && cert=(--cert-src "$STACK_CERT_SRC")
   # Non-zero when the gate is rejected (ok false): then current is not moved and the
   # hold fails.
-  python experiments/stack/equality_gate.py build "$OUT" --table "$STACK_TABLE" "${cert[@]}" \
-    "${ENGINE[@]}" || failed+=(gate)
+  python experiments/stack/equality_gate.py build "$OUT" --table "$STACK_TABLE" "${CERT[@]}" \
+    --prompts "$PROMPTS" "${ENGINE[@]}" || failed+=(gate)
 fi
 # The gate is current only if every equality run, the comparison and the gate succeeded.
 if (( ${#failed[@]} == 0 )); then

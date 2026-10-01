@@ -254,6 +254,6 @@ SGLANG_WORKTREE=~/sglang-wt/stack source scripts/sglang_env.sh
 | 0002 | kernel 0003 (certified MTP draft and DFlash draft projection) rebased: the hot-vocabulary DFlash draft head of moonshot 0005 returns before the certified draft projection | unchanged unless `--speculative-token-map` or `SGLANG_CERTIFIED_HEAD_DRAFT=1` |
 | 0003 | the EAGLE/MTP greedy chain path raises if moonshot's relaxed acceptance (`SGLANG_SPEC_RELAXED_GREEDY_LOGIT_GAP > 0`) meets certified verify ids, whose graph computes no logits (the DFlash path got the same refusal in 0001) | unchanged unless both are set |
 
-The composed tree is `628f650ea031b0fc8a68233ff10d8878eb22686d`. The kernel series
-(0001, 0004-0006) and the drafter's 0002-0003 come from PR #52 and PR #133; the build
-script stops and names the missing directory until both are on `main`.
+The composed tree is `628f650ea031b0fc8a68233ff10d8878eb22686d`. The kernel series (0001,
+0004-0006) and the drafter's 0001-0003 are on `main`; the kernel's later 0007-0010 and the
+drafter's 0004-0005 are not part of the composed engine.

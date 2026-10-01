@@ -21,7 +21,7 @@ declared in evidence/stack/README.md ("Composition plan"):
   (an invalid S0 launch, for every arm).
 * Every row must be a declared arm of the campaign (S0, B0, the full stack, each lever and
   shorter cumulative stack), a declared concurrency (1, 2, 4, 8) and a session named
-  stack-s<k>; its server's environment overrides must be exactly the arm's declared
+  stack-s1 to stack-s5 (three sessions and at most two replacements, as declared); its server's environment overrides must be exactly the arm's declared
   variables (and the fold flag present exactly for arms with F), and the ambient engine
   environment the session recorded beside the run must equal the gate's.
 * Every row's launch record (the run's server/launch.json, written by bench.server when
@@ -62,7 +62,7 @@ from typing import Any
 T95 = {1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365, 8: 2.306}
 METRICS = ('x_e2e', 'y')
 DECLARED_C = (1, 2, 4, 8)  # the plan's concurrencies
-SESSION_RE = re.compile(r'^stack-s[1-9][0-9]*$')
+SESSION_RE = re.compile(r'^stack-s[1-5]$')  # s1-s3 and at most two declared replacements
 MIN_SESSIONS = 3  # the declared plan's minimum of valid sessions for a decision
 
 
