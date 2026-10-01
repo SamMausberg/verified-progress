@@ -178,6 +178,21 @@ are classified against a stock plain c=1 run without the radix cache.
 `pools.csv` lists each server's capacity, KV and GDN state pools, radix setting and
 GDN kernel backends.
 
+Pools were sized from free memory and were not pinned, so every pair of servers had
+different KV pools:
+- stock MTP s3 426,043 tokens, buffered 247,851, buffered Triton 119,880;
+- plain Triton 265,839 and buffered decode 282,562, against the radix-on plain
+  reference's 97,672;
+- DFlash block 16: stock 169,883, Triton 70,518, Triton with the Triton verify kernel
+  24,980.
+
+GDN state slots matched within each capacity: 16 at capacity 16, 4 at capacity 4,
+and 122 for the radix-on reference. The floor pair is one server. At c=1 with the
+radix cache off and no pool near full (at most about 600 tokens per request), the
+pool size should not change outputs. That is reasoning, not a measurement. The runs
+were made with run_matrix.py before PR #102 pinned pools by default, so they are all
+in the unpinned regime.
+
 ```sh
 scripts/gpu_lock.sh -s bench/campaigns/equality_tuned.sh
 python -m bench.divergence evidence/bench/equality/summary.json --out /dev/null \
