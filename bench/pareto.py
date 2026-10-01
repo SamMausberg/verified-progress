@@ -56,6 +56,8 @@ POINT_FIELDS = (
     'isl_mean',
     'span_s',
     'foreign_cpu_max',
+    'max_running_logged',
+    'kv_retractions',
 )
 AGGREGATED = ('x_e2e', 'x_decode', 'y', 'y_steady', 'ttft_p50_ms', 'itl_p50_ms', 'accept_length')
 # Reference categorical order (dataviz palette, light surface), assigned per label in order.
@@ -116,6 +118,11 @@ def point_row(label: str, run: str, point: dict[str, Any], status: str = '') -> 
         'accept_length': spec.get('accept_length'),
         'accept_rate': spec.get('accept_rate'),
         'decode_graph_fraction': counters.get('decode_graph_fraction'),
+        # Largest running batch in the scheduler log and KV retractions during the
+        # point (blank: not recorded); below-concurrency batches or retractions mean
+        # the KV pool, not the client, limited the batch.
+        'max_running_logged': (point.get('server_log') or {}).get('max_running_logged'),
+        'kv_retractions': (point.get('server_log') or {}).get('kv_retractions'),
         'isl_mean': point.get('isl_mean'),
         'span_s': point.get('span_s'),
         # CPU cores used by other processes during the point (blank: not recorded).

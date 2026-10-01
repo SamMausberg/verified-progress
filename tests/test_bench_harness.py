@@ -288,6 +288,8 @@ def test_log_segment_stats() -> None:
         'Decode batch, #running-req: 5, #full token: 1, cuda graph: False, '
         'gen throughput (token/s): 12.0, #queue-req: 0\n'
         'Prefill batch, #new-seq: 1\n'
+        'KV cache pool is full. Retract requests. #retracted_reqs: 2, #new_tokens_gained: 594\n'
+        'KV cache pool is full. Retract requests. #retracted_reqs: 1, #new_tokens_gained: 318\n'
     )
     stats = log_segment_stats(text)
     assert stats['decode_log_lines'] == 2
@@ -295,6 +297,7 @@ def test_log_segment_stats() -> None:
     assert stats['max_running_logged'] == 5
     assert stats['logged_accept_len_mean'] == pytest.approx(3.0)
     assert stats['prefill_log_lines'] == 1
+    assert stats['kv_retractions'] == 3
 
 
 def test_frontier_dominance_and_aggregation() -> None:

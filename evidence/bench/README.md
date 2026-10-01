@@ -125,8 +125,11 @@ Configuration search on the `mixed-v2` tune split (never used for reported resul
 client concurrency 1, 8, 32 and 128, `max(32, 4c)` measured requests per point, 512
 output tokens, one run per configuration, base flags plus `--stream-interval 4`.
 `frontier.csv` has one row per configuration and concurrency (n = 1). Accept length
-in the tables is the value at c=32; it varies by at most 0.1 across concurrency for a
-given configuration (adaptive depth excepted).
+in the tables is the value at c=32; it varies by at most 0.09 across concurrency for a
+given configuration, except DFlash block 16 (0.22 with FlashInfer and 0.24 under Triton,
+both from a lower value at c=1 over 32 requests) and adaptive depth. `points.csv` also
+carries the largest running batch in the scheduler log (`max_running_logged`) and,
+for runs after this column was added, the KV retractions during the point.
 
 Host load. Mean foreign CPU load per point ranged 0.26-1.26 cores in T1, 0.38-2.81 in
 T2 and 0.39-3.45 in T3; three points exceed the 2-core threshold and are invalid (listed
@@ -140,8 +143,14 @@ as its own (commit 567ef70), and the confirmation runs use it.
 
 KV cache cap. Runs before commit 31e8eee had no `--max-total-tokens` cap: all of T1, and
 in T2 `plain` (radix off), `plain + --enable-linear-replayssm` and MTP s3 + replayssm-spec
-under Triton. The cap only bounds the KV pool (the uncapped pools held 1.1-2M tokens
-against at most ~80K in use), and the tuned arms all run with it.
+under Triton. Uncapped pools ranged from 54,077 tokens (MTP s5 with the radix
+cache) to 2.12M; with the radix cache on, the KV pool shrank with draft depth (663K
+tokens at s2, 460K at s3, 257K at s4, 54K at s5) as the GDN state buffers grew. The
+largest logged use in any tuning run was about 77K tokens. One point was KV-limited:
+MTP s5 with the radix cache at c=128, whose scheduler logged at most 123 running
+requests and three retraction events ("KV cache pool is full", four requests retracted).
+Its 8,719 tok/s measures a KV-limited server, not depth 5. The tuned arms all run
+with the 1M cap.
 
 Slot T1 (MTP depth and state handling), y in tok/s:
 
@@ -151,7 +160,7 @@ Slot T1 (MTP depth and state handling), y in tok/s:
 | MTP s2 | 385 | 2,288 | 5,455 | 9,153 | 2.67 |
 | MTP s3 | 461 | 2,482 | 5,839 | 9,593 | 3.28 |
 | MTP s4 | 465 | 2,608 | 5,761 | 9,276 | 3.72 |
-| MTP s5 | 468 | 2,575 | 5,684 | 8,719 | 4.11 |
+| MTP s5 | 468 | 2,575 | 5,684 | 8,719 (KV-limited) | 4.11 |
 | MTP s3, radix cache off | 466 | 2,534 | 6,127 | 10,106 | 3.27 |
 | MTP s5, radix cache off | 481 | 2,699 | 6,087 | 9,456 | 4.14 |
 | MTP s7, radix cache off | 465 | 2,514 | 5,690 | 8,493 | 4.62 |
@@ -165,8 +174,10 @@ MTP s3 delivers 1.64x plain's y at c=1 (461 against 282 tok/s; 1.65x in x) but f
 behind from c~32. Its verify pass writes one GDN state snapshot (50.3 MB, 48 MiB, in
 FP32) per draft token per request, a cost that grows with batch; SGLang's buffered GDN verify (`--enable-linear-replayssm-spec`, chains only)
 removes those snapshots and recovers 24% at c=128 for three steps at a 3% cost at c=1.
-Depth matters little at low concurrency (steps 3-5 within ~4%) and shallow chains are
-better at high concurrency.
+Depth matters little at low concurrency (steps 3-5 within ~4%). At c=128 depth 3
+beat depth 4 and 5 in every pair not limited by KV: s3 against s4 with the radix cache
+(9,593 against 9,276), s3 against s5 with it off (10,106 against 9,456) and with
+replayssm-spec (11,941 against 11,186).
 
 ```sh
 GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x bench/campaigns/tuning_depth.sh
@@ -227,10 +238,10 @@ concurrency) and `mtp-tuned-triton` (the same under Triton; low concurrency),
 `dflash-tuned-b16` (block 16, Triton, capacity 64; low concurrency) and
 `dflash-tuned-b4` (block 4, FlashInfer; high concurrency), plus
 `mtp-stockverify` and `plain-tuned-replayssm` as the exactness fallback and the
-buffered-decode variant. Depth 3 beat depth 4 and 5 at high concurrency and was within
-4% at low concurrency, so one depth serves both MTP arms. Within DFlash, block 4 leads at
-c=128 (11,477 against 10,594 tok/s for `dflash-tuned`, +8%) and trails below that, so it
-is the high-concurrency DFlash arm; FA4 draft attention was not tried with block 4.
+buffered-decode variant. Depth 3 beat depth 4 and 5 at c=128 in the three pairs not
+limited by KV and was within 4% at low concurrency, so one depth serves both MTP arms. Within DFlash, block 4 leads at
+c=128 (11,477 against 10,594 tok/s for `dflash-tuned`, +8%) and trails at c<=32 (c=64
+was not measured), so it is the high-concurrency DFlash arm; FA4 draft attention was not tried with block 4.
 Against its matched Triton plain baseline, block 16 under Triton gives 3.35x the
 per-user rate at c=1 (957 against 286 tok/s/user in x). Arms with buffered GDN state are
 pending classification of their greedy outputs against plain
@@ -250,7 +261,7 @@ cycles/s = y / (c x accept length) from the measured points. At c=128 that gives
 | MTP s2 | 3 | 9,153 | 2.66 | 26.9 | 10,325 | 520 GB/s |
 | MTP s3 | 4 | 9,593 | 3.26 | 23.0 | 11,773 | 593 GB/s |
 | MTP s4 | 5 | 9,276 | 3.72 | 19.5 | 12,464 | 627 GB/s |
-| MTP s5 | 6 | 8,719 | 4.07 | 16.7 | 12,851 | 647 GB/s |
+| MTP s5 (KV-limited) | 6 | 8,719 | 4.07 | 16.7 | 12,851 | 647 GB/s |
 | MTP s7, radix off | 8 | 8,493 | 4.56 | 14.6 | 14,909 | 750 GB/s |
 
 For comparison, plain decoding reads and writes each request's state once per token:
