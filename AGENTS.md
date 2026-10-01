@@ -10,6 +10,14 @@ backend caveat. Run `source scripts/sglang_env.sh` before any GPU or SGLang
 command. Never install or upgrade the NVIDIA driver or CUDA through apt on
 this Lambda box.
 
+## Where files go
+
+`README.md` describes the repository layout. Each experiment's code goes in
+`experiments/<name>/` and its committed results in `evidence/<topic>/`, with a
+README that gives the command behind every file; raw outputs (traces,
+hidden-state dumps) stay outside git. Name files for what they do, and keep
+scratch files and notebooks out of the repository.
+
 ## Formatting and linting
 
 When you finish a change, run the pre-commit hooks on the files you touched and
