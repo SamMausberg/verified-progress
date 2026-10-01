@@ -42,7 +42,7 @@ run_missing() {
   python experiments/state_safety/run_matrix.py --passes c1 --port 30017 --out-dir "$RUNS" \
     --configs "$joined" --tag "$tag" "--extra-flags=$flags" || failed+=("$joined/$tag")
 }
-run_missing mtp_s3,mtp_s3_replayssm,plain_replayssm bench_noradix "--disable-radix-cache"
+run_missing mtp_s3,mtp_s3_replayssm,plain_replayssm,plain bench_noradix "--disable-radix-cache"
 run_missing mtp_s3_replayssm,plain bench_noradix_triton "--disable-radix-cache --attention-backend triton"
 run_missing plain bench_dflash_b16 "$DFLASH_B16 --disable-radix-cache"
 run_missing plain bench_dflash_b16_triton "$DFLASH_B16 --disable-radix-cache --attention-backend triton"
@@ -61,20 +61,26 @@ cat > "$OUT/pairs.json" <<'PAIRS'
   ["mtp_s3 buffered vs stock verify radix-off c1", "mtp_s3__bench_noradix/c1", "mtp_s3_replayssm__bench_noradix/c1"],
   ["mtp_s3 buffered triton vs stock verify radix-off c1", "mtp_s3__bench_noradix/c1", "mtp_s3_replayssm__bench_noradix_triton/c1"],
   ["dflash b16 stock radix-off vs plain c1", "plain/c1", "plain__bench_dflash_b16/c1"],
+  ["plain radix-off vs plain c1", "plain/c1", "plain__bench_noradix/c1"],
+  ["plain radix-off triton vs plain radix-off c1", "plain__bench_noradix/c1", "plain__bench_noradix_triton/c1"],
+  ["plain buffered decode vs plain radix-off c1", "plain__bench_noradix/c1", "plain_replayssm__bench_noradix/c1"],
   ["dflash b16 triton vs stock dflash b16 radix-off c1", "plain__bench_dflash_b16/c1", "plain__bench_dflash_b16_triton/c1"],
   ["dflash b16 triton gdn-verify-triton vs stock dflash b16 radix-off c1", "plain__bench_dflash_b16/c1", "plain__bench_dflash_b16_triton_gdnverify/c1"]
 ]
 PAIRS
 # Each arm with a numerics change against its matched stock reference (bench/README.md):
-# plain levers against plain c1, speculative levers against stock speculation with
-# the same drafter and steps (radix cache off). Third entry: the arm against plain c1.
+# plain levers against stock plain c1 with the radix cache off, like the arms (the
+# state workstream's plain/c1 ran with it on, and with the radix cache on a request's
+# logprobs can depend on earlier requests, evidence/state_safety); speculative levers
+# against stock speculation with the same drafter and steps (radix cache off). Third
+# entry: the arm against plain/c1.
 # Stock arms have no matched pair (null) and are listed for their rate against plain.
 cat > "$OUT/arms.json" <<'ARMS'
 [
   ["mtp-tuned", "mtp_s3 buffered vs stock verify radix-off c1", "mtp_s3 buffered verify radix-off vs plain c1"],
   ["mtp-tuned-triton", "mtp_s3 buffered triton vs stock verify radix-off c1", "mtp_s3 buffered verify radix-off triton vs plain c1"],
-  ["plain-tuned-triton", "plain radix-off triton vs plain c1", "plain radix-off triton vs plain c1"],
-  ["plain-tuned-replayssm", "plain buffered decode radix-off vs plain c1", "plain buffered decode radix-off vs plain c1"],
+  ["plain-tuned-triton", "plain radix-off triton vs plain radix-off c1", "plain radix-off triton vs plain c1"],
+  ["plain-tuned-replayssm", "plain buffered decode vs plain radix-off c1", "plain buffered decode radix-off vs plain c1"],
   ["dflash-tuned-b16", "dflash b16 triton vs stock dflash b16 radix-off c1", "dflash b16 radix-off triton vs plain c1"],
   ["mtp-stockverify", null, "mtp_s3 stock verify radix-off vs plain c1"]
 ]
@@ -86,6 +92,33 @@ python experiments/state_safety/compare.py --runs "$RUNS" --pairs "$OUT/pairs.js
   --out-json "$OUT/summary.json" --out-csv "$OUT/divergences.csv" \
   --out-table "$OUT/table.csv" | tee "$OUT/compare.log"
 compare_status=${PIPESTATUS[0]}
+# Pool sizes and capacity of every server, from its log.
+python - "$RUNS" "$OUT/pools.csv" <<'POOLS'
+import csv, re, sys
+from pathlib import Path
+rows = []
+for run in sorted(Path(sys.argv[1]).iterdir()):
+    log = run / 'server.log'
+    if not log.exists():
+        continue
+    text = log.read_text(errors='replace')
+    def last(pattern):
+        found = re.findall(pattern, text)
+        return found[-1] if found else ''
+    rows.append({
+        'run': run.name,
+        'max_running_requests': last(r'max_running_requests=(\d+)'),
+        'max_total_num_tokens': last(r'max_total_num_tokens=(\d+)'),
+        'max_mamba_cache_size': last(r'max_mamba_cache_size: (\d+)'),
+        'disable_radix_cache': last(r"'disable_radix_cache': (\w+)"),
+        'attention_backend': last(r"'attention_backend': '(\w+)'"),
+        'gdn_backends': last(r'Linear attention kernel backend: ([^\n\[]*)').strip(),
+    })
+with open(sys.argv[2], 'w', newline='') as handle:
+    writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+    writer.writeheader()
+    writer.writerows(rows)
+POOLS
 python -m bench.divergence "$OUT/summary.json" --out "$OUT/report.json" \
   --arms "$OUT/arms.json" --classes-out "$OUT/classes.json"
 divergence_status=$?
