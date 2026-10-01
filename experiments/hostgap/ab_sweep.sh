@@ -7,11 +7,13 @@
 #   scripts/gpu_lock.sh -x experiments/hostgap/ab_sweep.sh A B A B
 #
 # A = stock SGLang (~/sglang at the pin), B = the hostgap worktree with the
-# flags in HOSTGAP_ENV. Both use the same arm and flags (bench defaults,
+# flags in HOSTGAP_ENV, T = stock SGLang with Triton attention instead of
+# FlashInfer (no host planning at all, different kernels and numerics; a
+# reference point, not an exact arm). All use the same arm and flags (bench defaults,
 # including --stream-interval 4). ARM_ARGS selects the configuration
 # (default: bench's tuned MTP arm: s3 + replayssm-spec, radix cache off, GDN
 # state cache 128, KV capped at 1M tokens); LABEL_PREFIX
-# names the runs. Results go to $OUT/<prefix>-{stock,hostgap}/<timestamp>/.
+# names the runs. Results go to $OUT/<prefix>-{stock,hostgap,triton}/<timestamp>/.
 set -uo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -31,7 +33,10 @@ sweep() {
   local side=$1
   local extra=()
   local label="$PREFIX-stock"
-  if [ "$side" = B ]; then
+  if [ "$side" = T ]; then
+    extra=(--set attention-backend=triton)
+    label="$PREFIX-triton"
+  elif [ "$side" = B ]; then
     extra=(--sglang-worktree "$PATCHED")
     local kv
     for kv in "${ENVS[@]}"; do extra+=(--env "$kv"); done
@@ -47,8 +52,8 @@ sweep() {
 
 for side in "$@"; do
   case "$side" in
-    A | B) sweep "$side" ;;
-    *) echo "unknown side $side (use A or B)" >&2 ;;
+    A | B | T) sweep "$side" ;;
+    *) echo "unknown side $side (use A, B or T)" >&2 ;;
   esac
 done
 exit 0
