@@ -248,17 +248,47 @@ What this shows:
   ran at most 5 requests. So batched served exactness needs deterministic batching.
 - The circular replay is not bitwise at any concurrency, as the kernel check predicts.
 
-Follow-up (`run_fold_localize.sh`, queued): every arm pins `--max-running-requests`,
-`--max-total-tokens` and `--max-mamba-cache-size` identically for stock and fold, and starts
-only when enough memory is free. (A) The four differing requests and four controls run at
-c=1 with the per-cycle trace, at the first check's stock pools and at a second pool size.
-(B) All of panel-v2 runs in waves sent as one batched request (deterministic batching):
-DFlash waves of 4 and MTP waves of 8, each with stock, fold and a stock rerun.
+The first check above therefore does not decide DFlash; the rerun with matched pools does.
 
     scripts/gpu_lock.sh -s experiments/drafter/run_replay_check.sh
     python experiments/drafter/summarize_replay_check.py \
         --run dflash:~/vp-data/drafter/replay-check --run mtp:~/vp-data/drafter/replay-check-mtp \
         --out evidence/drafter/buffered_verify
+
+### Matched pools and deterministic batching (`run_fold_localize.sh`)
+
+`buffered_verify/localize/` (one shared slot, 2026-10-01 17:19-17:40 UTC, repository at 0159c13,
+engine 31bda3e674; resolved pools and foreign CPU load per run in `localize/launch/`). Every arm
+pins `--max-running-requests`, `--max-total-tokens` and `--max-mamba-cache-size` identically for
+stock and fold and starts only when enough memory is free; the resolved pools match the pins in
+every run.
+
+- **(A) c = 1, radix cache on, per-cycle trace** (`off-p*_vs_fold-p*.json`, `off-p1_vs_off-p2.json`):
+  the four requests whose logprobs differed in the first check and four controls, stock and fold
+  at the first check's stock pools (p1: 60,630 KV tokens, 10 mamba slots, running limit 2) and at
+  a second size (p2: 40,000, 20, 2). At both sizes the fold equals stock in every token, every
+  top-5 logprob and every cycle's drafted block, target argmax and accepted length, for all eight
+  requests; stock at p1 also equals stock at p2. Today's stock and fold runs both reproduce the
+  first check's stock run exactly on all eight, and both differ from the first check's fold run
+  at the same four requests, from output index 2 or 3. The first check's four differences
+  therefore followed that fold server's own pools (running limit 8, 108 mamba slots, 130,324 KV
+  tokens), not the fold; which part of that configuration changes the first verify cycle's
+  arithmetic has not been traced.
+- **(B) Deterministic batched waves, radix cache off** (`*-vs-*.json`): all of panel-v2 sent in
+  waves, each wave one batched request, so batch composition is the same in every run. DFlash at
+  block 16 in waves of 4 (40,000 KV tokens, 4 slots, limit 4): the fold is bitwise equal to stock
+  on 80 of 80 sequences, in tokens and top-5 logprobs at every position (132,371 tokens), and a
+  stock rerun is too. MTP s3 in waves of 8 (60,000, 8, 8): fold 80 of 80 bitwise, stock rerun
+  80 of 80 (139,092 tokens).
+
+So with matched pools the fold is bitwise equal to stock verification in served DFlash and MTP:
+at c = 1 with the radix cache on, and in batches of 4 (DFlash) and 8 (MTP) when batch
+composition is held fixed. With a closed-loop client above c = 1, stock itself does not
+reproduce bitwise between runs (MTP c = 8 in the first check: 10 of 80), so no bitwise claim is
+made for that setting. Foreign CPU load averaged 0.36-0.74 cores except the first run (3.3);
+these are correctness runs, so the load does not bear on the result.
+
+    scripts/gpu_lock.sh -s experiments/drafter/run_fold_localize.sh
 
 ## Buffered GDN verify: per-phase split and the P10 gate (c = 8 and 16)
 
