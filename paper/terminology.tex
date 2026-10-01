@@ -26,12 +26,9 @@
 \term{app}{Batch size $B$, concurrency $c$}{$B$ is the number of requests in one decode step; $c$ is the number of requests the client keeps in flight, which the server may cap below $c$.}
 \term{app}{Batch union}{The set of vocabulary tiles or rows that at least one row of a batch still needs; a kernel that shares weight reads across the batch must read the whole union (Appendix~\ref{app:transport-sampled}).}
 \term{app}{Bound family, tiling}{The geometry of a transport bound (scalar, coordinate, grouped, low-rank radii, or their minimum) and the partition of the vocabulary into tiles (contiguous, random or $k$-means; 64 to 1,024 rows) (Appendix~\ref{app:transport-geometry}).}
-\term{app}{Capture and replay}{Head inputs recorded bit for bit from the running engine and re-evaluated offline (Section~\ref{sec:transport-capture}).}
-\term{app}{Certified row}{A head input whose \Rstock{} token the enclosures fix for every accumulator value the error model admits; every other row runs the fallback.}
 \term{app}{Commit rule, sound set}{Commit a decision when every logit vector in a set known to contain the reference logits gives the same decision (Definition~\ref{def:commit}).}
 \term{app}{Divergence, exposure, noise floor}{The first position at which two runs choose different tokens; the positions compared before it; divergences per 1,000 exposed tokens between stock configurations that ought to agree (Appendix~\ref{app:divergence}).}
 \term{app}{Drift scaling $s$}{A model extrapolation that replaces the draft input by $h^t-s\Delta$, scaling every drift term by $s$; not a measured drafter (Appendix~\ref{app:transport-scaling}).}
-\term{app}{Enclosure $[lo_i,hi_i]$}{An interval that contains the real logit $z_i$, computed with outward rounding (Lemma~\ref{lem:outward}).}
 \term{app}{First differing module output}{In a bit-exact tap of two runs, the first position and, in execution order, the first module whose output bits differ; cache state is checked separately (Appendix~\ref{app:divergence}).}
 \term{app}{Fixed-noise verification}{Sampled verification that accepts a drafted token exactly when it wins the target's race under the keyed noise field (Theorem~\ref{thm:fixednoise}).}
 \term{app}{Frontier coordinates $x$, $y$}{Mean per-request output rate including the time to first token, and output tokens per second on the GPU (Equation~\eqref{eq:frontier}).}
