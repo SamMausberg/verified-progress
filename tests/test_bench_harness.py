@@ -908,6 +908,54 @@ def test_envelope_ranks_only_points_with_enough_repeats(tmp_path: Path) -> None:
     assert path.read_text().strip() == ','.join(ENVELOPE_FIELDS)
 
 
+def test_envelope_threshold_counts_distinct_sessions() -> None:
+    from bench.pareto import aggregate, envelope
+
+    def row(label: str, run: str, session: str, y: float) -> dict[str, object]:
+        return {
+            'label': label,
+            'run': run,
+            'session': session,
+            'concurrency': 8,
+            'x_e2e': y / 8,
+            'y': y,
+            'failed': 0,
+            'invalid_reason': '',
+        }
+
+    rows = [row('plain', f'p{i}', f'r{i}', 100.0) for i in range(3)]
+    # Three reruns that share one session name are one session, however many rows.
+    rows += [row('rerun', f'q{i}', 'supp', 150.0) for i in range(3)]
+    # Runs without a session count as their own.
+    rows += [row('old', f'o{i}', '', 90.0) for i in range(3)]
+    frontier = {e['label']: e for e in aggregate(rows, None, min_n=3)}
+    assert frontier['rerun']['n'] == 3 and frontier['rerun']['n_sessions'] == 1
+    assert frontier['old']['n_sessions'] == 3
+    assert not frontier['rerun']['pareto_optimal']
+    (best,) = envelope(list(frontier.values()), min_n=3)
+    assert best['best'] == 'plain' and best['best_below_min_n'] == 'rerun'
+
+
+def test_classification_refuses_a_partial_comparison() -> None:
+    from bench.divergence import classify
+
+    entry = {
+        'pair': 'buffered vs stock',
+        'prompts': 300,
+        'per_1k': 3.8,
+        'per_1k_95': [3.0, 4.6],
+        'ratio_to_floor': 1.1,
+        'ratio_to_floor_95': [0.9, 1.4],
+        'classes': {'tie': 10, 'one_ulp': 1, 'near': 0, 'large': 0, 'not_argmax': 0},
+    }
+    arms: list[tuple[str, str | None, str]] = [('mtp-tuned', 'buffered vs stock', 'absent')]
+    with pytest.raises(SystemExit, match='incomplete'):
+        classify([entry], arms, expect_prompts=320)
+    assert classify([{**entry, 'prompts': 320}], arms, expect_prompts=320)[0]['exactness'] == (
+        'exact-up-to-rounding'
+    )
+
+
 def test_series_styles_share_a_hue_per_family() -> None:
     from bench.pareto import SERIES_COLOURS, series_styles
 

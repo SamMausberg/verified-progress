@@ -12,8 +12,9 @@ arm there (a classification can land after the run), else from the run's
 manifest, else from its flags (a numerics-changing flag makes it `pending`);
 `--class LABEL=CLASS` overrides all three. The envelope is computed twice: over
 all arms, and over exact arms (`stock` or `exact-up-to-rounding`). With
-`--envelope-min-n N`, only (label, concurrency) points with at least N valid
-repeats can be Pareto-optimal, rank in `envelope.csv` or lie on an envelope;
+`--envelope-min-n N`, only (label, concurrency) points with valid runs in at least
+N distinct sessions can be Pareto-optimal, rank in `envelope.csv` or lie on an
+envelope (`n_sessions` in `frontier.csv`; a run without a session counts as its own);
 points with fewer stay in `frontier.csv`, `envelope.csv` names the best of them
 where it beats the envelope (`best_below_min_n`), and the plot draws them hollow.
 
@@ -365,6 +366,11 @@ def dominated(point: tuple[float, float], others: list[tuple[float, float]]) -> 
     )
 
 
+def sessions(entry: dict[str, Any]) -> int:
+    """Distinct sessions behind a frontier entry (its point count when not recorded)."""
+    return int(entry.get('n_sessions', entry['n']))
+
+
 def aggregate(
     rows: list[dict[str, Any]], baseline: str | None, min_n: int = 1
 ) -> list[dict[str, Any]]:
@@ -383,6 +389,11 @@ def aggregate(
             'label': label,
             'concurrency': concurrency,
             'n': len(members),
+            # Distinct sessions among the valid points (a run without a session is its
+            # own, a row without either too): the envelope threshold counts these.
+            'n_sessions': len(
+                {m.get('session') or m.get('run') or f'row {i}' for i, m in enumerate(members)}
+            ),
             'n_invalid': invalid[(label, concurrency)],
         }
         for field in AGGREGATED:
@@ -393,7 +404,7 @@ def aggregate(
             entry[f'{field}_max'] = max(values) if values else math.nan
         entry['failed_total'] = sum(int(m.get('failed') or 0) for m in members)
         frontier.append(entry)
-    eligible = [entry for entry in frontier if entry['n'] >= max(min_n, 1)]
+    eligible = [entry for entry in frontier if entry['n'] > 0 and sessions(entry) >= min_n]
     means = [(entry['x_e2e_mean'], entry['y_mean']) for entry in eligible]
     for entry in frontier:
         entry['pareto_optimal'] = entry in eligible and not dominated(
@@ -425,7 +436,7 @@ def envelope(frontier: list[dict[str, Any]], min_n: int = 1) -> list[dict[str, A
     below: dict[int, list[dict[str, Any]]] = defaultdict(list)
     for entry in frontier:
         if entry['n'] > 0 and _finite(entry['y_mean']):
-            target = by_c if entry['n'] >= min_n else below
+            target = by_c if sessions(entry) >= min_n else below
             target[int(entry['concurrency'])].append(entry)
     rows = []
     for concurrency in sorted(by_c):
@@ -468,7 +479,9 @@ def pareto_envelope(
     chosen = [
         e
         for e in frontier
-        if e['n'] >= max(min_n, 1) and (not exact_only or e.get('exactness') in EXACT_CLASSES)
+        if e['n'] > 0
+        and sessions(e) >= min_n
+        and (not exact_only or e.get('exactness') in EXACT_CLASSES)
     ]
     means = [(e['x_e2e_mean'], e['y_mean']) for e in chosen]
     front = [e for e in chosen if not dominated((e['x_e2e_mean'], e['y_mean']), means)]
@@ -650,7 +663,7 @@ def plot(frontier: list[dict[str, Any]], path: Path, title: str, min_n: int = 1)
             zorder=2,
         )
         # Points with too few repeats to rank: hollow, over the series' own marker.
-        few = [entry for entry in entries if entry['n'] < min_n]
+        few = [entry for entry in entries if sessions(entry) < min_n]
         if few:
             ax.plot(
                 [entry['x_e2e_mean'] for entry in few],
@@ -679,7 +692,7 @@ def plot(frontier: list[dict[str, Any]], path: Path, title: str, min_n: int = 1)
     ax.grid(color='#e4e3df', linewidth=0.6)
     for spine in ('top', 'right'):
         ax.spines[spine].set_visible(False)
-    if any(entry['n'] < min_n for entry in frontier):
+    if any(sessions(entry) < min_n for entry in frontier):
         ax.plot(
             [],
             [],
@@ -732,7 +745,7 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=1,
         metavar='N',
-        help='valid repeats a point needs to rank, be Pareto-optimal or lie on an envelope',
+        help='distinct sessions a point needs to rank, be Pareto-optimal or lie on an envelope',
     )
     parser.add_argument(
         '--pair',

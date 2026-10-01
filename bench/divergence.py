@@ -99,10 +99,26 @@ ROUNDING_CLASSES = ('tie', 'one_ulp', 'near')
 
 
 def classify(
-    entries: list[dict[str, Any]], arms: list[tuple[str, str | None, str]]
+    entries: list[dict[str, Any]],
+    arms: list[tuple[str, str | None, str]],
+    expect_prompts: int | None = None,
 ) -> list[dict[str, Any]]:
-    """Class per arm from its matched-reference pair; rates reported beside it."""
+    """Class per arm from its matched-reference pair; rates reported beside it.
+
+    With `expect_prompts`, a pair the classes or rates come from must have compared
+    that many prompts: compare.py compares the prompts both runs hold, so a partial
+    run would otherwise be classified from a subset.
+    """
     by_pair = {entry['pair']: entry for entry in entries}
+    if expect_prompts is not None:
+        used = {name for _, matched, plain in arms for name in (matched, plain) if name}
+        short = {
+            name: by_pair[name]['prompts']
+            for name in sorted(used & set(by_pair))
+            if by_pair[name]['prompts'] != expect_prompts
+        }
+        if short:
+            raise SystemExit(f'incomplete comparisons (prompts of {expect_prompts}): {short}')
     out = []
     for arm, matched, plain in arms:
         record: dict[str, Any] = {'arm': arm, 'exactness': 'stock'}
@@ -148,6 +164,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--out', type=Path, default=None)
     parser.add_argument('--arms', type=Path, default=None, help='[[arm, matched, plain], ...]')
     parser.add_argument('--classes-out', type=Path, default=None)
+    parser.add_argument(
+        '--expect-prompts',
+        type=int,
+        default=None,
+        help='refuse to classify from a pair that compared any other number of prompts',
+    )
     args = parser.parse_args(argv)
     pairs = json.loads(args.summary.read_text())['pairs']
     result = report(pairs, args.floor)
@@ -157,7 +179,7 @@ def main(argv: list[str] | None = None) -> int:
         args.out.write_text(text + '\n')
     if args.arms:
         arms = [tuple(item) for item in json.loads(args.arms.read_text())]
-        classes = classify(result, arms)
+        classes = classify(result, arms, args.expect_prompts)
         print(json.dumps(classes, indent=2))
         if args.classes_out:
             args.classes_out.write_text(json.dumps(classes, indent=2) + '\n')

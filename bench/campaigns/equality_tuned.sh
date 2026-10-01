@@ -29,14 +29,28 @@ ln -sfn ~/vp-data/state/runs/plain "$RUNS/plain"
 DFLASH_B16="--speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash \
 --speculative-draft-model-revision 9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf \
 --speculative-dflash-block-size 16 --max-running-requests 4"
+PROMPTS=~/vp-data/state/prompts/prompts.jsonl   # run_matrix.py's default prompt set
 failed=()
+# A run is complete when its c1.jsonl holds exactly the prompt set's ids; compare.py
+# compares only the prompts both runs hold, so a partial run must not count.
+complete() {
+  python - "$PROMPTS" "$1" <<'COMPLETE'
+import json, sys
+def ids(path):
+    with open(path) as handle:
+        return [json.loads(line)['id'] for line in handle if line.strip()]
+want, have = ids(sys.argv[1]), ids(sys.argv[2])
+sys.exit(0 if len(have) == len(set(have)) == len(want) and set(have) == set(want) else 1)
+COMPLETE
+}
 # run_matrix.py parses --extra-flags with argparse, so the value must be attached
 # with '=' (a separate value that starts with '--' is read as a new option).
 run_missing() {
   local configs=$1 tag=$2 flags=$3 todo=()
   local name
   for name in ${configs//,/ }; do
-    [ -s "$RUNS/${name}__${tag}/c1.jsonl" ] || todo+=("$name")
+    { [ -s "$RUNS/${name}__${tag}/c1.jsonl" ] && complete "$RUNS/${name}__${tag}/c1.jsonl"; } ||
+      todo+=("$name")
   done
   [ "${#todo[@]}" -eq 0 ] && return 0
   local joined
@@ -130,7 +144,8 @@ with open(sys.argv[2], 'w', newline='') as handle:
     writer.writerows(rows)
 POOLS
 python -m bench.divergence "$OUT/summary.json" --out "$OUT/report.json" \
-  --arms "$OUT/arms.json" --classes-out "$OUT/classes.json"
+  --arms "$OUT/arms.json" --classes-out "$OUT/classes.json" \
+  --expect-prompts "$(grep -c . "$PROMPTS")"
 divergence_status=$?
 status=0
 if [ "$compare_status" -ne 0 ] || [ "$divergence_status" -ne 0 ]; then
@@ -145,13 +160,28 @@ if grep -q '^skip' "$OUT/compare.log"; then
   echo "compare.py skipped a pair (missing run files)" >&2
   status=1
 fi
-python - "$OUT/pairs.json" "$OUT/summary.json" <<'CHECK' || status=1
+python - "$OUT/pairs.json" "$OUT/summary.json" "$RUNS" "$PROMPTS" <<'CHECK' || status=1
 import json, sys
-pairs = [label for label, _, _ in json.load(open(sys.argv[1]))]
+from pathlib import Path
+spec = json.load(open(sys.argv[1]))
 summary = json.load(open(sys.argv[2]))
 summary = summary.get('pairs', summary) if isinstance(summary, dict) else summary
-missing = [label for label in pairs if label not in summary]
+missing = [label for label, _, _ in spec if label not in summary]
 if missing:
     sys.exit(f'pairs missing from summary.json: {missing}')
+# Both runs of every pair hold exactly the prompt set (compare.py compares only the
+# prompts both runs hold, so a partial run would pass unnoticed).
+def ids(path):
+    with open(path) as handle:
+        return [json.loads(line)['id'] for line in handle if line.strip()]
+want = set(ids(sys.argv[4]))
+bad = set()
+for _, run_a, run_b in spec:
+    for run in (run_a, run_b):
+        have = ids(Path(sys.argv[3]) / f'{run}.jsonl')
+        if len(have) != len(set(have)) or set(have) != want:
+            bad.add(run)
+if bad:
+    sys.exit(f'runs without exactly the {len(want)} prompts: {sorted(bad)}')
 CHECK
 exit "$status"
