@@ -712,6 +712,70 @@ caching allocator rounds up to 32 MiB (large blocks come in multiples of 2 MiB).
 microbenchmark therefore runs batch sizes above 32 in their own processes, and
 `src/certified_head/INTEGRATION.md` records what this means for the engine.
 
+## The head inside SGLang on the merged package (`engine_v2.json`)
+
+**Run.** x9e2, a shared-lock hold: first the merged package's GPU and CPU tests
+(`engine_v2_gpu_tests.log`, 167 passed), then the same eleven arms as
+`engine_v1.json` (method below), with `--max-mamba-cache-size 80` so that the GDN
+state cache no longer caps the running requests: up to 16 for plain decode and 8
+for speculation (`--max-running-requests`). Repository 4c9fc8f. Servers ran at
+`--mem-fraction-static 0.25`; SGLang sizes from the free memory at start-up, so a
+plain-decode server reached 48.9 GB with the GPU otherwise idle, and the
+speculative ones 28 to 30 GB.
+
+**Engine commit per arm** (`x9e2_commit.txt`; each arm's launch record in
+`engine_v2.json`). Patch 0009 was committed to the engine worktree during the
+hold, at 20:42. The first five arms (`plain_check`, `plain_check_columns`,
+`mtp_check`, `dflash_check`, `mtp_draft_check`) ran engine/kernel a28946e0d4
+(patches 0001-0008); the other six ran 9b5e82258d (0001-0009). `git diff
+a28946e0d4 9b5e82258d` is one hunk in one file
+(`python/sglang/srt/layers/certified_head.py`, 7 insertions, 2 deletions), the
+docstring and predicate of `_fixed_noise_eligible`, which runs only with
+`SAMPLED_VERIFY` on, that is, in `mtp_sampled_check`, which ran 0009.
+`mtp_draft_check`'s server was starting while 0009 was written; its log shows the
+head installed at 20:41:55 and the glue file was modified at 20:41:58, so it ran
+a28946e0d4, as recorded.
+
+| Arm | Path | Largest certified batch (rows) | Certified calls | Rows | Rows differing from stock | Rows falling back | Calls with a fallback |
+|---|---|---|---|---|---|---|---|
+| plain decode | decode | 16 | 1,036 | 14,946 | 0 | 207 (1.38%) | 253 (24.4%) |
+| plain decode, column fallback | decode | 16 | 1,042 | 14,949 | 0 | 207 (1.38%) | 229 (22.0%) |
+| MTP | greedy verify | 32 | 678 | 19,912 | 0 | 347 (1.74%) | 257 (37.9%) |
+| DFlash | greedy verify | 128 | 603 | 57,424 | 0 | 2,292 (3.99%) | 543 (90.0%) |
+| MTP | draft steps | 8 | 1,354 | 9,938 | 0 | 303 (3.05%) | 274 (20.2%) |
+| MTP | draft extend | 8 | 677 | 4,969 | 0 | 120 (2.41%) | 113 (16.7%) |
+| DFlash | draft projection | 120 | 599 | 53,580 | 0 | 2,120 (3.96%) | 525 (87.6%) |
+| MTP, seeded T = 0.7 | fixed-noise sampled verify | 32 | 700 | 21,016 | 0 | 386 (1.84%) | 279 (39.9%) |
+
+No row on any path was refused or tripped a runtime probe, and no sampled row took
+the temperature or small-probability guard. The committed check
+(`engine_validate.sh --check-only` at f80f7d8, `engine_v2_arm_checks.log`)
+passes every check arm: every path the arm must exercise made certified calls.
+`DRAFT` enables both draft families, so `mtp_draft_check` also lists
+`dflash_draft` and `dflash_draft_check` lists `draft` and `draft_extend`, with no
+calls; the check reports such paths and does not fail them.
+
+One request at a time, the certified and stock servers' outputs are identical on
+64 of 64 prompts for plain decode (14,995 tokens) and for MTP with certified
+greedy verify (14,990 tokens).
+
+Against `engine_v1.json`, which ran the pre-fix package, the DFlash draft
+projection now falls back on 3.96% of its rows instead of 89.6%, and DFlash
+verify was certified at up to 128 rows. This is consistent with the faulty TMA
+tiles causing the earlier fallback rate, though the two runs also differ in
+concurrency.
+
+**What went wrong in the hold.** I edited this branch's `engine_validate.sh` at
+about 20:42 while x9e2 was running it, and restored the committed bytes at
+20:42:51, before bash had read past its loop of arms. Every arm completed and
+printed its verdict. After the loop, though, bash failed to parse the rest of the
+script ("unexpected EOF while looking for matching" a quote, line 197, in
+`engine_v2_engine.log`), so the comparison of the one-request-at-a-time arms did
+not run and the hold ended FAILED. That comparison only reads the saved outputs:
+it was run afterwards with the committed `engine_equality.py`, and
+`engine_summary.py` regenerated `engine_v2.json` (both CPU steps). Patch 0009
+reaching the engine worktree mid-hold, above, was the same mistake.
+
 ## The head inside SGLang (`engine_v1.json`)
 
 **Which package these results used.** `engine_v1.json` ran on the package as it
@@ -724,7 +788,7 @@ the DFlash draft projection at up to 120, whose 89.6% fallback was this fault,
 and the sampled verify at 32) ran those tiles; their 0 differing rows are
 empirical. The evidence for the package as merged here, with #45's final tiles,
 self-test gate, probes, weight digest and sampling guards, is the rerun of the
-same checks, `engine_v2.json`, added after its hold.
+same checks, `engine_v2.json`, in the section before this one.
 
 The SGLang patch series `engine/sglang/patches/kernel/` (see
 `engine/sglang/README.md`) was validated per path in check mode: every certified
@@ -819,6 +883,9 @@ move a seeded token, while the BF16 logits and FP32 softmax together do.
 | `conditional_memory.json` | device memory left behind by deleted graphs, with and without conditional nodes | `python experiments/certified_head/conditional_memory.py --out ...` (46bcc84) |
 | `sample_kernel_sass.json` | SASS statistics of the envelope kernel, greedy and sampled, probes on and off, at the three default tiles, and x3's kernel | `python experiments/certified_head/sample_kernel_sass.py --compare 9e3a39a --out ...` (x8s2, 9f7f369, CPU) |
 | `engine_v1.json` | per-arm counters, client summaries and comparisons of the SGLang validation | `scripts/gpu_lock.sh -s experiments/certified_head/engine_validate.sh OUT plain_check mtp_check dflash_check mtp_draft_check dflash_draft_check mtp_sampled_check plain_check_columns plain_c1 plain_c1_stock mtp_c1 mtp_c1_stock`, then `python experiments/certified_head/engine_summary.py OUT --out evidence/certified_head/engine_v1.json` (pre-fix package: repo 8f4f3d7, tag `kernel-engine-v1`, before the TMA-fault fix, see "The head inside SGLang"; rebased twin c58a859 has identical `src/certified_head`, `experiments/certified_head`, tests and patches; engine 71c521db = patches 0001-0004) |
+| `engine_v2.json`, `engine_v2_engine.log`, `x9e2_commit.txt` | the SGLang checks on the merged package: per-arm counters, client summaries, launch records and the one-request-at-a-time comparisons; the hold's log; the commits per arm | `scripts/gpu_lock.sh -s experiments/certified_head/engine_validate.sh OUT plain_check plain_check_columns mtp_check dflash_check mtp_draft_check dflash_draft_check mtp_sampled_check plain_c1 plain_c1_stock mtp_c1 mtp_c1_stock` with `MAMBA_SLOTS=80`, then `engine_equality.py compare` for each c1 pair and `python experiments/certified_head/engine_summary.py OUT --out engine_v2.json` (x9e2, repo 4c9fc8f; engine per arm in `x9e2_commit.txt`) |
+| `engine_v2_gpu_tests.log` | the merged package's GPU and CPU tests before the engine arms | `python -m pytest tests/test_certified_head.py tests/test_certified_engine.py tests/test_certified_bounds.py tests/test_certified_head_inputs.py tests/test_enclosure_margin.py -q -s` (x9e2, 4c9fc8f) |
+| `engine_v2_arm_checks.log` | the check arms' verdicts under the per-path rule | `experiments/certified_head/engine_validate.sh --check-only OUT plain_check ... mtp_sampled_check` (f80f7d8, CPU) |
 | `p8_witnesses.json` | seeded-token differences between SGLang's chain, an FP64 log and exact arithmetic on 60,000 real rows, with the first witnesses | `python experiments/certified_head/p8_witness_search.py --rows 60000 --out evidence/certified_head/p8_witnesses.json` (commit ab507a9, tag `kernel-p8-witness-search`; rebased twin 24e213a has an identical search script and the modules it imports; GPU, shared lock) |
 
 Real head inputs come from the geometry workstream's plain-decode capture
