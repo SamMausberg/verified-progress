@@ -64,10 +64,13 @@ want() {
 }
 
 reuse() {  # name: copy an earlier run's ok outputs, or record the step as not run
-  local name=$1 f src
-  src=$(awk -F'\t' -v n="$name" '$1 == n && $2 == "ok" {print ($4 == "" ? "?" : $4)}' \
-    "$REUSE/steps.tsv" 2>/dev/null | tail -1)
-  if [ -z "$REUSE" ] || [ -z "$src" ]; then
+  local name=$1 f src=
+  # Without RUN_ALL_REUSE (or without its steps.tsv) there is nothing to reuse.
+  if [ -n "$REUSE" ] && [ -f "$REUSE/steps.tsv" ]; then
+    src=$(awk -F'\t' -v n="$name" '$1 == n && $2 == "ok" {print ($4 == "" ? "?" : $4)}' \
+      "$REUSE/steps.tsv" | tail -1)
+  fi
+  if [ -z "$src" ]; then
     record "$name" not-run -
     return
   fi

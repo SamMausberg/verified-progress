@@ -20,7 +20,6 @@ rows are reported in ``stats.status`` instead of being recomputed.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import time
 from collections.abc import Callable
@@ -43,7 +42,13 @@ from certified_head.bounds import (
     scale_rel_error,
     sqrt_upper_f32,
 )
-from certified_head.quantize import MODEL_ID, MODEL_REVISION, QuantizedHead, load_or_build
+from certified_head.quantize import (
+    MODEL_ID,
+    MODEL_REVISION,
+    QuantizedHead,
+    head_sha256,
+    load_or_build,
+)
 from certified_head.reference import reference_argmax, stock_seeded_sample
 
 logger = logging.getLogger(__name__)
@@ -200,14 +205,9 @@ class HeadStats:
 
 
 def weight_sha256(weight: torch.Tensor, chunk_rows: int = 16384) -> str:
-    """SHA-256 of a contiguous BF16 weight's bytes, equal to
-    :func:`certified_head.quantize.head_sha256` of the same values, read from the
-    device in chunks of ``chunk_rows`` rows so the host holds one chunk at a time."""
-    digest = hashlib.sha256()
-    bits = weight.view(torch.int16)
-    for r0 in range(0, bits.shape[0], chunk_rows):
-        digest.update(bits[r0 : r0 + chunk_rows].cpu().numpy().tobytes())
-    return digest.hexdigest()
+    """SHA-256 of a BF16 weight, as :func:`certified_head.quantize.head_sha256`
+    (read from the device in chunks of ``chunk_rows`` rows)."""
+    return head_sha256(weight, chunk_rows)
 
 
 def _if_body(pred: torch.Tensor) -> Any:
