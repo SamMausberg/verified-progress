@@ -14,7 +14,8 @@ declared in evidence/stack/README.md ("Composition plan"):
   A point that bench marks invalid (failed requests, wrong lengths, foreign CPU load
   above 2 cores, ...) drops that session at that concurrency for the arms it touches.
 * The four-way pattern for levers F and G on the composed tree (B0, F, G, FG): the
-  interaction log(FG/B0) - log(F/B0) - log(G/B0) per session, with the same interval.
+  interaction log(FG/B0) - log(F/B0) - log(G/B0) per session, with the same interval,
+  over the sessions in which every launch of B0, F, G and FG is valid.
   Isolated ratios are never multiplied into a composed estimate.
 
     python experiments/stack/analyze.py --points ~/vp-data/stack/pareto/points.csv \
@@ -76,6 +77,7 @@ def main() -> None:
         lambda: defaultdict(lambda: defaultdict(list))
     )
     invalid: list[dict[str, str]] = []
+    touched: set[tuple[str, int, str]] = set()  # (session, c, arm) with an invalid point
     for r in load(args.points):
         arm = r['label'].removeprefix('stack-')
         c = int(r['concurrency'])
@@ -83,6 +85,7 @@ def main() -> None:
             invalid.append(
                 {'session': r['session'], 'arm': arm, 'c': str(c), 'reason': r['invalid_reason']}
             )
+            touched.add((r['session'], c, arm))
             continue
         vals = {m: float(r[m]) for m in METRICS}
         vals['accept_length'] = float(r['accept_length'] or 'nan')
@@ -116,9 +119,13 @@ def main() -> None:
             logs = []
             for session in sorted(data):
                 cell = data[session].get(c, {})
-                got = {a: cell.get(a) for a in ('B0', 'F', 'G', 'FG')}
-                if all(v and len(v) >= 1 for v in got.values()):
-                    mean = {a: statistics.fmean(x[m] for _, x in v) for a, v in got.items() if v}
+                got = {a: cell.get(a, []) for a in ('B0', 'F', 'G', 'FG')}
+                # Every launch of all four arms must be valid in this session.
+                if all(
+                    len(v) == (2 if a == args.full else 1) and (session, c, a) not in touched
+                    for a, v in got.items()
+                ):
+                    mean = {a: statistics.fmean(x[m] for _, x in v) for a, v in got.items()}
                     logs.append(
                         math.log(mean['FG'] / mean['B0'])
                         - math.log(mean['F'] / mean['B0'])

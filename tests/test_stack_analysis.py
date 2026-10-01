@@ -174,3 +174,37 @@ def test_equality_gate_requires_bitwise_b0_and_drops_lossy_levers(tmp_path, monk
     (tmp_path / 'summary.json').write_text(json.dumps({'pairs': pairs}))
     gate.main()
     assert not json.loads((tmp_path / 'gate.json').read_text())['ok']
+
+
+def test_interaction_skips_a_session_with_one_invalid_full_launch(tmp_path, monkeypatch):
+    rows = []
+    for s in ('stack-s1', 'stack-s2'):
+        order = ['S0', 'FG', 'F', 'G', 'B0', 'FG', 'S0']
+        for i, arm in enumerate(order):
+            bad = (
+                'host_contention (3.0 foreign cores on average)'
+                if (s, i) == ('stack-s2', 5)
+                else ''
+            )
+            x = {'S0': 100.0, 'FG': 110.0, 'F': 105.0, 'G': 101.0, 'B0': 100.0}[arm]
+            rows.append(
+                {
+                    'label': f'stack-{arm}',
+                    'run': f'{s}-{i}',
+                    'session': s,
+                    'concurrency': '1',
+                    'x_e2e': x,
+                    'y': x,
+                    'invalid_reason': bad,
+                }
+            )
+    pts = tmp_path / 'points.csv'
+    _points(pts, rows)
+    out = tmp_path / 'out.json'
+    monkeypatch.setattr(
+        sys, 'argv', ['analyze', '--points', str(pts), '--full', 'FG', '--out', str(out)]
+    )
+    analyze.main()
+    res = json.loads(out.read_text())
+    assert res['arms']['FG']['1']['x_e2e']['n'] == 1
+    assert res['interaction_FG']['1']['x_e2e']['n'] == 1

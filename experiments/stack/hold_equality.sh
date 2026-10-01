@@ -52,9 +52,12 @@ run_eq() {
     echo "=== $tag $(date -Is) worktree=${worktree:-stock} env=$* top_logprobs=$logprobs"
     python experiments/state_safety/run_matrix.py --passes c1 --port 30062 --out-dir "$RUNS" \
       --no-pin --configs plain --tag "$tag" --top-logprobs "$logprobs" "--extra-flags=$flags"
-    echo "exit $? $(date -Is)"
-  )
+    status=$?
+    echo "exit $status $(date -Is)"
+    exit "$status"
+  ) || failed+=("$tag")
 }
+failed=()
 
 FOLD_ENV=(SGLANG_GDN_REPLAYSSM_FOLD=1)
 stack_table
@@ -89,6 +92,11 @@ ln -sfn "$HOME/vp-data/bench/equality/runs/plain__bench_dflash_b16_triton" "$RUN
   echo "compare exit $?"
   python experiments/stack/equality_gate.py "$OUT"
 )
+if (( ${#failed[@]} )); then
+  # The gate already fails when B0 or S0 is missing; a failed lever run leaves that lever
+  # out of the timed sessions. Either way the hold reports failure.
+  echo "equality runs failed: ${failed[*]}"
+fi
 
 # Phase diagnostic (timing, exclusive): composed tree with the probe, B0 and FG.
 (
@@ -101,3 +109,4 @@ ln -sfn "$HOME/vp-data/bench/equality/runs/plain__bench_dflash_b16_triton" "$RUN
   done
 )
 echo "hold_equality end $(date -Is)"
+(( ${#failed[@]} == 0 ))
