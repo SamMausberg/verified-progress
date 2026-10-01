@@ -527,3 +527,26 @@ def test_host_load_attributes_short_lived_own_children_to_the_run() -> None:
     finally:
         root.kill()
     assert result['own_cores'] >= 0.35
+
+
+def test_envelope_and_paired_ratios() -> None:
+    from bench.pareto import envelope, paired_ratios
+
+    def row(label: str, run: str, c: int, y: float) -> dict[str, object]:
+        return {'label': label, 'run': run, 'concurrency': c, 'x_e2e': y / c, 'y': y, 'failed': 0}
+
+    rows = [
+        row('plain', 'r1', 1, 100.0),
+        row('plain', 'r2', 1, 110.0),
+        row('spec', 'r3', 1, 200.0),
+        row('spec', 'r4', 1, 220.0),
+        row('plain', 'r1', 64, 1000.0),
+        row('spec', 'r3', 64, 800.0),
+    ]
+    frontier = aggregate(rows, baseline=None)
+    best = {e['concurrency']: e for e in envelope(frontier)}
+    assert best[1]['best'] == 'spec' and best[64]['best'] == 'plain'
+    assert best[64]['lead'] == pytest.approx(0.25)
+    ratios = {r['concurrency']: r for r in paired_ratios(rows, [('spec', 'plain')])}
+    assert ratios[1]['n'] == 2 and ratios[1]['y_ratio_mean'] == pytest.approx(2.0)
+    assert ratios[64]['y_ratio_mean'] == pytest.approx(0.8)
