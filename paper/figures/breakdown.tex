@@ -12,7 +12,8 @@
 % which round as the README's table does (the rounded percentages of breakdown.csv would
 % give 12.5% instead of 12.4% for MTP at B = 32).
 % Colours follow style.tex: the stock output head in ink (the stock engine), the drafter's heads
-% in purple, every other component in greys, idle time hatched.
+% in purple, every other component in two clearly different greys, idle time hatched. The column
+% at the right is the share of all heads, the target's and the drafter's.
 \vpreadcsv{\breakdowntable}{../evidence/profiles/breakdown.csv}
 \vpreadcsv{\stepsharetable}{../evidence/profiles/step_share.csv}
 \def\vpsplitconfig#1-#2\relax{\gdef\vparm{#1}\gdef\vpbatchsize{#2}}
@@ -41,7 +42,7 @@
   \addlegendentry{output head}
 \addplot[fill=cdraft] table[x=draft_head,y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
   \addlegendentry{draft heads}
-\addplot[fill=ccontext!55] table[x=weight_gemms,y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
+\addplot[fill=ccontext!85] table[x=weight_gemms,y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
   \addlegendentry{target GEMMs}
 \addplot[fill=ccontext!20] table[x expr={\thisrow{gdn_state}+\thisrow{attention}+\thisrow{small_kernels}+\thisrow{draft_model}},y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
   \addlegendentry{other kernels}
@@ -55,6 +56,6 @@
   ([xshift=-0.98cm]axis cs:0,4.3) -- ([xshift=-0.98cm]axis cs:0,6.9);
 \node[annot,rotate=90,anchor=south] at ([xshift=-1.0cm]axis cs:0,1.5) {plain};
 \node[annot,rotate=90,anchor=south] at ([xshift=-1.0cm]axis cs:0,5.6) {MTP};
-\node[annot,anchor=south west] at (axis cs:100.5,-0.6) {heads};
+\node[annot,anchor=south west,align=left] at (axis cs:100.5,-0.6) {all heads};
 \end{axis}
 \end{tikzpicture}

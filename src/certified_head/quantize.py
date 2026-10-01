@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -40,6 +41,20 @@ SCHEME = 'int8-sym-row-v2'
 
 def cache_dir() -> Path:
     return Path(os.environ.get('VP_KERNEL_CACHE', '~/vp-data/kernel')).expanduser()
+
+
+def publish(blob: dict[str, Any], path: Path) -> None:
+    """Write a cache entry so that concurrent builders cannot collide: each saves
+    to its own temporary file and renames it onto ``path`` atomically. Builders
+    of the same entry write the same data, so whichever rename lands last leaves
+    a complete file, and none fails because another moved its temporary file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f'{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp')
+    try:
+        torch.save(blob, tmp)
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def load_head_weight(model_id: str = MODEL_ID, revision: str = MODEL_REVISION) -> torch.Tensor:
@@ -188,6 +203,24 @@ def build_quantized_head(w: torch.Tensor, info: dict[str, Any] | None = None) ->
     )
 
 
+def quantized_for(w: torch.Tensor) -> QuantizedHead:
+    """The quantized copy of an arbitrary BF16 head (for example an engine's own
+    ``lm_head.weight``), cached under its SHA-256. The pinned checkpoint's cache
+    file is reused when its digest matches."""
+    w_cpu = w.detach().to('cpu', torch.bfloat16).contiguous()
+    digest = head_sha256(w_cpu)
+    pinned = cache_dir() / f'{MODEL_ID.replace("/", "--")}-{MODEL_REVISION[:12]}-{SCHEME}.pt'
+    path = cache_dir() / f'sha256-{digest[:16]}-{SCHEME}.pt'
+    for p in (path, pinned):
+        if p.exists():
+            blob = torch.load(p, weights_only=False)
+            if blob['info'].get('head_sha256') == digest:
+                return QuantizedHead(**blob)
+    qh = build_quantized_head(w_cpu, {'head_sha256': digest})
+    publish(qh.__dict__, path)
+    return qh
+
+
 def load_or_build(
     model_id: str = MODEL_ID, revision: str = MODEL_REVISION, rebuild: bool = False
 ) -> tuple[torch.Tensor, QuantizedHead]:
@@ -201,8 +234,5 @@ def load_or_build(
             return w, QuantizedHead(**blob)
     info = {'model_id': model_id, 'revision': revision, 'head_sha256': digest}
     qh = build_quantized_head(w, info)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix('.tmp')
-    torch.save(qh.__dict__, tmp)
-    tmp.replace(path)
+    publish(qh.__dict__, path)
     return w, qh

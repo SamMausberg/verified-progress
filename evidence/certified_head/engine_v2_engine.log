@@ -1,0 +1,41 @@
+=== plain_check start 20:30:12
+{"prompts": 64, "tokens": 14965, "seconds": 9.104202508926392, "temperature": 0.0, "concurrency": 16, "max_new_tokens": 256}
+certified calls 1036, rows differing from stock 0, refused rows 0, probe-tripped rows 0
+=== plain_check done 20:31:31
+=== plain_check_columns start 20:31:31
+{"prompts": 64, "tokens": 14960, "seconds": 8.92622447013855, "temperature": 0.0, "concurrency": 16, "max_new_tokens": 256}
+certified calls 1042, rows differing from stock 0, refused rows 0, probe-tripped rows 0
+=== plain_check_columns done 20:33:07
+=== mtp_check start 20:33:07
+{"prompts": 64, "tokens": 15025, "seconds": 10.527977466583252, "temperature": 0.0, "concurrency": 8, "max_new_tokens": 256}
+certified calls 678, rows differing from stock 0, refused rows 0, probe-tripped rows 0
+=== mtp_check done 20:37:11
+=== dflash_check start 20:37:11
+{"prompts": 64, "tokens": 15111, "seconds": 10.741147518157959, "temperature": 0.0, "concurrency": 8, "max_new_tokens": 256}
+certified calls 603, rows differing from stock 0, refused rows 0, probe-tripped rows 0
+=== dflash_check done 20:41:32
+=== mtp_draft_check start 20:41:32
+{"prompts": 64, "tokens": 14988, "seconds": 13.027430057525635, "temperature": 0.0, "concurrency": 8, "max_new_tokens": 256}
+certified calls 2031, rows differing from stock 0, refused rows 0, probe-tripped rows 0
+=== mtp_draft_check done 20:42:57
+=== dflash_draft_check start 20:42:57
+{"prompts": 64, "tokens": 15071, "seconds": 9.32715892791748, "temperature": 0.0, "concurrency": 8, "max_new_tokens": 256}
+certified calls 599, rows differing from stock 0, refused rows 0, probe-tripped rows 0
+=== dflash_draft_check done 20:45:14
+=== mtp_sampled_check start 20:45:14
+{"prompts": 64, "tokens": 14953, "seconds": 11.771037101745605, "temperature": 0.7, "concurrency": 8, "max_new_tokens": 256}
+certified calls 700, rows differing from stock 0, refused rows 0, probe-tripped rows 0
+=== mtp_sampled_check done 20:46:28
+=== plain_c1 start 20:46:28
+{"prompts": 64, "tokens": 14995, "seconds": 93.57791757583618, "temperature": 0.0, "concurrency": 1, "max_new_tokens": 256}
+=== plain_c1 done 20:49:04
+=== plain_c1_stock start 20:49:04
+{"prompts": 64, "tokens": 14995, "seconds": 54.503291606903076, "temperature": 0.0, "concurrency": 1, "max_new_tokens": 256}
+=== plain_c1_stock done 20:51:01
+=== mtp_c1 start 20:51:01
+{"prompts": 64, "tokens": 14990, "seconds": 55.088382720947266, "temperature": 0.0, "concurrency": 1, "max_new_tokens": 256}
+=== mtp_c1 done 20:53:03
+=== mtp_c1_stock start 20:53:03
+{"prompts": 64, "tokens": 14990, "seconds": 36.4551260471344, "temperature": 0.0, "concurrency": 1, "max_new_tokens": 256}
+=== mtp_c1_stock done 20:54:46
+experiments/certified_head/engine_validate.sh: line 197: unexpected EOF while looking for matching `''

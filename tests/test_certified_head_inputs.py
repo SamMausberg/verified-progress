@@ -8,6 +8,8 @@ before anything is allocated on a device.
 from __future__ import annotations
 
 import dataclasses
+from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -171,3 +173,64 @@ def test_a_sampled_winner_near_the_small_probabilities_falls_back(
     assert stats.fallback.tolist() == [True, False, True, False]
     assert bool(head._any)
     assert bool((stats.status[stats.fallback] == STATUS_BITS['small_probability']).all())
+
+
+def test_engine_flags_reject_unknown_modes() -> None:
+    """The SGLang glue builds Flags directly, so every construction must validate:
+    a misspelled fallback or error model fails start-up instead of running another
+    mode under the wrong name."""
+    from certified_head.engine import Flags
+
+    with pytest.raises(ValueError, match='FALLBACK'):
+        Flags(decode=True, fallback='colums')
+    with pytest.raises(ValueError, match='MODEL'):
+        Flags(decode=True, model='hopper')
+    assert Flags(decode=True, fallback='columns', model='hopper-wgmma').any
+
+
+def test_a_refused_sampled_batch_keeps_the_refused_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The sampling guards check a decision; a refused batch (no decision, already
+    on the stock chain) must keep exactly the status ``refused`` whatever stale
+    values the head's buffers hold."""
+    gen = torch.Generator().manual_seed(4)
+    w = (torch.randn(64, 256, generator=gen) * 0.02).to(torch.bfloat16)
+    head = CertifiedHead.from_quantized(
+        w, build_quantized_head(w), device='cpu', max_batch=8, capacity=16
+    )
+    monkeypatch.setattr(head, '_certifiable', lambda _m: False)
+    head._ymax.fill_(0.0)  # stale values: the guard would flag a refused row
+    h = torch.zeros(4, 256, dtype=torch.bfloat16)
+    seeds = torch.arange(4, dtype=torch.int64)
+    temps = torch.tensor([0.7, -1.0, 1.0, 0.5])
+    _, stats = head.gumbel_sample(h, seeds, seeds, temps, fallback=False)
+    assert stats.status.tolist() == [STATUS_BITS['refused']] * 4
+
+
+def test_concurrent_cache_builds_do_not_collide(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two engines building the same uncached head: the second finishes while the
+    first is between saving and renaming. Each must keep its own temporary file,
+    so both succeed and one complete cache entry remains."""
+    from certified_head import quantize
+
+    monkeypatch.setenv('VP_KERNEL_CACHE', str(tmp_path))
+    gen = torch.Generator().manual_seed(5)
+    w = (torch.randn(64, 256, generator=gen) * 0.02).to(torch.bfloat16)
+    real_save = torch.save
+    nested: dict[str, Any] = {}
+
+    def save(obj: Any, f: Any) -> None:
+        real_save(obj, f)
+        if 'started' not in nested:  # the other builder runs to completion here
+            nested['started'] = True
+            nested['head'] = quantize.quantized_for(w)
+
+    monkeypatch.setattr(torch, 'save', save)
+    first = quantize.quantized_for(w)
+    assert first.info['head_sha256'] == nested['head'].info['head_sha256']
+    entries = sorted(p.name for p in tmp_path.iterdir())
+    assert len(entries) == 1 and entries[0].endswith('.pt'), entries
+    assert quantize.quantized_for(w).info['head_sha256'] == first.info['head_sha256']

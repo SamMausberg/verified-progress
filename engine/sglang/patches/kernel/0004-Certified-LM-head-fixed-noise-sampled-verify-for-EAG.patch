@@ -1,0 +1,379 @@
+From 71c521dbd0bd3f7aad2ba917fc335cedd94513e9 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Wed, 30 Sep 2026 22:33:27 +0000
+Subject: [PATCH] Certified LM head: fixed-noise sampled verify for EAGLE/MTP
+
+Behind SGLANG_CERTIFIED_HEAD_SAMPLED_VERIFY (off by default), a separate
+arm. The target verify graph also captures the certified Gumbel-max sampler
+(CertifiedHead.gumbel_sample) under its own device flag; the stock head runs
+only when neither the greedy nor the sampled flag holds. Before a replay the
+host sets the sampled flag when every request is seeded
+(--enable-deterministic-inference) and sampled with temperature only (no
+top-k, top-p or min-p), with no logit adjustments, no rejection sampling and
+not DFlash, and stages each verify row's seed, position and temperature in
+static buffers.
+
+eagle_sample then verifies with fixed noise: each verify row's token is
+SGLang's seeded sampler (div_(T), softmax, log, multinomial_with_seed) applied
+to that row's logits at its seed and position, which the certified sampler
+returns without the logits (undecided rows run that sampler on the stock
+logits). A draft token is accepted iff it equals the sample, and the sample
+is emitted at the first mismatch or as the bonus. The output is equal in law
+to target sampling and does not depend on the drafter; it is token-identical
+to SGLang's seeded sampler applied to the verify pass's own logits, not to
+plain decoding, and it replaces the stock rejection-sampling verify. In check
+mode the stock seeded sampler runs on the same verify logits outside the
+graph and differing rows are counted.
+---
+ python/sglang/srt/environ.py                 |   3 +
+ python/sglang/srt/layers/certified_head.py   | 181 ++++++++++++++-----
+ python/sglang/srt/speculative/eagle_utils.py |  24 ++-
+ 3 files changed, 162 insertions(+), 46 deletions(-)
+
+diff --git a/python/sglang/srt/environ.py b/python/sglang/srt/environ.py
+index 2c6f1e4fdd..8a7096e070 100644
+--- a/python/sglang/srt/environ.py
++++ b/python/sglang/srt/environ.py
+@@ -1812,6 +1812,9 @@ class Envs:
+     # MTP draft top-1 (draft steps and draft extend) and DFlash's greedy draft
+     # projection through the certified head.
+     SGLANG_CERTIFIED_HEAD_DRAFT = EnvBool(False)
++    # Fixed-noise sampled verify (EAGLE/MTP, seeded temperature-only sampling):
++    # accept a draft iff it equals the certified seeded sample of the verify row.
++    SGLANG_CERTIFIED_HEAD_SAMPLED_VERIFY = EnvBool(False)
+     # Undecided rows: "batch" reruns the stock head on the whole batch;
+     # "columns" (only for shapes whose start-up self-test passes) gathers them.
+     SGLANG_CERTIFIED_HEAD_FALLBACK = EnvStr("batch")
+diff --git a/python/sglang/srt/layers/certified_head.py b/python/sglang/srt/layers/certified_head.py
+index 940abe57b9..97e7b7c359 100644
+--- a/python/sglang/srt/layers/certified_head.py
++++ b/python/sglang/srt/layers/certified_head.py
+@@ -40,9 +40,13 @@ PATH_FLAGS = {
+     "decode": envs.SGLANG_CERTIFIED_HEAD_DECODE,
+     "verify": envs.SGLANG_CERTIFIED_HEAD_VERIFY,
+     "draft": envs.SGLANG_CERTIFIED_HEAD_DRAFT,
++    "sampled_verify": envs.SGLANG_CERTIFIED_HEAD_SAMPLED_VERIFY,
+ }
+
+
++_MAX_ROWS = 256  # certified_head.engine.MAX_HEAD_BATCH
++
++
+ class _PathState:
+     """Host and device state of one path (one CUDA-graph family)."""
+
+@@ -53,6 +57,11 @@ class _PathState:
+         self.covered: Set[int] = set()
+         self.uncovered: Set[int] = set()
+         self.steps = {"certified": 0, "stock_graph": 0, "eager": 0}
++        # Sampled verify: per-row seed, position and temperature, filled before a
++        # replay (padding rows keep earlier, valid values).
++        self.seeds = torch.zeros(_MAX_ROWS, dtype=torch.int64, device=device)
++        self.positions = torch.zeros(_MAX_ROWS, dtype=torch.int64, device=device)
++        self.temps = torch.ones(_MAX_ROWS, dtype=torch.float32, device=device)
+
+     def max_rows(self, limit: int) -> int:
+         """Largest row count whose padded graph certainly has the certified head."""
+@@ -137,6 +146,7 @@ def install(model_runner) -> None:
+         decode=envs.SGLANG_CERTIFIED_HEAD_DECODE.get(),
+         verify=envs.SGLANG_CERTIFIED_HEAD_VERIFY.get(),
+         draft=envs.SGLANG_CERTIFIED_HEAD_DRAFT.get(),
++        sampled_verify=envs.SGLANG_CERTIFIED_HEAD_SAMPLED_VERIFY.get(),
+         fallback=envs.SGLANG_CERTIFIED_HEAD_FALLBACK.get(),
+         model=envs.SGLANG_CERTIFIED_HEAD_MODEL.get(),
+         check=envs.SGLANG_CERTIFIED_HEAD_CHECK.get(),
+@@ -158,16 +168,17 @@ def install(model_runner) -> None:
+     )
+
+
+-def _path_for(role: Optional[str], forward_mode: ForwardMode) -> Optional[str]:
++def _paths_for(role: Optional[str], forward_mode: ForwardMode) -> Tuple[str, ...]:
++    """The paths whose certified head a graph of this role and mode captures."""
+     if role == "target" and forward_mode.is_decode():
+-        return "decode"
++        return ("decode",)
+     if role == "target" and forward_mode.is_target_verify():
+-        return "verify"
++        return ("verify", "sampled_verify")
+     if role == "draft" and forward_mode.is_decode():
+-        return "draft"
++        return ("draft",)
+     if role == "draft" and forward_mode.is_draft_extend_v2():
+-        return "draft_extend"
+-    return None
++        return ("draft_extend",)
++    return ()
+
+
+ def _same_weight(weight: torch.Tensor, head: Any) -> bool:
+@@ -198,7 +209,9 @@ def _capturable(path: str, hidden: torch.Tensor, weight: torch.Tensor):
+         and _same_weight(weight, head)
+     )
+     if not torch.cuda.is_current_stream_capturing():
+-        if ok:
++        if ok and path == "sampled_verify":
++            head.warm_sampling(hidden)
++        elif ok:
+             head.warm(hidden, check=_heads.flags.check)
+         return None
+     (st.covered if ok else st.uncovered).add(m)
+@@ -215,36 +228,54 @@ def gated_logits(
+     """Called by ``LogitsProcessor.forward`` in place of ``_get_logits``.
+
+     Returns None when the stock head should run as usual. Under capture it
+-    records the certified head under the path's gate and the stock head under
+-    its negation, and returns the stock logits tensor (stale when the gate held).
++    records each path's certified head under that path's gate and the stock
++    head under the negation of all of them, and returns the stock logits
++    tensor (stale when a gate held). A target verify graph serves both greedy
++    verify and fixed-noise sampled verify; at most one gate holds per replay.
+     """
+     global _draft_step
+-    path = _path_for(role, forward_mode)
+-    if path == "draft":
++    paths = _paths_for(role, forward_mode)
++    if "draft" in paths:
+         _draft_step = None
+-    found = _capturable(path, hidden, lm_head.weight) if path is not None else None
+-    if found is None:
++    found = []
++    for path in paths:
++        got = _capturable(path, hidden, lm_head.weight)
++        if got is not None:
++            found.append((path, *got))
++    if not found:
+         return None
+-    st, head = found
+     from torch._higher_order_ops.cudagraph_conditional_nodes import _if_body
+
+-    if _heads.flags.check:
+-        # Validation: always run the stock head and count rows whose tokens differ.
+-        logits = stock_logits()
+-        ids = head.argmax(
+-            hidden,
+-            gate=st.gate,
+-            valid=st.valid,
+-            stock_ids=torch.argmax(logits, dim=-1),
+-        )
+-    else:
+-        ids = head.argmax(hidden, gate=st.gate, valid=st.valid)
++    check = _heads.flags.check
++    # Validation: always run the stock head and count rows whose tokens differ
++    # (sampled verify is compared outside the graph, in check_fixed_noise).
++    logits = stock_logits() if check else None
++    gates = []
++    m = hidden.shape[0]
++    for path, st, head in found:
++        if path == "sampled_verify":
++            ids = head.gumbel_sample(
++                hidden,
++                st.seeds[:m],
++                st.positions[:m],
++                st.temps[:m],
++                gate=st.gate,
++                valid=st.valid,
++            )
++        else:
++            stock_ids = torch.argmax(logits, dim=-1) if check else None
++            ids = head.argmax(hidden, gate=st.gate, valid=st.valid, stock_ids=stock_ids)
++        if path == "draft":
++            _draft_step = (ids, st.gate)
++        gates.append(st.gate)
++    if logits is None:
++        certified = gates[0]
++        for gate in gates[1:]:
++            certified = torch.logical_or(certified, gate)
+         out = []
+-        with _if_body(torch.logical_not(st.gate)):
++        with _if_body(torch.logical_not(certified)):
+             out.append(stock_logits())
+         logits = out[0]
+-    if path == "draft":
+-        _draft_step = (ids, st.gate)
+     return logits
+
+
+@@ -341,9 +372,10 @@ def mtp_draft_eligible(topk: int) -> bool:
+     return topk == 1 and not get_spec().speculative_use_rejection_sampling
+
+
+-def _needs_logits(forward_batch: ForwardBatch, observer: Any) -> bool:
++def _adjusts_logits(forward_batch: ForwardBatch, observer: Any) -> bool:
++    """The batch changes or reads the logits besides picking its tokens."""
+     si = forward_batch.sampling_info
+-    if si is None or not si.is_all_greedy or forward_batch.return_logprob:
++    if si is None or forward_batch.return_logprob:
+         return True
+     if len(si.temperatures) != forward_batch.batch_size:  # beam tail rows
+         return True
+@@ -363,10 +395,37 @@ def _needs_logits(forward_batch: ForwardBatch, observer: Any) -> bool:
+     )
+
+
++def _greedy_eligible(forward_batch: ForwardBatch, observer: Any) -> bool:
++    si = forward_batch.sampling_info
++    return (
++        si is not None
++        and si.is_all_greedy
++        and not _adjusts_logits(forward_batch, observer)
++    )
++
++
++def _fixed_noise_eligible(model_runner, forward_batch: ForwardBatch) -> bool:
++    """Fixed-noise sampled verify: EAGLE/MTP, every request seeded and sampled
++    with temperature only (no top-k, top-p or min-p), no logit adjustments."""
++    from sglang.srt.runtime_context import get_spec
++
++    si = forward_batch.sampling_info
++    return (
++        si is not None
++        and not si.is_all_greedy
++        and si.sampling_seed is not None
++        and not (si.need_top_k_sampling or si.need_top_p_sampling)
++        and not si.need_min_p_sampling
++        and not model_runner.spec_algorithm.is_dflash_family()
++        and not get_spec().speculative_use_rejection_sampling
++        and not _adjusts_logits(forward_batch, model_runner.sampling_observer)
++    )
++
++
+ def before_replay(
+     model_runner, forward_batch: ForwardBatch, can_run_graph: bool
+ ) -> None:
+-    """Set the gate for the ModelRunner graph replay about to run."""
++    """Set the gates for the ModelRunner graph replay about to run."""
+     if _heads is None:
+         return
+     mode = forward_batch.forward_mode
+@@ -380,22 +439,42 @@ def before_replay(
+             else:
+                 _state["dflash_draft"].steps["eager"] += 1
+         return
+-    path = _path_for("target", mode)
+-    st = _state.get(path) if path is not None else None
+-    if st is None:
++    paths = [p for p in _paths_for("target", mode) if p in _state]
++    if not paths:
+         return
+-    forward_batch.certified_rows = None
++    forward_batch.certified_path = None
+     if not can_run_graph:
+-        st.steps["eager"] += 1
++        for path in paths:
++            _state[path].steps["eager"] += 1
+         return
+     # Decode rows are requests; verify rows are requests x draft tokens. CUDA-graph
+     # padding follows the real rows.
+     rows = int(forward_batch.input_ids.shape[0])
+-    eligible = not _needs_logits(
+-        forward_batch, model_runner.sampling_observer
+-    ) and not (path == "verify" and _verify_needs_logits(model_runner))
+-    if set_gate(path, rows, eligible):
+-        forward_batch.certified_rows = rows
++    verify_ok = not (mode.is_target_verify() and _verify_needs_logits(model_runner))
++    observer = model_runner.sampling_observer
++    chosen = None
++    for path in paths:
++        if path == "sampled_verify":
++            eligible = chosen is None and _fixed_noise_eligible(
++                model_runner, forward_batch
++            )
++            if eligible:
++                _stage_sampling(_state[path], forward_batch, rows)
++        else:
++            eligible = _greedy_eligible(forward_batch, observer)
++        if set_gate(path, rows, eligible and verify_ok) and chosen is None:
++            chosen = path
++    forward_batch.certified_path = chosen
++    forward_batch.certified_rows = rows
++
++
++def _stage_sampling(st: _PathState, forward_batch: ForwardBatch, rows: int) -> None:
++    """Per-row seed, position and temperature for the sampled-verify head."""
++    si = forward_batch.sampling_info
++    per_req = rows // forward_batch.batch_size
++    st.seeds[:rows].copy_(si.sampling_seed.view(-1).repeat_interleave(per_req))
++    st.positions[:rows].copy_(forward_batch.positions[:rows])
++    st.temps[:rows].copy_(si.temperatures.view(-1).float().repeat_interleave(per_req))
+
+
+ def _verify_needs_logits(model_runner) -> bool:
+@@ -410,10 +489,24 @@ def after_replay(
+     model_runner, forward_batch: ForwardBatch, logits_output: LogitsProcessorOutput
+ ) -> None:
+     """Copy the certified ids out of the head's buffer before the next replay."""
+-    rows = getattr(forward_batch, "certified_rows", None)
+-    if rows is None:
++    path = getattr(forward_batch, "certified_path", None)
++    if path is not None:
++        attach_ids(path, logits_output, forward_batch.certified_rows)
++
++
++def check_fixed_noise(next_token_logits: torch.Tensor, ids: torch.Tensor) -> None:
++    """Check mode for sampled verify: compare the certified samples with SGLang's
++    seeded sampler applied to the same verify logits (valid in check mode)."""
++    if _heads is None or not _heads.flags.check:
+         return
+-    attach_ids(_path_for("target", forward_batch.forward_mode), logits_output, rows)
++    from certified_head.reference import stock_seeded_sample_from_logits
++
++    st = _state["sampled_verify"]
++    n = ids.shape[0]
++    stock = stock_seeded_sample_from_logits(
++        next_token_logits[:n], st.seeds[:n], st.positions[:n], st.temps[:n]
++    )
++    _heads.get("sampled_verify").add_mismatches(ids, stock)
+
+
+ def take_ids(logits_output: LogitsProcessorOutput) -> Optional[torch.Tensor]:
+diff --git a/python/sglang/srt/speculative/eagle_utils.py b/python/sglang/srt/speculative/eagle_utils.py
+index d6e90a6bfc..b04f861fbf 100644
+--- a/python/sglang/srt/speculative/eagle_utils.py
++++ b/python/sglang/srt/speculative/eagle_utils.py
+@@ -808,6 +808,8 @@ def eagle_sample(
+     # Sample tokens
+     target_predict = None
+     use_rejection_sampling = get_spec().speculative_use_rejection_sampling
++    # Certified LM head: greedy ids, or fixed-noise samples, without the logits.
++    certified_ids = certified_head.take_ids(logits_output)
+     if _verify_uses_greedy(
+         is_all_greedy=sampling_info.is_all_greedy,
+         is_cpu=_is_cpu,
+@@ -815,8 +817,7 @@ def eagle_sample(
+         is_xpu=_is_xpu,
+         use_rejection_sampling=use_rejection_sampling,
+     ):
+-        # Certified LM head: the stock argmax's tokens, computed without logits.
+-        target_predict = certified_head.take_ids(logits_output)
++        target_predict = certified_ids
+         if target_predict is None:
+             target_predict = torch.argmax(next_token_logits, dim=-1)
+         target_predict = target_predict.reshape(bs, verify_input.draft_token_num)
+@@ -846,6 +847,25 @@ def eagle_sample(
+                 tp_group.broadcast(predict, src=0)
+                 tp_group.broadcast(accept_index, src=0)
+                 tp_group.broadcast(num_correct_drafts, src=0)
++    elif certified_ids is not None:
++        # Fixed-noise sampled verification (SGLANG_CERTIFIED_HEAD_SAMPLED_VERIFY):
++        # each verify row's token is SGLang's seeded sample of that row's logits
++        # (seed, position, temperature). A draft token is accepted iff it equals
++        # the sample, and the sample is emitted at the first mismatch or as the
++        # bonus: equal in law to target sampling and independent of the drafter.
++        certified_head.check_fixed_noise(next_token_logits, certified_ids)
++        target_predict = certified_ids.reshape(bs, verify_input.draft_token_num)
++        predict, accept_index, num_correct_drafts = verify_tree_greedy_func(
++            predicts=predict,
++            accept_index=accept_index,
++            accept_token_num=num_correct_drafts,
++            candidates=candidates,
++            retrieve_index=verify_input.retrieve_index,
++            retrieve_next_token=verify_input.retrieve_next_token,
++            retrieve_next_sibling=verify_input.retrieve_next_sibling,
++            target_predict=target_predict,
++            topk=verify_input.tree_topk,
++        )
+     elif _can_use_sparse_uno_tree_target_sampling(
+         uno_target_max_top_k,
+         sampling_info,
+--
+2.34.1

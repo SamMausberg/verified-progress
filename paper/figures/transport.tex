@@ -33,13 +33,14 @@
 \addplot[copy int8 g128,derived] table[x=threshold_int8_g128,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};
 \addplot[copy int8 row,derived] table[x=threshold_int8_row,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};
 \addplot[copy int4,derived] table[x=threshold_int4_row,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};
-\addplot[drafter dflash,mark=*,mark size=1.4pt,mark repeat=50,mark phase=1] table[x=rho_all,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};
-\addplot[drafter mtp,mark repeat=50,mark phase=26] table[x=rho_all,y=q,col sep=comma]{../evidence/head_geometry/rho_mtp4b_quantiles.csv};
+% DFlash: solid, filled circles; MTP: lighter purple, dashed, hollow triangles
+\addplot[drafter dflash,mark=*,mark size=1.6pt,mark repeat=50,mark phase=1] table[x=rho_all,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};
+\addplot[cdraft!60,thick,dash pattern=on 3.5pt off 1.8pt,mark=triangle*,mark size=2.1pt,mark options={solid,fill=white,draw=cdraft},mark repeat=50,mark phase=26] table[x=rho_all,y=q,col sep=comma]{../evidence/head_geometry/rho_mtp4b_quantiles.csv};
 \draw[{Stealth[length=1.6mm]}-{Stealth[length=1.6mm]},ink!70] (axis cs:\figDstar,0.5) -- (axis cs:\figRho,0.5);
 \node[annot,fill=white] at (axis cs:0.037,0.5) {medians $\vpnum{0}{\figRho/\figDstar}\times$ apart};
 \node[annot,anchor=east,align=right] at (axis cs:0.0052,0.3) {$\delta^\ast_i$: int8,\\128 columns};
-\node[annot,anchor=west] at (axis cs:0.0084,0.3) {$\delta^\ast_i$: int8, per entry};
-\node[annot,anchor=east,align=right] at (axis cs:0.155,0.8) {$\delta^\ast_i$: int4,\\per entry};
+\node[annot,anchor=west] at (axis cs:0.0084,0.3) {$\delta^\ast_i$: int8, per row};
+\node[annot,anchor=east,align=right] at (axis cs:0.155,0.8) {$\delta^\ast_i$: int4,\\per row};
 \node[annot,anchor=east] at (axis cs:0.9,0.8) {$\rho$: DFlash-4B};
 \node[annot,anchor=east] at (axis cs:0.74,0.1) {$\rho$: MTP-4B};
 \end{semilogxaxis}
@@ -61,7 +62,7 @@
 \node[below,inner sep=2pt] at (80,-2) {$h^t$, $\norm{h^t}_2=\vpnum{0}{\figHt}$};
 \draw[flow,very thick,cdraft] (O) -- (D);
 \node[anchor=south east,align=right,inner sep=1pt] at ($(D)+(-1,1)$) {$h^d$, $\norm{h^d}_2=\vpnum{1}{\figHd}$};
-\draw[thick,cdraft,dashed,shorten >=2.2pt] (D) -- node[sloped,below,annot,text=black,pos=.52,yshift=-2.5pt]
+\draw[thick,cdraft,dashed,shorten >=2.2pt] (D) -- node[sloped,below,note,inner sep=1pt,pos=.44,yshift=-2pt]
   {$\Delta$, $\norm\Delta_2=\vpnum{2}{\figDrel}\,\norm{h^t}_2$} (T);
 \draw[ink!60] ($(O)+(13,0)$) arc[start angle=0,end angle={acos(\figCos)},radius=13];
 \node[note,anchor=west] at (14,5) {$\cos=\vpnum{2}{\figCos}$};
@@ -69,7 +70,7 @@
 \fill[ccert] (T) circle[radius={\figDstar*\figHt}];
 \draw[ccert,thin] (T) circle[radius=2.6pt];
 \draw[ccert,thin] (T) -- (148,-14);
-\node[note,text=black,anchor=north,align=center] at (146,-14) {transport beats int8 only\\inside the dot in this circle:\\radius $\vpnum{4}{\figDstar}\,\norm{h^t}_2$};
+\node[note,text=black,anchor=north,align=center] at (146,-14) {transport wins only\\inside this dot, of radius\\$\vpnum{4}{\figDstar}\,\norm{h^t}_2$};
 \end{scope}
 % (a)'s title on (b)'s title line
 \node[panel title,anchor=north] at (amid |- b.outer north) {\paneltitle{a}{Median DFlash-4B head inputs, to scale}};
