@@ -3,10 +3,10 @@ measured acceptance, and what acceptance 5x would need.
 
 Everything here is arithmetic on committed measurements and the model configs; no GPU.
 
-* Baseline per concurrency c: the best tuned DFlash arm of an exact class in bench's
-  confirmation frontier (`--frontier`, evidence/bench/confirm/frontier.csv), with its
-  per-user decode rate x_decode, its tokens per verify cycle (accept length, tau) and
-  the cycle time tau / x_decode.
+* Baseline per concurrency c: the best tuned DFlash arm of an exact class (bench's own
+  `bench.arms.EXACT_CLASSES`) in bench's confirmation frontier (`--frontier`,
+  evidence/bench/confirm/frontier.csv), with its per-user decode rate x_decode, its
+  tokens per verify cycle (accept length, tau) and the cycle time tau / x_decode.
 * Bandwidth floor of one block-16 cycle at c requests: every weight byte of the target
   and the drafter (its six layers, the fc over eight target layers and the tied head)
   read once, plus per request the FP32 GDN state read once and written either once per
@@ -39,15 +39,18 @@ import csv
 import hashlib
 import json
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from bench.arms import EXACT_CLASSES  # the exact classes bench's frontier rows carry
 
 BW = 3.79e12  # bytes/s: HBM read bandwidth over the head's bytes (evidence/profiles/hbm_bandwidth.json)
 TARGET_PARAMS = 4_204_789_760  # Qwen3.5-4B incl. the tied head (P2 weight inventory)
 GDN_STATE = 24 * 32 * 128 * 128 * 4  # FP32 state per request, bytes (50.3 MB)
 KV_PER_TOKEN = 8 * 4 * 256 * 2 * 2  # target attention layers x KV heads x head dim x (K, V) x BF16
 BLOCK = 16
-EXACT = ('stock', 'exact-up-to-rounding')
 DFLASH_LABELS = ('dflash-tuned', 'dflash-tuned-b16', 'dflash-tuned-b4')
 
 
@@ -71,7 +74,7 @@ def baselines(path: Path) -> dict[int, dict[str, Any]]:
     best: dict[int, dict[str, Any]] = {}
     with path.open() as f:
         for r in csv.DictReader(f):
-            if r['label'] not in DFLASH_LABELS or r['exactness'] not in EXACT:
+            if r['label'] not in DFLASH_LABELS or r['exactness'] not in EXACT_CLASSES:
                 continue
             c = int(r['concurrency'])
             row = {

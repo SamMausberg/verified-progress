@@ -593,3 +593,40 @@ def test_failed_check_never_writes_the_pin(tmp_path, monkeypatch):
     with pytest.raises(gate.GateError):
         gate.check(path, None, pin)
     assert not pin.exists()
+
+
+def test_ceiling_baselines_use_bench_exact_classes(tmp_path):
+    from bench.arms import EXACT_CLASSES, EXACTNESS_CLASSES
+
+    path = tmp_path / 'frontier.csv'
+    fields = [
+        'label',
+        'concurrency',
+        'n',
+        'x_e2e_mean',
+        'x_decode_mean',
+        'y_mean',
+        'accept_length_mean',
+        'exactness',
+    ]
+    rows = []
+    for i, cls in enumerate(EXACTNESS_CLASSES):
+        rows.append(
+            {
+                'label': 'dflash-tuned-b16',
+                'concurrency': str(i + 1),
+                'n': '3',
+                'x_e2e_mean': '900',
+                'x_decode_mean': '950',
+                'y_mean': '900',
+                'accept_length_mean': '5.7',
+                'exactness': cls,
+            }
+        )
+    with path.open('w', newline='') as f:
+        w = csv.DictWriter(f, fieldnames=fields)
+        w.writeheader()
+        w.writerows(rows)
+    kept = ceiling.baselines(path)
+    assert {r['exactness'] for r in kept.values()} == set(EXACT_CLASSES)
+    assert len(kept) == len(EXACT_CLASSES)
