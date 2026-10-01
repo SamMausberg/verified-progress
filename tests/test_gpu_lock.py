@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import fcntl
 import os
+import pty
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -415,3 +417,64 @@ def test_a_zombie_server_process_is_not_an_orphan(tmp_path: Path) -> None:
         assert time.time() - start < 4, 'the drain waited for a zombie'
     finally:
         holder.kill()
+
+
+def test_cleanup_does_not_wait_for_a_group_of_zombies(tmp_path: Path) -> None:
+    """A group member that has exited but is not reaped yet must not hold the lock for the grace."""
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock), GPU_JOB_KILL_GRACE='10')
+    # The job forks B, B forks C (still in the job's group), then B leaves the group and never
+    # reaps C. Once the job exits, C stays a zombie in the group for as long as B sleeps.
+    code = (
+        'import os, time\n'
+        'if os.fork() == 0:\n'
+        '    if os.fork() == 0:\n'
+        '        os._exit(0)\n'
+        '    os.setpgid(0, 0)\n'
+        '    time.sleep(8)\n'
+        '    os._exit(0)\n'
+        'time.sleep(1)\n'
+    )
+    start = time.time()
+    done = subprocess.run(
+        ['bash', str(SCRIPT), '-s', 'python3', '-c', code], env=env, timeout=60, check=False
+    )
+    assert done.returncode == 0
+    assert time.time() - start < 5, 'cleanup waited out the grace period for a zombie'
+
+
+def test_a_job_started_from_a_terminal_reads_end_of_input_instead_of_stopping(
+    tmp_path: Path,
+) -> None:
+    """The job runs in its own process group, so a read from the terminal would stop it."""
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock))
+    out = tmp_path / 'out'
+    bash = shutil.which('bash')
+    assert bash is not None
+    argv = ['bash', str(SCRIPT), '-s', 'bash', '-c', f'read -r x; echo "read=$?" > {out}']
+    pid, fd = pty.fork()  # the child gets the pty as its controlling terminal and stdin
+    if pid == 0:
+        try:
+            os.execve(bash, argv, env)
+        finally:
+            os._exit(127)
+    try:
+        deadline = time.time() + 30
+        status = None
+        while status is None and time.time() < deadline:
+            done, raw = os.waitpid(pid, os.WNOHANG)
+            if done:
+                status = os.waitstatus_to_exitcode(raw)
+            else:
+                time.sleep(0.1)
+        if status is None:
+            os.kill(pid, 9)
+            os.waitpid(pid, 0)
+            pytest.fail('the job hung reading the terminal')
+        assert status == 0
+        assert out.read_text().strip() == 'read=1'
+    finally:
+        os.close(fd)

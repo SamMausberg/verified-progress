@@ -10,7 +10,9 @@
 # when the command exits, so a child still starting up (before it touches the GPU) cannot
 # outlive the lock and overlap the next exclusive job. Processes that leave the group on
 # purpose (setsid, start_new_session) are not touched; gpu_drain_wait.sh catches those that
-# reach the GPU and any SGLang server process before the next exclusive job starts.
+# reach the GPU and any SGLang server process before the next exclusive job starts. Because
+# the command runs in a background process group, it cannot read from a terminal (the kernel
+# would stop it with SIGTTIN): when stdin is a terminal, the command reads /dev/null instead.
 set -uo pipefail
 
 mode="$1"
@@ -29,11 +31,22 @@ set -m # background jobs get their own process group, so the whole group can be 
 pid=""
 # TERM the job's process group, then KILL whatever is still there after a grace period, so a
 # process that ignores TERM cannot outlive the job (GPU_JOB_KILL_GRACE seconds, default 10).
+# True while a member of the job's group is still running. A member that has exited but is not
+# yet reaped (a zombie) still answers kill -0, but it cannot do anything, so it does not count.
+group_running() {
+  local f s state pgrp
+  for f in /proc/[0-9]*/stat; do
+    { read -r s <"$f"; } 2>/dev/null || continue
+    read -r state _ pgrp _ <<<"${s##*) }"
+    if [ "$pgrp" = "$pid" ] && [ "$state" != Z ]; then return 0; fi
+  done
+  return 1
+}
 stop_group() {
   [ -n "$pid" ] || return 0
   kill -TERM -- "-$pid" 2>/dev/null || return 0
   local t=0
-  while kill -0 -- "-$pid" 2>/dev/null && [ "$t" -lt "${GPU_JOB_KILL_GRACE:-10}" ]; do
+  while group_running && [ "$t" -lt "${GPU_JOB_KILL_GRACE:-10}" ]; do
     sleep 1
     t=$((t + 1))
   done
@@ -41,7 +54,7 @@ stop_group() {
 }
 # The trap is in place before the command starts, so a holder death at any moment is handled.
 trap 'stop_group; exit 143' TERM INT HUP
-"$@" &
+if [ -t 0 ]; then "$@" </dev/null & else "$@" & fi
 pid=$!
 wait "$pid"
 rc=$?
