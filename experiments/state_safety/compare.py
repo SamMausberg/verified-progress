@@ -303,7 +303,12 @@ def write_table(path: str, summary: dict[str, Any]) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument('--runs', default=str(Path.home() / 'vp-data/state/runs'))
+    ap.add_argument(
+        '--runs', required=True, help='run root: ~/vp-data/state/runs_pinned (or runs, unpinned)'
+    )
+    ap.add_argument(
+        '--require-all', action='store_true', help='exit non-zero if any pair has a missing run'
+    )
     ap.add_argument('--pairs', required=True, help='JSON file: list of [label, run_a, run_b]')
     ap.add_argument('--out-json', required=True)
     ap.add_argument('--out-csv', required=True, help='one row per divergence event')
@@ -316,10 +321,12 @@ def main() -> None:
     summary = {}
     events = []
     consistency: dict[str, Any] = {}
+    missing = []
     for label, ra, rb in pairs:
         pa, pb = root / f'{ra}.jsonl', root / f'{rb}.jsonl'
         if not (pa.exists() and pb.exists()):
             print(f'skip {label}: missing {pa if not pa.exists() else pb}')
+            missing.append(label)
             continue
         run_a, run_b = load_run(pa), load_run(pb)
         for name, run in ((ra, run_a), (rb, run_b)):
@@ -352,7 +359,16 @@ def main() -> None:
         runs = sorted({r for _, ra, rb in pairs for r in (ra, rb)})
         Path(args.out_meta).write_text(json.dumps(run_meta(root, runs), indent=1) + '\n')
     Path(args.out_json).write_text(
-        json.dumps({'pairs': summary, 'self_consistency': consistency}, indent=2) + '\n'
+        json.dumps(
+            {
+                'runs': str(root),
+                'pairs': summary,
+                'missing_pairs': missing,
+                'self_consistency': consistency,
+            },
+            indent=2,
+        )
+        + '\n'
     )
     cols = [
         'pair',
@@ -383,6 +399,8 @@ def main() -> None:
                 'prev_cycle_len_b': cyc.get('prev_cycle_len'),
             }
             f.write(','.join('' if e.get(c) is None else str(e.get(c)) for c in cols) + '\n')
+    if args.require_all and missing:
+        raise SystemExit(f'{len(missing)} pairs have missing runs under {root}: {missing}')
 
 
 if __name__ == '__main__':

@@ -98,7 +98,7 @@ def analyse(run_a: dict[str, Any], run_b: dict[str, Any]) -> dict[str, Any]:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument('--runs', default=str(Path.home() / 'vp-data/state/runs'))
+    ap.add_argument('--runs', required=True, help='run root (runs_pinned or runs)')
     ap.add_argument('--ref', required=True, help='reference run, e.g. plain/c1')
     ap.add_argument('--spec', required=True, help='speculative run, e.g. mtp_s3/c1')
     ap.add_argument('--out', required=True)

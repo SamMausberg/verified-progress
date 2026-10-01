@@ -60,7 +60,11 @@ the server until they match. Before each start it waits until enough memory is
 free: 68 GB for MTP and 52 GB for plain decode, or `GPU_STARTUP_MIN_FREE_GB`.
 Pinned runs go to `~/vp-data/state/runs_pinned/`. The first matrix runs (cap
 16, pools sized from free memory) stay in `~/vp-data/state/runs/`; `--no-pin`
-reproduces them. Targeted tests compare runs on one server and keep the
+reproduces them. `analyze_all.sh` analyses both roots: `pairs_pinned.json` over
+`runs_pinned/` into the `*_pinned` evidence files, and `pairs.json` over `runs/` into
+the unsuffixed ones. `compare.py` and `cycles.py` take the root as a required
+`--runs`. Once `runs_pinned/` exists, a pair with a missing run fails the script
+unless `STATE_ALLOW_MISSING=1` is set. Targeted tests compare runs on one server and keep the
 earlier flags.
 
 | Name | Extra flags |

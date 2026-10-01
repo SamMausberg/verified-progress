@@ -160,9 +160,19 @@ concurrency comparison below, generated up to two tokens past their known diverg
 - The two tapped servers had different pools: 159,322 vs 166,522 KV tokens and 199
   vs 97 GDN slots (`pools.json`). The pools were not pinned then. At batch 1 they do
   not change the batch. With the radix cache on, they can change which copy of a shared
-  prefix's KV a request reads (history section). That would first show at a
-  full-attention layer's output, and here every first difference is at layer 0's GDN
-  recurrence, before any layer reads cached KV.
+  prefix's KV a request reads (history section). In the target model that would first
+  show at a full-attention layer's output.
+- MTP has a second route. Its draft layer is full attention over its own cached prefix
+  KV, so a different copy can change the proposals. That changes the accepted lengths
+  and the cycle boundaries, and with them which positions later verify forwards
+  compute, all without any target attention output differing first. So for MTP
+  comparisons, the location of the first difference does not rule out the pools.
+- Here it bounds them only for the first difference itself. In all 167 prompts that
+  difference is at output index 1, the first row of the first verify forward. That
+  row's layer-0 GDN output depends on its token and on the GDN state left by the
+  prefill, not on the proposals in the later rows or on any cached KV (reasoning from
+  the row-wise structure of the kernels). Whether the pools contributed to the
+  divergences that follow is not determined. The pinned rerun removes the question.
 
 **Plain decode at client concurrency 1 vs 32, with at most 16 requests running** (`mechanism_plain_c1_vs_c32.json`;
 40 tapped prompts: the 16 whose divergence in the matrix run was not an exact tie,

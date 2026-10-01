@@ -5,23 +5,41 @@
 # that collect them (see README.md), because they read tens of thousands of files.
 #
 #   experiments/state_safety/analyze_all.sh
+#
+# Two run roots: runs_pinned/ (pinned pools, the current matrix; *_pinned outputs)
+# and runs/ (the first, unpinned matrix; the unsuffixed outputs). Once runs_pinned/
+# exists, every pair in pairs_pinned.json must have both runs, or the script fails;
+# STATE_ALLOW_MISSING=1 regenerates from what has landed so far.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo="$(cd "$here/../.." && pwd)"
 evidence="$repo/evidence/state_safety"
 runs="$HOME/vp-data/state/runs"
+pinned="$HOME/vp-data/state/runs_pinned"
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
 # shellcheck source=/dev/null
 source "$repo/scripts/sglang_env.sh"
 cd "$here"
 
-nice -n 19 python compare.py --pairs pairs.json \
+nice -n 19 python compare.py --runs "$runs" --pairs pairs.json \
   --out-json "$evidence/noise_floor.json" --out-table "$evidence/noise_floor.csv" \
   --out-csv "$evidence/divergences.csv" --out-meta "$evidence/run_meta.json"
+if [ -d "$pinned" ]; then
+  require=(--require-all)
+  if [ "${STATE_ALLOW_MISSING:-0}" = 1 ]; then require=(); fi
+  nice -n 19 python compare.py --runs "$pinned" --pairs pairs_pinned.json "${require[@]}" \
+    --out-json "$evidence/noise_floor_pinned.json" \
+    --out-table "$evidence/noise_floor_pinned.csv" \
+    --out-csv "$evidence/divergences_pinned.csv" --out-meta "$evidence/run_meta_pinned.json"
+fi
 
 # Top-2 BF16 gap statistics of plain decode at batch 1, kept with the noise floor.
-nice -n 19 python - "$runs/plain/c1.jsonl" "$evidence/noise_floor.json" <<'PY'
+for root_floor in "$runs:noise_floor.json" "$pinned:noise_floor_pinned.json"; do
+  root="${root_floor%%:*}"
+  floor="$evidence/${root_floor##*:}"
+  [ -f "$root/plain/c1.jsonl" ] && [ -f "$floor" ] || continue
+  nice -n 19 python - "$root/plain/c1.jsonl" "$floor" <<'PY'
 import json
 import sys
 
@@ -48,6 +66,7 @@ d['top2_gap_plain_c1'] = {
 }
 open(sys.argv[2], 'w').write(json.dumps(d, indent=2) + '\n')
 PY
+done
 
 # First differing module per comparison, one row per module, for the paper's figure.
 nice -n 19 python - "$evidence" <<'PY'
@@ -178,8 +197,11 @@ def add(source, label, dir_a, dir_b):
     )
 
 
-for label, s in json.loads((evidence / 'noise_floor.json').read_text())['pairs'].items():
-    add('noise_floor.json', label, *(root / 'runs' / Path(r).parent for r in (s['run_a'], s['run_b'])))
+for floor, sub in (('noise_floor.json', 'runs'), ('noise_floor_pinned.json', 'runs_pinned')):
+    if not (evidence / floor).exists():
+        continue
+    for label, s in json.loads((evidence / floor).read_text())['pairs'].items():
+        add(floor, label, *(root / sub / Path(r).parent for r in (s['run_a'], s['run_b'])))
 for f in sorted(evidence.glob('mechanism_*.json')):
     s = json.loads(f.read_text())['summary']
     add(f.name, f'{Path(s["a"]).name} vs {Path(s["b"]).name}', Path(s['a']), Path(s['b']))
@@ -198,8 +220,12 @@ PY
 # Drift and divergences by rejection position, for every speculative config.
 for spec in mtp_s1 mtp_s3 mtp_s5 mtp_tree; do
   if [ -f "$runs/$spec/c1.jsonl" ]; then
-    nice -n 19 python cycles.py --ref plain/c1 --spec "$spec/c1" \
+    nice -n 19 python cycles.py --runs "$runs" --ref plain/c1 --spec "$spec/c1" \
       --out "$evidence/cycles_$spec.json" > /dev/null
+  fi
+  if [ -f "$pinned/$spec/c1.jsonl" ] && [ -f "$pinned/plain/c1.jsonl" ]; then
+    nice -n 19 python cycles.py --runs "$pinned" --ref plain/c1 --spec "$spec/c1" \
+      --out "$evidence/cycles_${spec}_pinned.json" > /dev/null
   fi
 done
 
