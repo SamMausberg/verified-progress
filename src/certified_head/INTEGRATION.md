@@ -69,7 +69,7 @@ All are off by default; with none set the patched engine runs its stock code.
 
 ## The SGLang patch series
 
-`engine/sglang/patches/kernel/0001-0008` apply in order to `bd66ce34`:
+`engine/sglang/patches/kernel/0001-0009` apply in order to `bd66ce34`:
 
 ```sh
 scripts/sglang_worktree.sh kernel
@@ -88,6 +88,7 @@ export SGLANG_CERTIFIED_HEAD_SRC="$PWD/src" SGLANG_CERTIFIED_HEAD_DECODE=1
 | 0006 | keeps the stock head if `hopper-wgmma` is combined with deterministic inference | `MODEL` |
 | 0007 | the MTP draft and DFlash draft paths write their counters after each graph replay, so the last replay is recorded | `STATS` |
 | 0008 | in check mode, the counters are written again after the sampled-verify comparison, so its last mismatches are recorded | `STATS`, `CHECK` |
+| 0009 | fixed-noise sampled verify refuses any batch with a greedy row (not only an all-greedy batch) | `SAMPLED_VERIFY` |
 
 Patch 0004 needs `--enable-deterministic-inference`, which is what gives every
 request a seed; its reference is stock SGLang in that mode (a different engine

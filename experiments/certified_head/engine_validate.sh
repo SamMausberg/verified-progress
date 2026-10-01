@@ -13,6 +13,9 @@
 # test. The c1 arms run one request at a time, so a certified server and a stock
 # server see the same batch shapes and their outputs can be compared directly.
 #
+# With --check-only, nothing runs: each named check arm's counters in OUT are checked
+# again (check_arm_stats.py), for example after a change to the check.
+#
 # Arms:
 #   plain_check          greedy plain decode, batch fallback, check mode, 16 concurrent
 #   plain_check_columns  the same with the column fallback
@@ -40,7 +43,14 @@
 # about 5 x the running requests for plain decode and 9 x for speculation).
 set -euo pipefail
 
-out_root="${1:?usage: $0 OUT ARM...}"
+# --check-only OUT ARM...: rerun the check arms' verdicts (check_arm_stats.py) on
+# arms that have already run, without starting a server.
+check_only=0
+if [ "${1:-}" = --check-only ]; then
+  check_only=1
+  shift
+fi
+out_root="${1:?usage: $0 [--check-only] OUT ARM...}"
 shift
 repo="$(cd "$(dirname "$0")/../.." && pwd)"
 port="${PORT:-30040}"
@@ -102,6 +112,29 @@ stop_server() {
 export -f launch_and_wait
 
 # Runs in a subshell per arm, so the exported flags do not leak into the next arm.
+expected_paths() {  # the head paths a check arm must exercise (comma-separated)
+  case "$1" in
+    plain_check | plain_check_columns | plain_check_hopper | plain_bench_check) echo decode ;;
+    mtp_check | dflash_check) echo verify ;;
+    mtp_draft_check) echo draft,draft_extend ;;
+    dflash_draft_check) echo dflash_draft ;;
+    mtp_all_check | mtp_bench_check | mtp_triton_check) echo verify,draft,draft_extend ;;
+    mtp_sampled_check) echo sampled_verify ;;
+    *) echo "" ;;
+  esac
+}
+
+if [ "$check_only" -eq 1 ]; then
+  status=0
+  for arm in "$@"; do
+    [[ $arm == *_check* ]] || continue
+    echo "=== $arm"
+    python "$repo/experiments/certified_head/check_arm_stats.py" \
+      "$out_root/$arm/certified_stats.json" --expect "$(expected_paths "$arm")" || status=1
+  done
+  exit "$status"
+fi
+
 run_arm() {
   local arm="$1" dir="$out_root/$1" conc=16 rc need="$need_mib" temp=0
   local -a args=("${plain[@]}") flags=()
@@ -165,25 +198,12 @@ run_arm() {
     || rc=$?
   stop_server
   grep -E "Certified LM head|Traceback|Error" "$dir/server.log" | head -20 >"$dir/server_notes.txt" || true
-  # A check arm fails if any certified row differed from the stock row, or if the
-  # server wrote no counters (the head was not installed).
+  # A check arm fails if any certified row differed from the stock row, if any row
+  # was refused or probe-tripped, if the server wrote no counters, or if any enabled
+  # path made no certified call (check_arm_stats.py).
   if [[ $arm == *_check* ]] && [ "$rc" -eq 0 ]; then
-    python - "$dir/certified_stats.json" <<'PY' || rc=1
-import json, sys
-try:
-    paths = json.load(open(sys.argv[1]))['paths']
-except (OSError, ValueError, KeyError) as exc:
-    sys.exit(f'no certified counters: {exc}')
-bad = {p: v['mismatch_rows'] for p, v in paths.items() if v['mismatch_rows']}
-calls = sum(v['calls'] for v in paths.values())
-# A refused or probe-tripped row ran on the stock path: equality there is trivial,
-# so any refusal or probe trip fails the check.
-refused = {p: v.get('status_refused', 0) for p, v in paths.items() if v.get('status_refused')}
-probed = {p: v.get('status_probe', 0) for p, v in paths.items() if v.get('status_probe')}
-print(f'certified calls {calls}, rows differing from stock {bad or 0}, '
-      f'refused rows {refused or 0}, probe-tripped rows {probed or 0}')
-sys.exit(1 if bad or refused or probed or not calls else 0)
-PY
+    python "$repo/experiments/certified_head/check_arm_stats.py" "$dir/certified_stats.json" \
+      --expect "$(expected_paths "$arm")" || rc=1
   fi
   return "$rc"
 }
