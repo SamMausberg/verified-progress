@@ -2,14 +2,15 @@
 
 Runs `nsys stats --report cuda_gpu_kern_sum` on each report, sorts every kernel into a
 category by its name, and divides by the number of verify cycles in the window, counted as
-the launches of the most-launched GDN kernel (the verify kernel; prefill's chunked kernels
-launch once per layer per prefill) over the model's 24 GDN layers (one launch per layer per
-cycle; the state commit kernel, the earlier count, runs twice per cycle). Every kernel in
-the window is charged, so the per-cycle figures include the draft, prefill and warm-up
-kernels the window holds. Categories: GDN verify
-(the FlashInfer gated-delta-rule MTP kernel), GDN conv, GEMM (cuBLAS/nvjet/CUTLASS),
-attention (FlashInfer prefill/decode), head epilogue (logit copy, argmax), state
-commit, and other. Kernel time is GPU time inside the window, not wall time.
+the launches of the GDN verify kernel (FlashInfer's `gdn_verify_kernel_mtp`, or SGLang's
+Triton `fused_sigmoid_gating_delta_rule_update`) over the model's 24 GDN layers: one launch per
+layer per cycle. (Other GDN kernels, such as prefill's chunked ones, launch at other rates, and
+the state commit kernel, the earlier count, runs twice per cycle.) Every kernel in the window
+is charged, so the per-cycle figures include the draft, prefill and warm-up kernels the window
+holds. Categories: GDN verify (the kernel above), other GDN kernels, GDN conv, state commit,
+attention (FlashInfer prefill/decode), normalization, GEMM (cuBLAS/nvjet/CUTLASS), head
+epilogue (logit copy, argmax), and other. Kernel time is GPU time inside the window, not wall
+time.
 
     python experiments/repair/nsys_kernels.py ~/vp-data/repair/runs/nsys1/*.nsys-rep \\
         --out evidence/repair/verify_kernels.json
@@ -27,9 +28,11 @@ from pathlib import Path
 from typing import Any
 
 GDN_LAYERS = 24  # Qwen3.5-4B: 24 of 32 layers are Gated DeltaNet
+VERIFY_KERNEL = re.compile(r'gdn_verify_kernel|fused_sigmoid_gating_delta_rule_update', re.I)
 
 CATEGORIES = (
-    ('gdn_verify', re.compile(r'gated_delta|GatedDelta|gdn|delta_rule', re.I)),
+    ('gdn_verify', VERIFY_KERNEL),
+    ('gdn_other', re.compile(r'gated_delta|GatedDelta|gdn|delta_rule', re.I)),
     ('gdn_conv', re.compile(r'conv1d|causal_conv|conv_window', re.I)),
     ('state_commit', re.compile(r'mamba_state_scatter|state_scatter', re.I)),
     (
@@ -38,6 +41,7 @@ CATEGORIES = (
             r'BatchPrefill|BatchDecode|flashinfer.*(prefill|decode|attention)|fmha|flash_attn', re.I
         ),
     ),
+    ('norm', re.compile(r'rmsnorm|layer_norm', re.I)),
     ('gemm', re.compile(r'nvjet|gemm|cutlass|sm90_xmma|cublas|matmul', re.I)),
     ('head_epilogue', re.compile(r'argmax|reduce_kernel|topk', re.I)),
 )
@@ -92,8 +96,8 @@ def main() -> None:
             instances = int(float(row.get('Instances', 0) or 0))
             cat = categorize(name)
             by_cat[cat] = by_cat.get(cat, 0.0) + total_ns
-            if cat == 'gdn_verify':
-                verify_launches = max(verify_launches, instances)
+            if VERIFY_KERNEL.search(name):
+                verify_launches += instances
             if cat == 'state_commit':
                 commit_launches = max(commit_launches, instances)
             top.append(
