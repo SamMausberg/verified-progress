@@ -150,7 +150,9 @@ f = 2.39%, so 5x end to end needs 5.54x in decode; decode / end to end):
 | 256 | 12.72 / 9.94 | 10.73 / 8.71 | 7.11 / 6.21 | 11.28 / 9.06 |
 
 (S_b estimate bounds the Triton kernel's state writes by their bytes; no no-state Triton run.
-`S_b_ceiling_stateless_audit_e2e` gives the ceiling with a state-free audit.)
+`S_b_ceiling_stateless_audit_e2e` gives the ceiling with a state-free audit;
+`S_b_ceiling_meets_target` marks the widths where the ceiling already reaches the target,
+B = 64 and 256, where `audit_saving_needed_for_target_us` is 0.)
 
 - **The Stage A verdicts depend on the verify kernel.** With the Triton kernel (pending
   exactness classification), perfect B-token blocks reach the 5x target at B = 64 even paying

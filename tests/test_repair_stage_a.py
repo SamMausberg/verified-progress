@@ -219,3 +219,17 @@ def test_disabled_no_state_variable_is_an_ordinary_run(
     )
     data = json.loads((out / 'stage_a_oracle.json').read_text())
     assert [row['B'] for row in data['rows']] == [64]
+
+
+def test_audit_saving_is_clamped_where_the_ceiling_meets_the_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fast = timing_row('force_b256', 'force', 256, *FI)  # 4.1 ms per 256 tokens: far past the target
+    slow = timing_row('force_b16', 'force', 16, *FI)  # 4.1 ms per 16 tokens: short of it
+    rows = [timing_row('fresh_b16', 'fresh', 16, *FI), fast, slow]
+    out = run_main(tmp_path, monkeypatch, rows, '--verifier', 'flashinfer')
+    by_b = {row['B']: row for row in json.loads((out / 'stage_a_oracle.json').read_text())['rows']}
+    assert by_b[256]['S_b_ceiling_meets_target'] is True
+    assert by_b[256]['audit_saving_needed_for_target_us'] == 0.0
+    assert by_b[16]['S_b_ceiling_meets_target'] is False
+    assert by_b[16]['audit_saving_needed_for_target_us'] > 0.0

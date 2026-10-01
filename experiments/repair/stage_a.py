@@ -280,8 +280,16 @@ def main() -> None:
                 # How much cheaper the audit pass would have to be (e.g. a verifier without
                 # per-position state writes, its boundary replay uncharged) for the ceiling
                 # to reach the target.
+                # Clamped at 0: where the ceiling already reaches the target no saving is needed.
                 'audit_saving_needed_for_target_us': (
-                    c_b_floor - B * cd / (ad * need_decode) if need_decode != float('inf') else None
+                    max(0.0, c_b_floor - B * cd / (ad * need_decode))
+                    if need_decode != float('inf')
+                    else None
+                ),
+                'S_b_ceiling_meets_target': (
+                    c_b_floor <= B * cd / (ad * need_decode)
+                    if need_decode != float('inf')
+                    else False
                 ),
                 # Share of V(B) the per-position state writes would need to be for P3 to reach
                 # the target if both of its passes ran without per-position states (boundary
