@@ -27,7 +27,7 @@ Leaves satisfy both with equality. For an internal node, $|\hat s_v|\le(1+u_v)\s
 \item \emph{FP8 tensor cores.} The same published model gives FP8 \code{wgmma} only 13 fractional bits in 32-term blocks, consistent with the accumulation limits reported for FP8 training~\cite{deepseekv3}; an FP8 tensor-core pass needs periodic promotion to FP32 and its own analysis, and none is used here.
 \item \emph{IEEE FP32 on CUDA cores.} A balanced tree over blocks of 128 products, a sequential sum across the 20 blocks and one scale multiply give depth 28 with $u=2^{-24}$, so $\gamma=1.67\times10^{-6}$. This model does not describe the stock tensor-core GEMM; the paper uses it only as a sensitivity row.
 \end{itemize}
-Since the Hopper model is a published measurement-based model and not a documented contract, kernels built on it were validated against exact arithmetic on adversarial inputs~\ev{precision}, and the stock kernel's own error at the served shapes is \pend{kernel-error}.
+Since the Hopper model is a published measurement-based model and not a documented contract, kernels built on it were validated against exact arithmetic on adversarial inputs~\ev{precision}. On 2,048 real rows, the FP32-output form of the stock head GEMM (the call \code{-{}-enable-fp32-lm-head} makes) showed a largest error of $2.07\times10^{-6}$ of $\sum_j|w_{ij}h_j|$, 295 times inside the \modelcons{} and 58 times inside the \modelhopper{}; the BF16-output kernel that SGLang runs does not expose its FP32 accumulator, so for it the model remains an assumption~\ev{kernel-error}.
 
 \subsection{The envelope}\label{app:envelope}
 \begin{proof}[Proof of Theorem~\ref{thm:envelope}]

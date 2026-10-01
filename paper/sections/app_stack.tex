@@ -221,7 +221,7 @@ SGLang's packed GDN input projection, one GEMM over the concatenated $12{,}352\t
 Axis & Lever & Class & Status\\\midrule
 Progress per verify pass & MTP and DFlash drafting, deeper chains, trees where the GDN path allows, n-gram drafting & exact & Chosen in single runs on the tuning split: MTP with three steps, DFlash blocks 16, 8 and 4 by concurrency (Table~\ref{tab:tuning}); trees and n-gram drafting not searched; served comparison~\ev{bench-frontier}\\
 & Relaxed greedy acceptance within $g$ logits & lossy & \pend{moonshot-patches}\\
-Bytes per verify pass & Certified int8 head (Section~\ref{sec:selfevidence}) & exact & \pend{kernel-path}\\
+Bytes per verify pass & Certified int8 head (Section~\ref{sec:selfevidence}) & exact & Head alone (best mode, \modelcons{}): 0.62--0.69 of the stock chain's time up to $M=16$, slower from 128~\ev{kernel-path}; served \pend{bench-cert}\\
 & Replayed verification of the recurrent state & exact up to rounding$^\ast$ & MTP, three steps: $0.86\times$ plain decoding at $c=128$ on the confirmation split, against $0.68\times$ with snapshot verification (one session)~\ev{bench-frontier}; outputs rounding-level against stock MTP~\ev{bench-equality}; no detectable GSM8K loss~\ev{bench-quality}; beyond $c=128$ \pend{moonshot-state}\\
 & FP8 W8A8 weights, FP8 KV; int4 target with a matched drafter~\cite{nota2026} & lossy & FP8 weights: no consistent gain; FP8 KV: no gain (single runs); int4 \pend{moonshot-repeat}\\
 Bytes per draft step & Hot-vocabulary or low-precision draft head & exact & \pend{moonshot-patches}\\
