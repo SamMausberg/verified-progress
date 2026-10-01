@@ -17,8 +17,9 @@ if ! command -v nvidia-smi >/dev/null 2>&1; then
   exit 0
 fi
 while true; do
-  # A failed query is not an empty GPU: treat it as busy (fail closed) until the deadline.
-  if raw="$(nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null)"; then
+  # A failed or hung query (GPU_LOCK_SMI_TIMEOUT, default 30 s) is not an empty GPU: treat it as busy (fail
+  # closed) until the deadline.
+  if raw="$(timeout "${GPU_LOCK_SMI_TIMEOUT:-30}" nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null)"; then
     pids="$(printf '%s\n' "$raw" | tr -d ' ' | grep -v '^$' || true)"
     if [ -z "$pids" ]; then
       exit 0

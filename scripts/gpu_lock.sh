@@ -19,7 +19,8 @@
 # processes are discarded, so a crashed job cannot stall the queue. flock holds
 # the lock itself (-o) for exactly the command's lifetime: children do not inherit
 # it, so a job must stop its servers and background processes before it exits, and
-# killing the flock process releases the lock. An exclusive job then waits
+# killing the flock process releases the lock and (via gpu_job.sh) terminates the
+# job's process group. An exclusive job also waits
 # (scripts/gpu_drain_wait.sh, up to GPU_LOCK_DRAIN_WAIT s, default 600) until no compute
 # process is left on the GPU, so a killed job's surviving children cannot share an
 # exclusive run; it exits 75 if the GPU stays busy. GPU_LOCK_WAIT (seconds, default
@@ -28,6 +29,7 @@
 # (nanoseconds) in its old ticket name; it must not lie in the future.
 set -euo pipefail
 
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOCK_FILE="${GPU_LOCK_FILE:-$HOME/.gpu.lock}"
 QUEUE_DIR="$LOCK_FILE.queue"
 WAIT="${GPU_LOCK_WAIT:-43200}"
@@ -108,15 +110,14 @@ if [ "$kind" = x ]; then
   wait_while older_ticket "$name"
   # -o: the lock is held by flock itself for the command's lifetime and is not inherited, so a
   # background process the job leaves behind (or a successor ticket it queues) cannot keep it.
-  # Before the command, wait until no compute process is left on the GPU: holding the exclusive
-  # lock means every holder has exited, so anything still running is an orphan of a killed job.
-  # shellcheck disable=SC2016 # $0 and $@ belong to the inner shell
+  # gpu_job.sh drains the GPU of orphans first, runs the command in its own process group,
+  # and (via pdeathsig) terminates that group if this flock process dies.
   flock -o -x -w "$WAIT" -E 75 "$LOCK_FILE" \
-    bash -c '"$0" && exec "$@"' "$(dirname "${BASH_SOURCE[0]}")/gpu_drain_wait.sh" "$@"
+    setpriv --pdeathsig TERM -- "$HERE/gpu_job.sh" -x "$@"
 else
   wait_while older_ticket "$name" x
-  # Drop the ticket as soon as the shared lock is held, then run the command.
-  # shellcheck disable=SC2016 # $0 and $@ belong to the inner shell
+  # Drop the ticket as soon as the shared lock is held, then run the command (in its own
+  # process group, terminated if this flock process dies).
   flock -o -s -w "$WAIT" -E 75 "$LOCK_FILE" \
-    bash -c 'rm -f "$0"; exec "$@"' "$ticket" "$@"
+    setpriv --pdeathsig TERM -- "$HERE/gpu_job.sh" -s "$ticket" "$@"
 fi
