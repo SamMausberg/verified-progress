@@ -1,0 +1,119 @@
+% Shared figure style (owner: main-text author), loaded by macros.tex. Every figure in the
+% paper, main text and appendices, takes its colours, line styles, axis conventions and
+% panel titles from this file, so a series means the same thing wherever it appears.
+% ---------------------------------------------------------------------------
+% Palette. Okabe and Ito's blue, vermilion and bluish green, with their reddish purple as
+% a fourth hue, plus a near-black ink for the primary series and a grey for reference
+% lines and secondary annotations. Checked with an OKLab colour-vision validator
+% (Machado, Oliveira and Fernandes 2009 simulation at severity 1, distances in OKLab x100,
+% every pair compared): blue, vermilion and green are at least 11.0 apart under
+% protanopia and deuteranopia and 18.7 for normal vision; with the purple the worst pair
+% is green and purple, 7.6 under deuteranopia and 16.4 for normal vision; all have at
+% least 3:1 contrast on white. Grey is a neutral, not a series hue: it marks reference
+% lines and the least important series only. Blue, green, vermilion and purple have
+% similar lightness, so a greyscale print separates series only by line style, marker or
+% pattern; every figure therefore gives each series its own dash pattern or marker too.
+\definecolor{ink}{HTML}{1B3A57}
+\definecolor{vpblue}{HTML}{0072B2}
+\definecolor{vpvermilion}{HTML}{D55E00}
+\definecolor{vpgreen}{HTML}{009E73}
+\definecolor{vppurple}{HTML}{CC79A7}
+\definecolor{muted}{HTML}{6B7780}
+% Fills for diagram boxes and shaded regions.
+\definecolor{wash}{HTML}{F2F5F7}
+\colorlet{washgreen}{vpgreen!12}
+\colorlet{washamber}{vpvermilion!10}
+% Earlier names, kept so that existing appendix figures pick up the palette unchanged.
+% New figures use the names above.
+\colorlet{teal}{vpgreen}
+\colorlet{ochre}{vpvermilion}
+\colorlet{brick}{vppurple}
+% ---------------------------------------------------------------------------
+% Series. One style per quantity that recurs across figures.
+\pgfplotsset{
+  % Copies of the head (Figure fig:candidates, Figure fig:rho).
+  series int8 row/.style={vpblue,thick},
+  series int8 g128/.style={vpblue,thick,dashed},
+  series fp8/.style={vpvermilion,thick,dashdotted},
+  series int4/.style={muted,thick,densely dotted},
+  % Drafters (Figure fig:rho).
+  series dflash/.style={ink,very thick},
+  series mtp/.style={vppurple,very thick,mark=triangle*,mark size=1.8pt,mark options={solid}},
+  % Error models of the stock kernel (Figure fig:candidates).
+  series hopper/.style={ink,thick},
+  series conservative/.style={vpgreen,thick,dashed},
+}
+% ---------------------------------------------------------------------------
+% Text and axes. Figure text is set at most one size step below the body's 10 pt:
+% labels, panel titles and annotations \footnotesize (8 pt), tick labels and legends
+% \scriptsize (7 pt). Text is black; a coloured mark beside a label carries the identity.
+% Every panel title starts with its letter in bold and ends with the status of what it
+% shows: (measured), (derived) or (schematic).
+\newcommand{\paneltitle}[2]{\textbf{(#1)}~#2}
+% \vpnum{digits}{expression} and \vppct{digits}{expression} print a computed value.
+\newcommand{\vpnum}[2]{\pgfmathparse{#2}\pgfmathprintnumber[fixed,precision=#1]{\pgfmathresult}}
+\newcommand{\vppct}[2]{\pgfmathparse{#2}\pgfmathprintnumber[fixed,precision=#1,fixed zerofill]{\pgfmathresult}\%}
+\tikzset{
+  panel title/.style={font=\footnotesize,text height=1.6ex,text depth=.4ex,inner sep=2pt},
+  box/.style={draw=ink!60,fill=wash,rounded corners=1.5pt,align=center,font=\footnotesize,inner sep=3.5pt},
+  good/.style={box,fill=washgreen,draw=vpgreen!80!black},
+  warn/.style={box,fill=washamber,draw=vpvermilion!80!black},
+  flow/.style={-{Stealth[length=1.8mm]},semithick,draw=ink},
+  dashedflow/.style={flow,dashed},
+  note/.style={font=\scriptsize,text=muted,align=center},
+  annot/.style={font=\scriptsize,inner sep=1pt},
+}
+\pgfplotsset{every axis/.append style={
+    tick label style={font=\scriptsize},label style={font=\footnotesize},
+    title style={panel title,yshift=-2pt},
+    axis line style={ink!60},tick style={ink!60},major tick length=2.5pt,
+    grid style={draw=ink!10},
+    legend style={font=\scriptsize,draw=none,fill=white,fill opacity=.85,text opacity=1,
+      inner sep=1.5pt,row sep=-1pt},
+    legend cell align=left},
+  % Keep only rows whose column #1 equals #2 (long-form CSVs).
+  discard if not/.style 2 args={x filter/.append code={%
+    \edef\tempa{\thisrow{#1}}\edef\tempb{#2}%
+    \ifx\tempa\tempb\else\def\pgfmathresult{inf}\fi}},
+}
+% ---------------------------------------------------------------------------
+% Values from committed CSVs. \vpreadcsv{\table}{path} reads a CSV once;
+% \vplookup{\table}{key column}{key}{value column}{\result} sets \result to the value
+% in the first row whose key column equals the key, and stops the build if none does.
+% \vplookuptwo and \vplookupthree match two or three columns:
+% \vplookupthree{\table}{column 1}{key 1}{column 2}{key 2}{column 3}{key 3}{value column}{\result}.
+% Keys are expanded, so a key may be a macro. Figures use these instead of typing a
+% number read from a file.
+\makeatletter
+\newif\ifvp@match
+\newcommand{\vpreadcsv}[2]{\pgfplotstableread[col sep=comma]{#2}#1}
+\newcommand{\vplookup}[5]{\vplookupthree{#1}{#2}{#3}{}{}{}{}{#4}{#5}}
+\newcommand{\vplookuptwo}[7]{\vplookupthree{#1}{#2}{#3}{#4}{#5}{}{}{#6}{#7}}
+\newcommand{\vplookupthree}[9]{%
+  \global\let#9\relax
+  \edef\vp@keya{#3}\edef\vp@keyb{#5}\edef\vp@keyc{#7}\def\vp@colb{#4}\def\vp@colc{#6}%
+  \pgfplotstableforeachcolumnelement{#2}\of#1\as\vp@cell{%
+    \ifx#9\relax\ifx\vp@cell\vp@keya
+      \vp@matchtrue
+      \ifx\vp@colb\@empty\else
+        \pgfplotstablegetelem{\pgfplotstablerow}{#4}\of#1\let\vp@cellb\pgfplotsretval
+        \ifx\vp@cellb\vp@keyb\else\vp@matchfalse\fi
+      \fi
+      \ifx\vp@colc\@empty\else
+        \pgfplotstablegetelem{\pgfplotstablerow}{#6}\of#1\let\vp@cellc\pgfplotsretval
+        \ifx\vp@cellc\vp@keyc\else\vp@matchfalse\fi
+      \fi
+      \ifvp@match\vp@take{#1}{#8}{#9}\fi
+    \fi\fi}%
+  \ifx#9\relax\PackageError{paper}{No row with #2 = \vp@keya\space in the table}{}\fi}
+\newcommand{\vp@take}[3]{\pgfplotstablegetelem{\pgfplotstablerow}{#2}\of#1\global\let#3\pgfplotsretval}
+% \vpsum{\table}{key column}{key}{value column}{\result}: the sum of the value column over
+% the rows whose key column equals the key, printed as an integer.
+\newcommand{\vpsum}[5]{%
+  \gdef#5{0}\edef\vp@keya{#3}%
+  \pgfplotstableforeachcolumnelement{#2}\of#1\as\vp@cell{%
+    \ifx\vp@cell\vp@keya
+      \pgfplotstablegetelem{\pgfplotstablerow}{#4}\of#1%
+      \pgfmathtruncatemacro\vp@s{#5+\pgfplotsretval}\global\let#5\vp@s
+    \fi}}
+\makeatother
