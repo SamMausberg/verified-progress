@@ -297,6 +297,52 @@ pointer-load configurations in the sweeps (`pointer_vs_tma_*.json`):
   gates; this README then says "TMA kept on a clean stress test; pointer loads
   cost X%".
 
+**The rule as applied** (x7c, 46bcc84: `stress_defaults.json`, 0 misses for every
+TMA default; `pointer_vs_tma_{w8a16,w8a8,bf16}.json`, the fastest configurations
+of each load kind that pass the self-test, approximate pass alone with the
+production epilogue, median of 15 graph replays of 10 calls):
+
+| Pass | M | TMA default (us) | Fastest pointer loads (us) | Pointer / TMA default | Outcome |
+|---|---|---|---|---|---|
+| W8A16 | 1 | 202.5 | 222.6 (64x16x128) | 1.099 | TMA kept |
+| W8A16 | 2-16 | 208.4-209.2 | 233.9-237.5 (64x16x128) | 1.12-1.135 | TMA kept |
+| W8A16 | 32 | 255.7 | 284.2 (64x32x128) | 1.112 | TMA kept |
+| W8A16 | 64 | 312.9 | 367.8 (128x64x128) | 1.176 | TMA kept |
+| W8A16 | 128 | 589.3 | 680.2 (64x128x128) | 1.154 | TMA kept |
+| W8A16 | 256 | 1,231.5 | 1,364.6 (64x128x128) | 1.108 | TMA kept |
+| W8A8 | 16 | 187.1 | 188.6 (128x16x128) | 1.008 | pointer loads |
+| W8A8 | 32 | 198.2 | 202.2 (256x32x128) | 1.020 | pointer loads |
+| W8A8 | 64 | 251.0 | 247.7 (128x64x128, 4 stages) | 0.987 | pointer loads |
+| W8A8 | 128 | 367.3 | 372.7 (128x64x128, 4 stages) | 1.015 | pointer loads |
+| W8A8 | 256 | 665.1 | 722.2 (128x64x128, 4 stages) | 1.086 | TMA kept |
+| BF16 | 32 | 356.3 | 361.0 (128x32x64) | 1.013 | pointer loads |
+| BF16 | 64 | 409.8 | 398.7 (128x64x64, 4 stages) | 0.973 | pointer loads |
+| BF16 | 128 | 957.4 | 624.1 (256x64x64, 8 warps, 4 stages) | 0.652 | pointer loads |
+| BF16 | 256 | 1,567.0 | 1,164.5 (256x64x64, 8 warps, 4 stages) | 0.743 | pointer loads |
+
+W8A16, the pass the head uses by default: TMA kept on a clean stress test
+(1.00 to 1.04 million row-checks per tile configuration, 0 misses, a per-row miss
+rate below about 3e-6 at 95% if calls are independent trials); pointer loads
+cost 10% to 18%. The self-test gate and the runtime probes stay in front of it.
+
+The sweeps timed M = 1 to 256 (W8A16) and M = 16, 32, 64, 128 and 256 (W8A8,
+BF16). Each new default range takes the decision at the largest size in it that
+the sweep timed (W8A8: up to 16, 17 to 32, 33 to 128 and 129 to 256; BF16: up
+to 32, 33 to 64 and 65 to 256); the sizes between were not timed. Below 16 rows
+the W8A8 and BF16 sweeps timed nothing. At M = 16 the BF16 sweep timed only
+16-row tiles (best TMA 350.4 us, best pointer loads 353.1 us), not the 32-row
+default that serves M <= 32, so that range's decision rests on M = 32.
+
+BF16's earlier TMA default above 64 rows, 128x128x64, took 957.4 us at M = 128
+against 491.4 us for the best TMA configuration (128x64x64, 4 stages) and
+1,567.0 against 948.6 at M = 256. The BF16 tiles were never swept before x7c:
+`run_all.sh` sweeps only the W8A16 and W8A8 passes, and the BF16 defaults
+repeated the W8A16 defaults of that time (128x{32,64,128}x64); the docstring that
+attributed them to the sweep was wrong. The new pointer-load defaults (and the
+new W8A8 ones) get their own stress test in the shared hold that reruns the GPU
+tests; the head-path microbenchmark's W8A8 and BF16 rows below were timed on the
+earlier TMA tiles.
+
 ## Pending in this PR
 
 The GPU tests, the replay of 60,000 real decode rows under every contract, the

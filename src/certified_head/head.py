@@ -107,18 +107,32 @@ class GemvConfig:
 
 
 def default_arith_config(arith: Arith, m: int) -> GemvConfig:
-    """Tile shape for the W8A8 and BF16 passes (from ``bench/tune_gemv.py`` on GH200)."""
+    """Tile shape for the W8A8 and BF16 passes.
+
+    Chosen by the rule fixed before the x7c evidence run (evidence README, "How
+    the defaults are chosen"): at each batch size the sweep timed
+    (``pointer_vs_tma_{w8a8,bf16}.json``: M = 16, 32, 64, 128, 256), pointer loads
+    replace the TMA default when they cost at most 5% more, and the stress test
+    found 0 misses for every TMA default. Each range below takes the decision at
+    the largest size in it that the sweep timed; the sizes between were not timed.
+    """
     if arith == 'w8a8':
-        if m <= 16:
-            return GemvConfig(128, 16, 128, 4, 3, tma=True)
-        if m <= 32:
-            return GemvConfig(256, 32, 128, 4, 3, tma=True)
+        if m <= 16:  # pointer loads +0.8% at M = 16
+            return GemvConfig(128, 16, 128, 4, 3)
+        if m <= 32:  # +2.0% at 32
+            return GemvConfig(256, 32, 128, 4, 3)
+        if m <= 128:  # -1.3% at 64, +1.5% at 128 (against the TMA default's 3 stages)
+            return GemvConfig(128, 64, 128, 4, 4)
+        # Pointer loads +8.6% at 256: TMA kept on a clean stress test.
         return GemvConfig(128, 64, 128, 4, 3, tma=True)
+    # BF16: pointer loads +1.3% at M = 32, -2.7% at 64; above 64 rows the earlier
+    # TMA default (128x128x64, never swept) took 957 us at M = 128 against 624 us
+    # for these pointer-load tiles and 491 us for the best TMA tiles.
     if m <= 32:
-        return GemvConfig(128, 32, 64, 4, 3, tma=True)
+        return GemvConfig(128, 32, 64, 4, 3)
     if m <= 64:
-        return GemvConfig(128, 64, 64, 4, 3, tma=True)
-    return GemvConfig(128, 128, 64, 4, 3, tma=True)
+        return GemvConfig(128, 64, 64, 4, 4)
+    return GemvConfig(256, 64, 64, 8, 4)
 
 
 def default_gemv_config(m: int) -> GemvConfig:
