@@ -1,0 +1,426 @@
+{
+ "runs": "/home/ubuntu/vp-data/state/runs",
+ "buckets": [
+  "0-31",
+  "32-127",
+  "128+"
+ ],
+ "pairs": {
+  "repeat session, plain c1": {
+   "run_a": "plain/c1",
+   "run_b": "plain__rep/c1",
+   "prompts": 320,
+   "perturbed": 0,
+   "diverged": 0,
+   "share_diverged": null,
+   "share_diverged_wilson95": null,
+   "median_onset": null,
+   "post_onset_exposure": 0,
+   "per_1k_post_onset": null,
+   "by_onset": {
+    "0-31": {
+     "perturbed": 0,
+     "diverged": 0,
+     "share_diverged": null,
+     "share_diverged_wilson95": null,
+     "median_onset": null,
+     "post_onset_exposure": 0,
+     "per_1k_post_onset": null
+    },
+    "32-127": {
+     "perturbed": 0,
+     "diverged": 0,
+     "share_diverged": null,
+     "share_diverged_wilson95": null,
+     "median_onset": null,
+     "post_onset_exposure": 0,
+     "per_1k_post_onset": null
+    },
+    "128+": {
+     "perturbed": 0,
+     "diverged": 0,
+     "share_diverged": null,
+     "share_diverged_wilson95": null,
+     "median_onset": null,
+     "post_onset_exposure": 0,
+     "per_1k_post_onset": null
+    }
+   }
+  },
+  "repeat session, plain c32": {
+   "run_a": "plain/c32",
+   "run_b": "plain__rep/c32",
+   "prompts": 320,
+   "perturbed": 42,
+   "diverged": 24,
+   "share_diverged": 0.5714,
+   "share_diverged_wilson95": [
+    0.4221,
+    0.7088
+   ],
+   "median_onset": 14.5,
+   "post_onset_exposure": 3559,
+   "per_1k_post_onset": 6.743,
+   "by_onset": {
+    "0-31": {
+     "perturbed": 27,
+     "diverged": 15,
+     "share_diverged": 0.5556,
+     "share_diverged_wilson95": [
+      0.3731,
+      0.7241
+     ],
+     "median_onset": 1,
+     "post_onset_exposure": 3030,
+     "per_1k_post_onset": 4.95
+    },
+    "32-127": {
+     "perturbed": 10,
+     "diverged": 6,
+     "share_diverged": 0.6,
+     "share_diverged_wilson95": [
+      0.3127,
+      0.8318
+     ],
+     "median_onset": 58.5,
+     "post_onset_exposure": 434,
+     "per_1k_post_onset": 13.825
+    },
+    "128+": {
+     "perturbed": 5,
+     "diverged": 3,
+     "share_diverged": 0.6,
+     "share_diverged_wilson95": [
+      0.2307,
+      0.8824
+     ],
+     "median_onset": 235,
+     "post_onset_exposure": 95,
+     "per_1k_post_onset": 31.579
+    }
+   }
+  },
+  "concurrency 1 vs 32 (cap 16), plain": {
+   "run_a": "plain/c1",
+   "run_b": "plain/c32",
+   "prompts": 320,
+   "perturbed": 320,
+   "diverged": 167,
+   "share_diverged": 0.5219,
+   "share_diverged_wilson95": [
+    0.4672,
+    0.576
+   ],
+   "median_onset": 3.0,
+   "post_onset_exposure": 47016,
+   "per_1k_post_onset": 3.552,
+   "by_onset": {
+    "0-31": {
+     "perturbed": 318,
+     "diverged": 165,
+     "share_diverged": 0.5189,
+     "share_diverged_wilson95": [
+      0.4641,
+      0.5732
+     ],
+     "median_onset": 3.0,
+     "post_onset_exposure": 46791,
+     "per_1k_post_onset": 3.526
+    },
+    "32-127": {
+     "perturbed": 2,
+     "diverged": 2,
+     "share_diverged": 1.0,
+     "share_diverged_wilson95": [
+      0.3424,
+      1.0
+     ],
+     "median_onset": 43.0,
+     "post_onset_exposure": 225,
+     "per_1k_post_onset": 8.889
+    },
+    "128+": {
+     "perturbed": 0,
+     "diverged": 0,
+     "share_diverged": null,
+     "share_diverged_wilson95": null,
+     "median_onset": null,
+     "post_onset_exposure": 0,
+     "per_1k_post_onset": null
+    }
+   }
+  },
+  "same server repeat c1, plain": {
+   "run_a": "plain/c1",
+   "run_b": "plain/c1_warm",
+   "prompts": 320,
+   "perturbed": 1,
+   "diverged": 0,
+   "share_diverged": 0.0,
+   "share_diverged_wilson95": [
+    0.0,
+    0.7935
+   ],
+   "median_onset": 0,
+   "post_onset_exposure": 256,
+   "per_1k_post_onset": 0.0,
+   "by_onset": {
+    "0-31": {
+     "perturbed": 1,
+     "diverged": 0,
+     "share_diverged": 0.0,
+     "share_diverged_wilson95": [
+      0.0,
+      0.7935
+     ],
+     "median_onset": 0,
+     "post_onset_exposure": 256,
+     "per_1k_post_onset": 0.0
+    },
+    "32-127": {
+     "perturbed": 0,
+     "diverged": 0,
+     "share_diverged": null,
+     "share_diverged_wilson95": null,
+     "median_onset": null,
+     "post_onset_exposure": 0,
+     "per_1k_post_onset": null
+    },
+    "128+": {
+     "perturbed": 0,
+     "diverged": 0,
+     "share_diverged": null,
+     "share_diverged_wilson95": null,
+     "median_onset": null,
+     "post_onset_exposure": 0,
+     "per_1k_post_onset": null
+    }
+   }
+  },
+  "same server repeat c32, plain": {
+   "run_a": "plain/c32",
+   "run_b": "plain/c32_warm",
+   "prompts": 320,
+   "perturbed": 1,
+   "diverged": 0,
+   "share_diverged": 0.0,
+   "share_diverged_wilson95": [
+    0.0,
+    0.7935
+   ],
+   "median_onset": 0,
+   "post_onset_exposure": 256,
+   "per_1k_post_onset": 0.0,
+   "by_onset": {
+    "0-31": {
+     "perturbed": 1,
+     "diverged": 0,
+     "share_diverged": 0.0,
+     "share_diverged_wilson95": [
+      0.0,
+      0.7935
+     ],
+     "median_onset": 0,
+     "post_onset_exposure": 256,
+     "per_1k_post_onset": 0.0
+    },
+    "32-127": {
+     "perturbed": 0,
+     "diverged": 0,
+     "share_diverged": null,
+     "share_diverged_wilson95": null,
+     "median_onset": null,
+     "post_onset_exposure": 0,
+     "per_1k_post_onset": null
+    },
+    "128+": {
+     "perturbed": 0,
+     "diverged": 0,
+     "share_diverged": null,
+     "share_diverged_wilson95": null,
+     "median_onset": null,
+     "post_onset_exposure": 0,
+     "per_1k_post_onset": null
+    }
+   }
+  },
+  "deterministic, plain c1 vs c8 (8-prompt validation)": {
+   "run_a": "plain_det__validate/c1",
+   "run_b": "plain_det__validate/c8",
+   "prompts": 8,
+   "perturbed": 0,
+   "diverged": 0,
+   "share_diverged": null,
+   "share_diverged_wilson95": null,
+   "median_onset": null,
+   "post_onset_exposure": 0,
+   "per_1k_post_onset": null,
+   "by_onset": {
+    "0-31": {
+     "perturbed": 0,
+     "diverged": 0,
+     "share_diverged": null,
+     "share_diverged_wilson95": null,
+     "median_onset": null,
+     "post_onset_exposure": 0,
+     "per_1k_post_onset": null
+    },
+    "32-127": {
+     "perturbed": 0,
+     "diverged": 0,
+     "share_diverged": null,
+     "share_diverged_wilson95": null,
+     "median_onset": null,
+     "post_onset_exposure": 0,
+     "per_1k_post_onset": null
+    },
+    "128+": {
+     "perturbed": 0,
+     "diverged": 0,
+     "share_diverged": null,
+     "share_diverged_wilson95": null,
+     "median_onset": null,
+     "post_onset_exposure": 0,
+     "per_1k_post_onset": null
+    }
+   }
+  },
+  "deterministic, mtp_s3 c1 vs c8 (8-prompt validation)": {
+   "run_a": "mtp_s3_det__validate/c1",
+   "run_b": "mtp_s3_det__validate/c8",
+   "prompts": 8,
+   "perturbed": 8,
+   "diverged": 2,
+   "share_diverged": 0.25,
+   "share_diverged_wilson95": [
+    0.0715,
+    0.5907
+   ],
+   "median_onset": 1.0,
+   "post_onset_exposure": 914,
+   "per_1k_post_onset": 2.188,
+   "by_onset": {
+    "0-31": {
+     "perturbed": 8,
+     "diverged": 2,
+     "share_diverged": 0.25,
+     "share_diverged_wilson95": [
+      0.0715,
+      0.5907
+     ],
+     "median_onset": 1.0,
+     "post_onset_exposure": 914,
+     "per_1k_post_onset": 2.188
+    },
+    "32-127": {
+     "perturbed": 0,
+     "diverged": 0,
+     "share_diverged": null,
+     "share_diverged_wilson95": null,
+     "median_onset": null,
+     "post_onset_exposure": 0,
+     "per_1k_post_onset": null
+    },
+    "128+": {
+     "perturbed": 0,
+     "diverged": 0,
+     "share_diverged": null,
+     "share_diverged_wilson95": null,
+     "median_onset": null,
+     "post_onset_exposure": 0,
+     "per_1k_post_onset": null
+    }
+   }
+  },
+  "deterministic + verify KV split patch, mtp_s3 c1 vs c32 (96 prompts)": {
+   "run_a": "mtp_s3_det__verifyfix/c1",
+   "run_b": "mtp_s3_det__verifyfix/c32",
+   "prompts": 96,
+   "perturbed": 96,
+   "diverged": 28,
+   "share_diverged": 0.2917,
+   "share_diverged_wilson95": [
+    0.2102,
+    0.3892
+   ],
+   "median_onset": 1.0,
+   "post_onset_exposure": 17971,
+   "per_1k_post_onset": 1.558,
+   "by_onset": {
+    "0-31": {
+     "perturbed": 96,
+     "diverged": 28,
+     "share_diverged": 0.2917,
+     "share_diverged_wilson95": [
+      0.2102,
+      0.3892
+     ],
+     "median_onset": 1.0,
+     "post_onset_exposure": 17971,
+     "per_1k_post_onset": 1.558
+    },
+    "32-127": {
+     "perturbed": 0,
+     "diverged": 0,
+     "share_diverged": null,
+     "share_diverged_wilson95": null,
+     "median_onset": null,
+     "post_onset_exposure": 0,
+     "per_1k_post_onset": null
+    },
+    "128+": {
+     "perturbed": 0,
+     "diverged": 0,
+     "share_diverged": null,
+     "share_diverged_wilson95": null,
+     "median_onset": null,
+     "post_onset_exposure": 0,
+     "per_1k_post_onset": null
+    }
+   }
+  }
+ },
+ "missing_pairs": [
+  "repeat session, mtp_s3 c1",
+  "repeat session, mtp_s3 c32",
+  "logprobs off, plain c1",
+  "logprobs off, mtp_s3 c1",
+  "concurrency 1 vs 32 (cap 16), mtp_s1",
+  "concurrency 1 vs 32 (cap 16), mtp_s3",
+  "concurrency 1 vs 32 (cap 16), mtp_s5",
+  "concurrency 1 vs 32 (cap 16), mtp_tree",
+  "radix off c1, plain",
+  "radix off c1, mtp_s3",
+  "overlap off c1, plain",
+  "overlap off c1, mtp_s3",
+  "spec vs plain c1, mtp_s1",
+  "spec vs plain c1, mtp_s3",
+  "spec vs plain c1, mtp_s5",
+  "spec vs plain c1, mtp_tree",
+  "spec vs plain c32, mtp_s1",
+  "spec vs plain c32, mtp_s3",
+  "spec vs plain c32, mtp_s5",
+  "spec vs plain c32, mtp_tree",
+  "spec vs spec c1, mtp_s1 vs mtp_s3",
+  "spec vs spec c1, mtp_s3 vs mtp_s5",
+  "spec vs spec c1, mtp_s3 vs mtp_tree",
+  "deterministic, plain c1 vs c32",
+  "deterministic, mtp_s3 c1 vs c32",
+  "deterministic, plain vs mtp_s3 c1",
+  "deterministic on vs off, plain c1",
+  "fp32 head, plain c1 vs c32",
+  "fp32 head, mtp_s3 c1 vs c32",
+  "fp32 head, plain vs mtp_s3 c1",
+  "fp32 head, plain vs mtp_s3 c32",
+  "retraction c32, plain",
+  "retraction c32, mtp_s3",
+  "state path c1, plain_fidecode vs plain",
+  "concurrency 1 vs 32 (cap 16), plain_fidecode",
+  "state path c1, mtp_s3_fidecode vs mtp_s3",
+  "concurrency 1 vs 32 (cap 16), mtp_s3_fidecode",
+  "state path c1, plain_replayssm vs plain",
+  "concurrency 1 vs 32 (cap 16), plain_replayssm",
+  "state path c1, mtp_s3_replayssm vs mtp_s3",
+  "concurrency 1 vs 32 (cap 16), mtp_s3_replayssm"
+ ]
+}
