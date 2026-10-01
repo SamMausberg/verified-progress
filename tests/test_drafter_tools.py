@@ -140,3 +140,31 @@ def test_probe_waves_send_one_batched_request() -> None:
     assert records[1]['top_logprobs'] == [[[-0.1, 1]], [[-0.2, 1]]]
     single = probe.request_body(rows[:1], [[7]], args)
     assert single['rid'] == 'a' and single['input_ids'] == [7]
+
+
+def test_support_screen_greedy_walk_uses_chosen_predecessors() -> None:
+    import pytest
+
+    torch = pytest.importorskip('torch')  # runs in the SGLang environment
+    screen = load('support_screen')
+
+    class Chain:
+        """Prefers the candidate equal to predecessor + 1; ties broken by unary."""
+
+        def score_candidates(self, *, candidate_ids, unary_logits, hidden_states, predecessor_ids):
+            bonus = (candidate_ids == predecessor_ids[:, None] + 1).float() * 10
+            return unary_logits + bonus
+
+    # Two rows, three slots, two candidates per slot; unary prefers candidate 0.
+    candidates = torch.tensor([[[9, 1], [9, 2], [9, 3]], [[9, 5], [9, 6], [9, 7]]])
+    unary = torch.tensor([[[1.0, 0.0]] * 3] * 2)
+    hidden = torch.zeros(2, 3, 4)
+    walk = screen.greedy_walk(
+        Chain(), candidates, unary, hidden, torch.tensor([0, 4]), torch.tensor([0, 0])
+    )
+    assert walk.tolist() == [[1, 2, 3], [5, 6, 7]]
+    # Row 0 starts at slot 1 with predecessor 1 (a correction); row 1 never starts.
+    rewalk = screen.greedy_walk(
+        Chain(), candidates, unary, hidden, torch.tensor([1, 0]), torch.tensor([1, 3])
+    )
+    assert rewalk.tolist() == [[-1, 2, 3], [-1, -1, -1]]
