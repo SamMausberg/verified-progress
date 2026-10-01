@@ -1,6 +1,6 @@
-From 2aa6bd0230cdba8be0d6e0b2beb8dac19d1ba459 Mon Sep 17 00:00:00 2001
+From d8568201cb937a985ffd4520dc81c12f341b73e0 Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <sam@findtensor.com>
-Date: Wed, 30 Sep 2026 21:23:01 +0000
+Date: Thu, 1 Oct 2026 03:16:15 +0000
 Subject: [PATCH 1/2] Add a bit-exact tensor tap for divergence forensics
 
 With SGLANG_STATE_TAP_DIR set, forward hooks on the target model, plus
@@ -16,18 +16,18 @@ the logits fed to argmax. SGLANG_STATE_TAP_PERTURB=<module> adds one unit
 in the last place to the first element of that output in every forward,
 as a positive control. Off unless SGLANG_STATE_TAP_DIR is set.
 ---
- python/sglang/srt/debug_utils/state_tap.py    | 361 ++++++++++++++++++
+ python/sglang/srt/debug_utils/state_tap.py    | 371 ++++++++++++++++++
  .../layers/attention/linear/gdn_backend.py    |  16 +
  .../sglang/srt/model_executor/model_runner.py |   9 +
- 3 files changed, 386 insertions(+)
+ 3 files changed, 396 insertions(+)
  create mode 100644 python/sglang/srt/debug_utils/state_tap.py
 
 diff --git a/python/sglang/srt/debug_utils/state_tap.py b/python/sglang/srt/debug_utils/state_tap.py
 new file mode 100644
-index 0000000000..9d6d6a2d9a
+index 0000000000..bc5c01b648
 --- /dev/null
 +++ b/python/sglang/srt/debug_utils/state_tap.py
-@@ -0,0 +1,361 @@
+@@ -0,0 +1,371 @@
 +"""Bit-exact tensor tap for locating where two serving configurations diverge.
 +
 +Enabled with SGLANG_STATE_TAP_DIR. Forward hooks on the target model's modules
@@ -128,7 +128,17 @@ index 0000000000..9d6d6a2d9a
 +            bits = flat.contiguous().view(torch.int32).to(torch.int64)
 +        else:
 +            bits = flat.to(torch.int64)
-+        return (bits * self.coeff[: bits.shape[1]]).sum(dim=-1)
++        rows, m = bits.shape
++        if m <= _MAX_COLS:
++            return (bits * self.coeff[:m]).sum(dim=-1)
++        # Longer rows (a layer's SSM state): hash fixed-size chunks, then combine
++        # the chunk hashes with a second set of coefficients.
++        pad = (-m) % _MAX_COLS
++        if pad:
++            bits = torch.nn.functional.pad(bits, (0, pad))
++        chunks = bits.reshape(rows, -1, _MAX_COLS)
++        per_chunk = (chunks * self.coeff).sum(dim=-1)
++        return (per_chunk * self.coeff[: per_chunk.shape[1]]).sum(dim=-1)
 +
 +    def _cache_hashes(
 +        self, forward_batch, runner, i: int, first_row: int
