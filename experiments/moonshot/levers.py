@@ -70,6 +70,13 @@ LEVERS: dict[str, Lever] = {
         env={'SGLANG_GDN_EXACT_REPLAY': '1'},
         conflicts=('replayssm', 'bf16_state', 'fp16_state', 'fp8_state'),
     ),
+    # P4's served A/B pins the pools identically in both arms (BRIEF: equal running limit,
+    # KV tokens and mamba slots): 128 requests x (2,048 prompt + 512 output) = 327,680 KV
+    # tokens, plus headroom for chunked prefill.
+    'p4_pools': Lever(
+        {'max-running-requests': 128, 'max-total-tokens': 360448, 'max-mamba-cache-size': 128},
+        note='pinned pools for the P4 A/B: 128 running, 360,448 KV tokens, 128 mamba slots',
+    ),
     'replayssm_spec': Lever(
         {'enable-linear-replayssm-spec': True},
         note='chain verify (MTP top-1, DFlash) stores per-draft inputs and folds the '

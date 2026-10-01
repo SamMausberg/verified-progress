@@ -210,6 +210,20 @@ with this declaration):
   FP32 state, no speculation, radix off, `--stream-interval 4`. Dense decode (A) against
   exact replay at L = 4 (B), one server launch per arm, four pairs in A B B A A B B A order
   (labels r1-r4).
+- Workload (by SHA-256; the files are in `~/vp-data/moonshot/workloads/`, made by
+  `make_long_prompts.py` from mixed-v2 confirm and warm-up): `long2048.jsonl` `db376fa3aadf75a30933a649b5ded1dfcafac8289b8e2aed1dde7201afd2659c`
+  (512 prompts, templated length 2,046-2,048), warm-up pool `long2048_warmup.jsonl`
+  `b4b5b4e43b53f3c64083263113904868cccf23767aa0b3c5f1b45740c13130a6`.
+- Pools pinned identically in both arms (`p4_pools` lever): `--max-running-requests 128`,
+  `--max-total-tokens 360448`, `--max-mamba-cache-size 128`; each server's resolved sizes
+  are read from its log.
+- Validity (`validate_p4_ab.py`, before any ratio is computed): every arm ran the declared
+  workload with the greedy request body, all 256 requests completed with AIPerf exit 0, the
+  full-batch rate was measured with 128 requests running, the pools resolved to the pinned
+  sizes (KV pool identical in all arms and at least 327,680 tokens), the exact-replay
+  dispatch line appears only in exact-replay logs, and the arms ran
+  in the declared order. A failed check voids the run; it is repeated and its numbers are
+  not reported.
 - Primary metric: the token-weighted server full-batch decode rate per point (bench's
   `server_log.logged_gen_tps_full_batch`). It measures decode only, which is what the lever
   changes; the client throughput y includes the 2,048-token prefills. Client y and its ratio

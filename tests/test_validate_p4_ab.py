@@ -9,16 +9,33 @@ from pathlib import Path
 from typing import Any
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'experiments/moonshot/validate_p4_ab.py'
+DENSE = 'plain+no_radix+p4_pools'
+EXACT = 'plain+no_radix+p4_pools+exact_replay'
 ORDER = [
-    ('plain+no_radix', 'r1'),
-    ('plain+no_radix+exact_replay', 'r1'),
-    ('plain+no_radix+exact_replay', 'r2'),
-    ('plain+no_radix', 'r2'),
-    ('plain+no_radix', 'r3'),
-    ('plain+no_radix+exact_replay', 'r3'),
-    ('plain+no_radix+exact_replay', 'r4'),
-    ('plain+no_radix', 'r4'),
+    (DENSE, 'r1'),
+    (EXACT, 'r1'),
+    (EXACT, 'r2'),
+    (DENSE, 'r2'),
+    (DENSE, 'r3'),
+    (EXACT, 'r3'),
+    (EXACT, 'r4'),
+    (DENSE, 'r4'),
 ]
+MANIFEST: dict[str, Any] = {
+    'workload': {
+        'file': 'long2048.jsonl',
+        'sha256': 'db376fa3aadf75a30933a649b5ded1dfcafac8289b8e2aed1dde7201afd2659c',
+        'prompts': 512,
+        'warmup_pool_sha256': 'b4b5b4e43b53f3c64083263113904868cccf23767aa0b3c5f1b45740c13130a6',
+    },
+    'osl': 512,
+    'ignore_eos': True,
+    'request_body': {'temperature': 0.0, 'ignore_eos': True},
+}
+POOL_LOG = (
+    'max_total_num_tokens=360448, max_running_requests=128\n'
+    'Mamba Cache is allocated. max_mamba_cache_size: 128, conv_state size: 0.1GB\n'
+)
 
 
 def point(rate: float, **overrides: Any) -> dict[str, Any]:
@@ -30,15 +47,23 @@ def point(rate: float, **overrides: Any) -> dict[str, Any]:
         'osl_mismatch': 0,
         'aiperf_exit_code': 0,
         'prompts_as_expected': True,
+        'isl_mean': 2047.9,
         'y': rate * 0.6,
-        'server_log': {'logged_gen_tps_full_batch': rate},
+        'server_log': {'logged_gen_tps_full_batch': rate, 'max_running_logged': 128},
     }
     base.update(overrides)
     return base
 
 
-def make_run(root: Path, order: list[tuple[str, str]] = ORDER, **overrides: Any) -> Path:
-    """A synthetic A/B directory; `overrides` apply to the first exact-replay arm's point."""
+def make_run(
+    root: Path,
+    order: list[tuple[str, str]] = ORDER,
+    manifest: dict[str, Any] = MANIFEST,
+    pool_log: str = POOL_LOG,
+    **overrides: Any,
+) -> Path:
+    """A synthetic A/B directory; `overrides` apply to the first exact-replay arm's point,
+    `manifest` and `pool_log` to every arm."""
     records = []
     first_exact = True
     for arm, pair in order:
@@ -50,9 +75,10 @@ def make_run(root: Path, order: list[tuple[str, str]] = ORDER, **overrides: Any)
         extra = overrides if exact and first_exact else {}
         first_exact = first_exact and not exact
         rate = 10_000.0 * (1.2 if exact else 1.0) * (1.0 + 0.001 * int(pair[1]))
-        (run / 'sweep.json').write_text(json.dumps({'points': [point(rate, **extra)]}))
+        sweep = {**manifest, 'points': [point(rate, **extra)]}
+        (run / 'sweep.json').write_text(json.dumps(sweep))
         log = 'GDN decode: exact replay kernel, ring length 4\n' if exact else 'decode\n'
-        (run / 'server/server.log').write_text(log)
+        (run / 'server/server.log').write_text(pool_log + log)
     (root / 'lever_sweep_log.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in records))
     return root
 
@@ -98,3 +124,28 @@ def test_failed_arm_fails(tmp_path: Path) -> None:
     log = root / 'lever_sweep_log.jsonl'
     log.write_text(log.read_text().replace('"exit 0"', '"exit 1"', 1))
     assert run(root).returncode == 1
+
+
+def test_other_workload_fails(tmp_path: Path) -> None:
+    manifest = {**MANIFEST, 'workload': {**MANIFEST['workload'], 'sha256': '0' * 64}}
+    assert run(make_run(tmp_path, manifest=manifest)).returncode == 1
+
+
+def test_sampled_request_body_fails(tmp_path: Path) -> None:
+    manifest = {**MANIFEST, 'request_body': {'temperature': 0.6, 'ignore_eos': True}}
+    assert run(make_run(tmp_path, manifest=manifest)).returncode == 1
+
+
+def test_batch_below_128_fails(tmp_path: Path) -> None:
+    server_log = {'logged_gen_tps_full_batch': 12_000.0, 'max_running_logged': 120}
+    assert run(make_run(tmp_path, server_log=server_log)).returncode == 1
+
+
+def test_unpinned_pools_fail(tmp_path: Path) -> None:
+    pool_log = POOL_LOG.replace('max_running_requests=128', 'max_running_requests=133')
+    assert run(make_run(tmp_path, pool_log=pool_log)).returncode == 1
+
+
+def test_small_kv_pool_fails(tmp_path: Path) -> None:
+    pool_log = POOL_LOG.replace('max_total_num_tokens=360448', 'max_total_num_tokens=300000')
+    assert run(make_run(tmp_path, pool_log=pool_log)).returncode == 1

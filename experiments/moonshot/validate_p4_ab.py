@@ -6,7 +6,13 @@ Reads one fresh lever_sweep output directory and checks, for this run only:
   - every configuration has exactly one sweep.json with one concurrency-128 point that ran
     the configured number of requests (256) to completion: requests == completed == 256,
     failed 0, AIPerf exit code 0, the prompts sent as expected and no output-length
-    mismatch; and that carries the token-weighted server full-batch decode rate;
+    mismatch; and that carries the token-weighted server full-batch decode rate measured
+    with at least 128 requests running (server_log.max_running_logged >= 128);
+  - every arm ran the declared workload (long2048.jsonl and its warm-up pool by SHA-256,
+    512 prompts, mean input length 2,040-2,049 tokens, OSL 512 with ignore_eos, greedy
+    request body) and resolved the pinned pools from its server log: max_running_requests
+    128, max_mamba_cache_size 128 and a KV pool (max_total_num_tokens; 360,448 requested)
+    of at least 327,680 tokens (128 x 2,560), identical in all eight arms;
   - every exact-replay server log shows the exact-replay kernel dispatch line, and no
     dense server log does;
   - the run forms exactly four complete dense/exact pairs (labels r1-r4).
@@ -23,13 +29,14 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import statistics
 import sys
 from pathlib import Path
 from typing import Any
 
-DENSE = 'plain+no_radix'
-EXACT = 'plain+no_radix+exact_replay'
+DENSE = 'plain+no_radix+p4_pools'
+EXACT = 'plain+no_radix+p4_pools+exact_replay'
 PAIRS = ['r1', 'r2', 'r3', 'r4']
 # Execution order declared in README 2c: A B B A A B B A.
 ORDER = [
@@ -37,6 +44,15 @@ ORDER = [
     f'{DENSE}#r3', f'{EXACT}#r3', f'{EXACT}#r4', f'{DENSE}#r4',
 ]  # fmt: skip
 REQUESTS = 256  # --min-requests 256 at concurrency 128
+WORKLOAD_SHA256 = 'db376fa3aadf75a30933a649b5ded1dfcafac8289b8e2aed1dde7201afd2659c'
+WARMUP_SHA256 = 'b4b5b4e43b53f3c64083263113904868cccf23767aa0b3c5f1b45740c13130a6'
+POOLS = {'max_running_requests': 128, 'max_mamba_cache_size': 128}
+MIN_KV_TOKENS = 128 * (2048 + 512)
+POOL_PATTERNS = {
+    'max_running_requests': re.compile(r'max_running_requests=(\d+)'),
+    'max_total_num_tokens': re.compile(r'max_total_num_tokens=(\d+)'),
+    'max_mamba_cache_size': re.compile(r'max_mamba_cache_size: (\d+)'),
+}
 DISPATCH = 'GDN decode: exact replay kernel'
 T3_975 = 3.182446305284263  # Student t, 3 degrees of freedom, two-sided 95%
 THRESHOLD = 1.10
@@ -47,11 +63,40 @@ def fail(message: str) -> None:
     sys.exit(1)
 
 
+def check_manifest(label: str, data: dict[str, Any]) -> None:
+    workload = data.get('workload') or {}
+    if workload.get('sha256') != WORKLOAD_SHA256 or workload.get('prompts') != 512:
+        fail(f'{label}: workload {workload.get("file")} is not the declared long2048.jsonl')
+    if workload.get('warmup_pool_sha256') != WARMUP_SHA256:
+        fail(f'{label}: warm-up pool is not the declared long2048_warmup.jsonl')
+    body = data.get('request_body') or {}
+    if data.get('osl') != 512 or data.get('ignore_eos') is not True:
+        fail(f'{label}: osl {data.get("osl")}, ignore_eos {data.get("ignore_eos")}')
+    if body.get('temperature') != 0.0 or body.get('ignore_eos') is not True:
+        fail(f'{label}: request body is not greedy with ignore_eos: {body}')
+
+
+def resolved_pools(label: str, server_log: Path) -> dict[str, int]:
+    text = server_log.read_text(errors='replace') if server_log.exists() else ''
+    pools = {}
+    for key, pattern in POOL_PATTERNS.items():
+        values = {int(v) for v in pattern.findall(text)}
+        if len(values) != 1:
+            fail(f'{label}: {key} in the server log: {sorted(values)}')
+        pools[key] = values.pop()
+    if any(pools[key] != value for key, value in POOLS.items()):
+        fail(f'{label}: resolved pools {pools}, pinned {POOLS}')
+    if pools['max_total_num_tokens'] < MIN_KV_TOKENS:
+        fail(f'{label}: KV pool of {pools["max_total_num_tokens"]} tokens < {MIN_KV_TOKENS}')
+    return pools
+
+
 def point_of(out: Path, label: str) -> tuple[dict[str, Any], Path]:
     runs = sorted((out / label).glob('*/sweep.json'))
     if len(runs) != 1:
         fail(f'{label}: expected one sweep.json, found {len(runs)}')
     data = json.loads(runs[0].read_text())
+    check_manifest(label, data)
     points = [p for p in data.get('points', []) if p.get('concurrency') == 128]
     if len(points) != 1:
         fail(f'{label}: expected one concurrency-128 point, found {len(points)}')
@@ -69,6 +114,10 @@ def point_of(out: Path, label: str) -> tuple[dict[str, Any], Path]:
         fail(f'{label}: prompts not as expected')
     if int(point.get('osl_mismatch') or 0) != 0:
         fail(f'{label}: {point.get("osl_mismatch")} outputs with the wrong length')
+    if not 2040 <= float(point.get('isl_mean') or 0) <= 2049:
+        fail(f'{label}: mean input length {point.get("isl_mean")}, expected about 2,048')
+    if int((point.get('server_log') or {}).get('max_running_logged') or 0) < 128:
+        fail(f'{label}: at most {point["server_log"].get("max_running_logged")} requests running')
     if not (point.get('server_log') or {}).get('logged_gen_tps_full_batch'):
         fail(f'{label}: no token-weighted server full-batch decode rate')
     return point, runs[0].parent / 'server/server.log'
@@ -109,12 +158,18 @@ def main() -> None:
             dispatched = DISPATCH in text
             if dispatched != (arm == EXACT):
                 fail(f'{label}: exact-replay dispatch line present={dispatched}')
+            row[f'{key}_pools'] = resolved_pools(label, server_log)
             row[f'{key}_server_tps'] = float(point['server_log']['logged_gen_tps_full_batch'])
             row[f'{key}_client_y'] = float(point['y'])
         row['server_ratio'] = row['exact_server_tps'] / row['dense_server_tps']
         row['client_ratio'] = row['exact_client_y'] / row['dense_client_y']
         rows.append(row)
 
+    kv_pools = {
+        r[f'{key}_pools']['max_total_num_tokens'] for r in rows for key in ('dense', 'exact')
+    }
+    if len(kv_pools) != 1:
+        fail(f'KV pools differ between arms: {sorted(kv_pools)}')
     server = interval([r['server_ratio'] for r in rows])
     client = interval([r['client_ratio'] for r in rows])
     if server[2] < THRESHOLD:

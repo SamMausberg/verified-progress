@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -233,6 +234,9 @@ def bench(args: argparse.Namespace) -> dict[str, Any]:
         point = bench_width(T, args.requests, args.layer, args.seed)
         results['points'].append(point)
         print(json.dumps(point), flush=True)
+    results['flashinfer_failed'] = [
+        p['width'] for p in results['points'] if 'flashinfer_error' in p or 'flashinfer_us' not in p
+    ]
     return results
 
 
@@ -253,6 +257,8 @@ def main() -> None:
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(json.dumps(result, indent=1) + '\n')
+    if result.get('flashinfer_failed'):
+        sys.exit(f'FlashInfer MTP verify failed at widths {result["flashinfer_failed"]}')
 
 
 if __name__ == '__main__':

@@ -10,8 +10,10 @@
 #     configuration fails or lacks its comparison.
 #  4. Pre-registered A/B: batch 128, 2,048-token prompts, 512 generated, greedy, FP32 state,
 #     no speculation; dense vs exact replay L=4, four pairs in A B B A A B B A order; primary
-#     metric the token-weighted server full-batch decode rate, client y secondary. The run
-#     stops unless all eight arms of this run completed and form four dense/exact pairs.
+#     metric the token-weighted server full-batch decode rate, client y secondary. Pools are
+#     pinned in both arms (128 running, 360,448 KV tokens, 128 mamba slots). The run stops
+#     unless all eight arms of this run completed on the declared workload at batch 128 with
+#     the pinned pools and form four dense/exact pairs (validate_p4_ab.py).
 # Every step logs its start and exit status; any failed step makes the job exit non-zero
 # (required steps at once, optional steps at the end).
 # shellcheck source=/dev/null
@@ -73,10 +75,10 @@ step required ab-sweep python experiments/moonshot/lever_sweep.py --out "$AB" --
   --concurrency 128 --min-requests 256 --waves 2 \
   --workload ~/vp-data/moonshot/workloads/long2048.jsonl \
   --warmup-pool ~/vp-data/moonshot/workloads/long2048_warmup.jsonl \
-  --configs 'plain+no_radix#r1' 'plain+no_radix+exact_replay#r1' \
-  'plain+no_radix+exact_replay#r2' 'plain+no_radix#r2' \
-  'plain+no_radix#r3' 'plain+no_radix+exact_replay#r3' \
-  'plain+no_radix+exact_replay#r4' 'plain+no_radix#r4'
+  --configs 'plain+no_radix+p4_pools#r1' 'plain+no_radix+p4_pools+exact_replay#r1' \
+  'plain+no_radix+p4_pools+exact_replay#r2' 'plain+no_radix+p4_pools#r2' \
+  'plain+no_radix+p4_pools#r3' 'plain+no_radix+p4_pools+exact_replay#r3' \
+  'plain+no_radix+p4_pools+exact_replay#r4' 'plain+no_radix+p4_pools#r4'
 step required ab-validate-and-decide python experiments/moonshot/validate_p4_ab.py "$AB" \
   --json "$AB/verdict.json"
 
