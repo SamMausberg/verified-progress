@@ -67,8 +67,9 @@ scripts/gpu_lock.sh --status          # queued and running jobs
 
 Jobs run in arrival order, except for the priority lane (`GPU_LOCK_PRIORITY=1`),
 which only the integrator grants. The lock lasts exactly as long as the command:
-`scripts/gpu_job.sh` runs each job in its own process group and terminates the
-group when the job exits, and an exclusive job first waits
+when the job exits, `scripts/gpu_job.sh` terminates every process it started,
+including those that moved to another process group or session (`timeout`,
+`setsid`, `start_new_session`), and an exclusive job first waits
 (`scripts/gpu_drain_wait.sh`) until no GPU process or SGLang server from an
 earlier job is left. Start a server, run the client and stop the server inside
 one locked command, trap the exit so the server always dies, and check that
