@@ -218,8 +218,9 @@ those results stay empirical and are rerun on the new defaults.
 
 **Fix.**
 
-- Defaults: W8A16 uses TMA tiles with block_k = 128 at every batch size (128x16,
-  128x32, 128x64, 128x128 by M); all W8A16, W8A8 and BF16 defaults were checked
+- Defaults: W8A16 uses TMA tiles with block_k = 128 at every batch size (128x16
+  up to 16 rows, 128x32 up to 32, 128x64 above; a 128x128 tile was 2.3 times
+  slower at M = 128); all W8A16, W8A8 and BF16 defaults were checked
   on real rows at M = 1, 16, 17, 32, 33, 64, 65, 128, 200 and 256, twice, for the raw product, the envelope, the tile
   summaries and both decision paths, with 0 violations (`tma_candidates.json`).
 - Int8 TMA boxes narrower than 128 bytes are refused for both int8 passes.

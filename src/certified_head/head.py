@@ -135,9 +135,9 @@ def default_gemv_config(m: int) -> GemvConfig:
         return GemvConfig(128, 16, 128, 4, 4, tma=True)
     if m <= 32:
         return GemvConfig(128, 32, 128, 4, 4, tma=True)
-    if m <= 64:
-        return GemvConfig(128, 64, 128, 4, 3, tma=True)
-    return GemvConfig(128, 128, 128, 4, 3, tma=True)
+    # Above 64 rows, several 64-row tiles: 128x128x128 took 1,458 us at M = 128
+    # against 626 us for this one (x6 primitives and sweep).
+    return GemvConfig(128, 64, 128, 4, 3, tma=True)
 
 
 def check_gemv_config(arith: Arith, cfg: GemvConfig) -> None:
