@@ -756,9 +756,31 @@ def test_per_prompt_output_lengths(tmp_path: Path) -> None:
     _write_run(tmp_path)
     rows = load_requests(tmp_path)
     for index, row in enumerate(rows):
-        row['prompt_id'] = f'p{index}'
-    summary = summarise_point(rows, {'p0': 4, 'p1': 5}, concurrency=2)
+        row['prompt_sha'] = f'h{index}'
+    summary = summarise_point(rows, {'h0': 4, 'h1': 5}, concurrency=2)
     assert summary['osl_mismatch'] == 1
+    conflicting = tmp_path / 'conflict.jsonl'
+    conflicting.write_text(
+        json.dumps({**records[0], 'id': 'a2', 'output_length': 999})
+        + '\n'
+        + json.dumps(records[0])
+        + '\n'
+    )
+    with pytest.raises(ValueError, match='two output lengths'):
+        load_prompts(conflicting)
+
+
+def test_prompts_match_by_text_with_repeats() -> None:
+    from bench.results import prompt_hash
+    from bench.sweep import prompts_match
+
+    measured = [{'id': 'p0', 'text': 'x'}, {'id': 'p1', 'text': 'x'}, {'id': 'p2', 'text': 'y'}]
+    # Two copies of 'x' are labelled with one id; the hashes still match.
+    rows = [{'prompt_id': 'p1', 'prompt_sha': prompt_hash(t)} for t in ('x', 'y', 'x')]
+    assert prompts_match(rows, measured)
+    assert not prompts_match(rows[:2], measured)
+    rows_wrong = [{'prompt_sha': prompt_hash(t)} for t in ('x', 'y', 'y')]
+    assert not prompts_match(rows_wrong, measured)
 
 
 def test_sensitivity_arm_rule() -> None:
