@@ -125,6 +125,10 @@ def main() -> None:
     gdn = json.loads(args.gdn.read_text()) if args.gdn else {'blocks': {}}
     by_name = {Path(r['run']).name: r for r in rows}
     base = by_name.get(args.baseline)
+    if base is not None and verifier_of(base) != args.verifier:
+        raise SystemExit(
+            f'baseline {args.baseline} uses the {verifier_of(base)} verify kernel, not {args.verifier}'
+        )
     cd = args.cd_us if args.cd_us is not None else med(base or {}, 'cycle_period_us', 'median')
     ad = args.ad if args.ad is not None else med(base or {}, 'commit_per_cycle', 'mean')
     f = args.f if args.f is not None else med(base or {}, 'unaffected_fraction', 'median')
@@ -213,6 +217,11 @@ def main() -> None:
                 'S_b_ceiling_decode': B * cd / (ad * c_b_floor),
                 'S_b_ceiling_e2e': e2e(B * cd / (ad * c_b_floor)),
                 'S_b_ceiling_anchor_free_e2e': e2e(B * cd / (ad * (verify + commit))),
+                # The ceiling if the audit also dropped its per-position state writes (as measured
+                # or bounded above) and its boundary replay were free.
+                'S_b_ceiling_stateless_audit_e2e': e2e(B * cd / (ad * (c_b_floor - states)))
+                if not replay_protocol
+                else None,
                 # How much cheaper the audit pass would have to be (e.g. a verifier without
                 # per-position state writes, its boundary replay uncharged) for the ceiling
                 # to reach the target.
