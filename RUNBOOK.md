@@ -65,7 +65,8 @@ scripts/gpu_lock.sh -s <command...>   # shared: correctness only, no timing clai
 scripts/gpu_lock.sh --status          # queued and running jobs
 ```
 
-Jobs run in arrival order. The lock lasts exactly as long as the command:
+Jobs run in arrival order, except for the priority lane (`GPU_LOCK_PRIORITY=1`),
+which only the integrator grants. The lock lasts exactly as long as the command:
 `scripts/gpu_job.sh` runs each job in its own process group and terminates the
 group when the job exits, and an exclusive job first waits
 (`scripts/gpu_drain_wait.sh`) until no GPU process or SGLang server from an

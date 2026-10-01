@@ -33,11 +33,12 @@ machine.
 
 ## Main results
 
-Every GPU number below was measured on Qwen3.5-4B (revision `851bf6e8`) served
-by SGLang at the pinned commit on one GH200; the README of each evidence
-directory gives the command, commits and flags behind it. Results whose pull
-requests are still open are not listed; the paper shows them as pending items,
-never as numbers.
+Every GPU number below was measured on Qwen3.5-4B (revision `851bf6e8`) on one
+GH200 with SGLang at the pinned commit: some in the running server, others with
+its kernels in isolation or offline on states captured from it. The README of
+each evidence directory says which, and gives the command, commits and flags
+behind every number. Results whose pull requests are still open are not listed;
+the paper shows them as pending items, never as numbers.
 
 The main line of the paper:
 
@@ -59,12 +60,13 @@ The main line of the paper:
 - **Transport fails on real states.** Weight-only constants already limit it:
   on the Qwen3.5-4B head, transport's envelope is narrower than a per-row int8
   envelope only when the relative drift between draft and target head inputs is
-  below a threshold whose median over 64-row tiles is 0.85%
+  below a per-row threshold whose median over rows is 0.85%, with each row's
+  radius taken about its 64-row tile
   (`evidence/precision/head_constants.json`). On 40,000 held-out pairs each from
   the public DFlash-4B drafter and the native MTP layer, that drift has a median
   of 0.92 and 0.95. On 4,020 DFlash-4B and 16,016 MTP-4B held-out pairs, for
   every bound family and tiling tested, certified transport skips at most 0.65%
-  of the vocabulary on average, no more than a static screen
+  of the vocabulary on average, no better than a static screen
   (`evidence/head_geometry/`).
 - **Self-evidence certifies on real states.** On 6,005 plain-decode head inputs
   captured from the engine, an int8 copy of the head certifies the
@@ -80,8 +82,9 @@ Secondary investigations and supporting material:
 - **Speculation and the stock noise floor.** With identical pinned pools, every
   native-MTP configuration diverges from plain decoding at 3.5 to 4.0 per 1,000
   tokens, as often as from itself at another concurrency (3.1 to 3.5), and only
-  at near ties: no divergence is large and no run commits a token that is not its
-  own top-1. In a cache-level check of plain decoding against three-step MTP on
+  at near ties: at every divergence both runs' top-two logprob gaps are at most
+  two BF16 steps (0.25 nats), and no run commits a token that is not its own
+  top-1. In a cache-level check of plain decoding against three-step MTP on
   40 prompts, every cache entering the first differing module was identical, and
   that module is layer 0's GDN recurrence at the first verify. With the radix
   cache on, a request's logprobs depend on which request computed its shared
@@ -98,13 +101,12 @@ Secondary investigations and supporting material:
 - **Long-window repair.** With perfect continuations at one request, one wide
   verify pass costs 4.78 ms at block 16 and 44.82 ms at block 256 with
   FlashInfer's GDN verify kernel. The anchored residual evaluator (P3) fails at
-  the operator level: its repaired argmax matches the exact one at 33-44% of
-  changed positions, and free-running repair gains at most 0.11 accepted
-  drafts. An oracle does not
-  reject reusing a cached DFlash window once after a rejection (P9) with top-8
-  or top-16 candidate sets at concurrency 1 (top-16: +0.99 tokens per boundary,
-  95% interval 0.89-1.07), an upper bound under its stated scope, not a served
-  result (`evidence/repair/`).
+  the operator level: on the first replay its repaired argmax matches the exact
+  one at 33-44% of changed positions, and free-running repair gains at most 0.11
+  accepted drafts. An oracle does not reject reusing a cached DFlash window once
+  after a rejection (P9) with top-8 or top-16 candidate sets at concurrency 1
+  (top-16: +0.99 tokens per boundary, 95% interval 0.89-1.07), an upper bound
+  under its stated scope, not a served result (`evidence/repair/`).
 - **Recurrent-state replay (P4).** Strict GDN state replay is bit-exact at the
   kernel level on synthetic activations and 1.22x faster than the stock kernel
   at batch 128, which derives to about 1.08x per decode step, below the
