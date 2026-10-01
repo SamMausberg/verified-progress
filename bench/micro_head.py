@@ -517,6 +517,11 @@ def sampling_arms(
     def stock_seeded() -> Any:
         return stock_seeded_sample(h, w, 'bf16', seeds, positions, temps)
 
+    # The certified path's fallback calls SGLang's torch.compile'd sampler inside a
+    # conditional node; compile it for this batch size before any capture (a
+    # decided batch never runs the fallback during the eager warm-up).
+    stock_seeded()
+    torch.cuda.synchronize()
     return {
         'certified_sample': certified_sample,
         'certified_sample_fallback': certified_sample_fallback,
