@@ -81,6 +81,49 @@ with open(evidence / 'first_difference_by_module.csv', 'w', newline='') as f:
     w.writerows(rows)
 PY
 
+# Tap neutrality: which tapped prompts differ from the untapped matrix run, and where.
+nice -n 19 python - "$HOME/vp-data/state" "$evidence/tap_check.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+out = {}
+for session, ref in (('v3_plain_c1', 'plain/c1'), ('plain_c1', 'plain/c1')):
+    path = root / 'tap' / session / 'client.jsonl'
+    if not path.exists():
+        continue
+    tap = {json.loads(x)['id']: json.loads(x) for x in path.read_text().splitlines()}
+    base = {
+        json.loads(x)['id']: json.loads(x)
+        for x in (root / 'runs' / f'{ref}.jsonl').read_text().splitlines()
+    }
+    mismatched = {}
+    for pid, r in sorted(tap.items()):
+        if not r.get('tapped', True):
+            continue
+        n = len(r['output_ids'])
+        b = base[pid]
+        if r['output_ids'] == b['output_ids'][:n] and r['top_logprobs'] == b['top_logprobs'][:n]:
+            continue
+        first = next(
+            (i for i, (x, y) in enumerate(zip(r['top_logprobs'], b['top_logprobs'])) if x != y),
+            None,
+        )
+        mismatched[pid] = {
+            'first_logprob_difference': first,
+            'tokens_equal': r['output_ids'] == b['output_ids'][:n],
+        }
+    tag = 'tap v3 (module rows per token)' if session.startswith('v3') else 'tap v1'
+    out[session] = {
+        'tap_version': tag,
+        'untapped_run': ref,
+        'tapped_prompts': sum(1 for r in tap.values() if r.get('tapped', True)),
+        'mismatched': mismatched,
+    }
+Path(sys.argv[2]).write_text(json.dumps(out, indent=1) + '\n')
+PY
+
 # Drift and divergences by rejection position, for every speculative config.
 for spec in mtp_s1 mtp_s3 mtp_s5 mtp_tree; do
   if [ -f "$runs/$spec/c1.jsonl" ]; then

@@ -22,9 +22,13 @@ HERE = Path(__file__).resolve().parent
 
 def not_identical(test: str, case: dict[str, Any]) -> bool:
     if test == 'truncation':
-        return not case['identical']
+        return not case['identical'] or not case.get('logprobs_identical', True)
     if test == 'stops':
-        return not (case['stop_output_identical'] and case['extension_warm_vs_cold']['identical'])
+        return not (
+            case['stop_output_identical']
+            and case.get('stop_logprobs_identical', True)
+            and case['extension_warm_vs_cold']['identical']
+        )
     if test == 'prefix':
         return not case['warm_vs_cold']['identical'] or not case.get('truncated_identical', True)
     if test == 'abort':

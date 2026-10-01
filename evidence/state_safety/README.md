@@ -70,8 +70,13 @@ weights.
 Checks on the tool itself:
 
 - Neutrality: tapped runs match the untapped matrix run in tokens and logprobs for
-  162 of 167 prompts (plain decode, batch 1). The five exceptions are an open question
-  (below), not an assumption.
+  162 of 167 prompts (plain decode, batch 1). `tap_check.json` lists the five
+  exceptions (`alpaca_eval-0450`, `alpaca_eval-0500`, `mt_bench-0053`, `mt_bench-0056`,
+  `mt_bench-0059`): all five first differ in logprobs at output index 2, and two of
+  them keep identical tokens. They show the signature of the history dependence
+  described below (first difference at layer 3's attention at output index 2, with
+  identical projections), and one of them, `mt_bench-0056`, reproduces that dependence
+  deterministically without the tap; the KV-level link for all five is pending.
 - Positive controls (`tap_control_*.json`, analysed with the current `mechanism.py`):
   a one-ulp change injected into the first element of layer 9's `mlp.down_proj` output
   in every forward is named as the first difference, at the first prompt token, for
@@ -244,8 +249,9 @@ after the earlier prompt that shares the longest prefix with it (one request in 
 | Plain, radix cache off | 12/12 | 12/12 | - |
 | MTP steps 3, radix cache on | 10/12 | 12/12 | output index 2 and 5 |
 
-The two prompts are `mt_bench-0056` after `mt_bench-0054` (6 shared tokens) and
-`humaneval-0008` after `humaneval-0000` (22 shared tokens). So with the radix cache on, a
+The radix-off control was run for plain decoding only; the same control for MTP is
+**pending** (queued). The two prompts are `mt_bench-0056` after `mt_bench-0054` (6
+shared tokens) and `humaneval-0008` after `humaneval-0000` (22 shared tokens). So with the radix cache on, a
 request's output at a fixed configuration and batch shape depends on which earlier
 request computed its shared prefix, and under overlap scheduling on timing. The values
 involved are all valid; we found no case where this produced more than a near-tie flip,
@@ -279,16 +285,19 @@ common flags of the Setup section, one request in flight, 40 prompts per test (t
 40 of the prompt set):
 
 - **Truncation inside a verify cycle** (`max_new_tokens` ending after every possible
-  number of tokens of the final cycle; flushed cache before every request): MTP steps 3, 157/157 truncated runs bitwise
-  equal to the untruncated run's prefix, for 1 to 4 tokens kept; MTP steps 5, 240/240,
-  for 1 to 6 kept.
-- **Stop token at every index of a verify cycle**: MTP steps 3, 160/160 outputs bitwise
-  equal to the untruncated prefix (120 with the stop inside the draft block, so drafts
-  after it were accepted and folded into the GDN state before the stop was detected);
-  MTP steps 5, 240/240 (200 inside the block). None of the committed post-stop state
-  reaches the output. Extending each stopped conversation with a new user turn, served
+  number of tokens of the final cycle; flushed cache before every request): MTP steps 3, 157/157 truncated runs
+  token-identical to the untruncated run's prefix, for 1 to 4 tokens kept; MTP steps 5,
+  240/240, for 1 to 6 kept. These counts compare output token IDs only; logprobs and
+  state were not compared in these runs (`targeted.py` now also compares the top-5
+  logprobs, from the next runs on).
+- **Stop token at every index of a verify cycle**: MTP steps 3, 160/160 outputs
+  token-identical to the untruncated prefix (output IDs; logprobs and state not
+  compared), 120 of them with the stop inside the draft block, so drafts after it were
+  accepted and folded into the GDN state before the stop was detected; MTP steps 5,
+  240/240 (200 inside the block). The emitted tokens are unaffected by that committed
+  post-stop state. Extending each stopped conversation with a new user turn, served
   warm (radix cache on, so the prompt's GDN checkpoint is restored) and cold (after a
-  flush), gives identical continuations in 139/160 and 210/240 cases; the rest diverge at
+  flush), gives token-identical continuations in 139/160 and 210/240 cases; the rest diverge at
   exact ties (19 and 30) or within one BF16 step (2), consistent with the warm path's
   different prefill computation and with the history dependence above.
 

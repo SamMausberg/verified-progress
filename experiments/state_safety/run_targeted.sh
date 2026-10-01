@@ -57,7 +57,8 @@ group() {
       ids=$ids,mt_bench-0012,alpaca_eval-0020
       t_hold "history --config plain --history-ids $ids --full-len 64" \
         "history --config plain_noradix --history-ids $ids --full-len 64" \
-        "history --config mtp_s3 --history-ids $ids --full-len 64"
+        "history --config mtp_s3 --history-ids $ids --full-len 64" \
+        "history --config mtp_s3_noradix --history-ids $ids --full-len 64"
       ;;
     *)
       echo "unknown group $1" >&2

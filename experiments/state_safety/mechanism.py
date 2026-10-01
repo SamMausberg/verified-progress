@@ -590,6 +590,7 @@ def main() -> None:
             'untapped_run': args.untapped_a,
             'prompts': len(ca),
             'tokens_and_logprobs_bitwise_equal': len(same),
+            'mismatched_ids': sorted(set(ca) - set(same)),
         }
     Path(args.out).write_text(json.dumps({'summary': summary, 'cases': cases}, indent=1) + '\n')
     print(json.dumps(summary, indent=1))
