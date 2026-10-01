@@ -1,8 +1,12 @@
 """Kernel time per verify cycle by category from Nsight Systems reports (serve_probe.py --nsys).
 
 Runs `nsys stats --report cuda_gpu_kern_sum` on each report, sorts every kernel into a
-category by its name, and divides by the number of cycles in the window, counted as
-the instances of SGLang's per-cycle GDN state commit kernel. Categories: GDN verify
+category by its name, and divides by the number of verify cycles in the window, counted as
+the launches of the most-launched GDN kernel (the verify kernel; prefill's chunked kernels
+launch once per layer per prefill) over the model's 24 GDN layers (one launch per layer per
+cycle; the state commit kernel, the earlier count, runs twice per cycle). Every kernel in
+the window is charged, so the per-cycle figures include the draft, prefill and warm-up
+kernels the window holds. Categories: GDN verify
 (the FlashInfer gated-delta-rule MTP kernel), GDN conv, GEMM (cuBLAS/nvjet/CUTLASS),
 attention (FlashInfer prefill/decode), head epilogue (logit copy, argmax), state
 commit, and other. Kernel time is GPU time inside the window, not wall time.
@@ -21,6 +25,8 @@ import re
 import subprocess
 from pathlib import Path
 from typing import Any
+
+GDN_LAYERS = 24  # Qwen3.5-4B: 24 of 32 layers are Gated DeltaNet
 
 CATEGORIES = (
     ('gdn_verify', re.compile(r'gated_delta|GatedDelta|gdn|delta_rule', re.I)),
@@ -77,7 +83,8 @@ def main() -> None:
     for report in args.reports:
         rows = kernel_summary(report)
         by_cat: dict[str, float] = {}
-        cycles = 0
+        verify_launches = 0
+        commit_launches = 0
         top = []
         for row in rows:
             name = row.get('Name', '')
@@ -85,22 +92,28 @@ def main() -> None:
             instances = int(float(row.get('Instances', 0) or 0))
             cat = categorize(name)
             by_cat[cat] = by_cat.get(cat, 0.0) + total_ns
+            if cat == 'gdn_verify':
+                verify_launches = max(verify_launches, instances)
             if cat == 'state_commit':
-                cycles = max(cycles, instances)
+                commit_launches = max(commit_launches, instances)
             top.append(
                 {
                     'name': name[:160],
                     'category': cat,
                     'total_ms': total_ns / 1e6,
                     'instances': instances,
+                    'mean_us': total_ns / 1e3 / instances if instances else None,
                 }
             )
         top.sort(key=lambda r: -r['total_ms'])
         total = sum(by_cat.values())
+        cycles = verify_launches / GDN_LAYERS
         per_cycle = {k: v / 1e3 / cycles for k, v in sorted(by_cat.items())} if cycles else {}
         entry: dict[str, Any] = {
             'report': str(report),
             'cycles_in_window': cycles,
+            'cycles_source': f'GDN verify kernel launches ({verify_launches}) / {GDN_LAYERS} layers',
+            'state_commit_launches': commit_launches,
             'kernel_ms_total': total / 1e6,
             'per_cycle_us': per_cycle,
             'share': {k: v / total for k, v in sorted(by_cat.items())} if total else None,
