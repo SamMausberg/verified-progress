@@ -177,6 +177,12 @@ fi
 # comparisons pin the pools; the earlier runs did not, so record what each had).
 nice -n 19 python pools.py --root "$HOME/vp-data/state" --evidence "$evidence"
 
+# The declared first-cycle test, once all five of its runs exist (void otherwise).
+fresh="$HOME/vp-data/state/runs_fresh"
+if [ -f "$fresh/plain/c1.jsonl" ] && [ -f "$fresh/mtp_tree/c32.jsonl" ]; then
+  nice -n 19 python first_cycle.py --runs "$fresh" --out "$evidence/first_cycle_fresh.json"
+fi
+
 # Drift and divergences by rejection position, for every speculative config.
 for spec in mtp_s1 mtp_s3 mtp_s5 mtp_tree; do
   if [ -f "$runs/$spec/c1.jsonl" ]; then

@@ -221,3 +221,7 @@ reason go in a new commit before the runs.
     exploratory effect.
 - **If supported.** Use the cache tap to compare the GDN state handed from prefill to
   the first verify forward with the state handed to the first plain decode step.
+- **Implementation.** `first_cycle.py` implements this analysis.
+  `tests/test_state_safety_first_cycle.py` tests it on synthetic runs, and
+  `analyze_all.sh` runs it once all five runs exist. Missing runs, unpinned pools or
+  other generation settings make the result void, and then no results are written.
