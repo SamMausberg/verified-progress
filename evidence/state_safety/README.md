@@ -457,10 +457,16 @@ change perturbs at all, and how often a perturbed trajectory then flips a near t
 first matrix, `perturbation_pinned.json` for the pinned one). A prompt is perturbed when
 its two outputs are not bitwise identical in tokens and top-5 logprobs. Its onset is the
 first output index where they differ (output index 0 comes from the prefill alone). For
-perturbed prompts it reports the share whose tokens diverge within the 256 generated
-tokens, with a Wilson 95% interval, overall and by onset (0-31, 32-127, 128 and later).
-It also reports the median onset and the token divergences per 1,000 post-onset
-positions, which count from the onset to the divergence or the end.
+perturbed prompts the script reports several things, overall and by onset (0-31, 32-127,
+128 and later):
+- the share whose tokens diverge within the generated output (up to 256 tokens; an
+  output may end earlier at its stop token), with a Wilson 95% interval;
+- the median onset;
+- the token divergences per 1,000 post-onset positions, counted from the onset to the
+  divergence or the end.
+
+The comparison this supports is speculation against plain decoding, set beside the two
+plain-decoding floors:
 
 | Pair | Perturbed | Median onset | Diverged (share, 95%) | Per 1,000 post-onset |
 |---|---|---|---|---|
@@ -469,32 +475,49 @@ positions, which count from the onset to the divergence or the end.
 | MTP steps 3 vs plain, c1 (pinned) | 320/320 | 1 | 171 (0.53, 0.48-0.59) | 3.71 |
 | MTP steps 1, 5, tree vs plain, c1 (pinned) | 320/320 each | 1 | 164-170 (0.51-0.53) | 3.53-3.71 |
 | MTP vs plain, c32 (pinned) | 320/320 each | 1 | 166-181 (0.52-0.57) | 3.55-3.99 |
-| MTP steps 1 vs steps 3, c1 (pinned) | 241/320 | 41 | 92 (0.38, 0.32-0.44) | 3.47 |
 
-- Batch shape at cap 8 perturbs only 75 of 320 plain-decoding prompts, and 245 are
-  bitwise identical between c1 and c32. At cap 16 it perturbs all 320, and speculation
-  perturbs all 320 against plain decoding from the first verify forward.
-- In the onset bucket that holds almost all of them (0-31), the share that diverges is
-  about the same: 35 of 62 (0.56, 0.44-0.68) for plain at cap 8, 165 of 318 (0.52) at
-  cap 16, and 0.51 to 0.57 for every MTP configuration against plain decoding. The
-  post-onset rates, 3.5 to 4.1 per 1,000, agree as well.
-- So a perturbed trajectory flips a near tie at about the same rate whatever perturbed
-  it. The difference between the cap-8 floor (0.63 per 1,000 compared tokens) and the
-  speculative rate (3.5 to 4.0) is the number of prompts perturbed, not a higher rate of
-  divergence once perturbed. On this measure no excess of speculation is detected at
-  either concurrency. The cap-8 interval is wide (75 perturbed prompts), so a modest
-  difference is not excluded. A source that flipped near ties more often per perturbed
-  trajectory would raise the share or the post-onset rate; none does.
-- Onset matters where it varies. MTP steps 1 and 3 are perturbed later (median onset 41),
-  so fewer of their prompts diverge overall (0.38). In the 0-31 bucket the share is 51 of
-  103 (0.50), and the post-onset rate (3.47) is the same as elsewhere.
-- Other pinned pairs fall in the same range: MTP across concurrency, radix off, overlap
-  off, deterministic inference and the same-server repeats give shares of 0.44 to 0.60.
-  The FP32 head gives 0.41 (2.45 per 1,000 post-onset), since without BF16 ties there
-  are fewer near ties to flip.
-- These are counts over 320 prompts of 256 tokens, with intervals that assume prompts are
-  independent. The post-onset rate treats positions as independent, although they
-  cluster by prompt.
+- Batch shape at cap 8 perturbs only 75 of 320 plain-decoding prompts (245 are bitwise
+  identical between c1 and c32); at cap 16 it perturbs all 320. Speculation perturbs
+  all 320 against plain decoding: at c1 from the first verify forward (output index 1
+  for 313 or 314 prompts), and at c32 also from the prefill (output index 0 for 36 to
+  63 prompts, which are prefilled in batches).
+- Nearly all of these prompts have their onset at output index 0-31. In that bucket the
+  share that diverges is 35 of 62 (0.56, 0.44-0.68) for plain decoding at cap 8, 165 of
+  318 (0.52, 0.46-0.57) at cap 16, and 0.51 to 0.57 for every MTP configuration against
+  plain decoding, at c1 and c32. The post-onset rates are 3.5 to 4.1 per 1,000 for all
+  of them.
+- So the gap between the cap-8 floor (0.63 per 1,000 compared tokens) and the
+  speculative rate (3.5 to 4.0) is mainly the number of prompts perturbed. On this
+  measure no excess of speculation over either floor is detected. The cap-8 interval is
+  wide (62 prompts in the bucket), so a modest difference is not excluded.
+
+The conditional rate is not the same for every source of perturbation. Over the pairs
+in both files with at least 30 perturbed prompts, the share ranges from 0.29 to 0.60 and
+the post-onset rate from 1.56 to 6.74 per 1,000. The pairs that differ most:
+- Deterministic inference with the verify KV-split patch, MTP steps 3, c1 vs c32 (first
+  matrix, 96 prompts, patched engine): 28 of 96 (0.29, 0.21-0.39), 1.56 per 1,000. Its
+  interval excludes one half. It is unexplained. The pinned deterministic pair without
+  the patch gives 168 of 320 (0.53) and 3.50. The 8-prompt deterministic validation of
+  MTP (first matrix) gives 2 of 8 (0.25) at 2.19.
+- The FP32 head, MTP steps 3, c1 vs c32: 130 of 320 (0.41, 0.35-0.46), 2.45 per
+  1,000. Without BF16 rounding there are no exact ties to flip.
+- MTP steps 1 vs steps 3, c1: 92 of 241 (0.38, 0.32-0.44), with a later onset (median
+  41). In the 0-31 bucket it is 51 of 103 (0.50) at 3.78 per 1,000, so here the onset
+  accounts for the lower share.
+- Overlap off vs radix off, MTP steps 3, c1: 111 of 184 (0.60, 0.53-0.67), 4.65 per
+  1,000.
+- Fresh-server repeats of plain decoding at c32: 24 of 42 (0.57) at 6.74 per 1,000
+  (first matrix), and 4 of 8 at 6.70 (pinned). Same-server repeat at c32 (pinned): 4 of
+  9 at 4.69. These groups are small and start later (median onset 14.5 to 59), so their
+  post-onset exposure is short. The first matrix's same-server repeats perturb one
+  prompt each, and neither diverges.
+
+The other pinned pairs, which are MTP across concurrency, the MTP configurations against
+each other, radix off, overlap off, deterministic inference without the patch and the
+same-server c1 repeat, have shares of 0.47 to 0.55 and post-onset rates of 2.97 to
+3.98 per 1,000. Counts are over 320 prompts
+(fewer where stated), and the intervals assume prompts are independent. The post-onset
+rate treats positions as independent, although they cluster by prompt.
 
 **Pending** (queued, pinned): radix cache off, overlap off, deterministic inference
 and FP32 head for plain decoding, which give the radix-off noise floor (plain c1 vs
