@@ -282,16 +282,19 @@ common flags of the Setup section, one request in flight, 40 prompts per test (t
 40 of the prompt set):
 
 - **Truncation inside a verify cycle** (`max_new_tokens` ending after every possible
-  number of tokens of the final cycle; flushed cache before every request): MTP steps 3, 157/157 truncated runs bitwise
-  equal to the untruncated run's prefix, for 1 to 4 tokens kept; MTP steps 5, 240/240,
-  for 1 to 6 kept.
-- **Stop token at every index of a verify cycle**: MTP steps 3, 160/160 outputs bitwise
-  equal to the untruncated prefix (120 with the stop inside the draft block, so drafts
-  after it were accepted and folded into the GDN state before the stop was detected);
-  MTP steps 5, 240/240 (200 inside the block). None of the committed post-stop state
-  reaches the output. Extending each stopped conversation with a new user turn, served
+  number of tokens of the final cycle; flushed cache before every request): MTP steps 3, 157/157 truncated runs
+  token-identical to the untruncated run's prefix, for 1 to 4 tokens kept; MTP steps 5,
+  240/240, for 1 to 6 kept. These counts compare output token IDs only; logprobs and
+  state were not compared in these runs (`targeted.py` now also compares the top-5
+  logprobs, from the next runs on).
+- **Stop token at every index of a verify cycle**: MTP steps 3, 160/160 outputs
+  token-identical to the untruncated prefix (output IDs; logprobs and state not
+  compared), 120 of them with the stop inside the draft block, so drafts after it were
+  accepted and folded into the GDN state before the stop was detected; MTP steps 5,
+  240/240 (200 inside the block). The emitted tokens are unaffected by that committed
+  post-stop state. Extending each stopped conversation with a new user turn, served
   warm (radix cache on, so the prompt's GDN checkpoint is restored) and cold (after a
-  flush), gives identical continuations in 139/160 and 210/240 cases; the rest diverge at
+  flush), gives token-identical continuations in 139/160 and 210/240 cases; the rest diverge at
   exact ties (19 and 30) or within one BF16 step (2), consistent with the warm path's
   different prefill computation and with the history dependence above.
 

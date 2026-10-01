@@ -68,7 +68,8 @@ the GDN checkpointing kept is served from the cache.
 
 - `truncation`: `max_new_tokens` chosen so the request ends after every
   possible number of tokens of its final verify cycle. The output must equal
-  the prefix of an untruncated run on the same server, bitwise.
+  the prefix of an untruncated run on the same server, token for token (and, from the
+  runs after the first two, in the top-5 logprobs as well).
 - `stops`: a stop token that is first generated at every possible index
   inside a verify cycle, so drafts after it were accepted and folded into the
   GDN state before the stop was detected. The output must equal the untruncated
