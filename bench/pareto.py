@@ -69,6 +69,7 @@ POINT_FIELDS = (
     'decode_graph_fraction',
     'isl_mean',
     'span_s',
+    'foreign_cpu_mean',
     'foreign_cpu_max',
     'max_running_logged',
     'kv_retractions',
@@ -158,6 +159,7 @@ def point_row(label: str, run: str, point: dict[str, Any], status: str = '') -> 
         'isl_mean': point.get('isl_mean'),
         'span_s': point.get('span_s'),
         # CPU cores used by other processes during the point (blank: not recorded).
+        'foreign_cpu_mean': point.get('foreign_cpu_during_mean'),
         'foreign_cpu_max': point.get('foreign_cpu_during_max'),
     }
 
