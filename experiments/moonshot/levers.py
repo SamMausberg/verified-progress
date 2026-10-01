@@ -77,19 +77,23 @@ LEVERS: dict[str, Lever] = {
     # tokens, plus headroom for chunked prefill.
     'p4_pools': Lever(
         {
-            'max-running-requests': 128,
-            # 360,448 admitted only 127 (run 20261001T082738Z, void): with ignore_eos the
-            # scheduler reserves each request's full 512 output tokens and charges a
-            # shared-mamba cost per request in token units.
+            # 129 at concurrency 128 (amendment of 2026-10-01, README 2c): at the pinned
+            # engine a prefill pass that carries a chunked request's tail stops admitting one
+            # request early, because that request counts both in the pass and in the rows it
+            # already holds; with --max-running-requests 128 every wave stopped at 127
+            # (admission_plateaus.py). The client still sends at most 128 at a time.
+            'max-running-requests': 129,
+            # Raised from 360,448 after the void first run (20261001T082738Z), whose 127
+            # plateau was blamed on the KV budget; that run's plateaus match the chunked-tail
+            # count above instead. Kept at 655,360 so only the running limit changes.
             'max-total-tokens': 655360,
-            # 128 slots admitted only 127 long prompts (runs 20261001T082738Z and
-            # 20261001T104311Z): with chunked prefill the last admission saw no schedulable
-            # mamba slot while one was free. 132 leaves headroom; the running limit stays 128.
+            # 132 slots (amendment of 10:55 UTC) did not lift the 127 plateau, so the mamba
+            # slots were not the limit; kept at 132 so only the running limit changes.
             'max-mamba-cache-size': 132,
             'mamba-ssm-dtype': 'float32',
         },
-        note='pinned pools for the P4 A/B: 128 running, 655,360 KV tokens, 132 mamba slots, '
-        'FP32 state stated explicitly',
+        note='pinned pools for the P4 A/B: running limit 129 (128 sent), 655,360 KV tokens, '
+        '132 mamba slots, FP32 state stated explicitly',
     ),
     'replayssm_spec': Lever(
         {'enable-linear-replayssm-spec': True},
