@@ -1,6 +1,6 @@
 """Summarize the stock-versus-fold serving A/B (run_fold_timing.sh).
 
-Reads every bench.sweep run under OUT (OUT/<label>/<timestamp>/r0/cNNN/point.json,
+Reads every bench.sweep run under OUT (OUT/b<block>/<label>/<timestamp>/r0/cNNN/point.json,
 labels b<block>-<stock|fold>-r<n>) and writes, per block and client concurrency,
 the output throughput y (tokens/s/GPU) and per-user rate x of each run, the
 mean of each arm, the ratio fold/stock of the means with the smallest and largest
@@ -11,8 +11,8 @@ slots, running limit). The fold arm needs no per-position GDN states, so SGLang
 gives it a larger KV pool from the same memory; at these concurrencies neither
 pool binds (32 requests of about 1,300 tokens), and the running limit matches.
 
-    python experiments/drafter/fold_timing_summary.py ~/vp-data/drafter/fold-timing/b16 \
-        --out evidence/drafter/fold_timing/b16.json
+    python experiments/drafter/fold_timing_summary.py ~/vp-data/drafter/fold-timing \
+        --out evidence/drafter/fold_timing/summary.json
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ def server_pools(run: Path) -> dict[str, Any]:
 
 def collect(root: Path) -> list[dict[str, Any]]:
     rows = []
-    for sweep in sorted(root.glob('*/*/sweep.json')):
+    for sweep in sorted(root.rglob('sweep.json')):
         run = sweep.parent
         match = re.fullmatch(r'b(\d+)-(stock|fold)-r(\d+)', run.parent.name)
         if not match:
