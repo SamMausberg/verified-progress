@@ -78,5 +78,5 @@
   59999
  ],
  "script": "experiments/certified_head/make_probe_rows.py",
- "commit": "c327c369837bd67ab55d46b725a69f5f782ff4cd"
+ "commit": "8be6488e100bbaef9782579c1264b34c652e90b4"
 }
