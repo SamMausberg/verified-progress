@@ -227,7 +227,8 @@ those results stay empirical and are rerun on the new defaults.
   slower at M = 128); all W8A16, W8A8 and BF16 defaults were checked
   on real rows at M = 1, 16, 17, 32, 33, 64, 65, 128, 200 and 256, twice, for the raw product, the envelope, the tile
   summaries and both decision paths, with 0 violations (`tma_candidates.json`).
-- Int8 TMA boxes narrower than 128 bytes are refused for both int8 passes.
+- Int8 TMA boxes narrower than 128 bytes are refused for both int8 passes, and
+  so are int8 TMA tiles with `block_m >= 128` (the second fault, below; 2ab57df).
 - Fail-closed on non-finite values: a row with any non-finite approximate logit,
   radius or bound (sampling scores: NaN) is marked `nonfinite`, and so is a row
   with a non-finite lower bound.
@@ -358,6 +359,7 @@ final shared-lock hold, x8s2, reran the correctness checks at 9f7f369
 | Steps | Commit | Run | Why the result stands |
 |---|---|---|---|
 | compile, GPU and CPU tests, stress, TMA neighbourhood, SASS statistics | 9f7f369 | x8s2 | run at this commit |
+| CPU tests of the digest check and the refused tiles | 2ab57df | CPU only | adds two host-side refusals; the kernels and every default path are unchanged since 9f7f369, so x8s2's results stand |
 | micro, summarize, check_outputs | 46bcc84 | x7c | run at this commit; see below for the commits after it |
 | tune_w8a16, primitives, ncu, ncu_export | d2712cb | x7 | the package's code and data are unchanged from d2712cb to 46bcc84; `bench/tune_gemv.py` was refactored after d2712cb (c01d905: it also records the fastest TMA and pointer-load configurations, with the same winner selection), and x7c's own W8A16 sweep (`pointer_vs_tma_w8a16.json`) picks the same winners except at M = 256 (3 instead of 4 stages, within 0.2%) |
 | replay, invariance, tune_w8a8 | fff72dc | x6 | `kernels.py` is unchanged since; the replay's batches have at most 16 rows, whose tiles did not change; the invariance check runs only the stock head; the W8A8 sweep times every candidate tile explicitly |
@@ -375,8 +377,14 @@ factor for all K squares (eb6ef57), the weight digest recorded in a freshly
 built head (647427e), and the refusal of hidden sizes the kernels do not tile
 (9f7f369). x8s2 reran the GPU and CPU tests, the stress test of every default
 under the margin rule, the TMA neighbourhood and the SASS statistics at 9f7f369;
-its results are below. None of these commits changes the W8A16 pass's tiles or
-kernels, so x7c's timings stand for the W8A16 path. (A first attempt at this
+its results are below. One commit follows x8s2 and changes package code,
+2ab57df: `build_quantized_head` refuses a supplied `head_sha256` that is not the
+digest of the weight it quantizes, and `check_gemv_config` refuses int8 TMA
+tiles with `block_m >= 128` (see "The whole neighbourhood"). It adds refusals
+only, so it was checked by CPU tests alone (`tests/test_certified_head_inputs.py`,
+11 passed, 7 of them failing without it). None of these commits changes the
+W8A16 pass's default tiles or kernels, so x7c's timings stand for the W8A16
+path. (A first attempt at this
 hold, x8s, ran under the system Python, without the SGLang environment, and
 produced no results.) The SGLang engine checks are in the engine follow-up, not
 in this PR.
@@ -583,7 +591,10 @@ clocks):
 
 Even at M = 1 the pass is not limited by memory bandwidth alone: the envelope
 epilogue's directed-rounding arithmetic keeps the SMs busy (79%). At 64 rows and
-above the kernel uses all 255 registers; this export does not report spills.
+above the kernel uses all 255 registers; this export does not report spills,
+but `sample_kernel_sass.json` does: the greedy 128x64x128 kernel uses 255
+registers with the probes on (214 with them off), with no stack and no local
+loads or stores either way.
 
 **Stress test of the default tiles** (`stress_defaults.json`, 9f7f369, x8s2):
 every default tile configuration of every pass, at every batch size from 1 to
@@ -613,6 +624,16 @@ W8A16 defaults above and the earlier TMA W8A8 and BF16 defaults, with the row's
 lower bound under the earlier lenient rule; it also found 0 misses in about a
 million row-checks per configuration.
 
+**Memory breach.** x8s2 ran under the shared GPU lock, whose budget is 20 GB per
+job. The stress process held up to 36,102 MiB (35.3 GiB) of GPU memory, and more
+than 20 GiB from 15:19:43 to 15:36:25 UTC, about 17 minutes, from the W8A16
+33-256-row configuration onwards (`x8s2_gpu_memory.csv`, this job's processes
+only, sampled every 5 s). The cause is not established; PyTorch's caching
+allocator across the step's 224 batch shapes is the likely one. The results
+stand: memory pressure cannot hide a miss, and no call failed. This PR's script
+has no memory cap, so run it under the exclusive lock, as its docstring's
+command does; the cap is in a follow-up PR.
+
 **The faulty TMA tiles** (`tma_m128_check.json`, 46bcc84, the two families that
 missed in x7b; three identical runs each, lower and upper misses per run):
 
@@ -640,7 +661,11 @@ bounds 7 to 4,504 per run, upper bounds 5 to 49), 128x128x128 with 8 warps and
 envelope's half-width) and 128x128x128 with 8 warps and 4 stages (upper bounds 1
 to 71 per run). The other 13 TMA configurations and all 16 pointer-load
 configurations missed nothing, and the raw product was within its bound in
-every run of every configuration. None of the three is a default. (x7b's
+every run of every configuration. None of the three is a default. All three
+have `block_m = 128`, and 128x128x128 with 8 warps and 4 stages had a run with
+no miss in `tma_m128_check.json` (sweep rows, M = 128), which the self-test
+would pass; so `check_gemv_config` refuses int8 TMA tiles with `block_m >= 128`
+for both int8 passes (2ab57df). No default has `block_m` above 64. (x7b's
 earlier check of this neighbourhood, at 0d770c6, inverted a sign and counted
 the logits each bound enclosed; it pointed to the same three configurations.)
 
@@ -671,7 +696,9 @@ microbenchmark therefore runs batch sizes above 32 in their own processes, and
 | `tma_candidates.json` | every pass's candidate default tiles at M = 1, 16, 17, 32, 33, 64, 65, 128, 200 and 256, twice; isolation kernels at M = 1, 16, 64 and 256: raw product, envelope, tile summaries, decisions; minimal kernels isolating the fault | `python experiments/certified_head/tma_candidates.py --out ...` (commit 4a54503, GPU, shared lock) |
 | `steps.tsv`, `run_commit.txt`, `gpu.txt` | x7c's steps with each one's commit and, for a reused step, why it stands; the run's commit; the GPU | `RUN_ALL_ONLY=stress,micro,summarize RUN_ALL_REUSE=~/vp-data/kernel/runs/x7b scripts/gpu_lock.sh -x experiments/certified_head/run_all.sh ~/vp-data/kernel/runs/x7c` (46bcc84) |
 | `gpu_tests.log` | the GPU tests with the package's CPU tests | `python -m pytest tests/test_certified_head.py tests/test_enclosure_margin.py tests/test_certified_bounds.py tests/test_certified_head_inputs.py -q -s -p no:cacheprovider` (x8s2, 9f7f369, shared lock) |
-| `x8s2_commit.txt` | x8s2's commit and tree state | x8s2 ran, under `scripts/gpu_lock.sh -s`, `python experiments/certified_head/compile_check.py` (148 of 148 variants) and the commands of the four files marked x8s2 here |
+| `x8s2_commit.txt` | x8s2's commit and tree state | x8s2 ran, under `scripts/gpu_lock.sh -s`, the commands of the files marked x8s2 here |
+| `x8s2_compile.log` | every kernel variant compiled for sm_90: 148 of 148 | `python experiments/certified_head/compile_check.py` (x8s2, 9f7f369) |
+| `x8s2_gpu_memory.csv` | GPU memory of x8s2's own processes, every 5 s | `nvidia-smi --query-compute-apps=pid,used_memory` in the hold, filtered to the job's process tree |
 | `replay_decisions.json` | 60,000 real decode rows under every contract and both error models, greedy and seeded sampling | `python experiments/certified_head/replay_decisions.py --limit-rows 60000 --sample-temps 0.7 1.0 --out ...` (run_all step `replay`, fff72dc) |
 | `gemv_sweep_w8a16.json`, `gemv_sweep_w8a8.json`, `tune_*.hostload.json` | tile sweeps (the micro's tuned tiles) | `python bench/tune_gemv.py --arith w8a16 --out ...`; `--arith w8a8 --batches 16 32 64 128 256` (run_all steps `tune_w8a16`, d2712cb, and `tune_w8a8`, fff72dc) |
 | `micro_head.json`, `micro.hostload.json`, `head_path_time.csv`, `head_path_table.md` | head-path microbenchmark, both fallback modes, both error models, probes on and off, sampling, W8A8 and BF16 passes; its summary | `python bench/micro_head.py --trials 30 --pool-rows 60000 --gemv-configs gemv_sweep_w8a16.json --w8a8-configs gemv_sweep_w8a8.json --out ...`, then `python bench/summarize_head.py micro_head.json --csv head_path_time.csv` (46bcc84) |
