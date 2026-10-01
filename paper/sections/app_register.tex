@@ -68,6 +68,7 @@ Every committed result the paper cites is listed below with the claims it suppor
 \evitem{natural-lengths}{Where greedy outputs stop on 576 tuning prompts}{\nolinkurl{evidence/bench/workload/natural_lengths_tune.json}, \nolinkurl{natural_requests_tune.csv}}{\nolinkurl{bench/sweep.py}, \nolinkurl{bench/lengths.py}}
 \evitem{probes}{Feasibility probes of capacity and draft trees (what launches, not performance)}{\nolinkurl{evidence/bench/probes/}}{\nolinkurl{bench/campaigns/capacity_probes.sh}, \nolinkurl{bench/pareto.py}}
 \evitem{frontend}{Frontend diagnosis at concurrency 256 on a quiet host (single points)}{\nolinkurl{evidence/bench/frontend/}}{\nolinkurl{bench/campaigns/frontend_diagnostic.sh}, \nolinkurl{bench/pareto.py}}
+\evitem{tuning}{Configuration search on the tuning split, one launch per configuration, and the chosen arms (Table~\ref{tab:tuning}); derived snapshot traffic}{\nolinkurl{evidence/bench/tuning/points.csv}, \nolinkurl{frontier.csv}, \nolinkurl{launches.csv}, \nolinkurl{evidence/bench/README.md}, \nolinkurl{bench/arms.toml}}{\nolinkurl{bench/campaigns/tuning_depth.sh}, \nolinkurl{tuning_knobs_dflash.sh}, \nolinkurl{tuning_backend_dflash.sh}, \nolinkurl{bench/pareto.py}}
 \evgroup{Literature}
 \evitem{litreview}{Literature review and citation audit behind Section~\ref{sec:related}}{\nolinkurl{sources/literature_review.md}, \nolinkurl{citation_audit.md}, \nolinkurl{source_manifest.json}}{}
 \end{longtable}}
@@ -140,10 +141,10 @@ Each entry is designed work without a committed result. The text marks it \mbox{
 \devitem{repair-verifier}{Decomposition of the verify pass's growth with width (a verify without per-position states, Nsight Systems at $B=64$ and 256), which decides the two-pass ceiling for an audit without per-position state writes, and the acceptance of the reference continuation per width}{\nolinkurl{evidence/repair/}}
 \devitem{repair-jacobi}{Accepted drafts against the number of full sweeps in the engine, recycle and keep, per block width, and P2's verdict}{\nolinkurl{evidence/repair/jacobi_progress.csv}}
 \devitem{bench-capacity}{Capacity limits per arm at default settings, from the server logs}{\nolinkurl{evidence/bench/}}
-\devitem{bench-tuning}{The chosen MTP and DFlash configurations, with the tuning evidence}{\nolinkurl{evidence/bench/tuning/}}
+\devitem{bench-equality}{Greedy outputs of the arms that replay the recurrent state (replayed verification and replayed decoding) or run the target's attention under Triton, classified against plain decoding}{\nolinkurl{evidence/bench/}}
 \devitem{bench-quality}{GSM8K accuracy for arms A, B and C with intervals and paired tests}{\nolinkurl{evidence/bench/quality/}}
 \devitem{bench-frontier}{Frontier plot, frontier table and run-to-run variance for arms A, B and C}{\nolinkurl{evidence/bench/confirm/frontier.csv}, \nolinkurl{evidence/bench/variance/}}
-\devitem{bench-mtp}{Served MTP speculation against plain decoding across concurrency, with and without buffered GDN verification}{\nolinkurl{evidence/bench/}}
+\devitem{bench-mtp}{Served MTP speculation against plain decoding on the confirmation split, with and without replayed GDN verification, and where the two cross}{\nolinkurl{evidence/bench/}}
 \devitem{bench-cert}{Before-and-after frontiers for the certified head in drafting, verification and plain decoding, with output equality at the same batch shape (H4)}{\nolinkurl{evidence/bench/}}
 \devitem{bench-frontend}{Frontend behaviour above concurrency 256 on a quiet host, and repeats of the single-point diagnosis}{\nolinkurl{evidence/bench/frontend/}}
 \devitem{transfer}{Transfer to new prompts, a second model (the public DFlash~2 pair for Qwen3.8-27B) or a second GPU; not scheduled}{}
