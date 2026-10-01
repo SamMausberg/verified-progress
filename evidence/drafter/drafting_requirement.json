@@ -1,0 +1,144 @@
+{
+ "kind": "derived from committed measurements (no new runs)",
+ "repo_commit": "aa773bc9b20e01974b30422194164a5bc256f78d",
+ "target_e2e": 5.0,
+ "verifiers": {
+  "flashinfer": {
+   "source": "evidence/repair/stage_a_oracle.json",
+   "baseline_run": "fresh_b16",
+   "baseline_us_per_token": 971.6,
+   "decode_speedup_needed": 5.515,
+   "widths": [
+    {
+     "B": 16,
+     "run": "force_b16",
+     "cycle_period_us": 7601.6,
+     "tokens_per_cycle_needed": 43.15,
+     "max_tokens_per_cycle": 16,
+     "alpha_needed": null,
+     "miss_rate_needed": null
+    },
+    {
+     "B": 32,
+     "run": "force_b32",
+     "cycle_period_us": 10249.0,
+     "tokens_per_cycle_needed": 58.17,
+     "max_tokens_per_cycle": 32,
+     "alpha_needed": null,
+     "miss_rate_needed": null
+    },
+    {
+     "B": 64,
+     "run": "force_b64",
+     "cycle_period_us": 18610.4,
+     "tokens_per_cycle_needed": 105.63,
+     "max_tokens_per_cycle": 64,
+     "alpha_needed": null,
+     "miss_rate_needed": null
+    },
+    {
+     "B": 128,
+     "run": "force_b128",
+     "cycle_period_us": 31316.4,
+     "tokens_per_cycle_needed": 177.75,
+     "max_tokens_per_cycle": 128,
+     "alpha_needed": null,
+     "miss_rate_needed": null
+    },
+    {
+     "B": 256,
+     "run": "force_b256",
+     "cycle_period_us": 48622.8,
+     "tokens_per_cycle_needed": 275.98,
+     "max_tokens_per_cycle": 256,
+     "alpha_needed": null,
+     "miss_rate_needed": null
+    }
+   ]
+  },
+  "triton": {
+   "source": "evidence/repair/stage_a_oracle_triton.json",
+   "baseline_run": "fresh_tritonverify_b16",
+   "baseline_us_per_token": 960.3,
+   "decode_speedup_needed": 5.542,
+   "widths": [
+    {
+     "B": 16,
+     "run": "force_tritonverify_b16",
+     "cycle_period_us": 7302.0,
+     "tokens_per_cycle_needed": 42.14,
+     "max_tokens_per_cycle": 16,
+     "alpha_needed": null,
+     "miss_rate_needed": null
+    },
+    {
+     "B": 64,
+     "run": "force_tritonverify_b64",
+     "cycle_period_us": 10584.5,
+     "tokens_per_cycle_needed": 61.09,
+     "max_tokens_per_cycle": 64,
+     "alpha_needed": 0.99851,
+     "miss_rate_needed": 0.00149
+    },
+    {
+     "B": 256,
+     "run": "force_tritonverify_b256",
+     "cycle_period_us": 22902.3,
+     "tokens_per_cycle_needed": 132.17,
+     "max_tokens_per_cycle": 256,
+     "alpha_needed": 0.9941,
+     "miss_rate_needed": 0.0059
+    }
+   ]
+  }
+ },
+ "measured_block16": {
+  "source": "evidence/drafter/support/zlab_b16_panel_v1_survival.csv",
+  "L_engine": {
+   "alpha_by_position": [
+    0.8601,
+    0.7975,
+    0.8132,
+    0.8462,
+    0.8641,
+    0.8798,
+    0.8738,
+    0.8807,
+    0.8886,
+    0.8913,
+    0.8963,
+    0.8971,
+    0.9142,
+    0.899,
+    0.8985
+   ],
+   "alpha_min": 0.7975,
+   "alpha_max": 0.9142,
+   "alpha_positions_5_to_15_mean": 0.8894,
+   "tokens_per_cycle_block16": 6.204
+  },
+  "U_16": {
+   "alpha_by_position": [
+    0.9919,
+    0.9669,
+    0.9356,
+    0.9161,
+    0.9163,
+    0.9125,
+    0.9151,
+    0.9106,
+    0.9098,
+    0.9102,
+    0.9105,
+    0.9161,
+    0.9159,
+    0.9209,
+    0.9183
+   ],
+   "alpha_min": 0.9098,
+   "alpha_max": 0.9919,
+   "alpha_positions_5_to_15_mean": 0.9142,
+   "tokens_per_cycle_block16": 10.138
+  }
+ }
+}
