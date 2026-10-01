@@ -12,9 +12,9 @@ token is then checked against the winning bucket, and the decided rows where one
 could compete are counted: only there could a decision over the full vocabulary
 differ.
 
-``6.1e-4``  conservative model (2K roundings at 2^-23; the kernel's default),
-``1.19e-4`` Hopper wgmma model of Khattak and Mikaitis with a split-K allowance
-            (both as the kernel computes them, rounded up to FP32),
+``6.1e-4``      conservative model (2K roundings at 2^-23; the kernel's default),
+``1.19216e-4``  Hopper wgmma model of Khattak and Mikaitis with a split-K allowance
+                (both as the kernel computes them, rounded up to FP32),
 smaller values show what tighter knowledge of the stock kernel would buy.
 
 Batch-level rates group rows exactly as the engine batched them. Usage::
