@@ -212,7 +212,7 @@ with this declaration):
   (labels r1-r4).
 - Workload (by SHA-256; the files are in `~/vp-data/moonshot/workloads/`, made by
   `make_long_prompts.py` from mixed-v2 confirm and warm-up): `long2048.jsonl` `db376fa3aadf75a30933a649b5ded1dfcafac8289b8e2aed1dde7201afd2659c`
-  (512 prompts, templated length 2,046-2,048), warm-up pool `long2048_warmup.jsonl`
+  (512 prompts, 91 distinct texts, templated length 2,046-2,048), warm-up pool `long2048_warmup.jsonl`
   `b4b5b4e43b53f3c64083263113904868cccf23767aa0b3c5f1b45740c13130a6`.
 - Pools pinned identically in both arms (`p4_pools` lever): `--max-running-requests 128`,
   `--max-total-tokens 360448`, `--max-mamba-cache-size 128`; each server's resolved sizes
@@ -225,6 +225,18 @@ with this declaration):
   dispatch line appears only in exact-replay logs, and the arms ran
   in the declared order. A failed check voids the run; it is repeated and its numbers are
   not reported.
+- Prompt check (corrected on 2026-10-01 at 10:05 UTC, after the run of 08:27-09:03 UTC and
+  before its verdict was computed or looked at): the run failed validation at "prompts not
+  as expected" in all eight arms. That check used bench's id-based `prompts_as_expected`,
+  which is wrong for this workload: `long2048.jsonl` holds 91 distinct texts among its 512
+  prompts (each repeated about 6 times; `make_long_prompts.py` cycles the source split and
+  its cursor returns to the same offsets), bench's `prompt_index` keeps one id per text
+  hash, and the warm-up pool reuses the same id names (`long2048-0000` to `-0255`), so the
+  ids bench records differ from the declared ones even when the right texts are sent. The corrected check compares content exactly: the multiset of SHA-256 hashes of the
+  prompt texts in the profiling phase of the raw AIPerf stream must equal that of the
+  declared file's first 256 prompts, counts included (`check_sent_prompts`). It passes in all
+  eight arms of `p4_ab_20261001T082738Z`. The repeats have no caching effect: the radix
+  cache is off in both arms. No other check changed.
 - Primary metric (amended on 2026-10-01 at 08:19 and 08:22 UTC, before the run started; the first
   version named bench's `logged_gen_tps_full_batch`, which averages windows with at least
   0.9 x the peak running count, i.e. 116-128 of 128): the server's decode rate at exactly

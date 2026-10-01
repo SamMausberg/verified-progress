@@ -111,6 +111,9 @@ P4: writing the recurrent state less often, bit-exactly, gives at least $1.10\ti
 \quad The recurrent state compresses exactly & Exact witnesses; rank audit of captured keys & Witnesses committed~\ev{state-structure}; audit \pend{moonshot-rank}\\
 P5: exact computation can be shared across unrelated requests & Analysis, exact witnesses, measured share of the one structural candidate & Rejected in analysis and by its pre-registered criterion (at most 0.60\% of a step)~\ev{profile-p5}\\
 P6: a draft selector trained for rate beats the same selector with the strongest matched objective by $1.25\times$ & Candidate-support screen, then a matched-objective comparison (Appendix~\ref{app:selector}) & Survives the screen (oracle bound 10.14 against 6.20 tokens per cycle)~\ev{drafter-support}; comparison \pend{drafter-p6}\\
+P7a: every exactness claim names its reference and one of five contracts & Witnesses that separate the contracts (Appendix~\ref{app:contracts}) & Adopted throughout; witnesses committed~\ev{contracts}\\
+P7b: certified block-parallel GDN verification beats strict replay & Captured-trace arms: reference, strict replay, certified fast, unchecked fast (Appendix~\ref{app:verify-state}) & SGLang's chunked kernel is not a usable fast path (synthetic inputs, one request)~\ev{fast-verify}; the certified path \pend{p7b}\\
+P11: restartable prefix-demand verification removes verify work & None run (Appendix~\ref{app:verify-state}) & Dropped by its author in favour of P10: verify kernels keep the recurrent state in registers, so a shorter suffix does not remove per-token full-state reads (reasoning); P10's first test \pend{p10-split}\\
 Results transfer & New prompts, a second model or a second GPU & \pend{transfer}\\
 \end{longtable}}
 
@@ -140,6 +143,8 @@ Each entry is designed work without a committed result. The text marks it \mbox{
 \devitem{moonshot-state}{MTP with and without replayed verification at concurrency 128 to 1,024; logit-probe KL, divergence rate and GSM8K for FP32, FP16, BF16 and FP8 state, with and without replay}{\nolinkurl{evidence/moonshot/lever_sweeps_hc.csv}, \nolinkurl{lever_quality.csv}}
 \devitem{moonshot-rank}{Rank and observability audit of captured $q$, $k$, $\alpha$ and $\beta$ traces, by exact or modular rank}{\nolinkurl{evidence/moonshot/}}
 \devitem{moonshot-p4}{P4: the end-to-end bitwise check of rounding-preserving replay through the server, then the pre-registered paired timing at batch 128 with 2,048-token prompts}{\nolinkurl{evidence/moonshot/}}
+\devitem{p7b}{P7b: certified block-parallel GDN verification against strict replay on a captured GDN trace, with arms for the reference, strict replay, certified fast, unchecked fast and reduced precision}{\nolinkurl{evidence/moonshot/}}
+\devitem{p10-split}{P10's first test: the share of the speculative cycle spent in SGLang's exact GDN fold at concurrency 8 and 16; anchor-fused replay is built only if it is at least 9.09\%}{\nolinkurl{evidence/drafter/}}
 \devitem{moonshot-patches}{Measured effect of the reduced draft head and the relaxed greedy rule, and the rule's quality curve}{\nolinkurl{evidence/moonshot/}}
 \devitem{moonshot-frontiers}{The interaction matrix and the exact and lossy frontiers, one server launch per arm, with the lossy stack's quality}{\nolinkurl{evidence/moonshot/interactions.csv}, \nolinkurl{frontier_exact.csv}, \nolinkurl{frontier_lossy.csv}}
 \devitem{drafter-cycle}{The split of a DFlash cycle at batch 1, 4, 16 and 64 into draft forward, draft head, verification, state commit, cache update and host time, from an untraced run; decides whether the longer block pays for itself}{\nolinkurl{evidence/drafter/cycle_split.csv}}
