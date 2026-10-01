@@ -1,0 +1,319 @@
+From 13fdbb98b0d426642548f410cb48775e6af515d9 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Thu, 1 Oct 2026 06:40:58 +0000
+Subject: [PATCH 3/5] Route Qwen3.5 backbone projections through the skinny
+ GEMM (opt-in)
+
+Every switch defaults to off, and with all of them off no code path changes.
+- SGLANG_BACKBONE_GEMM=1: UnquantizedLinearMethod.apply and
+  _bf16_gemm_dispatch_impl send bias-free BF16 projections whose (N, K, M) has
+  a table entry to the skinny GEMM (table from SGLANG_BACKBONE_GEMM_TABLE).
+- SGLANG_BACKBONE_MERGE_IN_PROJ=1: Qwen3.5's GDN layers pack in_proj_qkvz and
+  in_proj_ba into one weight on CUDA too (it was finalized only under aiter),
+  and the dense Qwen3_5ForConditionalGeneration forwards
+  prepare_before_cuda_graph_capture to its language model, as the MoE wrapper
+  already does.
+- SGLANG_BACKBONE_FUSE_ACT=1: Qwen2MoeMLP folds SiLU-mul into the down
+  projection's prologue (plain TP=1 BF16 only).
+- SGLANG_BACKBONE_FUSE_NORM=1: the plain residual readouts may defer the add
+  and Gemma RMSNorm into the next projection's prologue (DeferredNormInput),
+  never on aux hidden-state capture layers or under LoRA.
+---
+ .../layer_boundary/residual/add_norm.py       | 11 +++
+ .../sglang/srt/layers/quantization/unquant.py | 11 +++
+ python/sglang/srt/models/qwen2_moe.py         | 27 ++++++
+ python/sglang/srt/models/qwen3_5.py           | 83 ++++++++++++++++---
+ 4 files changed, 119 insertions(+), 13 deletions(-)
+
+diff --git a/python/sglang/srt/layers/layer_boundary/residual/add_norm.py b/python/sglang/srt/layers/layer_boundary/residual/add_norm.py
+index c1378d05e3..50782158c4 100644
+--- a/python/sglang/srt/layers/layer_boundary/residual/add_norm.py
++++ b/python/sglang/srt/layers/layer_boundary/residual/add_norm.py
+@@ -20,6 +20,7 @@ from typing import Optional
+ 
+ import torch
+ 
++from sglang.srt.layers import backbone_gemm as _backbone_gemm
+ from sglang.srt.layers.dp_attention import is_dp_attention_enabled
+ from sglang.srt.layers.flashinfer_comm_fusion import (
+     is_flashinfer_allreduce_unavailable,
+@@ -315,6 +316,11 @@ class NormQuantReadout:
+         quant_format="",
+         post_residual_addition=None,
+     ):
++        deferred = _backbone_gemm.maybe_defer_norm(
++            update, hidden_states, residual, norm, quant_format, post_residual_addition
++        )
++        if deferred is not None:
++            return deferred
+         if not update.is_plain_add:
+             return self.read(update.update(hidden_states, residual), norm, quant_format)
+         if hidden_states.shape[0] == 0:
+@@ -356,6 +362,11 @@ class NormReadout:
+         if residual is None:
+             # The layer stack starts at this stage: its input is the residual.
+             return self.read(hidden_states, norm, quant_format, post_residual_addition)
++        deferred = _backbone_gemm.maybe_defer_norm(
++            update, hidden_states, residual, norm, quant_format, post_residual_addition
++        )
++        if deferred is not None:
++            return deferred
+         if not update.is_plain_add:
+             return self.read(update.update(hidden_states, residual), norm, quant_format)
+         if quant_format or post_residual_addition is not None:
+diff --git a/python/sglang/srt/layers/quantization/unquant.py b/python/sglang/srt/layers/quantization/unquant.py
+index 6086320ec6..742ab00161 100644
+--- a/python/sglang/srt/layers/quantization/unquant.py
++++ b/python/sglang/srt/layers/quantization/unquant.py
+@@ -13,6 +13,7 @@ from torch.nn.parameter import Parameter
+ from sglang.kernels.fused_op import BaseFusedOp
+ from sglang.srt.batch_invariant_ops import is_batch_invariant_mode_enabled
+ from sglang.srt.environ import envs
++from sglang.srt.layers import backbone_gemm as _backbone_gemm
+ from sglang.srt.layers.amx_utils import (
+     CPUQuantMethod,
+     _amx_process_weight_after_loading,
+@@ -319,6 +320,10 @@ def _bf16_gemm_dispatch_impl(
+     bias: Optional[torch.Tensor],
+     addend: Optional[torch.Tensor] = None,
+ ) -> torch.Tensor:
++    if _backbone_gemm.GEMM_ENABLED and bias is None and addend is None:
++        output = _backbone_gemm.maybe_linear(x, weight)
++        if output is not None:
++            return output
+     m = x.numel() // x.shape[-1]
+     if _enable_bf16_splitk_gemm and use_bf16_splitk_gemm(
+         m, weight.shape[0], weight.shape[1]
+@@ -464,6 +469,8 @@ class UnquantizedLinearMethod(LinearMethodBase):
+         x: torch.Tensor,
+         bias: Optional[torch.Tensor] = None,
+     ) -> torch.Tensor:
++        if isinstance(x, _backbone_gemm.DeferredNormInput):
++            return x.linear(layer.weight, bias)
+         if use_intel_amx_backend(layer):
+             x_shapes = x.shape
+             if len(x_shapes) == 3:
+@@ -510,6 +517,10 @@ class UnquantizedLinearMethod(LinearMethodBase):
+             # reachable through the packed GDN path; dispatch plain layers too.
+             return _bf16_gemm_dispatch_impl(x, layer.weight, bias)
+ 
++        if _backbone_gemm.GEMM_ENABLED and bias is None:
++            output = _backbone_gemm.maybe_linear(x, layer.weight)
++            if output is not None:
++                return output
+         return F.linear(x, layer.weight, bias)
+ 
+     def apply_with_addend(
+diff --git a/python/sglang/srt/models/qwen2_moe.py b/python/sglang/srt/models/qwen2_moe.py
+index 4c9dbdba9f..b723605159 100644
+--- a/python/sglang/srt/models/qwen2_moe.py
++++ b/python/sglang/srt/models/qwen2_moe.py
+@@ -39,6 +39,7 @@ from sglang.srt.environ import envs
+ from sglang.srt.eplb.expert_distribution import get_global_expert_distribution_recorder
+ from sglang.srt.eplb.expert_location import ModelConfigForExpertLocation
+ from sglang.srt.eplb.expert_location_dispatch import ExpertLocationDispatchInfo
++from sglang.srt.layers import backbone_gemm as _backbone_gemm
+ from sglang.srt.layers.activation import SiluAndMul
+ from sglang.srt.layers.aux_hidden_states import (
+     AuxHiddenStateAccumulator,
+@@ -76,6 +77,7 @@ from sglang.srt.layers.moe.utils import (
+     uses_per_rank_fused_shared_slots,
+ )
+ from sglang.srt.layers.quantization.base_config import QuantizationConfig
++from sglang.srt.layers.quantization.unquant import UnquantizedLinearMethod
+ from sglang.srt.layers.radix_attention import RadixAttention
+ from sglang.srt.layers.rotary_embedding import get_rope
+ from sglang.srt.layers.utils import PPMissingLayer, get_layer_id
+@@ -242,6 +244,19 @@ class Qwen2MoeMLP(nn.Module):
+         y_sf = y_sf.view(torch.uint8).permute(2, 4, 0, 1, 3, 5).reshape(m_padded, -1)
+         return y_fp4, y_sf
+ 
++    def _backbone_fuse_act_ok(self, gate_up) -> bool:
++        # Plain TP=1 BF16 down projection only (LoRA wrappers have no quant_method).
++        down = self.down_proj
++        return (
++            isinstance(gate_up, torch.Tensor)
++            and gate_up.dim() == 2
++            and isinstance(self.act_fn, SiluAndMul)
++            and isinstance(getattr(down, "quant_method", None), UnquantizedLinearMethod)
++            and getattr(down, "bias", None) is None
++            and getattr(down, "tp_size", None) == 1
++            and down.weight.dtype == torch.bfloat16
++        )
++
+     def forward(
+         self,
+         x,
+@@ -250,6 +265,18 @@ class Qwen2MoeMLP(nn.Module):
+         if self._enable_silu_fp4_quant_fusion and not isinstance(gate_up, tuple):
+             x, _ = self.down_proj(self._silu_fp4_quant_fused(gate_up))
+             return x
++        if _backbone_gemm.FUSE_ACT and self._backbone_fuse_act_ok(gate_up):
++            # SiLU-mul folded into the down projection's prologue (opt-in).
++            cfg = _backbone_gemm.select(
++                gate_up.shape[0], *self.down_proj.weight.shape, fused=True
++            )
++            if cfg is not None:
++                return _backbone_gemm.skinny_gemm(
++                    gate_up,
++                    self.down_proj.weight,
++                    cfg,
++                    prologue=_backbone_gemm.PROLOGUE_SILU_MUL,
++                )
+         x = self.act_fn(gate_up)
+         x, _ = self.down_proj(x)
+         return x
+diff --git a/python/sglang/srt/models/qwen3_5.py b/python/sglang/srt/models/qwen3_5.py
+index c1d17ee122..5660dcc02e 100644
+--- a/python/sglang/srt/models/qwen3_5.py
++++ b/python/sglang/srt/models/qwen3_5.py
+@@ -41,6 +41,7 @@ from sglang.srt.configs.qwen3_5 import (
+ from sglang.srt.environ import envs
+ from sglang.srt.eplb.expert_distribution import get_global_expert_distribution_recorder
+ from sglang.srt.eplb.expert_location import ModelConfigForExpertLocation
++from sglang.srt.layers import backbone_gemm as _backbone_gemm
+ from sglang.srt.layers.attention.mamba.mamba import mamba_v2_sharded_weight_loader
+ from sglang.srt.layers.aux_hidden_states import (
+     AuxHiddenStateAccumulator,
+@@ -288,6 +289,34 @@ def _select_fused_ar_input_for_linear(hidden_states, linear: nn.Module):
+     )
+ 
+ 
++def _plain_bf16_weight(linear: nn.Module) -> Optional[torch.Tensor]:
++    """The weight of a plain BF16, bias-free, TP=1 linear, else None."""
++    if not (
++        isinstance(getattr(linear, "quant_method", None), UnquantizedLinearMethod)
++        and getattr(linear, "bias", None) is None
++        and getattr(linear, "tp_size", 1) == 1
++        and linear.weight.dtype == torch.bfloat16
++    ):
++        return None
++    return linear.weight
++
++
++def _backbone_norm_consumer(weight, capture) -> Optional[torch.Tensor]:
++    """The projection an input norm may be folded into (opt-in), or None: never
++    for a layer whose input the aux hidden-state capture reads, or under LoRA."""
++    if not _backbone_gemm.FUSE_NORM or weight is None or capture is not None:
++        return None
++    if get_lora().enable_lora or get_lora().lora_paths:
++        return None
++    return weight
++
++
++def _backbone_mlp_norm_consumer(mlp: nn.Module) -> Optional[torch.Tensor]:
++    if not _backbone_gemm.FUSE_NORM or not isinstance(mlp, Qwen2MoeMLP):
++        return None
++    return _backbone_norm_consumer(_plain_bf16_weight(mlp.gate_up_proj), None)
++
++
+ if _is_npu:
+     from sgl_kernel_npu.norm.split_qkv_rmsnorm_rope import (
+         split_qkvgate_gemma_rmsnorm_rope,
+@@ -750,6 +779,16 @@ class Qwen3_5GatedDeltaNet(nn.Module):
+         )
+ 
+     def _forward_input_proj(self, hidden_states: torch.Tensor):
++        if isinstance(hidden_states, _backbone_gemm.DeferredNormInput):
++            # Opt-in norm fusion: the input norm runs in the merged GEMM's prologue.
++            if self._fused_in_proj_weight is None:
++                hidden_states = hidden_states.materialize()
++            else:
++                fused_out = hidden_states.linear(self._fused_in_proj_weight)
++                return (
++                    fused_out[:, : self._fused_in_proj_qkvz_width],
++                    fused_out[:, self._fused_in_proj_qkvz_width :],
++                )
+         if _use_aiter and self._fused_in_proj_weight is not None:
+             # Unquantized BF16 projections consume the bf16 side of the fused
+             # AR+RMSNorm tuple; one aiter GEMM replaces the two separate
+@@ -1131,12 +1170,16 @@ class Qwen3_5LinearDecoderLayer(nn.Module):
+         **kwargs,
+     ):
+         forward_batch = kwargs.get("forward_batch", None)
++        capture = kwargs.get("captured_last_layer_outputs", None)
+ 
+-        hidden_states = self.attn_boundary.prepare(
+-            hidden_states,
+-            forward_batch,
+-            capture_gathered=kwargs.get("captured_last_layer_outputs", None),
+-        )
++        with _backbone_gemm.defer_norm_into(
++            _backbone_norm_consumer(self.linear_attn._fused_in_proj_weight, capture)
++        ):
++            hidden_states = self.attn_boundary.prepare(
++                hidden_states,
++                forward_batch,
++                capture_gathered=capture,
++            )
+ 
+         # fused AR+quant hands down a (fp8, scale) / (bf16, fp8, scale) tuple
+         hs = hidden_states[0] if isinstance(hidden_states, tuple) else hidden_states
+@@ -1148,7 +1191,8 @@ class Qwen3_5LinearDecoderLayer(nn.Module):
+ 
+         # Fully Connected
+         hidden_states = self.attn_boundary.finish(hidden_states, forward_batch)
+-        hidden_states = self.ffn_boundary.prepare(hidden_states, forward_batch)
++        with _backbone_gemm.defer_norm_into(_backbone_mlp_norm_consumer(self.mlp)):
++            hidden_states = self.ffn_boundary.prepare(hidden_states, forward_batch)
+ 
+         with self.ffn_boundary.exit(forward_batch) as ffn_exit:
+             if isinstance(self.mlp, Qwen2MoeSparseMoeBlock):
+@@ -1536,11 +1580,16 @@ class Qwen3_5AttentionDecoderLayer(nn.Module):
+         captured_last_layer_outputs: Optional[AuxHiddenStateAccumulator] = None,
+         **kwargs,
+     ):
+-        hidden_states = self.attn_boundary.prepare(
+-            hidden_states,
+-            forward_batch,
+-            capture_gathered=captured_last_layer_outputs,
+-        )
++        with _backbone_gemm.defer_norm_into(
++            _backbone_norm_consumer(
++                _plain_bf16_weight(self.qkv_proj), captured_last_layer_outputs
++            )
++        ):
++            hidden_states = self.attn_boundary.prepare(
++                hidden_states,
++                forward_batch,
++                capture_gathered=captured_last_layer_outputs,
++            )
+ 
+         # fused AR+quant hands down a (fp8, scale) / (bf16, fp8, scale) tuple
+         hs = hidden_states[0] if isinstance(hidden_states, tuple) else hidden_states
+@@ -1553,7 +1602,8 @@ class Qwen3_5AttentionDecoderLayer(nn.Module):
+ 
+         # Fully Connected
+         hidden_states = self.attn_boundary.finish(hidden_states, forward_batch)
+-        hidden_states = self.ffn_boundary.prepare(hidden_states, forward_batch)
++        with _backbone_gemm.defer_norm_into(_backbone_mlp_norm_consumer(self.mlp)):
++            hidden_states = self.ffn_boundary.prepare(hidden_states, forward_batch)
+         with self.ffn_boundary.exit(forward_batch) as ffn_exit:
+             if isinstance(self.mlp, Qwen2MoeSparseMoeBlock):
+                 hidden_states = self.mlp(
+@@ -1758,7 +1808,9 @@ class Qwen3_5ForCausalLM(nn.Module):
+         return self.embed_tokens
+ 
+     def prepare_before_cuda_graph_capture(self, model_runner) -> None:
+-        if _use_aiter and self.config.model_type in _QWEN3_5_ROCM_PACKED_MODEL_TYPES:
++        if (
++            _use_aiter and self.config.model_type in _QWEN3_5_ROCM_PACKED_MODEL_TYPES
++        ) or (_is_cuda and _backbone_gemm.MERGE_IN_PROJ):
+             packed = 0
+             for module in self.modules():
+                 if isinstance(module, Qwen3_5GatedDeltaNet):
+@@ -2277,6 +2329,11 @@ class Qwen3_5ForConditionalGeneration(Qwen3VLForConditionalGeneration):
+     def get_hidden_dim(self, module_name: str, layer_idx: int):
+         return self.model.get_hidden_dim(module_name, layer_idx)
+ 
++    def prepare_before_cuda_graph_capture(self, model_runner) -> None:
++        prepare = getattr(self.model, "prepare_before_cuda_graph_capture", None)
++        if prepare is not None:
++            prepare(model_runner)
++
+     def should_apply_lora(self, module_name: str) -> bool:
+         return module_name.startswith("model.layers.")
+ 
+-- 
+2.34.1
+

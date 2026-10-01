@@ -14,9 +14,10 @@ a microbenchmark speed-up is not a served result.
 ## Setup
 
 GH200 (132 SMs, clocks 1980 MHz SM / 2619 MHz memory at the start of each run), torch 2.13.0+cu130,
-Triton 3.7.1, cuBLASLt 13.1, SGLang at the paper's pin with the backbone engine patch
-(`engine/backbone` e89b122037; the kernel is `sglang/srt/layers/backbone_gemm.py`), repository
-commit 1e56c79, `Qwen/Qwen3.5-4B@851bf6e8`. Every JSON records its command, commits (both trees
+Triton 3.7.1, cuBLASLt 13.1, SGLang at the paper's pin with backbone patches 0001-0003
+(`engine/sglang/patches/backbone/`; tree `a1c6b5f6d3`, recorded in the JSON files as the local
+commit e89b122037; the kernel is `sglang/srt/layers/backbone_gemm.py`), repository commit 1e56c79,
+`Qwen/Qwen3.5-4B@851bf6e8`. Every JSON records its command, commits (both trees
 clean), clocks and GPU. Foreign CPU load averaged 0.3-0.7 cores during each step of the run (limit
 2).
 

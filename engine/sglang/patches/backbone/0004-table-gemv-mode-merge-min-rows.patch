@@ -1,0 +1,112 @@
+From 2c302bccca4b68b6878912f21a5797d63b07c155 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Thu, 1 Oct 2026 06:41:07 +0000
+Subject: [PATCH 4/5] Backbone table: a Hopper GEMV mode, and the merged GDN
+ in_proj from 64 rows
+
+A table entry's mode "gemv" sends that (N, K) at M = 1 to SGLang's
+hopper_bf16_gemv (its own shape limits apply), which on GH200 is the fastest
+kernel for every Qwen3.5-4B backbone projection at one row. With
+SGLANG_BACKBONE_MERGE_IN_PROJ the packed GDN projection is used only from
+SGLANG_BACKBONE_MERGE_IN_PROJ_MIN_M rows (default 64): below that the two
+views of the packed weight are multiplied separately, as stock. The packed
+GEMM's output is bitwise equal either way.
+---
+ python/sglang/srt/layers/backbone_gemm.py | 47 +++++++++++++++++++----
+ python/sglang/srt/models/qwen3_5.py       |  3 ++
+ 2 files changed, 42 insertions(+), 8 deletions(-)
+
+diff --git a/python/sglang/srt/layers/backbone_gemm.py b/python/sglang/srt/layers/backbone_gemm.py
+index 3a2859bc6e..6fb8a62ae3 100644
+--- a/python/sglang/srt/layers/backbone_gemm.py
++++ b/python/sglang/srt/layers/backbone_gemm.py
+@@ -561,12 +561,17 @@ FUSE_NORM = GEMM_ENABLED and _env_flag("SGLANG_BACKBONE_FUSE_NORM")
+ # in_proj_ba (SGLang's packed-weight path, otherwise ROCm-only), cuBLAS or Triton.
+ MERGE_IN_PROJ = _env_flag("SGLANG_BACKBONE_MERGE_IN_PROJ")
+ 
++# SGLANG_BACKBONE_MERGE_IN_PROJ_MIN_M: below this many rows the merged GDN
++# weight's two views are multiplied separately, as stock (the merge only pays
++# for larger M; its output is bitwise equal either way).
++MERGE_MIN_M = int(os.environ.get("SGLANG_BACKBONE_MERGE_IN_PROJ_MIN_M", "64"))
++
+ # (N, K) -> ((m_max, config or None, mode), ...) in increasing m_max: the first
+ # entry with m <= m_max applies; None keeps cuBLAS for that M range, and M beyond
+-# the last entry stays on cuBLAS. mode "gemm": every call; "fused": only when a
+-# prologue (norm or SiLU) is folded into the call, i.e. where the Triton GEMM
+-# alone does not beat cuBLAS but the saved launch pays. Tuned on GH200 under
+-# CUDA graphs (verified-progress, experiments/backbone/gemm_bench.py and
++# the last entry stays on cuBLAS. mode "gemm": the Triton kernel for every call;
++# "fused": only when a prologue (norm or SiLU) is folded into the call; "gemv":
++# SGLang's Hopper GEMV (hopper_bf16_gemv, M = 1 only). Tuned on GH200 under CUDA
++# graphs (verified-progress, experiments/backbone/gemm_bench.py and
+ # make_table.py).
+ TableEntry = tuple[int, Optional[GemmConfig], str]
+ TABLE: dict[tuple[int, int], tuple[TableEntry, ...]] = {}
+@@ -590,11 +595,31 @@ def _load_table_override() -> None:
+ _load_table_override()
+ 
+ 
++def _entry(m: int, n: int, k: int) -> Optional[TableEntry]:
++    for entry in TABLE.get((n, k), ()):
++        if m <= entry[0]:
++            return entry
++    return None
++
++
++def _gemv_eligible(x: torch.Tensor, n: int, k: int) -> bool:
++    # hopper_bf16_gemv's own limits: one row, K a multiple of its 512-wide
++    # warp stride and small enough for its static shared memory, N % 8 == 0.
++    return (
++        x.shape[0] == 1
++        and x.is_contiguous()
++        and k % 512 == 0
++        and 512 <= k <= 17408
++        and n % 8 == 0
++        and n >= 64
++    )
++
++
+ def select(m: int, n: int, k: int, fused: bool = False) -> Optional[GemmConfig]:
+-    """The configuration for this problem, or None to keep cuBLAS."""
++    """The Triton configuration for this problem, or None (cuBLAS or GEMV)."""
+     for m_max, cfg, mode in TABLE.get((n, k), ()):
+         if m <= m_max:
+-            if cfg is None or (mode == "fused" and not fused):
++            if cfg is None or mode == "gemv" or (mode == "fused" and not fused):
+                 return None
+             if not cfg.valid_for(m, n, k):
+                 return None
+@@ -616,8 +641,14 @@ def maybe_linear(x: torch.Tensor, weight: torch.Tensor) -> Optional[torch.Tensor
+         and not torch.compiler.is_compiling()
+     ):
+         return None
+-    cfg = select(x.shape[0], weight.shape[0], weight.shape[1])
+-    if cfg is None or x.shape[0] == 0:
++    m, (n, k) = x.shape[0], weight.shape
++    entry = _entry(m, n, k)
++    if entry is not None and entry[2] == "gemv" and _gemv_eligible(x, n, k):
++        from sglang.kernels.ops.gemm.hopper_bf16_gemv import hopper_bf16_gemv
++
++        return hopper_bf16_gemv(x, weight)
++    cfg = select(m, n, k)
++    if cfg is None or m == 0:
+         return None
+     return skinny_gemm(x, weight, cfg)
+ 
+diff --git a/python/sglang/srt/models/qwen3_5.py b/python/sglang/srt/models/qwen3_5.py
+index 5660dcc02e..520dd9bb66 100644
+--- a/python/sglang/srt/models/qwen3_5.py
++++ b/python/sglang/srt/models/qwen3_5.py
+@@ -841,6 +841,9 @@ class Qwen3_5GatedDeltaNet(nn.Module):
+             # Measured on cuBLAS above ~1k rows:
+             # the merged (m, 4120) GEMM is ~10% slower than the two separate GEMMs.
+             and hidden_states.shape[0] <= 1024
++            # On CUDA the merge comes from SGLANG_BACKBONE_MERGE_IN_PROJ, which
++            # pays only from MERGE_MIN_M rows (GH200, Qwen3.5-4B).
++            and hidden_states.shape[0] >= _backbone_gemm.MERGE_MIN_M
+         ):
+             fused_out = bf16_gemm_dispatch(
+                 hidden_states, self._fused_in_proj_weight, None
+-- 
+2.34.1
+
