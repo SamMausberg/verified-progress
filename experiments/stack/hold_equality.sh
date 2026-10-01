@@ -96,7 +96,9 @@ python experiments/state_safety/compare.py --runs "$RUNS" --pairs "$OUT/pairs.js
 if [[ " ${failed[*]} " == *" compare "* ]]; then
   rm -f "$OUT/summary.json"
 else
-  python experiments/stack/equality_gate.py "$OUT" || failed+=(gate)
+  cert=()
+  [ -n "${STACK_CERT_SRC:-}" ] && cert=(--cert-src "$STACK_CERT_SRC")
+  python experiments/stack/equality_gate.py "$OUT" "${cert[@]}" || failed+=(gate)
 fi
 if (( ${#failed[@]} )); then
   # Without a current summary there is no gate, so no session runs; a failed lever run

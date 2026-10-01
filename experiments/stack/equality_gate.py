@@ -8,11 +8,16 @@ equality_pairs.py and writes gate.json, which the session holds read:
   Otherwise `ok` is false and no session runs.
 * Each lever's class against stock DFlash block 16 under bench's rule: lossy if any first
   divergence is `large` or `not_argmax`, otherwise exact-up-to-rounding (bitwise if it
-  matches B0 exactly). A lossy lever is dropped from the timed levers.
+  matches B0 exactly). A lossy lever is dropped from the timed levers; so is one compared
+  on fewer than 320 prompts (missing) or with any output-length mismatch (the
+  comparator's finish-bug signal). If F and G each pass but FG does not, only F is
+  timed (G if F did not pass).
 * The certified head (H) is timed only if its tokens-only runs equal their references
   on all 320 prompts (no divergence, no length mismatch; H against B0, FGH against FG)
   and both runs' check-mode statistics show the verify path certified rows with
-  mismatch_rows exactly 0.
+  mismatch_rows exactly 0. The gate records a fingerprint of the package that passed
+  (SHA-256 over its files); a timed session runs H only with that exact package
+  (`--fingerprint` prints it for the session hold to compare).
 
     python experiments/stack/equality_gate.py ~/vp-data/stack/equality
 """
@@ -20,6 +25,7 @@ equality_pairs.py and writes gate.json, which the session holds read:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -51,6 +57,8 @@ def lever_class(pairs: dict[str, Any], lever: str) -> str:
         own['classes'].get(k, 0) for k in LOSSY
     ):
         return 'lossy'
+    if stock['length_mismatch'] or own['length_mismatch']:
+        return 'length-mismatch'
     return 'bitwise' if bitwise(own) else 'exact-up-to-rounding'
 
 
@@ -70,10 +78,26 @@ def certified_check(path: Path) -> dict[str, Any]:
     return out
 
 
+def fingerprint(src: Path) -> str:
+    """SHA-256 over the certified_head package's files (paths and bytes, sorted)."""
+    h = hashlib.sha256()
+    pkg = src / 'certified_head'
+    for f in sorted(p for p in pkg.rglob('*') if p.is_file() and '__pycache__' not in p.parts):
+        h.update(str(f.relative_to(pkg)).encode() + b'\0' + f.read_bytes() + b'\0')
+    return h.hexdigest()
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument('equality_dir', type=Path)
+    ap.add_argument('equality_dir', type=Path, nargs='?')
+    ap.add_argument('--cert-src', type=Path, help='certified_head source dir the H runs used')
+    ap.add_argument('--fingerprint', type=Path, help='print the fingerprint of this source dir')
     args = ap.parse_args()
+    if args.fingerprint:
+        print(fingerprint(args.fingerprint))
+        return
+    if args.equality_dir is None:
+        ap.error('equality_dir is required')
     pairs = json.loads((args.equality_dir / 'summary.json').read_text())['pairs']
     b0 = pairs.get('B0 vs S0')
     gate: dict[str, Any] = {'b0_bitwise_to_s0': bitwise(b0), 'classes': {}}
@@ -90,7 +114,13 @@ def main() -> None:
         and identical_tokens(pairs.get('FGH tokens vs FG')),
         'check_mode': checks,
     }
-    if gate['certified']['tokens_identical'] and all(c['ok'] for c in checks):
+    if args.cert_src:
+        gate['certified']['package_sha256'] = fingerprint(args.cert_src)
+    if (
+        gate['certified']['tokens_identical']
+        and all(c['ok'] for c in checks)
+        and 'package_sha256' in gate['certified']
+    ):
         timed.append('H')
     gate['timed_levers'] = timed
     gate['ok'] = gate['b0_bitwise_to_s0'] and bool(timed)

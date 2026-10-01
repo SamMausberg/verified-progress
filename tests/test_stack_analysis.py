@@ -237,6 +237,9 @@ def test_equality_gate_fg_lossy_keeps_one_lever_and_h_needs_explicit_zero(tmp_pa
     # FG is lossy, so only F; H lacks the FGH statistics, so it is not timed.
     assert g['timed_levers'] == ['F']
     (tmp_path / 'certified_stats_FGH.json').write_text(json.dumps(stats))
+    (tmp_path / 'src' / 'certified_head').mkdir(parents=True)
+    (tmp_path / 'src' / 'certified_head' / 'engine.py').write_text('')
+    monkeypatch.setattr(sys, 'argv', ['gate', str(tmp_path), '--cert-src', str(tmp_path / 'src')])
     gate.main()
     assert json.loads((tmp_path / 'gate.json').read_text())['timed_levers'] == ['F', 'H']
     # An incomplete comparison is missing, not bitwise.
@@ -244,3 +247,80 @@ def test_equality_gate_fg_lossy_keeps_one_lever_and_h_needs_explicit_zero(tmp_pa
     (tmp_path / 'summary.json').write_text(json.dumps({'pairs': pairs}))
     gate.main()
     assert not json.loads((tmp_path / 'gate.json').read_text())['ok']
+
+
+def test_gate_length_mismatch_blocks_a_lever_and_h_needs_a_package(tmp_path, monkeypatch):
+    mismatch = _pair(10, 0.3, tie=10)
+    mismatch['length_mismatch'] = 1
+    pairs = {
+        'B0 vs S0': _pair(),
+        'F vs B0': _pair(),
+        'F vs bench stock b16': _pair(12, 0.4, tie=12),
+        'G vs B0': mismatch,
+        'G vs bench stock b16': _pair(12, 0.4, tie=12),
+        'FG vs B0': _pair(4, 0.3, tie=4),
+        'FG vs bench stock b16': _pair(12, 0.4, tie=12),
+        'H tokens vs B0 tokens': _pair(),
+        'FGH tokens vs FG': _pair(),
+    }
+    (tmp_path / 'summary.json').write_text(json.dumps({'pairs': pairs}))
+    stats = {'paths': {'verify': {'rows': 5000, 'mismatch_rows': 0}}}
+    for n in ('H', 'FGH'):
+        (tmp_path / f'certified_stats_{n}.json').write_text(json.dumps(stats))
+    monkeypatch.setattr(sys, 'argv', ['gate', str(tmp_path)])
+    gate.main()
+    g = json.loads((tmp_path / 'gate.json').read_text())
+    assert g['classes']['G'] == 'length-mismatch'
+    assert g['timed_levers'] == ['F']  # no package recorded, so no H
+    pkg = tmp_path / 'src' / 'certified_head'
+    pkg.mkdir(parents=True)
+    (pkg / 'head.py').write_text('x = 1\n')
+    monkeypatch.setattr(sys, 'argv', ['gate', str(tmp_path), '--cert-src', str(tmp_path / 'src')])
+    gate.main()
+    g = json.loads((tmp_path / 'gate.json').read_text())
+    assert g['timed_levers'] == ['F', 'H']
+    before = g['certified']['package_sha256']
+    (pkg / 'head.py').write_text('x = 2\n')
+    assert gate.fingerprint(tmp_path / 'src') != before
+
+
+def test_all_invalid_full_stays_visible_with_n_zero(tmp_path, monkeypatch):
+    rows = []
+    for i, arm in enumerate(['S0', 'FG', 'FG', 'S0']):
+        bad = 'osl_mismatch' if arm == 'FG' else ''
+        rows.append(
+            {
+                'label': f'stack-{arm}',
+                'run': f's1-{i}',
+                'session': 'stack-s1',
+                'concurrency': '8',
+                'x_e2e': 100.0,
+                'y': 100.0,
+                'invalid_reason': bad,
+            }
+        )
+    pts = tmp_path / 'points.csv'
+    _points(pts, rows)
+    out = tmp_path / 'out.json'
+    monkeypatch.setattr(
+        sys, 'argv', ['analyze', '--points', str(pts), '--full', 'FG', '--out', str(out)]
+    )
+    analyze.main()
+    assert json.loads(out.read_text())['arms']['FG']['8']['x_e2e']['n'] == 0
+
+
+def test_idle_is_the_median_of_per_cycle_idle(tmp_path):
+    log = tmp_path / 'phases.jsonl'
+    recs = []
+    t = 0.0
+    for draft, verify, period in (
+        (1000, 3000, 6.0),
+        (3000, 1000, 6.0),
+        (2000, 2000, 5.0),
+        (0, 0, 0),
+    ):
+        recs.append({'t0_ms': t, 'bs': 1, 'commit': [5], 'draft_us': draft, 'verify_us': verify})
+        t += period
+    log.write_text('\n'.join(json.dumps(r) for r in recs) + '\n')
+    s = phases.summarize(log, max_period_ms=50.0)['by_batch']['1']
+    assert s['idle_median_us'] == 2000.0

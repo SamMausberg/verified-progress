@@ -156,11 +156,13 @@ against stock DFlash block 16 (bench's class rule: exact-up-to-rounding if every
 divergence is a tie, one_ulp or near event; lossy if any is large or not_argmax).
 Decisions fixed now: B0 must be bitwise equal to S0 (tokens and logprobs on all 320
 prompts) or no timed session runs until the difference is explained; a lever classed
-lossy, or compared on fewer than 320 prompts, leaves the exact stack and its arms are
+lossy, compared on fewer than 320 prompts, or showing any output-length mismatch (the
+comparator's finish-bug signal) leaves the exact stack and its arms are
 dropped from the sessions (FULL is then the remaining levers); if F and G each pass but
 FG does not, only F is timed. H passes only if its runs give the same tokens and lengths
 as B0's and FG's on all 320 prompts and both check-mode statistics show certified verify
-rows with exactly zero rows differing from the stock head. `equality_gate.py` applies these decisions and writes the gate that
+rows with exactly zero rows differing from the stock head; the gate records the SHA-256
+of the package that passed, and a session runs H only with that exact package. `equality_gate.py` applies these decisions and writes the gate that
 the session holds read. The same hold runs a phase diagnostic: B0 and FG with the repair
 probe at c = 1 and 8 (`phases.py`).
 

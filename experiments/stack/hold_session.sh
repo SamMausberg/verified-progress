@@ -40,6 +40,11 @@ if not g['ok']:
 print('\\n'.join(g['timed_levers']))" "$GATE") || exit 1
 if [ -z "${STACK_CERT_SRC:-}" ]; then
   mapfile -t levers < <(printf '%s\n' "${levers[@]}" | grep -v '^H$')
+elif printf '%s\n' "${levers[@]}" | grep -qx H; then
+  # H only with the exact package that passed the equality gate.
+  want=$(python -c "import json, sys; print(json.load(open(sys.argv[1]))['certified']['package_sha256'])" "$GATE")
+  have=$(python experiments/stack/equality_gate.py --fingerprint "$STACK_CERT_SRC")
+  [ "$want" = "$have" ] || { echo "certified_head package $have is not the one that passed ($want)"; exit 1; }
 fi
 full=$(printf '%s' "${levers[@]}")
 middle=()

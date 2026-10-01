@@ -78,7 +78,12 @@ def main() -> None:
     )
     invalid: list[dict[str, str]] = []
     touched: set[tuple[str, int, str]] = set()  # (session, c, arm) with an invalid point
-    for r in load(args.points):
+    rows_in = load(args.points)
+    # Domains from every row, so an arm or concurrency with only invalid points still
+    # appears (with n = 0) instead of vanishing.
+    all_arms = {r['label'].removeprefix('stack-') for r in rows_in}
+    all_c = {int(r['concurrency']) for r in rows_in}
+    for r in rows_in:
         arm = r['label'].removeprefix('stack-')
         c = int(r['concurrency'])
         if r.get('invalid_reason'):
@@ -91,8 +96,8 @@ def main() -> None:
         vals['accept_length'] = float(r['accept_length'] or 'nan')
         data[r['session']][c][arm].append((r['run'], vals))
 
-    arms = sorted({a for s in data.values() for cc in s.values() for a in cc} - {'S0'})
-    concurrencies = sorted({c for s in data.values() for c in s})
+    arms = sorted(all_arms - {'S0'})
+    concurrencies = sorted(all_c)
     result: dict[str, Any] = {'full': args.full, 'invalid_points': invalid, 'arms': {}}
     rows = []
     for arm in arms:
