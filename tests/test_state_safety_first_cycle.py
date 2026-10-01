@@ -100,7 +100,14 @@ def _write_declared(tmp_path, ids):
         path = runs / f'{run}.jsonl'
         path.parent.mkdir(parents=True, exist_ok=True)
         rows = [
-            {'id': i, 'output_ids': [1, 2], 'top_logprobs': [[[-0.1, 1], [-0.2, 2]]] * 2}
+            {
+                'id': i,
+                'output_ids': [1, 2],
+                'top_logprobs': [[[-0.1, 1], [-0.2, 2]]] * 2,
+                'finish_reason': {'type': 'length'},
+                'completion_tokens': 2,
+                'aborted_by_client': False,
+            }
             for i in ids
         ]
         path.write_text(''.join(json.dumps(r) + '\n' for r in rows))
@@ -134,7 +141,14 @@ def _write_declared(tmp_path, ids):
     (runs / 'attest').mkdir()
     for hold in ('plain', 'mtp'):
         for when in ('before', 'after'):
-            rec = {'head': DECLARATION, 'porcelain': '', 'files': files}
+            rec = {
+                'head': DECLARATION,
+                'porcelain': '',
+                'files': files,
+                'pid': {'plain': 100, 'mtp': 200}[hold],
+                'process_cwd': '/w/experiments/state_safety',
+                'runner_dir': '/w/experiments/state_safety',
+            }
             (runs / 'attest' / f'{hold}-{when}.json').write_text(json.dumps(rec))
     return runs, prompts, manifest
 
@@ -238,6 +252,36 @@ def test_each_departure_from_the_declaration_makes_the_result_void(tmp_path, mon
         rec['files'] = {**rec['files'], 'server.py': '0' * 64}
         path.write_text(json.dumps(rec))
 
+    def other_process_after(runs, prompts, manifest):
+        path = runs / 'attest' / 'mtp-after.json'
+        rec = json.loads(path.read_text())
+        rec['pid'] = 999
+        path.write_text(json.dumps(rec))
+
+    def process_in_other_checkout(runs, prompts, manifest):
+        path = runs / 'attest' / 'plain-before.json'
+        rec = json.loads(path.read_text())
+        rec['process_cwd'] = '/dirty/experiments/state_safety'
+        path.write_text(json.dumps(rec))
+
+    def unfinished_record(runs, prompts, manifest):
+        path = runs / 'mtp_tree/c1.jsonl'
+        rows = [json.loads(x) for x in path.read_text().splitlines()]
+        rows[0]['finish_reason'] = None
+        path.write_text(''.join(json.dumps(r) + '\n' for r in rows))
+
+    def completion_count_differs(runs, prompts, manifest):
+        path = runs / 'plain/c1.jsonl'
+        rows = [json.loads(x) for x in path.read_text().splitlines()]
+        rows[2]['completion_tokens'] = 5
+        path.write_text(''.join(json.dumps(r) + '\n' for r in rows))
+
+    def aborted_by_client(runs, prompts, manifest):
+        path = runs / 'mtp_s5/c32.jsonl'
+        rows = [json.loads(x) for x in path.read_text().splitlines()]
+        rows[1]['aborted_by_client'] = True
+        path.write_text(''.join(json.dumps(r) + '\n' for r in rows))
+
     def missing_prompt(runs, prompts, manifest):
         path = runs / 'mtp_s5/c1.jsonl'
         path.write_text(''.join(path.read_text().splitlines(keepends=True)[:2]))
@@ -260,11 +304,16 @@ def test_each_departure_from_the_declaration_makes_the_result_void(tmp_path, mon
         dirty_engine: 'plain/c1: engine is not the clean pin',
         other_runner_code: 'mtp_tree/c32: repo_sha is not the declaration commit',
         other_server_for_c32: 'mtp_tree: c1 and c32 were not served by the same server',
+        other_process_after: 'hold mtp: attestations not bound to one run_matrix process',
+        process_in_other_checkout: 'hold plain: run_matrix process not in the attested checkout',
+        unfinished_record: 'mtp_tree/c1: 1 incomplete records',
+        completion_count_differs: 'plain/c1: 1 incomplete records',
+        aborted_by_client: 'mtp_s5/c32: 1 incomplete records',
         no_after_attestation: 'hold mtp: no after attestation',
         dirty_checkout: 'hold plain: checkout not clean (before)',
         edited_runner_file: 'hold mtp: runner files differ',
-        short_logprobs: 'mtp_s5/c1: 1 records lack top-5 logprobs',
-        one_candidate: 'plain/c1: 1 records lack top-5 logprobs',
+        short_logprobs: 'mtp_s5/c1: 1 incomplete records',
+        one_candidate: 'plain/c1: 1 incomplete records',
         missing_prompt: 'mtp_s5/c1: prompt IDs differ',
         prompts_not_frozen: 'does not match the frozen manifest',
     }
@@ -274,7 +323,7 @@ def test_each_departure_from_the_declaration_makes_the_result_void(tmp_path, mon
 
 
 def test_chunks_must_fit_one_verify_cycle_each():
-    ok = {'chunks': [[1, 0], [6, 0], [2, 2]], 'spec_verify_ct': 2}
+    ok = {'chunks': [[1, 0], [6, 0], [2, 2]], 'spec_verify_ct': 2, 'output_ids': [1] * 9}
     assert chunk_counters_ok(ok, max_commit=6)
     # A chunk longer than one cycle can commit.
     assert not chunk_counters_ok({**ok, 'chunks': [[1, 0], [7, 0], [2, 2]]}, max_commit=6)
@@ -282,6 +331,10 @@ def test_chunks_must_fit_one_verify_cycle_each():
     assert not chunk_counters_ok({**ok, 'chunks': [[1, 0], [6, 1], [2, 2]]}, max_commit=6)
     assert not chunk_counters_ok({**ok, 'chunks': [[1, 0], [6, 0], [2, 3]]}, max_commit=6)
     assert not chunk_counters_ok({**ok, 'spec_verify_ct': 3}, max_commit=6)
+    # The first chunk must be the single prefill token, and the chunks must cover
+    # every output token.
+    assert not chunk_counters_ok({**ok, 'chunks': [[2, 0], [5, 0], [2, 2]]}, max_commit=6)
+    assert not chunk_counters_ok({**ok, 'output_ids': [1] * 10}, max_commit=6)
 
 
 def test_attest_runner_records_and_detects_only_the_python_process(tmp_path, monkeypatch):
@@ -307,8 +360,10 @@ def test_attest_runner_records_and_detects_only_the_python_process(tmp_path, mon
     assert attest_runner.attest(repo)['porcelain'] != ''
 
     runs = tmp_path / 'runs'
-    waiting = f'bash gpu_lock.sh -x bash -c python run_matrix.py --configs plain --out-dir {runs}'
-    started = f'python run_matrix.py --configs mtp_s5,mtp_tree --passes c1,c32 --out-dir {runs}'
+    waiting = (
+        f' 7 bash gpu_lock.sh -x bash -c python run_matrix.py --configs plain --out-dir {runs}'
+    )
+    started = f'42 python run_matrix.py --configs mtp_s5,mtp_tree --passes c1,c32 --out-dir {runs}'
 
     class Out:
         def __init__(self, text):
@@ -317,23 +372,30 @@ def test_attest_runner_records_and_detects_only_the_python_process(tmp_path, mon
     monkeypatch.setattr(attest_runner.subprocess, 'run', lambda *a, **k: Out(waiting + '\n'))
     assert attest_runner.running_hold(runs) is None
     monkeypatch.setattr(attest_runner.subprocess, 'run', lambda *a, **k: Out(started + '\n'))
-    assert attest_runner.running_hold(runs) == 'mtp'
+    assert attest_runner.running_hold(runs) == ('mtp', 42)
+    # The record names the observed process and its directory.
+    rec = attest_runner.attest(repo, 42, '/somewhere')
+    assert rec['pid'] == 42 and rec['process_cwd'] == '/somewhere'
+    assert rec['runner_dir'] == str(base.resolve())
 
 
 def test_watch_attests_back_to_back_holds(monkeypatch, tmp_path):
     import attest_runner
 
     # The plain hold ends and the MTP hold starts within one poll.
-    seen = iter([None, 'plain', 'plain', 'mtp', 'mtp', None])
+    seen = iter([None, ('plain', 11), ('plain', 11), ('mtp', 22), ('mtp', 22), None])
     monkeypatch.setattr(attest_runner, 'running_hold', lambda runs: next(seen))
+    monkeypatch.setattr(attest_runner, 'process_cwd', lambda pid: f'/proc/{pid}')
     written = []
     monkeypatch.setattr(
-        attest_runner, 'write', lambda runs, hold, when, checkout: written.append((hold, when))
+        attest_runner,
+        'write',
+        lambda runs, hold, when, checkout, pid, cwd: written.append((hold, when, pid, cwd)),
     )
     attest_runner.watch(tmp_path, tmp_path, poll=0)
     assert written == [
-        ('plain', 'before'),
-        ('plain', 'after'),
-        ('mtp', 'before'),
-        ('mtp', 'after'),
+        ('plain', 'before', 11, '/proc/11'),
+        ('plain', 'after', 11, '/proc/11'),
+        ('mtp', 'before', 22, '/proc/22'),
+        ('mtp', 'after', 22, '/proc/22'),
     ]

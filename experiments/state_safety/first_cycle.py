@@ -170,7 +170,14 @@ def attestation_problems(root: Path, hold: str, expected: dict[str, str]) -> lis
             return [f'hold {hold}: no {when} attestation']
         recs[when] = json.loads(path.read_text())
     problems = []
+    pids = {r.get('pid') for r in recs.values()}
+    if None in pids or len(pids) != 1:
+        problems.append(f'hold {hold}: attestations not bound to one run_matrix process')
     for when, r in recs.items():
+        if not r.get('process_cwd') or r.get('process_cwd') != r.get('runner_dir'):
+            problems.append(
+                f'hold {hold}: run_matrix process not in the attested checkout ({when})'
+            )
         if r.get('porcelain') != '':
             problems.append(f'hold {hold}: checkout not clean ({when})')
         if r.get('head') != DECLARATION:
@@ -186,23 +193,37 @@ def chunk_counters_ok(rec: dict[str, Any], max_commit: int) -> bool:
     The server reports the cumulative spec_verify_ct only in the final chunk's meta
     (earlier chunks carry 0), so per-chunk counters cannot be checked. Instead: 0 in
     every chunk but the last; the last equal to the number of chunks after the
-    prefill token and to the request's spec_verify_ct; and every chunk after the
-    prefill token carrying 1 to max_commit tokens (steps + 1), the most one cycle
-    can commit.
+    prefill token and to the request's spec_verify_ct; every chunk after the prefill
+    token carrying 1 to max_commit tokens (steps + 1), the most one cycle can commit;
+    a first chunk of exactly the prefill token; and chunks that together cover every
+    output token.
     """
     c = [int(x[1]) for x in rec['chunks']]
     n = len(c) - 1
-    sizes_ok = all(1 <= int(x[0]) <= max_commit for x in rec['chunks'][1:])
+    lengths = [int(x[0]) for x in rec['chunks']]
+    # The first chunk is the single prefill token, and the chunks cover the output.
+    if not lengths or lengths[0] != 1 or sum(lengths) != len(rec['output_ids']):
+        return False
+    sizes_ok = all(1 <= x <= max_commit for x in lengths[1:])
     counts_ok = c[0] == 0 and all(x == 0 for x in c[1:-1]) and c[-1] == n == rec['spec_verify_ct']
     return sizes_ok and counts_ok
 
 
 def record_shape_problems(run: dict[str, dict[str, Any]]) -> int:
-    """Records whose top-k logprobs do not cover every output token with 2+ candidates."""
+    """Records that are incomplete: top-k logprobs missing at an output token or with
+    fewer than 2 candidates, no finish reason, a completion count that differs from
+    the output length, or an abort by the client."""
     bad = 0
     for r in run.values():
         top = r.get('top_logprobs') or []
-        if len(top) != len(r['output_ids']) or any(len(t) < 2 for t in top):
+        n = len(r['output_ids'])
+        if (
+            len(top) != n
+            or any(len(t) < 2 for t in top)
+            or not r.get('finish_reason')
+            or r.get('completion_tokens') != n
+            or r.get('aborted_by_client')
+        ):
             bad += 1
     return bad
 
@@ -256,7 +277,9 @@ def void_reasons(
         records = load_run(root / f'{run}.jsonl')
         bad = record_shape_problems(records)
         if bad:
-            reasons.append(f'{run}: {bad} records lack top-5 logprobs at every output token')
+            reasons.append(
+                f'{run}: {bad} incomplete records (logprobs, finish or completion count)'
+            )
         if ids is not None:
             run_ids = {r['id'] for r in records.values()}
             if run_ids != ids:

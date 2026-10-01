@@ -233,6 +233,9 @@ reason go in a new commit before the runs.
   - A hold's runs are void unless both of its records exist, are clean, are at
     b918c8b and match b918c8b's files.
   - Every run's `repo_sha` must be b918c8b.
+  - Every record must be complete: a finish reason, `completion_tokens` equal to the
+    output length, no client abort, and top-5 logprobs at every output token.
+    Otherwise the run is void.
   - Both passes (c1 and c32) of a configuration must come from one server (equal
     `server_id`).
   - The server streams the cumulative verify count only in a response's last chunk,
@@ -240,10 +243,16 @@ reason go in a new commit before the runs.
     unless all four MTP runs show:
     - 0 in every chunk but the last;
     - a last count equal to the chunk count and to `spec_verify_ct`;
-    - 1 to steps + 1 tokens in every chunk after the prefill token.
-  - The watcher for the declared runs was restarted at the fixed `attest_runner.py`
-    (back-to-back holds), from a copy byte-identical to this commit's file, before
-    either hold started. The time is in `~/vp-data/state/logs/attest_first_cycle.out`.
+    - 1 to steps + 1 tokens in every chunk after the prefill token;
+    - a first chunk of exactly the prefill token, and chunks that cover every
+      output token.
+  - Each record also holds the observed `run_matrix.py` process's PID and working
+    directory (`/proc/<pid>/cwd`, read when the hold starts). A hold's runs are void
+    unless both records name one PID and that process ran in the attested checkout's
+    `experiments/state_safety`.
+  - The watcher for the declared runs runs a copy byte-identical to this commit's
+    `attest_runner.py`. It was restarted before either hold started, and each restart
+    is logged in `~/vp-data/state/logs/attest_first_cycle.out`.
 - **Environment.** `analyze_all.sh` and `first_cycle.py` run in the SGLang venv
   (`scripts/sglang_env.sh`), which provides SciPy. The repository's `.venv` does not;
   its tests skip the SciPy calls.
