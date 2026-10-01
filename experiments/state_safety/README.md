@@ -141,6 +141,20 @@ made from a scratch copy of this script, which read the same input files from
 `mechanism_v4_*`. The committed summaries were regenerated from its tap data with the
 current `mechanism.py`.
 
+`run_tap_v4_batch.sh` runs the same cache-level check for the concurrency pair, in one
+exclusive hold: plain decoding at concurrency 1 and 32 (at most 16 running), every
+prompt served in both sessions and the 40 prompts of `mechanism_plain_c1_vs_c32.json`
+(`tap_v4_inputs/ids_c1_vs_c32.txt`) tapped. `tap_runs.py --pin` pins both servers to
+the same pools (cap 16, 98,304 KV tokens, 80 GDN slots, given in `--extra-flags`) and
+restarts each until it allocates exactly those sizes; `meta.json` records the pins and
+the repository commit. An untapped c1 pass with the same pools on the same engine
+(`run_matrix.py`, into `~/vp-data/state/runs_cap16`) is the reference for the
+tap-neutrality check. The script refuses to start unless `~/sglang-wt/state` is a
+clean checkout of the tap tree (`9341fb82`) and the repository checkout is clean.
+The summary, `cachecheck_v4_plain_c1_vs_c32.json`, will be
+committed to `evidence/state_safety` once the hold has run; until then the check is
+pending.
+
 `tap_signature.py` (light,
 run by `analyze_all.sh`) finds where the v1 and v3 tapped sessions of the same
 configuration first part ways. `pools.py` (run by `analyze_all.sh`) writes
