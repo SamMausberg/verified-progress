@@ -22,7 +22,8 @@ cycle commits G2_oracle = 1 + min(m, U_K - J) tokens; fresh DFlash commits G2_F 
     r_F = E[G1 + G2_F] / E[T1 + T2_F],
     Delta = E[G2_R - G2_F] - r_F E[A + T2_R - T2_F],
 
-with G2_R = G2_F and T2_R = T2_F where reuse is not possible. Costs at concurrency 1 come
+with G2_R = G2_F and T2_R = T2_F where reuse is not possible; r_F is re-estimated on the
+same boundaries as Delta (each bootstrap replicate and each domain gets its own). Costs at concurrency 1 come
 from the measured DFlash-16 phases (`evidence/repair/stage_a_timing.json`, run fresh_b16):
 a reused cycle skips the draft phase and pays the rest of the cycle; the oracle's extra
 first-cycle cost A and conditioning cost are 0, so the oracle is an upper bound for every
@@ -133,46 +134,61 @@ def boundaries(
     return out
 
 
-def delta(
+Components = tuple[list[float], list[float], list[float], list[float], float]
+
+
+def components(
     rows: list[dict[str, Any]],
     g2r: list[float],
     reuse: list[bool],
     ph: dict[str, float],
     extra_us: float,
-    rate_per_us: float | None = None,
-) -> tuple[float, float, list[float]]:
-    """(r_F in tokens per ms, Delta, per-boundary contributions).
-
-    r_F is Sam's two-cycle rate over these boundaries unless `rate_per_us` gives another
-    value of time (e.g. DFlash's overall rate A_D / C_D)."""
+) -> Components:
+    """Per-boundary G1, G2_F, G2_R - G2_F and T2_R - T2_F (us), and the fresh cycle time T_F."""
     t_f = ph['cycle']
     t_r = ph['cycle'] - ph['draft'] + extra_us
-    g1 = [1 + r['L'] for r in rows]
-    g2f = [1 + r['next_L'] for r in rows]
-    r_f = (sum(g1) + sum(g2f)) / (2 * t_f * len(rows))  # tokens per us of fresh DFlash
-    if rate_per_us is not None:
-        r_f = rate_per_us
+    g1 = [1.0 + r['L'] for r in rows]
+    g2f = [1.0 + r['next_L'] for r in rows]
     dg = [(a - b) if u else 0.0 for a, b, u in zip(g2r, g2f, reuse, strict=True)]
     dt = [(t_r - t_f) if u else 0.0 for u in reuse]
-    per = [x - r_f * y for x, y in zip(dg, dt, strict=True)]
-    return r_f * 1e3, statistics.fmean(per), per
+    return g1, g2f, dg, dt, t_f
+
+
+def estimate(
+    comp: Components, idx: list[int], rate_per_us: float | None = None
+) -> tuple[float, float]:
+    """(r_F in tokens per us, Delta) over the boundaries idx.
+
+    r_F = E[G1 + G2_F] / E[T1 + T2_F] is computed on the same boundaries as Delta, so a
+    bootstrap replicate or a domain gets its own rate; `rate_per_us` fixes it instead (e.g.
+    DFlash's overall rate A_D / C_D from the timing run, taken as a constant)."""
+    g1, g2f, dg, dt, t_f = comp
+    n = len(idx)
+    r_f = (
+        rate_per_us if rate_per_us is not None else sum(g1[i] + g2f[i] for i in idx) / (2 * t_f * n)
+    )
+    return r_f, sum(dg[i] for i in idx) / n - r_f * sum(dt[i] for i in idx) / n
 
 
 def bootstrap(
-    rows: list[dict[str, Any]], per: list[float], n: int, seed: int
+    rows: list[dict[str, Any]],
+    comp: Components,
+    n: int,
+    seed: int,
+    rate_per_us: float | None = None,
 ) -> tuple[float, float]:
-    by_rid: dict[str, list[float]] = collections.defaultdict(list)
-    for r, x in zip(rows, per, strict=True):
-        by_rid[r['rid']].append(x)
+    """95% interval of Delta over request-level resamples, re-estimating r_F in each replicate."""
+    by_rid: dict[str, list[int]] = collections.defaultdict(list)
+    for i, r in enumerate(rows):
+        by_rid[r['rid']].append(i)
     rids = list(by_rid)
     rng = random.Random(seed)
-    means = []
+    deltas = []
     for _ in range(n):
-        pick = [rids[rng.randrange(len(rids))] for _ in rids]
-        vals = [x for rid in pick for x in by_rid[rid]]
-        means.append(statistics.fmean(vals))
-    means.sort()
-    return means[int(0.025 * n)], means[int(0.975 * n) - 1]
+        idx = [i for _ in rids for i in by_rid[rids[rng.randrange(len(rids))]]]
+        deltas.append(estimate(comp, idx, rate_per_us)[1])
+    deltas.sort()
+    return deltas[int(0.025 * n)], deltas[int(0.975 * n) - 1]
 
 
 def main() -> None:
@@ -206,6 +222,7 @@ def main() -> None:
     timing_rows = {Path(r['run']).name: r for r in json.loads(args.timing.read_text())}
     base = timing_rows[args.baseline_run]
     overall_rate = base['commit_per_cycle']['mean'] / base['cycle_period_us']['median']
+    everything = list(range(len(rows)))
     result: dict[str, Any] = {
         'kind': 'derived: exact per-cycle support (drafter support screen) and measured c = 1 phases',
         'cycles': len(cycles),
@@ -225,19 +242,20 @@ def main() -> None:
             (1 + min(r['m'], r[f'U{k}'] - r['J'])) if s else (1 + r['next_L'])
             for r, s in zip(rows, supported, strict=True)
         ]
-        r_f, d, per = delta(rows, g2r, supported, ph, extra_us=0.0)
-        lo, hi = bootstrap(rows, per, args.bootstrap, seed=k)
-        _, d_overall, per_overall = delta(
-            rows, g2r, supported, ph, extra_us=0.0, rate_per_us=overall_rate
-        )
-        lo_o, hi_o = bootstrap(rows, per_overall, args.bootstrap, seed=100 + k)
+        comp = components(rows, g2r, supported, ph, extra_us=0.0)
+        r_f, d = estimate(comp, everything)
+        lo, hi = bootstrap(rows, comp, args.bootstrap, seed=k)
+        _, d_overall = estimate(comp, everything, overall_rate)
+        lo_o, hi_o = bootstrap(rows, comp, args.bootstrap, seed=100 + k, rate_per_us=overall_rate)
         by_domain = {}
         for dom in sorted({str(r['domain']) for r in rows}):
             idx = [i for i, r in enumerate(rows) if str(r['domain']) == dom]
+            r_dom, d_dom = estimate(comp, idx)  # the domain's own two-cycle rate
             by_domain[dom] = {
                 'boundaries': len(idx),
                 'supported_rate': statistics.fmean(supported[i] for i in idx),
-                'delta_oracle': statistics.fmean(per[i] for i in idx),
+                'r_F_tokens_per_ms': r_dom * 1e3,
+                'delta_oracle': d_dom,
             }
         result['by_k'][str(k)] = {
             'corrected_prefix_supported_rate': statistics.fmean(supported),
@@ -250,7 +268,7 @@ def main() -> None:
             )
             if suffix
             else None,
-            'r_F_tokens_per_ms': r_f,
+            'r_F_tokens_per_ms': r_f * 1e3,
             'delta_oracle': d,
             'delta_oracle_ci95': [lo, hi],
             'rejected': hi <= 0,
@@ -263,8 +281,9 @@ def main() -> None:
     g2k = [
         (1 + r['keep_accept']) if u else (1 + r['next_L']) for r, u in zip(rows, reuse, strict=True)
     ]
-    _, d, per = delta(rows, g2k, reuse, ph, extra_us=0.0)
-    lo, hi = bootstrap(rows, per, args.bootstrap, seed=99)
+    comp = components(rows, g2k, reuse, ph, extra_us=0.0)
+    _, d = estimate(comp, everything)
+    lo, hi = bootstrap(rows, comp, args.bootstrap, seed=99)
     result['keep_control'] = {
         'mean_accept': statistics.fmean(r['keep_accept'] for r in rows),
         'delta': d,
@@ -278,8 +297,9 @@ def main() -> None:
             (1 + r['rewalk_accept']) if u else (1 + r['next_L'])
             for r, u in zip(rows, reuse16, strict=True)
         ]
-        _, d, per = delta(rows, g2w, reuse16, ph, extra_us=args.rewalk_cost_us)
-        lo, hi = bootstrap(rows, per, args.bootstrap, seed=7)
+        comp = components(rows, g2w, reuse16, ph, extra_us=args.rewalk_cost_us)
+        _, d = estimate(comp, everything)
+        lo, hi = bootstrap(rows, comp, args.bootstrap, seed=7)
         result['rewalk_refiner'] = {
             'reused_boundaries': sum(reuse16),
             'mean_accept_when_reused': statistics.fmean(

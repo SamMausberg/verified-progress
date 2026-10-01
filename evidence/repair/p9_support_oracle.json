@@ -20,37 +20,41 @@
    "oracle_g2_mean_when_reused": 2.7248322147651005,
    "fresh_g2_mean_same_boundaries": 6.942953020134228,
    "r_F_tokens_per_ms": 0.683181508098623,
-   "delta_oracle": -0.042854229160387634,
+   "delta_oracle": -0.04285422916038764,
    "delta_oracle_ci95": [
-    -0.05797321196163092,
-    -0.028898167820735753
+    -0.05675318256216266,
+    -0.02982097837343695
    ],
    "rejected": true,
-   "delta_oracle_at_overall_dflash_rate": -0.029717675675088963,
+   "delta_oracle_at_overall_dflash_rate": -0.029717675675088956,
    "delta_oracle_at_overall_dflash_rate_ci95": [
     -0.043712180082937833,
-    -0.01781859049605808
+    -0.017818590496058072
    ],
    "by_domain": {
     "chat": {
      "boundaries": 6966,
      "supported_rate": 0.0103359173126615,
-     "delta_oracle": -0.009116431885234757
+     "r_F_tokens_per_ms": 0.49391017990999314,
+     "delta_oracle": -0.013669996816069528
     },
     "code": {
      "boundaries": 1511,
      "supported_rate": 0.02183984116479153,
-     "delta_oracle": -0.06652756755013232
+     "r_F_tokens_per_ms": 0.737647681625128,
+     "delta_oracle": -0.06375875204338449
     },
     "math": {
      "boundaries": 3410,
      "supported_rate": 0.017302052785923755,
-     "delta_oracle": -0.04052133759465695
+     "r_F_tokens_per_ms": 0.7780647004696076,
+     "delta_oracle": -0.036700095101807384
     },
     "math500": {
      "boundaries": 6387,
      "supported_rate": 0.02098011586034132,
-     "delta_oracle": -0.07529547571604012
+     "r_F_tokens_per_ms": 0.8260676828251597,
+     "delta_oracle": -0.06831771986560987
     }
    }
   },
@@ -60,37 +64,41 @@
    "oracle_g2_mean_when_reused": 3.098054828802184,
    "fresh_g2_mean_same_boundaries": 6.0701854169036515,
    "r_F_tokens_per_ms": 0.683181508098623,
-   "delta_oracle": -0.6647962360987878,
+   "delta_oracle": -0.6647962360987877,
    "delta_oracle_ci95": [
-    -0.8664773519984915,
-    -0.5091776467459345
+    -0.805558543987898,
+    -0.5493083810992377
    ],
    "rejected": true,
-   "delta_oracle_at_overall_dflash_rate": -0.2772679082824768,
+   "delta_oracle_at_overall_dflash_rate": -0.2772679082824765,
    "delta_oracle_at_overall_dflash_rate_ci95": [
     -0.4603852395233725,
-    -0.12862015111761413
+    -0.12862015111761393
    ],
    "by_domain": {
     "chat": {
      "boundaries": 6966,
      "supported_rate": 0.37941429801894916,
-     "delta_oracle": 0.019224555964970184
+     "r_F_tokens_per_ms": 0.49391017990999314,
+     "delta_oracle": -0.14792922337108955
     },
     "code": {
      "boundaries": 1511,
      "supported_rate": 0.5413633355393779,
-     "delta_oracle": -0.8373331014344995
+     "r_F_tokens_per_ms": 0.737647681625128,
+     "delta_oracle": -0.7687000382672348
     },
     "math": {
      "boundaries": 3410,
      "supported_rate": 0.5287390029325513,
-     "delta_oracle": -0.9005442787394885
+     "r_F_tokens_per_ms": 0.7780647004696076,
+     "delta_oracle": -0.7837696988308822
     },
     "math500": {
      "boundaries": 6387,
      "supported_rate": 0.5522154376076405,
-     "delta_oracle": -1.2441425346096833
+     "r_F_tokens_per_ms": 0.8260676828251597,
+     "delta_oracle": -1.060481751889777
     }
    }
   },
@@ -100,37 +108,41 @@
    "oracle_g2_mean_when_reused": 3.6417634838808954,
    "fresh_g2_mean_same_boundaries": 5.820497037777948,
    "r_F_tokens_per_ms": 0.683181508098623,
-   "delta_oracle": -0.41857688174877444,
+   "delta_oracle": -0.4185768817487743,
    "delta_oracle_ci95": [
-    -0.641153501416641,
-    -0.23191989843045374
+    -0.5601927295330631,
+    -0.2997394979026
    ],
    "rejected": true,
-   "delta_oracle_at_overall_dflash_rate": 0.15436199626608096,
+   "delta_oracle_at_overall_dflash_rate": 0.15436199626608116,
    "delta_oracle_at_overall_dflash_rate_ci95": [
-    -0.03571198586537152,
-    0.3224975540428375
+    -0.035711985865371165,
+    0.32249755404283764
    ],
    "by_domain": {
     "chat": {
      "boundaries": 6966,
      "supported_rate": 0.6026414010910135,
-     "delta_oracle": 0.3225223689195432
+     "r_F_tokens_per_ms": 0.49391017990999314,
+     "delta_oracle": 0.05702423586892691
     },
     "code": {
      "boundaries": 1511,
      "supported_rate": 0.7743216412971542,
-     "delta_oracle": -0.5734330233811128
+     "r_F_tokens_per_ms": 0.737647681625128,
+     "delta_oracle": -0.4752659281418712
     },
     "math": {
      "boundaries": 3410,
      "supported_rate": 0.7677419354838709,
-     "delta_oracle": -0.6178407416660299
+     "r_F_tokens_per_ms": 0.7780647004696076,
+     "delta_oracle": -0.44828120189856935
     },
     "math500": {
      "boundaries": 6387,
      "supported_rate": 0.7845623923594802,
-     "delta_oracle": -1.0838375656114951
+     "r_F_tokens_per_ms": 0.8260676828251597,
+     "delta_oracle": -0.8229007404883166
     }
    }
   },
@@ -140,37 +152,41 @@
    "oracle_g2_mean_when_reused": 4.339110225763612,
    "fresh_g2_mean_same_boundaries": 5.657171314741036,
    "r_F_tokens_per_ms": 0.683181508098623,
-   "delta_oracle": 0.22428171205679853,
+   "delta_oracle": 0.2242817120567988,
    "delta_oracle_ci95": [
-    0.03392366128224046,
-    0.3900831161506487
+    0.11907551979019737,
+    0.3179102081657713
    ],
    "rejected": false,
-   "delta_oracle_at_overall_dflash_rate": 0.8881625694010874,
+   "delta_oracle_at_overall_dflash_rate": 0.8881625694010875,
    "delta_oracle_at_overall_dflash_rate_ci95": [
-    0.7086564702185111,
+    0.708656470218511,
     1.0418240325253065
    ],
    "by_domain": {
     "chat": {
      "boundaries": 6966,
      "supported_rate": 0.7394487510766581,
-     "delta_oracle": 0.8300543367305465
+     "r_F_tokens_per_ms": 0.49391017990999314,
+     "delta_oracle": 0.5042847123037423
     },
     "code": {
      "boundaries": 1511,
      "supported_rate": 0.8755790866975512,
-     "delta_oracle": 0.20307375220514867
+     "r_F_tokens_per_ms": 0.737647681625128,
+     "delta_oracle": 0.31407808297567597
     },
     "math": {
      "boundaries": 3410,
      "supported_rate": 0.8621700879765396,
-     "delta_oracle": 0.0853987876063732
+     "r_F_tokens_per_ms": 0.7780647004696076,
+     "delta_oracle": 0.27581324402972474
     },
     "math500": {
      "boundaries": 6387,
      "supported_rate": 0.8839830906528887,
-     "delta_oracle": -0.35723951915747026
+     "r_F_tokens_per_ms": 0.8260676828251597,
+     "delta_oracle": -0.06323646295202856
     }
    }
   },
@@ -180,47 +196,51 @@
    "oracle_g2_mean_when_reused": 5.075372858375447,
    "fresh_g2_mean_same_boundaries": 5.554233945519536,
    "r_F_tokens_per_ms": 0.683181508098623,
-   "delta_oracle": 0.9867957687450898,
+   "delta_oracle": 0.9867957687450901,
    "delta_oracle_ci95": [
-    0.8200128322227446,
-    1.1300279039786576
+    0.8945591964180224,
+    1.0731906873677384
    ],
    "rejected": false,
    "delta_oracle_at_overall_dflash_rate": 1.7020766977801782,
    "delta_oracle_at_overall_dflash_rate_ci95": [
-    1.5500594825604888,
+    1.550059482560489,
     1.8365395892744525
    ],
    "by_domain": {
     "chat": {
      "boundaries": 6966,
      "supported_rate": 0.8271604938271605,
-     "delta_oracle": 1.4439815179257862
+     "r_F_tokens_per_ms": 0.49391017990999314,
+     "delta_oracle": 1.079569835544259
     },
     "code": {
      "boundaries": 1511,
      "supported_rate": 0.9338186631369954,
-     "delta_oracle": 1.1103790165894416
+     "r_F_tokens_per_ms": 0.737647681625128,
+     "delta_oracle": 1.2287668553779634
     },
     "math": {
      "boundaries": 3410,
      "supported_rate": 0.9167155425219942,
-     "delta_oracle": 0.8187649410792739
+     "r_F_tokens_per_ms": 0.7780647004696076,
+     "delta_oracle": 1.0212260263783883
     },
     "math500": {
      "boundaries": 6387,
      "supported_rate": 0.927978706748082,
-     "delta_oracle": 0.548639342575509
+     "r_F_tokens_per_ms": 0.8260676828251597,
+     "delta_oracle": 0.857274856944912
     }
    }
   }
  },
  "keep_control": {
   "mean_accept": 0.8342453759439641,
-  "delta": -1.93371691876809,
+  "delta": -1.9337169187680896,
   "delta_ci95": [
-   -2.3444767002673035,
-   -1.5853610693419777
+   -2.2225604776231864,
+   -1.6868083944715366
   ]
  }
 }

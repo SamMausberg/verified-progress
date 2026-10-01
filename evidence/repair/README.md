@@ -201,16 +201,18 @@ program from above.
 | K | corrected prefix supported | mean supported suffix | oracle G2 / fresh G2 (reused) | Delta (95% CI) | rule |
 |---|---|---|---|---|---|
 | 1 | 1.6% | 1.72 | 2.72 / 6.94 | -0.04 (-0.06, -0.03) | rejected |
-| 2 | 48.1% | 2.10 | 3.10 / 6.07 | -0.67 (-0.87, -0.51) | rejected |
-| 4 | 71.1% | 2.64 | 3.64 / 5.82 | -0.42 (-0.64, -0.23) | rejected |
-| 8 | 82.4% | 3.34 | 4.34 / 5.66 | +0.22 (+0.03, +0.39) | not rejected |
-| 16 | 88.8% | 4.08 | 5.08 / 5.55 | +0.99 (+0.82, +1.13) | not rejected |
+| 2 | 48.1% | 2.10 | 3.10 / 6.07 | -0.67 (-0.81, -0.55) | rejected |
+| 4 | 71.1% | 2.64 | 3.64 / 5.82 | -0.42 (-0.56, -0.30) | rejected |
+| 8 | 82.4% | 3.34 | 4.34 / 5.66 | +0.22 (+0.12, +0.32) | not rejected |
+| 16 | 88.8% | 4.08 | 5.08 / 5.55 | +0.99 (+0.90, +1.07) | not rejected |
 
-(Delta in tokens per post-rejection boundary, r_F = 0.683 tokens per ms, request-level bootstrap.)
+(Delta in tokens per post-rejection boundary, r_F = 0.683 tokens per ms; 95% intervals from a
+request-level bootstrap with 2,000 resamples, re-estimating r_F in every resample.)
 Valuing the saved time at DFlash's overall rate (1.029 tokens per ms) instead gives +0.89 (K = 8)
-and +1.70 (K = 16). By domain at K = 16: chat +1.44, code +1.11, maths +0.82, MATH-500 +0.55. The
-unchanged cached unary control (the old draft's tail after the correction, no fresh fill) accepts
-0.83 drafts and gives Delta = -1.93 (-2.34, -1.59): rejected.
+and +1.70 (K = 16), with r_F then a constant. By domain at K = 16, each with its own two-cycle rate
+r_F: chat +1.08, code +1.23, maths +1.02, MATH-500 +0.86. The unchanged cached unary control (the
+old draft's tail after the correction, no fresh fill) accepts 0.83 drafts and gives
+Delta = -1.93 (-2.22, -1.69): rejected.
 
 Assumptions of this oracle, stated plainly: (1) the candidate sets are the offline
 recomputation, whose top-1 token matches the engine's drafted token at 97.4% of positions, not
