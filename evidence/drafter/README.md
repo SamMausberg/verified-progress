@@ -78,18 +78,25 @@ number comes from it.
 
 ## P6 support screen (zero-training selector bound)
 
-`support/zlab_b16_panel_v1_summary.json`, `support/zlab_b16_panel_v1_survival.csv`: for each of
-the 21,067 verify cycles of the block-16 panel-v1 trace, the drafter's block at that cycle's
-anchor is recomputed offline (Hugging Face target features over the committed sequence,
-SpecForge's drafter module, BF16) and its top-K candidates taken through the tied head.
-U_K is the longest prefix of the realized greedy continuation that lies inside the
-candidate sets, an upper bound on the accepted prefix of any selector over those frozen
-candidates. `tau_*` is 1 + the mean over cycles (pooled); `survival.csv` gives S(k) per
-position for the engine's accepted length (`L_engine`), the offline unary argmax (`L_hf`)
-and U_K for K = 1, 2, 4, 8, 16. The offline drafter's argmax agrees with the engine's
-drafted token at 97.4% of positions (different BF16 kernels) and its unary acceptance
-matches the engine's (6.200 against 6.204 tokens per cycle).
+`support/zlab_b16_panel_v1_summary.json`, `support/zlab_b16_panel_v1_survival.csv`: for the
+verify cycles of the block-16 panel-v1 trace, the drafter's block at that cycle's anchor is
+recomputed offline (Hugging Face target features over the committed sequence, SpecForge's
+drafter module, BF16) and its top-K candidates taken through the tied head. U_K is the
+longest prefix of the realized greedy continuation that lies inside the candidate sets: at
+that state, an upper bound on the accepted prefix of any selector over those frozen
+candidates. `tau_*` is 1 + the mean over cycles (pooled). Averaged over the cycles the stock
+trajectory visited, tau_U_16 = 10.14 is an oracle bound per cycle on that trajectory, not a
+bound on another selector's tokens per cycle: a better selector would visit other anchors.
+The 207 cycles whose block runs past the end of the output (21,274 traced, 21,067 kept) are
+excluded because the continuation is not known there; they accept less than average, so the
+kept subset's engine rate (6.204) is slightly above the full trace's (6.184), and the bounds
+are biased upward by about the same amount. `survival.csv` gives S(k) per position for the
+engine's accepted length (`L_engine`), the offline unary argmax (`L_hf`) and U_K for K = 1,
+2, 4, 8, 16. The offline drafter's argmax agrees with the engine's drafted token at 97.4% of
+positions (different BF16 kernels) and its unary acceptance matches the engine's on the
+same cycles (6.200 against 6.204 tokens per cycle).
 
+    source scripts/sglang_env.sh
     PYTHONPATH=~/vp-data/drafter/pylib:~/vp-data/drafter/src/SpecForge \
     scripts/gpu_lock.sh -s python experiments/drafter/support_screen.py \
         --trace ~/vp-data/drafter/trace/b16 --panel experiments/drafter/panel-v1.jsonl \
@@ -123,13 +130,19 @@ top-1, 4 draft tokens). Tokens per cycle per request (pooled): DFlash 6.81 (6.11
 than DFlash (0.86, 0.79, 0.81), and DFlash keeps drafting to position 15.
 
 `panel_v2/equality_{zlab_b16,mtp3}.json`: first divergence of each output from plain decoding
-at concurrency 1 (plain run with top-2 logprobs), classified by the plain run's top-2 gap.
-DFlash: 77 of 80 sequences diverge somewhere in up to 2,048 tokens, 3.06 per 1,000 compared
-tokens, every divergence at an exact tie (48) or a top-2 gap of at most 0.25 nats (29). MTP:
-77 of 80, 2.50 per 1,000, 40 ties and 37 within 0.25 nats. Both match the stock noise floor
-the state workstream measured between plain decoding at batch 1 and 32 (3.42 per 1,000, all
-within 0.375 nats; PR #37): speculative verification computes the target at a different
-batch shape, and near-ties flip. No divergence has a larger margin.
+at concurrency 1, classified with the state workstream's convention
+(`experiments/state_safety/compare.py`, PR #37: tie, one_ulp, near, large). These runs
+recorded top-2 logprobs in the plain run only, so the classes are one-sided (`ref:` prefix,
+the plain run's margin between the two competing tokens; the speculative run's margin is
+unknown). DFlash: 77 of 80 sequences diverge somewhere in up to 2,048 tokens, 3.06 per 1,000
+compared tokens; the plain run's margin is an exact tie at 47 and within one BF16 spacing at
+28, and 2 are unknown because the speculative run's token is outside the plain run's top-2
+(math500 algebra/634 at position 1,168; oasst1-1a248423 at position 409). MTP: 77 of 80, 2.50
+per 1,000; 40 ties and 37 within one spacing on the plain side. For comparison, plain decoding
+at batch 1 against batch 32 diverges at 3.42 per 1,000, all within 0.375 nats (PR #37, which
+traced the MTP-versus-plain divergences to layer 0's GDN decode and verify kernels). These
+are observations about margins; the DFlash divergences have not been traced to a kernel. A
+rerun with top-5 logprobs on every run (`run_equality.sh`, queued) gives both margins.
 
     scripts/gpu_lock.sh -s experiments/drafter/run_equality.sh
     python experiments/drafter/summarize_acceptance.py \

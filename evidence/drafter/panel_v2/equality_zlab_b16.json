@@ -1,14 +1,15 @@
 {
   "ref": "~/vp-data/drafter/eval/plain/requests.jsonl",
   "test": "~/vp-data/drafter/eval/zlab/b16/requests.jsonl",
+  "convention": "experiments/state_safety/compare.py (PR #37): tie, one_ulp, near (<=0.5 nats), large",
   "requests": 80,
   "sequences_diverged": 77,
   "compared_tokens": 25187,
   "divergences_per_1000_tokens": 3.0571326477944973,
   "classes": {
-    "tie": 48,
-    "gap<=0.125": 26,
-    "gap<=0.375": 3
+    "ref:tie": 47,
+    "ref:one_ulp": 28,
+    "unknown": 2
   },
   "divergences": [
     {
@@ -17,8 +18,10 @@
       "position": 145,
       "ref_token": 3889,
       "test_token": 5129,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "gsm8k-train-0361",
@@ -26,8 +29,10 @@
       "position": 187,
       "ref_token": 20400,
       "test_token": 30116,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "gsm8k-train-0680",
@@ -35,8 +40,10 @@
       "position": 240,
       "ref_token": 3158,
       "test_token": 1149,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.125,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "gsm8k-train-3190",
@@ -44,8 +51,10 @@
       "position": 26,
       "ref_token": 21365,
       "test_token": 1796,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.125,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "gsm8k-train-3454",
@@ -53,8 +62,10 @@
       "position": 61,
       "ref_token": 3925,
       "test_token": 4935,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "gsm8k-train-4205",
@@ -62,8 +73,10 @@
       "position": 339,
       "ref_token": 220,
       "test_token": 1543,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "gsm8k-train-4640",
@@ -71,8 +84,10 @@
       "position": 355,
       "ref_token": 1987,
       "test_token": 3931,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "gsm8k-train-5144",
@@ -80,8 +95,10 @@
       "position": 636,
       "ref_token": 4559,
       "test_token": 85154,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "gsm8k-train-5345",
@@ -89,8 +106,10 @@
       "position": 184,
       "ref_token": 348,
       "test_token": 42862,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "gsm8k-train-5989",
@@ -98,8 +117,10 @@
       "position": 642,
       "ref_token": 9077,
       "test_token": 13,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.125,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "gsm8k-train-6045",
@@ -107,8 +128,10 @@
       "position": 1359,
       "ref_token": 16,
       "test_token": 22,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "gsm8k-train-7047",
@@ -116,8 +139,10 @@
       "position": 442,
       "ref_token": 18842,
       "test_token": 31547,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "gsm8k-train-7063",
@@ -125,8 +150,10 @@
       "position": 60,
       "ref_token": 393,
       "test_token": 220,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.125,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "gsm8k-train-7247",
@@ -134,8 +161,10 @@
       "position": 360,
       "ref_token": 318,
       "test_token": 271,
-      "ref_top2_gap": 0.25,
-      "class": "gap<=0.375"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.25,
+      "margin_test": null,
+      "ulp": 0.25
     },
     {
       "id": "gsm8k-train-7305",
@@ -143,8 +172,10 @@
       "position": 216,
       "ref_token": 3219,
       "test_token": 6820,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "gsm8k-train-7453",
@@ -152,8 +183,10 @@
       "position": 408,
       "ref_token": 733,
       "test_token": 78193,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "humaneval-105",
@@ -161,8 +194,10 @@
       "position": 53,
       "ref_token": 3010,
       "test_token": 9989,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "humaneval-162",
@@ -170,8 +205,10 @@
       "position": 294,
       "ref_token": 1220,
       "test_token": 3749,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "humaneval-78",
@@ -179,8 +216,10 @@
       "position": 109,
       "ref_token": 733,
       "test_token": 1987,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "humaneval-87",
@@ -188,8 +227,10 @@
       "position": 107,
       "ref_token": 198,
       "test_token": 12305,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "math500-test/algebra/1098.json",
@@ -197,8 +238,10 @@
       "position": 541,
       "ref_token": 1067,
       "test_token": 4087,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "math500-test/algebra/1529.json",
@@ -206,8 +249,10 @@
       "position": 247,
       "ref_token": 1088,
       "test_token": 61,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.125,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/algebra/1936.json",
@@ -215,8 +260,10 @@
       "position": 403,
       "ref_token": 2488,
       "test_token": 5272,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.125,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/algebra/2264.json",
@@ -224,8 +271,10 @@
       "position": 38,
       "ref_token": 13,
       "test_token": 421,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "math500-test/algebra/2593.json",
@@ -233,8 +282,10 @@
       "position": 333,
       "ref_token": 279,
       "test_token": 26782,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "math500-test/algebra/634.json",
@@ -242,8 +293,8 @@
       "position": 1168,
       "ref_token": 1987,
       "test_token": 561,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "unknown",
+      "margin_ref": null
     },
     {
       "id": "math500-test/algebra/668.json",
@@ -251,8 +302,10 @@
       "position": 316,
       "ref_token": 3750,
       "test_token": 13043,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "math500-test/counting_and_probability/1009.json",
@@ -260,8 +313,10 @@
       "position": 372,
       "ref_token": 717,
       "test_token": 37482,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "math500-test/counting_and_probability/14.json",
@@ -269,8 +324,10 @@
       "position": 472,
       "ref_token": 393,
       "test_token": 579,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "math500-test/counting_and_probability/389.json",
@@ -278,8 +335,10 @@
       "position": 650,
       "ref_token": 2519,
       "test_token": 86588,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "math500-test/counting_and_probability/731.json",
@@ -287,8 +346,10 @@
       "position": 135,
       "ref_token": 2297,
       "test_token": 2984,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "math500-test/counting_and_probability/765.json",
@@ -296,8 +357,10 @@
       "position": 285,
       "ref_token": 271,
       "test_token": 198,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.125,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/geometry/106.json",
@@ -305,8 +368,10 @@
       "position": 197,
       "ref_token": 10744,
       "test_token": 2250,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.125,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/geometry/1097.json",
@@ -314,8 +379,10 @@
       "position": 92,
       "ref_token": 14606,
       "test_token": 3443,
-      "ref_top2_gap": 0.12499994039535522,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.12499994039535522,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/geometry/229.json",
@@ -323,8 +390,10 @@
       "position": 222,
       "ref_token": 13534,
       "test_token": 16720,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "math500-test/geometry/248.json",
@@ -332,8 +401,10 @@
       "position": 142,
       "ref_token": 12669,
       "test_token": 20952,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "math500-test/intermediate_algebra/117.json",
@@ -341,8 +412,10 @@
       "position": 1334,
       "ref_token": 8,
       "test_token": 14646,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "math500-test/intermediate_algebra/1197.json",
@@ -350,8 +423,10 @@
       "position": 164,
       "ref_token": 2014,
       "test_token": 6140,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "math500-test/intermediate_algebra/1388.json",
@@ -359,8 +434,10 @@
       "position": 3,
       "ref_token": 586,
       "test_token": 364,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.125,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/intermediate_algebra/1410.json",
@@ -368,8 +445,10 @@
       "position": 80,
       "ref_token": 561,
       "test_token": 1061,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "math500-test/intermediate_algebra/1467.json",
@@ -377,8 +456,10 @@
       "position": 1492,
       "ref_token": 11,
       "test_token": 12576,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "math500-test/intermediate_algebra/690.json",
@@ -386,8 +467,10 @@
       "position": 50,
       "ref_token": 883,
       "test_token": 318,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.125,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/number_theory/612.json",
@@ -395,8 +478,10 @@
       "position": 669,
       "ref_token": 70,
       "test_token": 1940,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "math500-test/prealgebra/1298.json",
@@ -404,8 +489,10 @@
       "position": 205,
       "ref_token": 25,
       "test_token": 7258,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "math500-test/prealgebra/1961.json",
@@ -413,8 +500,10 @@
       "position": 150,
       "ref_token": 14167,
       "test_token": 37317,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "math500-test/prealgebra/1973.json",
@@ -422,8 +511,10 @@
       "position": 69,
       "ref_token": 264,
       "test_token": 56014,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "math500-test/prealgebra/1995.json",
@@ -431,8 +522,10 @@
       "position": 514,
       "ref_token": 20,
       "test_token": 23,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "math500-test/prealgebra/846.json",
@@ -440,8 +533,10 @@
       "position": 478,
       "ref_token": 279,
       "test_token": 411,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "math500-test/precalculus/625.json",
@@ -449,8 +544,10 @@
       "position": 485,
       "ref_token": 25273,
       "test_token": 348,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.125,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/precalculus/681.json",
@@ -458,8 +555,10 @@
       "position": 239,
       "ref_token": 2107,
       "test_token": 1608,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.125,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/precalculus/989.json",
@@ -467,8 +566,10 @@
       "position": 133,
       "ref_token": 36655,
       "test_token": 22868,
-      "ref_top2_gap": 0.25,
-      "class": "gap<=0.375"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.25,
+      "margin_test": null,
+      "ulp": 0.25
     },
     {
       "id": "mbpp-250",
@@ -476,8 +577,10 @@
       "position": 459,
       "ref_token": 460,
       "test_token": 4071,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "mbpp-29",
@@ -485,8 +588,10 @@
       "position": 237,
       "ref_token": 321,
       "test_token": 8,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.125,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "mbpp-299",
@@ -494,8 +599,10 @@
       "position": 286,
       "ref_token": 3172,
       "test_token": 628,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.125,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "mbpp-301",
@@ -503,8 +610,10 @@
       "position": 4,
       "ref_token": 3377,
       "test_token": 1228,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.125,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "mbpp-321",
@@ -512,8 +621,10 @@
       "position": 45,
       "ref_token": 424,
       "test_token": 24217,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "mbpp-356",
@@ -521,8 +632,10 @@
       "position": 199,
       "ref_token": 760,
       "test_token": 2324,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "mbpp-414",
@@ -530,8 +643,10 @@
       "position": 186,
       "ref_token": 653,
       "test_token": 460,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.125,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "mbpp-432",
@@ -539,8 +654,10 @@
       "position": 136,
       "ref_token": 25,
       "test_token": 318,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "mbpp-498",
@@ -548,8 +665,10 @@
       "position": 50,
       "ref_token": 11,
       "test_token": 13,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "mbpp-69",
@@ -557,8 +676,10 @@
       "position": 134,
       "ref_token": 2343,
       "test_token": 524,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.125,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "mtbench-106",
@@ -566,8 +687,10 @@
       "position": 423,
       "ref_token": 3,
       "test_token": 53031,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "mtbench-136",
@@ -575,8 +698,10 @@
       "position": 130,
       "ref_token": 328,
       "test_token": 4145,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "oasst1-153e6420-910d-49f2-9ecb-f40b7ba76eb8",
@@ -584,8 +709,10 @@
       "position": 490,
       "ref_token": 279,
       "test_token": 33649,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "oasst1-1a248423-814a-4ee9-b625-11cb28cd03ac",
@@ -593,8 +720,8 @@
       "position": 409,
       "ref_token": 78195,
       "test_token": 19361,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "unknown",
+      "margin_ref": null
     },
     {
       "id": "oasst1-20a5ed43-7852-437e-a92c-870ddd542a15",
@@ -602,8 +729,10 @@
       "position": 49,
       "ref_token": 72826,
       "test_token": 348,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.125,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "oasst1-2c629174-2898-4b56-9bd4-f88d073d5b39",
@@ -611,8 +740,10 @@
       "position": 143,
       "ref_token": 1459,
       "test_token": 5802,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "oasst1-5d5bda3c-4dc2-468b-b949-e4fbd9dafe70",
@@ -620,8 +751,10 @@
       "position": 105,
       "ref_token": 2478,
       "test_token": 10597,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "oasst1-5dad260e-3d2f-4dbb-a368-806905b4b34d",
@@ -629,8 +762,10 @@
       "position": 269,
       "ref_token": 4047,
       "test_token": 279,
-      "ref_top2_gap": 0.06249988079071045,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.06249988079071045,
+      "margin_test": null,
+      "ulp": 0.0625
     },
     {
       "id": "oasst1-5e4bc56a-d2dc-4e64-9dfa-bb5a0afb119d",
@@ -638,8 +773,10 @@
       "position": 28,
       "ref_token": 8758,
       "test_token": 25562,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     },
     {
       "id": "oasst1-6215f73c-d012-4f98-b2b1-66bc66cd912a",
@@ -647,8 +784,10 @@
       "position": 300,
       "ref_token": 1141,
       "test_token": 279,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.125,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "oasst1-65e4ec48-2687-472e-b985-79443e3d454b",
@@ -656,8 +795,10 @@
       "position": 380,
       "ref_token": 12287,
       "test_token": 869,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.125,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "oasst1-72019671-c7e2-4752-a6c1-eda0007a86d9",
@@ -665,8 +806,10 @@
       "position": 83,
       "ref_token": 1049,
       "test_token": 271,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.125,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "oasst1-776ac2a4-2e0f-40b5-bd1c-8022d80624ef",
@@ -674,8 +817,10 @@
       "position": 126,
       "ref_token": 1746,
       "test_token": 348,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.125,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "oasst1-98cc2b70-cbea-4b78-8031-846e7db6b1ef",
@@ -683,8 +828,10 @@
       "position": 48,
       "ref_token": 71899,
       "test_token": 1421,
-      "ref_top2_gap": 0.125,
-      "class": "gap<=0.125"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.125,
+      "margin_test": null,
+      "ulp": 0.125
     },
     {
       "id": "oasst1-ba31123e-edca-435a-98a4-c84e33381d50",
@@ -692,8 +839,10 @@
       "position": 302,
       "ref_token": 37444,
       "test_token": 1076,
-      "ref_top2_gap": 0.25,
-      "class": "gap<=0.375"
+      "class": "ref:one_ulp",
+      "margin_ref": 0.25,
+      "margin_test": null,
+      "ulp": 0.25
     },
     {
       "id": "oasst1-fe6a9022-314e-4ecc-a5ee-1ce6c31f7e81",
@@ -701,8 +850,10 @@
       "position": 85,
       "ref_token": 279,
       "test_token": 6278,
-      "ref_top2_gap": 0.0,
-      "class": "tie"
+      "class": "ref:tie",
+      "margin_ref": 0.0,
+      "margin_test": null,
+      "ulp": null
     }
   ]
 }
