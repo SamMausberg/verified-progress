@@ -27,7 +27,7 @@ BF16 output (R-stock).
   the model's own MTP layer (NEXTN, 4 steps), over the 160 held-out prompts. The
   numbers below are for DFlash-4B; "Transport certification rates (MTP-4B)" gives the
   MTP-4B ones, which tell the same story. The drafter's head input is not close to the target's (rho median
-  0.92, smallest 0.82, against a per-row int8 threshold of 0.0085). For greedy
+  0.92, smallest 0.82, against a per-row int8 threshold of 0.0085; MTP-4B median 0.95, smallest 0.39). For greedy
   verification the certified bounds skip at most 0.6% of the vocabulary on average (p90
   0.8%, k-means 64-row tiles), no better than the static screen. For sampled acceptance the
   test stays undecided with probability 0.92-0.96 on average (median 1), whether P_? is
@@ -37,7 +37,7 @@ BF16 output (R-stock).
   tiles is at least 99.5% of the head. Even oracle radii lose to the batch union at 16 rows.
 - **H3, self-evidence: confirmed.** An int8 head with a rigorous per-row envelope certifies
   the R-real argmax and the Gumbel-max winner with 1.3-1.6 candidate rows on average (p99
-  5-8) on plain decode and on the DFlash-4B verify rows a greedy verifier needs, reading
+  5-8) on plain decode and on the DFlash-4B and MTP-4B verify rows a greedy verifier needs, reading
   0.50-0.52 of the BF16 head's bytes. FP8 per-row and int4 alone do not certify cheaply.
 - **For kernels:** int8 weights with FP16 scales per row (or per 128-group), W8A16, the row
   Cauchy-Schwarz (or blockwise l2) envelope, compaction of rows with hi >= max lo, and BF16
@@ -59,7 +59,11 @@ BF16 output (R-stock).
 | `alignment_dflash4b.json` | DFlash-4B capture: FP64 argmax of the captured draft and target head inputs against the engine's tokens, per block position; accept-length consistency | `python validate_alignment.py --arm dflash4b --device cpu --out ../../evidence/head_geometry/alignment_dflash4b.json` | `18fdf95` |
 | `rho_dflash4b.json`, `rho_dflash4b_pairs.csv`, `rho_dflash4b_quantiles.csv` | DFlash-4B drift ratio rho on 40,000 held-out pairs and the per-row threshold; head-metric drift; realized per-tile errors; certification rates; plot data (the pairs CSV is a seeded 15,000-row subsample with prompt id and split) | `python analyze_rho.py --arm dflash4b --device cpu --max-rows 40000 --csv-pairs 15000 --out ../../evidence/head_geometry/rho_dflash4b.json` | `5c59ba3` |
 | `transport_mtp4b.{json,csv}` | MTP-4B transport on 16,016 held-out pairs (all held-out pairs of 160 prompts), same metrics as for DFlash-4B, run on the GPU | `python analyze_transport.py --arm mtp4b --max-rows 16000 --out ../../evidence/head_geometry` under `gpu_lock.sh -s` (committed in `54c4b63`) | `99b2d3f` |
-| `transport_dflash4b.{json,csv}` | DFlash-4B transport on 4,000 held-out pairs: skip fractions for greedy, partition widths and P_? at T = 1 and 0.7, retained-tail bounds, static screen, oracle radii, drift scaling, tile unions over real and random batches, by outcome, position and domain | `python analyze_transport.py --arm dflash4b --device cpu --max-rows 4000 --out ../../evidence/head_geometry --tag dflash4b` | `99b2d3f` |
+| `alignment_mtp4b.json` | MTP-4B capture: FP64 argmax of the captured draft and target head inputs against the engine's tokens, per draft step; accept-length consistency; outputs against plain decoding | `python validate_alignment.py --arm mtp4b --device cpu --out ../../evidence/head_geometry/alignment_mtp4b.json` | `18fdf95` |
+| `rho_mtp4b.json`, `rho_mtp4b_pairs.csv`, `rho_mtp4b_quantiles.csv` | MTP-4B drift ratio rho on 40,000 held-out pairs and the per-row threshold; head-metric drift; realized per-tile errors; certification rates; plot data (the pairs CSV is a seeded 15,000-row subsample) | `python analyze_rho.py --arm mtp4b --device cpu --max-rows 40000 --csv-pairs 15000 --out ../../evidence/head_geometry/rho_mtp4b.json` | `5c59ba3` |
+| `stats_mtp4b.json` | MTP-4B: norms of draft and target head inputs, margins, top-m mass, drift norms and cosine by outcome and step | `python analyze_stats.py --arm mtp4b --device cpu --max-rows 20000 --out ../../evidence/head_geometry/stats_mtp4b.json` | `239c482` |
+| `selfevidence_mtp4b.{json,csv}`, `selfevidence_mtp4b_ccdf.csv` | H3 on 4,010 held-out MTP-4B verify rows and 4,024 draft rows (int8, FP8 and int4 heads), split by whether the verifier needs the row | `python analyze_selfevidence.py --device cpu --threads 40 --sets verify draft --max-rows 4000 --chunk 64 --heads int8_row int8_g128 int8_g32 fp8_row int4_g128 int4_g32 --out ../../evidence/head_geometry --tag mtp4b`, then `python export_candidate_ccdf.py --tag mtp4b --out ../../evidence/head_geometry/selfevidence_mtp4b_ccdf.csv` | `fa7aad8` (CCDF `5831da1`) |
+| `transport_dflash4b.{json,csv}` | DFlash-4B transport on 4,020 held-out pairs: skip fractions for greedy, partition widths and P_? at T = 1 and 0.7, retained-tail bounds, static screen, oracle radii, drift scaling, tile unions over real and random batches, by outcome, position and domain | `python analyze_transport.py --arm dflash4b --device cpu --max-rows 4000 --out ../../evidence/head_geometry --tag dflash4b` | `99b2d3f` |
 | `stats_dflash4b.json` | DFlash-4B: norms of draft and target head inputs, margins, top-m mass, drift norms and cosine by outcome and position | `python analyze_stats.py --arm dflash4b --device cpu --max-rows 20000 --out ../../evidence/head_geometry/stats_dflash4b.json` | `239c482` |
 | `selfevidence_dflash4b.{json,csv}`, `selfevidence_dflash4b_ccdf.csv` | H3 on 4,000 held-out DFlash-4B verify rows and 4,020 draft rows (int8, FP8 and int4 heads), split by whether the verifier needs the row | `python analyze_selfevidence.py --device cpu --threads 40 --sets dflash_verify dflash_draft --max-rows 4000 --chunk 64 --heads int8_row int8_g128 int8_g32 fp8_row int4_g128 int4_g32 --out ../../evidence/head_geometry --tag dflash4b`, then `export_candidate_ccdf.py --tag dflash4b` | `fa7aad8` |
 | `tail_killtest.json` | P1 kill test: INT8 surrogate of the final FFN (and head) versus certified head only | `python tail_killtest.py --threads 16 --out ../../evidence/head_geometry/tail_killtest.json` | `ea4f208` |
@@ -91,11 +95,26 @@ the target's at 98.9%; every disagreement lies within one BF16 spacing, R-bf16 (
 logits rounded to BF16, first maximal index) reproduces the engine at 99.996% (draft) and
 99.998% (target), and the engine's
 accept lengths match the derived labels on all 24,020 blocks. Draft agreement falls from
-99.4% at block position 1 to 97.0% at position 15, as later draft distributions get
+99.3% at block position 1 to 97.0% at position 15, as later draft distributions get
 flatter (more near-ties). Only 39% of prompts produce output identical to plain decoding
 (median first divergence at token 181): greedy speculation and plain decoding compute the
 target at different batch shapes, and near-ties then diverge; this is not a pairing error,
 since the per-slot checks above use the engine's own decisions.
+
+### MTP-4B
+
+The MTP-4B capture (the model's own MTP layer, NEXTN, 4 draft steps, topk 1; 320 prompts,
+`alignment_mtp4b.json`) has 30,328 verify blocks and 121,312 draft rows. The FP64 argmax of the
+captured draft head input equals the engine's draft token at 99.08% of rows and the target's at
+99.33%; every disagreement (1,116 draft, 816 target) lies within one BF16 spacing, R-bf16
+reproduces the engine at 99.997% (draft) and 99.998% (target), and the engine's accept lengths
+match the derived labels on all 30,328 blocks. Draft agreement falls from 99.31% at step 1 to
+98.90% at step 4, and the acceptance rate given that a step is reached is 84.5%, 80.0%, 79.5% and
+80.6% at steps 1-4. The engine's own top two target logits were equal in BF16 at 1.3% of rows.
+42% of prompts produce output identical to plain decoding (median first divergence at token
+194). The per-row checks above use the engine's own decisions, so this is not a pairing error;
+the state workstream traces the first difference between MTP and plain decoding to layer 0's GDN
+recurrence, which runs different kernels in verify and in decode (`evidence/state_safety/README.md`).
 
 ## H2: transport on real pairs
 
@@ -140,9 +159,30 @@ transport and the static l2 screen each skip 0.08% of rows; transport with oracl
 (realized) radii would skip 99.9% (p10 67%); int8 per-row self-evidence skips all but one
 or two rows.
 
+MTP-4B, 40,000 pairs from the 160 held-out prompts (`rho_mtp4b.json`):
+
+| Group | smallest | p10 | median | p90 | largest |
+|---|---|---|---|---|---|
+| all | 0.385 | 0.767 | 0.954 | 1.174 | 1.481 |
+| accepted | 0.385 | 0.760 | 0.986 | 1.201 | 1.481 |
+| rejected | 0.415 | 0.728 | 0.887 | 1.085 | 1.418 |
+| step 1 | 0.385 | 0.667 | 0.864 | 1.092 | 1.404 |
+| step 4 | 0.607 | 0.845 | 1.002 | 1.214 | 1.449 |
+
+Medians by domain are 0.917-1.025. The smallest ratios are lower than DFlash-4B's and the median
+is higher; unlike DFlash-4B's, the MTP head input is not held at norm 50.6 (median norms 176.1 and
+160.2 for draft and target, `stats_mtp4b.json`). Transport's envelope is
+narrower than int8 per-row on 0.08% of rows in every pair, the same unused-token tiles as for
+DFlash-4B. After removing each position's mean logit the head-metric ratio has median 0.88;
+restricted to W's leading 64 right singular directions it is 0.86, and those directions carry
+23% of Delta's norm. Realized per-tile errors are 81 times int8's (median over tiles), and the
+realized transport error is the smaller one on 0.84% of rows. Certified l2 transport and the
+static l2 screen each skip 0.08% of rows; oracle radii would skip 99.97% (median; p10 98.6%);
+int8 per-row self-evidence skips all but about one row.
+
 ### Transport certification rates (DFlash-4B)
 
-`transport_dflash4b.{json,csv}`, 4,000 held-out pairs (110 prompts). Best certified family
+`transport_dflash4b.{json,csv}`, 4,020 held-out pairs (110 prompts; `--max-rows 4000` rounds up to whole chunks). Best certified family
 per tiling (the elementwise minimum of all certified radii), transport against the static
 screen with the same geometry, and oracle radii (realized per-tile deviations, a ceiling
 that no certified geometry can reach). Shares of the vocabulary skipped for greedy
@@ -255,6 +295,27 @@ exact argmax for greedy speculation to stay lossless, so the draft head can also
 uncertified low-precision head; certification matters for the verifier. FP8 per-row needs
 28.9 candidates on average over all verify rows (p99 240), and int4 g32 a median of 92,317.
 No envelope was violated and no winner was missed.
+
+### MTP-4B verify and draft head inputs
+
+`selfevidence_mtp4b.json` uses the same split: of 4,010 verify rows, 2,901 are needed by a
+greedy verifier (every earlier draft accepted); 4,024 draft rows, 2,997 needed.
+
+| Rows | Head, envelope | Candidates mean | median | p99 | max | 1 candidate |
+|---|---|---|---|---|---|---|
+| verify, needed | int8 per-row, row CS | 1.51 | 1 | 7 | 18 | 76.1% |
+| verify, needed | int8 g128, blockwise | 1.33 | 1 | 5 | 12 | 80.9% |
+| verify, after the first rejection | int8 per-row, row CS | 2.44 | 2 | 11 | 22 | 49.1% |
+| draft, needed | int8 per-row, row CS | 2.44 | 1 | 15 | 38 | 57.4% |
+| draft, needed | int8 g128, blockwise | 1.80 | 1 | 10 | 29 | 67.3% |
+
+On the verify rows the verifier needs, int8 behaves as on plain decode and on DFlash-4B. Unlike
+DFlash's, the MTP draft head needs more candidates than the verifier; its input keeps the
+target's scale (DFlash's has a third of it), and the envelope scales with ||h||. Under the
+R-stock gap rule the stock kernel is needed
+for 4.04% of verify rows with the conservative model (gamma 6.11e-4) and 2.84% with the Hopper
+model (gamma 1.19e-4, the rounded radius these replays used), and for 6.44% and 4.20% of draft rows; DFlash-4B's verify rows need it at
+8.6% and 5.7%, plain decode at 1.40% and 0.35%. No envelope was violated and no winner was missed.
 
 ### R-stock: how often the stock decision needs the stock kernel
 
