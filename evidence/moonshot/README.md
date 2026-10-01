@@ -217,7 +217,8 @@ with this declaration):
   `make_long_prompts.py` from mixed-v2 confirm and warm-up): `long2048.jsonl` `db376fa3aadf75a30933a649b5ded1dfcafac8289b8e2aed1dde7201afd2659c`
   (512 prompts, 91 distinct texts, templated length 2,046-2,048), warm-up pool `long2048_warmup.jsonl`
   `b4b5b4e43b53f3c64083263113904868cccf23767aa0b3c5f1b45740c13130a6`.
-- Pools pinned identically in both arms (`p4_pools` lever): `--max-running-requests 128`,
+- Pools pinned identically in both arms (`p4_pools` lever): `--max-running-requests 129`
+  (128 in the three void attempts; running-limit amendment of 14:29 UTC, below),
   `--max-total-tokens 655360` (360,448 in the void first run, below), `--max-mamba-cache-size
   132` (128 in the two void attempts, below); each server's resolved sizes are read from its
   log.
@@ -562,7 +563,9 @@ logged median decode latencies. The output directory was renamed to `decode_ceil
 after the run, before the summary step.
 
 `p4_admission_plateaus.csv` (2c, the 127 plateau) is read from the server logs of the three
-void P4b attempts on CPU, by `admission_plateaus.py` at commit 591d060:
+void P4b attempts on CPU. It was first written at commit 591d060; the command below, with the
+declared plans (`--expect`), needs `admission_plateaus.py` from commit fd8f028 on and
+regenerates it byte for byte:
 
 ```sh
 D=plain+no_radix+p4_pools; E=$D+exact_replay
