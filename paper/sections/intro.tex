@@ -9,7 +9,7 @@ In speculative decoding a cheap drafter proposes several tokens and the target m
 \begin{figure}[t]
 \centering
 \input{figures/breakdown}
-\caption{Where the GPU time of a stock decode step goes (baseline engine, no certified head), measured under Nsight Systems at a fixed batch $B$ \ev{profile-attr}. An MTP cycle (three draft steps and a verification) commits several tokens. Right: the heads' share of the profiled step or cycle. The profiler inflates the MTP cycle's idle time; untraced it is about 21\%, 20\% and 15\% (derived, Appendix~\ref{app:profile}).}
+\caption{Where the GPU time of a decode step goes in the stock engine (baseline; no certified head), measured under Nsight Systems at a fixed batch of $B$ requests \ev{profile-attr}. The output head is its GEMM, the FP32 copy of its logits and the argmax; an MTP cycle, with three draft steps, adds the drafter's heads and can commit several tokens. Right: the heads' share of the profiled step or cycle. Tracing inflates the MTP cycle's idle time; untraced it is about 21\%, 20\% and 15\% (derived, Appendix~\ref{app:profile}).}
 \label{fig:breakdown}
 \end{figure}
 
@@ -24,7 +24,7 @@ We also test \emph{transport}, the mechanism this work set out to build. A draft
 \begin{figure*}[t]
 \centering
 \input{figures/mechanism}
-\caption{The certified head, schematically (intervals not to scale). \textbf{(a)}~Approximate and bound: the int8 pass gives every vocabulary entry an interval $[lo_i,hi_i]$ containing its exact logit. Entries more than $\delta_{\max}$ (the stock kernel's modelled error plus one BF16 spacing) below the best lower end cannot win and are dropped. \textbf{(b)}~Refine: the one or two remaining entries are recomputed exactly, widened by the kernel's modelled error, and rounded to the BF16 values $[L_i^-,L_i^+]$ the kernel can output (shaded). Separate rounding cells fix the order; a shared cell is a tie that the lower index wins; a straddled boundary leaves the winner open. \textbf{(c)}~A fixed winner is emitted; an open one goes to the stock head at the same batch shape.}
+\caption{How the certified head chooses a token (schematic; values illustrative). \textbf{(a)}~The int8 copy scores every vocabulary entry and bounds the error, giving an interval $[lo_i,hi_i]$ that contains the exact score. An entry with $hi_i<\max_jlo_j-\delta_{\max}$, below the leader by more than the stock kernel's modelled error plus one BF16 spacing, cannot win and is dropped; one or two candidates usually remain. \textbf{(b)}~The candidates are recomputed from their BF16 weights and widened by the error model to the FP32 sums the stock kernel could form, whose BF16 roundings are shaded. Separate cells fix the order, a shared cell is a tie the lower index wins, and a shared boundary leaves the token open. \textbf{(c)}~If a position of the head call is open, the stock head recomputes either the whole batch or that position's candidates (Section~\ref{sec:kernel-fallback}).}
 \label{fig:mechanism}
 \end{figure*}
 

@@ -11,7 +11,7 @@ A drafter that projects through the target's head has already computed, for ever
 \begin{figure*}[t]
 \centering
 \input{figures/transport}
-\caption{Why transport fails. \textbf{(a)}~Median DFlash-4B head inputs, drawn to scale in the plane they span. Transport's bound beats the per-row int8 bound only if $h^d$ lies in the ball of radius $\delta^\ast\norm{h^t}_2$ around $h^t$, the dot at the tip of $h^t$ for the median $\delta^\ast$ (Theorem~\ref{thm:crossover}). \textbf{(b)}~Cumulative distributions of the measured drift $\rho$ over 40,000 aligned held-out pairs of each drafter, and of the threshold $\delta^\ast_i$ derived from the weights over the 248,320 vocabulary entries (64-entry contiguous tiles) \ev{head-constants,rho,rho-mtp,transport,stats-dflash}.}
+\caption{Why transport fails. \textbf{(a)}~Median DFlash-4B head inputs (4,020 pairs), drawn to scale in the plane they span. Transport's bound beats the int8 copy's only if $h^d$ lies within $\delta^\ast\norm{h^t}_2$ of $h^t$: the dot at the tip of $h^t$ for the median $\delta^\ast$ (Theorem~\ref{thm:crossover}). Even the best rescaling of $h^d$ (dotted) leaves $\rho=0.91$. \textbf{(b)}~Cumulative distributions of the measured drift $\rho$ over 40,000 aligned held-out pairs of each drafter, and of the threshold $\delta^\ast_i$ derived from the weights for each of the 248,320 vocabulary entries (64-entry tiles of contiguous token indices) \ev{head-constants,rho,rho-mtp,transport,stats-dflash}.}
 \label{fig:rho}\label{fig:transport}
 \end{figure*}
 
