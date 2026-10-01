@@ -162,7 +162,11 @@ recurrence running different kernels in verify and in decode.
 DFlash block 16 with `--linear-attn-verify-backend triton` (rows in `report.json`)
 produced the same tokens as without it on all 320 prompts. At this SGLang pin, verify
 already defaults to Triton when decode uses Triton (`verify=triton` in every server
-log), so the flag is not an arm. The first DFlash attempt failed at launch: at a 0.25
+log), so the flag is not an arm. It matters only with FlashInfer GDN decode
+(`--linear-attn-decode-backend flashinfer`, as on the DFlash model card), where verify
+follows decode onto FlashInfer. There, repair's #89 measured the Triton verify kernel
+2.06-2.34 times faster at block widths 64-256. The tuned arms decode with Triton, the
+stock default, and so already verify with it. The first DFlash attempt failed at launch: at a 0.25
 memory fraction, 16 requests' verify states left no KV memory. Its runs use capacity
 4, which is enough for a c=1 pass.
 
