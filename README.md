@@ -129,8 +129,9 @@ Opus 5.5 agents for the literature review, theory, measurements and writing.
 The literature, theory and evidence changes the paper cites were approved by an
 independent reviewing agent before merging, and the author directed the work
 and reviewed it as it progressed, including in discussions of specific points
-with Claude and with OpenAI models. No AI system is an author. The confidential assignment that motivated
-the work is not included, and no model weights are redistributed.
+with Claude and with OpenAI models. No AI system is an author. The confidential
+assignment that motivated the work is not included, and no model weights are
+redistributed.
 
 ## Citing this work
 
