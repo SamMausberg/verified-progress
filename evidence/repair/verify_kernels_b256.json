@@ -1,157 +1,177 @@
 [
  {
   "report": "/home/ubuntu/vp-data/repair/runs/nsys2/force_b256.nsys-rep",
-  "cycles_in_window": 19.75,
-  "cycles_source": "GDN verify kernel launches (474) / 24 layers",
+  "cycles": 19,
+  "cycles_source": "456 GDN verify launches up to the last state commit / 24 layers",
   "state_commit_launches": 38,
-  "kernel_ms_total": 936.677931,
+  "kernel_ms_charged": 901.742299,
+  "kernel_ms_after_last_commit_not_charged": 34.935632,
+  "kernels_after_last_commit": 479,
   "per_cycle_us": {
-   "attention": 395.9072405063291,
-   "gdn_conv": 6488.874126582278,
-   "gdn_other": 170.07311392405063,
-   "gdn_verify": 32684.29286075949,
-   "gemm": 5842.137670886076,
-   "head_epilogue": 183.1112911392405,
-   "norm": 512.2592405063292,
-   "other": 1094.249316455696,
-   "state_commit": 55.82582278481012
+   "attention": 400.2728421052632,
+   "gdn_conv": 6475.386947368421,
+   "gdn_other": 174.7402105263158,
+   "gdn_verify": 32684.016842105262,
+   "gemm": 5865.077631578948,
+   "head_epilogue": 186.26863157894735,
+   "norm": 513.4602105263158,
+   "other": 1102.8682105263158,
+   "state_commit": 58.02947368421052
   },
   "share": {
-   "attention": 0.008347765802117527,
-   "gdn_conv": 0.13681892116661815,
-   "gdn_other": 0.0035860180845874974,
-   "gdn_verify": 0.689153403359089,
-   "gemm": 0.12318238231236815,
-   "head_epilogue": 0.0038609300809928017,
-   "norm": 0.010801065836150248,
-   "other": 0.023072417193525187,
-   "state_commit": 0.0011770961645513564
+   "attention": 0.008433877404258265,
+   "gdn_conv": 0.13643848374024206,
+   "gdn_other": 0.0036818323856847267,
+   "gdn_verify": 0.6886627373348935,
+   "gemm": 0.12357907034368806,
+   "head_epilogue": 0.00392473992173234,
+   "norm": 0.010818771627790746,
+   "other": 0.023237787584366162,
+   "state_commit": 0.001222699657344121
   },
   "top_kernels": [
    {
     "name": "kernel_cutlass_gdn_verify_kernel_mtp_inline_tensorptrf32gmemalign16o128128163841281_tensorptrf32gmemalign16o128128163841281_4_16_8_tensorptrf32gmemalign16o321_t",
     "category": "gdn_verify",
-    "total_ms": 645.514784,
-    "instances": 474,
-    "mean_us": 1361.845535864979
+    "total_ms": 620.99632,
+    "instances": 456,
+    "per_cycle": 24.0,
+    "mean_us": 1361.8340350877193
    },
    {
     "name": "_causal_conv1d_update_kernel",
     "category": "gdn_conv",
-    "total_ms": 127.445408,
-    "instances": 475,
-    "mean_us": 268.30612210526317
+    "total_ms": 122.342176,
+    "instances": 456,
+    "per_cycle": 24.0,
+    "mean_us": 268.2942456140351
    },
    {
     "name": "nvjet_sm90_tst_320x128_64x3_4x2_h_bz_coopB_TNT",
     "category": "gemm",
-    "total_ms": 32.876982,
-    "instances": 752,
-    "mean_us": 43.71939095744681
+    "total_ms": 31.5639,
+    "instances": 722,
+    "per_cycle": 38.0,
+    "mean_us": 43.71731301939058
    },
    {
     "name": "nvjet_sm90_tst_96x64_64x10_2x4_h_bz_TNN",
     "category": "gemm",
-    "total_ms": 19.790755,
-    "instances": 752,
-    "mean_us": 26.31749335106383
+    "total_ms": 19.000365,
+    "instances": 722,
+    "per_cycle": 38.0,
+    "mean_us": 26.316295013850418
    },
    {
     "name": "nvjet_sm90_tst_320x128_64x3_1x2_h_bz_coopB_TNT",
     "category": "gemm",
-    "total_ms": 18.47296,
-    "instances": 39,
-    "mean_us": 473.665641025641
+    "total_ms": 17.999648,
+    "instances": 38,
+    "per_cycle": 2.0,
+    "mean_us": 473.6749473684211
    },
    {
     "name": "nvjet_sm90_tst_192x128_64x5_1x2_h_bz_coopB_TNT",
     "category": "gemm",
-    "total_ms": 12.107296,
-    "instances": 475,
-    "mean_us": 25.489044210526316
+    "total_ms": 11.623584,
+    "instances": 456,
+    "per_cycle": 24.0,
+    "mean_us": 25.490315789473687
    },
    {
     "name": "nvjet_sm90_tst_80x64_64x11_1x2_h_bz_TNN",
     "category": "gemm",
-    "total_ms": 10.913939,
-    "instances": 752,
-    "mean_us": 14.51321675531915
+    "total_ms": 10.481811,
+    "instances": 722,
+    "per_cycle": 38.0,
+    "mean_us": 14.51774376731302
    },
    {
     "name": "kernel_cutlass_kernel_flashinfernormkernelsfused_add_rmsnormFusedAddRMSNormKernel_object_at__tensorptrbf16gmemalign128oi64256025601_tensorptrbf16gmemalign128oi6",
     "category": "norm",
-    "total_ms": 6.046976,
-    "instances": 1696,
-    "mean_us": 3.5654339622641507
+    "total_ms": 5.830176,
+    "instances": 1636,
+    "per_cycle": 86.10526315789474,
+    "mean_us": 3.5636772616136922
    },
    {
     "name": "void flashinfer::BatchPrefillWithPagedKVCacheKernel<flashinfer::KernelTraits<(flashinfer::MaskMode)1, (unsigned int)64, (unsigned int)1, (unsigned int)4, (unsig",
     "category": "attention",
-    "total_ms": 4.722688,
-    "instances": 182,
-    "mean_us": 25.948835164835167
+    "total_ms": 4.611552,
+    "instances": 176,
+    "per_cycle": 9.263157894736842,
+    "mean_us": 26.201999999999998
    },
    {
     "name": "nvjet_sm90_tst_64x8_64x16_1x4_h_bz_TNT",
     "category": "gemm",
-    "total_ms": 3.912096,
-    "instances": 499,
-    "mean_us": 7.839871743486974
-   },
-   {
-    "name": "nvjet_sm90_tst_168x128_64x5_1x2_h_bz_TNN",
-    "category": "gemm",
-    "total_ms": 3.645888,
-    "instances": 158,
-    "mean_us": 23.075240506329113
+    "total_ms": 3.761888,
+    "instances": 480,
+    "per_cycle": 25.263157894736842,
+    "mean_us": 7.837266666666666
    },
    {
     "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 3)]::operator ()() const::[lambd",
     "category": "other",
     "total_ms": 3.61136,
     "instances": 22,
+    "per_cycle": 1.1578947368421053,
     "mean_us": 164.15272727272728
+   },
+   {
+    "name": "nvjet_sm90_tst_168x128_64x5_1x2_h_bz_TNN",
+    "category": "gemm",
+    "total_ms": 3.5064,
+    "instances": 152,
+    "per_cycle": 8.0,
+    "mean_us": 23.068421052631578
    },
    {
     "name": "void sglang::act_and_mul_kernel<__nv_bfloat16, (sglang::ActivationKind)0, (bool)1, (bool)0, (bool)0, (bool)0>(sglang::ActivationParams)",
     "category": "other",
-    "total_ms": 2.789024,
-    "instances": 848,
-    "mean_us": 3.288943396226415
+    "total_ms": 2.684256,
+    "instances": 818,
+    "per_cycle": 43.05263157894737,
+    "mean_us": 3.281486552567237
    },
    {
     "name": "void flashinfer::PersistentVariableLengthMergeStatesKernel<(unsigned int)8, (unsigned int)16, (unsigned int)8, (unsigned int)4, __nv_bfloat16, __nv_bfloat16, in",
     "category": "other",
-    "total_ms": 2.680832,
-    "instances": 120,
-    "mean_us": 22.340266666666665
+    "total_ms": 2.545888,
+    "instances": 114,
+    "per_cycle": 6.0,
+    "mean_us": 22.332350877192983
    },
    {
     "name": "void flashinfer::BatchPrefillWithPagedKVCacheKernel<flashinfer::KernelTraits<(flashinfer::MaskMode)1, (unsigned int)128, (unsigned int)2, (unsigned int)4, (unsi",
     "category": "attention",
-    "total_ms": 2.583328,
-    "instances": 100,
-    "mean_us": 25.83328
+    "total_ms": 2.497664,
+    "instances": 95,
+    "per_cycle": 5.0,
+    "mean_us": 26.291200000000003
    },
    {
     "name": "_layer_norm_fwd_1pass_kernel",
     "category": "norm",
-    "total_ms": 2.410688,
-    "instances": 546,
-    "mean_us": 4.415179487179487
+    "total_ms": 2.32592,
+    "instances": 528,
+    "per_cycle": 27.789473684210527,
+    "mean_us": 4.405151515151515
    },
    {
     "name": "fused_qkvzba_split_reshape_cat_contiguous_kernel",
     "category": "other",
-    "total_ms": 2.199296,
-    "instances": 475,
-    "mean_us": 4.630096842105263
+    "total_ms": 2.111104,
+    "instances": 456,
+    "per_cycle": 24.0,
+    "mean_us": 4.629614035087719
    },
    {
     "name": "void at::native::reduce_kernel<(int)512, (int)1, at::native::ReduceOp<float, at::native::ArgMaxOps<float>, unsigned int, long, (int)4, (int)4>>(T3)",
     "category": "head_epilogue",
     "total_ms": 2.07408,
     "instances": 22,
+    "per_cycle": 1.1578947368421053,
     "mean_us": 94.27636363636363
    },
    {
@@ -159,48 +179,55 @@
     "category": "gemm",
     "total_ms": 2.058976,
     "instances": 64,
+    "per_cycle": 3.3684210526315788,
     "mean_us": 32.1715
    },
    {
     "name": "nvjet_sm90_tst_96x128_64x7_2x1_v_bz_TNN",
     "category": "gemm",
-    "total_ms": 1.808768,
-    "instances": 120,
-    "mean_us": 15.073066666666668
+    "total_ms": 1.718688,
+    "instances": 114,
+    "per_cycle": 6.0,
+    "mean_us": 15.07621052631579
    },
    {
     "name": "nvjet_sm90_tst_64x16_64x16_4x1_v_bz_splitK_TNT",
     "category": "gemm",
     "total_ms": 1.685122,
     "instances": 130,
+    "per_cycle": 6.842105263157895,
     "mean_us": 12.962476923076924
    },
    {
     "name": "void flashinfer::PersistentVariableLengthMergeStatesKernel<(unsigned int)8, (unsigned int)32, (unsigned int)4, (unsigned int)4, __nv_bfloat16, __nv_bfloat16, in",
     "category": "other",
-    "total_ms": 1.569984,
-    "instances": 166,
-    "mean_us": 9.457734939759035
+    "total_ms": 1.510752,
+    "instances": 160,
+    "per_cycle": 8.421052631578947,
+    "mean_us": 9.4422
    },
    {
     "name": "void at::native::reduce_kernel<(int)512, (int)1, at::native::ReduceOp<c10::BFloat16, at::native::ArgMaxOps<float>, unsigned int, long, (int)4, (int)4>>(T3)",
     "category": "head_epilogue",
-    "total_ms": 1.542368,
-    "instances": 20,
-    "mean_us": 77.1184
+    "total_ms": 1.465024,
+    "instances": 19,
+    "per_cycle": 1.0,
+    "mean_us": 77.10652631578947
    },
    {
     "name": "_fused_qk_rmsnorm_rope_gate_kernel",
     "category": "norm",
-    "total_ms": 1.458432,
-    "instances": 182,
-    "mean_us": 8.013362637362638
+    "total_ms": 1.407008,
+    "instances": 176,
+    "per_cycle": 9.263157894736842,
+    "mean_us": 7.994363636363636
    },
    {
     "name": "nvjet_sm90_tst_128x16_64x11_4x1_v_bz_TNT",
     "category": "gemm",
     "total_ms": 1.32576,
     "instances": 64,
+    "per_cycle": 3.3684210526315788,
     "mean_us": 20.715
    }
   ]

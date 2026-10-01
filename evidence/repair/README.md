@@ -157,17 +157,19 @@ B = 16 and 2.33x faster at B = 256.
 
 **Kernel trace at B = 256.** `verify_kernels_b256.json` (`runs/verify_nsys.sh`, session_x2,
 16:54-16:59 UTC): Nsight Systems over two forced-acceptance requests of 2,048 tokens with the
-FlashInfer verify kernel. The profiler stretches the verify phase from 44.70 to 45.18 ms. All
-kernel time in the window, divided by the 19.75 verify cycles it holds (474 launches of the
-GDN verify kernel over 24 GDN layers; the draft, prefill and warm-up kernels in the window are
-spread over those cycles), is 47.4 ms per cycle:
+FlashInfer verify kernel. The profiler stretches the verify phase from 44.70 to 45.18 ms. The
+window holds 19 complete verify cycles (456 launches of the GDN verify kernel over 24 GDN
+layers, each cycle closed by its state commit) and a trailing cycle that `nsys stop` cut off
+after 18 verify launches, whose 34.9 ms of kernel time is left out. All kernel time up to the
+end of the last state commit, divided by the 19 cycles (the draft, prefill and warm-up kernels
+in that span are spread over them), is 47.5 ms per cycle:
 
 | category | ms per verify cycle | share |
 |---|---|---|
 | GDN verify kernel (`gdn_verify_kernel_mtp_inline`, 24 launches per cycle, 1.36 ms each) | 32.68 | 68.9% |
-| GDN causal conv update (`_causal_conv1d_update_kernel`, 0.27 ms per launch) | 6.49 | 13.7% |
-| GEMMs (target and drafter) | 5.84 | 12.3% |
-| other GDN kernels, attention, normalization, head argmax, state commit and the rest | 2.42 | 5.1% |
+| GDN causal conv update (`_causal_conv1d_update_kernel`, 24 launches per cycle, 0.27 ms each) | 6.48 | 13.6% |
+| GEMMs (target and drafter) | 5.87 | 12.4% |
+| other GDN kernels, attention, normalization, head argmax, state commit and the rest | 2.43 | 5.1% |
 
 The verify kernel takes 1.36 ms per layer for 256 positions, 5.3 us per position per layer, which
 fits a walk over the positions one after another; it is 72% of the verify phase under the profiler
@@ -478,8 +480,12 @@ for C in 8 16; do
       --timing evidence/repair/p9_draft_share.json --baseline-run fresh_b16_c$C \
       --bootstrap 2000 --out evidence/repair/p9_support_oracle_c$C.json
 done
-python experiments/repair/p9_support_oracle.py ... --baseline-run fresh_b16_c8 --draft-saving-us 73.09 \
-    --out evidence/repair/p9_support_oracle_c8_marginal.json    # 55.01 and _c16_marginal at c = 16
+python experiments/repair/p9_support_oracle.py --cycles ~/vp-data/drafter/support/zlab_b16_cycles/cycles.pt \
+    --timing evidence/repair/p9_draft_share.json --baseline-run fresh_b16_c8 --draft-saving-us 73.09 \
+    --bootstrap 2000 --out evidence/repair/p9_support_oracle_c8_marginal.json
+python experiments/repair/p9_support_oracle.py --cycles ~/vp-data/drafter/support/zlab_b16_cycles/cycles.pt \
+    --timing evidence/repair/p9_draft_share.json --baseline-run fresh_b16_c16 --draft-saving-us 55.01 \
+    --bootstrap 2000 --out evidence/repair/p9_support_oracle_c16_marginal.json
 ```
 
 The hold ran the four scripts in that order (the verify control and kernel trace are in the
