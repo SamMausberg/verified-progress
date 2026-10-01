@@ -153,3 +153,36 @@ changes unless one of these variables is set:
 | `SGLANG_REPAIR_DROP_VERIFY_STATES=1` | the verify kernel skips the per-position FP32 state writes. Timing with forced acceptance only: the commit then copies stale scratch into the request's state, so it corrupts the committed state and every token after the first cycle |
 
 Forced full acceptance uses SGLang's existing `SGLANG_SIMULATE_ACC_LEN`.
+
+## backbone (`patches/backbone/0001-0008`, branch `engine/backbone`, head `59deb68e29`)
+
+```sh
+scripts/sglang_worktree.sh backbone
+git -C ~/sglang-wt/backbone am "$PWD"/engine/sglang/patches/backbone/*.patch
+SGLANG_WORKTREE=~/sglang-wt/backbone source scripts/sglang_env.sh
+```
+
+Faster kernels for the backbone's weight GEMMs at decode batch sizes, and the norm and SiLU
+folded into a GEMM's prologue (`evidence/backbone/`, `experiments/backbone/`). Every change is
+off unless its flag or variable is set; with the whole series applied and every switch off no
+code path changes, on CUDA or under aiter. `0001` also applies to the pin on its own. The tree
+after `0003` (`a1c6b5f6d3`) is the one the hold-1 microbenchmarks ran. Two later patches fix
+default changes in that stage of the series: `0006` (the dense model's preparation hook was
+forwarded unconditionally, which under aiter would pack the GDN input projections) and `0007`
+(`0004`'s row cutoff applied to packed weights that a model's own loader builds, as Qwen4-Exp's
+does on CUDA).
+
+| Patch | What it changes | Switch | Default behaviour |
+|---|---|---|---|
+| 0001 | `UnquantizedLinearMethod.apply` dispatches bias-free BF16 layers through `_bf16_gemm_dispatch_impl` when the backend is `gemv`, so SGLang's Hopper GEMV (M = 1, its own N policy) serves them; at the pin the flag reached only the packed GDN path | `--bf16-gemm-backend gemv` | unchanged (backend `auto`) |
+| 0002 | Adds `srt/layers/backbone_gemm.py`: a Triton skinny GEMM (optional deterministic split-K and PDL), add-RMSNorm and SiLU-mul prologues in the stock kernels' arithmetic, a probe kernel, and the routing policy | none (nothing calls it) | unchanged |
+| 0003 | Routes projections through it: `apply` and `_bf16_gemm_dispatch_impl` use the table for bias-free BF16 layers; packs the GDN `in_proj_qkvz`/`in_proj_ba` on CUDA and forwards `prepare_before_cuda_graph_capture` in the dense `Qwen3_5ForConditionalGeneration`; folds SiLU-mul into `Qwen2MoeMLP`'s down projection; defers the residual add and RMSNorm into the next projection (`DeferredNormInput`, never on aux-capture layers or under LoRA) | `SGLANG_BACKBONE_GEMM=1` with `SGLANG_BACKBONE_GEMM_TABLE=<json>`; `SGLANG_BACKBONE_PDL`, `SGLANG_BACKBONE_MERGE_IN_PROJ`, `SGLANG_BACKBONE_FUSE_ACT`, `SGLANG_BACKBONE_FUSE_NORM` (each `=1`) | unchanged |
+| 0004 | Table mode `gemv` (SGLang's Hopper GEMV for an (N, K) at M = 1); the packed GDN projection is used only from `SGLANG_BACKBONE_MERGE_IN_PROJ_MIN_M` rows (default 64), below that its two views are multiplied separately | `SGLANG_BACKBONE_MERGE_IN_PROJ_MIN_M` | unchanged after 0007 |
+| 0005 | A scaled RMSNorm prologue (row scale applied after the product), for the skeleton microbenchmarks | none | unchanged |
+| 0006 | `Qwen3_5ForConditionalGeneration.prepare_before_cuda_graph_capture` (added by 0003) forwards to the language model only when the merge is on | `SGLANG_BACKBONE_MERGE_IN_PROJ` | unchanged, also under aiter |
+| 0007 | The packed-projection row cutoff of 0004 applies only with the merge switch (Qwen4-Exp's own packed weights keep the original gate), and also on the deferred-norm branch | `SGLANG_BACKBONE_MERGE_IN_PROJ` | unchanged |
+| 0008 | A table entry of mode `gemv` calls the Hopper GEMV only on Hopper (CUDA compute capability 9.x; HIP excluded, since ROCm reports gfx94x as 9.x), as SGLang's own gemv backend requires; elsewhere the call falls back to cuBLAS | with `SGLANG_BACKBONE_GEMM` | unchanged |
+
+The routing table is JSON from `experiments/backbone/make_table.py`. Measured so far: the kernels
+and fusions in isolation and in layer skeletons (`evidence/backbone/README.md`). The exactness
+class and serving effect of the switches are pending.

@@ -1,0 +1,134 @@
+From 58bb7769e2620734c3e0b536baadf07b63bb8055 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Thu, 1 Oct 2026 06:41:08 +0000
+Subject: [PATCH 5/8] Add a scaled RMSNorm prologue to the skinny GEMM
+
+PROLOGUE_ADD_RMSNORM_SCALED computes y = rsqrt(mean(h^2) + eps) *
+(bf16(h * (1 + g)) @ W^T) with the sum of squares accumulated in the main
+loop: one pass over x and the residual instead of two, but the A operand is
+rounded before the row scale rather than after it as the stock norm does.
+Requires split_k == 1. Used by the skeleton microbenchmarks only.
+---
+ python/sglang/srt/layers/backbone_gemm.py | 65 +++++++++++++++++------
+ 1 file changed, 50 insertions(+), 15 deletions(-)
+
+diff --git a/python/sglang/srt/layers/backbone_gemm.py b/python/sglang/srt/layers/backbone_gemm.py
+index 6fb8a62ae3..f61842518b 100644
+--- a/python/sglang/srt/layers/backbone_gemm.py
++++ b/python/sglang/srt/layers/backbone_gemm.py
+@@ -45,6 +45,11 @@ import triton.language as tl
+ PROLOGUE_NONE = 0
+ PROLOGUE_ADD_RMSNORM = 1
+ PROLOGUE_SILU_MUL = 2
++# The RMSNorm with its row scale factored out of the product:
++# y = rsqrt(mean(h^2) + eps) * (bf16(h * (1 + g)) @ W^T), the sum of squares
++# accumulated in the main loop. One pass over x and residual instead of two, but
++# the A operand is rounded before the scale, not after it as the stock norm does.
++PROLOGUE_ADD_RMSNORM_SCALED = 3
+ 
+ # SiLU arithmetic: 0 for the CPU interpreter (no libdevice), 1 as nvcc
+ # --use_fast_math compiles x / (1 + expf(-x)) (SGLang's JIT activation on
+@@ -230,26 +235,43 @@ def _bb_gemm_kernel(
+         acc = tl.zeros((BLOCK_M, BLOCK_N), dtype=tl.float32)
+     else:
+         acc3 = tl.zeros((BLOCK_M, BLOCK_N, BLOCK_K), dtype=tl.float32)
++    sum_sq = tl.zeros((BLOCK_M,), dtype=tl.float32)
+     for k0 in range(k_lo, k_lo + k_len, BLOCK_K):
+         offs_k = k0 + offs_kk
+         w = tl.load(
+             w_ptr + offs_n[:, None] * K + offs_k[None, :],
+             eviction_policy="evict_first",
+         )
+-        a = _a_tile(
+-            x_ptr,
+-            r_ptr,
+-            g_ptr,
+-            offs_m,
+-            mask_m,
+-            offs_k,
+-            stride_xm,
+-            K,
+-            rstd,
+-            PROLOGUE,
+-            HAS_RESIDUAL,
+-            SILU_MODE,
+-        )
++        if PROLOGUE == 3:
++            idx = offs_m[:, None] * stride_xm + offs_k[None, :]
++            h = tl.load(x_ptr + idx, mask=mask_m[:, None], other=0.0).to(tl.float32)
++            if HAS_RESIDUAL:
++                h += tl.load(r_ptr + idx, mask=mask_m[:, None], other=0.0).to(
++                    tl.float32
++                )
++                tl.store(
++                    r_out_ptr + idx,
++                    h.to(tl.bfloat16),
++                    mask=mask_m[:, None] & (pid_n == 0),
++                )
++            sum_sq += tl.sum(h * h, axis=1)
++            g = tl.load(g_ptr + offs_k).to(tl.float32) + 1.0
++            a = (h * g[None, :]).to(tl.bfloat16)
++        else:
++            a = _a_tile(
++                x_ptr,
++                r_ptr,
++                g_ptr,
++                offs_m,
++                mask_m,
++                offs_k,
++                stride_xm,
++                K,
++                rstd,
++                PROLOGUE,
++                HAS_RESIDUAL,
++                SILU_MODE,
++            )
+         if USE_DOT and BF16_DOT:
+             acc = tl.dot(a, tl.trans(w), acc)
+         elif USE_DOT:  # CPU interpreter: its BF16 dot is unreliable
+@@ -258,6 +280,8 @@ def _bb_gemm_kernel(
+             acc3 += a.to(tl.float32)[:, None, :] * w.to(tl.float32)[None, :, :]
+     if not USE_DOT:
+         acc = tl.sum(acc3, axis=2)
++    if PROLOGUE == 3:  # SPLIT_K == 1: this program saw all of K
++        acc = acc * tl.math.rsqrt(sum_sq / K + eps)[:, None]
+ 
+     y_ptrs = y_ptr + offs_m[:, None] * stride_ym + offs_n[None, :]
+     if SPLIT_K == 1:
+@@ -386,7 +410,7 @@ def _check_prologue_args(
+         assert x.shape[1] == 2 * k
+     else:
+         assert x.shape[1] == k
+-    if prologue == PROLOGUE_ADD_RMSNORM:
++    if prologue in (PROLOGUE_ADD_RMSNORM, PROLOGUE_ADD_RMSNORM_SCALED):
+         assert norm_weight is not None and norm_weight.shape == (k,)
+         assert x.is_contiguous()
+         if residual is not None:
+@@ -425,6 +449,8 @@ def skinny_gemm(
+     _check_prologue_args(x, k, prologue, residual, norm_weight, residual_out)
+     if not cfg.valid_for(m, n, k):
+         raise ValueError(f"config {cfg} does not tile m={m} n={n} k={k}")
++    if prologue == PROLOGUE_ADD_RMSNORM_SCALED and cfg.split_k != 1:
++        raise ValueError("the scaled RMSNorm prologue needs split_k == 1")
+     y = out if out is not None else x.new_empty((m, n))
+     grid = cfg.grid(m, n)
+     if cfg.split_k > 1:
+@@ -522,6 +548,15 @@ def reference(
+     kernel does; only the GEMM itself is evaluated in float64.
+     """
+     res_out = None
++    if prologue == PROLOGUE_ADD_RMSNORM_SCALED:
++        h = x.float()
++        if residual is not None:
++            h = h + residual.float()
++            res_out = h.to(torch.bfloat16)
++        rstd = torch.rsqrt(h.pow(2).mean(dim=-1, keepdim=True) + eps)
++        assert norm_weight is not None
++        a = (h * (norm_weight.float() + 1.0)).to(torch.bfloat16)
++        return (a.double() @ weight.double().T) * rstd.double(), res_out
+     if prologue == PROLOGUE_ADD_RMSNORM:
+         h = x.float()
+         if residual is not None:
+-- 
+2.34.1
+
