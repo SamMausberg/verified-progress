@@ -34,6 +34,9 @@ echo "engine $(git -C "$STACK_ENGINE" rev-parse HEAD) tree $(git -C "$STACK_ENGI
 [ "$(git -C "$STACK_ENGINE" rev-parse 'HEAD^{tree}')" = 0643b22a70d3168a1e10071359cf2a75e11d2833 ] ||
   { echo "composed engine tree is not the declared one"; exit 1; }
 export GPU_STARTUP_MIN_FREE_GB=${GPU_STARTUP_MIN_FREE_GB:-60}
+# Outputs of an earlier hold must not pass for this one.
+rm -f "$OUT/summary.json" "$OUT/gate.json" "$OUT/pairs.json" "$OUT/table.csv" \
+  "$OUT/divergences.csv" "$OUT/meta.json"
 
 DFLASH_B16="--speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash \
 --speculative-draft-model-revision 9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf \
@@ -43,7 +46,8 @@ DFLASH_B16="--speculative-algorithm DFLASH --speculative-draft-model-path z-lab/
 run_eq() {
   local tag=$1 worktree=$2 flags=$3 logprobs=$4
   shift 4
-  [ -s "$RUNS/plain__$tag/c1.jsonl" ] && { echo "skip $tag (exists)"; return 0; }
+  # The runner writes c1.meta.json after the pass completes; a partial run is redone.
+  [ -s "$RUNS/plain__$tag/c1.meta.json" ] && { echo "skip $tag (complete)"; return 0; }
   (
     if [ -n "$worktree" ]; then export SGLANG_WORKTREE=$worktree; else unset SGLANG_WORKTREE; fi
     # shellcheck source=/dev/null
@@ -84,18 +88,20 @@ fi
 # with Triton target attention.
 ln -sfn "$HOME/vp-data/bench/equality/runs/plain__bench_dflash_b16" "$RUNS/ref_dflash_b16"
 ln -sfn "$HOME/vp-data/bench/equality/runs/plain__bench_dflash_b16_triton" "$RUNS/ref_dflash_b16_triton"
-(
-  python experiments/stack/equality_pairs.py --runs "$RUNS" --out "$OUT/pairs.json"
-  python experiments/state_safety/compare.py --runs "$RUNS" --pairs "$OUT/pairs.json" \
-    --out-json "$OUT/summary.json" --out-csv "$OUT/divergences.csv" --out-table "$OUT/table.csv" \
-    --out-meta "$OUT/meta.json" > "$OUT/compare.log" 2>&1
-  echo "compare exit $?"
-  python experiments/stack/equality_gate.py "$OUT"
-)
+python experiments/stack/equality_pairs.py --runs "$RUNS" --out "$OUT/pairs.json" ||
+  failed+=(pairs)
+python experiments/state_safety/compare.py --runs "$RUNS" --pairs "$OUT/pairs.json" \
+  --out-json "$OUT/summary.json" --out-csv "$OUT/divergences.csv" --out-table "$OUT/table.csv" \
+  --out-meta "$OUT/meta.json" > "$OUT/compare.log" 2>&1 || failed+=(compare)
+if [[ " ${failed[*]} " == *" compare "* ]]; then
+  rm -f "$OUT/summary.json"
+else
+  python experiments/stack/equality_gate.py "$OUT" || failed+=(gate)
+fi
 if (( ${#failed[@]} )); then
-  # The gate already fails when B0 or S0 is missing; a failed lever run leaves that lever
-  # out of the timed sessions. Either way the hold reports failure.
-  echo "equality runs failed: ${failed[*]}"
+  # Without a current summary there is no gate, so no session runs; a failed lever run
+  # leaves that lever out of the timed sessions. Either way the hold reports failure.
+  echo "failed: ${failed[*]}"
 fi
 
 # Phase diagnostic (timing, exclusive): composed tree with the probe, B0 and FG.

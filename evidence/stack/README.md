@@ -130,7 +130,8 @@ cache off, running limit 64, 64 GDN slots, KV cap 1M tokens, static memory 0.85,
 - FG = F + G, FGH = F + G + H. The full stack FULL is FGH if H runs, else FG.
 
 H runs only if, before session 1 starts, a pushed commit of the certified-head package
-that the kernel workstream names exists, and its check-mode equality run (below) shows 0
+that the kernel workstream names exists (it does: `kernel/engine-combined` at `01502cc`,
+the package version of kernel's engine checks, whose SGLang patches equal #52's), and its check-mode equality run (below) shows 0
 rows differing from the stock head and tokens identical to B0's. Otherwise every session
 runs without H, and H stays in the inventory as blocked. The choice is written into each
 session's log and is the same for all sessions.
@@ -152,8 +153,11 @@ against stock DFlash block 16 (bench's class rule: exact-up-to-rounding if every
 divergence is a tie, one_ulp or near event; lossy if any is large or not_argmax).
 Decisions fixed now: B0 must be bitwise equal to S0 (tokens and logprobs on all 320
 prompts) or no timed session runs until the difference is explained; a lever classed
-lossy leaves the exact stack and its arms are dropped from the sessions (FULL is then the
-remaining levers). `equality_gate.py` applies these decisions and writes the gate that
+lossy, or compared on fewer than 320 prompts, leaves the exact stack and its arms are
+dropped from the sessions (FULL is then the remaining levers); if F and G each pass but
+FG does not, only F is timed. H passes only if its runs give the same tokens and lengths
+as B0's and FG's on all 320 prompts and both check-mode statistics show certified verify
+rows with exactly zero rows differing from the stock head. `equality_gate.py` applies these decisions and writes the gate that
 the session holds read. The same hold runs a phase diagnostic: B0 and FG with the repair
 probe at c = 1 and 8 (`phases.py`).
 

@@ -58,6 +58,7 @@ start=$(date +%s)
 echo "session s$k start $(date -Is) repo $(git rev-parse HEAD) engine $(git -C "$STACK_ENGINE" rev-parse HEAD)" \
   "cert_src=${STACK_CERT_SRC:-none} order=${order[*]} table_sha=$(sha256sum "$STACK_TABLE" | cut -c1-16)"
 last=$(( ${#order[@]} - 2 ))
+failed=()
 for i in "${!order[@]}"; do
   name=${order[$i]}
   if (( i > 1 && i < last )) && (( $(date +%s) - start > 36 * 60 )); then
@@ -69,6 +70,9 @@ for i in "${!order[@]}"; do
   python -m bench.sweep "${args[@]}" --label "stack-$name" --session "stack-s$k" --out "$OUT" \
     --port 30061 --osl 512 --quiet-cpu-wait 300 --concurrency 1 2 4 8 2>&1 |
     grep -E '^r0|FAIL|[Ee]rror|refus' | tail -8
-  echo "exit ${PIPESTATUS[0]} $(date -Is)"
+  status=${PIPESTATUS[0]}
+  echo "exit $status $(date -Is)"
+  (( status == 0 )) || failed+=("$i:$name")
 done
-echo "session s$k end $(date -Is) ($(( ($(date +%s) - start) / 60 )) min)"
+echo "session s$k end $(date -Is) ($(( ($(date +%s) - start) / 60 )) min) failed=${failed[*]:-none}"
+(( ${#failed[@]} == 0 ))

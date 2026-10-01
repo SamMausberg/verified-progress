@@ -149,8 +149,14 @@ def test_phase_summary_uses_consecutive_cycle_starts(tmp_path):
 gate = _load('equality_gate')
 
 
-def _pair(diverged: int = 0, drift: float = 0.0, **classes: int) -> dict:
-    return {'diverged': diverged, 'length_mismatch': 0, 'drift_max': drift, 'classes': classes}
+def _pair(diverged: int = 0, drift: float = 0.0, prompts: int = 320, **classes: int) -> dict:
+    return {
+        'prompts': prompts,
+        'diverged': diverged,
+        'length_mismatch': 0,
+        'drift_max': drift,
+        'classes': classes,
+    }
 
 
 def test_equality_gate_requires_bitwise_b0_and_drops_lossy_levers(tmp_path, monkeypatch):
@@ -208,3 +214,33 @@ def test_interaction_skips_a_session_with_one_invalid_full_launch(tmp_path, monk
     res = json.loads(out.read_text())
     assert res['arms']['FG']['1']['x_e2e']['n'] == 1
     assert res['interaction_FG']['1']['x_e2e']['n'] == 1
+
+
+def test_equality_gate_fg_lossy_keeps_one_lever_and_h_needs_explicit_zero(tmp_path, monkeypatch):
+    pairs = {
+        'B0 vs S0': _pair(),
+        'F vs B0': _pair(),
+        'F vs bench stock b16': _pair(12, 0.4, tie=12),
+        'G vs B0': _pair(),
+        'G vs bench stock b16': _pair(12, 0.4, tie=12),
+        'FG vs B0': _pair(3, 0.3, large=1, tie=2),
+        'FG vs bench stock b16': _pair(12, 0.4, tie=12),
+        'H tokens vs B0 tokens': _pair(),
+        'FGH tokens vs FG': _pair(),
+    }
+    (tmp_path / 'summary.json').write_text(json.dumps({'pairs': pairs}))
+    stats = {'paths': {'verify': {'rows': 5000, 'mismatch_rows': 0, 'fallback_rows': 40}}}
+    (tmp_path / 'certified_stats_H.json').write_text(json.dumps(stats))
+    monkeypatch.setattr(sys, 'argv', ['gate', str(tmp_path)])
+    gate.main()
+    g = json.loads((tmp_path / 'gate.json').read_text())
+    # FG is lossy, so only F; H lacks the FGH statistics, so it is not timed.
+    assert g['timed_levers'] == ['F']
+    (tmp_path / 'certified_stats_FGH.json').write_text(json.dumps(stats))
+    gate.main()
+    assert json.loads((tmp_path / 'gate.json').read_text())['timed_levers'] == ['F', 'H']
+    # An incomplete comparison is missing, not bitwise.
+    pairs['B0 vs S0'] = _pair(prompts=300)
+    (tmp_path / 'summary.json').write_text(json.dumps({'pairs': pairs}))
+    gate.main()
+    assert not json.loads((tmp_path / 'gate.json').read_text())['ok']
