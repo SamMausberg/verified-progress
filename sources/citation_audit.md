@@ -1,8 +1,8 @@
 # Citation audit of `paper/paper.tex`
 
-Audit date: 30 September 2026; one later entry (`sglangsampler`) was added and checked on 1 October 2026. Scope: all 34 `\bibitem` entries in `paper/paper.tex`
+Audit date: 30 September 2026; one later entry (`sglangsampler`) was added and checked on 1 October 2026. Scope: all 34 `\bibitem` entries in the original `paper/paper.tex`
 (mirrored in `sources/source_manifest.json`) and the manuscript sentences that cite
-them. The manuscript was drafted by another model, so each entry was checked
+them, plus that later entry: 35 rows in all. The manuscript was drafted by another model, so each entry was checked
 against a primary source rather than against the manifest's own notes.
 
 ## How entries were checked
