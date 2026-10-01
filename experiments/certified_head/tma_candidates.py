@@ -37,6 +37,7 @@ from certified_head.bounds import TENSOR_CORE_FP32, scale_rel_error
 from certified_head.head import TOP, CertifiedHead, GemvConfig
 from certified_head.quantize import load_or_build
 from certified_head.reference import exact_logits_fp64, reference_argmax, stock_seeded_sample
+from certified_head.selftest import row_lower_misses
 from real_states import plain_decode_steps
 
 CANDIDATES: dict[str, dict[str, GemvConfig]] = {
@@ -124,7 +125,7 @@ def summary_check(
     stored.scatter_(2, local.clamp(0, cfg.block_v - 1), valid)
     remainder = torch.where(stored, float('-inf'), xt + st).max(dim=2).values
     rest_bad = int((~(rest >= remainder)).sum())
-    lower_bad = int((~(lower <= x.max(dim=1).values + slack.max(dim=1).values)).sum())
+    lower_bad = int(row_lower_misses(lower, x).sum())
     nonfinite = int((~torch.isfinite(top[valid])).sum()) + int((~torch.isfinite(lower)).sum())
     return {
         'top_bad': top_bad,

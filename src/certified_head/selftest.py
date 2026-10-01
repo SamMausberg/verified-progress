@@ -89,6 +89,36 @@ def raw_reference(
     return ref, tol
 
 
+def margin(x: torch.Tensor) -> torch.Tensor:
+    """How far a bound must clear an FP64 reference logit to count as enclosing it.
+
+    The FP64 reference has its own rounding error (at most ``K 2^-53 sum|w h|``,
+    about 1e-13 relative here), so a bound that only reaches it is not confirmed
+    to enclose the true logit. Every check therefore requires a lower bound at
+    most ``x - margin`` and an upper bound at least ``x + margin``, and counts
+    anything else, NaN included, as a miss. This is the strict direction: a
+    tolerance (a lower bound up to ``x + margin``) would let a real miss of up to
+    1e-9 relative pass.
+    """
+    return 1e-9 * (1 + x.abs())
+
+
+def lower_misses(bound: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+    """Where a lower bound does not clear ``x`` by the margin (NaN included)."""
+    return ~(bound.double() <= x - margin(x))
+
+
+def upper_misses(bound: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+    """Where an upper bound does not clear ``x`` by the margin (NaN included)."""
+    return ~(bound.double() >= x + margin(x))
+
+
+def row_lower_misses(lower: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+    """Rows whose lower bound on the largest logit does not clear it by the margin:
+    it must be at most ``max_v (x_v - margin_v)``."""
+    return ~(lower.double() <= (x - margin(x)).max(dim=1).values)
+
+
 def summary_violations(head: CertifiedHead, block_v: int, h: torch.Tensor, x: torch.Tensor) -> int:
     """Epilogue 3's stored bounds against the exact logits (after ``_gemv(..., 3)``)."""
     from .head import TOP
@@ -100,7 +130,7 @@ def summary_violations(head: CertifiedHead, block_v: int, h: torch.Tensor, x: to
     idx = head._top_idx[: m * nt * TOP].view(m, nt, TOP).long()
     rest = head._rest[: m * nt].view(m, nt).double()
     lower = head._lower[:m].double()
-    slack = 1e-9 * (1 + x.abs())
+    slack = margin(x)
     valid = top > float('-inf')
     flat = idx.clamp(0, v - 1).view(m, -1)
     xi = torch.gather(x, 1, flat).view(m, nt, TOP)
@@ -113,7 +143,7 @@ def summary_violations(head: CertifiedHead, block_v: int, h: torch.Tensor, x: to
     stored.scatter_(2, local.clamp(0, block_v - 1), valid)
     remainder = torch.where(stored, float('-inf'), xt).max(dim=2).values
     bad += int((~(rest >= remainder)).sum())
-    bad += int((~(lower <= (x + slack).max(dim=1).values)).sum())
+    bad += int(row_lower_misses(lower, x).sum())
     bad += int((~torch.isfinite(top[valid])).sum()) + int((~torch.isfinite(lower)).sum())
     return bad
 
@@ -141,10 +171,7 @@ def _check_variants(head: CertifiedHead, h: torch.Tensor) -> dict[str, Any]:
     out['raw_outside_bound'] = int((~((zt - ref).abs() <= tol)).sum())
     del ref, tol, zt
     lo, hi, _ = head.envelope(h)
-    slack = 1e-9 * (1 + x.abs())
-    out['envelope_violations'] = int((~(lo.double() <= x - slack)).sum()) + int(
-        (~(hi.double() >= x + slack)).sum()
-    )
+    out['envelope_violations'] = int(lower_misses(lo, x).sum()) + int(upper_misses(hi, x).sum())
     del lo, hi
     if head.selection == 'tiles':
         head._prep(h, m)

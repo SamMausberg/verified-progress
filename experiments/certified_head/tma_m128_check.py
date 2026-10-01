@@ -34,7 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from certified_head.head import CertifiedHead, GemvConfig
 from certified_head.quantize import load_or_build
 from certified_head.reference import exact_logits_fp64
-from certified_head.selftest import raw_reference
+from certified_head.selftest import lower_misses, margin, raw_reference, upper_misses
 from real_states import plain_decode_steps
 
 
@@ -67,11 +67,14 @@ def sweep_rows(hidden: int, m: int) -> torch.Tensor:
 
 
 def side(bound: torch.Tensor, x: torch.Tensor, half: torch.Tensor, lower: bool) -> dict[str, Any]:
-    slack = 1e-9 * (1 + x.abs())
+    """Misses of one side of the envelope, by the self-test's margin rule
+    (:func:`certified_head.selftest.margin`): a lower bound must be at most
+    ``x - margin`` and an upper bound at least ``x + margin``; NaN is a miss."""
+    slack = margin(x)
     b = bound.double()
-    # Positive where the bound misses x: a lower bound above x, an upper bound below.
+    # Positive where the bound fails to clear x by the margin.
     miss = (b - (x - slack)) if lower else ((x + slack) - b)
-    bad = ~(miss <= 0)  # NaN counts as a miss
+    bad = lower_misses(bound, x) if lower else upper_misses(bound, x)
     rel = torch.where(bad & torch.isfinite(miss), miss / half.clamp_min(1e-30), 0.0)
     return {
         'violations': int(bad.sum()),

@@ -15,6 +15,11 @@ checked against FP64 logits of the same rows:
   (:func:`certified_head.selftest.summary_violations`), plus the runtime probes'
   own flag.
 
+Every bound must clear the FP64 logit by :func:`certified_head.selftest.margin`
+(the self-test's rule). The x7c run (46bcc84) checked the row's lower bound with
+that margin as a tolerance instead (``lower <= max(x + margin)``); later runs use
+the margin rule for it too.
+
 A row-check is one batch row of one call checked over the whole vocabulary. The
 pass criterion is 0 misses; with ``n`` row-checks and none missed, the per-row
 miss probability is below ``3 / n`` at 95% confidence if calls were independent
@@ -51,6 +56,7 @@ from certified_head.head import (
 )
 from certified_head.quantize import load_or_build
 from certified_head.reference import exact_logits_fp64
+from certified_head.selftest import lower_misses, margin, row_lower_misses, upper_misses
 from real_states import plain_decode_steps
 
 ROUND_ROWS = 256
@@ -88,7 +94,7 @@ def summary_misses(
     stored.scatter_(2, local.clamp(0, block_v - 1), valid)
     remainder = torch.where(stored, float('-inf'), xt.view(m, nt, block_v)).max(dim=2).values
     bad |= (~(rest >= remainder)).any(dim=1)
-    bad |= ~(lower <= (x + slack).max(dim=1).values)
+    bad |= row_lower_misses(lower, x)
     bad |= (valid & ~torch.isfinite(top)).flatten(1).any(dim=1) | ~torch.isfinite(lower)
     return bad
 
@@ -134,7 +140,7 @@ def stress_config(
             else:
                 rows = peaked_rows(head, ROUND_ROWS, gen)
             x = exact_logits_fp64(rows, head.weight)
-            slack = 1e-9 * (1 + x.abs())
+            slack = margin(x)
             perm = torch.randperm(ROUND_ROWS, device='cuda', generator=gen)
             for m in [m for _ in range(passes) for m in sizes]:
                 start = int(torch.randint(0, ROUND_ROWS, (1,), generator=cpu_gen))
@@ -145,8 +151,8 @@ def stress_config(
                 head._gemv(h, m, lo, 2)
                 head._prep(h, m)
                 head._gemv(h, m, hi, 1)
-                low_bad = ~(lo[:m].double() <= xm - sm)
-                up_bad = ~(hi[:m].double() >= xm + sm)
+                low_bad = lower_misses(lo[:m], xm)
+                up_bad = upper_misses(hi[:m], xm)
                 head._prep(h, m)
                 head._gemv(h, m, head._top, 3)
                 summ = summary_misses(head, cfg.block_v, xm, sm)
