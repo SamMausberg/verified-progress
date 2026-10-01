@@ -38,6 +38,7 @@ import argparse
 import csv
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -95,7 +96,11 @@ def main() -> None:
     ap.add_argument('--context', type=float, default=350.0, help='mean context tokens (assumed)')
     ap.add_argument('--out', type=Path, required=True)
     args = ap.parse_args()
+    commit = subprocess.run(
+        ['git', 'rev-parse', 'HEAD'], capture_output=True, text=True, check=False
+    ).stdout.strip()
     out: dict[str, Any] = {
+        'repo_commit': commit,
         'assumptions': {
             'hbm_read_bytes_per_s': BW,
             'target_weight_bytes': 2 * TARGET_PARAMS,
