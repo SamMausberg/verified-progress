@@ -39,7 +39,7 @@ Every committed result the paper cites is listed below with the claims it suppor
 \evgroup{The stock engine}
 \evitem{state-mech}{First differing module outputs and divergence classes under both error models (Figure~\ref{fig:divergence}, Table~\ref{tab:divergence})}{\nolinkurl{evidence/state_safety/mechanism_plain_c1_vs_mtp_s3_c1.json}, \nolinkurl{mechanism_plain_c1_vs_c32.json}, \nolinkurl{divergences.csv}}{\nolinkurl{experiments/state_safety/mechanism.py}, \nolinkurl{compare.py}}
 \evitem{state-noise}{Divergence rates, BF16 top-two ties, same-server repeats and the deterministic-mode checks; the server settings of every run}{\nolinkurl{evidence/state_safety/noise_floor.csv}, \nolinkurl{noise_floor.json}, \nolinkurl{run_meta.json}}{\nolinkurl{experiments/state_safety/run_all.sh}, \nolinkurl{compare.py}}
-\evitem{state-tap}{Positive controls of the bit-exact tap}{\nolinkurl{evidence/state_safety/tap_control_down9.json}, \nolinkurl{tap_control_core13_decode.json}, \nolinkurl{tap_control_core13.json}}{\nolinkurl{experiments/state_safety/mechanism.py}}
+\evitem{state-tap}{Positive controls of the bit-exact tap; the method and the open tap-changed prompts}{\nolinkurl{evidence/state_safety/tap_control_down9.json}, \nolinkurl{tap_control_core13_decode.json}, \nolinkurl{tap_control_core13.json}, \nolinkurl{README.md}}{\nolinkurl{experiments/state_safety/mechanism.py}}
 \evgroup{Where the time goes}
 \evitem{profile-attr}{Attribution of the plain step and the MTP cycle by component; unprofiled throughput; the state-slot reservation (Tables~\ref{tab:profile-plain}, \ref{tab:profile-mtp} and~\ref{tab:profile-ranked})}{\nolinkurl{evidence/profiles/tables.md}, \nolinkurl{breakdown.csv}, \nolinkurl{step_share.csv}, \nolinkurl{label_structure_check.json}, \nolinkurl{attribution/}, \nolinkurl{windows/}}{\nolinkurl{experiments/profiling/run_profiles.py}, \nolinkurl{attribute.py}, \nolinkurl{summarize.py}}
 \evitem{profile-head}{The head chain's share of a plain step and of an MTP cycle; the head microbenchmark and the kernels cuBLAS selects}{\nolinkurl{evidence/profiles/head_microbench.json}, \nolinkurl{head_microbench_kernels.json}, \nolinkurl{attribution/}}{\nolinkurl{experiments/profiling/attribute.py}, \nolinkurl{head_microbench.py}}
@@ -74,7 +74,7 @@ Table~\ref{tab:status} pairs each question of the programme (H1--H7) and each la
 \toprule Question or claim & Deciding or damaging test & Status\\\midrule\endfirsthead
 \toprule Question or claim & Deciding or damaging test & Status\\\midrule\endhead
 \bottomrule\endlastfoot
-H1: the head is a large share of decode and MTP-speculation time & Nsight attribution at several batch sizes (Appendix~\ref{app:profile}) & Measured: the head chain is 10.3--6.1\% of a plain step ($B=1$--128) and 17.2--12.4\% of an MTP cycle ($B=1$--32), below its 15.1\% byte share~\ev{profile-head}\\
+H1: the head is a large share of decode and MTP-speculation time & Nsight attribution at several batch sizes (Appendix~\ref{app:profile}) & Measured: the head chain is 10.3--6.1\% of a plain step ($B=1$--128), below its 15.1\% share of the step's weight bytes, and 17.2--12.4\% of an MTP cycle ($B=1$--32), against about 38\% of the cycle's bytes at $B=1$~\ev{profile-head,profile-bytes}\\
 H2: transport gives useful certificates on real hidden states, tighter than self-evidence and the static screen & Drift ratio against $\delta^\ast$; certification on aligned pairs (Section~\ref{sec:transport-measured}) & Refuted on DFlash-4B and MTP-4B for every bound family and tiling tested~\ev{rho,transport,transport-mtp}\\
 H3: a low-precision head with a rigorous envelope certifies the stock decision while reading fewer weight bytes & Candidate sets on replayed rows, then a GPU kernel against the stock head chain (Section~\ref{sec:selfevidence}) & Envelope and contract proved; candidate sets and fallback shares measured on replayed rows~\ev{selfevidence,rstock}; runtime \pend{kernel-path}\\
 \quad Certified tokens equal stock tokens & Same-shape token equality; measured cuBLAS error against the modelled $G_i$ & No disagreement on 6,005 replayed rows~\ev{rstock}; kernel error \pend{kernel-error}\\
@@ -97,7 +97,7 @@ Results transfer & New prompts, a second model or a second GPU & \pend{transfer}
 \end{longtable}}
 
 \subsection{Pending results}\label{app:devrecord}
-Each entry is designed work whose result is not in the repository's main branch. The text marks it \mbox{[pending D$n$]} and says beside the marker what the result will decide; no number stands in for it.
+Each entry is designed work without a committed result. The text marks it \mbox{[pending D$n$]} and says beside the marker what the result will decide; no number stands in for it.
 
 \newcounter{devitem}
 \newcommand{\devitem}[3]{\refstepcounter{devitem}\label{dev:#1}D\thedevitem & #2\ifblank{#3}{}{\par\vspace{1pt}{\footnotesize\color{muted}To be committed in #3.\par}}\vspace{2pt}\\}
@@ -174,9 +174,9 @@ Block drafter & \code{z-lab/Qwen3.5-4B-DFlash} at revision \texttt{9a1996ccf887b
 Engine patches & Head-input capture (\path{engine/sglang/patches/geometry/}), divergence tap and verify KV split (\path{state/}), lever arms (\path{moonshot/}), acceptance trace hook (\path{drafter/}); each is off unless its flag or environment variable is set\\
 Serving client & AIPerf 0.13.0, closed-loop concurrency, streaming chat completions\\
 Profilers & Nsight Systems 2025.3.2, Nsight Compute 2025.3.1\\
-CPU references & Python 3.13.15, NumPy 2.3.5; Lean 4.19.0\\
+CPU references & Python 3.13 (3.13.5 for the rational reference, 3.13.15 for the floating-point reference and the witnesses; each evidence file records its version), NumPy 2.3.5; Lean 4.19.0\\
 Prompts & 320 capture prompts (\path{evidence/head_geometry/prompt_manifest.csv}), 320 divergence prompts (\path{evidence/state_safety/prompt_manifest.json}), the serving workload~\ev{workload}, each with its sources and SHA-256 digests\\
 \end{longtable}}
 
 \subsection{Attribution and disclosure}\label{app:attribution}
-Samuel Mausberg is the author of this paper and is responsible for its claims. The earlier draft of the manuscript, its derivations and its reference code were prepared with GPT-6 Astra Pro (OpenAI) from research materials, public primary sources and local CPU execution. This version was produced with Claude Code, using Claude Opus 5.5 agents for the literature review, theory, measurements, implementation and writing; each change to the literature, theory and evidence this paper cites was reviewed by an independent reviewing agent before it was merged, and all of the work is subject to the author's review. No AI system is an author. The confidential assignment that motivated the work is not reproduced or quoted, and no model weights are redistributed.
+Samuel Mausberg is the author of this paper and is responsible for its claims. The earlier draft of the manuscript, its derivations and its reference code were prepared with GPT-6 Astra Pro (OpenAI). This version, including the literature review, theory, measurements, implementation and text, was produced with Claude Code using Claude Opus 5.5 agents, with an independent agent reviewing the changes, and all of it is subject to the author's review. No AI system is an author. The confidential assignment that motivated the work is not reproduced or quoted, and no model weights are redistributed.
