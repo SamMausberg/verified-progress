@@ -661,8 +661,9 @@ drafter workstream's block-16 panel (`drafter_b16_outputs.jsonl`, SHA-256
 `679240063371673782ca0fe6b7eeeb241c36bef2f183030bda3dcd9dceaffec4`, raw data outside git); 64-row
 tiles in token-id order, and the same tiles after sorting the rows by a random projection (a cheap
 clustering control, not k-means). Run under the shared lock on 2026-10-01, finishing at 18:51 UTC,
-from a local worktree whose `p12_static_screen.py` and `runs/p12_screen.sh` are byte-identical to
-the files on main.
+from a local worktree at commit `a05df1d`, which was never pushed. Its `p12_static_screen.py` and
+`runs/p12_screen.sh` are the same git blobs (`9389127` and `9c758ef`) as at commit `d365673`, which
+is on main through #150, so `d365673` is the revision to rerun; the JSON records no commit.
 
 | quantity | value |
 |---|---|
