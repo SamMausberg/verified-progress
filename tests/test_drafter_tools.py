@@ -59,3 +59,50 @@ def test_prefix_outputs_count_as_divergence(tmp_path: Path) -> None:
     assert summary['sequences_diverged'] == 1
     assert summary['divergences'][0]['position'] == 2
     assert summary['divergences'][0]['ref_token'] is None
+
+
+def test_serve_run_startup_lock_uses_the_script(tmp_path: Path) -> None:
+    """serve_run holds ~/.gpu.lock.startup through scripts/gpu_startup_lock.sh."""
+    import fcntl
+    import os
+
+    serve_run = load('serve_run')
+    bin_dir = tmp_path / 'bin'
+    bin_dir.mkdir()
+    smi = bin_dir / 'nvidia-smi'
+    smi.write_text('#!/bin/sh\necho 1000\n')  # 1,000 MiB free
+    smi.chmod(0o755)
+    env = {k: v for k, v in os.environ.items() if not k.startswith('GPU_STARTUP_')}
+    env.update(
+        PATH=f'{bin_dir}:{env["PATH"]}',
+        GPU_LOCK_FILE=str(tmp_path / 'gpu.lock'),
+        GPU_STARTUP_RETRY_WAIT='0',
+    )
+    lock_file = tmp_path / 'gpu.lock.startup'
+
+    def held() -> bool:
+        with lock_file.open('a') as handle:
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return True
+            return False
+
+    lock = serve_run.StartupLock(env)
+    lock.acquire()
+    assert held()
+    assert lock.release() == 0
+    assert not held()
+    # The free-memory gate: 1,000 MiB is below 1 GiB, so the script gives up (exit 75).
+    gated = serve_run.StartupLock({**env, 'GPU_STARTUP_MIN_FREE_GB': '1', 'GPU_STARTUP_TRIES': '2'})
+    try:
+        gated.acquire()
+    except RuntimeError as error:
+        assert 'exit 75' in str(error)
+    else:
+        raise AssertionError('acquired the lock with too little free memory')
+    assert not held()
+    lock = serve_run.StartupLock({**env, 'GPU_STARTUP_MIN_FREE_GB': '0.5'})
+    lock.acquire()
+    assert held()
+    lock.release()

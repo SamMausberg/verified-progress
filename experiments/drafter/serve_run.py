@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-import fcntl
 import json
 import os
 import shlex
@@ -32,6 +31,7 @@ import time
 import urllib.request
 from pathlib import Path
 
+LOCK_SCRIPT = Path(__file__).resolve().parents[2] / 'scripts' / 'gpu_startup_lock.sh'
 MODEL = 'Qwen/Qwen3.5-4B'
 REVISION = '851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a'
 DFLASH = 'z-lab/Qwen3.5-4B-DFlash'
@@ -73,6 +73,40 @@ def git_revision(path: Path) -> str | None:
         ).stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         return None
+
+
+class StartupLock:
+    """The team's server start-up lock, held through scripts/gpu_startup_lock.sh.
+
+    The script runs a placeholder command that reports when it holds the lock
+    (after the optional free-memory gate) and then waits for its stdin to close.
+    """
+
+    def __init__(self, env: dict[str, str]) -> None:
+        self.env = env
+        self.process: subprocess.Popen | None = None
+
+    def acquire(self) -> None:
+        self.process = subprocess.Popen(
+            [str(LOCK_SCRIPT), 'sh', '-c', 'echo locked; exec cat > /dev/null'],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            text=True,
+            env=self.env,
+        )
+        assert self.process.stdout is not None
+        if self.process.stdout.readline().strip() != 'locked':
+            code = self.release()
+            raise RuntimeError(f'start-up lock not acquired (gpu_startup_lock.sh exit {code})')
+
+    def release(self) -> int | None:
+        if self.process is None:
+            return None
+        process, self.process = self.process, None
+        assert process.stdin is not None
+        with contextlib.suppress(BrokenPipeError):
+            process.stdin.close()
+        return process.wait(timeout=60)
 
 
 def stop(server: subprocess.Popen) -> None:
@@ -126,6 +160,11 @@ def main() -> None:
         help='relaunches when start-up fails for lack of free GPU memory (other shared jobs)',
     )
     parser.add_argument('--retry-wait', type=float, default=60)
+    parser.add_argument(
+        '--min-free-gb',
+        type=float,
+        help='start only when this much GPU memory is free (GPU_STARTUP_MIN_FREE_GB)',
+    )
     args = parser.parse_args()
 
     args.out.mkdir(parents=True, exist_ok=True)
@@ -175,21 +214,29 @@ def main() -> None:
     }
     (args.out / 'launch.json').write_text(json.dumps(launch, indent=2) + '\n')
 
-    # Start-up is serialized with other jobs' servers (the same lock file as
-    # scripts/gpu_startup_lock.sh): SGLang sizes its pools from the free memory
-    # it sees while loading, so concurrent start-ups race. The lock descriptor
-    # is not inherited by the server (Popen closes fds) and is released once the
-    # server is healthy. If the pools do not fit because other shared jobs hold
-    # memory, the launch is retried after a wait (the lock is released meanwhile).
-    lock_path = os.environ.get('GPU_LOCK_FILE', str(Path.home() / '.gpu.lock')) + '.startup'
+    # Start-up is serialized with other jobs' servers through
+    # scripts/gpu_startup_lock.sh: SGLang sizes its pools from the free memory it
+    # sees while loading, so concurrent start-ups race. With --min-free-gb (or
+    # GPU_STARTUP_MIN_FREE_GB) the script also waits until that much GPU memory is
+    # free. The lock is held by the script, not by this process, so the server
+    # cannot inherit it; it is released once the server is healthy. If the pools
+    # still do not fit (memory taken after the check), the launch is retried after
+    # a wait with the lock released.
+    lock_env = dict(os.environ)
+    if args.min_free_gb is not None:
+        lock_env['GPU_STARTUP_MIN_FREE_GB'] = str(args.min_free_gb)
     attempt = 0
     while True:
         log = (args.out / 'server.log').open('w')
-        startup_lock = open(lock_path, 'a')  # noqa: SIM115 (released before the clients run)
-        fcntl.flock(startup_lock, fcntl.LOCK_EX)
-        server = subprocess.Popen(
-            command, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True
-        )
+        startup_lock = StartupLock(lock_env)
+        startup_lock.acquire()
+        try:
+            server = subprocess.Popen(
+                command, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True
+            )
+        except BaseException:
+            startup_lock.release()
+            raise
         try:
             wait_ready(args.port, server, args.ready_timeout)
             break
@@ -209,8 +256,7 @@ def main() -> None:
             stop(server)
             raise
         finally:
-            fcntl.flock(startup_lock, fcntl.LOCK_UN)
-            startup_lock.close()
+            startup_lock.release()
         time.sleep(args.retry_wait)
     launch['startup_attempts'] = attempt + 1
     (args.out / 'launch.json').write_text(json.dumps(launch, indent=2) + '\n')
