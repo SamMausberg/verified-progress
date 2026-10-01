@@ -39,8 +39,10 @@ run_missing() {
   [ "${#todo[@]}" -eq 0 ] && return 0
   local joined
   joined=$(IFS=,; echo "${todo[*]}")
+  # --no-pin: the reference (state's runs/plain) predates pinned pools, so the arms
+  # stay in the same unpinned regime (cap 16, pools sized from free memory).
   python experiments/state_safety/run_matrix.py --passes c1 --port 30017 --out-dir "$RUNS" \
-    --configs "$joined" --tag "$tag" "--extra-flags=$flags" || failed+=("$joined/$tag")
+    --no-pin --configs "$joined" --tag "$tag" "--extra-flags=$flags" || failed+=("$joined/$tag")
 }
 run_missing mtp_s3,mtp_s3_replayssm,plain_replayssm,plain bench_noradix "--disable-radix-cache"
 run_missing mtp_s3_replayssm,plain bench_noradix_triton "--disable-radix-cache --attention-backend triton"

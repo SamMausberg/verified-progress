@@ -12,6 +12,13 @@ repos:
         entry: these files are private and must never be committed
         language: fail
         files: ^(Sam's Inco Take Home Challenge\.pdf|writing\.md)$
+      # Checks the staged files itself: the evidence/ exclusion above must not hide them.
+      - id: forbid-host-identity
+        name: forbid this machine's hostname and IP addresses
+        entry: scripts/check_host_identity.sh
+        language: script
+        pass_filenames: false
+        always_run: true
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0

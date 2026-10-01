@@ -47,3 +47,32 @@ def test_exact_replay_matches_packed_decode_bitwise(ring: int) -> None:
     assert stats['exact_output_words_differing'] == 0
     assert stats['exact_state_words_differing'] == 0
     assert stats['bit_identical']
+
+
+@pytest.mark.parametrize('raw', ['0', '3', '-4', '48', 'abc'])
+def test_value_tile_env_rejects_non_powers_of_two(
+    raw: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = importlib.import_module(
+        'sglang.kernels.ops.attention.fla.fused_recurrent_exact_replay'
+    )
+    module._value_tile_from_env.cache_clear()
+    monkeypatch.setenv('SGLANG_GDN_EXACT_REPLAY_BV', raw)
+    try:
+        with pytest.raises(ValueError, match='positive power of two'):
+            module._value_tile_from_env()
+    finally:
+        module._value_tile_from_env.cache_clear()
+
+
+def test_value_tile_env_default_and_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    module = importlib.import_module(
+        'sglang.kernels.ops.attention.fla.fused_recurrent_exact_replay'
+    )
+    module._value_tile_from_env.cache_clear()
+    monkeypatch.delenv('SGLANG_GDN_EXACT_REPLAY_BV', raising=False)
+    assert module._value_tile_from_env() == 32
+    module._value_tile_from_env.cache_clear()
+    monkeypatch.setenv('SGLANG_GDN_EXACT_REPLAY_BV', '16')
+    assert module._value_tile_from_env() == 16
+    module._value_tile_from_env.cache_clear()

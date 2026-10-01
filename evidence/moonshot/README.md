@@ -17,24 +17,29 @@ harness (`bench.sweep`, `bench/` on main: aiperf 0.13.0, workload
 
 ### 1.1 Bandwidth and bytes per step
 
-- HBM read bandwidth: the ceilings below assume **3.79 TB/s**, the read peak the profile
-  workstream measured (its evidence is pending; the figure is an input here, not a claim).
+- HBM read bandwidth: **3.83 TB/s** for the best configuration of a 4 GiB read sweep, and
+  **3.79 TB/s** with that same configuration reused over exactly the head's 1.27 GB (not
+  swept at that size) (profile workstream, `evidence/profiles/hbm_bandwidth.json`, table in
+  `evidence/profiles/README.md`); the ceilings below use 3.79 TB/s.
 - Weights read once per decode step: 7.14 GB backbone + 1.27 GB tied head = **8.41 GB**
   (derived). Floor at batch 1: **2.22 ms/token, 451 tokens/s**. Measured plain decode at
   batch 1: 281 tokens/s end to end (Section 2), i.e. 3.56 ms per token, 62% of the floor.
-  Which kernels take the rest is the profile workstream's attribution (pending).
+  The profile workstream attributes the 3.54 ms step to weight GEMMs (68%), head (10%),
+  small kernels (6.5%), GDN state (6.2%), attention (4.8%) and idle (4.3%)
+  (`evidence/profiles/step_share.csv`).
 - GDN recurrent state (**code**): FP32 (`mamba_ssm_dtype: float32` in the config),
   24 layers x 32 heads x 128 x 128 per request = 50.3 MB, read and written once per
   step by `fused_recurrent_gated_delta_rule_packed_decode_kernel`, i.e. **100.7 MB per
-  request per step**. Whether the kernel runs at the bandwidth limit is the profile
-  workstream's measurement (pending).
+  request per step**. The profile workstream measured the kernel at 3.47-3.48 TB/s, i.e.
+  purely bandwidth-bound (`evidence/profiles/README.md`).
 - Attention KV: 8 layers x 4 KV heads x 256 x 2 x 2 B = 32 KB per context token, about
   10.9 MB per request per step at the benchmark's mean decode context (~334 tokens).
 - Crossover (**derived**, confirms the charter): FP32 state bytes alone equal the weight
   bytes at **B = 84**; with KV and conv state, per-request bytes pass the weights at
-  **B = 74** (`ceilings.json`). The measured crossover in kernel time is the profile
-  workstream's (pending). The 24% gain of FP16 state at c = 128 and its absence at c = 1
-  (Section 2) are what a per-request byte term predicts.
+  **B = 74** (`ceilings.json`). In kernel time the crossover is near B = 110-120, and at
+  B = 128 the GDN kernel is 41.6% of an 8.9 ms step (profile workstream,
+  `evidence/profiles/README.md`). The 24% gain of FP16 state at c = 128 and its absence at
+  c = 1 (Section 2) are what a per-request byte term predicts.
 
 ### 1.2 Speculative verification and the state
 
@@ -124,6 +129,263 @@ One_batch engine-only decode steps (first pass, `decode_ceiling_try1.csv`, noisy
 B = 64 because of per-step host overhead): B = 512 FP32 state 26.9 ms (19.0k tok/s), BF16
 23.0 ms (22.3k), FP16 22.5 ms (22.8k). Rerun with longer decodes pending.
 
+## 2b. Speculation at high concurrency: byte arithmetic (derived)
+
+Bench's depth tuning (`evidence/bench/tuning/points.csv`) measured MTP three steps at
+c = 128: 9.59k tok/s stock and 11.94k with `--enable-linear-replayssm-spec`,
+against 13.42k for plain decode, with 3.26 tokens per verify cycle. The implied cycle is
+128 x 3.26 / y = **43.5 ms stock, 35.0 ms with ReplaySSM-spec** (plain: 9.5 ms per step).
+Assumptions for the components below: 3.8 TB/s, 650 TFLOPS BF16, context ~400 tokens.
+
+| component per cycle, B = 128 | stock | ReplaySSM-spec |
+|---|---|---|
+| verify GEMMs over 512 tokens (4.3 TFLOP) | 6.6 ms | 6.6 ms |
+| three draft steps + draft extend (weights, head, MTP layer) | ~1.7 ms | ~1.7 ms |
+| verify attention (KV read) + small kernels | ~1.5 ms | ~1.5 ms |
+| GDN state traffic: 352 MB/request stock (read, 4 snapshots, commit), ~100 MB with ReplaySSM-spec (read, fold write) | 11.9 ms | 3.4 ms |
+| sum of derived components | ~21.7 ms | ~13.2 ms |
+| cycle implied by the measured throughput | 43.5 ms | 35.0 ms |
+
+- Removing the snapshots saved ~8.5 ms per cycle, which the 252 MB/request of snapshot and
+  commit traffic it removes accounts for (32 GB at 3.8 TB/s = 8.5 ms).
+- What ReplaySSM-spec still moves is ~3.4 ms. A strict-replay verify (anchor read, operand
+  ring, anchor written every L = 4 committed tokens) would cut it to ~2.1 ms, about 4% of
+  the cycle; it cannot decide whether speculation beats plain decode at c = 128, so it is
+  not built.
+- The measured cycle is 2-2.7x the sum of its derived parts. At lower batch the gap between
+  cycle and GPU work is smaller: the profile workstream's unprofiled MTP cycles are 6.70,
+  8.27 and 12.49 ms against 5.27, 6.62 and 10.62 ms of traced GPU-busy time at B = 1, 8 and
+  32, i.e. 1.27x, 1.25x and 1.18x (`evidence/profiles/README.md`). The lever that
+  could let speculation win at c >= 32 is whatever makes the cycle that much slower than its
+  parts; the hostgap workstream is attributing MTP at B = 64 and 128.
+- The cheapest frontier gain meanwhile is scheduling: choose plain decode above the batch
+  size where MTP stops paying (`--speculative-adaptive`, measured in the next sweep).
+
+## 2c. Strict write-avoiding GDN decode (proposal P4, patch 0007)
+
+**Bit-exactness (measured at kernel level, on synthetic activations, one layer).**
+`gdn_exact_replay_check.py check` runs SGLang's packed decode and the exact-replay kernel
+side by side for 48 steps at batch 8 with random activations (randn q, k, v, a, b and a
+random prefilled state) and the checkpoint's A_log/dt_bias (layer 0 at L = 4 and 16, layer
+20 at L = 4), rows
+flushing at staggered phases (forced flushes at rate 0.1). Before every real step it runs
+the same token on a copy with a forced flush, so the reconstructed state is written out
+and compared at every step, not only at flushes. Result: **0 of 201,326,592 state words
+and 0 of 1,572,864 output words differ** at ring length 4 and 16, and at layer 20
+(`gdn_exact_replay_check_L4.json`, `_L16.json`, `_L4_layer20.json`;
+`tests/test_gdn_exact_replay.py`: 3 passed). This is a kernel-level result on synthetic
+activations; the end-to-end bitwise probe (greedy tokens and top-20 logprobs at concurrency
+1 through the server) has not run yet: its first attempt failed before serving because the
+arm's 640-slot default survived radix-off (`exact_replay_e2e` inside run_p4_timed.sh), and
+it is queued again in run_p4b.sh. SGLang's ReplaySSM run on the same inputs
+differs in 465,102 output words and in nearly every state word at a flush (largest state
+deviation 0.38% of the state's largest entry), confirming it is an approximation.
+
+**Kernel time (measured, one layer, CUDA-graph replay, state pool 4x the batch so L2 is
+cold; `gdn_exact_replay_bench.json`).** Mean over the L cursor phases:
+
+| batch | packed decode | exact L=2 | exact L=4 | exact L=8 | exact L=16 |
+|---|---|---|---|---|---|
+| 32 | 45.9 us | 40.2 | 40.7 | 49.2 | 69.2 |
+| 128 | 161.5 us | 133.9 | **132.9 (1.215x)** | 165.3 | 243.6 |
+| 256 | 312.7 us | 257.6 | **254.8 (1.227x)** | 312.8 | 463.2 |
+
+The state traffic falls from 2D to 1.25D at L = 4 (1.6x fewer bytes), but the kernel gains
+1.22x: replaying up to three rank-one updates per step in registers costs compute, and longer
+rings lose more than they save. With the GDN kernel at 41.6% of a B = 128 step (profile),
+1.22x on the kernel predicts about **1.08x per decode step** at B = 128 (derived; less with the
+pre-registered 2,048-token prompts, where attention takes a larger share). The pre-registered
+claim was >= 1.10x; the served paired A/B is queued. The first attempt, with
+`sglang.benchmark.one_batch`, aborted in both arms (base r0-r2 and exact_replay_l4 r0-r2):
+a single 262,144-token prefill hits an illegal memory access in
+`fused_qk_gemma_rmsnorm_rope_gate`. Both arms ran on the patched engine (patches
+0001-0009, exact replay off in the base arm); it has not been tried on stock `bd66ce343e`.
+The A/B now runs through the server with chunked prefill (run_p4b.sh).
+
+**Analysis of the served A/B, declared on 2026-10-01 at 07:12 UTC, before the run started**
+(agreed with the coordinator; the run script is `experiments/moonshot/run_p4b.sh`, committed
+with this declaration):
+
+- Design: batch 128, 2,048-token prompts (`long2048.jsonl`), 512 generated tokens, greedy,
+  FP32 state, no speculation, radix off, `--stream-interval 4`. Dense decode (A) against
+  exact replay at L = 4 (B), one server launch per arm, four pairs in A B B A A B B A order
+  (labels r1-r4).
+- Workload (by SHA-256; the files are in `~/vp-data/moonshot/workloads/`, made by
+  `make_long_prompts.py` from mixed-v2 confirm and warm-up): `long2048.jsonl` `db376fa3aadf75a30933a649b5ded1dfcafac8289b8e2aed1dde7201afd2659c`
+  (512 prompts, 91 distinct texts, templated length 2,046-2,048), warm-up pool `long2048_warmup.jsonl`
+  `b4b5b4e43b53f3c64083263113904868cccf23767aa0b3c5f1b45740c13130a6`.
+- Pools pinned identically in both arms (`p4_pools` lever): `--max-running-requests 128`,
+  `--max-total-tokens 655360` (360,448 in the void first run, below), `--max-mamba-cache-size
+  132` (128 in the two void attempts, below); each server's resolved sizes are read from its
+  log.
+- Validity (`validate_p4_ab.py`, before any ratio is computed): every arm ran the declared
+  workload with the greedy request body, all 256 requests completed with AIPerf exit 0, the
+  measured phase has at least 8 decode-log windows with exactly 128 requests running, the
+  pools resolved to the pinned
+  sizes (KV pool identical in all arms and at least 327,680 tokens), the exact-replay
+  dispatch line appears only in exact-replay logs, and the arms ran
+  in the declared order. A failed check voids the run; it is repeated and its numbers are
+  not reported.
+- Prompt check (corrected on 2026-10-01 at 10:05 UTC, after the run of 08:27-09:03 UTC and
+  before its verdict was computed or looked at): the run failed validation at "prompts not
+  as expected" in all eight arms. That check used bench's id-based `prompts_as_expected`,
+  which is wrong for this workload: `long2048.jsonl` holds 91 distinct texts among its 512
+  prompts (each repeated about 6 times; `make_long_prompts.py` cycles the source split and
+  its cursor returns to the same offsets), bench's `prompt_index` keeps one id per text
+  hash, and the warm-up pool reuses the same id names (`long2048-0000` to `-0255`), so the
+  ids bench records differ from the declared ones even when the right texts are sent. The corrected check compares content exactly: the multiset of SHA-256 hashes of the
+  prompt texts in the profiling phase of the raw AIPerf stream must equal that of the
+  declared file's first 256 prompts, counts included (`check_sent_prompts`). It passes in all
+  eight arms of `p4_ab_20261001T082738Z`. The repeats have no caching effect: the radix
+  cache is off in both arms. No other check changed.
+- First run void (run 20261001T082738Z, 08:27-09:03 UTC, repo e67feb1, engine c29a91692b).
+  The validator (run once at 10:08 UTC from e37eed1, identical to main 3982f1d) stopped at
+  "plain+no_radix+p4_pools_r1: at most 127 requests running"; no ratio was computed and no
+  verdict exists. In all eight arms the resolved pools were exactly as pinned
+  (max_running_requests 128, max_total_num_tokens 360,448, max_mamba_cache_size 128), the
+  batch peaked at 127 running with one request queued (44 decode windows each, mamba usage
+  0.99, KV usage about 0.73, no retractions), so the 128th request was never admitted. The
+  likely limit is SGLang's admission budget: with ignore_eos it reserves each request's full
+  512 output tokens and charges a shared-mamba cost per request in token units, which the
+  128 x 2,560 sizing ignored. Its kernel-level steps passed (kernel checks at tiles 32 and
+  16, tile-16 kernel bench, FlashInfer verify timing); its other results are not reported.
+- Rerun amendment (2026-10-01 at 10:11 and 10:16 UTC, before the rerun; the validator is unchanged):
+  the pinned KV pool is 655,360 tokens in both arms; a required admission preflight starts
+  each A/B arm's server with the pinned pools, sends 128 long prompts at the A/B's output
+  length (512, so the scheduler reserves the same tokens per request) and stops the job
+  unless its log shows `#running-req: 128` inside the measured point's AIPerf profiling phase
+  (`check_admission.py`; bench's server warm-up at a short output length does not count). The kernel checks at tiles
+  32 and 16, the tile-16 kernel bench and the FlashInfer verify timing are reused from run
+  20261001T082738Z (repo e67feb1, engine c29a91692b): they run one layer's kernels on
+  synthetic inputs and cannot depend on a server's pools; the rerun stops unless the engine
+  is still at c29a91692b and records the reuse in `p4b_<run id>.reused.json`. The server
+  output probe and the A/B are rerun.
+- Second attempt void (run 20261001T104311Z, 10:43-10:47 UTC, repo 40064ea, engine
+  c29a91692b): the admission preflight stopped the job before the probe and the A/B. Both
+  arms peaked at 127 running in the profiling phase with the KV pool at 655,360 tokens (usage
+  0.40), so KV was not the limit. Its log shows the 128th request queued with
+  `mamba num: 127, mamba usage: 0.99`: prompts are admitted five at a time under chunked
+  prefill (8,192 tokens per pass), and the last admission found no schedulable mamba slot
+  while one of the 128 was free; bench's radix-off servers with 128 slots reached 128 because
+  their short prompts were all admitted in one pass. No results of this attempt are reported.
+- Mamba-slot amendment (2026-10-01 at 10:55 UTC, before any further run): the A/B arms pin
+  `--max-mamba-cache-size 132` (128 + 4 slots of headroom), identical in both arms, with
+  `--max-running-requests 128` and `--max-total-tokens 655360` unchanged;
+  `validate_p4_ab.py`'s pinned-pool constant reads 132 accordingly (no other validator
+  change). The admission preflight is run on its own first; the full job is queued only after
+  it shows 128 running in both arms.
+- Primary metric (amended on 2026-10-01 at 08:19 and 08:22 UTC, before the run started; the first
+  version named bench's `logged_gen_tps_full_batch`, which averages windows with at least
+  0.9 x the peak running count, i.e. 116-128 of 128): the server's decode rate at exactly
+  128 running requests in the measured phase. The scheduler logs one `gen throughput` per 40
+  decode passes; a window counts when it shows `#running-req: 128`, the previous decode line
+  also shows 128, no `Prefill batch` line lies between the two (a window containing a prefill
+  pass mixes prefill time into its rate), and both lines fall inside the AIPerf profiling
+  phase (first request start to last request end), which excludes the AIPerf warm-up wave
+  and the ramp and drain; the excluded windows at 128 are counted and recorded. Windows carry
+  equal token counts (128 per pass, no speculation), so the rate is the harmonic mean of the
+  window rates; fewer than 8 such windows in any arm voids the run. Bench's
+  `logged_gen_tps_full_batch` is recorded beside it as a diagnostic. The metric measures
+  decode only, which is what the lever changes; the client throughput y includes the
+  2,048-token prefills, and client y and its ratio are reported beside it.
+- Statistic: per pair, the ratio B / A; the mean of the four log ratios with a t interval,
+  t(3) = 3.182, exponentiated to a 95% interval for the ratio.
+- Decision (pre-registered threshold 1.10x): rejected if the interval's upper end is below
+  1.10; supported if its lower end is at or above 1.10; otherwise inconclusive. A supported
+  result is worded "served decode throughput at 128 running requests 1.xx times", never as an end-to-end
+  speedup, with client y and its ratio beside it.
+- Server output probe: greedy tokens and top-20 logprobs at concurrency 1, exact replay
+  against dense. A difference refutes end-to-end exactness; a pass does not establish it
+  (the probe sees only the emitted tokens and the top-20 logprobs, not the state or the
+  hidden outputs). Bit-exactness is shown only at kernel level (above). Every exact-replay
+  server log must show the exact-replay kernel dispatch line. A second dense server
+  (`plain+no_radix#2`) against the same reference is the noise control: if it differs, the
+  probe is undecided.
+- How the two combine (`output_probe.py`, `validate_p4_ab.py`): the verdict always states
+  both, as "throughput <supported|rejected|inconclusive>; <probe outcome>". If the probe
+  refuted exactness, it reads "end-to-end exactness REFUTED by the output probe; P4 exact
+  claim not supported", whatever the throughput interval says; it never reads as plain
+  support.
+- Derived expectation before the run: about 1.08x at a 418-token context, less at 2,048.
+
+## 2d. Speculative host gap: configuration-level levers (measured, single runs)
+
+MTP three steps (bench `mtp` arm, `--stream-interval 4`), c = 1 and 4 (`host_levers.csv`;
+foreign CPU 0.2-0.4 cores per point):
+
+| config | c=1 x (tok/s/user) | c=4 y (tok/s) | accept length |
+|---|---|---|---|
+| mtp | 448.7 | 1,484.5 | 3.23 |
+| + `--speculative-draft-attention-backend triton` | 483.3 (1.08x) | 1,577.9 (1.06x) | 3.23 |
+| + `--attention-backend triton` (target and draft) | **529.1 (1.18x)** | **1,687.1 (1.14x)** | 3.22 |
+| + `SGLANG_ENABLE_OVERLAP_PLAN_STREAM=1` + `SGLANG_ENABLE_METADATA_GLUE_GRAPH=1` | failed | failed | - |
+
+With Triton attention for target and draft, both backends declare
+`needs_cpu_seq_lens = False`, so the overlap scheduler stops copying sequence lengths to the
+host and no FlashInfer `plan()` runs in the cycle: the host can run ahead of the GPU again.
+That recovers 18% at c = 1, against the up-to-27% idle share the profile workstream derived.
+Exactness differs between the two arms: Triton attention for the draft only changes which
+tokens are proposed, never the target's decisions, so it is exact; Triton attention for the
+target changes the target's attention arithmetic, so its class waits for bench's equality
+classification. Bench's first related pair does not isolate Triton: it ran Triton attention
+together with ReplaySSM-spec (buffered verify) and diverged 3.80 times per 1,000 tokens,
+against a floor of 3.42 per 1,000 that is plain decoding at client concurrency 1 against 32
+(ratio 1.11, interval 0.90-1.37; not final).
+The plan-stream arm fails at the first verify: the hybrid GDN backend does not implement
+`update_verify_buffers_to_fill_after_draft` (`base_attn_backend.py:258`,
+NotImplementedError), so the plan stream cannot be used with Qwen3.5 MTP at this commit.
+The engine-level fix (sync-free FlashInfer planning) belongs to the hostgap workstream.
+
+## 2e. Block-parallel GDN verification (proposal P7, first rejection tests)
+
+`gdn_fast_verify_check.py`, one layer, synthetic activations with the checkpoint's gates.
+
+- **BF16 disagreement of the unchecked fast path** (`p7_fast_verify_check.json`): SGLang's
+  chunked GDN kernel (`chunk_gated_delta_rule`, the (I + A) U = R form on tensor cores) run
+  over a block of D tokens disagrees with D packed-decode steps in **52-55% of BF16 output
+  words** for D = 2-16 (median absolute error 2-4e-6, p99.99 2.4-4.9e-4). A boundary
+  certificate could emit the fast value for only a minority of words.
+- **Speed at one request** (`p7_verify_width_bench.json`, per layer):
+
+| block width T | Triton recurrent verify, FP32 snapshot per position | same, no snapshots | chunked |
+|---|---|---|---|
+| 4 | 75 us | 74 us | 990 us |
+| 16 | 76 us | 92 us | 983 us |
+| 64 | 137 us | 212 us | 842 us |
+| 128 | 219 us | 369 us | 842 us |
+| 256 | 378 us | 672 us | 815 us |
+
+At one request SGLang's chunked kernel is slower than the recurrent verify at every width
+up to 256 (its cost is launch- and setup-bound and nearly flat), so even the unchecked fast
+path does not beat the recurrent path: SGLang's chunked GDN kernel is not a usable fast path
+for P7 (synthetic inputs, one layer, one request). A purpose-built block-parallel kernel is
+untested. (The recurrent kernel without snapshots is slower than with them because
+the wrapper picks a different launch configuration when no snapshot buffer is passed.) The
+FlashInfer MTP verify kernel that the DFlash baseline uses is not in this table yet.
+
+## 2f. Hot-vocabulary draft maps: held-out coverage (measured, `token_map_coverage.csv`)
+
+Bench's hot-vocabulary maps are built from greedy outputs on the tune split
+(`python -m bench.token_map build`, maps in `~/vp-data/bench/token_map/`). Evaluated
+unpadded on the target's 171,968 output tokens from the plain sweep of the confirm split
+(c = 1/32/128, OSL 512), the share of output tokens inside each map is:
+
+| map | rows | held-out coverage |
+|---|---|---|
+| hot4096_tune | 4,096 | 89.1% |
+| hot8192_tune | 8,192 | 93.3% |
+| hot16384_tune | 16,384 | 96.3% |
+| hot32k_tune | 22,936 (every token seen in the tune outputs) | 97.5% |
+
+Percentages are rounded from the exact shares (16,384 rows: 0.96345), not from the CSV's four
+decimals. Coverage bounds how often a truncated draft head can still propose the target's
+token. The
+`hot23k` lever uses the 22,936-row map. The CSV comes from
+`experiments/moonshot/token_map_coverage.py` (command in Section 4), which uses bench's
+token counting. `experiments/moonshot/build_token_map.py` is a separate generator
+(its own calibration hold-out, maps padded to fixed sizes, `token_map_report.json`) and
+did not produce this table.
+
 ## 3. Ranked portfolio
 
 Ranking by measured or derived gain at the relevant end, times the probability it holds,
@@ -133,10 +395,10 @@ to the measured noise floor); "lossy" changes them and needs the quality budget 
 | # | lever | end | class | ceiling (derived) or measured | quality cost | effort | status / owner |
 |---|---|---|---|---|---|---|---|
 | 1 | Public DFlash-4B drafter (z-lab) | latency | exact | drafter measured tau 6.18 at c=1, block 16 (`evidence/drafter/acceptance_summary.csv`); model card 3.4-4.6x on B200 | none | serving works | drafter owns baseline; I stack levers on it |
-| 2 | Remove the speculative host gap (MTP/DFlash, c=1-4) | latency | exact | idle share of the MTP cycle pending (profile workstream); 1/(1 - idle share) if removed | none | medium-high (sync removal) | levers queued (Triton attention, plan stream, glue graph) |
+| 2 | Remove the speculative host gap (MTP/DFlash, c=1-4) | latency | `--attention-backend triton`: class pending bench's equality classification (it changes the target's attention arithmetic; bench's first pair, 3.80/1K against the 3.42/1K plain c=1-vs-32 floor, combines Triton with ReplaySSM-spec, so it does not isolate Triton); `--speculative-draft-attention-backend triton`: exact (draft only) | measured: Triton for target and draft 1.18x at c=1, 1.14x at c=4; draft only 1.08x / 1.06x (2d) | none for draft-only | flag; engine fix by hostgap | DFlash + Triton attention queued |
 | 3 | FP16 GDN state + capacity lift (radix off, 256-1,024) | throughput | lossy, likely near-lossless | measured 1.24x at c=128; derived ceiling 1.46x | pending (DAMP: FP16 near-lossless, BF16 not) | flags only | quality and c>=256 sweeps queued |
-| 4 | Strict write-avoiding replay (P4, patch 0007) | throughput | designed to be bit-identical; validation pending | derived 1.19x at B=128 (2D -> 1.25D) | none if the check passes | built | one-layer kernel check (every output and state word) and the end-to-end bitwise probe queued, then the pre-registered paired A/B (>=1.10x at B=128, 2,048-token prompts) |
-| 5 | MTP + ReplaySSM-spec at high batch | throughput | exact up to reassociation | derived 34.3k vs plain 23.7k (FP32) | none | flags only | queued |
+| 4 | Strict write-avoiding replay (P4, patch 0007) | throughput | bit-identical to the packed decode at kernel level (synthetic activations, one layer; 2c); end-to-end probe queued | kernel 1.22x at B=128/256 (L=4); traffic-only ceiling 1.18x at B=128 (f = 0.416); derived ~1.08x per decode step, below the pre-registered 1.10x gate | none | built | server A/B pending (run_p4b.sh) |
+| 5 | MTP + ReplaySSM-spec at high batch | throughput | class pending measurement; mechanism suggests lossy (verify outputs from a chunked UT transform on TF32 tensor cores) | derived 34.3k vs plain 23.7k (FP32) | none | flags only | queued |
 | 6 | INT4 QAD target (nota-ai) with its INT4 DFlash drafter | latency | lossy | verify weight bytes 8.4 -> 3.3 GB (2.6x fewer, derived from the safetensors headers); arXiv 2607.04244 reports 6.98x over its baseline on an A10G | the same report: MMLU-Pro 0.690 -> 0.659, IFEval 0.857 -> 0.845, GPQA-D 0.700 -> 0.667; GSM8K here pending | checkpoints local | load test queued |
 | 7 | Hot-vocab draft head (patches 0001 MTP, 0005 DFlash) | latency | exact | MTP cycle floor -26% at c=1 | none | built | queued |
 | 8 | Relaxed greedy acceptance, g in {1, 2} (patches 0002, 0004) | latency | lossy | pending | pending | built | queued |
@@ -173,6 +435,9 @@ python experiments/moonshot/summarise.py sweeps ~/vp-data/moonshot/sweeps \
   --baseline plain --out evidence/moonshot/lever_sweeps_quick.csv
 python experiments/moonshot/ceilings.py --out evidence/moonshot/ceilings.json \
   --csv evidence/moonshot/ceilings.csv
+python experiments/moonshot/token_map_coverage.py \
+  ~/vp-data/moonshot/sweeps/plain/20260930-200640 \
+  --out evidence/moonshot/token_map_coverage.csv
 ```
 
 Lever definitions (flags and environment per lever, lossy labels, conflicts):
