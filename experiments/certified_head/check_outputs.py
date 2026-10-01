@@ -7,6 +7,7 @@ stock head trivially. This reads the outputs in OUT_DIR and exits 1, listing the
 problems, if any of them is not what a valid run produces::
 
     python experiments/certified_head/check_outputs.py OUT_DIR
+    python experiments/certified_head/check_outputs.py --engine ENGINE_ARMS_DIR
 """
 
 from __future__ import annotations
@@ -32,7 +33,49 @@ def errors_in(obj: Any, path: str = '') -> list[str]:
     return found
 
 
+MIN_CERTIFIED_SHARE = 0.5
+MIN_CERTIFIED_ROWS = 1000
+
+
+def engine_problems(root: Path) -> list[str]:
+    """SGLang check arms (``engine_validate.sh`` output): every path must certify at
+    least ``MIN_CERTIFIED_SHARE`` of its rows and ``MIN_CERTIFIED_ROWS`` rows, with
+    no row differing from the stock head and none refused or probe-tripped, so
+    "0 differing rows" cannot come from a path that certified almost nothing."""
+    found = []
+    arms = [d for d in sorted(root.iterdir()) if d.is_dir() and d.name.endswith('_check')]
+    if not arms:
+        found.append(f'{root}: no check arms')
+    for d in arms:
+        stats = d / 'certified_stats.json'
+        if not stats.exists():
+            found.append(f'{d.name}: no certified_stats.json')
+            continue
+        paths = json.loads(stats.read_text())['paths']
+        active = {p: v for p, v in paths.items() if v.get('calls')}
+        if not active:
+            found.append(f'{d.name}: no certified calls')
+        for p, v in active.items():
+            certified = v['rows'] - v['fallback_rows']
+            if v['mismatch_rows']:
+                found.append(f'{d.name}/{p}: {v["mismatch_rows"]} rows differ from stock')
+            if v.get('status_refused') or v.get('status_probe'):
+                found.append(
+                    f'{d.name}/{p}: refused {v.get("status_refused", 0)}, '
+                    f'probe-tripped {v.get("status_probe", 0)} rows'
+                )
+            if certified < MIN_CERTIFIED_ROWS or certified < MIN_CERTIFIED_SHARE * v['rows']:
+                found.append(f'{d.name}/{p}: only {certified} of {v["rows"]} rows certified')
+    return found
+
+
 def main() -> None:
+    if len(sys.argv) == 3 and sys.argv[1] == '--engine':
+        found = engine_problems(Path(sys.argv[2]))
+        for p in found:
+            print(' ', p)
+        print('engine output check', 'FAILED' if found else 'passed')
+        sys.exit(1 if found else 0)
     out = Path(sys.argv[1])
     problems: list[str] = []
 
