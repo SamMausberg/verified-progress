@@ -155,6 +155,7 @@ better at high concurrency.
 ```sh
 GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x bench/campaigns/tuning_depth.sh
 GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x bench/campaigns/tuning_knobs_dflash.sh
+GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x bench/campaigns/tuning_backend_dflash.sh
 python -m bench.pareto $(for d in ~/vp-data/bench/tuning/tune-*/2026*; do \
     [ -f $d/r0/c001/point.json ] && echo $d; done) --out evidence/bench/tuning --status tuning --no-plot
 ```
@@ -181,6 +182,35 @@ replayssm-spec runs without the radix cache (out of memory in prefill before the
 cap existed; rerun as the row above). Adaptive depth drops to zero draft steps at
 c=128 yet stays below plain there, so the speculative worker's per-step overhead
 remains. DFlash block 8 is the strongest speculator at c<=8; plain is best at c=128.
+
+Slot T3 (attention backend for DFlash, block sizes, FA4 draft attention, MTP depth 4
+under Triton); radix cache off, y in tok/s:
+
+| Config | c=1 | c=8 | c=32 | c=64 or 128 | Accept length |
+|---|---|---|---|---|---|
+| DFlash b8, Triton | 807 | 3,613 | 6,307 | 8,957 (128) | 4.75 |
+| DFlash b8, FA4 draft attention | 769 | (invalid) | 6,983 | 10,594 (128) | 4.76 |
+| DFlash b4 | 498 | 2,682 | 6,380 | 11,477 (128) | 3.26 |
+| DFlash b16, capacity 64 | (invalid) | 3,398 | 5,387 | 6,737 (64) | 5.66 |
+| DFlash b16, capacity 64, Triton | 851 | 3,639 | 5,199 | 6,397 (64) | 5.69 |
+| MTP s4 + replayssm-spec, Triton | 552 | 3,104 | 6,958 | 10,804 (128) | 3.73 |
+
+Invalid points (host contention, mean foreign load above 2 cores): FA4 at c=8 (3.5
+cores), b16 FlashInfer at c=1 (2.1), and plain at c=32 in T2 (2.8). FA4 draft attention
+runs on sm_90 and improved block 8 at each valid point. Triton attention helps every
+speculative family at low concurrency and hurts at high concurrency; plain decoding is
+indifferent.
+
+**Chosen configurations** (`bench/arms.toml`), all with the radix cache off:
+`plain-tuned` (and `plain-tuned-triton` as the matched baseline for Triton arms),
+`mtp-tuned` (NEXTN s3, top-1, `--enable-linear-replayssm-spec`, FlashInfer; high
+concurrency) and `mtp-tuned-triton` (the same under Triton; low concurrency),
+`dflash-tuned` (block 8, FA4 draft attention, FlashInfer; all concurrencies) and
+`dflash-tuned-b16` (block 16, Triton, capacity 64; low concurrency), plus
+`mtp-stockverify` and `plain-tuned-replayssm` as the exactness fallback and the
+buffered-decode variant. Depth 3 beat depth 4 and 5 at high concurrency and was within
+4% at low concurrency, so one depth serves both MTP arms. Block 4 never led. Arms with
+buffered GDN state are pending classification of their greedy outputs against plain.
 
 **GDN verify snapshot traffic (derived, not measured).** Speculative verify keeps one
 intermediate recurrent state per draft token per request so a rejected suffix can be
