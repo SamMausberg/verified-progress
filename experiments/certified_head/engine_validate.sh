@@ -24,12 +24,15 @@
 #   dflash_check         DFlash (block 16), greedy verify, check mode
 #   dflash_c1, dflash_c1_stock  DFlash certified and stock, one request at a time
 #   mtp_draft_check      MTP draft top-1 (draft steps and draft extend), check mode
+#   mtp_all_check        MTP with verify and draft top-1 both certified, check mode
 #   dflash_draft_check   DFlash greedy draft projection, check mode
 #   mtp_sampled_check    MTP with fixed-noise sampled verify, seeded T = 0.7
 #                        (--enable-deterministic-inference), check mode
 #
 # Environment: PORT (default 30040), LIMIT (prompts, default 64), MAX_NEW_TOKENS
-# (default 256), NEED_FREE_MIB (default 40000).
+# (default 256), NEED_FREE_MIB (default 40000), MAMBA_SLOTS (GDN state slots; at a
+# 0.25 memory fraction the default admits only 3 running requests, so set it to
+# about 5 x the running requests for plain decode and 9 x for speculation).
 set -euo pipefail
 
 out_root="${1:?usage: $0 OUT ARM...}"
@@ -50,6 +53,8 @@ model=(--model-path Qwen/Qwen3.5-4B --revision 851bf6e806efd8d0a36b00ddf55e13ccb
 common=(--attention-backend flashinfer --mm-attention-backend triton_attn
   --host 127.0.0.1 --port "$port" --mem-fraction-static 0.25 --random-seed 0)
 plain=(--max-running-requests 16)
+mamba=()
+[ -n "${MAMBA_SLOTS:-}" ] && mamba=(--max-mamba-cache-size "$MAMBA_SLOTS")
 # The geometry workstream's MTP and DFlash settings at a 0.25 memory fraction.
 mtp=(--max-mamba-cache-size 24 --max-running-requests 8 --speculative-algorithm NEXTN
   --speculative-num-steps 3 --speculative-eagle-topk 1 --speculative-num-draft-tokens 4)
@@ -105,6 +110,7 @@ run_arm() {
     plain_c1_stock | mtp_c1_stock | dflash_c1_stock) conc=1 ;;
     mtp_check | dflash_check) flags=(VERIFY=1 CHECK=1) ;;
     mtp_draft_check | dflash_draft_check) flags=(DRAFT=1 CHECK=1) ;;
+    mtp_all_check) flags=(VERIFY=1 DRAFT=1 CHECK=1) ;;
     mtp_sampled_check)
       flags=(SAMPLED_VERIFY=1 CHECK=1) temp=0.7
       args+=(--enable-deterministic-inference) ;;
@@ -122,14 +128,14 @@ run_arm() {
     echo "repo=$(git -C "$repo" rev-parse HEAD) dirty=$(git -C "$repo" status --porcelain | wc -l)"
     echo "sglang=$(git -C "$SGLANG_WORKTREE" rev-parse HEAD) dirty=$(git -C "$SGLANG_WORKTREE" status --porcelain | wc -l)"
     echo "flags=${flags[*]}"
-    echo "args=${model[*]} ${common[*]} ${args[*]}"
+    echo "args=${model[*]} ${common[*]} ${args[*]} ${mamba[*]}"
     echo "concurrency=$conc limit=$limit max_new_tokens=$max_new temperature=$temp"
   } >"$dir/run_info.txt"
   rc=2
   for _ in $(seq 1 360); do
     rc=0
     "$startup_lock" bash -c 'launch_and_wait "$@"' _ \
-      "$dir/server.pid" "$dir/server.log" "$need" "${model[@]}" "${common[@]}" "${args[@]}" \
+      "$dir/server.pid" "$dir/server.log" "$need" "${model[@]}" "${common[@]}" "${args[@]}" "${mamba[@]}" \
       || rc=$?
     [ "$rc" -ne 2 ] && break
     sleep 10
