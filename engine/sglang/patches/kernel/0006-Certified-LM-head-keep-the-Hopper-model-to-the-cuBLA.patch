@@ -1,20 +1,20 @@
-From a630d715c45c1df7673a872f27f155e5568396e9 Mon Sep 17 00:00:00 2001
+From 7500af8c85a767671892d4fa190380145604c77f Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <samuelmausberg@gmail.com>
 Date: Thu, 1 Oct 2026 00:35:52 +0000
 Subject: [PATCH] Certified LM head: keep the Hopper model to the cuBLAS head
 
 --enable-deterministic-inference replaces aten::mm with SGLang's
-batch-invariant Triton matmul (FP32 accumulation over BLOCK_K tiles, no
-split-K), so the head's stock GEMM is no longer cuBLAS. The conservative
-error model covers any FP32 accumulation; the hopper-wgmma model was derived
-and checked for the cuBLAS kernels only, so that combination now keeps the
-stock head with a warning.
+batch-invariant matmul (matmul_persistent: DeepGEMM's BF16 GEMM when it is
+available, else a Triton kernel), so the head's stock GEMM is no longer
+cuBLAS. The conservative error model covers any FP32 accumulation; the
+hopper-wgmma model was derived and checked for the cuBLAS kernels only, so
+that combination now keeps the stock head with a warning.
 ---
- python/sglang/srt/layers/certified_head.py | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ python/sglang/srt/layers/certified_head.py | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
 diff --git a/python/sglang/srt/layers/certified_head.py b/python/sglang/srt/layers/certified_head.py
-index b93ab2d361..e96cb820cc 100644
+index b93ab2d361..1beb765454 100644
 --- a/python/sglang/srt/layers/certified_head.py
 +++ b/python/sglang/srt/layers/certified_head.py
 @@ -29,6 +29,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Set, Tuple
@@ -25,7 +25,7 @@ index b93ab2d361..e96cb820cc 100644
  
  if TYPE_CHECKING:
      from sglang.srt.layers.logits_processor import LogitsProcessorOutput
-@@ -115,6 +116,14 @@ def _unsupported(model_runner) -> Optional[str]:
+@@ -115,6 +116,15 @@ def _unsupported(model_runner) -> Optional[str]:
          return "SGLANG_SANITIZE_NAN_LOGITS changes the stock argmax on nonfinite logits"
      if envs.SGLANG_ENABLE_ASYNC_ASSERT.get():
          return "SGLANG_ENABLE_ASYNC_ASSERT reads the logits a certified step skips"
@@ -33,9 +33,10 @@ index b93ab2d361..e96cb820cc 100644
 +        envs.SGLANG_CERTIFIED_HEAD_MODEL.get() == "hopper-wgmma"
 +        and get_exec().deterministic.enable_deterministic_inference
 +    ):
-+        # Deterministic inference replaces aten::mm with a batch-invariant Triton
-+        # matmul; the Hopper model describes the cuBLAS head and is not checked
-+        # for that kernel. The conservative model covers any FP32 accumulation.
++        # Deterministic inference replaces aten::mm with SGLang's batch-invariant
++        # matmul (DeepGEMM's BF16 GEMM when available, else a Triton kernel); the
++        # Hopper model describes the cuBLAS head and is not checked for those.
++        # The conservative model covers any FP32 accumulation.
 +        return "the hopper-wgmma model is validated only for the cuBLAS head"
      return None
  

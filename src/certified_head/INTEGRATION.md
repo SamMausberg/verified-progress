@@ -79,7 +79,8 @@ Patch 0004 needs `--enable-deterministic-inference`, which is what gives every
 request a seed; its reference is stock SGLang in that mode (a different engine
 configuration from the default), namely SGLang's seeded sampler applied to the
 verify pass's own logits. That mode also replaces `aten::mm` with SGLang's
-batch-invariant Triton matmul, so the stock head (and the certified head's
+batch-invariant `matmul_persistent` (DeepGEMM's BF16 GEMM at the pin's defaults on
+Hopper, a Triton kernel as fallback), so the stock head (and the certified head's
 fallback, which calls the same `torch.matmul`) is that kernel, not cuBLAS: use the
 conservative error model there. Patch 0006 refuses `hopper-wgmma` under
 deterministic inference, since that model was derived and checked for the cuBLAS

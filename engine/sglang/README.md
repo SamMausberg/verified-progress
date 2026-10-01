@@ -142,7 +142,7 @@ deterministic inference) run the stock head.
 | 0003 | `SGLANG_CERTIFIED_HEAD_DRAFT=1`: MTP draft top-1 (draft steps inside the draft graph and the draft-extend token) and DFlash's greedy draft projection. | unchanged unless set |
 | 0004 | `SGLANG_CERTIFIED_HEAD_SAMPLED_VERIFY=1`: fixed-noise sampled verify for EAGLE/MTP with seeded temperature-only sampling (`--enable-deterministic-inference`); accepts a draft iff it equals SGLang's seeded sample of the verify row. It replaces the stock rejection-sampling verify. | unchanged unless set |
 | 0005 | Records the row counts of certified steps in the stats file. | unchanged unless `_STATS` is set |
-| 0006 | With `--enable-deterministic-inference` the head's stock GEMM is SGLang's batch-invariant Triton matmul, not cuBLAS; `SGLANG_CERTIFIED_HEAD_MODEL=hopper-wgmma` (derived for cuBLAS) then keeps the stock head with a warning. | unchanged unless set |
+| 0006 | With `--enable-deterministic-inference` the head's stock GEMM is SGLang's batch-invariant `matmul_persistent` (DeepGEMM's BF16 GEMM at the pin's defaults, a Triton kernel as fallback), not cuBLAS; `SGLANG_CERTIFIED_HEAD_MODEL=hopper-wgmma` (derived for cuBLAS) then keeps the stock head with a warning. | unchanged unless set |
 
 Validation: `experiments/certified_head/engine_validate.sh` (check mode per path and
 one request at a time against the stock server; results in

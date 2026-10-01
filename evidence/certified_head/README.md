@@ -161,10 +161,12 @@ For fixed-noise sampled verify the comparison is with SGLang's seeded sampler
 (`div_(T)`, FP32 softmax and log, `multinomial_with_seed`) applied to the same
 verify logits, outside the graph, under `--enable-deterministic-inference`; this is
 that path's contract, not plain seeded decoding. In that mode SGLang replaces
-`aten::mm` with its batch-invariant Triton matmul (FP32 accumulation over 64- or
-32-wide K tiles, no split-K, BF16 round-to-nearest output), so the sampled arm's
-stock head, and the certified head's fallback, which calls the same `torch.matmul`,
-run that kernel instead of cuBLAS. The sampled arm used the conservative error
+`aten::mm` with its batch-invariant `matmul_persistent`, which at the pin's
+defaults on this GH200 is DeepGEMM's BF16 GEMM (one FP32 `wgmma` accumulator over
+K, BF16 round-to-nearest store), with a Triton kernel (FP32 accumulation over K
+tiles) only as its fallback; so the sampled arm's stock head, and the certified
+head's fallback, which calls the same `torch.matmul`, run that kernel instead of
+cuBLAS (a profiler check of the kernel name is in the second session). The sampled arm used the conservative error
 model, which covers any FP32 accumulation; the Hopper model is validated for the
 cuBLAS head only, and patch 0006 refuses it under deterministic inference.
 
