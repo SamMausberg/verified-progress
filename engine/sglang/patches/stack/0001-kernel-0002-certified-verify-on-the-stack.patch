@@ -1,0 +1,268 @@
+From 7ecfb8e33179d219d207deb763c0147f5d7e895d Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Wed, 30 Sep 2026 22:23:27 +0000
+Subject: [PATCH] Certified LM head: greedy target verify for EAGLE/MTP and
+ DFlash
+
+Behind SGLANG_CERTIFIED_HEAD_VERIFY (off by default), the target head in the
+TARGET_VERIFY CUDA graphs is the certified head under a device flag, with
+the stock head under its negation, as for plain decode. The certified ids
+(one per verify row) are attached to the replay's LogitsProcessorOutput as
+certified_ids and replace torch.argmax(next_token_logits) in eagle_sample's
+greedy branch and in DFlash's greedy _accept_block. The plain-decode path
+now hands its ids over the same way.
+
+A verify batch is certified only if it is all greedy and needs no logits:
+besides the plain-decode conditions, no DFlash linear penalties or grammar
+mask, no simulated acceptance and no ragged verify layout. The selector and
+LiLiCorr sampling paths need a batch that is not all greedy, so they never
+see stale logits. SGLANG_ENABLE_ASYNC_ASSERT, which reads the logits, keeps
+the stock head.
+---
+ python/sglang/srt/environ.py                  |  2 +
+ python/sglang/srt/layers/certified_head.py    | 42 +++++++++++++++----
+ python/sglang/srt/layers/logits_processor.py  |  5 +++
+ .../sglang/srt/model_executor/model_runner.py |  4 +-
+ .../srt/speculative/dflash_worker_v2.py       | 17 ++++++--
+ python/sglang/srt/speculative/eagle_utils.py  |  6 ++-
+ 6 files changed, 61 insertions(+), 15 deletions(-)
+
+diff --git a/python/sglang/srt/environ.py b/python/sglang/srt/environ.py
+index d8467c5ee4..cc24d0a2ff 100644
+--- a/python/sglang/srt/environ.py
++++ b/python/sglang/srt/environ.py
+@@ -1820,6 +1820,8 @@ class Envs:
+     # ===================================================================
+     # Greedy plain decode through the certified head; off by default.
+     SGLANG_CERTIFIED_HEAD_DECODE = EnvBool(False)
++    # Greedy target verify (EAGLE/MTP and DFlash) through the certified head.
++    SGLANG_CERTIFIED_HEAD_VERIFY = EnvBool(False)
+     # Undecided rows: "batch" reruns the stock head on the whole batch;
+     # "columns" (only for shapes whose start-up self-test passes) gathers them.
+     SGLANG_CERTIFIED_HEAD_FALLBACK = EnvStr("batch")
+diff --git a/python/sglang/srt/layers/certified_head.py b/python/sglang/srt/layers/certified_head.py
+index 83c25e711f..90e7bc49ae 100644
+--- a/python/sglang/srt/layers/certified_head.py
++++ b/python/sglang/srt/layers/certified_head.py
+@@ -31,12 +31,14 @@ import torch
+ from sglang.srt.environ import envs
+ 
+ if TYPE_CHECKING:
++    from sglang.srt.layers.logits_processor import LogitsProcessorOutput
+     from sglang.srt.model_executor.forward_batch_info import ForwardBatch, ForwardMode
+ 
+ logger = logging.getLogger(__name__)
+ 
+ PATH_FLAGS = {
+     "decode": envs.SGLANG_CERTIFIED_HEAD_DECODE,
++    "verify": envs.SGLANG_CERTIFIED_HEAD_VERIFY,
+ }
+ 
+ 
+@@ -97,6 +99,8 @@ def _unsupported(model_runner) -> Optional[str]:
+         return "logit softcapping or gathered logits"
+     if envs.SGLANG_SANITIZE_NAN_LOGITS.get():
+         return "SGLANG_SANITIZE_NAN_LOGITS changes the stock argmax on nonfinite logits"
++    if envs.SGLANG_ENABLE_ASYNC_ASSERT.get():
++        return "SGLANG_ENABLE_ASYNC_ASSERT reads the logits a certified step skips"
+     return None
+ 
+ 
+@@ -117,6 +121,7 @@ def install(model_runner) -> None:
+     model = model_runner.model
+     flags = engine.Flags(
+         decode=envs.SGLANG_CERTIFIED_HEAD_DECODE.get(),
++        verify=envs.SGLANG_CERTIFIED_HEAD_VERIFY.get(),
+         fallback=envs.SGLANG_CERTIFIED_HEAD_FALLBACK.get(),
+         model=envs.SGLANG_CERTIFIED_HEAD_MODEL.get(),
+         check=envs.SGLANG_CERTIFIED_HEAD_CHECK.get(),
+@@ -141,6 +146,8 @@ def install(model_runner) -> None:
+ def _path_for(role: Optional[str], forward_mode: ForwardMode) -> Optional[str]:
+     if role == "target" and forward_mode.is_decode():
+         return "decode"
++    if role == "target" and forward_mode.is_target_verify():
++        return "verify"
+     return None
+ 
+ 
+@@ -199,6 +206,8 @@ def _needs_logits(forward_batch: ForwardBatch, observer: Any) -> bool:
+     orchestrator = si.penalizer_orchestrator
+     return bool(
+         si.grammars is not None
++        or getattr(si, "grammar_mask", None) is not None
++        or getattr(si, "acc_linear_penalties", None) is not None
+         or (orchestrator is not None and orchestrator.is_required)
+         or si.acc_additive_penalties is not None
+         or si.acc_scaling_penalties is not None
+@@ -224,10 +233,14 @@ def before_replay(
+     if not can_run_graph:
+         st.steps["eager"] += 1
+         return
+-    rows = forward_batch.batch_size
++    # Decode rows are requests; verify rows are requests x draft tokens. CUDA-graph
++    # padding follows the real rows.
++    rows = int(forward_batch.input_ids.shape[0])
+     limit = envs.SGLANG_CERTIFIED_HEAD_MAX_ROWS.get()
+-    certify = rows <= st.max_rows(limit) and not _needs_logits(
+-        forward_batch, model_runner.sampling_observer
++    certify = (
++        rows <= st.max_rows(limit)
++        and not _needs_logits(forward_batch, model_runner.sampling_observer)
++        and not (path == "verify" and _verify_needs_logits(model_runner))
+     )
+     st.gate.fill_(certify)
+     st.valid.fill_(rows)
+@@ -236,20 +249,31 @@ def before_replay(
+         forward_batch.certified_rows = rows
+ 
+ 
+-def after_replay(model_runner, forward_batch: ForwardBatch) -> None:
++def _verify_needs_logits(model_runner) -> bool:
++    """Verify configurations that read the target logits besides the greedy argmax."""
++    from sglang.srt.speculative.spec_utils import SIMULATE_ACC_LEN
++
++    runner = model_runner.decode_cuda_graph_runner
++    return SIMULATE_ACC_LEN > 0 or bool(getattr(runner, "ragged_verify_mode", False))
++
++
++def after_replay(
++    model_runner, forward_batch: ForwardBatch, logits_output: LogitsProcessorOutput
++) -> None:
+     """Copy the certified ids out of the head's buffer before the next replay."""
+     rows = getattr(forward_batch, "certified_rows", None)
+     if rows is None:
+         return
+     path = _path_for("target", forward_batch.forward_mode)
+-    forward_batch.certified_ids = _heads.get(path).head._ids[:rows].clone()
++    logits_output.certified_ids = _heads.get(path).head._ids[:rows].clone()
+     _maybe_dump()
+ 
+ 
+-def take_ids(forward_batch: ForwardBatch) -> Optional[torch.Tensor]:
+-    """The certified greedy ids for this batch, or None to run the sampler."""
+-    ids = getattr(forward_batch, "certified_ids", None)
+-    forward_batch.certified_ids = None
++def take_ids(logits_output: LogitsProcessorOutput) -> Optional[torch.Tensor]:
++    """The certified greedy ids for this forward (int64, one per row), or None
++    to run the stock argmax. ``next_token_logits`` is stale when this is set."""
++    ids = logits_output.certified_ids
++    logits_output.certified_ids = None
+     return ids
+ 
+ 
+diff --git a/python/sglang/srt/layers/logits_processor.py b/python/sglang/srt/layers/logits_processor.py
+index cdda6574e3..d5a58702af 100644
+--- a/python/sglang/srt/layers/logits_processor.py
++++ b/python/sglang/srt/layers/logits_processor.py
+@@ -274,6 +274,11 @@ class LogitsProcessorOutput:
+     # Scheduler-local output copied alongside the ordinary generation result.
+     auxiliary_device_output: Optional[DeviceAuxiliaryOutput] = None
+ 
++    # Greedy ids from the certified LM head (layers/certified_head.py), set after
++    # a CUDA-graph replay that skipped the stock head; next_token_logits is then
++    # stale and the stock argmax must use these instead.
++    certified_ids: Optional[torch.Tensor] = None
++
+     def finalize_input_logprobs(self) -> None:
+         if self.input_logprobs_copy_done is None:
+             return
+diff --git a/python/sglang/srt/model_executor/model_runner.py b/python/sglang/srt/model_executor/model_runner.py
+index 2172ff85dd..9d8876b2bb 100644
+--- a/python/sglang/srt/model_executor/model_runner.py
++++ b/python/sglang/srt/model_executor/model_runner.py
+@@ -1901,7 +1901,7 @@ class ModelRunner:
+                     forward_batch,
+                     pp_proxy_tensors=pp_proxy_tensors,
+                 )
+-                certified_head.after_replay(self, forward_batch)
++                certified_head.after_replay(self, forward_batch, ret)
+                 return ModelRunnerOutput(logits_output=ret, can_run_graph=can_run_graph)
+ 
+             # DP / MLP-sync padding + attn-tp normalization. Only the decode
+@@ -2012,7 +2012,7 @@ class ModelRunner:
+         # runners may reuse backing objects. Never leak an auxiliary result from
+         # a previous replay into a request with no observer state.
+         logits_output.auxiliary_device_output = None
+-        certified_ids = certified_head.take_ids(forward_batch)
++        certified_ids = certified_head.take_ids(logits_output)
+         if certified_ids is not None:
+             # Greedy ids from the certified head (the stock head's tokens for this
+             # batch); the batch needs no logits, so the sampler is skipped.
+diff --git a/python/sglang/srt/speculative/dflash_worker_v2.py b/python/sglang/srt/speculative/dflash_worker_v2.py
+index 32ff815001..c60ac7162f 100644
+--- a/python/sglang/srt/speculative/dflash_worker_v2.py
++++ b/python/sglang/srt/speculative/dflash_worker_v2.py
+@@ -19,6 +19,7 @@ from sglang.kernels.ops.speculative.dspark.dspark_accept import (
+ )
+ from sglang.srt.configs.hybrid_arch import mambaish_config
+ from sglang.srt.environ import envs
++from sglang.srt.layers import certified_head
+ from sglang.srt.layers.logits_processor import should_apply_lm_head_quant_method
+ from sglang.srt.layers.logprob_processor import compute_spec_logprobs
+ from sglang.srt.lora.layers import unwrap_lora_layer
+@@ -2163,6 +2164,7 @@ class DFlashWorkerV2(BaseSpecWorker):
+         draft_input,
+         prefix_lens: torch.Tensor,
+         bs: int,
++        certified_ids: Optional[torch.Tensor] = None,
+     ):
+         new_seq_lens = None
+         target_predict = None
+@@ -2193,11 +2195,19 @@ class DFlashWorkerV2(BaseSpecWorker):
+             self._tp_sync.sync(SpecTpSyncSite.DFLASH_ACCEPT_SAMPLE, bonus)
+             out_tokens, commit_lens = _commit_accept(candidates, accept_len, bonus)
+         else:
+-            target_predict = torch.argmax(next_token_logits, dim=-1).view(
+-                bs, int(self.block_size)
+-            )
++            # Certified LM head: the stock argmax's tokens, computed without logits.
++            target_predict = (
++                certified_ids
++                if certified_ids is not None
++                else torch.argmax(next_token_logits, dim=-1)
++            ).view(bs, int(self.block_size))
+             relaxed_gap = envs.SGLANG_SPEC_RELAXED_GREEDY_LOGIT_GAP.get()
+             if relaxed_gap > 0:
++                if certified_ids is not None:
++                    raise RuntimeError(
++                        "SGLANG_SPEC_RELAXED_GREEDY_LOGIT_GAP needs the verify logits; "
++                        "it cannot run with the certified LM head"
++                    )
+                 target_predict = relax_greedy_chain_predict(
+                     next_token_logits, candidates, target_predict, relaxed_gap
+                 )
+@@ -2845,6 +2855,7 @@ class DFlashWorkerV2(BaseSpecWorker):
+             draft_input=draft_input,
+             prefix_lens=prefix_lens,
+             bs=bs,
++            certified_ids=certified_head.take_ids(logits_output),
+         )
+         if dflash_trace.TRACER is not None and target_predict is not None:
+             dflash_trace.TRACER.record(
+diff --git a/python/sglang/srt/speculative/eagle_utils.py b/python/sglang/srt/speculative/eagle_utils.py
+index ca9455ad2c..ca6f84b141 100644
+--- a/python/sglang/srt/speculative/eagle_utils.py
++++ b/python/sglang/srt/speculative/eagle_utils.py
+@@ -15,6 +15,7 @@ from sglang.srt.environ import envs
+ from sglang.srt.hardware_backend.npu.dsv4.dsv4_common_hooks import (
+     maybe_build_dsv4_verify_bundle,
+ )
++from sglang.srt.layers import certified_head
+ from sglang.srt.mem_cache.allocation import alloc_for_spec_decode
+ from sglang.srt.mem_cache.allocation_sizing import (
+     get_alloc_reserve_per_decode,
+@@ -841,7 +842,10 @@ def eagle_sample(
+         is_xpu=_is_xpu,
+         use_rejection_sampling=use_rejection_sampling,
+     ):
+-        target_predict = torch.argmax(next_token_logits, dim=-1)
++        # Certified LM head: the stock argmax's tokens, computed without logits.
++        target_predict = certified_head.take_ids(logits_output)
++        if target_predict is None:
++            target_predict = torch.argmax(next_token_logits, dim=-1)
+         target_predict = target_predict.reshape(bs, verify_input.draft_token_num)
+         relaxed_gap = envs.SGLANG_SPEC_RELAXED_GREEDY_LOGIT_GAP.get()
+         if relaxed_gap > 0 and verify_input.tree_topk == 1:
+-- 
+2.34.1
+
