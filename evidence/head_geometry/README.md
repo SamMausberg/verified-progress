@@ -95,7 +95,7 @@ the target's at 98.9%; every disagreement lies within one BF16 spacing, R-bf16 (
 logits rounded to BF16, first maximal index) reproduces the engine at 99.996% (draft) and
 99.998% (target), and the engine's
 accept lengths match the derived labels on all 24,020 blocks. Draft agreement falls from
-99.4% at block position 1 to 97.0% at position 15, as later draft distributions get
+99.3% at block position 1 to 97.0% at position 15, as later draft distributions get
 flatter (more near-ties). Only 39% of prompts produce output identical to plain decoding
 (median first divergence at token 181): greedy speculation and plain decoding compute the
 target at different batch shapes, and near-ties then diverge; this is not a pairing error,
@@ -112,8 +112,9 @@ match the derived labels on all 30,328 blocks. Draft agreement falls from 99.31%
 98.90% at step 4, and the acceptance rate given that a step is reached is 84.5%, 80.0%, 79.5% and
 80.6% at steps 1-4. The engine's own top two target logits were equal in BF16 at 1.3% of rows.
 42% of prompts produce output identical to plain decoding (median first divergence at token
-194); as for DFlash-4B, the per-row checks above use the engine's own decisions, so this is
-the batch-shape divergence, not a pairing error.
+194). The per-row checks above use the engine's own decisions, so this is not a pairing error;
+the state workstream traces the first difference between MTP and plain decoding to layer 0's GDN
+recurrence, which runs different kernels in verify and in decode (`evidence/state_safety/README.md`).
 
 ## H2: transport on real pairs
 
@@ -169,8 +170,8 @@ MTP-4B, 40,000 pairs from the 160 held-out prompts (`rho_mtp4b.json`):
 | step 4 | 0.607 | 0.845 | 1.002 | 1.214 | 1.449 |
 
 Medians by domain are 0.917-1.025. The smallest ratios are lower than DFlash-4B's and the median
-is higher; unlike DFlash-4B's, the MTP head input is not held at norm 50.6 (median norms 176 and
-160 for draft and target, from the transport pairs below). Transport's envelope is
+is higher; unlike DFlash-4B's, the MTP head input is not held at norm 50.6 (median norms 176.1 and
+160.2 for draft and target, `stats_mtp4b.json`). Transport's envelope is
 narrower than int8 per-row on 0.08% of rows in every pair, the same unused-token tiles as for
 DFlash-4B. After removing each position's mean logit the head-metric ratio has median 0.88;
 restricted to W's leading 64 right singular directions it is 0.86, and those directions carry
@@ -313,7 +314,7 @@ DFlash's, the MTP draft head needs more candidates than the verifier; its input 
 target's scale (DFlash's has a third of it), and the envelope scales with ||h||. Under the
 R-stock gap rule the stock kernel is needed
 for 4.04% of verify rows with the conservative model (gamma 6.11e-4) and 2.84% with the Hopper
-model (gamma 1.19e-4), and for 6.44% and 4.20% of draft rows; DFlash-4B's verify rows need it at
+model (gamma 1.19e-4, the rounded radius these replays used), and for 6.44% and 4.20% of draft rows; DFlash-4B's verify rows need it at
 8.6% and 5.7%, plain decode at 1.40% and 0.35%. No envelope was violated and no winner was missed.
 
 ### R-stock: how often the stock decision needs the stock kernel
