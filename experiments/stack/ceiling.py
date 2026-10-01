@@ -9,10 +9,12 @@ Everything here is arithmetic on committed measurements and the model configs; n
   tokens per verify cycle (accept length, tau) and the cycle time tau / x_decode.
 * Bandwidth floor of one block-16 cycle at c requests: every weight byte of the target
   and the drafter (its six layers, the fc over eight target layers and the tied head)
-  read once, plus per request the FP32 GDN state read once and written either once per
-  drafted position (stock verify: 16 snapshots and a commit copy) or once (an exact
-  snapshot-free verify), plus the KV of the context, all at the measured HBM read
-  bandwidth. A floor, not a prediction: no kernel reaches peak bandwidth, launches and
+  read once, plus per request the FP32 GDN state traffic of one cycle, plus the KV of the
+  context, all at the measured HBM read bandwidth. State traffic in units of one state
+  (50.3 MB): stock verify reads the state, writes 16 per-position snapshots and copies
+  the accepted one back (read and write), 19; an exact snapshot-free verify reads the
+  state and the fold-every-commit replays the accepted prefix into the checkpoint (read
+  and write), 3. A floor, not a prediction: no kernel reaches peak bandwidth, launches and
   host work cost nothing, and compute never binds (at c = 8 the verify's 128 tokens are
   about 1.1 TFLOP, below the memory time).
 * Required tau for 5x at a cycle time T: 5 x_decode(c) T.
@@ -64,8 +66,9 @@ def draft_params() -> int:
 
 def floor_ms(c: int, context: float, snapshots: bool) -> float:
     weights = 2 * (TARGET_PARAMS + draft_params())
-    # stock: read the state, write 16 per-position snapshots, copy the accepted one back
-    state = GDN_STATE * ((1 + BLOCK + 2) if snapshots else 2)
+    # stock: read the state, write 16 per-position snapshots, copy the accepted one back;
+    # snapshot-free: read the state, then the fold reads and writes the checkpoint
+    state = GDN_STATE * ((1 + BLOCK + 2) if snapshots else (1 + 2))
     kv = context * KV_PER_TOKEN
     return (weights + c * (state + kv)) / BW * 1e3
 

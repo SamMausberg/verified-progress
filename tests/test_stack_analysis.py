@@ -181,7 +181,13 @@ def test_bandwidth_floor_counts_weights_and_state():
     )
     one = ceiling.floor_ms(1, 0.0, snapshots=False)
     eight = ceiling.floor_ms(8, 0.0, snapshots=False)
-    assert math.isclose((eight - one) / 7, 2 * ceiling.GDN_STATE / ceiling.BW * 1e3, rel_tol=1e-9)
+    # snapshot-free: read the state, the fold reads and writes it: 3 states per request-cycle
+    assert math.isclose((eight - one) / 7, 3 * ceiling.GDN_STATE / ceiling.BW * 1e3, rel_tol=1e-9)
+    stock_one = ceiling.floor_ms(1, 0.0, snapshots=True)
+    stock_eight = ceiling.floor_ms(8, 0.0, snapshots=True)
+    assert math.isclose(
+        (stock_eight - stock_one) / 7, 19 * ceiling.GDN_STATE / ceiling.BW * 1e3, rel_tol=1e-9
+    )
     assert ceiling.floor_ms(1, 0.0, snapshots=True) > one
 
 
@@ -995,6 +1001,12 @@ def test_tree_state_sees_tracked_edits_and_untracked_engine_files(tmp_path):
     assert gate.tree_state(repo, None)['dirty'] == []
     (repo / 'python' / 'mod.py').write_text('a = 2\n')
     assert ' M python/mod.py' in gate.tree_state(repo, None)['dirty']
+    (repo / 'sitecustomize.py').write_text('')
+    assert '?? sitecustomize.py' in gate.tree_state(repo, '.')['dirty']
+    assert '?? sitecustomize.py' not in gate.tree_state(repo, 'python')['dirty']
+    (repo / '.gitignore').write_text('ignored.txt\n')
+    (repo / 'ignored.txt').write_text('')
+    assert '?? ignored.txt' not in gate.tree_state(repo, '.')['dirty']
 
 
 @pytest.mark.parametrize('n', [0, 1, 2])

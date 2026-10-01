@@ -204,8 +204,8 @@ def _git(path: Path, *args: str) -> str:
 
 
 def tree_state(path: Path, untracked_under: str | None) -> dict[str, Any]:
-    """HEAD, tree and every uncommitted change of a checkout (tracked files, plus
-    untracked files under `untracked_under`, which the engine would import)."""
+    """HEAD, tree and every uncommitted change of a checkout: tracked files, plus untracked
+    (not gitignored) files under `untracked_under` ('.' for the whole checkout)."""
     dirty = _git(path, 'status', '--porcelain', '--untracked-files=no').splitlines()
     if untracked_under:
         listing = _git(
@@ -239,7 +239,9 @@ def engine_env() -> dict[str, str]:
 def identity(repo: Path, s0: Path, stack_engine: Path) -> dict[str, Any]:
     """What a timed run's numbers depend on outside the gate's own files."""
     return {
-        'repo': tree_state(repo, None),
+        # Any untracked file in the repository (a stray sitecustomize.py, a local module)
+        # can be imported by every hold process.
+        'repo': tree_state(repo, '.'),
         's0': tree_state(s0, 'python'),
         'stack_engine': tree_state(stack_engine, 'python'),
         'packages': package_versions(),
