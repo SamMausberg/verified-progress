@@ -8,7 +8,7 @@ at `851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a`, drafter z-lab/Qwen3.5-4B-DFlash a
 branch `engine/repair` (`engine/sglang/patches/repair/`): patch 0001 (engine commit
 `101e52731b`) for the Stage A session and earlier runs, patches 0001 and 0002 (`5d8e00e3e1`)
 for the verify decomposition; each run's `run.json` records its engine commit. One GH200,
-greedy decoding, concurrency 1. Code is in
+greedy decoding, concurrency 1 except the P9 runs at 8 and 16. Code is in
 `experiments/repair/`; raw traces stay in `~/vp-data/repair/`.
 
 ## Results and verdicts
@@ -95,12 +95,11 @@ foreign CPU load below 0.5 cores; p10-p90 of every cycle period within 1.3% of i
 The session's two Nsight Systems runs (`force_nsys_b64`, `force_nsys_b256`) failed at launch
 and are excluded.
 
-**Cross-session caveat.** The FlashInfer-with-states column comes from the Stage A session
-(00:04-00:41 UTC), the other two from this session. The draft phase, which neither change
+**Cross-session caveat, now checked.** The FlashInfer-with-states column comes from the Stage A
+session (00:04-00:41 UTC), the other two from this session. The draft phase, which neither change
 touches, is 1.8-2.6% shorter in this session (2.335 and 2.339 against 2.397 ms at B = 16, 3.148
 and 3.131 against 3.207 ms at B = 256), so differences of a few percent between the sessions are
-within drift; a
-same-session control (all three variants at B = 16 and 256) is queued.
+within drift. The same-session control below confirms every value in the table to within 1.5%.
 
 Which verify kernel the baseline used: at the pin SGLang's GDN verify kernel follows the decode
 backend unless `--linear-attn-verify-backend` overrides it (FlashInfer if the decode backend is
@@ -124,14 +123,14 @@ once per T). Two runs separate its parts:
 
 (ms, forced full acceptance; dropping the states uses engine patch 0002 and is timing only.)
 With the FlashInfer kernel the per-position FP32 state writes cost 0.26, 1.26 and 4.10 ms
-(5.3%, 8.1% and 9.1% of V(B); at B = 16 the difference is within the cross-session drift),
-close to their bytes at 3 TB/s (0.27, 1.07, 4.29 ms). The larger cost is the FlashInfer verify
+(5.3%, 8.1% and 9.1% of V(B); at B = 16 the difference is within the cross-session drift;
+within one session, 0.18 and 3.98 ms at B = 16 and 256, below), close to their bytes at 3 TB/s
+(0.27, 1.07, 4.29 ms). The larger cost is the FlashInfer verify
 kernel itself: selecting SGLang's Triton GDN verify kernel instead
 (`--linear-attn-verify-backend triton`, a stock option) makes the whole pass 2.06x faster at
-B = 64 and 2.34x faster at B = 256. Whether the FlashInfer kernel's sequential walk is where
-the time goes inside the pass (its kernel share) needs the queued Nsight Systems trace; the
-ratios here are whole-pass times. **Exactness: pending.** The Triton verify kernel is a
-different numerical path: stock DFlash at block 16 with it commits 7.603 tokens per cycle
+B = 64 and 2.34x faster at B = 256; the kernel trace below attributes 72% of the FlashInfer
+pass at B = 256 to the verify kernel itself. **Exactness: pending.** The Triton
+verify kernel is a different numerical path: stock DFlash at block 16 with it commits 7.603 tokens per cycle
 against 7.675 with the FlashInfer kernel, so the greedy outputs differ, and every Triton-based
 figure here (the speed ratios, the baseline below, the Triton Stage A table) is pending an
 exactness classification of that kernel switch against plain decoding. That baseline runs
@@ -139,6 +138,45 @@ exactness classification of that kernel switch against plain decoding. That base
 session): single runs from two sessions, a 2.1% shorter cycle and 0.9% fewer tokens per cycle,
 within plausible run-to-run and cross-session variance, so the baseline gain is not
 established; the wide blocks gain 2x.
+
+**Same-session control.** session_x2 reran all three variants at B = 16 and 256 one after
+another in one exclusive hold (`verify_control.json`, `runs/verify_control.sh`, 2026-10-01
+16:39-16:54 UTC; same panel, flags and engine build; foreign CPU load at most 0.64 cores):
+
+| B | V(B), FlashInfer kernel | same, per-position states dropped | V(B), Triton kernel |
+|---|---|---|---|
+| 16 | 4.78 | 4.60 | 4.57 |
+| 256 | 44.70 | 40.72 | 19.19 |
+
+(ms, forced full acceptance, medians; p10-p90 within 1.1% of the median.) Every
+cross-session value in the first table of this section is within 1.5% of its same-session
+value (the largest gap is the B = 16 no-state run, 4.53 against 4.60 ms), so the conclusions
+above stand. Within one session the per-position state writes cost 0.18 ms at B = 16 (3.8% of
+V(16)) and 3.98 ms at B = 256 (8.9%), and the Triton kernel makes the pass 4.3% shorter at
+B = 16 and 2.33x faster at B = 256.
+
+**Kernel trace at B = 256.** `verify_kernels_b256.json` (`runs/verify_nsys.sh`, session_x2,
+16:54-16:59 UTC): Nsight Systems over two forced-acceptance requests of 2,048 tokens with the
+FlashInfer verify kernel. The profiler stretches the verify phase from 44.70 to 45.18 ms. All
+kernel time in the window, divided by the 19.75 verify cycles it holds (474 launches of the
+GDN verify kernel over 24 GDN layers; the draft, prefill and warm-up kernels in the window are
+spread over those cycles), is 47.4 ms per cycle:
+
+| category | ms per verify cycle | share |
+|---|---|---|
+| GDN verify kernel (`gdn_verify_kernel_mtp_inline`, 24 launches per cycle, 1.36 ms each) | 32.68 | 68.9% |
+| GDN causal conv update (`_causal_conv1d_update_kernel`, 0.27 ms per launch) | 6.49 | 13.7% |
+| GEMMs (target and drafter) | 5.84 | 12.3% |
+| other GDN kernels, attention, normalization, head argmax, state commit and the rest | 2.42 | 5.1% |
+
+The verify kernel takes 1.36 ms per layer for 256 positions, 5.3 us per position per layer, which
+fits a walk over the positions one after another; it is 72% of the verify phase under the profiler
+(32.68 of 45.18 ms) and is what the Triton kernel replaces. The conv update kernel, 0.27 ms per
+layer, comes next. Derived, not measured: if the Triton path leaves the conv, GEMM and other
+kernels unchanged, they take about 12.4 ms of the 44.70 ms pass without the profiler (45.18 -
+32.68 ms, scaled by 44.70 / 45.18), so the Triton GDN kernel would take about 6.8 ms of its
+19.19 ms pass and the conv update about a third of it. A trace of the Triton pass would settle
+this.
 
 Stage A with the Triton verify kernel and the DFlash baseline on the same kernel (derived from
 the measured V(B) and baseline; `stage_a_oracle_triton.csv`; pending exactness classification;
@@ -247,9 +285,10 @@ block-16 values, and none of the tested K would be rejected. A narrower cycle ca
 phases (`fresh_b8` keeps 0.384 ms after draft and verify, `fresh_b16` 0.395 ms), so this is not a
 bound for every implementation. On the point estimates (no intervals), top-1, top-2 and top-4 stay
 negative only while V_R exceeds 0.89, 2.71 and 3.87 ms. The only measured verify below width 16 at
-c = 1 is 4.16 ms at width 8 (`fresh_b8`, same session as `fresh_b16`), so these thresholds are not
-settled by the data here; a sweep of the verify phase over widths 2 to 16 at c = 1 is queued. The
-top-8 and top-16 verdicts (not rejected) hold for either implementation.
+c = 1 was 4.16 ms at width 8 (`fresh_b8`, same session as `fresh_b16`). The sweep over widths 2
+to 16 in the next section settles them: the narrowest verify costs 3.83 ms, and charged at their
+measured widths the reused cycles keep top-1, top-2 and top-4 rejected. The top-8 and top-16
+verdicts (not rejected) hold for either implementation.
 
 Omniscient-gate oracle (`omniscient_gate_oracle` in the JSON; an oracle, since its gate knows fresh
 DFlash's next accepted length). A gated program may choose fresh DFlash on supported boundaries
@@ -307,13 +346,146 @@ omniscient-gate oracle above bounds those).
   top-1 choices fail), and its compile, conditioning and retention costs (A) are charged against the
   same margin. For gated programs with a padded verify the omniscient-gate oracle gives an upper
   bound of +2.05 (+1.93, +2.18) at top-16, and no tested K is rejected. A program whose support
-  starts at the correction (suffix-only) is not covered. The c = 8 and 16 draft shares, which set
-  T2_R - T2_F beyond c = 1, are queued.
+  starts at the correction (suffix-only) is not covered. The next section prices the remainder
+  verify, the reuse program and concurrency 8 and 16.
 
 ```sh
 python experiments/repair/p9_support_oracle.py --cycles ~/vp-data/drafter/support/zlab_b16_cycles/cycles.pt \
-    --timing evidence/repair/stage_a_timing.json --bootstrap 2000 --out evidence/repair/p9_support_oracle.json
+    --timing evidence/repair/stage_a_timing.json --width-timing evidence/repair/p9_verify_widths.json \
+    --bootstrap 2000 --out evidence/repair/p9_support_oracle.json
 ```
+
+The `--width-timing` fields come from the next section's sweep; every other field is unchanged
+from the run without it (the bootstrap draws the same resamples), apart from `kind` and the
+added `baseline_run`, `draft_share_of_cycle` and phase fields.
+
+### P9 costs: the remainder verify, the reuse program and concurrency 8 and 16
+
+Session `session_x2` under the exclusive lock, 2026-10-01 16:13-16:59 UTC: `runs/p9_draft_share.sh`
+and `runs/p9_verify_widths.sh` (`experiments/repair/`, with `p9_program_cost.py`) at repository
+commit `d365673`, engine build `5d8e00e3e1`, the configuration of the Stage A runs. Every number in this section uses FlashInfer's GDN verify kernel, as the P9 baseline
+`fresh_b16` does (`--linear-attn-decode-backend flashinfer`, the DFlash model card's setting);
+SGLang's default on sm_90 is the Triton verify kernel, which the bench's tuned DFlash arms use.
+Foreign CPU load averaged at most 0.8 cores in every run (`foreign_cpu_during` in each run's
+`run.json`, kept with the raw data, and in the c > 1 rows of `p9_draft_share.json`).
+
+**The remainder verify (c = 1).** After a correction at block position J, m = 15 - J old
+positions remain, so a program could verify m + 1 positions instead of a padded block of 16.
+Forced full acceptance at widths B = 2 to 16 (`p9_verify_widths.json`; four MATH-500 requests of
+512 tokens per width, one server per width, c = 1) gives the verify phase (medians; p10-p90 within
+1.6% of the median at every width):
+
+| B | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| V(B) ms | 3.83 | 3.86 | 3.95 | 3.98 | 4.08 | 4.08 | 4.20 | 4.38 | 4.42 | 4.45 | 4.52 | 4.57 | 4.65 | 4.76 | 4.78 |
+
+Verifying two positions costs 80% of verifying sixteen; each further position adds about 68 us.
+V(16) equals the Stage A session's 4.78 ms. Charging every reused cycle the verify of its own
+width (`measured_width_verify` in `p9_support_oracle.json`: the reused cycle saves this session's
+V(16) - V(m + 1), every other phase stays at its `fresh_b16` value; same bootstrap and resamples
+as the first table) saves 0.30 ms of verify on the average reused cycle, because most corrections
+come early and leave a wide remainder:
+
+| K | padded verify (first table) | measured m + 1 verify | rule | measured, omniscient gate |
+|---|---|---|---|---|
+| 1 | -0.04 (-0.06, -0.03) | -0.04 (-0.05, -0.03) | rejected | +0.01 (+0.01, +0.01) |
+| 2 | -0.66 (-0.81, -0.55) | -0.57 (-0.69, -0.46) | rejected | +0.49 (+0.45, +0.54) |
+| 4 | -0.42 (-0.56, -0.30) | -0.27 (-0.39, -0.17) | rejected | +0.98 (+0.91, +1.06) |
+| 8 | +0.22 (+0.12, +0.32) | +0.39 (+0.31, +0.47) | not rejected | +1.53 (+1.43, +1.64) |
+| 16 | +0.99 (+0.89, +1.07) | +1.17 (+1.09, +1.26) | not rejected | +2.16 (+2.03, +2.30) |
+
+(Delta in tokens per post-rejection boundary, 95% intervals.) For P9's always-reuse program
+verifying m + 1 positions with SGLang's verify pass, the measured widths keep top-1, top-2 and
+top-4 rejected; the narrower cycle's other phases would have to fall by about 0.35 ms more than
+their block-16 values to lift top-4's upper bound to zero, against the 11 us that `fresh_b8`
+saves over `fresh_b16`. The Triton verify kernel's widths were not swept.
+
+**The reuse program.** `p9_program_cost.json` (`p9_program_cost.py`, run in the same hold after
+the draft-share runs): the backward messages, the forward message over the corrected prefix and
+the greedy walk of a fixed-shape program over top-16 sets (H = 15), with random values, at every
+correction slot. Captured as one CUDA graph it takes 133-315 us per reuse (longest when the
+correction comes first and the walk covers 14 slots), almost independent of the rank (2, 4, 8)
+and of the batch (1, 8, 16 requests at once); run eagerly, 3.2-5.8 ms, longer than the draft it
+would replace. It does not include building the matrices from the drafter's state. At c = 1 the
+graph costs 6-14% of the 2.33 ms draft; charged on every reuse it lowers Delta by r_F p_K A,
+about 0.2 tokens at K = 16 for A = 0.3 ms.
+
+**Concurrency 8 and 16.** `p9_draft_share.json` (`runs/p9_draft_share.sh`): fresh DFlash at
+block 16 kept at 8 and 16 requests in flight (96 and 192 decode checkpoints of the drafter's
+shared panel, 512 new tokens each, natural stop), phases over the cycles that ran at the full
+batch (463 and 252 cycles):
+
+| c | draft ms | verify ms | commit ms | cycle ms | draft share of the cycle |
+|---|---|---|---|---|---|
+| 1 (`fresh_b16`, Stage A session) | 2.33 | 4.73 | 0.11 | 7.46 | 31% |
+| 8 | 2.84 | 7.88 | 0.38 | 11.45 | 25% |
+| 16 | 3.28 | 12.09 | 0.68 | 16.46 | 20% |
+
+(Cycle p10-p90 within 1.5% of the median.) The batched draft grows by 73 us per added request from
+1 to 8 and by 55 us from 8 to 16. At c > 1 one reusing request does not skip the batch's draft;
+the batch drafts one row fewer, and the shorter batch period s serves every request, so a reuse
+is worth c r_F s tokens (r_F per request). The oracle at c (`p9_support_oracle_c8.json`,
+`p9_support_oracle_c16.json`) takes acceptance from the c = 1 support table, not remeasured at c,
+and the phases from the c-run, and is scored two ways. With the request's even share of the
+draft, s = draft(c) / c, it bounds P9 from above when the draft's cost is concave in the number
+of rows, as the measured growth suggests (2.33 ms for the first request, then 73 and 55 us per
+added request). With s set to that growth per added request (`_marginal` files: 73 us at c = 8,
+55 us at c = 16), which bounds a single reusing request's s from above under the same condition,
+it bounds what one request reusing on its own can gain:
+
+| K | c = 8, even share | c = 8, per-request growth | c = 16, even share | c = 16, per-request growth |
+|---|---|---|---|---|
+| 1 | -0.05 (-0.06, -0.03) | -0.06 (-0.08, -0.05) | -0.05 (-0.07, -0.04) | -0.06 (-0.08, -0.05) |
+| 2 | -0.82 (-0.98, -0.69) | -1.30 (-1.53, -1.12) | -0.94 (-1.12, -0.80) | -1.30 (-1.52, -1.12) |
+| 4 | -0.65 (-0.81, -0.51) | -1.36 (-1.60, -1.16) | -0.83 (-1.01, -0.67) | -1.36 (-1.59, -1.15) |
+| 8 | -0.05 (-0.17, +0.07) | -0.87 (-1.07, -0.70) | -0.25 (-0.39, -0.12) | -0.86 (-1.06, -0.69) |
+| 16 | +0.70 (+0.59, +0.79) | -0.19 (-0.36, -0.05) | +0.48 (+0.36, +0.58) | -0.18 (-0.35, -0.04) |
+
+(Always-reuse Delta, padded block-16 verify, 95% intervals. The omniscient-gate bounds with the
+even share are +0.01, +0.37, +0.77, +1.26 and +1.84 at c = 8 and +0.01, +0.31, +0.67, +1.13 and
++1.69 at c = 16 for K = 1 to 16; with the per-request growth, +0.00, +0.17, +0.42, +0.78 and
++1.27 at c = 8 and the same to two decimals at c = 16, apart from +0.79 at K = 8. The JSON's
+free-verify fields at c > 1 also credit the request's even share of the batched verify and are
+not discussed here.) A real batch saves less still:
+SGLang replays the draft from CUDA graphs captured at fixed batch sizes, so a batch that drafts
+one row fewer may pay for the full graph. And one reuse step of the program (133-315 us) costs
+more GPU time than the 55-73 us draft row it removes.
+
+- **Verdict for P9 (oracle, upper bounds under the stated scopes).** At c = 1, with the measured
+  remainder verify, reuse over top-16 and top-8 sets is not rejected (+1.17 and +0.39 tokens per
+  post-rejection boundary) and top-1, top-2 and top-4 are rejected for always-reuse programs.
+  Fresh DFlash commits about 10.2 tokens over the two cycles around a boundary, so the best
+  always-reuse oracle gains about a tenth on them, and the omniscient gate about a fifth
+  (+2.16), before the program, conditioning and retention costs and with the true token picked
+  whenever the old set holds it. At c = 8 and 16 the even share keeps top-16 positive (+0.70
+  and +0.48), and top-8 is not rejected at c = 8 only. Charging one reusing request the measured
+  growth of the batched draft instead, always-reuse is rejected at every K, top-16 included
+  (-0.19 and -0.18), and the reuse program alone costs more GPU time than the draft row it
+  removes; the omniscient gate still bounds a gated program at +1.27 for top-16. Beyond c = 1,
+  reuse would have to remove whole draft passes, that is, many requests of a batch reusing in the
+  same cycle, which this oracle does not measure.
+
+```sh
+scripts/gpu_lock.sh -x bash -c 'for s in p9_draft_share p9_verify_widths verify_control verify_nsys; do
+    experiments/repair/runs/$s.sh; done'   # raw runs in ~/vp-data/repair/runs/{p9share,p9width,control1,nsys2}
+python experiments/repair/analyze_timing.py ~/vp-data/repair/runs/p9share/fresh_b16_c{8,16} \
+    --out evidence/repair/p9_draft_share.json
+python experiments/repair/analyze_timing.py ~/vp-data/repair/runs/p9width/force_b{2..16} \
+    --out evidence/repair/p9_verify_widths.json
+cp ~/vp-data/repair/runs/p9share/program_cost.json evidence/repair/p9_program_cost.json
+for C in 8 16; do
+  python experiments/repair/p9_support_oracle.py --cycles ~/vp-data/drafter/support/zlab_b16_cycles/cycles.pt \
+      --timing evidence/repair/p9_draft_share.json --baseline-run fresh_b16_c$C \
+      --bootstrap 2000 --out evidence/repair/p9_support_oracle_c$C.json
+done
+python experiments/repair/p9_support_oracle.py ... --baseline-run fresh_b16_c8 --draft-saving-us 73.09 \
+    --out evidence/repair/p9_support_oracle_c8_marginal.json    # 55.01 and _c16_marginal at c = 16
+```
+
+The hold ran the four scripts in that order (the verify control and kernel trace are in the
+verify section above). The draft growth per added request is (2839.30 - 2327.65) / 7 = 73.09 us from `fresh_b16`
+(`stage_a_timing.json`) to `fresh_b16_c8`, and (3279.38 - 2839.30) / 8 = 55.01 us from c = 8 to
+c = 16 (draft medians).
 
 ### P3 Stage B: anchored residual evaluation on real DFlash blocks (block 16)
 
@@ -464,11 +636,17 @@ python experiments/repair/stage_a.py --timing evidence/repair/stage_a_timing.jso
 python experiments/repair/stage_a.py --timing evidence/repair/stage_a_timing.json \
     --baseline fresh_tritonverify_b16 --verifier triton --state-bytes-bound --suffix _triton \
     --out-dir evidence/repair
+# same-session control and kernel trace (session_x2, raw runs in ~/vp-data/repair/runs/{control1,nsys2})
+python experiments/repair/analyze_timing.py ~/vp-data/repair/runs/control1/force_{,nostate_,tritonverify_}b{16,256} \
+    --out evidence/repair/verify_control.json
+python experiments/repair/nsys_kernels.py ~/vp-data/repair/runs/nsys2/force_b256.nsys-rep \
+    --out evidence/repair/verify_kernels_b256.json
 ```
 
 The decomposition session's two Nsight Systems runs failed at launch (an `nsys launch` option
 that only `nsys start` accepts); the Triton-versus-FlashInfer runs answer the attribution
-question causally.
+question causally, and session_x2's B = 256 trace (`verify_kernels_b256.json`) gives the kernel
+shares.
 
 The ReplaySSM spec protocol does not start with DFlash on this GDN model ("requires a KDA
 model"), and the session's GDN kernel microbenchmark was stopped after 16 minutes of CPU-bound
