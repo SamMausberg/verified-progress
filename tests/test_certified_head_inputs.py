@@ -8,6 +8,8 @@ before anything is allocated on a device.
 from __future__ import annotations
 
 import dataclasses
+from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -204,3 +206,31 @@ def test_a_refused_sampled_batch_keeps_the_refused_status(
     temps = torch.tensor([0.7, -1.0, 1.0, 0.5])
     _, stats = head.gumbel_sample(h, seeds, seeds, temps, fallback=False)
     assert stats.status.tolist() == [STATUS_BITS['refused']] * 4
+
+
+def test_concurrent_cache_builds_do_not_collide(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two engines building the same uncached head: the second finishes while the
+    first is between saving and renaming. Each must keep its own temporary file,
+    so both succeed and one complete cache entry remains."""
+    from certified_head import quantize
+
+    monkeypatch.setenv('VP_KERNEL_CACHE', str(tmp_path))
+    gen = torch.Generator().manual_seed(5)
+    w = (torch.randn(64, 256, generator=gen) * 0.02).to(torch.bfloat16)
+    real_save = torch.save
+    nested: dict[str, Any] = {}
+
+    def save(obj: Any, f: Any) -> None:
+        real_save(obj, f)
+        if 'started' not in nested:  # the other builder runs to completion here
+            nested['started'] = True
+            nested['head'] = quantize.quantized_for(w)
+
+    monkeypatch.setattr(torch, 'save', save)
+    first = quantize.quantized_for(w)
+    assert first.info['head_sha256'] == nested['head'].info['head_sha256']
+    entries = sorted(p.name for p in tmp_path.iterdir())
+    assert len(entries) == 1 and entries[0].endswith('.pt'), entries
+    assert quantize.quantized_for(w).info['head_sha256'] == first.info['head_sha256']

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -40,6 +41,20 @@ SCHEME = 'int8-sym-row-v2'
 
 def cache_dir() -> Path:
     return Path(os.environ.get('VP_KERNEL_CACHE', '~/vp-data/kernel')).expanduser()
+
+
+def publish(blob: dict[str, Any], path: Path) -> None:
+    """Write a cache entry so that concurrent builders cannot collide: each saves
+    to its own temporary file and renames it onto ``path`` atomically. Builders
+    of the same entry write the same data, so whichever rename lands last leaves
+    a complete file, and none fails because another moved its temporary file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f'{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp')
+    try:
+        torch.save(blob, tmp)
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def load_head_weight(model_id: str = MODEL_ID, revision: str = MODEL_REVISION) -> torch.Tensor:
@@ -202,10 +217,7 @@ def quantized_for(w: torch.Tensor) -> QuantizedHead:
             if blob['info'].get('head_sha256') == digest:
                 return QuantizedHead(**blob)
     qh = build_quantized_head(w_cpu, {'head_sha256': digest})
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix('.tmp')
-    torch.save(qh.__dict__, tmp)
-    tmp.replace(path)
+    publish(qh.__dict__, path)
     return qh
 
 
@@ -222,8 +234,5 @@ def load_or_build(
             return w, QuantizedHead(**blob)
     info = {'model_id': model_id, 'revision': revision, 'head_sha256': digest}
     qh = build_quantized_head(w, info)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix('.tmp')
-    torch.save(qh.__dict__, tmp)
-    tmp.replace(path)
+    publish(qh.__dict__, path)
     return w, qh

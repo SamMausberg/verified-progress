@@ -129,7 +129,7 @@ setting the variable reproduces).
 | `SGLANG_STATE_TAP_PERTURB` | 0001 | module whose output gets a one-ulp change (positive control) |
 | `SGLANG_STATE_VERIFY_FIXED_SPLIT` | 0002 | `1`: fixed KV split in the verify plan under deterministic inference |
 
-## kernel (`patches/kernel/0001-0009`, branch `engine/kernel`)
+## kernel (`patches/kernel/0001-0010`, branch `engine/kernel`)
 
 The certified LM head (`src/certified_head/`, PR #45) on SGLang's head paths. The
 engine imports the package from `SGLANG_CERTIFIED_HEAD_SRC`; it is not copied into
@@ -161,6 +161,7 @@ deterministic inference) run the stock head.
 | 0007 | The MTP draft and DFlash draft paths also write their counters after each graph replay (before, only the next replay's gate read them, so the last replay was never written). | unchanged unless `_STATS` is set |
 | 0008 | In check mode the counters are written again after the sampled-verify comparison with SGLang's seeded sampler, which runs after the replay's own write, so a mismatch on the last replay is recorded. | unchanged unless `_STATS` and `_CHECK` are set |
 | 0009 | Fixed-noise sampled verify refuses any batch with a greedy row, not only an all-greedy one. At the pin a greedy request is also normalised to `top_k = 1`, which already made such a batch ineligible; the patch makes the contract explicit. | unchanged unless `_SAMPLED_VERIFY` is set |
+| 0010 | Sampled verify checks the row limit before staging its seeds, positions and temperatures in the head's 256-row buffers, so a larger batch (65 MTP requests give 260 rows) takes the stock path instead of failing. | unchanged unless `_SAMPLED_VERIFY` is set |
 
 Validation: `experiments/certified_head/engine_validate.sh` (check mode per path and
 one request at a time against the stock server; results in

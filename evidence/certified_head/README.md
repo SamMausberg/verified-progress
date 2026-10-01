@@ -736,6 +736,18 @@ docstring and predicate of `_fixed_noise_eligible`, which runs only with
 head installed at 20:41:55 and the glue file was modified at 20:41:58, so it ran
 a28946e0d4, as recorded.
 
+Two changes came after x9e2. Neither alters what its arms ran:
+
+- **Patch 0010** (engine/kernel a3a4c8e99a; `git diff 9b5e82258d a3a4c8e99a`: one
+  file, `certified_head.py`, 17 insertions, 4 deletions). It moves the row-limit
+  check before the staging of the sampled-verify inputs. The sampled arm's batches
+  had at most 32 rows (8 requests x 4 draft rows; its certified graphs were 4 to
+  32 rows), always within the limit, so the same batches were staged and
+  certified.
+- **`quantize.publish`** writes the int8 cache entry through a process-unique
+  temporary file. It runs only when no cache entry exists. x9e2's servers loaded
+  the pinned entry, written on 2026-09-30, so none of them wrote one.
+
 | Arm | Path | Largest certified batch (rows) | Certified calls | Rows | Rows differing from stock | Rows falling back | Calls with a fallback |
 |---|---|---|---|---|---|---|---|
 | plain decode | decode | 16 | 1,036 | 14,946 | 0 | 207 (1.38%) | 253 (24.4%) |
