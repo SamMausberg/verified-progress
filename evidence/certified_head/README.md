@@ -628,9 +628,15 @@ million row-checks per configuration.
 job. The stress process held up to 36,102 MiB (35.3 GiB) of GPU memory, and more
 than 20 GiB from 15:19:43 to 15:36:25 UTC, about 17 minutes, from the W8A16
 33-256-row configuration onwards (`x8s2_gpu_memory.csv`, this job's processes
-only, sampled every 5 s). The cause is not established; PyTorch's caching
-allocator across the step's 224 batch shapes is the likely one. The results
-stand: memory pressure cannot hide a miss, and no call failed. This PR's script
+only, sampled every 5 s). Just before that window the GPU ran out of memory: at
+15:19:34, 15:19:37 and 15:19:40 three allocations of 350, 402 and 450 MiB failed
+with 81, 135 and 379 MiB free of 96,768 MiB (PyTorch's CUDACachingAllocator
+warnings in `x8s2_stress.log`). The allocator released cached blocks and
+retried, and the configuration completed its 1,035,776 row-checks; other jobs
+allocating on the GPU in those seconds could have failed. The cause is not
+established; PyTorch's caching allocator across the step's 224 batch shapes is
+the likely one. The results stand: memory pressure cannot hide a miss, and no
+call of the head failed. This PR's script
 has no memory cap, so run it under the exclusive lock, as its docstring's
 command does; the cap is in a follow-up PR.
 
@@ -698,6 +704,7 @@ microbenchmark therefore runs batch sizes above 32 in their own processes, and
 | `gpu_tests.log` | the GPU tests with the package's CPU tests | `python -m pytest tests/test_certified_head.py tests/test_enclosure_margin.py tests/test_certified_bounds.py tests/test_certified_head_inputs.py -q -s -p no:cacheprovider` (x8s2, 9f7f369, shared lock) |
 | `x8s2_commit.txt` | x8s2's commit and tree state | x8s2 ran, under `scripts/gpu_lock.sh -s`, the commands of the files marked x8s2 here |
 | `x8s2_compile.log` | every kernel variant compiled for sm_90: 148 of 148 | `python experiments/certified_head/compile_check.py` (x8s2, 9f7f369) |
+| `x8s2_stress.log` | the stress step's log: one line per configuration, and the allocator's three out-of-memory warnings | `python experiments/certified_head/stress_defaults.py --out ...` (x8s2, 9f7f369, shared lock) |
 | `x8s2_gpu_memory.csv` | GPU memory of x8s2's own processes, every 5 s | `nvidia-smi --query-compute-apps=pid,used_memory` in the hold, filtered to the job's process tree |
 | `replay_decisions.json` | 60,000 real decode rows under every contract and both error models, greedy and seeded sampling | `python experiments/certified_head/replay_decisions.py --limit-rows 60000 --sample-temps 0.7 1.0 --out ...` (run_all step `replay`, fff72dc) |
 | `gemv_sweep_w8a16.json`, `gemv_sweep_w8a8.json`, `tune_*.hostload.json` | tile sweeps (the micro's tuned tiles) | `python bench/tune_gemv.py --arith w8a16 --out ...`; `--arith w8a8 --batches 16 32 64 128 256` (run_all steps `tune_w8a16`, d2712cb, and `tune_w8a8`, fff72dc) |
