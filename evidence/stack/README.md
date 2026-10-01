@@ -153,7 +153,8 @@ divergence is a tie, one_ulp or near event; lossy if any is large or not_argmax)
 Decisions fixed now: B0 must be bitwise equal to S0 (tokens and logprobs on all 320
 prompts) or no timed session runs until the difference is explained; a lever classed
 lossy leaves the exact stack and its arms are dropped from the sessions (FULL is then the
-remaining levers). The same hold runs a phase diagnostic: B0 and FG with the repair
+remaining levers). `equality_gate.py` applies these decisions and writes the gate that
+the session holds read. The same hold runs a phase diagnostic: B0 and FG with the repair
 probe at c = 1 and 8 (`phases.py`).
 
 **Step 2, timing** (`hold_session.sh <k>`, sessions s1, s2, s3, one exclusive hold each).

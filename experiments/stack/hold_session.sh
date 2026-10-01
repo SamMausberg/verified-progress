@@ -6,7 +6,8 @@
 #   S0  FULL  <middle arms>  FULL  S0
 #
 # with the middle arms in declared order for odd sessions and reversed for even ones.
-# FULL is FGH when STACK_CERT_SRC names the certified_head package, else FG. A middle
+# FULL combines every lever that passed the equality step (gate.json); H counts only when
+# STACK_CERT_SRC names the certified_head package. A middle
 # arm is skipped if the session has run 36 minutes when it would start (the closing
 # FULL and S0 always run), so a hold stays under about 45 minutes.
 #
@@ -28,13 +29,25 @@ exec >>"$LOG" 2>&1
 [ "$(git -C "$STACK_ENGINE" rev-parse 'HEAD^{tree}')" = 0643b22a70d3168a1e10071359cf2a75e11d2833 ] ||
   { echo "composed engine tree is not the declared one"; exit 1; }
 stack_table
-if [ -n "${STACK_CERT_SRC:-}" ]; then
-  full=FGH
-  middle=(F G H FG B0)
-else
-  full=FG
-  middle=(F G B0)
+# The levers that passed step 1 (equality_gate.py); FULL is all of them, the middle arms
+# are each lever alone and every shorter cumulative stack (in the order F, G, H), then B0.
+GATE=$HOME/vp-data/stack/equality/gate.json
+mapfile -t levers < <(python -c "
+import json, sys
+g = json.load(open(sys.argv[1]))
+if not g['ok']:
+    sys.exit('equality gate not passed: ' + json.dumps(g))
+print('\\n'.join(g['timed_levers']))" "$GATE") || exit 1
+if [ -z "${STACK_CERT_SRC:-}" ]; then
+  mapfile -t levers < <(printf '%s\n' "${levers[@]}" | grep -v '^H$')
 fi
+full=$(printf '%s' "${levers[@]}")
+middle=()
+if (( ${#levers[@]} > 1 )); then
+  middle+=("${levers[@]}")
+  for (( j=2; j<${#levers[@]}; j++ )); do middle+=("${full:0:$j}"); done
+fi
+middle+=(B0)
 if (( k % 2 == 0 )); then
   rev=()
   for (( i=${#middle[@]}-1; i>=0; i-- )); do rev+=("${middle[$i]}"); done

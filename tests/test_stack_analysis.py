@@ -144,3 +144,33 @@ def test_phase_summary_uses_consecutive_cycle_starts(tmp_path):
     assert s['median_us']['period_us'] == 6000.0
     assert s['idle_median_us'] == 800.0
     assert s['us_per_token'] == 1000.0
+
+
+gate = _load('equality_gate')
+
+
+def _pair(diverged: int = 0, drift: float = 0.0, **classes: int) -> dict:
+    return {'diverged': diverged, 'length_mismatch': 0, 'drift_max': drift, 'classes': classes}
+
+
+def test_equality_gate_requires_bitwise_b0_and_drops_lossy_levers(tmp_path, monkeypatch):
+    pairs = {
+        'B0 vs S0': _pair(),
+        'F vs B0': _pair(),
+        'F vs bench stock b16': _pair(12, 0.4, tie=11, one_ulp=1),
+        'G vs B0': _pair(5, 0.3, tie=4, large=1),
+        'G vs bench stock b16': _pair(13, 0.4, tie=13),
+        'FG vs B0': _pair(5, 0.3, tie=4, large=1),
+        'FG vs bench stock b16': _pair(14, 0.4, tie=14),
+    }
+    (tmp_path / 'summary.json').write_text(json.dumps({'pairs': pairs}))
+    monkeypatch.setattr(sys, 'argv', ['gate', str(tmp_path)])
+    gate.main()
+    g = json.loads((tmp_path / 'gate.json').read_text())
+    assert g['classes'] == {'F': 'bitwise', 'G': 'lossy', 'FG': 'lossy'}
+    assert g['timed_levers'] == ['F']
+    assert g['ok']
+    pairs['B0 vs S0'] = _pair(1, 0.1, tie=1)
+    (tmp_path / 'summary.json').write_text(json.dumps({'pairs': pairs}))
+    gate.main()
+    assert not json.loads((tmp_path / 'gate.json').read_text())['ok']

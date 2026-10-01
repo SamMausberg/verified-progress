@@ -10,7 +10,7 @@
 #   F      exact GDN fold-every-commit verify (drafter patches 0002-0003)
 #   G      backbone GEMM routing table v1, PDL, merged GDN in_proj (backbone 0001-0008)
 #   H      certified LM head on the greedy verify (kernel 0001-0006), only if enabled
-#   FG     F + G
+#   FG     F + G; any other combination of the letters F, G, H likewise
 #   FGH    F + G + H
 #
 # STACK_ENGINE    composed SGLang worktree (default ~/sglang-wt/stack)
@@ -40,16 +40,20 @@ lever_H=(
 )
 
 arm_args() {
-  local name=$1 out=(--arm "$STACK_ARM")
+  local name=$1 out=(--arm "$STACK_ARM") i
   if [ "$name" != S0 ]; then out+=(--sglang-worktree "$STACK_ENGINE"); fi
   case $name in
     S0 | B0) ;;
-    F) out+=("${lever_F[@]}") ;;
-    G) out+=("${lever_G[@]}") ;;
-    H) out+=("${lever_H[@]}") ;;
-    FG) out+=("${lever_F[@]}" "${lever_G[@]}") ;;
-    FGH) out+=("${lever_F[@]}" "${lever_G[@]}" "${lever_H[@]}") ;;
-    *) echo "unknown arm $name" >&2; return 64 ;;
+    *)
+      for (( i=0; i<${#name}; i++ )); do
+        case ${name:$i:1} in
+          F) out+=("${lever_F[@]}") ;;
+          G) out+=("${lever_G[@]}") ;;
+          H) out+=("${lever_H[@]}") ;;
+          *) echo "unknown arm $name" >&2; return 64 ;;
+        esac
+      done
+      ;;
   esac
   printf '%s\n' "${out[@]}"
 }

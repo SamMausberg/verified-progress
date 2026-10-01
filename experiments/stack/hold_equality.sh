@@ -87,6 +87,7 @@ ln -sfn "$HOME/vp-data/bench/equality/runs/plain__bench_dflash_b16_triton" "$RUN
     --out-json "$OUT/summary.json" --out-csv "$OUT/divergences.csv" --out-table "$OUT/table.csv" \
     --out-meta "$OUT/meta.json" > "$OUT/compare.log" 2>&1
   echo "compare exit $?"
+  python experiments/stack/equality_gate.py "$OUT"
 )
 
 # Phase diagnostic (timing, exclusive): composed tree with the probe, B0 and FG.
