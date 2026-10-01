@@ -1,6 +1,6 @@
-From 6ca40e754747f67da8afcc1a3fd637065540423d Mon Sep 17 00:00:00 2001
+From 31bda3e674f70773cd8a842d4e505f9c362cfb19 Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <samuelmausberg@gmail.com>
-Date: Thu, 1 Oct 2026 03:19:53 +0000
+Date: Thu, 1 Oct 2026 04:23:33 +0000
 Subject: [PATCH] GDN: opt-in fold-every-commit buffered verify
  (SGLANG_GDN_REPLAYSSM_FOLD)
 

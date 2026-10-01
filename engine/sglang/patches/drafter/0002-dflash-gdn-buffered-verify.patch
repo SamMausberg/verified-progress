@@ -1,6 +1,6 @@
-From a7dac3f95a18e1dc739fa5baf8c03c4e9c7c8bff Mon Sep 17 00:00:00 2001
-From: Samuel Mausberg <sam@findtensor.com>
-Date: Thu, 1 Oct 2026 00:03:32 +0000
+From bbf30af19acb4ee2c427513cc9e0465e7b77652e Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Thu, 1 Oct 2026 04:23:33 +0000
 Subject: [PATCH] DFLASH: buffered GDN verify commit under
  --enable-linear-replayssm-spec
 
