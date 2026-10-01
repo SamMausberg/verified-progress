@@ -1,7 +1,7 @@
 From 58bb7769e2620734c3e0b536baadf07b63bb8055 Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <samuelmausberg@gmail.com>
 Date: Thu, 1 Oct 2026 06:41:08 +0000
-Subject: [PATCH 5/7] Add a scaled RMSNorm prologue to the skinny GEMM
+Subject: [PATCH 5/8] Add a scaled RMSNorm prologue to the skinny GEMM
 
 PROLOGUE_ADD_RMSNORM_SCALED computes y = rsqrt(mean(h^2) + eps) *
 (bf16(h * (1 + g)) @ W^T) with the sum of squares accumulated in the main

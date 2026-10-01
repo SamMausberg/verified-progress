@@ -1,7 +1,7 @@
 From 714e6cc2cbf00ebe3e390f19b44a6475c80102c9 Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <samuelmausberg@gmail.com>
 Date: Thu, 1 Oct 2026 06:40:57 +0000
-Subject: [PATCH 2/7] Add an opt-in skinny BF16 GEMM for small-batch decode
+Subject: [PATCH 2/8] Add an opt-in skinny BF16 GEMM for small-batch decode
  projections
 
 sglang/srt/layers/backbone_gemm.py: a Triton kernel for y = a @ W^T with M up

@@ -154,7 +154,7 @@ changes unless one of these variables is set:
 
 Forced full acceptance uses SGLang's existing `SGLANG_SIMULATE_ACC_LEN`.
 
-## backbone (`patches/backbone/0001-0007`, branch `engine/backbone`, head `5758637531`)
+## backbone (`patches/backbone/0001-0008`, branch `engine/backbone`, head `fbdc3165b0`)
 
 ```sh
 scripts/sglang_worktree.sh backbone
@@ -181,6 +181,7 @@ does on CUDA).
 | 0005 | A scaled RMSNorm prologue (row scale applied after the product), for the skeleton microbenchmarks | none | unchanged |
 | 0006 | `Qwen3_5ForConditionalGeneration.prepare_before_cuda_graph_capture` (added by 0003) forwards to the language model only when the merge is on | `SGLANG_BACKBONE_MERGE_IN_PROJ` | unchanged, also under aiter |
 | 0007 | The packed-projection row cutoff of 0004 applies only with the merge switch (Qwen4-Exp's own packed weights keep the original gate), and also on the deferred-norm branch | `SGLANG_BACKBONE_MERGE_IN_PROJ` | unchanged |
+| 0008 | A table entry of mode `gemv` calls the Hopper GEMV only on SM 9.x (as SGLang's own gemv backend requires); elsewhere the call falls back to cuBLAS | with `SGLANG_BACKBONE_GEMM` | unchanged |
 
 The routing table is JSON from `experiments/backbone/make_table.py`. Measured so far: the kernels
 and fusions in isolation and in layer skeletons (`evidence/backbone/README.md`). The exactness

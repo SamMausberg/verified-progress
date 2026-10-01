@@ -1,7 +1,7 @@
 From 13fdbb98b0d426642548f410cb48775e6af515d9 Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <samuelmausberg@gmail.com>
 Date: Thu, 1 Oct 2026 06:40:58 +0000
-Subject: [PATCH 3/7] Route Qwen3.5 backbone projections through the skinny
+Subject: [PATCH 3/8] Route Qwen3.5 backbone projections through the skinny
  GEMM (opt-in)
 
 Every switch defaults to off, and with all of them off no code path changes.

@@ -1,7 +1,7 @@
 From 5758637531c8bed925231ef8ea67803267f39d9d Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <samuelmausberg@gmail.com>
 Date: Thu, 1 Oct 2026 06:47:54 +0000
-Subject: [PATCH 7/7] Limit the packed in_proj row cutoff to the merge switch
+Subject: [PATCH 7/8] Limit the packed in_proj row cutoff to the merge switch
 
 Patch 0004 applied SGLANG_BACKBONE_MERGE_IN_PROJ_MIN_M to every packed GDN
 weight on the CUDA path, which changed the default for models whose loader

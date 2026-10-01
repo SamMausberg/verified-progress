@@ -1,7 +1,7 @@
 From 4b5e3e698eb7354c748aa18899b1d0449d0ef6b3 Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <samuelmausberg@gmail.com>
 Date: Thu, 1 Oct 2026 06:46:47 +0000
-Subject: [PATCH 6/7] Forward the dense Qwen3.5 preparation hook only with the
+Subject: [PATCH 6/8] Forward the dense Qwen3.5 preparation hook only with the
  merge switch
 
 Patch 0003 made Qwen3_5ForConditionalGeneration forward
