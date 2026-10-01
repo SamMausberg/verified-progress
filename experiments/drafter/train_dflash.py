@@ -573,7 +573,13 @@ def train(args: argparse.Namespace) -> None:
     save_state(trainer, run)
     digest = export_draft(trainer.draft, trainer.config_dict, run / 'export')
     (run / 'export' / 'STEP').write_text(f'{trainer.step}\n')
-    print(f'segment done: step={trainer.step} export sha256={digest}', flush=True)
+    if trainer.step >= args.total_steps:
+        print('final step reached', flush=True)
+    peak_gib = torch.cuda.max_memory_allocated() / 2**30 if device.type == 'cuda' else 0.0
+    print(
+        f'segment done: step={trainer.step} export sha256={digest} peak_gpu_gib={peak_gib:.1f}',
+        flush=True,
+    )
 
 
 def main() -> None:

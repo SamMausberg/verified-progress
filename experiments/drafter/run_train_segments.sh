@@ -11,13 +11,29 @@ max="$1"
 script="$2"
 shift 2
 segment="$here/train_segment.sh"
+# Each run keeps its own segment log, so concurrent drivers do not collide.
+run_dir=""
+for ((j = 1; j <= $#; j++)); do
+  if [ "${!j}" = "--run" ]; then
+    k=$((j + 1))
+    run_dir="${!k}"
+  fi
+done
+log="${run_dir:?--run is required}/last_segment.log"
+export TRAIN_SEGMENT_LOG="$log"
 for i in $(seq 1 "$max"); do
   echo "segment $i start $(date +%T)"
+  # FIRST_ARRIVAL keeps the first segment's queue place when the driver is restarted.
+  if [ "$i" -eq 1 ] && [ -n "${FIRST_ARRIVAL:-}" ]; then
+    export GPU_LOCK_ARRIVAL="$FIRST_ARRIVAL"
+  else
+    unset GPU_LOCK_ARRIVAL
+  fi
   "$HOME/verified-progress/scripts/gpu_lock.sh" -s "$segment" "$here/$script" "$@"
   status=$?
   echo "segment $i exit $status $(date +%T)"
   if [ "$status" -ne 0 ]; then break; fi
-  if grep -q "final step reached" "$HOME/vp-data/drafter/runs/last_segment.log" 2>/dev/null; then
+  if grep -q "final step reached" "$log" 2>/dev/null; then
     break
   fi
 done
