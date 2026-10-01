@@ -90,6 +90,17 @@ SELECTION = {
 }
 
 
+# The original manifest's wording, kept so that `--set main` regenerates the
+# committed main manifest byte for byte.
+MAIN_SELECTION_TEXT = {
+    'gsm8k': 'test rows 0-79',
+    'humaneval': 'test rows 0-59',
+    'mt_bench': 'first turn of questions 0-79',
+    'alpaca_eval': 'rows 0, 10, ..., 590',
+    'cnn_dailymail': 'test rows 0-39',
+}
+
+
 def _describe(r: range) -> str:
     if not len(r):
         return 'none'
@@ -180,6 +191,47 @@ def ids_digest(items: list[dict[str, Any]]) -> str:
     return h.hexdigest()
 
 
+def build_manifest(items: list[dict[str, Any]], prompt_set: str) -> dict[str, Any]:
+    """The manifest of a tokenized prompt set.
+
+    The main set keeps its original layout (no prompt_set key, the original
+    selection wording), so the committed manifest regenerates byte for byte.
+    """
+    lengths = sorted(len(item['input_ids']) for item in items)
+    counts: dict[str, int] = {}
+    for item in items:
+        counts[item['source']] = counts.get(item['source'], 0) + 1
+    if prompt_set == 'main':
+        selection: dict[str, str] = dict(MAIN_SELECTION_TEXT)
+    else:
+        selection = {name: _describe(r) for name, r in SELECTION[prompt_set].items()}
+    selection['thinking'] = 'every third prompt of each source (index % 3 == 2)'
+    manifest: dict[str, Any] = {
+        'model': MODEL,
+        'model_revision': MODEL_REVISION,
+        'sources': {
+            name: {'repo': repo, 'revision': rev, 'file': fn}
+            for name, (repo, rev, fn) in SOURCES.items()
+        },
+    }
+    if prompt_set != 'main':
+        manifest['prompt_set'] = prompt_set
+    manifest.update(
+        selection=selection,
+        num_prompts=len(items),
+        per_source=counts,
+        num_thinking=sum(item['thinking'] for item in items),
+        input_tokens={
+            'min': lengths[0],
+            'median': lengths[len(lengths) // 2],
+            'max': lengths[-1],
+            'total': sum(lengths),
+        },
+        input_ids_sha256=ids_digest(items),
+    )
+    return manifest
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--out', type=Path, required=True)
@@ -197,33 +249,7 @@ def main() -> None:
             )
             f.write('\n')
 
-    lengths = sorted(len(item['input_ids']) for item in items)
-    counts: dict[str, int] = {}
-    for item in items:
-        counts[item['source']] = counts.get(item['source'], 0) + 1
-    manifest = {
-        'model': MODEL,
-        'model_revision': MODEL_REVISION,
-        'sources': {
-            name: {'repo': repo, 'revision': rev, 'file': fn}
-            for name, (repo, rev, fn) in SOURCES.items()
-        },
-        'prompt_set': args.prompt_set,
-        'selection': {
-            **{name: _describe(r) for name, r in SELECTION[args.prompt_set].items()},
-            'thinking': 'every third prompt of each source (index % 3 == 2)',
-        },
-        'num_prompts': len(items),
-        'per_source': counts,
-        'num_thinking': sum(item['thinking'] for item in items),
-        'input_tokens': {
-            'min': lengths[0],
-            'median': lengths[len(lengths) // 2],
-            'max': lengths[-1],
-            'total': sum(lengths),
-        },
-        'input_ids_sha256': ids_digest(items),
-    }
+    manifest = build_manifest(items, args.prompt_set)
     args.manifest.parent.mkdir(parents=True, exist_ok=True)
     args.manifest.write_text(json.dumps(manifest, indent=2) + '\n')
     print(json.dumps(manifest, indent=2))

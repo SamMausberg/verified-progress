@@ -156,7 +156,9 @@ reason go in a new commit before the runs.
   and CNN/DailyMail test rows 40-335 (296), with every third prompt per source in
   thinking mode.
   - `evidence/state_safety/prompt_manifest_fresh.json` freezes the token IDs
-    (SHA-256). The original set's manifest is unchanged byte for byte.
+    (SHA-256). `prompts.py` without `--set` still regenerates the original set's
+    manifest byte for byte: the main set keeps its original layout, and
+    `tests/test_state_safety_prompts.py` checks both manifests.
   - The source mix differs from the original set. MT-Bench has no unused questions,
     and GSM8K and CNN/DailyMail have larger shares. Rates from the two sets are
     therefore not compared directly.
