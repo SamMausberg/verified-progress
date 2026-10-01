@@ -192,4 +192,10 @@ done
 if compgen -G "$HOME/vp-data/state/targeted/*.json" > /dev/null; then
   nice -n 19 python summarize_targeted.py --out "$evidence/targeted.json" > /dev/null
 fi
+# The machine's host name can be its public address: refuse evidence that contains it.
+host="$(hostname)"
+if grep -rlF -e "$host" -e "${host//-/.}" "$evidence" > /dev/null; then
+  echo "evidence contains the host name; not publishing it" >&2
+  exit 1
+fi
 echo "evidence regenerated in $evidence"
