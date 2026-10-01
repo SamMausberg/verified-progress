@@ -281,6 +281,8 @@ class CertifiedHead:
         self._variant_ids: dict[tuple[Any, ...], int] = {}
         self._in_self_test = False
         self.enclosure_report: dict[str, Any] | None = None
+        # Every self-test check this head ran (batch size, tiles, result, seconds).
+        self.self_test_log: list[dict[str, Any]] = []
         # Runtime probes (see kernels._probe_kernel).
         self._probe_idx = torch.zeros(K.PROBES, dtype=torch.int32, device=dev)
         self._probe_x = torch.zeros(mb * K.PROBES, dtype=torch.float64, device=dev)
@@ -786,7 +788,23 @@ class CertifiedHead:
         report['ok'] = not report['refused_batch_sizes']
         torch.cuda.empty_cache()
         self.enclosure_report = report
+        self.self_test_log.extend(c for c in report['checks'] if not c.get('cached'))
         return report
+
+    def self_test_summary(self) -> dict[str, Any]:
+        """Cumulative self-test record: batch sizes certified and refused, and the
+        initialisation cost (seconds of checks)."""
+        return {
+            'verified_batch_sizes': sorted({m for _, m in self._verified}),
+            'refused_variants': [
+                {'arith': k[0], 'config': k[1:]} for k in sorted(self._failed_variants, key=str)
+            ],
+            'checks': len(self.self_test_log),
+            'seconds_total': sum(c.get('seconds', 0.0) for c in self.self_test_log),
+            'seconds_by_batch_size': {
+                c['batch_size']: round(c.get('seconds', 0.0), 3) for c in self.self_test_log
+            },
+        }
 
     def _assume_verified(self, batch_sizes: list[int]) -> None:
         """Mark batch sizes as self-tested without running the test. For tests of

@@ -894,6 +894,9 @@ def test_enclosure_self_test_passes_the_default_tiles(checkpoint: tuple[Any, Any
     assert [c['batch_size'] for c in report['checks']] == sizes  # every size, not endpoints
     times = {c['batch_size']: round(c['seconds'], 3) for c in report['checks']}
     print(f'self-test seconds per batch size {times}, total {report["seconds"]:.2f}')
+    summary = head.self_test_summary()
+    assert summary['checks'] == len(sizes) and summary['verified_batch_sizes'] == sizes
+    assert head.enclosure_self_test(sizes)['seconds'] == 0.0  # cached, not rerun
 
 
 def test_enclosure_self_test_refuses_a_bad_configuration(checkpoint: tuple[Any, Any]) -> None:
