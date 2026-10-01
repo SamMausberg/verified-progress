@@ -259,3 +259,60 @@ DFlash waves of 4 and MTP waves of 8, each with stock, fold and a stock rerun.
     python experiments/drafter/summarize_replay_check.py \
         --run dflash:~/vp-data/drafter/replay-check --run mtp:~/vp-data/drafter/replay-check-mtp \
         --out evidence/drafter/buffered_verify
+
+## Buffered GDN verify: per-phase split and the P10 gate (c = 8 and 16)
+
+`phase_timing/summary.csv`, `phase_timing/kernels.json`, `phase_timing/launch/`
+(`run_phase_timing.sh`, one exclusive hold, 2026-10-01 15:57-16:04 UTC, repository at 0159c13):
+DFlash block 16 on the bench mixed-v2 tune split (22 prompts per domain, 512 output tokens with
+ignore_eos), client concurrency 8 and then 16 on one server per arm, Triton GDN decode and verify
+(`--linear-attn-decode-backend triton`, so the verify kernel is
+`fused_sigmoid_gating_delta_rule_update` in the stock and fold arms), radix cache off, and the
+same pinned pools in all three arms (100,000 KV tokens, 16 mamba slots, running limit 16;
+recorded in `launch/*.json`). Engine: `engine/drafter` 0001-0003 plus the repair workstream's
+CUDA-event probe (`engine/sglang/patches/repair/0001`; worktree `drafter-timing` at 93d07cc642),
+which records the GPU time of each phase of every cycle without host synchronization. The table
+gives medians over the cycles at the steady batch size of each client run (626 cycles at 8; 111
+at 16 for stock and fold, 158 for circular); the period is the median gap between consecutive
+cycle starts on the GPU timeline, so it includes host gaps. Foreign CPU load averaged 0.41-0.53
+cores. One run per arm.
+
+| arm | batch | period (ms) | verify | draft | commit | tokens per request per cycle |
+|---|---|---|---|---|---|---|
+| stock | 8 | 10.83 | 7.38 (68.1%) | 2.82 (26.0%) | 0.27 (2.5%) | 5.94 |
+| fold | 8 | 9.90 | 6.28 (63.5%) | 2.78 (28.1%) | 0.49 (4.9%) | 5.94 |
+| circular | 8 | 9.94 | 6.47 (65.1%) | 2.80 (28.1%) | 0.31 (3.1%) | 5.97 |
+| stock | 16 | 15.37 | 11.26 (73.2%) | 3.19 (20.8%) | 0.52 (3.4%) | 5.97 |
+| fold | 16 | 13.54 | 9.10 (67.2%) | 3.15 (23.2%) | 0.90 (6.6%) | 5.97 |
+| circular | 16 | 13.45 | 9.27 (68.9%) | 3.19 (23.7%) | 0.58 (4.3%) | 5.91 |
+
+Phases are medians in ms with their share of the period; the accept and draft-KV append phases
+take the remaining 1.7-2.0%. "Commit" is the GDN state commit: the scatter of the accepted
+per-position snapshot (stock, `_fused_mamba_state_scatter_with_mask_kernel`), the circular ring
+commit (circular), or the exact fold (`gdn_replayssm_exact_fold_kernel`).
+
+- **The fold shortens the held-batch cycle by 8.6% at batch 8 and 11.9% at batch 16** (10.83 to
+  9.90 ms and 15.37 to 13.54 ms, so 1.09x and 1.13x the per-GPU token rate on the GPU timeline).
+  The verify phase loses 1.10 and 2.16 ms, the per-position FP32 state writes it no longer makes,
+  and the commit gains 0.22 and 0.38 ms, one state read and write per request to replay the
+  accepted prefix. This is one run per arm at a steady batch; the served A/B against the tuned
+  DFlash arms (`run_fold_timing.sh`) is the end-to-end measurement.
+- **Outputs.** The fold arm's tokens equal stock's for all 66 requests at both concurrencies
+  (`phase_timing/fold_c{8,16}-vs-stock.json`); the circular arm's differ in 51 of 66. These
+  timing runs recorded no logprobs (so the files report 0 bitwise-identical sequences, which here
+  means "not checked") and used closed-loop clients, so this is token identity in two runs, not
+  the bitwise check of `run_fold_localize.sh`.
+- **P10 is rejected without building.** Its declared first test (TASKS.md, P10; the paper's
+  appendix item `p10-split`) builds the anchor-fused replay only if the fold phase is at least
+  9.09% of the cycle at c = 8 and 16. The fold phase is 4.9% and 6.6%, so removing it outright, at no cost of its own,
+  would make the cycle at most 1.05x and 1.07x faster, short of the 1.10x threshold. The fused
+  replay would also keep a checkpoint write of its own, so its saving would be smaller still.
+- With the fold, the verify is still 63-67% of the cycle and drafting 23-28% (2.8-3.2 ms per cycle
+  for the six draft layers and the head over 16 positions per request).
+
+    scripts/gpu_lock.sh -x experiments/drafter/run_phase_timing.sh
+    # its last step: phase_summary.py --run stock:DIR --run circular:DIR --run fold:DIR --segments 8 16
+    python experiments/drafter/compare_outputs.py \
+        --ref ~/vp-data/drafter/phase-timing/stock/c8/requests.jsonl \
+        --test ~/vp-data/drafter/phase-timing/fold/c8/requests.jsonl \
+        --out evidence/drafter/phase_timing/fold_c8-vs-stock.json   # likewise c16 and circular
