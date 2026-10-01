@@ -141,3 +141,83 @@ root.
 Raw outputs stay in `~/vp-data/state/` (`runs_pinned/`, `runs/`, `targeted/`); each
 run has a `.meta.json` with the flags, the pool pin, the resolved server settings
 and pool sizes, and the repository and SGLang commits.
+
+## Declared follow-up: the first verify cycle after prefill (not yet run)
+
+In the pinned matrix, the first verify cycle after prefill had a higher divergence
+rate per fragile position than later cycles for MTP steps 5 and the tree (7/40 and
+6/33). That observation is exploratory (`evidence/state_safety/README.md`). The test
+below is fixed before any data for it exists. If it changes, the change and its
+reason go in a new commit before the runs.
+
+- **Prompts.** The fresh set, `prompts.py --set fresh`: 960 prompts disjoint from
+  the 320 used so far (no shared ID, message or token sequence). They are GSM8K test
+  rows 80-559 (480), HumanEval rows 60-163 (104), AlpacaEval rows 5, 15, ..., 795 (80)
+  and CNN/DailyMail test rows 40-335 (296), with every third prompt per source in
+  thinking mode.
+  - `evidence/state_safety/prompt_manifest_fresh.json` freezes the token IDs
+    (SHA-256). `prompts.py` without `--set` still regenerates the original set's
+    manifest byte for byte: the main set keeps its original layout, and
+    `tests/test_state_safety_prompts.py` checks both manifests.
+  - The source mix differs from the original set. MT-Bench has no unused questions,
+    and GSM8K and CNN/DailyMail have larger shares. Rates from the two sets are
+    therefore not compared directly.
+  - Generation uses 256 new tokens and top-5 logprobs.
+- **Runs.** Pinned pools (cap 8, 49,152 KV tokens, 40 GDN slots), radix cache and
+  overlap on, written to `~/vp-data/state/runs_fresh/`. There are two exclusive
+  holds, each under 45 minutes:
+  - plain c1;
+  - MTP steps 5 at c1 and c32, then the tree (3 steps, top-k 2) at c1 and c32. Each
+    configuration is served from one server.
+- **Pairs.** Each pair has a reference run R and a compared run C. One speculative
+  c1 run L labels the cycles.
+  - Primary: R = plain c1 and C = L = MTP steps 5 c1. Likewise with the tree c1 as
+    C and L.
+  - Control: R = L = MTP steps 5 c1 and C = MTP steps 5 c32. Likewise for the tree.
+- **Positions.** The method is `cycles.py`'s: positions up to and including the
+  first token difference between R and C.
+  - A position is fragile when R's top-2 logprob gap there is at most 0.25 nats.
+  - First cycle: the positions of L's chunk 1, the first verify cycle after the
+    prefill token. Later: L's later chunks.
+  - Only divergences at fragile positions count.
+- **Population.** A prompt is excluded from every pair if any of the four MTP runs
+  (steps 5 and tree, c1 and c32) does not stream exactly one chunk per verify cycle.
+  All four pairs therefore cover the same prompts, and the number excluded is
+  reported.
+- **Statistic.** For each pair, form a 2x2 table: first or later cycle against
+  diverged or not, at fragile positions. The primary log odds ratio, L_p, uses the
+  table summed over the two primary pairs, with 0.5 added to every cell. The control
+  log odds ratio, L_c, is the same for the two control pairs.
+- **Bootstrap.** Use 10,000 replicates with `numpy.random.default_rng(0)`. Each
+  replicate draws the included prompts with replacement, once, and applies that draw
+  to all four pairs. One-sided 95% lower bounds are the 5th percentiles (percentile
+  method).
+- **(a) Primary.** The lower bound of L_p is above 0, meaning the first cycle's
+  odds are higher.
+- **(b) Selection control.** The lower bound of L_p - L_c is above 0. Prompts with a
+  high divergence hazard leave early, so later cycles carry fewer of them even
+  without a state effect. The c1-vs-c32 pairs share that selection, at a similar
+  hazard (3.1-3.5 against 3.5-4.0 divergences per 1,000 tokens), but not the plain
+  decode against verify handoff.
+  - Limits: an effect that also differs between c1 and c32 cancels out.
+  - A supported result can be a benign difference in numerical path rather than a
+    state error.
+- **Secondary.** A one-sided Fisher exact test on the pooled primary table. Steps 1
+  and 3 are not run here.
+- **Decision.**
+  - If (a) and (b) both hold, a first-cycle excess specific to speculation against
+    plain decoding is supported.
+  - Otherwise the result is reported as inconclusive, not as evidence of no effect.
+  - Both bounds are reported either way.
+- **Power.** These figures are approximate. They use a normal approximation on the
+  log odds ratios and treat positions as independent, so they are optimistic.
+  - Basis: the original set's counts, 0.228 first-cycle fragile positions per
+    prompt pooled over the two configurations, and a later rate of 0.08. For 960
+    prompts this predicts about 219 first-cycle and 12,200 later fragile positions.
+  - Joint power of (a) and (b), with the control at an odds ratio of 1, is about
+    0.87 at the exploratory effect (0.17 against 0.08, odds ratio 2.36). It is 0.70
+    at an odds ratio of 2.0 and 0.51 at 1.75.
+  - 800 prompts would give about 0.81, so the set is sized to stay above 0.8 at the
+    exploratory effect.
+- **If supported.** Use the cache tap to compare the GDN state handed from prefill to
+  the first verify forward with the state handed to the first plain decode step.

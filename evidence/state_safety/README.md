@@ -354,9 +354,10 @@ Setup section. Rates are per 1,000 compared tokens
 
 **Pending** (queued, pinned): radix cache off, overlap off, deterministic inference
 and FP32 head for plain and MTP, the logprobs-off control, retraction, a second MTP
-session, and the ReplaySSM and FlashInfer GDN decode paths. Not yet designed: the
-pre-declared first-cycle test on fresh prompts and the prefill-to-decode handoff
-check above.
+session, and the ReplaySSM and FlashInfer GDN decode paths. The first-cycle test on
+fresh prompts is declared, with its prompts, runs, analysis and decision rule fixed
+(`experiments/state_safety/README.md`, "Declared follow-up"), and is not yet run. The
+prefill-to-decode handoff check depends on its outcome.
 
 ## History dependence through radix-cache insertion
 
