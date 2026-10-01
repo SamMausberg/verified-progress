@@ -77,7 +77,13 @@ nvidia-smi --query-gpu=name,driver_version,clocks.max.sm,clocks.max.mem --format
   git rev-parse HEAD
   echo "dirty $(git status --porcelain | wc -l)"
 } >"$OUT/commit.txt"
-step tests 600 python -m pytest tests/test_certified_head.py -q -s -p no:cacheprovider
+# Every kernel variant must compile (CPU, no GPU needed) before the GPU steps run.
+step compile 900 python experiments/certified_head/compile_check.py
+if ! ok compile; then
+  echo "=== FAILED $(date +%T): kernels do not compile; see $OUT/compile.log"
+  exit 1
+fi
+step tests 900 python -m pytest tests/test_certified_head.py -q -s -p no:cacheprovider
 step replay 300 python experiments/certified_head/replay_decisions.py --limit-rows 60000 \
   --sample-temps 0.7 1.0 --out "$OUT/replay_decisions.json"
 step invariance 120 python experiments/certified_head/stock_invariance.py --out "$OUT/stock_invariance.json"
@@ -108,6 +114,9 @@ if ok micro; then
 else
   skip summarize micro
 fi
+# Exit codes are not enough: check the outputs themselves (refusals, per-arm
+# errors, Nsight launches, sweep winners).
+step check_outputs 120 python experiments/certified_head/check_outputs.py "$OUT"
 nvidia-smi --query-compute-apps=pid,used_memory --format=csv || true
 bad=$(awk -F'\t' '$2 != "ok"' "$OUT/steps.tsv")
 if [ -n "$bad" ]; then
