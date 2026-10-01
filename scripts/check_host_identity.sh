@@ -53,10 +53,12 @@ for p in "${patterns[@]}"; do args+=(-e "$p"); done
 
 status=0
 for f in "${files[@]}"; do
-  # The path itself is published too.
+  # The path itself is published too; a path that names the identity is not printed.
+  shown="$f"
   for p in "${patterns[@]}"; do
     if [[ ${f,,} == *"${p,,}"* ]]; then
-      echo "$f: the path contains this machine's hostname or IP address" >&2
+      shown="(a staged path, not shown)"
+      echo "$shown: the path contains this machine's hostname or IP address" >&2
       status=1
       break
     fi
@@ -69,7 +71,7 @@ for f in "${files[@]}"; do
     hits="$(grep -n -a -i -F "${args[@]}" "$f" | cut -d: -f1 | tr '\n' ' ' || true)"
   fi
   if [ -n "$hits" ]; then
-    echo "$f: line(s) ${hits% } contain this machine's hostname or IP address" >&2
+    echo "$shown: line(s) ${hits% } contain this machine's hostname or IP address" >&2
     status=1
   fi
 done

@@ -105,9 +105,11 @@ def test_global_ipv6_addresses_are_patterns_but_local_ones_are_not(tmp_path: Pat
 def test_paths_are_checked_as_well_as_contents(tmp_path: Path) -> None:
     env = fake_host(tmp_path, '203-0-113-7', '203.0.113.7')
     (tmp_path / 'run-203-0-113-7.log').write_text('clean\n')
-    done = run(env, tmp_path, 'run-203-0-113-7.log')
+    (tmp_path / 'both-203.0.113.7.txt').write_text('203.0.113.7\n')
+    done = run(env, tmp_path, 'run-203-0-113-7.log', 'both-203.0.113.7.txt')
     assert done.returncode == 1
-    assert 'the path contains' in done.stderr
+    assert done.stderr.count('the path contains') == 2
+    assert '203' not in done.stderr, 'the report must not repeat the address in a path'
 
 
 def test_ipv6_matches_any_case_and_the_expanded_form(tmp_path: Path) -> None:
