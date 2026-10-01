@@ -11,7 +11,7 @@ The speed at stake for the target's own head is modest. For Qwen3.5-4B the head 
 \begin{figure}[t]
 \centering
 \input{figures/breakdown}
-\caption{Where the GPU time of a stock decode step goes (baseline; no certified head), measured under Nsight Systems at a fixed batch of $B$ requests \ev{profile-attr}. The output head is its GEMM, the FP32 copy of its logits and the argmax. An MTP cycle (three draft steps here, four in Section~\ref{sec:measure}) adds the drafter's heads; the right-hand column counts all heads (Table~\ref{tab:profile-mtp} splits them). Tracing inflates the MTP cycle's idle time; untraced it is about 21\%, 20\% and 15\% (derived, Appendix~\ref{app:profile}).}
+\caption{Where the GPU time of a stock decode step goes (baseline; no certified head), measured under Nsight Systems at a fixed batch of $B$ requests \ev{profile-attr}. The target head is its GEMM, the FP32 copy of its logits and the argmax. An MTP cycle (three draft steps here, four in Section~\ref{sec:measure}) adds the drafter's heads. The numbers beside the bars give the heads' share: the target head for plain decoding, target plus drafter heads for MTP. Tracing inflates the MTP cycle's idle time (dotted); untraced it is about 21\%, 20\% and 15\% (derived, Appendix~\ref{app:profile}).}
 \label{fig:breakdown}
 \end{figure}
 
@@ -26,7 +26,7 @@ We also test a second source of bounds, which we call \emph{transport}. A drafte
 \begin{figure*}[t]
 \centering
 \input{figures/mechanism}
-\caption{How the certified head chooses a token (schematic; values illustrative). \textbf{(a)}~The int8 copy scores every vocabulary entry and bounds the error, giving an interval $[lo_i,hi_i]$ that contains the exact score. An entry with $hi_i<\max_jlo_j-\delta_{\max}$, below the leader by more than twice the stock kernel's largest modelled error plus one BF16 spacing, cannot win and is dropped; one or two candidates usually remain. \textbf{(b)}~The candidates are recomputed from their BF16 weights and widened by the error model to the FP32 sums the stock kernel could form, whose BF16 roundings are shaded. \textbf{(c)}~If a position of the head call is open, the stock head recomputes either the whole batch or that position's candidates (Section~\ref{sec:kernel-fallback}).}
+\caption{How the certified head chooses a token (schematic; values illustrative). \textbf{(a)}~The int8 copy scores every vocabulary entry and bounds the error, giving an interval $[lo_i,hi_i]$ that contains the exact score. An entry with $hi_i<\max_jlo_j-\delta_{\max}$ cannot win and is dropped, where $\delta_{\max}$ is twice the stock kernel's largest modelled error plus the BF16 spacing at the largest score (Section~\ref{sec:headcontracts}); one or two candidates usually remain. \textbf{(b)}~The candidates are recomputed from their BF16 weights and widened by the error model to the FP32 sums the stock kernel could form, whose BF16 roundings are shaded. \textbf{(c)}~If a position of the head call is open, the stock head recomputes either the whole batch or that position's candidates (Section~\ref{sec:kernel-fallback}).}
 \label{fig:mechanism}
 \end{figure*}
 
@@ -35,5 +35,5 @@ We also test a second source of bounds, which we call \emph{transport}. A drafte
 \item \emph{A contract against the engine's own head} (Section~\ref{sec:contract}): two proved conditions under which intervals around the stock kernel's FP32 sums fix the stock head's token at the same batch shape, with the stock head as the fallback. The kernel's error bound is assumed and tested, not proved.
 \item \emph{A certified head that meets it} (Section~\ref{sec:head}): an error bound for the int8 copy that holds for tensor-core accumulation under Khattak and Mikaitis's model of Hopper, the GH200's GPU architecture~\cite{khattak2026}, and one procedure that decides greedy tokens and, in the engine's deterministic-inference mode without top-$k$ or top-$p$ truncation, seeded samples. Each compiled kernel is checked, not proved, to compute the modelled arithmetic.
 \item \emph{Measurements on the engine's own states} (Section~\ref{sec:measure}): recomputation, fallback and token agreement offline and inside the engine, and the head's time in isolation; the effect on serving is not yet measured \pend{bench-cert}.
-\item \emph{A negative result} (Section~\ref{sec:transport}): for both public drafters, with every bound variant and tile layout tested, certified transport skips under 0.7\% of the vocabulary, because draft and target head inputs differ two orders of magnitude more than certified bounds tolerate.
+\item \emph{A negative result} (Section~\ref{sec:transport}): for both public drafters and every bound variant and tile layout tested, certified transport skips under 0.7\% of the vocabulary.
 \end{enumerate}
