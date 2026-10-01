@@ -168,23 +168,28 @@ overlap scheduler and CUDA graphs on, static memory fraction 0.25. `experiments/
 finds each prompt's first token divergence from stock plain decoding and classifies it by the two
 runs' own margins between the competing tokens: an exact BF16 tie, one BF16 step, near (both
 margins at most 0.5 nats) or large ([`../state_safety/README.md`](../state_safety/README.md)).
-Classes follow `bench/arms.py`: **bitwise** means every token and every top-5 logprob is equal;
-**exact up to rounding** means every first divergence is a tie, one step or near, and no run
-commits a token that is not its own top-1.
+Classes follow `bench/arms.py`. **Bitwise** means that for every prompt the two runs return the
+same output token ids and the same top-5 logprob arrays (token ids and values at every output
+position); `experiments/backbone/bitwise_runs.py` checks this on the raw runs
+([`served/bitwise_c1_unpinned.json`](served/bitwise_c1_unpinned.json),
+[`served/bitwise_lever_v1_pinned.json`](served/bitwise_lever_v1_pinned.json)). **Exact up to
+rounding** means every first divergence is a tie, one step or near, and no run commits a token
+that is not its own top-1.
 
 **Off, merge and gemv** ran at concurrency 1 with SGLang-sized pools, like the stock reference run
 (running limit 16; the five servers' KV pools held 93,544 to 160,610 tokens). No prefill in any of
 these runs reused a cached prefix, and two stock servers with different pools (97,672 and 133,885
-tokens) gave bitwise-equal outputs, so neither pool size nor request history entered the
-comparison ([`served/exactness_c1_unpinned.json`](served/exactness_c1_unpinned.json)).
+tokens) returned bitwise-equal outputs for all 320 prompts at concurrency 1, so at this
+concurrency neither pool size nor request history entered the comparison
+([`served/exactness_c1_unpinned.json`](served/exactness_c1_unpinned.json)).
 
-| Comparison | Prompts that diverge | Per 1,000 tokens | tie / one step / near / large | Class |
-|---|---|---|---|---|
-| stock, two fresh servers, c = 1 | 0 / 320 | 0 | - | bitwise (reference) |
-| stock, c = 1 against c = 32 on one server, cap 16 | 167 / 320 | 3.42 | 151 / 14 / 2 / 0 | batch-shape noise floor |
-| off against stock, c = 1 | 0 / 320 | 0 | - | **bitwise** |
-| merge against stock, c = 1 | 0 / 320 | 0 | - | **bitwise** |
-| gemv against stock, c = 1 | 174 / 320 | 3.75 | 164 / 8 / 2 / 0 | **exact up to rounding** |
+| Comparison | Prompts that diverge | Per 1,000 tokens | tie / one step / near / large | Bitwise-equal prompts | Class |
+|---|---|---|---|---|---|
+| stock, two fresh servers, c = 1 | 0 / 320 | 0 | - | 320 / 320 | bitwise (reference) |
+| stock, c = 1 against c = 32 on one server, cap 16 | 167 / 320 | 3.42 | 151 / 14 / 2 / 0 | 0 / 320 | batch-shape noise floor |
+| off against stock, c = 1 | 0 / 320 | 0 | - | 320 / 320 | **bitwise** |
+| merge against stock, c = 1 | 0 / 320 | 0 | - | 320 / 320 | **bitwise** |
+| gemv against stock, c = 1 | 174 / 320 | 3.75 | 164 / 8 / 2 / 0 | 0 / 320 | **exact up to rounding** |
 
 **Lever v1** ran with the pools pinned as in the state workstream's matrix (running limit 8,
 49,152 KV tokens, 40 GDN slots; the runner restarts a server until it gets exactly these), one
@@ -193,23 +198,25 @@ structure of the pinned stock repeat. At concurrency 32 the limit of 8 binds, so
 run at M = 1 to 8 and reach the Triton route
 ([`served/exactness_lever_v1_pinned.json`](served/exactness_lever_v1_pinned.json)).
 
-| Comparison (pinned pools, cap 8) | Prompts that diverge | Per 1,000 tokens | tie / one step / near / large | Class |
-|---|---|---|---|---|
-| stock, two fresh servers, c = 1 | 0 / 320 | 0 | - | bitwise (reference) |
-| stock, two fresh servers, c = 32 | 4 / 320 | 0.06 | 4 / 0 / 0 / 0 | reference |
-| stock, c = 1 against c = 32 on one server | 41 / 320 | 0.63 | 39 / 2 / 0 / 0 | batch-shape noise floor at cap 8 |
-| lever v1 against stock, c = 1 | 161 / 320 | 3.40 | 157 / 3 / 1 / 0 | **exact up to rounding** |
-| lever v1 against stock, c = 32 | 174 / 320 | 3.82 | 167 / 6 / 1 / 0 | **exact up to rounding** |
+| Comparison (pinned pools, cap 8) | Prompts that diverge | Per 1,000 tokens | tie / one step / near / large | Bitwise-equal prompts | Class |
+|---|---|---|---|---|---|
+| stock, two fresh servers, c = 1 | 0 / 320 | 0 | - | 320 / 320 | bitwise (reference) |
+| stock, two fresh servers, c = 32 | 4 / 320 | 0.06 | 4 / 0 / 0 / 0 | 312 / 320 | reference |
+| stock, c = 1 against c = 32 on one server | 41 / 320 | 0.63 | 39 / 2 / 0 / 0 | 245 / 320 | batch-shape noise floor at cap 8 |
+| lever v1 against stock, c = 1 | 161 / 320 | 3.40 | 157 / 3 / 1 / 0 | 0 / 320 | **exact up to rounding** |
+| lever v1 against stock, c = 32 | 174 / 320 | 3.82 | 167 / 6 / 1 / 0 | 0 / 320 | **exact up to rounding** |
 
-- **Off** is the no-op check of the series: all 320 outputs match stock in every token and
-  top-5 logprob.
-- **Merge** is bitwise in served outputs where it acts at concurrency 1: every prompt of 64 or
-  more tokens, more than half of the set (the median prompt has 78 tokens,
-  [`../state_safety/prompt_manifest.json`](../state_safety/prompt_manifest.json)), is prefilled
-  through the packed GEMM, and every output equals stock's, as the per-GEMM microbenchmark
-  predicted. Decode at concurrency 1 stays below the 64-row cutoff, so
+- **Off** is the no-op check of the series: at concurrency 1 with SGLang-sized pools, all 320
+  prompts have the same output token ids and the same top-5 logprob arrays as stock.
+- **Merge** is bitwise in served outputs where it acts at concurrency 1 (same comparison as off):
+  every prompt of 64 or more tokens, more than half of the set (the median prompt has 78
+  tokens, [`../state_safety/prompt_manifest.json`](../state_safety/prompt_manifest.json)), is
+  prefilled through the packed GEMM, and all 320 outputs equal stock's in token ids and top-5
+  logprob arrays, as the per-GEMM microbenchmark predicted. Decode at concurrency 1 stays below the 64-row cutoff, so
   this run does not cover the packed GEMM in decode.
-- **Gemv and lever v1** change exact ties. Every first divergence is rounding-level (the largest
+- **Gemv and lever v1** change exact ties. Token ids stay equal on 146 to 159 of the 320 prompts,
+  but no prompt keeps all its top-5 logprob values: the different summation order shifts some
+  logit by a rounding somewhere in every output. Every first divergence is rounding-level (the largest
   margin is 0.25 nats; the one near event in each lever pass, `mt_bench-0079`, is two BF16 steps
   against one), and no run commits a token that is not its own top-1 (0 of 69,816 to 70,066
   positions per run). Both kernels sum each output in a different order from cuBLAS, which
@@ -325,10 +332,13 @@ SGLANG_BACKBONE_GEMM=1 SGLANG_BACKBONE_PDL=1 SGLANG_BACKBONE_MERGE_IN_PROJ=1 SGL
 #   unpinned: plain, plain__rep -> state's runs; plain__bb_{off,merge,gemv} -> $U
 #   pinned:   plain, plain__rep -> state's runs_pinned; plain__bb_lever_v1 -> state_runs_pinned
 for regime in unpinned pinned; do
-  out=evidence/backbone/served/exactness_$([ $regime = unpinned ] && echo c1_unpinned || echo lever_v1_pinned)
+  tag=$([ $regime = unpinned ] && echo c1_unpinned || echo lever_v1_pinned)
+  out=evidence/backbone/served/exactness_$tag
   python experiments/state_safety/compare.py --runs ~/vp-data/backbone/compare/$regime --require-all \
       --all-logprob-differences --pairs evidence/backbone/served/exactness_pairs_$regime.json \
       --out-json $out.json --out-csv ${out}_events.csv --out-table ${out}_table.csv --out-meta ${out}_meta.json
+  python experiments/backbone/bitwise_runs.py --runs ~/vp-data/backbone/compare/$regime \
+      --pairs evidence/backbone/served/exactness_pairs_$regime.json --out evidence/backbone/served/bitwise_$tag.json
 done
 # Paired serving: one exclusive hold, in the order B A A B (A: the same command without the --env
 # switches, label backbone-plain-v1-A), repository commit 50978e2.

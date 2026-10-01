@@ -119,9 +119,10 @@ Secondary investigations and supporting material:
   decoding 3.4% faster at concurrency 1 and 1.0% at 128 (two pairs, one
   session), with greedy outputs exact up to rounding against stock; at
   concurrency 8 it gains 0.4%, a tenth of the microbenchmark prediction, for a
-  reason not yet traced. The packed projection alone is bitwise equal to stock.
-  Folding the norm and SiLU into the GEMM, as implemented, is a measured loss.
-  Serving against tuned MTP is pending (`evidence/backbone/`).
+  reason not yet traced. The packed projection alone gives the same tokens
+  and top-5 logprobs as stock on 320 prompts at concurrency 1. Folding the
+  norm and SiLU into the GEMM, as implemented, is a measured loss. Serving
+  against tuned MTP is pending (`evidence/backbone/`).
 - **Exact witnesses.** `tests/test_state_structure.py` and
   `tests/test_contracts.py` check in exact arithmetic why the recurrent state
   resists exact compression, why computation cannot be shared across unrelated
