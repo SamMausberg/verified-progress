@@ -111,7 +111,7 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 - `done` P7: five-contract framing of every exactness claim in the paper, counterexamples reproduced as tests (paper; PR #26, #30; `evidence/contracts/`)
 - `active` P10: anchor-fused exact replay of the accepted GDN tail inside the next verify; first the per-phase split with SGLang's exact GDN fold at c = 8 and 16, build only if the fold phase is at least 9.09% of the cycle (drafter; phase-timing hold queued)
 - `dropped` P11: restartable prefix-demand verification, in favour of P10 (Sam's revision; recorded in the paper's proposals appendix, PR #100); its free-boundary oracle stays as a P10 control
-- `active` P13: GDN state reduction chosen for future output distortion, a training-free test against the lossy-stack quality budget (moonshot; queued)
+- `done` P13: GDN state reduction chosen for future output distortion, a training-free test against criteria of the lossy-stack budget's form (moonshot; PR #145, `evidence/moonshot/README.md` section 2g): under long-context teacher forcing no tested reduction (r = 32, 64, 96; at least a 25% cut) meets them (best, energy basis at r = 96: KL 0.133 nats, 93.8% top-1), and P13 is closed; the declared logit probe was not run
 
 ### Engine
 - `active` Differential output-equality tests: MTP versus plain decode, rejection positions, aborts, prefix reuse (state; PR #59, #76, #86, #110; `evidence/state_safety/`): truncation and stop tokens at every in-cycle index are token-identical for MTP chains, and identical in tokens and logprobs for the tree; with the radix cache on, a request's logprobs depend on which request computed its shared prefix. Checkpoint reuse, aborts with slot reuse and chunked prefill remain
