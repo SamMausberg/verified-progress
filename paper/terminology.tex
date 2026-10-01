@@ -7,10 +7,10 @@
 \term{main}{Batch shape $M$}{The number of positions in one head call; cuBLAS chooses its kernel by it. $B$ is the number of requests in a decode step.}
 \term{main}{Real logit $z_i$}{$\langle w_i,h\rangle$ in exact arithmetic over the stored BF16 operands.}
 \term{main}{Accumulator $\hat y_i$}{The FP32 sum a kernel forms for a logit before rounding it to BF16.}
-\term{main}{Stock head}{SGLang's head at the pin: a cuBLAS BF16 GEMM with FP32 accumulation and BF16 output, then \code{torch.argmax} (first maximal index).}
+\term{main}{Stock head}{SGLang's head at the pinned commit: a cuBLAS BF16 GEMM with FP32 accumulation and BF16 output, then \code{torch.argmax} (first maximal index).}
 \term{main}{\Rreal, \Rbf, \Rstock, \Srace}{The four references for one decision (Definition~\ref{def:contracts}).}
 \term{main}{Error model $\gamma$, $G_i$}{An assumed bound $G_i=\gamma\sum_j|w_{ij}h_j|+\eta$ on the stock kernel's accumulation error, with $\gamma$ from the \modelcons{} or the \modelhopper{} (Section~\ref{sec:headcontracts}, Table~\ref{tab:assumptions}).}
-\term{main}{Error bound $\beta_i$}{A proved bound on the error of the int8 copy's score for entry $i$ (Theorem~\ref{thm:envelope}); the appendices also call it the envelope.}
+\term{main}{Error bound $\beta_i$}{A proved bound on the error of the int8 copy's score for entry $i$ (Theorem~\ref{thm:envelope}).}
 \term{main}{Enclosure, interval $[lo_i,hi_i]$}{An interval that contains the value it encloses, given the stated assumptions, computed with outward rounding.}
 \term{main}{Candidate}{A vocabulary entry the screen cannot exclude; it is recomputed from its BF16 row.}
 \term{main}{Certified position}{A position whose \Rstock{} token the intervals fix for every accumulator value the error model admits.}
