@@ -1,0 +1,93 @@
+{
+ "kind": "oracle upper bound for P-C one-sweep progress with point-predictor interpreters; CPU",
+ "boundaries": 18022,
+ "requests": 80,
+ "skipped": {
+  "no_correction_or_no_remainder": 3070,
+  "past_output_end": 262
+ },
+ "per_boundary_means": {
+  "fresh_dflash_capped": {
+   "mean": 3.555,
+   "ci95": [
+    3.326,
+    3.823
+   ]
+  },
+  "horizon": {
+   "mean": 10.435,
+   "ci95": [
+    10.169,
+    10.659
+   ]
+  },
+  "interpreter_only_copy": {
+   "mean": 0.588,
+   "ci95": [
+    0.519,
+    0.668
+   ]
+  },
+  "interpreter_only_mix": {
+   "mean": 0.829,
+   "ci95": [
+    0.746,
+    0.925
+   ]
+  },
+  "pc_bound_copy": {
+   "mean": 1.603,
+   "ci95": [
+    1.478,
+    1.743
+   ]
+  },
+  "pc_bound_mix": {
+   "mean": 2.004,
+   "ci95": [
+    1.856,
+    2.178
+   ]
+  },
+  "recycle": {
+   "mean": 0.438,
+   "ci95": [
+    0.407,
+    0.473
+   ]
+  }
+ },
+ "C1": {
+  "copy": {
+   "pc_bound_minus_fresh_dflash": {
+    "mean": -1.952,
+    "ci95": [
+     -2.127,
+     -1.801
+    ]
+   },
+   "rejected": true
+  },
+  "mix": {
+   "pc_bound_minus_fresh_dflash": {
+    "mean": -1.55,
+    "ci95": [
+     -1.698,
+     -1.413
+    ]
+   },
+   "rejected": true
+  }
+ },
+ "inputs": {
+  "trace_cycles_sha256": "28d10fae306904cbf856b3342da490eebd2084e9244944beffed6dcd2e843a15",
+  "sequences_sha256": "19fc24e8ab59e8ae8339603152e15717bd27b13842df8679170e6e1c1180584f",
+  "ngram_snapshot_sha256": "b1174862b45d47adf408deb903e9065c6bcc3f13a584f0136d60c87ef520773d"
+ },
+ "repo_commit": "adc4865bc04351311f348bbfb6f80fcfcc024af0",
+ "generator_sha256": {
+  "defect_oracle.py": "75b95e11950b194b2e61ca0d9ba291af655af9e2fd82b1e166c717c098ad9ee0",
+  "interpreters.py": "527f318c8cd33617de9b76d9b2dbfd817cefac84daeb143771b34bddcdd7964d",
+  "frame.py": "bd88525186ea02d0d07fe31126449d9dad2c277dcc56e4296566e2eafd83cdfd"
+ }
+}
