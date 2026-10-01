@@ -2,7 +2,8 @@
 % decoder layer. Drawn from evidence/state_safety/first_difference_by_module.csv (one row per
 % pair, first differing module, layer, kind and count). Full-attention layers are every fourth
 % layer (3, 7, ..., 31); the rest are Gated DeltaNet layers. The module kinds have no paper-wide
-% colour, so every mark is ink and the kinds differ by marker shape; each mark's count is printed.
+% colour, so every mark is ink and the kinds differ by marker shape; each mark's count is printed
+% (8 pt).
 \datafigure{../evidence/state_safety/first_difference_by_module.csv}{%
 \vpreadcsv{\divtable}{../evidence/state_safety/first_difference_by_module.csv}%
 \vpsum{\divtable}{pair}{plain_c1_vs_mtp_s3_c1}{count}{\nmtp}%
@@ -26,18 +27,18 @@
 % plain vs MTP: the GDN recurrence (decode kernel against target-verify kernel)
 \addplot[only marks,mark=*,mark size=2.6pt,ink,discard if not={kind}{gdn_core},
   nodes near coords={all \cnt: GDN recurrence (decode kernel vs target-verify kernel)},
-  every node near coord/.append style={anchor=west,xshift=0.12cm,font=\scriptsize}]
+  every node near coord/.append style={anchor=west,xshift=0.12cm,font=\figsmall}]
   table[x=layer,y expr=1.5,col sep=comma]{../evidence/state_safety/first_difference_by_module.csv};
 % concurrency 1 vs 32: gated RMSNorm of GDN layers, a full-attention layer's output, and the
 % MLP down-projection of a batched prefill; the count of prompts above each mark
 \addplot[only marks,mark=square*,mark size=2.3pt,ink,discard if not={kind}{gated_norm},
-  nodes near coords={\cnt},every node near coord/.append style={font=\scriptsize,anchor=south,yshift=1pt}]
+  nodes near coords={\cnt},every node near coord/.append style={font=\figsmall,anchor=south,yshift=1pt}]
   table[x=layer,y expr=0.3,col sep=comma]{../evidence/state_safety/first_difference_by_module.csv};
 \addplot[only marks,mark=triangle*,mark size=2.9pt,ink,discard if not={kind}{attn},
-  nodes near coords={\cnt},every node near coord/.append style={font=\scriptsize,anchor=south,yshift=1pt}]
+  nodes near coords={\cnt},every node near coord/.append style={font=\figsmall,anchor=south,yshift=1pt}]
   table[x=layer,y expr=0.3,col sep=comma]{../evidence/state_safety/first_difference_by_module.csv};
 \addplot[only marks,mark=diamond*,mark size=2.9pt,ink,discard if not={kind}{mlp_down_proj},
-  nodes near coords={\cnt},every node near coord/.append style={font=\scriptsize,anchor=west,xshift=2pt}]
+  nodes near coords={\cnt},every node near coord/.append style={font=\figsmall,anchor=west,xshift=2pt}]
   table[x=layer,y expr=-0.15,col sep=comma]{../evidence/state_safety/first_difference_by_module.csv};
 \end{axis}
 % key, in absolute centimetres below the axis

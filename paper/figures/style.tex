@@ -57,18 +57,20 @@
   drafter mtp/.style={cdraft,thick,densely dashed,mark=triangle*,mark size=1.8pt,mark options={solid}},
 }
 % ---------------------------------------------------------------------------
-% Text and axes. Figure text is set at most one size step below the body's 10 pt: labels, panel
-% titles and annotations \footnotesize (8 pt), tick labels, legends and direct labels
-% \scriptsize (7 pt). Text is black; the coloured line or mark beside a label carries the
+% Text and axes. In the MLSys style \footnotesize is 9 pt and \scriptsize 7 pt (body 10 pt).
+% Axis labels and panel titles are \footnotesize; notes in diagrams are \figsmall (8 pt, style
+% note); tick labels, legends and direct labels inside plots are \scriptsize (7 pt, style annot),
+% the smallest size used. Text is black; the coloured line or mark beside a label carries the
 % identity. Figures are drawn at their final size: never scale a figure.
 % \vpnum{digits}{expression} and \vppct{digits}{expression} print a computed value.
+\newcommand{\figsmall}{\fontsize{8}{9.5}\selectfont}
 \newcommand{\vpnum}[2]{\pgfmathparse{#2}\pgfmathprintnumber[fixed,precision=#1]{\pgfmathresult}}
 \newcommand{\vppct}[2]{\pgfmathparse{#2}\pgfmathprintnumber[fixed,precision=#1,fixed zerofill]{\pgfmathresult}\%}
 \tikzset{
   panel title/.style={font=\footnotesize,text height=1.6ex,text depth=.4ex,inner sep=2pt},
   % An arrow means "passes to"; every arrow carries a label saying what passes or when.
   flow/.style={-{Stealth[length=1.6mm]},semithick,draw=ink},
-  note/.style={font=\scriptsize,text=black,align=center},
+  note/.style={font=\figsmall,text=black,align=center},
   annot/.style={font=\scriptsize,inner sep=1pt},
 }
 \pgfplotsset{every axis/.append style={

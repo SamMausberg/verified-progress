@@ -3,16 +3,17 @@
 % (b) recompute the survivors, widen them by the stock kernel's modelled error, round to BF16 and
 % decide; (c) fall back for a position left open. Schematic: the values below are illustrative,
 % chosen to show each case, and are not data. Colours follow style.tex: blue the certified head,
-% vermilion the fallback and open decisions, grey dropped entries.
+% vermilion an open decision, ink (tinted) what the stock head computes, grey dropped entries.
+% Notes are \figsmall (8 pt); axis labels and titles \footnotesize (9 pt).
 \begin{tikzpicture}[x=1cm,y=0.8cm,font=\footnotesize]
 % ---------------- (a) approximate and bound ----------------
 \begin{scope}
-\node[panel title,anchor=north] at (1.93,4.35) {\paneltitle{a}{Approximate and bound (schematic)}};
+\node[panel title,anchor=north] at (2.3,4.35) {\paneltitle{a}{Approximate and bound (schematic)}};
 \draw[-{Stealth[length=1.5mm]},ink!70] (0,0) -- (0,3.55) node[above,inner sep=1pt,text=black]{score};
 \draw[ink!70] (0,0) -- (3.85,0);
 % entries: x, lo, hi, kept (1) or dropped (0); the threshold is 2.10 = 2.55 - delta_max
-\foreach \x/\lo/\hi/\k in {0.28/0.95/1.45/0, 0.62/0.35/0.85/0, 0.96/1.15/1.65/0, 1.30/2.55/3.05/1,
-                           1.64/0.60/1.10/0, 1.98/1.25/1.75/0, 2.32/2.00/2.50/1, 2.66/0.25/0.75/0,
+\foreach \x/\lo/\hi/\k in {0.28/0.95/1.45/0, 0.62/0.35/0.85/0, 0.96/1.15/1.62/0, 1.30/2.55/3.05/1,
+                           1.64/0.60/1.10/0, 1.98/1.12/1.60/0, 2.32/2.00/2.50/1, 2.66/0.25/0.75/0,
                            3.00/1.30/1.80/0, 3.34/0.80/1.30/0} {
   \ifnum\k=1
     \draw[ccert,line width=1.6pt] (\x,\lo) -- (\x,\hi);
@@ -24,25 +25,27 @@
 }
 \node at (3.62,1.0) {$\cdots$};
 \draw[dashed,ink] (0,2.55) -- (3.85,2.55);
-\node[annot,anchor=south west] at (0.03,2.56) {$\max_j lo_j$};
+\node[note,anchor=south west,inner sep=1pt] at (0.03,2.57) {$\max_j lo_j$};
 \draw[densely dotted,ink,thick] (0,2.10) -- (3.85,2.10);
-\node[annot,anchor=north west] at (0.03,2.08) {$\max_j lo_j-\delta_{\max}$};
+\node[note,anchor=north west,inner sep=1pt] at (0.03,2.07) {$\max_j lo_j-\delta_{\max}$};
 \node[anchor=north] at (1.93,-0.05) {vocabulary entries $i$};
-\draw[ccert,line width=1.6pt] (0.25,-0.88) -- (0.25,-0.58);
-\node[annot,anchor=west] at (0.35,-0.73) {kept: a candidate};
-\draw[ccontext!70,line width=1.2pt] (2.15,-0.88) -- (2.15,-0.58);
-\node[annot,anchor=west] at (2.25,-0.73) {dropped for good};
+\draw[ccert,line width=1.6pt] (0.2,-0.9) -- (0.2,-0.58);
+\node[note,anchor=west] at (0.3,-0.74) {candidate};
+\draw[ccontext!70,line width=1.2pt] (1.75,-0.9) -- (1.75,-0.58);
+\node[note,anchor=west] at (1.85,-0.74) {dropped for good};
 \end{scope}
 % from (a) to (b): the candidates pass on
-\draw[flow] (4.08,1.55) -- node[annot,above=1pt]{candidates} (4.95,1.55);
+\draw[flow] (4.05,1.55) -- node[note,above=1pt]{candidates} (5.12,1.55);
 % ---------------- (b) recompute and round ----------------
-\begin{scope}[xshift=5.2cm]
-\node[panel title,anchor=north] at (2.15,4.35) {\paneltitle{b}{Recompute and round (schematic)}};
+\begin{scope}[xshift=5.35cm]
+\node[panel title,anchor=north] at (2.25,4.35) {\paneltitle{b}{Recompute and round (schematic)}};
 \draw[-{Stealth[length=1.5mm]},ink!70] (0,0) -- (0,3.55) node[above,inner sep=1pt,text=black]{score};
 \draw[ink!70] (0,0) -- (4.3,0);
 % BF16 rounding boundaries, one spacing apart
 \foreach \y in {0.95,1.95,2.95} {\draw[ink!30] (0,\y) -- (4.3,\y);}
-\draw[decorate,decoration={brace,amplitude=3pt,mirror},ink] (4.37,1.95) -- node[annot,right=4pt,align=left]{one BF16\\spacing} (4.37,2.95);
+% one BF16 spacing, marked inside the empty part of the lowest cell
+\draw[{Stealth[length=1.3mm]}-{Stealth[length=1.3mm]},ink!70] (1.42,0.97) -- (1.42,1.93);
+\node[note,anchor=west,align=left] at (1.5,1.45) {one BF16\\spacing};
 % \vpcase{x}{lo}{hi}{cell lo}{cell hi}{name}{colour}: a candidate's interval for the stock
 % kernel's FP32 sum (bar) and the BF16 rounding cells it can reach (shading)
 \newcommand{\vpcase}[7]{%
@@ -56,38 +59,41 @@
 \vpcase{1.92}{2.05}{2.40}{1.95}{2.95}{a}{ccert}\vpcase{2.32}{2.45}{2.80}{1.95}{2.95}{b}{ccert}
 % both straddle a boundary: either can round above the other
 \vpcase{3.42}{1.70}{2.15}{0.95}{2.95}{a}{cfallback}\vpcase{3.82}{1.75}{2.10}{0.95}{2.95}{b}{cfallback}
-\node[annot,align=center] at (0.62,0.45) {certified:\\$a$ wins};
-\node[annot,align=center] at (2.12,0.45) {certified: tie,\\lower index $a$};
-\node[annot,align=center] at (3.62,0.45) {open:\\either can win};
-\node[anchor=north,align=center] at (2.15,-0.05) {candidates, recomputed and widened};
-\node[annot,anchor=north,align=center] at (2.15,-0.5) {bar: the stock kernel's possible FP32 sums;\\shading: the BF16 values they round to};
+\node[note] at (0.62,0.45) {certified:\\$a$};
+\node[note] at (2.12,0.45) {certified:\\tie, so $a$};
+\node[note] at (3.62,0.45) {open};
+\node[anchor=north] at (2.15,-0.05) {candidates, recomputed and widened};
+\node[note,anchor=north] at (2.15,-0.52) {bar: possible FP32 sums\\shading: their BF16 values};
 \end{scope}
 % ---------------- (c) fall back ----------------
-% One head call of M = 8 positions: blue, the certified head's token; vermilion, the stock
-% head's token; an outlined cell, a position left open.
-\begin{scope}[xshift=11.3cm]
-\node[panel title,anchor=north] at (2.55,4.35) {\paneltitle{c}{Fall back (schematic)}};
-% \vpstrip{y}{open cell (0 for none)}{fallback cells: 0 none, 1 the open cell, 2 all}
-\newcommand{\vpstrip}[3]{%
+% One head call of M = 8 positions. Fill: blue, certified; vermilion, open; ink tint, rerun by the
+% stock head.
+\begin{scope}[xshift=10.75cm]
+\node[panel title,anchor=north] at (2.45,4.35) {\paneltitle{c}{Fall back (schematic)}};
+% \vpstrip{y}{state}: state 0 after (b), cell 6 open; 1 whole-batch fallback, every cell rerun;
+% 2 per-position fallback, cell 6 rerun
+\newcommand{\vpstrip}[2]{%
   \foreach \i in {1,...,8} {%
-    \pgfmathsetmacro{\vpx}{0.33*(\i-1)}%
-    \ifnum#3=2 \def\vpfill{cfallback!28}\else
-      \ifnum\i=#2 \ifnum#3=1 \def\vpfill{cfallback!28}\else\def\vpfill{white}\fi
+    \pgfmathsetmacro{\vpx}{0.3*(\i-1)}%
+    \ifnum#2=1 \def\vpfill{ink!30}\else
+      \ifnum\i=6 \ifnum#2=0 \def\vpfill{cfallback!45}\else\def\vpfill{ink!30}\fi
       \else\def\vpfill{ccert!22}\fi\fi
-    \filldraw[fill=\vpfill,draw=ink!45] (\vpx,#1) rectangle ++(0.33,0.45);}%
-  \ifnum#3=0 \draw[cfallback,thick] ({0.33*(#2-1)},#1) rectangle ++(0.33,0.45);\fi}
-\vpstrip{2.75}{6}{0}
-\node[annot,anchor=south] at (1.32,3.22) {one head call, $M$ positions};
-\node[annot,anchor=north] at (1.815,2.73) {open};
-\node[annot,anchor=west,align=left] at (2.8,2.98) {after (b): blue\\certified, one open};
-\vpstrip{1.30}{6}{2}
-\node[annot,anchor=west,align=left] at (2.8,1.52) {stock head on all\\$M$ positions, same\\shape; no error model};
-\vpstrip{-0.15}{6}{1}
-\node[annot,anchor=west,align=left] at (2.8,0.07) {stock head on the open\\position's candidates;\\needs per-position\\invariance};
-% the two fallbacks for the open position: alternatives, each labelled
-\draw[flow] (-0.04,2.97) -- (-0.32,2.97) -- (-0.32,1.52) -- (-0.04,1.52);
-\draw[flow] (-0.32,1.52) -- (-0.32,0.07) -- (-0.04,0.07);
-\node[annot,anchor=south west] at (0.0,1.78) {whole-batch fallback};
-\node[annot,anchor=south west] at (0.0,0.33) {per-position fallback};
+    \filldraw[fill=\vpfill,draw=ink!45] (\vpx,#1) rectangle ++(0.3,0.45);}}
+\node[note,anchor=south] at (1.2,3.32) {one head call, $M$ positions};
+\vpstrip{2.85}{0}
+\node[note,anchor=west,align=left] at (2.5,3.07) {one position open};
+\node[note,anchor=south west] at (0,1.82) {whole-batch fallback};
+\vpstrip{1.35}{1}
+\node[note,anchor=west,align=left] at (2.5,1.57) {stock head reruns all\\$M$ positions, same shape};
+\node[note,anchor=south west] at (0,0.32) {per-position fallback};
+\vpstrip{-0.15}{2}
+\node[note,anchor=west,align=left] at (2.5,0.07) {stock head reruns the\\open position's\\candidates; needs\\per-position invariance};
+% the two fallbacks for the open position: alternatives, each named above its strip
+\draw[flow] (-0.04,3.07) -- (-0.32,3.07) -- (-0.32,1.57) -- (-0.04,1.57);
+\draw[flow] (-0.32,1.57) -- (-0.32,0.07) -- (-0.04,0.07);
+% colour key
+\foreach \c/\t/\x in {ccert!22/certified/0, cfallback!45/open/1.7, ink!30/rerun by stock head/2.85} {
+  \filldraw[fill=\c,draw=ink!45] (\x,-1.45) rectangle ++(0.22,0.3);
+  \node[note,anchor=west,text height=1.6ex,text depth=0.4ex] at (\x+0.25,-1.3) {\t};}
 \end{scope}
 \end{tikzpicture}
