@@ -1,0 +1,17 @@
+{
+  "interval_s": 1.0,
+  "samples": 26,
+  "foreign_cores_mean": 0.744,
+  "foreign_cores_max": 1.51,
+  "contended": false,
+  "contention_threshold_cores": 2.0,
+  "top_foreign_mean_cores": {
+    "claude --dangerously-skip-permissions": 0.18,
+    "/home/ubuntu/.cache/pre-commit/repozih6vfym/py_env-python3.13/bin/python /home/ubuntu/.cache/pre-commit/repozih6vfym/py_": 0.16,
+    "bash /home/ubuntu/vp-wt/infra-contain/scripts/gpu_drain_wait.sh": 0.01
+  },
+  "own_peak_cores": {
+    "python /home/ubuntu/vp-wt/drafter-run/experiments/drafter/ac": 5.17,
+    "sglang::scheduler": 1.03
+  }
+}

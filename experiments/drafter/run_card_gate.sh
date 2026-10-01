@@ -8,7 +8,7 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 unset SGLANG_WORKTREE
 # shellcheck source=/dev/null
-source "$HOME/verified-progress/scripts/sglang_env.sh"
+source "$here/../../scripts/sglang_env.sh"
 out="${1:-$HOME/vp-data/drafter/card-gate}"
 python "$here/serve_run.py" --arm dflash --block 16 --port 30084 --out "$out/b16" \
   --mem 0.25 --max-running 4 \

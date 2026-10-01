@@ -1,0 +1,13 @@
+{
+  "ref": "/home/ubuntu/vp-data/drafter/localize/dflash-w4-off/requests.jsonl",
+  "test": "/home/ubuntu/vp-data/drafter/localize/dflash-w4-off2/requests.jsonl",
+  "convention": "experiments/state_safety/compare.py (PR #37): tie, one_ulp, near (<=0.5 nats), large",
+  "requests": 80,
+  "sequences_diverged": 0,
+  "compared_tokens": 132371,
+  "divergences_per_1000_tokens": 0.0,
+  "classes": {},
+  "bitwise_identical_sequences": 80,
+  "first_logprob_difference": {},
+  "divergences": []
+}

@@ -28,12 +28,15 @@ ignore = ["E501"]
 "tests/*" = ["E402", "F403", "F405"]
 "scripts/*" = ["E402"]
 "experiments/*" = ["E402", "F403", "F405"]
+"bench/*" = ["E402"]
 
 [tool.ruff.lint.isort]
 known-first-party = [
+  "certified_head",
   "decision_reference",
   "precision_reference",
   "race_reference",
+  "real_states",
   "v1_reference",
   "v2_reference",
 ]

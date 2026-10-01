@@ -1,0 +1,58 @@
+{
+  "launch": {
+    "command": [
+      "~/sglang/.venv/bin/python",
+      "-m",
+      "sglang.launch_server",
+      "--model-path",
+      "Qwen/Qwen3.5-4B",
+      "--revision",
+      "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "30082",
+      "--attention-backend",
+      "flashinfer",
+      "--mm-attention-backend",
+      "triton_attn",
+      "--random-seed",
+      "0",
+      "--enable-metrics",
+      "--stream-interval",
+      "4",
+      "--mem-fraction-static",
+      "0.25",
+      "--max-running-requests",
+      "4"
+    ],
+    "env": {},
+    "sglang_worktree": "~/sglang",
+    "sglang_revision": "bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824",
+    "sglang_dirty": false,
+    "repo_revision": "db8e5262f43c370af22734541863e92aedd31280",
+    "clients": [
+      "python ~/vp-wt/drafter/experiments/drafter/accept_probe.py --port {port} --workload ~/vp-wt/drafter/experiments/drafter/panel-v2.jsonl --per-domain 32   --max-new-tokens 2048 --concurrency 1 --logprobs --out {out} --label plain"
+    ],
+    "started": "2026-10-01T04:09:20+0000"
+  },
+  "cpu_load": {
+    "interval_s": 1.0,
+    "samples": 684,
+    "foreign_cores_mean": 3.189,
+    "foreign_cores_max": 38.95,
+    "contended": true,
+    "contention_threshold_cores": 2.0,
+    "top_foreign_mean_cores": {
+      "sglang::scheduler": 1.05,
+      "~/sglang/.venv/bin/python -c from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=27, pipe_han": 0.16,
+      "claude --dangerously-skip-permissions": 0.13,
+      "~/sglang/.venv/bin/python -m sglang.launch_server --model-path Qwen/Qwen3.5-4B --revision 851bf6e806efd8d0a36": 0.1,
+      "~/.cursor-server/bin/linux-arm64/e44a49c17e334d442e58bbde931d791200f014a0/node --dns-result-order=ipv4first -": 0.1
+    },
+    "own_peak_cores": {
+      "python ~/vp-wt/drafter/experiments/drafter/accept": 5.04,
+      "sglang::scheduler": 1.04
+    }
+  }
+}

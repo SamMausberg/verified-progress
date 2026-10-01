@@ -1,6 +1,6 @@
-% Terminology, declared once (macros.tex explains \term). Scope main: printed in the main
-% text's Table tab:terms (owner: main-text author). Scope app: terms used only in the
-% appendices (owner: appendix editor). The glossary quotes the main definitions verbatim.
+% Terminology, declared once (macros.tex explains \term). Scope main: terms the main text
+% relies on (owner: main-text author). Scope app: terms used only in the appendices (owner:
+% appendix editor). The glossary (Appendix app:glossary) prints both scopes.
 \term{main}{Head input $h$}{The BF16 vector the engine feeds to the output head (the final norm's output).}
 \term{main}{Real logit $z_i$}{$\langle w_i,h\rangle$ in exact arithmetic over the stored BF16 operands.}
 \term{main}{Stock head}{SGLang's head at the pin: a cuBLAS BF16 GEMM with FP32 accumulation and BF16 output, then \code{torch.argmax} (first maximal index).}
@@ -35,7 +35,7 @@
 \term{app}{Fixed-noise verification}{Sampled verification that accepts a drafted token exactly when it wins the target's race under the keyed noise field (Theorem~\ref{thm:fixednoise}).}
 \term{app}{Frontier coordinates $x$, $y$}{Mean per-request output rate including the time to first token, and output tokens per second on the GPU (Equation~\eqref{eq:frontier}).}
 \term{app}{Guards, $P_?$}{Interval tests that decide the standard acceptance rule from enclosures of the numerator and the partition function; $P_?$ is the probability that neither fires (Theorem~\ref{thm:guards}).}
-\term{app}{H1--H7, P1--P13}{The programme's questions and the later proposals with pre-registered kill tests (Table~\ref{tab:status}); P7a and P7b are the two parts of P7, and a proposal is listed once it has a result or a decision.}
+\term{app}{H1--H7, P1--P13}{The programme's questions and the later proposals (Table~\ref{tab:status}), all but P13 with a pre-registered kill test; P7a and P7b are the two parts of P7, and a proposal is listed once it has a result or a decision.}
 \term{app}{Head chain}{The stock head GEMM, the FP32 copy of its logits and the argmax or top-1 that follows it (Appendix~\ref{app:profile}).}
 \term{app}{Integer pass}{A certified pass that quantizes the head input as well and accumulates exactly in int32 (Theorem~\ref{thm:integer}).}
 \term{app}{Keyed noise field}{Gumbel noise $G_{t,i}$ that is a pure function of (seed, absolute position $t$, token $i$), as in the engine's seeded sampler.}
