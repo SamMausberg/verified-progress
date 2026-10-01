@@ -30,9 +30,12 @@ Reads one fresh lever_sweep output directory and checks, for this run only:
     that engine tree), with no modified tracked files in either.
 Primary metric: the server's decode rate at exactly 128 running requests during the measured
 phase. The scheduler logs one `gen throughput` per 40 decode passes; a window counts when it
-shows `#running-req: 128` and both it and the previous decode line fall inside the AIPerf
-profiling phase (first request start to last request end, from profile_export_raw), so the
-AIPerf warm-up wave and the ramp-up and drain at the phase edges are excluded. Each window
+shows `#running-req: 128`, the previous decode line also shows 128, no `Prefill batch` line
+lies between the two (a window that contains a prefill pass mixes prefill time into its
+rate), and both lines fall inside the AIPerf profiling phase (first request start to last
+request end, from profile_export_raw), so the AIPerf warm-up wave and the ramp-up and drain
+at the phase edges are excluded. The windows at 128 running that fail the previous-line or
+prefill condition are counted and recorded as excluded. Each window
 carries the same number of tokens (128 per pass, no speculation), so the token-weighted rate
 is the harmonic mean of the window rates. Bench's own diagnostic
 (`server_log.logged_gen_tps_full_batch`, windows with >= 0.9 x the peak running count) is
@@ -86,9 +89,9 @@ THRESHOLD = 1.10
 MIN_WINDOWS = 8
 DECODE_WINDOW = re.compile(
     r'^\[(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\] Decode batch, #running-req: (\d+),'
-    r'.*?gen throughput \(token/s\): ([\d.]+)',
-    re.MULTILINE,
+    r'.*?gen throughput \(token/s\): ([\d.]+)'
 )
+PREFILL_LINE = re.compile(r'^\[[^\]]+\] Prefill batch')
 PROBE_WORDING = {
     'refuted': 'end-to-end exactness REFUTED by the output probe; P4 exact claim not supported',
     'undecided': 'output probe undecided (the dense repeat also differed); end-to-end '
@@ -187,19 +190,34 @@ def profiling_span(point_dir: Path) -> tuple[float, float]:
     return min(starts) / 1e9, max(ends) / 1e9
 
 
-def exact_batch_rate(log_text: str, start: float, end: float) -> tuple[float, int]:
-    """Harmonic-mean decode rate over the windows inside [start, end] at exactly 128 running."""
-    rates = []
-    previous = None
-    for stamp, running, rate in DECODE_WINDOW.findall(log_text):
+def exact_batch_rate(log_text: str, start: float, end: float) -> tuple[float, int, int]:
+    """Harmonic-mean decode rate over the steady windows inside [start, end] at exactly 128
+    running: (rate, windows counted, windows at 128 excluded for a prefill or a previous
+    line below 128)."""
+    rates: list[float] = []
+    excluded = 0
+    previous: tuple[float, int] | None = None  # (time, running) of the last decode line
+    prefill_since = False
+    for line in log_text.splitlines():
+        if PREFILL_LINE.search(line):
+            prefill_since = True
+            continue
+        match = DECODE_WINDOW.match(line)
+        if not match:
+            continue
+        stamp, running, rate = match.groups()
         moment = datetime.strptime(stamp, '%Y-%m-%d %H:%M:%S').replace(tzinfo=UTC).timestamp()
-        inside = previous is not None and previous >= start and moment <= end
-        if inside and int(running) == 128 and float(rate) > 0:
-            rates.append(float(rate))
-        previous = moment
+        in_phase = previous is not None and previous[0] >= start and moment <= end
+        if in_phase and int(running) == 128 and previous is not None:
+            if previous[1] == 128 and not prefill_since and float(rate) > 0:
+                rates.append(float(rate))
+            else:
+                excluded += 1
+        previous = (moment, int(running))
+        prefill_since = False
     if not rates:
-        return 0.0, 0
-    return len(rates) / sum(1 / r for r in rates), len(rates)
+        return 0.0, 0, excluded
+    return len(rates) / sum(1 / r for r in rates), len(rates), excluded
 
 
 def point_of(out: Path, label: str) -> tuple[dict[str, Any], Path]:
@@ -294,13 +312,14 @@ def main() -> None:
                     fail(f'{label}: launched with SGLANG_GDN_EXACT_REPLAY_BV={tile!r}, not 32')
             row[f'{key}_pools'] = resolved_pools(label, server_log)
             start, end = profiling_span(point['_point_dir'])
-            rate, windows = exact_batch_rate(text, start, end)
+            rate, windows, excluded = exact_batch_rate(text, start, end)
             if windows < MIN_WINDOWS:
                 fail(
                     f'{label}: {windows} decode windows at exactly 128 running, need {MIN_WINDOWS}'
                 )
             row[f'{key}_server_tps'] = rate
             row[f'{key}_windows_at_128'] = windows
+            row[f'{key}_windows_excluded'] = excluded
             row[f'{key}_bench_full_batch_tps'] = (point.get('server_log') or {}).get(
                 'logged_gen_tps_full_batch'
             )

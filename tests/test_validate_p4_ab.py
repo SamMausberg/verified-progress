@@ -65,8 +65,10 @@ PHASE_START = 1_790_812_810  # 2026-10-01 00:00:10 UTC
 PHASE_END = PHASE_START + 50
 
 
-def decode_log(rate: float, running_in_phase: int = 128) -> str:
-    """Decode-log lines every 2 s from 10 s before the profiling phase to 10 s after it."""
+def decode_log(rate: float, running_in_phase: int = 128, prefill_at: int | None = None) -> str:
+    """Decode-log lines every 2 s from 10 s before the profiling phase to 10 s after it; with
+    `prefill_at`, a prefill burst precedes the decode line at that offset into the phase,
+    whose window then shows 128 running at a low rate."""
     lines = []
     for t in range(PHASE_START - 10, PHASE_END + 11, 2):
         stamp = datetime.fromtimestamp(t, UTC).strftime('%Y-%m-%d %H:%M:%S')
@@ -74,6 +76,9 @@ def decode_log(rate: float, running_in_phase: int = 128) -> str:
         running = running_in_phase if inside else 128
         # Outside the phase (warm-up wave, drain) the rate is deliberately off.
         shown = rate if inside else rate / 3
+        if prefill_at is not None and t == PHASE_START + prefill_at:
+            lines.append(f'[{stamp}] Prefill batch, #new-seq: 8, #new-token: 16384')
+            shown = rate / 8
         lines.append(
             f'[{stamp}] Decode batch, #running-req: {running}, #token: 1, '
             f'gen throughput (token/s): {shown:.2f}, #queue-req: 0'
@@ -110,6 +115,7 @@ def make_run(
     state_dtype: str = 'float32',
     probe: str = 'no difference',
     running_in_phase: int = 128,
+    prefill_at: int | None = None,
     **overrides: Any,
 ) -> Path:
     """A synthetic A/B directory; `overrides` apply to the first exact-replay arm's point,
@@ -128,7 +134,9 @@ def make_run(
         sweep = {**manifest, 'points': [point(rate, **extra)]}
         (run / 'sweep.json').write_text(json.dumps(sweep))
         log = 'GDN decode: exact replay kernel, ring length 4\n' if exact else 'decode\n'
-        (run / 'server/server.log').write_text(pool_log + log + decode_log(rate, running_in_phase))
+        (run / 'server/server.log').write_text(
+            pool_log + log + decode_log(rate, running_in_phase, prefill_at)
+        )
         aiperf_raw(run / 'r0/c128/aiperf')
         env = {'SGLANG_GDN_EXACT_REPLAY': '1', 'SGLANG_GDN_EXACT_REPLAY_BV': tile} if exact else {}
         launch = {
@@ -289,3 +297,11 @@ def test_too_few_windows_at_128_fail(tmp_path: Path) -> None:
     result = run(make_run(tmp_path, running_in_phase=127))
     assert result.returncode == 1
     assert 'exactly 128' in result.stdout
+
+
+def test_post_prefill_window_is_excluded(tmp_path: Path) -> None:
+    result = run(make_run(tmp_path, prefill_at=20))
+    assert result.returncode == 0, result.stdout
+    pair = json.loads(result.stdout)['pairs'][0]
+    assert abs(pair['dense_server_tps'] - 10_010.0) < 0.5
+    assert pair['dense_windows_excluded'] == 1
