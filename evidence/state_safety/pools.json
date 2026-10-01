@@ -307,6 +307,114 @@
  },
  {
   "evidence": "noise_floor_pinned.json",
+  "comparison": "radix off c1, mtp_s3",
+  "server_a": "runs_pinned/mtp_s3/c1",
+  "server_b": "runs_pinned/mtp_s3_noradix/c1",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "radix off c32, mtp_s3",
+  "server_a": "runs_pinned/mtp_s3/c32",
+  "server_b": "runs_pinned/mtp_s3_noradix/c32",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "radix off, mtp_s3 c1 vs c32",
+  "server_a": "runs_pinned/mtp_s3_noradix/c1",
+  "server_b": "runs_pinned/mtp_s3_noradix/c32",
+  "same_server": true,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "overlap off c1, mtp_s3",
+  "server_a": "runs_pinned/mtp_s3/c1",
+  "server_b": "runs_pinned/mtp_s3_nooverlap/c1",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "overlap off vs radix off c1, mtp_s3",
+  "server_a": "runs_pinned/mtp_s3_noradix/c1",
+  "server_b": "runs_pinned/mtp_s3_nooverlap/c1",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "overlap off, mtp_s3 c1 vs c32",
+  "server_a": "runs_pinned/mtp_s3_nooverlap/c1",
+  "server_b": "runs_pinned/mtp_s3_nooverlap/c32",
+  "same_server": true,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
   "comparison": "spec vs plain c1, mtp_s1",
   "server_a": "runs_pinned/plain/c1",
   "server_b": "runs_pinned/mtp_s1/c1",
@@ -491,6 +599,42 @@
   "server_a": "runs_pinned/mtp_s3/c1",
   "server_b": "runs_pinned/mtp_tree/c1",
   "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "deterministic, mtp_s3 c1 vs c32",
+  "server_a": "runs_pinned/mtp_s3_det/c1",
+  "server_b": "runs_pinned/mtp_s3_det/c32",
+  "same_server": true,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "fp32 head, mtp_s3 c1 vs c32",
+  "server_a": "runs_pinned/mtp_s3_fp32head/c1",
+  "server_b": "runs_pinned/mtp_s3_fp32head/c32",
+  "same_server": true,
   "pools_a": {
    "max_total_tokens": 49152,
    "max_running_requests": 8,

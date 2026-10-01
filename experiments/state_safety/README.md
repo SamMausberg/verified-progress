@@ -34,7 +34,9 @@ state error perturbs the hidden state and shows up as drift even when no token
 flips. `cycles.py` buckets positions of a speculative run by the previous
 verify cycle's commit length (which draft position was rejected) and the
 offset inside the current cycle, so a rollback error for one accept length
-would stand out.
+would stand out. `perturbation.py` separates how many prompts a change perturbs at
+all (outputs not bitwise identical) from how often a perturbed trajectory then
+diverges in tokens, by the output index where the perturbation starts.
 
 ## Server configurations
 
@@ -62,7 +64,10 @@ Pinned runs go to `~/vp-data/state/runs_pinned/`. The first matrix runs (cap
 16, pools sized from free memory) stay in `~/vp-data/state/runs/`; `--no-pin`
 reproduces them. `analyze_all.sh` analyses both roots: `pairs_pinned.json` over
 `runs_pinned/` into the `*_pinned` evidence files, and `pairs.json` over `runs/` into
-the unsuffixed ones. `compare.py` and `cycles.py` take the root as a required
+the unsuffixed ones. Two deliberate mixed-regime comparisons ask whether the pools
+alone change batch-1 output: `pairs_cross_regime.json` (pinned against unpinned plain
+decoding, radix cache on) and `pairs_cross_bench.json` (pinned radix-off runs against
+the bench workstream's unpinned radix-off equality runs in `~/vp-data/bench/equality/runs`). `compare.py` and `cycles.py` take the root as a required
 `--runs`. Once `runs_pinned/` exists, a pair with a missing run fails the script
 unless `STATE_ALLOW_MISSING=1` is set. Pool regimes cannot be mixed silently.
 `run_matrix.py` refuses to write into a root that already holds runs of the other
@@ -76,7 +81,7 @@ earlier flags.
 |---|---|
 | `plain` | none (radix cache with the `extra_buffer` GDN strategy, overlap scheduler, CUDA graphs) |
 | `plain_noradix` | `--disable-radix-cache` |
-| `plain_nooverlap` | `--disable-overlap-schedule` |
+| `plain_nooverlap` | `--disable-overlap-schedule` (at this pin this also switches the GDN radix strategy from `extra_buffer` to `no_buffer`; see `server_args` in the server log) |
 | `plain_det` | `--enable-deterministic-inference` (with FlashInfer this also disables the radix cache) |
 | `plain_fp32head` | `--enable-fp32-lm-head` |
 | `mtp_s1`, `mtp_s3`, `mtp_s5` | `--speculative-algorithm EAGLE` (native MTP), steps 1/3/5, top-k 1, steps+1 draft tokens |
@@ -140,6 +145,20 @@ made from a scratch copy of this script, which read the same input files from
 `~/vp-data/state/tap`, ran the sessions in a different order and named the outputs
 `mechanism_v4_*`. The committed summaries were regenerated from its tap data with the
 current `mechanism.py`.
+
+`run_tap_v4_batch.sh` runs the same cache-level check for the concurrency pair, in one
+exclusive hold: plain decoding at concurrency 1 and 32 (at most 16 running), every
+prompt served in both sessions and the 40 prompts of `mechanism_plain_c1_vs_c32.json`
+(`tap_v4_inputs/ids_c1_vs_c32.txt`) tapped. `tap_runs.py --pin` pins both servers to
+the same pools (cap 16, 98,304 KV tokens, 80 GDN slots, given in `--extra-flags`) and
+restarts each until it allocates exactly those sizes; `meta.json` records the pins and
+the repository commit. An untapped c1 pass with the same pools on the same engine
+(`run_matrix.py`, into `~/vp-data/state/runs_cap16`) is the reference for the
+tap-neutrality check. The script refuses to start unless `~/sglang-wt/state` is a
+clean checkout of the tap tree (`9341fb82`) and the repository checkout is clean.
+The summary, `cachecheck_v4_plain_c1_vs_c32.json`, will be
+committed to `evidence/state_safety` once the hold has run; until then the check is
+pending.
 
 `tap_signature.py` (light,
 run by `analyze_all.sh`) finds where the v1 and v3 tapped sessions of the same

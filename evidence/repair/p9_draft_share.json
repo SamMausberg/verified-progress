@@ -1,0 +1,262 @@
+[
+  {
+    "run": "/home/ubuntu/vp-data/repair/runs/p9share/fresh_b16_c8",
+    "mode": "fresh",
+    "block": 16,
+    "concurrency": 8,
+    "engine_sha": "5d8e00e3e121e980fa055c06f86e0845972cc712",
+    "command": [
+      "/home/ubuntu/sglang/.venv/bin/python",
+      "-m",
+      "sglang.launch_server",
+      "--model-path",
+      "Qwen/Qwen3.5-4B",
+      "--revision",
+      "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "--attention-backend",
+      "flashinfer",
+      "--mm-attention-backend",
+      "triton_attn",
+      "--speculative-algorithm",
+      "DFLASH",
+      "--speculative-draft-model-path",
+      "z-lab/Qwen3.5-4B-DFlash",
+      "--speculative-draft-model-revision",
+      "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
+      "--linear-attn-prefill-backend",
+      "flashinfer",
+      "--linear-attn-decode-backend",
+      "flashinfer",
+      "--random-seed",
+      "0",
+      "--stream-interval",
+      "4",
+      "--speculative-dflash-block-size",
+      "16",
+      "--max-running-requests",
+      "8",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "30098"
+    ],
+    "probe_env": {
+      "SGLANG_REPAIR_TIMING_LOG": "/home/ubuntu/vp-data/repair/runs/p9share/fresh_b16_c8/timing.jsonl"
+    },
+    "foreign_cpu_during": {
+      "interval_s": 1.0,
+      "samples": 12,
+      "foreign_cores_mean": 0.457,
+      "foreign_cores_max": 1.04,
+      "contended": false,
+      "contention_threshold_cores": 2.0,
+      "top_foreign_mean_cores": {
+        "/home/ubuntu/.cursor-server/bin/linux-arm64/e44a49c17e334d442e58bbde931d791200f014a0/node --dns-result-order=ipv4first -": 0.09,
+        "claude --dangerously-skip-permissions": 0.08
+      },
+      "own_peak_cores": {
+        "sglang::scheduler": 1.03
+      }
+    },
+    "steady_cycles": 463,
+    "all_cycles": 912,
+    "phase_us": {
+      "draft": {
+        "n": 463,
+        "median": 2839.3,
+        "mean": 2848.7272786177105,
+        "p25": 2799.26,
+        "p75": 2887.36,
+        "p10": 2764.93,
+        "p90": 2927.49
+      },
+      "verify": {
+        "n": 463,
+        "median": 7876.26,
+        "mean": 7883.816609071274,
+        "p25": 7858.66,
+        "p75": 7894.5,
+        "p10": 7847.1,
+        "p90": 7910.82
+      },
+      "accept": {
+        "n": 463,
+        "median": 73.76,
+        "mean": 74.16451403887689,
+        "p25": 73.18,
+        "p75": 74.4,
+        "p10": 72.64,
+        "p90": 75.78
+      },
+      "commit": {
+        "n": 463,
+        "median": 375.14,
+        "mean": 375.6609503239741,
+        "p25": 373.86,
+        "p75": 376.61,
+        "p10": 372.93,
+        "p90": 378.18
+      },
+      "append": {
+        "n": 463,
+        "median": 111.01,
+        "mean": 119.61159827213822,
+        "p25": 109.57,
+        "p75": 114.08,
+        "p10": 108.26,
+        "p90": 115.87
+      }
+    },
+    "cycle_period_us": {
+      "n": 430,
+      "median": 11449.951171875,
+      "mean": 11485.69222383721,
+      "p25": 11387.6953125,
+      "p75": 11510.7421875,
+      "p10": 11344.23828125,
+      "p90": 11564.453125
+    },
+    "commit_per_cycle_batch": {
+      "n": 463,
+      "median": 64,
+      "mean": 64.0842332613391,
+      "p25": 53,
+      "p75": 75,
+      "p10": 42,
+      "p90": 84
+    },
+    "draft_share_of_cycle": 0.2479748566067507,
+    "tokens_per_s_batch": 5596.900135150961
+  },
+  {
+    "run": "/home/ubuntu/vp-data/repair/runs/p9share/fresh_b16_c16",
+    "mode": "fresh",
+    "block": 16,
+    "concurrency": 16,
+    "engine_sha": "5d8e00e3e121e980fa055c06f86e0845972cc712",
+    "command": [
+      "/home/ubuntu/sglang/.venv/bin/python",
+      "-m",
+      "sglang.launch_server",
+      "--model-path",
+      "Qwen/Qwen3.5-4B",
+      "--revision",
+      "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "--attention-backend",
+      "flashinfer",
+      "--mm-attention-backend",
+      "triton_attn",
+      "--speculative-algorithm",
+      "DFLASH",
+      "--speculative-draft-model-path",
+      "z-lab/Qwen3.5-4B-DFlash",
+      "--speculative-draft-model-revision",
+      "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
+      "--linear-attn-prefill-backend",
+      "flashinfer",
+      "--linear-attn-decode-backend",
+      "flashinfer",
+      "--random-seed",
+      "0",
+      "--stream-interval",
+      "4",
+      "--speculative-dflash-block-size",
+      "16",
+      "--max-running-requests",
+      "16",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "30098"
+    ],
+    "probe_env": {
+      "SGLANG_REPAIR_TIMING_LOG": "/home/ubuntu/vp-data/repair/runs/p9share/fresh_b16_c16/timing.jsonl"
+    },
+    "foreign_cpu_during": {
+      "interval_s": 1.0,
+      "samples": 18,
+      "foreign_cores_mean": 0.477,
+      "foreign_cores_max": 1.18,
+      "contended": false,
+      "contention_threshold_cores": 2.0,
+      "top_foreign_mean_cores": {
+        "claude --dangerously-skip-permissions": 0.2,
+        "/home/ubuntu/.cursor-server/bin/linux-arm64/e44a49c17e334d442e58bbde931d791200f014a0/node --dns-result-order=ipv4first -": 0.11
+      },
+      "own_peak_cores": {
+        "sglang::scheduler": 1.03,
+        "python experiments/repair/serve_probe.py --mode fresh --bloc": 0.06,
+        "/home/ubuntu/sglang/.venv/bin/python -m sglang.launch_server": 0.05
+      }
+    },
+    "steady_cycles": 252,
+    "all_cycles": 1015,
+    "phase_us": {
+      "draft": {
+        "n": 252,
+        "median": 3279.375,
+        "mean": 3289.9849206349204,
+        "p25": 3240.96,
+        "p75": 3326.69,
+        "p10": 3210.75,
+        "p90": 3368.03
+      },
+      "verify": {
+        "n": 252,
+        "median": 12093.935,
+        "mean": 12121.146785714287,
+        "p25": 12069.92,
+        "p75": 12128.99,
+        "p10": 12048.13,
+        "p90": 12218.85
+      },
+      "accept": {
+        "n": 252,
+        "median": 117.84,
+        "mean": 117.62718253968254,
+        "p25": 116.8,
+        "p75": 118.91,
+        "p10": 115.87,
+        "p90": 119.84
+      },
+      "commit": {
+        "n": 252,
+        "median": 684.755,
+        "mean": 935.0005158730158,
+        "p25": 683.46,
+        "p75": 686.34,
+        "p10": 681.98,
+        "p90": 688.03
+      },
+      "append": {
+        "n": 252,
+        "median": 135.07,
+        "mean": 145.35154761904764,
+        "p25": 132.99,
+        "p75": 137.34,
+        "p10": 131.33,
+        "p90": 138.75
+      }
+    },
+    "cycle_period_us": {
+      "n": 216,
+      "median": 16456.0546875,
+      "mean": 16823.59031394676,
+      "p25": 16398.4375,
+      "p75": 16533.203125,
+      "p10": 16355.46875,
+      "p90": 16697.265625
+    },
+    "commit_per_cycle_batch": {
+      "n": 252,
+      "median": 118.0,
+      "mean": 114.97619047619048,
+      "p25": 93,
+      "p75": 137,
+      "p10": 76,
+      "p90": 153
+    },
+    "draft_share_of_cycle": 0.19928075485134414,
+    "tokens_per_s_batch": 6986.862444224026
+  }
+]

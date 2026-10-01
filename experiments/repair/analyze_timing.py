@@ -19,6 +19,7 @@ first-token and scheduling time), the f of the Amdahl conversion.
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import statistics
 from pathlib import Path
@@ -94,8 +95,49 @@ def match_groups(
     return kept
 
 
+def summarize_batched(run: Path, info: dict[str, Any], bs: int) -> dict[str, Any]:
+    """Concurrency > 1: phase times and cycle periods over cycles that ran at batch size bs."""
+    cycles = load_cycles(run)
+    phase: dict[str, list[float]] = {p: [] for p in PHASES}
+    period: list[float] = []
+    commit: list[float] = []
+    steady = [c for c in cycles if c['bs'] == bs]
+    for c in steady:
+        for p in PHASES:
+            if f'{p}_us' in c:
+                phase[p].append(c[f'{p}_us'])
+        commit.append(sum(c['commit']))
+    for a, b in itertools.pairwise(cycles):
+        if a['bs'] == bs and b['bs'] == bs:
+            period.append((b['t0_ms'] - a['t0_ms']) * 1000.0)
+    out = {
+        'run': str(run),
+        'mode': info['mode'],
+        'block': info['block'],
+        'concurrency': bs,
+        'engine_sha': info.get('engine_sha'),
+        'command': info.get('command'),
+        'probe_env': info.get('probe_env'),
+        'foreign_cpu_during': info.get('foreign_cpu_during'),
+        'steady_cycles': len(steady),
+        'all_cycles': len(cycles),
+        'phase_us': {p: quantiles(v) for p, v in phase.items()},
+        'cycle_period_us': quantiles(period),
+        'commit_per_cycle_batch': quantiles(commit),
+    }
+    if period and commit:
+        med = statistics.median(period)
+        out['draft_share_of_cycle'] = (
+            statistics.median(phase['draft']) / med if phase['draft'] else None
+        )
+        out['tokens_per_s_batch'] = statistics.fmean(commit) / (med / 1e6)
+    return out
+
+
 def summarize_run(run: Path, drop_first: int, drop_last: int) -> dict[str, Any]:
     info = json.loads((run / 'run.json').read_text())
+    if int(info.get('concurrency', 1)) > 1:
+        return summarize_batched(run, info, int(info['concurrency']))
     results = [
         json.loads(line)
         for line in (run / 'results.jsonl').read_text().splitlines()
@@ -181,6 +223,21 @@ def main() -> None:
             continue
         row = summarize_run(run, args.drop_first, args.drop_last)
         rows.append(row)
+        if 'concurrency' in row:
+            print(
+                json.dumps(
+                    {
+                        'run': run.name,
+                        'c': row['concurrency'],
+                        'cycles': row['steady_cycles'],
+                        'draft_med_us': row['phase_us']['draft'].get('median'),
+                        'verify_med_us': row['phase_us']['verify'].get('median'),
+                        'period_med_us': row['cycle_period_us'].get('median'),
+                        'draft_share': row.get('draft_share_of_cycle'),
+                    }
+                )
+            )
+            continue
         short = {
             'run': run.name,
             'B': row['block'],

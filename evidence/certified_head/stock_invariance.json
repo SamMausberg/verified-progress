@@ -1,0 +1,358 @@
+{
+ "scope": {
+  "torch": "2.13.0+cu130",
+  "cuda": "13.0",
+  "gpu": "NVIDIA GH200 480GB",
+  "nvidia-cublas": "13.1.1.3"
+ },
+ "default_allow_bf16_reduced_precision_reduction": true,
+ "batches": {
+  "1": {
+   "kernels_flag_on": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_512x8_64x3_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_on": "1/1",
+   "subsets_equal_flag_on": "6/6",
+   "kernels_flag_off": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_512x8_64x3_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_off": "1/1",
+   "subsets_equal_flag_off": "6/6",
+   "bitwise_equal_flag_on_off": true,
+   "column_subset_equal": true,
+   "gathered_candidates_equal": true
+  },
+  "2": {
+   "kernels_flag_on": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_512x8_64x3_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_on": "2/2",
+   "subsets_equal_flag_on": "6/6",
+   "kernels_flag_off": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_512x8_64x3_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_off": "2/2",
+   "subsets_equal_flag_off": "6/6",
+   "bitwise_equal_flag_on_off": true,
+   "column_subset_equal": true,
+   "gathered_candidates_equal": true
+  },
+  "3": {
+   "kernels_flag_on": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_512x8_64x3_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_on": "3/3",
+   "subsets_equal_flag_on": "6/6",
+   "kernels_flag_off": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_512x8_64x3_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_off": "3/3",
+   "subsets_equal_flag_off": "6/6",
+   "bitwise_equal_flag_on_off": true,
+   "column_subset_equal": true,
+   "gathered_candidates_equal": true
+  },
+  "4": {
+   "kernels_flag_on": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_512x8_64x3_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_on": "4/4",
+   "subsets_equal_flag_on": "6/6",
+   "kernels_flag_off": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_512x8_64x3_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_off": "4/4",
+   "subsets_equal_flag_off": "6/6",
+   "bitwise_equal_flag_on_off": true,
+   "column_subset_equal": true,
+   "gathered_candidates_equal": true
+  },
+  "5": {
+   "kernels_flag_on": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_512x8_64x3_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_on": "5/5",
+   "subsets_equal_flag_on": "6/6",
+   "kernels_flag_off": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_512x8_64x3_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_off": "5/5",
+   "subsets_equal_flag_off": "6/6",
+   "bitwise_equal_flag_on_off": true,
+   "column_subset_equal": true,
+   "gathered_candidates_equal": true
+  },
+  "8": {
+   "kernels_flag_on": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_512x8_64x3_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_on": "8/8",
+   "subsets_equal_flag_on": "6/6",
+   "kernels_flag_off": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_512x8_64x3_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_off": "8/8",
+   "subsets_equal_flag_off": "6/6",
+   "bitwise_equal_flag_on_off": true,
+   "column_subset_equal": true,
+   "gathered_candidates_equal": true
+  },
+  "12": {
+   "kernels_flag_on": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_512x16_64x3_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_on": "12/12",
+   "subsets_equal_flag_on": "6/6",
+   "kernels_flag_off": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_512x16_64x3_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_off": "12/12",
+   "subsets_equal_flag_off": "6/6",
+   "bitwise_equal_flag_on_off": true,
+   "column_subset_equal": true,
+   "gathered_candidates_equal": true
+  },
+  "16": {
+   "kernels_flag_on": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_512x16_64x3_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_on": "16/16",
+   "subsets_equal_flag_on": "6/6",
+   "kernels_flag_off": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_512x16_64x3_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_off": "16/16",
+   "subsets_equal_flag_off": "6/6",
+   "bitwise_equal_flag_on_off": true,
+   "column_subset_equal": true,
+   "gathered_candidates_equal": true
+  },
+  "24": {
+   "kernels_flag_on": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_512x24_64x3_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_on": "24/24",
+   "subsets_equal_flag_on": "6/6",
+   "kernels_flag_off": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_512x24_64x3_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_off": "24/24",
+   "subsets_equal_flag_off": "6/6",
+   "bitwise_equal_flag_on_off": true,
+   "column_subset_equal": true,
+   "gathered_candidates_equal": true
+  },
+  "32": {
+   "kernels_flag_on": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_384x32_64x4_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_on": "32/32",
+   "subsets_equal_flag_on": "6/6",
+   "kernels_flag_off": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_384x32_64x4_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_off": "32/32",
+   "subsets_equal_flag_off": "6/6",
+   "bitwise_equal_flag_on_off": true,
+   "column_subset_equal": true,
+   "gathered_candidates_equal": true
+  },
+  "40": {
+   "kernels_flag_on": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_384x40_64x3_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_on": "40/40",
+   "subsets_equal_flag_on": "6/6",
+   "kernels_flag_off": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_384x40_64x3_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_off": "40/40",
+   "subsets_equal_flag_off": "6/6",
+   "bitwise_equal_flag_on_off": true,
+   "column_subset_equal": true,
+   "gathered_candidates_equal": true
+  },
+  "48": {
+   "kernels_flag_on": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_384x48_64x3_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_on": "48/48",
+   "subsets_equal_flag_on": "6/6",
+   "kernels_flag_off": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_384x48_64x3_2x1_v_bz_TNT"
+   ],
+   "rows_equal_to_m1_flag_off": "48/48",
+   "subsets_equal_flag_off": "6/6",
+   "bitwise_equal_flag_on_off": true,
+   "column_subset_equal": true,
+   "gathered_candidates_equal": true
+  },
+  "64": {
+   "kernels_flag_on": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_384x64_64x3_2x1_v_bz_coopB_TNN"
+   ],
+   "rows_equal_to_m1_flag_on": "64/64",
+   "subsets_equal_flag_on": "6/6",
+   "kernels_flag_off": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_384x64_64x3_2x1_v_bz_coopB_TNN"
+   ],
+   "rows_equal_to_m1_flag_off": "64/64",
+   "subsets_equal_flag_off": "6/6",
+   "bitwise_equal_flag_on_off": true,
+   "column_subset_equal": true,
+   "gathered_candidates_equal": true
+  },
+  "80": {
+   "kernels_flag_on": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_384x80_64x3_2x1_v_bz_coopA_TNT"
+   ],
+   "rows_equal_to_m1_flag_on": "80/80",
+   "subsets_equal_flag_on": "6/6",
+   "kernels_flag_off": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_384x80_64x3_2x1_v_bz_coopA_TNT"
+   ],
+   "rows_equal_to_m1_flag_off": "80/80",
+   "subsets_equal_flag_off": "6/6",
+   "bitwise_equal_flag_on_off": true,
+   "column_subset_equal": true,
+   "gathered_candidates_equal": true
+  },
+  "96": {
+   "kernels_flag_on": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_384x96_64x3_2x1_v_bz_coopA_TNT"
+   ],
+   "rows_equal_to_m1_flag_on": "96/96",
+   "subsets_equal_flag_on": "6/6",
+   "kernels_flag_off": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_384x96_64x3_2x1_v_bz_coopA_TNT"
+   ],
+   "rows_equal_to_m1_flag_off": "96/96",
+   "subsets_equal_flag_off": "6/6",
+   "bitwise_equal_flag_on_off": true,
+   "column_subset_equal": true,
+   "gathered_candidates_equal": true
+  },
+  "128": {
+   "kernels_flag_on": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_320x128_64x3_2x1_v_bz_coopB_TNT"
+   ],
+   "rows_equal_to_m1_flag_on": "128/128",
+   "subsets_equal_flag_on": "6/6",
+   "kernels_flag_off": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_320x128_64x3_2x1_v_bz_coopB_TNT"
+   ],
+   "rows_equal_to_m1_flag_off": "128/128",
+   "subsets_equal_flag_off": "6/6",
+   "bitwise_equal_flag_on_off": true,
+   "column_subset_equal": true,
+   "gathered_candidates_equal": true
+  },
+  "160": {
+   "kernels_flag_on": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_192x160_64x4_2x1_v_bz_coopB_TNT"
+   ],
+   "rows_equal_to_m1_flag_on": "160/160",
+   "subsets_equal_flag_on": "6/6",
+   "kernels_flag_off": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_192x160_64x4_2x1_v_bz_coopB_TNT"
+   ],
+   "rows_equal_to_m1_flag_off": "160/160",
+   "subsets_equal_flag_off": "6/6",
+   "bitwise_equal_flag_on_off": true,
+   "column_subset_equal": true,
+   "gathered_candidates_equal": true
+  },
+  "192": {
+   "kernels_flag_on": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_192x192_64x4_2x1_v_bz_coopB_TNN"
+   ],
+   "rows_equal_to_m1_flag_on": "192/192",
+   "subsets_equal_flag_on": "6/6",
+   "kernels_flag_off": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_192x192_64x4_2x1_v_bz_coopB_TNN"
+   ],
+   "rows_equal_to_m1_flag_off": "192/192",
+   "subsets_equal_flag_off": "6/6",
+   "bitwise_equal_flag_on_off": true,
+   "column_subset_equal": true,
+   "gathered_candidates_equal": true
+  },
+  "224": {
+   "kernels_flag_on": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_128x224_64x4_2x1_v_bz_coopA_TNT"
+   ],
+   "rows_equal_to_m1_flag_on": "224/224",
+   "subsets_equal_flag_on": "6/6",
+   "kernels_flag_off": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_128x224_64x4_2x1_v_bz_coopA_TNT"
+   ],
+   "rows_equal_to_m1_flag_off": "224/224",
+   "subsets_equal_flag_off": "6/6",
+   "bitwise_equal_flag_on_off": true,
+   "column_subset_equal": true,
+   "gathered_candidates_equal": true
+  },
+  "256": {
+   "kernels_flag_on": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_320x128_64x3_1x2_h_bz_coopB_TNT"
+   ],
+   "rows_equal_to_m1_flag_on": "256/256",
+   "subsets_equal_flag_on": "6/6",
+   "kernels_flag_off": [
+    "Memset (Device)",
+    "nvjet_sm90_tst_320x128_64x3_1x2_h_bz_coopB_TNT"
+   ],
+   "rows_equal_to_m1_flag_off": "256/256",
+   "subsets_equal_flag_off": "6/6",
+   "bitwise_equal_flag_on_off": true,
+   "column_subset_equal": true,
+   "gathered_candidates_equal": true
+  }
+ },
+ "fp32_output_error": {
+  "rows": 2048,
+  "max_rel_to_sum_abs": 2.0700643390195154e-06,
+  "p50_row_max": 1.1397772554452016e-06,
+  "model_conservative": 0.0006107243190423843,
+  "model_hopper_wgmma": 0.00011922159170544789
+ }
+}

@@ -187,23 +187,26 @@ does on CUDA).
 | 0007 | The packed-projection row cutoff of 0004 applies only with the merge switch (Qwen4-Exp's own packed weights keep the original gate), and also on the deferred-norm branch | `SGLANG_BACKBONE_MERGE_IN_PROJ` | unchanged |
 | 0008 | A table entry of mode `gemv` calls the Hopper GEMV only on Hopper (CUDA compute capability 9.x; HIP excluded, since ROCm reports gfx94x as 9.x), as SGLang's own gemv backend requires; elsewhere the call falls back to cuBLAS | with `SGLANG_BACKBONE_GEMM` | unchanged |
 
-The routing table is JSON from `experiments/backbone/make_table.py`. Measured so far: the kernels
-and fusions in isolation and in layer skeletons (`evidence/backbone/README.md`). The exactness
-class and serving effect of the switches are pending.
+The routing table is JSON from `experiments/backbone/make_table.py`. Measured
+(`evidence/backbone/README.md`): the kernels and fusions in isolation and in layer skeletons;
+greedy outputs against stock plain decoding on 320 prompts, where every switch off and the merge
+switch give the same token ids and top-5 logprobs at concurrency 1, and `--bf16-gemm-backend
+gemv` and the routing table (lever v1) are exact up to rounding; and paired serving of lever v1 against tuned plain decoding (3.4% faster at
+concurrency 1, 1.0% at 128). Serving against tuned MTP is pending.
 
 ## hostgap (`patches/hostgap/0001-0005`, branch `engine/hostgap`)
 
-The series applies in order to `bd66ce343e` on its own. Patches 0001-0003 are the validated
-state (GPU plan check, in-engine validation and greedy output equality, all on 0001-0003):
+The series applies in order to `bd66ce343e` on its own. The whole series (engine
+`6b1d344887`) passed the GPU tests and the GPU plan check, which covers the EAGLE verify and
+the DFlash draft block, and, on the tuned MTP arm, in-engine validation and token-identical
+greedy outputs (`evidence/hostgap/README.md`, hold 4). For DFlash, serving equality has run
+only on 0001-0003, with an unpinned KV pool; the full-series DFlash check is pending:
 
 ```sh
 scripts/sglang_worktree.sh hostgap
-git -C ~/sglang-wt/hostgap am "$PWD"/engine/sglang/patches/hostgap/000[1-3]-*.patch
+git -C ~/sglang-wt/hostgap am "$PWD"/engine/sglang/patches/hostgap/*.patch
 SGLANG_WORKTREE=~/sglang-wt/hostgap source scripts/sglang_env.sh
 ```
-
-Patches 0004 and 0005 have not run on a GPU yet; their checks are queued. To apply them on
-top: `git -C ~/sglang-wt/hostgap am "$PWD"/engine/sglang/patches/hostgap/000[45]-*.patch`.
 
 With speculative decoding and FlashInfer attention, the scheduler blocks on device-to-host
 reads whose values it already knows and then plans while the GPU idles. Each patch
@@ -221,12 +224,11 @@ runs only).
 | 0001 | `SGLANG_HOSTGAP_VERIFY_PLAN=1`: the EAGLE/NEXTN target-verify CUDA-graph wrappers plan with `fast_verify_plan` (`srt/layers/attention/flashinfer_hostgap.py`), FlashInfer 0.6.18's `plan()` for fa2 in CUDA-graph mode with its four blocking reads (`segment_packbits`'s `.item()` and three `.to("cpu")`) replaced by host-computed qo/kv indptr, kv lengths and packed-mask size. A per-wrapper CUDA event orders reuse of FlashInfer's pinned plan buffer after its previous asynchronous copy, which the stock blocking reads used to guarantee (this also covers the draft-extend wrapper's `fast_prefill_plan`). | stock `plan()` |
 | 0002 | `SGLANG_HOSTGAP_DRAFT_INDPTR=1`: `FlashInferMultiStepDraftBackend.common_template` builds the per-step draft `kv_indptr` rows on the host instead of copying them back with `.cpu()`. | stock `.cpu()` |
 | 0003 | `SGLANG_HOSTGAP_DFLASH_DRAFT_PLAN=1`: the DFlash draft forward (the drafter's sliding-window and full-attention wrappers, no custom mask) plans with `fast_verify_plan` from the worker's exact host copy of the committed lengths; without that copy (compact draft cache, GPU-only backends) the stock `plan()` runs. | stock `plan()` |
-| 0004 | Not yet validated. No new flag: the host-side plan inputs of 0001-0003 are computed with numpy, and `fast_verify_plan` uploads the custom-mask bit and byte offsets in one pinned copy instead of deriving them with about ten small device ops. It is meant to produce the same integers for the same packing kernel; the GPU check and equality runs that would confirm it are pending. | unchanged (only the flagged paths change) |
-| 0005 | Not yet validated. No new flag: `fast_verify_plan` passes `disable_split_kv` as `plan()` does, forced on for NVFP4 KV caches (FlashInfer's `_nvfp4_kv_requires_disabled_split_kv`); no change for BF16 or FP8 KV. Also corrects the module docstring. | unchanged (only the flagged paths change) |
+| 0004 | No new flag: the host-side plan inputs of 0001-0003 are computed with numpy, and `fast_verify_plan` uploads the custom-mask bit and byte offsets in one pinned copy instead of deriving them with about ten small device ops (one of them, FlashInfer's `mask_indptr[0] = 0`, a blocking host-to-device copy). The same integers reach the same packing kernel. | unchanged (only the flagged paths change) |
+| 0005 | No new flag (NVFP4 path untested): `fast_verify_plan` passes `disable_split_kv` as `plan()` does, forced on for NVFP4 KV caches (FlashInfer's `_nvfp4_kv_requires_disabled_split_kv`); no change for BF16 or FP8 KV. Also corrects the module docstring. | unchanged (only the flagged paths change) |
 
 Checks: `experiments/hostgap/plan_equivalence.py` compares FlashInfer's stock `plan()`
 with `fast_verify_plan` on the GPU (plan state, pinned bytes, device buffers and a replayed
 attention graph's output, for the EAGLE verify and the DFlash draft block) and the draft
-rows with the Triton kernel; `tests/test_hostgap_plan.py` runs a small version (not yet run
-on a GPU). `experiments/hostgap/equality.py` compares greedy outputs with the stock engine.
+rows with the Triton kernel; `tests/test_hostgap_plan.py` runs a small version. `experiments/hostgap/equality.py` compares greedy outputs with the stock engine.
 Results and commands: `evidence/hostgap/README.md`.
