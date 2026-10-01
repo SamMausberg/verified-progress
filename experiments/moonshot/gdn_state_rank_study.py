@@ -124,6 +124,8 @@ def bases(cq: torch.Tensor, ck: torch.Tensor, kind: str, r: int) -> torch.Tensor
 
 def texts(path: Path, count: int) -> list[str]:
     rows = [json.loads(line) for line in path.read_text().splitlines() if line]
+    if len(rows) < count:
+        raise SystemExit(f'{path} has {len(rows)} texts, {count} requested')
     return [r['text'] for r in rows[:count]]
 
 
@@ -167,6 +169,14 @@ def retrieval(model: Any, tok: Any, probes: list[dict[str, Any]]) -> tuple[float
     return hits / len(probes), sum(logps) / len(logps)
 
 
+def positive(text: str) -> int:
+    """An argparse type for a sample count: an integer of at least 1."""
+    value = int(text)
+    if value < 1:
+        raise argparse.ArgumentTypeError(f'count {value} is not positive')
+    return value
+
+
 def rank(text: str) -> int:
     """An argparse type for a state rank: an integer in 1..K."""
     value = int(text)
@@ -183,9 +193,9 @@ def main() -> None:
     parser.add_argument(
         '--eval', type=Path, default=Path.home() / 'vp-data/moonshot/workloads/long2048.jsonl'
     )
-    parser.add_argument('--calib-count', type=int, default=24)
-    parser.add_argument('--eval-count', type=int, default=8)
-    parser.add_argument('--probes', type=int, default=24)
+    parser.add_argument('--calib-count', type=positive, default=24)
+    parser.add_argument('--eval-count', type=positive, default=8)
+    parser.add_argument('--probes', type=positive, default=24)
     parser.add_argument('--ranks', type=rank, nargs='+', default=[32, 64, 96, 128])
     parser.add_argument('--kinds', nargs='+', choices=KINDS, default=list(KINDS))
     parser.add_argument('--out', type=Path, required=True)
