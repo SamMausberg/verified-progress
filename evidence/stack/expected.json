@@ -1,5 +1,9 @@
 {
- "repo_commit": "9754fcdd87ae99faaaaf1bd48808e2856e8e795a",
+ "repo_commit": "64b5f27b711e915f0ff11ca8bec419985f6fc9b2",
+ "inputs": {
+  "evidence/stack/ceiling.json": "04171c7088177a089e66e59a300e5f1e37271126ce259fbd2de3c252e1b4ae84",
+  "evidence/backbone/gemm_microbench.json": "f001afa814cdeae6f3fa2fdf459bfae6d47098f107bf4c0bf8fb608bc404160f"
+ },
  "formula": "ratio = T / (T - sum of savings), savings in ms, low and high ends separately",
  "f_bytes_removed_per_request": 805306368,
  "f_low_penalty_ms": 0.384,

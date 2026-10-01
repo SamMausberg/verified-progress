@@ -204,7 +204,22 @@ end, and the analysis refuses any run whose launch record (`server/launch.json`)
 another engine commit or repository commit, or uncommitted changes in either. Bench's two
 stock DFlash block-16 runs that the equality step reuses as references must name the
 pinned stock commit with a clean tree and the same model revision as S0's run, and their
-outputs are recorded in the gate by SHA-256. The repository commit pins the harness, the arm
+outputs are recorded in the gate by SHA-256.
+
+Every check compares against what the plan declares, not against what happens to exist.
+Each hold clears the engine environment variables (`SGLANG_*`, `TORCH_*`, `PYTORCH_*`,
+`TRITON_*`, `FLASHINFER_*`, `NCCL_*` and `CUDA_*` other than `CUDA_HOME`) before any server
+starts, so a server sees only its arm's declared variables; the identity records what
+remains and must match across holds. The equality hold writes its declared runs
+(`plan.jsonl`: engine, flags, logprobs and lever variables of each), and the gate requires
+exactly that set (S0, B0, F, G and FG, and all or none of the three certified-head runs), a
+record for every declared run whose flags, prompt count, pass and model revision match,
+and no undeclared run. The analysis accepts only the campaign's declared arms,
+concurrencies 1, 2, 4 and 8, and sessions named `stack-s<k>`; it refuses a server whose
+environment overrides are not exactly its arm's declared variables (with the gate's routing
+table), whose fold flag does not match the arm, or whose recorded ambient environment
+differs from the gate's; and it withholds the decision ("incomplete") wherever fewer than
+three valid sessions remain, including none or one. The repository commit pins the harness, the arm
 definitions, the hold scripts and the workload files; so that the sessions can use the
 gate, the hold worktree stays at the equality hold's commit for the whole campaign.
 
