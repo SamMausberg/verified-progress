@@ -1,9 +1,9 @@
 {
-  "runs": "/home/ubuntu/vp-data/state",
+  "runs": "/home/ubuntu/vp-data",
   "pairs": {
-    "pinned (cap 8) vs unpinned (cap 16) plain c1": {
+    "pinned (cap 8) vs bench unpinned (cap 16) radix-off mtp_s3 c1": {
       "prompts": 320,
-      "bitwise_identical": 319,
+      "bitwise_identical": 320,
       "output0_differs": {
         "prompt_le_64": {
           "prompts": 127,
@@ -14,13 +14,11 @@
           "differ": 0
         }
       },
-      "first_difference_index": {
-        "2": 1
-      },
+      "first_difference_index": {},
       "diverged": 0,
       "identical": 320,
       "length_mismatch": 0,
-      "exposure_tokens": 70042,
+      "exposure_tokens": 69960,
       "per_1k_tokens": 0.0,
       "classes": {},
       "max_margin_median": null,
@@ -28,28 +26,30 @@
       "max_margin_max": null,
       "drift_median": 0.0,
       "drift_p99": 0.0,
-      "drift_max": 0.23776817321777344,
+      "drift_max": 0.0,
       "prompts_with_large_drift": 0,
-      "run_a": "runs/plain/c1",
-      "run_b": "runs_pinned/plain/c1",
-      "pinned_a": false,
-      "pinned_b": true,
+      "run_a": "state/runs_pinned/mtp_s3_noradix/c1",
+      "run_b": "bench/equality/runs/mtp_s3__bench_noradix/c1",
+      "pinned_a": true,
+      "pinned_b": false,
       "same_server": false,
       "pools_identical": false
     }
   },
-  "missing_pairs": [],
+  "missing_pairs": [
+    "pinned (cap 8) vs bench unpinned (cap 16) radix-off plain c1"
+  ],
   "mixed_pin_pairs": [
-    "pinned (cap 8) vs unpinned (cap 16) plain c1"
+    "pinned (cap 8) vs bench unpinned (cap 16) radix-off mtp_s3 c1"
   ],
   "self_consistency": {
-    "runs/plain/c1": {
-      "positions": 70042,
+    "state/runs_pinned/mtp_s3_noradix/c1": {
+      "positions": 69960,
       "not_argmax": 0,
       "worst_gap": 0.0
     },
-    "runs_pinned/plain/c1": {
-      "positions": 70042,
+    "bench/equality/runs/mtp_s3__bench_noradix/c1": {
+      "positions": 69960,
       "not_argmax": 0,
       "worst_gap": 0.0
     }

@@ -321,7 +321,12 @@ Setup section. Rates are per 1,000 compared tokens
   change is at most 0.62 nats.
 - **Speculation against plain decoding.** Every MTP configuration diverges from plain
   decoding at 3.5 to 4.0 per 1,000 tokens, as often as from itself at another
-  concurrency (3.1 to 3.5), and only at near ties.
+  concurrency (3.1 to 3.5), and only at near ties. At c1 no prompt's output is bitwise
+  identical to plain decoding's: the logprobs of 313 or 314 of the 320 prompts first
+  differ at output index 1, the first verify forward, and the rest at index 2 or 3
+  (`first_difference_index`). That is the forward where the tap found the decode and
+  verify recurrent kernels parting; the full set is consistent with it, though only
+  the tapped prompts locate the kernel.
 - **By rejection position.** Divergences at fragile positions (where the plain
   reference's top-2 gap is at most 0.25 nats) per fragile position, by the previous
   cycle's commit length, including full acceptance (`cycles_*_pinned.json`,
@@ -381,10 +386,75 @@ Setup section. Rates are per 1,000 compared tokens
   whose runs are still queued. They are listed under Pending below. This regeneration
   used `STATE_ALLOW_MISSING=1`.
 
+### Configuration switches for MTP steps 3
+
+MTP steps 3 with the radix cache off, the overlap scheduler off, deterministic
+inference and the FP32 head ran with the same pinned pools, each at c1 and c32 on one
+server (runs at commit `a493cbf`, whose runner files are those of the runs above; the
+engine is the clean pin). The same switches for plain decoding are queued, so for now
+a switch's effect on speculation cannot be separated from its effect on decoding in
+general.
+
+| Pair (MTP steps 3) | Diverged | Per 1,000 | Tie | One ulp | Near |
+|---|---|---|---|---|---|
+| Radix cache off vs on, c1 | 98/320 | 1.73 | 87 | 11 | 0 |
+| Radix cache off vs on, c32 | 106/320 | 1.89 | 95 | 8 | 3 |
+| Radix cache off, c1 vs c32 | 169/320 | 3.62 | 159 | 8 | 2 |
+| Overlap off vs on, c1 | 161/320 | 3.40 | 145 | 14 | 2 |
+| Overlap off vs radix cache off, c1 | 111/320 | 2.00 | 105 | 5 | 1 |
+| Overlap off, c1 vs c32 | 174/320 | 3.64 | 166 | 8 | 0 |
+| Deterministic inference, c1 vs c32 | 168/320 | 3.48 | 164 | 4 | 0 |
+| FP32 head, c1 vs c32 | 130/320 | 2.44 | - | - | 130 |
+
+- **Classes.** No divergence is `large`, and no run committed a token that was not
+  its own top-1. The eight `near` events with the BF16 head fall on three prompts
+  (`cnn_dailymail-0025`, `cnn_dailymail-0033` and `gsm8k-0015`); in each, one run's
+  margin is at most 0.375 nats and the other's at most 0.125. Logprob drift without a
+  token change is at most 0.62 nats.
+- **Both switches change the prefill of prompts longer than 64 tokens.** With the
+  radix cache on, the GDN cache strategy at this pin is `extra_buffer`, and
+  `--disable-overlap-schedule` switches it to `no_buffer`
+  (`mamba_radix_cache_strategy` in `run_meta_pinned.json`). The overlap-off
+  configuration therefore changes two things at once. Either switch changes the top-5
+  logprobs of the first output token, which come from the prefill alone, in 192 of the
+  193 prompts longer than 64 tokens and in none of the 127 shorter ones (c1,
+  `output0_differs` in `noise_floor_pinned.json`). Radix off and overlap off agree
+  with each other on the first output token for all 320. This extends the tap v4 check
+  below, where all 6 prompts longer than 64 tokens differed in the prefill at layer 0's
+  GDN recurrence, from 40 prompts to 320. The prefill of a prompt longer than one
+  64-token chunk therefore depends on the GDN cache strategy: `extra_buffer` computes
+  it differently from `no_buffer` and from the radix-off path. That the cause is the
+  checkpoint tracking in `extra_buffer`'s extend kernel is still code reading. Of the
+  198 prompts whose outputs differ at all between radix on and off at c1, 192 differ
+  from the prefill on, before any speculative step (`first_difference_index`).
+  Overlap off and radix off still part later, in 177 prompts at output index 1 (the
+  first verify forward) and 7 later. Which kernel differs there has not been located;
+  the overlap-off server runs SGLang's synchronous speculative path.
+- **Pools at batch 1 without the radix cache.** The pinned radix-off c1 run is bitwise
+  identical, in tokens and top-5 logprobs on all 320 prompts, to the bench
+  workstream's unpinned radix-off MTP steps 3 run at c1 (cap 16 and a 426,043-token KV
+  pool; `evidence/bench/README.md`, equality/), which bench's equality classes use
+  (`cross_bench.json`, `divergences_cross_bench.csv`). So for MTP at batch 1 with the
+  radix cache off, the pool size did not change the output, as bench's comparison
+  assumed. The plain-decoding counterpart is queued.
+- **Deterministic inference does not make MTP batch-invariant.** Between c1 and c32,
+  168 of 320 prompts diverge (3.48 per 1,000, all ties or one ulp), about the rate
+  without it (3.25). This confirms the early 8-prompt check (under "Deterministic
+  inference") on the full prompt set with pinned pools.
+- **The FP32 head removes BF16 ties, not divergences.** With `--enable-fp32-lm-head`,
+  MTP diverges between c1 and c32 in 130 of 320 prompts (2.44 per 1,000, against 3.25
+  with the BF16 head). The ulp classes of `compare.py` assume BF16 logits, so every
+  event falls under `near`. The larger of the two margins has median 0.036 nats and
+  maximum 0.19. Without BF16 rounding the remaining divergences are order flips
+  between near-equal FP32 logits, moved by the batch-dependent hidden state (the tap
+  found the head input different in every divergence it examined).
+
 **Pending** (queued, pinned): radix cache off, overlap off, deterministic inference
-and FP32 head for plain and MTP, the logprobs-off control, retraction, a second MTP
-session, and the ReplaySSM and FlashInfer GDN decode paths. The first-cycle test on
-fresh prompts is declared, with its prompts, runs, analysis and decision rule fixed
+and FP32 head for plain decoding, which give the radix-off noise floor (plain c1 vs
+c32 without the radix cache) and radix-off speculation against radix-off plain
+decoding; the logprobs-off control, retraction, a second MTP session, and the
+ReplaySSM and FlashInfer GDN decode paths. The first-cycle test on fresh prompts is
+declared, with its prompts, runs, analysis and decision rule fixed
 (`experiments/state_safety/README.md`, "Declared follow-up"), and is not yet run. The
 prefill-to-decode handoff check depends on its outcome.
 
@@ -433,10 +503,11 @@ after the earlier prompt that shares the longest prefix with it (one request in 
 | Plain, radix cache on | 10/12 | 12/12 | output index 2 (2 prompts) |
 | Plain, radix cache off | 12/12 | 12/12 | - |
 | MTP steps 3, radix cache on | 10/12 | 12/12 | output index 2 and 5 |
+| MTP steps 3, radix cache off | 12/12 | 12/12 | - |
 
-The radix-off control was run for plain decoding only; the same control for MTP is
-**pending** (queued). The two prompts that change are `mt_bench-0056` after
-`mt_bench-0054` (6 shared tokens) and `humaneval-0008` after `humaneval-0000` (22
+With the radix cache off, both plain decoding and MTP give identical logprobs for all
+12, so the history dependence needs the radix cache in both. The two prompts that
+change are `mt_bench-0056` after `mt_bench-0054` (6 shared tokens) and `humaneval-0008` after `humaneval-0000` (22
 shared tokens). `history__*.pairs` lists all 12 pairs. The 12 include all five prompts
 the tap changed, and only `mt_bench-0056` changes here. The other four do not change
 when served after their single longest-prefix predecessor, under plain decoding or
@@ -539,8 +610,10 @@ tokens, all at exact ties (`noise_floor.csv`, row `deterministic + verify KV spl
 patch`; that run predates the patch's `SGLANG_STATE_VERIFY_FIXED_SPLIT` gate and had
 the change on unconditionally). A plausible reason, not yet tested: the
 draft is not batch-invariant, so acceptance lengths, and with them the offset of a
-position inside its verify block, differ between batch sizes. **Pending**: the full
-deterministic-mode pairs.
+position inside its verify block, differ between batch sizes. On the full prompt set
+with pinned pools, deterministic MTP steps 3 diverges between c1 and c32 in 168 of 320
+prompts (3.48 per 1,000; "Configuration switches for MTP steps 3" above). **Pending**:
+the plain-decoding deterministic pairs.
 
 ## Targeted state tests
 
@@ -577,7 +650,36 @@ common flags of the Setup section, one request in flight, 40 prompts per test (t
   no speculative state, so it shows that the warm/cold tie flips come from the warm
   path's prefill and radix history, not from speculation.
 
-**Pending** (queued): GDN checkpoint reuse at the 256-token tracking interval,
-including checkpoints taken in the cycle that finished the request; aborts with slot
-reuse on a four-slot GDN pool; chunked prefill at 200 and 256 tokens; and run-to-run
-repeats. Per-rejection-position drift is under "Matrix with pinned pools" above.
+- **GDN checkpoint reuse** (`prefix__*`). With the radix cache on, SGLang stores the
+  GDN state every 256 tokens of sequence length, including during speculative decode.
+  Each prompt (12 thinking-mode prompts for MTP steps 3, 8 for the tree and for plain
+  decoding) generates 700 tokens, crossing that interval during decode. Prefixes that
+  end at a boundary or 1, 3 or 37 tokens past it are then served warm (after a flush
+  and a regeneration of the original request, which reproduced it in every case) and
+  cold (after a flush), for 48 tokens. The comparison is of tokens, not logprobs.
+  - Decode checkpoints were restored less often than the test intended. The
+    cached-token counts show that a finished request kept only its latest checkpoint,
+    so a warm request restored a decode checkpoint only when its prefix extended past
+    the last boundary the original crossed: 9 of 100 cases for MTP steps 3, 6 of 68
+    for the tree and 6 of 68 for plain decoding (`warm_cache_hit_at_boundary`). The
+    other warm requests restored only the prompt's 64-token checkpoint and prefilled
+    the rest.
+  - Where a decode checkpoint was restored, warm and cold gave the same tokens in 9/9
+    cases for MTP steps 3 and 6/6 for the tree; for plain decoding in 4/6, the other
+    two at exact ties.
+  - A checkpoint taken in the verify cycle that finished the request (ended there by
+    `max_new_tokens` or by a stop token) was restored in every case. Warm and cold
+    gave the same tokens in 45/53 cases for MTP steps 3 and 19/21 for the tree; the
+    other 10 diverge at exact ties.
+  - Without a decode checkpoint, warm and cold differ in 13/91 (MTP steps 3), 6/62
+    (tree) and 7/62 (plain decoding) cases, all at exact ties except one one-ulp case
+    for the tree.
+  - Warm and cold reach the state at the boundary by different computations (decode or
+    verify forwards against the chunked prefill), so bitwise equality is not
+    expected. Every difference is an exact tie or one ulp, and plain decoding, which has
+    no speculative state, shows them too (9 of 68 cases, against 21 of 153 for MTP
+    steps 3 and 8 of 89 for the tree). None points to a wrong restored state.
+
+**Pending** (queued): aborts with slot reuse on a four-slot GDN pool; chunked prefill
+at 200 and 256 tokens; and run-to-run repeats. Per-rejection-position drift is under
+"Matrix with pinned pools" above.
