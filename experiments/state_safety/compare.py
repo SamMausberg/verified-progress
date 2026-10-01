@@ -120,10 +120,14 @@ def compare_pair(
         row: dict[str, Any] = {'id': pid, 'len_a': len(ta), 'len_b': len(tb)}
         top_a, top_b = a.get('top_logprobs') or [], b.get('top_logprobs') or []
         row['prompt_tokens'] = a.get('prompt_tokens')
-        row['bitwise_identical'] = ta == tb and top_a == top_b
+        # A run made without logprobs (the logprobs-off control) has none to compare:
+        # identity and first differences then rest on the tokens alone.
+        lp_compared = any(top_a) and any(top_b)
+        row['logprobs_compared'] = lp_compared
+        row['bitwise_identical'] = ta == tb and (top_a == top_b or not lp_compared)
         # The first output token comes from the prefill alone: a difference there is a
         # difference in the prefill computation, before any decode or verify step.
-        row['output0_differs'] = ta[:1] != tb[:1] or top_a[:1] != top_b[:1]
+        row['output0_differs'] = ta[:1] != tb[:1] or (lp_compared and top_a[:1] != top_b[:1])
         common = d if d is not None else n
         drift, drift_pos = 0.0, None
         for i in range(min(common, len(top_a), len(top_b))):
@@ -144,10 +148,12 @@ def compare_pair(
         # the outputs are bitwise identical).
         if row['bitwise_identical']:
             row['first_difference'] = None
-        elif row['first_logprob_diff'] is not None:
+        elif lp_compared and row['first_logprob_diff'] is not None:
             row['first_difference'] = row['first_logprob_diff']
+        elif d is not None:
+            row['first_difference'] = d
         else:
-            row['first_difference'] = common if d is not None else min(len(top_a), len(top_b), n)
+            row['first_difference'] = min(len(top_a), len(top_b), n) if lp_compared else n
         if d is None:
             row['diverged'] = False
             row['exposure'] = n
@@ -246,7 +252,9 @@ def summarize(rows: Iterable[dict[str, Any]]) -> dict[str, Any]:
             }
     return {
         'prompts': len(rows),
+        # Tokens and top-k logprobs equal; tokens alone where a run has no logprobs.
         'bitwise_identical': sum(1 for r in rows if r.get('bitwise_identical')),
+        'logprobs_compared': sum(1 for r in rows if r.get('logprobs_compared')),
         # Prompts whose first output token or its top-k logprobs differ, by prompt length.
         'output0_differs': by_len,
         # Prompts by the first output index where tokens or top-k logprobs differ.

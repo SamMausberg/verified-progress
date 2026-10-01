@@ -178,3 +178,19 @@ def test_summary_counts_bitwise_identity_and_first_output_by_prompt_length():
     }
     no_len = {k: {**v, 'prompt_tokens': None} for k, v in a.items()}
     assert summarize(compare_pair(no_len, no_len))['output0_differs'] is None
+
+
+def test_run_without_logprobs_is_compared_on_tokens_only():
+    from compare import summarize
+
+    lp = {'output_ids': [1, 2], 'top_logprobs': [[[-0.1, 1]], [[-0.2, 2]]], 'prompt_tokens': 3}
+    no_lp = {'output_ids': [1, 2], 'top_logprobs': [], 'prompt_tokens': 3}
+    other = {'output_ids': [1, 3], 'top_logprobs': [], 'prompt_tokens': 3}
+    (same,) = compare_pair({'p': lp}, {'p': no_lp})
+    assert same['bitwise_identical'] and not same['logprobs_compared']
+    assert not same['output0_differs'] and same['first_difference'] is None
+    (diff,) = compare_pair({'p': lp}, {'p': other})
+    assert not diff['bitwise_identical'] and diff['first_difference'] == 1
+    s = summarize(compare_pair({'p': lp, 'q': lp}, {'p': no_lp, 'q': lp}))
+    assert s['bitwise_identical'] == 2 and s['logprobs_compared'] == 1
+    assert s['first_difference_index'] == {}
