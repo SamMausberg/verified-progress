@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'experiments' / 'moonshot'))
+SCRIPT = Path(__file__).resolve().parents[1] / 'experiments' / 'moonshot' / 'admission_plateaus.py'
+sys.path.insert(0, str(SCRIPT.parent))
 
 from admission_plateaus import plateaus
 
@@ -51,3 +53,42 @@ def test_finishes_between_passes_are_not_inferable() -> None:
 def test_decode_without_a_queue_is_not_a_plateau() -> None:
     log = HEADER + prefill(4, 8192, 120, 0) + decode(124, 0)
     assert plateaus(log) == []
+
+
+def run_cli(tmp_path: Path, logs: dict[str, str], *args: str) -> subprocess.CompletedProcess[str]:
+    """Lay the logs out as lever_sweep does (<run>/<arm>/<stamp>/server/server.log)."""
+    run = tmp_path / 'run'
+    for arm, text in logs.items():
+        log = run / arm / '20261001-000000' / 'server' / 'server.log'
+        log.parent.mkdir(parents=True)
+        log.write_text(text)
+    return subprocess.run(
+        [sys.executable, str(SCRIPT), str(run), *args], capture_output=True, text=True, check=False
+    )
+
+
+PLATEAU_127 = HEADER + prefill(5, 8192, 119, 1) + prefill(4, 8179, 123, 1) + decode(127, 1)
+
+
+def test_cli_passes_when_every_log_plateaus_as_predicted(tmp_path: Path) -> None:
+    result = run_cli(tmp_path, {'dense': PLATEAU_127, 'exact': PLATEAU_127})
+    assert result.returncode == 0, result.stdout
+
+
+def test_cli_fails_on_a_log_without_plateaus(tmp_path: Path) -> None:
+    filled = HEADER + prefill(4, 8192, 120, 0) + decode(124, 0)
+    result = run_cli(tmp_path, {'dense': PLATEAU_127, 'exact': filled})
+    assert result.returncode == 1
+    assert 'exact: 0 plateaus' in result.stdout
+
+
+def test_cli_fails_below_the_required_count(tmp_path: Path) -> None:
+    result = run_cli(tmp_path, {'dense': PLATEAU_127}, '--min-plateaus', '2')
+    assert result.returncode == 1
+
+
+def test_cli_fails_on_a_plateau_outside_its_scope(tmp_path: Path) -> None:
+    finished = HEADER + prefill(2, 4096, 120, 3) + prefill(3, 6144, 110, 1) + decode(113, 1)
+    result = run_cli(tmp_path, {'dense': PLATEAU_127, 'exact': finished})
+    assert result.returncode == 1
+    assert '1 with C not inferable' in result.stdout

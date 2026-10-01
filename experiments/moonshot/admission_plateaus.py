@@ -19,10 +19,16 @@ pass (a pass that starts a new chunked request does not move it into the running
 That inference assumes no request finished between the two passes, which holds for P4b's
 phases (one synchronised wave each, fixed output length, nothing finishes during the fill)
 but not under continuous traffic; a value other than 0 or 1 (only one chunked request is in
-flight at a time) is reported as not inferable and left out of the comparison. It exits 1 if
-any inferable plateau differs from the prediction.
+flight at a time) means the log is outside that scope.
 
-    python experiments/moonshot/admission_plateaus.py <lever_sweep out dir> ... [--csv out.csv]
+It prints one count line per server log and exits 1 if any log yields fewer than
+--min-plateaus plateaus (default 1, so an unparsed log or one whose waves all filled cannot
+pass silently), if any plateau's C is not inferable, or if any plateau differs from the
+prediction. It explains plateaus; it is not the admission test (check_admission.py is), and
+a run whose waves all fill has no plateau to explain.
+
+    python experiments/moonshot/admission_plateaus.py <lever_sweep out dir> ... \
+        [--min-plateaus N] [--csv out.csv]
 """
 
 from __future__ import annotations
@@ -102,36 +108,49 @@ def plateaus(log_text: str) -> list[dict[str, int | str]]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('runs', nargs='+', type=Path, help='lever_sweep output directories')
+    parser.add_argument('--min-plateaus', type=int, default=1, help='required per server log')
     parser.add_argument('--csv', type=Path)
     args = parser.parse_args()
     rows: list[dict[str, int | str]] = []
+    failed: list[str] = []
     for run in args.runs:
         logs = sorted(run.glob('*/*/server/server.log'))
         if not logs:
             sys.exit(f'{run}: no server logs')
         for log in logs:
             arm = log.parents[2].name
-            for row in plateaus(log.read_text(errors='replace')):
-                rows.append({'run': run.name, 'arm': arm, **row})
-    for row in rows:
-        print(
-            f'{row["run"]} {row["arm"]} {row["time_utc"]}: R={row["running_before"]} '
-            f'n={row["requests_in_pass"]} C={row["continuation"]} -> '
-            f'{row["plateau_observed"]} running, {row["queued_after"]} queued '
-            f'(predicted {row["plateau_predicted"]})'
-        )
-    inferable = [row for row in rows if row['continuation'] != '']
-    mismatched = [row for row in inferable if row['plateau_observed'] != row['plateau_predicted']]
-    print(
-        f'{len(rows)} plateaus, {len(rows) - len(inferable)} with C not inferable, '
-        f'{len(inferable) - len(mismatched)} of {len(inferable)} as predicted'
-    )
+            found = [
+                {'run': run.name, 'arm': arm, **row}
+                for row in plateaus(log.read_text(errors='replace'))
+            ]
+            for row in found:
+                print(
+                    f'{row["run"]} {row["arm"]} {row["time_utc"]}: R={row["running_before"]} '
+                    f'n={row["requests_in_pass"]} C={row["continuation"]} -> '
+                    f'{row["plateau_observed"]} running, {row["queued_after"]} queued '
+                    f'(predicted {row["plateau_predicted"]})'
+                )
+            unknown = sum(row['continuation'] == '' for row in found)
+            wrong = sum(
+                row['continuation'] != '' and row['plateau_observed'] != row['plateau_predicted']
+                for row in found
+            )
+            verdict = 'ok'
+            if len(found) < args.min_plateaus or unknown or wrong:
+                verdict = 'FAILED'
+                failed.append(f'{run.name}/{arm}')
+            print(
+                f'{run.name} {arm}: {len(found)} plateaus, {unknown} with C not inferable, '
+                f'{wrong} differing from the prediction: {verdict}'
+            )
+            rows.extend(found)
+    print(f'{len(rows)} plateaus in total; logs failing: {failed or "none"}')
     if args.csv:
         with args.csv.open('w', newline='') as handle:
             writer = csv.DictWriter(handle, fieldnames=FIELDS, lineterminator='\n')
             writer.writeheader()
             writer.writerows(rows)
-    if mismatched:
+    if failed:
         sys.exit(1)
 
 

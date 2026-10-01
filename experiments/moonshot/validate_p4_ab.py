@@ -13,8 +13,9 @@ Reads one fresh lever_sweep output directory and checks, for this run only:
   - every arm ran the declared workload (long2048.jsonl and its warm-up pool by SHA-256,
     512 prompts, mean input length 2,040-2,049 tokens, OSL 512 with ignore_eos, greedy
     request body) and resolved the pinned pools from its server log: max_running_requests
-    129 (one above the 128 sent, see README 2c), max_mamba_cache_size 132 and a KV pool (max_total_num_tokens; 360,448 requested)
-    of at least 327,680 tokens (128 x 2,560), identical in all eight arms;
+    129 (one above the 128 sent, see README 2c), max_mamba_cache_size 132 and a KV pool
+    (max_total_num_tokens; 655,360 requested) of at least 327,680 tokens (128 x 2,560),
+    identical in all eight arms;
   - every exact-replay server log shows the exact-replay kernel dispatch line, and no
     dense server log does; every exact-replay server was launched with
     SGLANG_GDN_EXACT_REPLAY_BV=32 (bench's launch.json records the arm's environment,
