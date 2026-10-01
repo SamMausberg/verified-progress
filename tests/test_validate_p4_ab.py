@@ -40,8 +40,8 @@ ENGINE_HEAD = 'b' * 40
 ENGINE = '/engine'
 POOL_LOG = (
     'max_total_num_tokens=360448, max_running_requests=128\n'
-    'Mamba Cache is allocated. max_mamba_cache_size: 128, conv_state size: 0.10GB, '
-    'ssm_state size: 6.05GB intermediate_ssm_state_cache size: 0.00GB\n'
+    'Mamba Cache is allocated. max_mamba_cache_size: 132, conv_state size: 0.10GB, '
+    'ssm_state size: 6.23GB intermediate_ssm_state_cache size: 0.00GB\n'
 )
 
 
@@ -302,7 +302,7 @@ def test_other_state_dtype_fails(tmp_path: Path) -> None:
 
 
 def test_half_size_state_pool_fails(tmp_path: Path) -> None:
-    pool_log = POOL_LOG.replace('ssm_state size: 6.05GB', 'ssm_state size: 3.02GB')
+    pool_log = POOL_LOG.replace('ssm_state size: 6.23GB', 'ssm_state size: 3.12GB')
     assert run(make_run(tmp_path, pool_log=pool_log)).returncode == 1
 
 

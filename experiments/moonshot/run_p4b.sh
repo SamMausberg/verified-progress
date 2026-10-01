@@ -14,7 +14,7 @@
 #     no speculation; dense vs exact replay L=4, four pairs in A B B A A B B A order; primary
 #     metric the server decode rate in windows at exactly 128 running requests during the
 #     measured phase, client y secondary. Pools are
-#     pinned in both arms (128 running, 655,360 KV tokens, 128 mamba slots). The run stops
+#     pinned in both arms (128 running, 655,360 KV tokens, 132 mamba slots). The run stops
 #     unless all eight arms of this run completed on the declared workload at batch 128 with
 #     the pinned pools and form four dense/exact pairs (validate_p4_ab.py).
 # Every step logs its start and exit status; any failed step makes the job exit non-zero
