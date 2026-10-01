@@ -9,9 +9,13 @@
 # access to GPU performance counters (here: passwordless sudo).
 #
 # Every step's exit status is checked and written to OUT_DIR/steps.tsv
-# (step, status, exit code); a timeout is exit 124. A step whose prerequisite
-# failed is skipped, and the script exits non-zero if any step failed or was
-# skipped, printing "=== FAILED" instead of "=== done".
+# (step, status, exit code, commit); a timeout is exit 124. A step whose
+# prerequisite failed is skipped, and the script exits non-zero if any step failed
+# or was skipped, printing "=== FAILED" instead of "=== done".
+#
+# To rerun only some steps: RUN_ALL_ONLY=step1,step2 runs those (check_outputs
+# always runs); RUN_ALL_REUSE=DIR copies every other step's outputs from an earlier
+# run if that run recorded the step as ok, and records it with that run's commit.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="${1:-$HOME/vp-data/kernel/runs/latest}"
@@ -20,16 +24,59 @@ cd "$ROOT"
 export PYTHONPATH="$ROOT/src"
 : >"$OUT/steps.tsv"
 declare -A STATUS=()
+COMMIT="$(git rev-parse --short HEAD)"
+ONLY="${RUN_ALL_ONLY:-}"
+REUSE="${RUN_ALL_REUSE:-}"
+declare -A OUTPUTS=(
+  [compile]="compile.log"
+  [tests]="tests.log"
+  [replay]="replay.log replay_decisions.json"
+  [invariance]="invariance.log stock_invariance.json"
+  [tune_w8a16]="tune_w8a16.log tune_w8a16.hostload.json gemv_sweep_w8a16.json"
+  [tune_w8a8]="tune_w8a8.log tune_w8a8.hostload.json gemv_sweep_w8a8.json"
+  [micro]="micro.log micro.hostload.json micro_head.json"
+  [primitives]="primitives.log primitives.hostload.json head_primitives.json"
+  [ncu]="ncu.log ncu_gemv.ncu-rep"
+  [ncu_export]="ncu_export.log ncu_gemv_details.csv"
+  [summarize]="summarize.log head_path_time.csv head_path_table.md"
+)
 
-record() {  # name status code
+record() {  # name status code [commit]
   STATUS[$1]=$2
-  printf '%s\t%s\t%s\n' "$1" "$2" "$3" >>"$OUT/steps.tsv"
-  echo "=== $1 $2 exit=$3 $(date +%T)"
+  printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "${4:-$COMMIT}" >>"$OUT/steps.tsv"
+  echo "=== $1 $2 exit=$3 ${4:-$COMMIT} $(date +%T)"
+}
+
+want() {
+  [ -z "$ONLY" ] || [ "$1" = check_outputs ] || [[ ",$ONLY," == *",$1,"* ]]
+}
+
+reuse() {  # name: copy an earlier run's ok outputs, or record the step as not run
+  local name=$1 f src
+  src=$(awk -F'\t' -v n="$name" '$1 == n && $2 == "ok" {print ($4 == "" ? "?" : $4)}' \
+    "$REUSE/steps.tsv" 2>/dev/null | tail -1)
+  if [ -z "$REUSE" ] || [ -z "$src" ]; then
+    record "$name" not-run -
+    return
+  fi
+  for f in ${OUTPUTS[$name]:-}; do
+    [ -e "$REUSE/$f" ] && cp -p "$REUSE/$f" "$OUT/$f"
+  done
+  if [ "$src" = "?" ]; then
+    src="reused:$(head -1 "$REUSE/commit.txt" | cut -c1-7)"
+  else
+    src="reused:$src"
+  fi
+  record "$name" ok 0 "$src"
 }
 
 step() {  # name timeout command...
   local name=$1 t=$2 rc=0
   shift 2
+  if ! want "$name"; then
+    reuse "$name"
+    return 0
+  fi
   echo "=== $name start $(date +%T)"
   timeout "$t" "$@" >"$OUT/$name.log" 2>&1 || rc=$?
   if [ "$rc" -eq 0 ]; then
@@ -64,6 +111,10 @@ HOSTLOAD="${HOSTLOAD:-$ROOT/bench/hostload.py}"
 timed() {
   local name=$1 t=$2
   shift 2
+  if ! want "$name"; then
+    reuse "$name"
+    return 0
+  fi
   if [ -f "$HOSTLOAD" ]; then
     step "$name" "$t" python "$HOSTLOAD" record --out "$OUT/$name.hostload.json" -- "$@"
   else
@@ -87,8 +138,11 @@ step tests 900 python -m pytest tests/test_certified_head.py -q -s -p no:cachepr
 step replay 300 python experiments/certified_head/replay_decisions.py --limit-rows 60000 \
   --sample-temps 0.7 1.0 --out "$OUT/replay_decisions.json"
 step invariance 120 python experiments/certified_head/stock_invariance.py --out "$OUT/stock_invariance.json"
-timed tune_w8a16 600 python bench/tune_gemv.py --arith w8a16 --out "$OUT/gemv_sweep_w8a16.json"
-timed tune_w8a8 480 python bench/tune_gemv.py --arith w8a8 --batches 16 32 64 128 256 \
+# The sweeps compile each candidate tile configuration once (about 1 s each from a
+# cold Triton cache after a kernel change; 52 to 88 candidates per batch size), so
+# their budgets cover a cold cache: x6's W8A16 sweep needed 9 minutes for M <= 128.
+timed tune_w8a16 1500 python bench/tune_gemv.py --arith w8a16 --out "$OUT/gemv_sweep_w8a16.json"
+timed tune_w8a8 900 python bench/tune_gemv.py --arith w8a8 --batches 16 32 64 128 256 \
   --out "$OUT/gemv_sweep_w8a8.json"
 if ok tune_w8a16 tune_w8a8; then
   timed micro 900 python bench/micro_head.py --trials 30 --pool-rows 60000 \
@@ -102,7 +156,7 @@ step ncu 240 sudo -E env PATH="$PATH" LD_LIBRARY_PATH="$LD_LIBRARY_PATH" PYTHONP
   "$CUDA_HOME/bin/ncu" --set full -k regex:_gemv_envelope_kernel -c 8 -f -o "$OUT/ncu_gemv" \
   "$(command -v python)" bench/profile_gemv.py --batches 1 16 64 256 --calls 2
 if ok ncu; then
-  sudo chown "$(id -u):$(id -g)" "$OUT/ncu_gemv.ncu-rep"
+  [ -O "$OUT/ncu_gemv.ncu-rep" ] || sudo chown "$(id -u):$(id -g)" "$OUT/ncu_gemv.ncu-rep"
   step ncu_export 120 bash -c "'$CUDA_HOME/bin/ncu' --import '$OUT/ncu_gemv.ncu-rep' \
     --page details --csv > '$OUT/ncu_gemv_details.csv'"
 else

@@ -1059,3 +1059,35 @@ def test_probes_are_on_unless_explicitly_disabled(checkpoint: tuple[Any, Any]) -
         head.probes = 0  # type: ignore[misc]
     head.disable_probes_for_measurement()
     assert head.probes == 0 and head.unsafe
+
+
+def test_fp64_references_bypass_a_deterministic_matmul_override(monkeypatch: Any) -> None:
+    """Under SGLang's deterministic inference aten::mm has no FP64 path; the
+    self-test's exact references switch the override off and then on again."""
+    import sys
+    import types
+
+    from certified_head.selftest import native_fp64_matmul
+
+    calls: list[str] = []
+    fake = types.ModuleType('sglang.srt.batch_invariant_ops.batch_invariant_ops')
+    state = {'on': True}
+
+    def disable() -> None:
+        calls.append('off')
+        state['on'] = False
+
+    def enable() -> None:
+        calls.append('on')
+        state['on'] = True
+
+    fake.is_batch_invariant_mode_enabled = lambda: state['on']  # type: ignore[attr-defined]
+    fake.disable_batch_invariant_mode = disable  # type: ignore[attr-defined]
+    fake.enable_batch_invariant_mode = enable  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, fake.__name__, fake)
+    with native_fp64_matmul():
+        assert not state['on']
+    assert state['on'] and calls == ['off', 'on']
+    with pytest.raises(RuntimeError), native_fp64_matmul():
+        raise RuntimeError('restored even on errors')
+    assert state['on']
