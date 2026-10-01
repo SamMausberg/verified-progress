@@ -294,8 +294,8 @@ Setup section. Rates are per 1,000 compared tokens
   decoding at 3.5 to 4.0 per 1,000 tokens, as often as from itself at another
   concurrency (3.1 to 3.5), and only at near ties.
 - **By rejection position.** Divergences per fragile position (one where the plain
-  reference's top-2 gap is at most 0.25 nats) do not depend on the previous cycle's
-  commit length, including full acceptance (`cycles_*_pinned.json`):
+  reference's top-2 gap is at most 0.25 nats), by the previous cycle's commit length,
+  including full acceptance (`cycles_*_pinned.json`):
 
   | Configuration | Commit length 1, 2, 3, ... (full acceptance last) | All |
   |---|---|---|
@@ -305,9 +305,13 @@ Setup section. Rates are per 1,000 compared tokens
   | MTP tree | 0.100, 0.075, 0.063, 0.090 | 0.083 |
 
   A state error at one rejection position (a wrong rollback for one accept length)
-  would raise that position's rate. None does. A chi-square test of one common rate
-  across commit lengths gives p = 0.74, 0.72, 0.71 and 0.27 for steps 1, 3, 5 and the
-  tree (`by_commit_length.homogeneity_chi2` in each file).
+  would raise that position's rate. No length stands out. The rates are compatible
+  with one common rate: chi-square p = 0.74, 0.72, 0.71 and 0.27 for steps 1, 3, 5 and
+  the tree (`by_commit_length.homogeneity_chi2` in each file). That is a failure to
+  reject, not a proof of equal rates. The test also treats positions as independent,
+  although they cluster by prompt and a prompt's positions stop at its first
+  divergence. No prompt-clustered analysis or bound on a per-length excess rate has
+  been done.
 - **Pinning and the repeat floor.** The fresh-server repeat at concurrency 32 drops
   from 24/320 (unpinned: different pools, cap 16) to 4/320 (identical pools, cap 8).
   Both changed at once, and a smaller cap also narrows the batch compositions, so
