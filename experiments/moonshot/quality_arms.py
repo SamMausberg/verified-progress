@@ -126,12 +126,16 @@ def probe(
 
 
 def compare(reference: Path, candidate: Path) -> dict[str, object]:
+    """logit_probe.py compare: exit 0 if identical, 3 if the runs differ (both are results,
+    with `identical` and `first_difference` in the summary); anything else is an error."""
     result = subprocess.run(
         [sys.executable, str(HERE / 'logit_probe.py'), 'compare', str(reference), str(candidate)],
-        check=True,
+        check=False,
         capture_output=True,
         text=True,
     )
+    if result.returncode not in (0, 3):
+        raise RuntimeError(f'compare exited {result.returncode}: {result.stderr[-2000:]}')
     parsed: dict[str, object] = json.loads(result.stdout)
     return parsed
 

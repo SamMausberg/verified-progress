@@ -69,6 +69,7 @@ def make_run(
     dirty: list[str] | None = None,
     extra_env: dict[str, str] | None = None,
     state_dtype: str = 'float32',
+    probe: str = 'no difference',
     **overrides: Any,
 ) -> Path:
     """A synthetic A/B directory; `overrides` apply to the first exact-replay arm's point,
@@ -109,6 +110,7 @@ def make_run(
         'engine_head': ENGINE_HEAD,
     }
     (root / 'provenance.json').write_text(json.dumps(provenance))
+    (root / 'output_probe.json').write_text(json.dumps({'outcome': probe}))
     return root
 
 
@@ -119,6 +121,8 @@ def run(root: Path) -> subprocess.CompletedProcess[str]:
         str(root),
         '--provenance',
         str(root / 'provenance.json'),
+        '--output-probe',
+        str(root / 'output_probe.json'),
     ]
     return subprocess.run(command, capture_output=True, text=True, check=False)
 
@@ -126,7 +130,9 @@ def run(root: Path) -> subprocess.CompletedProcess[str]:
 def test_complete_run_is_decided(tmp_path: Path) -> None:
     result = run(make_run(tmp_path))
     assert result.returncode == 0, result.stdout + result.stderr
-    assert json.loads(result.stdout)['decision'] == 'supported'
+    verdict = json.loads(result.stdout)
+    assert verdict['throughput_decision'] == 'supported'
+    assert verdict['verdict'].startswith('throughput supported; output probe found no difference')
 
 
 def test_partial_point_fails(tmp_path: Path) -> None:
@@ -215,3 +221,16 @@ def test_other_state_dtype_fails(tmp_path: Path) -> None:
 def test_half_size_state_pool_fails(tmp_path: Path) -> None:
     pool_log = POOL_LOG.replace('ssm_state size: 6.05GB', 'ssm_state size: 3.02GB')
     assert run(make_run(tmp_path, pool_log=pool_log)).returncode == 1
+
+
+def test_refuting_probe_is_stated_with_the_throughput(tmp_path: Path) -> None:
+    result = run(make_run(tmp_path, probe='refuted'))
+    assert result.returncode == 0
+    verdict = json.loads(result.stdout)['verdict']
+    assert verdict.startswith('throughput supported; end-to-end exactness REFUTED')
+
+
+def test_missing_probe_outcome_fails(tmp_path: Path) -> None:
+    root = make_run(tmp_path)
+    (root / 'output_probe.json').unlink()
+    assert run(root).returncode == 1

@@ -238,7 +238,14 @@ with this declaration):
   against dense. A difference refutes end-to-end exactness; a pass does not establish it
   (the probe sees only the emitted tokens and the top-20 logprobs, not the state or the
   hidden outputs). Bit-exactness is shown only at kernel level (above). Every exact-replay
-  server log must show the exact-replay kernel dispatch line.
+  server log must show the exact-replay kernel dispatch line. A second dense server
+  (`plain+no_radix#2`) against the same reference is the noise control: if it differs, the
+  probe is undecided.
+- How the two combine (`output_probe.py`, `validate_p4_ab.py`): the verdict always states
+  both, as "throughput <supported|rejected|inconclusive>; <probe outcome>". If the probe
+  refuted exactness, it reads "end-to-end exactness REFUTED by the output probe; P4 exact
+  claim not supported", whatever the throughput interval says; it never reads as plain
+  support.
 - Derived expectation before the run: about 1.08x at a 418-token context, less at 2,048.
 
 ## 2d. Speculative host gap: configuration-level levers (measured, single runs)

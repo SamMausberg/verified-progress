@@ -100,6 +100,8 @@ step required server-output-probe python experiments/moonshot/quality_arms.py --
   'plain+no_radix#2' plain+no_radix+fp16_state plain+no_radix+bf16_state
 step required probe-dispatch-log grep -q "GDN decode: exact replay kernel" \
   "$QUALITY/plain+no_radix+exact_replay/server/server.log"
+step required output-probe-outcome python experiments/moonshot/output_probe.py \
+  "$QUALITY/summary.json" --json "$QUALITY/output_probe.json"
 
 AB=$DATA/p4_ab_$RUN_ID
 step required ab-sweep python experiments/moonshot/lever_sweep.py --out "$AB" --stream-interval 4 \
@@ -111,7 +113,7 @@ step required ab-sweep python experiments/moonshot/lever_sweep.py --out "$AB" --
   'plain+no_radix+p4_pools#r3' 'plain+no_radix+p4_pools+exact_replay#r3' \
   'plain+no_radix+p4_pools+exact_replay#r4' 'plain+no_radix+p4_pools#r4'
 step required ab-validate-and-decide python experiments/moonshot/validate_p4_ab.py "$AB" \
-  --provenance "$PROVENANCE" --json "$AB/verdict.json"
+  --provenance "$PROVENANCE" --output-probe "$QUALITY/output_probe.json" --json "$AB/verdict.json"
 
 if [ ${#OPTIONAL_FAILED[@]} -gt 0 ]; then
   echo "P4b finished; optional steps FAILED: ${OPTIONAL_FAILED[*]}"

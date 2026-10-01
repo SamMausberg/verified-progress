@@ -30,8 +30,11 @@ Reads one fresh lever_sweep output directory and checks, for this run only:
     that engine tree), with no modified tracked files in either.
 Any failed check prints FAILED and exits 1. Otherwise it prints, per pair, the exact / dense
 ratio of the primary metric (`server_log.logged_gen_tps_full_batch`) and of client y, the
-mean log ratio with a t(3) 95% interval, and the decision at 1.10x (rejected if the upper
-end < 1.10, supported if the lower end >= 1.10, otherwise inconclusive).
+mean log ratio with a t(3) 95% interval, and the throughput decision at 1.10x (rejected if
+the upper end < 1.10, supported if the lower end >= 1.10, otherwise inconclusive). The
+verdict always states the throughput decision together with the server output probe's
+outcome (output_probe.py): "throughput <decision>; end-to-end exactness REFUTED by the
+output probe" when the probe refuted it, so a refuted run never reads as plain support.
 
     python experiments/moonshot/validate_p4_ab.py <out dir> --json <verdict.json>
 """
@@ -68,6 +71,13 @@ POOL_PATTERNS = {
 DISPATCH = 'GDN decode: exact replay kernel'
 T3_975 = 3.182446305284263  # Student t, 3 degrees of freedom, two-sided 95%
 THRESHOLD = 1.10
+PROBE_WORDING = {
+    'refuted': 'end-to-end exactness REFUTED by the output probe; P4 exact claim not supported',
+    'undecided': 'output probe undecided (the dense repeat also differed); end-to-end '
+    'exactness not established',
+    'no difference': 'output probe found no difference (this does not establish end-to-end '
+    'exactness; bit-exactness is shown at kernel level)',
+}
 
 
 def fail(message: str) -> None:
@@ -184,12 +194,18 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('out', type=Path)
     parser.add_argument('--provenance', type=Path, required=True)
+    parser.add_argument('--output-probe', type=Path, required=True, help='output_probe.py JSON')
     parser.add_argument('--json', type=Path, default=None)
     args = parser.parse_args()
     out = args.out.expanduser()
     if not args.provenance.exists():
         fail(f'provenance file {args.provenance} missing')
     provenance = json.loads(args.provenance.read_text())
+    if not args.output_probe.exists():
+        fail(f'output probe result {args.output_probe} missing')
+    probe = json.loads(args.output_probe.read_text())
+    if probe.get('outcome') not in PROBE_WORDING:
+        fail(f'output probe outcome {probe.get("outcome")!r}')
     for key in ('repo', 'repo_head', 'engine', 'engine_head'):
         if not provenance.get(key):
             fail(f'provenance lacks {key}')
@@ -247,13 +263,15 @@ def main() -> None:
     else:
         decision = 'inconclusive'
     verdict = {
+        'verdict': f'throughput {decision}; {PROBE_WORDING[probe["outcome"]]}',
+        'throughput_decision': decision,
+        'output_probe': probe,
         'provenance': provenance,
         'pairs': rows,
         'primary_metric': 'server_log.logged_gen_tps_full_batch',
         'server_ratio_mean_ci95': server,
         'client_y_ratio_mean_ci95': client,
         'threshold': THRESHOLD,
-        'decision': decision,
     }
     print(json.dumps(verdict, indent=1), flush=True)
     if args.json:
