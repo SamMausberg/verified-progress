@@ -177,10 +177,15 @@ all succeeded. Every timed hold first runs `equality_gate.py check`, which recom
 decision from that run's files, compares it with the stored gate, and verifies the
 routing table's and (when H passed) the package's hashes; a session whose gate includes
 H refuses to start without that package, and any failed check stops the hold before a
-server starts. The first session pins the campaign to its gate (the gate's and its
-comparison summary's SHA-256 and the run directory); a later session under any other
-gate refuses to start, each session records the digest beside its runs, and the
-analysis refuses sessions with missing or differing records. Bitwise (B0 against S0, or a
+server starts. A campaign is the set of sessions analysed together. It starts when
+`~/vp-data/stack/campaign_gate.json` does not exist; the first session whose check
+passes writes it (the gate's and its comparison summary's SHA-256 and the run
+directory), and a failed check never writes it. A later session under any other gate
+refuses to start, each session copies the pin beside its runs, and the analysis takes
+its gate only from the pin (whose files must be unchanged) and refuses sessions with
+missing or differing records. Only the stack workstream deletes the pin, to start a new
+campaign after a dated amendment that says why; the old pin is kept beside the
+campaign's runs. Bitwise (B0 against S0, or a
 lever against B0) compares the two runs' raw outputs, token ids and complete top-logprob
 arrays, prompt by prompt. The same hold runs a phase diagnostic: B0 and FG with the repair probe at
 c = 1 and 8 (`phases.py`).
@@ -286,7 +291,7 @@ scripts/gpu_lock.sh -x experiments/stack/hold_session.sh 1          # then 2 and
 python -m bench.pareto ~/vp-data/stack/runs/stack-*/2026* --out ~/vp-data/stack/pareto \
     --points-only --status stack
 python experiments/stack/analyze.py --points ~/vp-data/stack/pareto/points.csv \
-    --gate ~/vp-data/stack/equality/current/gate.json --session-gates ~/vp-data/stack/runs \
+    --campaign ~/vp-data/stack/campaign_gate.json --session-gates ~/vp-data/stack/runs \
     --out evidence/stack/composition.json --csv evidence/stack/composition.csv
 scripts/gpu_lock.sh -x experiments/stack/hold_oracle.sh             # diagnostic, after the sessions
 ```

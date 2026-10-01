@@ -13,17 +13,19 @@ declared in evidence/stack/README.md ("Composition plan"):
   above 1, "slowdown" if its upper end is below 1, otherwise "no detectable change".
   A point that bench marks invalid (failed requests, wrong lengths, foreign CPU load
   above 2 cores, ...) drops that session at that concurrency for the arms it touches.
-* Every session must have run under the same equality gate: each session hold writes
-  the campaign's gate digest to `session_<session>.gate.json` beside its runs
-  (`--session-gates`), and the analysis stops if any session's record is missing or
-  differs, so measurements from different routing tables or packages are never pooled.
+* The gate comes only from the campaign pin (`--campaign`, the campaign_gate.json the
+  first session wrote): its pinned files must be unchanged, and the full stack is that
+  gate's timed levers. Every session must have run under it: each session hold copies
+  the pin to `session_<session>.gate.json` beside its runs (`--session-gates`), and the
+  analysis stops if any session's record is missing or differs, so measurements from
+  different routing tables or packages are never pooled.
 * The four-way pattern for levers F and G on the composed tree (B0, F, G, FG): the
   interaction log(FG/B0) - log(F/B0) - log(G/B0) per session, with the same interval,
   over the sessions in which every launch of B0, F, G and FG is valid.
   Isolated ratios are never multiplied into a composed estimate.
 
     python experiments/stack/analyze.py --points ~/vp-data/stack/pareto/points.csv \
-        --gate ~/vp-data/stack/equality/current/gate.json --session-gates ~/vp-data/stack/runs \
+        --campaign ~/vp-data/stack/campaign_gate.json --session-gates ~/vp-data/stack/runs \
         --out evidence/stack/composition.json --csv evidence/stack/composition.csv
 """
 
@@ -31,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import importlib.util
 import json
 import math
 import statistics
@@ -65,6 +68,16 @@ def interval(logs: list[float]) -> dict[str, Any]:
     return out
 
 
+def _gate_module():
+    spec = importlib.util.spec_from_file_location(
+        'equality_gate', Path(__file__).resolve().parent / 'equality_gate.py'
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def load(path: Path) -> list[dict[str, Any]]:
     with path.open() as f:
         return [r for r in csv.DictReader(f) if r['label'].startswith('stack-')]
@@ -73,9 +86,11 @@ def load(path: Path) -> list[dict[str, Any]]:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--points', type=Path, required=True)
-    ap.add_argument('--full', help='arm name of the full stack (FG or FGH)')
     ap.add_argument(
-        '--gate', type=Path, help='equality gate.json: the full stack is its timed levers'
+        '--campaign',
+        type=Path,
+        required=True,
+        help="the campaign pin (campaign_gate.json); the full stack is its gate's timed levers",
     )
     ap.add_argument(
         '--session-gates',
@@ -86,10 +101,11 @@ def main() -> None:
     ap.add_argument('--out', type=Path, required=True)
     ap.add_argument('--csv', type=Path, help='one row per arm, concurrency and metric')
     args = ap.parse_args()
-    if args.gate:
-        args.full = ''.join(json.loads(args.gate.read_text())['timed_levers'])
-    if not args.full:
-        ap.error('give --full or --gate')
+    pin = json.loads(args.campaign.read_text())
+    try:
+        args.full = ''.join(_gate_module().pinned_gate(args.campaign)['timed_levers'])
+    except Exception as err:  # the pinned gate is missing or changed
+        raise SystemExit(f'campaign gate: {err}') from err
 
     # session -> concurrency -> arm -> list of (run, metrics) in launch order
     data: dict[str, dict[int, dict[str, list[tuple[str, dict[str, float]]]]]] = defaultdict(
@@ -122,13 +138,13 @@ def main() -> None:
         if not record.is_file():
             raise SystemExit(f'no gate record for session {session} ({record})')
         digests[session] = json.loads(record.read_text())
-    if len({json.dumps(d, sort_keys=True) for d in digests.values()}) > 1:
-        raise SystemExit(f'sessions ran under different equality gates: {digests}')
+        if digests[session] != pin:
+            raise SystemExit(f'session {session} ran under another gate: {digests[session]}')
     arms = sorted(all_arms - {'S0'})
     concurrencies = sorted(all_c)
     result: dict[str, Any] = {
         'full': args.full,
-        'gate': next(iter(digests.values()), None),
+        'gate': pin,
         'invalid_points': invalid,
         'arms': {},
     }

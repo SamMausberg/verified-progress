@@ -28,9 +28,10 @@ The decision is all or nothing:
     python experiments/stack/equality_gate.py check --gate ~/vp-data/stack/equality/current/gate.json \
         [--cert-src ~/vp-wt/stack-cert/src] [--pin ~/vp-data/stack/campaign_gate.json]
 
-`--pin` binds a campaign of sessions to one gate: the first check writes the gate's
-and its comparison summary's SHA-256 and the run directory there, and every later check
-refuses a different gate.
+`--pin` binds a campaign of sessions to one gate: the first check that passes every
+precondition writes the gate's and its comparison summary's SHA-256 and the run
+directory there, and every later check refuses a different gate. A failed check never
+writes a pin.
 """
 
 from __future__ import annotations
@@ -174,17 +175,6 @@ def check(gate_path: Path, cert_src: Path | None, pin: Path | None = None) -> tu
         raise GateError(f'no gate at {gate_path}')
     stored = json.loads(gate_path.read_text())
     run = gate_path.resolve().parent
-    digest = {
-        'gate_sha256': sha256_file(gate_path),
-        'summary_sha256': sha256_file(run / 'summary.json'),
-        'run': str(run),
-    }
-    if pin is not None:
-        if pin.is_file():
-            if json.loads(pin.read_text()) != digest:
-                raise GateError(f'this campaign is pinned to another gate ({pin})')
-        else:
-            pin.write_text(json.dumps(digest, indent=1) + '\n')
     recomputed = evaluate(
         run, stored.get('table_sha256'), stored.get('certified', {}).get('package_sha256')
     )
@@ -203,7 +193,34 @@ def check(gate_path: Path, cert_src: Path | None, pin: Path | None = None) -> tu
             raise GateError('the gate includes H but no certified_head package was named')
         if fingerprint(cert_src) != stored['certified']['package_sha256']:
             raise GateError(f'certified_head package under {cert_src} is not the one that passed')
+    # Only a gate that passed every check above may pin or continue a campaign.
+    if pin is not None:
+        digest = campaign_digest(gate_path)
+        if pin.is_file():
+            if json.loads(pin.read_text()) != digest:
+                raise GateError(f'this campaign is pinned to another gate ({pin})')
+        else:
+            pin.write_text(json.dumps(digest, indent=1) + '\n')
     return ''.join(levers), table
+
+
+def campaign_digest(gate_path: Path) -> dict[str, str]:
+    run = gate_path.resolve().parent
+    return {
+        'gate_sha256': sha256_file(gate_path),
+        'summary_sha256': sha256_file(run / 'summary.json'),
+        'run': str(run),
+    }
+
+
+def pinned_gate(pin: Path) -> dict[str, Any]:
+    """The gate a campaign is pinned to, after checking the pinned files are unchanged."""
+    digest = json.loads(pin.read_text())
+    gate_path = Path(digest['run']) / 'gate.json'
+    if campaign_digest(gate_path) != digest:
+        raise GateError(f'the gate pinned in {pin} has changed on disk')
+    gate: dict[str, Any] = json.loads(gate_path.read_text())
+    return gate
 
 
 def main() -> int:

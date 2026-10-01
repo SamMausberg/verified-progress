@@ -26,21 +26,28 @@ def _load(name: str):
 
 
 analyze = _load('analyze')
+gate = _load('equality_gate')
 ceiling = _load('ceiling')
 phases = _load('phases')
 
 FIELDS = ['label', 'run', 'session', 'concurrency', 'invalid_reason', 'x_e2e', 'y', 'accept_length']
 
 
-def _points(path: Path, rows: list[dict], digest: dict | None = None) -> None:
+def _points(path: Path, rows: list[dict], levers: str = 'FG') -> None:
+    """points.csv, a pinned campaign gate (timed levers `levers`) and session records."""
     with path.open('w', newline='') as f:
         w = csv.DictWriter(f, fieldnames=FIELDS)
         w.writeheader()
         for r in rows:
             w.writerow({'invalid_reason': '', 'accept_length': '5.7', **r})
+    run = path.parent / 'campaign_run'
+    run.mkdir(exist_ok=True)
+    (run / 'gate.json').write_text(json.dumps({'timed_levers': list(levers)}))
+    (run / 'summary.json').write_text('{}')
+    digest = gate.campaign_digest(run / 'gate.json')
+    (path.parent / 'campaign_gate.json').write_text(json.dumps(digest))
     for session in {r['session'] for r in rows}:
-        record = path.parent / f'session_{session}.gate.json'
-        record.write_text(json.dumps(digest or {'gate_sha256': 'g', 'run': 'r'}))
+        (path.parent / f'session_{session}.gate.json').write_text(json.dumps(digest))
 
 
 def test_full_stack_ratio_pairs_both_launches_with_both_baselines(tmp_path, monkeypatch):
@@ -69,8 +76,8 @@ def test_full_stack_ratio_pairs_both_launches_with_both_baselines(tmp_path, monk
             'analyze',
             '--points',
             str(pts),
-            '--full',
-            'FG',
+            '--campaign',
+            str(tmp_path / 'campaign_gate.json'),
             '--out',
             str(out),
             '--session-gates',
@@ -121,8 +128,8 @@ def test_invalid_point_drops_the_session_for_that_arm(tmp_path, monkeypatch):
             'analyze',
             '--points',
             str(pts),
-            '--full',
-            'FG',
+            '--campaign',
+            str(tmp_path / 'campaign_gate.json'),
             '--out',
             str(out),
             '--session-gates',
@@ -173,9 +180,6 @@ def test_phase_summary_uses_consecutive_cycle_starts(tmp_path):
     assert s['median_us']['period_us'] == 6000.0
     assert s['idle_median_us'] == 800.0
     assert s['us_per_token'] == 1000.0
-
-
-gate = _load('equality_gate')
 
 
 def _pair(diverged: int = 0, drift: float = 0.0, prompts: int = 320, **classes: int) -> dict:
@@ -399,8 +403,8 @@ def test_interaction_skips_a_session_with_one_invalid_full_launch(tmp_path, monk
             'analyze',
             '--points',
             str(pts),
-            '--full',
-            'FG',
+            '--campaign',
+            str(tmp_path / 'campaign_gate.json'),
             '--out',
             str(out),
             '--session-gates',
@@ -438,8 +442,8 @@ def test_all_invalid_full_stays_visible_with_n_zero(tmp_path, monkeypatch):
             'analyze',
             '--points',
             str(pts),
-            '--full',
-            'FG',
+            '--campaign',
+            str(tmp_path / 'campaign_gate.json'),
             '--out',
             str(out),
             '--session-gates',
@@ -481,9 +485,7 @@ def test_analysis_takes_the_full_arm_from_the_gate(tmp_path, monkeypatch):
             }
         )
     pts = tmp_path / 'points.csv'
-    _points(pts, rows)
-    gate_file = tmp_path / 'gate.json'
-    gate_file.write_text(json.dumps({'timed_levers': ['F', 'G', 'H']}))
+    _points(pts, rows, levers='FGH')
     out = tmp_path / 'out.json'
     monkeypatch.setattr(
         sys,
@@ -492,8 +494,8 @@ def test_analysis_takes_the_full_arm_from_the_gate(tmp_path, monkeypatch):
             'analyze',
             '--points',
             str(pts),
-            '--gate',
-            str(gate_file),
+            '--campaign',
+            str(tmp_path / 'campaign_gate.json'),
             '--out',
             str(out),
             '--session-gates',
@@ -531,8 +533,8 @@ def test_analysis_refuses_sessions_under_different_gates(tmp_path, monkeypatch):
             'analyze',
             '--points',
             str(pts),
-            '--full',
-            'FG',
+            '--campaign',
+            str(tmp_path / 'campaign_gate.json'),
             '--out',
             str(out),
             '--session-gates',
@@ -544,3 +546,50 @@ def test_analysis_refuses_sessions_under_different_gates(tmp_path, monkeypatch):
     (tmp_path / 'session_stack-s2.gate.json').unlink()
     with pytest.raises(SystemExit):
         analyze.main()
+
+
+def test_analysis_refuses_a_changed_pinned_gate(tmp_path, monkeypatch):
+    rows = [
+        {
+            'label': f'stack-{arm}',
+            'run': f's1-{i}',
+            'session': 'stack-s1',
+            'concurrency': '1',
+            'x_e2e': 100.0,
+            'y': 100.0,
+        }
+        for i, arm in enumerate(['S0', 'FG', 'FG', 'S0'])
+    ]
+    pts = tmp_path / 'points.csv'
+    _points(pts, rows)
+    (tmp_path / 'campaign_run' / 'gate.json').write_text(
+        json.dumps({'timed_levers': ['F', 'G', 'H']})
+    )
+    out = tmp_path / 'out.json'
+    monkeypatch.setattr(
+        sys,
+        'argv',
+        [
+            'analyze',
+            '--points',
+            str(pts),
+            '--out',
+            str(out),
+            '--campaign',
+            str(tmp_path / 'campaign_gate.json'),
+            '--session-gates',
+            str(tmp_path),
+        ],
+    )
+    with pytest.raises(SystemExit):
+        analyze.main()
+
+
+def test_failed_check_never_writes_the_pin(tmp_path, monkeypatch):
+    pin = tmp_path / 'campaign.json'
+    pairs = _passing()
+    pairs['B0 vs S0'] = _pair(1, 0.1, tie=1)
+    _, path = _build(tmp_path, monkeypatch, pairs)
+    with pytest.raises(gate.GateError):
+        gate.check(path, None, pin)
+    assert not pin.exists()
