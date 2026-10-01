@@ -117,11 +117,14 @@ replays against the original anchor: y1 = F(y0) and y2 = F(y1), both exact Jacob
 - (2) Decisions: on replay 1 the repaired argmax equals the exact argmax at 35% of the changed
   positions with rank 0 (anchor outputs reused unchanged), 37% at rank 128 and 44% at rank 512;
   at the corrected position itself 11-14%; on replay 2, 24-35%. The certificate ratio
-  R_i = 2 ||z~ - z||_inf / m_i is below 1 at 4.7% of positions (43 of 962), the same 43 positions
-  at every rank including rank 0: positions whose exact top-two margin is large (median 12
-  logits, against 1.3 over all replayed positions), where even reusing the anchor logits stays
-  within half the margin. These certificates are not earned by the repair; the median R_i is
-  13-16. Positions before the first change agree exactly in every block (harness check). The
+  R_i = 2 ||z~ - z||_inf / m_i is below 1 at 4.7% of the positions where it is defined (43 of
+  921; the other 41 of the 962 changed positions are exact top-two ties of the exact logits,
+  margin 0, where R_i is undefined), the same 43 positions at every rank including rank 0:
+  positions whose exact top-two margin is large (median 12 logits, against 1.3 over all 962
+  replayed positions), where even reusing the anchor logits stays within half the margin
+  (`ratio_below_1_count`, `tied_positions_ratio_undefined`, `margin_median_*`,
+  `ratio_below_1_same_positions_at_every_rank` in the JSON). These certificates are not earned
+  by the repair; the median R_i is 13-16. Positions before the first change agree exactly in every block (harness check). The
   corrected position's decision is right in 9 of 80 blocks at ranks 0-256 and 11 at rank 512.
 - (3) Progress: free-running repair from y1, audited exactly after every sweep, accepts 4.33
   drafts after 0 sweeps and 4.33-4.44 after 4 sweeps at every rank, while exact Jacobi from the

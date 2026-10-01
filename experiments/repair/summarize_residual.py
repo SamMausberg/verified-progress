@@ -92,16 +92,29 @@ def main() -> None:
             below: list[int] = []
             firsts: list[int | None] = []
             before_ok = []
+            ties = 0
+            below_positions: list[list[int]] = []
+            margins_all: list[float] = []
+            margins_below: list[float] = []
             for rec in held:
                 st = rec['ranks'][key][replay]
                 before_ok.append(int(st['agree_before_start']))
-                for d, (a, ratio, tie) in enumerate(
-                    zip(st['agree'], st['ratio'], st['tie'], strict=True)
+                margins = st.get('margin') or [None] * len(st['agree'])
+                for d, (a, ratio, tie, margin) in enumerate(
+                    zip(st['agree'], st['ratio'], st['tie'], margins, strict=True)
                 ):
                     agree_by_d[d].append(a)
-                    if not tie:
-                        ratio_all.append(ratio)
-                        below.append(int(ratio < 1.0))
+                    if margin is not None:
+                        margins_all.append(margin)
+                    if tie:
+                        ties += 1  # exact top-two tie: margin 0, R_i undefined
+                        continue
+                    ratio_all.append(ratio)
+                    below.append(int(ratio < 1.0))
+                    if ratio < 1.0:
+                        below_positions.append([rec['case'], d])
+                        if margin is not None:
+                            margins_below.append(margin)
                 firsts.append(st['first_disagreement'])
             flat = [a for v in agree_by_d.values() for a in v]
             out[replay] = {
@@ -109,6 +122,16 @@ def main() -> None:
                 'agree_rate': mean(flat),
                 'agree_rate_by_distance': {d: mean(v) for d, v in sorted(agree_by_d.items())},
                 'ratio_below_1_rate': mean(below),
+                'ratio_defined_positions': len(below),
+                'ratio_below_1_count': sum(below),
+                'tied_positions_ratio_undefined': ties,
+                'margin_median_all_positions': statistics.median(margins_all)
+                if margins_all
+                else None,
+                'margin_median_ratio_below_1': statistics.median(margins_below)
+                if margins_below
+                else None,
+                'ratio_below_1_positions': below_positions,
                 'ratio_median': statistics.median(ratio_all) if ratio_all else None,
                 'blocks_without_disagreement': mean([float(f is None) for f in firsts]),
                 'first_disagreement_median': statistics.median([f for f in firsts if f is not None])
@@ -140,6 +163,17 @@ def main() -> None:
             op: statistics.median(v) for op, v in sorted(ops.items())
         }
         per_rank[key] = out
+    # Whether the positions certified by R_i < 1 change with the rank.
+    for replay in ('replay1', 'replay2'):
+        sets = {
+            k: {tuple(x) for x in v[replay]['ratio_below_1_positions']} for k, v in per_rank.items()
+        }
+        first = next(iter(sets.values()), set())
+        for v in per_rank.values():
+            v[replay]['ratio_below_1_same_positions_at_every_rank'] = all(
+                s == first for s in sets.values()
+            )
+            del v[replay]['ratio_below_1_positions']
 
     sweeps_exact = len(held[0]['exact_jacobi_accept'])
     exact = [[rec['exact_jacobi_accept'][k] for rec in held] for k in range(sweeps_exact)]
