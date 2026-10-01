@@ -168,7 +168,10 @@ follows decode onto FlashInfer. There, repair's #89 measured the Triton verify k
 2.06-2.34 times faster at block widths 64-256. The tuned arms decode with Triton, the
 stock default, and so already verify with it. The first DFlash attempt failed at launch: at a 0.25
 memory fraction, 16 requests' verify states left no KV memory. Its runs use capacity
-4, which is enough for a c=1 pass.
+4, which is enough for a c=1 pass. The DFlash class comes from DFlash runs that all have
+capacity 4. Its rates against plain c=1 compare capacity 4 with the reference's 16 (pools
+sized from free memory, unpinned, like every run here), so they are reported as rates
+only.
 
 ```sh
 scripts/gpu_lock.sh -s bench/campaigns/equality_tuned.sh
