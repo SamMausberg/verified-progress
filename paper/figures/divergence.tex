@@ -1,0 +1,32 @@
+% Figure: where equivalent stock configurations first produce different module outputs, by
+% decoder layer. Counts are typed from evidence/state_safety/mechanism_plain_c1_vs_mtp_s3_c1.json
+% and mechanism_plain_c1_vs_c32.json (summary.first_difference_module); full-attention
+% layers are every fourth layer (3, 7, ..., 31), the rest are Gated DeltaNet layers.
+\begin{tikzpicture}[x=0.33cm,y=1cm,font=\footnotesize]
+% full-attention layer columns
+\foreach \l in {3,7,11,15,19,23,27,31} {\fill[wash] (\l-0.45,-0.55) rectangle (\l+0.45,2.05);}
+\draw[ink!60] (-0.6,-0.55) -- (31.6,-0.55);
+\foreach \l in {0,4,8,12,16,20,24,28,31} {\draw[ink!60] (\l,-0.55) -- (\l,-0.65) node[below,text=ink]{\l};}
+\node[text=ink] at (15.5,-1.3) {decoder layer (shaded: full attention; others: Gated DeltaNet)};
+% row labels
+\node[anchor=east,align=right,text=ink] at (-1,1.5) {plain vs MTP\\(batch 1, 167)};
+\node[anchor=east,align=right,text=ink] at (-1,0.3) {concurrency 1 vs 32\\(plain, 40)};
+\draw[ink!15] (-0.6,1.5) -- (31.6,1.5);\draw[ink!15] (-0.6,0.3) -- (31.6,0.3);
+% plain vs MTP: layer 0 GDN recurrence in all 167
+\fill[brick] (0,1.5) circle (5.5pt);
+\node[anchor=west,text=brick] at (0.9,1.5) {all 167: GDN recurrence (decode kernel vs target-verify kernel)};
+% concurrency 1 vs 32 (batches of up to 16): gated RMSNorm in GDN layers (squares), attention output (triangle), prefill down_proj (diamond)
+\foreach \l/\n in {0/3,5/1,10/1,14/3,16/1,18/4,20/2,21/3,24/1,25/3,26/1,28/4,29/2} {
+  \node[draw=teal,fill=teal!35,rectangle,minimum size={2.6pt+1.6pt*\n},inner sep=0pt] at (\l,0.3) {};
+  \node[text=teal,font=\scriptsize] at (\l,0.72) {\n};}
+\node[draw=ink,fill=ink!40,regular polygon,regular polygon sides=3,minimum size=12pt,inner sep=0pt] at (3,0.3) {};
+\node[text=ink,font=\scriptsize] at (3,0.72) {6};
+\node[draw=ochre,fill=ochre!40,diamond,minimum size=10pt,inner sep=0pt] at (0,-0.12) {};
+\node[text=ochre,font=\scriptsize,anchor=west] at (0.35,-0.12) {5};
+% legend, in absolute centimetres below the axis
+\begin{scope}[x=1cm]
+\node[draw=teal,fill=teal!35,rectangle,minimum size=5pt,inner sep=0pt] at (-1.9,-1.9) {};\node[anchor=west] at (-1.75,-1.9) {gated RMSNorm, decode};
+\node[draw=ink,fill=ink!40,regular polygon,regular polygon sides=3,minimum size=7pt,inner sep=0pt] at (2.3,-1.9) {};\node[anchor=west] at (2.45,-1.9) {attention output, decode};
+\node[draw=ochre,fill=ochre!40,diamond,minimum size=6pt,inner sep=0pt] at (6.6,-1.9) {};\node[anchor=west] at (6.75,-1.9) {MLP down-projection, batched prefill};
+\end{scope}
+\end{tikzpicture}

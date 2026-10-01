@@ -6,13 +6,18 @@ Apply them in a private worktree, never in `~/sglang` itself:
 
 ```sh
 scripts/sglang_worktree.sh <name>                      # creates ~/sglang-wt/<name>
-git -C ~/sglang-wt/<name> am "$PWD"/engine/sglang/patches/<patch>.patch
+git -C ~/sglang-wt/<name> am "$PWD"/engine/sglang/patches/<workstream>/<patch>.patch
 SGLANG_WORKTREE=~/sglang-wt/<name> source scripts/sglang_env.sh
 ```
 
-## 0001-head-capture-replay-dumps.patch (capture only)
+Patches live under `engine/sglang/patches/<workstream>/NNNN-<topic>.patch`, with one
+section per workstream below.
 
-Records the exact LM-head inputs for the real-head replay in
+## geometry
+
+### geometry/0001-head-capture-replay-dumps.patch (capture only)
+
+The geometry workstream's patch. It records the exact LM-head inputs for the real-head replay in
 `experiments/head_geometry/`. It changes nothing unless `SGLANG_HEAD_CAPTURE_DIR` is set.
 When it is set:
 
@@ -23,7 +28,8 @@ When it is set:
   verification one `mtp_verify` record per step stores the draft and target head inputs,
   the verify tokens, the engine's target argmax, its top-2 logits and the accept lengths.
 - DFlash: one `dflash_verify` record per step with the draft hidden states at block
-  positions 1..7 (the input to `candidate_topk` on the target head), the stashed target
+  positions 1 to block size - 1 (the input to the draft's projection through the target
+  head), the stashed target
   verify head input, the proposed block, the target argmax and accept lengths.
 - Plain decode (no speculation): one `plain_decode` record per forward with the head
   input, the sampled token and the engine's top-2 logits.
@@ -74,6 +80,39 @@ SGLANG_WORKTREE=~/sglang-wt/drafter source scripts/sglang_env.sh
 
 The drafter's timed runs use the stock engine; trained drafters load through SGLang's
 unmodified `DFlashDraftModel` and `DFlash2DraftModel`.
+
+## state/ (divergence forensics)
+
+Both patches apply to the pin `bd66ce343e` in this order and change nothing unless
+the variables below are set:
+
+```sh
+scripts/sglang_worktree.sh state
+git -C ~/sglang-wt/state am "$PWD"/engine/sglang/patches/state/0001-state-tap.patch \
+    "$PWD"/engine/sglang/patches/state/0002-verify-kv-split-deterministic.patch
+SGLANG_WORKTREE=~/sglang-wt/state source scripts/sglang_env.sh
+```
+
+`0001-state-tap.patch` adds `srt/debug_utils/state_tap.py`. With
+`SGLANG_STATE_TAP_DIR` set, forward hooks on every module of the target model, plus
+explicit taps after the GDN causal convolution and recurrence, write a 64-bit hash of
+each output's exact bits, one row per token, into static device buffers. The hooks
+only launch GPU ops into those buffers, so they are captured into CUDA graphs and
+replay with them. Whether tapped and untapped runs agree bitwise is checked for every
+tapped session in `evidence/state_safety/` (the tap check there). After each target forward that
+contains a request whose rid starts with `SGLANG_STATE_TAP_RID_PREFIX` (default
+`tap-`), the request's rows are saved with the head input and the logits fed to
+argmax. `SGLANG_STATE_TAP_PERTURB=<module>` adds one unit in the last place to the
+first element of that module's output in every forward, which is the positive
+control for the attribution. The read-out synchronizes the forward stream after
+every tapped forward, so decode runs about five times slower; use it for
+diagnosis only. `experiments/state_safety/tap_runs.py` and `mechanism.py` drive and
+analyse it.
+
+`0002-verify-kv-split-deterministic.patch` passes the deterministic-inference KV
+split size to FlashInfer's target-verify plan, as decode and extend already do. It
+does not make MTP speculation batch-invariant under `--enable-deterministic-inference`
+(see `evidence/state_safety/README.md`); it is kept because a committed run used it.
 
 ## repair (`patches/repair/0001-0002`, branch `engine/repair`, head `5d8e00e3e1`)
 

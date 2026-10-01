@@ -318,6 +318,16 @@ def test_frontier_dominance_and_aggregation() -> None:
     assert math.isnan(by_label['a']['accept_length_mean'])
 
 
+def test_loop_onset_finds_repetition_and_ignores_varied_text() -> None:
+    from bench.lengths import LOOP_WINDOW, loop_onset
+
+    varied = list(range(2000))
+    assert loop_onset(varied) is None
+    looping = [*range(1000), *([7, 8, 9, 10, 11] * 200)]
+    onset = loop_onset(looping)
+    assert onset is not None and 1000 - LOOP_WINDOW < onset <= 1000
+
+
 def test_point_is_not_measured_after_a_failed_cache_flush(tmp_path: Path) -> None:
     import argparse
 
@@ -411,3 +421,52 @@ def test_quality_comparison_fails_closed_without_the_task_set(tmp_path: Path) ->
     (a / 'quality.json').write_text(json.dumps({**summary, 'sgl_eval_exit_code': 1}))
     with pytest.raises(ValueError, match='sgl-eval exited'):
         compare(a, b)
+
+
+def test_host_load_tree_and_contention_summary() -> None:
+    from bench.hostload import CONTENTION_CORES, process_tree, summarise
+
+    table = {1: (0, 0.0), 10: (1, 0.0), 11: (10, 0.0), 12: (11, 0.0), 20: (1, 0.0)}
+    assert process_tree(10, table) == {10, 11, 12}
+    quiet = [{'cores': 0.5, 'top': [], 'own': []}] * 3
+    busy = [{'cores': 3.0, 'top': [{'cmd': 'analysis', 'cores': 3.0}], 'own': []}] * 3
+    assert not summarise(quiet)['contended']
+    report = summarise(busy)
+    assert report['contended'] and report['foreign_cores_mean'] > CONTENTION_CORES
+    assert report['top_foreign_mean_cores'] == {'analysis': 3.0}
+
+
+def test_contended_points_are_invalid() -> None:
+    from bench.pareto import invalid_reason
+
+    point = {'concurrency': 1, 'x_e2e': 1.0, 'y': 1.0, 'failed': 0, 'aiperf_exit_code': 0}
+    assert invalid_reason({**point, 'foreign_cpu_during_mean': 0.4}) == ''
+    assert invalid_reason({**point, 'foreign_cpu_during_mean': 3.0}).startswith('host_contention')
+
+
+def test_host_load_counts_short_lived_foreign_processes() -> None:
+    import subprocess
+    import sys
+    import threading
+    import time
+
+    from bench.hostload import sample
+
+    # The run's own tree is a sleeping process; the burner starts after the first
+    # snapshot and exits before the second, so only host totals can see it.
+    root = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(10)'])
+    burner_code = 'import time\nt = time.time()\nwhile time.time() - t < 0.7:\n    pass'
+
+    def burn() -> None:
+        time.sleep(0.2)
+        subprocess.run([sys.executable, '-c', burner_code], check=True)
+
+    thread = threading.Thread(target=burn)
+    thread.start()
+    try:
+        result = sample(root.pid, interval=1.5)
+    finally:
+        thread.join()
+        root.kill()
+    assert result['cores'] >= 0.25
+    assert all('while time.time()' not in proc['cmd'] for proc in result['top'])

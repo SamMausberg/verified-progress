@@ -1,0 +1,55 @@
+{
+  "model": "Qwen/Qwen3.5-4B",
+  "model_revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+  "sources": {
+    "gsm8k": {
+      "repo": "openai/gsm8k",
+      "revision": "740312add88f781978c0658806c59bc2815b9866",
+      "file": "main/test-00000-of-00001.parquet"
+    },
+    "humaneval": {
+      "repo": "openai/openai_humaneval",
+      "revision": "7dce6050a7d6d172f3cc5c32aa97f52fa1a2e544",
+      "file": "openai_humaneval/test-00000-of-00001.parquet"
+    },
+    "mt_bench": {
+      "repo": "HuggingFaceH4/mt_bench_prompts",
+      "revision": "e3a795c5e9a82ee40611c416b8a7786c73198991",
+      "file": "raw/question.jsonl"
+    },
+    "alpaca_eval": {
+      "repo": "tatsu-lab/alpaca_eval",
+      "revision": "2edc6fad8be6b14ea7230aabfd08188da6b8b814",
+      "file": "alpaca_eval.json"
+    },
+    "cnn_dailymail": {
+      "repo": "abisee/cnn_dailymail",
+      "revision": "96df5e686bee6baa90b8bee7c28b81fa3fa6223d",
+      "file": "3.0.0/test-00000-of-00001.parquet"
+    }
+  },
+  "selection": {
+    "gsm8k": "test rows 0-79",
+    "humaneval": "test rows 0-59",
+    "mt_bench": "first turn of questions 0-79",
+    "alpaca_eval": "rows 0, 10, ..., 590",
+    "cnn_dailymail": "test rows 0-39",
+    "thinking": "every third prompt of each source (index % 3 == 2)"
+  },
+  "num_prompts": 320,
+  "per_source": {
+    "gsm8k": 80,
+    "humaneval": 60,
+    "mt_bench": 80,
+    "alpaca_eval": 60,
+    "cnn_dailymail": 40
+  },
+  "num_thinking": 105,
+  "input_tokens": {
+    "min": 15,
+    "median": 78,
+    "max": 2375,
+    "total": 56366
+  },
+  "input_ids_sha256": "bda857fb792ded4ffff97d4164f2eb71688ff02d303060d36c1d933cc05c11c9"
+}

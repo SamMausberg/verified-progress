@@ -41,6 +41,7 @@ COMMON = [
     "--mm-attention-backend", "triton_attn",
     "--random-seed", "0",
     "--enable-metrics",
+    "--stream-interval", "4",  # the team's shared default for served comparisons
 ]  # fmt: skip
 ARMS: dict[str, list[str]] = {
     "plain": [],
@@ -176,10 +177,18 @@ def main() -> None:
             f'http://127.0.0.1:{args.port}/server_info', timeout=30
         ) as response:
             (args.out / 'server_info.json').write_bytes(response.read())
-        for client in args.client:
-            text = client.format(port=args.port, out=args.out)
-            print(f'[serve_run] {text}', flush=True)
-            status = subprocess.run(text, shell=True).returncode or status
+        # Foreign CPU load while the clients run (bench.hostload: everything outside
+        # this process tree, i.e. outside the server and the clients); a mean above
+        # two cores marks the run as contended.
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+        from bench.hostload import HostLoadSampler
+
+        with HostLoadSampler(root=os.getpid()) as load:
+            for client in args.client:
+                text = client.format(port=args.port, out=args.out)
+                print(f'[serve_run] {text}', flush=True)
+                status = subprocess.run(text, shell=True).returncode or status
+        (args.out / 'cpu_load.json').write_text(json.dumps(load.summary(), indent=2) + '\n')
     finally:
         os.killpg(server.pid, signal.SIGTERM)
         try:

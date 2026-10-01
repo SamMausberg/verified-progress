@@ -27,6 +27,7 @@ import csv
 import hashlib
 import json
 import math
+import os
 import statistics
 import subprocess
 import sys
@@ -34,6 +35,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from bench.hostload import HostLoadSampler
 from bench.results import counter_deltas, iter_jsonl, parse_prometheus
 from bench.server import (
     Server,
@@ -305,7 +307,10 @@ def run(args: argparse.Namespace) -> int:
             server.base_url, arm.model, task_file, run_dir / 'sgl_eval', args.threads, args.seed
         )
         started = time.time()
-        with (run_dir / 'sgl_eval_console.txt').open('w') as console:
+        with (
+            HostLoadSampler(os.getpid(), interval=1.0) as sampler,
+            (run_dir / 'sgl_eval_console.txt').open('w') as console,
+        ):
             result = subprocess.run(command, stdout=console, stderr=subprocess.STDOUT, check=False)
         elapsed = time.time() - started
         after = parse_prometheus(http_get(f'{server.base_url}/metrics'))
@@ -338,6 +343,8 @@ def run(args: argparse.Namespace) -> int:
         'sgl_eval_command': command,
         'sgl_eval_exit_code': result.returncode,
         'wall_s': elapsed,
+        # Foreign CPU load during the evaluation; it affects wall time, not accuracy.
+        'host_load': sampler.summary(),
         'server_counters': counter_deltas(before, after),
         'avg_spec_accept_length_since_start': (server_info.get('internal_states') or [{}])[0].get(
             'avg_spec_accept_length'

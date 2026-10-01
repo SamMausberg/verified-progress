@@ -1,4 +1,5 @@
 test_distinct_fp32_values_share_a_bf16_cell (__main__.Contracts.test_distinct_fp32_values_share_a_bf16_cell) ... ok
+test_equal_quality_different_outputs (__main__.Contracts.test_equal_quality_different_outputs) ... ok
 test_reassociation_flips_a_greedy_winner (__main__.Contracts.test_reassociation_flips_a_greedy_winner) ... ok
 test_regrouped_gdn_recurrence_changes_outputs (__main__.Contracts.test_regrouped_gdn_recurrence_changes_outputs) ... ok
 test_same_argmax_different_law (__main__.Contracts.test_same_argmax_different_law) ... ok
@@ -6,12 +7,12 @@ test_same_law_different_seeded_tokens (__main__.Contracts.test_same_law_differen
 test_transition_norm_and_error_growth (__main__.Contracts.test_transition_norm_and_error_growth) ... ok
 
 ----------------------------------------------------------------------
-Ran 6 tests in 0.033s
+Ran 7 tests in 0.039s
 
 OK
 {
   "status": "pass",
-  "methods": 6,
+  "methods": 7,
   "witnesses": {
     "bf16_cell": {
       "fp32": [
@@ -19,6 +20,15 @@ OK
         1.0009765625
       ],
       "bf16": 1.0
+    },
+    "equal_quality_different_outputs": {
+      "accuracy_x": "1/2",
+      "accuracy_y": "1/2",
+      "problems_with_different_answers": 4,
+      "discordant_pairs_x_only_y_only": [
+        2,
+        2
+      ]
     },
     "reassociation_flips_greedy": {
       "sequential_logits": [
@@ -61,8 +71,8 @@ OK
       "5/2": "3/2"
     }
   },
-  "seconds": 0.033,
-  "repo_commit": "29c85d7fafbc8eae0a10b39851731e293ba6cbf0",
+  "seconds": 0.039,
+  "repo_commit": "64fc8ce2d955df0cd3d194b5253252a84a917419",
   "numpy": "2.3.5",
   "python": "3.13.15",
   "scope": "exact and float32 witnesses separating the contracts; not model measurements"

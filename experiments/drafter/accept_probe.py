@@ -87,7 +87,7 @@ def run_one(
         },
     }
     if args.logprobs:
-        body.update(return_logprob=True, top_logprobs_num=2, logprob_start_len=-1)
+        body.update(return_logprob=True, top_logprobs_num=5, logprob_start_len=-1)
     start = time.perf_counter()
     result = post(f'http://127.0.0.1:{port}/generate', body, args.timeout)
     latency = time.perf_counter() - start
@@ -105,8 +105,10 @@ def run_one(
     }
     if args.logprobs:
         # [[logprob, token_id, text], [..]] per output position.
-        record['top2'] = [
-            [[entry[0], entry[1]] for entry in position[:2]]
+        # [[logprob, token_id], ...] (top 5) per output position, the format of the
+        # state workstream's experiments/state_safety/compare.py.
+        record['top_logprobs'] = [
+            [[entry[0], entry[1]] for entry in position[:5]]
             for position in meta.get('output_top_logprobs', [])
         ]
     return record
@@ -179,7 +181,7 @@ def main() -> None:
     parser.add_argument('--concurrency', type=int, default=1)
     parser.add_argument('--ignore-eos', action='store_true')
     parser.add_argument('--no-thinking', action='store_true')
-    parser.add_argument('--logprobs', action='store_true', help='record top-2 logprobs')
+    parser.add_argument('--logprobs', action='store_true', help='record top-5 logprobs')
     parser.add_argument('--timeout', type=float, default=1800)
     parser.add_argument('--label', default='')
     parser.add_argument('--out', type=Path, required=True)

@@ -24,7 +24,8 @@ adversarial novelty assessment and a list of implementations to benchmark or reu
 
 Items that could not be confirmed are listed in the last section. Reported speedups
 are the authors' own numbers; none were reproduced here. BibTeX for every entry is
-in `paper/references.bib`, and the keys are given in brackets.
+in `sources/references_full.bib` (the paper's `paper/references.bib` holds the entries it
+cites, with the same keys), and the keys are given in brackets.
 
 **Terminology.** In this review:
 
