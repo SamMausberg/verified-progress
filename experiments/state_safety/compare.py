@@ -371,6 +371,7 @@ def main() -> None:
     summary = {}
     events = []
     consistency: dict[str, Any] = {}
+    # Validate before writing anything, so a refused run leaves earlier outputs intact.
     missing: list[str] = []
     mixed: list[str] = []
     for label, ra, rb in pairs:
@@ -379,6 +380,20 @@ def main() -> None:
             print(f'skip {label}: missing {pa if not pa.exists() else pb}')
             missing.append(label)
             continue
+        pins = [pinned(root / f'{r}.meta.json') for r in (ra, rb)]
+        if None not in pins and pins[0] != pins[1]:
+            mixed.append(label)
+    if args.require_all and missing:
+        raise SystemExit(f'{len(missing)} pairs have missing runs under {root}: {missing}')
+    if mixed and not args.allow_mixed_pins:
+        raise SystemExit(
+            f'{len(mixed)} pairs compare a pinned-pool run with an unpinned one: {mixed} '
+            '(--allow-mixed-pins to report them anyway)'
+        )
+    for label, ra, rb in pairs:
+        if label in missing:
+            continue
+        pa, pb = root / f'{ra}.jsonl', root / f'{rb}.jsonl'
         run_a, run_b = load_run(pa), load_run(pb)
         for name, run in ((ra, run_a), (rb, run_b)):
             if name not in consistency:
@@ -386,10 +401,7 @@ def main() -> None:
         rows = compare_pair(run_a, run_b)
         s = summarize(rows)
         s.update(run_a=ra, run_b=rb)
-        pins = [pinned(root / f'{r}.meta.json') for r in (ra, rb)]
-        s['pinned_a'], s['pinned_b'] = pins
-        if None not in pins and pins[0] != pins[1]:
-            mixed.append(label)
+        s['pinned_a'], s['pinned_b'] = (pinned(root / f'{r}.meta.json') for r in (ra, rb))
         # Pools of the servers that ran each pass (None: unknown).
         s['same_server'], s['pools_identical'] = pools_match(root, ra, rb)
         summary[label] = s
@@ -450,13 +462,6 @@ def main() -> None:
                 'prev_cycle_len_b': cyc.get('prev_cycle_len'),
             }
             w.writerow('' if e.get(c) is None else str(e.get(c)) for c in cols)
-    if args.require_all and missing:
-        raise SystemExit(f'{len(missing)} pairs have missing runs under {root}: {missing}')
-    if mixed and not args.allow_mixed_pins:
-        raise SystemExit(
-            f'{len(mixed)} pairs compare a pinned-pool run with an unpinned one: {mixed} '
-            '(--allow-mixed-pins to report them anyway)'
-        )
 
 
 if __name__ == '__main__':

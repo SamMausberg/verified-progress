@@ -175,3 +175,21 @@ def test_pools_record_regenerates_under_another_home(tmp_path, monkeypatch):
     assert pools.data_relative(str(root / 'tap' / 'x'), root).as_posix() == 'tap/x'
     with pytest.raises(ValueError):
         pools.data_relative('/elsewhere/tap/x', root)
+
+
+def test_compare_refuses_before_writing_any_output(tmp_path, monkeypatch):
+    import json
+
+    import compare
+
+    pairs = tmp_path / 'pairs.json'
+    pairs.write_text(json.dumps([['floor', 'plain/c1', 'plain/c32']]))
+    out = tmp_path / 'noise_floor_pinned.json'
+    out.write_text('earlier complete result\n')
+    argv = ['compare.py', '--runs', str(tmp_path / 'runs'), '--pairs', str(pairs)]
+    argv += ['--require-all', '--out-json', str(out), '--out-csv', str(tmp_path / 'd.csv')]
+    monkeypatch.setattr('sys.argv', argv)
+    with pytest.raises(SystemExit, match='missing runs'):
+        compare.main()
+    assert out.read_text() == 'earlier complete result\n'
+    assert not (tmp_path / 'd.csv').exists()
