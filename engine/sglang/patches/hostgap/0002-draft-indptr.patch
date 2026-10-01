@@ -1,7 +1,7 @@
 From ca665d6166f6222fe185e1eac9f2cb358f0624a4 Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <samuelmausberg@gmail.com>
 Date: Wed, 30 Sep 2026 23:28:16 +0000
-Subject: [PATCH 2/4] hostgap: host-computed draft kv_indptr for the multi-step
+Subject: [PATCH 2/5] hostgap: host-computed draft kv_indptr for the multi-step
  draft backend
 
 FlashInferMultiStepDraftBackend.common_template copies the per-step

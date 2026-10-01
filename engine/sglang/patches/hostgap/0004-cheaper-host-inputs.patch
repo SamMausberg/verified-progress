@@ -1,17 +1,16 @@
-From be3a6ccd8e2e07a45c62ffa146e5f0c83f5abf53 Mon Sep 17 00:00:00 2001
+From 8febddb786dc50912c79de9d52a15673fc85c8de Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <samuelmausberg@gmail.com>
 Date: Thu, 1 Oct 2026 13:52:10 +0000
-Subject: [PATCH 4/4] hostgap: cheaper host-side planning inputs
+Subject: [PATCH 4/5] hostgap: cheaper host-side planning inputs
 
-The first profiles of patches 0001-0003 showed the blocking reads gone
-but the host still on the critical path between learning the previous
-verify's lengths and launching the draft and verify graphs, and the host
-arithmetic that replaced the reads costing more than the reads had cost
-once the GPU was already idle (draft kv_indptr ~46 us of torch CPU ops,
-verify plan inputs ~55 us, plus about ten small device ops for the mask
-offsets).
+The host traces of patches 0001-0003 show the blocking reads gone but the
+host still on the critical path between learning the previous verify's
+lengths and launching the draft and verify graphs. The arithmetic that
+replaced the reads sits on that path: torch CPU ops for the draft
+kv_indptr rows and the verify plan inputs, plus about ten small device
+ops for the custom-mask offsets.
 
-The host-side plan inputs are now computed with numpy (12 and 19 us), and
+The host-side plan inputs are now computed with numpy, and
 fast_verify_plan uploads the custom-mask bit and byte offsets, which
 plan() derives on the device, in one pinned copy before the same
 segment_packbits kernel. All values are integers computed from the same

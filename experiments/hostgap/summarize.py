@@ -10,8 +10,20 @@ profile_arms.sh), pairs each unprofiled label with its host-trace label
   idle attributed to host call sites and the blocking host calls per site;
 * derived: unprofiled idle per cycle = unprofiled cycle time minus the traced
   GPU busy time per cycle (kernel durations are not inflated by the profiler,
-  host time is), and its share of the cycle;
-* the py-spy share of scheduler samples inside the named call sites.
+  host time is), and its share of the cycle. A stock label without its own
+  trace in the directory borrows the GPU busy time of its patched trace (the
+  patches launch the same graphs and kernels on the same data); the row names
+  its source;
+* derived, before/after: the unprofiled cycle-time change of each patched
+  label against its stock label, the share of the stock idle it removed, and
+  when each server started (which one ran first);
+* derived, EAGLE seam: GPU work still queued when the host learns the previous
+  verify's lengths = host resolve-to-draft-launch time minus the GPU's idle gap
+  before the draft (a difference of medians; assumes the draft graph starts
+  when it is launched, which holds when the GPU is idle);
+* the py-spy share of scheduler samples inside the named call sites;
+* provenance per label (repository and SGLang commits, launch command, flag
+  environment, start time, Nsight version) and every counted window's values.
 
     python experiments/hostgap/summarize.py ~/vp-data/hostgap/prof1 --out evidence/hostgap/cycle_profiles.json
 """
@@ -21,6 +33,7 @@ from __future__ import annotations
 import argparse
 import json
 import statistics
+import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
@@ -100,12 +113,49 @@ def counter_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         if rows
         else None,
         'contended': any(r.get('hostload', {}).get('contended') for r in rows),
+        'windows': [
+            {
+                'repeat': r.get('repeat'),
+                'cycle_ms': r.get('cycle_ms'),
+                'tokens_per_request_per_cycle': r.get('tokens_per_request_per_cycle'),
+                'foreign_cores_mean': (r.get('hostload') or {}).get('foreign_cores_mean'),
+            }
+            for r in rows
+        ],
+    }
+
+
+def provenance(label_dir: Path) -> dict[str, Any] | None:
+    path = label_dir / 'run_meta.json'
+    if not path.exists():
+        return None
+    meta = json.loads(path.read_text())
+    launch = meta.get('launch') or {}
+    source = launch.get('sglang_source') or {}
+    repo = launch.get('repo') or {}
+    return {
+        'started': meta.get('started'),
+        'repo_head': repo.get('head'),
+        'repo_dirty_files': repo.get('dirty_files'),
+        'sglang_head': source.get('head'),
+        'sglang_branch': source.get('branch'),
+        'sglang_dirty_files': source.get('dirty_files'),
+        'env_overrides': launch.get('env_overrides'),
+        'launch_command': launch.get('command'),
+        'mode': meta.get('mode'),
+        'host_trace': meta.get('host_trace'),
+        'graph_trace': meta.get('graph_trace'),
+        'nsys_version': meta.get('nsys_version'),
     }
 
 
 def summarize_label(label_dir: Path) -> dict[str, Any]:
     windows = load_windows(label_dir)
-    out: dict[str, Any] = {'label': label_dir.name, 'by_concurrency': {}}
+    out: dict[str, Any] = {
+        'label': label_dir.name,
+        'provenance': provenance(label_dir),
+        'by_concurrency': {},
+    }
     for c in sorted({w['concurrency'] for w in windows}):
         rows = [w for w in windows if w['concurrency'] == c]
         counted = [
@@ -148,6 +198,12 @@ def main() -> int:
             continue
         base = name[: -len('-none')]
         traced = labels.get(f'{base}-host')
+        busy_source = f'{base}-host'
+        own_trace = traced is not None
+        if traced is None and not base.endswith('-patched'):
+            # Stock without its own trace here: the patched trace's GPU busy time.
+            traced = labels.get(f'{base}-patched-host')
+            busy_source = f'{base}-patched-host (assumed equal: same graphs and kernels)'
         if traced is None:
             continue
         rows = {}
@@ -157,22 +213,79 @@ def main() -> int:
             if trace is None or cycle is None or 'gpu_busy_ms_per_cycle' not in trace:
                 continue
             idle = cycle - trace['gpu_busy_ms_per_cycle']
-            rows[c] = {
+            row: dict[str, Any] = {
                 'unprofiled_cycle_ms': cycle,
+                'gpu_busy_source': busy_source,
                 'traced_gpu_busy_ms_per_cycle': trace['gpu_busy_ms_per_cycle'],
                 'derived_unprofiled_idle_ms_per_cycle': idle,
                 'derived_unprofiled_idle_fraction': idle / cycle,
-                'profiled_cycle_ms': trace['cycle_ms'],
-                'profiled_idle_ms_per_cycle': trace['gpu_idle_ms_per_cycle'],
-                'profiled_idle_fraction': trace['idle_fraction'],
+            }
+            if own_trace:
+                row |= {
+                    'profiled_cycle_ms': trace['cycle_ms'],
+                    'profiled_idle_ms_per_cycle': trace['gpu_idle_ms_per_cycle'],
+                    'profiled_idle_fraction': trace['idle_fraction'],
+                }
+                seam = trace.get('eagle_seam') or {}
+                if 'host_resolve_to_draft_launched_ms' in seam:
+                    row['gpu_work_queued_at_resolve_ms'] = round(
+                        seam['host_resolve_to_draft_launched_ms']
+                        - seam['gpu_extend_end_to_draft_start_ms'],
+                        4,
+                    )
+            row |= {
                 'tokens_per_s_per_user': entry['counter_windows']['tokens_per_s_per_user'],
                 'tokens_per_request_per_cycle': entry['counter_windows'][
                     'tokens_per_request_per_cycle'
                 ],
                 'foreign_cores_mean': entry['counter_windows']['foreign_cores_mean'],
             }
+            rows[c] = row
         derived[base] = rows
-    report = {'tag_dir': str(args.tag_dir), 'labels': labels, 'derived_idle': derived}
+    before_after: dict[str, Any] = {}
+    for name, stock in labels.items():
+        if not name.endswith('-none') or '-patched' in name:
+            continue
+        base = name[: -len('-none')]
+        patched = labels.get(f'{base}-patched-none')
+        if patched is None:
+            continue
+        started = {
+            side: (summary.get('provenance') or {}).get('started')
+            for side, summary in (('stock', stock), ('patched', patched))
+        }
+        pairs = {}
+        for c, entry in stock['by_concurrency'].items():
+            a = entry['counter_windows'].get('cycle_ms')
+            b = (patched['by_concurrency'].get(c) or {}).get('counter_windows', {}).get('cycle_ms')
+            if not a or not b:
+                continue
+            change = b['mean'] - a['mean']
+            pair: dict[str, Any] = {
+                'stock_cycle_ms': a,
+                'patched_cycle_ms': b,
+                'cycle_change_ms': change,
+                'cycle_change_fraction': change / a['mean'],
+            }
+            stock_idle = (
+                derived.get(base, {}).get(c, {}).get('derived_unprofiled_idle_ms_per_cycle')
+            )
+            if stock_idle:
+                pair['removed_share_of_stock_idle'] = -change / stock_idle
+            pairs[c] = pair
+        before_after[base] = {'started': started, 'by_concurrency': pairs}
+    head = subprocess.run(
+        ['git', '-C', str(Path(__file__).resolve().parent), 'rev-parse', 'HEAD'],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    report = {
+        'generated_by': {'repo_head': head, 'argv': sys.argv},
+        'tag_dir': str(args.tag_dir),
+        'labels': labels,
+        'derived_idle': derived,
+        'before_after': before_after,
+    }
     text = json.dumps(report, indent=2, default=str)
     if args.out is not None:
         args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -183,9 +296,14 @@ def main() -> int:
                 f'{base:18} c={c:>3}: cycle {r["unprofiled_cycle_ms"]:6.2f} ms, '
                 f'busy {r["traced_gpu_busy_ms_per_cycle"]:6.2f}, '
                 f'idle {r["derived_unprofiled_idle_ms_per_cycle"]:5.2f} ms '
-                f'({100 * r["derived_unprofiled_idle_fraction"]:4.1f}%), profiled idle '
-                f'{r["profiled_idle_ms_per_cycle"]:5.2f} ms, '
+                f'({100 * r["derived_unprofiled_idle_fraction"]:4.1f}%), '
                 f'{r["tokens_per_s_per_user"]["mean"]:6.1f} tok/s/user'
+            )
+    for base, ab in before_after.items():
+        for c, r in ab['by_concurrency'].items():
+            print(
+                f'{base:18} c={c:>3}: stock {r["stock_cycle_ms"]["mean"]:6.3f} ms, patched '
+                f'{r["patched_cycle_ms"]["mean"]:6.3f} ms ({100 * r["cycle_change_fraction"]:+.2f}%)'
             )
     return 0
 

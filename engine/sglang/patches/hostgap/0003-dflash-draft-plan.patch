@@ -1,7 +1,7 @@
 From 02b0e36ec881b96c387d0c134673b89236005f05 Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <samuelmausberg@gmail.com>
 Date: Thu, 1 Oct 2026 03:23:36 +0000
-Subject: [PATCH 3/4] hostgap: sync-free FlashInfer plan for the DFlash draft
+Subject: [PATCH 3/5] hostgap: sync-free FlashInfer plan for the DFlash draft
  forward
 
 The DFlash draft forward runs in TARGET_VERIFY mode over the drafter's
