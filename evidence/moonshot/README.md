@@ -445,6 +445,88 @@ token counting. `experiments/moonshot/build_token_map.py` is a separate generato
 (its own calibration hold-out, maps padded to fixed sizes, `token_map_report.json`) and
 did not produce this table.
 
+## 2g. GDN state reduced to rank r (proposal P13; offline, training-free; closed)
+
+The question was whether the GDN recurrent state can be cut to rank r in the key dimension,
+with the basis chosen offline, while keeping output quality within criteria of the
+lossy-stack budget's form (Section 3). Per layer
+and head, `gdn_state_rank_study.py` projects the queries and keys (after the convolution and
+the L2 normalisation) onto an orthonormal basis U of 128 x r. It then runs the same chunked
+gated delta rule in r dimensions, so the state is V x r and holds r / 128 of the bytes. The
+bases come from covariances on the first 24 texts of `long2048_tune.jsonl`: the top-r
+eigenvectors of the key covariance (energy), of the query covariance (query), or of
+C_k^1/2 C_q C_k^1/2 (product, a first-order proxy for the output error).
+
+The measurement uses the HF model (BF16 weights, transformers 5.12.1, the torch reference GDN
+rule, teacher forcing) on the first 8 texts of `long2048.jsonl`. The study encodes each
+text raw, without the chat template that `make_long_prompts.py` budgeted for, so every text
+is 2,038 tokens long. The JSON's `eval_tokens_per_text: 2048` is the script's cap, which no
+text reaches. KL and top-1 agreement are averaged over the second half: the predictions from
+position 1,019 to the end, 1,018 per text and 8,144 in all. The calibration texts are also
+2,038 tokens each. Both files are in `~/vp-data/moonshot/workloads/`. `long2048.jsonl` is
+P4's declared workload (2c, sha256
+`db376fa3aadf75a30933a649b5ded1dfcafac8289b8e2aed1dde7201afd2659c`). `long2048_tune.jsonl`
+(sha256 `e68930de7103193e52291e1235d393ad9032c47da6d8de97370324b23c6aeaa0`, 48 texts) was
+made on 2026-10-01 at 03:29 UTC by `python make_long_prompts.py --split tune --count 48 --out
+~/vp-data/moonshot/workloads/long2048_tune.jsonl`, run in `experiments/moonshot` at repo
+`ed4682d`. That run used the original `make_long_prompts.py`, which main carried from
+`f349045` until #101. It wrote ids such as `long2048-0000` and did not deduplicate texts.
+`8d55367` (#101) later changed it to write distinct texts with split-prefixed ids, so the
+current version would not reproduce these bytes. The 24 calibration texts and the 8 evaluation texts
+are distinct, and no text appears in both sets.
+
+The study compares each configuration with the same rule at full rank (U = I), which isolates
+the projection, using:
+- the mean full-vocabulary KL(reference || reduced) per position;
+- top-1 agreement;
+- a delayed-retrieval probe: 24 prompts with facts, then filler, then a query, scored by
+  exact match and the answer's log-probability.
+
+A full-rank rotation (energy, r = 128) measures the comparison's own rounding floor. The run
+was one shared-lock run (`gdn_state_rank_study.json`; command in Section 4).
+
+| basis | r | state bytes | KL (nats) | top-1 agreement | retrieval exact |
+|---|---|---|---|---|---|
+| energy (rotation floor) | 128 | 1.00 | 0.008 | 98.5% | 24/24 |
+| energy | 96 | 0.75 | 0.133 | 93.8% | 24/24 |
+| energy | 64 | 0.50 | 0.294 | 89.9% | 24/24 |
+| energy | 32 | 0.25 | 0.411 | 86.0% | 24/24 |
+| query | 96 | 0.75 | 0.372 | 86.8% | 24/24 |
+| query | 64 | 0.50 | 0.610 | 78.5% | 22/24 |
+| query | 32 | 0.25 | 0.940 | 70.3% | 4/24 |
+| product | 96 | 0.75 | 0.501 | 84.0% | 24/24 |
+| product | 64 | 0.50 | 0.540 | 83.3% | 24/24 |
+| product | 32 | 0.25 | 0.652 | 82.3% | 24/24 |
+
+On this measure no reduced configuration meets a criterion of the budget's form (KL at most
+0.01 nats, top-1 agreement at least 98%). The best one, the energy basis at r = 96, cuts only
+25% of the state bytes. It still has 16 times the floor's KL and 4.7 points less top-1
+agreement than the floor.
+
+This is not a measurement of the declared budget, which is defined on a different probe:
+top-20 KL and top-1 agreement on `logit_probe.py`'s 48 prompts at 256 tokens. That probe was
+not run on these configurations. The study measures full-vocabulary KL on the second halves
+of 2,038-token texts, where a reduced state has had longer to drift, so the declared probe
+might show smaller differences.
+
+The floor itself sits at the budget's edge, because the rotated BF16 path adds its own
+rounding. So these numbers bound the projection's damage only to within about 0.01 nats.
+
+Choosing the basis for output sensitivity made things worse, not better. The query and
+product bases have higher KL and lower top-1 agreement than the plain key-energy basis at
+every tested rank. The query basis also loses delayed retrieval at r = 64 (22 of 24 exact)
+and r = 32 (4 of 24). With the energy basis, retrieval survives at every tested rank while top-1
+agreement falls, so the damage is spread over ordinary next-token prediction rather than
+concentrated on recalling early facts.
+
+Decision: P13 closes on this evidence. Under long-context teacher forcing its one planned
+training-free test (`TASKS.md`) misses a criterion of the budget's form at every tested rank
+(r = 32, 64 and 96, so cuts of at least 25%): by 13 times in KL even at the 25% cut, and the
+output-sensitivity bases do worse. Smaller cuts (r between 97 and 127) were not tested. The declared probe
+was not run. The untested variants would need training or a different design: recovering
+quality by training, choosing ranks per layer or per head, and bases applied before the
+depthwise convolution.
+
 ## 3. Ranked portfolio
 
 Ranking by measured or derived gain at the relevant end, times the probability it holds,
@@ -561,6 +643,34 @@ abort loop, so `stack_lossy` never ran and `fp8_weights` has no rows. Every conf
 out of memory at B = 1024 (the ReplaySSM ones at B = 512), so the CSV is parsed from the
 logged median decode latencies. The output directory was renamed to `decode_ceiling_try1`
 after the run, before the summary step.
+
+`gdn_state_rank_study.json` (2g) comes from one shared-lock job on 2026-10-01 between 16:04
+and 16:10 UTC. It ran at repo `154e94f` with a clean tree and used
+the HF model in SGLang's virtual environment (transformers 5.12.1, torch 2.13.0+cu130); it
+needs no SGLang engine. The committed file is a byte-identical copy of the job's output.
+
+```sh
+PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True scripts/gpu_lock.sh -s \
+  python experiments/moonshot/gdn_state_rank_study.py \
+  --out ~/vp-data/moonshot/p13/gdn_state_rank_study.json
+```
+
+The encoded lengths in 2g (2,038 tokens for each of the 8 evaluation and 24 calibration
+texts) were counted once, on CPU, the way the study encodes them:
+
+```python
+import json
+from pathlib import Path
+from transformers import AutoTokenizer
+tok = AutoTokenizer.from_pretrained(
+    'Qwen/Qwen3.5-4B', revision='851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a'
+)
+workloads = Path.home() / 'vp-data/moonshot/workloads'
+for name, count in (('long2048.jsonl', 8), ('long2048_tune.jsonl', 24)):
+    lines = (workloads / name).read_text().splitlines()
+    rows = [json.loads(line) for line in lines if line.strip()][:count]
+    print(name, [len(tok.encode(r['text'], add_special_tokens=False)) for r in rows])
+```
 
 `p4_admission_plateaus.csv` (2c, the 127 plateau) is read from the server logs of the three
 void P4b attempts on CPU. It was first written at commit 591d060; the command below, with the
