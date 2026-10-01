@@ -67,6 +67,7 @@
     "gain_over_always_reuse": 0.05308495831330279
    },
    "free_verify_always_reuse": {
+    "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values; not for every implementation",
     "delta": 0.009889613680103146,
     "delta_ci95": [
      0.002184872462070969,
@@ -75,6 +76,7 @@
     "rejected": false
    },
    "omniscient_gate_free_verify": {
+    "scope": "P9 program with any gate; otherwise as free_verify_always_reuse",
     "delta": 0.03923715405856975,
     "delta_ci95": [
      0.03220036934769837,
@@ -135,6 +137,7 @@
     "gain_over_always_reuse": 1.1164305525774356
    },
    "free_verify_always_reuse": {
+    "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values; not for every implementation",
     "delta": 0.8911471276956902,
     "delta_ci95": [
      0.8101244055384849,
@@ -143,6 +146,7 @@
     "rejected": false
    },
    "omniscient_gate_free_verify": {
+    "scope": "P9 program with any gate; otherwise as free_verify_always_reuse",
     "delta": 1.4699710584725056,
     "delta_ci95": [
      1.3480470583210171,
@@ -203,6 +207,7 @@
     "gain_over_always_reuse": 1.3256868500568841
    },
    "free_verify_always_reuse": {
+    "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values; not for every implementation",
     "delta": 1.8817980356937039,
     "delta_ci95": [
      1.7499942653478893,
@@ -211,6 +216,7 @@
     "rejected": false
    },
    "omniscient_gate_free_verify": {
+    "scope": "P9 program with any gate; otherwise as free_verify_always_reuse",
     "delta": 2.5377593365062068,
     "delta_ci95": [
      2.3518211748298494,
@@ -271,6 +277,7 @@
     "gain_over_always_reuse": 1.2116059866187758
    },
    "free_verify_always_reuse": {
+    "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values; not for every implementation",
     "delta": 2.889792695874889,
     "delta_ci95": [
      2.7083603785714843,
@@ -279,6 +286,7 @@
     "rejected": false
    },
    "omniscient_gate_free_verify": {
+    "scope": "P9 program with any gate; otherwise as free_verify_always_reuse",
     "delta": 3.4681460162428266,
     "delta_ci95": [
      3.238673627469029,
@@ -339,6 +347,7 @@
     "gain_over_always_reuse": 1.06228903680835
    },
    "free_verify_always_reuse": {
+    "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values; not for every implementation",
     "delta": 3.858680312133692,
     "delta_ci95": [
      3.6394587347454115,
@@ -347,6 +356,7 @@
     "rejected": false
    },
    "omniscient_gate_free_verify": {
+    "scope": "P9 program with any gate; otherwise as free_verify_always_reuse",
     "delta": 4.351820224319278,
     "delta_ci95": [
      4.090869216442323,

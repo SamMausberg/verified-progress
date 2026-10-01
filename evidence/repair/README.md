@@ -236,13 +236,15 @@ the variable-width verify cost at its lower bound of zero (V_R = 0, every other 
 at its block-16 value: accept, commit and append 0.23 ms, and 0.16 ms of the cycle outside the timed
 phases; `free_verify_always_reuse` in the JSON, the same request-level bootstrap and resamples as
 the table), Delta would be +0.01 (+0.00, +0.02) at K = 1, +0.89 (+0.81, +0.98) at 2, +1.88
-(+1.75, +2.05) at 4, +2.89 (+2.71, +3.10) at 8 and +3.86 (+3.64, +4.11) at 16. These bound P9's
-always-reuse program at any verify width from above, provided its other phases cost no less than at
-block 16, and none of the tested K would be rejected. On the point estimates (no intervals), top-1,
-top-2 and top-4 stay negative only while V_R exceeds 0.89, 2.71 and 3.87 ms. The only measured
-verify below width 16 at c = 1 is 4.16 ms at width 8 (`fresh_b8`, same session as `fresh_b16`), so
-these thresholds are not settled by the data here; a sweep of the verify phase over widths 2 to 16
-at c = 1 is queued. The top-8 and top-16 verdicts (not rejected) hold for either implementation.
+(+1.75, +2.05) at 4, +2.89 (+2.71, +3.10) at 8 and +3.86 (+3.64, +4.11) at 16. These bound from
+above P9's always-reuse program at any verify width whose non-verify phases cost at least their
+block-16 values, and none of the tested K would be rejected. A narrower cycle can also cut those
+phases (`fresh_b8` keeps 0.384 ms after draft and verify, `fresh_b16` 0.395 ms), so this is not a
+bound for every implementation. On the point estimates (no intervals), top-1, top-2 and top-4 stay
+negative only while V_R exceeds 0.89, 2.71 and 3.87 ms. The only measured verify below width 16 at
+c = 1 is 4.16 ms at width 8 (`fresh_b8`, same session as `fresh_b16`), so these thresholds are not
+settled by the data here; a sweep of the verify phase over widths 2 to 16 at c = 1 is queued. The
+top-8 and top-16 verdicts (not rejected) hold for either implementation.
 
 Omniscient-gate oracle (`omniscient_gate_oracle` in the JSON; an oracle, since its gate knows fresh
 DFlash's next accepted length). A gated program may choose fresh DFlash on supported boundaries
@@ -261,9 +263,9 @@ most a perfect gate could add (same resamples as the table, so the intervals are
 | 16 | 62.9% | +2.05 (+1.93, +2.18) | +1.06 |
 
 The same gate applied to the free-verify scoring (`omniscient_gate_free_verify`, same resamples)
-bounds P9's program with any gate, at any verify width, with the other phases charged as above:
-+0.04 (+0.03, +0.05) at K = 1, +1.47 (+1.35, +1.61) at 2, +2.54 (+2.35, +2.76) at 4, +3.47
-(+3.24, +3.73) at 8 and +4.35 (+4.09, +4.64) at 16.
+bounds P9's program with any gate, at any verify width whose non-verify phases cost at least their
+block-16 values: +0.04 (+0.03, +0.05) at K = 1, +1.47 (+1.35, +1.61) at 2, +2.54 (+2.35, +2.76) at
+4, +3.47 (+3.24, +3.73) at 8 and +4.35 (+4.09, +4.64) at 16.
 
 A perfect gate would add 1.06 to 1.33 tokens per post-rejection boundary at the tested K from 2 to
 16 (2, 4, 8 and 16). A real gate decides before the second cycle and does not see fresh DFlash's

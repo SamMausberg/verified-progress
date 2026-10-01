@@ -43,10 +43,12 @@ padded verify, and its excess over always-reuse is the most a perfect gate could
 
 A program could also verify only the m + 1 positions left after the correction instead of a
 padded block. `free_verify_always_reuse` charges the reused cycle no verify at all (the lower
-bound of any width's verify cost, every other phase still charged at its block-16 value), so its
-Delta bounds P9's always-reuse program at any verify width from above.
+bound of any width's verify cost) and every other phase at its block-16 value, so its Delta
+bounds from above P9's always-reuse program at any verify width whose non-verify phases cost at
+least their block-16 values. A narrower cycle can also cut those (fresh_b8 keeps 383.81 us after
+draft and verify, fresh_b16 395.11 us), so it is not a bound for every implementation.
 `omniscient_gate_free_verify` applies the omniscient gate to that free-verify scoring and bounds
-P9's program with any gate, at any verify width.
+P9's program with any gate, at any verify width, under the same condition.
 
     python experiments/repair/p9_support_oracle.py --cycles ~/vp-data/drafter/support/zlab_b16_cycles/cycles.pt \\
         --timing evidence/repair/stage_a_timing.json --out evidence/repair/p9_support_oracle.json
@@ -64,6 +66,10 @@ from pathlib import Path
 from typing import Any
 
 H = 15  # drafted positions per block-16 cycle
+FREE_VERIFY_SCOPE = (
+    'upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost '
+    'at least their block-16 values; not for every implementation'
+)
 
 
 def as_list(value: Any) -> list[Any]:
@@ -319,14 +325,16 @@ def main() -> None:
                 'delta_ci95': [lo_g, hi_g],
                 'gain_over_always_reuse': d_gate - d,
             },
-            # Upper bound on always-reuse Delta at any verify width (reused verify costs 0).
+            # Reused verify costs 0, other phases at block 16 (see FREE_VERIFY_SCOPE).
             'free_verify_always_reuse': {
+                'scope': FREE_VERIFY_SCOPE,
                 'delta': d_free,
                 'delta_ci95': [lo_f, hi_f],
                 'rejected': hi_f <= 0,
             },
-            # Oracle: gate and free verify together; bounds P9's program with any gate, any width.
+            # Oracle: gate and free verify together, under the same condition.
             'omniscient_gate_free_verify': {
+                'scope': 'P9 program with any gate; otherwise as free_verify_always_reuse',
                 'delta': d_gate_free,
                 'delta_ci95': [lo_gf, hi_gf],
             },
