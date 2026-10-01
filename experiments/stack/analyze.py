@@ -5,14 +5,18 @@ sweep runs (labels `stack-<arm>`, sessions `stack-s<k>`). The statistics are the
 declared in evidence/stack/README.md ("Composition plan"):
 
 * Within a session the baseline S0 runs first and last, and the full stack FULL
-  second and second to last (A-B-B-A). The session's ratio for FULL is
+  second and second to last (A-B-B-A). A session ratio exists only if every launch of the
+  arm and of S0 at that concurrency is valid and the arm and S0 ran exactly as often as the
+  declared order says (`cell_valid`): one invalid launch voids it, and a retried launch
+  does not stand in for it. The session's ratio for FULL is
   mean(FULL) / mean(S0); for every other arm X it is X / mean(S0).
 * Across sessions: the geometric mean of the session ratios with a 95% t interval on
   their logs (n - 1 degrees of freedom).
 * Decision at each concurrency and metric: "speedup" if the interval's lower end is
   above 1, "slowdown" if its upper end is below 1, otherwise "no detectable change".
   A point that bench marks invalid (failed requests, wrong lengths, foreign CPU load
-  above 2 cores, ...) drops that session at that concurrency for the arms it touches.
+  above 2 cores, ...) drops that session at that concurrency for the arms it touches
+  (an invalid S0 launch, for every arm).
 * The gate comes only from the campaign pin (`--campaign`, the campaign_gate.json the
   first session wrote): its pinned files must be unchanged, and the full stack is that
   gate's timed levers. Every session must have run under it: each session hold copies
@@ -21,7 +25,7 @@ declared in evidence/stack/README.md ("Composition plan"):
   different routing tables or packages are never pooled.
 * The four-way pattern for levers F and G on the composed tree (B0, F, G, FG): the
   interaction log(FG/B0) - log(F/B0) - log(G/B0) per session, with the same interval,
-  over the sessions in which every launch of B0, F, G and FG is valid.
+  over the sessions in which B0, F, G and FG each pass `cell_valid` (so S0 too).
   Isolated ratios are never multiplied into a composed estimate.
 
     python experiments/stack/analyze.py --points ~/vp-data/stack/pareto/points.csv \
@@ -76,6 +80,31 @@ def _gate_module():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def launches_expected(arm: str, full: str) -> int:
+    """Launches per session and concurrency the declared order gives an arm."""
+    return 2 if arm in ('S0', full) else 1
+
+
+def cell_valid(
+    session: str,
+    c: int,
+    arm: str,
+    cell: dict[str, list[Any]],
+    touched: set[tuple[str, int, str]],
+    full: str,
+) -> bool:
+    """The declared rule for one session ratio: every launch of the arm and of S0 at this
+    concurrency is valid and present exactly as often as the declared order runs it. Any
+    invalid launch voids the ratio, even if another valid launch of the same arm exists (a
+    retry is not a substitute); extra or missing launches void it too."""
+    for a in (arm, 'S0'):
+        if (session, c, a) in touched:
+            return False
+        if len(cell.get(a, [])) != launches_expected(a, full):
+            return False
+    return True
 
 
 def load(path: Path) -> list[dict[str, Any]]:
@@ -159,8 +188,7 @@ def main() -> None:
                     cell = data[session].get(c, {})
                     base = [v[m] for _, v in sorted(cell.get('S0', []))]
                     test = [v[m] for _, v in sorted(cell.get(arm, []))]
-                    want = 2 if arm == args.full else 1
-                    if len(base) == 2 and len(test) == want:
+                    if cell_valid(session, c, arm, cell, touched, args.full):
                         logs.append(math.log(statistics.fmean(test) / statistics.fmean(base)))
                 entry[m] = interval(logs)
                 rows.append({'arm': arm, 'c': c, 'metric': m, **entry[m]})
@@ -175,10 +203,7 @@ def main() -> None:
                 cell = data[session].get(c, {})
                 got = {a: cell.get(a, []) for a in ('B0', 'F', 'G', 'FG')}
                 # Every launch of all four arms must be valid in this session.
-                if all(
-                    len(v) == (2 if a == args.full else 1) and (session, c, a) not in touched
-                    for a, v in got.items()
-                ):
+                if all(cell_valid(session, c, a, cell, touched, args.full) for a in got):
                     mean = {a: statistics.fmean(x[m] for _, x in v) for a, v in got.items()}
                     logs.append(
                         math.log(mean['FG'] / mean['B0'])

@@ -205,7 +205,9 @@ each c: the geometric mean of the session ratios and a 95% t interval on their l
 degrees of freedom). "Speedup" if the interval's lower end is above 1, "slowdown" if its
 upper end is below 1, otherwise "no detectable change". A point bench marks invalid
 (failed requests, wrong output lengths, foreign CPU load above 2 cores on average, ...)
-removes that session at that c for the arms it touches; if fewer than three sessions
+removes that session at that c for the arms it touches (for every arm if it is an S0
+launch); a retried launch of the same arm does not stand in for it, and a cell with more
+or fewer launches than the declared order is void too; if fewer than three sessions
 remain valid for FULL against S0 at any c, one more session runs (at most two more). The
 headline is FULL against S0: the per-user rate at c = 1 (P2's latency question) and
 throughput at c = 8, each with the exactness class from step 1. F and G are also read in

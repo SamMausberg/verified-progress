@@ -630,3 +630,75 @@ def test_ceiling_baselines_use_bench_exact_classes(tmp_path):
     kept = ceiling.baselines(path)
     assert {r['exactness'] for r in kept.values()} == set(EXACT_CLASSES)
     assert len(kept) == len(EXACT_CLASSES)
+
+
+def _cell_rows(spoil: str) -> list[dict]:
+    """One session at c = 1 in the declared order; `spoil` names the declared rule to break."""
+    order = ['S0', 'FG', 'F', 'G', 'B0', 'FG', 'S0']
+    rows = []
+    for i, arm in enumerate(order):
+        bad = ''
+        if spoil == 'invalid S0' and i == 6:
+            bad = 'osl_mismatch'
+        if spoil == 'invalid FULL' and i == 1:
+            bad = 'osl_mismatch'
+        if spoil == 'invalid middle arm' and arm == 'F':
+            bad = 'osl_mismatch'
+        x = {'S0': 100.0, 'FG': 110.0, 'F': 105.0, 'G': 101.0, 'B0': 100.0}[arm]
+        rows.append(
+            {
+                'label': f'stack-{arm}',
+                'run': f's1-{i:02d}',
+                'session': 'stack-s1',
+                'concurrency': '1',
+                'x_e2e': x,
+                'y': x,
+                'invalid_reason': bad,
+            }
+        )
+    if spoil == 'invalid FULL with a retried launch':
+        rows[1]['invalid_reason'] = 'osl_mismatch'
+        rows.append({**rows[1], 'run': 's1-07', 'invalid_reason': ''})
+    if spoil == 'missing closing S0':
+        rows.pop()
+    if spoil == 'extra B0 launch':
+        rows.append({**rows[4], 'run': 's1-08'})
+    return rows
+
+
+# rule broken -> arms whose ratio must be void (n = 0); every other arm keeps n = 1
+CELL_RULES = [
+    ('none', set()),
+    ('invalid S0', {'FG', 'F', 'G', 'B0'}),
+    ('invalid FULL', {'FG'}),
+    ('invalid FULL with a retried launch', {'FG'}),
+    ('invalid middle arm', {'F'}),
+    ('missing closing S0', {'FG', 'F', 'G', 'B0'}),
+    ('extra B0 launch', {'B0'}),
+]
+
+
+@pytest.mark.parametrize(('spoil', 'void'), CELL_RULES)
+def test_each_declared_cell_rule(tmp_path, monkeypatch, spoil, void):
+    pts = tmp_path / 'points.csv'
+    _points(pts, _cell_rows(spoil))
+    out = tmp_path / 'out.json'
+    monkeypatch.setattr(
+        sys,
+        'argv',
+        [
+            'analyze',
+            '--points',
+            str(pts),
+            '--out',
+            str(out),
+            '--campaign',
+            str(tmp_path / 'campaign_gate.json'),
+            '--session-gates',
+            str(tmp_path),
+        ],
+    )
+    analyze.main()
+    arms = json.loads(out.read_text())['arms']
+    for arm in ('FG', 'F', 'G', 'B0'):
+        assert arms[arm]['1']['x_e2e']['n'] == (0 if arm in void else 1), (spoil, arm)
