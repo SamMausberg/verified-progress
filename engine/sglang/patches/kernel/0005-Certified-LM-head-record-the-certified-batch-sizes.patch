@@ -1,0 +1,48 @@
+From e93bd233b127532d37995c99007cace415e310ba Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Thu, 1 Oct 2026 00:22:25 +0000
+Subject: [PATCH] Certified LM head: record the certified batch sizes
+
+Each path keeps a histogram of the real row counts (CUDA-graph padding
+excluded) of the steps it certified, and the stats file reports it with
+the largest, so validation can state the batch sizes at which equality was
+observed rather than the graph sizes captured.
+---
+ python/sglang/srt/layers/certified_head.py | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/python/sglang/srt/layers/certified_head.py b/python/sglang/srt/layers/certified_head.py
+index 97e7b7c359..b93ab2d361 100644
+--- a/python/sglang/srt/layers/certified_head.py
++++ b/python/sglang/srt/layers/certified_head.py
+@@ -57,6 +57,8 @@ class _PathState:
+         self.covered: Set[int] = set()
+         self.uncovered: Set[int] = set()
+         self.steps = {"certified": 0, "stock_graph": 0, "eager": 0}
++        # Certified steps by real row count (CUDA-graph padding excluded).
++        self.rows_histogram: Dict[int, int] = {}
+         # Sampled verify: per-row seed, position and temperature, filled before a
+         # replay (padding rows keep earlier, valid values).
+         self.seeds = torch.zeros(_MAX_ROWS, dtype=torch.int64, device=device)
+@@ -353,6 +355,8 @@ def set_gate(path: str, rows: int, eligible: bool = True) -> bool:
+     st.gate.fill_(certify)
+     st.valid.fill_(rows)
+     st.steps["certified" if certify else "stock_graph"] += 1
++    if certify:
++        st.rows_histogram[rows] = st.rows_histogram.get(rows, 0) + 1
+     _maybe_dump()  # reads the counters of earlier replays
+     return certify
+
+@@ -528,6 +532,10 @@ def _maybe_dump() -> None:
+     report = _heads.stats()
+     for path, st in _state.items():
+         report["paths"][path]["host_steps"] = dict(st.steps)
++        report["paths"][path]["certified_rows_histogram"] = {
++            str(k): v for k, v in sorted(st.rows_histogram.items())
++        }
++        report["paths"][path]["max_certified_rows"] = max(st.rows_histogram, default=0)
+         report["paths"][path]["graph_sizes_certified"] = sorted(st.covered)
+         report["paths"][path]["graph_sizes_stock_only"] = sorted(st.uncovered)
+     out = Path(_heads.flags.stats)
+--
+2.34.1

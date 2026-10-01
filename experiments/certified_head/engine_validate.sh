@@ -25,6 +25,11 @@
 #   dflash_c1, dflash_c1_stock  DFlash certified and stock, one request at a time
 #   mtp_draft_check      MTP draft top-1 (draft steps and draft extend), check mode
 #   mtp_all_check        MTP with verify and draft top-1 both certified, check mode
+#   plain_bench_check    plain decode, check mode, with the bench workstream's flags
+#                        (--enable-linear-replayssm, --disable-radix-cache, stream interval 4)
+#   mtp_bench_check      MTP verify and draft, check mode, with bench's MTP flags
+#                        (--enable-linear-replayssm-spec, --disable-radix-cache)
+#   mtp_triton_check     mtp_bench_check with Triton attention
 #   dflash_draft_check   DFlash greedy draft projection, check mode
 #   mtp_sampled_check    MTP with fixed-noise sampled verify, seeded T = 0.7
 #                        (--enable-deterministic-inference), check mode
@@ -111,6 +116,13 @@ run_arm() {
     mtp_check | dflash_check) flags=(VERIFY=1 CHECK=1) ;;
     mtp_draft_check | dflash_draft_check) flags=(DRAFT=1 CHECK=1) ;;
     mtp_all_check) flags=(VERIFY=1 DRAFT=1 CHECK=1) ;;
+    plain_bench_check)
+      flags=(DECODE=1 CHECK=1)
+      args+=(--enable-linear-replayssm --disable-radix-cache --stream-interval 4) ;;
+    mtp_triton_check) args+=(--attention-backend triton) ;;&
+    mtp_bench_check | mtp_triton_check)
+      flags=(VERIFY=1 DRAFT=1 CHECK=1)
+      args+=(--enable-linear-replayssm-spec --disable-radix-cache --stream-interval 4) ;;
     mtp_sampled_check)
       flags=(SAMPLED_VERIFY=1 CHECK=1) temp=0.7
       args+=(--enable-deterministic-inference) ;;
