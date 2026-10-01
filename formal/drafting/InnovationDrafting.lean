@@ -140,9 +140,9 @@ theorem decode_append_prefix (base : List α → α) (h : List α)
 
 /-- Command-prefix agreement suffices; later commands may be arbitrary. -/
 theorem common_program_prefix (base : List α → α) (h : List α)
-    (prefix left right : List (Command α)) :
-    (decode base h (prefix ++ left)).take prefix.length =
-      (decode base h (prefix ++ right)).take prefix.length := by
+    («prefix» left right : List (Command α)) :
+    (decode base h («prefix» ++ left)).take «prefix».length =
+      (decode base h («prefix» ++ right)).take «prefix».length := by
   rw [decode_append_prefix, decode_append_prefix]
 
 /-- A causal reference can include a fixed request/position-keyed random field.

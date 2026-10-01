@@ -55,8 +55,8 @@ theorem weighted_depth
       omega
   | succ n ih =>
       intro i
-      induction i using Nat.strong_induction_on with
-      | h i inner =>
+      induction i using Nat.strongRecOn with
+      | ind i inner =>
           intro hi
           change step (iterate step initial n) i = target i
           apply settles
@@ -154,8 +154,8 @@ theorem verified_prefix
     (m : Nat) (verified : ∀ i, i < m → proposal i = decide i proposal) :
     ∀ i, i < m → proposal i = target i := by
   intro i
-  induction i using Nat.strong_induction_on with
-  | h i ih =>
+  induction i using Nat.strongRecOn with
+  | ind i ih =>
       intro him
       calc
         proposal i = decide i proposal := verified i him
@@ -203,8 +203,8 @@ theorem teacher_forced_prefix_iff
       _ = proposal i := (proposal_eq i).symm
       _ = target i := hp i hi
   · intro ht i
-    induction i using Nat.strong_induction_on with
-    | h i ih =>
+    induction i using Nat.strongRecOn with
+    | ind i ih =>
         intro hi
         calc
           proposal i = decide i proposal := proposal_eq i

@@ -133,8 +133,8 @@ theorem verified_prefix_sound {α : Type u}
     (hMatch : ∀ i, i < k → draft i = step i draft) :
     ∀ i, i < k → draft i = truth i := by
   intro i
-  induction i using Nat.strong_induction_on with
-  | h i ih =>
+  induction i using Nat.strongRecOn with
+  | ind i ih =>
     intro hik
     calc
       draft i = step i draft := hMatch i hik
@@ -169,8 +169,8 @@ theorem teacher_forced_first_error {α : Type u}
     FirstMismatch r zstar run e := by
   have hBefore : ∀ j, j < e → run j = zstar j := by
     intro j
-    induction j using Nat.strong_induction_on with
-    | h j ih =>
+    induction j using Nat.strongRecOn with
+    | ind j ih =>
       intro hje
       calc
         run j = planner j run := hRun j
