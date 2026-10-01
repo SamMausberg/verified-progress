@@ -20,8 +20,10 @@ nvbin() { "$1" -c 'import os, triton; print(os.path.join(os.path.dirname(triton.
 ptxas129=$(nvbin "$py380")/ptxas
 ptxas133=$(nvbin "$py380")/ptxas-blackwell
 ptxas134=$(nvbin "$pymain")/ptxas-blackwell
-export CUDA_HOME=${CUDA_HOME:-$HOME/.local/cuda-13.0}
-export LD_LIBRARY_PATH="$HOME/.local/cuda-compat-13.0:$CUDA_HOME/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+# The machine's CUDA 13 environment (compat libraries, CUDA_HOME); each build below then runs with
+# its own interpreter, so the SGLang venv this activates only provides python3 for summarize.py.
+# shellcheck source=/dev/null
+source "$repo/scripts/sglang_env.sh"
 export OMP_NUM_THREADS=1 PYTHONUNBUFFERED=1
 mkdir -p "$out"
 # name | interpreter | ptxas override for sm_90 (3.7.1 and 3.8.0 read TRITON_PTXAS_PATH, main
@@ -35,17 +37,16 @@ runs=(
   "tmain|$pymain|-"
   "tmain_ptxas129|$pymain|TRITON_PTXAS_BLACKWELL_PATH=$ptxas129"
 )
-pids=()
+# One build at a time: each process peaks at about 3.5 GB, and a shared job must stay under 20 GB.
+# Both override variables are cleared first, so a caller's setting cannot leak into a bundled run.
+status=0
 for r in "${runs[@]}"; do
   IFS='|' read -r name py override <<<"$r"
-  rm -f "$out/$name.jsonl"
-  env TRITON_CACHE_DIR="$out/cache-$name" "${override/#-/TRITON_PTXAS_UNSET=1}" \
+  env -u TRITON_PTXAS_PATH -u TRITON_PTXAS_BLACKWELL_PATH TRITON_CACHE_DIR="$out/cache-$name" \
+    "${override/#-/TRITON_PTXAS_UNSET=1}" \
     timeout --foreground 900 "$py" "$repo/experiments/triton_tma/int8_tma_check.py" --real \
-    --out "$out/$name.jsonl" >"$out/$name.log" 2>&1 &
-  pids+=($!)
+    --out "$out/$name.jsonl" >"$out/$name.log" 2>&1 || status=1
 done
-status=0
-for p in "${pids[@]}"; do wait "$p" || status=1; done
 rm -rf "$out"/cache-*
-python3 "$repo/experiments/triton_tma/summarize.py" "$out"/*.jsonl --out "$out/int8_tma_summary.json"
-exit $status
+python "$repo/experiments/triton_tma/summarize.py" "$out"/*.jsonl --out "$out/int8_tma_summary.json"
+exit "$status"

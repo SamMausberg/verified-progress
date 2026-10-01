@@ -10,7 +10,8 @@ FP32 accumulation, both operands loaded through host-side ``TensorDescriptor``s:
 Every case is compared with an FP64 reference: each int8 x BF16 product is exact in FP32, so the
 only legitimate error is FP32 accumulation, and an entry is wrong when it differs from the exact
 dot product by more than ``K * 2^-22 * sum_k |a_k b_k|`` (NaN and Inf are wrong). Every case runs
-twice on the same inputs. One JSON line per case, plus a header line with the environment.
+twice on the same inputs. One JSON line per case, after a header line with the environment; an existing output file is
+replaced.
 
     scripts/gpu_lock.sh -s python experiments/triton_tma/int8_tma_check.py --out cases.jsonl
 
@@ -162,7 +163,7 @@ def main() -> None:
     ap.add_argument('--hidden', type=Path, default=Path('~/vp-data/geometry/plain4b/heads'))
     args = ap.parse_args()
     torch.set_num_threads(1)
-    with args.out.open('a') as f:
+    with args.out.open('w') as f:
         f.write(json.dumps({'env': environment()}) + '\n')
         g = torch.Generator(device='cuda').manual_seed(0)
         for data in ['random', 'real'] if args.real else ['random']:
