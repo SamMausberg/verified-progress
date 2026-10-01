@@ -113,3 +113,35 @@ analyse it.
 split size to FlashInfer's target-verify plan, as decode and extend already do. It
 does not make MTP speculation batch-invariant under `--enable-deterministic-inference`
 (see `evidence/state_safety/README.md`); it is kept because a committed run used it.
+
+## kernel (`patches/kernel/0001-0005`, branch `engine/kernel`)
+
+The certified LM head (`src/certified_head/`, PR #45) on SGLang's head paths. The
+engine imports the package from `SGLANG_CERTIFIED_HEAD_SRC`; it is not copied into
+SGLang. The series applies in order to `bd66ce343e`:
+
+```sh
+scripts/sglang_worktree.sh kernel
+git -C ~/sglang-wt/kernel am "$PWD"/engine/sglang/patches/kernel/*.patch
+SGLANG_WORKTREE=~/sglang-wt/kernel source scripts/sglang_env.sh
+export SGLANG_CERTIFIED_HEAD_SRC="$PWD/src"
+```
+
+Every change is off unless its variable is set. With a path enabled, each CUDA graph
+on that path captures the certified head under a device flag and SGLang's own head
+under its negation; the host sets the flag per replay only for batches that need no
+logits, so other batches, eager forwards and unsupported configurations (TP or PP > 1,
+DP attention, quantized, LoRA, FP32, scaled or softcapped heads, padded vocabularies,
+`SGLANG_SANITIZE_NAN_LOGITS`, `SGLANG_ENABLE_ASYNC_ASSERT`) run the stock head.
+
+| Patch | What it changes | Default behaviour |
+|---|---|---|
+| 0001 | `SGLANG_CERTIFIED_HEAD_DECODE=1`: greedy plain decode takes its tokens from the certified head (the stock head's tokens for the same batch); `SGLANG_CERTIFIED_HEAD_FALLBACK` (`batch` or `columns`), `_MODEL` (`conservative` or `hopper-wgmma`), `_MAX_ROWS`, `_CHECK` (also run the stock head and count differing rows), `_STATS`. | unchanged unless set |
+| 0002 | `SGLANG_CERTIFIED_HEAD_VERIFY=1`: greedy target verify for EAGLE/MTP (`eagle_sample`) and DFlash (`_accept_block`). | unchanged unless set |
+| 0003 | `SGLANG_CERTIFIED_HEAD_DRAFT=1`: MTP draft top-1 (draft steps inside the draft graph and the draft-extend token) and DFlash's greedy draft projection. | unchanged unless set |
+| 0004 | `SGLANG_CERTIFIED_HEAD_SAMPLED_VERIFY=1`: fixed-noise sampled verify for EAGLE/MTP with seeded temperature-only sampling (`--enable-deterministic-inference`); accepts a draft iff it equals SGLang's seeded sample of the verify row. It replaces the stock rejection-sampling verify. | unchanged unless set |
+| 0005 | Records the row counts of certified steps in the stats file. | unchanged unless `_STATS` is set |
+
+Validation: `experiments/certified_head/engine_validate.sh` (check mode per path and
+one request at a time against the stock server; results in
+`evidence/certified_head/README.md`).
