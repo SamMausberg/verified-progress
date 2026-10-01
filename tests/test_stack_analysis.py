@@ -32,12 +32,15 @@ phases = _load('phases')
 FIELDS = ['label', 'run', 'session', 'concurrency', 'invalid_reason', 'x_e2e', 'y', 'accept_length']
 
 
-def _points(path: Path, rows: list[dict]) -> None:
+def _points(path: Path, rows: list[dict], digest: dict | None = None) -> None:
     with path.open('w', newline='') as f:
         w = csv.DictWriter(f, fieldnames=FIELDS)
         w.writeheader()
         for r in rows:
             w.writerow({'invalid_reason': '', 'accept_length': '5.7', **r})
+    for session in {r['session'] for r in rows}:
+        record = path.parent / f'session_{session}.gate.json'
+        record.write_text(json.dumps(digest or {'gate_sha256': 'g', 'run': 'r'}))
 
 
 def test_full_stack_ratio_pairs_both_launches_with_both_baselines(tmp_path, monkeypatch):
@@ -60,7 +63,19 @@ def test_full_stack_ratio_pairs_both_launches_with_both_baselines(tmp_path, monk
     _points(pts, rows)
     out = tmp_path / 'out.json'
     monkeypatch.setattr(
-        sys, 'argv', ['analyze', '--points', str(pts), '--full', 'FG', '--out', str(out)]
+        sys,
+        'argv',
+        [
+            'analyze',
+            '--points',
+            str(pts),
+            '--full',
+            'FG',
+            '--out',
+            str(out),
+            '--session-gates',
+            str(tmp_path),
+        ],
     )
     analyze.main()
     res = json.loads(out.read_text())
@@ -100,7 +115,19 @@ def test_invalid_point_drops_the_session_for_that_arm(tmp_path, monkeypatch):
     _points(pts, rows)
     out = tmp_path / 'out.json'
     monkeypatch.setattr(
-        sys, 'argv', ['analyze', '--points', str(pts), '--full', 'FG', '--out', str(out)]
+        sys,
+        'argv',
+        [
+            'analyze',
+            '--points',
+            str(pts),
+            '--full',
+            'FG',
+            '--out',
+            str(out),
+            '--session-gates',
+            str(tmp_path),
+        ],
     )
     analyze.main()
     res = json.loads(out.read_text())
@@ -181,9 +208,42 @@ def _passing(h: bool = False) -> dict:
 STATS = {'paths': {'verify': {'rows': 5000, 'mismatch_rows': 0, 'fallback_rows': 40}}}
 
 
-def _build(tmp_path, monkeypatch, pairs, stats=(), cert=None) -> tuple[int, Path]:
+RUN_OF = {'S0': 'S0', 'B0': 'B0', 'F': 'F', 'G': 'G', 'FG': 'FG'}
+
+
+def _outputs(lp: float = -0.5) -> list[dict]:
+    return [
+        {'id': f'p{i}', 'output_ids': [1, 2, 3], 'top_logprobs': [[[-0.1, 1], [lp, 7]]] * 3}
+        for i in range(gate.PROMPTS)
+    ]
+
+
+def _write_runs(run: Path, b0_low_entry: float = -0.5) -> None:
+    """Raw run files: S0, B0 and F identical; G and FG with other logprobs."""
+    runs = run / 'runs'
+    for name, lp in (
+        ('S0', -0.5),
+        ('B0', b0_low_entry),
+        ('F', b0_low_entry),
+        ('G', -0.6),
+        ('FG', -0.6),
+    ):
+        d = runs / f'plain__stack_{name}'
+        d.mkdir(parents=True, exist_ok=True)
+        (d / 'c1.jsonl').write_text('\n'.join(json.dumps(r) for r in _outputs(lp)) + '\n')
+    pairs = [['B0 vs S0', 'plain__stack_S0/c1', 'plain__stack_B0/c1']]
+    pairs += [
+        [f'{x} vs B0', 'plain__stack_B0/c1', f'plain__stack_{x}/c1'] for x in ('F', 'G', 'FG')
+    ]
+    (run / 'pairs.json').write_text(json.dumps(pairs))
+
+
+def _build(
+    tmp_path, monkeypatch, pairs, stats=(), cert=None, b0_low_entry=-0.5
+) -> tuple[int, Path]:
     run = tmp_path / 'run'
     run.mkdir(exist_ok=True)
+    _write_runs(run, b0_low_entry)
     (run / 'summary.json').write_text(json.dumps({'pairs': pairs}))
     (run / gate.TABLE).write_text('{"2560,4096": []}')
     for n in stats:
@@ -243,6 +303,33 @@ def test_gate_check_refuses_every_failed_equality(tmp_path, monkeypatch, spoil):
     _, path = _build(tmp_path, monkeypatch, pairs)
     with pytest.raises(gate.GateError):
         gate.check(path, None)
+
+
+def test_bitwise_compares_complete_logprob_arrays(tmp_path, monkeypatch):
+    # Same tokens and no drift in the summary, but a low top-5 entry differs: not bitwise.
+    _, path = _build(tmp_path, monkeypatch, _passing(), b0_low_entry=-7.25)
+    g = json.loads(path.read_text())
+    assert not g['b0_bitwise_to_s0'] and not g['ok']
+    with pytest.raises(gate.GateError):
+        gate.check(path, None)
+
+
+def test_campaign_pin_refuses_a_second_gate(tmp_path, monkeypatch):
+    pin = tmp_path / 'campaign.json'
+    _, path = _build(tmp_path, monkeypatch, _passing())
+    assert gate.check(path, None, pin)[0] == 'FG'
+    assert gate.check(path, None, pin)[0] == 'FG'
+    other = _passing()
+    other['G vs B0'] = _pair(4, 0.2, tie=4)
+    _, path = _build(tmp_path, monkeypatch, other)  # a new gate with the same levers
+    with pytest.raises(gate.GateError):
+        gate.check(path, None, pin)
+
+
+def test_decision_uses_unrounded_bounds():
+    logs = [math.log(1.000004), math.log(1.0000041), math.log(1.0000042)]
+    out = analyze.interval(logs)
+    assert out['lo'] == 1.0 and out['decision'] == 'speedup'
 
 
 def test_gate_check_refuses_changed_files_and_missing_package(tmp_path, monkeypatch):
@@ -306,7 +393,19 @@ def test_interaction_skips_a_session_with_one_invalid_full_launch(tmp_path, monk
     _points(pts, rows)
     out = tmp_path / 'out.json'
     monkeypatch.setattr(
-        sys, 'argv', ['analyze', '--points', str(pts), '--full', 'FG', '--out', str(out)]
+        sys,
+        'argv',
+        [
+            'analyze',
+            '--points',
+            str(pts),
+            '--full',
+            'FG',
+            '--out',
+            str(out),
+            '--session-gates',
+            str(tmp_path),
+        ],
     )
     analyze.main()
     res = json.loads(out.read_text())
@@ -333,7 +432,19 @@ def test_all_invalid_full_stays_visible_with_n_zero(tmp_path, monkeypatch):
     _points(pts, rows)
     out = tmp_path / 'out.json'
     monkeypatch.setattr(
-        sys, 'argv', ['analyze', '--points', str(pts), '--full', 'FG', '--out', str(out)]
+        sys,
+        'argv',
+        [
+            'analyze',
+            '--points',
+            str(pts),
+            '--full',
+            'FG',
+            '--out',
+            str(out),
+            '--session-gates',
+            str(tmp_path),
+        ],
     )
     analyze.main()
     assert json.loads(out.read_text())['arms']['FG']['8']['x_e2e']['n'] == 0
@@ -375,9 +486,61 @@ def test_analysis_takes_the_full_arm_from_the_gate(tmp_path, monkeypatch):
     gate_file.write_text(json.dumps({'timed_levers': ['F', 'G', 'H']}))
     out = tmp_path / 'out.json'
     monkeypatch.setattr(
-        sys, 'argv', ['analyze', '--points', str(pts), '--gate', str(gate_file), '--out', str(out)]
+        sys,
+        'argv',
+        [
+            'analyze',
+            '--points',
+            str(pts),
+            '--gate',
+            str(gate_file),
+            '--out',
+            str(out),
+            '--session-gates',
+            str(tmp_path),
+        ],
     )
     analyze.main()
     res = json.loads(out.read_text())
     assert res['full'] == 'FGH'
     assert res['arms']['FGH']['1']['x_e2e']['n'] == 1
+
+
+def test_analysis_refuses_sessions_under_different_gates(tmp_path, monkeypatch):
+    rows = []
+    for s in ('stack-s1', 'stack-s2'):
+        for i, arm in enumerate(['S0', 'FG', 'FG', 'S0']):
+            rows.append(
+                {
+                    'label': f'stack-{arm}',
+                    'run': f'{s}-{i}',
+                    'session': s,
+                    'concurrency': '1',
+                    'x_e2e': 100.0,
+                    'y': 100.0,
+                }
+            )
+    pts = tmp_path / 'points.csv'
+    _points(pts, rows)
+    (tmp_path / 'session_stack-s2.gate.json').write_text(json.dumps({'gate_sha256': 'other'}))
+    out = tmp_path / 'out.json'
+    monkeypatch.setattr(
+        sys,
+        'argv',
+        [
+            'analyze',
+            '--points',
+            str(pts),
+            '--full',
+            'FG',
+            '--out',
+            str(out),
+            '--session-gates',
+            str(tmp_path),
+        ],
+    )
+    with pytest.raises(SystemExit):
+        analyze.main()
+    (tmp_path / 'session_stack-s2.gate.json').unlink()
+    with pytest.raises(SystemExit):
+        analyze.main()

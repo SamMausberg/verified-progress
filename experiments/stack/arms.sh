@@ -23,8 +23,10 @@ STACK_ENGINE=${STACK_ENGINE:-$HOME/sglang-wt/stack}
 # shellcheck disable=SC2034 # read by the scripts that source this file
 STACK_TREE=628f650ea031b0fc8a68233ff10d8878eb22686d
 STACK_ARM=dflash-tuned-b16
-# The equality gate the sessions obey and the routing table that passed with it.
+# The equality gate the sessions obey and the routing table that passed with it; the
+# first session pins the campaign to that gate, and later sessions refuse another.
 STACK_CURRENT=$HOME/vp-data/stack/equality/current
+STACK_PIN=$HOME/vp-data/stack/campaign_gate.json
 
 # Build the routing table backbone's hold 2 used (lever v1) from committed data into
 # $STACK_TABLE (the equality hold does this once, in its own directory).
@@ -40,7 +42,7 @@ gate_plan() {
   local plan cert=()
   [ -n "${STACK_CERT_SRC:-}" ] && cert=(--cert-src "$STACK_CERT_SRC")
   plan=$(python experiments/stack/equality_gate.py check --gate "$STACK_CURRENT/gate.json" \
-    "${cert[@]}") || return 1
+    --pin "${1:-$STACK_PIN}" "${cert[@]}") || return 1
   # shellcheck disable=SC2034 # FULL is read by the hold scripts that source this file
   FULL=$(sed -n 's/^full=//p' <<< "$plan")
   STACK_TABLE=$(sed -n 's/^table=//p' <<< "$plan")

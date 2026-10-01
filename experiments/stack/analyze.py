@@ -13,13 +13,17 @@ declared in evidence/stack/README.md ("Composition plan"):
   above 1, "slowdown" if its upper end is below 1, otherwise "no detectable change".
   A point that bench marks invalid (failed requests, wrong lengths, foreign CPU load
   above 2 cores, ...) drops that session at that concurrency for the arms it touches.
+* Every session must have run under the same equality gate: each session hold writes
+  the campaign's gate digest to `session_<session>.gate.json` beside its runs
+  (`--session-gates`), and the analysis stops if any session's record is missing or
+  differs, so measurements from different routing tables or packages are never pooled.
 * The four-way pattern for levers F and G on the composed tree (B0, F, G, FG): the
   interaction log(FG/B0) - log(F/B0) - log(G/B0) per session, with the same interval,
   over the sessions in which every launch of B0, F, G and FG is valid.
   Isolated ratios are never multiplied into a composed estimate.
 
     python experiments/stack/analyze.py --points ~/vp-data/stack/pareto/points.csv \
-        --gate ~/vp-data/stack/equality/current/gate.json \
+        --gate ~/vp-data/stack/equality/current/gate.json --session-gates ~/vp-data/stack/runs \
         --out evidence/stack/composition.json --csv evidence/stack/composition.csv
 """
 
@@ -49,14 +53,15 @@ def interval(logs: list[float]) -> dict[str, Any]:
     out['ratio'] = round(math.exp(mean), 5)
     if n >= 2:
         half = T95[n - 1] * statistics.stdev(logs) / math.sqrt(n)
-        out['lo'] = round(math.exp(mean - half), 5)
-        out['hi'] = round(math.exp(mean + half), 5)
-        if out['lo'] > 1:
+        lo, hi = mean - half, mean + half  # decide on the unrounded log bounds
+        if lo > 0:
             out['decision'] = 'speedup'
-        elif out['hi'] < 1:
+        elif hi < 0:
             out['decision'] = 'slowdown'
         else:
             out['decision'] = 'no detectable change'
+        out['lo'] = round(math.exp(lo), 5)
+        out['hi'] = round(math.exp(hi), 5)
     return out
 
 
@@ -71,6 +76,12 @@ def main() -> None:
     ap.add_argument('--full', help='arm name of the full stack (FG or FGH)')
     ap.add_argument(
         '--gate', type=Path, help='equality gate.json: the full stack is its timed levers'
+    )
+    ap.add_argument(
+        '--session-gates',
+        type=Path,
+        required=True,
+        help="directory with each session hold's session_<session>.gate.json",
     )
     ap.add_argument('--out', type=Path, required=True)
     ap.add_argument('--csv', type=Path, help='one row per arm, concurrency and metric')
@@ -104,9 +115,23 @@ def main() -> None:
         vals['accept_length'] = float(r['accept_length'] or 'nan')
         data[r['session']][c][arm].append((r['run'], vals))
 
+    sessions = sorted({r['session'] for r in rows_in})
+    digests = {}
+    for session in sessions:
+        record = args.session_gates / f'session_{session}.gate.json'
+        if not record.is_file():
+            raise SystemExit(f'no gate record for session {session} ({record})')
+        digests[session] = json.loads(record.read_text())
+    if len({json.dumps(d, sort_keys=True) for d in digests.values()}) > 1:
+        raise SystemExit(f'sessions ran under different equality gates: {digests}')
     arms = sorted(all_arms - {'S0'})
     concurrencies = sorted(all_c)
-    result: dict[str, Any] = {'full': args.full, 'invalid_points': invalid, 'arms': {}}
+    result: dict[str, Any] = {
+        'full': args.full,
+        'gate': next(iter(digests.values()), None),
+        'invalid_points': invalid,
+        'arms': {},
+    }
     rows = []
     for arm in arms:
         result['arms'][arm] = {}

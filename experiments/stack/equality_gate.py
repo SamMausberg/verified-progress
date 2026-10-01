@@ -13,8 +13,9 @@ The decision is all or nothing:
   and FG must each be exact against both B0 and stock DFlash block 16. A comparison is
   usable only if it covers all 320 prompts with no output-length mismatch; it is exact
   only if every first divergence is classified `tie`, `one_ulp` or `near` (anything else,
-  including `unknown` when a run lacks the logprobs, fails); bitwise if it has no
-  divergence and no logprob drift.
+  including `unknown` when a run lacks the logprobs, fails); bitwise only if the two
+  runs' raw outputs are identical, token ids and complete top-logprob arrays, prompt by
+  prompt (the comparator's drift statistic ignores low-probability entries).
 * The routing table G ran with is recorded by its SHA-256; a session must use that file.
 * The certified head (H) joins FG only if the tokens-only B0 run reproduces the logprob
   B0 run, H and FGH reproduce B0 and FG (tokens and lengths, all 320 prompts), both
@@ -25,7 +26,11 @@ The decision is all or nothing:
     python experiments/stack/equality_gate.py build ~/vp-data/stack/equality/<run> \
         --table <run>/backbone_table_v1.json [--cert-src ~/vp-wt/stack-cert/src]
     python experiments/stack/equality_gate.py check --gate ~/vp-data/stack/equality/current/gate.json \
-        [--cert-src ~/vp-wt/stack-cert/src]
+        [--cert-src ~/vp-wt/stack-cert/src] [--pin ~/vp-data/stack/campaign_gate.json]
+
+`--pin` binds a campaign of sessions to one gate: the first check writes the gate's
+and its comparison summary's SHA-256 and the run directory there, and every later check
+refuses a different gate.
 """
 
 from __future__ import annotations
@@ -44,6 +49,26 @@ TABLE = 'backbone_table_v1.json'
 
 class GateError(Exception):
     """A precondition of a timed run does not hold."""
+
+
+def load_run(path: Path) -> dict[str, dict[str, Any]]:
+    with path.open() as f:
+        return {r['id']: r for r in (json.loads(line) for line in f if line.strip())}
+
+
+def runs_identical(run: Path, label: str) -> bool:
+    """Both runs of pair `label` have identical token ids and top-logprob arrays."""
+    pairs = {p[0]: p[1:] for p in json.loads((run / 'pairs.json').read_text())}
+    if label not in pairs:
+        return False
+    a, b = (load_run(run / 'runs' / f'{r}.jsonl') for r in pairs[label])
+    if len(a) != PROMPTS or a.keys() != b.keys():
+        return False
+    return all(
+        a[k]['output_ids'] == b[k]['output_ids']
+        and (a[k].get('top_logprobs') or []) == (b[k].get('top_logprobs') or [])
+        for k in a
+    )
 
 
 def usable(pair: dict[str, Any] | None) -> bool:
@@ -68,12 +93,14 @@ def exact(pair: dict[str, Any] | None) -> bool:
     )
 
 
-def lever_class(pairs: dict[str, Any], lever: str) -> str:
+def lever_class(run: Path, pairs: dict[str, Any], lever: str) -> str:
     stock = pairs.get(f'{lever} vs bench stock b16')
     own = pairs.get(f'{lever} vs B0')
     if not (exact(stock) and exact(own)):
         return 'not exact'
-    return 'bitwise' if bitwise(own) else 'exact-up-to-rounding'
+    if bitwise(own) and runs_identical(run, f'{lever} vs B0'):
+        return 'bitwise'
+    return 'exact-up-to-rounding'
 
 
 def certified_check(path: Path) -> dict[str, Any]:
@@ -111,8 +138,8 @@ def evaluate(run: Path, table_sha: str | None, package_sha: str | None) -> dict[
     """The gate decision for an equality run directory (pure: reads only that directory)."""
     pairs = json.loads((run / 'summary.json').read_text())['pairs']
     gate: dict[str, Any] = {
-        'b0_bitwise_to_s0': bitwise(pairs.get('B0 vs S0')),
-        'classes': {x: lever_class(pairs, x) for x in ('F', 'G', 'FG')},
+        'b0_bitwise_to_s0': bitwise(pairs.get('B0 vs S0')) and runs_identical(run, 'B0 vs S0'),
+        'classes': {x: lever_class(run, pairs, x) for x in ('F', 'G', 'FG')},
         'table_sha256': table_sha,
     }
     gate['ok'] = bool(
@@ -141,12 +168,23 @@ def evaluate(run: Path, table_sha: str | None, package_sha: str | None) -> dict[
     return gate
 
 
-def check(gate_path: Path, cert_src: Path | None) -> tuple[str, Path]:
+def check(gate_path: Path, cert_src: Path | None, pin: Path | None = None) -> tuple[str, Path]:
     """Every precondition of a timed run; returns (full arm, routing table) or raises."""
     if not gate_path.is_file():
         raise GateError(f'no gate at {gate_path}')
     stored = json.loads(gate_path.read_text())
     run = gate_path.resolve().parent
+    digest = {
+        'gate_sha256': sha256_file(gate_path),
+        'summary_sha256': sha256_file(run / 'summary.json'),
+        'run': str(run),
+    }
+    if pin is not None:
+        if pin.is_file():
+            if json.loads(pin.read_text()) != digest:
+                raise GateError(f'this campaign is pinned to another gate ({pin})')
+        else:
+            pin.write_text(json.dumps(digest, indent=1) + '\n')
     recomputed = evaluate(
         run, stored.get('table_sha256'), stored.get('certified', {}).get('package_sha256')
     )
@@ -178,6 +216,7 @@ def main() -> int:
     c = sub.add_parser('check', help='verify every precondition of a timed run')
     c.add_argument('--gate', type=Path, required=True)
     c.add_argument('--cert-src', type=Path)
+    c.add_argument('--pin', type=Path, help='campaign file binding sessions to one gate')
     f = sub.add_parser('fingerprint', help='print the certified_head package fingerprint')
     f.add_argument('src', type=Path)
     args = ap.parse_args()
@@ -192,7 +231,7 @@ def main() -> int:
             (args.run / 'gate.json').write_text(json.dumps(gate, indent=1) + '\n')
             print(json.dumps(gate))
         else:
-            full, table = check(args.gate, args.cert_src)
+            full, table = check(args.gate, args.cert_src, args.pin)
             print(f'full={full}')
             print(f'table={table}')
     except (GateError, OSError, KeyError, ValueError) as err:

@@ -177,7 +177,12 @@ all succeeded. Every timed hold first runs `equality_gate.py check`, which recom
 decision from that run's files, compares it with the stored gate, and verifies the
 routing table's and (when H passed) the package's hashes; a session whose gate includes
 H refuses to start without that package, and any failed check stops the hold before a
-server starts. The same hold runs a phase diagnostic: B0 and FG with the repair probe at
+server starts. The first session pins the campaign to its gate (the gate's and its
+comparison summary's SHA-256 and the run directory); a later session under any other
+gate refuses to start, each session records the digest beside its runs, and the
+analysis refuses sessions with missing or differing records. Bitwise (B0 against S0, or a
+lever against B0) compares the two runs' raw outputs, token ids and complete top-logprob
+arrays, prompt by prompt. The same hold runs a phase diagnostic: B0 and FG with the repair probe at
 c = 1 and 8 (`phases.py`).
 
 **Step 2, timing** (`hold_session.sh <k>`, sessions s1, s2, s3, one exclusive hold each).
@@ -281,7 +286,7 @@ scripts/gpu_lock.sh -x experiments/stack/hold_session.sh 1          # then 2 and
 python -m bench.pareto ~/vp-data/stack/runs/stack-*/2026* --out ~/vp-data/stack/pareto \
     --points-only --status stack
 python experiments/stack/analyze.py --points ~/vp-data/stack/pareto/points.csv \
-    --gate ~/vp-data/stack/equality/current/gate.json \
+    --gate ~/vp-data/stack/equality/current/gate.json --session-gates ~/vp-data/stack/runs \
     --out evidence/stack/composition.json --csv evidence/stack/composition.csv
 scripts/gpu_lock.sh -x experiments/stack/hold_oracle.sh             # diagnostic, after the sessions
 ```
