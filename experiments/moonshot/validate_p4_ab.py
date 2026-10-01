@@ -1,11 +1,12 @@
 """Validate P4's served A/B run and apply the declared decision rule (README 2c).
 
 Reads one fresh lever_sweep output directory and checks, for this run only:
-  - lever_sweep_log.jsonl lists exactly the expected configurations, each with status
-    'exit 0';
-  - every configuration has exactly one sweep.json with one concurrency-128 point whose
-    requests all completed (failed 0, completed == requests > 0) and that carries the
-    token-weighted server full-batch decode rate;
+  - lever_sweep_log.jsonl lists exactly the expected configurations in the declared
+    A B B A A B B A order, each with status 'exit 0';
+  - every configuration has exactly one sweep.json with one concurrency-128 point that ran
+    the configured number of requests (256) to completion: requests == completed == 256,
+    failed 0, AIPerf exit code 0, the prompts sent as expected and no output-length
+    mismatch; and that carries the token-weighted server full-batch decode rate;
   - every exact-replay server log shows the exact-replay kernel dispatch line, and no
     dense server log does;
   - the run forms exactly four complete dense/exact pairs (labels r1-r4).
@@ -30,6 +31,12 @@ from typing import Any
 DENSE = 'plain+no_radix'
 EXACT = 'plain+no_radix+exact_replay'
 PAIRS = ['r1', 'r2', 'r3', 'r4']
+# Execution order declared in README 2c: A B B A A B B A.
+ORDER = [
+    f'{DENSE}#r1', f'{EXACT}#r1', f'{EXACT}#r2', f'{DENSE}#r2',
+    f'{DENSE}#r3', f'{EXACT}#r3', f'{EXACT}#r4', f'{DENSE}#r4',
+]  # fmt: skip
+REQUESTS = 256  # --min-requests 256 at concurrency 128
 DISPATCH = 'GDN decode: exact replay kernel'
 T3_975 = 3.182446305284263  # Student t, 3 degrees of freedom, two-sided 95%
 THRESHOLD = 1.10
@@ -49,9 +56,19 @@ def point_of(out: Path, label: str) -> tuple[dict[str, Any], Path]:
     if len(points) != 1:
         fail(f'{label}: expected one concurrency-128 point, found {len(points)}')
     point = points[0]
+    # `requests` counts exported rows, so an AIPerf run that stops early can show
+    # completed == requests below the configured count; check the count itself.
     requests, completed = int(point.get('requests') or 0), int(point.get('completed') or 0)
-    if requests <= 0 or completed != requests or int(point.get('failed') or 0) != 0:
-        fail(f'{label}: {completed}/{requests} completed, {point.get("failed")} failed')
+    if requests != REQUESTS or completed != REQUESTS or int(point.get('failed') or 0) != 0:
+        fail(
+            f'{label}: {completed}/{requests} completed of {REQUESTS}, {point.get("failed")} failed'
+        )
+    if point.get('aiperf_exit_code') != 0:
+        fail(f'{label}: AIPerf exit code {point.get("aiperf_exit_code")}')
+    if point.get('prompts_as_expected') is not True:
+        fail(f'{label}: prompts not as expected')
+    if int(point.get('osl_mismatch') or 0) != 0:
+        fail(f'{label}: {point.get("osl_mismatch")} outputs with the wrong length')
     if not (point.get('server_log') or {}).get('logged_gen_tps_full_batch'):
         fail(f'{label}: no token-weighted server full-batch decode rate')
     return point, runs[0].parent / 'server/server.log'
@@ -70,14 +87,14 @@ def main() -> None:
     parser.add_argument('--json', type=Path, default=None)
     args = parser.parse_args()
     out = args.out.expanduser()
-    expected = [f'{arm}#{pair}' for pair in PAIRS for arm in (DENSE, EXACT)]
+    expected = ORDER
 
     log = out / 'lever_sweep_log.jsonl'
     if not log.exists():
         fail(f'{log} missing')
     records = [json.loads(line) for line in log.read_text().splitlines() if line.strip()]
-    if sorted(r['config'] for r in records) != sorted(expected):
-        fail(f'configurations in the log {[r["config"] for r in records]} != {expected}')
+    if [r['config'] for r in records] != expected:
+        fail(f'configurations in the log {[r["config"] for r in records]} != {expected} (order)')
     bad = [r['config'] for r in records if r['status'] != 'exit 0']
     if bad:
         fail(f'arms did not exit 0: {bad}')
