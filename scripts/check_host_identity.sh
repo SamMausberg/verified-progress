@@ -23,13 +23,14 @@ if [[ $host =~ ^[0-9]{1,3}(-[0-9]{1,3}){3}$ ]]; then
 fi
 for addr in $(hostname -I 2>/dev/null || true); do
   case "$addr" in
-    ::1 | [fF][eE]80:* | [fF][cCdD]*:*) continue ;; # IPv6 loopback, link-local, unique local
     *:*)
-      # The compressed and fully expanded spellings; the search ignores case.
+      # Global addresses only (loopback, link-local fe80::/10 and unique-local are skipped), in
+      # the compressed and fully expanded spellings; the search ignores case.
       mapfile -t forms < <(python3 -c 'import ipaddress, sys
 a = ipaddress.IPv6Address(sys.argv[1].split("%")[0])
-print(a.compressed)
-print(a.exploded)' "$addr" 2>/dev/null || echo "$addr")
+if a.is_global:
+    print(a.compressed)
+    print(a.exploded)' "$addr" 2>/dev/null || echo "$addr")
       patterns+=("${forms[@]}")
       continue
       ;;
@@ -68,7 +69,7 @@ for f in "${files[@]}"; do
     hits="$(git cat-file blob ":$f" 2>/dev/null | grep -n -a -i -F "${args[@]}" | cut -d: -f1 | tr '\n' ' ' || true)"
   else
     [ -f "$f" ] || continue
-    hits="$(grep -n -a -i -F "${args[@]}" "$f" | cut -d: -f1 | tr '\n' ' ' || true)"
+    hits="$(grep -n -a -i -F "${args[@]}" -- "$f" | cut -d: -f1 | tr '\n' ' ' || true)"
   fi
   if [ -n "$hits" ]; then
     echo "$shown: line(s) ${hits% } contain this machine's hostname or IP address" >&2

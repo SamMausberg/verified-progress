@@ -94,9 +94,10 @@ def test_binary_files_are_scanned_too(tmp_path: Path) -> None:
 
 
 def test_global_ipv6_addresses_are_patterns_but_local_ones_are_not(tmp_path: Path) -> None:
-    env = fake_host(tmp_path, 'ubuntu', '2001:db8::7 fe80::1 fd00::2')
-    (tmp_path / 'global.txt').write_text('peer 2001:db8::7\n')
-    (tmp_path / 'local.txt').write_text('peer fe80::1 and fd00::2\n')
+    # 2001:db8::/32 is documentation-only and not global, so the examples use global unicast.
+    env = fake_host(tmp_path, 'ubuntu', '2600:1f18::7 fe80::1 fe90::1 febf::1 fd00::2')
+    (tmp_path / 'global.txt').write_text('peer 2600:1f18::7\n')
+    (tmp_path / 'local.txt').write_text('peer fe80::1, fe90::1, febf::1 and fd00::2\n')
     done = run(env, tmp_path, 'global.txt', 'local.txt')
     assert done.returncode == 1
     assert 'global.txt' in done.stderr and 'local.txt' not in done.stderr
@@ -113,9 +114,16 @@ def test_paths_are_checked_as_well_as_contents(tmp_path: Path) -> None:
 
 
 def test_ipv6_matches_any_case_and_the_expanded_form(tmp_path: Path) -> None:
-    env = fake_host(tmp_path, 'ubuntu', '2001:db8::7')
-    (tmp_path / 'upper.txt').write_text('peer 2001:DB8::7\n')
-    (tmp_path / 'expanded.txt').write_text('peer 2001:0db8:0000:0000:0000:0000:0000:0007\n')
+    env = fake_host(tmp_path, 'ubuntu', '2600:1f18::ab')
+    (tmp_path / 'upper.txt').write_text('peer 2600:1F18::AB\n')
+    (tmp_path / 'expanded.txt').write_text('peer 2600:1f18:0000:0000:0000:0000:0000:00ab\n')
     done = run(env, tmp_path, 'upper.txt', 'expanded.txt')
     assert done.returncode == 1
     assert 'upper.txt' in done.stderr and 'expanded.txt' in done.stderr
+
+
+def test_a_file_named_like_an_option_is_scanned(tmp_path: Path) -> None:
+    env = fake_host(tmp_path, '203-0-113-7', '203.0.113.7')
+    (tmp_path / '-v').write_text('203.0.113.7\n')
+    done = run(env, tmp_path, '-v')
+    assert done.returncode == 1
