@@ -1,0 +1,39 @@
+test,baseline,concurrency,n,sessions,dropped_invalid,unmatched,y_ratio_mean,y_ratio_min,y_ratio_max,x_e2e_ratio_mean,x_e2e_ratio_min,x_e2e_ratio_max
+mtp-tuned,plain-tuned,32,3,confirm-r0 confirm-r1 confirm-r2,0,0,1.0519,1.0386,1.0634,1.1356,1.1215,1.1470
+mtp-tuned,plain-tuned,48,3,confirm-r0 confirm-r1 confirm-r2,0,0,0.9764,0.9585,0.9947,1.0423,1.0233,1.0630
+mtp-tuned,plain-tuned,64,3,confirm-r0 confirm-r1 confirm-r2,0,0,0.9122,0.8982,0.9220,0.9878,0.9740,0.9973
+mtp-tuned,plain-tuned,96,3,confirm-r0 confirm-r1 confirm-r2,0,0,0.8679,0.8610,0.8779,0.9354,0.9303,0.9455
+mtp-tuned,plain-tuned,128,3,confirm-r0 confirm-r1 confirm-r2,0,0,0.8633,0.8586,0.8690,0.9250,0.9199,0.9302
+dflash-tuned,plain-tuned,1,3,confirm-r0 confirm-r1 confirm-r2,0,0,2.7214,2.7198,2.7239,2.8850,2.8825,2.8877
+dflash-tuned,plain-tuned,2,3,confirm-r0 confirm-r1 confirm-r2,0,0,2.5783,2.5703,2.5831,2.7530,2.7441,2.7588
+dflash-tuned,plain-tuned,4,3,confirm-r0 confirm-r1 confirm-r2,0,0,2.2558,2.2385,2.2789,2.4666,2.4487,2.4895
+dflash-tuned,plain-tuned,8,3,confirm-r0 confirm-r1 confirm-r2,0,0,1.8234,1.8139,1.8375,2.0734,2.0623,2.0899
+dflash-tuned,plain-tuned,16,3,confirm-r0 confirm-r1 confirm-r2,0,0,1.4413,1.4286,1.4529,1.6214,1.6075,1.6338
+dflash-tuned,plain-tuned,32,3,confirm-r0 confirm-r1 confirm-r2,0,0,1.0980,1.0955,1.1011,1.2218,1.2174,1.2253
+dflash-tuned,plain-tuned,48,3,confirm-r0 confirm-r1 confirm-r2,0,0,0.9134,0.9114,0.9151,1.0064,1.0041,1.0079
+dflash-tuned,plain-tuned,64,3,confirm-r0 confirm-r1 confirm-r2,0,0,0.7995,0.7881,0.8079,0.8919,0.8814,0.9004
+dflash-tuned,plain-tuned,96,3,confirm-r0 confirm-r1 confirm-r2,0,0,0.6939,0.6911,0.6964,0.7694,0.7655,0.7736
+dflash-tuned,plain-tuned,128,3,confirm-r0 confirm-r1 confirm-r2,0,0,0.7586,0.7552,0.7628,0.8315,0.8276,0.8358
+dflash-tuned-b4,plain-tuned,32,3,confirm-r0 confirm-r1 confirm-r2,0,0,0.9884,0.9810,0.9947,1.0589,1.0567,1.0620
+dflash-tuned-b4,plain-tuned,48,3,confirm-r0 confirm-r1 confirm-r2,0,0,0.8843,0.8775,0.8893,0.9361,0.9281,0.9424
+dflash-tuned-b4,plain-tuned,64,3,confirm-r0 confirm-r1 confirm-r2,0,0,0.8000,0.7940,0.8046,0.8594,0.8527,0.8644
+dflash-tuned-b4,plain-tuned,96,3,confirm-r0 confirm-r1 confirm-r2,0,0,0.7220,0.7182,0.7283,0.7694,0.7653,0.7773
+dflash-tuned-b4,plain-tuned,128,3,confirm-r0 confirm-r1 confirm-r2,0,0,0.8331,0.8282,0.8398,0.8758,0.8703,0.8830
+plain-tuned-triton,plain-tuned,1,2,confirm-r0 confirm-r1,0,1,1.0121,1.0102,1.0139,1.0121,1.0102,1.0139
+plain-tuned-triton,plain-tuned,2,2,confirm-r0 confirm-r1,0,1,1.0101,1.0087,1.0114,1.0101,1.0087,1.0114
+plain-tuned-triton,plain-tuned,4,2,confirm-r0 confirm-r1,0,1,1.0108,1.0091,1.0126,1.0109,1.0091,1.0126
+plain-tuned-triton,plain-tuned,8,2,confirm-r0 confirm-r1,0,1,1.0068,1.0054,1.0082,1.0068,1.0054,1.0082
+plain-tuned-triton,plain-tuned,16,2,confirm-r0 confirm-r1,0,1,1.0028,1.0011,1.0046,1.0028,1.0011,1.0046
+plain-tuned-triton,plain-tuned,32,2,confirm-r0 confirm-r1,0,1,1.0007,0.9995,1.0020,1.0008,0.9995,1.0020
+mtp-tuned-triton,plain-tuned-triton,1,2,confirm-r0 confirm-r1,0,0,1.8651,1.8632,1.8669,1.8890,1.8872,1.8908
+mtp-tuned-triton,plain-tuned-triton,2,2,confirm-r0 confirm-r1,0,0,1.7969,1.7939,1.7999,1.8371,1.8341,1.8401
+mtp-tuned-triton,plain-tuned-triton,4,2,confirm-r0 confirm-r1,0,0,1.6807,1.6780,1.6833,1.7368,1.7339,1.7397
+mtp-tuned-triton,plain-tuned-triton,8,2,confirm-r0 confirm-r1,0,0,1.4923,1.4914,1.4931,1.5997,1.5986,1.6008
+mtp-tuned-triton,plain-tuned-triton,16,2,confirm-r0 confirm-r1,0,0,1.2835,1.2753,1.2916,1.3715,1.3628,1.3803
+mtp-tuned-triton,plain-tuned-triton,32,2,confirm-r0 confirm-r1,0,0,1.0736,1.0693,1.0778,1.1527,1.1497,1.1557
+dflash-tuned-b16,plain-tuned-triton,1,2,confirm-r0 confirm-r1,0,0,3.0601,3.0556,3.0646,3.4484,3.4478,3.4490
+dflash-tuned-b16,plain-tuned-triton,2,2,confirm-r0 confirm-r1,0,0,2.7325,2.7278,2.7372,3.1684,3.1631,3.1738
+dflash-tuned-b16,plain-tuned-triton,4,2,confirm-r0 confirm-r1,0,0,2.2774,2.2759,2.2789,2.6664,2.6640,2.6687
+dflash-tuned-b16,plain-tuned-triton,8,2,confirm-r0 confirm-r1,0,0,1.7281,1.7278,1.7285,2.0900,2.0900,2.0901
+dflash-tuned-b16,plain-tuned-triton,16,2,confirm-r0 confirm-r1,0,0,1.1837,1.1810,1.1864,1.4372,1.4334,1.4410
+dflash-tuned-b16,plain-tuned-triton,32,2,confirm-r0 confirm-r1,0,0,0.8047,0.8033,0.8060,0.9395,0.9387,0.9403

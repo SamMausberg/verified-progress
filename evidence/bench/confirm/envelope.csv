@@ -1,0 +1,11 @@
+concurrency,best,best_exactness,y_mean,y_std,x_e2e_mean,n,runner_up,runner_up_y_mean,lead,best_exact,best_exact_y_mean,best_exact_x_e2e_mean,best_exact_divergence_vs_plain_per_1k
+1,dflash-tuned-b16,exact-up-to-rounding,873.9587,0.9806,985.8625,2,dflash-tuned,767.4428,0.1388,dflash-tuned-b16,873.9587,985.8625,3.9450
+2,dflash-tuned-b16,exact-up-to-rounding,1508.0429,0.0456,875.1498,2,dflash-tuned,1408.3932,0.0708,dflash-tuned-b16,1508.0429,875.1498,3.9450
+4,dflash-tuned-b16,exact-up-to-rounding,2424.4550,2.4280,710.2646,2,dflash-tuned,2376.1766,0.0203,dflash-tuned-b16,2424.4550,710.2646,3.9450
+8,dflash-tuned,stock,3651.3276,20.1165,519.4178,3,dflash-tuned-b16,3485.3686,0.0476,dflash-tuned,3651.3276,519.4178,nan
+16,dflash-tuned,stock,5255.6433,44.6850,369.8612,3,mtp-tuned-triton,4697.0657,0.1189,dflash-tuned,5255.6433,369.8612,nan
+32,dflash-tuned,stock,6844.1624,22.3798,238.1857,3,mtp-tuned-triton,6696.6258,0.0220,dflash-tuned,6844.1624,238.1857,nan
+48,plain-tuned,stock,8286.1853,4.8215,172.7597,3,mtp-tuned,8091.0551,0.0241,plain-tuned,8286.1853,172.7597,nan
+64,plain-tuned,stock,9902.1288,7.9287,154.8361,3,mtp-tuned,9033.1984,0.0962,plain-tuned,9902.1288,154.8361,nan
+96,plain-tuned,stock,12182.7392,21.5005,127.0002,3,mtp-tuned,10573.0121,0.1522,plain-tuned,12182.7392,127.0002,nan
+128,plain-tuned,stock,13902.6659,11.5491,108.7086,3,mtp-tuned,12002.6085,0.1583,plain-tuned,13902.6659,108.7086,nan

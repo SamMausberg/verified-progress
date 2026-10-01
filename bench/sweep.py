@@ -512,6 +512,12 @@ def build_parser() -> argparse.ArgumentParser:
         '--allow-busy-gpu', action='store_true', help='run even if other GPU processes exist'
     )
     parser.add_argument(
+        '--busy-gpu-wait',
+        type=float,
+        default=300.0,
+        help='seconds to wait for other GPU processes to exit before refusing to run',
+    )
+    parser.add_argument(
         '--streaming',
         action=argparse.BooleanOptionalAction,
         default=True,
@@ -534,9 +540,15 @@ def prepare(parser: argparse.ArgumentParser, argv: list[str] | None) -> argparse
         parser.error(f'concurrency above the arm capacity target {arm.max_concurrency}')
     if not args.allow_unlocked and not gpu_lock_held_by_someone():
         parser.error('run under scripts/gpu_lock.sh -x (the GPU lock is not held)')
+    # A previous lock holder's server can take a few seconds to leave the GPU after
+    # its job releases the lock; wait for it before refusing to measure.
+    deadline = time.monotonic() + args.busy_gpu_wait
     busy = gpu_snapshot()['compute_apps']
+    while busy and not args.allow_busy_gpu and time.monotonic() < deadline:
+        time.sleep(5)
+        busy = gpu_snapshot()['compute_apps']
     if busy and not args.allow_busy_gpu:
-        parser.error(f'GPU has running processes: {busy}')
+        parser.error(f'GPU has running processes after {args.busy_gpu_wait:.0f} s: {busy}')
     args.arm_resolved = arm
     return args
 
