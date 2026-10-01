@@ -214,6 +214,9 @@ def main() -> None:
         help='extra cost of one re-walk (charged as A + conditioning on every reused cycle)',
     )
     args = ap.parse_args()
+    if args.rewalk is not None and 16 not in args.ks:
+        # The re-walk reuses exactly where the top-16 oracle could, which needs U_16.
+        args.ks = sorted({*args.ks, 16})
     cycles = load_cycles(args.cycles)
     ph = phases(args.timing, args.baseline_run)
     rewalk = load_rewalk(args.rewalk) if args.rewalk is not None else None
