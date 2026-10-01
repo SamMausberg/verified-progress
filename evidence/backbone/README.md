@@ -316,7 +316,7 @@ c = 1, 8, 32 and 128. Foreign CPU load averaged 0.19-0.36 cores per point (large
 
 - **No gain at any concurrency.** At c = 8 and 32 the two pairs straddle 1, and A's own rate rose
   by 1.3-2.4% between its two runs (bench's `mtp-tuned` confirmation sessions differ by 2.2% at
-  c = 32, `evidence/bench/confirm/points.csv`). A's rates are within 1% of that confirmation's.
+  c = 32, `evidence/bench/confirm/points.csv`). A's rates are within about 1% of that confirmation's.
 - **c = 1: 0.9% slower** in both pairs (one of the two beyond the 0.85% spread). About 0.2% of it
   is fewer tokens per verify cycle, 3.273 against 3.279 in both sessions: the routes change the
   draft and verify passes' arithmetic, which moves acceptance at near ties. The rest is not
@@ -346,8 +346,9 @@ cores).
   c = 8 is not a route that failed to dispatch.
 - **GPU time per step** (replay span, first kernel start to last kernel end, median over 573-589
   and 463-466 complete replays): 3,474.9 to 3,373.0 us at M = 1 (-102 us, -2.9%) and 4,313.3 to
-  4,268.6 us at M = 16 (-45 us, -1.0%). The isolated microbenchmarks predict 197 us at M = 1 (the
-  table's GEMV calls; `in_proj_ba` runs on a side stream and is left out) and 120 us at M = 16.
+  4,268.6 us at M = 16 (-45 us, -1.0%). The isolated microbenchmarks predict 197 us at M = 1 and
+  120 us at M = 16 (cuBLAS's time minus the routed kernel's per call in `gemm_microbench.json`,
+  times the calls per step; `in_proj_ba` runs on a side stream and is left out).
   In the served step the routes keep 52% of their isolated gain at M = 1 and 37% at M = 16.
 - **Kernel durations do not add up here.** With PDL, a norm or SiLU kernel launched early waits
   inside the kernel until the Triton GEMM before it finishes: at M = 16 B's summed norm and SiLU
