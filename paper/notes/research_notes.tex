@@ -1,0 +1,72 @@
+% Research notes for "The Work a Verifier Needs" (owner: appendix editor).
+% Build from paper/, after the paper, because the notes read paper.aux for references into it:
+%   cd paper && latexmk -pdf paper.tex && latexmk -pdf notes/research_notes.tex
+% This writes research_notes.pdf in paper/. Building from paper/ keeps \input paths, the figures'
+% data paths (../evidence/..., ../data/...) and latexmkrc's template paths as the paper has them.
+% References go one way: these notes cite the paper's labels through xr-hyper (\paperref), and the
+% paper names the notes only in words, so the paper builds on its own.
+\RequirePackage{fix-cm}
+\documentclass[10pt]{article}
+\usepackage[T1]{fontenc}
+% The paper's one-column appendix geometry (MLSys: 6.75 x 9 in on US letter), so that tables moved
+% from the appendices keep their widths.
+\usepackage[letterpaper,textwidth=6.75in,textheight=9in,centering]{geometry}
+% What the MLSys style gives the paper: Times, color, algorithm(ic), natbib with \cite as \citep.
+\usepackage{times}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{color}
+\usepackage{algorithm,algorithmic}
+\usepackage{natbib}
+\setcitestyle{authoryear,round,citesep={;},aysep={,},yysep={;}}
+\usepackage{xr-hyper}
+\usepackage[hypertexnames=false]{hyperref}
+\input{macros}
+\renewcommand{\cite}[1]{\citep{#1}}
+\usetikzlibrary{shapes.geometric}
+% A reference into the paper: the paper's number for one of its labels, without a link.
+\externaldocument[paper-]{paper}
+\newcommand{\paperref}[1]{\ref*{paper-#1}}
+\newcommand{\papereqref}[1]{(\ref*{paper-#1})}
+% The paper's type sizes and leading (mlsys2025.sty) and its small captions, so that tables and
+% figures moved from the appendices keep their size.
+\usepackage[font=footnotesize,labelfont=sl,labelsep=period]{caption}
+\makeatletter
+\renewcommand\normalsize{\@setfontsize\normalsize\@xpt{11}}
+\renewcommand\small{\@setfontsize\small\@ixpt{10}}
+\renewcommand\footnotesize{\@setfontsize\footnotesize\@ixpt{10}}
+\renewcommand\scriptsize{\@setfontsize\scriptsize\@viipt{8}}
+\renewcommand\tiny{\@setfontsize\tiny\@vipt{7}}
+\normalsize
+\makeatother
+% Floats on a float-only page stack from the top, as in the paper's appendices.
+\makeatletter
+\setlength{\@fptop}{0pt}
+\setlength{\@fpsep}{\floatsep}
+\setlength{\@fpbot}{0pt plus 1fil}
+\makeatother
+\hypersetup{pdftitle={Research notes for The Work a Verifier Needs},pdfauthor={Samuel Mausberg}}
+
+\title{Research Notes for ``The Work a Verifier Needs''}
+\author{Samuel Mausberg}
+\date{1 October 2026}
+
+\begin{document}
+\maketitle
+\tableofcontents
+
+\input{notes/about}
+\input{notes/status}
+\input{notes/stack}
+\input{notes/drafting}
+\input{notes/engine}
+\input{notes/analysis}
+\input{notes/rational}
+\input{notes/register}
+\input{notes/glossary}
+
+{\raggedright
+\bibliography{references}
+\bibliographystyle{mlsys2025}
+}
+\end{document}
