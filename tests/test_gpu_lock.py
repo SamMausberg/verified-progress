@@ -61,3 +61,22 @@ def test_lock_is_held_while_the_command_runs(tmp_path: Path) -> None:
         assert lock_free(lock)
     finally:
         proc.kill()
+
+
+def test_shared_job_drops_its_ticket_and_holds_the_lock(tmp_path: Path) -> None:
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    queue = Path(str(lock) + '.queue')
+    env = dict(os.environ, GPU_LOCK_FILE=str(lock))
+    proc = subprocess.Popen(['bash', str(SCRIPT), '-s', 'sleep', '3'], env=env)
+    try:
+        deadline = time.time() + 5
+        while lock_free(lock) and time.time() < deadline:
+            time.sleep(0.05)
+        assert not lock_free(lock), 'the shared lock was not held during the command'
+        assert lock_free(lock, shared=True), 'a second shared holder must still get in'
+        assert not any(queue.iterdir()), 'the shared ticket was not dropped once the lock was held'
+        assert proc.wait(timeout=30) == 0
+        assert lock_free(lock)
+    finally:
+        proc.kill()
