@@ -76,15 +76,29 @@ def _state(wrapper, nnz: int, n_kv: int, n_idx: int) -> dict[str, torch.Tensor]:
         'last_page_len': wrapper._paged_kv_last_page_len_buf.cpu(),
         'kv_indices': wrapper._paged_kv_indices_buf[:n_idx].cpu(),
         'kv_lens': wrapper._kv_lens_buffer[:n_kv].cpu(),
-        'mask': wrapper._custom_mask_buf[:nnz].cpu(),
-        'mask_indptr': wrapper._mask_indptr_buf.cpu(),
-    }
+    } | (
+        {
+            'mask': wrapper._custom_mask_buf[:nnz].cpu(),
+            'mask_indptr': wrapper._mask_indptr_buf.cpu(),
+        }
+        if wrapper._custom_mask_buf is not None
+        else {}
+    )
 
 
 def verify_batch(
-    seq_lens: list[int], draft: int, pool: int, rng: torch.Generator, device: str
+    seq_lens: list[int],
+    draft: int,
+    pool: int,
+    rng: torch.Generator,
+    device: str,
+    masked: bool = True,
 ) -> tuple[torch.Tensor, tuple, dict[str, Any]]:
-    """The plan() arguments SGLang's EAGLE verify path builds for these lengths."""
+    """The plan() arguments SGLang's verify paths build for these paged lengths.
+
+    `masked` adds EAGLE's chain custom mask; without it the batch matches the
+    DFlash block forward (no mask, kv = paged length + block).
+    """
     bs = len(seq_lens)
     lens = torch.tensor(seq_lens, dtype=torch.int64)
     kv_lens = lens + draft
@@ -105,7 +119,7 @@ def verify_batch(
     kwargs = dict(
         q_data_type=torch.bfloat16,
         kv_data_type=torch.bfloat16,
-        custom_mask=chain_mask(seq_lens, draft, device),
+        custom_mask=chain_mask(seq_lens, draft, device) if masked else None,
         non_blocking=True,
         fixed_split_size=None,
         prefix_len_ptr=None,
@@ -117,8 +131,16 @@ def verify_batch(
 
 
 def check_verify_plan(
-    rng: torch.Generator, trials: int, batch_sizes: list[int], draft: int, max_len: int
+    rng: torch.Generator,
+    trials: int,
+    batch_sizes: list[int],
+    draft: int,
+    max_len: int,
+    window: int = 0,
 ) -> dict[str, Any]:
+    """EAGLE verify (window 0: chain mask) or DFlash draft block (window > 0: no
+    mask, sliding-window wrapper lengths min(seq_len, window))."""
+    masked = window == 0
     from flashinfer import BatchPrefillWithPagedKVCacheWrapper
     from sglang.srt.layers.attention import flashinfer_hostgap as hostgap
 
@@ -127,15 +149,23 @@ def check_verify_plan(
     k_cache = torch.randn(pool, NUM_KV_HEADS, HEAD_DIM, dtype=torch.bfloat16, device=device)
     v_cache = torch.randn(pool, NUM_KV_HEADS, HEAD_DIM, dtype=torch.bfloat16, device=device)
     workspace = torch.empty(512 * 1024 * 1024, dtype=torch.uint8, device=device)
-    results: dict[str, Any] = {'draft_token_num': draft, 'per_bs': {}}
+    results: dict[str, Any] = {'draft_token_num': draft, 'window': window, 'per_bs': {}}
     for bs in batch_sizes:
         max_tokens = bs * draft
         qo_buf = torch.zeros(bs + 1, dtype=torch.int32, device=device)
         kv_buf = torch.zeros(bs + 1, dtype=torch.int32, device=device)
         idx_buf = torch.zeros(bs * (max_len + draft), dtype=torch.int32, device=device)
         last_buf = torch.ones(bs, dtype=torch.int32, device=device)
-        mask_buf = torch.zeros(max_tokens * (max_len + draft), dtype=torch.uint8, device=device)
-        mask_ptr_buf = torch.zeros(bs + 1, dtype=torch.int32, device=device)
+        mask_bufs = (
+            dict(
+                custom_mask_buf=torch.zeros(
+                    max_tokens * (max_len + draft), dtype=torch.uint8, device=device
+                ),
+                mask_indptr_buf=torch.zeros(bs + 1, dtype=torch.int32, device=device),
+            )
+            if masked
+            else {}
+        )
         wrapper = BatchPrefillWithPagedKVCacheWrapper(
             workspace,
             'NHD',
@@ -145,12 +175,11 @@ def check_verify_plan(
             paged_kv_indptr_buf=kv_buf,
             paged_kv_indices_buf=idx_buf,
             paged_kv_last_page_len_buf=last_buf,
-            custom_mask_buf=mask_buf,
-            mask_indptr_buf=mask_ptr_buf,
+            **mask_bufs,
         )
 
         # Capture-time plan (dummy lengths, as SGLang's capture does), then graph.
-        _, args, kwargs = verify_batch([FILL] * bs, draft, pool, rng, device)
+        _, args, kwargs = verify_batch([FILL] * bs, draft, pool, rng, device, masked)
         wrapper.plan(*args, **kwargs)
         q = torch.zeros(max_tokens, NUM_QO_HEADS, HEAD_DIM, dtype=torch.bfloat16, device=device)
         wrapper.run(q, (k_cache, v_cache))
@@ -168,22 +197,29 @@ def check_verify_plan(
             pad = int(torch.randint(0, bs, (1,), generator=rng)) if bs > 1 else 0
             real = torch.randint(1, max_len, (bs - pad,), generator=rng).tolist()
             seq_lens = real + [FILL] * pad
-            lens, args, kwargs = verify_batch(seq_lens, draft, pool, rng, device)
-            host = hostgap.eagle_verify_plan_kwargs(lens, draft, bs)
+            if masked:
+                lens, args, kwargs = verify_batch(seq_lens, draft, pool, rng, device)
+                host = hostgap.eagle_verify_plan_kwargs(lens, draft, bs)
+            else:
+                paged = [min(x, window) for x in seq_lens]
+                lens, args, kwargs = verify_batch(paged, draft, pool, rng, device, False)
+                host = hostgap.block_verify_plan_kwargs(
+                    torch.clamp(torch.tensor(seq_lens), max=window), draft
+                )
             q.copy_(torch.randn(q.shape, generator=rng).to(q))
             n_kv, n_idx = bs, int(host['kv_indptr_host'][-1])
             wrapper._pin_memory_int_workspace_buffer.zero_()
             BatchPrefillWithPagedKVCacheWrapper.plan(wrapper, *args, **kwargs)
             graph.replay()
             torch.cuda.synchronize()
-            stock_state = _state(wrapper, host['packed_mask_nnz'], n_kv, n_idx)
+            stock_state = _state(wrapper, host.get('packed_mask_nnz', 0), n_kv, n_idx)
             stock_out = out.clone()
             out.zero_()
             wrapper._pin_memory_int_workspace_buffer.zero_()
             hostgap.fast_verify_plan(wrapper, *args, **kwargs, **host)
             graph.replay()
             torch.cuda.synchronize()
-            fast_state = _state(wrapper, host['packed_mask_nnz'], n_kv, n_idx)
+            fast_state = _state(wrapper, host.get('packed_mask_nnz', 0), n_kv, n_idx)
             differing = [k for k in stock_state if not torch.equal(stock_state[k], fast_state[k])]
             stats['trials'] += 1
             if differing:
@@ -255,6 +291,8 @@ def main() -> int:
     parser.add_argument('--batch-sizes', type=int, nargs='+', default=[1, 2, 4, 8, 32, 64, 128])
     parser.add_argument('--draft-token-num', type=int, default=4)
     parser.add_argument('--max-len', type=int, default=6000)
+    parser.add_argument('--block-size', type=int, default=8, help='DFlash block')
+    parser.add_argument('--window', type=int, default=4096, help='DFlash draft window')
     args = parser.parse_args()
 
     import sglang
@@ -280,10 +318,16 @@ def main() -> int:
     report['verify_plan'] = check_verify_plan(
         rng, args.trials, args.batch_sizes, args.draft_token_num, args.max_len
     )
+    report['dflash_block_plan'] = check_verify_plan(
+        rng, args.trials, args.batch_sizes, args.block_size, args.max_len, args.window
+    )
     report['draft_indptr'] = check_draft_indptr(rng, args.trials, args.max_len)
     report['seconds'] = round(time.time() - started, 1)
     ok = report['packbits']['mismatches'] == 0
-    for stats in report['verify_plan']['per_bs'].values():
+    for stats in [
+        *report['verify_plan']['per_bs'].values(),
+        *report['dflash_block_plan']['per_bs'].values(),
+    ]:
         ok &= stats['state_mismatches'] == 0 and stats['output_mismatches'] == 0
     for stats in report['draft_indptr'].values():
         ok &= stats['mismatches'] == 0

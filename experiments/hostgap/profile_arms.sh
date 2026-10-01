@@ -13,7 +13,7 @@
 #   mtp-none, mtp-host, mtp-node          stock SGLang, tuned MTP (s3, replayssm-spec)
 #   dflash-none, dflash-host              stock SGLang, DFlash block 8
 #   mtp-patched-none, mtp-patched-host    patched worktree + HOSTGAP_ENV
-#   mtp-validate                          patched + SGLANG_HOSTGAP_VALIDATE=1 (checks only)
+#   mtp-validate, dflash-validate         patched + SGLANG_HOSTGAP_VALIDATE=1 (checks only)
 #   dflash-patched-none, dflash-patched-host
 set -uo pipefail
 
@@ -67,6 +67,9 @@ step() {
       # Patched engine with SGLANG_HOSTGAP_VALIDATE=1: every sync-free plan is
       # checked against the stock read-back path (synchronizes; no timing use).
       prof "$1" "${MTP[@]}" "${extra[@]}" --env SGLANG_HOSTGAP_VALIDATE=1 --mode none \
+        --repeats 1 --window 3 --concurrency 1 3 8 29 ;;
+    dflash-validate)
+      prof "$1" "${DFLASH[@]}" "${extra[@]}" --env SGLANG_HOSTGAP_VALIDATE=1 --mode none \
         --repeats 1 --window 3 --concurrency 1 3 8 29 ;;
     mtp-host | mtp-patched-host)
       prof "$1" "${MTP[@]}" "${extra[@]}" --mode nsys --host-trace --repeats 1 \

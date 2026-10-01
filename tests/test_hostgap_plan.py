@@ -2,7 +2,8 @@
 
 Runs `experiments/hostgap/plan_equivalence.py` on a few batches: FlashInfer's
 stock `plan()` against `fast_verify_plan()` for the EAGLE verify wrapper (plan
-state, pinned plan buffer, device buffers and the replayed attention output),
+state, pinned plan buffer, device buffers and the replayed attention output)
+and the same plan for the DFlash draft's unmasked block forward,
 the sync-free `segment_packbits`, and the draft `kv_indptr` rows against the
 Triton kernel. Needs CUDA and SGLang from the engine/hostgap worktree (with its
 `python/` directory first on PYTHONPATH); skips otherwise.
@@ -50,10 +51,12 @@ def test_packbits_known_nnz_matches_flashinfer() -> None:
 
 
 @pytest.mark.parametrize('bs', [1, 4, 32])
-def test_fast_verify_plan_matches_stock_plan(bs: int) -> None:
+@pytest.mark.parametrize(('draft', 'window'), [(4, 0), (8, 2048)])
+def test_fast_verify_plan_matches_stock_plan(bs: int, draft: int, window: int) -> None:
     from plan_equivalence import check_verify_plan
 
-    stats = check_verify_plan(_rng(), 6, [bs], 4, 3000)['per_bs'][str(bs)]
+    # window 0: EAGLE verify with its chain mask; window > 0: DFlash draft block.
+    stats = check_verify_plan(_rng(), 6, [bs], draft, 3000, window)['per_bs'][str(bs)]
     assert stats['state_mismatches'] == 0, stats['fields']
     assert stats['output_mismatches'] == 0
 

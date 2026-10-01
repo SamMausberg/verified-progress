@@ -16,7 +16,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUT="${OUT:-$HOME/vp-data/hostgap/equality}"
 PORT="${PORT:-30102}"
 PATCHED="${SGLANG_PATCHED:-$HOME/sglang-wt/hostgap}"
-read -ra ENVS <<<"${HOSTGAP_ENV:-SGLANG_HOSTGAP_VERIFY_PLAN=1 SGLANG_HOSTGAP_DRAFT_INDPTR=1}"
+read -ra ENVS <<<"${HOSTGAP_ENV:-SGLANG_HOSTGAP_VERIFY_PLAN=1 SGLANG_HOSTGAP_DRAFT_INDPTR=1 SGLANG_HOSTGAP_DFLASH_DRAFT_PLAN=1}"
 # shellcheck source=/dev/null
 source "$REPO/scripts/sglang_env.sh"
 cd "$REPO" || exit 1
