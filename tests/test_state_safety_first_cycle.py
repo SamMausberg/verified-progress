@@ -147,6 +147,7 @@ def _write_declared(tmp_path, ids):
                 'files': files,
                 'pid': {'plain': 100, 'mtp': 200}[hold],
                 'process_cwd': '/w/experiments/state_safety',
+                'process_script': '/w/experiments/state_safety/run_matrix.py',
                 'runner_dir': '/w/experiments/state_safety',
             }
             (runs / 'attest' / f'{hold}-{when}.json').write_text(json.dumps(rec))
@@ -264,6 +265,12 @@ def test_each_departure_from_the_declaration_makes_the_result_void(tmp_path, mon
         rec['process_cwd'] = '/dirty/experiments/state_safety'
         path.write_text(json.dumps(rec))
 
+    def script_elsewhere(runs, prompts, manifest):
+        path = runs / 'attest' / 'mtp-before.json'
+        rec = json.loads(path.read_text())
+        rec['process_script'] = '/elsewhere/experiments/state_safety/run_matrix.py'
+        path.write_text(json.dumps(rec))
+
     def unfinished_record(runs, prompts, manifest):
         path = runs / 'mtp_tree/c1.jsonl'
         rows = [json.loads(x) for x in path.read_text().splitlines()]
@@ -306,6 +313,7 @@ def test_each_departure_from_the_declaration_makes_the_result_void(tmp_path, mon
         other_server_for_c32: 'mtp_tree: c1 and c32 were not served by the same server',
         other_process_after: 'hold mtp: attestations not bound to one run_matrix process',
         process_in_other_checkout: 'hold plain: run_matrix process not in the attested checkout',
+        script_elsewhere: 'hold mtp: run_matrix process ran another script (before)',
         unfinished_record: 'mtp_tree/c1: 1 incomplete records',
         completion_count_differs: 'plain/c1: 1 incomplete records',
         aborted_by_client: 'mtp_s5/c32: 1 incomplete records',
@@ -386,11 +394,12 @@ def test_watch_attests_back_to_back_holds(monkeypatch, tmp_path):
     seen = iter([None, ('plain', 11), ('plain', 11), ('mtp', 22), ('mtp', 22), None])
     monkeypatch.setattr(attest_runner, 'running_hold', lambda runs: next(seen))
     monkeypatch.setattr(attest_runner, 'process_cwd', lambda pid: f'/proc/{pid}')
+    monkeypatch.setattr(attest_runner, 'process_script', lambda pid, cwd: f'{cwd}/run_matrix.py')
     written = []
     monkeypatch.setattr(
         attest_runner,
         'write',
-        lambda runs, hold, when, checkout, pid, cwd: written.append((hold, when, pid, cwd)),
+        lambda runs, hold, when, checkout, pid, cwd, script: written.append((hold, when, pid, cwd)),
     )
     attest_runner.watch(tmp_path, tmp_path, poll=0)
     assert written == [
@@ -399,3 +408,27 @@ def test_watch_attests_back_to_back_holds(monkeypatch, tmp_path):
         ('mtp', 'before', 22, '/proc/22'),
         ('mtp', 'after', 22, '/proc/22'),
     ]
+
+
+def test_process_script_resolves_the_run_matrix_argument(tmp_path, monkeypatch):
+    import attest_runner
+
+    proc = tmp_path / 'proc'
+    (proc / '7').mkdir(parents=True)
+    real_path = attest_runner.Path
+
+    def fake_path(p):
+        p = str(p)
+        return (
+            real_path(p.replace('/proc', str(proc), 1)) if p.startswith('/proc/') else real_path(p)
+        )
+
+    monkeypatch.setattr(attest_runner, 'Path', fake_path)
+    (proc / '7' / 'cmdline').write_bytes(b'python\0run_matrix.py\0--configs\0plain\0')
+    assert attest_runner.process_script(7, '/w/experiments/state_safety') == str(
+        real_path('/w/experiments/state_safety/run_matrix.py').resolve()
+    )
+    (proc / '7' / 'cmdline').write_bytes(b'python\0/elsewhere/run_matrix.py\0--configs\0plain\0')
+    assert (
+        attest_runner.process_script(7, '/w/experiments/state_safety') == '/elsewhere/run_matrix.py'
+    )

@@ -11,9 +11,10 @@ and match the declaration commit's files.
     python experiments/state_safety/attest_runner.py --watch \
         --checkout ~/vp-wt/state-fc --runs ~/vp-data/state/runs_fresh
 
-Each record also holds the PID of the observed run_matrix.py process and that
-process's working directory (from /proc/<pid>/cwd, read when the hold starts),
-so first_cycle.py can check that the runs came from the attested checkout.
+Each record also holds the PID of the observed run_matrix.py process, its working
+directory (/proc/<pid>/cwd) and the run_matrix.py path it runs (its
+/proc/<pid>/cmdline entry resolved against that directory), all read when the hold
+starts, so first_cycle.py can check that the runs came from the attested files.
 
 Timing: --watch polls the process table every 2 s. "before" is taken when a
 run_matrix.py process writing to <runs> appears, within 2 s of its start;
@@ -43,7 +44,26 @@ def process_cwd(pid: int) -> str | None:
         return None
 
 
-def attest(checkout: Path, pid: int | None = None, cwd: str | None = None) -> dict[str, Any]:
+def process_script(pid: int, cwd: str | None) -> str | None:
+    """The run_matrix.py path the process runs (its argv entry, resolved against cwd)."""
+    try:
+        argv = Path(f'/proc/{pid}/cmdline').read_bytes().split(b'\0')
+    except OSError:
+        return None
+    for arg in (a.decode() for a in argv[1:]):
+        if arg.endswith('run_matrix.py'):
+            path = Path(arg)
+            if not path.is_absolute():
+                if cwd is None:
+                    return None
+                path = Path(cwd) / path
+            return str(path.resolve())
+    return None
+
+
+def attest(
+    checkout: Path, pid: int | None = None, cwd: str | None = None, script: str | None = None
+) -> dict[str, Any]:
     def git(*args: str) -> str:
         out = subprocess.run(
             ['git', '-C', str(checkout), *args], capture_output=True, text=True, check=True
@@ -57,6 +77,9 @@ def attest(checkout: Path, pid: int | None = None, cwd: str | None = None) -> di
         # record to the checkout that actually produced the runs.
         'pid': pid,
         'process_cwd': cwd,
+        # Python puts the script's own directory first on sys.path, so this is where
+        # server.py and client.py were imported from.
+        'process_script': script,
         'runner_dir': str(base.resolve()),
         'head': git('rev-parse', 'HEAD').strip(),
         'porcelain': git('status', '--porcelain'),
@@ -65,13 +88,19 @@ def attest(checkout: Path, pid: int | None = None, cwd: str | None = None) -> di
 
 
 def write(
-    runs: Path, hold: str, when: str, checkout: Path, pid: int | None, cwd: str | None
+    runs: Path,
+    hold: str,
+    when: str,
+    checkout: Path,
+    pid: int | None,
+    cwd: str | None,
+    script: str | None,
 ) -> None:
     out = runs / 'attest'
     out.mkdir(parents=True, exist_ok=True)
-    rec = attest(checkout, pid, cwd)
+    rec = attest(checkout, pid, cwd, script)
     (out / f'{hold}-{when}.json').write_text(json.dumps(rec, indent=1) + '\n')
-    print(f'{hold}-{when} attested (pid {pid}, cwd {cwd})', flush=True)
+    print(f'{hold}-{when} attested (pid {pid}, script {script})', flush=True)
 
 
 def running_hold(runs: Path) -> tuple[str, int] | None:
@@ -92,17 +121,19 @@ def watch(checkout: Path, runs: Path, poll: float = 2.0) -> None:
     done: set[str] = set()
     current: tuple[str, int] | None = None
     cwd: str | None = None
+    script: str | None = None
     while len(done) < len(HOLDS):
         seen = running_hold(runs)
         if seen != current:
             # A hold ended, another started, or both within one poll.
             if current is not None:
-                # The process has exited; its PID and cwd were read at the start.
-                write(runs, current[0], 'after', checkout, current[1], cwd)
+                # The process has exited; its PID, cwd and script were read at the start.
+                write(runs, current[0], 'after', checkout, current[1], cwd, script)
                 done.add(current[0])
             if seen is not None:
                 cwd = process_cwd(seen[1])
-                write(runs, seen[0], 'before', checkout, seen[1], cwd)
+                script = process_script(seen[1], cwd)
+                write(runs, seen[0], 'before', checkout, seen[1], cwd, script)
             current = seen
         time.sleep(poll)
 
@@ -121,7 +152,8 @@ def main() -> None:
         seen = running_hold(args.runs)
         pid = seen[1] if seen and seen[0] == args.hold else None
         cwd = process_cwd(pid) if pid is not None else None
-        write(args.runs, args.hold, args.when, args.checkout, pid, cwd)
+        script = process_script(pid, cwd) if pid is not None else None
+        write(args.runs, args.hold, args.when, args.checkout, pid, cwd, script)
     else:
         raise SystemExit('give --watch, or --hold and --when')
 

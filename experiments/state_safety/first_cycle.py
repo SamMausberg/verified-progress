@@ -178,6 +178,9 @@ def attestation_problems(root: Path, hold: str, expected: dict[str, str]) -> lis
             problems.append(
                 f'hold {hold}: run_matrix process not in the attested checkout ({when})'
             )
+        # The script itself must be the attested one: its directory supplies the imports.
+        if r.get('process_script') != f'{r.get("runner_dir")}/run_matrix.py':
+            problems.append(f'hold {hold}: run_matrix process ran another script ({when})')
         if r.get('porcelain') != '':
             problems.append(f'hold {hold}: checkout not clean ({when})')
         if r.get('head') != DECLARATION:

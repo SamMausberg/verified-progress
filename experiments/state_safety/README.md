@@ -246,10 +246,12 @@ reason go in a new commit before the runs.
     - 1 to steps + 1 tokens in every chunk after the prefill token;
     - a first chunk of exactly the prefill token, and chunks that cover every
       output token.
-  - Each record also holds the observed `run_matrix.py` process's PID and working
-    directory (`/proc/<pid>/cwd`, read when the hold starts). A hold's runs are void
-    unless both records name one PID and that process ran in the attested checkout's
-    `experiments/state_safety`.
+  - Each record also holds the observed `run_matrix.py` process's PID, its working
+    directory (`/proc/<pid>/cwd`) and the script it runs (its `/proc/<pid>/cmdline`
+    entry resolved against that directory), all read when the hold starts. A hold's
+    runs are void unless both records name one PID, and that process ran the attested
+    checkout's `experiments/state_safety/run_matrix.py` from that directory. Python
+    imports `server.py` and `client.py` from the script's own directory.
   - The watcher for the declared runs runs a copy byte-identical to this commit's
     `attest_runner.py`. It was restarted before either hold started, and each restart
     is logged in `~/vp-data/state/logs/attest_first_cycle.out`.
