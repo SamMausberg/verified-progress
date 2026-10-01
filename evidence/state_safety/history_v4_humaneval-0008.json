@@ -31,6 +31,7 @@
    "id": "humaneval-0008",
    "prompt_len": 141,
    "diverged_at": null,
+   "first_logprob_difference": 2,
    "first_difference": {
     "position": 142,
     "module": "model.layers.3.attn",

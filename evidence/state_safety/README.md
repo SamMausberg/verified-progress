@@ -442,9 +442,19 @@ prompts it has not been run.
 
 These were run with the cache-hashing tap, at batch 1, on plain decoding with the
 unpinned flags of the first matrix (`cachecheck_v4_*.json`, `history_v4_*.json`,
-`repeats_v4_h44_*.json`). A prefill with no cached prefix reads no cache. Its GDN slot
-can hold an earlier request's state, which the kernel ignores (`has_initial_state` is
-false), so `mechanism.py` does not compare caches at such a forward.
+`repeats_v4_h44_*.json`).
+- **Fresh prefills are not compared.** A prefill with no cached prefix reads no
+  earlier state, so `mechanism.py` does not compare caches at such a forward.
+  - The tap hashes the caches before the forward runs (`state_tap.begin`). The engine
+    zeroes a fresh GDN slot only inside the forward (`clear_slots`, deferred by
+    `mamba_needs_clear`). So the hash of a fresh slot still shows an earlier
+    request's leftover state.
+  - The forward then reads zeros. The SSM chunk prefill reads the zeroed slot, and
+    the convolution reads no initial state (`has_initial_state` is false).
+  - The run bears this out. Before the change, all 38 cases with a "cache" origin
+    were at such a forward, in GDN state only, with no cached positions and no KV.
+    31 of the radix pairs were identical throughout despite differing leftover
+    state, and the other 7 cases were identical at the first prompt position.
 
 - **Plain vs MTP steps 3 (40 prompts).** In all 40, every cache entering every forward
   up to the first differing module output is identical. That first difference is layer
@@ -469,7 +479,8 @@ false), so `mechanism.py` does not compare caches at such a forward.
   - All 6 prompts longer than 64 tokens differ in the prefill, from prompt position
     1, at layer 0's GDN recurrence. No cache is read before that point.
   - So the radix setting changes the chunked GDN prefill for prompts longer than one
-    64-token chunk. Their first logprob difference is at output index 0.
+    64-token chunk. Their first logprob difference is at output index 0, while the
+    other 34 have none (`first_logprob_difference` per case).
   - From reading the code, with the radix cache on the extend kernel also tracks
     states for checkpoints (`track_state`, `state_checkpoint_*`). That is the likely
     difference; it has not been verified.

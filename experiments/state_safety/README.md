@@ -130,12 +130,18 @@ Tensor-level forensics (engine patch `engine/sglang/patches/state/0001-state-tap
 applied in `~/sglang-wt/state`): `tap_runs.py` serves tagged prompts with the tap on and
 `mechanism.py` compares two tapped runs (`--a`, `--b`), or the repeats of one prompt
 inside a run (`--repeat-of`). Both are run inside the GPU hold that collects the data;
-the exact commands are in `evidence/state_safety/README.md`. `run_tap_v4.sh` runs the cache-level checks of the tap v4 run in one shared hold:
-`tap_runs.py` sessions, then `mechanism.py`. Its summaries are committed as
+the exact commands are in `evidence/state_safety/README.md`.
+
+`run_tap_v4.sh` runs the cache-level checks of the tap v4 run in one shared hold:
+`tap_runs.py` sessions, then `mechanism.py`. Its tapped prompt lists and per-prompt
+token limits are committed in `tap_v4_inputs/`. Its summaries are committed as
 `cachecheck_v4_*.json`, `history_v4_*.json` and `repeats_v4_h44_*.json`. The run was
-made from a scratch copy of this script, which ran the sessions in a different order
-and named the outputs `mechanism_v4_*`. The committed summaries were regenerated from
-its tap data with the current `mechanism.py`. `tap_signature.py` (light,
+made from a scratch copy of this script, which read the same input files from
+`~/vp-data/state/tap`, ran the sessions in a different order and named the outputs
+`mechanism_v4_*`. The committed summaries were regenerated from its tap data with the
+current `mechanism.py`.
+
+`tap_signature.py` (light,
 run by `analyze_all.sh`) finds where the v1 and v3 tapped sessions of the same
 configuration first part ways. `pools.py` (run by `analyze_all.sh`) writes
 `pools.json`, both servers' pools for every comparison in the evidence; it rebases

@@ -31,6 +31,7 @@
    "id": "mt_bench-0056",
    "prompt_len": 216,
    "diverged_at": null,
+   "first_logprob_difference": 2,
    "first_difference": {
     "position": 217,
     "module": "model.layers.3.attn",

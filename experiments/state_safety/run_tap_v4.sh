@@ -16,10 +16,13 @@ source "$here/../../scripts/sglang_env.sh"
 cd "$here"
 T="$HOME/vp-data/state/tap"
 U="$HOME/vp-data/state/runs/plain/c1.jsonl"
+# The tapped prompt lists and per-prompt token limits, committed next to this script.
+I="$here/tap_v4_inputs"
+mkdir -p "$T"
 rm -rf "$T"/v4_*
 
 echo "v4 smoke $(date +%T)"
-python tap_runs.py --config plain --concurrency 1 --tap-ids "$T/ids_smoke.txt" \
+python tap_runs.py --config plain --concurrency 1 --tap-ids "$I/ids_smoke.txt" \
   --out-dir "$T/v4_smoke" --max-new-tokens 16 --port 30056
 python - "$T/v4_smoke/client.jsonl" "$U" <<'PY'
 import json
@@ -37,15 +40,15 @@ PY
 
 echo "v4 sessions $(date +%T)"
 for config in plain plain_noradix mtp_s3; do
-  python tap_runs.py --config "$config" --concurrency 1 --tap-ids "$T/ids_v4.txt" \
-    --limits "$T/limits_c1.json" --out-dir "$T/v4_${config}_c1" --port 30056
+  python tap_runs.py --config "$config" --concurrency 1 --tap-ids "$I/ids_v4.txt" \
+    --limits "$I/limits_c1.json" --out-dir "$T/v4_${config}_c1" --port 30056
 done
 
 echo "h44 $(date +%T)"
-python tap_runs.py --config plain --concurrency 1 --repeats 5 --tap-ids "$T/ids_h44.txt" \
+python tap_runs.py --config plain --concurrency 1 --repeats 5 --tap-ids "$I/ids_h44.txt" \
   --out-dir "$T/v4_h44_noflush" --max-new-tokens 4 --port 30056
 python tap_runs.py --config plain --concurrency 1 --repeats 5 --flush-each \
-  --tap-ids "$T/ids_h44.txt" --out-dir "$T/v4_h44_flush" --max-new-tokens 4 --port 30056
+  --tap-ids "$I/ids_h44.txt" --out-dir "$T/v4_h44_flush" --max-new-tokens 4 --port 30056
 
 echo "history pairs $(date +%T)"
 # Each prompt served alone and right after its predecessor, each on a fresh server.

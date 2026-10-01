@@ -49,6 +49,7 @@
    "id": "alpaca_eval-0000",
    "prompt_len": 27,
    "diverged_at": 6,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 27,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -126,6 +127,7 @@
    "id": "alpaca_eval-0010",
    "prompt_len": 32,
    "diverged_at": 246,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 32,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -202,6 +204,7 @@
    "id": "alpaca_eval-0020",
    "prompt_len": 19,
    "diverged_at": null,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 19,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -231,6 +234,7 @@
    "id": "alpaca_eval-0030",
    "prompt_len": 19,
    "diverged_at": 155,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 19,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -307,6 +311,7 @@
    "id": "alpaca_eval-0040",
    "prompt_len": 18,
    "diverged_at": 8,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 18,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -384,6 +389,7 @@
    "id": "alpaca_eval-0050",
    "prompt_len": 20,
    "diverged_at": 254,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 20,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -462,6 +468,7 @@
    "id": "alpaca_eval-0060",
    "prompt_len": 21,
    "diverged_at": 125,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 21,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -539,6 +546,7 @@
    "id": "alpaca_eval-0070",
    "prompt_len": 38,
    "diverged_at": null,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 38,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -568,6 +576,7 @@
    "id": "alpaca_eval-0080",
    "prompt_len": 33,
    "diverged_at": 110,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 33,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -644,6 +653,7 @@
    "id": "alpaca_eval-0090",
    "prompt_len": 26,
    "diverged_at": 88,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 26,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -721,6 +731,7 @@
    "id": "alpaca_eval-0100",
    "prompt_len": 63,
    "diverged_at": 51,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 63,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -798,6 +809,7 @@
    "id": "alpaca_eval-0110",
    "prompt_len": 51,
    "diverged_at": 93,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 51,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -874,6 +886,7 @@
    "id": "alpaca_eval-0120",
    "prompt_len": 23,
    "diverged_at": 100,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 23,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -952,6 +965,7 @@
    "id": "alpaca_eval-0130",
    "prompt_len": 34,
    "diverged_at": 38,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 34,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -1029,6 +1043,7 @@
    "id": "alpaca_eval-0150",
    "prompt_len": 52,
    "diverged_at": 134,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 52,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -1105,6 +1120,7 @@
    "id": "alpaca_eval-0160",
    "prompt_len": 29,
    "diverged_at": 112,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 29,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -1183,6 +1199,7 @@
    "id": "alpaca_eval-0170",
    "prompt_len": 20,
    "diverged_at": 241,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 20,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -1260,6 +1277,7 @@
    "id": "alpaca_eval-0180",
    "prompt_len": 68,
    "diverged_at": null,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 68,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -1289,6 +1307,7 @@
    "id": "alpaca_eval-0200",
    "prompt_len": 18,
    "diverged_at": 144,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 18,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -1366,6 +1385,7 @@
    "id": "alpaca_eval-0210",
    "prompt_len": 18,
    "diverged_at": 20,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 18,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -1444,6 +1464,7 @@
    "id": "alpaca_eval-0220",
    "prompt_len": 27,
    "diverged_at": 7,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 27,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -1521,6 +1542,7 @@
    "id": "alpaca_eval-0230",
    "prompt_len": 36,
    "diverged_at": 190,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 36,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -1598,6 +1620,7 @@
    "id": "alpaca_eval-0240",
    "prompt_len": 23,
    "diverged_at": 9,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 23,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -1675,6 +1698,7 @@
    "id": "alpaca_eval-0250",
    "prompt_len": 44,
    "diverged_at": 71,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 44,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -1752,6 +1776,7 @@
    "id": "alpaca_eval-0260",
    "prompt_len": 24,
    "diverged_at": 201,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 24,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -1829,6 +1854,7 @@
    "id": "alpaca_eval-0270",
    "prompt_len": 39,
    "diverged_at": 11,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 39,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -1906,6 +1932,7 @@
    "id": "alpaca_eval-0280",
    "prompt_len": 36,
    "diverged_at": 42,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 36,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -1983,6 +2010,7 @@
    "id": "alpaca_eval-0290",
    "prompt_len": 58,
    "diverged_at": 109,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 58,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -2059,6 +2087,7 @@
    "id": "alpaca_eval-0300",
    "prompt_len": 56,
    "diverged_at": null,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 56,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -2088,6 +2117,7 @@
    "id": "alpaca_eval-0320",
    "prompt_len": 37,
    "diverged_at": 125,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 37,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -2165,6 +2195,7 @@
    "id": "alpaca_eval-0330",
    "prompt_len": 19,
    "diverged_at": 10,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 19,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -2243,6 +2274,7 @@
    "id": "alpaca_eval-0340",
    "prompt_len": 20,
    "diverged_at": 59,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 20,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -2319,6 +2351,7 @@
    "id": "alpaca_eval-0350",
    "prompt_len": 15,
    "diverged_at": null,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 15,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -2348,6 +2381,7 @@
    "id": "alpaca_eval-0360",
    "prompt_len": 24,
    "diverged_at": 32,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 24,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -2424,6 +2458,7 @@
    "id": "alpaca_eval-0380",
    "prompt_len": 15,
    "diverged_at": null,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 15,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -2453,6 +2488,7 @@
    "id": "alpaca_eval-0450",
    "prompt_len": 68,
    "diverged_at": 216,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 68,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -2529,6 +2565,7 @@
    "id": "alpaca_eval-0500",
    "prompt_len": 67,
    "diverged_at": null,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 67,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -2558,6 +2595,7 @@
    "id": "mt_bench-0053",
    "prompt_len": 225,
    "diverged_at": null,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 225,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -2587,6 +2625,7 @@
    "id": "mt_bench-0056",
    "prompt_len": 216,
    "diverged_at": null,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 216,
     "module": "model.layers.0.linear_attn.gdn_core",
@@ -2616,6 +2655,7 @@
    "id": "mt_bench-0059",
    "prompt_len": 353,
    "diverged_at": null,
+   "first_logprob_difference": 1,
    "first_difference": {
     "position": 353,
     "module": "model.layers.0.linear_attn.gdn_core",
