@@ -39,7 +39,7 @@ REPO_HEAD = 'a' * 40
 ENGINE_HEAD = 'b' * 40
 ENGINE = '/engine'
 POOL_LOG = (
-    'max_total_num_tokens=360448, max_running_requests=128\n'
+    'max_total_num_tokens=360448, max_running_requests=129\n'
     'Mamba Cache is allocated. max_mamba_cache_size: 132, conv_state size: 0.10GB, '
     'ssm_state size: 6.23GB intermediate_ssm_state_cache size: 0.00GB\n'
 )
@@ -265,7 +265,7 @@ def test_batch_below_128_fails(tmp_path: Path) -> None:
 
 
 def test_unpinned_pools_fail(tmp_path: Path) -> None:
-    pool_log = POOL_LOG.replace('max_running_requests=128', 'max_running_requests=133')
+    pool_log = POOL_LOG.replace('max_running_requests=129', 'max_running_requests=128')
     assert run(make_run(tmp_path, pool_log=pool_log)).returncode == 1
 
 
