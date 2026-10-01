@@ -69,8 +69,10 @@ DFlash2 card's H200 numbers) are not like-for-like with this machine.
 
 Other startup notes:
 
-- `max_running_requests` is capped at 133 by the Mamba/GDN state cache; see
-  the log line for the flags that raise it.
+- `max_running_requests` is capped at 133 by the Mamba/GDN state cache at
+  default memory settings (`evidence/moonshot/README.md`, section 1.3, derives
+  the number); `bench/arms.toml` shows the flags the serving arms use to admit
+  128 requests with speculation.
 - The `torchcodec` import warning is harmless (no aarch64 wheel).
 
 ## Models
@@ -83,9 +85,11 @@ revisions; pass `--revision` so a moved `main` cannot change a run.
 | `Qwen/Qwen3.5-4B` | `851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a` | 9.3 GB |
 | `Qwen/Qwen3.8-27B` | `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0` | 55.6 GB |
 | `incoai/Qwen3.8-27B-DFlash2` | `015e795645c74b1a0eeef3b570031fb62e769bc5` | 3.8 GB |
+| `z-lab/Qwen3.5-4B-DFlash` | `9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf` | 1.2 GB |
 
 The 27B pair is the paper's separate transfer lane. No public 4B DFlash2
-draft exists.
+draft exists; the public DFlash drafter for Qwen3.5-4B is the 4B lane's block
+drafter.
 
 ## Tools
 
@@ -108,12 +112,15 @@ draft exists.
   evidence.
 - The paper builds with `latexmk` (pdfLaTeX and BibTeX). The TeX Gyre fonts it needs
   come from the `tex-gyre` apt package.
-- `formal/DecisionGuards.lean` elaborates without errors under Lean 4.19.0
-  (`bash scripts/check_lean.sh`).
+- Both Lean files in `formal/` elaborate without errors under Lean 4.19.0
+  (`bash scripts/check_lean.sh`; `formal/STATUS.md`).
 
 ## Verified so far
 
 - A Qwen3.5-4B server starts with CUDA graphs and overlap scheduling and
   answers chat requests correctly.
 - AIPerf streams against it (16/16 requests, 0 errors).
-- MTP and DFlash2 speculative-decoding launches have **not** been tested yet.
+- Native MTP speculation and the DFlash-4B drafter launch and serve with CUDA
+  graphs; `evidence/bench/README.md` and `evidence/drafter/README.md` record
+  each launch and the configurations that failed or were rejected.
+- No committed run has served the 27B DFlash2 pair on this machine.
