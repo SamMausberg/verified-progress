@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -55,13 +56,18 @@ def test_decode_without_a_queue_is_not_a_plateau() -> None:
     assert plateaus(log) == []
 
 
-def run_cli(tmp_path: Path, logs: dict[str, str], *args: str) -> subprocess.CompletedProcess[str]:
-    """Lay the logs out as lever_sweep does (<run>/<arm>/<stamp>/server/server.log)."""
+def run_cli(
+    tmp_path: Path, logs: dict[str, str], *args: str, configs: list[str] | None = None
+) -> subprocess.CompletedProcess[str]:
+    """Lay the logs out as lever_sweep does (<run>/<arm>/<stamp>/server/server.log, with
+    lever_sweep_log.jsonl listing the configurations, by default the logs' arms)."""
     run = tmp_path / 'run'
     for arm, text in logs.items():
-        log = run / arm / '20261001-000000' / 'server' / 'server.log'
+        log = run / arm.replace('#', '_') / '20261001-000000' / 'server' / 'server.log'
         log.parent.mkdir(parents=True)
         log.write_text(text)
+    record = [{'config': config, 'status': 'exit 0'} for config in configs or list(logs)]
+    (run / 'lever_sweep_log.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in record))
     return subprocess.run(
         [sys.executable, str(SCRIPT), str(run), *args], capture_output=True, text=True, check=False
     )
@@ -92,3 +98,16 @@ def test_cli_fails_on_a_plateau_outside_its_scope(tmp_path: Path) -> None:
     result = run_cli(tmp_path, {'dense': PLATEAU_127, 'exact': finished})
     assert result.returncode == 1
     assert '1 with C not inferable' in result.stdout
+
+
+def test_cli_fails_when_a_recorded_configuration_has_no_log(tmp_path: Path) -> None:
+    result = run_cli(tmp_path, {'dense#r1': PLATEAU_127}, configs=['dense#r1', 'exact#r1'])
+    assert result.returncode == 1
+    assert 'exact_r1: 0 server logs, expected 1' in result.stdout
+
+
+def test_cli_fails_on_a_log_outside_the_record(tmp_path: Path) -> None:
+    logs = {'dense': PLATEAU_127, 'exact': PLATEAU_127}
+    result = run_cli(tmp_path, logs, configs=['dense'])
+    assert result.returncode == 1
+    assert 'not in the record' in result.stdout

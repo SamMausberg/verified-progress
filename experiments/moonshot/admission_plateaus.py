@@ -21,6 +21,8 @@ phases (one synchronised wave each, fixed output length, nothing finishes during
 but not under continuous traffic; a value other than 0 or 1 (only one chunked request is in
 flight at a time) means the log is outside that scope.
 
+Each run directory must hold lever_sweep's lever_sweep_log.jsonl and exactly one server log
+per configuration it lists (no more, no fewer), so a missing arm cannot drop out of the check.
 It prints one count line per server log and exits 1 if any log yields fewer than
 --min-plateaus plateaus (default 1, so an unparsed log or one whose waves all filled cannot
 pass silently), if any plateau's C is not inferable, or if any plateau differs from the
@@ -35,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import re
 import sys
 from pathlib import Path
@@ -105,6 +108,35 @@ def plateaus(log_text: str) -> list[dict[str, int | str]]:
     return rows
 
 
+def expected_logs(run: Path) -> tuple[dict[str, Path], list[str]]:
+    """One server log per configuration in the run's lever_sweep_log.jsonl, and the problems.
+
+    lever_sweep writes each configuration's runs under its label with '#' replaced by '_'.
+    """
+    record = run / 'lever_sweep_log.jsonl'
+    if not record.exists():
+        return {}, [f'{run.name}: no lever_sweep_log.jsonl']
+    arms = [
+        json.loads(line)['config'].replace('#', '_')
+        for line in record.read_text().splitlines()
+        if line.strip()
+    ]
+    problems = []
+    logs: dict[str, Path] = {}
+    for arm in arms:
+        found = sorted((run / arm).glob('*/server/server.log'))
+        if len(found) != 1:
+            problems.append(f'{run.name}/{arm}: {len(found)} server logs, expected 1')
+        else:
+            logs[arm] = found[0]
+    extra = {log.parents[2].name for log in run.glob('*/*/server/server.log')} - set(arms)
+    problems += [
+        f'{run.name}/{arm}: server log of a configuration not in the record'
+        for arm in sorted(extra)
+    ]
+    return logs, problems
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('runs', nargs='+', type=Path, help='lever_sweep output directories')
@@ -114,11 +146,11 @@ def main() -> None:
     rows: list[dict[str, int | str]] = []
     failed: list[str] = []
     for run in args.runs:
-        logs = sorted(run.glob('*/*/server/server.log'))
-        if not logs:
-            sys.exit(f'{run}: no server logs')
-        for log in logs:
-            arm = log.parents[2].name
+        logs, problems = expected_logs(run)
+        for problem in problems:
+            print(f'{problem}: FAILED')
+        failed += problems
+        for arm, log in sorted(logs.items()):
             found = [
                 {'run': run.name, 'arm': arm, **row}
                 for row in plateaus(log.read_text(errors='replace'))
