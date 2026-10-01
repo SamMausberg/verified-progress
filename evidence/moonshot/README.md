@@ -202,6 +202,28 @@ a single 262,144-token prefill hits an illegal memory access in
 0001-0009, exact replay off in the base arm); it has not been tried on stock `bd66ce343e`.
 The A/B now runs through the server with chunked prefill (run_p4b.sh).
 
+**Analysis of the served A/B, declared on 2026-10-01 at 07:12 UTC, before the run started**
+(agreed with the coordinator; the run script is `~/vp-data/moonshot/run_p4b.sh`):
+
+- Design: batch 128, 2,048-token prompts (`long2048.jsonl`), 512 generated tokens, greedy,
+  FP32 state, no speculation, radix off, `--stream-interval 4`. Dense decode (A) against
+  exact replay at L = 4 (B), one server launch per arm, four pairs in A B B A A B B A order
+  (labels r1-r4).
+- Primary metric: the token-weighted server full-batch decode rate per point (bench's
+  `server_log.logged_gen_tps_full_batch`). It measures decode only, which is what the lever
+  changes; the client throughput y includes the 2,048-token prefills. Client y and its ratio
+  are reported beside it.
+- Statistic: per pair, the ratio B / A; the mean of the four log ratios with a t interval,
+  t(3) = 3.182, exponentiated to a 95% interval for the ratio.
+- Decision (pre-registered threshold 1.10x): rejected if the interval's upper end is below
+  1.10; supported if its lower end is at or above 1.10; otherwise inconclusive. A supported
+  result is worded "full-batch served decode throughput 1.xx times", never as an end-to-end
+  speedup, with client y and its ratio beside it.
+- Bit-exactness through the server: greedy tokens and top-20 logprobs at concurrency 1,
+  exact replay against dense; one differing token or logprob means not bit-exact end to end.
+  Every exact-replay server log must show the exact-replay kernel dispatch line.
+- Derived expectation before the run: about 1.08x at a 418-token context, less at 2,048.
+
 ## 2d. Speculative host gap: configuration-level levers (measured, single runs)
 
 MTP three steps (bench `mtp` arm, `--stream-interval 4`), c = 1 and 4 (`host_levers.csv`;
