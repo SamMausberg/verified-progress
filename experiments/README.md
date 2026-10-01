@@ -15,6 +15,7 @@ those results to the claims they support in the paper.
 | [`moonshot/`](moonshot/) | The lever harness (flags and environment per lever), derived ceilings, served lever sweeps and quality probes, the P4 replay and P7 verify kernel checks, hot-vocabulary draft maps | `evidence/moonshot/` | `evidence/moonshot/README.md` and each script's docstring |
 | [`drafter/`](drafter/) | Serving, characterizing and fine-tuning the public DFlash-4B drafter: acceptance probes, cycle traces, output equality, the P6 support screen, training data | `evidence/drafter/` | `evidence/drafter/README.md`; tools described in this directory's README |
 | [`repair/`](repair/) | Oracles and probes for long-window repair (P2, P3) and cached-window reuse (P9); `runs/` holds the scripts of each GPU session | `evidence/repair/` | `evidence/repair/README.md` |
+| [`frontier/`](frontier/) | Pre-registered first oracles for three external drafting proposals (innovation-clock drafting, prefix-isolated planning, causal defect drafting): the 5x requirement per verify width, interpreter innovation counts, perfect-event and support bounds | `evidence/frontier/` | this directory's README |
 | `synthetic_drift.py` | The imported bundle's synthetic work-count generator | `evidence/synthetic_drift.json`, `data/synthetic_drift.csv` | `python experiments/synthetic_drift.py`, also run by `scripts/verify_artifact.py` |
 
 `synthetic_drift.py` stays at this level because `scripts/verify_artifact.py` and the bundle
