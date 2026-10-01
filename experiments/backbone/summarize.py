@@ -181,11 +181,31 @@ def chain_tables(data: dict[str, Any]) -> list[str]:
     return out
 
 
+def merge_tables(data: dict[str, Any]) -> list[str]:
+    out = [
+        '### GDN input projection: merged 12352-row weight against qkvz + ba '
+        f'({data["layers"]} layers, us per layer)\n',
+        '| M | bitwise equal | max abs diff | separate, ba on side stream (stock) | separate, serial | merged | merged / stock |',
+        '|---|---|---|---|---|---|---|',
+    ]
+    for r in data['rows']:
+        side = r['separate_side_stream_us_per_layer']['median_us']
+        merged = r['merged_us_per_layer']['median_us']
+        out.append(
+            f'| {r["m"]} | {r["bitwise_equal_fraction"]:.6f} | {r["max_abs_diff"]:.3g} | '
+            f'{side:.2f} | {r["separate_serial_us_per_layer"]["median_us"]:.2f} | {merged:.2f} | '
+            f'{merged / side:.3f} |'
+        )
+    out.append('')
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--gemm')
     ap.add_argument('--norm')
     ap.add_argument('--chain')
+    ap.add_argument('--merge')
     args = ap.parse_args()
     lines: list[str] = []
     if args.gemm:
@@ -193,6 +213,11 @@ def main() -> None:
         lines += ['## Projections\n', *gemm_tables(data), *step_table(data)]
     if args.norm:
         lines += ['## Norms\n', *norm_tables(json.loads(Path(args.norm).read_text()))]
+    if args.merge:
+        lines += [
+            '## Merged GDN input projection\n',
+            *merge_tables(json.loads(Path(args.merge).read_text())),
+        ]
     if args.chain:
         lines += ['## Skeletons\n', *chain_tables(json.loads(Path(args.chain).read_text()))]
     print('\n'.join(lines))
