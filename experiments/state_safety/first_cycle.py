@@ -46,7 +46,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from compare import load_run, spec_cycles_consistent
 from cycles import FRAGILE_GAP
-from server import POOL_PIN, expected_pools, pool_flags
+from server import CONFIGS, MODEL_REVISION, POOL_PIN, expected_pools, pool_flags
 
 RUNS = ['plain/c1', 'mtp_s5/c1', 'mtp_s5/c32', 'mtp_tree/c1', 'mtp_tree/c32']
 MTP_RUNS = ['mtp_s5/c1', 'mtp_s5/c32', 'mtp_tree/c1', 'mtp_tree/c32']
@@ -156,6 +156,17 @@ def void_reasons(
             reasons.append(f'{run}: configuration {got}, declared {(algo, steps, topk, conc)}')
         if info.get('disable_radix_cache') or info.get('disable_overlap_schedule'):
             reasons.append(f'{run}: radix cache or overlap scheduler off, declared on')
+        config = run.split('/')[0]
+        # The declared invocation: the configuration's flags plus the pin, nothing extra.
+        if m.get('config') != config or m.get('flags') != CONFIGS[config] + pool_flags():
+            reasons.append(f'{run}: configuration or flags differ from the declared invocation')
+        if (
+            m.get('model_revision') != MODEL_REVISION
+            or info.get('attention_backend') != 'flashinfer'
+        ):
+            reasons.append(f'{run}: model revision or attention backend differs')
+        if m.get('warm') is not False:
+            reasons.append(f'{run}: not a cold pass')
         if ids is not None:
             run_ids = {r['id'] for r in load_run(root / f'{run}.jsonl').values()}
             if run_ids != ids:

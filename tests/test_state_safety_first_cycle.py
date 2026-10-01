@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'experiments' / 'st
 
 import numpy as np
 from first_cycle import DECLARED, RUNS, analyse, counts, log_odds, void_reasons
-from server import POOL_PIN
+from server import CONFIGS, MODEL_REVISION, POOL_PIN, pool_flags
 
 FRAGILE = [[-0.6, 1], [-0.7, 2]]  # top-2 gap 0.1 nats
 SURE = [[-0.01, 1], [-5.0, 2]]
@@ -88,7 +88,12 @@ def _write_declared(tmp_path, ids):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(''.join(json.dumps({'id': i}) + '\n' for i in ids))
         algo, steps, topk, conc = DECLARED[run]
+        config = run.split('/')[0]
         meta = {
+            'config': config,
+            'flags': CONFIGS[config] + pool_flags(),
+            'model_revision': MODEL_REVISION,
+            'warm': False,
             'concurrency': conc,
             'pool_pin': POOL_PIN,
             'max_new_tokens': 256,
@@ -100,6 +105,7 @@ def _write_declared(tmp_path, ids):
                 'speculative_eagle_topk': topk,
                 'disable_radix_cache': False,
                 'disable_overlap_schedule': False,
+                'attention_backend': 'flashinfer',
             },
         }
         (runs / f'{run}.meta.json').write_text(json.dumps(meta))
@@ -110,7 +116,7 @@ def _edit_meta(runs, run, **info):
     path = runs / f'{run}.meta.json'
     meta = json.loads(path.read_text())
     for k, v in info.items():
-        if k == 'concurrency':
+        if k in meta:
             meta[k] = v
         else:
             meta['server_info'][k] = v
@@ -156,6 +162,16 @@ def test_each_departure_from_the_declaration_makes_the_result_void(tmp_path, mon
     def radix_off(runs, prompts, manifest):
         _edit_meta(runs, 'mtp_tree/c1', disable_radix_cache=True)
 
+    def extra_flag(runs, prompts, manifest):
+        meta = json.loads((runs / 'mtp_s5/c1.meta.json').read_text())
+        _edit_meta(runs, 'mtp_s5/c1', flags=meta['flags'] + ['--disable-radix-cache'])
+
+    def warm_pass(runs, prompts, manifest):
+        _edit_meta(runs, 'plain/c1', warm=True)
+
+    def other_revision(runs, prompts, manifest):
+        _edit_meta(runs, 'mtp_tree/c1', model_revision='0' * 40)
+
     def missing_prompt(runs, prompts, manifest):
         path = runs / 'mtp_s5/c1.jsonl'
         path.write_text(''.join(path.read_text().splitlines(keepends=True)[:2]))
@@ -171,6 +187,9 @@ def test_each_departure_from_the_declaration_makes_the_result_void(tmp_path, mon
         wrong_tree_topk: 'mtp_tree/c32: configuration',
         wrong_concurrency: 'mtp_s5/c32: configuration',
         radix_off: 'mtp_tree/c1: radix cache or overlap',
+        extra_flag: 'mtp_s5/c1: configuration or flags differ',
+        warm_pass: 'plain/c1: not a cold pass',
+        other_revision: 'mtp_tree/c1: model revision',
         missing_prompt: 'mtp_s5/c1: prompt IDs differ',
         prompts_not_frozen: 'does not match the frozen manifest',
     }
