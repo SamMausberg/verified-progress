@@ -110,6 +110,20 @@ _RESOLVED_RE = {
 }
 
 
+def public_server_info(info: dict[str, Any]) -> dict[str, Any]:
+    """server_info as it may be committed: no launch command, no host in server_id.
+
+    Runs launched before the host was dropped recorded server_id as
+    host:port:pid:ns; the host part is replaced by a constant, which keeps ids
+    of different servers distinct (port, pid and start time) and equal ids equal.
+    """
+    out = {k: v for k, v in info.items() if k != 'cmd'}
+    sid = out.get('server_id')
+    if isinstance(sid, str) and sid.count(':') == 3:
+        out['server_id'] = 'host:' + sid.split(':', 1)[1]
+    return out
+
+
 def pools_known(pools: dict[str, int | None] | None) -> bool:
     """True when every pool size was found (a missing field is unknown, not equal)."""
     return pools is not None and all(v is not None for v in pools.values())
@@ -398,7 +412,8 @@ def launch(
         log.flush()
         summary['resolved_pools'] = resolved_pools(log_path)
         # One id per server process, so passes can be matched to the server that ran them.
-        summary['server_id'] = f'{socket.gethostname()}:{port}:{proc.pid}:{time.time_ns()}'
+        # No host name: it can carry the machine's address into committed evidence.
+        summary['server_id'] = f'{port}:{proc.pid}:{time.time_ns()}'
         summary['cmd'] = cmd
         yield {'base_url': base, 'server_info': summary}
     finally:

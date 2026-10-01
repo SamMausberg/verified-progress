@@ -34,6 +34,13 @@ if [ -d "$pinned" ]; then
     --out-csv "$evidence/divergences_pinned.csv" --out-meta "$evidence/run_meta_pinned.json"
 fi
 
+# One deliberate cross-regime pair: does the pool regime alone change batch-1 output?
+if [ -f "$pinned/plain/c1.jsonl" ] && [ -f "$runs/plain/c1.jsonl" ]; then
+  nice -n 19 python compare.py --runs "$HOME/vp-data/state" --pairs pairs_cross_regime.json \
+    --allow-mixed-pins --all-logprob-differences --out-json "$evidence/cross_regime.json" \
+    --out-csv "$evidence/divergences_cross_regime.csv" > /dev/null
+fi
+
 # Top-2 BF16 gap statistics of plain decode at batch 1, kept with the noise floor.
 for root_floor in "$runs:noise_floor.json" "$pinned:noise_floor_pinned.json"; do
   root="${root_floor%%:*}"
@@ -184,5 +191,12 @@ done
 
 if compgen -G "$HOME/vp-data/state/targeted/*.json" > /dev/null; then
   nice -n 19 python summarize_targeted.py --out "$evidence/targeted.json" > /dev/null
+fi
+# The machine's host name can be its public address: refuse evidence that contains it.
+host="$(hostname)"
+if leaked="$(grep -rlF -e "$host" -e "${host//-/.}" "$evidence")"; then
+  echo "evidence contains the host name; not publishing it. Files:" >&2
+  echo "$leaked" >&2
+  exit 1
 fi
 echo "evidence regenerated in $evidence"

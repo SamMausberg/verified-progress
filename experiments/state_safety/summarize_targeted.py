@@ -20,6 +20,9 @@ from pathlib import Path
 from typing import Any
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+
+from server import public_server_info
 
 
 def not_identical(test: str, case: dict[str, Any]) -> bool:
@@ -58,7 +61,7 @@ def main() -> None:
         entry: dict[str, Any] = {
             'summary': data['summary'],
             'flags': meta['flags'],
-            'server_info': {k: v for k, v in meta['server_info'].items() if k not in ('cmd',)},
+            'server_info': public_server_info(meta['server_info']),
             'repo_sha': meta['repo_sha'],
             'sglang_sha': meta['sglang_sha'],
             'wall_s': meta['wall_s'],

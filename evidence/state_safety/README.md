@@ -252,12 +252,111 @@ tokens and 122 and 167 GDN slots, with the same cap of 16 running requests
 rows of `noise_floor.csv`). The 24 differences can therefore come from either. A rerun
 with identical pinned pools (cap 8) is queued; see `experiments/state_safety/README.md`.
 
-**Pending**: MTP steps 1/3/5 and the top-k 2 tree at concurrency 1 and 32, radix cache off,
-overlap off, deterministic inference and FP32 head for plain and MTP, the logprobs-off
-control, retraction, and the ReplaySSM and FlashInfer GDN decode paths. These runs are
-queued with pinned pools (cap 8, 49,152 KV tokens, 40 GDN slots), together with a
-pinned rerun of the plain baseline, so every comparison across servers is between
-identical pools.
+## Matrix with pinned pools
+
+These runs replace the comparisons above for every pair they cover. Every server was
+started with the same pools: at most 8 running requests, 49,152 KV tokens and 40 GDN
+slots (`experiments/state_safety/README.md`). Each was checked to have allocated exactly
+those sizes (`run_meta_pinned.json`, `resolved_pools`), so every pair compares identical
+pools (`pools.json`, `pools_identical`). Radix cache, overlap scheduler and CUDA graphs
+are on. Each run covers 320 prompts and 256 new tokens, with the common flags of the
+Setup section. Rates are per 1,000 compared tokens
+(`noise_floor_pinned.json`/`.csv`, events in `divergences_pinned.csv`).
+
+| Pair | Diverged | Per 1,000 | Tie | One ulp | Near |
+|---|---|---|---|---|---|
+| Plain, fresh-server repeat, c1 | 0/320 | 0 | - | - | - |
+| Plain, fresh-server repeat, c32 | 4/320 | 0.06 | 4 | 0 | 0 |
+| Plain, same-server warm repeat, c1 | 17/320 | 0.25 | 16 | 1 | 0 |
+| Plain, same-server warm repeat, c32 | 4/320 | 0.06 | 4 | 0 | 0 |
+| Plain, c1 vs c32 (one server) | 41/320 | 0.63 | 39 | 2 | 0 |
+| MTP steps 1, c1 vs c32 | 165/320 | 3.47 | 157 | 7 | 1 |
+| MTP steps 3, c1 vs c32 | 156/320 | 3.25 | 146 | 9 | 1 |
+| MTP steps 5, c1 vs c32 | 152/320 | 3.07 | 143 | 8 | 1 |
+| MTP tree (3 steps, top-k 2), c1 vs c32 | 156/320 | 3.11 | 150 | 6 | 0 |
+| MTP steps 1 vs plain, c1 | 170/320 | 3.65 | 159 | 9 | 2 |
+| MTP steps 3 vs plain, c1 | 171/320 | 3.68 | 163 | 7 | 1 |
+| MTP steps 5 vs plain, c1 | 164/320 | 3.51 | 156 | 8 | 0 |
+| MTP tree vs plain, c1 | 170/320 | 3.68 | 163 | 7 | 0 |
+| MTP steps 1 vs plain, c32 | 175/320 | 3.86 | 166 | 7 | 2 |
+| MTP steps 3 vs plain, c32 | 181/320 | 3.96 | 169 | 11 | 1 |
+| MTP steps 5 vs plain, c32 | 166/320 | 3.57 | 159 | 6 | 1 |
+| MTP tree vs plain, c32 | 167/320 | 3.53 | 162 | 4 | 1 |
+| MTP steps 1 vs steps 3, c1 | 92/320 | 1.53 | 89 | 3 | 0 |
+| MTP steps 3 vs steps 5, c1 | 170/320 | 3.70 | 164 | 6 | 0 |
+| MTP steps 3 vs tree, c1 | 163/320 | 3.49 | 155 | 8 | 0 |
+
+- **Classes.** No divergence in any pair is `large`, and no run committed a token
+  that was not its own top-1 (`self_consistency`). The 11 `near` events (5 prompts)
+  have both margins at most two BF16 steps (0.25 nats). Logprob drift without a token
+  change is at most 0.62 nats.
+- **Speculation against plain decoding.** Every MTP configuration diverges from plain
+  decoding at 3.5 to 4.0 per 1,000 tokens, as often as from itself at another
+  concurrency (3.1 to 3.5), and only at near ties.
+- **By rejection position.** Divergences at fragile positions (where the plain
+  reference's top-2 gap is at most 0.25 nats) per fragile position, by the previous
+  cycle's commit length, including full acceptance (`cycles_*_pinned.json`,
+  `by_commit_length`). Divergences at non-fragile positions are counted separately.
+  A divergence where the reference was not near a tie would be the strong sign of a
+  state error. There are none at any commit length, in any configuration.
+
+  | Configuration | Commit length 1, 2, 3, ... (full acceptance last) | All lengths | First cycle after prefill | Non-fragile divergences |
+  |---|---|---|---|---|
+  | MTP steps 1 | 0.092, 0.085 | 0.086 | 2/22 | 0 |
+  | MTP steps 3 | 0.089, 0.098, 0.088, 0.079 | 0.086 | 3/32 | 0 |
+  | MTP steps 5 | 0.064, 0.074, 0.097, 0.061, 0.080, 0.082 | 0.077 | 7/40 | 0 |
+  | MTP tree | 0.085, 0.075, 0.063, 0.090 | 0.081 | 6/33 | 0 |
+
+  A state error at one rejection position (a wrong rollback for one accept length)
+  would raise that position's rate. No length stands out. The rates are compatible
+  with one common rate: chi-square p = 0.75, 0.72, 0.54 and 0.38 for steps 1, 3, 5 and
+  the tree (`by_commit_length.homogeneity_chi2` in each file). That is a failure to
+  reject, not a proof of equal rates. The test also treats positions as independent,
+  although they cluster by prompt and a prompt's positions stop at its first
+  divergence. No prompt-clustered analysis or bound on a per-length excess rate has
+  been done.
+- **The first verify cycle after the prefill** follows no earlier cycle. It is counted
+  separately (`first_cycle_after_prefill`) and is not part of the test above.
+  - Its rate is higher for steps 5 and the tree (7/40 and 6/33 fragile positions,
+    against 0.077 and 0.081 later). A Fisher exact test against all later cycles gives
+    p = 0.71, 0.75, 0.033 and 0.049 for steps 1, 3, 5 and the tree
+    (`fisher_vs_later_p_exploratory`).
+  - That test is exploratory. It was chosen after looking at the data. It is not
+    corrected for the four configurations and several cycle buckets examined.
+  - The groups also differ in more than state. The first cycle follows the prefill
+    chunk, every prompt contributes it, and later cycles count only prompts that have
+    not yet diverged.
+  - So this is a lead for a declared follow-up, not a finding. The follow-up is a
+    first-cycle test, declared in advance, on fresh prompts. It is pending, as is a
+    look at the prefill-to-decode handoff of the GDN state.
+- **Pinning and the repeat floor.** The fresh-server repeat at concurrency 32 drops
+  from 24/320 (unpinned: different pools, cap 16) to 4/320 (identical pools, cap 8).
+  Both changed at once, and a smaller cap also narrows the batch compositions, so
+  these runs do not say how much of the drop is due to each.
+- **Same-server warm repeats.** These now differ: 17/320 at c1 and 4/320 at c32, all
+  at ties or one ulp. Before, the result was 0/320 with a larger KV pool. No prefill in
+  any pass reused a cached prefix (`cached_tokens` and `requests_with_cached_tokens`
+  are 0 for every run in `run_meta_pinned.json`). One pass computes 126,408 tokens,
+  56,366 prompt plus 70,042 output (`prompt_tokens`, `output_tokens`), more than the
+  pinned 49,152-token pool, so the radix tree evicts during the first pass. We read
+  this, without having tested it, as the history dependence below: the warm pass's
+  requests read different earlier copies of shared prefixes. With the radix cache on,
+  a same-server warm repeat is therefore not an equality reference.
+- **Pool regime alone at batch 1.** Comparing the pinned plain c1 run with the earlier
+  unpinned one (cap 16, 97,672 KV tokens, 122 GDN slots) gives 320/320 identical
+  tokens. One prompt's logprobs differ (`mt_bench-0064`, from output index 2, drift
+  at most 0.24 nats; `cross_regime.json` and `divergences_cross_regime.csv`, a
+  deliberate mixed-regime comparison that lists every prompt whose logprobs differ,
+  with `first_logprob_diff`).
+- **Missing pairs.** `missing_pairs` in `noise_floor_pinned.json` lists the pairs
+  whose runs are still queued. They are listed under Pending below. This regeneration
+  used `STATE_ALLOW_MISSING=1`.
+
+**Pending** (queued, pinned): radix cache off, overlap off, deterministic inference
+and FP32 head for plain and MTP, the logprobs-off control, retraction, a second MTP
+session, and the ReplaySSM and FlashInfer GDN decode paths. Not yet designed: the
+pre-declared first-cycle test on fresh prompts and the prefill-to-decode handoff
+check above.
 
 ## History dependence through radix-cache insertion
 
@@ -381,8 +480,16 @@ common flags of the Setup section, one request in flight, 40 prompts per test (t
   exact ties (19 and 30) or within one BF16 step (2), consistent with the warm path's
   different prefill computation and with the history dependence above.
 
-**Pending** (queued): the same two tests for the top-k 2 tree and for plain decode, GDN
-checkpoint reuse at the 256-token tracking interval including checkpoints taken in the
-cycle that finished the request, aborts with slot reuse on a four-slot GDN pool,
-chunked prefill at 200 and 256 tokens, run-to-run repeats, and per-rejection-position
-drift.
+- **The same tests for the top-k 2 tree and for plain decoding**, comparing top-5
+  logprobs as well as tokens. Truncation: tree 159/159 and plain 39/39, identical in
+  tokens and logprobs to the untruncated prefix. Stop token at every cycle index: tree
+  160/160 and plain 40/40, identical in tokens and logprobs up to the stop; 120 tree
+  cases have the stop inside the draft block. Warm vs cold continuation: tree 142/160
+  identical (17 exact ties, 1 one-ulp), plain 33/40 (7 exact ties). Plain decoding has
+  no speculative state, so it shows that the warm/cold tie flips come from the warm
+  path's prefill and radix history, not from speculation.
+
+**Pending** (queued): GDN checkpoint reuse at the 256-token tracking interval,
+including checkpoints taken in the cycle that finished the request; aborts with slot
+reuse on a four-slot GDN pool; chunked prefill at 200 and 256 tokens; and run-to-run
+repeats. Per-rejection-position drift is under "Matrix with pinned pools" above.

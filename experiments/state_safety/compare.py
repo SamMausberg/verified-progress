@@ -39,7 +39,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from server import log_time_span, pools_known, resolved_pools
+from server import log_time_span, pools_known, public_server_info, resolved_pools
 
 NEAR_NATS = 0.5
 LARGE_DRIFT_NATS = 0.5
@@ -127,6 +127,10 @@ def compare_pair(
                     drift, drift_pos = diff, i
         row['max_drift'] = drift
         row['max_drift_pos'] = drift_pos
+        # First output index whose top-k logprobs differ at all (before any token change).
+        row['first_logprob_diff'] = next(
+            (i for i in range(min(common, len(top_a), len(top_b))) if top_a[i] != top_b[i]), None
+        )
         if d is None:
             row['diverged'] = False
             row['exposure'] = n
@@ -269,7 +273,7 @@ def run_meta(root: Path, runs: list[str]) -> dict[str, Any]:
         if not meta_path.exists():
             continue
         meta = json.loads(meta_path.read_text())
-        info = {k: v for k, v in meta['server_info'].items() if k != 'cmd'}
+        info = public_server_info(meta['server_info'])
         entry = {
             k: meta[k]
             for k in (
@@ -297,6 +301,12 @@ def run_meta(root: Path, runs: list[str]) -> dict[str, Any]:
             tokens = sum(len(r['output_ids']) for r in run.values())
             entry['spec_accept_length'] = round(tokens / verify, 4)
             entry['cycles_one_chunk_each'] = sum(spec_cycles_consistent(r) for r in run.values())
+        # Prompt tokens computed and prompt tokens served from the radix cache.
+        entry['prompt_tokens'] = sum(r.get('prompt_tokens') or 0 for r in run.values())
+        entry['cached_tokens'] = sum(r.get('cached_tokens') or 0 for r in run.values())
+        entry['requests_with_cached_tokens'] = sum(
+            1 for r in run.values() if r.get('cached_tokens')
+        )
         entry['finish'] = {}
         for r in run.values():
             k = (r['finish_reason'] or {}).get('type', 'none')
@@ -355,6 +365,12 @@ def main() -> None:
         '--require-all', action='store_true', help='exit non-zero if any pair has a missing run'
     )
     ap.add_argument(
+        '--all-logprob-differences',
+        action='store_true',
+        help='also write every prompt whose logprobs differ without a token change '
+        f'(by default only drift above {LARGE_DRIFT_NATS} nats is written)',
+    )
+    ap.add_argument(
         '--allow-mixed-pins',
         action='store_true',
         help='compare a pinned-pool run with an unpinned one (flagged, not refused)',
@@ -406,7 +422,12 @@ def main() -> None:
         s['same_server'], s['pools_identical'] = pools_match(root, ra, rb)
         summary[label] = s
         for r in rows:
-            if r['diverged'] or r['length_mismatch'] or r['max_drift'] > LARGE_DRIFT_NATS:
+            if (
+                r['diverged']
+                or r['length_mismatch']
+                or r['max_drift'] > LARGE_DRIFT_NATS
+                or (args.all_logprob_differences and r['first_logprob_diff'] is not None)
+            ):
                 events.append({'pair': label, **r})
         print(
             f'{label:40s} div {s["diverged"]:3d}/{s["prompts"]:3d}  '
@@ -444,6 +465,7 @@ def main() -> None:
         'cls',
         'max_drift',
         'max_drift_pos',
+        'first_logprob_diff',
         'len_a',
         'len_b',
         'length_mismatch',
