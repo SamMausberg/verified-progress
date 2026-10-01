@@ -214,13 +214,20 @@ concurrencies, and every logprob except those of one prompt (`humaneval-0044`, a
 server at batch 1 reproduces the first pass bitwise on all 320 prompts, that one
 included, so its difference in the same-server repeat comes from what the radix tree
 already held (see the history dependence below); a tapped test of which op changes is
-queued. A fresh server at concurrency 32 reproduces 296 of 320 sequences: request
-arrival timing, and with it batch composition, differs between sessions.
+queued. A fresh server at concurrency 32 reproduces 296 of 320 sequences. Request
+arrival timing, and with it batch composition, differs between sessions, but these two
+sessions also differ in their pools: their servers allocated 97,672 and 133,885 KV
+tokens and 122 and 167 GDN slots, with the same cap of 16 running requests
+(`run_meta.json`, `resolved_pools`; `pools_identical` is false for both repeat-session
+rows of `noise_floor.csv`). The 24 differences can therefore come from either. A rerun
+with identical pinned pools (cap 8) is queued; see `experiments/state_safety/README.md`.
 
 **Pending**: MTP steps 1/3/5 and the top-k 2 tree at concurrency 1 and 32, radix cache off,
 overlap off, deterministic inference and FP32 head for plain and MTP, the logprobs-off
 control, retraction, and the ReplaySSM and FlashInfer GDN decode paths. These runs are
-queued.
+queued with pinned pools (cap 8, 49,152 KV tokens, 40 GDN slots), together with a
+pinned rerun of the plain baseline, so every comparison across servers is between
+identical pools.
 
 ## History dependence through radix-cache insertion
 

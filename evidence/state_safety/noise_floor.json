@@ -16,7 +16,8 @@
       "drift_max": 0.0,
       "prompts_with_large_drift": 0,
       "run_a": "plain/c1",
-      "run_b": "plain__rep/c1"
+      "run_b": "plain__rep/c1",
+      "pools_identical": false
     },
     "repeat session, plain c32": {
       "prompts": 320,
@@ -36,7 +37,8 @@
       "drift_max": 0.3272993564605713,
       "prompts_with_large_drift": 0,
       "run_a": "plain/c32",
-      "run_b": "plain__rep/c32"
+      "run_b": "plain__rep/c32",
+      "pools_identical": false
     },
     "concurrency 1 vs 32 (cap 16), plain": {
       "prompts": 320,
@@ -58,7 +60,8 @@
       "drift_max": 0.6860885620117188,
       "prompts_with_large_drift": 1,
       "run_a": "plain/c1",
-      "run_b": "plain/c32"
+      "run_b": "plain/c32",
+      "pools_identical": true
     },
     "same server repeat c1, plain": {
       "prompts": 320,
@@ -76,7 +79,8 @@
       "drift_max": 0.22667717933654785,
       "prompts_with_large_drift": 0,
       "run_a": "plain/c1",
-      "run_b": "plain/c1_warm"
+      "run_b": "plain/c1_warm",
+      "pools_identical": true
     },
     "same server repeat c32, plain": {
       "prompts": 320,
@@ -94,7 +98,8 @@
       "drift_max": 0.3229396343231201,
       "prompts_with_large_drift": 0,
       "run_a": "plain/c32",
-      "run_b": "plain/c32_warm"
+      "run_b": "plain/c32_warm",
+      "pools_identical": true
     },
     "deterministic, plain c1 vs c8 (8-prompt validation)": {
       "prompts": 8,
@@ -112,7 +117,8 @@
       "drift_max": 0.0,
       "prompts_with_large_drift": 0,
       "run_a": "plain_det__validate/c1",
-      "run_b": "plain_det__validate/c8"
+      "run_b": "plain_det__validate/c8",
+      "pools_identical": true
     },
     "deterministic, mtp_s3 c1 vs c8 (8-prompt validation)": {
       "prompts": 8,
@@ -132,7 +138,8 @@
       "drift_max": 0.22288966178894043,
       "prompts_with_large_drift": 0,
       "run_a": "mtp_s3_det__validate/c1",
-      "run_b": "mtp_s3_det__validate/c8"
+      "run_b": "mtp_s3_det__validate/c8",
+      "pools_identical": true
     },
     "deterministic + verify KV split patch, mtp_s3 c1 vs c32 (96 prompts)": {
       "prompts": 96,
@@ -152,7 +159,8 @@
       "drift_max": 0.3275878429412842,
       "prompts_with_large_drift": 0,
       "run_a": "mtp_s3_det__verifyfix/c1",
-      "run_b": "mtp_s3_det__verifyfix/c32"
+      "run_b": "mtp_s3_det__verifyfix/c32",
+      "pools_identical": true
     }
   },
   "self_consistency": {

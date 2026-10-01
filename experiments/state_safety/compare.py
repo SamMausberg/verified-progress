@@ -38,6 +38,8 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
+from server import resolved_pools
+
 NEAR_NATS = 0.5
 LARGE_DRIFT_NATS = 0.5
 DRIFT_REGION_LP = -4.0
@@ -244,6 +246,10 @@ def run_meta(root: Path, runs: list[str]) -> dict[str, Any]:
                 'started_at',
             )
         }
+        log = (root / name).parent / 'server.log'
+        if 'resolved_pools' not in info and log.exists():
+            # Runs from before the pools were recorded: read them from the log.
+            info['resolved_pools'] = resolved_pools(log)
         entry['server_info'] = info
         run = load_run(root / f'{name}.jsonl')
         verify = sum(r.get('spec_verify_ct') or 0 for r in run.values())
@@ -278,6 +284,7 @@ def write_table(path: str, summary: dict[str, Any]) -> None:
         'max_margin_max',
         'drift_p99',
         'drift_max',
+        'pools_identical',
     ]
     with open(path, 'w') as f:
         f.write(','.join(cols) + '\n')
@@ -321,6 +328,14 @@ def main() -> None:
         rows = compare_pair(run_a, run_b)
         s = summarize(rows)
         s.update(run_a=ra, run_b=rb)
+        # Same server, or two servers that allocated the same pools (None: unknown).
+        la, lb = ((root / r).parent / 'server.log' for r in (ra, rb))
+        if la == lb:
+            s['pools_identical'] = True
+        elif la.exists() and lb.exists():
+            s['pools_identical'] = resolved_pools(la) == resolved_pools(lb)
+        else:
+            s['pools_identical'] = None
         summary[label] = s
         for r in rows:
             if r['diverged'] or r['length_mismatch'] or r['max_drift'] > LARGE_DRIFT_NATS:
