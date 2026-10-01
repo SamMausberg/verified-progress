@@ -1,5 +1,5 @@
-% Figure 1: the certified head as a mechanism. Schematic: the interval values below are
-% illustrative, chosen to show each case, and are not data.
+% Figure fig:mechanism: the certified head as a mechanism. Schematic: the interval values
+% below are illustrative, chosen to show each case, and are not data.
 \begin{tikzpicture}[x=1cm,y=1cm,font=\footnotesize]
 % ---------------- (a) level 0 ----------------
 \begin{scope}
@@ -20,12 +20,12 @@
 }
 \node[text=muted] at (4.4,.9) {$\cdots$};
 \draw[dashed,ink] (0,2.58) -- (4.8,2.58) node[right,text=ink,inner sep=2pt,yshift=3pt]{$\max_i lo_i$};
-\draw[densely dotted,brick,thick] (0,2.40) -- (4.8,2.40) node[right,text=brick,inner sep=2pt,yshift=-4pt]{$-\,\delta_{\max}$};
+\draw[densely dotted,brick,thick] (0,2.40) -- (4.8,2.40) node[right,text=brick,inner sep=2pt,yshift=-5pt]{$\max_i lo_i-\delta_{\max}$};
 \node[text=ink] at (2.4,-.33) {vocabulary rows (int8 pass)};
-\node[text=muted,font=\scriptsize,align=center] at (2.4,-.82) {dark: kept;\quad grey: $hi_i<\max_j lo_j-\delta_{\max}$,\\dropped for good};
+\node[text=muted,font=\scriptsize,align=center] at (2.4,-.85) {dark: kept (candidates)\\grey: $hi_i<\max_j lo_j-\delta_{\max}$, dropped for good};
 \end{scope}
 % ---------------- (b) re-score the survivors ----------------
-\begin{scope}[xshift=6.95cm]
+\begin{scope}[xshift=7.6cm]
 \node[anchor=west,font=\footnotesize\bfseries] at (-.3,4.25) {(b) Re-score and round};
 \draw[-{Stealth[length=1.6mm]},ink!70] (0,0) -- (0,3.5) node[above,text=ink]{logit};
 \foreach \y in {0.4,1.0,1.6,2.2,2.8} {\draw[ink!20] (0,\y) -- (2.05,\y); \draw[ink!60] (-.06,\y) -- (0,\y);}
@@ -40,14 +40,14 @@
 \node[text=muted,font=\scriptsize,align=center] at (1.35,-.82) {bars: accumulator enclosures;\\shaded: BF16 buckets $[L_i^-,L_i^+]$};
 \end{scope}
 % ---------------- (c) decide ----------------
-\begin{scope}[xshift=11.0cm]
+\begin{scope}[xshift=11.9cm]
 \node[anchor=west,font=\footnotesize\bfseries] at (-.3,4.25) {(c) Decide};
-\node[good,font=\footnotesize,text width=2.75cm,anchor=north] (cert) at (2.1,3.45) {Certified token: R-stock under the modelled error $G_i$};
-\node[warn,font=\footnotesize,text width=2.75cm,anchor=north] (fb) at (2.1,1.75) {Stock head kernel at the same batch shape, and its argmax};
+\node[good,font=\footnotesize,text width=3.3cm,anchor=north] (cert) at (2.2,3.45) {Certified: the \Rstock{} token under the modelled error $G_i$};
+\node[warn,font=\footnotesize,text width=3.3cm,anchor=north] (fb) at (2.2,1.75) {Stock head kernel at the same batch shape, and its argmax};
 \coordinate (split) at (-.4,2.3);
 \draw[semithick,ink] (-.7,2.3) -- (split);
-\draw[flow] (split) -- (split |- cert.west) -- node[above,label]{fixed} (cert.west);
-\draw[flow] (split) -- (split |- fb.west) -- node[below,label]{open} (fb.west);
+\draw[flow] (split) -- (split |- cert.west) -- node[above,note]{fixed} (cert.west);
+\draw[flow] (split) -- (split |- fb.west) -- node[below,note]{open} (fb.west);
 \node[text=muted,font=\scriptsize,align=center,below=2pt of fb] {a conditional node of\\the captured CUDA graph};
 \end{scope}
 \end{tikzpicture}

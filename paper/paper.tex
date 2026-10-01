@@ -1,158 +1,59 @@
-\documentclass[11pt,letterpaper]{article}
+% The Work a Verifier Needs: venue version in the MLSys two-column format.
+% Build: cd paper && latexmk -pdf -interaction=nonstopmode -halt-on-error paper.tex
+% (latexmkrc fetches and hash-checks the MLSys style file; see template/README.md).
+% Main text (sections/intro ... sections/discussion), shared macros (macros.tex) and
+% terminology (terminology.tex): main-text author. Appendices (sections/appendices.tex and
+% the files it loads) and references.bib: appendix editor.
+\RequirePackage{fix-cm}
+\documentclass{article}
 \usepackage[T1]{fontenc}
-\usepackage[utf8]{inputenc}
-\usepackage{amsmath,amsthm,amssymb}
-\usepackage{charter}
-\usepackage[charter,vvarbb]{newtxmath}
-\usepackage[scaled=.86,varqu]{zi4}
-\usepackage[scaled=.88]{helvet}
-\usepackage[textwidth=6.05in,textheight=8.85in,centering,headheight=14pt,headsep=18pt,footskip=28pt]{geometry}
-\usepackage{microtype,mathtools,bm}
-\usepackage{booktabs,tabularx,longtable,array,multirow}
-\usepackage{graphicx,xcolor,tikz,pgfplots}
-\usetikzlibrary{arrows.meta,positioning,calc,fit,backgrounds,decorations.pathreplacing,shapes.geometric}
-\pgfplotsset{compat=1.18}
-\usepgfplotslibrary{fillbetween,groupplots}
-\usepackage{caption,subcaption,float,placeins}
-\usepackage{enumitem,listings,fancyhdr,titlesec,etoolbox}
-\usepackage[numbers,sort&compress]{natbib}
-\usepackage{xurl}
-\usepackage[colorlinks=true,linkcolor=ink,citecolor=ink,urlcolor=ink,bookmarksnumbered=true]{hyperref}
-% Colours. Every figure also distinguishes its series by line style or marker, so the
-% colours are a convenience, not the only cue; they stay distinct in greyscale by lightness.
-\definecolor{ink}{HTML}{1B3A57}
-\definecolor{teal}{HTML}{1F7A73}
-\definecolor{muted}{HTML}{66737D}
-\definecolor{ochre}{HTML}{9A5B13}
-\definecolor{brick}{HTML}{A33A2A}
-\definecolor{wash}{HTML}{F2F5F7}
-\definecolor{washgreen}{HTML}{EAF3F1}
-\definecolor{washamber}{HTML}{FBF3E6}
-\hypersetup{pdftitle={The Work a Verifier Needs},pdfauthor={Samuel Mausberg},pdfsubject={Certified low-precision output heads under a stock-kernel contract, and the serving stack of a hybrid model}}
-\pagestyle{fancy}\fancyhf{}
-\fancyhead[L]{\small\textsc{The Work a Verifier Needs}}
-\fancyhead[R]{\small\color{muted}Working draft, 30 September 2026}
-\fancyfoot[C]{\small\thepage}
-\renewcommand{\headrulewidth}{0.3pt}
-\fancypagestyle{plain}{\fancyhf{}\fancyfoot[C]{\small\thepage}\renewcommand{\headrulewidth}{0pt}}
-\titleformat{\section}{\large\bfseries\color{ink}}{\thesection}{0.7em}{}
-\titleformat{\subsection}{\normalsize\bfseries\color{ink}}{\thesubsection}{0.6em}{}
-\titleformat{\subsubsection}{\normalsize\itshape}{\thesubsubsection}{0.6em}{}
-\titleformat{\paragraph}[runin]{\normalsize\bfseries}{}{0pt}{}[.]
-\titlespacing*{\section}{0pt}{2.6ex plus 1ex minus .3ex}{1.2ex}
-\titlespacing*{\subsection}{0pt}{2.0ex plus .6ex minus .3ex}{.8ex}
-\titlespacing*{\paragraph}{0pt}{1.2ex plus .4ex minus .2ex}{.6em}
-\setlength{\parindent}{1.2em}\setlength{\parskip}{0pt}
-\linespread{1.04}
-\setlength{\emergencystretch}{2.5em}
-\clubpenalty=10000\widowpenalty=10000\displaywidowpenalty=10000
-\setlist{nosep,leftmargin=1.5em,topsep=.5ex,itemsep=.25ex}
-\captionsetup{font=small,labelfont={bf},skip=6pt,margin=.2in}
-\renewcommand{\arraystretch}{1.14}
-\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
-\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
-% ---------------------------------------------------------------------------
-% Mathematical macros
-\newcommand{\E}{\mathbb E}\newcommand{\R}{\mathbb R}\newcommand{\ind}{\mathbf 1}
-\newcommand{\argmax}{\operatorname*{arg\,max}}
-\newcommand{\lse}{\operatorname{LSE}}
-\newcommand{\softmax}{\operatorname{softmax}}
-\newcommand{\clip}{\operatorname{clip}}
-\newcommand{\TV}{\operatorname{TV}}
-\newcommand{\KL}{\operatorname{KL}}
-\newcommand{\norm}[1]{\left\lVert #1\right\rVert}
-\newcommand{\fl}{\operatorname{fl}}
-\newcommand{\rnb}{\operatorname{rn}_{\mathrm{B}}}
-\newcommand{\ulpb}{\operatorname{ulp}_{\mathrm{B}}}
-\newcommand{\tok}{\operatorname{tok}}
-\newcommand{\code}[1]{\texttt{#1}}
-\newcommand{\sourcepin}{\texttt{bd66ce343e4f}}
-\newcommand{\modelpin}{\texttt{851bf6e806ef}}
-\newcommand{\repourl}{\url{https://github.com/SamMausberg/verified-progress}}
-% ---------------------------------------------------------------------------
-% Evidence status. A committed result is cited by its entry in the evidence register
-% (Appendix A.1): \ev{key} or \ev{key1,key2} prints [E3] or [E3, E7]. Work that is designed
-% but not yet committed is marked \pend{key} and described in the development record
-% (Appendix A.2), which names the evidence file it will produce and any open pull request.
-% The prose beside each marker states the scientific status.
-\newcommand{\evref}[1]{\hyperref[ev:#1]{E\ref*{ev:#1}}}
-\newcommand{\evloop}[1]{\evsep\evref{#1}\def\evsep{, }}
-\DeclareRobustCommand{\ev}[1]{{\def\evsep{}[\forcsvlist{\evloop}{#1}]}}
-\newcommand{\devref}[1]{\hyperref[dev:#1]{D\ref*{dev:#1}}}
-\newcommand{\devloop}[1]{\devsep\devref{#1}\def\devsep{, }}
-\DeclareRobustCommand{\pend}[1]{\leavevmode{\def\devsep{}\color{ochre}\textsf{\footnotesize[pending \forcsvlist{\devloop}{#1}]}}}
-\DeclareRobustCommand{\pendtext}{\leavevmode{\color{ochre}\textsf{\footnotesize pending}}}
-\newcommand{\pendingfigure}[2]{%
-  \begin{center}\setlength{\fboxsep}{9pt}\color{ochre}%
-  \fbox{\parbox{.9\linewidth}{\centering\small\textsf{Pending figure.} #1\par\smallskip
-  \footnotesize\textsf{Data:} \texttt{\detokenize{#2}}}}\end{center}}
-% A figure that reads a committed data file: draw it if the file exists, otherwise a
-% pending placeholder naming the file (so the source builds before the evidence merges).
-\newcommand{\datafigure}[3]{\IfFileExists{#1}{#2}{\pendingfigure{#3}{#1}}}
-\newtheorem{theorem}{Theorem}[section]
-\newtheorem{proposition}[theorem]{Proposition}
-\newtheorem{lemma}[theorem]{Lemma}
-\newtheorem{corollary}[theorem]{Corollary}
-\theoremstyle{definition}\newtheorem{definition}[theorem]{Definition}
-\theoremstyle{remark}\newtheorem{remark}[theorem]{Remark}
-\lstset{basicstyle=\ttfamily\footnotesize,breaklines=true,columns=fullflexible,keepspaces=true,frame=single,rulecolor=\color{ink!25},showstringspaces=false,aboveskip=8pt,belowskip=8pt}
-\tikzset{box/.style={draw=ink!55,fill=wash,rounded corners=1.5pt,align=center,font=\small,inner sep=5pt},
-  good/.style={box,fill=washgreen,draw=teal!70},warn/.style={box,fill=washamber,draw=ochre!70},
-  flow/.style={-{Stealth[length=2mm]},semithick,draw=ink},dashedflow/.style={flow,dashed},
-  label/.style={font=\footnotesize,text=muted,align=center}}
-% Keep only rows whose column #1 equals #2 (for long-form CSVs in PGFPlots).
-\pgfplotsset{discard if not/.style 2 args={x filter/.append code={%
-  \edef\tempa{\thisrow{#1}}\edef\tempb{#2}%
-  \ifx\tempa\tempb\else\def\pgfmathresult{inf}\fi}}}
-\pgfplotsset{every axis/.append style={tick label style={font=\footnotesize},label style={font=\small},
-  grid style={draw=ink!10},legend style={font=\footnotesize,draw=none,fill=white,fill opacity=.9,text opacity=1},legend cell align=left}}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage[hypertexnames=false]{hyperref}
+\usepackage[accepted]{mlsys2025}
+\input{macros}
+\input{terminology}
+% The style's \flushbottom stretches columns that hold large floats (template/README.md).
+\raggedbottom
+% This is a preprint, not a paper accepted at MLSys: replace the style's proceedings
+% notice (printed at the foot of the first column) without modifying the style file.
+\makeatletter
+\renewcommand{\Notice@String}{Preprint, 30 September 2026; not peer reviewed.}
+\makeatother
+\hypersetup{pdftitle={The Work a Verifier Needs: Certified Low-Precision Output Heads under a Stock-Kernel Contract},pdfauthor={Samuel Mausberg}}
+\mlsystitlerunning{The Work a Verifier Needs}
 
-\renewcommand{\topfraction}{.9}\renewcommand{\bottomfraction}{.6}\renewcommand{\textfraction}{.1}\renewcommand{\floatpagefraction}{.72}
-\setcounter{topnumber}{3}\setcounter{totalnumber}{4}
-\setcounter{tocdepth}{1}
 \begin{document}
-\thispagestyle{plain}
-\begin{center}
-{\LARGE\bfseries\color{ink}The Work a Verifier Needs\par}
-\vspace{.6ex}
-{\large Certified low-precision output heads under a stock-kernel contract,\\ and the serving stack of a hybrid model\par}
-\vspace{2ex}
-{\normalsize Samuel Mausberg\footnote{Code, exact references, committed evidence and the source of this manuscript: \repourl. Cite as Samuel Mausberg, \emph{The Work a Verifier Needs}, 2026, at that address.}\par}
-\vspace{.4ex}
-{\small\color{muted}Working draft, 30 September 2026\par}
-\end{center}
-\vspace{1ex}
-\begin{abstract}
-\noindent A speculative decoder asks its target model for a full vocabulary projection at every verified position, although a greedy verifier needs only the winning token. We ask how much of that projection a verifier needs for Qwen3.5-4B served by SGLang on one GH200, where the tied 248,320-row output head is 15\% of the weight bytes of a plain decode step and 84\% of those of a multi-token-prediction draft step. The mechanism the earlier revisions of this work were built on, transporting a drafter's tile summaries to the target's hidden state, fails on real states: for the public DFlash drafter and for the model's own multi-token-prediction layer, draft and target head inputs differ by a median 92\% and 95\% in relative $\ell_2$ distance, against the 0.85\% at which transport would beat an int8 envelope, and for every bound family and tiling tested its certificates skip at most 0.65\% of the vocabulary. A low-precision copy of the head works instead. Screening such a copy with an error bound is prior art for greedy heads; we state the contract it can meet against the engine's own closed-source head kernel. A row is certified only when enclosures of that kernel's BF16 outputs, under a model of its FP32 accumulation error, fix the token its first-index argmax returns at the same batch shape; every other row runs the stock kernel. We prove an envelope that covers Hopper tensor-core accumulation under the published Khattak--Mikaitis model and extend certification to seeded Gumbel sampling and fixed-noise speculative verification. On 6,005 captured plain-decode head inputs an int8 head certifies the exact winner with 1.3--1.6 candidate rows on average; under the Khattak--Mikaitis model 0.35\% of rows (2.8\% of the capture's batches of up to 16) need the stock kernel, 1.40\% (10.9\%) under a conservative model, and no certified token differed from the engine's. At serving batch sizes the case rests on a row-wise fallback. Head-path runtime and served frontiers are pending.
-\end{abstract}
-
-\vspace{1ex}
-\noindent{\small\textbf{Status of the evidence.} A \emph{finding} is a theorem proved here or a result whose evidence is committed in the repository; it cites its entry in the evidence register as \textcolor{ink}{[E$n$]} (Appendix~\ref{app:register}). A \emph{derived} number is a calculation from the pinned checkpoint, configuration or source code, with its formula and inputs given where it is used. A \emph{hypothesis} is labelled as one, with the test that could reject it. Work that is designed but whose result is not yet committed is marked {\color{ochre}\textsf{\footnotesize[pending D$n$]}} with an entry in the development record (Appendix~\ref{app:devrecord}); no number stands in for it. Section~\ref{sec:falsifiers} gives the status of every question.\par}
-
-\clearpage
-{\small\tableofcontents}
-\vspace{2ex}
+\twocolumn[
+\mlsystitle{The Work a Verifier Needs: Certified Low-Precision Output Heads under a Stock-Kernel Contract}
+\begin{mlsysauthorlist}
+% No affiliation is given, so the name is set directly (\mlsysauthor requires one).
+\mbox{\bf Samuel Mausberg}
+\end{mlsysauthorlist}
+\mlsyskeywords{speculative decoding, LLM inference, certified computation, floating point, SGLang}
+\vskip 0.3in
+\input{sections/abstract}
+]
+% First-column footnote in place of the style's \printAffiliationsAndNotice (no affiliation
+% and no correspondence address to print). Hyperref's footnote anchor is switched off for it.
+\makeatletter
+{\let\thefootnote\relax\let\@footnotetext\H@@footnotetext
+\footnotetext{\hspace*{-\footnotesep}Code, exact references, committed evidence and the source of this paper: \repourl.\par\Notice@String}}
+\makeatother
 
 \input{sections/intro}
-\input{sections/setting}
-\input{sections/exactness}
+\input{sections/contract}
+\input{sections/setup}
 \input{sections/head}
-\input{sections/sampling}
 \input{sections/transport}
-\input{sections/speculation}
-\input{sections/stack}
-\input{sections/drafting}
-\input{sections/serving}
 \input{sections/related}
 \input{sections/discussion}
 
-\appendix
-\input{sections/app_record}
-\input{sections/app_derivations}
-\input{sections/app_untested}
-\input{sections/app_engine}
-
-\small\raggedright
-\bibliographystyle{plainnat}
+{\raggedright
 \bibliography{references}
+\bibliographystyle{mlsys2025}
+}
+
+\IfFileExists{sections/appendices.tex}{\appendix\input{sections/appendices}}{}
 \end{document}
