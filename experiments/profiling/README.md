@@ -25,7 +25,7 @@ scripts/gpu_lock.sh -s experiments/profiling/analyze_all.sh
 | File | Role | Evidence it writes |
 |---|---|---|
 | `run_all.sh` | GPU steps: `microbench`, `plain`, `mtp`, `baseline`, `startprofile`, `graphtrace`, `eager`, `host`, `dflash`, `gdn`, `ncu` | raw reports in `$VP_DATA` |
-| `analyze_all.sh` | Every analysis below, in order, over whatever raw runs exist | everything in `evidence/profiles/` except the microbenchmark files (`hbm_bandwidth.json`, `head_microbench*.json`, `microbench_clocks.json`) |
+| `analyze_all.sh` | Every analysis below, in order. Most steps skip when their raw runs are missing, but the bytes model needs the window files of both `plain_nsys/` and `mtp_nsys/`, so the script stops without the `plain` and `mtp` runs | everything in `evidence/profiles/` except the microbenchmark files (`hbm_bandwidth.json`, `head_microbench*.json`, `microbench_clocks.json`) |
 | `run_profiles.py` | Launches one server arm (plain, MTP, DFlash block 16 or 8, eager diagnostic arms), profiles steady-state windows under nsys (or none, for throughput), stops the server | raw reports, client windows |
 | `drive_decode.py` | The client: holds C concurrent greedy generations so the batch is exactly C during the profiled window, then aborts them | used by `run_profiles.py` |
 | `host_functions.json` | Host functions wrapped in NVTX ranges for the host-gap diagnostic (`run_profiles.py --host-trace`) | input |
