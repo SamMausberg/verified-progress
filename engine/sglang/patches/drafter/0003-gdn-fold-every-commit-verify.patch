@@ -1,4 +1,4 @@
-From d1201b03e74a6490dbb4805ad3df710bce7071df Mon Sep 17 00:00:00 2001
+From 6ca40e754747f67da8afcc1a3fd637065540423d Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <samuelmausberg@gmail.com>
 Date: Thu, 1 Oct 2026 03:19:53 +0000
 Subject: [PATCH] GDN: opt-in fold-every-commit buffered verify
@@ -14,8 +14,9 @@ hook routes to the GDN fold when it is on. Off by default.
 ---
  python/sglang/srt/environ.py                  |  4 ++
  .../attention/hybrid_linear_attn_backend.py   | 38 ++++++++++++++-----
- python/sglang/srt/mem_cache/memory_pool.py    |  7 +++-
- 3 files changed, 38 insertions(+), 11 deletions(-)
+ .../srt/mem_cache/kv_cache_configurator.py    |  8 +++-
+ python/sglang/srt/mem_cache/memory_pool.py    | 14 +++++--
+ 4 files changed, 51 insertions(+), 13 deletions(-)
 
 diff --git a/python/sglang/srt/environ.py b/python/sglang/srt/environ.py
 index f3571906ff..6a71873da2 100644
@@ -91,8 +92,27 @@ index e8beb66cb4..c522fad003 100644
          from sglang.kernels.ops.attention.fla.gdn_replayssm_spec_decode import (
              commit_gdn_replayssm_circular,
              commit_gdn_replayssm_spec,
+diff --git a/python/sglang/srt/mem_cache/kv_cache_configurator.py b/python/sglang/srt/mem_cache/kv_cache_configurator.py
+index 35bc56db5c..8f8882bef4 100644
+--- a/python/sglang/srt/mem_cache/kv_cache_configurator.py
++++ b/python/sglang/srt/mem_cache/kv_cache_configurator.py
+@@ -2476,7 +2476,13 @@ class KVCacheConfigurator:
+         else:
+             replayssm_ring_per_req = 0
+         replayssm_ring_per_req = int(replayssm_ring_per_req * pp_layer_scale)
+-        if replayssm_active and self.hybrid_kda_config is None:
++        # GDN compact replay is request scratch; the fold-every-commit rings (KDA,
++        # and GDN under SGLANG_GDN_REPLAYSSM_FOLD) are attached to each mamba slot.
++        if (
++            replayssm_active
++            and self.hybrid_kda_config is None
++            and not envs.SGLANG_GDN_REPLAYSSM_FOLD.get()
++        ):
+             replay_req_slots = (
+                 get_schedule().max_running_requests // self.attn_dp_size + 1
+             )
 diff --git a/python/sglang/srt/mem_cache/memory_pool.py b/python/sglang/srt/mem_cache/memory_pool.py
-index aa8a3b44bf..7947bf1a6f 100644
+index aa8a3b44bf..480b90ca10 100644
 --- a/python/sglang/srt/mem_cache/memory_pool.py
 +++ b/python/sglang/srt/mem_cache/memory_pool.py
 @@ -567,7 +567,8 @@ class MambaPool:
@@ -105,7 +125,23 @@ index aa8a3b44bf..7947bf1a6f 100644
          )
          _replayssm_on = enable_linear_replayssm or enable_linear_replayssm_spec
  
-@@ -709,7 +710,9 @@ class MambaPool:
+@@ -659,9 +660,14 @@ class MambaPool:
+                 L = linear_replayssm_cache_len
+                 # GDN speculative replay is request-lifetime scratch. Size it by
+                 # active requests instead of every persistent radix-cache slot.
++                # The fold-every-commit rings (KDA, and GDN under
++                # SGLANG_GDN_REPLAYSSM_FOLD) are indexed by the physical mamba
++                # slot, both in the ring-writing verify and in the fold.
+                 num_slots = (
+                     spec_state_size + 1
+-                    if enable_linear_replayssm_spec and not cache_params.is_kda
++                    if enable_linear_replayssm_spec
++                    and not cache_params.is_kda
++                    and not self.replayssm_spec_fold
+                     else size + 1
+                 )
+                 # Decode records follow the SSM dtype. Spec-verify compact d/k
+@@ -709,7 +715,9 @@ class MambaPool:
                  )
                  # KDA still uses raw-input fold-every-commit. GDN materializes
                  # its compact d/k/g history directly and needs no duplicate ring.
