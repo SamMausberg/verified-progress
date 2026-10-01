@@ -3,8 +3,9 @@
 How to reproduce the evidence behind the paper and how to run new GPU
 experiments on this machine. `SETUP.md` describes the machine itself. Every
 committed result lives under `evidence/<topic>/` with a README that gives the
-exact command that produced it; section 5 maps each experiment to its evidence,
-and section 6 states the rules that make a run admissible as evidence.
+exact command that produced it; section 5 points at the indexes of experiments
+and evidence, and section 6 states the rules that make a run admissible as
+evidence.
 
 ## 1. Environments
 
@@ -97,26 +98,11 @@ python -m bench.pareto <run dirs> --out <output dir> --baseline plain
 
 ## 5. Experiments and where their evidence lives
 
-Status by task is in `TASKS.md`; this table only says where things are. Work
-still in review has no evidence directory on `main` yet.
-
-| Experiment | Code | Evidence |
-|---|---|---|
-| Certified-head exact reference and weight-only head constants | `src/precision_reference.py`, `experiments/precision_head_constants/` | `evidence/precision/` |
-| The imported bundle's CPU references and synthetic drift | `src/*_reference.py`, `experiments/synthetic_drift.py` | files at the top of `evidence/`, `data/synthetic_drift.csv` |
-| State-structure witnesses (P4, P5) | `tests/test_state_structure.py` | `evidence/state_structure/` |
-| Contract witnesses (P7) | `tests/test_contracts.py` | `evidence/contracts/` |
-| Attribution, head microbenchmark, bytes per step | `experiments/profiling/` | `evidence/profiles/` |
-| Head geometry: transport and self-evidence on captured states | `experiments/head_geometry/` | `evidence/head_geometry/` |
-| Serving harness, tuned arms, workloads, quality | `bench/` | `evidence/bench/` |
-| State safety under speculation and the stock noise floor (H5) | `experiments/state_safety/` | `evidence/state_safety/` |
-| Public DFlash-4B drafter | `experiments/drafter/` | `evidence/drafter/` |
-| Stack levers, ceilings, P4 replay | `experiments/moonshot/` | `evidence/moonshot/` |
-| Long-window repair (P2, P3) and window reuse (P9) | `experiments/repair/` | `evidence/repair/` |
-| Backbone GEMMs and RMSNorm launches | `experiments/backbone/` | `evidence/backbone/` |
-
-When a pull request merges, the paper replaces the matching pending items with
-its numbers.
+`experiments/README.md` maps each experiment directory to its evidence directory
+and to where its commands are recorded; `evidence/README.md` indexes the
+evidence directories, the paper claims each supports, and the imported bundle's
+files at the top of `evidence/`. Status by task is in `TASKS.md`. When a pull
+request merges, the paper replaces the matching pending items with its numbers.
 
 ## 6. What makes a run admissible
 

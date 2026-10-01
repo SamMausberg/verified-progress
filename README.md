@@ -159,8 +159,8 @@ and SGLang at the pinned commit with the patch series under
 | `formal/` | Lean sources and `STATUS.md` (what is and is not formalized) |
 | `bench/` | Serving benchmark harness: arms, aiperf sweeps, Pareto frontiers, quality check, frozen workloads |
 | `engine/sglang/` | SGLang changes as `git format-patch` series under `patches/<workstream>/`, with apply commands in its README |
-| `experiments/<name>/` | Capture and analysis code, one directory per experiment |
-| `evidence/<topic>/` | Committed results; each directory's README gives the command behind every file. The files at the top of `evidence/` are the imported bundle's records |
+| `experiments/<name>/` | Capture and analysis code, one directory per experiment; `experiments/README.md` maps each to its evidence |
+| `evidence/<topic>/` | Committed results; each directory's README gives the command behind every file. `evidence/README.md` indexes the topics, the paper claims they support and the imported bundle's records at the top of `evidence/` |
 | `sources/` | Literature review, citation audit, manuscript review, the verified bibliography and source manifest, and the imported bundle's checksums |
 | `scripts/` | GPU lock and job containment (`gpu_*.sh`), SGLang environment and worktrees (`sglang_*.sh`), repository checks (`check_*`, `verify_artifact.py`) and the bundle's auxiliary streaming client (`benchmark_sse.py`) |
 | `data/` | The bundle's synthetic drift table, which the paper plots, and the auxiliary client's example workload |
