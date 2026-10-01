@@ -44,7 +44,12 @@ def state_compare() -> ModuleType:
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules['state_safety_compare'] = module
-    spec.loader.exec_module(module)
+    # compare.py imports its sibling server.py (stdlib only) by bare name.
+    sys.path.insert(0, str(path.parent))
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.remove(str(path.parent))
     return module
 
 
