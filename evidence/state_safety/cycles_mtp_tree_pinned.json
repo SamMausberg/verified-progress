@@ -266,7 +266,8 @@
    "fragile_divergences": 6,
    "fragile": 33,
    "divergences_per_fragile": 0.1818,
-   "nonfragile_divergences": 0
+   "nonfragile_divergences": 0,
+   "fisher_vs_later_p_exploratory": 0.0494
   },
   "nonfragile_divergences": 0,
   "homogeneity_chi2": {

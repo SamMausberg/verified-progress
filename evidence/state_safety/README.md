@@ -310,16 +310,25 @@ Setup section. Rates are per 1,000 compared tokens
   A state error at one rejection position (a wrong rollback for one accept length)
   would raise that position's rate. No length stands out. The rates are compatible
   with one common rate: chi-square p = 0.75, 0.72, 0.54 and 0.38 for steps 1, 3, 5 and
-  the tree (`by_commit_length.homogeneity_chi2` in each file).
-- The first verify cycle after the prefill follows no earlier cycle, so it is counted
-  separately (`first_cycle_after_prefill`) and is not part of the test. Its rate is
-  higher for steps 5 and the tree (7/40 and 6/33 fragile positions), but the counts
-  are small and untested. Every prompt contributes this cycle, while later cycles only
-  count prompts that have not yet diverged, so the groups are not alike. That is a failure to
+  the tree (`by_commit_length.homogeneity_chi2` in each file). That is a failure to
   reject, not a proof of equal rates. The test also treats positions as independent,
   although they cluster by prompt and a prompt's positions stop at its first
   divergence. No prompt-clustered analysis or bound on a per-length excess rate has
   been done.
+- **The first verify cycle after the prefill** follows no earlier cycle. It is counted
+  separately (`first_cycle_after_prefill`) and is not part of the test above.
+  - Its rate is higher for steps 5 and the tree (7/40 and 6/33 fragile positions,
+    against 0.077 and 0.081 later). A Fisher exact test against all later cycles gives
+    p = 0.71, 0.75, 0.033 and 0.049 for steps 1, 3, 5 and the tree
+    (`fisher_vs_later_p_exploratory`).
+  - That test is exploratory. It was chosen after looking at the data. It is not
+    corrected for the four configurations and several cycle buckets examined.
+  - The groups also differ in more than state. The first cycle follows the prefill
+    chunk, every prompt contributes it, and later cycles count only prompts that have
+    not yet diverged.
+  - So this is a lead for a declared follow-up, not a finding. The follow-up is a
+    first-cycle test, declared in advance, on fresh prompts. It is pending, as is a
+    look at the prefill-to-decode handoff of the GDN state.
 - **Pinning and the repeat floor.** The fresh-server repeat at concurrency 32 drops
   from 24/320 (unpinned: different pools, cap 16) to 4/320 (identical pools, cap 8).
   Both changed at once, and a smaller cap also narrows the batch compositions, so
@@ -345,7 +354,9 @@ Setup section. Rates are per 1,000 compared tokens
 
 **Pending** (queued, pinned): radix cache off, overlap off, deterministic inference
 and FP32 head for plain and MTP, the logprobs-off control, retraction, a second MTP
-session, and the ReplaySSM and FlashInfer GDN decode paths.
+session, and the ReplaySSM and FlashInfer GDN decode paths. Not yet designed: the
+pre-declared first-cycle test on fresh prompts and the prefill-to-decode handoff
+check above.
 
 ## History dependence through radix-cache insertion
 

@@ -148,9 +148,27 @@ def by_commit_length(buckets: dict[str, dict[str, Any]]) -> dict[str, Any]:
 
         chi2, p, dof, _ = chi2_contingency(used)
         test.update(chi2=round(float(chi2), 3), dof=int(dof), p=round(float(p), 4))
+    first = entry(*after_prefill)
+    d_later = sum(v[0] for v in rows.values())
+    f_later = sum(v[1] for v in rows.values())
+    if after_prefill[1] and f_later:
+        # Exploratory: first cycle against all later cycles, fragile positions only.
+        # Chosen after seeing the data, uncorrected, and the groups differ by more
+        # than state (see the README); a lead for a declared follow-up, not a finding.
+        try:
+            from scipy.stats import fisher_exact
+        except ImportError:  # the repository's test environment has no SciPy
+            first['fisher_vs_later_p_exploratory'] = None
+        else:
+            table2 = [
+                [after_prefill[0], after_prefill[1] - after_prefill[0]],
+                [d_later, f_later - d_later],
+            ]
+            p_value = float(fisher_exact(table2)[1])
+            first['fisher_vs_later_p_exploratory'] = round(p_value, 4)
     return {
         'by_length': table,
-        'first_cycle_after_prefill': entry(*after_prefill),
+        'first_cycle_after_prefill': first,
         'nonfragile_divergences': sum(v[2] for v in rows.values()) + after_prefill[2],
         'homogeneity_chi2': test,
     }
