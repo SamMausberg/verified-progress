@@ -13,13 +13,18 @@ a microbenchmark speed-up is not a served result.
 
 ## Setup
 
-GH200 (132 SMs, clocks 1980 MHz SM / 2619 MHz memory at the start of each run), torch 2.13.0+cu130,
+GH200 (132 SMs; `nvidia-smi` read 1980 MHz SM / 2619 MHz memory before the gemm, norm and merge
+runs, and an idle 345 MHz SM / 2619 MHz memory before the chain run, which then warmed up under
+its own load; clocks under load were not logged), torch 2.13.0+cu130,
 Triton 3.7.1, cuBLASLt 13.1, SGLang at the paper's pin with backbone patches 0001-0003
 (`engine/sglang/patches/backbone/`; tree `a1c6b5f6d3`, recorded in the JSON files as the local
 commit e89b122037; the kernel is `sglang/srt/layers/backbone_gemm.py`), repository commit 1e56c79,
 `Qwen/Qwen3.5-4B@851bf6e8`. Every JSON records its command, commits (both trees
-clean), clocks and GPU. Foreign CPU load averaged 0.3-0.7 cores during each step of the run (limit
-2).
+clean), clocks and GPU. Foreign CPU load (`bench/hostload.py`, one sample per second, files in
+[`hostload/`](hostload/)) averaged 0.68, 0.54, 0.39 and 0.29 cores during the gemm, norm, merge and
+chain runs, below the 2-core limit; the gemm run had a single-sample maximum of 17.2 cores (217
+samples, not flagged as contended), the others at most 2.4. The committed copies reduce other
+processes' command lines to program names.
 
 **Timing.** For each projection and M, one CUDA graph calls the arm once per layer, each layer with
 its own real checkpoint weight and its own input (24 GDN, 8 attention or 32 MLP layers; together
@@ -96,10 +101,15 @@ without a profiler, so at most 5.7%), and 92-120 us less at M = 2-16.
 
 ### Merged GDN input projection
 
-SGLang's packed path (one GEMM over the concatenated 12352 x 2560 weight) gives **bitwise the
-same output as the separate qkvz and ba GEMMs at every M from 1 to 1024** on all 24 layers (the
-merged GEMM uses the qkvz GEMM's kernel). Against the stock pair (ba on a side stream) it is
-neutral up to M = 16, 3% slower at M = 32 and 5-13% faster from M = 64 to 1024.
+SGLang's packed path multiplies the concatenated 12352 x 2560 weight in one GEMM instead of the
+12288 x 2560 qkvz and 64 x 2560 ba GEMMs. Tested at M = 1, 2, 4, 8, 16, 32, 64, 128, 256, 512 and
+1024 rows, with the real weights of all 24 GDN layers, random N(0, 1) BF16 inputs, cuBLAS 13.1 on
+this GH200, in an isolated microbenchmark (`merge_microbench.json`): **every element of the packed
+GEMM's output is bitwise equal to the separate GEMMs' outputs** (cuBLAS picks the qkvz GEMM's
+kernel for the packed one at each tested M). This is a per-GEMM statement; whether served tokens
+are unchanged is pending (the exactness runs below). Against the stock pair (ba on a side stream)
+the packed GEMM is neutral up to M = 16, 3% slower at M = 32 and 5-13% faster from M = 64 to
+1024.
 
 ### RMSNorm
 

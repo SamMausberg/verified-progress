@@ -1,0 +1,24 @@
+{
+  "command": [
+    "python",
+    "experiments/backbone/gemm_bench.py",
+    "merge",
+    "--out",
+    "~/vp-data/backbone/runs/h1/merge_microbench.json"
+  ],
+  "exit_code": 0,
+  "interval_s": 1.0,
+  "samples": 15,
+  "foreign_cores_mean": 0.385,
+  "foreign_cores_max": 0.99,
+  "contended": false,
+  "contention_threshold_cores": 2.0,
+  "top_foreign_mean_cores": {
+    "claude": 0.06,
+    "node": 0.06
+  },
+  "own_peak_cores": {
+    "python gemm_bench.py": 5.25
+  },
+  "note": "bench/hostload.py record output for the hold-1 merge step; process command lines are reduced to program names in this committed copy"
+}
