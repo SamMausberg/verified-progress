@@ -26,7 +26,7 @@
 \begin{tikzpicture}[font=\footnotesize]
 % ---------------- (b) measured drift against the thresholds ----------------
 \begin{semilogxaxis}[name=b,at={(11.2cm,0)},anchor=center,
-  width=8.7cm,height=3.95cm,xmin=1e-3,xmax=1.6,ymin=0,ymax=1,
+  width=8.7cm,height=3.95cm,xmin=1e-3,xmax=5,ymin=0,ymax=1,
   xlabel={Drift ratio $\rho$ of a pair, or threshold $\delta^\ast_i$ of an entry},ylabel={Cumulative share},grid=major,
   ytick={0,0.25,0.5,0.75,1},yticklabels={0,0.25,0.5,0.75,1},
   title={\paneltitle{b}{Measured drift against derived thresholds}},xminorticks=false]
@@ -38,11 +38,14 @@
 \addplot[cdraft!60,thick,dash pattern=on 3.5pt off 1.8pt,mark=triangle*,mark size=2.1pt,mark options={solid,fill=white,draw=cdraft},mark repeat=50,mark phase=26] table[x=rho_all,y=q,col sep=comma]{../evidence/head_geometry/rho_mtp4b_quantiles.csv};
 \draw[{Stealth[length=1.6mm]}-{Stealth[length=1.6mm]},ink!70] (axis cs:\figDstar,0.5) -- (axis cs:\figRho,0.5);
 \node[annot,fill=white] at (axis cs:0.037,0.5) {medians $\vpnum{0}{\figRho/\figDstar}\times$ apart};
-\node[annot,anchor=east,align=right] at (axis cs:0.0052,0.3) {$\delta^\ast_i$: int8,\\128 columns};
-\node[annot,anchor=west] at (axis cs:0.0084,0.3) {$\delta^\ast_i$: int8, per row};
-\node[annot,anchor=east,align=right] at (axis cs:0.155,0.8) {$\delta^\ast_i$: int4,\\per row};
-\node[annot,anchor=east] at (axis cs:0.9,0.8) {$\rho$: DFlash-4B};
-\node[annot,anchor=east] at (axis cs:0.74,0.1) {$\rho$: MTP-4B};
+\node[annot,anchor=east,align=right] at (axis cs:0.0052,0.3) {$\delta^\ast_i$:\\int8, 128\\columns};
+\node[annot,anchor=west] at (axis cs:0.0084,0.3) {$\delta^\ast_i$: int8, per entry};
+\node[annot,anchor=east,align=right] at (axis cs:0.155,0.8) {$\delta^\ast_i$: int4,\\per entry};
+% each drafter's label on the side where its curve is the outer one (at a share of 0.85, DFlash
+% is at 0.955 and MTP at 1.135); the drift curves are the purple ones, every threshold label
+% starts with delta*
+\node[annot,anchor=east] at (axis cs:0.9,0.85) {DFlash-4B};
+\node[annot,anchor=west] at (axis cs:1.25,0.85) {MTP-4B};
 \end{semilogxaxis}
 % ---------------- (a) median DFlash-4B head inputs, to scale ----------------
 % The drawing spans y from about -41 units (the callout text) to 62 (the line through h^d);
