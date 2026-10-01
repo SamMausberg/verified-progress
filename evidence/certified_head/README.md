@@ -275,8 +275,9 @@ and 50 exact logits in three identical runs; its tile summaries and decisions
 were right, and the runtime probe tripped and latched it. The same tiles with
 pointer loads, and the default (TMA 128x64x128), missed none. A count that
 varies between identical runs points to a race; that is not established.
-`tma_m128_check.json` checks its neighbours (block_v 64 and 128, block_m 64 and
-128, 4 and 8 warps, 3 and 4 stages, TMA and pointer loads) at M = 128 and 256.
+`tma_m128_neighbourhood.json` checks all 32 of its neighbours (block_v 64 and
+128, block_m 64 and 128, 4 and 8 warps, 3 and 4 stages, TMA and pointer loads)
+at M = 128 and 256.
 Neither fault's mechanism is known, so the defaults' clean record (the checks
 above, the self-test at every batch size, 0 differing rows in the SGLang checks)
 is empirical, and a rare intermittent miss could pass 8 probe rows per call:
@@ -342,20 +343,23 @@ attributed them to the sweep was wrong. The rule was applied as declared there
 too: it compares pointer loads with the TMA default, so above 64 rows BF16 takes
 the pointer-load tiles (624.1 us at M = 128) although the best TMA tiles (491.4
 us) are faster still. The new pointer-load defaults (and the
-new W8A8 ones) get their own stress test in the shared hold that reruns the GPU
-tests; the head-path microbenchmark's W8A8 and BF16 rows below were timed on the
-earlier TMA tiles.
+new W8A8 ones) got their own stress test in x8s2 (0 misses, below); the
+head-path microbenchmark's W8A8 and BF16 rows below were timed on the earlier
+TMA tiles.
 
 ## Results at the final commit
 
-**Where each result comes from.** The final evidence run is x7c (`steps.tsv`,
-`run_commit.txt`). It reran what had changed and reused the rest from x7 and
-x6; for each reused step `steps.tsv` gives the reason it stands.
+**Where each result comes from.** The final timed evidence run is x7c
+(`steps.tsv`, `run_commit.txt`). It reran what had changed and reused the rest
+from x7 and x6; for each reused step `steps.tsv` gives the reason it stands. A
+final shared-lock hold, x8s2, reran the correctness checks at 9f7f369
+(`x8s2_commit.txt`).
 
 | Steps | Commit | Run | Why the result stands |
 |---|---|---|---|
-| stress, micro, summarize, check_outputs | 46bcc84 | x7c | run at this commit |
-| compile, tests, tune_w8a16, primitives, ncu, ncu_export | d2712cb | x7 | the package's code and data are unchanged from d2712cb to 46bcc84; `bench/tune_gemv.py` was refactored after d2712cb (c01d905: it also records the fastest TMA and pointer-load configurations, with the same winner selection), and x7c's own W8A16 sweep (`pointer_vs_tma_w8a16.json`) picks the same winners except at M = 256 (3 instead of 4 stages, within 0.2%) |
+| compile, GPU and CPU tests, stress, TMA neighbourhood, SASS statistics | 9f7f369 | x8s2 | run at this commit |
+| micro, summarize, check_outputs | 46bcc84 | x7c | run at this commit; see below for the commits after it |
+| tune_w8a16, primitives, ncu, ncu_export | d2712cb | x7 | the package's code and data are unchanged from d2712cb to 46bcc84; `bench/tune_gemv.py` was refactored after d2712cb (c01d905: it also records the fastest TMA and pointer-load configurations, with the same winner selection), and x7c's own W8A16 sweep (`pointer_vs_tma_w8a16.json`) picks the same winners except at M = 256 (3 instead of 4 stages, within 0.2%) |
 | replay, invariance, tune_w8a8 | fff72dc | x6 | `kernels.py` is unchanged since; the replay's batches have at most 16 rows, whose tiles did not change; the invariance check runs only the stock head; the W8A8 sweep times every candidate tile explicitly |
 
 Also in x7c at 46bcc84, outside `run_all.sh`: `pointer_vs_tma_*.json`,
@@ -363,14 +367,19 @@ Also in x7c at 46bcc84, outside `run_all.sh`: `pointer_vs_tma_*.json`,
 the host's foreign CPU load (`*.hostload.json`); none was contended (the micro
 averaged 1.76 foreign cores against a threshold of 2). x7b's micro run (0d770c6)
 was flagged contended (2.03, the author's own CPU compiles during the hold) and is
-not used. Three commits follow 46bcc84 in this PR and change package code: the
+not used. Six commits follow 46bcc84 in this PR and change package code: the
 margin rule for the row's lower bound in the self-test (a9f1793), the W8A8 and
-BF16 default tiles (2d1794a), and the check that the quantization data belongs
-to the supplied weight, with contiguous inputs required (d3a2b13). The GPU tests
-and the stress test of every default under the margin rule are rerun on them in
-a shared-lock hold, x8s, whose results are added to this directory when it has
-run. None of them changes the W8A16 pass's tiles or kernels. The SGLang engine checks are in the engine
-follow-up, not in this PR.
+BF16 default tiles (2d1794a), the check that the quantization data belongs to
+the supplied weight, with contiguous inputs required (d3a2b13), the row norm's
+factor for all K squares (eb6ef57), the weight digest recorded in a freshly
+built head (647427e), and the refusal of hidden sizes the kernels do not tile
+(9f7f369). x8s2 reran the GPU and CPU tests, the stress test of every default
+under the margin rule, the TMA neighbourhood and the SASS statistics at 9f7f369;
+its results are below. None of these commits changes the W8A16 pass's tiles or
+kernels, so x7c's timings stand for the W8A16 path. (A first attempt at this
+hold, x8s, ran under the system Python, without the SGLang environment, and
+produced no results.) The SGLang engine checks are in the engine follow-up, not
+in this PR.
 
 **Checks recorded under the earlier, more lenient row-lower rule.** Until a9f1793
 the self-test, the stress test and `tma_candidates` let the row's lower bound on
@@ -381,8 +390,8 @@ rule could only add a miss where that lower bound lies within `2 margin` (about
 per-logit lower bounds that epilogues 1 and 2 compute (the epilogues share the
 code that computes them), and each of those cleared its exact logit by the
 margin in every check (0 envelope misses), so on those inputs it cannot fall in
-that band unless epilogue 3's arithmetic differs from the other epilogues'. The
-GPU tests at a9f1793 and later rerun the self-test under the new rule.
+that band unless epilogue 3's arithmetic differs from the other epilogues'.
+x8s2's GPU tests and stress test (9f7f369) check it under the new rule.
 
 **The row norm for seeded sampling (Codex, fixed after 78b3bb3).** `_prep_kernel`
 bounds each row's norm ||h||, which seeded sampling uses in
@@ -412,8 +421,14 @@ path:
   6.1e-4, BF16 rounding 2^-8 and the FP32 division). That is an argument from
   the code's stated bounds, not a measurement.
 
-**GPU tests** (`gpu_tests.log`, d2712cb): 119 passed. x8s reruns them at
-2d1794a, with the CPU tests of the margin rule (`tests/test_enclosure_margin.py`).
+**GPU tests** (`gpu_tests.log`, 9f7f369, x8s2): 145 passed, none skipped: the
+121 GPU tests of `tests/test_certified_head.py` and 24 CPU tests
+(`tests/test_enclosure_margin.py`, `tests/test_certified_bounds.py`,
+`tests/test_certified_head_inputs.py`). x7 ran 119 GPU tests at d2712cb; the two
+added since check that the quantization data belongs to the weight and that
+strided inputs are refused. The weight digest check that `from_quantized` runs (the
+SHA-256 of the 1.27 GB head, read from the device in row chunks) took 0.96 s,
+a cost paid once per head at start-up.
 
 **Replay of 60,000 real decode rows** (`replay_decisions.json`, fff72dc). Each
 engine step is replayed at its own batch shape (at most 16 rows).
@@ -515,8 +530,7 @@ Limitations of the sampled path:
   3.6 at 256). The sampling epilogue computes FP64 Gumbel noise and score bounds
   for every element of its tile, so its cost grows with the tile's rows, and at
   the 32- and 64-row tiles the compiled kernel runs out of registers and spills
-  (`sample_kernel_sass.json`, regenerated in x8s with the 32- and 64-row tiles;
-  the committed file still holds the 16-row tile only):
+  (`sample_kernel_sass.json`, x8s2, 9f7f369):
 
   | Sampled kernel (probes on / off) | Registers | Stack bytes | Local loads and stores |
   |---|---|---|---|
@@ -571,26 +585,33 @@ Even at M = 1 the pass is not limited by memory bandwidth alone: the envelope
 epilogue's directed-rounding arithmetic keeps the SMs busy (79%). At 64 rows and
 above the kernel uses all 255 registers; this export does not report spills.
 
-**Stress test of the default tiles** (`stress_defaults.json`, 46bcc84): every
-default tile configuration of every pass, at every batch size from 1 to 256
-that dispatches to it, on real and peaked rows, each call against FP64 logits.
+**Stress test of the default tiles** (`stress_defaults.json`, 9f7f369, x8s2):
+every default tile configuration of every pass, at every batch size from 1 to
+256 that dispatches to it, on real and peaked rows, each call against FP64
+logits, with every bound (the row's lower bound included) held to the margin
+rule.
 
-| Pass | Tile (TMA) | Batch sizes | Row-checks | Misses (lower, upper, summary, probe flag) |
-|---|---|---|---|---|
-| W8A16 | 128x16x128, 4 stages | 1-16 | 1,003,680 | 0, 0, 0, 0 |
-| W8A16 | 128x32x128, 4 stages | 17-32 | 1,003,520 | 0, 0, 0, 0 |
-| W8A16 | 128x64x128, 3 stages | 33-256 | 1,035,776 | 0, 0, 0, 0 |
-| W8A8 | 128x16x128, 3 stages | 1-16 | 1,003,680 | 0, 0, 0, 0 |
-| W8A8 | 256x32x128, 3 stages | 17-32 | 1,003,520 | 0, 0, 0, 0 |
-| W8A8 | 128x64x128, 3 stages | 33-256 | 1,035,776 | 0, 0, 0, 0 |
-| BF16 | 128x32x64, 3 stages | 1-32 | 1,001,088 | 0, 0, 0, 0 |
-| BF16 | 128x64x64, 3 stages | 33-64 | 1,002,592 | 0, 0, 0, 0 |
-| BF16 | 128x128x64, 3 stages | 65-256 | 1,047,744 | 0, 0, 0, 0 |
+| Pass | Tile | Loads | Batch sizes | Row-checks | Misses (lower, upper, summary, probe flag) |
+|---|---|---|---|---|---|
+| W8A16 | 128x16x128, 4 stages | TMA | 1-16 | 1,003,680 | 0, 0, 0, 0 |
+| W8A16 | 128x32x128, 4 stages | TMA | 17-32 | 1,003,520 | 0, 0, 0, 0 |
+| W8A16 | 128x64x128, 3 stages | TMA | 33-256 | 1,035,776 | 0, 0, 0, 0 |
+| W8A8 | 128x16x128, 3 stages | pointer | 1-16 | 1,003,680 | 0, 0, 0, 0 |
+| W8A8 | 256x32x128, 3 stages | pointer | 17-32 | 1,003,520 | 0, 0, 0, 0 |
+| W8A8 | 128x64x128, 4 stages | pointer | 33-128 | 1,004,640 | 0, 0, 0, 0 |
+| W8A8 | 128x64x128, 3 stages | TMA | 129-256 | 1,034,880 | 0, 0, 0, 0 |
+| BF16 | 128x32x64, 3 stages | pointer | 1-32 | 1,001,088 | 0, 0, 0, 0 |
+| BF16 | 128x64x64, 4 stages | pointer | 33-64 | 1,002,592 | 0, 0, 0, 0 |
+| BF16 | 256x64x64, 8 warps, 4 stages | pointer | 65-256 | 1,047,744 | 0, 0, 0, 0 |
 
-With 0 misses in n row-checks the per-row miss probability is below 3/n (about
-3e-6) at 95% confidence if calls are independent trials; a race that depends on
-load or timing need not behave like independent trials. The new W8A8 and BF16
-defaults (2d1794a) are stressed the same way in x8s.
+All use 4 warps unless stated. With 0 misses in n row-checks the per-row miss
+probability is below 3/n (about 3e-6) at 95% confidence if calls are independent
+trials; a race that depends on load or timing need not behave like independent
+trials. The hold shared the GPU with another job, so these calls ran under
+different load from x7c's exclusive run. x7c's stress test (46bcc84) checked the
+W8A16 defaults above and the earlier TMA W8A8 and BF16 defaults, with the row's
+lower bound under the earlier lenient rule; it also found 0 misses in about a
+million row-checks per configuration.
 
 **The faulty TMA tiles** (`tma_m128_check.json`, 46bcc84, the two families that
 missed in x7b; three identical runs each, lower and upper misses per run):
@@ -608,10 +629,20 @@ In these two families, 64x128x128 with 4 warps and 4 stages or with 8 warps,
 128x128x128 with 4 warps, and every pointer-load configuration missed nothing,
 and the raw product (epilogue 0) was within its bound in every run, so the fault
 lies in the envelope's values, not in the GEMM.
-In x7b (0d770c6, a check with an inverted sign, whose counts are the logits each
-bound enclosed) the full neighbourhood at M = 128 and 256 (block_v 64 and 128,
-block_m 64 and 128, 4 and 8 warps, 3 and 4 stages, TMA and pointer loads) showed
-misses only in these three configurations. None is a default.
+
+**The whole neighbourhood** (`tma_m128_neighbourhood.json`, 9f7f369, x8s2):
+all 32 configurations with block_v 64 and 128, block_m 64 and 128, 4 and 8
+warps, 3 and 4 stages, TMA and pointer loads, at M = 128 and 256, on the
+sweep's random rows and on real rows, three identical runs each. Only the same
+three TMA configurations missed: 64x128x128 with 4 warps and 3 stages (lower
+bounds 7 to 4,504 per run, upper bounds 5 to 49), 128x128x128 with 8 warps and
+3 stages (upper bounds 3,742 to 39,612 per run, up to 4,875 times the
+envelope's half-width) and 128x128x128 with 8 warps and 4 stages (upper bounds 1
+to 71 per run). The other 13 TMA configurations and all 16 pointer-load
+configurations missed nothing, and the raw product was within its bound in
+every run of every configuration. None of the three is a default. (x7b's
+earlier check of this neighbourhood, at 0d770c6, inverted a sign and counted
+the logits each bound enclosed; it pointed to the same three configurations.)
 
 **Conditional-node memory** (`conditional_memory.json`, 46bcc84): five M = 64
 stock GEMMs per graph, captured, replayed and deleted four times each way.
@@ -639,17 +670,19 @@ microbenchmark therefore runs batch sizes above 32 in their own processes, and
 | `tma_repro.json` | the raw W8A16 product (standalone kernel and the pass's epilogue 0) per tile configuration, and the failing envelope's violations by class | `python experiments/certified_head/tma_repro.py --out ...` (commit 7f8079f, GPU, shared lock) |
 | `tma_candidates.json` | every pass's candidate default tiles at M = 1, 16, 17, 32, 33, 64, 65, 128, 200 and 256, twice; isolation kernels at M = 1, 16, 64 and 256: raw product, envelope, tile summaries, decisions; minimal kernels isolating the fault | `python experiments/certified_head/tma_candidates.py --out ...` (commit 4a54503, GPU, shared lock) |
 | `steps.tsv`, `run_commit.txt`, `gpu.txt` | x7c's steps with each one's commit and, for a reused step, why it stands; the run's commit; the GPU | `RUN_ALL_ONLY=stress,micro,summarize RUN_ALL_REUSE=~/vp-data/kernel/runs/x7b scripts/gpu_lock.sh -x experiments/certified_head/run_all.sh ~/vp-data/kernel/runs/x7c` (46bcc84) |
-| `gpu_tests.log` | the GPU tests | `python -m pytest tests/test_certified_head.py -q -s` (run_all step `tests`, d2712cb) |
+| `gpu_tests.log` | the GPU tests with the package's CPU tests | `python -m pytest tests/test_certified_head.py tests/test_enclosure_margin.py tests/test_certified_bounds.py tests/test_certified_head_inputs.py -q -s -p no:cacheprovider` (x8s2, 9f7f369, shared lock) |
+| `x8s2_commit.txt` | x8s2's commit and tree state | x8s2 ran, under `scripts/gpu_lock.sh -s`, `python experiments/certified_head/compile_check.py` (148 of 148 variants) and the commands of the four files marked x8s2 here |
 | `replay_decisions.json` | 60,000 real decode rows under every contract and both error models, greedy and seeded sampling | `python experiments/certified_head/replay_decisions.py --limit-rows 60000 --sample-temps 0.7 1.0 --out ...` (run_all step `replay`, fff72dc) |
 | `gemv_sweep_w8a16.json`, `gemv_sweep_w8a8.json`, `tune_*.hostload.json` | tile sweeps (the micro's tuned tiles) | `python bench/tune_gemv.py --arith w8a16 --out ...`; `--arith w8a8 --batches 16 32 64 128 256` (run_all steps `tune_w8a16`, d2712cb, and `tune_w8a8`, fff72dc) |
 | `micro_head.json`, `micro.hostload.json`, `head_path_time.csv`, `head_path_table.md` | head-path microbenchmark, both fallback modes, both error models, probes on and off, sampling, W8A8 and BF16 passes; its summary | `python bench/micro_head.py --trials 30 --pool-rows 60000 --gemv-configs gemv_sweep_w8a16.json --w8a8-configs gemv_sweep_w8a8.json --out ...`, then `python bench/summarize_head.py micro_head.json --csv head_path_time.csv` (46bcc84) |
 | `head_primitives.json`, `primitives.hostload.json` | primitive costs (stock chain, W8A16 pass, tile GEMMs, rescoring, draft summary) | `python bench/head_primitives.py --trials 15 --out ...` (d2712cb) |
 | `ncu_gemv_summary.json`, `ncu_expected.json` | Nsight Compute summary of the production envelope launches at M = 1, 16, 64 and 256, and the launches expected | run_all steps `ncu` and `ncu_export` (d2712cb), then `python experiments/certified_head/ncu_summary.py ncu_gemv_details.csv ncu_gemv_summary.json` |
-| `stress_defaults.json` | every default tile configuration of every pass, every batch size, about a million row-checks each | `python experiments/certified_head/stress_defaults.py --out ...` (run_all step `stress`, 46bcc84) |
+| `stress_defaults.json` | every default tile configuration of every pass, every batch size, about a million row-checks each | `python experiments/certified_head/stress_defaults.py --out ...` (x8s2, 9f7f369, shared lock) |
 | `pointer_vs_tma_{w8a16,w8a8,bf16}.json`, `pointer_vs_tma_*.hostload.json` | fastest passing TMA and pointer-load configurations and the default's time per batch size | `python bench/tune_gemv.py --arith ARITH --out ...` (46bcc84, exclusive lock) |
 | `tma_m128_check.json` | the two faulty TMA tile families at M = 128 and 256: raw product and each side of the envelope, three runs | `python experiments/certified_head/tma_m128_check.py --configs 64x128x128 128x128x128 --out ...` (46bcc84) |
+| `tma_m128_neighbourhood.json` | all 32 configurations around the faulty TMA tiles at M = 128 and 256, random and real rows: raw product and each side of the envelope, three runs | `python experiments/certified_head/tma_m128_check.py --out ...` (x8s2, 9f7f369, shared lock) |
 | `conditional_memory.json` | device memory left behind by deleted graphs, with and without conditional nodes | `python experiments/certified_head/conditional_memory.py --out ...` (46bcc84) |
-| `sample_kernel_sass.json` | SASS statistics of the envelope kernel, greedy and sampled, probes on and off, at the three default tiles, and x3's kernel | `python experiments/certified_head/sample_kernel_sass.py --compare 9e3a39a --out ...` (CPU) |
+| `sample_kernel_sass.json` | SASS statistics of the envelope kernel, greedy and sampled, probes on and off, at the three default tiles, and x3's kernel | `python experiments/certified_head/sample_kernel_sass.py --compare 9e3a39a --out ...` (x8s2, 9f7f369, CPU) |
 
 Real head inputs come from the geometry workstream's plain-decode capture
 (SGLang `bd66ce34` with its capture patch, `--disable-cuda-graph`,

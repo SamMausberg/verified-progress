@@ -24,7 +24,7 @@
    },
    "logits_missed": 0,
    "missed_by_batch_size": {},
-   "seconds": 174.2,
+   "seconds": 411.9,
    "ok": true,
    "per_row_miss_rate_95pct_upper": 2.9890004782400766e-06
   },
@@ -51,7 +51,7 @@
    },
    "logits_missed": 0,
    "missed_by_batch_size": {},
-   "seconds": 73.5,
+   "seconds": 267.4,
    "ok": true,
    "per_row_miss_rate_95pct_upper": 2.9894770408163264e-06
   },
@@ -78,7 +78,7 @@
    },
    "logits_missed": 0,
    "missed_by_batch_size": {},
-   "seconds": 50.2,
+   "seconds": 165.4,
    "ok": true,
    "per_row_miss_rate_95pct_upper": 2.8963791398912508e-06
   },
@@ -90,7 +90,7 @@
     "block_k": 128,
     "num_warps": 4,
     "num_stages": 3,
-    "tma": true
+    "tma": false
    },
    "batch_sizes": [
     1,
@@ -105,7 +105,7 @@
    },
    "logits_missed": 0,
    "missed_by_batch_size": {},
-   "seconds": 190.9,
+   "seconds": 261.8,
    "ok": true,
    "per_row_miss_rate_95pct_upper": 2.9890004782400766e-06
   },
@@ -117,7 +117,7 @@
     "block_k": 128,
     "num_warps": 4,
     "num_stages": 3,
-    "tma": true
+    "tma": false
    },
    "batch_sizes": [
     17,
@@ -132,9 +132,36 @@
    },
    "logits_missed": 0,
    "missed_by_batch_size": {},
-   "seconds": 74.9,
+   "seconds": 82.4,
    "ok": true,
    "per_row_miss_rate_95pct_upper": 2.9894770408163264e-06
+  },
+  {
+   "arith": "w8a8",
+   "config": {
+    "block_v": 128,
+    "block_m": 64,
+    "block_k": 128,
+    "num_warps": 4,
+    "num_stages": 4,
+    "tma": false
+   },
+   "batch_sizes": [
+    33,
+    128
+   ],
+   "row_checks": 1004640,
+   "rows_missed": {
+    "lower": 0,
+    "upper": 0,
+    "summary": 0,
+    "probe_flag": 0
+   },
+   "logits_missed": 0,
+   "missed_by_batch_size": {},
+   "seconds": 88.7,
+   "ok": true,
+   "per_row_miss_rate_95pct_upper": 2.9861442904921164e-06
   },
   {
    "arith": "w8a8",
@@ -147,10 +174,10 @@
     "tma": true
    },
    "batch_sizes": [
-    33,
+    129,
     256
    ],
-   "row_checks": 1035776,
+   "row_checks": 1034880,
    "rows_missed": {
     "lower": 0,
     "upper": 0,
@@ -159,9 +186,9 @@
    },
    "logits_missed": 0,
    "missed_by_batch_size": {},
-   "seconds": 44.2,
+   "seconds": 60.9,
    "ok": true,
-   "per_row_miss_rate_95pct_upper": 2.8963791398912508e-06
+   "per_row_miss_rate_95pct_upper": 2.898886827458256e-06
   },
   {
    "arith": "bf16",
@@ -171,7 +198,7 @@
     "block_k": 64,
     "num_warps": 4,
     "num_stages": 3,
-    "tma": true
+    "tma": false
    },
    "batch_sizes": [
     1,
@@ -186,7 +213,7 @@
    },
    "logits_missed": 0,
    "missed_by_batch_size": {},
-   "seconds": 120.0,
+   "seconds": 183.1,
    "ok": true,
    "per_row_miss_rate_95pct_upper": 2.9967395473724586e-06
   },
@@ -197,8 +224,8 @@
     "block_m": 64,
     "block_k": 64,
     "num_warps": 4,
-    "num_stages": 3,
-    "tma": true
+    "num_stages": 4,
+    "tma": false
    },
    "batch_sizes": [
     33,
@@ -213,19 +240,19 @@
    },
    "logits_missed": 0,
    "missed_by_batch_size": {},
-   "seconds": 68.5,
+   "seconds": 118.8,
    "ok": true,
    "per_row_miss_rate_95pct_upper": 2.992244103284287e-06
   },
   {
    "arith": "bf16",
    "config": {
-    "block_v": 128,
-    "block_m": 128,
+    "block_v": 256,
+    "block_m": 64,
     "block_k": 64,
-    "num_warps": 4,
-    "num_stages": 3,
-    "tma": true
+    "num_warps": 8,
+    "num_stages": 4,
+    "tma": false
    },
    "batch_sizes": [
     65,
@@ -240,7 +267,7 @@
    },
    "logits_missed": 0,
    "missed_by_batch_size": {},
-   "seconds": 57.4,
+   "seconds": 64.6,
    "ok": true,
    "per_row_miss_rate_95pct_upper": 2.8632948506505407e-06
   }
