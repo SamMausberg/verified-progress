@@ -6,8 +6,8 @@
 #   S0  FULL  <middle arms>  FULL  S0
 #
 # with the middle arms in declared order for odd sessions and reversed for even ones.
-# FULL combines every lever that passed the equality step (gate.json); H counts only when
-# STACK_CERT_SRC names the certified_head package. A middle
+# FULL combines every lever that passed the equality step (gate.json, checked by
+# equality_gate.py check before anything runs). A middle
 # arm is skipped if the session has run 36 minutes when it would start (the closing
 # FULL and S0 always run), so a hold stays under about 45 minutes.
 #
@@ -28,25 +28,14 @@ mkdir -p "$OUT"
 exec >>"$LOG" 2>&1
 [ "$(git -C "$STACK_ENGINE" rev-parse 'HEAD^{tree}')" = "$STACK_TREE" ] ||
   { echo "composed engine tree is not the declared one"; exit 1; }
-use_gate_table || exit 1
-# The levers that passed step 1 (equality_gate.py); FULL is all of them, the middle arms
-# are each lever alone and every shorter cumulative stack (in the order F, G, H), then B0.
-GATE=$STACK_CURRENT/gate.json
-mapfile -t levers < <(python -c "
-import json, sys
-g = json.load(open(sys.argv[1]))
-if not g['ok']:
-    sys.exit('equality gate not passed: ' + json.dumps(g))
-print('\\n'.join(g['timed_levers']))" "$GATE") || exit 1
-if [ -z "${STACK_CERT_SRC:-}" ]; then
-  mapfile -t levers < <(printf '%s\n' "${levers[@]}" | grep -v '^H$')
-elif printf '%s\n' "${levers[@]}" | grep -qx H; then
-  # H only with the exact package that passed the equality gate.
-  want=$(python -c "import json, sys; print(json.load(open(sys.argv[1]))['certified']['package_sha256'])" "$GATE")
-  have=$(python experiments/stack/equality_gate.py --fingerprint "$STACK_CERT_SRC")
-  [ "$want" = "$have" ] || { echo "certified_head package $have is not the one that passed ($want)"; exit 1; }
-fi
-full=$(printf '%s' "${levers[@]}")
+# Every precondition (equality_gate.py check): FULL is the gate's timed levers; the
+# middle arms are each lever alone and every shorter cumulative stack (in the order F, G,
+# H), then B0. A gate that includes H refuses a session without its exact package.
+gate_plan || { echo "refused: the equality gate's preconditions do not hold"; exit 1; }
+# shellcheck disable=SC2153 # FULL is set by gate_plan (arms.sh)
+full=$FULL
+levers=()
+for (( j=0; j<${#full}; j++ )); do levers+=("${full:$j:1}"); done
 middle=()
 if (( ${#levers[@]} > 1 )); then
   middle+=("${levers[@]}")
@@ -70,9 +59,9 @@ for i in "${!order[@]}"; do
     echo "skip $name (session at $(( ($(date +%s) - start) / 60 )) min)"
     continue
   fi
-  mapfile -t args < <(arm_args "$name")
+  load_args "$name" || { echo "no arguments for arm $name"; failed+=("$i:$name"); continue; }
   echo "=== $i $name $(date -Is)"
-  python -m bench.sweep "${args[@]}" --label "stack-$name" --session "stack-s$k" --out "$OUT" \
+  python -m bench.sweep "${ARGS[@]}" --label "stack-$name" --session "stack-s$k" --out "$OUT" \
     --port 30061 --osl 512 --quiet-cpu-wait 300 --concurrency 1 2 4 8 2>&1 |
     grep -E '^r0|FAIL|[Ee]rror|refus' | tail -8
   status=${PIPESTATUS[0]}

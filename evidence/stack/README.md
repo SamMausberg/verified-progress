@@ -161,8 +161,9 @@ Decisions fixed now, all or nothing (`equality_gate.py`, which writes the gate t
 session holds read): the sessions run only if B0 is bitwise equal to S0 (tokens and
 logprobs on all 320 prompts) and F, G and FG are each exact against both B0 and stock
 DFlash block 16. A comparison counts only if it covers all 320 prompts with no
-output-length mismatch (the comparator's finish-bug signal); exact means no first
-divergence is large or not_argmax. If any check fails, no session runs until a dated
+output-length mismatch (the comparator's finish-bug signal); exact means every first
+divergence is classified tie, one_ulp or near (bench's rule as an allow-list, so an
+`unknown` event, from a run that lacks the requested logprobs, fails). If any check fails, no session runs until a dated
 amendment decides the composition. H joins FG only if its runs give the same tokens and
 lengths as B0's and FG's on all 320 prompts and both check-mode statistics show certified
 verify rows with exactly zero rows differing from the stock head; the gate records the
@@ -172,7 +173,11 @@ ran with is built once, in the equality hold's directory, and recorded by its SH
 sessions use that file and refuse a different one.
 Otherwise FULL is FG. Every equality hold writes a fresh directory and reuses no earlier
 run; the sessions read the gate of the last hold whose equality runs, comparison and gate
-all succeeded. The same hold runs a phase diagnostic: B0 and FG with the repair probe at
+all succeeded. Every timed hold first runs `equality_gate.py check`, which recomputes the
+decision from that run's files, compares it with the stored gate, and verifies the
+routing table's and (when H passed) the package's hashes; a session whose gate includes
+H refuses to start without that package, and any failed check stops the hold before a
+server starts. The same hold runs a phase diagnostic: B0 and FG with the repair probe at
 c = 1 and 8 (`phases.py`).
 
 **Step 2, timing** (`hold_session.sh <k>`, sessions s1, s2, s3, one exclusive hold each).

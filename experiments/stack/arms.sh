@@ -15,7 +15,7 @@
 #
 # STACK_ENGINE    composed SGLang worktree (default ~/sglang-wt/stack)
 # STACK_TABLE     backbone routing table: built by stack_table in the equality hold's own
-#                 directory; sessions use the one behind the current gate (use_gate_table)
+#                 directory; timed holds use the one behind the current gate (gate_plan)
 # STACK_CERT_SRC  directory holding the certified_head package; H arms exist only if set
 
 STACK_ENGINE=${STACK_ENGINE:-$HOME/sglang-wt/stack}
@@ -33,14 +33,26 @@ stack_table() {
     --gemv-m1 --pdl --max-m 16 --out "$STACK_TABLE" > /dev/null
 }
 
-# Point STACK_TABLE at the table that passed the current gate and check its hash.
-use_gate_table() {
-  STACK_TABLE=$STACK_CURRENT/backbone_table_v1.json
-  local want have
-  want=$(python -c "import json, sys; print(json.load(open(sys.argv[1]))['table_sha256'])" \
-    "$STACK_CURRENT/gate.json") || return 1
-  have=$(sha256sum "$STACK_TABLE" | cut -d' ' -f1)
-  [ "$want" = "$have" ] || { echo "routing table $have is not the one that passed ($want)" >&2; return 1; }
+# The single precondition of every timed hold: equality_gate.py check verifies the current
+# gate (recomputed decision, ok, routing table hash, certified-head package) and prints
+# the plan. On success it sets FULL and STACK_TABLE; on any failure it returns non-zero.
+gate_plan() {
+  local plan cert=()
+  [ -n "${STACK_CERT_SRC:-}" ] && cert=(--cert-src "$STACK_CERT_SRC")
+  plan=$(python experiments/stack/equality_gate.py check --gate "$STACK_CURRENT/gate.json" \
+    "${cert[@]}") || return 1
+  # shellcheck disable=SC2034 # FULL is read by the hold scripts that source this file
+  FULL=$(sed -n 's/^full=//p' <<< "$plan")
+  STACK_TABLE=$(sed -n 's/^table=//p' <<< "$plan")
+  [ -n "$FULL" ] && [ -n "$STACK_TABLE" ]
+}
+
+# Read arm NAME's bench.sweep arguments into the array ARGS; fails if arm_args fails.
+load_args() {
+  local text
+  text=$(arm_args "$1") || return 1
+  # shellcheck disable=SC2034 # ARGS is read by the hold scripts that source this file
+  mapfile -t ARGS <<< "$text"
 }
 
 # Overrides of one lever (F, G or H), built when called so they use the current

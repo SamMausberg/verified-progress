@@ -20,13 +20,13 @@ mkdir -p "$OUT"
 exec >>"$OUT/hold.log" 2>&1
 [ "$(git -C "$STACK_ENGINE" rev-parse 'HEAD^{tree}')" = "$STACK_TREE" ] ||
   { echo "composed engine tree is not the declared one"; exit 1; }
-use_gate_table || exit 1
+gate_plan || { echo "refused: the equality gate's preconditions do not hold"; exit 1; }
 echo "hold_oracle start $(date -Is) repo $(git rev-parse HEAD) engine $(git -C "$STACK_ENGINE" rev-parse HEAD)"
-mapfile -t args < <(arm_args FG)
+load_args FG || exit 1
 failed=()
 for B in 16 32 64; do
   echo "=== B=$B $(date -Is)"
-  python -m bench.sweep "${args[@]}" --set "speculative-dflash-block-size=$B" \
+  python -m bench.sweep "${ARGS[@]}" --set "speculative-dflash-block-size=$B" \
     --set max-running-requests=4 --set max-mamba-cache-size=4 --max-concurrency 4 \
     --env "SGLANG_SIMULATE_ACC_LEN=$B" --env "SGLANG_REPAIR_TIMING_LOG=$OUT/phases_b$B.jsonl" \
     --label "stack-oracle-b$B" --session stack-oracle --out "$OUT/runs" --port 30061 --osl 512 \

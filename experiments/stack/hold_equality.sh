@@ -102,7 +102,7 @@ if [[ " ${failed[*]} " == *" compare "* ]]; then
 else
   cert=()
   [ -n "${STACK_CERT_SRC:-}" ] && cert=(--cert-src "$STACK_CERT_SRC")
-  python experiments/stack/equality_gate.py "$OUT" --table "$STACK_TABLE" "${cert[@]}" ||
+  python experiments/stack/equality_gate.py build "$OUT" --table "$STACK_TABLE" "${cert[@]}" ||
     failed+=(gate)
 fi
 # The gate is current only if every equality run, the comparison and the gate succeeded.
@@ -112,9 +112,9 @@ if (( ${#failed[@]} == 0 )); then
 fi
 # Phase diagnostic (timing, exclusive): composed tree with the probe, B0 and FG.
 for name in B0 FG; do
-  mapfile -t args < <(arm_args "$name")
+  load_args "$name" || { failed+=("phases_$name"); continue; }
   echo "=== phases $name $(date -Is)"
-  python -m bench.sweep "${args[@]}" --env "SGLANG_REPAIR_TIMING_LOG=$OUT/phases_$name.jsonl" \
+  python -m bench.sweep "${ARGS[@]}" --env "SGLANG_REPAIR_TIMING_LOG=$OUT/phases_$name.jsonl" \
     --label "stack-phases-$name" --session stack-diag --out "$OUT/diag" \
     --port 30061 --osl 512 --quiet-cpu-wait 300 --concurrency 1 8 2>&1 | tail -4
   status=${PIPESTATUS[0]}
