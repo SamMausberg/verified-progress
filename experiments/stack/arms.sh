@@ -18,6 +18,9 @@
 # STACK_CERT_SRC  directory holding the certified_head package; H arms exist only if set
 
 STACK_ENGINE=${STACK_ENGINE:-$HOME/sglang-wt/stack}
+# Tree of the composed engine (experiments/stack/build_engine.sh); every hold checks it.
+# shellcheck disable=SC2034 # read by the scripts that source this file
+STACK_TREE=628f650ea031b0fc8a68233ff10d8878eb22686d
 STACK_TABLE=${STACK_TABLE:-$HOME/vp-data/stack/backbone_table_v1.json}
 STACK_ARM=dflash-tuned-b16
 

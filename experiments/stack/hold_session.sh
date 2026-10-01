@@ -26,12 +26,12 @@ OUT=$HOME/vp-data/stack/runs
 LOG=$HOME/vp-data/stack/session_s$k.log
 mkdir -p "$OUT"
 exec >>"$LOG" 2>&1
-[ "$(git -C "$STACK_ENGINE" rev-parse 'HEAD^{tree}')" = 0643b22a70d3168a1e10071359cf2a75e11d2833 ] ||
+[ "$(git -C "$STACK_ENGINE" rev-parse 'HEAD^{tree}')" = "$STACK_TREE" ] ||
   { echo "composed engine tree is not the declared one"; exit 1; }
 stack_table
 # The levers that passed step 1 (equality_gate.py); FULL is all of them, the middle arms
 # are each lever alone and every shorter cumulative stack (in the order F, G, H), then B0.
-GATE=$HOME/vp-data/stack/equality/gate.json
+GATE=$HOME/vp-data/stack/equality/current/gate.json
 mapfile -t levers < <(python -c "
 import json, sys
 g = json.load(open(sys.argv[1]))

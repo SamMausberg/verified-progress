@@ -88,7 +88,7 @@ under 1%; FP8 weights and KV give nothing.
 
 ## Composed engine
 
-`experiments/stack/build_engine.sh` builds it: the pin `bd66ce343e` plus 32 patches, in
+`experiments/stack/build_engine.sh` builds it: the pin `bd66ce343e` plus 33 patches, in
 this order, with every switch off by default.
 
 | Order | Series | Base it was made for | Applies on the stack |
@@ -99,13 +99,16 @@ this order, with every switch off by default.
 | 4 | kernel 0001, 0004-0006 (PR #52) and `engine/sglang/patches/stack/0001-0002` in place of kernel 0002-0003 | bd66ce343e | 0002 and 0003 conflict in `dflash_worker_v2.py` and are rebased |
 | 5 | hostgap 0001-0005 (`main`) | bd66ce343e | cleanly |
 | 6 | repair 0001 (`main`): CUDA-event phase probe | bd66ce343e | cleanly |
+| 7 | `engine/sglang/patches/stack/0003` | the stack | refuses moonshot's relaxed EAGLE acceptance with the certified head |
 
 The two resolutions: in the DFlash greedy accept step the certified head's tokens replace
 the argmax before moonshot's relaxed-acceptance rule, which now refuses to run with the
 certified head (it needs the logits the certified head does not compute); in the DFlash
 draft sampler the hot-vocabulary path returns before the certified draft projection
 (both are off unless their switches are set; kernel advises leaving the draft projection
-off for DFlash). The resulting tree is `0643b22a70d3168a1e10071359cf2a75e11d2833`; the
+off for DFlash). Patch `stack/0003` adds the same refusal on the EAGLE/MTP chain path,
+where moonshot's relaxed rule would otherwise read logits the certified head never
+computed. The resulting tree is `628f650ea031b0fc8a68233ff10d8878eb22686d`; the
 build script and every hold script check it. Commit hashes differ between builds because
 `git am` stamps new dates. Until PR #52 and PR #133 merge, the build needs their patch
 directories.
@@ -154,17 +157,20 @@ off) and run with the head's check mode. Comparisons (`equality_pairs.py`, state
 `compare.py`): S0 and B0 against bench's stock b16 Triton run; each lever against B0 and
 against stock DFlash block 16 (bench's class rule: exact-up-to-rounding if every first
 divergence is a tie, one_ulp or near event; lossy if any is large or not_argmax).
-Decisions fixed now: B0 must be bitwise equal to S0 (tokens and logprobs on all 320
-prompts) or no timed session runs until the difference is explained; a lever classed
-lossy, compared on fewer than 320 prompts, or showing any output-length mismatch (the
-comparator's finish-bug signal) leaves the exact stack and its arms are
-dropped from the sessions (FULL is then the remaining levers); if F and G each pass but
-FG does not, only F is timed. H passes only if its runs give the same tokens and lengths
-as B0's and FG's on all 320 prompts and both check-mode statistics show certified verify
-rows with exactly zero rows differing from the stock head; the gate records the SHA-256
-of the package that passed, and a session runs H only with that exact package. `equality_gate.py` applies these decisions and writes the gate that
-the session holds read. The same hold runs a phase diagnostic: B0 and FG with the repair
-probe at c = 1 and 8 (`phases.py`).
+Decisions fixed now, all or nothing (`equality_gate.py`, which writes the gate the
+session holds read): the sessions run only if B0 is bitwise equal to S0 (tokens and
+logprobs on all 320 prompts) and F, G and FG are each exact against both B0 and stock
+DFlash block 16. A comparison counts only if it covers all 320 prompts with no
+output-length mismatch (the comparator's finish-bug signal); exact means no first
+divergence is large or not_argmax. If any check fails, no session runs until a dated
+amendment decides the composition. H joins FG only if its runs give the same tokens and
+lengths as B0's and FG's on all 320 prompts and both check-mode statistics show certified
+verify rows with exactly zero rows differing from the stock head; the gate records the
+SHA-256 of the package that passed, and a session runs H only with that exact package.
+Otherwise FULL is FG. Every equality hold writes a fresh directory and reuses no earlier
+run; the sessions read the gate of the last hold whose equality runs, comparison and gate
+all succeeded. The same hold runs a phase diagnostic: B0 and FG with the repair probe at
+c = 1 and 8 (`phases.py`).
 
 **Step 2, timing** (`hold_session.sh <k>`, sessions s1, s2, s3, one exclusive hold each).
 Each session launches every arm once through `bench.sweep` at c = 1, 2, 4, 8 (64 measured

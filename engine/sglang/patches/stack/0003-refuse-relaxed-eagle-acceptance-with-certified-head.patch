@@ -1,0 +1,33 @@
+From 7f6f891b9e7fcfa983e896197e7fc0dfba9b44d1 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Thu, 1 Oct 2026 15:45:25 +0000
+Subject: [PATCH] Stack: refuse relaxed EAGLE acceptance with the certified
+ head
+
+With SGLANG_CERTIFIED_HEAD_VERIFY=1 the verify graph computes no logits, so the relaxed
+greedy rule (SGLANG_SPEC_RELAXED_GREEDY_LOGIT_GAP > 0) would read stale next_token_logits
+on the EAGLE/MTP chain path. Raise instead, as the DFlash path already does.
+---
+ python/sglang/srt/speculative/eagle_utils.py | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/python/sglang/srt/speculative/eagle_utils.py b/python/sglang/srt/speculative/eagle_utils.py
+index 4997759dde..0855ce14db 100644
+--- a/python/sglang/srt/speculative/eagle_utils.py
++++ b/python/sglang/srt/speculative/eagle_utils.py
+@@ -850,6 +850,12 @@ def eagle_sample(
+         target_predict = target_predict.reshape(bs, verify_input.draft_token_num)
+         relaxed_gap = envs.SGLANG_SPEC_RELAXED_GREEDY_LOGIT_GAP.get()
+         if relaxed_gap > 0 and verify_input.tree_topk == 1:
++            if certified_ids is not None:
++                # The certified head computes no logits, so next_token_logits is stale.
++                raise RuntimeError(
++                    "SGLANG_SPEC_RELAXED_GREEDY_LOGIT_GAP needs the verify logits; "
++                    "it cannot run with the certified LM head"
++                )
+             target_predict = relax_greedy_chain_predict(
+                 next_token_logits, candidates, target_predict, relaxed_gap
+             )
+-- 
+2.34.1
+

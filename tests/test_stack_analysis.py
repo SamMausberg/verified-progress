@@ -159,27 +159,42 @@ def _pair(diverged: int = 0, drift: float = 0.0, prompts: int = 320, **classes: 
     }
 
 
-def test_equality_gate_requires_bitwise_b0_and_drops_lossy_levers(tmp_path, monkeypatch):
-    pairs = {
+def _passing() -> dict:
+    return {
         'B0 vs S0': _pair(),
         'F vs B0': _pair(),
         'F vs bench stock b16': _pair(12, 0.4, tie=11, one_ulp=1),
-        'G vs B0': _pair(5, 0.3, tie=4, large=1),
+        'G vs B0': _pair(3, 0.2, tie=3),
         'G vs bench stock b16': _pair(13, 0.4, tie=13),
-        'FG vs B0': _pair(5, 0.3, tie=4, large=1),
+        'FG vs B0': _pair(3, 0.2, tie=3),
         'FG vs bench stock b16': _pair(14, 0.4, tie=14),
     }
+
+
+def _run_gate(tmp_path, monkeypatch, pairs, *extra):
     (tmp_path / 'summary.json').write_text(json.dumps({'pairs': pairs}))
-    monkeypatch.setattr(sys, 'argv', ['gate', str(tmp_path)])
+    monkeypatch.setattr(sys, 'argv', ['gate', str(tmp_path), *extra])
     gate.main()
-    g = json.loads((tmp_path / 'gate.json').read_text())
-    assert g['classes'] == {'F': 'bitwise', 'G': 'lossy', 'FG': 'lossy'}
-    assert g['timed_levers'] == ['F']
-    assert g['ok']
-    pairs['B0 vs S0'] = _pair(1, 0.1, tie=1)
-    (tmp_path / 'summary.json').write_text(json.dumps({'pairs': pairs}))
-    gate.main()
-    assert not json.loads((tmp_path / 'gate.json').read_text())['ok']
+    return json.loads((tmp_path / 'gate.json').read_text())
+
+
+def test_equality_gate_is_all_or_nothing(tmp_path, monkeypatch):
+    g = _run_gate(tmp_path, monkeypatch, _passing())
+    assert g['ok'] and g['classes'] == {
+        'F': 'bitwise',
+        'G': 'exact-up-to-rounding',
+        'FG': 'exact-up-to-rounding',
+    }
+    assert g['timed_levers'] == ['F', 'G']
+    for key, bad in (
+        ('FG vs B0', _pair(3, 0.3, tie=2, large=1)),
+        ('G vs bench stock b16', {**_pair(12, 0.4, tie=12), 'length_mismatch': 1}),
+        ('F vs B0', _pair(prompts=300)),
+        ('B0 vs S0', _pair(1, 0.1, tie=1)),
+    ):
+        pairs = {**_passing(), key: bad}
+        g = _run_gate(tmp_path, monkeypatch, pairs)
+        assert not g['ok'] and g['timed_levers'] == [], key
 
 
 def test_interaction_skips_a_session_with_one_invalid_full_launch(tmp_path, monkeypatch):
@@ -216,72 +231,27 @@ def test_interaction_skips_a_session_with_one_invalid_full_launch(tmp_path, monk
     assert res['interaction_FG']['1']['x_e2e']['n'] == 1
 
 
-def test_equality_gate_fg_lossy_keeps_one_lever_and_h_needs_explicit_zero(tmp_path, monkeypatch):
-    pairs = {
-        'B0 vs S0': _pair(),
-        'F vs B0': _pair(),
-        'F vs bench stock b16': _pair(12, 0.4, tie=12),
-        'G vs B0': _pair(),
-        'G vs bench stock b16': _pair(12, 0.4, tie=12),
-        'FG vs B0': _pair(3, 0.3, large=1, tie=2),
-        'FG vs bench stock b16': _pair(12, 0.4, tie=12),
-        'H tokens vs B0 tokens': _pair(),
-        'FGH tokens vs FG': _pair(),
-    }
-    (tmp_path / 'summary.json').write_text(json.dumps({'pairs': pairs}))
+def test_certified_head_needs_tokens_counters_and_package(tmp_path, monkeypatch):
+    pairs = {**_passing(), 'H tokens vs B0 tokens': _pair(), 'FGH tokens vs FG': _pair()}
     stats = {'paths': {'verify': {'rows': 5000, 'mismatch_rows': 0, 'fallback_rows': 40}}}
     (tmp_path / 'certified_stats_H.json').write_text(json.dumps(stats))
-    monkeypatch.setattr(sys, 'argv', ['gate', str(tmp_path)])
-    gate.main()
-    g = json.loads((tmp_path / 'gate.json').read_text())
-    # FG is lossy, so only F; H lacks the FGH statistics, so it is not timed.
-    assert g['timed_levers'] == ['F']
+    g = _run_gate(tmp_path, monkeypatch, pairs)
+    assert g['timed_levers'] == ['F', 'G']  # FGH statistics missing
     (tmp_path / 'certified_stats_FGH.json').write_text(json.dumps(stats))
-    (tmp_path / 'src' / 'certified_head').mkdir(parents=True)
-    (tmp_path / 'src' / 'certified_head' / 'engine.py').write_text('')
-    monkeypatch.setattr(sys, 'argv', ['gate', str(tmp_path), '--cert-src', str(tmp_path / 'src')])
-    gate.main()
-    assert json.loads((tmp_path / 'gate.json').read_text())['timed_levers'] == ['F', 'H']
-    # An incomplete comparison is missing, not bitwise.
-    pairs['B0 vs S0'] = _pair(prompts=300)
-    (tmp_path / 'summary.json').write_text(json.dumps({'pairs': pairs}))
-    gate.main()
-    assert not json.loads((tmp_path / 'gate.json').read_text())['ok']
-
-
-def test_gate_length_mismatch_blocks_a_lever_and_h_needs_a_package(tmp_path, monkeypatch):
-    mismatch = _pair(10, 0.3, tie=10)
-    mismatch['length_mismatch'] = 1
-    pairs = {
-        'B0 vs S0': _pair(),
-        'F vs B0': _pair(),
-        'F vs bench stock b16': _pair(12, 0.4, tie=12),
-        'G vs B0': mismatch,
-        'G vs bench stock b16': _pair(12, 0.4, tie=12),
-        'FG vs B0': _pair(4, 0.3, tie=4),
-        'FG vs bench stock b16': _pair(12, 0.4, tie=12),
-        'H tokens vs B0 tokens': _pair(),
-        'FGH tokens vs FG': _pair(),
-    }
-    (tmp_path / 'summary.json').write_text(json.dumps({'pairs': pairs}))
-    stats = {'paths': {'verify': {'rows': 5000, 'mismatch_rows': 0}}}
-    for n in ('H', 'FGH'):
-        (tmp_path / f'certified_stats_{n}.json').write_text(json.dumps(stats))
-    monkeypatch.setattr(sys, 'argv', ['gate', str(tmp_path)])
-    gate.main()
-    g = json.loads((tmp_path / 'gate.json').read_text())
-    assert g['classes']['G'] == 'length-mismatch'
-    assert g['timed_levers'] == ['F']  # no package recorded, so no H
+    g = _run_gate(tmp_path, monkeypatch, pairs)
+    assert g['timed_levers'] == ['F', 'G']  # no package fingerprint recorded
     pkg = tmp_path / 'src' / 'certified_head'
     pkg.mkdir(parents=True)
     (pkg / 'head.py').write_text('x = 1\n')
-    monkeypatch.setattr(sys, 'argv', ['gate', str(tmp_path), '--cert-src', str(tmp_path / 'src')])
-    gate.main()
-    g = json.loads((tmp_path / 'gate.json').read_text())
-    assert g['timed_levers'] == ['F', 'H']
+    src = str(tmp_path / 'src')
+    g = _run_gate(tmp_path, monkeypatch, pairs, '--cert-src', src)
+    assert g['timed_levers'] == ['F', 'G', 'H']
     before = g['certified']['package_sha256']
     (pkg / 'head.py').write_text('x = 2\n')
     assert gate.fingerprint(tmp_path / 'src') != before
+    longer = {**_pair(), 'length_mismatch': 2}
+    g = _run_gate(tmp_path, monkeypatch, {**pairs, 'FGH tokens vs FG': longer}, '--cert-src', src)
+    assert g['timed_levers'] == ['F', 'G']
 
 
 def test_all_invalid_full_stays_visible_with_n_zero(tmp_path, monkeypatch):

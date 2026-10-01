@@ -18,7 +18,7 @@ source "$repo/experiments/stack/arms.sh"
 OUT=$HOME/vp-data/stack/oracle
 mkdir -p "$OUT"
 exec >>"$OUT/hold.log" 2>&1
-[ "$(git -C "$STACK_ENGINE" rev-parse 'HEAD^{tree}')" = 0643b22a70d3168a1e10071359cf2a75e11d2833 ] ||
+[ "$(git -C "$STACK_ENGINE" rev-parse 'HEAD^{tree}')" = "$STACK_TREE" ] ||
   { echo "composed engine tree is not the declared one"; exit 1; }
 stack_table
 echo "hold_oracle start $(date -Is) repo $(git rev-parse HEAD) engine $(git -C "$STACK_ENGINE" rev-parse HEAD)"

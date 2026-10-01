@@ -10,6 +10,7 @@
 #                       certified LM head; 0002 and 0003 rebased onto the series above
 #   hostgap  0001-0005  sync-free FlashInfer planning
 #   repair   0001       CUDA-event phase probe (SGLANG_REPAIR_TIMING_LOG)
+#   stack    0003       relaxed EAGLE acceptance refuses to run with the certified head
 #
 #   experiments/stack/build_engine.sh [name]     # -> ~/sglang-wt/<name> (default stack)
 #
@@ -22,7 +23,9 @@ repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 P="$repo/engine/sglang/patches"
 name="${1:-stack}"
 wt="$HOME/sglang-wt/$name"
-EXPECTED_TREE=0643b22a70d3168a1e10071359cf2a75e11d2833
+# shellcheck source=experiments/stack/arms.sh
+source "$repo/experiments/stack/arms.sh"
+EXPECTED_TREE=$STACK_TREE
 
 need() {
   local f
@@ -40,9 +43,10 @@ series=(
   "$P"/kernel/000[4-6]-*.patch
   "$P"/hostgap/000[1-5]-*.patch
   "$P"/repair/0001-*.patch
+  "$P"/stack/0003-*.patch
 )
 need "${series[@]}"
-[ "${#series[@]}" -eq 32 ] || { echo "expected 32 patches, found ${#series[@]}" >&2; exit 65; }
+[ "${#series[@]}" -eq 33 ] || { echo "expected 33 patches, found ${#series[@]}" >&2; exit 65; }
 
 if [ ! -d "$wt" ]; then
   "$repo/scripts/sglang_worktree.sh" "$name" >/dev/null

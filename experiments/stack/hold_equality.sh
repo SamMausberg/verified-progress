@@ -3,7 +3,13 @@
 # per-phase timing diagnostic. Run under the GPU lock (exclusive, because the
 # diagnostic times the GPU; the equality part alone would be correctness-only):
 #
-#   scripts/gpu_lock.sh -x experiments/stack/hold_equality.sh [OUT]
+#   scripts/gpu_lock.sh -x experiments/stack/hold_equality.sh
+#
+# Every run writes a fresh directory ~/vp-data/stack/equality/<UTC time> and reuses
+# nothing from earlier runs; when it finishes with every step passing, the link
+# ~/vp-data/stack/equality/current points at it once every equality run, the comparison
+# and the gate have succeeded; the session holds read the gate there (no link, no
+# session). A failed phase diagnostic makes the hold exit non-zero but does not block.
 #
 # Equality (declared in evidence/stack/README.md, "Composition plan"): bench's
 # DFlash block-16 Triton reference configuration exactly (experiments/state_safety's
@@ -25,29 +31,26 @@ unset SGLANG_WORKTREE PYTHONPATH
 source "$repo/scripts/sglang_env.sh"
 # shellcheck source=/dev/null
 source "$repo/experiments/stack/arms.sh"
-OUT=${1:-$HOME/vp-data/stack/equality}
+ROOT=$HOME/vp-data/stack/equality
+OUT=$ROOT/$(date -u +%Y%m%dT%H%M%SZ)
 RUNS=$OUT/runs
 mkdir -p "$RUNS"
 exec >>"$OUT/hold.log" 2>&1
 echo "hold_equality start $(date -Is) repo $(git rev-parse HEAD) dirty=$(git status --porcelain --untracked-files=no | wc -l)"
 echo "engine $(git -C "$STACK_ENGINE" rev-parse HEAD) tree $(git -C "$STACK_ENGINE" rev-parse 'HEAD^{tree}') cert_src=${STACK_CERT_SRC:-none}"
-[ "$(git -C "$STACK_ENGINE" rev-parse 'HEAD^{tree}')" = 0643b22a70d3168a1e10071359cf2a75e11d2833 ] ||
+[ "$(git -C "$STACK_ENGINE" rev-parse 'HEAD^{tree}')" = "$STACK_TREE" ] ||
   { echo "composed engine tree is not the declared one"; exit 1; }
 export GPU_STARTUP_MIN_FREE_GB=${GPU_STARTUP_MIN_FREE_GB:-60}
-# Outputs of an earlier hold must not pass for this one.
-rm -f "$OUT/summary.json" "$OUT/gate.json" "$OUT/pairs.json" "$OUT/table.csv" \
-  "$OUT/divergences.csv" "$OUT/meta.json"
 
 DFLASH_B16="--speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash \
 --speculative-draft-model-revision 9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf \
 --speculative-dflash-block-size 16 --max-running-requests 4 --disable-radix-cache --attention-backend triton"
 
 # Each configuration runs in its own subshell so its environment does not leak.
+# Nothing is reused: every configuration runs afresh in this hold's directory.
 run_eq() {
   local tag=$1 worktree=$2 flags=$3 logprobs=$4
   shift 4
-  # The runner writes c1.meta.json after the pass completes; a partial run is redone.
-  [ -s "$RUNS/plain__$tag/c1.meta.json" ] && { echo "skip $tag (complete)"; return 0; }
   (
     if [ -n "$worktree" ]; then export SGLANG_WORKTREE=$worktree; else unset SGLANG_WORKTREE; fi
     # shellcheck source=/dev/null
@@ -100,21 +103,21 @@ else
   [ -n "${STACK_CERT_SRC:-}" ] && cert=(--cert-src "$STACK_CERT_SRC")
   python experiments/stack/equality_gate.py "$OUT" "${cert[@]}" || failed+=(gate)
 fi
-if (( ${#failed[@]} )); then
-  # Without a current summary there is no gate, so no session runs; a failed lever run
-  # leaves that lever out of the timed sessions. Either way the hold reports failure.
-  echo "failed: ${failed[*]}"
+# The gate is current only if every equality run, the comparison and the gate succeeded.
+if (( ${#failed[@]} == 0 )); then
+  ln -sfn "$OUT" "$ROOT/current"
+  echo "current -> $OUT"
 fi
-
 # Phase diagnostic (timing, exclusive): composed tree with the probe, B0 and FG.
-(
-  for name in B0 FG; do
-    mapfile -t args < <(arm_args "$name")
-    echo "=== phases $name $(date -Is)"
-    python -m bench.sweep "${args[@]}" --env "SGLANG_REPAIR_TIMING_LOG=$OUT/phases_$name.jsonl" \
-      --label "stack-phases-$name" --session stack-diag --out "$HOME/vp-data/stack/diag" \
-      --port 30061 --osl 512 --quiet-cpu-wait 300 --concurrency 1 8 2>&1 | tail -4
-  done
-)
-echo "hold_equality end $(date -Is)"
+for name in B0 FG; do
+  mapfile -t args < <(arm_args "$name")
+  echo "=== phases $name $(date -Is)"
+  python -m bench.sweep "${args[@]}" --env "SGLANG_REPAIR_TIMING_LOG=$OUT/phases_$name.jsonl" \
+    --label "stack-phases-$name" --session stack-diag --out "$OUT/diag" \
+    --port 30061 --osl 512 --quiet-cpu-wait 300 --concurrency 1 8 2>&1 | tail -4
+  status=${PIPESTATUS[0]}
+  echo "phases $name exit $status"
+  (( status == 0 )) || failed+=("phases_$name")
+done
+echo "hold_equality end $(date -Is) failed: ${failed[*]:-none}"
 (( ${#failed[@]} == 0 ))

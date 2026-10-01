@@ -227,12 +227,13 @@ rows with the Triton kernel; `tests/test_hostgap_plan.py` runs a small version (
 on a GPU). `experiments/hostgap/equality.py` compares greedy outputs with the stock engine.
 Results and commands: `evidence/hostgap/README.md`.
 
-## stack (`patches/stack/0001-0002`, composed engine `~/sglang-wt/stack`)
+## stack (`patches/stack/0001-0003`, composed engine `~/sglang-wt/stack`)
 
 The stack workstream composes every candidate lever's series in one engine, all switches
 off by default, and times them together (`evidence/stack/README.md`). The series apply to
 the pin together in this order: drafter 0001-0003, moonshot 0001-0009, backbone 0001-0008,
-kernel 0001, `stack/0001`, `stack/0002`, kernel 0004-0006, hostgap 0001-0005, repair 0001.
+kernel 0001, `stack/0001`, `stack/0002`, kernel 0004-0006, hostgap 0001-0005, repair 0001,
+`stack/0003`.
 `git am -3` merges moonshot 0007-0009 around the drafter's `environ.py` and memory-pool
 hunks without conflicts.
 
@@ -245,7 +246,8 @@ SGLANG_WORKTREE=~/sglang-wt/stack source scripts/sglang_env.sh
 |---|---|---|
 | 0001 | kernel 0002 (certified head on the greedy verify) rebased onto the drafter and moonshot series: in DFlash's greedy accept step the certified tokens replace the argmax before moonshot's relaxed-acceptance rule, and that rule raises if it is combined with the certified head, which computes no logits | unchanged unless `SGLANG_CERTIFIED_HEAD_VERIFY=1` |
 | 0002 | kernel 0003 (certified MTP draft and DFlash draft projection) rebased: the hot-vocabulary DFlash draft head of moonshot 0005 returns before the certified draft projection | unchanged unless `--speculative-token-map` or `SGLANG_CERTIFIED_HEAD_DRAFT=1` |
+| 0003 | the EAGLE/MTP greedy chain path raises if moonshot's relaxed acceptance (`SGLANG_SPEC_RELAXED_GREEDY_LOGIT_GAP > 0`) meets certified verify ids, whose graph computes no logits (the DFlash path got the same refusal in 0001) | unchanged unless both are set |
 
-The composed tree is `0643b22a70d3168a1e10071359cf2a75e11d2833`. The kernel series
+The composed tree is `628f650ea031b0fc8a68233ff10d8878eb22686d`. The kernel series
 (0001, 0004-0006) and the drafter's 0002-0003 come from PR #52 and PR #133; the build
 script stops and names the missing directory until both are on `main`.
