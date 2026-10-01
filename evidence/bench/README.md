@@ -21,6 +21,139 @@ Each run's `launch.json` records the exact command, the SGLang tree imported and
 state, this repository's commit and the GPU state; `launches.csv` in each directory
 below condenses them.
 
+## confirm/
+
+The serving frontier: every tuned arm (chosen on the tune split, tuning/ below) measured
+on the held-out confirmation split. All nine arms are `stock` or `exact-up-to-rounding`
+(equality/), so the envelope over all arms is also the envelope over exact arms.
+
+**Design.** Workload `bench/workloads/mixed-v2/confirm.jsonl` (1,152 prompts), 512
+output tokens per request with `ignore_eos`, greedy, thinking on; client concurrency
+c = 1, 2, 4, 8, 16, 32, 48, 64, 96, 128 against one server per arm and session,
+launched at capacity 128 (64 for `dflash-tuned-b16`); `max(64, 8c)` measured requests
+per point after a warmup wave. A session launches every arm in it afresh and holds
+each speculative arm's matched plain baseline (`plain-tuned` for FlashInfer arms,
+`plain-tuned-triton` for Triton arms), so every ratio below is paired within one
+session. Sessions, all on 2026-10-01 UTC:
+
+| Session | Holds | Arms |
+|---|---|---|
+| confirm-r0 | one, 03:19-04:09 | all seven confirmation arms |
+| confirm-r1 | a and b, 05:02-06:40 | the same, in reverse order |
+| confirm-r2 | a from 06:49, b 11:26-12:49 | the same, in the original order |
+| confirm-supp | one, 14:17-14:50 | `plain-tuned`; `mtp-stockverify` at every c; `mtp-tuned` at c <= 16; `plain-tuned-replayssm` at c >= 32 |
+
+Part a holds `plain-tuned`, `mtp-tuned` (c >= 32), `dflash-tuned` and `dflash-tuned-b4`
+(c >= 32); part b holds `plain-tuned-triton` (c <= 32), `mtp-tuned-triton` (c <= 64)
+and `dflash-tuned-b16` (c <= 64). The first attempt at r2 b (07:35) refused to start
+because a departing GPU process was still listed; it was rerun at 11:26. Repeat 0
+predates session records and is assigned confirm-r0 by `confirm_evidence.sh`.
+
+**Validity and host load.** Each point records the CPU used by processes outside the
+run's own process tree (host busy time from /proc/stat minus the run's tree, sampled
+once per second; `foreign_cpu_mean` and `foreign_cpu_max` in `points.csv`). A point
+whose mean exceeds 2 cores is invalid (`host_contention`), as is one with failed
+requests, wrong output lengths, an unflushed cache or unexpected prompts. Of 186
+points, 4 are invalid, all `plain-tuned` in confirm-supp: c=2, 8, 16 and 32 at 3.8,
+2.4, 2.1 and 2.6 foreign cores (an unlocked Triton build and other agents' test runs
+during the hold). They stay in `points.csv` with their reason and out of every mean and
+pair, so `mtp-stockverify` at those concurrencies, `mtp-tuned` at c=2, 8, 16 and
+`plain-tuned-replayssm` at c=32 have no paired baseline in that session. The valid
+points saw a median of 0.56 and at most 1.81 foreign cores.
+
+**Frontier.** Best arm by mean y at each concurrency (`envelope.csv`), n = sessions with
+a valid point (`plain-tuned` also ran in confirm-supp):
+
+| c | Best arm (class) | y, tok/s (sd) | x, tok/s/user | n | `plain-tuned` y (sd) | Runner-up, y |
+|---|---|---|---|---|---|---|
+| 1 | `dflash-tuned-b16` (exact-up-to-rounding) | 874 (1) | 987 | 3 | 282 (0) | `dflash-tuned` 767 |
+| 2 | `dflash-tuned-b16` (exact-up-to-rounding) | 1,510 (3) | 876 | 3 | 546 (0) | `dflash-tuned` 1,408 |
+| 4 | `dflash-tuned-b16` (exact-up-to-rounding) | 2,433 (15) | 713 | 3 | 1,053 (2) | `dflash-tuned` 2,376 |
+| 8 | `dflash-tuned` (stock) | 3,651 (20) | 519 | 3 | 2,002 (4) | `dflash-tuned-b16` 3,502 |
+| 16 | `dflash-tuned` (stock) | 5,256 (45) | 370 | 3 | 3,646 (5) | `mtp-tuned-triton` 4,704 |
+| 32 | `dflash-tuned` (stock) | 6,844 (22) | 238 | 3 | 6,233 (4) | `mtp-tuned-triton` 6,688 |
+| 48 | `plain-tuned` (stock) | 8,286 (4) | 173 | 4 | 8,286 (4) | `mtp-tuned` 8,091 |
+| 64 | `plain-tuned-replayssm` (exact-up-to-rounding) | 9,917 | 155 | 1 | 9,901 (7) | `plain-tuned` 9,901 |
+| 96 | `plain-tuned-replayssm` (exact-up-to-rounding) | 12,773 | 133 | 1 | 12,180 (18) | `plain-tuned` 12,180 |
+| 128 | `plain-tuned-replayssm` (exact-up-to-rounding) | 15,012 | 117 | 1 | 13,898 (13) | `plain-tuned` 13,898 |
+
+Buffered plain decoding (`plain-tuned-replayssm`) leads at c >= 64 in its one session,
+by 0.2%, 4.9% and 8.1% over `plain-tuned` in the same hold. That is a single session:
+it entered the frontier only when the radix-off reference made it exact (equality/),
+and two more sessions are queued (confirm-supp2 and confirm-supp3). Until they land,
+the declared n=3 frontier at c >= 64 is `plain-tuned`.
+
+y in tok/s per arm (mean over sessions; n=3 unless marked):
+
+| Arm | c=1 | c=2 | c=4 | c=8 | c=16 | c=32 | c=48 | c=64 | c=96 | c=128 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `plain-tuned` | 282 | 546 | 1,053 | 2,002 | 3,646 | 6,233 | 8,286 | 9,901 | 12,180 | 13,898 |
+| `plain-tuned-triton` | 286 | 552 | 1,064 | 2,018 | 3,667 | 6,237 |  |  |  |  |
+| `plain-tuned-replayssm` |  |  |  |  |  | 5,888 (n=1) | 8,077 (n=1) | 9,917 (n=1) | 12,773 (n=1) | 15,012 (n=1) |
+| `mtp-tuned` | 456 (n=1) | 853 (n=1) | 1,579 (n=1) | 2,682 (n=1) | 4,442 (n=1) | 6,556 | 8,091 | 9,033 | 10,573 | 12,003 |
+| `mtp-tuned-triton` | 532 | 991 | 1,789 | 3,009 | 4,704 | 6,688 | 8,006 | 8,766 |  |  |
+| `mtp-stockverify` | 461 (n=1) | 855 (n=1) | 1,541 (n=1) | 2,556 (n=1) | 4,045 (n=1) | 5,872 (n=1) | 6,980 (n=1) | 7,607 (n=1) | 8,653 (n=1) | 9,464 (n=1) |
+| `dflash-tuned` | 767 | 1,408 | 2,376 | 3,651 | 5,256 | 6,844 | 7,568 | 7,917 | 8,454 | 10,546 |
+| `dflash-tuned-b16` | 874 | 1,510 | 2,433 | 3,502 | 4,380 | 5,039 | 5,326 | 6,259 |  |  |
+| `dflash-tuned-b4` |  |  |  |  |  | 6,161 | 7,327 | 7,922 | 8,796 | 11,582 |
+
+**Variance across sessions.** Over the 52 arm-concurrency points with three sessions,
+the coefficient of variation of y has a median of 0.4% and a maximum of 1.9%
+(`mtp-tuned` at c=48 and `dflash-tuned-b16` at c=16); x varies by at most 1.9%. These
+are three server launches at different times of day on one machine, not independent
+machines.
+
+**Paired ratios.** y of each arm over its matched baseline in the same session
+(`pairs.csv`), mean with the range over sessions:
+
+| Arm / baseline | c=1 | c=4 | c=8 | c=16 | c=32 | c=48 | c=64 | c=128 |
+|---|---|---|---|---|---|---|---|---|
+| `dflash-tuned-b16` / `plain-tuned-triton` | 3.06 (3.06-3.06) | 2.29 (2.28-2.30) | 1.74 (1.73-1.75) | 1.19 (1.18-1.22) | 0.81 (0.80-0.81) |  |  |  |
+| `dflash-tuned` / `plain-tuned` | 2.72 (2.72-2.72) | 2.26 (2.24-2.28) | 1.82 (1.81-1.84) | 1.44 (1.43-1.45) | 1.10 (1.10-1.10) | 0.91 (0.91-0.92) | 0.80 (0.79-0.81) | 0.76 (0.76-0.76) |
+| `mtp-tuned-triton` / `plain-tuned-triton` | 1.86 (1.86-1.87) | 1.68 (1.68-1.68) | 1.49 (1.49-1.49) | 1.28 (1.28-1.29) | 1.07 (1.07-1.08) |  |  |  |
+| `mtp-tuned` / `plain-tuned` | 1.62 (n=1) | 1.50 (n=1) |  |  | 1.05 (1.04-1.06) | 0.98 (0.96-0.99) | 0.91 (0.90-0.92) | 0.86 (0.86-0.87) |
+| `dflash-tuned-b4` / `plain-tuned` |  |  |  |  | 0.99 (0.98-0.99) | 0.88 (0.88-0.89) | 0.80 (0.79-0.80) | 0.83 (0.83-0.84) |
+| `mtp-stockverify` / `plain-tuned` | 1.64 (n=1) | 1.46 (n=1) |  |  |  | 0.84 (n=1) | 0.77 (n=1) | 0.68 (n=1) |
+| `plain-tuned-replayssm` / `plain-tuned` |  |  |  |  |  | 0.97 (n=1) | 1.00 (n=1) | 1.08 (n=1) |
+| `plain-tuned-triton` / `plain-tuned` | 1.01 (1.01-1.01) | 1.01 (1.01-1.01) | 1.01 (1.01-1.01) | 1.01 (1.00-1.01) | 1.00 (1.00-1.00) |  |  |  |
+
+In per-user rate (x) at c=1, `dflash-tuned-b16` gives 3.45 times its Triton plain
+baseline (987 against 286 tok/s/user) and `dflash-tuned` 2.89 times `plain-tuned`.
+Speculation leads plain decoding through c=32 and trails it from c=48 in every family:
+at c=48 the best speculative arm (`mtp-tuned`) delivers 0.98 times plain, and at c=128
+the best (`mtp-tuned`) 0.86 times. Acceptance does not explain the loss: accept length
+is flat across concurrency (3.24-3.28 for MTP, 4.67-4.81 for DFlash block 8). These
+runs do not say where the cycle's time goes at large batch; evidence/profiles/
+attributes it by component.
+
+**Negative and unexplained results.**
+- Stock GDN verify (`mtp-stockverify`, n=1) falls to 0.68 times plain at c=128;
+  buffered verify (`mtp-tuned`) recovers part of that (0.86), and neither reaches plain
+  above c=32.
+- DFlash block 16 (`dflash-tuned-b16`) is the best arm at c <= 4 but 0.81 times its
+  baseline at c=32; it verifies sixteen tokens per request per cycle, twice block 8.
+  Block 4 (`dflash-tuned-b4`) never leads.
+- Both FlashInfer DFlash arms dip relative to plain at c=96 (0.69 and 0.72) and recover at
+  c=128 (0.76 and 0.83). Their median inter-token latency is about the same at c=96 and
+  c=128 (10.0 and 10.4 ms for block 8 in confirm-r1), so the cycle does not get cheaper
+  with the smaller batch; the verify graph has a batch-96 entry, so padding is not the
+  cause. Not explained; a profile at batch 96 would settle it.
+- Triton attention changes plain decoding by at most 1.3% (c=1) and nothing from c=32;
+  its value is entirely in the speculative arms at low concurrency.
+
+`launches.csv` records each server's command, capacity, pools, graph range and checks.
+`frontier.csv` has per-arm means, standard deviations and ranges of x, y, y_steady,
+TTFT, ITL, accept length and the server's full-batch rate; `<arm>.dat` and
+`envelope-*.dat` are PGFPlots tables; `pareto.png` plots every arm (hue by family,
+line style by variant) with the envelope.
+
+```sh
+scripts/gpu_lock.sh -x bench/campaigns/confirm.sh 0 all          # confirm-r0
+scripts/gpu_lock.sh -x bench/campaigns/confirm.sh <1|2> <a|b>    # confirm-r1, confirm-r2
+scripts/gpu_lock.sh -x bench/campaigns/confirm_supplementary.sh a
+bench/campaigns/confirm_evidence.sh                              # CPU only: this directory
+```
+
 ## workload/
 
 Natural output lengths on the tune split, used to justify the fixed 512-token panel and
@@ -425,9 +558,9 @@ one depth serves both MTP arms. Within DFlash, block 4 leads at
 c=128 (11,477 against 10,594 tok/s for `dflash-tuned`, +8%) and trails at c<=32 (c=64
 was not measured), so it is the high-concurrency DFlash arm; FA4 draft attention was not tried with block 4.
 Against its matched Triton plain baseline, block 16 under Triton gives 3.35x the
-per-user rate at c=1 (957 against 286 tok/s/user in x). Arms with buffered GDN state are
-pending classification of their greedy outputs against plain
-(`bench/campaigns/equality_tuned.sh`).
+per-user rate at c=1 (957 against 286 tok/s/user in x; 3.45x on the confirmation
+split). The arms that change arithmetic (buffered GDN state, Triton attention) were
+classified afterwards; all are `exact-up-to-rounding` (equality/).
 
 **GDN verify snapshot traffic (derived, not measured).** Speculative verify keeps one
 intermediate recurrent state per draft token per request so a rejected suffix can be
