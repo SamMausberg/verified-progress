@@ -18,6 +18,7 @@ py380=${TRITON_380_PY:-$v/venv-3.8.0/bin/python}
 pymain=${TRITON_MAIN_PY:-$v/venv-main/bin/python}
 nvbin() { "$1" -c 'import os, triton; print(os.path.join(os.path.dirname(triton.__file__), "backends/nvidia/bin"))'; }
 ptxas129=$(nvbin "$py380")/ptxas
+ptxas133=$(nvbin "$py380")/ptxas-blackwell
 ptxas134=$(nvbin "$pymain")/ptxas-blackwell
 export CUDA_HOME=${CUDA_HOME:-$HOME/.local/cuda-13.0}
 export LD_LIBRARY_PATH="$HOME/.local/cuda-compat-13.0:$CUDA_HOME/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
@@ -29,6 +30,8 @@ runs=(
   "t371|$py371|-"
   "t371_ptxas134|$py371|TRITON_PTXAS_PATH=$ptxas134"
   "t380|$py380|-"
+  "t380_ptxas133|$py380|TRITON_PTXAS_PATH=$ptxas133"
+  "t380_ptxas134|$py380|TRITON_PTXAS_PATH=$ptxas134"
   "tmain|$pymain|-"
   "tmain_ptxas129|$pymain|TRITON_PTXAS_BLACKWELL_PATH=$ptxas129"
 )
