@@ -52,11 +52,19 @@ cat > "$OUT/pairs.json" <<'PAIRS'
   ["mtp_s3 buffered vs stock verify radix-off c1", "mtp_s3__bench_noradix/c1", "mtp_s3_replayssm__bench_noradix/c1"]
 ]
 PAIRS
+# Outputs of an earlier run must not pass for this one.
+rm -f "$OUT/summary.json" "$OUT/report.json" "$OUT/divergences.csv" "$OUT/table.csv"
 python experiments/state_safety/compare.py --runs "$RUNS" --pairs "$OUT/pairs.json" \
   --out-json "$OUT/summary.json" --out-csv "$OUT/divergences.csv" \
   --out-table "$OUT/table.csv" | tee "$OUT/compare.log"
+compare_status=${PIPESTATUS[0]}
 python -m bench.divergence "$OUT/summary.json" --out "$OUT/report.json"
+divergence_status=$?
 status=0
+if [ "$compare_status" -ne 0 ] || [ "$divergence_status" -ne 0 ]; then
+  echo "compare.py exited $compare_status, bench.divergence exited $divergence_status" >&2
+  status=1
+fi
 if [ "${#failed[@]}" -gt 0 ]; then
   echo "configurations that failed to run: ${failed[*]}" >&2
   status=1

@@ -9,9 +9,10 @@
 #   exactness = "stock" | "exact-up-to-floor" | "pending" | "lossy"
 #                   how the arm's greedy outputs relate to plain decoding with the
 #                   default flags (bench/arms.py says what each class means).
-#                   Numerics-changing flags (buffered GDN state, Triton target
-#                   attention, FP8, ...) make an arm pending until
-#                   bench/campaigns/equality_tuned.sh classifies it.
+#                   A stock arm may only set flags in NEUTRAL_FLAGS
+#                   (bench/arms.py) and FlashInfer target attention; anything
+#                   else makes an arm pending until its outputs are classified
+#                   (bench/campaigns/equality_tuned.sh).
 # Optional per-arm keys:
 #   lossy = "..."   what the arm changes numerically (FP8 weights, FP8 KV, BF16
 #                   GDN state, ...); required unless the class is stock. Lossy

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from bench.arms import Arm, flag_tokens, parse_overrides, resolve_arm, server_command
+from bench.arms import ArgValue, Arm, flag_tokens, parse_overrides, resolve_arm, server_command
 from bench.pareto import aggregate, dominated
 from bench.results import counter_deltas, load_requests, parse_prometheus, summarise_point
 from bench.server import (
@@ -106,9 +106,51 @@ def test_every_arm_declares_a_consistent_exactness_class(tmp_path: Path) -> None
     assert resolve_arm('plain-tuned-triton').exactness == 'pending'
     assert resolve_arm('dflash-tuned-b16').exactness == 'pending'
     assert resolve_arm('dflash-tuned').exactness == 'stock'  # FA4 is draft-only
-    # A numerics-changing override makes a stock arm pending.
-    assert resolve_arm('plain', {'attention-backend': 'triton'}).exactness == 'pending'
-    assert resolve_arm('mtp', {'enable-linear-replayssm-spec': True}).exactness == 'pending'
+    # Any flag outside the neutral allowlist makes a stock arm pending, whatever
+    # its class: state dtype, compilation, kernel backends, precision, model dtype,
+    # verify mode, buffered GDN state, FP8.
+    changing: list[tuple[str, ArgValue]] = [
+        ('attention-backend', 'triton'),
+        ('decode-attention-backend', 'triton'),
+        ('prefill-attention-backend', 'triton'),
+        ('mamba-ssm-dtype', 'float16'),
+        ('enable-torch-compile', True),
+        ('linear-attn-prefill-backend', 'triton'),
+        ('linear-attn-decode-backend', 'flashinfer'),
+        ('enable-tf32-matmul', True),
+        ('bf16-gemm-backend', 'cublas'),
+        ('dtype', 'float16'),
+        ('speculative-attention-mode', 'decode'),
+        ('rl-on-policy-target', 'fsdp'),
+        ('enable-linear-replayssm', True),
+        ('enable-linear-replayssm-spec', True),
+        ('kv-cache-dtype', 'fp8_e4m3'),
+        ('quantization', 'fp8'),
+        ('chunked-prefill-size', 4096),
+    ]
+    for flag, value in changing:
+        arm = resolve_arm('plain-tuned', {flag: value})
+        assert arm.exactness == 'pending', flag
+    assert resolve_arm('plain-tuned', env_overrides={'SGLANG_X': '1'}).exactness == 'pending'
+    # Neutral flags keep the class.
+    neutral: list[tuple[str, ArgValue]] = [
+        ('stream-interval', 1),
+        ('cuda-graph-max-bs', 64),
+        ('max-running-requests', 64),
+        ('speculative-num-steps', 4),
+        ('speculative-draft-attention-backend', 'fa4'),
+        ('attention-backend', 'flashinfer'),
+    ]
+    for flag, value in neutral:
+        assert resolve_arm('plain-tuned', {flag: value}).exactness == 'stock', flag
+    assert (
+        resolve_arm(
+            'plain-tuned', env_overrides={'SGLANG_FLASHINFER_WORKSPACE_SIZE': '1'}
+        ).exactness
+        == 'stock'
+    )
+    # A pending arm stays pending under overrides.
+    assert resolve_arm('mtp-tuned', {'cuda-graph-max-bs': 64}).exactness == 'pending'
     head = '[defaults]\nmodel = "m"\nrevision = "r"\n'
     missing = tmp_path / 'missing.toml'
     missing.write_text(head + '[arms.a]\ndescription = "d"\n')
@@ -129,6 +171,9 @@ def test_every_arm_declares_a_consistent_exactness_class(tmp_path: Path) -> None
     base = resolve_arm('plain').to_json()
     assert Arm(**{**base, 'lossy': 'FP8 KV cache'}).exactness == 'lossy'
     assert Arm(**{**base, 'lossy': 'pending: check'}).exactness == 'pending'
+    # An explicit lossy note on an arm that inherited the pending class.
+    pending = resolve_arm('mtp-tuned').to_json()
+    assert Arm(**{**pending, 'lossy': 'BF16 GDN state'}).exactness == 'lossy'
 
 
 def test_repository_arms_resolve() -> None:
@@ -663,6 +708,14 @@ def test_runs_get_sessions_and_exactness_from_their_manifests(tmp_path: Path) ->
     assert exactness({'arm': {'name': 'x', 'args': {'attention-backend': 'triton'}}}) == 'pending'
     assert exactness({'arm': {'name': 'x', 'args': {}, 'lossy': 'FP8 KV'}}) == 'lossy'
     assert exactness({'arm': {'name': 'x', 'args': {}}}) == 'unclassified'
+    reference = {'model': plain['model'], 'revision': plain['revision']}
+    # A recorded stock class does not survive the run's own numerics flags.
+    recorded = {'name': 'x', 'args': {'mamba-ssm-dtype': 'float16'}, 'exactness': 'stock'}
+    assert exactness({'arm': {**recorded, **reference}}) == 'pending'
+    neutral = {'name': 'x', 'args': {'stream-interval': 4}, **reference}
+    assert exactness({'arm': neutral}) == 'stock'
+    other_model = {'name': 'x', 'args': {}, 'model': 'm-fp8', 'revision': 'r'}
+    assert exactness({'arm': other_model}) == 'pending'
 
 
 def test_per_prompt_output_lengths(tmp_path: Path) -> None:

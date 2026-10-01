@@ -200,23 +200,34 @@ EXACTNESS_ORDER = ('unclassified', 'lossy', 'pending', 'exact-up-to-floor', 'sto
 
 
 def exactness(manifest: dict[str, Any]) -> str:
-    """The run's exactness class (see the module docstring)."""
+    """The run's exactness class (see the module docstring).
+
+    The run's own flags are checked before anything it recorded: a recorded
+    `stock` or `exact-up-to-floor` class does not survive a numerics change in
+    the flags the run actually used.
+    """
     arm = manifest.get('arm') or {}
     name = arm.get('name')
     args = arm.get('args') or {}
+    env = arm.get('env') or {}
     if name and name in load_arms().get('arms', {}):
         current = resolve_arm(str(name))
-        if current.args == args and current.env == (arm.get('env') or {}):
+        if current.args == args and current.env == env:
             return current.exactness
+    model = (str(arm.get('model')), str(arm.get('revision'))) if arm.get('model') else None
+    changes = numerics_changes(args, env, model)
     note = str(arm.get('lossy') or '').strip()
     recorded = str(arm.get('exactness') or '')
-    if note and recorded in ('', 'stock'):
+    if note and recorded in ('', 'stock', 'pending'):
         return 'pending' if note.lower().startswith('pending') else 'lossy'
-    if recorded in EXACTNESS_CLASSES:
+    if recorded in ('lossy', 'pending'):
         return recorded
-    if numerics_changes(args):
+    if changes:
         return 'pending'
-    return 'unclassified'
+    if recorded in EXACT_CLASSES:
+        return recorded
+    # Every flag neutral and the reference model: stock by the rule in bench/arms.py.
+    return 'stock' if model is not None else 'unclassified'
 
 
 def label_exactness(

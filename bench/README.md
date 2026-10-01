@@ -90,8 +90,9 @@ concurrency order.
 
 ### Declared sensitivity workload: natural output lengths
 
-Declared on 2026-10-01 at 03:50 UTC. At that point the tune split and repeat 0 of the
-confirmation sweep had been measured, and no arm had been timed on this workload.
+Declared in commit b028c6c (2026-10-01 03:40 UTC). The tune split had been measured,
+repeat 0 of the confirmation sweep was running, and no arm had been timed on this
+workload (only the natural-length run on the tune split, 2026-09-30, existed).
 
 The fixed-length panel above is the primary, pre-declared result and stays as it is.
 With a closed-loop client and equal output lengths, plain requests start and finish
@@ -113,10 +114,11 @@ and nothing else:
 - Points: c = 32 and 128 with `max(64, 8 c)` measured requests (eight waves; at
   least four at c = 128 were required).
 - Arms, chosen by a rule fixed now: for each family (MTP, DFlash) and each of
-  c = 32 and 128, the family's arm with the highest confirmation y at that
-  concurrency, each with its matched plain baseline (`plain-tuned` for FlashInfer
-  arms, `plain-tuned-triton` for Triton arms). Plain decoding runs as both the
-  baseline and an arm.
+  c = 32 and 128, the family's arm with the highest mean y over the three
+  confirmation sessions at that concurrency, invalid points excluded, each with its
+  matched plain baseline (`plain-tuned` for FlashInfer arms, `plain-tuned-triton`
+  for Triton arms). If the family's second arm is within 2% of the best, both run.
+  Plain decoding runs as both the baseline and an arm.
 - Repeats: three sessions, each launching every selected arm with its matched
   baseline in the same exclusive hold, in alternating order, with the sweep's
   foreign-load recording and quiet-host wait.
