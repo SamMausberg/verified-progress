@@ -8,7 +8,7 @@ At every position a speculative decoder verifies, the target model projects its 
 \begin{figure}[t]
 \centering
 \input{figures/breakdown}
-\caption{GPU time of a decode step by component, measured under Nsight Systems at a fixed batch $B$ \ev{profile-attr}; an MTP cycle (three draft steps) commits several tokens. Right: the share of the target and draft heads, which bounds what a free head could save; it falls as the Gated DeltaNet kernels grow with $B$.}
+\caption{GPU time of a decode step by component, measured under Nsight Systems at a fixed batch $B$ \ev{profile-attr}; an MTP cycle (three draft steps) commits several tokens. Right: the heads' share of the profiled step or cycle. Tracing inflates the MTP cycle's idle time; untraced it is about 21\%, 20\% and 15\% (derived, Appendix~\ref{app:profile}).}
 \label{fig:breakdown}
 \end{figure}
 
@@ -21,7 +21,7 @@ We also test \emph{transport}, the mechanism this work set out to build: a draft
 \begin{figure*}[t]
 \centering
 \input{figures/mechanism}
-\caption{The certified head, schematically (intervals not to scale). \textbf{(a)}~An int8 pass encloses every row's real logit in $[lo_i,hi_i]$. Rows with $hi_i<\max_jlo_j-\delta_{\max}$ lose to every possible winner by more than the stock kernel's modelled accumulation error plus one BF16 spacing, so, given valid enclosures, they are dropped for good; one or two rows usually survive. \textbf{(b)}~The survivors are re-scored from their BF16 rows, and each enclosure of the stock kernel's FP32 accumulator is rounded into the BF16 values $[L_i^-,L_i^+]$ it can produce (shaded): values in separate rounding cells fix the order, two enclosures within one cell tie and the lower index wins, and two that straddle the same rounding boundary leave the argmax open. \textbf{(c)}~A fixed argmax certifies the token; otherwise the stock head runs at the same batch shape and its own argmax is returned.}
+\caption{The certified head, schematically (intervals not to scale). \textbf{(a)}~An int8 pass encloses every row's real logit in $[lo_i,hi_i]$. Rows with $hi_i<\max_jlo_j-\delta_{\max}$ lose to every possible winner by more than the stock kernel's modelled accumulation error plus one BF16 spacing, so, given valid enclosures, they are dropped for good; one or two rows usually survive. \textbf{(b)}~The survivors are re-scored from their BF16 rows, and each enclosure of the stock kernel's FP32 accumulator is rounded into the BF16 values $[L_i^-,L_i^+]$ it can produce (shaded): values in separate rounding cells fix the order, two enclosures within one cell tie and the lower index wins, and two that straddle the same rounding boundary leave the argmax open. \textbf{(c)}~A fixed argmax certifies the token; otherwise the stock head runs at the same batch shape.}
 \label{fig:mechanism}
 \end{figure*}
 
