@@ -737,6 +737,78 @@ def run_norms(
         fn(x, r, g)
 
 
+def ulp_diff_bf16(a: torch.Tensor, b: torch.Tensor) -> int:
+    """Largest distance in BF16 units in the last place (same-sign values)."""
+    ia, ib = a.view(torch.int16).int(), b.view(torch.int16).int()
+    return int((ia - ib).abs().max()) if a.numel() else 0
+
+
+def prologue_agreement(
+    ckpt: Checkpoint, gws: list[torch.Tensor], m_values: list[int]
+) -> list[dict[str, Any]]:
+    """Bitwise agreement of the GEMM prologues with the stock kernels they replace.
+
+    add-RMSNorm: the probe kernel's A operand against FlashInfer's
+    gemma_fused_add_rmsnorm output, and its residual write against FlashInfer's.
+    SiLU-mul: the probe against SGLang's JIT silu_and_mul, for the fast-math
+    and the precise SiLU arithmetic.
+    """
+    from sgl_kernel import gemma_fused_add_rmsnorm
+    from sglang.kernels.ops.activation.activation import silu_and_mul
+    from sglang.srt.layers import backbone_gemm as bg
+
+    hidden = ckpt.config['hidden_size']
+    inter = ckpt.config['intermediate_size']
+    eps = ckpt.config['rms_norm_eps']
+    rows = []
+    for m in m_values:
+        torch.manual_seed(1000 + m)
+        x = torch.randn(m, hidden, device='cuda', dtype=torch.bfloat16)
+        r = (torch.randn(m, hidden, device='cuda') * 4).to(torch.bfloat16)
+        xs, rs = x.clone(), r.clone()
+        gemma_fused_add_rmsnorm(xs, rs, gws[1], eps)
+        r_out = torch.empty_like(r)
+        a = bg.prologue_probe(
+            x,
+            hidden,
+            bg.PROLOGUE_ADD_RMSNORM,
+            residual=r,
+            norm_weight=gws[1],
+            eps=eps,
+            residual_out=r_out,
+        )
+        rows.append(
+            {
+                'm': m,
+                'prologue': 'add_rmsnorm',
+                'out_bitwise_equal': float(
+                    (a.view(torch.int16) == xs.view(torch.int16)).float().mean()
+                ),
+                'out_max_ulp': ulp_diff_bf16(a, xs),
+                'residual_bitwise_equal': float(
+                    (r_out.view(torch.int16) == rs.view(torch.int16)).float().mean()
+                ),
+            }
+        )
+        gu = (torch.randn(m, 2 * inter, device='cuda') * 2).to(torch.bfloat16)
+        stock = silu_and_mul(gu)
+        for mode, label in ((bg.SILU_FAST, 'fast'), (bg.SILU_PRECISE, 'precise')):
+            a = bg.prologue_probe(gu, inter, bg.PROLOGUE_SILU_MUL, silu_mode=mode)
+            rows.append(
+                {
+                    'm': m,
+                    'prologue': f'silu_mul_{label}',
+                    'out_bitwise_equal': float(
+                        (a.view(torch.int16) == stock.view(torch.int16)).float().mean()
+                    ),
+                    'out_max_ulp': ulp_diff_bf16(a, stock),
+                }
+            )
+    for row in rows:
+        print('prologue', row, flush=True)
+    return rows
+
+
 def bench_norm(args: argparse.Namespace) -> dict[str, Any]:
     import flashinfer.norm as fnorm
     from sgl_kernel import gemma_fused_add_rmsnorm
@@ -749,7 +821,11 @@ def bench_norm(args: argparse.Namespace) -> dict[str, Any]:
         ckpt.norm_weight(i // 2, 'input_layernorm' if i % 2 == 0 else 'post_attention_layernorm')
         for i in range(n_layers)
     ]
-    cuda_mod = fnorm.get_norm_module()
+    try:
+        cuda_mod: Any = fnorm.get_norm_module()
+    except Exception as e:  # the CUDA JIT norm may need a build; report and go on
+        print(f'flashinfer CUDA norm module unavailable: {e!r}', flush=True)
+        cuda_mod = None
     arms: dict[str, NormFn] = {
         'flashinfer_cute_pdl': lambda x, r, w: gemma_fused_add_rmsnorm(x, r, w, eps),
         'flashinfer_cute_nopdl': lambda x, r, w: fnorm.gemma_fused_add_rmsnorm(
@@ -760,10 +836,13 @@ def bench_norm(args: argparse.Namespace) -> dict[str, Any]:
             x, r, w, eps, False
         ),
     }
+    if cuda_mod is None:
+        arms = {a: f for a, f in arms.items() if 'cuda' not in a}
     result: dict[str, Any] = {
         'meta': environment(args),
         'norm_calls_per_graph': n_layers,
         'rows': [],
+        'prologue_agreement': prologue_agreement(ckpt, gws, args.m or list(M_VALUES)),
     }
     for m in args.m or list(M_VALUES):
         torch.manual_seed(m)
