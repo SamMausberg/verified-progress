@@ -16,10 +16,11 @@
 # already running) and keeps its ticket until it exits. A shared job waits only
 # for older exclusive tickets, takes the lock in shared mode alongside other
 # shared jobs, and drops its ticket once the lock is held. Tickets of dead
-# processes are discarded, so a crashed job cannot stall the queue. The lock is
-# released when the command and every child holding it exit, so a server left
-# running keeps the GPU locked. GPU_LOCK_WAIT (seconds, default 4 h) bounds each
-# wait; a timeout exits 75. To extend a wait without losing your place, cancel
+# processes are discarded, so a crashed job cannot stall the queue. flock holds
+# the lock itself (-o) for exactly the command's lifetime: children do not inherit
+# it, so a job must stop its servers and background processes before it exits, and
+# killing the flock process releases the lock. GPU_LOCK_WAIT (seconds, default 4 h)
+# bounds each wait; a timeout exits 75. To extend a wait without losing your place, cancel
 # the waiting job and resubmit it with GPU_LOCK_ARRIVAL set to the arrival time
 # (nanoseconds) in its old ticket name; it must not lie in the future.
 set -euo pipefail
@@ -102,11 +103,13 @@ trap 'rm -f "$ticket"' EXIT
 
 if [ "$kind" = x ]; then
   wait_while older_ticket "$name"
-  flock -x -w "$WAIT" -E 75 "$LOCK_FILE" "$@"
+  # -o: the lock is held by flock itself for the command's lifetime and is not inherited, so a
+  # background process the job leaves behind (or a successor ticket it queues) cannot keep it.
+  flock -o -x -w "$WAIT" -E 75 "$LOCK_FILE" "$@"
 else
   wait_while older_ticket "$name" x
   # Drop the ticket as soon as the shared lock is held, then run the command.
   # shellcheck disable=SC2016 # $0 and $@ belong to the inner shell
-  flock -s -w "$WAIT" -E 75 "$LOCK_FILE" \
+  flock -o -s -w "$WAIT" -E 75 "$LOCK_FILE" \
     bash -c 'rm -f "$0"; exec "$@"' "$ticket" "$@"
 fi
