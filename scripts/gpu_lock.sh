@@ -102,11 +102,13 @@ trap 'rm -f "$ticket"' EXIT
 
 if [ "$kind" = x ]; then
   wait_while older_ticket "$name"
-  flock -x -w "$WAIT" -E 75 "$LOCK_FILE" "$@"
+  # -o: the lock is held by flock itself for the command's lifetime and is not inherited, so a
+  # background process the job leaves behind (or a successor ticket it queues) cannot keep it.
+  flock -o -x -w "$WAIT" -E 75 "$LOCK_FILE" "$@"
 else
   wait_while older_ticket "$name" x
   # Drop the ticket as soon as the shared lock is held, then run the command.
   # shellcheck disable=SC2016 # $0 and $@ belong to the inner shell
-  flock -s -w "$WAIT" -E 75 "$LOCK_FILE" \
+  flock -o -s -w "$WAIT" -E 75 "$LOCK_FILE" \
     bash -c 'rm -f "$0"; exec "$@"' "$ticket" "$@"
 fi
