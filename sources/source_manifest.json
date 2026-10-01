@@ -1,6 +1,6 @@
 {
   "audit_date": "2026-09-30",
-  "source_count": 223,
+  "source_count": 224,
   "sources": [
     {
       "key": "sgcode",
@@ -133,6 +133,17 @@
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
       "audit_note": "Citation audit 30 Sep 2026 (lit workstream): verified. Lines 1-95 read at the pin: docstring calls the fold a 'BITWISE CLONE', forbids tl.dot/reciprocal reordering and requires num_warps=1; accept_lens 'incl. bonus'. See sources/citation_audit.md."
+    },
+    {
+      "key": "sglangsampler",
+      "bibliography_text": "SGLang contributors. \\emph{Sampler}. Frozen commit \\sourcepin. \\url{https://github.com/sgl-project/sglang/blob/bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824/python/sglang/srt/layers/sampler.py#L746-L800}.",
+      "urls": [
+        "https://github.com/sgl-project/sglang/blob/bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824/python/sglang/srt/layers/sampler.py#L746-L800"
+      ],
+      "accessed": "2026-10-01",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Read at the pin 1 Oct 2026 (appendix workstream). top_k_top_p_min_p_sampling_from_probs_torch (lines 746-800) sorts the probabilities, and with a seed calls multinomial_with_seed on the sorted row, whose hash keys each column by its index in that row (lines 899-902: col_indices = arange(m)), then maps back through probs_idx; min-p with a seed is refused by an assert (line 776). _sample_from_logprobs (lines 594-611) and the untruncated seeded path key the hash by token index."
     },
     {
       "key": "opttree",
