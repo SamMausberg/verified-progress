@@ -321,6 +321,8 @@ class EngineHeads:
             'flags': asdict(self.flags),
             'paths': {p: h.stats() for p, h in self.paths.items()},
             'column_reports': {p: h.column_report for p, h in self.paths.items()},
+            'self_test': {p: h.head.self_test_summary() for p, h in self.paths.items()},
+            'probe_stats': {p: h.head.probe_stats() for p, h in self.paths.items()},
         }
 
     def dump(self) -> None:
