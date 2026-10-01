@@ -1,0 +1,69 @@
+{
+ "triton": "3.7.1",
+ "rows": [
+  {
+   "source": "c01d905",
+   "sample": false,
+   "batch_size": "runtime M",
+   "instructions": 4384,
+   "fp64_instructions": 160,
+   "registers": 162
+  },
+  {
+   "source": "c01d905",
+   "sample": false,
+   "batch_size": "M = 1",
+   "instructions": 3408,
+   "fp64_instructions": 40,
+   "registers": 161
+  },
+  {
+   "source": "c01d905",
+   "sample": true,
+   "batch_size": "runtime M",
+   "instructions": 10088,
+   "fp64_instructions": 1607,
+   "registers": 200
+  },
+  {
+   "source": "c01d905",
+   "sample": true,
+   "batch_size": "M = 1",
+   "instructions": 5688,
+   "fp64_instructions": 542,
+   "registers": 165
+  },
+  {
+   "source": "9e3a39a",
+   "sample": false,
+   "batch_size": "runtime M",
+   "instructions": 2096,
+   "fp64_instructions": 0,
+   "registers": 166
+  },
+  {
+   "source": "9e3a39a",
+   "sample": false,
+   "batch_size": "M = 1",
+   "instructions": 1568,
+   "fp64_instructions": 0,
+   "registers": 165
+  },
+  {
+   "source": "9e3a39a",
+   "sample": true,
+   "batch_size": "runtime M",
+   "instructions": 7696,
+   "fp64_instructions": 1447,
+   "registers": 194
+  },
+  {
+   "source": "9e3a39a",
+   "sample": true,
+   "batch_size": "M = 1",
+   "instructions": 3808,
+   "fp64_instructions": 502,
+   "registers": 165
+  }
+ ]
+}

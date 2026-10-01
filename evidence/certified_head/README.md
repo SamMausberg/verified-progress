@@ -283,6 +283,20 @@ is empirical, and a rare intermittent miss could pass 8 probe rows per call:
 `stress_defaults.json` checks every default configuration of every pass, at
 every batch size that dispatches to it, about a million row-checks each.
 
+**How the defaults are chosen (rule fixed before the stress results).** For each
+pass and batch size, from `stress_defaults.json` and the fastest passing TMA and
+pointer-load configurations in the sweeps (`pointer_vs_tma_*.json`):
+
+- any miss for a TMA default: that default becomes the fastest pointer-load
+  configuration that passes the self-test, whatever it costs, and the cost is
+  reported;
+- 0 misses and pointer loads within 5% of the TMA default: pointer loads anyway,
+  as cheap insurance;
+- 0 misses and pointer loads more than 5% slower: TMA is kept, citing the stress
+  count, its 3/n bound and the independence caveat, and the self-test and probe
+  gates; this README then says "TMA kept on a clean stress test; pointer loads
+  cost X%".
+
 ## Pending in this PR
 
 The GPU tests, the replay of 60,000 real decode rows under every contract, the
