@@ -108,6 +108,7 @@ def main() -> None:
 
     log = Path(args.out).expanduser() / 'lever_sweep_log.jsonl'
     log.parent.mkdir(parents=True, exist_ok=True)
+    statuses: dict[str, str] = {}
     for config in args.configs:
         started = time.time()
         status = 'ok'
@@ -128,6 +129,10 @@ def main() -> None:
         with log.open('a') as handle:
             record = {'config': config, 'status': status, 'seconds': round(time.time() - started)}
             handle.write(json.dumps(record) + '\n')
+        statuses[config] = status
+    failed = [config for config, status in statuses.items() if status != 'exit 0']
+    if failed:
+        sys.exit(f'lever_sweep: failed configurations: {failed}')
 
 
 if __name__ == '__main__':

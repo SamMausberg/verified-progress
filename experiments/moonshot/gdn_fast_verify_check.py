@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -134,7 +135,9 @@ def bench_width(T: int, N: int, layer: int, seed: int) -> dict[str, Any]:
 
     recurrent_snapshots: SGLang's Triton target-verify kernel writing one FP32 state per
     position (what MTP/DFlash verification runs today); recurrent: the same kernel with no
-    snapshots (the strict sequential walk alone); chunked: the block-parallel form.
+    snapshots (the strict sequential walk alone); chunked: the block-parallel form;
+    flashinfer(_snapshots): FlashInfer's `gated_delta_rule_mtp` (the FP32-state verify the
+    FlashInfer GDN backend dispatches on SM90), with and without per-position states.
     """
     from sglang.kernels.ops.attention.fla.chunk import chunk_gated_delta_rule
     from sglang.kernels.ops.attention.fla.fused_sigmoid_gating_recurrent import (
@@ -176,13 +179,52 @@ def bench_width(T: int, N: int, layer: int, seed: int) -> dict[str, Any]:
             inplace_update=False,
         )  # fmt: skip
 
-    return {
+    point: dict[str, Any] = {
         'width': T,
         'requests': N,
         'recurrent_snapshots_us': time_us(lambda: recurrent(True)),
         'recurrent_us': time_us(lambda: recurrent(False)),
         'chunked_us': time_us(chunked),
     }
+    fi_mtp = flashinfer_mtp()
+    if fi_mtp is not None:
+        fi_snaps = torch.empty(N, T, HV, V, K, device=dev)
+
+        def flashinfer(snapshots: bool) -> torch.Tensor:
+            out, _ = fi_mtp(
+                q=q.view(N, T, H, K), k=k.view(N, T, H, K), v=v.view(N, T, HV, V),
+                initial_state=state, initial_state_indices=idx, A_log=A_log,
+                a=a.view(N, T, HV), dt_bias=dt_bias, b=b.view(N, T, HV), scale=scale,
+                intermediate_states_buffer=fi_snaps if snapshots else None,
+                disable_state_update=True, use_qk_l2norm=True,
+            )  # fmt: skip
+            return out
+
+        try:
+            # Compile outside the timed region, and compare outputs with the Triton verify.
+            reference = fused_sigmoid_gating_delta_rule_update(
+                A_log=A_log, a=a, dt_bias=dt_bias, softplus_beta=1.0, softplus_threshold=20.0,
+                q=q, k=k, v=v, b=b, initial_state_source=state, initial_state_indices=idx,
+                scale=scale, use_qk_l2norm_in_kernel=True, cu_seqlens=cu,
+                disable_state_update=True,
+            )  # fmt: skip
+            out = flashinfer(False).reshape(reference.shape)
+            point['flashinfer_words_differing_from_triton'] = int((out != reference).sum())
+            point['flashinfer_snapshots_us'] = time_us(lambda: flashinfer(True))
+            point['flashinfer_us'] = time_us(lambda: flashinfer(False))
+        except Exception as exc:
+            point['flashinfer_error'] = repr(exc)[:300]
+    return point
+
+
+def flashinfer_mtp() -> Any:
+    """FlashInfer's FP32-state MTP verify kernel, or None when FlashInfer lacks it."""
+    os.environ.setdefault('FLASHINFER_DISABLE_VERSION_CHECK', '1')
+    try:
+        from flashinfer.gdn_decode import gated_delta_rule_mtp
+    except ImportError:
+        return None
+    return gated_delta_rule_mtp
 
 
 def bench(args: argparse.Namespace) -> dict[str, Any]:

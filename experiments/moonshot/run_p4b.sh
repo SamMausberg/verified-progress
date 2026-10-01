@@ -1,35 +1,75 @@
 #!/bin/bash
-# Exclusive-lock job: P4 completion.
-#  1. Exact replay with a 16-wide value tile: bit-exactness and kernel time (one layer).
-#  2. Server output probe (greedy tokens + top-20 logprobs, concurrency 1): dense vs exact
+# Exclusive-lock job: P4 completion (design, metric and decision rule: evidence/moonshot/README.md 2c).
+#  1. Prerequisite: exact replay at the timed configuration (value tile 32) is bit-identical
+#     to the packed decode at kernel level; the run stops if any word differs.
+#  2. Optional: exact replay with a 16-wide value tile (bit-exactness and kernel time), and a
+#     P7 kernel timing (FlashInfer vs Triton GDN verify at one request).
+#  3. Server output probe (greedy tokens + top-20 logprobs, concurrency 1): dense vs exact
 #     replay vs ReplaySSM, plus FP16/BF16 state probes (radix off, mem 0.25). A difference
-#     refutes end-to-end exactness; a pass does not establish it.
-#  3. Pre-registered A/B: batch 128, 2,048-token prompts, 512 generated, greedy, FP32 state,
+#     refutes end-to-end exactness; a pass does not establish it. The run stops if any
+#     configuration fails or lacks its comparison.
+#  4. Pre-registered A/B: batch 128, 2,048-token prompts, 512 generated, greedy, FP32 state,
 #     no speculation; dense vs exact replay L=4, four pairs in A B B A A B B A order; primary
-#     metric the token-weighted server full-batch decode rate, client y secondary.
-#  (Also a short P7 kernel timing: FlashInfer vs Triton GDN verify at one request.)
+#     metric the token-weighted server full-batch decode rate, client y secondary. The run
+#     stops unless all eight arms of this run completed and form four dense/exact pairs.
+# Every step logs its start and exit status; any failed step makes the job exit non-zero
+# (required steps at once, optional steps at the end).
 # shellcheck source=/dev/null
 source ~/verified-progress/scripts/sglang_env.sh
+set -euo pipefail
 export SGLANG_WORKTREE=~/sglang-wt/moonshot
-set -x
-cd ~/vp-wt/moonshot || exit 1
+# Run every tool from the checkout that holds this script, so the job uses the committed code.
+cd "$(dirname "$(readlink -f "$0")")/../.." || exit 1
+REPO=$(pwd)
+RUN_ID=$(date -u +%Y%m%dT%H%M%SZ)
+DATA=~/vp-data/moonshot
+OPTIONAL_FAILED=()
+
+step() {  # step <required|optional> <name> <command...>
+  local kind=$1 name=$2
+  shift 2
+  echo "[$(date -u +%H:%M:%S)] STEP $name: start"
+  if "$@"; then
+    echo "[$(date -u +%H:%M:%S)] STEP $name: ok"
+  else
+    local code=$?
+    echo "[$(date -u +%H:%M:%S)] STEP $name: FAILED (exit $code)"
+    if [ "$kind" = required ]; then
+      echo "P4b FAILED at required step $name"
+      exit 1
+    fi
+    OPTIONAL_FAILED+=("$name")
+  fi
+}
+
+echo "P4b run $RUN_ID, engine $(git -C "$SGLANG_WORKTREE" rev-parse --short HEAD), repo $REPO at $(git rev-parse --short HEAD)"
+git status --short -- experiments bench | sed 's/^/uncommitted: /'
 export PYTHONPATH=$SGLANG_WORKTREE/python
-SGLANG_GDN_EXACT_REPLAY_BV=16 python experiments/moonshot/gdn_exact_replay_check.py check \
-  --batch 8 --steps 48 --ring 4 --force-rate 0.1 --out ~/vp-data/moonshot/exact_replay/check_L4_bv16.json \
-  | grep -E "bit_identical|differing"
-SGLANG_GDN_EXACT_REPLAY_BV=16 python experiments/moonshot/gdn_exact_replay_check.py bench \
-  --batches 128 256 --rings 2 4 --out ~/vp-data/moonshot/exact_replay/bench_bv16.json
-# P7 side measurement for repair: FlashInfer's FP32-state MTP verify against SGLang's Triton
-# verify per layer at one request, T = 4-256 (JIT compile happens in the warm-up calls).
-python experiments/moonshot/gdn_fast_verify_check.py bench --widths 4 16 64 128 256 \
-  --requests 1 --out ~/vp-data/moonshot/p7/verify_width_flashinfer.json
-export PYTHONPATH=$SGLANG_WORKTREE/python:$HOME/vp-wt/moonshot
-python experiments/moonshot/quality_arms.py --out ~/vp-data/moonshot/quality_exact2 \
+step required kernel-check-bv32 python experiments/moonshot/gdn_exact_replay_check.py check \
+  --batch 8 --steps 48 --ring 4 --force-rate 0.1 \
+  --out "$DATA/exact_replay/check_L4_bv32_$RUN_ID.json"
+step optional kernel-check-bv16 env SGLANG_GDN_EXACT_REPLAY_BV=16 \
+  python experiments/moonshot/gdn_exact_replay_check.py check \
+  --batch 8 --steps 48 --ring 4 --force-rate 0.1 \
+  --out "$DATA/exact_replay/check_L4_bv16_$RUN_ID.json"
+step optional kernel-bench-bv16 env SGLANG_GDN_EXACT_REPLAY_BV=16 \
+  python experiments/moonshot/gdn_exact_replay_check.py bench \
+  --batches 128 256 --rings 2 4 --out "$DATA/exact_replay/bench_bv16_$RUN_ID.json"
+step optional p7-flashinfer-verify python experiments/moonshot/gdn_fast_verify_check.py bench \
+  --widths 4 16 64 128 256 --requests 1 \
+  --out "$DATA/p7/verify_width_flashinfer_$RUN_ID.json"
+
+export PYTHONPATH=$SGLANG_WORKTREE/python:$REPO
+QUALITY=$DATA/quality_exact_$RUN_ID
+step required server-output-probe python experiments/moonshot/quality_arms.py --out "$QUALITY" \
   --reference plain+no_radix --probe-concurrency 1 \
-  --configs plain+no_radix plain+no_radix+exact_replay plain+no_radix+replayssm 'plain+no_radix#2' \
-  plain+no_radix+fp16_state plain+no_radix+bf16_state 2>&1 | grep -E '"(sequences_identical|kl_mean|argmax_agreement|divergences_per_1k_shared_tokens|error)"'
-grep -l "exact replay kernel" ~/vp-data/moonshot/quality_exact2/*/server/server.log
-python experiments/moonshot/lever_sweep.py --out ~/vp-data/moonshot/p4_ab --stream-interval 4 \
+  --configs plain+no_radix plain+no_radix+exact_replay plain+no_radix+replayssm \
+  'plain+no_radix#2' plain+no_radix+fp16_state plain+no_radix+bf16_state
+step required probe-dispatch-log grep -q "GDN decode: exact replay kernel" \
+  "$QUALITY/plain+no_radix+exact_replay/server/server.log"
+
+AB=$DATA/p4_ab_$RUN_ID
+step required ab-sweep python experiments/moonshot/lever_sweep.py --out "$AB" --stream-interval 4 \
   --concurrency 128 --min-requests 256 --waves 2 \
   --workload ~/vp-data/moonshot/workloads/long2048.jsonl \
   --warmup-pool ~/vp-data/moonshot/workloads/long2048_warmup.jsonl \
@@ -37,4 +77,11 @@ python experiments/moonshot/lever_sweep.py --out ~/vp-data/moonshot/p4_ab --stre
   'plain+no_radix+exact_replay#r2' 'plain+no_radix#r2' \
   'plain+no_radix#r3' 'plain+no_radix+exact_replay#r3' \
   'plain+no_radix+exact_replay#r4' 'plain+no_radix#r4'
-grep -c "exact replay kernel" ~/vp-data/moonshot/p4_ab/*exact_replay*/*/server/server.log
+step required ab-validate-and-decide python experiments/moonshot/validate_p4_ab.py "$AB" \
+  --json "$AB/verdict.json"
+
+if [ ${#OPTIONAL_FAILED[@]} -gt 0 ]; then
+  echo "P4b finished; optional steps FAILED: ${OPTIONAL_FAILED[*]}"
+  exit 1
+fi
+echo "P4b finished; all steps ok"

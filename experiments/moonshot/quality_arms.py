@@ -205,6 +205,18 @@ def main() -> None:
         summary[config] = entry
         summary_path.write_text(json.dumps(summary, indent=1))
         print(json.dumps({config: entry}, indent=1), flush=True)
+    # Exit non-zero when any configuration of this invocation failed or lacks its comparison.
+    failed = [
+        config
+        for config in args.configs
+        if 'error' in summary[config]
+        or (
+            config != args.reference
+            and not all(m in summary[config] for m in ('generate', 'score'))
+        )
+    ]
+    if failed:
+        sys.exit(f'quality_arms: failed or incomplete configurations: {failed}')
 
 
 if __name__ == '__main__':
