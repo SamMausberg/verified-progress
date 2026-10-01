@@ -1,4 +1,6 @@
 pair,run_a,run_b,prompts,diverged,exposure_tokens,per_1k_tokens,tie,one_ulp,near,large,not_argmax,length_mismatch,max_margin_median,max_margin_max,drift_p99,drift_max
+repeat session, plain c1,plain/c1,plain__rep/c1,320,0,70042,0,0,0,0,0,0,0,,,0,0
+repeat session, plain c32,plain/c32,plain__rep/c32,320,24,68322,0.3513,24,0,0,0,0,0,0.125,0.25,0.2373,0.3273
 concurrency 1 vs 32 (cap 16), plain,plain/c1,plain/c32,320,167,48816,3.421,151,14,2,0,0,0,0.125,0.375,0.3596,0.6861
 same server repeat c1, plain,plain/c1,plain/c1_warm,320,0,70042,0,0,0,0,0,0,0,,,0,0.2267
 same server repeat c32, plain,plain/c32,plain/c32_warm,320,0,70060,0,0,0,0,0,0,0,,,0,0.3229
