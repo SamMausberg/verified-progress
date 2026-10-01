@@ -40,7 +40,7 @@ the head read. The hooks run in Python between forwards, so the server must run 
 wrong forward mode or row count is skipped with a warning rather than misaligned. The
 patch adds device-to-host copies on every step and is for measurement only.
 
-## moonshot (`patches/moonshot/0001-0008`, branch `engine/moonshot`)
+## moonshot (`patches/moonshot/0001-0009`, branch `engine/moonshot`)
 
 The series applies in order to `bd66ce343e` on its own:
 
@@ -62,6 +62,7 @@ Every change is off unless its flag or environment variable is set.
 | 0006 | Under an 8-bit GDN state, the ReplaySSM decode ring keeps 16-bit (d, k) records, so the state is rounded to 8 bits only at a flush. | unchanged for FP32/FP16/BF16 state |
 | 0007 | `SGLANG_GDN_EXACT_REPLAY=1` with `--enable-linear-replayssm`: rounding-preserving live replay for GDN decode. The ring stores the packed decode's own FP32 operands (normalized key, raw value, g, beta) and every step replays them from the dense anchor in the packed kernel's order; the anchor is written every `--linear-replayssm-cache-len` steps. Designed to be bit-identical to the packed decode; validation pending (`tests/test_gdn_exact_replay.py`, `experiments/moonshot/gdn_exact_replay_check.py`). FP32 state only. | unchanged |
 | 0008 | With `SGLANG_GDN_EXACT_REPLAY=1` but no ring (no `--enable-linear-replayssm`, or no beta ring), decode raises instead of silently running another kernel; the first exact-replay dispatch is logged ("GDN decode: exact replay kernel, ring length L"). | unchanged when the flag is off |
+| 0009 | `SGLANG_GDN_EXACT_REPLAY_BV` selects the exact-replay value tile (default 32, the packed decode's); any other value must be re-checked for bit-equality. | unchanged (32) |
 
 Tests: `tests/test_moonshot_levers.py` and `tests/test_gdn_exact_replay.py` (the engine
 tests run in the SGLang venv with the worktree on `PYTHONPATH` and skip elsewhere).
@@ -110,9 +111,48 @@ diagnosis only. `experiments/state_safety/tap_runs.py` and `mechanism.py` drive 
 analyse it.
 
 `0002-verify-kv-split-deterministic.patch` passes the deterministic-inference KV
-split size to FlashInfer's target-verify plan, as decode and extend already do. It
-does not make MTP speculation batch-invariant under `--enable-deterministic-inference`
-(see `evidence/state_safety/README.md`); it is kept because a committed run used it.
+split size to FlashInfer's target-verify plan, as decode and extend already do, but
+only with `SGLANG_STATE_VERIFY_FIXED_SPLIT=1` and `--enable-deterministic-inference`;
+otherwise the plan is unchanged. It does not make MTP speculation batch-invariant
+(see `evidence/state_safety/README.md`); it is kept because a committed run used it
+(that run predates the variable and had the change on unconditionally, which is what
+setting the variable reproduces).
+
+| Variable | Patch | Effect when set |
+|---|---|---|
+| `SGLANG_STATE_TAP_DIR` | 0001 | enables the tap and sets its output directory |
+| `SGLANG_STATE_TAP_RID_PREFIX` | 0001 | rid prefix of tapped requests (default `tap-`) |
+| `SGLANG_STATE_TAP_FULL_GAP` | 0001 | top-2 gap below which full logit rows are saved (default 0.5) |
+| `SGLANG_STATE_TAP_PERTURB` | 0001 | module whose output gets a one-ulp change (positive control) |
+| `SGLANG_STATE_VERIFY_FIXED_SPLIT` | 0002 | `1`: fixed KV split in the verify plan under deterministic inference |
+
+## repair (`patches/repair/0001-0002`, branch `engine/repair`, head `5d8e00e3e1`)
+
+```sh
+scripts/sglang_worktree.sh repair
+git -C ~/sglang-wt/repair am "$PWD"/engine/sglang/patches/repair/*.patch
+SGLANG_WORKTREE=~/sglang-wt/repair source scripts/sglang_env.sh
+```
+
+`0001` adds `sglang/srt/speculative/repair_probe.py` and hooks in the DFlash worker
+(`dflash_worker_v2.py`) for the long-window repair oracles in `experiments/repair/`. Nothing
+changes unless one of these variables is set:
+
+| Variable | Effect |
+|---|---|
+| `SGLANG_REPAIR_TIMING_LOG=<path>` | one JSON line per decode cycle: GPU phase times from CUDA events (draft, verify, accept, commit, append) and the cycle start on the GPU timeline, resolved lazily without host syncs |
+| `SGLANG_REPAIR_ORACLE=<json>` | each block's draft tokens are replaced by the request's reference continuation; the target still verifies them |
+| `SGLANG_REPAIR_POLICY=recycle\|keep`, `SGLANG_REPAIR_MAX_PASSES=r` | after a rejection the next block is drafted from the previous pass's target predictions (a sliding Jacobi step) or from the previous draft's tail, falling back to the fresh draft; greedy only |
+| `SGLANG_REPAIR_SWEEPS=k` with `SGLANG_REPAIR_TRACE=<path>` | probe mode: k extra full verify passes per block (Jacobi and correct-one sweeps) from the same committed prefix, then the original draft's pass is re-run and committed, so the trajectory is plain DFlash; the committed GDN conv and SSM states are restored before every extra pass and the re-run must reproduce the first pass's argmax |
+| `SGLANG_REPAIR_TRACE=<path>` | one JSON line per request per cycle: prefix length, fresh draft, verified block, target argmax at every position, accepted length, sweeps (syncs the host; no timing from traced runs) |
+
+`0002` adds one variable to the FlashInfer GDN verify kernel:
+
+| Variable | Effect |
+|---|---|
+| `SGLANG_REPAIR_DROP_VERIFY_STATES=1` | the verify kernel skips the per-position FP32 state writes. Timing with forced acceptance only: the commit then copies stale scratch into the request's state, so it corrupts the committed state and every token after the first cycle |
+
+Forced full acceptance uses SGLang's existing `SGLANG_SIMULATE_ACC_LEN`.
 
 ## hostgap (`patches/hostgap/0001-0004`, branch `engine/hostgap`)
 

@@ -5,5 +5,6 @@ set -euo pipefail
 source "$HOME/verified-progress/scripts/sglang_env.sh"
 export PYTHONPATH="$HOME/vp-data/drafter/pylib:$HOME/vp-data/drafter/src/SpecForge${PYTHONPATH:+:$PYTHONPATH}"
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-log="$HOME/vp-data/drafter/runs/last_segment.log"
+log="${TRAIN_SEGMENT_LOG:-$HOME/vp-data/drafter/runs/last_segment.log}"
+mkdir -p "$(dirname "$log")"
 timeout 1740 python "$@" 2>&1 | tee "$log"

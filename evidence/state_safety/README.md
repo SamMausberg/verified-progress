@@ -14,6 +14,9 @@ This file is updated as runs complete. Results not yet collected are marked
   `run_meta.json` records `sglang_dirty: false`), Qwen/Qwen3.5-4B at
   `851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a`, one GH200 (sm_90), CUDA 13 compat,
   FlashInfer attention, Triton GDN kernels, CUDA graphs and the overlap scheduler on.
+- "c32" in run names means 32 client requests in flight against a server capped at
+  16 running requests (`--max-running-requests 16`): decode batches have at most 16
+  rows, and the rest wait in the queue.
 - Server flags common to every configuration: `--mem-fraction-static 0.25
   --max-running-requests 16 --mamba-full-memory-ratio 2 --incremental-streaming-output
   --random-seed 0` (see `run_meta.json` for the full command of each run).
@@ -66,9 +69,20 @@ weights.
 
 Checks on the tool itself:
 
-- Neutrality: tapped runs match the untapped matrix run in tokens and logprobs for
-  162 of 167 prompts (plain decode, batch 1). The five exceptions are an open question
-  (below), not an assumption.
+- Neutrality: tapped runs of the current tap (v3, every module output per token)
+  match the untapped matrix run in tokens and logprobs for 162 of 167 prompts (plain
+  decode, batch 1); the earlier v1 tap session matched 166 of 167, all but
+  `mt_bench-0056`. `tap_check.json` lists the five v3 exceptions (`alpaca_eval-0450`,
+  `alpaca_eval-0500`, `mt_bench-0053`, `mt_bench-0056`, `mt_bench-0059`): all five first
+  differ in logprobs at output index 2, and two of them keep identical tokens. In the
+  other three, the top-2 logprob gap at the first changed token is 0 (an exact tie) or
+  0.125 in both runs. The tapped and untapped servers had different pools (159,322
+  vs 97,672 KV tokens, 199 vs 122 GDN slots; `pools.json`), so these exceptions are
+  not attributed to the tap itself. Four of the five change between the v1 and v3
+  tapped sessions too, and there they show the signature described under "History dependence" below
+  (first difference at layer 3's attention, with identical projections). Of the five,
+  only `mt_bench-0056` changes in the deterministic history test without the tap. The
+  KV-level link for all five is pending.
 - Positive controls (`tap_control_*.json`, analysed with the current `mechanism.py`):
   a one-ulp change injected into the first element of layer 9's `mlp.down_proj` output
   in every forward is named as the first difference, at the first prompt token, for
@@ -127,8 +141,8 @@ disagree under either model (`float64_contradicts_bf16` is false in every case).
 ### Results
 
 **Plain decode vs MTP (steps 3, top-k 1), both at batch 1**
-(`mechanism_plain_c1_vs_mtp_s3_c1.json`; 167 prompts that diverged in the batch
-comparison below, generated up to two tokens past their known divergence).
+(`mechanism_plain_c1_vs_mtp_s3_c1.json`; 167 prompts that diverged in the
+concurrency comparison below, generated up to two tokens past their known divergence).
 
 - In all 167 prompts the first differing module output is layer 0's GDN recurrence
   output at the first speculative cycle, while its immediate input, the causal
@@ -143,8 +157,24 @@ comparison below, generated up to two tokens past their known divergence).
 - 129 of the 167 diverged within the generated length. Tie rule: 0. Head GEMM: 0; the
   head input differs in every case. Conservative model: rounding flip 29, order flip 7,
   accumulator ambiguous 93. Hopper model: rounding flip 89, order flip 16, ambiguous 24.
+- The two tapped servers had different pools: 159,322 vs 166,522 KV tokens and 199
+  vs 97 GDN slots (`pools.json`). The pools were not pinned then. At batch 1 they do
+  not change the batch. With the radix cache on, they can change which copy of a shared
+  prefix's KV a request reads (history section). In the target model that would first
+  show at a full-attention layer's output.
+- MTP has a second route. Its draft layer is full attention over its own cached prefix
+  KV, so a different copy can change the proposals. That changes the accepted lengths
+  and the cycle boundaries, and with them which positions later verify forwards
+  compute, all without any target attention output differing first. So for MTP
+  comparisons, the location of the first difference does not rule out the pools.
+- Here it bounds them only for the first difference itself. In all 167 prompts that
+  difference is at output index 1, the first row of the first verify forward. That
+  row's layer-0 GDN output depends on its token and on the GDN state left by the
+  prefill, not on the proposals in the later rows or on any cached KV (reasoning from
+  the row-wise structure of the kernels). Whether the pools contributed to the
+  divergences that follow is not determined. The pinned rerun removes the question.
 
-**Plain decode at batch 1 vs 32 requests in flight** (`mechanism_plain_c1_vs_c32.json`;
+**Plain decode at client concurrency 1 vs 32, with at most 16 requests running** (`mechanism_plain_c1_vs_c32.json`;
 40 tapped prompts: the 16 whose divergence in the matrix run was not an exact tie,
 and 24 of the 151 that were, drawn at random; all 40 diverged again in the tapped
 reproduction, whose batches differ from the matrix run's).
@@ -161,6 +191,12 @@ reproduction, whose batches differ from the matrix run's).
 - At the divergence: tie rule 0, head GEMM 0. Conservative model: rounding flip 3,
   order flip 15, accumulator ambiguous 22. Hopper model: rounding flip 14, order flip
   17, ambiguous 9.
+- The two tapped servers had different pools: 159,322 vs 89,652 KV tokens and 199 vs
+  111 GDN slots, both with at most 16 running (`pools.json`). A different copy of a
+  shared prefix's KV would first show at a full-attention layer's output. So for the 6
+  prompts that first differ there, the pools and the radix history are possible causes
+  besides the attention kernel's dependence on the batch. For the other 34, every
+  attention output before the first difference is identical.
 
 In words, subject to the pending cache-level check: the configurations first produce
 different module outputs at a kernel that is not invariant to the batch or to the
@@ -171,6 +207,12 @@ letting BF16 rounding merge them into a tie that the index rule resolves the oth
 way. Which of the two happened cannot be decided for most divergences under the
 conservative accumulation model, and for about a fifth under the Hopper model.
 
+`first_difference_by_module.csv` (columns `pair,module,layer,kind,count`, written by
+`experiments/state_safety/analyze_all.sh` from the `mechanism_*.json` summaries) lists
+the first differing module output per comparison; `kind` is `gdn_core`, `gdn_conv`,
+`gated_norm`, `gdn_block` (the whole GDN attention module), `attn` (full attention) or
+`mlp_down_proj`.
+
 ## Noise floor
 
 Rate is divergences per 1,000 compared tokens (compared tokens stop at the first
@@ -178,38 +220,224 @@ divergence of each prompt). `divergences.csv` lists every event with both runs'
 margins; `noise_floor.csv` has one row per pair; `run_meta.json` has flags, resolved
 server settings and commits per run. The margin classes there (`tie`, `one_ulp`,
 `near`, `large`) describe the observed logprob gap at the divergence, not its cause.
+`pools.json` lists the pools both servers allocated for every comparison in this
+directory: the noise-floor pairs, the tapped mechanism runs, the tap checks and the
+tap signature. These runs predate pinned pools. The concurrency 1 vs 32 floor, the
+same-server repeats and the deterministic rows compare passes on one server, so their
+pools are identical. Every comparison across two servers had different pools, and is
+flagged where it is reported.
 
 | Pair | Diverged | Compared tokens | Per 1,000 | Largest margin |
 |---|---|---|---|---|
-| Plain, batch 1 vs 32 | 167/320 | 48,816 | 3.42 | 0.375 nats |
+| Plain, concurrency 1 vs 32 (at most 16 running) | 167/320 | 48,816 | 3.42 | 0.375 nats |
 | Plain, batch 1, same server repeated | 0/320 | 70,042 | 0 | - |
-| Plain, batch 32, same server repeated | 0/320 | 70,060 | 0 | - |
+| Plain, concurrency 32, same server repeated | 0/320 | 70,060 | 0 | - |
+| Plain, batch 1, fresh server repeated | 0/320 | 70,042 | 0 | - |
+| Plain, concurrency 32, fresh server repeated | 24/320 | 68,322 | 0.35 | 0.25 nats |
 
 Plain decode at batch 1 has an exact BF16 tie between its top two logits at 11.3 of
 every 1,000 positions, and a nonzero gap of at most 0.125 at another 22.2
 (`noise_floor.json`, `top2_gap_plain_c1`). No run committed a token that was not its
 own top-1 (`self_consistency`). Same-server repeats reproduce every token at both
-batch sizes, and every logprob except those of one prompt (`humaneval-0044`, a
-128-token prompt), which differ from its prefill onward in both repeats; a tapped
-test of that prompt is queued.
+concurrencies, and every logprob except those of one prompt (`humaneval-0044`, a
+128-token prompt), which differ from its prefill onward in both repeats. A fresh
+server at batch 1 reproduces the first pass bitwise on all 320 prompts, that one
+included, so its difference in the same-server repeat comes from what the radix tree
+already held (see the history dependence below); a tapped test of which op changes is
+queued. A fresh server at concurrency 32 reproduces 296 of 320 sequences. Request
+arrival timing, and with it batch composition, differs between sessions, but these two
+sessions also differ in their pools: their servers allocated 97,672 and 133,885 KV
+tokens and 122 and 167 GDN slots, with the same cap of 16 running requests
+(`run_meta.json`, `resolved_pools`; `pools_identical` is false for both repeat-session
+rows of `noise_floor.csv`). The 24 differences can therefore come from either. A rerun
+with identical pinned pools (cap 8) is queued; see `experiments/state_safety/README.md`.
 
-**Pending**: MTP steps 1/3/5 and the top-k 2 tree at batch 1 and 32, radix cache off,
-overlap off, deterministic inference and FP32 head for plain and MTP, fresh-server
-repeats, the logprobs-off control, retraction, and the ReplaySSM and FlashInfer GDN
-decode paths. These runs are queued.
+## Matrix with pinned pools
 
-## Open: five prompts where tapping changed the output
+These runs replace the comparisons above for every pair they cover. Every server was
+started with the same pools: at most 8 running requests, 49,152 KV tokens and 40 GDN
+slots (`experiments/state_safety/README.md`). Each was checked to have allocated exactly
+those sizes (`run_meta_pinned.json`, `resolved_pools`), so every pair compares identical
+pools (`pools.json`, `pools_identical`). Radix cache, overlap scheduler and CUDA graphs
+are on. Each run covers 320 prompts and 256 new tokens, with the common flags of the
+Setup section. Rates are per 1,000 compared tokens
+(`noise_floor_pinned.json`/`.csv`, events in `divergences_pinned.csv`).
 
-For 5 of 167 prompts (plain decode, batch 1) the tapped run differs from the untapped
-one from output index 2 on (three change tokens), and two tapped runs of four of them
-also differ, in MTP too. In each, the first differing module at output index 2 is
-layer 3's attention output (the first full-attention layer) while its `qkv_proj`
-output, and every earlier module, is identical: the attention read different KV.
-**Hypothesis, not yet tested**: after the prefill, radix-cache insertion repoints the
-running request's prefix KV to an older copy of the same tokens computed in another
-request's prefill (valid values, not bitwise equal), and the tap's per-forward
-synchronization changes whether decode step 2 reads the repointed copy. A tapped run
-with `--disable-radix-cache` is queued as the test.
+| Pair | Diverged | Per 1,000 | Tie | One ulp | Near |
+|---|---|---|---|---|---|
+| Plain, fresh-server repeat, c1 | 0/320 | 0 | - | - | - |
+| Plain, fresh-server repeat, c32 | 4/320 | 0.06 | 4 | 0 | 0 |
+| Plain, same-server warm repeat, c1 | 17/320 | 0.25 | 16 | 1 | 0 |
+| Plain, same-server warm repeat, c32 | 4/320 | 0.06 | 4 | 0 | 0 |
+| Plain, c1 vs c32 (one server) | 41/320 | 0.63 | 39 | 2 | 0 |
+| MTP steps 1, c1 vs c32 | 165/320 | 3.47 | 157 | 7 | 1 |
+| MTP steps 3, c1 vs c32 | 156/320 | 3.25 | 146 | 9 | 1 |
+| MTP steps 5, c1 vs c32 | 152/320 | 3.07 | 143 | 8 | 1 |
+| MTP tree (3 steps, top-k 2), c1 vs c32 | 156/320 | 3.11 | 150 | 6 | 0 |
+| MTP steps 1 vs plain, c1 | 170/320 | 3.65 | 159 | 9 | 2 |
+| MTP steps 3 vs plain, c1 | 171/320 | 3.68 | 163 | 7 | 1 |
+| MTP steps 5 vs plain, c1 | 164/320 | 3.51 | 156 | 8 | 0 |
+| MTP tree vs plain, c1 | 170/320 | 3.68 | 163 | 7 | 0 |
+| MTP steps 1 vs plain, c32 | 175/320 | 3.86 | 166 | 7 | 2 |
+| MTP steps 3 vs plain, c32 | 181/320 | 3.96 | 169 | 11 | 1 |
+| MTP steps 5 vs plain, c32 | 166/320 | 3.57 | 159 | 6 | 1 |
+| MTP tree vs plain, c32 | 167/320 | 3.53 | 162 | 4 | 1 |
+| MTP steps 1 vs steps 3, c1 | 92/320 | 1.53 | 89 | 3 | 0 |
+| MTP steps 3 vs steps 5, c1 | 170/320 | 3.70 | 164 | 6 | 0 |
+| MTP steps 3 vs tree, c1 | 163/320 | 3.49 | 155 | 8 | 0 |
+
+- **Classes.** No divergence in any pair is `large`, and no run committed a token
+  that was not its own top-1 (`self_consistency`). The 11 `near` events (5 prompts)
+  have both margins at most two BF16 steps (0.25 nats). Logprob drift without a token
+  change is at most 0.62 nats.
+- **Speculation against plain decoding.** Every MTP configuration diverges from plain
+  decoding at 3.5 to 4.0 per 1,000 tokens, as often as from itself at another
+  concurrency (3.1 to 3.5), and only at near ties.
+- **By rejection position.** Divergences at fragile positions (where the plain
+  reference's top-2 gap is at most 0.25 nats) per fragile position, by the previous
+  cycle's commit length, including full acceptance (`cycles_*_pinned.json`,
+  `by_commit_length`). Divergences at non-fragile positions are counted separately.
+  A divergence where the reference was not near a tie would be the strong sign of a
+  state error. There are none at any commit length, in any configuration.
+
+  | Configuration | Commit length 1, 2, 3, ... (full acceptance last) | All lengths | First cycle after prefill | Non-fragile divergences |
+  |---|---|---|---|---|
+  | MTP steps 1 | 0.092, 0.085 | 0.086 | 2/22 | 0 |
+  | MTP steps 3 | 0.089, 0.098, 0.088, 0.079 | 0.086 | 3/32 | 0 |
+  | MTP steps 5 | 0.064, 0.074, 0.097, 0.061, 0.080, 0.082 | 0.077 | 7/40 | 0 |
+  | MTP tree | 0.085, 0.075, 0.063, 0.090 | 0.081 | 6/33 | 0 |
+
+  A state error at one rejection position (a wrong rollback for one accept length)
+  would raise that position's rate. No length stands out. The rates are compatible
+  with one common rate: chi-square p = 0.75, 0.72, 0.54 and 0.38 for steps 1, 3, 5 and
+  the tree (`by_commit_length.homogeneity_chi2` in each file). That is a failure to
+  reject, not a proof of equal rates. The test also treats positions as independent,
+  although they cluster by prompt and a prompt's positions stop at its first
+  divergence. No prompt-clustered analysis or bound on a per-length excess rate has
+  been done.
+- **The first verify cycle after the prefill** follows no earlier cycle. It is counted
+  separately (`first_cycle_after_prefill`) and is not part of the test above.
+  - Its rate is higher for steps 5 and the tree (7/40 and 6/33 fragile positions,
+    against 0.077 and 0.081 later). A Fisher exact test against all later cycles gives
+    p = 0.71, 0.75, 0.033 and 0.049 for steps 1, 3, 5 and the tree
+    (`fisher_vs_later_p_exploratory`).
+  - That test is exploratory. It was chosen after looking at the data. It is not
+    corrected for the four configurations and several cycle buckets examined.
+  - The groups also differ in more than state. The first cycle follows the prefill
+    chunk, every prompt contributes it, and later cycles count only prompts that have
+    not yet diverged.
+  - So this is a lead for a declared follow-up, not a finding. The follow-up is a
+    first-cycle test, declared in advance, on fresh prompts. It is pending, as is a
+    look at the prefill-to-decode handoff of the GDN state.
+- **Pinning and the repeat floor.** The fresh-server repeat at concurrency 32 drops
+  from 24/320 (unpinned: different pools, cap 16) to 4/320 (identical pools, cap 8).
+  Both changed at once, and a smaller cap also narrows the batch compositions, so
+  these runs do not say how much of the drop is due to each.
+- **Same-server warm repeats.** These now differ: 17/320 at c1 and 4/320 at c32, all
+  at ties or one ulp. Before, the result was 0/320 with a larger KV pool. No prefill in
+  any pass reused a cached prefix (`cached_tokens` and `requests_with_cached_tokens`
+  are 0 for every run in `run_meta_pinned.json`). One pass computes 126,408 tokens,
+  56,366 prompt plus 70,042 output (`prompt_tokens`, `output_tokens`), more than the
+  pinned 49,152-token pool, so the radix tree evicts during the first pass. We read
+  this, without having tested it, as the history dependence below: the warm pass's
+  requests read different earlier copies of shared prefixes. With the radix cache on,
+  a same-server warm repeat is therefore not an equality reference.
+- **Pool regime alone at batch 1.** Comparing the pinned plain c1 run with the earlier
+  unpinned one (cap 16, 97,672 KV tokens, 122 GDN slots) gives 320/320 identical
+  tokens. One prompt's logprobs differ (`mt_bench-0064`, from output index 2, drift
+  at most 0.24 nats; `cross_regime.json` and `divergences_cross_regime.csv`, a
+  deliberate mixed-regime comparison that lists every prompt whose logprobs differ,
+  with `first_logprob_diff`).
+- **Missing pairs.** `missing_pairs` in `noise_floor_pinned.json` lists the pairs
+  whose runs are still queued. They are listed under Pending below. This regeneration
+  used `STATE_ALLOW_MISSING=1`.
+
+**Pending** (queued, pinned): radix cache off, overlap off, deterministic inference
+and FP32 head for plain and MTP, the logprobs-off control, retraction, a second MTP
+session, and the ReplaySSM and FlashInfer GDN decode paths. The first-cycle test on
+fresh prompts is declared, with its prompts, runs, analysis and decision rule fixed
+(`experiments/state_safety/README.md`, "Declared follow-up"), and is not yet run. The
+prefill-to-decode handoff check depends on its outcome.
+
+## History dependence through radix-cache insertion
+
+For 5 of 167 prompts (plain decode, batch 1) the tapped run (tap v3) differed from the
+untapped one from output index 2 on, and three of them changed tokens
+(`tap_check.json`). For four of them (`alpaca_eval-0450`, `alpaca_eval-0500`,
+`mt_bench-0053`, `mt_bench-0059`) the v1 and v3 tapped sessions also differ from each
+other, in plain decode and with MTP steps 3 (`tap_signature.json`). In all eight
+comparisons the first differing module output is layer 3's attention (the first
+full-attention layer). For plain decode it is at output index 2, and for MTP at a
+verify step at output index 3 or 5. Its `qkv_proj` output and every earlier module
+output that both tap versions hash are identical. Both sessions of each pair ran the
+same configuration at batch 1 and served the same 167 prompts in the same order. At the
+same batch shape that points to the attention reading different cached KV; the cache
+hashes that would show it directly are pending (below). For `mt_bench-0056` the only
+tapped comparison is plain at concurrency 1 vs 32 (`mechanism_plain_c1_vs_c32.json`),
+which shows the same signature but at different batch shapes, where the attention
+kernel itself can differ. The evidence for it is the deterministic reproduction below.
+
+The stock code path that does this, at this commit: after a request's prefill,
+`UnifiedRadixCache.cache_unfinished_req` (`srt/mem_cache/unified_radix_cache.py:1161`)
+inserts the request's prefix into the tree, matches it again, and overwrites the
+request's `req_to_token` row with the tree's indices (`req_to_token_pool.write`, line
+1263), freeing the request's own duplicate KV slots.
+For tokens the tree already held, such as a chat-template prefix shared with an
+earlier request, the request attends from then on over the earlier request's copy of
+that KV: valid values for the same tokens at the same positions, but computed in a
+prefill of another shape and so not necessarily bitwise equal (code reading). Under
+the overlap scheduler, decode step 1 is already in flight with the request's own KV
+when this runs, so the switch shows from output index 2 (code reading; the overlap-off
+control has not been run). No prefill in the tapped sessions or in the history test
+below reused a cached prefix (server logs; `prefill_cache_hits` in
+`tap_signature.json` and `targeted.json`). By the code, this hybrid cache only reuses a
+prefix at a stored GDN state, and these short shared prefixes had none, so the repoint
+is the only way one request's KV reaches another.
+
+A deterministic reproduction on stock SGLang (`targeted.json`, `history__*` entries,
+`targeted.py history`): each of 12 prompts is served on an empty cache, and again right
+after the earlier prompt that shares the longest prefix with it (one request in flight,
+64 new tokens, otherwise the common flags).
+
+| Configuration | Logprobs identical | Tokens identical | First logprob difference |
+|---|---|---|---|
+| Plain, radix cache on | 10/12 | 12/12 | output index 2 (2 prompts) |
+| Plain, radix cache off | 12/12 | 12/12 | - |
+| MTP steps 3, radix cache on | 10/12 | 12/12 | output index 2 and 5 |
+
+The radix-off control was run for plain decoding only; the same control for MTP is
+**pending** (queued). The two prompts that change are `mt_bench-0056` after
+`mt_bench-0054` (6 shared tokens) and `humaneval-0008` after `humaneval-0000` (22
+shared tokens). `history__*.pairs` lists all 12 pairs. The 12 include all five prompts
+the tap changed, and only `mt_bench-0056` changes here. The other four do not change
+when served after their single longest-prefix predecessor, under plain decoding or
+MTP.
+
+So, with the radix cache on, a request's output at a fixed configuration and batch shape
+depends on which earlier request computed its shared prefix. That is shown for two
+prompts. For the other four tap-changed prompts the history test does not reproduce
+the change, and the v1/v3 comparison shows they can change between two sessions that
+serve the same requests in the same order. Those sessions differ in the tap version,
+which changes the host time per forward, in how many tokens the earlier requests
+generated (v3 capped them), and in their pools: 93,742 vs 159,322 KV tokens and 118 vs
+199 GDN slots for plain, and 84,003 vs 166,522 tokens and 55 vs 97 slots for MTP
+(`pools.json`). The KV pool never filled in either plain session, which computed 72,056
+and 56,630 tokens in all. For these four we still consider attention over a
+different copy of cached KV the likely mechanism, because of the signature at the same
+batch shape. We do not know what decides which copy a decode step reads in those
+sessions. One candidate, which is reasoning and untested, is ordering. The repoint is a
+write to `req_to_token` issued from the host while, under the overlap scheduler, the
+next decode step is already queued. If the two are not ordered on the GPU, the step
+from which the switch shows could depend on timing.
+
+The values involved are valid by the code path, and we found no case where this
+produced more than a near-tie flip. No token changed in the history test, and where
+the tap changed tokens the top-2 gap was 0 or 0.125 in both runs. We do not consider
+it state corruption. The KV-level confirmation (hashes of every cached position
+entering each step) is **pending**. The first cache-hashing run crashed on long SSM
+rows, and the fixed tap is queued. It now includes both history pairs, each prompt
+served alone and after its predecessor on fresh servers, and radix on vs off for the
+five tap-changed prompts.
 
 ## Deterministic inference
 
@@ -219,17 +447,50 @@ PyTorch and disables the radix cache. In an early 8-prompt, 128-token check
 identical tokens and bitwise-identical logprobs) and MTP was not (2 of 8 diverged).
 Passing the deterministic KV split to FlashInfer's target-verify plan
 (`engine/sglang/patches/state/0002-verify-kv-split-deterministic.patch`) did not change
-that: 28 of 96 prompts still diverged between batch 1 and 32, 1.55 per 1,000 compared
+that: 28 of 96 prompts still diverged between concurrency 1 and 32 (at most 16 running), 1.55 per 1,000 compared
 tokens, all at exact ties (`noise_floor.csv`, row `deterministic + verify KV split
-patch`). A plausible reason, not yet tested: the
+patch`; that run predates the patch's `SGLANG_STATE_VERIFY_FIXED_SPLIT` gate and had
+the change on unconditionally). A plausible reason, not yet tested: the
 draft is not batch-invariant, so acceptance lengths, and with them the offset of a
 position inside its verify block, differ between batch sizes. **Pending**: the full
 deterministic-mode pairs.
 
 ## Targeted state tests
 
-**Pending** (queued): truncation and stop tokens at every index inside a verify cycle,
-GDN checkpoint reuse at the 256-token tracking interval including checkpoints taken in
-the cycle that finished the request, aborts with slot reuse on a four-slot GDN pool,
-chunked prefill at 200 and 256 tokens, run-to-run repeats, and per-rejection-position
-drift. Small debug runs of each test passed their checks.
+Results so far (`targeted.json`; each test's command in
+`experiments/state_safety/run_targeted.sh`). Configuration for every count below: native
+MTP (`--speculative-algorithm EAGLE`, top-k 1) with 3 or 5 steps as stated, radix cache on
+with the default `extra_buffer` GDN strategy, overlap scheduler and CUDA graphs on, the
+common flags of the Setup section, one request in flight, 40 prompts per test (the first
+40 of the prompt set):
+
+- **Truncation inside a verify cycle** (`max_new_tokens` ending after every possible
+  number of tokens of the final cycle; flushed cache before every request): MTP steps 3, 157/157 truncated runs
+  token-identical to the untruncated run's prefix, for 1 to 4 tokens kept; MTP steps 5,
+  240/240, for 1 to 6 kept. These counts compare output token IDs only; logprobs and
+  state were not compared in these runs (`targeted.py` now also compares the top-5
+  logprobs, from the next runs on).
+- **Stop token at every index of a verify cycle**: MTP steps 3, 160/160 outputs
+  token-identical to the untruncated prefix (output IDs; logprobs and state not
+  compared), 120 of them with the stop inside the draft block, so drafts after it were
+  accepted and folded into the GDN state before the stop was detected; MTP steps 5,
+  240/240 (200 inside the block). The emitted tokens are unaffected by that committed
+  post-stop state. Extending each stopped conversation with a new user turn, served
+  warm (radix cache on, so the prompt's GDN checkpoint is restored) and cold (after a
+  flush), gives token-identical continuations in 139/160 and 210/240 cases; the rest diverge at
+  exact ties (19 and 30) or within one BF16 step (2), consistent with the warm path's
+  different prefill computation and with the history dependence above.
+
+- **The same tests for the top-k 2 tree and for plain decoding**, comparing top-5
+  logprobs as well as tokens. Truncation: tree 159/159 and plain 39/39, identical in
+  tokens and logprobs to the untruncated prefix. Stop token at every cycle index: tree
+  160/160 and plain 40/40, identical in tokens and logprobs up to the stop; 120 tree
+  cases have the stop inside the draft block. Warm vs cold continuation: tree 142/160
+  identical (17 exact ties, 1 one-ulp), plain 33/40 (7 exact ties). Plain decoding has
+  no speculative state, so it shows that the warm/cold tie flips come from the warm
+  path's prefill and radix history, not from speculation.
+
+**Pending** (queued): GDN checkpoint reuse at the 256-token tracking interval,
+including checkpoints taken in the cycle that finished the request; aborts with slot
+reuse on a four-slot GDN pool; chunked prefill at 200 and 256 tokens; and run-to-run
+repeats. Per-rejection-position drift is under "Matrix with pinned pools" above.

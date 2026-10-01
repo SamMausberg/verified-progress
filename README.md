@@ -1,35 +1,35 @@
 # The Work a Verifier Needs
 
-**Samuel Mausberg · working draft · 30 September 2026**
+**Samuel Mausberg · preprint · 30 September 2026**
 
-A speculative decoder asks its target model for a full vocabulary projection at
-every verified position, although a greedy verifier needs only a winner and a
-sampled verifier often needs only the truth of one inequality. This repository
-holds a paper that asks what work a verifier actually needs, the exact
-references and proofs behind it, and the measurements that test it on
-Qwen3.5-4B served by SGLang on one NVIDIA GH200.
+A greedy or seeded speculative verifier needs one fact from the target's output
+head, the winning token, yet computes every logit. This repository holds a paper
+that asks how much of that projection a verifier needs and against what it must
+be exact, the exact references and proofs behind it, and the measurements that
+test it on Qwen3.5-4B served by SGLang on one NVIDIA GH200.
 
 The paper is organized around a certified low-precision output head. The head
 is evaluated at low precision with a rigorous per-row envelope, only the rows
 that can still win are re-scored, and any row that cannot be certified runs the
 engine's own head kernel at the same batch shape, so the contract is the stock
-kernel's token. *Transport*, the mechanism of the earlier revisions, carried a
-drafter's tile summaries through the shared output head to the target's hidden
+kernel's token. *Transport*, the mechanism the project set out to build, carries
+a drafter's tile summaries through the shared output head to the target's hidden
 state; measured on real draft states of two drafters it certifies almost
-nothing, and the paper reports that failure with its mechanism. The paper also
-covers exact sampling and speculative decisions, and the rest of the serving
-stack: drafting, recurrent state, system overheads, and two latency-throughput
-frontiers (one exact, one lossy under a declared quality budget).
+nothing, and the paper reports that failure with its mechanism. The appendices
+cover exact sampling and speculative decisions, the stock engine's own
+divergences, and the rest of the serving stack: drafting, recurrent state,
+system overheads and the latency-throughput frontiers.
 
 ## Start here
 
-Read `paper/paper.pdf`. The source is `paper/paper.tex` with one file per
-section under `paper/sections/` and the bibliography in `paper/references.bib`.
-The paper marks every claim as a finding (a proof, or evidence committed on
-`main`), a derived calculation, a pending measurement, or a hypothesis. Its
-Appendix A holds the evidence register (every committed file the text cites),
-the development record (pending work, with any open pull request) and the claim
-ledger. `TASKS.md` tracks the work, `SETUP.md` describes the machine and
+Read `paper/paper.pdf`, typeset in the MLSys two-column format: a 10-page main
+text on the exactness contract, the certified head and transport, then the
+references and the appendices. The source is `paper/paper.tex` with one file per
+section under `paper/sections/`, shared macros in `paper/macros.tex`, the
+terminology in `paper/terminology.tex` and the bibliography in
+`paper/references.bib`. The paper cites committed evidence as [E*n*] and marks
+work whose result is not yet committed as [pending D*n*]; the evidence register
+and the pending list are in the appendices, with the reproduction commands. `TASKS.md` tracks the work, `SETUP.md` describes the machine and
 `RUNBOOK.md` gives the commands.
 
 ## What is established on `main`
@@ -72,7 +72,7 @@ ledger. `TASKS.md` tracks the work, `SETUP.md` describes the machine and
   and scaled-integer bounds, not IEEE rounding, exponentials or probability.
 - **Literature.** `sources/literature_review.md`, `sources/citation_audit.md`
   and `sources/manuscript_review.md`. The greedy certified low-precision head is
-  prior art; the paper's claim is narrower (its Section 11.8).
+  prior art; the paper's claim is narrower (its Sections 4.5 and 6).
 
 GPU measurements (attribution, head geometry, kernels, drafting, serving
 frontiers) enter the paper as their pull requests merge. Until then the paper
@@ -101,9 +101,11 @@ cd paper
 latexmk -pdf -interaction=nonstopmode -halt-on-error paper.tex
 ```
 
-pdfLaTeX and BibTeX, no shell escape. Figures are TikZ and PGFPlots; plots that
-read committed data files (for example `data/synthetic_drift.csv`) regenerate on
-each build.
+pdfLaTeX and BibTeX, no shell escape. The MLSys style file carries no licence,
+so it is not committed: `paper/latexmkrc` fetches the official author kit and
+checks its SHA-256 before each build, which needs network access the first time
+(`paper/template/README.md`). Figures are TikZ and PGFPlots; plots that read
+committed data files under `evidence/` regenerate on each build.
 
 ## Repository map
 
@@ -125,9 +127,11 @@ Samuel Mausberg is the author. The earlier revisions were prepared with GPT-6
 Astra Pro (OpenAI). This revision was produced with Claude Code, using Claude
 Opus 5.5 agents for the literature review, theory, measurements and writing.
 The literature, theory and evidence changes the paper cites were approved by an
-independent reviewing agent before merging, and all of the work remains subject
-to the author's review. No AI system is an author. The confidential assignment that motivated
-the work is not included, and no model weights are redistributed.
+independent reviewing agent before merging, and the author directed the work
+and reviewed it as it progressed, including in discussions of specific points
+with Claude and with OpenAI models. No AI system is an author. The confidential
+assignment that motivated the work is not included, and no model weights are
+redistributed.
 
 ## Citing this work
 

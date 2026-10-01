@@ -1,0 +1,49 @@
+{
+ "v3_plain_c1": {
+  "tap_version": "tap v3 (module rows per token)",
+  "untapped_run": "plain/c1",
+  "tapped_prompts": 167,
+  "mismatched": {
+   "alpaca_eval-0450": {
+    "first_logprob_difference": 2,
+    "tokens_equal": false,
+    "first_token_difference": 216,
+    "top2_gap_tapped": 0.125,
+    "top2_gap_untapped": 0.125
+   },
+   "alpaca_eval-0500": {
+    "first_logprob_difference": 2,
+    "tokens_equal": false,
+    "first_token_difference": 36,
+    "top2_gap_tapped": 0.0,
+    "top2_gap_untapped": 0.125
+   },
+   "mt_bench-0053": {
+    "first_logprob_difference": 2,
+    "tokens_equal": false,
+    "first_token_difference": 33,
+    "top2_gap_tapped": 0.125,
+    "top2_gap_untapped": 0.0
+   },
+   "mt_bench-0056": {
+    "first_logprob_difference": 2,
+    "tokens_equal": true
+   },
+   "mt_bench-0059": {
+    "first_logprob_difference": 2,
+    "tokens_equal": true
+   }
+  }
+ },
+ "plain_c1": {
+  "tap_version": "tap v1",
+  "untapped_run": "plain/c1",
+  "tapped_prompts": 167,
+  "mismatched": {
+   "mt_bench-0056": {
+    "first_logprob_difference": 2,
+    "tokens_equal": true
+   }
+  }
+ }
+}

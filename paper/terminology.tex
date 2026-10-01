@@ -1,0 +1,53 @@
+% Terminology, declared once (macros.tex explains \term). Scope main: printed in the main
+% text's Table tab:terms (owner: main-text author). Scope app: terms used only in the
+% appendices (owner: appendix editor). The glossary quotes the main definitions verbatim.
+\term{main}{Head input $h$}{The BF16 vector the engine feeds to the output head (the final norm's output).}
+\term{main}{Real logit $z_i$}{$\langle w_i,h\rangle$ in exact arithmetic over the stored BF16 operands.}
+\term{main}{Stock head}{SGLang's head at the pin: a cuBLAS BF16 GEMM with FP32 accumulation and BF16 output, then \code{torch.argmax} (first maximal index).}
+\term{main}{Batch shape $M$}{The number of head inputs in one head GEMM call; cuBLAS chooses its kernel by it.}
+\term{main}{\Rreal, \Rbf, \Rstock, \Srace}{The four references for one decision (Definition~\ref{def:contracts}).}
+\term{main}{Error model $\gamma$, $G_i$}{An assumed bound $G_i=\gamma\sum_j|w_{ij}h_j|$ on the stock kernel's accumulation error (Table~\ref{tab:assumptions}).}
+\term{main}{Envelope $\beta_i$}{A proved bound on the error of the low-precision copy's value for row $i$.}
+\term{main}{Candidate}{A row the level-0 screen cannot exclude; it is re-scored from its BF16 row.}
+\term{main}{Fallback}{The stock head on the same inputs at the same batch shape; whole-batch or row-wise.}
+\term{main}{Self-evidence; transport}{Enclosures from a low-precision copy of the head at the target's own input; enclosures carried from a drafter's per-tile summaries to it.}
+\term{main}{$\rho$; $\delta^\ast_i$}{Drift ratio $\norm{h^t-h^d}_2/\norm{h^t}_2$ of a draft pair; the $\rho$ below which transport beats int8 on row $i$.}
+\term{main}{Held-out}{From prompts that no choice of head, envelope or threshold was fitted on.}
+% ---------------------------------------------------------------------------
+% Scope app (owner: appendix editor): terms used only in the appendices, in alphabetical
+% order; printed by the glossary (Appendix app:glossary).
+\term{app}{Accepted length}{Committed tokens per verify cycle, the bonus token included: $\tau$ pooled over cycles, $\bar\tau_{\rm req}$ averaged over requests as the DFlash model card does (Appendix~\ref{app:drafter-acceptance}).}
+\term{app}{Batch size $B$, concurrency $c$}{$B$ is the number of requests in one decode step; $c$ is the number of requests the client keeps in flight, which the server may cap below $c$.}
+\term{app}{Batch union}{The set of vocabulary tiles or rows that at least one row of a batch still needs; a kernel that shares weight reads across the batch must read the whole union (Appendix~\ref{app:transport-sampled}).}
+\term{app}{Bound family, tiling}{The geometry of a transport bound (scalar, coordinate, grouped, low-rank radii, or their minimum) and the partition of the vocabulary into tiles (contiguous, random or $k$-means; 64 to 1,024 rows) (Appendix~\ref{app:transport-geometry}).}
+\term{app}{Capture and replay}{Head inputs recorded bit for bit from the running engine and re-evaluated offline (Section~\ref{sec:transport-capture}).}
+\term{app}{Certified row}{A head input whose \Rstock{} token the enclosures fix for every accumulator value the error model admits; every other row runs the fallback.}
+\term{app}{Commit rule, sound set}{Commit a decision when every logit vector in a set known to contain the reference logits gives the same decision (Definition~\ref{def:commit}).}
+\term{app}{Common mass $\alpha^\ast$}{The largest probability with which an exact sampler can emit a token before more is known, $\sum_i\inf_pp_i$ over the compatible laws (Proposition~\ref{prop:commonmass}).}
+\term{app}{Dead, deferred, soundly enclosed}{The three classes of skipped work: no remaining consumer; a later consumer with a reconstruction path; or bounded well enough for every consumer that remains (Appendix~\ref{app:tail}).}
+\term{app}{Demand frontier}{Suppression of head work after the first certified rejection in a chain (Proposition~\ref{prop:frontier}).}
+\term{app}{Divergence, exposure, noise floor}{The first position at which two runs choose different tokens; the positions compared before it; divergences per 1,000 exposed tokens between stock configurations that ought to agree (Appendix~\ref{app:divergence}).}
+\term{app}{Drift scaling $s$}{A model extrapolation that replaces the draft input by $h^t-s\Delta$, scaling every drift term by $s$; not a measured drafter (Appendix~\ref{app:transport-scaling}).}
+\term{app}{Emitted and materialized prefix}{The tokens a cycle has returned and the tokens already consumed into every cache; the bonus token is emitted before it is materialized (Appendix~\ref{app:state}).}
+\term{app}{Enclosure $[lo_i,hi_i]$}{An interval that contains the real logit $z_i$, computed with outward rounding (Lemma~\ref{lem:outward}).}
+\term{app}{Exact and lossy lever, exact and lossy stack}{A lever is exact when every emitted token remains the target's decision under the stock-kernel contract, lossy otherwise; the lossy stack admits lossy levers under a quality budget declared before measuring (Appendices~\ref{app:levers} and~\ref{app:stacks}).}
+\term{app}{First differing module output}{In a bit-exact tap of two runs, the first position and, in execution order, the first module whose output bits differ; cache state is checked separately (Appendix~\ref{app:divergence}).}
+\term{app}{Fixed-noise verification}{Sampled verification that accepts a drafted token exactly when it wins the target's race under the keyed noise field (Theorem~\ref{thm:fixednoise}).}
+\term{app}{Frontier coordinates $x$, $y$}{Mean per-request output rate including the time to first token, and output tokens per second on the GPU (Equation~\eqref{eq:frontier}).}
+\term{app}{Guards, $P_?$}{Interval tests that decide the standard acceptance rule from enclosures of the numerator and the partition function; $P_?$ is the probability that neither fires (Theorem~\ref{thm:guards}).}
+\term{app}{H1--H7, P1--P13}{The programme's questions and the later proposals with pre-registered kill tests (Table~\ref{tab:status}); P7a and P7b are the two parts of P7, and a proposal is listed once it has a result or a decision.}
+\term{app}{Head chain}{The stock head GEMM, the FP32 copy of its logits and the argmax or top-1 that follows it (Appendix~\ref{app:profile}).}
+\term{app}{Integer pass}{A certified pass that quantizes the head input as well and accumulates exactly in int32 (Theorem~\ref{thm:integer}).}
+\term{app}{Keyed noise field}{Gumbel noise $G_{t,i}$ that is a pure function of (seed, absolute position $t$, token $i$), as in the engine's seeded sampler.}
+\term{app}{Layer-serial and overlapped ceilings}{Throughput bounds under two execution models: per-request kernels after the weight GEMMs, as the engine runs, or overlapped with them (Equations~\eqref{eq:stack-floor} and~\eqref{eq:stack-floor-overlap}).}
+\term{app}{Oracle radii}{The realized per-tile deviations used as transport radii; a ceiling that no certified geometry reaches (Appendix~\ref{app:transport-families}).}
+\term{app}{Partition interval $\log(Z^+/Z^-)$}{The width, in nats, of an enclosure of the partition function; it decides how often the acceptance guards fire (Appendix~\ref{app:transport-sampled}).}
+\term{app}{Point-mass proposal}{A deterministic draft token, SGLang's default for sampled verification; its residual is a race over the untried tokens (Appendix~\ref{app:residual}).}
+\term{app}{Replayed and snapshot verification}{Two ways SGLang verifies a draft chain on the GDN layers: snapshot verification writes one FP32 state per draft token and copies the accepted one back at commit; replayed verification (\code{-{}-enable-linear-replayssm-spec}) keeps each draft token's inputs and folds the accepted prefix into the state at commit (Appendix~\ref{app:spec-state}).}
+\term{app}{Residual race}{An exact sample from the residual law $(p-q)_+$ by a certified race under a fixed priority field (Theorem~\ref{thm:residualrace}).}
+\term{app}{Rounding flip, order flip, ambiguous}{How a divergence reaches the token: BF16 rounding merges an unchanged accumulator order into a tie; the accumulator order reverses; or the order cannot be read from the data under the named error model (Appendix~\ref{app:divergence}).}
+\term{app}{Rounding-preserving replay}{Decoding that keeps a dense state anchor and the recent FP32 operands and replays them in the stock kernel's order, writing the state less often (P4, Appendix~\ref{app:minimal-state}).}
+\term{app}{Static screen}{Tile bounds $\langle\mu_c,h\rangle+r_c\norm h$ evaluated at the target state without any draft (Proposition~\ref{prop:static}).}
+\term{app}{Survival $S(k)$, conditional acceptance $\alpha_k$}{The share of verify cycles that accept at least $k$ drafted tokens, and $S(k)/S(k-1)$ (Appendix~\ref{app:drafter-acceptance}).}
+\term{app}{Tuning and confirmation splits}{Disjoint prompt sets of the serving workload: configurations are chosen on the first and reported on the second (Appendix~\ref{app:serving}).}
+\term{app}{Verify pass, draft step, cycle}{The target's forward pass over a drafted block; one drafter forward; a draft, its verification and the state commit (Appendices~\ref{app:profile} and~\ref{app:drafting}).}

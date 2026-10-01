@@ -1,7 +1,9 @@
-pair,run_a,run_b,prompts,diverged,exposure_tokens,per_1k_tokens,tie,one_ulp,near,large,not_argmax,length_mismatch,max_margin_median,max_margin_max,drift_p99,drift_max
-batch c1 vs c32, plain,plain/c1,plain/c32,320,167,48816,3.421,151,14,2,0,0,0,0.125,0.375,0.3596,0.6861
-same server repeat c1, plain,plain/c1,plain/c1_warm,320,0,70042,0,0,0,0,0,0,0,,,0,0.2267
-same server repeat c32, plain,plain/c32,plain/c32_warm,320,0,70060,0,0,0,0,0,0,0,,,0,0.3229
-deterministic, plain c1 vs c8 (8-prompt validation),plain_det__validate/c1,plain_det__validate/c8,8,0,1024,0,0,0,0,0,0,0,,,0,0
-deterministic, mtp_s3 c1 vs c8 (8-prompt validation),mtp_s3_det__validate/c1,mtp_s3_det__validate/c8,8,2,922,2.169,2,0,0,0,0,0,0.125,0.125,0.2229,0.2229
-deterministic + verify KV split patch, mtp_s3 c1 vs c32 (96 prompts),mtp_s3_det__verifyfix/c1,mtp_s3_det__verifyfix/c32,96,28,18068,1.55,28,0,0,0,0,0,0.125,0.25,0.3276,0.3276
+pair,run_a,run_b,prompts,diverged,exposure_tokens,per_1k_tokens,tie,one_ulp,near,large,not_argmax,length_mismatch,max_margin_median,max_margin_max,drift_p99,drift_max,same_server,pools_identical,pinned_a,pinned_b
+"repeat session, plain c1",plain/c1,plain__rep/c1,320,0,70042,0,0,0,0,0,0,0,,,0,0,False,False,False,False
+"repeat session, plain c32",plain/c32,plain__rep/c32,320,24,68322,0.3513,24,0,0,0,0,0,0.125,0.25,0.2373,0.3273,False,False,False,False
+"concurrency 1 vs 32 (cap 16), plain",plain/c1,plain/c32,320,167,48816,3.421,151,14,2,0,0,0,0.125,0.375,0.3596,0.6861,True,True,False,False
+"same server repeat c1, plain",plain/c1,plain/c1_warm,320,0,70042,0,0,0,0,0,0,0,,,0,0.2267,True,True,False,False
+"same server repeat c32, plain",plain/c32,plain/c32_warm,320,0,70060,0,0,0,0,0,0,0,,,0,0.3229,True,True,False,False
+"deterministic, plain c1 vs c8 (8-prompt validation)",plain_det__validate/c1,plain_det__validate/c8,8,0,1024,0,0,0,0,0,0,0,,,0,0,True,True,False,False
+"deterministic, mtp_s3 c1 vs c8 (8-prompt validation)",mtp_s3_det__validate/c1,mtp_s3_det__validate/c8,8,2,922,2.169,2,0,0,0,0,0,0.125,0.125,0.2229,0.2229,True,True,False,False
+"deterministic + verify KV split patch, mtp_s3 c1 vs c32 (96 prompts)",mtp_s3_det__verifyfix/c1,mtp_s3_det__verifyfix/c32,96,28,18068,1.55,28,0,0,0,0,0,0.125,0.25,0.3276,0.3276,True,True,False,False

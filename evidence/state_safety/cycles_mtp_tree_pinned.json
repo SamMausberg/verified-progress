@@ -1,0 +1,280 @@
+{
+ "buckets": {
+  "1/0": {
+   "positions": 756,
+   "fragile": 77,
+   "divergences": 7,
+   "fragile_divergences": 7,
+   "nonfragile_divergences": 0,
+   "drift_max": 0.24269938468933105,
+   "drift_mean": 0.03875951022254985,
+   "divergences_per_1k": 9.25925925925926,
+   "divergences_per_fragile": 0.09090909090909091
+  },
+  "1/1": {
+   "positions": 653,
+   "fragile": 59,
+   "divergences": 6,
+   "fragile_divergences": 6,
+   "nonfragile_divergences": 0,
+   "drift_max": 0.24398446083068848,
+   "drift_mean": 0.0350220025731055,
+   "divergences_per_1k": 9.188361408882082,
+   "divergences_per_fragile": 0.1016949152542373
+  },
+  "1/2": {
+   "positions": 493,
+   "fragile": 36,
+   "divergences": 3,
+   "fragile_divergences": 3,
+   "nonfragile_divergences": 0,
+   "drift_max": 0.2165539264678955,
+   "drift_mean": 0.03287630441539679,
+   "divergences_per_1k": 6.085192697768763,
+   "divergences_per_fragile": 0.08333333333333333
+  },
+  "1/3": {
+   "positions": 292,
+   "fragile": 16,
+   "divergences": 0,
+   "fragile_divergences": 0,
+   "nonfragile_divergences": 0,
+   "drift_max": 0.2441849708557129,
+   "drift_mean": 0.027214254473376394,
+   "divergences_per_1k": 0.0,
+   "divergences_per_fragile": 0.0
+  },
+  "2/0": {
+   "positions": 1472,
+   "fragile": 115,
+   "divergences": 10,
+   "fragile_divergences": 10,
+   "nonfragile_divergences": 0,
+   "drift_max": 0.2444477081298828,
+   "drift_mean": 0.03553080975855741,
+   "divergences_per_1k": 6.793478260869565,
+   "divergences_per_fragile": 0.08695652173913043
+  },
+  "2/1": {
+   "positions": 1286,
+   "fragile": 114,
+   "divergences": 6,
+   "fragile_divergences": 6,
+   "nonfragile_divergences": 0,
+   "drift_max": 0.3268766403198242,
+   "drift_mean": 0.03514757611367747,
+   "divergences_per_1k": 4.665629860031104,
+   "divergences_per_fragile": 0.05263157894736842
+  },
+  "2/2": {
+   "positions": 988,
+   "fragile": 75,
+   "divergences": 7,
+   "fragile_divergences": 7,
+   "nonfragile_divergences": 0,
+   "drift_max": 0.23609185218811035,
+   "drift_mean": 0.03232167671028116,
+   "divergences_per_1k": 7.08502024291498,
+   "divergences_per_fragile": 0.09333333333333334
+  },
+  "2/3": {
+   "positions": 680,
+   "fragile": 54,
+   "divergences": 4,
+   "fragile_divergences": 4,
+   "nonfragile_divergences": 0,
+   "drift_max": 0.19028854370117188,
+   "drift_mean": 0.026613391692165696,
+   "divergences_per_1k": 5.882352941176471,
+   "divergences_per_fragile": 0.07407407407407407
+  },
+  "3/0": {
+   "positions": 1987,
+   "fragile": 160,
+   "divergences": 16,
+   "fragile_divergences": 16,
+   "nonfragile_divergences": 0,
+   "drift_max": 0.3333742618560791,
+   "drift_mean": 0.03396475627058709,
+   "divergences_per_1k": 8.05234021137393,
+   "divergences_per_fragile": 0.1
+  },
+  "3/1": {
+   "positions": 1764,
+   "fragile": 120,
+   "divergences": 7,
+   "fragile_divergences": 7,
+   "nonfragile_divergences": 0,
+   "drift_max": 0.23945403099060059,
+   "drift_mean": 0.03145299711990399,
+   "divergences_per_1k": 3.9682539682539684,
+   "divergences_per_fragile": 0.058333333333333334
+  },
+  "3/2": {
+   "positions": 1412,
+   "fragile": 110,
+   "divergences": 3,
+   "fragile_divergences": 3,
+   "nonfragile_divergences": 0,
+   "drift_max": 0.24484968185424805,
+   "drift_mean": 0.027627092006266712,
+   "divergences_per_1k": 2.1246458923512748,
+   "divergences_per_fragile": 0.02727272727272727
+  },
+  "3/3": {
+   "positions": 971,
+   "fragile": 52,
+   "divergences": 2,
+   "fragile_divergences": 2,
+   "nonfragile_divergences": 0,
+   "drift_max": 0.2655799388885498,
+   "drift_mean": 0.024931894243794408,
+   "divergences_per_1k": 2.059732234809475,
+   "divergences_per_fragile": 0.038461538461538464
+  },
+  "4/0": {
+   "positions": 8864,
+   "fragile": 290,
+   "divergences": 24,
+   "fragile_divergences": 24,
+   "nonfragile_divergences": 0,
+   "drift_max": 0.32736778259277344,
+   "drift_mean": 0.01669451963530478,
+   "divergences_per_1k": 2.707581227436823,
+   "divergences_per_fragile": 0.08275862068965517
+  },
+  "4/1": {
+   "positions": 8550,
+   "fragile": 303,
+   "divergences": 29,
+   "fragile_divergences": 29,
+   "nonfragile_divergences": 0,
+   "drift_max": 0.36684632301330566,
+   "drift_mean": 0.01568014093285153,
+   "divergences_per_1k": 3.391812865497076,
+   "divergences_per_fragile": 0.09570957095709572
+  },
+  "4/2": {
+   "positions": 7827,
+   "fragile": 251,
+   "divergences": 21,
+   "fragile_divergences": 21,
+   "nonfragile_divergences": 0,
+   "drift_max": 0.24549245834350586,
+   "drift_mean": 0.015173394519323601,
+   "divergences_per_1k": 2.6830203142966655,
+   "divergences_per_fragile": 0.08366533864541832
+  },
+  "4/3": {
+   "positions": 6771,
+   "fragile": 193,
+   "divergences": 19,
+   "fragile_divergences": 19,
+   "nonfragile_divergences": 0,
+   "drift_max": 0.24549317359924316,
+   "drift_mean": 0.013134334984988307,
+   "divergences_per_1k": 2.806084773297888,
+   "divergences_per_fragile": 0.09844559585492228
+  },
+  "prefill/0": {
+   "positions": 320,
+   "fragile": 7,
+   "divergences": 2,
+   "fragile_divergences": 2,
+   "nonfragile_divergences": 0,
+   "drift_max": 0.23542332649230957,
+   "drift_mean": 0.017201986252682988,
+   "divergences_per_1k": 6.25,
+   "divergences_per_fragile": 0.2857142857142857
+  },
+  "prefill/1": {
+   "positions": 297,
+   "fragile": 15,
+   "divergences": 3,
+   "fragile_divergences": 3,
+   "nonfragile_divergences": 0,
+   "drift_max": 0.22611308097839355,
+   "drift_mean": 0.01619816790343492,
+   "divergences_per_1k": 10.1010101010101,
+   "divergences_per_fragile": 0.2
+  },
+  "prefill/2": {
+   "positions": 267,
+   "fragile": 8,
+   "divergences": 1,
+   "fragile_divergences": 1,
+   "nonfragile_divergences": 0,
+   "drift_max": 0.23309898376464844,
+   "drift_mean": 0.012575332130647064,
+   "divergences_per_1k": 3.745318352059925,
+   "divergences_per_fragile": 0.125
+  },
+  "prefill/3": {
+   "positions": 214,
+   "fragile": 3,
+   "divergences": 0,
+   "fragile_divergences": 0,
+   "nonfragile_divergences": 0,
+   "drift_max": 0.14811134338378906,
+   "drift_mean": 0.009744092029625569,
+   "divergences_per_1k": 0.0,
+   "divergences_per_fragile": 0.0
+  },
+  "prefill_token": {
+   "positions": 320,
+   "fragile": 34,
+   "divergences": 0,
+   "fragile_divergences": 0,
+   "nonfragile_divergences": 0,
+   "drift_max": 0.0,
+   "drift_mean": 0.0,
+   "divergences_per_1k": 0.0,
+   "divergences_per_fragile": 0.0
+  }
+ },
+ "skipped_prompts": 0,
+ "ref": "plain/c1",
+ "spec": "mtp_tree/c1",
+ "by_commit_length": {
+  "by_length": {
+   "1": {
+    "fragile_divergences": 16,
+    "fragile": 188,
+    "divergences_per_fragile": 0.0851,
+    "nonfragile_divergences": 0
+   },
+   "2": {
+    "fragile_divergences": 27,
+    "fragile": 358,
+    "divergences_per_fragile": 0.0754,
+    "nonfragile_divergences": 0
+   },
+   "3": {
+    "fragile_divergences": 28,
+    "fragile": 442,
+    "divergences_per_fragile": 0.0633,
+    "nonfragile_divergences": 0
+   },
+   "4": {
+    "fragile_divergences": 93,
+    "fragile": 1037,
+    "divergences_per_fragile": 0.0897,
+    "nonfragile_divergences": 0
+   }
+  },
+  "first_cycle_after_prefill": {
+   "fragile_divergences": 6,
+   "fragile": 33,
+   "divergences_per_fragile": 0.1818,
+   "nonfragile_divergences": 0,
+   "fisher_vs_later_p_exploratory": 0.0494
+  },
+  "nonfragile_divergences": 0,
+  "homogeneity_chi2": {
+   "lengths": 4,
+   "chi2": 3.093,
+   "dof": 3,
+   "p": 0.3775
+  }
+ }
+}

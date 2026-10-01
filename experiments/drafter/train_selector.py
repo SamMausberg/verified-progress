@@ -12,6 +12,10 @@ With the target's greedy continuation g as teacher-forced predecessors,
 q_i = softmax over C_i of score_i( . | g_{i-1}), and q_i(g_i) = 0 when g_i is not a
 candidate. Objectives (`--objective`):
 
+Several objectives can be trained side by side (`--objectives prefix,vat`): each
+arm has its own selector and optimizer, and all arms see the same sequences,
+anchors and candidates.
+
   prefix  expected accepted length of a draft sampled from q:
           E[L] = sum_k prod_{i<=k} q_i(g_i | g_{i-1}); the loss is -E[L] per block.
           At a fixed block size the cycle cost does not depend on the selector,
@@ -84,16 +88,25 @@ class SelectorTrainer:
         self.block = int(dflash.get('block_size', self.config.get('block_size', 16)))
         self.mask_token = int(dflash['mask_token_id'])
         self.top_k = args.top_k
-        self.selector = CandidateSelector(
-            hidden_size=int(self.config['hidden_size']),
-            vocab_size=int(self.config['vocab_size']),
-            state_rank=args.rank,
-            top_k=args.top_k,
-            initializer_range=float(self.config.get('initializer_range', 0.02)),
-        ).to(device)
-        self.optimizer = torch.optim.AdamW(
-            self.selector.parameters(), lr=args.lr, betas=(0.9, 0.95), weight_decay=0.0
-        )
+        # One selector and optimizer per objective. The arms see the same sequences,
+        # anchors and candidates (computed once per sequence), so the comparison
+        # between objectives is matched by construction.
+        self.objectives = args.objectives
+        self.selectors: dict[str, torch.nn.Module] = {}
+        self.optimizers: dict[str, torch.optim.Optimizer] = {}
+        for objective in self.objectives:
+            torch.manual_seed(args.seed)  # identical initialization in every arm
+            selector = CandidateSelector(
+                hidden_size=int(self.config['hidden_size']),
+                vocab_size=int(self.config['vocab_size']),
+                state_rank=args.rank,
+                top_k=args.top_k,
+                initializer_range=float(self.config.get('initializer_range', 0.02)),
+            ).to(device)
+            self.selectors[objective] = selector
+            self.optimizers[objective] = torch.optim.AdamW(
+                selector.parameters(), lr=args.lr, betas=(0.9, 0.95), weight_decay=0.0
+            )
         self.step = self.epoch = self.cursor = 0
 
     @torch.no_grad()
@@ -131,17 +144,19 @@ class SelectorTrainer:
             'anchor_tok': ids[0, anchors],
         }
 
-    def scores(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
+    def scores(self, batch: dict[str, torch.Tensor], objective: str) -> torch.Tensor:
         predecessors = torch.cat([batch['anchor_tok'][:, None], batch['truth'][:, :-1]], dim=1)
-        return self.selector.score_candidates(
+        return self.selectors[objective].score_candidates(
             candidate_ids=batch['cand'],
             unary_logits=batch['unary'],
             hidden_states=batch['hidden'],
             predecessor_ids=predecessors,
         )
 
-    def loss(self, batch: dict[str, torch.Tensor]) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
-        scores = self.scores(batch)  # [n, B-1, K]
+    def loss(
+        self, batch: dict[str, torch.Tensor], objective: str
+    ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
+        scores = self.scores(batch, objective)  # [n, B-1, K]
         match = batch['cand'] == batch['truth'][..., None]
         covered = match.any(-1)
         log_q = torch.log_softmax(scores.float(), dim=-1)
@@ -149,7 +164,6 @@ class SelectorTrainer:
             covered, (log_q * match).sum(-1), torch.full_like(covered, -1e4, dtype=log_q.dtype)
         )
         positions = torch.arange(self.block - 1, device=self.device)
-        objective = self.args.objective
         if objective == 'prefix':
             survival = torch.exp(torch.cumsum(log_q_truth, dim=-1))
             loss = -survival.sum(-1).mean()
@@ -206,28 +220,33 @@ def add_terms(total: dict[str, torch.Tensor], terms: dict[str, torch.Tensor]) ->
 
 def evaluate(trainer: SelectorTrainer, rows: list[dict[str, Any]]) -> dict[str, float]:
     state = random.getstate()
-    random.seed(1234)
-    total: dict[str, torch.Tensor] = {}
-    loss_sum = 0.0
+    random.seed(1234)  # the same anchors at every evaluation
+    totals: dict[str, dict[str, torch.Tensor]] = {obj: {} for obj in trainer.objectives}
+    losses = dict.fromkeys(trainer.objectives, 0.0)
     with torch.no_grad():
         for row in rows:
             batch = trainer.candidates(row)
             if batch is None:
                 continue
-            loss, terms = trainer.loss(batch)
-            loss_sum += float(loss)
-            add_terms(total, terms)
+            for objective in trainer.objectives:
+                loss, terms = trainer.loss(batch, objective)
+                losses[objective] += float(loss)
+                add_terms(totals[objective], terms)
     random.setstate(state)
-    return {'eval/loss': loss_sum / max(1, len(rows)), **summarize(total, 'eval/')}
+    out: dict[str, float] = {}
+    for objective in trainer.objectives:
+        out[f'eval/{objective}/loss'] = losses[objective] / max(1, len(rows))
+        out.update(summarize(totals[objective], f'eval/{objective}/'))
+    return out
 
 
-def export(trainer: SelectorTrainer, init_dir: Path, out: Path) -> str:
-    """DFlash 2 checkpoint: the frozen backbone's tensors plus the selector's."""
+def export(trainer: SelectorTrainer, objective: str, init_dir: Path, out: Path) -> str:
+    """DFlash 2 checkpoint: the frozen backbone's tensors plus one arm's selector."""
     from safetensors.torch import load_file, save_file
 
     out.mkdir(parents=True, exist_ok=True)
     state = load_file(str(init_dir / 'model.safetensors'))
-    for key, value in trainer.selector.state_dict().items():
+    for key, value in trainer.selectors[objective].state_dict().items():
         state[f'candidate_selector.{key}'] = value.detach().to(torch.bfloat16).cpu().contiguous()
     save_file(state, str(out / 'model.safetensors'), metadata={'format': 'pt'})
     config = dict(trainer.config)
@@ -247,7 +266,12 @@ def main() -> None:
     parser.add_argument('--run', type=Path, required=True)
     parser.add_argument('--init', required=True)
     parser.add_argument('--data', type=Path, required=True)
-    parser.add_argument('--objective', choices=['prefix', 'ce', 'dpace', 'vat'], default='prefix')
+    parser.add_argument(
+        '--objectives',
+        type=lambda text: text.split(','),
+        default=['prefix'],
+        help='comma-separated arms trained side by side: prefix, ce, dpace, vat',
+    )
     parser.add_argument('--gamma', type=float, default=7.0)
     parser.add_argument('--dpace-alpha', type=float, default=0.5)
     parser.add_argument('--rank', type=int, default=256)
@@ -270,6 +294,9 @@ def main() -> None:
         '--attention-backend', choices=['flex_attention', 'sdpa'], default='flex_attention'
     )
     args = parser.parse_args()
+    for objective in args.objectives:
+        if objective not in ('prefix', 'ce', 'dpace', 'vat'):
+            parser.error(f'unknown objective {objective}')
 
     device = torch.device(args.device)
     random.seed(args.seed)
@@ -289,8 +316,9 @@ def main() -> None:
     state_path = run / 'state.pt'
     if state_path.exists():
         state = torch.load(state_path, map_location=device, weights_only=False)
-        trainer.selector.load_state_dict(state['selector'])
-        trainer.optimizer.load_state_dict(state['optimizer'])
+        for objective in trainer.objectives:
+            trainer.selectors[objective].load_state_dict(state['arms'][objective]['selector'])
+            trainer.optimizers[objective].load_state_dict(state['arms'][objective]['optimizer'])
         trainer.step, trainer.epoch, trainer.cursor = state['step'], state['epoch'], state['cursor']
         random.setstate(state['python_rng'])
     else:
@@ -298,8 +326,9 @@ def main() -> None:
         if eval_rows:
             append_csv(run / 'eval.csv', {'step': 0, **evaluate(trainer, eval_rows)})
     order = epoch_order(len(train_rows), args.seed, trainer.epoch)
-    window: dict[str, torch.Tensor] = {}
-    window_loss, window_items, window_start = 0.0, 0, time.monotonic()
+    window: dict[str, dict[str, torch.Tensor]] = {}
+    window_loss: dict[str, float] = {}
+    window_items, window_start = 0, time.monotonic()
     while (
         trainer.step < args.total_steps and time.monotonic() - started < args.segment_minutes * 60
     ):
@@ -308,9 +337,10 @@ def main() -> None:
         cosine = args.min_lr_ratio + (1 - args.min_lr_ratio) * 0.5 * (
             1 + math.cos(math.pi * progress)
         )
-        for group in trainer.optimizer.param_groups:
-            group['lr'] = args.lr * warm * cosine
-        trainer.optimizer.zero_grad(set_to_none=True)
+        for optimizer in trainer.optimizers.values():
+            optimizer.zero_grad(set_to_none=True)
+            for group in optimizer.param_groups:
+                group['lr'] = args.lr * warm * cosine
         for _ in range(args.accumulate):
             if trainer.cursor >= len(order):
                 trainer.epoch, trainer.cursor = trainer.epoch + 1, 0
@@ -320,38 +350,46 @@ def main() -> None:
             batch = trainer.candidates(row)
             if batch is None:
                 continue
-            loss, terms = trainer.loss(batch)
-            (loss / args.accumulate).backward()
-            window_loss += float(loss.detach())
             window_items += 1
-            add_terms(window, terms)
-        torch.nn.utils.clip_grad_norm_(trainer.selector.parameters(), 1.0)
-        trainer.optimizer.step()
+            for objective in trainer.objectives:
+                loss, terms = trainer.loss(batch, objective)
+                (loss / args.accumulate).backward()
+                window_loss[objective] = window_loss.get(objective, 0.0) + float(loss.detach())
+                add_terms(window.setdefault(objective, {}), terms)
+        for objective in trainer.objectives:
+            torch.nn.utils.clip_grad_norm_(trainer.selectors[objective].parameters(), 1.0)
+            trainer.optimizers[objective].step()
         trainer.step += 1
         if trainer.step % args.log_every == 0 and window:
             elapsed = time.monotonic() - window_start
-            row_out = {
+            row_out: dict[str, float] = {
                 'step': trainer.step,
                 'epoch': trainer.epoch,
-                'lr': trainer.optimizer.param_groups[0]['lr'],
+                'lr': args.lr * warm * cosine,
                 'seq_per_s': window_items / elapsed,
-                'train/loss': window_loss / max(1, window_items),
-                **summarize(window, 'train/'),
             }
+            for objective in trainer.objectives:
+                row_out[f'train/{objective}/loss'] = window_loss[objective] / max(1, window_items)
+                row_out.update(summarize(window[objective], f'train/{objective}/'))
             append_csv(run / 'train.csv', row_out)
             print(
                 json.dumps(
-                    {k: round(v, 4) for k, v in row_out.items() if 'S' not in k.split('/')[-1][:1]}
+                    {k: round(v, 4) for k, v in row_out.items() if '_S' not in k.split('/')[-1]}
                 ),
                 flush=True,
             )
-            window, window_loss, window_items, window_start = {}, 0.0, 0, time.monotonic()
+            window, window_loss, window_items, window_start = {}, {}, 0, time.monotonic()
         if trainer.step % args.eval_every == 0 and eval_rows:
             append_csv(run / 'eval.csv', {'step': trainer.step, **evaluate(trainer, eval_rows)})
     torch.save(
         {
-            'selector': trainer.selector.state_dict(),
-            'optimizer': trainer.optimizer.state_dict(),
+            'arms': {
+                objective: {
+                    'selector': trainer.selectors[objective].state_dict(),
+                    'optimizer': trainer.optimizers[objective].state_dict(),
+                }
+                for objective in trainer.objectives
+            },
             'step': trainer.step,
             'epoch': trainer.epoch,
             'cursor': trainer.cursor,
@@ -360,9 +398,19 @@ def main() -> None:
         run / 'state.pt.tmp',
     )
     os.replace(run / 'state.pt.tmp', state_path)
-    digest = export(trainer, resolve_init(args.init), run / 'export')
-    (run / 'export' / 'STEP').write_text(f'{trainer.step}\n')
-    print(f'segment done: step={trainer.step} export sha256={digest}', flush=True)
+    digests = {}
+    for objective in trainer.objectives:
+        out = run / f'export-{objective}'
+        digests[objective] = export(trainer, objective, resolve_init(args.init), out)
+        (out / 'STEP').write_text(f'{trainer.step}\n')
+    digest = ' '.join(f'{k}={v}' for k, v in digests.items())
+    if trainer.step >= args.total_steps:
+        print('final step reached', flush=True)
+    peak_gib = torch.cuda.max_memory_allocated() / 2**30 if device.type == 'cuda' else 0.0
+    print(
+        f'segment done: step={trainer.step} export sha256={digest} peak_gpu_gib={peak_gib:.1f}',
+        flush=True,
+    )
 
 
 if __name__ == '__main__':

@@ -455,12 +455,59 @@ def abs_products(head: Head, h: np.ndarray, toks: tuple[int, int]) -> float:
     return float(sum(np.sum(np.abs(head.row(t) * h.astype(np.float64))) for t in toks))
 
 
+def compare_repeats(run_dir: Path, pid: str, prompt: list[int]) -> dict[str, Any]:
+    """First module-output and cache differences between repeats of one prompt.
+
+    Repeats are the rids tap-<pid>-r0, tap-<pid>-r1, ... written by
+    tap_runs.py --repeats; each later repeat is compared with r0.
+    """
+    names = json.loads((run_dir / 'tap' / 'slots.json').read_text())['names']
+    client = {
+        json.loads(line)['id']: json.loads(line)
+        for line in (run_dir / 'client.jsonl').read_text().splitlines()
+    }
+    reps = sorted(k for k in client if k.startswith(f'{pid}-r'))
+    base = client[reps[0]]
+    rows0 = committed_rows(run_dir / 'tap' / f'tap-{reps[0]}', prompt + base['output_ids'])
+    cache0 = entering_caches(run_dir / 'tap' / f'tap-{reps[0]}', prompt + base['output_ids'])
+    out = []
+    for r in reps[1:]:
+        rec = client[r]
+        rows = committed_rows(run_dir / 'tap' / f'tap-{r}', prompt + rec['output_ids'])
+        cache = entering_caches(run_dir / 'tap' / f'tap-{r}', prompt + rec['output_ids'])
+        upto = len(prompt) + min(len(base['output_ids']), len(rec['output_ids'])) - 1
+        out.append(
+            {
+                'repeat': r,
+                'tokens_equal': rec['output_ids'] == base['output_ids'],
+                'logprobs_equal': rec['top_logprobs'] == base['top_logprobs'],
+                'first_difference': first_hash_difference(rows0, rows, names, names, upto),
+                'first_cache_difference': first_cache_difference(cache0, cache, upto)
+                if cache0 and cache
+                else None,
+            }
+        )
+    return {'run': str(run_dir), 'prompt': pid, 'reference': reps[0], 'repeats': out}
+
+
+def data_root_relative(path: str) -> str:
+    """path relative to ~/vp-data/state when it lies there, else unchanged."""
+    try:
+        return str(Path(path).resolve().relative_to(Path.home().resolve() / 'vp-data/state'))
+    except ValueError:
+        return path
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--a', required=True)
-    ap.add_argument('--b', required=True)
+    ap.add_argument('--b', help='second run directory (not needed with --repeat-of)')
     ap.add_argument('--prompts', default=str(Path.home() / 'vp-data/state/prompts/prompts.jsonl'))
     ap.add_argument('--out', required=True)
+    ap.add_argument(
+        '--repeat-of',
+        help='compare the tapped repeats of this prompt id inside --a (ignores --b)',
+    )
     ap.add_argument(
         '--start-output-index',
         type=int,
@@ -474,6 +521,16 @@ def main() -> None:
         'the tap leaves tokens and logprobs bitwise unchanged',
     )
     args = ap.parse_args()
+    if args.repeat_of:
+        prompt = next(
+            json.loads(line)['input_ids']
+            for line in Path(args.prompts).read_text().splitlines()
+            if json.loads(line)['id'] == args.repeat_of
+        )
+        res = compare_repeats(Path(args.a), args.repeat_of, prompt)
+        Path(args.out).write_text(json.dumps(res, indent=1) + '\n')
+        print(json.dumps(res, indent=1))
+        return
     dir_a, dir_b = Path(args.a), Path(args.b)
     names = json.loads((dir_a / 'tap' / 'slots.json').read_text())['names']
     names_b = json.loads((dir_b / 'tap' / 'slots.json').read_text())['names']
@@ -500,14 +557,15 @@ def main() -> None:
         )
     fd = [c['first_difference'] for c in cases if c.get('first_difference')]
     summary = {
-        'a': args.a,
-        'b': args.b,
+        # Relative to the data root, so the committed summary does not name a home directory.
+        'a': data_root_relative(args.a),
+        'b': data_root_relative(args.b),
         'prompts': len(cases),
         'classes': dict(Counter(c['cls'] for c in cases)),
         'classes_hopper_model': dict(
             Counter(c['model_hopper']['cls'] if 'model_hopper' in c else c['cls'] for c in cases)
         ),
-        'first_difference_module': dict(Counter(f['module'] for f in fd).most_common(20)),
+        'first_difference_module': dict(Counter(f['module'] for f in fd).most_common()),
         'first_difference_modes': dict(Counter(f'{f["mode_a"]} vs {f["mode_b"]}' for f in fd)),
         'first_difference_output_index': dict(
             Counter(
@@ -538,9 +596,10 @@ def main() -> None:
             and r['top_logprobs'] == ref[pid]['top_logprobs'][: len(r['top_logprobs'])]
         ]
         summary['tap_check'] = {
-            'untapped_run': args.untapped_a,
+            'untapped_run': data_root_relative(args.untapped_a),
             'prompts': len(ca),
             'tokens_and_logprobs_bitwise_equal': len(same),
+            'mismatched_ids': sorted(set(ca) - set(same)),
         }
     Path(args.out).write_text(json.dumps({'summary': summary, 'cases': cases}, indent=1) + '\n')
     print(json.dumps(summary, indent=1))

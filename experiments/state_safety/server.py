@@ -13,6 +13,7 @@ import contextlib
 import fcntl
 import json
 import os
+import re
 import signal
 import socket
 import subprocess
@@ -51,6 +52,100 @@ BASE_FLAGS = [
     '--mamba-full-memory-ratio',
     '2',
 ]
+
+
+# Pools pinned for output comparisons across servers (team rule: equality
+# comparisons pin the pools). Left to itself SGLang sizes the KV and GDN state
+# pools from the memory free at start-up, so two servers of one configuration
+# can get different pools, and with them different radix eviction (which
+# request's copy of a shared prefix survives) and different batch caps. With 40
+# GDN slots the cap of 8 binds in every configuration: the radix cache with the
+# overlap scheduler takes 5 slots per running request, 4 without overlap and 1
+# without the radix cache. 49,152 KV tokens hold 8 of the longest prompts plus
+# their outputs. The sizes fit MTP with five steps at --mem-fraction-static 0.25
+# when about 65 GB are free at start-up (pools about 6 GB, weights 10 GB).
+POOL_PIN = {'max_running_requests': 8, 'max_total_tokens': 49152, 'max_mamba_cache_size': 40}
+_POOL_FLAG = {k: '--' + k.replace('_', '-') for k in POOL_PIN}
+
+
+def pool_flags(pin: dict[str, int] = POOL_PIN) -> list[str]:
+    return [x for k, v in pin.items() for x in (_POOL_FLAG[k], str(v))]
+
+
+def expected_pools(flags: list[str], pin: dict[str, int] = POOL_PIN) -> dict[str, int]:
+    """The pinned sizes after later flags on the command line override them."""
+    out = dict(pin)
+    for k, flag in _POOL_FLAG.items():
+        for i in range(len(flags) - 1):
+            if flags[i] == flag:
+                out[k] = int(flags[i + 1])
+    return out
+
+
+def mixed_pin_runs(root: Path, pin: bool) -> list[str]:
+    """Sessions under root (symlinks followed) whose pool regime differs from pin.
+
+    A run is pinned when its meta records a pool_pin; runs from before the pin
+    have no such key and count as unpinned.
+    """
+    out = set()
+    for meta in root.glob('*/*.meta.json'):
+        if (json.loads(meta.read_text()).get('pool_pin') is not None) != pin:
+            out.add(meta.parent.name)
+    return sorted(out)
+
+
+def min_free_gb(flags: list[str]) -> float:
+    """Free memory a pinned server needs at start-up (4 x (weights + pools))."""
+    env = os.environ.get('GPU_STARTUP_MIN_FREE_GB')
+    if env:
+        return float(env)
+    return 68.0 if '--speculative-algorithm' in flags else 52.0
+
+
+_RESOLVED_RE = {
+    'max_total_tokens': re.compile(r'max_total_num_tokens=(\d+)'),
+    'max_running_requests': re.compile(r'max_total_num_tokens=\d+, .*?max_running_requests=(\d+)'),
+    'max_mamba_cache_size': re.compile(r'Mamba Cache is allocated\. max_mamba_cache_size: (\d+)'),
+}
+
+
+def public_server_info(info: dict[str, Any]) -> dict[str, Any]:
+    """server_info as it may be committed: no launch command, no host in server_id.
+
+    Runs launched before the host was dropped recorded server_id as
+    host:port:pid:ns; the host part is replaced by a constant, which keeps ids
+    of different servers distinct (port, pid and start time) and equal ids equal.
+    """
+    out = {k: v for k, v in info.items() if k != 'cmd'}
+    sid = out.get('server_id')
+    if isinstance(sid, str) and sid.count(':') == 3:
+        out['server_id'] = 'host:' + sid.split(':', 1)[1]
+    return out
+
+
+def pools_known(pools: dict[str, int | None] | None) -> bool:
+    """True when every pool size was found (a missing field is unknown, not equal)."""
+    return pools is not None and all(v is not None for v in pools.values())
+
+
+_LOG_TIME_RE = re.compile(r'^\[(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\]', re.M)
+
+
+def log_time_span(log_path: Path) -> tuple[str, str] | None:
+    """First and last timestamp of a server log ('YYYY-mm-dd HH:MM:SS', local time)."""
+    times = _LOG_TIME_RE.findall(log_path.read_text(errors='replace'))
+    return (times[0], times[-1]) if times else None
+
+
+def resolved_pools(log_path: Path) -> dict[str, int | None]:
+    """Pool sizes the server actually allocated, from its log (last match)."""
+    text = log_path.read_text(errors='replace')
+    out: dict[str, int | None] = {}
+    for k, rx in _RESOLVED_RE.items():
+        found = rx.findall(text)
+        out[k] = int(found[-1]) if found else None
+    return out
 
 
 def _mtp(steps: int, topk: int, draft_tokens: int) -> list[str]:
@@ -148,13 +243,18 @@ def launch_with_retry(
     log_path: Path,
     attempts: int = 6,
     require_full_batch: bool = True,
+    expect_pools: dict[str, int] | None = None,
+    min_free: float | None = None,
 ) -> Iterator[dict[str, Any]]:
     """launch(), retried while other shared-lock jobs squeeze the memory budget.
 
     SGLang sizes its pools from the free memory it sees at startup, so a server
     started while another job is allocating can fail or come up with a smaller
     batch cap. Both cases are retried after a pause (the second only with
-    require_full_batch); errors raised by the caller's block are not.
+    require_full_batch); errors raised by the caller's block are not. With
+    expect_pools, a server whose allocated pools differ from the pinned sizes is
+    also retried, and the last attempt raises instead of running unpinned.
+    min_free (GB) makes each start wait until that much GPU memory is free.
     """
     all_flags = BASE_FLAGS + flags
     # The last --max-running-requests on the command line wins.
@@ -169,7 +269,7 @@ def launch_with_retry(
         for attempt in range(attempts):
             inner = contextlib.ExitStack()
             try:
-                srv = inner.enter_context(launch(flags, port, log_path))
+                srv = inner.enter_context(launch(flags, port, log_path, min_free=min_free))
             except (RuntimeError, TimeoutError) as exc:
                 inner.close()
                 # Only memory pressure from other jobs is worth waiting out.
@@ -185,30 +285,67 @@ def launch_with_retry(
                 print(f'launch attempt {attempt + 1}: batch cap {cap}; retrying', flush=True)
                 time.sleep(60)
                 continue
+            pools = srv['server_info']['resolved_pools']
+            if expect_pools is not None and pools != expect_pools:
+                inner.close()
+                msg = f'pools {pools}, expected {expect_pools}'
+                if attempt == attempts - 1:
+                    raise RuntimeError(f'{msg}; not running unpinned')
+                print(f'launch attempt {attempt + 1}: {msg}; retrying', flush=True)
+                time.sleep(60)
+                continue
             stack.push(inner)
             yield srv
             return
 
 
+def gpu_free_gb() -> float:
+    gpu = os.environ.get('GPU_STARTUP_GPU', '0')
+    out = subprocess.run(
+        ['nvidia-smi', f'--id={gpu}', '--query-gpu=memory.free', '--format=csv,noheader,nounits'],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return float(out.stdout.split()[0]) / 1024
+
+
 @contextlib.contextmanager
-def startup_lock() -> Iterator[None]:
+def startup_lock(min_free: float | None = None) -> Iterator[None]:
     """Hold the team's server start-up lock (scripts/gpu_startup_lock.sh semantics).
 
     SGLang sizes its pools from the free memory it sees while loading, so
     concurrent start-ups by shared jobs race; the lock covers launch until healthy.
+    With min_free (GB), as with GPU_STARTUP_MIN_FREE_GB in the script, the lock is
+    only kept when that much memory is free; otherwise it is released and retried
+    after GPU_STARTUP_RETRY_WAIT s (default 60), up to GPU_STARTUP_TRIES times
+    (default 30).
     """
     path = Path(os.environ.get('GPU_LOCK_FILE', str(Path.home() / '.gpu.lock')) + '.startup')
     wait = float(os.environ.get('GPU_STARTUP_LOCK_WAIT', '1800'))
+    tries = int(os.environ.get('GPU_STARTUP_TRIES', '30'))
+    retry_wait = float(os.environ.get('GPU_STARTUP_RETRY_WAIT', '60'))
     with path.open('a') as f:  # not inherited by child processes
-        deadline = time.monotonic() + wait
-        while True:
-            try:
-                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        for attempt in range(1, tries + 1):
+            deadline = time.monotonic() + wait
+            while True:
+                try:
+                    fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.monotonic() > deadline:
+                        raise TimeoutError('start-up lock not acquired') from None
+                    time.sleep(1)
+            if min_free is None:
                 break
-            except BlockingIOError:
-                if time.monotonic() > deadline:
-                    raise TimeoutError('start-up lock not acquired') from None
-                time.sleep(1)
+            free = gpu_free_gb()
+            if free >= min_free:
+                break
+            fcntl.flock(f, fcntl.LOCK_UN)
+            if attempt == tries:
+                raise TimeoutError(f'only {free:.1f} GB free, need {min_free} (memory failure)')
+            print(f'start-up: {free:.1f} GB free, need {min_free}; waiting', flush=True)
+            time.sleep(retry_wait)
         try:
             yield
         finally:
@@ -217,7 +354,11 @@ def startup_lock() -> Iterator[None]:
 
 @contextlib.contextmanager
 def launch(
-    flags: list[str], port: int, log_path: Path, startup_timeout: float = 900.0
+    flags: list[str],
+    port: int,
+    log_path: Path,
+    startup_timeout: float = 900.0,
+    min_free: float | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Start an SGLang server, wait until it can generate, yield its info, stop it."""
     cmd = [
@@ -238,7 +379,7 @@ def launch(
     log = log_path.open('w')
     log.write(' '.join(cmd) + '\n')
     log.flush()
-    start = startup_lock()
+    start = startup_lock(min_free)
     start.__enter__()
     proc = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
     base = f'http://127.0.0.1:{port}'
@@ -268,6 +409,11 @@ def launch(
             'effective_max_running_requests_per_dp'
         )
         summary['max_total_num_tokens'] = internal[0].get('max_total_num_tokens')
+        log.flush()
+        summary['resolved_pools'] = resolved_pools(log_path)
+        # One id per server process, so passes can be matched to the server that ran them.
+        # No host name: it can carry the machine's address into committed evidence.
+        summary['server_id'] = f'{port}:{proc.pid}:{time.time_ns()}'
         summary['cmd'] = cmd
         yield {'base_url': base, 'server_info': summary}
     finally:
