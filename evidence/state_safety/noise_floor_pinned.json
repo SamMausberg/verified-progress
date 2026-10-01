@@ -3,6 +3,19 @@
   "pairs": {
     "repeat session, plain c1": {
       "prompts": 320,
+      "bitwise_identical": 320,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {},
       "diverged": 0,
       "identical": 320,
       "length_mismatch": 0,
@@ -25,6 +38,22 @@
     },
     "repeat session, plain c32": {
       "prompts": 320,
+      "bitwise_identical": 312,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {
+        "1": 1,
+        "6+": 7
+      },
       "diverged": 4,
       "identical": 316,
       "length_mismatch": 0,
@@ -49,6 +78,24 @@
     },
     "concurrency 1 vs 32 (cap 8), plain": {
       "prompts": 320,
+      "bitwise_identical": 245,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 14
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 32
+        }
+      },
+      "first_difference_index": {
+        "0": 46,
+        "1": 6,
+        "2": 6,
+        "6+": 17
+      },
       "diverged": 41,
       "identical": 279,
       "length_mismatch": 0,
@@ -74,6 +121,24 @@
     },
     "concurrency 1 vs 32 (cap 8), mtp_s1": {
       "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 7
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 10
+        }
+      },
+      "first_difference_index": {
+        "0": 17,
+        "1": 293,
+        "2": 9,
+        "4": 1
+      },
       "diverged": 165,
       "identical": 155,
       "length_mismatch": 0,
@@ -100,6 +165,24 @@
     },
     "concurrency 1 vs 32 (cap 8), mtp_s3": {
       "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 8
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 4
+        }
+      },
+      "first_difference_index": {
+        "0": 12,
+        "1": 297,
+        "2": 10,
+        "4": 1
+      },
       "diverged": 156,
       "identical": 164,
       "length_mismatch": 0,
@@ -126,6 +209,27 @@
     },
     "concurrency 1 vs 32 (cap 8), mtp_s5": {
       "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 11
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 22
+        }
+      },
+      "first_difference_index": {
+        "0": 33,
+        "1": 83,
+        "2": 28,
+        "3": 24,
+        "4": 17,
+        "5": 20,
+        "6+": 115
+      },
       "diverged": 152,
       "identical": 168,
       "length_mismatch": 0,
@@ -152,6 +256,27 @@
     },
     "concurrency 1 vs 32 (cap 8), mtp_tree": {
       "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 8
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 18
+        }
+      },
+      "first_difference_index": {
+        "0": 26,
+        "1": 96,
+        "2": 32,
+        "3": 19,
+        "4": 18,
+        "5": 24,
+        "6+": 105
+      },
       "diverged": 156,
       "identical": 164,
       "length_mismatch": 0,
@@ -177,6 +302,24 @@
     },
     "same server repeat c1, plain": {
       "prompts": 320,
+      "bitwise_identical": 285,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 1
+        }
+      },
+      "first_difference_index": {
+        "0": 1,
+        "2": 32,
+        "3": 1,
+        "4": 1
+      },
       "diverged": 17,
       "identical": 303,
       "length_mismatch": 0,
@@ -202,6 +345,23 @@
     },
     "same server repeat c32, plain": {
       "prompts": 320,
+      "bitwise_identical": 311,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 1
+        }
+      },
+      "first_difference_index": {
+        "0": 1,
+        "1": 1,
+        "6+": 7
+      },
       "diverged": 4,
       "identical": 316,
       "length_mismatch": 0,
@@ -224,8 +384,286 @@
       "same_server": true,
       "pools_identical": true
     },
+    "radix off c1, mtp_s3": {
+      "prompts": 320,
+      "bitwise_identical": 122,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 192
+        }
+      },
+      "first_difference_index": {
+        "0": 192,
+        "2": 1,
+        "3": 2,
+        "5": 3
+      },
+      "diverged": 98,
+      "identical": 222,
+      "length_mismatch": 0,
+      "exposure_tokens": 56759,
+      "per_1k_tokens": 1.726598424919396,
+      "classes": {
+        "tie": 87,
+        "one_ulp": 11
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.25,
+      "drift_median": 0.1280536651611328,
+      "drift_p99": 0.36684632301330566,
+      "drift_max": 0.40804147720336914,
+      "prompts_with_large_drift": 0,
+      "run_a": "mtp_s3/c1",
+      "run_b": "mtp_s3_noradix/c1",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": false,
+      "pools_identical": true
+    },
+    "radix off c32, mtp_s3": {
+      "prompts": 320,
+      "bitwise_identical": 111,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 11
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 188
+        }
+      },
+      "first_difference_index": {
+        "0": 199,
+        "2": 1,
+        "3": 2,
+        "5": 7
+      },
+      "diverged": 106,
+      "identical": 214,
+      "length_mismatch": 0,
+      "exposure_tokens": 56018,
+      "per_1k_tokens": 1.8922489199900032,
+      "classes": {
+        "tie": 95,
+        "one_ulp": 8,
+        "near": 3
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.375,
+      "drift_median": 0.12878870964050293,
+      "drift_p99": 0.36080098152160645,
+      "drift_max": 0.612208366394043,
+      "prompts_with_large_drift": 1,
+      "run_a": "mtp_s3/c32",
+      "run_b": "mtp_s3_noradix/c32",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": false,
+      "pools_identical": true
+    },
+    "radix off, mtp_s3 c1 vs c32": {
+      "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 13
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 20
+        }
+      },
+      "first_difference_index": {
+        "0": 33,
+        "1": 280,
+        "2": 6,
+        "4": 1
+      },
+      "diverged": 169,
+      "identical": 151,
+      "length_mismatch": 0,
+      "exposure_tokens": 46744,
+      "per_1k_tokens": 3.61543727537224,
+      "classes": {
+        "tie": 159,
+        "one_ulp": 8,
+        "near": 2
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.25,
+      "drift_median": 0.1952211856842041,
+      "drift_p99": 0.36457204818725586,
+      "drift_max": 0.48453640937805176,
+      "prompts_with_large_drift": 0,
+      "run_a": "mtp_s3_noradix/c1",
+      "run_b": "mtp_s3_noradix/c32",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": true,
+      "pools_identical": true
+    },
+    "overlap off c1, mtp_s3": {
+      "prompts": 320,
+      "bitwise_identical": 28,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 192
+        }
+      },
+      "first_difference_index": {
+        "0": 192,
+        "1": 92,
+        "2": 3,
+        "3": 2,
+        "5": 3
+      },
+      "diverged": 161,
+      "identical": 159,
+      "length_mismatch": 0,
+      "exposure_tokens": 47405,
+      "per_1k_tokens": 3.396266216643814,
+      "classes": {
+        "tie": 145,
+        "one_ulp": 14,
+        "near": 2
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.25,
+      "drift_median": 0.21382546424865723,
+      "drift_p99": 0.36737632751464844,
+      "drift_max": 0.4430372714996338,
+      "prompts_with_large_drift": 0,
+      "run_a": "mtp_s3/c1",
+      "run_b": "mtp_s3_nooverlap/c1",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": false,
+      "pools_identical": true
+    },
+    "overlap off vs radix off c1, mtp_s3": {
+      "prompts": 320,
+      "bitwise_identical": 136,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {
+        "1": 177,
+        "2": 3,
+        "6+": 4
+      },
+      "diverged": 111,
+      "identical": 209,
+      "length_mismatch": 0,
+      "exposure_tokens": 55474,
+      "per_1k_tokens": 2.0009373760680678,
+      "classes": {
+        "tie": 105,
+        "one_ulp": 5,
+        "near": 1
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.25,
+      "drift_median": 0.1212155818939209,
+      "drift_p99": 0.24551105499267578,
+      "drift_max": 0.3654294013977051,
+      "prompts_with_large_drift": 0,
+      "run_a": "mtp_s3_noradix/c1",
+      "run_b": "mtp_s3_nooverlap/c1",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": false,
+      "pools_identical": true
+    },
+    "overlap off, mtp_s3 c1 vs c32": {
+      "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 7
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 15
+        }
+      },
+      "first_difference_index": {
+        "0": 22,
+        "1": 291,
+        "2": 6,
+        "4": 1
+      },
+      "diverged": 174,
+      "identical": 146,
+      "length_mismatch": 0,
+      "exposure_tokens": 47830,
+      "per_1k_tokens": 3.637884173113109,
+      "classes": {
+        "tie": 166,
+        "one_ulp": 8
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.25,
+      "drift_median": 0.20729637145996094,
+      "drift_p99": 0.3592667579650879,
+      "drift_max": 0.43307924270629883,
+      "prompts_with_large_drift": 0,
+      "run_a": "mtp_s3_nooverlap/c1",
+      "run_b": "mtp_s3_nooverlap/c32",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": true,
+      "pools_identical": true
+    },
     "spec vs plain c1, mtp_s1": {
       "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {
+        "1": 314,
+        "2": 6
+      },
       "diverged": 170,
       "identical": 150,
       "length_mismatch": 0,
@@ -252,6 +690,22 @@
     },
     "spec vs plain c1, mtp_s3": {
       "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {
+        "1": 314,
+        "2": 6
+      },
       "diverged": 171,
       "identical": 149,
       "length_mismatch": 0,
@@ -278,6 +732,23 @@
     },
     "spec vs plain c1, mtp_s5": {
       "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {
+        "1": 313,
+        "2": 6,
+        "3": 1
+      },
       "diverged": 164,
       "identical": 156,
       "length_mismatch": 0,
@@ -303,6 +774,23 @@
     },
     "spec vs plain c1, mtp_tree": {
       "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {
+        "1": 313,
+        "2": 6,
+        "3": 1
+      },
       "diverged": 170,
       "identical": 150,
       "length_mismatch": 0,
@@ -328,6 +816,23 @@
     },
     "spec vs plain c32, mtp_s1": {
       "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 14
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 22
+        }
+      },
+      "first_difference_index": {
+        "0": 36,
+        "1": 279,
+        "2": 5
+      },
       "diverged": 175,
       "identical": 145,
       "length_mismatch": 0,
@@ -354,6 +859,23 @@
     },
     "spec vs plain c32, mtp_s3": {
       "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 16
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 30
+        }
+      },
+      "first_difference_index": {
+        "0": 46,
+        "1": 269,
+        "2": 5
+      },
       "diverged": 181,
       "identical": 139,
       "length_mismatch": 0,
@@ -380,6 +902,23 @@
     },
     "spec vs plain c32, mtp_s5": {
       "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 19
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 44
+        }
+      },
+      "first_difference_index": {
+        "0": 63,
+        "1": 251,
+        "2": 6
+      },
       "diverged": 166,
       "identical": 154,
       "length_mismatch": 0,
@@ -406,6 +945,23 @@
     },
     "spec vs plain c32, mtp_tree": {
       "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 16
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 32
+        }
+      },
+      "first_difference_index": {
+        "0": 48,
+        "1": 267,
+        "2": 5
+      },
       "diverged": 167,
       "identical": 153,
       "length_mismatch": 0,
@@ -432,6 +988,26 @@
     },
     "spec vs spec c1, mtp_s1 vs mtp_s3": {
       "prompts": 320,
+      "bitwise_identical": 79,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {
+        "1": 1,
+        "2": 2,
+        "3": 61,
+        "4": 3,
+        "5": 2,
+        "6+": 172
+      },
       "diverged": 92,
       "identical": 228,
       "length_mismatch": 0,
@@ -457,6 +1033,23 @@
     },
     "spec vs spec c1, mtp_s3 vs mtp_s5": {
       "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {
+        "1": 308,
+        "2": 11,
+        "4": 1
+      },
       "diverged": 170,
       "identical": 150,
       "length_mismatch": 0,
@@ -482,6 +1075,23 @@
     },
     "spec vs spec c1, mtp_s3 vs mtp_tree": {
       "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {
+        "1": 308,
+        "2": 11,
+        "4": 1
+      },
       "diverged": 163,
       "identical": 157,
       "length_mismatch": 0,
@@ -504,6 +1114,89 @@
       "pinned_b": true,
       "same_server": false,
       "pools_identical": true
+    },
+    "deterministic, mtp_s3 c1 vs c32": {
+      "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {
+        "1": 310,
+        "2": 9,
+        "3": 1
+      },
+      "diverged": 168,
+      "identical": 152,
+      "length_mismatch": 0,
+      "exposure_tokens": 48300,
+      "per_1k_tokens": 3.4782608695652173,
+      "classes": {
+        "tie": 164,
+        "one_ulp": 4
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.12500005960464478,
+      "max_margin_max": 0.2500000596046448,
+      "drift_median": 0.19754374027252197,
+      "drift_p99": 0.302775502204895,
+      "drift_max": 0.3560323715209961,
+      "prompts_with_large_drift": 0,
+      "run_a": "mtp_s3_det/c1",
+      "run_b": "mtp_s3_det/c32",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": true,
+      "pools_identical": true
+    },
+    "fp32 head, mtp_s3 c1 vs c32": {
+      "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 8
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 13
+        }
+      },
+      "first_difference_index": {
+        "0": 21,
+        "1": 298,
+        "2": 1
+      },
+      "diverged": 130,
+      "identical": 190,
+      "length_mismatch": 0,
+      "exposure_tokens": 53356,
+      "per_1k_tokens": 2.436464502586401,
+      "classes": {
+        "near": 130
+      },
+      "max_margin_median": 0.0359649658203125,
+      "max_margin_p90": 0.07676506042480469,
+      "max_margin_max": 0.18555831909179688,
+      "drift_median": 0.11735224723815918,
+      "drift_p99": 0.2981564998626709,
+      "drift_max": 0.5567474365234375,
+      "prompts_with_large_drift": 2,
+      "run_a": "mtp_s3_fp32head/c1",
+      "run_b": "mtp_s3_fp32head/c32",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": true,
+      "pools_identical": true
     }
   },
   "missing_pairs": [
@@ -512,15 +1205,19 @@
     "logprobs off, plain c1",
     "logprobs off, mtp_s3 c1",
     "radix off c1, plain",
-    "radix off c1, mtp_s3",
+    "radix off c32, plain",
+    "radix off, plain c1 vs c32",
+    "radix off, spec vs plain c1, mtp_s3",
+    "radix off, spec vs plain c32, mtp_s3",
     "overlap off c1, plain",
-    "overlap off c1, mtp_s3",
+    "overlap off vs radix off c1, plain",
+    "overlap off, plain c1 vs c32",
+    "overlap off, spec vs plain c1, mtp_s3",
     "deterministic, plain c1 vs c32",
-    "deterministic, mtp_s3 c1 vs c32",
     "deterministic, plain vs mtp_s3 c1",
+    "deterministic, plain vs mtp_s3 c32",
     "deterministic on vs off, plain c1",
     "fp32 head, plain c1 vs c32",
-    "fp32 head, mtp_s3 c1 vs c32",
     "fp32 head, plain vs mtp_s3 c1",
     "fp32 head, plain vs mtp_s3 c32",
     "retraction c32, plain",
@@ -603,6 +1300,46 @@
     },
     "plain/c32_warm": {
       "positions": 70042,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "mtp_s3_noradix/c1": {
+      "positions": 69960,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "mtp_s3_noradix/c32": {
+      "positions": 70076,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "mtp_s3_nooverlap/c1": {
+      "positions": 70020,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "mtp_s3_nooverlap/c32": {
+      "positions": 70065,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "mtp_s3_det/c1": {
+      "positions": 69961,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "mtp_s3_det/c32": {
+      "positions": 70105,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "mtp_s3_fp32head/c1": {
+      "positions": 70214,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "mtp_s3_fp32head/c32": {
+      "positions": 70150,
       "not_argmax": 0,
       "worst_gap": 0.0
     }

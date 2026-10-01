@@ -31,6 +31,20 @@ def fake_smi(tmp_path: Path, script: str = '') -> dict[str, str]:
     )
 
 
+def path_without(tmp_path: Path, name: str) -> str:
+    """A PATH holding every tool on the current PATH except `name` (as symlinks in one directory)."""
+    bin_dir = tmp_path / f'no-{name}'
+    bin_dir.mkdir()
+    for d in os.environ['PATH'].split(':'):
+        if not os.path.isdir(d):
+            continue
+        for entry in os.listdir(d):
+            link = bin_dir / entry
+            if entry != name and not link.exists() and not link.is_symlink():
+                link.symlink_to(os.path.join(d, entry))
+    return str(bin_dir)
+
+
 def alive(pid: int) -> bool:
     """True if the process exists and is not a zombie (a reaped-late zombie counts as gone)."""
     try:
@@ -53,28 +67,19 @@ def lock_free(lock: Path, shared: bool = False) -> bool:
 
 
 @pytest.mark.parametrize('mode', ['-x', '-s'])
-def test_background_child_does_not_keep_the_lock(tmp_path: Path, mode: str) -> None:
+def test_the_job_does_not_inherit_the_lock(tmp_path: Path, mode: str) -> None:
+    """flock -o: no process the job starts has the lock open, so none could keep it held."""
     lock = tmp_path / 'gpu.lock'
     lock.touch()
-    pid_file = tmp_path / 'child.pid'
+    fds = tmp_path / 'fds'
     env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock))
-    # The job leaves a detached sleeper behind, as a hold that queues its successor does.
-    # The sleeper leaves the job's process group (setsid) before the job exits, so the job
-    # wrapper does not stop it; it must still not keep the lock.
-    job = f'setsid nohup sleep 30 >/dev/null 2>&1 < /dev/null & echo $! > {pid_file}; sleep 1'
+    job = f'for f in /proc/$$/fd/*; do readlink "$f" || :; done > {fds}'
     done = subprocess.run(
         ['bash', str(SCRIPT), mode, 'bash', '-c', job], env=env, timeout=60, check=False
     )
     assert done.returncode == 0
-    child = int(pid_file.read_text())
-    try:
-        assert alive(child)  # the leftover process is still alive
-        deadline = time.time() + 5
-        while not lock_free(lock) and time.time() < deadline:
-            time.sleep(0.1)
-        assert lock_free(lock), 'a leftover background process kept the GPU lock'
-    finally:
-        os.kill(child, 9)
+    assert os.path.realpath(lock) not in fds.read_text().split('\n'), 'the job holds the lock'
+    assert lock_free(lock)
 
 
 def test_lock_is_held_while_the_command_runs(tmp_path: Path) -> None:
@@ -105,7 +110,12 @@ def test_shared_job_drops_its_ticket_and_holds_the_lock(tmp_path: Path) -> None:
             time.sleep(0.05)
         assert not lock_free(lock), 'the shared lock was not held during the command'
         assert lock_free(lock, shared=True), 'a second shared holder must still get in'
+        # The wrapper drops the ticket just after it starts (after its subreaper re-exec).
+        deadline = time.time() + 2
+        while any(queue.iterdir()) and time.time() < deadline:
+            time.sleep(0.05)
         assert not any(queue.iterdir()), 'the shared ticket was not dropped once the lock was held'
+        assert not lock_free(lock), 'the job ended before its ticket was checked'
         assert proc.wait(timeout=30) == 0
         assert lock_free(lock)
     finally:
@@ -240,6 +250,245 @@ def test_leftover_group_members_are_stopped_when_the_job_ends(tmp_path: Path) ->
     if alive(left):
         os.kill(left, 9)
         pytest.fail('a leftover process in the job group outlived the job')
+
+
+# `ids <pid>` prints a process's group and session, so a test can show that the process it
+# checks really left the job's group or session.
+IDS = 'ids() { local s; read -r s </proc/"$1"/stat; set -- ${s##*) }; echo "$3 $4"; }\n'
+
+
+def job_script(tmp_path: Path, body: str) -> list[str]:
+    """Command that runs `body` (with `ids` defined) as a bash script; at its end, the script
+    records the time in `ended`, so a test can time the cleanup apart from the drain."""
+    script = tmp_path / 'job.sh'
+    script.write_text(IDS + body + 'date +%s.%N > ended\n')
+    return ['bash', str(script)]
+
+
+def cleanup_time(tmp_path: Path) -> float:
+    """Seconds from the end of a job_script job until now."""
+    return time.time() - float((tmp_path / 'ended').read_text())
+
+
+def gone_within(pid: int, seconds: float) -> bool:
+    deadline = time.time() + seconds
+    while alive(pid) and time.time() < deadline:
+        time.sleep(0.05)
+    return not alive(pid)
+
+
+def kill_if_alive(*pids: int) -> None:
+    for pid in pids:
+        if alive(pid):
+            os.kill(pid, 9)
+
+
+@pytest.mark.parametrize('mode', ['-x', '-s'])
+def test_a_child_under_plain_timeout_is_stopped_when_the_job_ends(
+    tmp_path: Path, mode: str
+) -> None:
+    """Plain `timeout` puts itself and its child in a new process group, out of the group kill."""
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    # A long grace: finishing well inside it shows the child got TERM, not the late KILL.
+    env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock), GPU_JOB_KILL_GRACE='30')
+    job = job_script(
+        tmp_path,
+        "timeout 60 bash -c 'echo $$ > child.pid; exec sleep 60' &\n"
+        'while [ ! -s child.pid ]; do sleep 0.05; done\n'
+        'echo "$(ids $$) $(ids "$(cat child.pid)")" > ids\n',
+    )
+    bystander = subprocess.Popen(['sleep', '60'], start_new_session=True)  # not the job's
+    child = 0
+    try:
+        done = subprocess.run(
+            ['bash', str(SCRIPT), mode, *job], env=env, cwd=tmp_path, timeout=60, check=False
+        )
+        assert done.returncode == 0
+        child = int((tmp_path / 'child.pid').read_text())
+        job_group, _, child_group, _ = map(int, (tmp_path / 'ids').read_text().split())
+        assert child_group != job_group, 'the child did not leave the job group'
+        assert gone_within(child, 5), 'a child under plain timeout outlived the job'
+        assert cleanup_time(tmp_path) < 15
+        assert bystander.poll() is None, 'a process the job did not start was stopped'
+    finally:
+        kill_if_alive(child)
+        bystander.kill()
+
+
+def test_a_server_orphaned_in_a_new_session_is_stopped_when_the_job_ends(tmp_path: Path) -> None:
+    """The 2026-10-01 15:41 case: a launcher under plain `timeout` starts its server with
+    start_new_session and exits without stopping it, so the server has no parent left in the job."""
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock), GPU_JOB_KILL_GRACE='30')
+    launcher = (
+        'import subprocess; '
+        'p = subprocess.Popen(["sleep", "60"], start_new_session=True); '
+        'open("server.pid", "w").write(str(p.pid))'
+    )
+    job = job_script(
+        tmp_path,
+        f"timeout 60 python3 -c '{launcher}'\n"
+        'echo "$(ids $$) $(ids "$(cat server.pid)")" > ids\n',
+    )
+    server = 0
+    try:
+        done = subprocess.run(
+            ['bash', str(SCRIPT), '-x', *job], env=env, cwd=tmp_path, timeout=60, check=False
+        )
+        assert done.returncode == 0
+        server = int((tmp_path / 'server.pid').read_text())
+        _, job_session, _, server_session = map(int, (tmp_path / 'ids').read_text().split())
+        assert server_session != job_session, 'the server did not leave the job session'
+        assert gone_within(server, 5), 'an orphaned server in its own session outlived the job'
+        assert cleanup_time(tmp_path) < 15
+    finally:
+        kill_if_alive(server)
+
+
+def test_a_setsid_child_that_ignores_term_is_killed_after_the_grace(tmp_path: Path) -> None:
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock), GPU_JOB_KILL_GRACE='2')
+    job = job_script(
+        tmp_path,
+        'setsid bash -c \'trap "" TERM; echo $$ > child.pid; sleep 60 & wait\' &\n'
+        'while [ ! -s child.pid ]; do sleep 0.05; done\n'
+        'echo "$(ids $$) $(ids "$(cat child.pid)")" > ids\n',
+    )
+    child = 0
+    try:
+        done = subprocess.run(
+            ['bash', str(SCRIPT), '-s', *job], env=env, cwd=tmp_path, timeout=60, check=False
+        )
+        assert done.returncode == 0
+        child = int((tmp_path / 'child.pid').read_text())
+        _, job_session, _, child_session = map(int, (tmp_path / 'ids').read_text().split())
+        assert child_session != job_session, 'the child did not leave the job session'
+        assert gone_within(child, 5), 'a TERM-ignoring setsid child outlived the job'
+        assert cleanup_time(tmp_path) >= 2, 'the child was killed before the grace ran out'
+    finally:
+        kill_if_alive(child)
+
+
+def test_escaped_children_are_stopped_when_the_holder_dies(tmp_path: Path) -> None:
+    """The holder-death path: TERM to every escaped process, KILL after the grace."""
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock), GPU_JOB_KILL_GRACE='1')
+    job = job_script(
+        tmp_path,
+        'timeout 60 bash -c \'trap "echo > a.term; exit 0" TERM; echo $$ > a.pid; '
+        "sleep 60 & wait' &\n"
+        'setsid bash -c \'trap "" TERM; echo $$ > b.pid; sleep 60 & wait\' &\n'
+        'while [ ! -s a.pid ] || [ ! -s b.pid ]; do sleep 0.05; done\n'
+        'echo $$ > job.pid\n'
+        'wait\n',
+    )
+    proc = subprocess.Popen(['bash', str(SCRIPT), '-x', *job], env=env, cwd=tmp_path)
+    a = b = 0
+    try:
+        _wait_for(tmp_path / 'job.pid')
+        a = int((tmp_path / 'a.pid').read_text())
+        b = int((tmp_path / 'b.pid').read_text())
+        os.kill(_holder_of(proc), 9)
+        assert gone_within(a, 10), 'a child under plain timeout outlived the lock holder'
+        assert gone_within(b, 10), 'a TERM-ignoring setsid child outlived the lock holder'
+        assert (tmp_path / 'a.term').exists(), 'the escaped child was not sent TERM first'
+    finally:
+        kill_if_alive(a, b)
+        proc.kill()
+
+
+def test_an_orphan_that_exits_mid_job_does_not_end_the_job(tmp_path: Path) -> None:
+    """The wrapper reaps orphans it adopts while it waits for the job; the job runs to its end."""
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock))
+    out = tmp_path / 'out'
+    # The subshell exits at once, so its sleep is orphaned, adopted and reaped mid-job.
+    job = f'(sleep 0.3 &); sleep 2; echo finished > {out}; exit 3'
+    start = time.time()
+    done = subprocess.run(
+        ['bash', str(SCRIPT), '-s', 'bash', '-c', job], env=env, timeout=60, check=False
+    )
+    assert done.returncode == 3
+    assert out.read_text().strip() == 'finished'
+    assert time.time() - start >= 2
+
+
+def sig_ignored(status: str) -> int:
+    """The SigIgn mask from the text of /proc/<pid>/status."""
+    line = next(x for x in status.splitlines() if x.startswith('SigIgn:'))
+    return int(line.split()[1], 16)
+
+
+@pytest.mark.parametrize('ignored', ['', 'PIPE XFSZ'])
+def test_the_job_keeps_the_callers_signal_dispositions(tmp_path: Path, ignored: str) -> None:
+    """The subreaper helper (Python) ignores SIGPIPE and SIGXFSZ itself; the job must get the
+    caller's dispositions back, ignored or not."""
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock))
+    out = tmp_path / 'status'
+    environ = tmp_path / 'environ'
+    caller = f"trap '' {ignored}; " if ignored else ''
+    job = f'cat /proc/self/status > {out}; env > {environ}'
+    done = subprocess.run(
+        ['bash', '-c', f'{caller}exec bash {SCRIPT} -s bash -c "{job}"'],
+        env=env,
+        timeout=60,
+        check=False,
+    )
+    assert done.returncode == 0
+    status = subprocess.run(
+        ['bash', '-c', f'{caller}exec cat /proc/self/status'],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    reset = (1 << (1 - 1)) | (1 << (2 - 1)) | (1 << (15 - 1))  # HUP, INT, TERM: gpu_lock.sh resets
+    assert sig_ignored(out.read_text()) == sig_ignored(status) & ~reset
+    assert 'GPU_JOB_SUBREAPER' not in environ.read_text()
+    assert 'GPU_JOB_SIGIGN' not in environ.read_text()
+
+
+def test_a_job_whose_caller_ignores_sigpipe_survives_it(tmp_path: Path) -> None:
+    """Codex's example on #146: with SIGPIPE ignored by the caller, the job survives one."""
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock))
+    out = tmp_path / 'out'
+    job = f'kill -PIPE $$; kill -XFSZ $$; echo survived > {out}'
+    done = subprocess.run(
+        ['bash', '-c', f"trap '' PIPE XFSZ; exec bash {SCRIPT} -s bash -c '{job}'"],
+        env=env,
+        timeout=60,
+        check=False,
+    )
+    assert done.returncode == 0
+    assert out.read_text().strip() == 'survived'
+
+
+def test_a_job_that_cannot_be_contained_does_not_run(tmp_path: Path) -> None:
+    """Without python3 the wrapper cannot become a subreaper, so the job does not start."""
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    ran = tmp_path / 'ran'
+    env = dict(fake_smi(tmp_path), PATH=path_without(tmp_path, 'python3'), GPU_LOCK_FILE=str(lock))
+    done = subprocess.run(
+        ['bash', str(SCRIPT), '-s', 'touch', str(ran)],
+        env=env,
+        timeout=60,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert done.returncode == 75
+    assert not ran.exists()
+    assert 'python3' in done.stderr
 
 
 def test_exclusive_waits_for_a_detached_server_that_has_not_reached_the_gpu(tmp_path: Path) -> None:
@@ -726,19 +975,9 @@ def test_without_nvidia_smi_the_drain_still_waits_for_earlier_jobs(tmp_path: Pat
     sleeper = subprocess.Popen(['sleep', '3'], start_new_session=True)  # its own group
     try:
         (registry / '1').write_text(f'1 {sleeper.pid}\n')  # a dead wrapper, a live group
-        # Every tool on PATH except nvidia-smi.
-        bin_dir = tmp_path / 'nosmi'
-        bin_dir.mkdir()
-        for d in os.environ['PATH'].split(':'):
-            if not os.path.isdir(d):
-                continue
-            for name in os.listdir(d):
-                link = bin_dir / name
-                if name != 'nvidia-smi' and not link.exists() and not link.is_symlink():
-                    link.symlink_to(os.path.join(d, name))
         env = dict(
             fake_smi(tmp_path),
-            PATH=str(bin_dir),
+            PATH=path_without(tmp_path, 'nvidia-smi'),
             GPU_LOCK_FILE=str(lock),
             GPU_LOCK_DRAIN_WAIT='20',
         )
