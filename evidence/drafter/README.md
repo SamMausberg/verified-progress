@@ -470,7 +470,9 @@ e8a9e6c, engine 9292abd874; `fold_narrow_tiles/`, resolved pools and foreign CPU
   (`fold_bitwise_in_every_case`).
 - **Served, matched pools** (`run_fold_localize.sh` as before): DFlash at c = 1 with the per-cycle
   trace, eight requests at two pinned pool sizes, identical in every token, top-5 logprob and
-  cycle (`off-p*_vs_fold-p*.json`); deterministic waves, radix cache off: DFlash in waves of 4 and
+  cycle, with every request traced over its whole output in both runs (`off-p*_vs_fold-p*.json`,
+  `trace_coverage`; regenerated from the job's traces with `fold_localize.py --require-identical`
+  after the coverage rule was added; #133's c = 1 runs also pass it); deterministic waves, radix cache off: DFlash in waves of 4 and
   MTP s3 in waves of 8 bitwise equal to stock on 80 of 80 sequences, as are the stock reruns
   (`*-vs-*.json`).
 - **Patch 0004's gate:** DFlash with decode-only ReplaySSM (`--enable-linear-replayssm` without
