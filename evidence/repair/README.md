@@ -588,8 +588,9 @@ not improve on fresh DFlash drafting.
 
 `jacobi_probe_progress.csv`, `jacobi_probe_summary.json` (measured). Session `runs/jacobi_probes.sh`
 under the exclusive lock on 2026-10-01, 21:53-22:05 UTC (exclusive for memory; nothing here is
-timed), repository commit `17bbeac` (on main; each run's `run.json` records it), engine build
-`5d8e00e3e1`. The probe follows the stock DFlash trajectory and, on
+timed), repository commit `17bbeac` (on main) and engine build `5d8e00e3e1`, both clean, as each
+run's `run.json` records (`jacobi_probe_provenance.json` copies those records with the input and
+trace hashes). The probe follows the stock DFlash trajectory and, on
 every block, runs four extra exact target passes from the same committed prefix of each kind: recycle
 sweeps (the Jacobi map: the next candidate takes the target's predictions from the previous pass,
 shifted by one) and keep sweeps (only the first mismatching draft token is replaced by the
@@ -661,9 +662,12 @@ drafter workstream's block-16 panel (`drafter_b16_outputs.jsonl`, SHA-256
 `679240063371673782ca0fe6b7eeeb241c36bef2f183030bda3dcd9dceaffec4`, raw data outside git); 64-row
 tiles in token-id order, and the same tiles after sorting the rows by a random projection (a cheap
 clustering control, not k-means). Run under the shared lock on 2026-10-01, finishing at 18:51 UTC,
-from a local worktree at commit `a05df1d`, which was never pushed. Its `p12_static_screen.py` and
-`runs/p12_screen.sh` are the same git blobs (`9389127` and `9c758ef`) as at commit `d365673`, which
-is on main through #150, so `d365673` is the revision to rerun; the JSON records no commit.
+at repository commit `a05df1d` (`p12_static_screen.provenance.json`): a local branch, never pushed,
+recovered from the run worktree's reflog (HEAD there from 10:04 UTC on, worktree clean, both
+scripts last modified at 08:28 UTC), since the JSON itself records no commit. Its
+`p12_static_screen.py` (SHA-256 `7ca21067...`) and `runs/p12_screen.sh` (`c32c4c10...`) are
+byte-identical to the files at `694c0bc`, the commit on main that added them, which is the revision
+to rerun; the provenance file gives the full hashes.
 
 | quantity | value |
 |---|---|
