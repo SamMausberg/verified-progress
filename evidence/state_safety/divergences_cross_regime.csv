@@ -1,0 +1,2 @@
+pair,id,pos,tok_a,tok_b,margin_a,margin_b,ulp,cls,max_drift,max_drift_pos,first_logprob_diff,len_a,len_b,length_mismatch,cycle_offset_b,prev_cycle_len_b,cycles_ok_b
+pinned (cap 8) vs unpinned (cap 16) plain c1,mt_bench-0064,,,,,,,,0.23776817321777344,29,2,256,256,False,,,

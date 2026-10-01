@@ -103,6 +103,26 @@ same cycles (6.200 against 6.204 tokens per cycle).
         --draft z-lab/Qwen3.5-4B-DFlash@9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf \
         --out ~/vp-data/drafter/support/zlab_b16
 
+Per-cycle table for P9 (`~/vp-data/drafter/support/zlab_b16_cycles/cycles.pt`, 57 MB, not
+committed; SHA-256 a587d952074d93f5d135c75760a32587f3e7a631360c4f20884be1c7bdddc36b). It
+holds one row per kept cycle (21,067), in the order of the screen: request id, domain,
+anchor position, the top-16 candidate ids and their BF16 drafter logits at every block
+position, the realized continuation, the engine's drafted tokens, L_engine, L_hf and U_K for
+K = 1, 2, 4, 8 and 16. It was written on 2026-10-01 at 08:27 by `support_screen.py
+--save-cycles` as of commit b631dc4, through `run_support_screen.sh` on a shared slot (GPU lock
+ticket 1790824862701528348). The environment was `scripts/sglang_env.sh` with the stock
+engine (`~/sglang` at bd66ce343e; Python 3.12.14, torch 2.13.0+cu130, transformers 5.12.1),
+SpecForge at 3cb0510f0bd0e8c195ac6e9c5c62f6b50580ff83 and flash-linear-attention 0.5.2 from
+`~/vp-data/drafter/pylib`. Its `summary.json` equals `support/zlab_b16_panel_v1_summary.json`
+in every number.
+
+    scripts/gpu_lock.sh -s experiments/drafter/run_support_screen.sh
+    # = PYTHONPATH=~/vp-data/drafter/pylib:~/vp-data/drafter/src/SpecForge \
+    #   python experiments/drafter/support_screen.py --trace ~/vp-data/drafter/trace/b16 \
+    #     --panel experiments/drafter/panel-v1.jsonl \
+    #     --draft z-lab/Qwen3.5-4B-DFlash@9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf \
+    #     --out ~/vp-data/drafter/support/zlab_b16_cycles --save-cycles
+
 ## Card-reproduction gate (MT-Bench)
 
 `card_gate_mtbench.json`, `launch/zlab_b16_card_gate.json`: the 80 MT-Bench first turns with

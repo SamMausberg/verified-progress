@@ -1,0 +1,42 @@
+From 7e08b0c6455cdec81b922b52c14d841fbfe9ca53 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Thu, 1 Oct 2026 06:40:56 +0000
+Subject: [PATCH 1/8] Reach --bf16-gemm-backend gemv from
+ UnquantizedLinearMethod.apply
+
+The flag loads the Hopper GEMV (hopper_bf16_gemv), but apply() calls the
+dispatcher only for the cutedsl backend, so on sm_90 plain BF16 layers kept
+F.linear and the GEMV ran only on the packed GDN projection path. Dispatch
+bias-free BF16 layers through _bf16_gemm_dispatch_impl when the backend is
+gemv; use_hopper_bf16_gemv still limits it to M = 1 and its tuned N range.
+Default behaviour (backend auto) is unchanged.
+---
+ python/sglang/srt/layers/quantization/unquant.py | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/python/sglang/srt/layers/quantization/unquant.py b/python/sglang/srt/layers/quantization/unquant.py
+index 8edd7e7240..6086320ec6 100644
+--- a/python/sglang/srt/layers/quantization/unquant.py
++++ b/python/sglang/srt/layers/quantization/unquant.py
+@@ -498,6 +498,18 @@ class UnquantizedLinearMethod(LinearMethodBase):
+                 return bf16_gemm_dispatch(x, layer.weight, bias)
+             return _bf16_gemm_dispatch_impl(x, layer.weight, bias)
+ 
++        elif (
++            get_bf16_gemm_backend().is_gemv()
++            and bias is None
++            and x.is_cuda
++            and x.dtype == torch.bfloat16
++            and layer.weight.dtype == torch.bfloat16
++            and not torch.compiler.is_compiling()
++        ):
++            # The Hopper GEMV backend (M = 1, see use_hopper_bf16_gemv) was only
++            # reachable through the packed GDN path; dispatch plain layers too.
++            return _bf16_gemm_dispatch_impl(x, layer.weight, bias)
++
+         return F.linear(x, layer.weight, bias)
+ 
+     def apply_with_addend(
+-- 
+2.34.1
+

@@ -1,0 +1,63 @@
+% Figure fig:rho. (a) is drawn to scale from medians: ||h^d|| = 50.596 and ||h^t|| = 159.2
+% (evidence/head_geometry/transport_dflash4b.json, headline hdnorm2/htnorm2 medians),
+% cos(h^d, h^t) = 0.408 (evidence/head_geometry/stats_dflash4b.json, pairs/cos_hd_ht/all
+% q50), and the median threshold delta* = 0.00854 (evidence/precision/head_constants.json,
+% tiles/contiguous/euclid_int8_row_threshold/p50). (b) reads
+% evidence/head_geometry/rho_dflash4b_quantiles.csv (DFlash-4B drift and the per-row
+% thresholds) and evidence/head_geometry/rho_mtp4b_quantiles.csv (MTP-4B drift); both
+% hold 40,000 held-out pairs.
+% Both panels are one picture: (b)'s plot area is centred on y = 0, (a)'s drawing is shifted
+% so that its vertical centre is also at y = 0, and (a)'s title is set on the same top line
+% and with the same font, text height and depth as (b)'s.
+\begin{tikzpicture}[font=\footnotesize,
+  paneltitle/.style={font=\footnotesize,text height=1.6ex,text depth=.4ex,inner sep=2pt}]
+% ---------------- (b) measured drift against the thresholds ----------------
+\begin{semilogxaxis}[name=b,at={(11.2cm,0)},anchor=center,
+  width=8.7cm,height=4.7cm,xmin=2e-3,xmax=1.6,ymin=0,ymax=1,
+  xlabel={Drift ratio $\rho$ of a pair, or per-row threshold $\delta^\ast_i$},ylabel={Cumulative share},grid=major,
+  title={(b) Measured drift against the thresholds},title style={paneltitle},xminorticks=false,
+  legend style={at={(0.5,-0.36)},anchor=north,legend columns=3,
+    /tikz/every even column/.append style={column sep=5pt}}]
+\addplot[thick,teal,dashed] table[x=threshold_int8_row,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};\addlegendentry{$\delta^\ast_i$, int8 per row}
+\addplot[thick,teal,densely dotted] table[x=threshold_int8_g128,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};\addlegendentry{$\delta^\ast_i$, int8 128 cols}
+\addplot[thick,ochre,dashdotted] table[x=threshold_int4_row,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};\addlegendentry{$\delta^\ast_i$, int4 per row}
+\addplot[very thick,ink] table[x=rho_all,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};\addlegendentry{$\rho$, DFlash-4B pairs}
+\addplot[very thick,brick,mark=triangle*,mark size=1.9pt,mark repeat=25,mark phase=13] table[x=rho_all,y=q,col sep=comma]{../evidence/head_geometry/rho_mtp4b_quantiles.csv};\addlegendentry{$\rho$, MTP-4B pairs}
+\draw[{Stealth[length=1.6mm]}-{Stealth[length=1.6mm]},muted] (axis cs:0.0095,0.5) -- (axis cs:0.84,0.5);
+\node[font=\scriptsize,text=ink,fill=white,inner sep=1pt] at (axis cs:0.037,0.5) {medians $\approx100\times$ apart};
+\end{semilogxaxis}
+% ---------------- (a) median DFlash-4B head inputs, to scale ----------------
+% The drawing spans y from -40 to 75 units (callout text to the rescaling note); its middle,
+% y = 17.5 units, is placed at y = 0, the centre of (b)'s plot area.
+\begin{scope}[x=0.032cm,y=0.032cm,shift={(0,-17.5)}]
+\pgfmathsetmacro{\Lt}{159.2}
+\pgfmathsetmacro{\Ld}{50.596}
+\pgfmathsetmacro{\Cth}{0.408}
+\pgfmathsetmacro{\Sth}{sqrt(1-\Cth*\Cth)}
+\coordinate (O) at (0,0);
+\coordinate (T) at (\Lt,0);
+\coordinate (D) at ({\Ld*\Cth},{\Ld*\Sth});
+\coordinate (F) at ({\Lt*\Cth*\Cth},{\Lt*\Cth*\Sth});
+\coordinate (amid) at (68,0);
+% the line through h^d and the foot of the perpendicular from h^t (best rescaling of h^d)
+\draw[muted,densely dotted] (O) -- ($(O)!1.18!(F)$);
+\draw[muted,densely dotted] (T) -- (F);
+\node[note,anchor=west,align=left] at ($(F)+(3,4)$) {closest rescaling of $h^d$:\\$\rho\approx0.91$};
+% vectors
+\draw[flow,very thick,shorten >=2.2pt] (O) -- (T);
+\node[below,text=ink] at (80,-2) {$h^t$, $\norm{h^t}_2\approx159$};
+\draw[flow,very thick,teal] (O) -- (D);
+\node[text=teal,anchor=east,align=right] at ($(D)+(-3,-10)$) {$h^d$, $\norm{h^d}_2$\\$=\sqrt{2560}$};
+\draw[flow,thick,brick,dashed,shorten >=2.2pt] (D) -- (T);
+\node[text=brick,anchor=south west] at (78,22) {$\Delta$: $\norm\Delta_2\approx0.92\norm{h^t}_2$};
+\draw[muted] ($(O)+(13,0)$) arc[start angle=0,end angle=65.9,radius=13];
+\node[note,anchor=west] at (14,5) {$\cos=0.41$};
+% the ball inside which transport would beat int8: radius 0.00854*159.2 = 1.36 units, to scale
+\fill[ochre] (T) circle[radius={0.00854*\Lt}];
+\draw[ochre,thin] (T) circle[radius=2.6pt];
+\draw[ochre,thin] (T) -- (148,-14);
+\node[note,text=ochre,anchor=north,align=center] at (146,-14) {transport beats int8 only\\inside the dot in this circle:\\radius $0.0085\norm{h^t}_2$};
+\end{scope}
+% (a)'s title on (b)'s title line
+\node[paneltitle,anchor=north] at (amid |- b.outer north) {(a) Median DFlash-4B head inputs, to scale};
+\end{tikzpicture}

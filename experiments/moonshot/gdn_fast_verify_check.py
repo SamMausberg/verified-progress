@@ -25,6 +25,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -112,20 +114,151 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     return results
 
 
+def time_us(fn: Any, reps: int = 30) -> float:
+    """Median event-timed runtime of fn in microseconds (no CUDA graph: the chunked
+    path computes chunk metadata on the host)."""
+    for _ in range(3):
+        fn()
+    torch.cuda.synchronize()
+    samples = []
+    for _ in range(reps):
+        start, end = torch.cuda.Event(True), torch.cuda.Event(True)
+        start.record()
+        fn()
+        end.record()
+        end.synchronize()
+        samples.append(start.elapsed_time(end) * 1e3)
+    return sorted(samples)[len(samples) // 2]
+
+
+def bench_width(T: int, N: int, layer: int, seed: int) -> dict[str, Any]:
+    """Per-layer GDN verify time for N requests at block width T.
+
+    recurrent_snapshots: SGLang's Triton target-verify kernel writing one FP32 state per
+    position (what MTP/DFlash verification runs today); recurrent: the same kernel with no
+    snapshots (the strict sequential walk alone); chunked: the block-parallel form;
+    flashinfer(_snapshots): FlashInfer's `gated_delta_rule_mtp` (the FP32-state verify the
+    FlashInfer GDN backend dispatches on SM90), with and without per-position states.
+    """
+    from sglang.kernels.ops.attention.fla.chunk import chunk_gated_delta_rule
+    from sglang.kernels.ops.attention.fla.fused_sigmoid_gating_recurrent import (
+        fused_sigmoid_gating_delta_rule_update,
+    )
+
+    dev = 'cuda'
+    A_log, dt_bias = layer_params(layer, dev)
+    scale = K**-0.5
+    x = make_inputs(N, T, seed, dev)
+    qkv = x['qkv'].transpose(0, 1).reshape(1, N * T, QKV)
+    q = qkv[..., : H * K].reshape(1, N * T, H, K).contiguous()
+    k = qkv[..., H * K : 2 * H * K].reshape(1, N * T, H, K).contiguous()
+    v = qkv[..., 2 * H * K :].reshape(1, N * T, HV, V).contiguous()
+    a = x['a'].transpose(0, 1).reshape(N * T, HV).contiguous()
+    b = x['b'].transpose(0, 1).reshape(N * T, HV).contiguous()
+    g, beta = gates(a, b, A_log, dt_bias)
+    state = 0.1 * torch.randn(N + 1, HV, V, K, device=dev)
+    idx = torch.arange(1, N + 1, device=dev, dtype=torch.int32)
+    cu = torch.arange(0, (N + 1) * T, T, device=dev, dtype=torch.int32)
+    snaps = torch.empty(N + 1, T, HV, V, K, device=dev)
+
+    def recurrent(snapshots: bool) -> None:
+        fused_sigmoid_gating_delta_rule_update(
+            A_log=A_log, a=a, dt_bias=dt_bias, softplus_beta=1.0,
+            softplus_threshold=20.0, q=q, k=k, v=v, b=b,
+            initial_state_source=state, initial_state_indices=idx, scale=scale,
+            use_qk_l2norm_in_kernel=True, cu_seqlens=cu, disable_state_update=True,
+            intermediate_states_buffer=snaps if snapshots else None,
+            intermediate_state_indices=idx if snapshots else None,
+            cache_steps=T if snapshots else None,
+        )  # fmt: skip
+
+    def chunked() -> None:
+        chunk_gated_delta_rule(
+            q=q, k=k, v=v, g=g.reshape(1, N * T, HV), beta=beta.reshape(1, N * T, HV),
+            scale=scale, initial_state=state, initial_state_indices=idx,
+            cu_seqlens=cu.long(), head_first=False, use_qk_l2norm_in_kernel=True,
+            inplace_update=False,
+        )  # fmt: skip
+
+    point: dict[str, Any] = {
+        'width': T,
+        'requests': N,
+        'recurrent_snapshots_us': time_us(lambda: recurrent(True)),
+        'recurrent_us': time_us(lambda: recurrent(False)),
+        'chunked_us': time_us(chunked),
+    }
+    fi_mtp = flashinfer_mtp()
+    if fi_mtp is not None:
+        fi_snaps = torch.empty(N, T, HV, V, K, device=dev)
+
+        def flashinfer(snapshots: bool) -> torch.Tensor:
+            out, _ = fi_mtp(
+                q=q.view(N, T, H, K), k=k.view(N, T, H, K), v=v.view(N, T, HV, V),
+                initial_state=state, initial_state_indices=idx, A_log=A_log,
+                a=a.view(N, T, HV), dt_bias=dt_bias, b=b.view(N, T, HV), scale=scale,
+                intermediate_states_buffer=fi_snaps if snapshots else None,
+                disable_state_update=True, use_qk_l2norm=True,
+            )  # fmt: skip
+            return out
+
+        try:
+            # Compile outside the timed region, and compare outputs with the Triton verify.
+            reference = fused_sigmoid_gating_delta_rule_update(
+                A_log=A_log, a=a, dt_bias=dt_bias, softplus_beta=1.0, softplus_threshold=20.0,
+                q=q, k=k, v=v, b=b, initial_state_source=state, initial_state_indices=idx,
+                scale=scale, use_qk_l2norm_in_kernel=True, cu_seqlens=cu,
+                disable_state_update=True,
+            )  # fmt: skip
+            out = flashinfer(False).reshape(reference.shape)
+            point['flashinfer_words_differing_from_triton'] = int((out != reference).sum())
+            point['flashinfer_snapshots_us'] = time_us(lambda: flashinfer(True))
+            point['flashinfer_us'] = time_us(lambda: flashinfer(False))
+        except Exception as exc:
+            point['flashinfer_error'] = repr(exc)[:300]
+    return point
+
+
+def flashinfer_mtp() -> Any:
+    """FlashInfer's FP32-state MTP verify kernel, or None when FlashInfer lacks it."""
+    os.environ.setdefault('FLASHINFER_DISABLE_VERSION_CHECK', '1')
+    try:
+        from flashinfer.gdn_decode import gated_delta_rule_mtp
+    except ImportError:
+        return None
+    return gated_delta_rule_mtp
+
+
+def bench(args: argparse.Namespace) -> dict[str, Any]:
+    results: dict[str, Any] = {'layer': args.layer, 'requests': args.requests, 'points': []}
+    for T in args.widths:
+        point = bench_width(T, args.requests, args.layer, args.seed)
+        results['points'].append(point)
+        print(json.dumps(point), flush=True)
+    results['flashinfer_failed'] = [
+        p['width'] for p in results['points'] if 'flashinfer_error' in p or 'flashinfer_us' not in p
+    ]
+    return results
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
+    parser.add_argument('mode', choices=['check', 'bench'], nargs='?', default='check')
     parser.add_argument('--block-sizes', type=int, nargs='+', default=[2, 4, 8, 16])
     parser.add_argument('--blocks', type=int, default=8)
     parser.add_argument('--batch', type=int, default=8)
+    parser.add_argument('--widths', type=int, nargs='+', default=[4, 16, 64, 128, 256])
+    parser.add_argument('--requests', type=int, default=1)
     parser.add_argument('--layer', type=int, default=0)
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--out', type=Path, default=None)
     args = parser.parse_args()
-    result = run(args)
+    result = run(args) if args.mode == 'check' else bench(args)
     result['qkv_width'] = QKV
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(json.dumps(result, indent=1) + '\n')
+    if result.get('flashinfer_failed'):
+        sys.exit(f'FlashInfer MTP verify failed at widths {result["flashinfer_failed"]}')
 
 
 if __name__ == '__main__':

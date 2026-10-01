@@ -6,7 +6,7 @@
   "weight": "model.language_model.embed_tokens.weight from Qwen/Qwen3.5-4B@851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
   "weight_bytes": 1271398400,
   "measured_read_peak_tb_per_s": 3.790873752182905,
-  "roofline_floor_us_at_measured_peak": 335383999339964.44,
+  "roofline_floor_us_at_measured_peak": 335.3839993399645,
   "l2_evict_reduction_us_median": 79.35839891433716,
   "repeats": 50,
   "inner": 20,

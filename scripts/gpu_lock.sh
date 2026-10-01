@@ -16,14 +16,21 @@
 # already running) and keeps its ticket until it exits. A shared job waits only
 # for older exclusive tickets, takes the lock in shared mode alongside other
 # shared jobs, and drops its ticket once the lock is held. Tickets of dead
-# processes are discarded, so a crashed job cannot stall the queue. The lock is
-# released when the command and every child holding it exit, so a server left
-# running keeps the GPU locked. GPU_LOCK_WAIT (seconds, default 4 h) bounds each
-# wait; a timeout exits 75. To extend a wait without losing your place, cancel
+# processes are discarded, so a crashed job cannot stall the queue. flock holds
+# the lock itself (-o) for exactly the command's lifetime: children do not inherit
+# it, so a job must stop its servers and background processes before it exits, and
+# killing the flock process releases the lock and (via gpu_job.sh) terminates the
+# job's process group. An exclusive job also waits
+# (scripts/gpu_drain_wait.sh, up to GPU_LOCK_DRAIN_WAIT s, default 600) until no compute
+# process, SGLang server or earlier job (one still being stopped after its holder died) is
+# left, so a killed job's surviving children cannot share an exclusive run; it exits 75 if
+# the GPU stays busy. GPU_LOCK_WAIT (seconds, default
+# 12 h) bounds each wait; a timeout exits 75. To extend a wait without losing your place, cancel
 # the waiting job and resubmit it with GPU_LOCK_ARRIVAL set to the arrival time
 # (nanoseconds) in its old ticket name; it must not lie in the future.
 set -euo pipefail
 
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOCK_FILE="${GPU_LOCK_FILE:-$HOME/.gpu.lock}"
 QUEUE_DIR="$LOCK_FILE.queue"
 WAIT="${GPU_LOCK_WAIT:-43200}"
@@ -102,11 +109,17 @@ trap 'rm -f "$ticket"' EXIT
 
 if [ "$kind" = x ]; then
   wait_while older_ticket "$name"
-  flock -x -w "$WAIT" -E 75 "$LOCK_FILE" "$@"
+  # -o: the lock is held by flock itself for the command's lifetime and is not inherited, so a
+  # background process the job leaves behind (or a successor ticket it queues) cannot keep it.
+  # gpu_job.sh drains the GPU of orphans first, runs the command in its own process group,
+  # and (via pdeathsig) terminates that group if this flock process dies; env resets signal
+  # dispositions a caller may have set to ignore, so the TERM is not lost.
+  flock -o -x -w "$WAIT" -E 75 "$LOCK_FILE" \
+    setpriv --pdeathsig TERM -- env --default-signal=TERM,INT,HUP "$HERE/gpu_job.sh" -x "$@"
 else
   wait_while older_ticket "$name" x
-  # Drop the ticket as soon as the shared lock is held, then run the command.
-  # shellcheck disable=SC2016 # $0 and $@ belong to the inner shell
-  flock -s -w "$WAIT" -E 75 "$LOCK_FILE" \
-    bash -c 'rm -f "$0"; exec "$@"' "$ticket" "$@"
+  # Drop the ticket as soon as the shared lock is held, then run the command (in its own
+  # process group, terminated if this flock process dies).
+  flock -o -s -w "$WAIT" -E 75 "$LOCK_FILE" \
+    setpriv --pdeathsig TERM -- env --default-signal=TERM,INT,HUP "$HERE/gpu_job.sh" -s "$ticket" "$@"
 fi

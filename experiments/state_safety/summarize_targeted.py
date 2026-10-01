@@ -1,7 +1,8 @@
 """Collect the targeted-test outputs into one evidence file.
 
 Keeps each test's summary, its run metadata and every case that was not
-identical (with its divergence position, margins and class), and adds the
+identical (with its divergence position, margins and class), lists every pair
+the history test served, and adds the
 chunked-prefill comparisons against the unchunked run of the same config.
 
     python experiments/state_safety/summarize_targeted.py \
@@ -12,23 +13,35 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+
+from server import public_server_info
 
 
 def not_identical(test: str, case: dict[str, Any]) -> bool:
     if test == 'truncation':
-        return not case['identical']
+        return not case['identical'] or not case.get('logprobs_identical', True)
     if test == 'stops':
-        return not (case['stop_output_identical'] and case['extension_warm_vs_cold']['identical'])
+        return not (
+            case['stop_output_identical']
+            and case.get('stop_logprobs_identical', True)
+            and case['extension_warm_vs_cold']['identical']
+        )
     if test == 'prefix':
         return not case['warm_vs_cold']['identical'] or not case.get('truncated_identical', True)
     if test == 'abort':
         return not case['identical']
+    if test == 'history':
+        return not case['logprobs_identical']
+    if test == 'repeat':
+        return case['logprobs_bitwise_identical'] < case['repeats'] - 1
     return False
 
 
@@ -48,13 +61,37 @@ def main() -> None:
         entry: dict[str, Any] = {
             'summary': data['summary'],
             'flags': meta['flags'],
-            'server_info': {k: v for k, v in meta['server_info'].items() if k not in ('cmd',)},
+            'server_info': public_server_info(meta['server_info']),
             'repo_sha': meta['repo_sha'],
             'sglang_sha': meta['sglang_sha'],
             'wall_s': meta['wall_s'],
         }
         if test != 'prefill':
             entry['non_identical_cases'] = [c for c in data['cases'] if not_identical(test, c)]
+        if test == 'history':
+            # Every pair tested, identical or not: which prompt followed which.
+            entry['pairs'] = [
+                {
+                    k: c[k]
+                    for k in (
+                        'id',
+                        'predecessor',
+                        'shared_prefix_tokens',
+                        'tokens_identical',
+                        'first_logprob_difference',
+                    )
+                }
+                for c in data['cases']
+            ]
+            # Prefills that reused a cached prefix, from the server log: with none, the
+            # only sharing between requests is the repoint after the prefill.
+            log = path.with_suffix('.server.log')
+            if log.exists():
+                cached = re.findall(r'#cached-token: (\d+)', log.read_text())
+                entry['prefill_cache_hits'] = {
+                    'prefills': len(cached),
+                    'with_cached_tokens': sum(int(c) > 0 for c in cached),
+                }
         out[path.stem] = entry
 
     # Chunked prefill: compare each chunked run with the unchunked run.

@@ -2,9 +2,6 @@
 /Sam's Inco Take Home Challenge.pdf
 /writing.md
 
-# Source archive (already extracted into this repo)
-/Inco_Verifier_Research_v3.zip
-
 # Python
 .venv/
 venv/
@@ -25,6 +22,8 @@ paper/*.fdb_latexmk
 paper/*.synctex.gz
 paper/*.bbl
 paper/*.blg
+# Fetched at build time and hash-checked; no licence to redistribute (paper/template/README.md)
+paper/template/mlsys2025.sty
 
 # Lean build output
 formal/.lake/

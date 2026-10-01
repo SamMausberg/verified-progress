@@ -19,8 +19,8 @@ floors at batch B are reported:
   inherit the assumed P (at the datasheet peak they would be higher). As B grows its
   tokens/s approach min(BW / s, P / F) (``overlapped_limit_tokens_per_s``).
 
-BW is an assumed HBM read peak of 3.79 TB/s (the profile workstream's measurement,
-evidence pending); P is the fraction of datasheet dense peak that cuBLAS/CUTLASS
+BW is the HBM read peak the profile workstream measured over the head's 1.27 GB,
+3.79 TB/s (evidence/profiles/hbm_bandwidth.json); P is the fraction of datasheet dense peak that cuBLAS/CUTLASS
 reach at these shapes (assumed, stated below).
 
     python experiments/moonshot/ceilings.py --out evidence/moonshot/ceilings.json \
@@ -34,7 +34,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-BW = 3.79e12  # assumed HBM read peak (the profile workstream's measurement; evidence pending)
+BW = 3.79e12  # HBM read peak over 1.27 GB (evidence/profiles/hbm_bandwidth.json)
 # Assumed achievable dense throughput (fraction of datasheet 989 / 1979 TFLOPS).
 PEAK_BF16 = 0.70 * 989e12
 PEAK_FP8 = 0.60 * 1979e12
