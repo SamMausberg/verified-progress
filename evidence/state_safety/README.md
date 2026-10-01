@@ -121,9 +121,11 @@ bound leaves the accumulator's order undetermined. Two named error models are re
 
 - **conservative** (the project's model, the primary class): gamma(2K, 2^-23) =
   2K u / (1 - 2K u), u = 2^-23, K = 2560, which covers any reduction order, split-K
-  with FP32 partials and truncating adders (gamma = 6.1e-4).
+  with FP32 partials and truncating adders (gamma = 6.11e-4, rounded up).
 - **Hopper**: the blocked Hopper `wgmma` accumulation model used by the kernel
-  workstream, gamma = 1.19e-4 including an FP32 split-K allowance; it rests on a
+  workstream, including an FP32 split-K allowance: gamma = (1 + 17 * 2^-25 + 2^-23)^160
+  (1 + 2^-23)^160 - 1 = 1.1922e-4 (rounded up), computed exactly by
+  `precision_reference.hopper_wgmma_gamma` and rounded up to binary64. It rests on a
   published measurement-based hardware model, not on vendor documentation.
 
 Where both the BF16 order and a float64 gap outside the bound are available, they never
@@ -213,6 +215,32 @@ conservative accumulation model, and for about a fifth under the Hopper model.
 the first differing module output per comparison; `kind` is `gdn_core`, `gdn_conv`,
 `gated_norm`, `gdn_block` (the whole GDN attention module), `attn` (full attention) or
 `mlp_down_proj`.
+
+### Regenerating the classification
+
+The divergence summaries (`mechanism_*.json`, `tap_control_*.json`,
+`cachecheck_v4_*.json`, `history_v4_*.json`) are recomputed from the saved tap data
+without a GPU, from `experiments/state_safety/` in the SGLang venv, with
+`T=~/vp-data/state/tap` and `U=~/vp-data/state/runs/plain/c1.jsonl`:
+
+```sh
+E=../../evidence/state_safety
+python mechanism.py --a $T/v3_plain_c1 --b $T/v3_mtp_s3_c1 --untapped-a $U --out $E/mechanism_plain_c1_vs_mtp_s3_c1.json
+python mechanism.py --a $T/v3_plain_c1 --b $T/v3_plain_c32 --untapped-a $U --out $E/mechanism_plain_c1_vs_c32.json
+python mechanism.py --a $T/v3_smoke --b $T/v3_ctrl_down9 --out $E/tap_control_down9.json
+python mechanism.py --a $T/v3_smoke --b $T/v3_ctrl_core13 --out $E/tap_control_core13.json
+python mechanism.py --a $T/v3_smoke --b $T/v3_ctrl_core13 --start-output-index 1 \
+    --out $E/tap_control_core13_decode.json
+```
+
+The `cachecheck_v4_*` and `history_v4_*` files come from the `mechanism.py` lines of
+`run_tap_v4.sh`, with `--out` in this directory. The committed files were produced this
+way at commit `0769b2b`, which replaced the Hopper model's hard-coded 1.19e-4, 0.18%
+below its derived value, with that value rounded up. No class changed under either
+model; only the Hopper `gap_bound_*` values grew, by that 0.18%. Rerunning the current
+`mechanism.py` also records the data paths relative to `~/vp-data/state`, adds
+`first_logprob_difference` to every case, and lists the five tap-changed prompts as
+`mismatched_ids` in the two v3 tap checks.
 
 ## Noise floor
 
