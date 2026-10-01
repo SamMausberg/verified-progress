@@ -22,10 +22,18 @@ to `evidence/bench/`.
 | `sweep.py` | One server launch, then an aiperf sweep over client concurrency |
 | `results.py` | Per-request rows and point summaries from aiperf's exports |
 | `pareto.py` | Frontier CSV, PGFPlots tables and a PNG from sweep runs |
+| `hostload.py` | Samples CPU use by processes outside a timed run (1 Hz); the sweep and quality runs record it |
 | `quality.py` | GSM8K accuracy for an arm and paired comparison of two runs |
+| `divergence.py` | Greedy divergence rates against the batch-shape floor and each arm's exactness class |
+| `frontend.py` | One load point under several client settings: is the client or the server the limit? |
+| `lengths.py` | Per-domain output lengths of a natural-stopping point |
+| `natural_workload.py` | Freezes per-prompt natural lengths into the sensitivity workload |
+| `sensitivity_arms.py` | Applies the sensitivity workload's declared arm rule to the confirmation points |
+| `token_map.py` | Hot-token draft vocabulary (`--speculative-token-map`) from model outputs, and its coverage |
 | `build_workload.py` | Rebuilds the frozen prompt set in `workloads/` |
 | `workloads/mixed-v2/` | Chat, code and maths prompts split into warmup, tune and confirm |
 | `quality/gsm8k_test.jsonl` | Frozen GSM8K test split for `quality.py` |
+| `campaigns/` | The GPU holds and evidence builds behind `evidence/bench/`; each script is cited where its output is described |
 
 ## Metrics
 
@@ -105,7 +113,9 @@ and nothing else:
   stored order, with the request settings above (thinking on, greedy, same template).
 - Output lengths: each prompt's own greedy completion length under the target alone,
   measured once with `plain-tuned` (stock arithmetic) with natural stopping and
-  `max_completion_tokens = 2048`. Each request is then sent with that length
+  `max_completion_tokens = 2048` (`campaigns/natural_lengths_confirm.sh`, which also
+  freezes the file and checks that the lengths reach the server). Each request is
+  then sent with that length
   (`output_length` per record, `ignore_eos = true`), so every arm generates exactly
   the same number of tokens per request. On the tune split, the same cap leaves
   45% of requests at 2,048 tokens and a mean of about 1,540 (from
