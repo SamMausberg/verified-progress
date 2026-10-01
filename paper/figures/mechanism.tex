@@ -1,63 +1,93 @@
-% Figure fig:mechanism: the certified head as a mechanism. Schematic: the interval values
-% below are illustrative, chosen to show each case, and are not data.
-\begin{tikzpicture}[x=1cm,y=0.86cm,font=\footnotesize]
-% ---------------- (a) level 0 ----------------
+% Figure fig:mechanism: the certified head as a mechanism, in the five operations of the text:
+% (a) approximate every score and bound its error, and drop the entries that cannot win;
+% (b) recompute the survivors, widen them by the stock kernel's modelled error, round to BF16 and
+% decide; (c) fall back for a position left open. Schematic: the values below are illustrative,
+% chosen to show each case, and are not data. Colours follow style.tex: blue the certified head,
+% vermilion the fallback and open decisions, grey dropped entries.
+\begin{tikzpicture}[x=1cm,y=0.8cm,font=\footnotesize]
+% ---------------- (a) approximate and bound ----------------
 \begin{scope}
-\node[panel title,anchor=north] at (2.2,4.45) {\paneltitle{a}{Level 0: enclose every row}};
-\draw[-{Stealth[length=1.6mm]},ink!70] (0,0) -- (0,3.45) node[above,inner sep=1pt]{logit};
-\draw[ink!70] (0,0) -- (4.4,0);
-% rows: x, lo, hi, kept (1) or dropped (0)
-\foreach \x/\lo/\hi/\k in {0.3/1.05/1.60/0, 0.7/0.35/0.90/0, 1.1/1.55/2.15/0, 1.5/2.58/3.12/1,
-                           1.9/0.60/1.15/0, 2.3/1.20/1.75/0, 2.7/2.22/2.76/1, 3.1/0.25/0.80/0,
-                           3.5/1.80/2.34/0, 3.9/0.85/1.40/0} {
+\node[panel title,anchor=north] at (1.93,4.35) {\paneltitle{a}{Approximate and bound (schematic)}};
+\draw[-{Stealth[length=1.5mm]},ink!70] (0,0) -- (0,3.55) node[above,inner sep=1pt,text=black]{score};
+\draw[ink!70] (0,0) -- (3.85,0);
+% entries: x, lo, hi, kept (1) or dropped (0); the threshold is 2.10 = 2.55 - delta_max
+\foreach \x/\lo/\hi/\k in {0.28/0.95/1.45/0, 0.62/0.35/0.85/0, 0.96/1.15/1.65/0, 1.30/2.55/3.05/1,
+                           1.64/0.60/1.10/0, 1.98/1.25/1.75/0, 2.32/2.00/2.50/1, 2.66/0.25/0.75/0,
+                           3.00/1.30/1.80/0, 3.34/0.80/1.30/0} {
   \ifnum\k=1
-    \draw[ink,line width=1.7pt] (\x,\lo) -- (\x,\hi);
-    \draw[ink,semithick] (\x-.09,\lo) -- (\x+.09,\lo) (\x-.09,\hi) -- (\x+.09,\hi);
+    \draw[ccert,line width=1.6pt] (\x,\lo) -- (\x,\hi);
+    \draw[ccert,semithick] (\x-.08,\lo) -- (\x+.08,\lo) (\x-.08,\hi) -- (\x+.08,\hi);
   \else
-    \draw[muted!60,line width=1.1pt] (\x,\lo) -- (\x,\hi);
-    \draw[muted!60] (\x-.07,\lo) -- (\x+.07,\lo) (\x-.07,\hi) -- (\x+.07,\hi);
+    \draw[ccontext!70,line width=1pt] (\x,\lo) -- (\x,\hi);
+    \draw[ccontext!70] (\x-.06,\lo) -- (\x+.06,\lo) (\x-.06,\hi) -- (\x+.06,\hi);
   \fi
 }
-\node[text=muted] at (4.2,.9) {$\cdots$};
-\draw[dashed,ink] (0,2.58) -- (4.4,2.58) node[right,inner sep=2pt,yshift=3pt]{$\max_i lo_i$};
-\draw[densely dotted,vpvermilion,thick] (0,2.40) -- (4.4,2.40) node[right,inner sep=2pt,yshift=-5pt]{$\max_i lo_i-\delta_{\max}$};
-\node at (2.2,-.33) {vocabulary rows (int8 pass)};
-\node[note] at (2.2,-.86) {dark: kept (candidates)\\grey: $hi_i<\max_j lo_j-\delta_{\max}$, dropped for good};
+\node at (3.62,1.0) {$\cdots$};
+\draw[dashed,ink] (0,2.55) -- (3.85,2.55);
+\node[annot,anchor=south west] at (0.03,2.56) {$\max_j lo_j$};
+\draw[densely dotted,ink,thick] (0,2.10) -- (3.85,2.10);
+\node[annot,anchor=north west] at (0.03,2.08) {$\max_j lo_j-\delta_{\max}$};
+\node[anchor=north] at (1.93,-0.05) {vocabulary entries $i$};
+\draw[ccert,line width=1.6pt] (0.25,-0.88) -- (0.25,-0.58);
+\node[annot,anchor=west] at (0.35,-0.73) {kept: a candidate};
+\draw[ccontext!70,line width=1.2pt] (2.15,-0.88) -- (2.15,-0.58);
+\node[annot,anchor=west] at (2.25,-0.73) {dropped for good};
 \end{scope}
-% ---------------- (b) re-score and round ----------------
-\begin{scope}[xshift=7.0cm]
-\node[panel title,anchor=north] at (2.05,4.45) {\paneltitle{b}{Re-score and round}};
-\draw[-{Stealth[length=1.6mm]},ink!70] (0,0) -- (0,3.45) node[above,inner sep=1pt]{logit};
+% from (a) to (b): the candidates pass on
+\draw[flow] (4.08,1.55) -- node[annot,above=1pt]{candidates} (4.95,1.55);
+% ---------------- (b) recompute and round ----------------
+\begin{scope}[xshift=5.2cm]
+\node[panel title,anchor=north] at (2.15,4.35) {\paneltitle{b}{Recompute and round (schematic)}};
+\draw[-{Stealth[length=1.5mm]},ink!70] (0,0) -- (0,3.55) node[above,inner sep=1pt,text=black]{score};
+\draw[ink!70] (0,0) -- (4.3,0);
 % BF16 rounding boundaries, one spacing apart
-\foreach \y in {1.2,1.8,2.4,3.0} {\draw[ink!25] (0,\y) -- (4.1,\y);}
-\draw[decorate,decoration={brace,amplitude=3pt,mirror},muted] (4.17,1.2) -- node[right=3pt,note,align=left]{one BF16\\spacing} (4.17,1.8);
-% \vprow{x}{enclosure lo}{enclosure hi}{BF16 range lo}{BF16 range hi}{name}: a candidate's
-% accumulator enclosure (bar) and the rounding intervals it reaches (shading)
-\newcommand{\vprow}[6]{%
-  \fill[ink!13] ({#1-.17},#4) rectangle ({#1+.17},#5);
-  \draw[ink,line width=1.7pt] (#1,#2) -- (#1,#3);
-  \node[inner sep=1pt] at (#1,3.22) {$#6$};}
-% separated: the buckets fix L_a > L_b
-\vprow{0.45}{2.55}{2.75}{2.4}{3.0}{a}\vprow{0.95}{1.95}{2.15}{1.8}{2.4}{b}
-% one bucket: L_a = L_b for every admissible accumulator, so the first index, a, wins
-\vprow{1.75}{2.48}{2.62}{2.4}{3.0}{a}\vprow{2.25}{2.66}{2.84}{2.4}{3.0}{b}
-% straddled boundary: either row can round above the other
-\vprow{3.05}{2.31}{2.52}{1.8}{3.0}{a}\vprow{3.55}{2.28}{2.46}{1.8}{3.0}{b}
-\node[note,text=black] at (0.7,0.75) {fixed: $a$};
-\node[note,text=black] at (2.0,0.75) {fixed: $a$\\(tie; first index)};
-\node[note,text=black] at (3.3,0.75) {open};
-\node at (2.05,-.33) {candidates, re-scored from BF16 rows};
-\node[note] at (2.05,-.86) {bars: enclosures of the stock accumulator;\\shading: the rounding cells each can land in};
+\foreach \y in {0.95,1.95,2.95} {\draw[ink!30] (0,\y) -- (4.3,\y);}
+\draw[decorate,decoration={brace,amplitude=3pt,mirror},ink] (4.37,1.95) -- node[annot,right=4pt,align=left]{one BF16\\spacing} (4.37,2.95);
+% \vpcase{x}{lo}{hi}{cell lo}{cell hi}{name}{colour}: a candidate's interval for the stock
+% kernel's FP32 sum (bar) and the BF16 rounding cells it can reach (shading)
+\newcommand{\vpcase}[7]{%
+  \fill[#7!16] ({#1-.17},#4) rectangle ({#1+.17},#5);
+  \draw[#7,line width=1.8pt] (#1,#2) -- (#1,#3);
+  \draw[#7,semithick] ({#1-.08},#2) -- ({#1+.08},#2) ({#1-.08},#3) -- ({#1+.08},#3);
+  \node[inner sep=1pt] at (#1,3.2) {$#6$};}
+% separated: the cells fix L_a > L_b
+\vpcase{0.42}{2.15}{2.55}{1.95}{2.95}{a}{ccert}\vpcase{0.82}{1.25}{1.65}{0.95}{1.95}{b}{ccert}
+% one cell: L_a = L_b for every admissible sum, so the lower index, a, wins
+\vpcase{1.92}{2.05}{2.40}{1.95}{2.95}{a}{ccert}\vpcase{2.32}{2.45}{2.80}{1.95}{2.95}{b}{ccert}
+% both straddle a boundary: either can round above the other
+\vpcase{3.42}{1.70}{2.15}{0.95}{2.95}{a}{cfallback}\vpcase{3.82}{1.75}{2.10}{0.95}{2.95}{b}{cfallback}
+\node[annot,align=center] at (0.62,0.45) {certified:\\$a$ wins};
+\node[annot,align=center] at (2.12,0.45) {certified: tie,\\lower index $a$};
+\node[annot,align=center] at (3.62,0.45) {open:\\either can win};
+\node[anchor=north,align=center] at (2.15,-0.05) {candidates, recomputed and widened};
+\node[annot,anchor=north,align=center] at (2.15,-0.5) {bar: the stock kernel's possible FP32 sums;\\shading: the BF16 values they round to};
 \end{scope}
-% ---------------- (c) decide ----------------
-\begin{scope}[xshift=13.15cm]
-\node[panel title,anchor=north] at (1.95,4.45) {\paneltitle{c}{Decide}};
-\node[good,text width=2.85cm,anchor=north] (cert) at (2.05,3.45) {Certified: the \Rstock{} token under the modelled error $G_i$};
-\node[warn,text width=2.85cm,anchor=north] (fb) at (2.05,1.75) {Stock head kernel at the same batch shape, and its argmax};
-\coordinate (split) at (-0.45,2.3);
-\draw[semithick,ink] (-1.95,2.3) -- (split);
-\draw[flow] (split) -- (split |- cert.west) -- node[above,note]{fixed} (cert.west);
-\draw[flow] (split) -- (split |- fb.west) -- node[below,note]{open} (fb.west);
-\node[note,below=2pt of fb] {a conditional node of\\the captured CUDA graph};
+% ---------------- (c) fall back ----------------
+% One head call of M = 8 positions: blue, the certified head's token; vermilion, the stock
+% head's token; an outlined cell, a position left open.
+\begin{scope}[xshift=11.3cm]
+\node[panel title,anchor=north] at (2.55,4.35) {\paneltitle{c}{Fall back (schematic)}};
+% \vpstrip{y}{open cell (0 for none)}{fallback cells: 0 none, 1 the open cell, 2 all}
+\newcommand{\vpstrip}[3]{%
+  \foreach \i in {1,...,8} {%
+    \pgfmathsetmacro{\vpx}{0.33*(\i-1)}%
+    \ifnum#3=2 \def\vpfill{cfallback!28}\else
+      \ifnum\i=#2 \ifnum#3=1 \def\vpfill{cfallback!28}\else\def\vpfill{white}\fi
+      \else\def\vpfill{ccert!22}\fi\fi
+    \filldraw[fill=\vpfill,draw=ink!45] (\vpx,#1) rectangle ++(0.33,0.45);}%
+  \ifnum#3=0 \draw[cfallback,thick] ({0.33*(#2-1)},#1) rectangle ++(0.33,0.45);\fi}
+\vpstrip{2.75}{6}{0}
+\node[annot,anchor=south] at (1.32,3.22) {one head call, $M$ positions};
+\node[annot,anchor=north] at (1.815,2.73) {open};
+\node[annot,anchor=west,align=left] at (2.8,2.98) {after (b): blue\\certified, one open};
+\vpstrip{1.30}{6}{2}
+\node[annot,anchor=west,align=left] at (2.8,1.52) {stock head on all\\$M$ positions, same\\shape; no error model};
+\vpstrip{-0.15}{6}{1}
+\node[annot,anchor=west,align=left] at (2.8,0.07) {stock head on the open\\position's candidates;\\needs per-position\\invariance};
+% the two fallbacks for the open position: alternatives, each labelled
+\draw[flow] (-0.04,2.97) -- (-0.32,2.97) -- (-0.32,1.52) -- (-0.04,1.52);
+\draw[flow] (-0.32,1.52) -- (-0.32,0.07) -- (-0.04,0.07);
+\node[annot,anchor=south west] at (0.0,1.78) {whole-batch fallback};
+\node[annot,anchor=south west] at (0.0,0.33) {per-position fallback};
 \end{scope}
 \end{tikzpicture}

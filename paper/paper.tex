@@ -19,7 +19,9 @@
 % This is a preprint, not a paper accepted at MLSys: replace the style's proceedings
 % notice (printed at the foot of the first column) without modifying the style file.
 \makeatletter
-\renewcommand{\Notice@String}{Preprint, 30 September 2026; not peer reviewed.}
+% The notice carries the date of the build, in the paper's day-month-year style.
+\newcommand{\builddate}{\number\day\space\ifcase\month\or January\or February\or March\or April\or May\or June\or July\or August\or September\or October\or November\or December\fi\space\number\year}
+\renewcommand{\Notice@String}{Preprint, \builddate; not peer reviewed.}
 \makeatother
 \hypersetup{pdftitle={The Work a Verifier Needs: Certified Low-Precision Output Heads under a Stock-Kernel Contract},pdfauthor={Samuel Mausberg}}
 \mlsystitlerunning{The Work a Verifier Needs}
@@ -44,8 +46,8 @@
 
 \input{sections/intro}
 \input{sections/contract}
-\input{sections/setup}
 \input{sections/head}
+\input{sections/setup}
 \input{sections/transport}
 \input{sections/related}
 \input{sections/discussion}
