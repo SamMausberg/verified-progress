@@ -68,6 +68,24 @@ def first_cycle_difference(
     return None
 
 
+POOL_KEYS = (
+    'max_total_num_tokens',
+    'max_mamba_cache_size',
+    'effective_max_running_requests_per_dp',
+)
+
+
+def pools(directory: Path) -> dict[str, Any]:
+    """Pool sizes the server chose (they depend on free memory unless pinned)."""
+    path = directory / 'server_info.json'
+    if not path.exists():
+        return {}
+    info = json.loads(path.read_text())
+    internal = info.get('internal_states') or [{}]
+    merged = {**info, **(internal[0] if isinstance(internal, list) else internal)}
+    return {key: merged.get(key) for key in POOL_KEYS}
+
+
 def compare(a_dir: Path, b_dir: Path) -> dict[str, Any]:
     a_out, b_out = outputs(a_dir), outputs(b_dir)
     a_tr, b_tr = traces(a_dir), traces(b_dir)
@@ -112,8 +130,10 @@ def main() -> None:
     result: dict[str, Any] = {
         'a': str(args.a),
         'b': str(args.b),
+        'pools': {'a': pools(args.a), 'b': pools(args.b)},
         'requests': compare(args.a, args.b),
     }
+    print(f'pools a={result["pools"]["a"]} b={result["pools"]["b"]}')
     for earlier in args.earlier:
         result[f'reproduces:{earlier}'] = {
             str(run): {

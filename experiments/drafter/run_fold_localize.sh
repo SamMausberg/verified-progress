@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
-# Localize the DFlash fold-vs-stock differences of the c=1 exactness check: the
-# four requests whose logprobs differed (and four that were bitwise identical, as
-# controls) rerun at concurrency 1 with the per-cycle trace on, in three arms:
-# stock, stock again (is stock reproducible on its own?) and fold. Same flags as
-# run_replay_check.sh. Correctness only (shared slot):
+# Localize the DFlash fold-vs-stock differences of the c=1 exactness check. The
+# stock and fold servers there chose different pool sizes from free memory (stock
+# 60,630 KV tokens and 10 mamba slots, fold 130,324 and 108), so this pins them.
+# The four requests whose logprobs differed and four bitwise-identical controls
+# rerun at concurrency 1 with the per-cycle trace on, in four arms:
+#   off-p1, fold-p1   stock and fold with c1-off's pools (60,630 tokens, 10 slots)
+#   off-p2, fold-p2   stock and fold with other pools (100,000 tokens, 26 slots)
+# Comparisons: off-p1 against the earlier c1-off (reproduction), fold against
+# stock at each pool size (exactness with matched pools), off-p2 against off-p1
+# (does the pool size alone change stock outputs?). Same flags as
+# run_replay_check.sh otherwise. Correctness only (shared slot):
 #   scripts/gpu_lock.sh -s experiments/drafter/run_fold_localize.sh [OUT]
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -13,7 +19,7 @@ source "$here/../../scripts/sglang_env.sh"
 out="${1:-$HOME/vp-data/drafter/localize}"
 check="$HOME/vp-data/drafter/replay-check"
 mkdir -p "$out"
-python - "$here/panel-v2.jsonl" "$out/workload.jsonl" <<'EOF'
+python - "$here/panel-v2.jsonl" "$out/workload.jsonl" <<'PY'
 import json, sys
 keep = {
     'gsm8k-train-3454', 'gsm8k-train-7247', 'math500-test/counting_and_probability/14.json',
@@ -23,20 +29,30 @@ keep = {
 rows = [line for line in open(sys.argv[1]) if json.loads(line)['id'] in keep]
 assert len(rows) == len(keep), len(rows)
 open(sys.argv[2], 'w').writelines(rows)
-EOF
-for arm in off off2 fold; do
-  extra="--linear-attn-decode-backend triton"
-  env=(--env "SGLANG_DFLASH_TRACE_PATH=$out/$arm/trace")
-  if [ "$arm" = fold ]; then
-    extra="$extra --enable-linear-replayssm-spec"
-    env+=(--env SGLANG_GDN_REPLAYSSM_FOLD=1)
-  fi
-  python "$here/serve_run.py" --arm dflash --block 16 --port 30087 --out "$out/$arm" \
-    --mem 0.25 --max-running 8 --extra="$extra" "${env[@]}" \
-    --client "python $here/accept_probe.py --port {port} --workload $out/workload.jsonl \
-      --per-domain 32 --max-new-tokens 2048 --concurrency 1 --logprobs \
-      --label loc-$arm --out {out}"
+PY
+declare -A pins=(
+  [p1]="--max-total-tokens 60630 --max-mamba-cache-size 10"
+  [p2]="--max-total-tokens 100000 --max-mamba-cache-size 26"
+)
+for pool in p1 p2; do
+  for arm in off fold; do
+    run="$arm-$pool"
+    extra="--linear-attn-decode-backend triton ${pins[$pool]}"
+    env=(--env "SGLANG_DFLASH_TRACE_PATH=$out/$run/trace")
+    if [ "$arm" = fold ]; then
+      extra="$extra --enable-linear-replayssm-spec"
+      env+=(--env SGLANG_GDN_REPLAYSSM_FOLD=1)
+    fi
+    python "$here/serve_run.py" --arm dflash --block 16 --port 30087 --out "$out/$run" \
+      --mem 0.25 --max-running 8 --min-free-gb 60 --extra="$extra" "${env[@]}" \
+      --client "python $here/accept_probe.py --port {port} --workload $out/workload.jsonl \
+        --per-domain 32 --max-new-tokens 2048 --concurrency 1 --logprobs \
+        --label loc-$run --out {out}"
+  done
 done
-python "$here/fold_localize.py" --a "$out/off" --b "$out/fold" \
-  --earlier "$check/c1-off" --earlier "$check/c1-fold" --out "$out/off_vs_fold.json"
-python "$here/fold_localize.py" --a "$out/off" --b "$out/off2" --out "$out/off_vs_off2.json"
+loc() { python "$here/fold_localize.py" --a "$out/$1" --b "$2" --out "$out/$3.json"; }
+loc off-p1 "$check/c1-off" off-p1_vs_c1-off
+loc off-p1 "$out/fold-p1" off-p1_vs_fold-p1
+loc off-p2 "$out/fold-p2" off-p2_vs_fold-p2
+loc off-p1 "$out/off-p2" off-p1_vs_off-p2
+loc off-p1 "$check/c1-fold" off-p1_vs_c1-fold
