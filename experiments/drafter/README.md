@@ -54,6 +54,7 @@ Training data, training and the P6 screen:
 | `support_screen.py`, `run_support_screen.sh` | Zero-training support screen (P6): U_K, the longest realized-greedy prefix inside the drafter's top-K candidates, per traced cycle; saves the per-cycle table `cycles.pt` for P9 |
 | `run_selector_rewalk.sh` | A trained selector's greedy walk over the same frozen candidates (L_sel) and the corrected re-walk after early rejections for P9 (`selector_rewalk.pt`) |
 | `rho_pairs.py` | Teacher-forced draft and target head inputs per block slot, and rho = relative head-input distance, with acceptance labels |
+| `drafting_requirement.py` | Derived, no GPU: the tokens per cycle and the constant per-position acceptance a block drafter needs for a 5x end-to-end gain at each width, from the repair workstream's measured cycle periods, against the measured block-16 acceptance and its top-16 support bound |
 
 ## Engine patches
 
@@ -67,6 +68,8 @@ Training data, training and the P6 screen:
   circular ring commit; not bitwise).
 - 0003 adds `SGLANG_GDN_REPLAYSSM_FOLD=1`: SGLang's fold-every-commit protocol for
   GDN pools, for DFLASH and EAGLE/MTP.
+- 0004 takes the DFLASH ReplaySSM commit only under `--enable-linear-replayssm-spec`
+  (plain `--enable-linear-replayssm` also allocates replay rings).
 
 ## Training environment
 

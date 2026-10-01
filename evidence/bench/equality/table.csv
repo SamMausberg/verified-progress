@@ -1,0 +1,22 @@
+pair,run_a,run_b,prompts,diverged,exposure_tokens,per_1k_tokens,tie,one_ulp,near,large,not_argmax,length_mismatch,max_margin_median,max_margin_max,drift_p99,drift_max,same_server,pools_identical,pinned_a,pinned_b
+floor plain c1 vs c32,plain/c1,plain/c32,320,167,48816,3.421,151,14,2,0,0,0,0.125,0.375,0.3596,0.6861,True,True,False,False
+mtp_s3 stock verify radix-off vs plain c1,plain/c1,mtp_s3__bench_noradix/c1,320,186,42274,4.4,169,14,3,0,0,0,0.125,0.375,0.4081,0.4684,False,False,False,False
+mtp_s3 buffered verify radix-off vs plain c1,plain/c1,mtp_s3_replayssm__bench_noradix/c1,320,183,43558,4.201,166,15,2,0,0,0,0.125,0.3125,0.3654,0.4685,False,False,False,False
+mtp_s3 buffered verify radix-off triton vs plain c1,plain/c1,mtp_s3_replayssm__bench_noradix_triton/c1,320,174,45758,3.803,162,7,5,0,0,0,0.125,0.25,0.412,0.7647,False,False,False,False
+plain buffered decode radix-off vs plain c1,plain/c1,plain_replayssm__bench_noradix/c1,320,175,45360,3.858,160,13,1,1,0,0,0.125,0.5625,0.4489,0.4756,False,False,False,False
+plain radix-off triton vs plain c1,plain/c1,plain__bench_noradix_triton/c1,320,179,43817,4.085,170,7,2,0,0,0,0.125,0.375,0.4681,0.9898,False,False,False,False
+dflash b16 radix-off triton vs plain c1,plain/c1,plain__bench_dflash_b16_triton/c1,320,176,44617,3.945,167,7,2,0,0,0,0.125,0.25,0.5644,0.6827,False,False,False,False
+dflash b16 radix-off triton gdn-verify-triton vs plain c1,plain/c1,plain__bench_dflash_b16_triton_gdnverify/c1,320,176,44617,3.945,167,7,2,0,0,0,0.125,0.25,0.5644,0.6827,False,False,False,False
+mtp_s3 buffered vs stock verify radix-off c1,mtp_s3__bench_noradix/c1,mtp_s3_replayssm__bench_noradix/c1,320,171,45091,3.792,161,8,2,0,0,0,0.125,0.3125,0.3646,0.6175,False,False,False,False
+mtp_s3 buffered triton vs stock verify radix-off c1,mtp_s3__bench_noradix/c1,mtp_s3_replayssm__bench_noradix_triton/c1,320,179,44155,4.054,169,8,2,0,0,0,0.125,0.375,0.3685,0.4813,False,False,False,False
+dflash b16 stock radix-off vs plain c1,plain/c1,plain__bench_dflash_b16/c1,320,186,42419,4.385,174,9,3,0,0,0,0.125,0.375,0.3685,0.4691,False,False,False,False
+plain radix-off vs plain c1,plain/c1,plain__bench_noradix/c1,320,96,56760,1.691,88,6,2,0,0,0,0.125,0.25,0.3659,0.4675,False,False,False,False
+plain radix-off triton vs plain radix-off c1,plain__bench_noradix/c1,plain__bench_noradix_triton/c1,320,176,45247,3.89,167,6,3,0,0,0,0.125,0.375,0.4618,0.5264,False,False,False,False
+plain buffered decode vs plain radix-off c1,plain__bench_noradix/c1,plain_replayssm__bench_noradix/c1,320,163,47868,3.405,160,3,0,0,0,0,0.125,0.25,0.3625,0.4756,False,False,False,False
+mtp_s3 stock verify vs plain radix-off c1,plain__bench_noradix/c1,mtp_s3__bench_noradix/c1,320,177,44834,3.948,169,6,2,0,0,0,0.125,0.25,0.3618,0.4154,False,False,False,False
+mtp_s3 buffered verify vs plain radix-off c1,plain__bench_noradix/c1,mtp_s3_replayssm__bench_noradix/c1,320,172,46398,3.707,159,13,0,0,0,0,0.125,0.25,0.341,0.4302,False,False,False,False
+mtp_s3 buffered verify triton vs plain radix-off c1,plain__bench_noradix/c1,mtp_s3_replayssm__bench_noradix_triton/c1,320,172,47038,3.657,161,8,3,0,0,0,0.125,0.375,0.3825,0.4813,False,False,False,False
+dflash b16 stock vs plain radix-off c1,plain__bench_noradix/c1,plain__bench_dflash_b16/c1,320,177,45142,3.921,172,5,0,0,0,0,0.125,0.25,0.3678,0.4264,False,False,False,False
+dflash b16 triton vs plain radix-off c1,plain__bench_noradix/c1,plain__bench_dflash_b16_triton/c1,320,183,44141,4.146,172,9,2,0,0,0,0.125,0.375,0.3718,0.4813,False,False,False,False
+dflash b16 triton vs stock dflash b16 radix-off c1,plain__bench_dflash_b16/c1,plain__bench_dflash_b16_triton/c1,320,173,45274,3.821,161,11,1,0,0,0,0.125,0.375,0.3841,0.4813,False,False,False,False
+dflash b16 triton gdn-verify-triton vs stock dflash b16 radix-off c1,plain__bench_dflash_b16/c1,plain__bench_dflash_b16_triton_gdnverify/c1,320,173,45274,3.821,161,11,1,0,0,0,0.125,0.375,0.3841,0.4813,False,False,False,False
