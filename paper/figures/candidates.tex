@@ -35,16 +35,17 @@
   xticklabels={1,10,$10^2$,$10^3$,$10^4$,$V$},
   ytick={1,0.1,0.01,0.001,0.0001},yticklabels={100\%,10\%,1\%,0.1\%,0.01\%},
   minor tick num=0,xminorticks=false,yminorticks=false,
-  % the legend sits right of the FP8 line's end (k = 256) and left of the int4 line's drop at V;
-  % short line samples keep it narrow without squashing the circle
-  legend style={at={(axis cs:132000,1.1e-4)},anchor=south east,cells={align=left}},
+  % the legend sits below the axis, one row; short line samples keep the circle round
+  legend style={at={(-0.02,-0.37)},anchor=north west,legend columns=4,
+    /tikz/every even column/.append style={column sep=4pt}},
   legend image code/.code={\draw[mark repeat=2,mark phase=2,#1] plot coordinates {(0cm,0cm) (0.2cm,0cm) (0.4cm,0cm)};}]
-\addlegendimage{empty legend}\addlegendentry{int8 copies:}
+\addlegendimage{empty legend}\addlegendentry{int8:}
 \addplot[copy int8 row] table[x=k,y=plain_int8_row_greedy,col sep=comma]{\ccdf};\addlegendentry{per entry}
 \addplot[copy int8 g128] table[x=k,y=plain_int8_g128_greedy,col sep=comma]{\ccdf};\addlegendentry{128 columns}
-\addplot[ccert,only marks,mark=o,mark size=1.5pt] table[x=k,y=plain_int8_g128_gumbel_t1.0,col sep=comma]{\ccdf};\addlegendentry{128 columns,\\race at $T{=}1$}
+\addplot[ccert,only marks,mark=o,mark size=1.5pt] table[x=k,y=plain_int8_g128_gumbel_t1.0,col sep=comma]{\ccdf};\addlegendentry{128 columns, race at $T{=}1$}
 \addplot[copy fp8,forget plot] table[x=k,y=plain_fp8_row_greedy,col sep=comma]{\ccdf};
-\node[annot,anchor=west] at (axis cs:60,0.045) {FP8, per entry};
+% FP8's label at the end of its curve (k = 256)
+\node[annot,anchor=west] at (axis cs:290,3.3e-4) {FP8, per entry};
 \addplot[copy int4,forget plot] table[x=k,y=plain_int4_g128_greedy,col sep=comma]{\ccdf};
 \node[annot,anchor=north] at (axis cs:1500,0.5) {int4, 128 columns};
 % ---------------- (b) whole-batch fallback ----------------
@@ -55,6 +56,7 @@
   title={\paneltitle{b}{Whole-batch fallback}},
   legend style={at={(0.02,0.98)},anchor=north west},legend image post style={xscale=0.8}]
 \fill[wash] (axis cs:16,0) rectangle (axis cs:256,1);
+\draw[ink!45] (axis cs:16,0) -- (axis cs:16,1);
 \node[annot,anchor=north west,align=center] at (axis cs:17.5,0.985) {beyond the\\capture's\\batches};
 \addplot[cfallback,thick,model cons,derived,domain=1:256,samples=120]{1-(1-\pcons)^x};
   \addlegendentry{cons.}
@@ -82,6 +84,7 @@
   legend style={at={(0.02,0.98)},anchor=north west},
   legend image code/.code={\draw[mark repeat=2,mark phase=2,#1] plot coordinates {(0cm,0cm) (0.25cm,0cm) (0.5cm,0cm)};}]
 \fill[wash] (axis cs:16,0.5) rectangle (axis cs:256,2.5);
+\draw[ink!45] (axis cs:16,0.5) -- (axis cs:16,2.5);
 \draw[cstock,semithick] (axis cs:1,1) -- (axis cs:256,1);
 \node[annot,anchor=south west] at (axis cs:1.1,1.01) {stock head};
 \addplot[ccert,thick,mark=*,mark size=1.6pt,

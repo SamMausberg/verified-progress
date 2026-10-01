@@ -87,7 +87,7 @@
 \node[note,anchor=west,align=left] at (2.5,1.57) {stock head reruns all\\$M$ positions, same shape};
 \node[note,anchor=south west] at (0,0.32) {per-position fallback};
 \vpstrip{-0.15}{2}
-\node[note,anchor=west,align=left] at (2.5,0.07) {stock head reruns the\\open position's\\candidates; needs\\per-position invariance};
+\node[note,anchor=west,align=left] at (2.5,0.07) {stock head reruns only\\the open position's\\candidates; needs its\\logits independent of\\the rest of the batch};
 % the two fallbacks for the open position: alternatives, each named above its strip
 \draw[flow] (-0.04,3.07) -- (-0.32,3.07) -- (-0.32,1.57) -- (-0.04,1.57);
 \draw[flow] (-0.32,1.57) -- (-0.32,0.07) -- (-0.04,0.07);
