@@ -1,6 +1,6 @@
-% Terminology, declared once (macros.tex explains \term). Scope main: printed in the main
-% text's Table tab:terms (owner: main-text author). Scope app: terms used only in the
-% appendices (owner: appendix editor). The glossary quotes the main definitions verbatim.
+% Terminology, declared once (macros.tex explains \term). Scope main: terms the main text
+% relies on (owner: main-text author). Scope app: terms used only in the appendices (owner:
+% appendix editor). The glossary (Appendix app:glossary) prints both scopes.
 \term{main}{Head input $h$}{The BF16 vector the engine feeds to the output head (the final norm's output).}
 \term{main}{Real logit $z_i$}{$\langle w_i,h\rangle$ in exact arithmetic over the stored BF16 operands.}
 \term{main}{Stock head}{SGLang's head at the pin: a cuBLAS BF16 GEMM with FP32 accumulation and BF16 output, then \code{torch.argmax} (first maximal index).}
