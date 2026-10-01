@@ -53,61 +53,65 @@ def gemv_variants() -> list[tuple[str, dict[str, str], dict[str, Any]]]:
         groups = 2 if arith == 'w8a8' else 1
         for epilogue in (0, 1, 2, 3):
             for sample in (False, True) if epilogue == 3 else (False,):
-                for mode in (0, 1):
-                    sig = {
-                        'q_ptr': f'*{weight}',
-                        'scale_ptr': '*fp32',
-                        'a_ptr': '*fp32',
-                        'h_ptr': f'*{inputs}',
-                        'b_ptr': '*fp32',
-                        'out_ptr': '*bf16' if epilogue == 0 else '*fp32',
-                        'idx_ptr': '*i32',
-                        'rest_ptr': '*fp32',
-                        'lower_ptr': '*fp32',
-                        'status_ptr': '*i32',
-                        'probe_idx_ptr': '*i32',
-                        'probe_x_ptr': '*fp64',
-                        'probe_fail_ptr': '*i32',
-                        'seed_ptr': '*i64',
-                        'pos_ptr': '*i64',
-                        'temp_ptr': '*fp32',
-                        'hnorm_ptr': '*fp32',
-                        'hs_ptr': '*fp32',
-                        'ymax_ptr': '*fp32',
-                        'q_desc': f'tensordesc<{weight}[{cfg.block_v}, {cfg.block_k}]>'
-                        if cfg.tma
-                        else 'constexpr',
-                        'h_desc': f'tensordesc<{inputs}[{cfg.block_m}, {cfg.block_k}]>'
-                        if cfg.tma
-                        else 'constexpr',
-                        'M': 'i32',
-                        'V': 'i32',
-                        'rel_scale': 'fp32',
-                        'abs_floor': 'fp32',
-                        'wmax': 'fp32',
-                    }
-                    consts: dict[str, Any] = {
-                        'K': KDIM,
-                        'G': groups,
-                        'BSTRIDE': 2,
-                        'EPILOGUE': epilogue,
-                        'TOP': TOP,
-                        'SAMPLE': sample,
-                        'MODE': mode,
-                        'ARITH': code,
-                        'TMA': cfg.tma,
-                        'BLOCK_V': cfg.block_v,
-                        'BLOCK_M': cfg.block_m,
-                        'BLOCK_K': cfg.block_k,
-                        'P': K.PROBES,
-                    }
-                    if not cfg.tma:
-                        consts['q_desc'] = None
-                        consts['h_desc'] = None
-                    for name in consts:
-                        sig.setdefault(name, 'constexpr')
-                    name = f'gemv {arith} {cfg} epilogue={epilogue} sample={sample} mode={mode}'
-                    out.append((name, sig, consts))
+                for probes in (K.PROBES, 0) if epilogue == 3 else (K.PROBES,):
+                    for mode in (0, 1):
+                        sig = {
+                            'q_ptr': f'*{weight}',
+                            'scale_ptr': '*fp32',
+                            'a_ptr': '*fp32',
+                            'h_ptr': f'*{inputs}',
+                            'b_ptr': '*fp32',
+                            'out_ptr': '*bf16' if epilogue == 0 else '*fp32',
+                            'idx_ptr': '*i32',
+                            'rest_ptr': '*fp32',
+                            'lower_ptr': '*fp32',
+                            'status_ptr': '*i32',
+                            'probe_idx_ptr': '*i32',
+                            'probe_x_ptr': '*fp64',
+                            'probe_fail_ptr': '*i32',
+                            'seed_ptr': '*i64',
+                            'pos_ptr': '*i64',
+                            'temp_ptr': '*fp32',
+                            'hnorm_ptr': '*fp32',
+                            'hs_ptr': '*fp32',
+                            'ymax_ptr': '*fp32',
+                            'q_desc': f'tensordesc<{weight}[{cfg.block_v}, {cfg.block_k}]>'
+                            if cfg.tma
+                            else 'constexpr',
+                            'h_desc': f'tensordesc<{inputs}[{cfg.block_m}, {cfg.block_k}]>'
+                            if cfg.tma
+                            else 'constexpr',
+                            'M': 'i32',
+                            'V': 'i32',
+                            'rel_scale': 'fp32',
+                            'abs_floor': 'fp32',
+                            'wmax': 'fp32',
+                        }
+                        consts: dict[str, Any] = {
+                            'K': KDIM,
+                            'G': groups,
+                            'BSTRIDE': 2,
+                            'EPILOGUE': epilogue,
+                            'TOP': TOP,
+                            'SAMPLE': sample,
+                            'MODE': mode,
+                            'ARITH': code,
+                            'TMA': cfg.tma,
+                            'BLOCK_V': cfg.block_v,
+                            'BLOCK_M': cfg.block_m,
+                            'BLOCK_K': cfg.block_k,
+                            'P': probes,
+                        }
+                        if not cfg.tma:
+                            consts['q_desc'] = None
+                            consts['h_desc'] = None
+                        for name in consts:
+                            sig.setdefault(name, 'constexpr')
+                        name = (
+                            f'gemv {arith} {cfg} epilogue={epilogue} sample={sample} '
+                            f'probes={probes} mode={mode}'
+                        )
+                        out.append((name, sig, consts))
     return out
 
 

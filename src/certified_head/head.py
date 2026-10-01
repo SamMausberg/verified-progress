@@ -291,6 +291,8 @@ class CertifiedHead:
         self._probe_trips = torch.zeros(1, dtype=torch.int64, device=dev)
         self._probe_tripped = torch.zeros(MAX_VARIANTS, dtype=torch.int32, device=dev)
         self._probe_trips_logged = 0
+        self.probes = K.PROBES
+        """Probe rows per call (0 disables the runtime probes; benchmarks only)."""
         c = self.const
         const64 = [0.0] * 3
         const64[K.CONST_SUMSQ_INFLATE.value] = c.sumsq_inflate
@@ -386,7 +388,8 @@ class CertifiedHead:
             CH=self.chunk,
             BSTRIDE=2 * self.groups,
         )
-        self._run_probe(hidden, m)
+        if self.probes:
+            self._run_probe(hidden, m)
         if self.arith_for(m) == 'w8a8':
             K._quantize_hidden_kernel[(m,)](
                 hidden,
@@ -411,7 +414,7 @@ class CertifiedHead:
             self._probe_counter,
             self.vocab,
             K=self.hidden,
-            P=K.PROBES,
+            P=self.probes,
             CH=256,
         )
 
@@ -477,7 +480,7 @@ class CertifiedHead:
             BLOCK_V=cfg.block_v,
             BLOCK_M=cfg.block_m,
             BLOCK_K=cfg.block_k,
-            P=K.PROBES,
+            P=self.probes,
             num_warps=cfg.num_warps,
             num_stages=cfg.num_stages,
         )
@@ -596,7 +599,7 @@ class CertifiedHead:
                 for key, i in self._variant_ids.items()
                 if i in latched
             ],
-            'probe_rows_per_call': K.PROBES,
+            'probe_rows_per_call': self.probes,
         }
 
     def _variant_key(self, m: int) -> tuple[Any, ...]:

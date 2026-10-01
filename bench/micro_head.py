@@ -351,6 +351,18 @@ def main() -> None:
     status_sizes = [m for m in status_sizes if m <= head.max_batch]
     self_tests = {'w8a16': head.enclosure_self_test(status_sizes)}
     head_cols._verified = set(head._verified)  # same tiles; columns change only the fallback
+    # The same head without runtime probes, to measure their cost.
+    head_np = CertifiedHead.from_quantized(
+        w,
+        qh,
+        reference='bf16',
+        group_size=args.group_size,
+        capacity=args.capacity,
+        max_batch=max(args.batches),
+    )
+    head_np.gemv_config = head.gemv_config
+    head_np.probes = 0
+    head_np._verified = set(head._verified)
     head_cols._failed_variants = set(head._failed_variants)
     status = {'w8a16': row_status(head, pool, 'argmax'), 'sample': row_status(head, pool, 'sample')}
     # The same kernels under the Hopper wgmma error model: only the fallback rate changes.
@@ -430,6 +442,8 @@ def main() -> None:
         h_amb = h.clone()
         h_amb[0] = amb_row
         arms = build_arms(head, w, h, h_fb, marlin, scale_bf16 if has_int8pack else None)
+        # The identical certified kernel with the runtime probes compiled out.
+        arms['certified_no_probe'] = functools.partial(head_np.argmax, h)
         arms['certified_columns_mode'] = functools.partial(head_cols.argmax, h)
         s_idx = decided_batch(status['sample'], m)
         arms.update(sampling_arms(head, w, pool[s_idx].contiguous(), s_idx))

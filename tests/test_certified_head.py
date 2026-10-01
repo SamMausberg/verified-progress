@@ -1028,3 +1028,24 @@ def test_untested_batch_size_is_refused_under_capture(checkpoint: tuple[Any, Any
     _, stats = head.argmax(other, fallback=False)
     assert (head._variant_key(8), 8) in head._verified
     assert int(stats.fallback.sum()) == 0
+
+
+@pytest.mark.parametrize('m', [1, 2, 3, 8, 16, 17, 24, 32, 33, 48, 64, 65, 96, 128, 200, 256])
+def test_runtime_probe_catches_a_wrong_envelope_at_every_batch_size(
+    checkpoint: tuple[Any, Any], m: int
+) -> None:
+    """The reduced probe check (only the tiles holding a probe row compare) still
+    catches a finite wrong envelope at every batch size the self-test covers."""
+    w, qh = checkpoint
+    base = CertifiedHead.from_quantized(w, qh, max_batch=256, capacity=64)
+    # Negated, tripled scales: every approximate logit is -3x its value with a finite
+    # envelope sized for the true one, so a probe row lies outside it unless its
+    # exact logit is within a quarter radius of 0 (8 probes per row miss ~1e-8).
+    bad = _modified_head(base, -3 * base.scale, {a: c.clone() for a, c in base.coeff.items()})
+    bad._assume_verified([m])
+    h = random_hidden(m)
+    _, stats = bad.argmax(h, fallback=False)
+    assert bool(((stats.status & STATUS_BITS['probe']) != 0).all()), m
+    assert bad.probe_stats()['calls_with_probe_violation'] == 1
+    ids, _ = bad.argmax(h)
+    assert torch.equal(ids, reference_argmax(h, w, 'bf16'))
