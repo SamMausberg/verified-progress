@@ -18,7 +18,8 @@ set -uo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO" || exit 1
 export TAG="${TAG:-prof4}" VP_DATA="${VP_DATA:-$HOME/vp-data/hostgap}"
-# Not exported: ab_sweep.sh reads OUT for its own output directory (set below).
+# Not exported: ab_sweep.sh reads OUT for its own output directory, set below per TAG
+# because ab_summary.py pairs every run under a label.
 OUT="${OUT:-$HOME/vp-data/hostgap/equality_x}"
 export SGLANG_PATCHED="${SGLANG_PATCHED:-$HOME/sglang-wt/hostgap}"
 export HOSTGAP_ENV="SGLANG_HOSTGAP_VERIFY_PLAN=1 SGLANG_HOSTGAP_DRAFT_INDPTR=1 SGLANG_HOSTGAP_DFLASH_DRAFT_PLAN=1"
@@ -50,9 +51,9 @@ if [ "$OK" = 1 ]; then
 fi
 if [ "$OK" = 1 ]; then
   experiments/hostgap/profile_arms.sh mtp-patched-none mtp-none mtp-patched-host mtp-host
-  OUT="$VP_DATA/ab" LABEL_PREFIX=mtp-rspec experiments/hostgap/ab_sweep.sh A B B A
+  OUT="$VP_DATA/ab-$TAG" LABEL_PREFIX=mtp-rspec experiments/hostgap/ab_sweep.sh A B B A
   if [ $((SECONDS - T0)) -lt 2100 ]; then
-    OUT="$VP_DATA/ab" LABEL_PREFIX=mtp-rspec experiments/hostgap/ab_sweep.sh T
+    OUT="$VP_DATA/ab-$TAG" LABEL_PREFIX=mtp-rspec experiments/hostgap/ab_sweep.sh T
   else
     echo "=== skipping the Triton reference sweep: $((SECONDS - T0)) s used"
   fi

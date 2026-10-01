@@ -36,7 +36,7 @@ echo "=== dflash equality ok=$OK ($((SECONDS - T0)) s): $(grep "hostgap validati
 if [ "$OK" = 1 ]; then
   experiments/hostgap/profile_arms.sh dflash-patched-none dflash-none dflash-patched-host dflash-host
   ARM_ARGS="--arm dflash --set disable-radix-cache=true --set max-mamba-cache-size=128 --set max-total-tokens=1000000 --no-strict" \
-    LABEL_PREFIX=dflash-b8 experiments/hostgap/ab_sweep.sh A B B A
+    OUT="$VP_DATA/ab-$TAG" LABEL_PREFIX=dflash-b8 experiments/hostgap/ab_sweep.sh A B B A
 else
   experiments/hostgap/profile_arms.sh dflash-none dflash-host
 fi
