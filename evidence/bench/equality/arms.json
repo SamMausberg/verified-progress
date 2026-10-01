@@ -1,0 +1,8 @@
+[
+  ["mtp-tuned", "mtp_s3 buffered vs stock verify radix-off c1", "mtp_s3 buffered verify vs plain radix-off c1"],
+  ["mtp-tuned-triton", "mtp_s3 buffered triton vs stock verify radix-off c1", "mtp_s3 buffered verify triton vs plain radix-off c1"],
+  ["plain-tuned-triton", "plain radix-off triton vs plain radix-off c1", "plain radix-off triton vs plain radix-off c1"],
+  ["plain-tuned-replayssm", "plain buffered decode vs plain radix-off c1", "plain buffered decode vs plain radix-off c1"],
+  ["dflash-tuned-b16", "dflash b16 triton vs stock dflash b16 radix-off c1", "dflash b16 triton vs plain radix-off c1"],
+  ["mtp-stockverify", null, "mtp_s3 stock verify vs plain radix-off c1"]
+]

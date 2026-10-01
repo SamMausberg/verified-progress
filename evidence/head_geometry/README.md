@@ -52,20 +52,20 @@ BF16 output (R-stock).
 |---|---|---|---|
 | `prompt_manifest.csv` | Prompt sources, split, thinking flag and SHA-256 (no texts) | `python build_prompts.py --out ~/vp-data/geometry --manifest ../../evidence/head_geometry/prompt_manifest.csv` | `018f927` |
 | `alignment_plain4b.json` | Plain decode: FP64 argmax of the captured head input against the engine's token | `python validate_alignment.py --arm plain4b --device cpu --out ../../evidence/head_geometry/alignment_plain4b.json` | `f0e9c30` |
-| `selfevidence_plain4b.{json,csv}` | H3 on 6,005 held-out plain-decode positions: R-real candidate counts per head, envelope, accumulation model and decision; batch unions; cascades; rescoring overlap; R-stock fallback share | `python analyze_selfevidence.py --device cpu --threads 40 --sets plain --max-rows 6000 --chunk 64 --out ../../evidence/head_geometry --tag plain4b` | `18fdf95` |
-| `selfevidence_plain4b_ccdf.csv` | Share of positions needing at least k candidate rows (plot data) | `python export_candidate_ccdf.py --tag plain4b --out ../../evidence/head_geometry/selfevidence_plain4b_ccdf.csv` | `18fdf95` |
+| `selfevidence_plain4b.{json,csv}` | H3 on 6,005 held-out plain-decode positions: R-real candidate counts per head, envelope, accumulation model and decision; batch unions; cascades; rescoring overlap; R-stock fallback share | `python analyze_selfevidence.py --device cpu --threads 40 --sets plain --max-rows 6000 --chunk 64 --out ../../evidence/head_geometry --tag plain4b` | `0769b2b` |
+| `selfevidence_plain4b_ccdf.csv` | Share of positions needing at least k candidate rows (plot data) | `python export_candidate_ccdf.py --tag plain4b --out ../../evidence/head_geometry/selfevidence_plain4b_ccdf.csv` | `0769b2b` |
 | `stats_plain4b.json` | Plain decode: norms, margins, top-m softmax mass, hidden-dimension energy, head statistics, envelope width versus realized error per quantizer, centring diagnostics | `python analyze_stats.py --arm plain4b --device cpu --out ../../evidence/head_geometry/stats_plain4b.json` | `239c482` |
-| `rstock_plain4b.json` | R-stock on the same 6,005 positions: share needing the stock kernel under the `stock_gap` rule and a bucket-exact rule, for four gammas; certified tokens against the engine's | `python analyze_rstock.py --device cpu --out ../../evidence/head_geometry/rstock_plain4b.json` | `0d10d3a` |
+| `rstock_plain4b.json` | R-stock on the same 6,005 positions: share needing the stock kernel under the `stock_gap` rule and a bucket-exact rule, for four gammas; certified tokens against the engine's | `python analyze_rstock.py --device cpu --out ../../evidence/head_geometry/rstock_plain4b.json` | `0769b2b` |
 | `alignment_dflash4b.json` | DFlash-4B capture: FP64 argmax of the captured draft and target head inputs against the engine's tokens, per block position; accept-length consistency | `python validate_alignment.py --arm dflash4b --device cpu --out ../../evidence/head_geometry/alignment_dflash4b.json` | `18fdf95` |
 | `rho_dflash4b.json`, `rho_dflash4b_pairs.csv`, `rho_dflash4b_quantiles.csv` | DFlash-4B drift ratio rho on 40,000 held-out pairs and the per-row threshold; head-metric drift; realized per-tile errors; certification rates; plot data (the pairs CSV is a seeded 15,000-row subsample with prompt id and split) | `python analyze_rho.py --arm dflash4b --device cpu --max-rows 40000 --csv-pairs 15000 --out ../../evidence/head_geometry/rho_dflash4b.json` | `5c59ba3` |
 | `transport_mtp4b.{json,csv}` | MTP-4B transport on 16,016 held-out pairs (all held-out pairs of 160 prompts), same metrics as for DFlash-4B, run on the GPU | `python analyze_transport.py --arm mtp4b --max-rows 16000 --out ../../evidence/head_geometry` under `gpu_lock.sh -s` (committed in `54c4b63`) | `99b2d3f` |
 | `alignment_mtp4b.json` | MTP-4B capture: FP64 argmax of the captured draft and target head inputs against the engine's tokens, per draft step; accept-length consistency; outputs against plain decoding | `python validate_alignment.py --arm mtp4b --device cpu --out ../../evidence/head_geometry/alignment_mtp4b.json` | `18fdf95` |
 | `rho_mtp4b.json`, `rho_mtp4b_pairs.csv`, `rho_mtp4b_quantiles.csv` | MTP-4B drift ratio rho on 40,000 held-out pairs and the per-row threshold; head-metric drift; realized per-tile errors; certification rates; plot data (the pairs CSV is a seeded 15,000-row subsample) | `python analyze_rho.py --arm mtp4b --device cpu --max-rows 40000 --csv-pairs 15000 --out ../../evidence/head_geometry/rho_mtp4b.json` | `5c59ba3` |
 | `stats_mtp4b.json` | MTP-4B: norms of draft and target head inputs, margins, top-m mass, drift norms and cosine by outcome and step | `python analyze_stats.py --arm mtp4b --device cpu --max-rows 20000 --out ../../evidence/head_geometry/stats_mtp4b.json` | `239c482` |
-| `selfevidence_mtp4b.{json,csv}`, `selfevidence_mtp4b_ccdf.csv` | H3 on 4,010 held-out MTP-4B verify rows and 4,024 draft rows (int8, FP8 and int4 heads), split by whether the verifier needs the row | `python analyze_selfevidence.py --device cpu --threads 40 --sets verify draft --max-rows 4000 --chunk 64 --heads int8_row int8_g128 int8_g32 fp8_row int4_g128 int4_g32 --out ../../evidence/head_geometry --tag mtp4b`, then `python export_candidate_ccdf.py --tag mtp4b --out ../../evidence/head_geometry/selfevidence_mtp4b_ccdf.csv` | `fa7aad8` (CCDF `5831da1`) |
+| `selfevidence_mtp4b.{json,csv}`, `selfevidence_mtp4b_ccdf.csv` | H3 on 4,010 held-out MTP-4B verify rows and 4,024 draft rows (int8, FP8 and int4 heads), split by whether the verifier needs the row | `python analyze_selfevidence.py --device cpu --threads 40 --sets verify draft --max-rows 4000 --chunk 64 --heads int8_row int8_g128 int8_g32 fp8_row int4_g128 int4_g32 --out ../../evidence/head_geometry --tag mtp4b`, then `python export_candidate_ccdf.py --tag mtp4b --out ../../evidence/head_geometry/selfevidence_mtp4b_ccdf.csv` | `0769b2b` |
 | `transport_dflash4b.{json,csv}` | DFlash-4B transport on 4,020 held-out pairs: skip fractions for greedy, partition widths and P_? at T = 1 and 0.7, retained-tail bounds, static screen, oracle radii, drift scaling, tile unions over real and random batches, by outcome, position and domain | `python analyze_transport.py --arm dflash4b --device cpu --max-rows 4000 --out ../../evidence/head_geometry --tag dflash4b` | `99b2d3f` |
 | `stats_dflash4b.json` | DFlash-4B: norms of draft and target head inputs, margins, top-m mass, drift norms and cosine by outcome and position | `python analyze_stats.py --arm dflash4b --device cpu --max-rows 20000 --out ../../evidence/head_geometry/stats_dflash4b.json` | `239c482` |
-| `selfevidence_dflash4b.{json,csv}`, `selfevidence_dflash4b_ccdf.csv` | H3 on 4,000 held-out DFlash-4B verify rows and 4,020 draft rows (int8, FP8 and int4 heads), split by whether the verifier needs the row | `python analyze_selfevidence.py --device cpu --threads 40 --sets dflash_verify dflash_draft --max-rows 4000 --chunk 64 --heads int8_row int8_g128 int8_g32 fp8_row int4_g128 int4_g32 --out ../../evidence/head_geometry --tag dflash4b`, then `export_candidate_ccdf.py --tag dflash4b` | `fa7aad8` |
+| `selfevidence_dflash4b.{json,csv}`, `selfevidence_dflash4b_ccdf.csv` | H3 on 4,000 held-out DFlash-4B verify rows and 4,020 draft rows (int8, FP8 and int4 heads), split by whether the verifier needs the row | `python analyze_selfevidence.py --device cpu --threads 40 --sets dflash_verify dflash_draft --max-rows 4000 --chunk 64 --heads int8_row int8_g128 int8_g32 fp8_row int4_g128 int4_g32 --out ../../evidence/head_geometry --tag dflash4b`, then `export_candidate_ccdf.py --tag dflash4b` | `0769b2b` |
 | `tail_killtest.json` | P1 kill test: INT8 surrogate of the final FFN (and head) versus certified head only | `python tail_killtest.py --threads 16 --out ../../evidence/head_geometry/tail_killtest.json` | `ea4f208` |
 
 The plain-decode capture ran with the capture patch before SGLang's own formatting hooks
@@ -324,7 +324,7 @@ DFlash's, the MTP draft head needs more candidates than the verifier; its input 
 target's scale (DFlash's has a third of it), and the envelope scales with ||h||. Under the
 R-stock gap rule the stock kernel is needed
 for 4.04% of verify rows with the conservative model (gamma 6.11e-4) and 2.84% with the Hopper
-model (gamma 1.19e-4, the rounded radius these replays used), and for 6.44% and 4.20% of draft rows; DFlash-4B's verify rows need it at
+model (gamma 1.1922e-4, the model's derived value rounded up), and for 6.44% and 4.20% of draft rows; DFlash-4B's verify rows need it at
 8.6% and 5.7%, plain decode at 1.40% and 0.35%. No envelope was violated and no winner was missed.
 
 ### R-stock: how often the stock decision needs the stock kernel
@@ -339,7 +339,7 @@ the stock kernel must decide, at:
 | gamma for the stock kernel's FP32 accumulation | Positions failing | Capture-run batches with at least one |
 |---|---|---|
 | 6.11e-4: conservative default, the largest fused-adder model of `src/precision_reference.py` | 3.03% | 21.6% |
-| 1.19e-4: a tighter tensor-core model (the kernel workstream's; its justification is pending that workstream's evidence) | 2.18% | 16.0% |
+| 1.1922e-4: the Hopper `wgmma` model with a split-K allowance, its derived value rounded up (whether the stock kernel stays within it is pending the kernel workstream's evidence) | 2.18% | 16.0% |
 | 1.67e-6: IEEE FP32 blocked tree, not justified for the stock tensor-core GEMM (shown for scale) | 1.95% | 14.8% |
 
 The floor near 2% belongs to this sufficient condition, not to R-stock itself: with G
@@ -353,12 +353,21 @@ outward to FP32 and then to BF16, and compare with the tie rule) certifies most 
 | gamma | gap rule: positions / batches needing the stock kernel | bucket-exact rule: positions / batches |
 |---|---|---|
 | 6.11e-4 (conservative default) | 3.03% / 21.6% | 1.40% / 10.9% |
-| 1.19e-4 (tighter tensor-core model, pending its evidence) | 2.18% / 16.0% | 0.35% / 2.8% |
+| 1.1922e-4 (Hopper model, pending its evidence) | 2.18% / 16.0% | 0.35% / 2.8% |
 | 1e-5 (not justified for the stock tensor-core GEMM) | 1.97% / 14.9% | 0.017% / 0.13% |
 | 1.67e-6 (IEEE FP32 tree; not justified for the stock tensor-core GEMM) | 1.95% / 14.8% | 0% / 0% |
 
 The last two rows only show how the rate scales with gamma: a 0% fallback is not
 achievable with the stock BF16 tensor-core GEMM unless its error is shown to be that small.
+
+The Hopper rows keep the key `gamma_1.19e-4` in `rstock_plain4b.json` and in each
+`selfevidence_*.json` (`rstock_fallback_share`, `rstock_steps_with_fallback`), which names
+the value to three digits; `gammas` and `rstock_gammas` record it exactly,
+0.00011921636278483056, the model's (1 + 17 * 2^-25 + 2^-23)^160 (1 + 2^-23)^160 - 1
+computed by `src/precision_reference.py` and rounded up to binary64. Before commit
+`0769b2b` these replays used 1.19e-4, 0.18% below that value. Rerunning them with the
+derived value changed no count in any file: every share, batch share and candidate count
+is identical, and so are the CSV and CCDF files and the per-row arrays.
 
 For every gamma, no certified token differed from the token the engine returned at the
 capture's batch shape, i.e. no counterexample to any of these error models for cuBLAS on

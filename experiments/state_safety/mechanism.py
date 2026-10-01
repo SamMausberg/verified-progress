@@ -47,11 +47,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+
+# The exact reference (src/precision_reference.py) supplies the Hopper model's gamma.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'src'))
 
 MODEL_DIR = (
     Path.home()
@@ -128,6 +132,14 @@ def first_cache_difference(
         if q0 > upto:
             break
         a, b = ca[q0], cb[q0]
+        if a['cached'] == 0 and b['cached'] == 0:
+            # A prefill with no cached prefix reads no earlier state. The tap hashes
+            # the caches in state_tap.begin, before _forward_raw runs the deferred
+            # mamba clear, so a fresh GDN slot is hashed with an earlier request's
+            # leftover state. The forward then reads zeros: clear_slots zeroes the
+            # slot first (mamba_needs_clear), the SSM chunk prefill reads that zeroed
+            # slot, and the conv reads no initial state (has_initial_state is false).
+            continue
         found: list[dict[str, Any]] = []
         for kind in ('k', 'v'):
             if a[kind] is None or b[kind] is None:
@@ -318,6 +330,10 @@ def analyse_prompt(
     rb = committed_rows(dir_b / 'tap' / f'tap-{pid}', prompt + ob)
     upto = P + (d if d is not None else n) - 1
     out: dict[str, Any] = {'id': pid, 'prompt_len': P, 'diverged_at': d}
+    la, lb = ca.get('top_logprobs') or [], cb.get('top_logprobs') or []
+    out['first_logprob_difference'] = next(
+        (i for i in range(min(len(la), len(lb))) if la[i] != lb[i]), None
+    )
     out['first_difference'] = first_hash_difference(ra, rb, names[0], names[1], upto, lo)
     cache_a = entering_caches(dir_a / 'tap' / f'tap-{pid}', prompt + oa)
     cache_b = entering_caches(dir_b / 'tap' / f'tap-{pid}', prompt + ob)
@@ -443,11 +459,18 @@ def error_models(k: int) -> dict[str, float]:
     conservative: the project's model, gamma(2k, 2**-23) = 2k u / (1 - 2k u) with
     u = 2**-23, covering any reduction order, split-K with FP32 partials and
     truncating adders. hopper: the blocked Hopper wgmma model used by the kernel
-    workstream (1.19e-4 at k = 2560, including an FP32 split-K allowance); it rests
-    on a published measurement-based hardware model, not vendor documentation.
+    workstream, including an FP32 split-K allowance, computed exactly by
+    precision_reference.hopper_wgmma_gamma and rounded up (1.19216e-4 at k = 2560);
+    it rests on a published measurement-based hardware model, not vendor
+    documentation.
     """
+    import precision_reference as ref
+
     u = 2.0**-23
-    return {'conservative': 2 * k * u / (1 - 2 * k * u), 'hopper': 1.19e-4}
+    return {
+        'conservative': 2 * k * u / (1 - 2 * k * u),
+        'hopper': ref.float_up(ref.hopper_wgmma_gamma(k)),
+    }
 
 
 def abs_products(head: Head, h: np.ndarray, toks: tuple[int, int]) -> float:
@@ -487,7 +510,8 @@ def compare_repeats(run_dir: Path, pid: str, prompt: list[int]) -> dict[str, Any
                 else None,
             }
         )
-    return {'run': str(run_dir), 'prompt': pid, 'reference': reps[0], 'repeats': out}
+    run = data_root_relative(str(run_dir))
+    return {'run': run, 'prompt': pid, 'reference': reps[0], 'repeats': out}
 
 
 def data_root_relative(path: str) -> str:

@@ -1,0 +1,11 @@
+run,max_running_requests,max_total_num_tokens,max_mamba_cache_size,disable_radix_cache,attention_backend,gdn_backends
+mtp_s3__bench_noradix,16,426043,16,True,flashinfer,"decode=triton, prefill=flashinfer, verify=triton"
+mtp_s3_replayssm__bench_noradix,16,247851,16,True,flashinfer,"decode=triton, prefill=flashinfer, verify=triton"
+mtp_s3_replayssm__bench_noradix_triton,16,119880,16,True,triton,"decode=triton, prefill=flashinfer, verify=triton"
+plain,16,97672,122,False,flashinfer,"decode=triton, prefill=flashinfer, verify=triton"
+plain__bench_dflash_b16,4,169883,4,True,flashinfer,"decode=triton, prefill=flashinfer, verify=triton"
+plain__bench_dflash_b16_triton,4,70518,4,True,triton,"decode=triton, prefill=flashinfer, verify=triton"
+plain__bench_dflash_b16_triton_gdnverify,4,24980,4,True,triton,"decode=triton, prefill=flashinfer, verify=triton"
+plain__bench_noradix,16,316021,16,True,flashinfer,"decode=triton, prefill=flashinfer, verify=triton"
+plain__bench_noradix_triton,16,265839,16,True,triton,"decode=triton, prefill=flashinfer, verify=triton"
+plain_replayssm__bench_noradix,16,282562,16,True,flashinfer,"decode=triton, prefill=flashinfer, verify=triton"

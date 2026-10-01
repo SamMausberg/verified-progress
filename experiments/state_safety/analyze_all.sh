@@ -6,6 +6,10 @@
 #
 #   experiments/state_safety/analyze_all.sh
 #
+# Runs in the SGLang venv (sourced below from scripts/sglang_env.sh), which provides
+# SciPy for cycles.py's homogeneity test and first_cycle.py's Fisher test. The
+# repository's .venv has no SciPy, and its tests skip those calls.
+#
 # Two run roots: runs_pinned/ (pinned pools, the current matrix; *_pinned outputs)
 # and runs/ (the first, unpinned matrix; the unsuffixed outputs). Once runs_pinned/
 # exists, every pair in pairs_pinned.json must have both runs, or the script fails;
@@ -32,6 +36,13 @@ if [ -d "$pinned" ]; then
     --out-json "$evidence/noise_floor_pinned.json" \
     --out-table "$evidence/noise_floor_pinned.csv" \
     --out-csv "$evidence/divergences_pinned.csv" --out-meta "$evidence/run_meta_pinned.json"
+fi
+
+# One deliberate cross-regime pair: does the pool regime alone change batch-1 output?
+if [ -f "$pinned/plain/c1.jsonl" ] && [ -f "$runs/plain/c1.jsonl" ]; then
+  nice -n 19 python compare.py --runs "$HOME/vp-data/state" --pairs pairs_cross_regime.json \
+    --allow-mixed-pins --all-logprob-differences --out-json "$evidence/cross_regime.json" \
+    --out-csv "$evidence/divergences_cross_regime.csv" > /dev/null
 fi
 
 # Top-2 BF16 gap statistics of plain decode at batch 1, kept with the noise floor.
@@ -170,6 +181,14 @@ fi
 # comparisons pin the pools; the earlier runs did not, so record what each had).
 nice -n 19 python pools.py --root "$HOME/vp-data/state" --evidence "$evidence"
 
+# The declared first-cycle test, once all five of its runs exist. If they are not the
+# declared runs the result is void: first_cycle.py exits non-zero and, under set -e,
+# stops this script.
+fresh="$HOME/vp-data/state/runs_fresh"
+if [ -f "$fresh/plain/c1.jsonl" ] && [ -f "$fresh/mtp_tree/c32.jsonl" ]; then
+  nice -n 19 python first_cycle.py --runs "$fresh" --out "$evidence/first_cycle_fresh.json"
+fi
+
 # Drift and divergences by rejection position, for every speculative config.
 for spec in mtp_s1 mtp_s3 mtp_s5 mtp_tree; do
   if [ -f "$runs/$spec/c1.jsonl" ]; then
@@ -184,5 +203,12 @@ done
 
 if compgen -G "$HOME/vp-data/state/targeted/*.json" > /dev/null; then
   nice -n 19 python summarize_targeted.py --out "$evidence/targeted.json" > /dev/null
+fi
+# The machine's host name can be its public address: refuse evidence that contains it.
+host="$(hostname)"
+if leaked="$(grep -rlF -e "$host" -e "${host//-/.}" "$evidence")"; then
+  echo "evidence contains the host name; not publishing it. Files:" >&2
+  echo "$leaked" >&2
+  exit 1
 fi
 echo "evidence regenerated in $evidence"

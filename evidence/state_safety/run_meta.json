@@ -51,6 +51,9 @@
   },
   "spec_accept_length": 3.531,
   "cycles_one_chunk_each": 8,
+  "prompt_tokens": 624,
+  "cached_tokens": 0,
+  "requests_with_cached_tokens": 0,
   "finish": {
    "length": 8
   }
@@ -107,6 +110,9 @@
   },
   "spec_accept_length": 3.5068,
   "cycles_one_chunk_each": 8,
+  "prompt_tokens": 624,
+  "cached_tokens": 0,
+  "requests_with_cached_tokens": 0,
   "finish": {
    "length": 8
   }
@@ -163,6 +169,9 @@
   },
   "spec_accept_length": 3.4583,
   "cycles_one_chunk_each": 96,
+  "prompt_tokens": 8443,
+  "cached_tokens": 0,
+  "requests_with_cached_tokens": 0,
   "finish": {
    "length": 73,
    "stop": 23
@@ -220,6 +229,9 @@
   },
   "spec_accept_length": 3.4633,
   "cycles_one_chunk_each": 96,
+  "prompt_tokens": 8443,
+  "cached_tokens": 0,
+  "requests_with_cached_tokens": 0,
   "finish": {
    "length": 73,
    "stop": 23
@@ -265,6 +277,9 @@
     "max_mamba_cache_size": 122
    }
   },
+  "prompt_tokens": 56366,
+  "cached_tokens": 0,
+  "requests_with_cached_tokens": 0,
   "finish": {
    "length": 216,
    "stop": 104
@@ -310,6 +325,9 @@
     "max_mamba_cache_size": 122
    }
   },
+  "prompt_tokens": 56366,
+  "cached_tokens": 0,
+  "requests_with_cached_tokens": 0,
   "finish": {
    "length": 216,
    "stop": 104
@@ -355,6 +373,9 @@
     "max_mamba_cache_size": 122
    }
   },
+  "prompt_tokens": 56366,
+  "cached_tokens": 0,
+  "requests_with_cached_tokens": 0,
   "finish": {
    "length": 217,
    "stop": 103
@@ -400,6 +421,9 @@
     "max_mamba_cache_size": 122
    }
   },
+  "prompt_tokens": 56366,
+  "cached_tokens": 0,
+  "requests_with_cached_tokens": 0,
   "finish": {
    "length": 217,
    "stop": 103
@@ -445,6 +469,9 @@
     "max_mamba_cache_size": 167
    }
   },
+  "prompt_tokens": 56366,
+  "cached_tokens": 0,
+  "requests_with_cached_tokens": 0,
   "finish": {
    "length": 216,
    "stop": 104
@@ -490,6 +517,9 @@
     "max_mamba_cache_size": 167
    }
   },
+  "prompt_tokens": 56366,
+  "cached_tokens": 0,
+  "requests_with_cached_tokens": 0,
   "finish": {
    "length": 217,
    "stop": 103
@@ -536,6 +566,9 @@
     "max_mamba_cache_size": 69
    }
   },
+  "prompt_tokens": 624,
+  "cached_tokens": 0,
+  "requests_with_cached_tokens": 0,
   "finish": {
    "length": 8
   }
@@ -581,6 +614,9 @@
     "max_mamba_cache_size": 69
    }
   },
+  "prompt_tokens": 624,
+  "cached_tokens": 0,
+  "requests_with_cached_tokens": 0,
   "finish": {
    "length": 8
   }

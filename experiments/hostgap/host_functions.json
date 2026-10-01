@@ -1,0 +1,116 @@
+[
+  {
+    "_comment": "Host functions recorded as NVTX ranges by nsys --python-functions-trace in cycle_profile.py --host-trace runs (SGLang bd66ce34 names). gap_analysis.py attributes each GPU-idle interval to the innermost of these ranges open on the scheduler thread.",
+    "module": "sglang.srt.managers.scheduler",
+    "domain": "sglang-host",
+    "functions": [
+      "Scheduler.run_batch",
+      "Scheduler.process_batch_result",
+      "Scheduler.get_next_batch_to_run",
+      "Scheduler.ingest_requests",
+      "Scheduler.launch_batch_sample_if_needed",
+      "Scheduler._apply_war_barrier"
+    ]
+  },
+  {
+    "module": "sglang.srt.managers.overlap_utils",
+    "domain": "sglang-host",
+    "functions": ["FutureMap.resolve_seq_lens_cpu", "FutureMap._resolve_spec_extras", "FutureMap.publish", "FutureMap.stash"]
+  },
+  {
+    "module": "sglang.srt.managers.scheduler_components.batch_result_processor",
+    "domain": "sglang-host",
+    "functions": ["SchedulerBatchResultProcessor.process_batch_result_decode"]
+  },
+  {
+    "module": "sglang.srt.managers.tp_worker",
+    "domain": "sglang-host",
+    "functions": ["TpModelWorker.forward_batch_generation"]
+  },
+  {
+    "module": "sglang.srt.model_executor.model_runner",
+    "domain": "sglang-host",
+    "functions": ["ModelRunner.forward"]
+  },
+  {
+    "module": "sglang.srt.model_executor.runner.decode_cuda_graph_runner",
+    "domain": "sglang-host",
+    "functions": ["DecodeCudaGraphRunner.execute", "DecodeCudaGraphRunner.load_batch"]
+  },
+  {
+    "module": "sglang.srt.speculative.eagle_worker_v2",
+    "domain": "sglang-host",
+    "functions": [
+      "EAGLEWorkerV2.forward_batch_generation",
+      "EagleDraftWorker.draft",
+      "EagleDraftWorker.draft_forward",
+      "EagleDraftWorker._draft_extend_for_decode"
+    ]
+  },
+  {
+    "module": "sglang.srt.speculative.eagle_worker_common",
+    "domain": "sglang-host",
+    "functions": ["prepare_for_draft", "build_eagle_verify_input", "run_eagle_verify", "prepare_for_draft_extend"]
+  },
+  {
+    "module": "sglang.srt.speculative.eagle_utils",
+    "domain": "sglang-host",
+    "functions": ["eagle_prepare_for_verify", "eagle_sample"]
+  },
+  {
+    "module": "sglang.srt.speculative.eagle_draft_cuda_graph_runner",
+    "domain": "sglang-host",
+    "functions": ["EAGLEDraftCudaGraphRunner.execute"]
+  },
+  {
+    "module": "sglang.srt.speculative.eagle_draft_extend_cuda_graph_runner",
+    "domain": "sglang-host",
+    "functions": ["EAGLEDraftExtendCudaGraphRunner.execute"]
+  },
+  {
+    "module": "sglang.srt.speculative.dflash_worker_v2",
+    "domain": "sglang-host",
+    "functions": [
+      "DFlashWorkerV2.forward_batch_generation",
+      "DFlashWorkerV2._accept_block",
+      "DFlashWorkerV2._append_target_hidden_to_draft_kv_by_loc",
+      "DFlashWorkerV2._update_target_mamba_state_after_verify"
+    ]
+  },
+  {
+    "module": "sglang.srt.speculative.dflash_info",
+    "domain": "sglang-host",
+    "functions": ["DFlashVerifyInput.prepare_for_verify"]
+  },
+  {
+    "module": "sglang.srt.layers.attention.flashinfer_backend",
+    "domain": "sglang-host",
+    "functions": [
+      "FlashInferAttnBackend.init_forward_metadata",
+      "FlashInferAttnBackend.init_forward_metadata_out_graph",
+      "FlashInferIndicesUpdaterPrefill.call_begin_forward",
+      "FlashInferIndicesUpdaterDecode.call_begin_forward",
+      "FlashInferMultiStepDraftBackend.common_template",
+      "fast_prefill_plan"
+    ]
+  },
+  {
+    "module": "sglang.srt.layers.attention.hybrid_linear_attn_backend",
+    "domain": "sglang-host",
+    "functions": [
+      "HybridLinearAttnBackend.init_forward_metadata",
+      "HybridLinearAttnBackend.init_forward_metadata_out_graph",
+      "MambaAttnBackendBase.init_forward_metadata_out_graph"
+    ]
+  },
+  {
+    "module": "flashinfer.prefill",
+    "domain": "sglang-host",
+    "functions": ["BatchPrefillWithPagedKVCacheWrapper.plan"]
+  },
+  {
+    "module": "flashinfer.decode",
+    "domain": "sglang-host",
+    "functions": ["fast_decode_plan"]
+  }
+]

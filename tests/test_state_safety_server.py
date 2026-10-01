@@ -193,3 +193,12 @@ def test_compare_refuses_before_writing_any_output(tmp_path, monkeypatch):
         compare.main()
     assert out.read_text() == 'earlier complete result\n'
     assert not (tmp_path / 'd.csv').exists()
+
+
+def test_public_server_info_drops_the_host():
+    from server import public_server_info
+
+    info = {'cmd': ['python'], 'server_id': '192-0-2-1:30050:42:1000', 'x': 1}
+    assert public_server_info(info) == {'server_id': 'host:30050:42:1000', 'x': 1}
+    # New ids carry no host and are left as they are.
+    assert public_server_info({'server_id': '30050:42:1000'}) == {'server_id': '30050:42:1000'}

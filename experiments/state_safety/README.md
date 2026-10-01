@@ -130,7 +130,18 @@ Tensor-level forensics (engine patch `engine/sglang/patches/state/0001-state-tap
 applied in `~/sglang-wt/state`): `tap_runs.py` serves tagged prompts with the tap on and
 `mechanism.py` compares two tapped runs (`--a`, `--b`), or the repeats of one prompt
 inside a run (`--repeat-of`). Both are run inside the GPU hold that collects the data;
-the exact commands are in `evidence/state_safety/README.md`. `tap_signature.py` (light,
+the exact commands are in `evidence/state_safety/README.md`.
+
+`run_tap_v4.sh` runs the cache-level checks of the tap v4 run in one shared hold:
+`tap_runs.py` sessions, then `mechanism.py`. Its tapped prompt lists and per-prompt
+token limits are committed in `tap_v4_inputs/`. Its summaries are committed as
+`cachecheck_v4_*.json`, `history_v4_*.json` and `repeats_v4_h44_*.json`. The run was
+made from a scratch copy of this script, which read the same input files from
+`~/vp-data/state/tap`, ran the sessions in a different order and named the outputs
+`mechanism_v4_*`. The committed summaries were regenerated from its tap data with the
+current `mechanism.py`.
+
+`tap_signature.py` (light,
 run by `analyze_all.sh`) finds where the v1 and v3 tapped sessions of the same
 configuration first part ways. `pools.py` (run by `analyze_all.sh`) writes
 `pools.json`, both servers' pools for every comparison in the evidence; it rebases
@@ -141,3 +152,146 @@ root.
 Raw outputs stay in `~/vp-data/state/` (`runs_pinned/`, `runs/`, `targeted/`); each
 run has a `.meta.json` with the flags, the pool pin, the resolved server settings
 and pool sizes, and the repository and SGLang commits.
+
+## Declared follow-up: the first verify cycle after prefill (not yet run)
+
+In the pinned matrix, the first verify cycle after prefill had a higher divergence
+rate per fragile position than later cycles for MTP steps 5 and the tree (7/40 and
+6/33). That observation is exploratory (`evidence/state_safety/README.md`). The test
+below is fixed before any data for it exists. If it changes, the change and its
+reason go in a new commit before the runs.
+
+- **Prompts.** The fresh set, `prompts.py --set fresh`: 960 prompts disjoint from
+  the 320 used so far (no shared ID, message or token sequence). They are GSM8K test
+  rows 80-559 (480), HumanEval rows 60-163 (104), AlpacaEval rows 5, 15, ..., 795 (80)
+  and CNN/DailyMail test rows 40-335 (296), with every third prompt per source in
+  thinking mode.
+  - `evidence/state_safety/prompt_manifest_fresh.json` freezes the token IDs
+    (SHA-256). `prompts.py` without `--set` still regenerates the original set's
+    manifest byte for byte: the main set keeps its original layout, and
+    `tests/test_state_safety_prompts.py` checks both manifests.
+  - The source mix differs from the original set. MT-Bench has no unused questions,
+    and GSM8K and CNN/DailyMail have larger shares. Rates from the two sets are
+    therefore not compared directly.
+  - Generation uses 256 new tokens and top-5 logprobs.
+- **Runs.** Pinned pools (cap 8, 49,152 KV tokens, 40 GDN slots), radix cache and
+  overlap on, written to `~/vp-data/state/runs_fresh/`. There are two exclusive
+  holds, each under 45 minutes:
+  - plain c1;
+  - MTP steps 5 at c1 and c32, then the tree (3 steps, top-k 2) at c1 and c32. Each
+    configuration is served from one server.
+- **Pairs.** Each pair has a reference run R and a compared run C. One speculative
+  c1 run L labels the cycles.
+  - Primary: R = plain c1 and C = L = MTP steps 5 c1. Likewise with the tree c1 as
+    C and L.
+  - Control: R = L = MTP steps 5 c1 and C = MTP steps 5 c32. Likewise for the tree.
+- **Positions.** The method is `cycles.py`'s: positions up to and including the
+  first token difference between R and C.
+  - A position is fragile when R's top-2 logprob gap there is at most 0.25 nats.
+  - First cycle: the positions of L's chunk 1, the first verify cycle after the
+    prefill token. Later: L's later chunks.
+  - Only divergences at fragile positions count.
+- **Population.** A prompt is excluded from every pair if any of the four MTP runs
+  (steps 5 and tree, c1 and c32) does not stream exactly one chunk per verify cycle.
+  All four pairs therefore cover the same prompts, and the number excluded is
+  reported.
+- **Statistic.** For each pair, form a 2x2 table: first or later cycle against
+  diverged or not, at fragile positions. The primary log odds ratio, L_p, uses the
+  table summed over the two primary pairs, with 0.5 added to every cell. The control
+  log odds ratio, L_c, is the same for the two control pairs.
+- **Bootstrap.** Use 10,000 replicates with `numpy.random.default_rng(0)`. Each
+  replicate draws the included prompts with replacement, once, and applies that draw
+  to all four pairs. One-sided 95% lower bounds are the 5th percentiles (percentile
+  method).
+- **(a) Primary.** The lower bound of L_p is above 0, meaning the first cycle's
+  odds are higher.
+- **(b) Selection control.** The lower bound of L_p - L_c is above 0. Prompts with a
+  high divergence hazard leave early, so later cycles carry fewer of them even
+  without a state effect. The c1-vs-c32 pairs share that selection, at a similar
+  hazard (3.1-3.5 against 3.5-4.0 divergences per 1,000 tokens), but not the plain
+  decode against verify handoff.
+  - Limits: an effect that also differs between c1 and c32 cancels out.
+  - A supported result can be a benign difference in numerical path rather than a
+    state error.
+- **Secondary.** A one-sided Fisher exact test on the pooled primary table. Steps 1
+  and 3 are not run here.
+- **Decision.**
+  - If (a) and (b) both hold, a first-cycle excess specific to speculation against
+    plain decoding is supported.
+  - Otherwise the result is reported as inconclusive, not as evidence of no effect.
+  - Both bounds are reported either way.
+- **Power.** These figures are approximate. They use a normal approximation on the
+  log odds ratios and treat positions as independent, so they are optimistic.
+  - Basis: the original set's counts, 0.228 first-cycle fragile positions per
+    prompt pooled over the two configurations, and a later rate of 0.08. For 960
+    prompts this predicts about 219 first-cycle and 12,200 later fragile positions.
+  - Joint power of (a) and (b), with the control at an odds ratio of 1, is about
+    0.87 at the exploratory effect (0.17 against 0.08, odds ratio 2.36). It is 0.70
+    at an odds ratio of 2.0 and 0.51 at 1.75.
+  - 800 prompts would give about 0.81, so the set is sized to stay above 0.8 at the
+    exploratory effect.
+- **If supported.** Use the cache tap to compare the GDN state handed from prefill to
+  the first verify forward with the state handed to the first plain decode step.
+- **Attestation.** `run_matrix.py` records only `repo_sha`, which does not show that
+  the checkout was clean. `attest_runner.py --watch` therefore runs outside the holds,
+  started before the first one.
+  - Whenever a `run_matrix.py` process writing to `runs_fresh/` appears or exits, it
+    records the checkout's HEAD, `git status --porcelain` and the SHA-256 of
+    `run_matrix.py`, `server.py` and `client.py` in
+    `runs_fresh/attest/<hold>-<before|after>.json`.
+  - The process table is polled every 2 s. An edit made and reverted inside that
+    window would not be seen.
+  - A hold's runs are void unless both of its records exist, are clean, are at
+    b918c8b and match b918c8b's files.
+  - Every run's `repo_sha` must be b918c8b.
+  - Every record must be complete, or the run is void:
+    - a normal finish, either `stop`, or `length` with exactly 256 output tokens
+      (a server abort or error is not one);
+    - `completion_tokens` equal to the output length;
+    - no client abort;
+    - top-5 logprobs at every output token.
+  - Both passes (c1 and c32) of a configuration must come from one server (equal
+    `server_id`).
+  - The server streams the cumulative verify count only in a response's last chunk,
+    so per-chunk counters cannot be checked. A prompt is excluded from every pair
+    unless all four MTP runs show:
+    - 0 in every chunk but the last;
+    - a last count equal to the chunk count and to `spec_verify_ct`;
+    - 1 to steps + 1 tokens in every chunk after the prefill token;
+    - a first chunk of exactly the prefill token, and chunks that cover every
+      output token.
+  - Each record also holds the observed `run_matrix.py` process's PID, its working
+    directory (`/proc/<pid>/cwd`) and the script it runs (its `/proc/<pid>/cmdline`
+    entry resolved against that directory), all read when the hold starts. A hold's
+    runs are void unless both records name one PID, and that process ran the attested
+    checkout's `experiments/state_safety/run_matrix.py` from that directory. Python
+    imports `server.py` and `client.py` from the script's own directory.
+  - Each record also holds the `--prompts` path the process was given (from its
+    command line, resolved against its directory) and that file's SHA-256 at the
+    time of the record. A hold's runs are void unless both records name the
+    canonical prompt file, the one checked against the frozen manifest, with its
+    current hash.
+  - As a cross-check, a run is void if any record's `prompt_tokens` differs from the
+    frozen prompt's length for that ID.
+  - The "after" record holds the SHA-256 of every `*.jsonl` and `*.meta.json` the hold
+    wrote. A run is void unless the analysed files still hash to those values.
+  - A run is also void unless its `started_at` lies between its hold's before and
+    after times.
+    - `started_at` is the host's local time (`run_matrix.py` uses `time.localtime`,
+      written without a zone).
+    - Each attestation records both `time_utc` and `time_local` (the same instant in
+      local time, in `started_at`'s format, with `local_utc_offset`).
+    - The check compares `started_at` with `time_local`, so both sides are in the
+      same zone. The host runs in UTC.
+  - The watcher for the declared runs runs a copy byte-identical to this commit's
+    `attest_runner.py`. It was restarted before either hold started, and each restart
+    is logged in `~/vp-data/state/logs/attest_first_cycle.out`.
+- **Environment.** `analyze_all.sh` and `first_cycle.py` run in the SGLang venv
+  (`scripts/sglang_env.sh`), which provides SciPy. The repository's `.venv` does not;
+  its tests skip the SciPy calls.
+- **No prompts left.** If every prompt is excluded, the result is void: no statistic
+  is computed, and the output records only the counts.
+- **Implementation.** `first_cycle.py` implements this analysis.
+  `tests/test_state_safety_first_cycle.py` tests it on synthetic runs, and
+  `analyze_all.sh` runs it once all five runs exist. Missing runs, unpinned pools or
+  other generation settings make the result void, and then no results are written.
