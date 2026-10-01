@@ -31,6 +31,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'src'))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import certified_head.head
+from certified_head.bounds import Arith
 from certified_head.head import CertifiedHead, GemvConfig
 from certified_head.quantize import load_or_build
 from certified_head.reference import exact_logits_fp64
@@ -54,6 +56,11 @@ def configs(only: list[str] | None = None) -> list[GemvConfig]:
 
 def _fixed(cfg: GemvConfig, _m: int) -> GemvConfig:
     return cfg
+
+
+def _measure_refused_tiles(arith: Arith, cfg: GemvConfig) -> None:
+    """Diagnosis only: this script runs the tiles ``check_gemv_config`` refuses,
+    to measure their faults; a served head never skips the check."""
 
 
 def sweep_rows(hidden: int, m: int) -> torch.Tensor:
@@ -119,6 +126,7 @@ def main() -> None:
     w, qh = load_or_build()
     head = CertifiedHead.from_quantized(w.cuda(), qh, max_batch=max(args.batches))
     head.arith_for = _const_w8a16
+    certified_head.head.check_gemv_config = _measure_refused_tiles
     real = torch.cat([s for s, _ in plain_decode_steps(limit_rows=max(args.batches))])
     result: dict[str, Any] = {'checks': []}
     for m in args.batches:

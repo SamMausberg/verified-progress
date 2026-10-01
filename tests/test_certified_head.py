@@ -988,7 +988,8 @@ def test_enclosure_self_test_refuses_a_bad_configuration(checkpoint: tuple[Any, 
     graph.replay()
     torch.cuda.synchronize()
     assert torch.equal(out, reference_argmax(other, w, 'bf16'))
-    # The W8A16 TMA tiles with block_m = 128 are refused by the dispatcher itself.
+    # The dispatcher itself refuses int8 TMA tiles with a box narrower than 128 bytes
+    # or block_m >= 128; this 128x128x64 tile is refused on both counts.
     head = CertifiedHead.from_quantized(w, qh, max_batch=128, capacity=64)
     head.gemv_config = lambda _m: GemvConfig(128, 128, 64, 4, 3, tma=True)
     report = head.enclosure_self_test([96, 128])

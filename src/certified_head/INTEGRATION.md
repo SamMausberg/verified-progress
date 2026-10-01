@@ -84,10 +84,14 @@ Measured violations: TMA loads of the int8 weight tile with a 64-byte box
 (`block_k = 64`) feeding the BF16 conversion and `tl.dot` returned wrong products
 on GH200 with Triton 3.7.1 and torch 2.13.0+cu130
 (`experiments/certified_head/tma_repro.py`, `evidence/certified_head/tma_repro.json`);
-such tiles are refused (`check_gemv_config`). A second TMA tile with a 128-byte
-box (64x128x128 at M = 256, not a default) produced a wrong envelope with a miss
-count that varied between identical runs; the self-test and the probes caught it.
-The defaults' clean record is empirical (see the evidence README).
+such tiles are refused (`check_gemv_config`). With a 128-byte box, three TMA tiles
+with `block_m = 128` (64x128x128 with 4 warps and 3 stages, 128x128x128 with 8
+warps and 3 or 4 stages, none a default) produced wrong envelopes with miss counts
+that varied between identical runs (`evidence/certified_head/tma_m128_neighbourhood.json`).
+128x128x128 with 8 warps and 4 stages also had a run with no miss
+(`tma_m128_check.json`, sweep rows at M = 128), which the self-test would pass,
+so int8 TMA tiles with `block_m >= 128` are refused too. The defaults' clean record is
+empirical (see the evidence README).
 
 ## Known limitation: conditional nodes keep their bodies' memory
 

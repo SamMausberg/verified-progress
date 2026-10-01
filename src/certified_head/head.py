@@ -152,8 +152,8 @@ def default_gemv_config(m: int) -> GemvConfig:
     BF16 conversion and ``tl.dot`` returned wrong products on GH200 (Triton 3.7.1,
     ``experiments/certified_head/tma_repro.py``); these configurations were checked
     on real rows at M = 1, 16, 17, 32, 33, 64, 65, 128, 200 and 256
-    (``tma_candidates.py``); the 64-byte-box tiles are refused,
-    see :func:`check_gemv_config`.
+    (``tma_candidates.py``); the 64-byte-box tiles, and int8 TMA tiles with
+    ``block_m >= 128``, are refused, see :func:`check_gemv_config`.
     """
     if m <= 16:
         return GemvConfig(128, 16, 128, 4, 4, tma=True)
@@ -165,20 +165,32 @@ def default_gemv_config(m: int) -> GemvConfig:
 
 
 def check_gemv_config(arith: Arith, cfg: GemvConfig) -> None:
-    """Refuse tile configurations of the measured TMA fault.
+    """Refuse tile configurations of the two measured TMA faults.
 
     With TMA loads of an int8 operand whose box is narrower than 128 bytes
     (``block_k < 128``), the W8A16 pass (int8 weights converted to BF16 before
     ``tl.dot``) computed wrong products, finite and non-finite, at several tile
     shapes and batch sizes; pointer loads of the same tiles, TMA with a 128-byte
     box, a BF16 operand through a 64-byte box and an int8 x int8 dot through a
-    64-byte box were exact. Int8 TMA boxes narrower than 128 bytes are refused for
-    both int8 passes until the cause is understood.
+    64-byte box were exact.
+
+    With a 128-byte box and ``block_m = 128`` (64x128x128 with 4 warps and 3
+    stages, 128x128x128 with 8 warps and 3 or 4 stages), the W8A16 envelope
+    missed exact logits in counts that varied between identical runs, and one of
+    these configurations had a run with no miss, which the self-test would pass.
+    No default has ``block_m >= 128``.
+
+    Both are refused for both int8 passes until the causes are understood.
     """
     if arith in ('w8a16', 'w8a8') and cfg.tma and cfg.block_k < 128:
         raise ValueError(
             f'{arith} with TMA int8 loads narrower than 128 bytes is refused '
             f'(measured wrong products): {cfg}'
+        )
+    if arith in ('w8a16', 'w8a8') and cfg.tma and cfg.block_m >= 128:
+        raise ValueError(
+            f'{arith} with TMA int8 loads and block_m >= 128 is refused '
+            f'(measured wrong envelopes): {cfg}'
         )
 
 

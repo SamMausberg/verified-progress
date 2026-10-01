@@ -164,10 +164,16 @@ class QuantizedHead:
 
 def build_quantized_head(w: torch.Tensor, info: dict[str, Any] | None = None) -> QuantizedHead:
     """Quantize ``w`` and compute its envelope metadata. ``info`` records the
-    head's SHA-256 (computed from ``w`` unless given), which
-    ``CertifiedHead.from_quantized`` checks against the weight it is handed."""
+    SHA-256 of ``w``, which ``CertifiedHead.from_quantized`` checks against the
+    weight it is handed. A ``head_sha256`` supplied in ``info`` must equal it:
+    metadata copied from another head would otherwise label these codes and
+    bounds with that head's digest and pass the check for the wrong weight."""
     info = dict(info or {})
-    info.setdefault('head_sha256', head_sha256(w))
+    digest = head_sha256(w)
+    supplied = info.get('head_sha256')
+    if supplied is not None and supplied != digest:
+        raise ValueError('the supplied head_sha256 is not the digest of the weight being quantized')
+    info['head_sha256'] = digest
     q, scale = quantize_int8_rows(w)
     meta = error_metadata(w, q, scale)
     return QuantizedHead(
