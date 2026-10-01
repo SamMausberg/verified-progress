@@ -47,7 +47,7 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 | upstream | Bug reports and fixes for SGLang from what the workstreams found | `active`; nothing filed yet |
 | paper | Manuscript revision as results land | `done` (milestones PRs #21, #30, #32, #36; editorial PR #49) |
 | author, appendix | Focused MLSys-format paper: main text, and appendices with the evidence register | `active` (PR #53; results folded in as they merge) |
-| organize | Repository organization: layout, indexes, top-level documents, this list | `review` (#125; PR #122, #124 merged) |
+| organize | Repository organization: layout, indexes, top-level documents, this list | `review` (#125, #127; PR #122, #124 merged) |
 | review | Independent review of every PR before merge | `active` |
 
 ## Task list
