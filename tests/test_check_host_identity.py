@@ -100,3 +100,20 @@ def test_global_ipv6_addresses_are_patterns_but_local_ones_are_not(tmp_path: Pat
     done = run(env, tmp_path, 'global.txt', 'local.txt')
     assert done.returncode == 1
     assert 'global.txt' in done.stderr and 'local.txt' not in done.stderr
+
+
+def test_paths_are_checked_as_well_as_contents(tmp_path: Path) -> None:
+    env = fake_host(tmp_path, '203-0-113-7', '203.0.113.7')
+    (tmp_path / 'run-203-0-113-7.log').write_text('clean\n')
+    done = run(env, tmp_path, 'run-203-0-113-7.log')
+    assert done.returncode == 1
+    assert 'the path contains' in done.stderr
+
+
+def test_ipv6_matches_any_case_and_the_expanded_form(tmp_path: Path) -> None:
+    env = fake_host(tmp_path, 'ubuntu', '2001:db8::7')
+    (tmp_path / 'upper.txt').write_text('peer 2001:DB8::7\n')
+    (tmp_path / 'expanded.txt').write_text('peer 2001:0db8:0000:0000:0000:0000:0000:0007\n')
+    done = run(env, tmp_path, 'upper.txt', 'expanded.txt')
+    assert done.returncode == 1
+    assert 'upper.txt' in done.stderr and 'expanded.txt' in done.stderr

@@ -8,7 +8,9 @@
 # With no arguments it checks the files staged for commit (pre-commit runs it that way, so the
 # config's evidence/ exclusion does not hide evidence files from it). It looks for the hostname
 # when that is an IP address in dashed form, and for every public IPv4 address `hostname -I`
-# reports, dotted and dashed, and for every global IPv6 address it reports. Binary files are
+# reports, dotted and dashed, and for every global IPv6 address it reports (compressed and
+# fully expanded spellings, any case; other spellings are not matched). File paths are checked
+# as well as contents. Binary files are
 # scanned as text too (a PDF or binary artifact can embed the address); a compressed stream
 # can still hide it, so check generated archives at the source. Matches are reported by file
 # and line, without the value.
@@ -23,7 +25,12 @@ for addr in $(hostname -I 2>/dev/null || true); do
   case "$addr" in
     ::1 | [fF][eE]80:* | [fF][cCdD]*:*) continue ;; # IPv6 loopback, link-local, unique local
     *:*)
-      patterns+=("$addr")
+      # The compressed and fully expanded spellings; the search ignores case.
+      mapfile -t forms < <(python3 -c 'import ipaddress, sys
+a = ipaddress.IPv6Address(sys.argv[1].split("%")[0])
+print(a.compressed)
+print(a.exploded)' "$addr" 2>/dev/null || echo "$addr")
+      patterns+=("${forms[@]}")
       continue
       ;;
     127.* | 10.* | 192.168.* | 169.254.*) continue ;;
@@ -46,12 +53,20 @@ for p in "${patterns[@]}"; do args+=(-e "$p"); done
 
 status=0
 for f in "${files[@]}"; do
+  # The path itself is published too.
+  for p in "${patterns[@]}"; do
+    if [[ ${f,,} == *"${p,,}"* ]]; then
+      echo "$f: the path contains this machine's hostname or IP address" >&2
+      status=1
+      break
+    fi
+  done
   # Staged content, not the working copy, when checking a commit.
   if [ -n "$staged" ]; then
-    hits="$(git cat-file blob ":$f" 2>/dev/null | grep -n -a -F "${args[@]}" | cut -d: -f1 | tr '\n' ' ' || true)"
+    hits="$(git cat-file blob ":$f" 2>/dev/null | grep -n -a -i -F "${args[@]}" | cut -d: -f1 | tr '\n' ' ' || true)"
   else
     [ -f "$f" ] || continue
-    hits="$(grep -n -a -F "${args[@]}" "$f" | cut -d: -f1 | tr '\n' ' ' || true)"
+    hits="$(grep -n -a -i -F "${args[@]}" "$f" | cut -d: -f1 | tr '\n' ' ' || true)"
   fi
   if [ -n "$hits" ]; then
     echo "$f: line(s) ${hits% } contain this machine's hostname or IP address" >&2
