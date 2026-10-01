@@ -76,6 +76,15 @@ def verifier_of(row: dict[str, Any]) -> str:
     otherwise the verifier is FlashInfer when the decode backend (--linear-attn-decode-backend,
     else --linear-attn-backend, else its default, triton) is FlashInfer, and Triton otherwise."""
     cmd = [str(x) for x in (row.get('command') or [])]
+    # ReplaySSM spec verify replaces the per-position-state kernels on the GDN verify path.
+    if '--enable-linear-replayssm-spec' in cmd or flag_value(
+        cmd, '--enable-linear-replayssm-spec'
+    ) in (
+        'true',
+        'True',
+        '1',
+    ):
+        return 'replayssm_spec'
     verify = flag_value(cmd, '--linear-attn-verify-backend')
     if verify is not None:
         return verify
@@ -112,7 +121,7 @@ def main() -> None:
     )
     ap.add_argument(
         '--verifier',
-        choices=['flashinfer', 'triton'],
+        choices=['flashinfer', 'triton', 'replayssm_spec'],
         default='flashinfer',
         help='GDN verify kernel of the forced-acceptance rows (the baseline should use the same)',
     )
@@ -167,6 +176,22 @@ def main() -> None:
 
     def no_state(r: dict[str, Any]) -> bool:
         return 'SGLANG_REPAIR_DROP_VERIFY_STATES' in (r.get('probe_env') or {})
+
+    # Comparators that only one verify kernel honours. SGLANG_REPAIR_DROP_VERIFY_STATES (engine
+    # patch 0002) acts only inside FlashInfer's GDN verify kernel, and gdn_state_bench.py times
+    # only FlashInfer's gated_delta_rule_mtp; neither describes another verify kernel.
+    for r in rows:
+        if no_state(r) and verifier_of(r) != 'flashinfer':
+            raise SystemExit(
+                f'run {Path(r["run"]).name} sets SGLANG_REPAIR_DROP_VERIFY_STATES but verifies with '
+                f'the {verifier_of(r)} kernel, where the variable has no effect (it acts only in '
+                "FlashInfer's GDN verify kernel), so it is not a no-state run"
+            )
+    if args.gdn is not None and args.verifier != 'flashinfer':
+        raise SystemExit(
+            f"--gdn times FlashInfer's gated_delta_rule_mtp and cannot describe the {args.verifier} "
+            'verify kernel'
+        )
 
     nostate = {
         int(r['block']): med(r, 'phase_us', 'verify', 'median')

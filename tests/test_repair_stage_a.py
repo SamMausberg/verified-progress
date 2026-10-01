@@ -115,3 +115,85 @@ def test_baseline_verifier_check(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     stage_a.main()
     out = json.loads((tmp_path / 'stage_a_oracle.json').read_text())
     assert [row['B'] for row in out['rows']] == [64]
+
+
+def test_replayssm_spec_runs_get_their_own_label() -> None:
+    stage_a = load('stage_a')
+    assert (
+        stage_a.verifier_of(
+            run('--linear-attn-decode-backend', 'flashinfer', '--enable-linear-replayssm-spec')
+        )
+        == 'replayssm_spec'
+    )
+
+
+def test_no_state_comparator_must_be_flashinfer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stage_a = load('stage_a')
+    bad = timing_row(
+        'force_nostate_tritonverify_b64', 'force', 64, '--linear-attn-verify-backend', 'triton'
+    )
+    bad['probe_env'] = {'SGLANG_REPAIR_DROP_VERIFY_STATES': '1'}
+    timing = tmp_path / 'timing.json'
+    timing.write_text(
+        json.dumps(
+            [
+                timing_row(
+                    'fresh_tritonverify_b16', 'fresh', 16, '--linear-attn-verify-backend', 'triton'
+                ),
+                timing_row(
+                    'force_tritonverify_b64', 'force', 64, '--linear-attn-verify-backend', 'triton'
+                ),
+                bad,
+            ]
+        )
+    )
+    args = [
+        'stage_a.py',
+        '--timing',
+        str(timing),
+        '--verifier',
+        'triton',
+        '--baseline',
+        'fresh_tritonverify_b16',
+        '--out-dir',
+        str(tmp_path),
+    ]
+    monkeypatch.setattr(sys, 'argv', args)
+    with pytest.raises(SystemExit, match='not a no-state run'):
+        stage_a.main()
+
+
+def test_gdn_microbenchmark_only_describes_flashinfer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stage_a = load('stage_a')
+    timing = tmp_path / 'timing.json'
+    timing.write_text(
+        json.dumps(
+            [
+                timing_row(
+                    'fresh_tritonverify_b16', 'fresh', 16, '--linear-attn-verify-backend', 'triton'
+                )
+            ]
+        )
+    )
+    gdn = tmp_path / 'gdn.json'
+    gdn.write_text(json.dumps({'blocks': {}}))
+    args = [
+        'stage_a.py',
+        '--timing',
+        str(timing),
+        '--verifier',
+        'triton',
+        '--baseline',
+        'fresh_tritonverify_b16',
+        '--gdn',
+        str(gdn),
+        '--out-dir',
+        str(tmp_path),
+    ]
+    monkeypatch.setattr(sys, 'argv', args)
+    with pytest.raises(SystemExit, match='gated_delta_rule_mtp'):
+        stage_a.main()
