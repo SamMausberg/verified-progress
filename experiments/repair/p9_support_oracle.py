@@ -39,6 +39,11 @@ knowing G2_F in advance. It is >= 0 and >= the always-reuse Delta by constructio
 reject nothing); it bounds gated programs over the same candidate sets with a padded verify, and
 its excess over always-reuse is the most a perfect gate could add.
 
+A program could also verify only the m + 1 positions left after the correction instead of a
+padded block. `free_verify_always_reuse` charges the reused cycle no verify at all (the lower
+bound of any width's verify cost, every other phase still charged), so its Delta bounds
+always-reuse programs at any verify width from above.
+
     python experiments/repair/p9_support_oracle.py --cycles ~/vp-data/drafter/support/zlab_b16_cycles/cycles.pt \\
         --timing evidence/repair/stage_a_timing.json --out evidence/repair/p9_support_oracle.json
 """
@@ -263,6 +268,10 @@ def main() -> None:
         comp = components(rows, g2r, supported, ph, extra_us=0.0)
         r_f, d = estimate(comp, everything)
         lo, hi = bootstrap(rows, comp, args.bootstrap, seed=k)
+        # Variable-width verify at its cost lower bound: the reused cycle's verify is free.
+        comp_free = components(rows, g2r, supported, ph, extra_us=-ph['verify'])
+        _, d_free = estimate(comp_free, everything)
+        lo_f, hi_f = bootstrap(rows, comp_free, args.bootstrap, seed=k)
         _, d_gate = estimate(comp, everything, gate=True)
         lo_g, hi_g = bootstrap(rows, comp, args.bootstrap, seed=k, gate=True)
         _, d_overall = estimate(comp, everything, overall_rate)
@@ -303,6 +312,12 @@ def main() -> None:
                 'delta': d_gate,
                 'delta_ci95': [lo_g, hi_g],
                 'gain_over_always_reuse': d_gate - d,
+            },
+            # Upper bound on always-reuse Delta at any verify width (reused verify costs 0).
+            'free_verify_always_reuse': {
+                'delta': d_free,
+                'delta_ci95': [lo_f, hi_f],
+                'rejected': hi_f <= 0,
             },
         }
     # Unchanged cached unary control: reuse the old drafted tail wherever the horizon remains.

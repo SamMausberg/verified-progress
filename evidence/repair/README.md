@@ -229,9 +229,11 @@ oracle is therefore not an upper bound, and the rejections of top-1 to top-4 do 
 the mean verify time of a reused cycle in place of 4.73 ms, and everything else unchanged,
 Delta = Delta_padded + r_F p_K (4.73 ms - V_R), where p_K is the supported rate in the table. With
 the variable-width verify cost at its lower bound of zero (V_R = 0, every other phase still charged;
-derived from the table, point estimates, no intervals), Delta would be +0.01 (K = 1), +0.89 (2),
-+1.88 (4), +2.89 (8) and +3.86 (16): upper bounds for any verify width, and no K would be rejected.
-On the point estimates, top-1, top-2 and top-4 stay negative only while V_R exceeds 0.89, 2.71 and
+`free_verify_always_reuse` in the JSON, the same request-level bootstrap and resamples as the
+table), Delta would be +0.01 (+0.00, +0.02) at K = 1, +0.89 (+0.81, +0.98) at 2, +1.88
+(+1.75, +2.05) at 4, +2.89 (+2.71, +3.10) at 8 and +3.86 (+3.64, +4.11) at 16. These bound
+always-reuse programs at any verify width from above, and no K would be rejected. On the point
+estimates (no intervals), top-1, top-2 and top-4 stay negative only while V_R exceeds 0.89, 2.71 and
 3.87 ms. The only measured verify below width 16 at c = 1 is 4.16 ms at width 8 (`fresh_b8`, same
 session as `fresh_b16`), so these thresholds are not settled by the data here; a sweep of the verify
 phase over widths 2 to 16 at c = 1 is queued. The top-8 and top-16 verdicts (not rejected) hold for

@@ -188,3 +188,24 @@ def test_gate_takes_the_better_arm_per_boundary() -> None:
     assert r_f == pytest.approx(4.0 / 2000.0)
     assert always == pytest.approx((2.0 - 3.0) / 3 + r_f * 1000.0 / 3)
     assert gated == pytest.approx((2.0 + r_f * 500.0) / 3)
+
+
+def test_free_verify_shifts_delta_by_the_saved_verify(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    oracle = load('p9_support_oracle')
+    cycles, _, timing = write_inputs(tmp_path)
+    out = tmp_path / 'out.json'
+    argv = ['p9_support_oracle.py', '--cycles', str(cycles), '--timing', str(timing)]
+    argv += ['--bootstrap', '50', '--out', str(out)]
+    monkeypatch.setattr(sys, 'argv', argv)
+    oracle.main()
+    data = json.loads(out.read_text())
+    verify_ms = data['phases_us']['verify'] / 1e3
+    for v in data['by_k'].values():
+        free = v['free_verify_always_reuse']
+        saved = v['r_F_tokens_per_ms'] * v['corrected_prefix_supported_rate'] * verify_ms
+        assert free['delta'] == pytest.approx(v['delta_oracle'] + saved)
+        # Paired resamples: a free verify can only raise each replicate's Delta.
+        assert free['delta_ci95'][0] >= v['delta_oracle_ci95'][0] - 1e-12
+        assert free['delta_ci95'][1] >= v['delta_oracle_ci95'][1] - 1e-12
