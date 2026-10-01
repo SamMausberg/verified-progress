@@ -3,7 +3,9 @@
 # Repeat 0 ran before bench.sweep recorded sessions; its runs are the ones whose
 # manifest has no session, and they are assigned confirm-r0 here. Matched pairs:
 # FlashInfer speculative arms against plain-tuned, Triton arms against
-# plain-tuned-triton, and the Triton plain arm against plain-tuned.
+# plain-tuned-triton, and the Triton plain arm against plain-tuned. Only points with
+# three valid sessions (the declared repeats) rank or lie on the envelope; points
+# with fewer stay in frontier.csv and are drawn hollow.
 #   bench/campaigns/confirm_evidence.sh
 set -euo pipefail
 cd "$(dirname "$0")/../.." || exit 1
@@ -16,11 +18,23 @@ for dir in ~/vp-data/bench/confirm/*/2026*; do
     "$dir/sweep.json")
   [ -n "$session" ] || SESSIONS+=(--session-of "$(basename "$dir")=confirm-r0")
 done
+# Divergence rates and classes from the equality check (evidence/bench/equality/).
+DIVERGENCE=()
+[ -s evidence/bench/equality/classes.json ] &&
+  DIVERGENCE=(--divergence evidence/bench/equality/classes.json)
 # The plot needs matplotlib, which the SGLang venv has.
-~/sglang/.venv/bin/python -m bench.pareto "${RUNS[@]}" "${SESSIONS[@]}" \
-  --out evidence/bench/confirm --status confirmation --baseline plain-tuned \
+~/sglang/.venv/bin/python -m bench.pareto "${RUNS[@]}" "${SESSIONS[@]}" "${DIVERGENCE[@]}" \
+  --out evidence/bench/confirm --status confirmation --baseline plain-tuned --envelope-min-n 3 \
   --title 'Qwen3.5-4B on one GH200: confirmation split' \
   --pair mtp-tuned:plain-tuned --pair mtp-stockverify:plain-tuned \
   --pair dflash-tuned:plain-tuned --pair dflash-tuned-b4:plain-tuned \
   --pair plain-tuned-replayssm:plain-tuned --pair plain-tuned-triton:plain-tuned \
   --pair mtp-tuned-triton:plain-tuned-triton --pair dflash-tuned-b16:plain-tuned-triton
+# Run records may carry the machine's name, which encodes its public address; the
+# evidence must not (the files are published). Report file names only.
+host=$(hostname)
+dotted=$(echo "$host" | sed -E 's/^ip-//; s/-/./g')
+if grep -rlF -e "$host" -e "$dotted" evidence/bench; then
+  echo "the files above contain the hostname or address; scrub them before committing" >&2
+  exit 1
+fi

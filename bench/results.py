@@ -206,9 +206,9 @@ def summarise_point(
     summary['osl_min'] = min(osl)
     summary['osl_max'] = max(osl)
     if isinstance(target_osl, dict):
-        # Per-prompt lengths (natural-length workload), matched by prompt id.
+        # Per-prompt lengths (natural-length workload), matched by prompt text hash.
         summary['osl_mismatch'] = sum(
-            1 for row in ok if row['osl'] != target_osl.get(str(row.get('prompt_id')), -1)
+            1 for row in ok if row['osl'] != target_osl.get(str(row.get('prompt_sha')), -1)
         )
     else:
         summary['osl_mismatch'] = (
