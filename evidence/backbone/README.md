@@ -10,8 +10,10 @@ commands are in [`experiments/backbone/`](../../experiments/backbone/).
 Status: the kernel, merge, norm and skeleton results are **microbenchmarks** (measured) or
 calculations from them (**derived**). [Served results](#served-results) add the exactness class
 of each engine switch (greedy outputs against stock plain decoding) and paired serving runs of
-the routing table against tuned plain and tuned MTP decoding, and a trace of which GEMM kernels
-the served engine dispatches. The exactness class of the routing table under MTP is **pending**.
+the routing table against tuned plain decoding and against MTP with FlashInfer attention
+(`mtp-tuned`), and a trace of which GEMM kernels the served engine dispatches. The routing
+table's exactness class under MTP, and its effect on bench's low-concurrency MTP arm
+(`mtp-tuned-triton`, untested at c = 1-32), are **pending**.
 
 ## Setup
 
@@ -299,10 +301,12 @@ the unfused Triton kernel at M = 1 and doubles the MLP layer from M = 2. No fold
 here pays at any M from 1 to 16, so folding the norm or the SiLU into the GEMM prologue is closed
 as a negative result. The stock and Triton rows repeat hold 1's to within 1.4 us.
 
-### Paired serving: lever v1 against tuned MTP (hold 3)
+### Paired serving: lever v1 against MTP with FlashInfer attention (`mtp-tuned`, hold 3)
 
 The same design in one exclusive hold (2026-10-01, 22:05-22:23 UTC): arm `mtp-tuned` (native MTP,
-three-step chain, buffered GDN verify, radix cache off, 128 GDN slots), both arms on the backbone
+three-step chain, buffered GDN verify, FlashInfer attention, radix cache off, 128 GDN slots),
+which `bench/arms.toml` tunes for high concurrency; at c = 1-32 bench serves MTP faster with
+Triton attention (`mtp-tuned-triton`), which these runs did not test. Both arms on the backbone
 engine, order B A A B with the sessions recorded by the harness (pairs (B1, A1) and (A2, B2)),
 c = 1, 8, 32 and 128. Foreign CPU load averaged 0.19-0.36 cores per point (largest single sample
 1.17), and no point is invalid ([`served/mtp_v1/`](served/mtp_v1/)).
@@ -314,7 +318,7 @@ c = 1, 8, 32 and 128. Foreign CPU load averaged 0.19-0.36 cores per point (large
 | 32 | 6,488.0, 6,643.6 | 6,567.7, 6,635.6 | 1.012, 0.999 | 2.37% | 3.260, 3.261 |
 | 128 | 12,108.5, 12,207.4 | 12,064.3, 12,014.4 | 0.996, 0.984 | 0.81% | 3.257-3.258, 3.257-3.260 |
 
-- **No gain at any concurrency.** At c = 8 and 32 the two pairs straddle 1, and A's own rate rose
+- **No gain at any concurrency on `mtp-tuned`.** At c = 8 and 32 the two pairs straddle 1, and A's own rate rose
   by 1.3-2.4% between its two runs (bench's `mtp-tuned` confirmation sessions differ by 2.2% at
   c = 32, `evidence/bench/confirm/points.csv`). A's rates are within about 1% of that confirmation's.
 - **c = 1: 0.9% slower** in both pairs (one of the two beyond the 0.85% spread). About 0.2% of it
@@ -325,6 +329,10 @@ c = 1, 8, 32 and 128. Foreign CPU load averaged 0.19-0.36 cores per point (large
   (not traced).
 - **c = 128: no claim.** Both pairs are below 1 (0.996, 0.984), one beyond the 0.81% spread.
 - The exactness class of lever v1 on MTP was not measured; the frontier file marks it pending.
+- The routing table is untested against `mtp-tuned-triton`, bench's low-concurrency MTP arm
+  (faster at c = 1-32: 532 against 456 tokens/s at c = 1 in bench's confirmation). With Triton
+  target attention the kernels around the routed GEMMs, and with them PDL's overlap, differ, so
+  these runs say nothing about it.
 
 ### Which GEMM kernels the served engine runs (hold 3)
 
@@ -363,6 +371,8 @@ cores).
 ## Pending
 
 - The exactness class of lever v1 under MTP (greedy outputs against stock MTP).
+- Paired serving of lever v1 against `mtp-tuned-triton`, bench's low-concurrency MTP arm, at
+  c = 1, 8 and 32 (queued as hold 4).
 - Why the step at c = 16 keeps only a third of the GPU span's saving, and why MTP at c = 1 is
   slower; neither is traced.
 
