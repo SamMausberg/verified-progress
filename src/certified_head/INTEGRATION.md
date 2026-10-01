@@ -54,7 +54,9 @@ the fallback check costs one `.item()`. Use one instance per graph family
 `reference='bf16'` returns, row by row, the token SGLang's stock head returns for
 the same batch shape (R-stock; see `evidence/certified_head/README.md` for the
 error models). `gumbel_sample` returns the token SGLang's seeded sampler returns
-on the same logits (temperature only). Fixed-noise sampled verification built on
+on the same logits (temperature only). Its score bounds assume a finite, positive
+temperature; a row with any other temperature is marked `temperature` and takes
+SGLang's chain (a device-side check, graph-safe). Fixed-noise sampled verification built on
 it is equal in law to target sampling, drafter-invariant, and token-identical to
 SGLang's seeded sampler applied to the verify pass's own logits.
 

@@ -62,7 +62,10 @@ STATUS_BITS = {
     'tile_overflow': K.STATUS_TILE_OVERFLOW.value,
     'refused': K.STATUS_REFUSED.value,
     'probe': K.STATUS_PROBE.value,
+    'temperature': 256,
 }
+"""Status bits. ``temperature`` is set on the host side (device ops, no kernel): a
+sampled row whose temperature is not finite and positive takes the stock path."""
 
 Fallback = Literal['batch', 'columns']
 """How undecided greedy rows are completed.
@@ -998,7 +1001,10 @@ class CertifiedHead:
         ``log``, then ``multinomial_with_seed``, whose noise is a function of
         ``(seeds[m], positions[m], token id)``. Rows the certificate cannot decide
         run that chain for the whole batch. ``seeds`` and ``positions`` are int64
-        ``[M]``, ``temperatures`` FP32 ``[M]`` and positive. The stock seeded
+        ``[M]`` (any values: both sides hash them as uint64 and uint32),
+        ``temperatures`` FP32 ``[M]``. The score bounds assume a finite, positive
+        temperature (a negative one reverses them); rows with any other value are
+        marked ``temperature`` and take the stock chain. The stock seeded
         sampler with top-k, top-p or min-p keys its noise by sorted rank and is
         not covered.
         """
@@ -1025,6 +1031,10 @@ class CertifiedHead:
                 self._decide(m)
         finally:
             self._sampling = None
+        # Device ops only, so the guard is graph-safe and needs no host sync.
+        bad_t = ~(torch.isfinite(temperatures) & (temperatures > 0))
+        self._status[:m].bitwise_or_(bad_t.to(torch.int32) * STATUS_BITS['temperature'])
+        self._any.logical_or_(bad_t.any())
         ids = self._ids[:m]
         stats = HeadStats(self._count[:m], self._status[:m])
         if fallback:

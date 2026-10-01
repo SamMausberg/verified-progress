@@ -17,6 +17,7 @@ pytest.importorskip('triton')
 from certified_head.bounds import Arith
 from certified_head.head import (
     K_CHUNK,
+    STATUS_BITS,
     CertifiedHead,
     GemvConfig,
     check_gemv_config,
@@ -83,3 +84,29 @@ def test_every_default_tile_is_accepted() -> None:
         others: tuple[Arith, ...] = ('w8a8', 'bf16')
         for arith in others:
             check_gemv_config(arith, default_arith_config(arith, m))
+
+
+def test_sampled_rows_need_a_finite_positive_temperature(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The score bounds assume T > 0 (a negative T reverses them): rows with any
+    other temperature must take the stock chain. The kernel stages are stubbed
+    (they need a GPU); the guard runs on whatever they leave."""
+    gen = torch.Generator().manual_seed(1)
+    w = (torch.randn(64, 256, generator=gen) * 0.02).to(torch.bfloat16)
+    head = CertifiedHead.from_quantized(
+        w, build_quantized_head(w), device='cpu', max_batch=8, capacity=16
+    )
+    monkeypatch.setattr(head, '_certifiable', lambda _m: True)
+    for stage in ('_approximate', '_refine'):
+        monkeypatch.setattr(head, stage, lambda *_a: None)
+    monkeypatch.setattr(head, '_decide', lambda m: head._status[:m].zero_())
+    h = torch.zeros(6, 256, dtype=torch.bfloat16)
+    seeds = torch.arange(6, dtype=torch.int64)
+    temps = torch.tensor([0.7, -0.7, 0.0, float('inf'), float('nan'), 1.0])
+    _, stats = head.gumbel_sample(h, seeds, seeds, temps, fallback=False)
+    assert stats.fallback.tolist() == [False, True, True, True, True, False]
+    assert bool(head._any)
+    assert bool((stats.status[stats.fallback] == STATUS_BITS['temperature']).all())
+    good = torch.tensor([0.7, 1.0, 1.5, 0.3, 2.0, 1e-3])
+    head._any.zero_()
+    _, stats = head.gumbel_sample(h, seeds, seeds, good, fallback=False)
+    assert not bool(stats.status.any()) and not bool(head._any)
