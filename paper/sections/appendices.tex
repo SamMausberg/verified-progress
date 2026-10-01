@@ -12,6 +12,17 @@
 \setlength{\@fpbot}{0pt plus 1fil}
 \makeatother
 \usetikzlibrary{shapes.geometric}
+% The style sets \flushbottom with a rigid \parskip, so a paragraph that cannot be split at the
+% foot of a page leaves a blank band there. A little stretch between paragraphs lets the page
+% fill instead.
+\setlength{\parskip}{6pt plus 2pt}
+% Start a new page unless at least #1 of space is left, so that no appendix heading sits at the
+% foot of a page with a few lines under it (the needspace package's test, without the package).
+\makeatletter
+\newcommand{\appneedspace}[1]{\par\penalty-100\begingroup\setlength{\dimen@}{#1}%
+  \dimen@ii\pagegoal\advance\dimen@ii-\pagetotal
+  \ifdim\dimen@>\dimen@ii\ifdim\dimen@ii>\z@\vfil\fi\penalty-\@M\fi\endgroup}
+\makeatother
 % A pointer into the research notes, which build after the paper and cannot be cross-referenced
 % from it: \notessec{<label in the notes>}{<its section number>} prints the number.
 % scripts/check_paper_references.py checks the number against the notes' .aux file.

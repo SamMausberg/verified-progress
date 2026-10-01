@@ -4,6 +4,7 @@
 % workload, tuning, confirmed frontier, output equality (bench-*). Served certified head:
 % pending (bench-cert). The serving protocol in full, the ceilings, levers, P4 and P5 are
 % in the research notes.
+\appneedspace{10\baselineskip}
 \section{Where the time goes, and the serving baseline}\label{app:stack}\label{sec:stack}\label{sec:time}
 This appendix measures the stock engine, the baseline a certified head would have to improve. No served result for the certified head exists yet: none of the runs here uses it, and its effect on serving is pending~\pend{bench-cert}. A component that occupies a fraction $f$ of a step can speed the step up by at most $1/(1-f)$, so the head's share of the time bounds what any head certificate can deliver. Appendices~\ref{app:bytes} and~\ref{app:profile} measure where the time of a plain decode step and of an MTP speculative cycle goes, and Appendix~\ref{app:serving} gives the stock serving frontier. The serving protocol in full, what the other layers of the stack could deliver, the first lever measurements and the proposals for writing the recurrent state less often or sharing it across requests are in the research notes (the protocol in their Section~\notessec{notes:serving}{4}, the rest in Section~\notessec{notes:stack}{3}).
 
