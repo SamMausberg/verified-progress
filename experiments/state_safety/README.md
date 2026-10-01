@@ -47,6 +47,22 @@ packages tokens. Each streamed chunk then carries one verify cycle, which is
 how cycle boundaries are recovered; `compare.spec_cycles_consistent` checks
 that the chunk count matches the server's `spec_verify_ct`.
 
+Matrix runs pin the pools (`server.POOL_PIN`): `--max-running-requests 8`,
+`--max-total-tokens 49152` and `--max-mamba-cache-size 40`, added after the
+configuration's flags. Without them SGLang sizes the KV and GDN state pools from
+the memory free at start-up, so two servers of the same configuration can differ
+in batch cap and in radix eviction, and so in which request's copy of a shared
+prefix a later request reads. With 40 GDN slots the cap of 8 binds in every
+configuration: the radix cache with the overlap scheduler needs 5 slots per
+running request, 4 without overlap, 1 without the radix cache.
+`launch_with_retry` reads the allocated sizes from the server log and restarts
+the server until they match. Before each start it waits until enough memory is
+free: 68 GB for MTP and 52 GB for plain decode, or `GPU_STARTUP_MIN_FREE_GB`.
+Pinned runs go to `~/vp-data/state/runs_pinned/`. The first matrix runs (cap
+16, pools sized from free memory) stay in `~/vp-data/state/runs/`; `--no-pin`
+reproduces them. Targeted tests compare runs on one server and keep the
+earlier flags.
+
 | Name | Extra flags |
 |---|---|
 | `plain` | none (radix cache with the `extra_buffer` GDN strategy, overlap scheduler, CUDA graphs) |
@@ -109,6 +125,6 @@ the exact commands are in `evidence/state_safety/README.md`. `tap_signature.py` 
 run by `analyze_all.sh`) finds where the v1 and v3 tapped sessions of the same
 configuration first part ways.
 
-Raw outputs stay in `~/vp-data/state/` (`runs/`, `targeted/`); each run has a
-`.meta.json` with the flags, resolved server settings, and the repository and
-SGLang commits.
+Raw outputs stay in `~/vp-data/state/` (`runs_pinned/`, `runs/`, `targeted/`); each
+run has a `.meta.json` with the flags, the pool pin, the resolved server settings
+and pool sizes, and the repository and SGLang commits.
