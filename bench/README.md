@@ -134,9 +134,11 @@ scripts/gpu_lock.sh -x python -m bench.server --arm mtp --port 30010 \
 scripts/gpu_lock.sh -x python -m bench.sweep --arm mtp --label mtp \
     --concurrency 1 2 4 8 16 32 64 128 --repeats 1
 
-# Frontier from any set of runs
+# Frontier from any set of runs, with matched-flag ratios (pairs.csv) and the
+# envelope over all arms and over stock-arithmetic arms (envelope.csv, *.dat, PNG);
+# the plot needs matplotlib (in the SGLang venv)
 python -m bench.pareto ~/vp-data/bench/runs/plain/* ~/vp-data/bench/runs/mtp/* \
-    --out evidence/bench/confirm --baseline plain
+    --out evidence/bench/confirm --baseline plain --pair mtp:plain
 
 # Quality (GSM8K test, thinking on, T 0.6 / top-p 0.95 / top-k 20, fixed seed, natural stopping)
 scripts/gpu_lock.sh -x python -m bench.quality run --arm plain

@@ -533,7 +533,7 @@ def test_host_load_attributes_short_lived_own_children_to_the_run() -> None:
 
 
 def test_envelope_and_paired_ratios() -> None:
-    from bench.pareto import envelope, paired_ratios
+    from bench.pareto import envelope, exactness_class, paired_ratios, pareto_envelope
 
     def row(label: str, run: str, c: int, y: float) -> dict[str, object]:
         return {'label': label, 'run': run, 'concurrency': c, 'x_e2e': y / c, 'y': y, 'failed': 0}
@@ -550,6 +550,15 @@ def test_envelope_and_paired_ratios() -> None:
     best = {e['concurrency']: e for e in envelope(frontier)}
     assert best[1]['best'] == 'spec' and best[64]['best'] == 'plain'
     assert best[64]['lead'] == pytest.approx(0.25)
+    for entry in frontier:
+        entry['exactness'] = 'pending' if entry['label'] == 'spec' else ''
+    best = {e['concurrency']: e for e in envelope(frontier)}
+    assert best[1]['best_exactness'] == 'pending' and best[1]['best_stock'] == 'plain'
+    assert [e['label'] for e in pareto_envelope(frontier, stock_only=True)] == ['plain'] * 2
+    assert {e['label'] for e in pareto_envelope(frontier, stock_only=False)} == {'plain', 'spec'}
+    assert exactness_class('') == ''
+    assert exactness_class('pending: classification') == 'pending'
+    assert exactness_class('changes greedy outputs') == 'lossy'
     ratios = {r['concurrency']: r for r in paired_ratios(rows, [('spec', 'plain')])}
     assert ratios[1]['n'] == 2 and ratios[1]['y_ratio_mean'] == pytest.approx(2.0)
     assert ratios[64]['y_ratio_mean'] == pytest.approx(0.8)
