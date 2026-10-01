@@ -28,8 +28,9 @@ so neither a missing arm nor an interrupted run can drop out of the check.
 It prints one count line per server log and exits 1 if any log yields fewer than
 --min-plateaus plateaus (default 1, so an unparsed log or one whose waves all filled cannot
 pass silently), if any plateau's C is not inferable, or if any plateau differs from the
-prediction. It explains plateaus; it is not the admission test (check_admission.py is), and
-a run whose waves all fill has no plateau to explain.
+prediction; --csv is written only when every check passes. It explains plateaus; it is not
+the admission test (check_admission.py is), and a run whose waves all fill has no plateau to
+explain.
 
     python experiments/moonshot/admission_plateaus.py <lever_sweep out dir> ... \
         --expect <run dir name>=<label>,<label> ... [--min-plateaus N] [--csv out.csv]
@@ -213,13 +214,14 @@ def main() -> None:
             )
             rows.extend(found)
     print(f'{len(rows)} plateaus in total; logs failing: {failed or "none"}')
+    if failed:
+        # Leave any existing CSV untouched: a failed audit must not replace the evidence.
+        sys.exit(1)
     if args.csv:
         with args.csv.open('w', newline='') as handle:
             writer = csv.DictWriter(handle, fieldnames=FIELDS, lineterminator='\n')
             writer.writeheader()
             writer.writerows(rows)
-    if failed:
-        sys.exit(1)
 
 
 if __name__ == '__main__':

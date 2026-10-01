@@ -143,3 +143,20 @@ def test_cli_fails_on_a_run_without_a_plan(tmp_path: Path) -> None:
     )
     assert other.returncode == 1
     assert 'run and --expect do not match' in other.stdout
+
+
+def test_failed_audit_leaves_the_csv_untouched(tmp_path: Path) -> None:
+    out = tmp_path / 'plateaus.csv'
+    out.write_text('previous evidence\n')
+    result = run_cli(
+        tmp_path, {'dense#r1': PLATEAU_127}, '--csv', str(out), configs=['dense#r1', 'exact#r1']
+    )
+    assert result.returncode == 1
+    assert out.read_text() == 'previous evidence\n'
+
+
+def test_passing_audit_writes_the_csv(tmp_path: Path) -> None:
+    out = tmp_path / 'plateaus.csv'
+    result = run_cli(tmp_path, {'dense': PLATEAU_127}, '--csv', str(out))
+    assert result.returncode == 0
+    assert out.read_text().splitlines()[0].startswith('run,arm,time_utc')
