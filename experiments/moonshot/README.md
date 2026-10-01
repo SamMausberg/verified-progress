@@ -19,7 +19,7 @@ their command in the docstring. The levers that need engine changes come from th
 | `summarise.py` | Tables from raw results: `ceiling` (decode-step sweeps), `sweeps` (lever sweeps), `quality` (probe summaries) | `decode_ceiling_try1.csv`, `lever_sweeps_quick.csv`, `host_levers.csv` |
 | `ceilings.py` | Derived step-time floors and throughput ceilings per lever stack under two execution models (a calculation, not a measurement) | `ceilings.json`, `ceilings.csv` |
 | `decode_ceiling_sweep.py` | Engine-only decode-step latency against batch size per configuration (`sglang.benchmark.one_batch`) | raw, summarised into `decode_ceiling_try1.csv` |
-| `gdn_exact_replay_check.py` | P4: bit-exactness (`check`) and kernel time (`bench`) of exact replay and ReplaySSM against SGLang's packed GDN decode | `gdn_exact_replay_check_*.json`, `gdn_exact_replay_bench.json` |
+| `gdn_exact_replay_check.py` | P4: bit-exactness of exact replay and of ReplaySSM against SGLang's packed GDN decode (`check`), and the kernel time of exact replay by ring length against the packed decode (`bench`) | `gdn_exact_replay_check_*.json`, `gdn_exact_replay_bench.json` |
 | `gdn_fast_verify_check.py` | P7: disagreement and time of SGLang's chunked GDN kernel used as a block-parallel verify path | `p7_fast_verify_check.json`, `p7_verify_width_bench.json` |
 | `token_map_coverage.py` | Held-out coverage of bench's hot-vocabulary draft maps on plain outputs of the confirm split | `token_map_coverage.csv` |
 | `build_token_map.py` | Builds hot-vocabulary maps for the MTP draft head from the model's own outputs on a calibration set | maps in `~/vp-data/moonshot/token_map/` |
@@ -28,7 +28,7 @@ their command in the docstring. The levers that need engine changes come from th
 | `gsm8k_arms.py` | GSM8K accuracy per lever stack through `bench.quality`, for the declared quality budget | pending |
 | `make_long_prompts.py` | The 2,048-token prompts of P4's served test, built from a bench split | input of the P4 test |
 | `run_p4_admission.sh`, `check_admission.py` | P4's admission preflight: every arm's server must run 128 requests at once during the measured phase | pending |
-| `run_p4b.sh` | P4's served test in one exclusive hold: kernel checks, admission, output probe, then the paired A/B | pending |
+| `run_p4b.sh` | P4's served test in one exclusive hold: admission preflight, server output probe, then the paired A/B validated by `validate_p4_ab.py` (the kernel checks are reused from an earlier run, as its header explains) | pending |
 | `output_probe.py` | Outcome of P4's server output probe (refuted, undecided or no difference) | pending |
 | `validate_p4_ab.py` | Validates one P4 A/B run and applies the declared decision rule | pending |
 
