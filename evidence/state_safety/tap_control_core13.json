@@ -1,7 +1,7 @@
 {
  "summary": {
-  "a": "/home/ubuntu/vp-data/state/tap/v3_smoke",
-  "b": "/home/ubuntu/vp-data/state/tap/v3_ctrl_core13",
+  "a": "tap/v3_smoke",
+  "b": "tap/v3_ctrl_core13",
   "prompts": 4,
   "classes": {
    "accumulator_ambiguous": 1,
@@ -31,6 +31,7 @@
    "id": "alpaca_eval-0000",
    "prompt_len": 27,
    "diverged_at": 6,
+   "first_logprob_difference": 0,
    "first_difference": {
     "position": 0,
     "module": "model.layers.13.linear_attn.attn",
@@ -82,8 +83,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.015619586091863895,
-    "gap_bound_b": 0.01561522428916584,
+    "gap_bound_a": 0.015647985227533946,
+    "gap_bound_b": 0.015643615494316743,
     "accumulator_order_source": [
      "bf16",
      "ambiguous"
@@ -97,6 +98,7 @@
    "id": "alpaca_eval-0010",
    "prompt_len": 32,
    "diverged_at": null,
+   "first_logprob_difference": 0,
    "first_difference": {
     "position": 0,
     "module": "model.layers.13.linear_attn.attn",
@@ -116,6 +118,7 @@
    "id": "alpaca_eval-0020",
    "prompt_len": 19,
    "diverged_at": null,
+   "first_logprob_difference": 0,
    "first_difference": {
     "position": 0,
     "module": "model.layers.13.linear_attn.attn",
@@ -135,6 +138,7 @@
    "id": "alpaca_eval-0030",
    "prompt_len": 19,
    "diverged_at": null,
+   "first_logprob_difference": 0,
    "first_difference": {
     "position": 0,
     "module": "model.layers.13.linear_attn.attn",

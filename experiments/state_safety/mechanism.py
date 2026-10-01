@@ -47,11 +47,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+
+# The exact reference (src/precision_reference.py) supplies the Hopper model's gamma.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'src'))
 
 MODEL_DIR = (
     Path.home()
@@ -455,11 +459,18 @@ def error_models(k: int) -> dict[str, float]:
     conservative: the project's model, gamma(2k, 2**-23) = 2k u / (1 - 2k u) with
     u = 2**-23, covering any reduction order, split-K with FP32 partials and
     truncating adders. hopper: the blocked Hopper wgmma model used by the kernel
-    workstream (1.19e-4 at k = 2560, including an FP32 split-K allowance); it rests
-    on a published measurement-based hardware model, not vendor documentation.
+    workstream, including an FP32 split-K allowance, computed exactly by
+    precision_reference.hopper_wgmma_gamma and rounded up (1.19216e-4 at k = 2560);
+    it rests on a published measurement-based hardware model, not vendor
+    documentation.
     """
+    import precision_reference as ref
+
     u = 2.0**-23
-    return {'conservative': 2 * k * u / (1 - 2 * k * u), 'hopper': 1.19e-4}
+    return {
+        'conservative': 2 * k * u / (1 - 2 * k * u),
+        'hopper': ref.float_up(ref.hopper_wgmma_gamma(k)),
+    }
 
 
 def abs_products(head: Head, h: np.ndarray, toks: tuple[int, int]) -> float:

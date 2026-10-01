@@ -168,6 +168,26 @@ def gamma(depth: int, u: Q) -> Q:
     return depth * u / (1 - depth * u)
 
 
+def hopper_wgmma_gamma(n: int) -> Q:
+    """gamma of the Hopper model for an n-term BF16 dot product with FP32 output.
+
+    Khattak and Mikaitis model Hopper's BF16 wgmma as a multi-term adder over 16
+    products plus the accumulator that keeps 25 fractional bits and truncates, so
+    each of the m = ceil(n / 16) nodes on the path has u_v = 17 * 2**-25 + 2**-23.
+    An allowance of m further truncating FP32 additions (2**-23 each) covers split-K
+    partials. Returns (1 + u_v)**m * (1 + 2**-23)**m - 1 exactly: 1.19216e-4 at
+    n = 2560. The model rests on published measurements, not vendor documentation.
+    """
+    m = -(-n // 16)
+    u_v = 17 * pow2(-25) + pow2(-23)
+    return (1 + u_v) ** m * (1 + pow2(-23)) ** m - 1
+
+
+def float_up(x: Q) -> float:
+    """The smallest binary64 value >= x, so a bound stays a bound as a Python float."""
+    return float(round_to(x, FP64, 'up'))
+
+
 def _trunc(x: Q) -> int:
     return math.floor(x) if x >= 0 else -math.floor(-x)
 
