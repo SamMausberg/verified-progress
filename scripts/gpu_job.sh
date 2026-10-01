@@ -35,24 +35,30 @@ fi
 # exec keeps it) and executes bash on this script with the same arguments. The pid does not
 # change, so flock is still the parent and the parent-death signal still applies;
 # GPU_JOB_SUBREAPER marks the second pass. Python ignores SIGPIPE and SIGXFSZ when it starts and
-# an exec keeps ignored signals ignored, so it restores both to the default first. A job that
-# cannot be contained does not run.
+# an exec keeps ignored signals ignored, so it puts both back as the caller had them: the ignored
+# signals of this process (SigIgn in /proc/$$/status, read before the re-exec) travel in
+# GPU_JOB_SIGIGN. A job that cannot be contained does not run.
 if [ "${GPU_JOB_SUBREAPER:-}" != "$$" ]; then
+  sigign=0
+  while read -r key value; do
+    if [ "$key" = SigIgn: ]; then sigign="$value"; fi
+  done <"/proc/$$/status"
   shopt -s execfail
-  GPU_JOB_SUBREAPER="$$" exec python3 -I -S -c '
+  GPU_JOB_SUBREAPER="$$" GPU_JOB_SIGIGN="$sigign" exec python3 -I -S -c '
 import ctypes, os, signal, sys
 if ctypes.CDLL(None, use_errno=True).prctl(36, 1, 0, 0, 0) != 0:  # PR_SET_CHILD_SUBREAPER
     err = os.strerror(ctypes.get_errno())
     print("gpu_job.sh: cannot become a child subreaper:", err, file=sys.stderr)
     sys.exit(75)
-signal.signal(signal.SIGPIPE, signal.SIG_DFL)
-signal.signal(signal.SIGXFSZ, signal.SIG_DFL)
+ignored = int(os.environ["GPU_JOB_SIGIGN"], 16)
+for sig in (signal.SIGPIPE, signal.SIGXFSZ):
+    signal.signal(sig, signal.SIG_IGN if ignored >> (sig - 1) & 1 else signal.SIG_DFL)
 os.execv(sys.argv[1], sys.argv[1:])
 ' "$BASH" "${BASH_SOURCE[0]}" "$@"
   echo "gpu_job.sh: cannot run python3 to contain the job; not running" >&2
   exit 75
 fi
-unset GPU_JOB_SUBREAPER
+unset GPU_JOB_SUBREAPER GPU_JOB_SIGIGN
 
 mode="$1"
 shift

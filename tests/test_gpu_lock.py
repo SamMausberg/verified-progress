@@ -424,33 +424,52 @@ def sig_ignored(status: str) -> int:
     return int(line.split()[1], 16)
 
 
-def test_the_job_keeps_the_callers_signal_dispositions(tmp_path: Path) -> None:
-    """The subreaper helper (Python) ignores SIGPIPE and SIGXFSZ; the job must not inherit that."""
+@pytest.mark.parametrize('ignored', ['', 'PIPE XFSZ'])
+def test_the_job_keeps_the_callers_signal_dispositions(tmp_path: Path, ignored: str) -> None:
+    """The subreaper helper (Python) ignores SIGPIPE and SIGXFSZ itself; the job must get the
+    caller's dispositions back, ignored or not."""
     lock = tmp_path / 'gpu.lock'
     lock.touch()
     env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock))
     out = tmp_path / 'status'
     environ = tmp_path / 'environ'
+    caller = f"trap '' {ignored}; " if ignored else ''
+    job = f'cat /proc/self/status > {out}; env > {environ}'
     done = subprocess.run(
-        [
-            'bash',
-            str(SCRIPT),
-            '-s',
-            'bash',
-            '-c',
-            f'cat /proc/self/status > {out}; env > {environ}',
-        ],
+        ['bash', '-c', f'{caller}exec bash {SCRIPT} -s bash -c "{job}"'],
         env=env,
         timeout=60,
         check=False,
     )
     assert done.returncode == 0
-    caller = subprocess.run(
-        ['cat', '/proc/self/status'], env=env, capture_output=True, text=True, check=True
+    status = subprocess.run(
+        ['bash', '-c', f'{caller}exec cat /proc/self/status'],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout
     reset = (1 << (1 - 1)) | (1 << (2 - 1)) | (1 << (15 - 1))  # HUP, INT, TERM: gpu_lock.sh resets
-    assert sig_ignored(out.read_text()) == sig_ignored(caller) & ~reset
+    assert sig_ignored(out.read_text()) == sig_ignored(status) & ~reset
     assert 'GPU_JOB_SUBREAPER' not in environ.read_text()
+    assert 'GPU_JOB_SIGIGN' not in environ.read_text()
+
+
+def test_a_job_whose_caller_ignores_sigpipe_survives_it(tmp_path: Path) -> None:
+    """Codex's example on #146: with SIGPIPE ignored by the caller, the job survives one."""
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock))
+    out = tmp_path / 'out'
+    job = f'kill -PIPE $$; kill -XFSZ $$; echo survived > {out}'
+    done = subprocess.run(
+        ['bash', '-c', f"trap '' PIPE XFSZ; exec bash {SCRIPT} -s bash -c '{job}'"],
+        env=env,
+        timeout=60,
+        check=False,
+    )
+    assert done.returncode == 0
+    assert out.read_text().strip() == 'survived'
 
 
 def test_a_job_that_cannot_be_contained_does_not_run(tmp_path: Path) -> None:
