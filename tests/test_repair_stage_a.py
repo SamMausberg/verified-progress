@@ -84,39 +84,6 @@ def timing_row(name: str, mode: str, block: int, *flags: str) -> dict[str, objec
     }
 
 
-def test_baseline_verifier_check(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    stage_a = load('stage_a')
-    timing = tmp_path / 'timing.json'
-    timing.write_text(
-        json.dumps(
-            [
-                timing_row('fresh_b16', 'fresh', 16, '--linear-attn-decode-backend', 'flashinfer'),
-                timing_row(
-                    'force_tritonverify_b64', 'force', 64, '--linear-attn-verify-backend', 'triton'
-                ),
-            ]
-        )
-    )
-    base_args = [
-        'stage_a.py',
-        '--timing',
-        str(timing),
-        '--verifier',
-        'triton',
-        '--out-dir',
-        str(tmp_path),
-    ]
-    # A FlashInfer baseline for a Triton calculation is rejected ...
-    monkeypatch.setattr(sys, 'argv', base_args)
-    with pytest.raises(SystemExit):
-        stage_a.main()
-    # ... unless C_D, A_D and f are all given, so the named baseline contributes nothing.
-    monkeypatch.setattr(sys, 'argv', [*base_args, '--cd-us', '6500', '--ad', '7', '--f', '0.02'])
-    stage_a.main()
-    out = json.loads((tmp_path / 'stage_a_oracle.json').read_text())
-    assert [row['B'] for row in out['rows']] == [64]
-
-
 def test_replayssm_spec_runs_get_their_own_label() -> None:
     stage_a = load('stage_a')
     assert (
@@ -127,73 +94,102 @@ def test_replayssm_spec_runs_get_their_own_label() -> None:
     )
 
 
-def test_no_state_comparator_must_be_flashinfer(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    stage_a = load('stage_a')
-    bad = timing_row(
-        'force_nostate_tritonverify_b64', 'force', 64, '--linear-attn-verify-backend', 'triton'
-    )
-    bad['probe_env'] = {'SGLANG_REPAIR_DROP_VERIFY_STATES': '1'}
-    timing = tmp_path / 'timing.json'
-    timing.write_text(
-        json.dumps(
-            [
-                timing_row(
-                    'fresh_tritonverify_b16', 'fresh', 16, '--linear-attn-verify-backend', 'triton'
-                ),
-                timing_row(
-                    'force_tritonverify_b64', 'force', 64, '--linear-attn-verify-backend', 'triton'
-                ),
-                bad,
-            ]
-        )
-    )
-    args = [
-        'stage_a.py',
-        '--timing',
-        str(timing),
-        '--verifier',
-        'triton',
-        '--baseline',
-        'fresh_tritonverify_b16',
-        '--out-dir',
-        str(tmp_path),
-    ]
-    monkeypatch.setattr(sys, 'argv', args)
-    with pytest.raises(SystemExit, match='not a no-state run'):
-        stage_a.main()
+FI = ('--linear-attn-decode-backend', 'flashinfer')
+TR = ('--linear-attn-verify-backend', 'triton')
 
 
-def test_gdn_microbenchmark_only_describes_flashinfer(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def no_state(row: dict[str, object]) -> dict[str, object]:
+    row['probe_env'] = {'SGLANG_REPAIR_DROP_VERIFY_STATES': '1'}
+    return row
+
+
+def run_main(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, rows: list[dict[str, object]], *extra: str
+) -> Path:
     stage_a = load('stage_a')
     timing = tmp_path / 'timing.json'
-    timing.write_text(
-        json.dumps(
-            [
-                timing_row(
-                    'fresh_tritonverify_b16', 'fresh', 16, '--linear-attn-verify-backend', 'triton'
-                )
-            ]
-        )
+    timing.write_text(json.dumps(rows))
+    out = tmp_path / 'out'
+    out.mkdir(exist_ok=True)
+    monkeypatch.setattr(
+        sys, 'argv', ['stage_a.py', '--timing', str(timing), '--out-dir', str(out), *extra]
     )
+    stage_a.main()
+    return out
+
+
+FAILURES = {
+    'no rows for the verifier': (
+        [timing_row('fresh_b16', 'fresh', 16, *FI)],
+        ['--verifier', 'flashinfer'],
+    ),
+    'baseline on another verifier': (
+        [timing_row('fresh_b16', 'fresh', 16, *FI), timing_row('force_tv_b64', 'force', 64, *TR)],
+        ['--verifier', 'triton'],
+    ),
+    'no-state row on the triton kernel': (
+        [
+            timing_row('fresh_tv_b16', 'fresh', 16, *TR),
+            timing_row('force_tv_b64', 'force', 64, *TR),
+            no_state(timing_row('force_nostate_tv_b64', 'force', 64, *TR)),
+        ],
+        ['--verifier', 'triton', '--baseline', 'fresh_tv_b16'],
+    ),
+    'microbenchmark with the triton kernel': (
+        [
+            timing_row('fresh_tv_b16', 'fresh', 16, *TR),
+            timing_row('force_tv_b64', 'force', 64, *TR),
+        ],
+        ['--verifier', 'triton', '--baseline', 'fresh_tv_b16', '--gdn', 'GDN'],
+    ),
+    'baseline is not a fresh run': (
+        [timing_row('force_b64', 'force', 64, *FI)],
+        ['--verifier', 'flashinfer', '--baseline', 'force_b64'],
+    ),
+    'missing baseline': ([timing_row('force_b64', 'force', 64, *FI)], ['--verifier', 'flashinfer']),
+    'duplicate run names': (
+        [timing_row('fresh_b16', 'fresh', 16, *FI), timing_row('fresh_b16', 'fresh', 16, *FI)],
+        ['--verifier', 'flashinfer'],
+    ),
+}
+
+
+@pytest.mark.parametrize('case', sorted(FAILURES))
+def test_bad_inputs_fail_without_writing(
+    case: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rows, extra = FAILURES[case]
     gdn = tmp_path / 'gdn.json'
     gdn.write_text(json.dumps({'blocks': {}}))
-    args = [
-        'stage_a.py',
-        '--timing',
-        str(timing),
-        '--verifier',
-        'triton',
-        '--baseline',
-        'fresh_tritonverify_b16',
-        '--gdn',
-        str(gdn),
-        '--out-dir',
-        str(tmp_path),
+    extra = [str(gdn) if x == 'GDN' else x for x in extra]
+    out = tmp_path / 'out'
+    out.mkdir()
+    stale = out / 'stage_a_oracle.csv'
+    stale.write_text('stale\n')
+    with pytest.raises(SystemExit):
+        run_main(tmp_path, monkeypatch, rows, *extra)
+    assert stale.read_text() == 'stale\n'
+    assert not (out / 'stage_a_oracle.json').exists()
+
+
+@pytest.mark.parametrize('overridden', [False, True])
+def test_outputs_are_written_together(
+    overridden: bool, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rows = [
+        timing_row('fresh_b16', 'fresh', 16, *FI),
+        timing_row('force_b64', 'force', 64, *FI),
+        no_state(timing_row('force_nostate_b64', 'force', 64, *FI)),
+        timing_row('force_tv_b64', 'force', 64, *TR),
     ]
-    monkeypatch.setattr(sys, 'argv', args)
-    with pytest.raises(SystemExit, match='gated_delta_rule_mtp'):
-        stage_a.main()
+    extra = ['--verifier', 'flashinfer']
+    if overridden:
+        # A fully overridden baseline contributes nothing, so its verify kernel is not checked.
+        extra = ['--verifier', 'triton', '--cd-us', '6500', '--ad', '7', '--f', '0.02']
+    out = run_main(tmp_path, monkeypatch, rows, *extra)
+    data = json.loads((out / 'stage_a_oracle.json').read_text())
+    csv_rows = (out / 'stage_a_oracle.csv').read_text().strip().splitlines()
+    assert len(csv_rows) == len(data['rows']) + 1 == 2
+    assert data['verifier'] == ('triton' if overridden else 'flashinfer')
+    if not overridden:
+        assert data['rows'][0]['state_writes_source'].startswith('measured')

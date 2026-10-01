@@ -151,9 +151,17 @@ def main() -> None:
 
     rows = json.loads(args.timing.read_text())
     gdn = json.loads(args.gdn.read_text()) if args.gdn else {'blocks': {}}
-    by_name = {Path(r['run']).name: r for r in rows}
+    names = [Path(r['run']).name for r in rows]
+    duplicates = sorted({n for n in names if names.count(n) > 1})
+    if duplicates:
+        raise SystemExit(f'run names must be unique in the timing input; repeated: {duplicates}')
+    by_name = dict(zip(names, rows, strict=True))
     base = by_name.get(args.baseline)
     overridden = args.cd_us is not None and args.ad is not None and args.f is not None
+    if base is not None and not overridden and base['mode'] != 'fresh':
+        raise SystemExit(
+            f'baseline {args.baseline} is a {base["mode"]} run, not a stock DFlash (fresh) run'
+        )
     if base is not None and not overridden and verifier_of(base) != args.verifier:
         raise SystemExit(
             f'baseline {args.baseline} uses the {verifier_of(base)} verify kernel, not {args.verifier}'
@@ -287,6 +295,12 @@ def main() -> None:
                 'gate_rejects': (verify + commit) / B >= per_token_base,
             }
         )
+    if not table:
+        # Fail before writing, so no output file is left half-updated.
+        raise SystemExit(
+            f'no forced-acceptance rows with complete phase times for the {args.verifier} verify kernel '
+            'in the timing input; nothing written'
+        )
     out = {
         'kind': 'derived from measured phase times (analyze_timing.py) and kernel microbenchmarks',
         'verifier': args.verifier,
@@ -305,13 +319,13 @@ def main() -> None:
         'hbm_read_TBps': gdn.get('hbm_1GiB', {}).get('read_TBps_median'),
         'rows': table,
     }
+    # Both files are always written together from the same table.
     args.out_dir.mkdir(parents=True, exist_ok=True)
     (args.out_dir / f'stage_a_oracle{args.suffix}.json').write_text(json.dumps(out, indent=2))
-    if table:
-        with open(args.out_dir / f'stage_a_oracle{args.suffix}.csv', 'w', newline='') as fh:
-            w = csv.DictWriter(fh, fieldnames=list(table[0]))
-            w.writeheader()
-            w.writerows(table)
+    with open(args.out_dir / f'stage_a_oracle{args.suffix}.csv', 'w', newline='') as fh:
+        w = csv.DictWriter(fh, fieldnames=list(table[0]))
+        w.writeheader()
+        w.writerows(table)
     print(json.dumps({k: v for k, v in out.items() if k != 'rows'}, indent=1))
     for r in table:
         print(
