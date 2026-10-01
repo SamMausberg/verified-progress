@@ -8,11 +8,12 @@ experiments/profiling/attribute.py (each GEMM gets its projection from its neigh
 each GEMM kernel is also given its implementation from its name: ``triton`` (the backbone
 skinny GEMM, ``_bb_gemm_kernel``), ``gemv`` (SGLang's Hopper GEMV) or ``cublas`` (nvjet,
 xmma, cutlass and the split-K reduction). Only replays of the window's most frequent decode
-graph are kept, so every kept replay has the same batch size.
+graph are kept, so every kept replay has the same batch size, and of those only replays with
+that graph's full kernel count, without the first and last (the window can cut them).
 
 Per report, medians over the kept replays: the replay's span (first kernel start to last
 kernel end), the summed kernel time of each projection by implementation, and the kernel
-count per projection and implementation (from the first kept replay). With ``--pair
+count per projection and implementation (from the first complete replay). With ``--pair
 TEST:BASE`` the medians of TEST minus BASE are reported as well.
 
     python experiments/backbone/insitu_gemm.py \\
@@ -31,10 +32,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'profiling'))
-
-from attribute import label_all
-from nsys_db import load
+PROFILING = Path(__file__).resolve().parents[1] / 'profiling'
 
 GEMM_LABELS = {
     'gdn_in_proj_gemm',
@@ -56,19 +54,41 @@ def implementation(name: str) -> str:
     return 'cublas'
 
 
+def complete_replays(order: list[int], sizes: dict[int, int]) -> tuple[list[int], int]:
+    """Replays (in start order) that the collection window did not cut, and their size.
+
+    A complete replay has the graph's full kernel count, the most common count (ties go
+    to the larger, since a cut replay only loses kernels). The first and last full-count
+    replays are dropped as well, as experiments/profiling/check_labels.py does, as a margin
+    against records at the window's edges.
+    """
+    counts = Counter(sizes.get(c, 0) for c in order)
+    full = max(counts.items(), key=lambda kv: (kv[1], kv[0]))[0]
+    return [c for c in order if sizes.get(c, 0) == full][1:-1], full
+
+
 def summarize(report: Path) -> dict[str, Any]:
+    # pandas is needed only here (the profiling workstream's nsys loader).
+    sys.path.insert(0, str(PROFILING))
+    from attribute import label_all
+    from nsys_db import load
+
     kernels, replays, _ = label_all(load(report))
     target = replays[replays['role'] == 'target']
     if target.empty:
         raise SystemExit(f'{report}: no target graph replays')
     graph = int(target['graph_id'].mode().iloc[0])
-    kept = target[target['graph_id'] == graph]
+    kept = target[target['graph_id'] == graph].sort_values('start')
     in_graph = kernels[kernels['node_id'].notna() & (kernels['graph_id'] == graph)]
+    sizes = {int(c): int(n) for c, n in in_graph.groupby('corr').size().items()}
+    complete, full = complete_replays([int(c) for c in kept['corr']], sizes)
+    if not complete:
+        raise SystemExit(f'{report}: no complete replays of graph {graph}')
     spans: list[float] = []
     per_key: dict[str, list[float]] = defaultdict(list)
     counts: Counter[str] = Counter()
     names: dict[str, Counter[str]] = defaultdict(Counter)
-    for i, corr in enumerate(kept['corr']):
+    for i, corr in enumerate(complete):
         seq = in_graph[in_graph['corr'] == corr]
         spans.append((seq['end'].max() - seq['start'].min()) / 1e3)
         sums: dict[str, float] = defaultdict(float)
@@ -95,6 +115,8 @@ def summarize(report: Path) -> dict[str, Any]:
         'report': report.name,
         'graph_id': graph,
         'replays': n,
+        'replays_dropped': len(kept) - n,
+        'kernels_per_replay': full,
         'span_us_median': statistics.median(spans),
         'span_us_p10': sorted(spans)[n // 10],
         'span_us_p90': sorted(spans)[(9 * n) // 10],
