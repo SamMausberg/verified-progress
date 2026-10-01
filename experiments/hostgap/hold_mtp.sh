@@ -59,3 +59,6 @@ else
 fi
 echo "=== hold end $(date -u +%FT%TZ) ($((SECONDS - T0)) s)"
 nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader
+# A failed plan check, equality or validation check fails the hold (the stock
+# profiles above still ran, so the hold's output is usable for the stock side).
+[ "$OK" = 1 ] || { echo "=== hold failed: plan check, MTP equality or validation did not pass"; exit 1; }
