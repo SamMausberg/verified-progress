@@ -355,7 +355,7 @@ def counter_deltas(before: dict[str, float], after: dict[str, float]) -> dict[st
         'prefill_graph_passes': ('sglang:cuda_graph_passes_total', 'mode="prefill_cuda_graph"'),
         'prefill_eager_passes': ('sglang:cuda_graph_passes_total', 'mode="prefill_none"'),
         'num_requests': ('sglang:num_requests_total', ''),
-        'retracted_requests': ('sglang:num_retracted_reqs_total', ''),
+        'retracted_requests': ('sglang:num_retracted_requests_total', ''),
     }
     deltas = {
         short: total(after, name, contains) - total(before, name, contains)

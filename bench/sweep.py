@@ -61,6 +61,7 @@ _DECODE_LINE = re.compile(
     r'Decode batch.*?#running-req: (\d+).*?(?:accept len: ([\d.]+).*?)?cuda graph: (True|False)'
     r'.*?gen throughput \(token/s\): ([\d.]+)'
 )
+_RETRACT_LINE = re.compile(r'KV cache pool is full\. Retract requests\. #retracted_reqs: (\d+)')
 
 
 def requests_for(concurrency: int, min_requests: int, waves: int) -> int:
@@ -177,6 +178,9 @@ def log_segment_stats(text: str) -> dict[str, Any]:
         'logged_accept_len_mean': sum(accept) / len(accept) if accept else None,
         'logged_gen_tps_full_batch_p50': full[len(full) // 2] if full else None,
         'prefill_log_lines': text.count('Prefill batch'),
+        # Requests the scheduler evicted and recomputed because the KV pool was full:
+        # a point with retractions measures a KV-limited server.
+        'kv_retractions': sum(int(n) for n in _RETRACT_LINE.findall(text)),
     }
 
 
