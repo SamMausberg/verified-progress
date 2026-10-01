@@ -6,12 +6,13 @@
 % exists only in JSON and is read from figures/data/json_values.csv. Every number printed in (a)
 % is computed from these four values. Colours: h^t ink (the target), h^d and Delta purple (the
 % drafter and its drift), the ball blue (the int8 copy's threshold). (b) reads
-% evidence/head_geometry/rho_dflash4b_quantiles.csv (DFlash-4B drift and the per-row
-% thresholds) and evidence/head_geometry/rho_mtp4b_quantiles.csv (MTP-4B drift); both
-% hold 40,000 held-out pairs. Thresholds are derived from the weights (lines without markers);
-% the drift is measured (sparse markers).
-% Both panels are one picture: (b)'s plot area is centred on y = 0, (a)'s drawing sits
-% beside it below the shared title line, and (a)'s title is set on (b)'s title line.
+% evidence/head_geometry/rho_dflash4b_quantiles.csv (DFlash-4B drift and the per-entry
+% thresholds) and (c) evidence/head_geometry/rho_mtp4b_quantiles.csv (MTP-4B drift) with the same
+% thresholds; both hold 40,000 held-out pairs. Thresholds are derived from the weights (lines
+% without markers); the drift is measured (sparse markers). The printed ratios are median drift
+% over median int8 per-entry threshold (107 for DFlash-4B, 112 for MTP-4B).
+% All panels are one picture: (b) and (c) are stacked on the right with a shared x axis, (a)'s
+% drawing sits beside them below the shared title line, and (a)'s title is set on (b)'s.
 \vpreadcsv{\transporttable}{../evidence/head_geometry/transport_dflash4b.csv}
 \vpreadcsv{\rhotable}{../evidence/head_geometry/rho_dflash4b_quantiles.csv}
 \vplookuptwo{\transporttable}{metric}{htnorm2}{group}{all}{median}{\figHt}
@@ -23,31 +24,45 @@
 \pgfmathsetmacro{\figSin}{sqrt(1-\figCos*\figCos)}
 \pgfmathsetmacro{\figNormRatio}{\figHd/\figHt}
 \pgfmathsetmacro{\figDrel}{sqrt(1+\figNormRatio*\figNormRatio-2*\figNormRatio*\figCos)}
+\vpreadcsv{\rhomtptable}{../evidence/head_geometry/rho_mtp4b_quantiles.csv}
+\vplookup{\rhomtptable}{q}{0.5}{rho_all}{\figRhoMtp}
+\def\rhodflash{../evidence/head_geometry/rho_dflash4b_quantiles.csv}
+\def\rhomtp{../evidence/head_geometry/rho_mtp4b_quantiles.csv}
 \begin{tikzpicture}[font=\footnotesize]
-% ---------------- (b) measured drift against the thresholds ----------------
-\begin{semilogxaxis}[name=b,at={(11.2cm,0)},anchor=center,
-  width=8.7cm,height=3.95cm,xmin=1e-3,xmax=20,ymin=0,ymax=1,
-  % a key for the two drafters in the empty upper right (both curves lie left of 1.4)
-  legend style={at={(axis cs:19,0.97)},anchor=north east},
-  legend image code/.code={\draw[mark repeat=2,mark phase=2,#1] plot coordinates {(0cm,0cm) (0.25cm,0cm) (0.5cm,0cm)};},
-  xlabel={Drift ratio $\rho$ of a pair, or threshold $\delta^\ast_i$ of an entry},ylabel={Cumulative share},grid=major,
-  ytick={0,0.25,0.5,0.75,1},yticklabels={0,0.25,0.5,0.75,1},
-  title={\paneltitle{b}{Measured drift against derived thresholds}},xminorticks=false]
-\addplot[copy int8 g128,derived,forget plot] table[x=threshold_int8_g128,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};
-\addplot[copy int8 row,derived,forget plot] table[x=threshold_int8_row,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};
-\addplot[copy int4,derived,forget plot] table[x=threshold_int4_row,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};
-% DFlash: solid, filled circles; MTP: lighter purple, dashed, hollow triangles
-\addplot[drafter dflash,mark=*,mark size=1.6pt,mark repeat=50,mark phase=1] table[x=rho_all,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};
-\addlegendentry{DFlash-4B}
-\addplot[cdraft!60,thick,dash pattern=on 3.5pt off 1.8pt,mark=triangle*,mark size=2.1pt,mark options={solid,fill=white,draw=cdraft},mark repeat=50,mark phase=26] table[x=rho_all,y=q,col sep=comma]{../evidence/head_geometry/rho_mtp4b_quantiles.csv};
-\addlegendentry{MTP-4B}
-\draw[{Stealth[length=1.6mm]}-{Stealth[length=1.6mm]},ink!70] (axis cs:\figDstar,0.5) -- (axis cs:\figRho,0.5);
-% above the arrow, between the int8 and int4 threshold curves
-\node[annot,anchor=south,align=center] at (axis cs:0.025,0.515) {medians\\$\vpnum{0}{\figRho/\figDstar}\times$ apart};
-\node[annot,anchor=east,align=right] at (axis cs:0.0052,0.3) {$\delta^\ast_i$:\\int8, 128\\columns};
-\node[annot,anchor=west] at (axis cs:0.0084,0.3) {$\delta^\ast_i$: int8, per entry};
-\node[annot,anchor=east,align=right] at (axis cs:0.155,0.87) {$\delta^\ast_i$: int4,\\per entry};
+% ---------------- (b) DFlash-4B and (c) MTP-4B: measured drift against the thresholds -------
+% Two short panels, one drafter each, on a shared x axis; both show the same derived thresholds
+% (lines without markers), labelled in (b). The arrow joins the median threshold (int8, per
+% entry) to the drafter's median drift.
+\pgfplotsset{drift panel/.style={scale only axis,width=7.1cm,height=1.3cm,xmin=1e-3,xmax=10,
+  ymin=0,ymax=1,ytick={0,0.5,1},yticklabels={0,0.5,1},grid=major,xminorticks=false}}
+\begin{semilogxaxis}[drift panel,name=b,at={(7.85cm,0.35cm)},anchor=south west,xticklabels={},
+  title={\paneltitle{b}{DFlash-4B: measured drift, derived thresholds}}]
+\addplot[copy int8 g128,derived] table[x=threshold_int8_g128,y=q,col sep=comma]{\rhodflash};
+\addplot[copy int8 row,derived] table[x=threshold_int8_row,y=q,col sep=comma]{\rhodflash};
+\addplot[copy int4,derived] table[x=threshold_int4_row,y=q,col sep=comma]{\rhodflash};
+\addplot[drafter dflash,mark=*,mark size=1.6pt,mark repeat=50,mark phase=25] table[x=rho_all,y=q,col sep=comma]{\rhodflash};
+\draw[{Stealth[length=1.5mm]}-{Stealth[length=1.5mm]},ink!70] (axis cs:\figDstar,0.5) -- (axis cs:\figRho,0.5);
+% below the arrow, between the int4 thresholds and the drift curve
+\node[annot,anchor=north,align=center] at (axis cs:0.37,0.47) {medians\\$\vpnum{0}{\figRho/\figDstar}\times$};
+\node[annot,anchor=east,align=right] at (axis cs:0.0048,0.5) {$\delta^\ast_i$: int8,\\per 128\\weights};
+\node[annot,anchor=west] at (axis cs:0.0098,0.2) {$\delta^\ast_i$: int8, per entry};
+\node[annot,anchor=east,align=right] at (axis cs:0.15,0.8) {$\delta^\ast_i$: int4,\\per entry};
+\node[annot,anchor=west] at (axis cs:1.1,0.3) {$\rho$, DFlash-4B};
 \end{semilogxaxis}
+\begin{semilogxaxis}[drift panel,name=c,at={(7.85cm,-1.65cm)},anchor=south west,
+  xlabel={Drift ratio $\rho$ of a pair, or threshold $\delta^\ast_i$ of an entry},
+  title={\paneltitle{c}{MTP-4B: measured drift, same thresholds}}]
+\addplot[copy int8 g128,derived] table[x=threshold_int8_g128,y=q,col sep=comma]{\rhodflash};
+\addplot[copy int8 row,derived] table[x=threshold_int8_row,y=q,col sep=comma]{\rhodflash};
+\addplot[copy int4,derived] table[x=threshold_int4_row,y=q,col sep=comma]{\rhodflash};
+\addplot[cdraft,very thick,mark=triangle*,mark size=2pt,mark repeat=50,mark phase=25,mark options={solid}] table[x=rho_all,y=q,col sep=comma]{\rhomtp};
+\draw[{Stealth[length=1.5mm]}-{Stealth[length=1.5mm]},ink!70] (axis cs:\figDstar,0.5) -- (axis cs:\figRhoMtp,0.5);
+\node[annot,anchor=north,align=center] at (axis cs:0.34,0.47) {medians\\$\vpnum{0}{\figRhoMtp/\figDstar}\times$};
+\node[annot,anchor=west] at (axis cs:0.0011,0.8) {$\delta^\ast_i$ as in (b)};
+\node[annot,anchor=west] at (axis cs:1.1,0.3) {$\rho$, MTP-4B};
+\end{semilogxaxis}
+% one y label for both panels
+\node[rotate=90,anchor=south] at (7.23cm,0) {Cumulative share};
 % ---------------- (a) median DFlash-4B head inputs, to scale ----------------
 % The drawing spans y from about -41 units (the callout text) to 62 (the line through h^d);
 % it is shifted down 17 units so that its top stays below the shared title line.
@@ -61,7 +76,8 @@
 % the tip of h^t; F is marked, and the dotted perpendicular has length rho = sin(angle) ||h^t||
 \draw[cdraft,densely dotted] (D) -- (F);
 \draw[ink!60,densely dotted] (T) -- (F);
-\fill[cdraft] (F) circle[radius=1.1pt];
+\fill[cdraft] (F) circle[radius=1.7pt];
+\draw[ink!60] ($(F)!3.5pt!(O)$) -- ($($(F)!3.5pt!(O)$)+($(F)!3.5pt!(T)$)-(F)$) -- ($(F)!3.5pt!(T)$);
 \node[note,anchor=south west,align=left] at ($(T)!.4!(F)+(2,2)$) {closest rescaling of $h^d$:\\$\rho=\vpnum{2}{\figSin}$};
 % vectors
 \draw[flow,very thick,shorten >=2.2pt] (O) -- (T);

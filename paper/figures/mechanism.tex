@@ -39,7 +39,7 @@
 % ---------------- (b) recompute and round ----------------
 \begin{scope}[xshift=5.35cm]
 \node[panel title,anchor=north] at (2.25,4.35) {\paneltitle{b}{Recompute and round (schematic)}};
-\draw[-{Stealth[length=1.5mm]},ink!70] (0,0) -- (0,3.55) node[above,inner sep=1pt,text=black]{score};
+\draw[-{Stealth[length=1.5mm]},ink!70] (0,0) -- (0,3.55) node[left,inner sep=2pt,text=black]{score};
 \draw[ink!70] (0,0) -- (4.3,0);
 % BF16 rounding boundaries, one spacing apart
 \foreach \y in {0.95,1.95,2.95} {\draw[ink!30] (0,\y) -- (4.3,\y);}
@@ -52,8 +52,11 @@
   \fill[#7!16] ({#1-.17},#4) rectangle ({#1+.17},#5);
   \draw[#7,line width=1.8pt] (#1,#2) -- (#1,#3);
   \draw[#7,semithick] ({#1-.08},#2) -- ({#1+.08},#2) ({#1-.08},#3) -- ({#1+.08},#3);
-  \node[inner sep=1pt] at (#1,3.2) {$#6$};}
-% separated: the cells fix L_a > L_b
+  \node[inner sep=1pt] at (#1,3.18) {$#6$};}
+% three alternative cases, each a pair of candidates a and b, separated by faint lines
+\foreach \x in {1.37,2.87} {\draw[ink!20] (\x,0.1) -- (\x,3.75);}
+\foreach \x/\n in {0.62/1,2.12/2,3.62/3} {\node[note,inner sep=1pt] at (\x,3.62) {case \n};}
+% case 1, separated: the cells fix L_a > L_b
 \vpcase{0.42}{2.15}{2.55}{1.95}{2.95}{a}{ccert}\vpcase{0.82}{1.25}{1.65}{0.95}{1.95}{b}{ccert}
 % one cell: L_a = L_b for every admissible sum, so the lower index, a, wins
 \vpcase{1.92}{2.05}{2.40}{1.95}{2.95}{a}{ccert}\vpcase{2.32}{2.45}{2.80}{1.95}{2.95}{b}{ccert}

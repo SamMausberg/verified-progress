@@ -12,9 +12,9 @@
 % which round as the README's table does (the rounded percentages of breakdown.csv would
 % give 12.5% instead of 12.4% for MTP at B = 32).
 % Colours follow style.tex: the target's head in ink (the stock engine), the drafter's heads in
-% purple, every other component in two clearly different greys, idle time patterned. The MTP
-% idle segments have their own pattern and legend entry because tracing inflates them (the caption
-% gives the untraced shares). The column at the right gives the target head's share and, for MTP,
+% purple, every other component in two clearly different greys, GPU idle as an empty white
+% segment. The MTP idle segments are hatched, with their own legend entry, because tracing inflates
+% them (the caption gives the untraced shares). The column at the right gives the target head's share and, for MTP,
 % the drafter's heads' share separately (target + draft), each from the microseconds of
 % step_share.csv; the legend sits below the axis to leave room for the column's header.
 \vpreadcsv{\breakdowntable}{../evidence/profiles/breakdown.csv}
@@ -52,9 +52,9 @@
   \addlegendentry{target GEMMs}
 \addplot[fill=ccontext!20] table[x expr={\thisrow{gdn_state}+\thisrow{attention}+\thisrow{small_kernels}+\thisrow{draft_model}},y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
   \addlegendentry{other kernels}
-\addplot[fill=white,draw=ccontext,pattern=north east lines,pattern color=ccontext!80] table[x expr={(\thisrow{x}>3)?0:\thisrow{idle}},y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
+\addplot[fill=white,draw=ccontext] table[x expr={(\thisrow{x}>3)?0:\thisrow{idle}},y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
   \addlegendentry{GPU idle}
-\addplot[fill=white,draw=ccontext,pattern=crosshatch dots,pattern color=ccontext!80] table[x expr={(\thisrow{x}>3)?\thisrow{idle}:0},y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
+\addplot[fill=white,draw=ccontext,pattern=north east lines,pattern color=ccontext] table[x expr={(\thisrow{x}>3)?\thisrow{idle}:0},y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
   \addlegendentry{GPU idle, inflated by tracing}
 % head shares at the right: target alone for plain decoding, target + draft for MTP
 \pgfplotsinvokeforeach{0,...,3}{%
