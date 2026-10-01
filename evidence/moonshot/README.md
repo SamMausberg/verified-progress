@@ -257,6 +257,29 @@ untested. (The recurrent kernel without snapshots is slower than with them becau
 the wrapper picks a different launch configuration when no snapshot buffer is passed.) The
 FlashInfer MTP verify kernel that the DFlash baseline uses is not in this table yet.
 
+## 2f. Hot-vocabulary draft maps: held-out coverage (measured, `token_map_coverage.csv`)
+
+Bench's hot-vocabulary maps are built from greedy outputs on the tune split
+(`python -m bench.token_map build`, maps in `~/vp-data/bench/token_map/`). Evaluated
+unpadded on the target's 171,968 output tokens from the plain sweep of the confirm split
+(c = 1/32/128, OSL 512), the share of output tokens inside each map is:
+
+| map | rows | held-out coverage |
+|---|---|---|
+| hot4096_tune | 4,096 | 89.1% |
+| hot8192_tune | 8,192 | 93.3% |
+| hot16384_tune | 16,384 | 96.3% |
+| hot32k_tune | 22,936 (every token seen in the tune outputs) | 97.5% |
+
+Percentages are rounded from the exact shares (16,384 rows: 0.96345), not from the CSV's four
+decimals. Coverage bounds how often a truncated draft head can still propose the target's
+token. The
+`hot23k` lever uses the 22,936-row map. The CSV comes from
+`experiments/moonshot/token_map_coverage.py` (command in Section 4), which uses bench's
+token counting. `experiments/moonshot/build_token_map.py` is a separate generator
+(its own calibration hold-out, maps padded to fixed sizes, `token_map_report.json`) and
+did not produce this table.
+
 ## 3. Ranked portfolio
 
 Ranking by measured or derived gain at the relevant end, times the probability it holds,
@@ -306,6 +329,9 @@ python experiments/moonshot/summarise.py sweeps ~/vp-data/moonshot/sweeps \
   --baseline plain --out evidence/moonshot/lever_sweeps_quick.csv
 python experiments/moonshot/ceilings.py --out evidence/moonshot/ceilings.json \
   --csv evidence/moonshot/ceilings.csv
+python experiments/moonshot/token_map_coverage.py \
+  ~/vp-data/moonshot/sweeps/plain/20260930-200640 \
+  --out evidence/moonshot/token_map_coverage.csv
 ```
 
 Lever definitions (flags and environment per lever, lossy labels, conflicts):
