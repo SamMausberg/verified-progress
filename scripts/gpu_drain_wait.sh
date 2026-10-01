@@ -90,7 +90,6 @@ leftover_jobs() {
   for e in "$registry"/*; do
     [ -e "$e" ] || continue
     w="${e##*/}"
-    case "$ancestors" in *" $w "*) continue ;; esac
     wstart="" pgid="" pstart=""
     read -r wstart pgid pstart <"$e" 2>/dev/null || true
     read -r st _pg start <<<"$(proc_state "$w")"

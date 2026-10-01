@@ -557,6 +557,12 @@ def test_a_holder_death_before_the_job_pid_is_known_still_stops_the_job(tmp_path
         proc.kill()
 
 
+def running_check(pid: int) -> str:
+    """Shell that prints overlap if `pid` is running (a zombie counts as gone), else clean."""
+    state = f'$(cut -d" " -f3 /proc/{pid}/stat 2>/dev/null)'
+    return f's={state}; if [ -n "$s" ] && [ "$s" != Z ]; then echo overlap; else echo clean; fi'
+
+
 def _holder_of(proc: subprocess.Popen[bytes]) -> int:
     holder = subprocess.run(
         ['pgrep', '-P', str(proc.pid), '-x', 'flock'], capture_output=True, text=True, check=False
@@ -599,7 +605,7 @@ def test_next_exclusive_job_waits_while_the_old_job_is_still_being_stopped(tmp_p
         job = int(a_pid.read_text())
         os.kill(_holder_of(a), 9)  # the lock is free now; the job ignores TERM
         out = tmp_path / 'b.out'
-        check = f'if kill -0 {job} 2>/dev/null; then echo overlap; else echo clean; fi > {out}'
+        check = f'{running_check(job)} > {out}'
         b = subprocess.run(
             ['bash', str(SCRIPT), '-x', 'bash', '-c', check], env=env, timeout=60, check=False
         )
@@ -629,7 +635,7 @@ def test_next_exclusive_job_waits_for_a_job_whose_wrapper_was_killed(tmp_path: P
         os.kill(int(wrapper[0]), 9)
         os.kill(holder, 9)
         out = tmp_path / 'b.out'
-        check = f'if kill -0 {job} 2>/dev/null; then echo overlap; else echo clean; fi > {out}'
+        check = f'{running_check(job)} > {out}'
         b = subprocess.run(
             ['bash', str(SCRIPT), '-x', 'bash', '-c', check], env=env, timeout=60, check=False
         )
@@ -745,6 +751,30 @@ def test_without_nvidia_smi_the_drain_still_waits_for_earlier_jobs(tmp_path: Pat
         )
         done = subprocess.run(
             ['bash', str(SCRIPT), '-x', 'bash', '-c', check], env=env, timeout=60, check=False
+        )
+        assert done.returncode == 0
+        assert out.read_text().strip() == 'clean'
+    finally:
+        sleeper.kill()
+
+
+def test_an_entry_named_by_an_ancestor_pid_still_counts(tmp_path: Path) -> None:
+    """A reused pid can name an old entry after one of the drain's ancestors; check it anyway."""
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    registry = tmp_path / 'gpu.lock.jobs'
+    registry.mkdir()
+    sleeper = subprocess.Popen(['sleep', '3'], start_new_session=True)  # a live old job group
+    try:
+        # Named by this test's pid (an ancestor of the drain), with another wrapper start time.
+        (registry / str(os.getpid())).write_text(f'1 {sleeper.pid}\n')
+        env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock), GPU_LOCK_DRAIN_WAIT='20')
+        out = tmp_path / 'out'
+        done = subprocess.run(
+            ['bash', str(SCRIPT), '-x', 'bash', '-c', f'{running_check(sleeper.pid)} > {out}'],
+            env=env,
+            timeout=60,
+            check=False,
         )
         assert done.returncode == 0
         assert out.read_text().strip() == 'clean'
