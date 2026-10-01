@@ -44,11 +44,16 @@ fi
 # job's drain (gpu_drain_wait.sh) waits while the wrapper or the job's group is still running.
 registry="${GPU_LOCK_FILE:-$HOME/.gpu.lock}.jobs"
 entry="$registry/$$"
-start_time() {
+stat_field() { # field $2 (0 = state, 1 = ppid, 19 = start time) of /proc/$1/stat
   local s f
   { read -r s <"/proc/$1/stat"; } 2>/dev/null || return 0
   read -r -a f <<<"${s##*) }"
-  echo "${f[19]}"
+  echo "${f[$2]}"
+}
+# Entries are written to a dotfile and renamed into place, so a drain never reads half of one.
+write_entry() {
+  local tmp="$registry/.$$.$BASHPID"
+  printf '%s\n' "$*" >"$tmp" && mv -f "$tmp" "$entry"
 }
 
 set -m # background jobs get their own process group, so the whole group can be signalled
@@ -90,15 +95,28 @@ on_signal() {
   exit 143
 }
 trap on_signal TERM INT HUP
-mkdir -p "$registry"
-start_time $$ >"$entry"
-trap 'rm -f "$entry"' EXIT # after stop_group: every exit path below stops the group first
+wstart="$(stat_field $$ 19)"
+# A job that cannot be recorded does not run: the next exclusive job could not see it.
+if ! mkdir -p "$registry" 2>/dev/null || ! write_entry "$wstart" 2>/dev/null; then
+  echo "gpu_job.sh: cannot record the job in $registry; not running" >&2
+  exit 75
+fi
+trap 'rm -f "$entry" "$registry/.$$."*' EXIT # after stop_group: every exit path below stops the group first
 if [ -n "$pending" ]; then exit 143; fi
-if [ -t 0 ]; then "$@" </dev/null & else "$@" & fi
+# The job's first process (its pid is the job's pgid) records the group itself before the command
+# starts, so the entry names the group even if this wrapper is killed right after the fork. If
+# the wrapper is already gone by then (the process was reparented), the command does not start.
+(
+  me="$BASHPID"
+  # Tests widen the window between the fork and the job recording itself.
+  if [ -n "${GPU_JOB_TEST_RECORD_DELAY:-}" ]; then sleep "$GPU_JOB_TEST_RECORD_DELAY"; fi
+  write_entry "$wstart $me $(stat_field "$me" 19)" 2>/dev/null || exit 75
+  [ "$(stat_field "$me" 1)" = "$$" ] || exit 75
+  if [ -t 0 ]; then exec "$@" </dev/null; else exec "$@"; fi
+) &
 # Tests widen the window between the fork and pid=$! to deliver a signal inside it.
 if [ -n "${GPU_JOB_TEST_SPAWN_DELAY:-}" ]; then sleep "$GPU_JOB_TEST_SPAWN_DELAY"; fi
 pid=$!
-echo "$(start_time $$) $pid $(start_time "$pid")" >"$entry"
 if [ -n "$pending" ]; then
   stop_group
   exit 143

@@ -103,9 +103,10 @@ leftover_jobs() {
     fi
   done
 }
+have_smi=1
 if ! command -v nvidia-smi >/dev/null 2>&1; then
-  echo "gpu_drain_wait: no nvidia-smi on PATH; nothing to drain" >&2
-  exit 0
+  echo "gpu_drain_wait: no nvidia-smi on PATH; checking only SGLang servers and earlier jobs" >&2
+  have_smi=""
 fi
 while true; do
   # A failed or hung query (GPU_LOCK_SMI_TIMEOUT, default 30 s) is not an empty GPU: treat it as busy (fail
@@ -117,9 +118,12 @@ while true; do
   smi_limit="${GPU_LOCK_SMI_TIMEOUT:-30}"
   [ "$smi_limit" -le "$((remaining - 1))" ] || smi_limit="$((remaining - 1))"
   # --kill-after: a query that ignores TERM is killed 1 s later, so the limit really bounds it.
-  if [ "$smi_limit" -lt 1 ]; then
+  if [ -z "$have_smi" ]; then
+    raw=""
+  fi
+  if [ -n "$have_smi" ] && [ "$smi_limit" -lt 1 ]; then
     pids="(no time left for a bounded GPU query)"
-  elif raw="$(timeout --kill-after=1 "$smi_limit" nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null)"; then
+  elif [ -z "$have_smi" ] || raw="$(timeout --kill-after=1 "$smi_limit" nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null)"; then
     pids="$(printf '%s\n' "$raw" | tr -d ' ' | grep -v '^$' || true)"
     # Under the exclusive lock any SGLang server is an orphan, even one that detached from
     # its job's process group and has not reached CUDA yet.
@@ -138,11 +142,11 @@ while true; do
     pids="(nvidia-smi query failed)"
   fi
   if [ "$pids" != "$reported" ]; then
-    echo "gpu_drain_wait: waiting for compute processes left on the GPU: $(echo "$pids" | tr '\n' ' ')" >&2
+    echo "gpu_drain_wait: waiting for what earlier jobs left behind: $(echo "$pids" | tr '\n' ' ')" >&2
     reported="$pids"
   fi
   if [ "$SECONDS" -ge "$deadline" ]; then
-    echo "gpu_drain_wait: GPU still busy after ${limit}s (pids: $(echo "$pids" | tr '\n' ' ')); not starting" >&2
+    echo "gpu_drain_wait: still busy after ${limit}s ($(echo "$pids" | tr '\n' ' ')); not starting" >&2
     exit 75
   fi
   left=$((deadline - SECONDS))

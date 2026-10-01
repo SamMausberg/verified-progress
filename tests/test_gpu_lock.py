@@ -658,3 +658,95 @@ def test_a_stale_registry_entry_does_not_block_and_is_removed(tmp_path: Path) ->
     assert time.time() - start < 4
     assert not stale.exists()
     assert list(registry.iterdir()) == [], 'the job left its own entry behind'
+
+
+def test_a_job_whose_wrapper_dies_before_it_is_recorded_does_not_start(tmp_path: Path) -> None:
+    """The job records its group itself; if its wrapper is already gone, it does not run."""
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    ran = tmp_path / 'ran'
+    env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock), GPU_JOB_TEST_RECORD_DELAY='2')
+    a = subprocess.Popen(['bash', str(SCRIPT), '-s', 'touch', str(ran)], env=env)
+    try:
+        deadline = time.time() + 10
+        wrapper: list[str] = []
+        while not wrapper and time.time() < deadline:
+            holder = subprocess.run(
+                ['pgrep', '-P', str(a.pid), '-x', 'flock'],
+                capture_output=True,
+                text=True,
+                check=False,
+            ).stdout.split()
+            if holder:
+                wrapper = subprocess.run(
+                    ['pgrep', '-P', holder[0]], capture_output=True, text=True, check=False
+                ).stdout.split()
+            time.sleep(0.05)
+        assert wrapper, 'no wrapper under flock'
+        os.kill(int(wrapper[0]), 9)  # inside the window before the job records itself
+        time.sleep(4)
+        assert not ran.exists(), 'the job ran after its wrapper died'
+        registry = tmp_path / 'gpu.lock.jobs'
+        b = subprocess.run(
+            ['bash', str(SCRIPT), '-x', 'true'],
+            env=dict(env, GPU_JOB_TEST_RECORD_DELAY='', GPU_LOCK_DRAIN_WAIT='5'),
+            timeout=60,
+            check=False,
+        )
+        assert b.returncode == 0, 'a job that never started blocked the next one'
+        assert [e for e in registry.iterdir() if not e.name.startswith('.')] == []
+    finally:
+        a.kill()
+
+
+def test_a_job_that_cannot_be_recorded_does_not_run(tmp_path: Path) -> None:
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    (tmp_path / 'gpu.lock.jobs').write_text('')  # a file where the registry directory goes
+    ran = tmp_path / 'ran'
+    env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock))
+    done = subprocess.run(
+        ['bash', str(SCRIPT), '-s', 'touch', str(ran)], env=env, timeout=60, check=False
+    )
+    assert done.returncode == 75
+    assert not ran.exists()
+
+
+def test_without_nvidia_smi_the_drain_still_waits_for_earlier_jobs(tmp_path: Path) -> None:
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    registry = tmp_path / 'gpu.lock.jobs'
+    registry.mkdir()
+    sleeper = subprocess.Popen(['sleep', '3'], start_new_session=True)  # its own group
+    try:
+        (registry / '1').write_text(f'1 {sleeper.pid}\n')  # a dead wrapper, a live group
+        # Every tool on PATH except nvidia-smi.
+        bin_dir = tmp_path / 'nosmi'
+        bin_dir.mkdir()
+        for d in os.environ['PATH'].split(':'):
+            if not os.path.isdir(d):
+                continue
+            for name in os.listdir(d):
+                link = bin_dir / name
+                if name != 'nvidia-smi' and not link.exists() and not link.is_symlink():
+                    link.symlink_to(os.path.join(d, name))
+        env = dict(
+            fake_smi(tmp_path),
+            PATH=str(bin_dir),
+            GPU_LOCK_FILE=str(lock),
+            GPU_LOCK_DRAIN_WAIT='20',
+        )
+        out = tmp_path / 'out'
+        # The test does not reap the sleeper, so a finished sleeper is a zombie: count it as gone.
+        state = f'$(cut -d" " -f3 /proc/{sleeper.pid}/stat 2>/dev/null)'
+        check = (
+            f's={state}; if [ -n "$s" ] && [ "$s" != Z ]; then echo overlap; else echo clean; fi'
+            f' > {out}'
+        )
+        done = subprocess.run(
+            ['bash', str(SCRIPT), '-x', 'bash', '-c', check], env=env, timeout=60, check=False
+        )
+        assert done.returncode == 0
+        assert out.read_text().strip() == 'clean'
+    finally:
+        sleeper.kill()
