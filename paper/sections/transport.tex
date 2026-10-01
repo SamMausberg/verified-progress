@@ -36,7 +36,7 @@ The drift is measured on 40,000 held-out \emph{drift pairs} per drafter. Its med
 
 \paragraph{Why the drift is large} Two properties of the DFlash drafter set its $\rho$ (Figure~\ref{fig:rho}a) \ev{stats-dflash}. Its final RMSNorm has unit gain, so its head input has a third of the target's norm, so the triangle inequality alone gives $\rho\ge0.68$. The angle between the two is large as well: even the best rescaling of $h^d$ leaves $\rho$ near 0.91. The drafter is trained to rank the right token first under $Wh^d$, not to reproduce the target's head input. Nor does the drift hide in directions the head ignores: after removing each position's mean logit, $\norm{W\Delta}_2/\norm{Wh^t}_2$ has a median of 0.85 \ev{rho}. The MTP layer's head input is slightly longer than the target's, so its drift is mainly one of direction \ev{transport-mtp}.
 
-\begin{table}[t]
+\begin{table}[!b]
 \caption{Transport on the held-out \emph{transport pairs} (DFlash-4B: 4,020 from 110 prompts; MTP-4B: 16,016 from 160), over every bound family and tiling tested (tiles of 64 to 1,024 entries). Single values are the best case; ranges span the tilings (in full: Table~\ref{tab:transport-full}). ``Skipped'': mean share of the vocabulary a greedy verifier skips; ``read by a real verify batch'': the share in tiles that at least one position of the batch still needs; $P_?$: mean probability, over proposals at $T=1$, that the sampled acceptance test stays undecided. Measured \ev{transport,transport-mtp}.}\label{tab:transport}
 \vskip 0.05in
 \centering\footnotesize
