@@ -141,3 +141,47 @@ root.
 Raw outputs stay in `~/vp-data/state/` (`runs_pinned/`, `runs/`, `targeted/`); each
 run has a `.meta.json` with the flags, the pool pin, the resolved server settings
 and pool sizes, and the repository and SGLang commits.
+
+## Declared follow-up: the first verify cycle after prefill (not yet run)
+
+In the pinned matrix, the first verify cycle after prefill had a higher divergence
+rate per fragile position than later cycles for MTP steps 5 and the tree (7/40 and
+6/33). That observation is exploratory (`evidence/state_safety/README.md`). The
+test below is fixed before any data for it exists. If it changes, the change and
+its reason go in a new commit before the runs.
+
+- **Prompts.** Use the fresh set, `prompts.py --set fresh`: 384 prompts disjoint
+  from the 320 used so far (GSM8K test rows 80-179, HumanEval rows 60-163, AlpacaEval
+  rows 5, 15, ..., 795, CNN/DailyMail test rows 40-139; every third prompt per source
+  in thinking mode). `evidence/state_safety/prompt_manifest_fresh.json` freezes the
+  token IDs (SHA-256 of IDs and tokens). Generation uses 256 new tokens and top-5
+  logprobs.
+- **Runs.** Pinned pools (cap 8, 49,152 KV tokens, 40 GDN slots), radix cache and
+  overlap on. Each configuration is served at c1 and c32 on one server: plain, MTP
+  steps 5, and the MTP tree (3 steps, top-k 2). Output goes to
+  `~/vp-data/state/runs_fresh/`.
+- **Positions.** The method is `cycles.py`'s: positions up to and including the first
+  divergence, fragile when the reference's top-2 gap is at most 0.25 nats.
+  - First cycle: positions in the first verify cycle after the prefill token
+    (chunk 1).
+  - Later cycles: all later chunks.
+  - Only divergences at fragile positions count.
+- **Primary test (a).** Pool the counts of the two pairs MTP steps 5 c1 vs plain c1
+  and MTP tree c1 vs plain c1 into one table: first or later cycle against diverged
+  or not, at fragile positions. Test it with a one-sided Fisher exact test (first
+  cycle rate higher), alpha 0.05.
+- **Selection control (b).** Prompts with a high divergence hazard leave early, so
+  later cycles carry fewer of them even without any state effect. The control
+  measures that effect without a plain-versus-speculative handoff difference. It
+  applies the same counts to MTP steps 5 c1 vs c32 and to the tree c1 vs c32, using
+  the cycles of the c1 run.
+  - (b) holds when the pooled log odds ratio of first versus later cycles is larger
+    in the primary pairs than in the control pairs.
+  - The criterion is a one-sided 95% lower bound above 0, from a prompt-level
+    bootstrap: 10,000 resamples, seed 0, 0.5 added to every cell.
+- **Decision.** If (a) and (b) both hold, a first-cycle excess specific to
+  speculation against plain decoding is supported. Otherwise it is not. Both results
+  are reported either way, together with steps 1 and 3 as secondary pairs, which do
+  not enter the decision.
+- **If supported.** Use the cache tap to compare the GDN state handed from prefill to
+  the first verify forward with the state handed to the first plain decode step.
