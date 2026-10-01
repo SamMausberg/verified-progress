@@ -1,28 +1,29 @@
 """Kernel time per verify cycle by category from Nsight Systems reports (serve_probe.py --nsys).
 
-Runs `nsys stats --report cuda_gpu_kern_sum` on each report, sorts every kernel into a
-category by its name, and divides by the number of verify cycles in the window, counted as
-the launches of the GDN verify kernel (FlashInfer's `gdn_verify_kernel_mtp`, or SGLang's
-Triton `fused_sigmoid_gating_delta_rule_update`) over the model's 24 GDN layers: one launch per
-layer per cycle. (Other GDN kernels, such as prefill's chunked ones, launch at other rates, and
-the state commit kernel, the earlier count, runs twice per cycle.) Every kernel in the window
-is charged, so the per-cycle figures include the draft, prefill and warm-up kernels the window
-holds. Categories: GDN verify (the kernel above), other GDN kernels, GDN conv, state commit,
-attention (FlashInfer prefill/decode), normalization, GEMM (cuBLAS/nvjet/CUTLASS), head
-epilogue (logit copy, argmax), and other. Kernel time is GPU time inside the window, not wall
-time.
+Exports each report's kernel timeline to SQLite (`nsys export`), sorts every kernel into a
+category by its name, and charges the kernel time up to the end of the last complete verify
+cycle to the complete cycles in that span. A cycle ends with SGLang's GDN state commit (its
+scatter kernel); kernels after the last commit belong to a cycle that `nsys stop` cut off and
+are reported separately, not charged. The cycles in the span are counted as the launches of the
+GDN verify kernel (FlashInfer's `gdn_verify_kernel_mtp`, or SGLang's Triton
+`fused_sigmoid_gating_delta_rule_update`) over the model's 24 GDN layers, one launch per layer
+per cycle; a count that is not a whole number of cycles (a window that starts inside a cycle)
+is an error. Every kernel in the span is charged, so the per-cycle figures include the draft,
+prefill and warm-up kernels it holds. Categories: GDN verify (the kernel above), other GDN
+kernels, GDN conv, state commit, attention (FlashInfer prefill/decode), normalization, GEMM
+(cuBLAS/nvjet/CUTLASS), head epilogue (logit copy, argmax), and other. Kernel time is GPU time,
+not wall time.
 
-    python experiments/repair/nsys_kernels.py ~/vp-data/repair/runs/nsys1/*.nsys-rep \\
-        --out evidence/repair/verify_kernels.json
+    python experiments/repair/nsys_kernels.py ~/vp-data/repair/runs/nsys2/force_b256.nsys-rep \\
+        --out evidence/repair/verify_kernels_b256.json
 """
 
 from __future__ import annotations
 
 import argparse
-import csv
-import io
 import json
 import re
+import sqlite3
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -54,26 +55,67 @@ def categorize(name: str) -> str:
     return 'other'
 
 
-def kernel_summary(report: Path) -> list[dict[str, Any]]:
-    out = subprocess.run(
-        [
-            'nsys',
-            'stats',
-            '--report',
-            'cuda_gpu_kern_sum',
-            '--format',
-            'csv',
-            '--output',
-            '-',
-            str(report),
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout
-    start = out.find('Time (%)')
-    rows = list(csv.DictReader(io.StringIO(out[start:])))
-    return rows
+def kernel_timeline(report: Path) -> list[tuple[int, int, str]]:
+    """(start ns, end ns, demangled name) of every kernel in the report, in start order."""
+    sqlite = report.with_suffix('.sqlite')
+    cmd = ['nsys', 'export', '--type', 'sqlite', '--force-overwrite', 'true']
+    subprocess.run([*cmd, '--output', str(sqlite), str(report)], capture_output=True, check=True)
+    con = sqlite3.connect(sqlite)
+    try:
+        rows = con.execute(
+            'SELECT k.start, k.end, s.value FROM CUPTI_ACTIVITY_KIND_KERNEL k '
+            'JOIN StringIds s ON k.demangledName = s.id ORDER BY k.start'
+        ).fetchall()
+    finally:
+        con.close()
+    return [(int(a), int(b), str(n)) for a, b, n in rows]
+
+
+def summarize(report: Path, kernels: list[tuple[int, int, str]]) -> dict[str, Any]:
+    """Per-cycle kernel time by category over the complete cycles of one report."""
+    commits = [end for _, end, name in kernels if categorize(name) == 'state_commit']
+    if not commits:
+        raise SystemExit(f'{report}: no state commit kernel, so no complete verify cycle')
+    cutoff = max(commits)
+    span = [k for k in kernels if k[0] < cutoff]
+    cut = [k for k in kernels if k[0] >= cutoff]
+    launches = sum(1 for _, _, name in span if VERIFY_KERNEL.search(name))
+    if launches == 0 or launches % GDN_LAYERS:
+        raise SystemExit(
+            f'{report}: {launches} verify launches up to the last commit, not a whole number of '
+            f'{GDN_LAYERS}-layer cycles (did the window start inside a cycle?)'
+        )
+    cycles = launches // GDN_LAYERS
+    by_cat: dict[str, float] = {}
+    by_name: dict[str, list[float]] = {}
+    for start, end, name in span:
+        by_cat[categorize(name)] = by_cat.get(categorize(name), 0.0) + (end - start)
+        by_name.setdefault(name, []).append(end - start)
+    top: list[dict[str, Any]] = [
+        {
+            'name': name[:160],
+            'category': categorize(name),
+            'total_ms': sum(t) / 1e6,
+            'instances': len(t),
+            'per_cycle': len(t) / cycles,
+            'mean_us': sum(t) / 1e3 / len(t),
+        }
+        for name, t in by_name.items()
+    ]
+    top.sort(key=lambda r: -float(r['total_ms']))
+    total = sum(by_cat.values())
+    return {
+        'report': str(report),
+        'cycles': cycles,
+        'cycles_source': f'{launches} GDN verify launches up to the last state commit / {GDN_LAYERS} layers',
+        'state_commit_launches': len(commits),
+        'kernel_ms_charged': total / 1e6,
+        'kernel_ms_after_last_commit_not_charged': sum(e - b for b, e, _ in cut) / 1e6,
+        'kernels_after_last_commit': len(cut),
+        'per_cycle_us': {k: v / 1e3 / cycles for k, v in sorted(by_cat.items())},
+        'share': {k: v / total for k, v in sorted(by_cat.items())},
+        'top_kernels': top[:25],
+    }
 
 
 def main() -> None:
@@ -85,54 +127,19 @@ def main() -> None:
     args = ap.parse_args()
     results = []
     for report in args.reports:
-        rows = kernel_summary(report)
-        by_cat: dict[str, float] = {}
-        verify_launches = 0
-        commit_launches = 0
-        top = []
-        for row in rows:
-            name = row.get('Name', '')
-            total_ns = float(row.get('Total Time (ns)', 0) or 0)
-            instances = int(float(row.get('Instances', 0) or 0))
-            cat = categorize(name)
-            by_cat[cat] = by_cat.get(cat, 0.0) + total_ns
-            if VERIFY_KERNEL.search(name):
-                verify_launches += instances
-            if cat == 'state_commit':
-                commit_launches = max(commit_launches, instances)
-            top.append(
-                {
-                    'name': name[:160],
-                    'category': cat,
-                    'total_ms': total_ns / 1e6,
-                    'instances': instances,
-                    'mean_us': total_ns / 1e3 / instances if instances else None,
-                }
-            )
-        top.sort(key=lambda r: -r['total_ms'])
-        total = sum(by_cat.values())
-        cycles = verify_launches / GDN_LAYERS
-        per_cycle = {k: v / 1e3 / cycles for k, v in sorted(by_cat.items())} if cycles else {}
-        entry: dict[str, Any] = {
-            'report': str(report),
-            'cycles_in_window': cycles,
-            'cycles_source': f'GDN verify kernel launches ({verify_launches}) / {GDN_LAYERS} layers',
-            'state_commit_launches': commit_launches,
-            'kernel_ms_total': total / 1e6,
-            'per_cycle_us': per_cycle,
-            'share': {k: v / total for k, v in sorted(by_cat.items())} if total else None,
-            'top_kernels': top[:25],
-        }
+        entry = summarize(report, kernel_timeline(report))
         results.append(entry)
+        per_cycle = entry['per_cycle_us']
         print(
             json.dumps(
                 {
                     'report': report.name,
-                    'cycles': cycles,
+                    'cycles': entry['cycles'],
                     'per_cycle_us': {k: round(v) for k, v in per_cycle.items()},
                 }
             )
         )
+    # Written only after every report passed its checks.
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(results, indent=1))
 
