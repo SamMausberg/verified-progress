@@ -458,16 +458,21 @@ eigenvectors of the key covariance (energy), of the query covariance (query), or
 C_k^1/2 C_q C_k^1/2 (product, a first-order proxy for the output error).
 
 The measurement uses the HF model (BF16 weights, transformers 5.12.1, the torch reference GDN
-rule, teacher forcing) on the second halves of the first 8 texts of `long2048.jsonl`
-(2,048 tokens each). Both files are in `~/vp-data/moonshot/workloads/`. `long2048.jsonl` is
+rule, teacher forcing) on the first 8 texts of `long2048.jsonl`. The study encodes each
+text raw, without the chat template that `make_long_prompts.py` budgeted for, so every text
+is 2,038 tokens long. The JSON's `eval_tokens_per_text: 2048` is the script's cap, which no
+text reaches. KL and top-1 agreement are averaged over the second half: the predictions from
+position 1,019 to the end, 1,018 per text and 8,144 in all. The calibration texts are also
+2,038 tokens each. Both files are in `~/vp-data/moonshot/workloads/`. `long2048.jsonl` is
 P4's declared workload (2c, sha256
 `db376fa3aadf75a30933a649b5ded1dfcafac8289b8e2aed1dde7201afd2659c`). `long2048_tune.jsonl`
 (sha256 `e68930de7103193e52291e1235d393ad9032c47da6d8de97370324b23c6aeaa0`, 48 texts) was
 made on 2026-10-01 at 03:29 UTC by `python make_long_prompts.py --split tune --count 48 --out
 ~/vp-data/moonshot/workloads/long2048_tune.jsonl`, run in `experiments/moonshot` at repo
-`ed4682d`. That `make_long_prompts.py` is the version main carried from `f349045` until
-#101 (`8d55367`), which made it write distinct texts with split-prefixed ids, so the current
-version would not reproduce these bytes. The 24 calibration texts and the 8 evaluation texts
+`ed4682d`. That run used the original `make_long_prompts.py`, which main carried from
+`f349045` until #101. It wrote ids such as `long2048-0000` and did not deduplicate texts.
+`8d55367` (#101) later changed it to write distinct texts with split-prefixed ids, so the
+current version would not reproduce these bytes. The 24 calibration texts and the 8 evaluation texts
 are distinct, and no text appears in both sets.
 
 The study compares each configuration with the same rule at full rank (U = I), which isolates
@@ -501,7 +506,7 @@ agreement than the floor.
 This is not a measurement of the declared budget, which is defined on a different probe:
 top-20 KL and top-1 agreement on `logit_probe.py`'s 48 prompts at 256 tokens. That probe was
 not run on these configurations. The study measures full-vocabulary KL on the second halves
-of 2,048-token texts, where a reduced state has had longer to drift, so the declared probe
+of 2,038-token texts, where a reduced state has had longer to drift, so the declared probe
 might show smaller differences.
 
 The floor itself sits at the budget's edge, because the rotated BF16 path adds its own
@@ -648,6 +653,23 @@ needs no SGLang engine. The committed file is a byte-identical copy of the job's
 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True scripts/gpu_lock.sh -s \
   python experiments/moonshot/gdn_state_rank_study.py \
   --out ~/vp-data/moonshot/p13/gdn_state_rank_study.json
+```
+
+The encoded lengths in 2g (2,038 tokens for each of the 8 evaluation and 24 calibration
+texts) were counted once, on CPU, the way the study encodes them:
+
+```python
+import json
+from pathlib import Path
+from transformers import AutoTokenizer
+tok = AutoTokenizer.from_pretrained(
+    'Qwen/Qwen3.5-4B', revision='851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a'
+)
+workloads = Path.home() / 'vp-data/moonshot/workloads'
+for name, count in (('long2048.jsonl', 8), ('long2048_tune.jsonl', 24)):
+    lines = (workloads / name).read_text().splitlines()
+    rows = [json.loads(line) for line in lines if line.strip()][:count]
+    print(name, [len(tok.encode(r['text'], add_special_tokens=False)) for r in rows])
 ```
 
 `p4_admission_plateaus.csv` (2c, the 127 plateau) is read from the server logs of the three
