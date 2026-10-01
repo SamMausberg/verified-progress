@@ -44,6 +44,10 @@ from server import log_time_span, pools_known, public_server_info, resolved_pool
 NEAR_NATS = 0.5
 LARGE_DRIFT_NATS = 0.5
 DRIFT_REGION_LP = -4.0
+# Chunk length of the GDN chunked-prefill kernels: a prompt longer than this is
+# prefilled in several chunks, which is where the radix cache's GDN checkpoint
+# tracking can change the computation.
+GDN_PREFILL_CHUNK = 64
 
 
 def load_run(path: Path) -> dict[str, dict[str, Any]]:
@@ -115,6 +119,11 @@ def compare_pair(
         d = next((i for i in range(n) if ta[i] != tb[i]), None)
         row: dict[str, Any] = {'id': pid, 'len_a': len(ta), 'len_b': len(tb)}
         top_a, top_b = a.get('top_logprobs') or [], b.get('top_logprobs') or []
+        row['prompt_tokens'] = a.get('prompt_tokens')
+        row['bitwise_identical'] = ta == tb and top_a == top_b
+        # The first output token comes from the prefill alone: a difference there is a
+        # difference in the prefill computation, before any decode or verify step.
+        row['output0_differs'] = ta[:1] != tb[:1] or top_a[:1] != top_b[:1]
         common = d if d is not None else n
         drift, drift_pos = 0.0, None
         for i in range(min(common, len(top_a), len(top_b))):
@@ -131,6 +140,14 @@ def compare_pair(
         row['first_logprob_diff'] = next(
             (i for i in range(min(common, len(top_a), len(top_b))) if top_a[i] != top_b[i]), None
         )
+        # First output index where the tokens or their top-k logprobs differ (None when
+        # the outputs are bitwise identical).
+        if row['bitwise_identical']:
+            row['first_difference'] = None
+        elif row['first_logprob_diff'] is not None:
+            row['first_difference'] = row['first_logprob_diff']
+        else:
+            row['first_difference'] = common if d is not None else min(len(top_a), len(top_b), n)
         if d is None:
             row['diverged'] = False
             row['exposure'] = n
@@ -208,8 +225,32 @@ def summarize(rows: Iterable[dict[str, Any]]) -> dict[str, Any]:
     def q(xs: list[float], p: float) -> float | None:
         return xs[min(len(xs) - 1, int(p * len(xs)))] if xs else None
 
+    first_diff: dict[str, int] = {}
+    for r in rows:
+        i = r.get('first_difference')
+        if i is not None:
+            key = str(i) if i < 6 else '6+'
+            first_diff[key] = first_diff.get(key, 0) + 1
+    first_diff = dict(sorted(first_diff.items()))
+    by_len: dict[str, dict[str, int]] | None = None
+    if rows and all(r.get('prompt_tokens') is not None for r in rows):
+        by_len = {}
+        for key, sel in (
+            (f'prompt_le_{GDN_PREFILL_CHUNK}', lambda n: n <= GDN_PREFILL_CHUNK),
+            (f'prompt_gt_{GDN_PREFILL_CHUNK}', lambda n: n > GDN_PREFILL_CHUNK),
+        ):
+            group = [r for r in rows if sel(r['prompt_tokens'])]
+            by_len[key] = {
+                'prompts': len(group),
+                'differ': sum(1 for r in group if r.get('output0_differs')),
+            }
     return {
         'prompts': len(rows),
+        'bitwise_identical': sum(1 for r in rows if r.get('bitwise_identical')),
+        # Prompts whose first output token or its top-k logprobs differ, by prompt length.
+        'output0_differs': by_len,
+        # Prompts by the first output index where tokens or top-k logprobs differ.
+        'first_difference_index': first_diff,
         'diverged': len(events),
         'identical': sum(1 for r in rows if not r['diverged'] and not r['length_mismatch']),
         'length_mismatch': sum(1 for r in rows if r['length_mismatch']),

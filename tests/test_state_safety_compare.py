@@ -147,3 +147,34 @@ def test_divergence_at_a_non_fragile_position_is_counted_apart():
     assert res['by_length']['2']['nonfragile_divergences'] == 1
     assert res['by_length']['2']['fragile_divergences'] == 0
     assert res['nonfragile_divergences'] == 1
+
+
+def test_summary_counts_bitwise_identity_and_first_output_by_prompt_length():
+    from compare import GDN_PREFILL_CHUNK, summarize
+
+    def r(ids, lps, n):
+        return {
+            'output_ids': ids,
+            'top_logprobs': [[[lp, i]] for lp, i in zip(lps, ids, strict=True)],
+            'prompt_tokens': n,
+        }
+
+    a = {
+        'short': r([1, 2], [-0.1, -0.2], GDN_PREFILL_CHUNK),
+        'long': r([1, 2], [-0.1, -0.2], GDN_PREFILL_CHUNK + 1),
+        'late': r([1, 2], [-0.1, -0.2], GDN_PREFILL_CHUNK + 1),
+    }
+    b = {
+        'short': r([1, 2], [-0.1, -0.2], GDN_PREFILL_CHUNK),
+        'long': r([1, 2], [-0.15, -0.2], GDN_PREFILL_CHUNK + 1),
+        'late': r([1, 2], [-0.1, -0.25], GDN_PREFILL_CHUNK + 1),
+    }
+    s = summarize(compare_pair(a, b))
+    assert s['bitwise_identical'] == 1
+    assert s['first_difference_index'] == {'0': 1, '1': 1}
+    assert s['output0_differs'] == {
+        f'prompt_le_{GDN_PREFILL_CHUNK}': {'prompts': 1, 'differ': 0},
+        f'prompt_gt_{GDN_PREFILL_CHUNK}': {'prompts': 2, 'differ': 1},
+    }
+    no_len = {k: {**v, 'prompt_tokens': None} for k, v in a.items()}
+    assert summarize(compare_pair(no_len, no_len))['output0_differs'] is None
