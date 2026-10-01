@@ -1,5 +1,5 @@
 {
- "repo_commit": "51c181917f7c1d75db75655cc14cd35ef2169433",
+ "repo_commit": "9754fcdd87ae99faaaaf1bd48808e2856e8e795a",
  "assumptions": {
   "hbm_read_bytes_per_s": 3790000000000.0,
   "target_weight_bytes": 8409579520,
@@ -11,7 +11,7 @@
   "selector_bound_tau_ratio": 1.6342
  },
  "inputs": {
-  "evidence/bench/confirm/frontier.csv": "734533588d7c20f60f2c476b693b5a52f38b8330a31a0f05f429bed8b06c40e9",
+  "evidence/bench/confirm/frontier.csv": "3f433375f1a6336bd797798400add33f24f1dc7f473ebc34f953b5e55d3f2a10",
   "evidence/repair/stage_a_timing.json": "68c122e89b052f365e2bb6c78f43061f1a462d677f2a0da31985788dfc192e50",
   "evidence/drafter/support/zlab_b16_panel_v1_summary.json": "e20782d9edabecfeffe491e9913d0af1a288468044086e55c21b9bea6f5fcfc3"
  },

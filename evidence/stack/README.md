@@ -51,11 +51,9 @@ microbenchmark, offline oracle, or derived) with its n, where it is, the exactne
 against stock decoding and its source, the engine series and switch, what blocks it, and
 whether it enters the composed run. "c" is client concurrency. Where a cited file is on an
 open pull request rather than on `main`, the row names the pull request and its numbers
-are marked pending until it merges; the one exception is bench's confirmation frontier
-(PR #131), which this directory depends on and which merges first.
+are marked pending until it merges.
 
-Baselines (measured, bench confirmation, n = 3 sessions each, `evidence/bench/confirm/frontier.csv`
-from PR #131): the best tuned DFlash arm of an exact class is `dflash-tuned-b16` (block
+Baselines (measured, bench confirmation, n = 3 sessions each, `evidence/bench/confirm/frontier.csv`): the best tuned DFlash arm of an exact class is `dflash-tuned-b16` (block
 16, Triton target and draft attention; exact-up-to-rounding) by per-user rate at every
 c <= 8: 986.9, 876.4, 713.0 and 530.0 tok/s/user at c = 1, 2, 4, 8, with 5.68-5.77 tokens
 per verify cycle. By throughput at c = 8, `dflash-tuned` (block 8, FA4 draft attention;
@@ -241,7 +239,7 @@ against the phase diagnostic before it is reported.
 
 ## Derived ceilings and the gap to 5x (`ceiling.json`)
 
-`experiments/stack/ceiling.py`, from bench's confirmation frontier (PR #131 at `82e75d7`), repair's
+`experiments/stack/ceiling.py`, from bench's confirmation frontier (`evidence/bench/confirm/frontier.csv`), repair's
 forced-acceptance runs (`evidence/repair/stage_a_timing.json`) and the drafter's support
 screen (`evidence/drafter/support/zlab_b16_panel_v1_summary.json`); the file records the
 SHA-256 of each input. The floor reads every weight byte of the target (8.41 GB) and the
