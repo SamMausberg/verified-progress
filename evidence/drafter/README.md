@@ -346,3 +346,51 @@ commit (circular), or the exact fold (`gdn_replayssm_exact_fold_kernel`).
         --ref ~/vp-data/drafter/phase-timing/stock/c8/requests.jsonl \
         --test ~/vp-data/drafter/phase-timing/fold/c8/requests.jsonl \
         --out evidence/drafter/phase_timing/fold_c8-vs-stock.json   # likewise c16 and circular
+
+## Buffered GDN verify: served A/B against the tuned DFlash arms
+
+`fold_timing/summary.json`, `fold_timing/launch/` (`run_fold_timing.sh`, one exclusive hold,
+2026-10-01 18:05-18:38 UTC, repository at 0159c13, engine `engine/drafter` 31bda3e674; the
+launch records are bench.sweep's with the hostname field removed). The bench's two tuned DFlash
+arms, each run as stock and with the fold (`--enable-linear-replayssm-spec` and
+`SGLANG_GDN_REPLAYSSM_FOLD=1`, nothing else changed), in the order stock, fold, fold, stock:
+`dflash-tuned-b16` (block 16, Triton attention, capacity 64) and `dflash-tuned` (block 8, FA4
+draft attention, FlashInfer target attention, capacity 128). Bench confirm split, 512 output
+tokens with ignore_eos, greedy, one server launch per run; y is output tokens/s per GPU, the mean
+of the two runs per arm, and the ratio is fold over stock with its range over the four
+stock-fold run pairs. Every point passed bench's validity rule; foreign CPU load averaged
+0.27-0.83 cores per point.
+
+| block | c | stock y | fold y | fold/stock (range) | tokens per cycle |
+|---|---|---|---|---|---|
+| 16 | 1 | 876 | 848 | 0.968 (0.966-0.970) | 5.70 |
+| 16 | 2 | 1,516 | 1,490 | 0.983 (0.980-0.985) | 5.69 |
+| 16 | 4 | 2,440 | 2,452 | 1.005 (1.000-1.010) | 5.68 |
+| 16 | 8 | 3,523 | 3,739 | 1.061 (1.053-1.070) | 5.77 |
+| 16 | 16 | 4,419 | 4,836 | 1.094 (1.077-1.113) | 5.61 |
+| 16 | 32 | 5,078 | 5,686 | 1.120 (1.106-1.134) | 5.62 |
+| 8 | 1 | 763 | 752 | 0.986 (0.981-0.990) | 4.74 |
+| 8 | 2 | 1,396 | 1,410 | 1.010 (1.006-1.013) | 4.81 |
+| 8 | 4 | 2,355 | 2,401 | 1.020 (1.016-1.023) | 4.78 |
+| 8 | 8 | 3,635 | 3,845 | 1.058 (1.050-1.066) | 4.73 |
+| 8 | 16 | 5,260 | 5,691 | 1.082 (1.069-1.094) | 4.67 |
+| 8 | 32 | 6,754 | 7,552 | 1.118 (1.114-1.123) | 4.75 |
+
+- **From c = 8 up the fold is faster on both arms**: 5.8-6.1% at c = 8, 8.2-9.4% at 16 and
+  11.8-12.0% at 32, with every pairwise ratio at least 1.05. Tokens per cycle are the same in both
+  arms (identical at c <= 8; within the run-to-run spread of stock at 16 and 32), so the gain is
+  cycle time, as in the per-phase split.
+- **At c = 1-2 it is slower on block 16** (3.2% and 1.7%) and about even on block 8, so it does
+  not improve the best low-concurrency configuration (stock `dflash-tuned-b16` at c = 1).
+  A likely cause, from code reading and not yet measured: SGLang's recurrent GDN kernel uses
+  value tiles of 4 on sm_90 for at most 64 sequences only when it writes per-position states
+  (`_select_recurrent_launch_config`, `target_verify`); the ring-writing verify the fold uses
+  keeps tiles of 32, so at small batches it launches 8x fewer blocks. The kernel check above
+  found the two tilings bitwise equal on this GPU, so selecting the narrow tiles for the
+  ring-writing verify would not change the arithmetic.
+- The stock arms' KV pools were about 308,000 (block 16) and 258,000 (block 8) tokens against the
+  fold's 1,000,000 cap, because stock reserves the per-position states; at c <= 32 (requests of
+  about 1,300 tokens) neither binds, and the running limits match (64 and 128).
+
+    scripts/gpu_lock.sh -x experiments/drafter/run_fold_timing.sh
+    # its last step: ab_timing_summary.py ~/vp-data/drafter/fold-timing --base stock --test fold
