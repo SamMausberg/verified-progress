@@ -21,8 +21,10 @@ phases (one synchronised wave each, fixed output length, nothing finishes during
 but not under continuous traffic; a value other than 0 or 1 (only one chunked request is in
 flight at a time) means the log is outside that scope.
 
-Each run directory must hold lever_sweep's lever_sweep_log.jsonl and exactly one server log
-per configuration it lists (no more, no fewer), so a missing arm cannot drop out of the check.
+Each run is checked against its declared configurations (--expect RUN=LABEL,..., the plan the
+run was launched with): its lever_sweep_log.jsonl must list exactly those, in order, each with
+exit 0, and it must hold exactly one server log per configuration and none outside the plan,
+so neither a missing arm nor an interrupted run can drop out of the check.
 It prints one count line per server log and exits 1 if any log yields fewer than
 --min-plateaus plateaus (default 1, so an unparsed log or one whose waves all filled cannot
 pass silently), if any plateau's C is not inferable, or if any plateau differs from the
@@ -30,7 +32,7 @@ prediction. It explains plateaus; it is not the admission test (check_admission.
 a run whose waves all fill has no plateau to explain.
 
     python experiments/moonshot/admission_plateaus.py <lever_sweep out dir> ... \
-        [--min-plateaus N] [--csv out.csv]
+        --expect <run dir name>=<label>,<label> ... [--min-plateaus N] [--csv out.csv]
 """
 
 from __future__ import annotations
@@ -108,20 +110,30 @@ def plateaus(log_text: str) -> list[dict[str, int | str]]:
     return rows
 
 
-def expected_logs(run: Path) -> tuple[dict[str, Path], list[str]]:
-    """One server log per configuration in the run's lever_sweep_log.jsonl, and the problems.
+def expected_logs(run: Path, plan: list[str]) -> tuple[dict[str, Path], list[str]]:
+    """One server log per planned configuration, and the problems found.
 
-    lever_sweep writes each configuration's runs under its label with '#' replaced by '_'.
+    The plan is the declared configuration list (--expect), not lever_sweep_log.jsonl:
+    lever_sweep appends a record only after each configuration finishes, so an interrupted
+    run's record holds just the completed prefix. The record must list exactly the plan, in
+    order, each with status 'exit 0'. lever_sweep writes each configuration's runs under its
+    label with '#' replaced by '_'.
     """
+    problems = []
     record = run / 'lever_sweep_log.jsonl'
     if not record.exists():
-        return {}, [f'{run.name}: no lever_sweep_log.jsonl']
-    arms = [
-        json.loads(line)['config'].replace('#', '_')
-        for line in record.read_text().splitlines()
-        if line.strip()
-    ]
-    problems = []
+        problems.append(f'{run.name}: no lever_sweep_log.jsonl')
+    else:
+        entries = [json.loads(line) for line in record.read_text().splitlines() if line.strip()]
+        recorded = [entry['config'] for entry in entries]
+        if recorded != plan:
+            problems.append(f'{run.name}: record lists {recorded}, plan is {plan}')
+        problems += [
+            f'{run.name}/{entry["config"]}: status {entry.get("status")!r}'
+            for entry in entries
+            if entry.get('status') != 'exit 0'
+        ]
+    arms = [label.replace('#', '_') for label in plan]
     logs: dict[str, Path] = {}
     for arm in arms:
         found = sorted((run / arm).glob('*/server/server.log'))
@@ -131,22 +143,46 @@ def expected_logs(run: Path) -> tuple[dict[str, Path], list[str]]:
             logs[arm] = found[0]
     extra = {log.parents[2].name for log in run.glob('*/*/server/server.log')} - set(arms)
     problems += [
-        f'{run.name}/{arm}: server log of a configuration not in the record'
-        for arm in sorted(extra)
+        f'{run.name}/{arm}: server log of a configuration outside the plan' for arm in sorted(extra)
     ]
     return logs, problems
+
+
+def parse_plans(specs: list[str]) -> dict[str, list[str]]:
+    """--expect RUN=LABEL[,LABEL...] entries, keyed by the run directory's name."""
+    plans: dict[str, list[str]] = {}
+    for spec in specs:
+        name, sep, labels = spec.partition('=')
+        if not sep or not labels or name in plans:
+            raise SystemExit(f'--expect {spec!r}: need RUN=LABEL[,LABEL...], once per run')
+        plans[name] = labels.split(',')
+    return plans
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('runs', nargs='+', type=Path, help='lever_sweep output directories')
+    parser.add_argument(
+        '--expect',
+        action='append',
+        required=True,
+        metavar='RUN=LABEL[,LABEL...]',
+        help="each run's declared configurations, in launch order (one per run)",
+    )
     parser.add_argument('--min-plateaus', type=int, default=1, help='required per server log')
     parser.add_argument('--csv', type=Path)
     args = parser.parse_args()
     rows: list[dict[str, int | str]] = []
     failed: list[str] = []
+    plans = parse_plans(args.expect)
+    unplanned = {run.name for run in args.runs} ^ set(plans)
+    failed += [f'{name}: run and --expect do not match' for name in sorted(unplanned)]
+    for problem in failed:
+        print(f'{problem}: FAILED')
     for run in args.runs:
-        logs, problems = expected_logs(run)
+        if run.name not in plans:
+            continue
+        logs, problems = expected_logs(run, plans[run.name])
         for problem in problems:
             print(f'{problem}: FAILED')
         failed += problems

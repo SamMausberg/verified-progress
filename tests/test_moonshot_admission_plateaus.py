@@ -57,19 +57,29 @@ def test_decode_without_a_queue_is_not_a_plateau() -> None:
 
 
 def run_cli(
-    tmp_path: Path, logs: dict[str, str], *args: str, configs: list[str] | None = None
+    tmp_path: Path,
+    logs: dict[str, str],
+    *args: str,
+    configs: list[str] | None = None,
+    plan: list[str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Lay the logs out as lever_sweep does (<run>/<arm>/<stamp>/server/server.log, with
-    lever_sweep_log.jsonl listing the configurations, by default the logs' arms)."""
+    lever_sweep_log.jsonl recording `configs`, by default the logs' arms) and check them
+    against `plan` (by default the recorded configurations)."""
     run = tmp_path / 'run'
     for arm, text in logs.items():
         log = run / arm.replace('#', '_') / '20261001-000000' / 'server' / 'server.log'
         log.parent.mkdir(parents=True)
         log.write_text(text)
-    record = [{'config': config, 'status': 'exit 0'} for config in configs or list(logs)]
+    recorded = configs or list(logs)
+    record = [{'config': config, 'status': 'exit 0'} for config in recorded]
     (run / 'lever_sweep_log.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in record))
+    expect = f'run={",".join(plan or recorded)}'
     return subprocess.run(
-        [sys.executable, str(SCRIPT), str(run), *args], capture_output=True, text=True, check=False
+        [sys.executable, str(SCRIPT), str(run), '--expect', expect, *args],
+        capture_output=True,
+        text=True,
+        check=False,
     )
 
 
@@ -106,8 +116,30 @@ def test_cli_fails_when_a_recorded_configuration_has_no_log(tmp_path: Path) -> N
     assert 'exact_r1: 0 server logs, expected 1' in result.stdout
 
 
-def test_cli_fails_on_a_log_outside_the_record(tmp_path: Path) -> None:
+def test_cli_fails_on_a_log_outside_the_plan(tmp_path: Path) -> None:
     logs = {'dense': PLATEAU_127, 'exact': PLATEAU_127}
     result = run_cli(tmp_path, logs, configs=['dense'])
     assert result.returncode == 1
-    assert 'not in the record' in result.stdout
+    assert 'outside the plan' in result.stdout
+
+
+def test_cli_fails_on_an_interrupted_run(tmp_path: Path) -> None:
+    # lever_sweep stopped after the first configuration: its record holds only that prefix.
+    result = run_cli(
+        tmp_path, {'dense#r1': PLATEAU_127}, configs=['dense#r1'], plan=['dense#r1', 'exact#r1']
+    )
+    assert result.returncode == 1
+    assert 'record lists' in result.stdout
+
+
+def test_cli_fails_on_a_run_without_a_plan(tmp_path: Path) -> None:
+    result = run_cli(tmp_path, {'dense': PLATEAU_127})
+    assert result.returncode == 0
+    other = subprocess.run(
+        [sys.executable, str(SCRIPT), str(tmp_path / 'run'), '--expect', 'elsewhere=dense'],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert other.returncode == 1
+    assert 'run and --expect do not match' in other.stdout

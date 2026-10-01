@@ -565,12 +565,20 @@ after the run, before the summary step.
 void P4b attempts on CPU, by `admission_plateaus.py` at commit 591d060:
 
 ```sh
+D=plain+no_radix+p4_pools; E=$D+exact_replay
 python experiments/moonshot/admission_plateaus.py \
   ~/vp-data/moonshot/p4_ab_20261001T082738Z \
   ~/vp-data/moonshot/p4_admission_20261001T104311Z \
   ~/vp-data/moonshot/p4_admission_20261001T115146Z \
+  --expect "p4_ab_20261001T082738Z=$D#r1,$E#r1,$E#r2,$D#r2,$D#r3,$E#r3,$E#r4,$D#r4" \
+  --expect "p4_admission_20261001T104311Z=$D,$E" \
+  --expect "p4_admission_20261001T115146Z=$D,$E" \
   --min-plateaus 4 --csv evidence/moonshot/p4_admission_plateaus.csv
 ```
+
+The `--expect` lists are the configurations each run was launched with, in order (the A/B in
+`run_p4b.sh`'s declared A B B A order, the preflights in `run_p4_admission.sh`); the script
+fails unless each run's record and server logs match them exactly.
 
 Lever definitions (flags and environment per lever, lossy labels, conflicts):
 `experiments/moonshot/levers.py`.
