@@ -36,7 +36,7 @@ declare -A OUTPUTS=(
   [tune_w8a8]="tune_w8a8.log tune_w8a8.hostload.json gemv_sweep_w8a8.json"
   [micro]="micro.log micro.hostload.json micro_head.json"
   [primitives]="primitives.log primitives.hostload.json head_primitives.json"
-  [ncu]="ncu.log ncu_gemv.ncu-rep"
+  [ncu]="ncu.log ncu_gemv.ncu-rep ncu_expected.json"
   [ncu_export]="ncu_export.log ncu_gemv_details.csv"
   [summarize]="summarize.log head_path_time.csv head_path_table.md"
 )
@@ -152,9 +152,15 @@ else
   skip micro tune_w8a16 tune_w8a8
 fi
 timed primitives 300 python bench/head_primitives.py --trials 15 --out "$OUT/head_primitives.json"
-step ncu 240 sudo -E env PATH="$PATH" LD_LIBRARY_PATH="$LD_LIBRARY_PATH" PYTHONPATH="$PYTHONPATH" \
-  "$CUDA_HOME/bin/ncu" --set full -k regex:_gemv_envelope_kernel -c 8 -f -o "$OUT/ncu_gemv" \
-  "$(command -v python)" bench/profile_gemv.py --batches 1 16 64 256 --calls 2
+# Only the profiled calls' NVTX ranges count: the self-test and warm-up launch the
+# same kernel many times first. check_outputs compares the launches with the
+# expected batch sizes and grids that profile_gemv.py writes.
+NCU_RANGES=()
+for m in 1 16 64 256; do NCU_RANGES+=(--nvtx-include "certified_head M=$m/"); done
+step ncu 600 sudo -E env PATH="$PATH" LD_LIBRARY_PATH="$LD_LIBRARY_PATH" PYTHONPATH="$PYTHONPATH" \
+  "$CUDA_HOME/bin/ncu" --set full --nvtx "${NCU_RANGES[@]}" -k regex:_gemv_envelope_kernel -c 8 \
+  -f -o "$OUT/ncu_gemv" "$(command -v python)" bench/profile_gemv.py --batches 1 16 64 256 \
+  --calls 2 --expect-out "$OUT/ncu_expected.json"
 if ok ncu; then
   [ -O "$OUT/ncu_gemv.ncu-rep" ] || sudo chown "$(id -u):$(id -g)" "$OUT/ncu_gemv.ncu-rep"
   step ncu_export 120 bash -c "'$CUDA_HOME/bin/ncu' --import '$OUT/ncu_gemv.ncu-rep' \

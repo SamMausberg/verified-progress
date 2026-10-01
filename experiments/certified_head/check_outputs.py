@@ -122,9 +122,19 @@ def main() -> None:
         problems.append('ncu_gemv_details.csv: missing')
     else:
         with details.open(newline='') as f:
-            ids = {r['ID'] for r in csv.DictReader(f)}
-        if len(ids) != 8:
-            problems.append(f'ncu: {len(ids)} profiled launches, expected 8')
+            grids: dict[int, str] = {}
+            for r in csv.DictReader(f):
+                grids[int(r['ID'])] = r['Grid Size']
+        if len(grids) != 8:
+            problems.append(f'ncu: {len(grids)} profiled launches, expected 8')
+        expected_path = out / 'ncu_expected.json'
+        if not expected_path.exists():
+            problems.append('ncu_expected.json: missing (cannot tell which launches were profiled)')
+        else:
+            expected = [e['grid'] for e in json.loads(expected_path.read_text())]
+            got = [int(grids[i].strip('()').split(',')[0]) for i in sorted(grids)]
+            if got != expected:
+                problems.append(f'ncu: launch grids {got}, expected {expected}')
     if problems:
         print('output check FAILED:')
         for p in problems:
