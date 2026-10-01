@@ -40,7 +40,10 @@ def server_pools(run: Path) -> dict[str, Any]:
     if not info_path.exists():
         return {}
     info = json.loads(info_path.read_text())
-    return {k: info.get(k) for k in POOL_KEYS}
+    # The running limit is resolved by the scheduler: /server_info's internal_states[0].
+    internal = info.get('internal_states') or [{}]
+    merged = {**info, **(internal[0] if isinstance(internal, list) else internal)}
+    return {k: merged.get(k) for k in POOL_KEYS}
 
 
 def collect(root: Path) -> list[dict[str, Any]]:

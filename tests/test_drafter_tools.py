@@ -168,3 +168,35 @@ def test_support_screen_greedy_walk_uses_chosen_predecessors() -> None:
         Chain(), candidates, unary, hidden, torch.tensor([1, 0]), torch.tensor([1, 3])
     )
     assert rewalk.tolist() == [[-1, 2, 3], [-1, -1, -1]]
+
+
+def test_localize_reports_strict_prefix_differences() -> None:
+    localize = load('fold_localize')
+    assert localize.first_difference([1, 2, 3], [1, 2, 3]) is None
+    assert localize.first_difference([1, 2, 3], [1, 5, 3]) == 1
+    assert localize.first_difference([1, 2], [1, 2, 3]) == 2
+    a = {'output_ids': [1, 2], 'top_logprobs': [[0.0], [0.0]]}
+    b = {'output_ids': [1, 2, 3], 'top_logprobs': [[0.0], [0.0], [0.0]]}
+    assert localize.first_token_difference(a, b) == 2
+    assert localize.first_logprob_difference(a, b) == 2
+    cycle = {'prefix_len': 10, 'draft': [1, 2], 'target': [1, 2], 'accept': 1}
+    later = dict(cycle, prefix_len=12)
+    found = localize.first_cycle_difference([cycle], [cycle, later])
+    assert found['cycle'] == 1 and found['differs'] == ['cycle_count']
+    assert found['prefix_len'] == 12
+    assert localize.first_cycle_difference([cycle], [cycle]) is None
+
+
+def test_ab_summary_reads_the_scheduler_running_limit(tmp_path: Path) -> None:
+    summary = load('ab_timing_summary')
+    run = tmp_path / 'b16-fold-r1' / '20261001-000000'
+    (run / 'server').mkdir(parents=True)
+    info = {
+        'max_total_num_tokens': 300000,
+        'max_running_requests': 64,
+        'internal_states': [{'effective_max_running_requests_per_dp': 64}],
+    }
+    (run / 'server' / 'server_info.json').write_text(json.dumps(info))
+    pools = summary.server_pools(run)
+    assert pools['effective_max_running_requests_per_dp'] == 64
+    assert pools['max_total_num_tokens'] == 300000

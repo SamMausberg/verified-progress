@@ -33,18 +33,20 @@ def traces(directory: Path) -> dict[str, list[dict[str, Any]]]:
     return cycles
 
 
-def first_logprob_difference(a: dict[str, Any], b: dict[str, Any]) -> int | None:
-    for index, (x, y) in enumerate(zip(a['top_logprobs'], b['top_logprobs'], strict=False)):
+def first_difference(a: list[Any], b: list[Any]) -> int | None:
+    """First index where two lists differ; a strict prefix differs where it ends."""
+    for index, (x, y) in enumerate(zip(a, b, strict=False)):
         if x != y:
             return index
-    return None
+    return None if len(a) == len(b) else min(len(a), len(b))
+
+
+def first_logprob_difference(a: dict[str, Any], b: dict[str, Any]) -> int | None:
+    return first_difference(a['top_logprobs'], b['top_logprobs'])
 
 
 def first_token_difference(a: dict[str, Any], b: dict[str, Any]) -> int | None:
-    for index, (x, y) in enumerate(zip(a['output_ids'], b['output_ids'], strict=False)):
-        if x != y:
-            return index
-    return None
+    return first_difference(a['output_ids'], b['output_ids'])
 
 
 def first_cycle_difference(
@@ -65,6 +67,17 @@ def first_cycle_difference(
                 'a': {key: x[key] for key in ('prefix_len', 'draft', 'target', 'accept')},
                 'b': {key: y[key] for key in ('prefix_len', 'draft', 'target', 'accept')},
             }
+    if len(a) != len(b):
+        # Same cycles as far as the shorter trace goes: one run stopped earlier.
+        index = min(len(a), len(b))
+        extra = (a if len(a) > len(b) else b)[index]
+        return {
+            'cycle': index,
+            'prefix_len': extra['prefix_len'],
+            'differs': ['cycle_count'],
+            'first_draft_slot': None,
+            'cycles': {'a': len(a), 'b': len(b)},
+        }
     return None
 
 
