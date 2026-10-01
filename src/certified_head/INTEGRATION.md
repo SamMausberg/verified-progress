@@ -54,6 +54,25 @@ SGLang's seeded sampler applied to the verify pass's own logits.
 its bitwise self-test for the exact gathered-GEMM shape; only those batch sizes
 then use the column fallback.
 
+The certificate is sound if the low-precision kernel computes the modelled
+arithmetic (`s (q . h)` with FP32 accumulation within gamma, or the exact int32
+product for W8A8). This is checked per compiled variant at start-up and by runtime
+probes, not proved:
+
+- call `head.enclosure_self_test(batch_sizes)` at start-up, outside capture, for
+  every batch size the engine will use: each tile configuration is checked (raw
+  product, envelope, tile summaries, decisions) on shipped real rows against FP64,
+  and a failing configuration's batch sizes take the stock path (logged);
+- every call checks 8 exactly computed vocabulary rows against the production
+  kernel's own bounds; a violation sends the batch to the stock path and latches
+  that batch size for the process (`head.probe_stats()`).
+
+A measured violation: TMA loads of the int8 weight tile with a 64-byte box
+(`block_k = 64`) feeding the BF16 conversion and `tl.dot` returned wrong products
+on GH200 with Triton 3.7.1 and torch 2.13.0+cu130
+(`experiments/certified_head/tma_repro.py`, `evidence/certified_head/tma_repro.json`).
+Such tiles are refused (`check_gemv_config`), and the defaults use 128-byte boxes.
+
 ## Call sites at the pin (paths under `python/sglang/`)
 
 1. Plain decode, greedy: `srt/layers/logits_processor.py`

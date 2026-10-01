@@ -42,6 +42,12 @@ pass accumulates exactly in int32 and needs no model for itself. With
 `reference='fp32'` the same two assumptions apply (the stock kernel's FP32
 accumulation and our pass's), without the BF16 rounding step.
 
+The certificate also assumes that the compiled approximate pass computes the
+modelled arithmetic (``s (q . h)`` with FP32 accumulation within gamma, or the
+exact int32 product for W8A8). That is checked per compiled kernel variant at
+start-up and by runtime probes on every call, not proved; a measured violation and
+its fix are described below ("A TMA fault in the W8A16 pass").
+
 Rows the certificate cannot decide are completed by the stock kernel itself:
 `fallback_mode='batch'` (default) reruns `torch.matmul` on the whole batch at
 the same shape and takes its argmax, and needs no model. `fallback_mode='columns'`
@@ -120,29 +126,126 @@ on it; the start-up self-test re-checks it on the deployed shapes.
 
 ## How often the certificate needs the stock kernel (`fallback_vs_model.json`)
 
-CPU, FP64: the first 20,000 real decode rows of the capture in capture order
-(1,260 engine steps, all prompt splits), top 64 tokens per row, the same
-bucket-exact decision as the GPU kernel after rescoring. (A rerun on 60,000 rows,
-which also checks every token outside the top 64 against the winning bucket, is
-pending; the reviewer's check of 3,013 rows found no such token.)
+CPU, FP64: the first 60,000 real decode rows of the capture in capture order
+(3,768 engine steps, all prompt splits). Each row is decided over its top 64
+tokens by exact logit with the GPU kernel's bucket-exact rule; every other token
+is then checked against the winning bucket, and in no decided row, at any gamma,
+could a token outside the top 64 compete.
 
 | stock error bound gamma | rows undecided | engine steps with a fallback |
 |---|---|---|
-| 6.1e-4 (conservative) | 2.24% | 29.4% |
-| 1.19e-4 (Hopper wgmma) | 0.45% | 6.8% |
-| 3e-5 | 0.10% | 1.5% |
-| 1e-5 | 0.045% | 0.71% |
-| 1e-6 (about the largest observed cuBLAS error) | 0.010% | 0.16% |
+| 6.1e-4 (conservative) | 1.46% (878) | 20.2% |
+| 1.19e-4 (Hopper wgmma) | 0.28% (166) | 4.25% |
+| 3e-5 | 0.065% (39) | 1.0% |
+| 1e-5 | 0.025% (15) | 0.40% |
+| 3e-6 | 0.0083% (5) | 0.13% |
+| 1e-6 (about the largest observed cuBLAS error) | 0.0033% (2) | 0.05% |
 | 0 | 0 | 0 |
 
-The rate depends on the population. The same rule gives 1.46% and 0.28% on the
-GPU replay's 60,000 rows and 1.40% and 0.35% on the geometry workstream's
-held-out 6,005 rows: the first 20,000 rows in capture order fall back more often
-than later ones (their prompt mix differs), so figures should cite their rows.
+The GPU replay of the same 60,000 rows at x3's commit gives the same undecided
+counts under both models (878 and 166). This CPU run started from the branch
+between 0c0bb7a and 90cc31a (its start commit was not recorded); the two differ
+only in the Hopper radius, by 1e-4 relative, and the count under the corrected
+radius equals the GPU replay's. An earlier version of this table used the first
+20,000 rows (2.24% and 0.45%): the rate depends on the population, and the
+geometry workstream's held-out 6,005 rows give 1.40% and 0.35%, so figures
+should cite their rows.
 
 The fallback rate is set by the stock error model, not by the BF16 spacing:
 a decision that compares BF16 values exactly certifies BF16 ties, and only an
 accumulation interval that straddles a rounding boundary leaves a row undecided.
+
+## A TMA fault in the W8A16 pass (found, isolated, fixed)
+
+The certificate rests on an assumption about the compiled approximate pass: that
+it computes the modelled arithmetic, ``s (q . h)`` with FP32 accumulation within
+the stated gamma (W8A16, BF16) or the exact int32 product (W8A8). This is checked
+per compiled kernel variant at start-up and by runtime probes on every call (both
+below); it is not proved. One family of tile configurations measurably violated it
+on this machine (GH200, Triton 3.7.1, torch 2.13.0+cu130).
+
+**Finding.** The final evidence run (x3, commit 9e3a39a) found the W8A16 pass
+deciding 52 of 60,000 real rows when row statuses were computed 256 rows at a time
+(`large_m_check.json`): with TMA tiles block_v 128, block_m 128, block_k 64 (the
+default for M > 64, and the x3 sweep's choice at M = 128 and 256) the envelope was
+wrong at every batch size tried, while pointer loads of the same tiles enclosed.
+
+**Isolation** (`tma_repro.json`, `experiments/certified_head/tma_repro.py`,
+commit 7f8079f; `tma_candidates.json`, `tma_candidates.py`, commit 4a54503):
+
+- A minimal Triton kernel with no envelope code (TMA load of the int8 weight tile,
+  conversion to BF16, `tl.dot`, FP32 store) returns wrong products against FP64
+  for every configuration whose int8 tile is loaded by TMA with block_k = 64, a
+  64-byte inner box: 128x128x64 with 4 warps (NaN and Inf among them) and with 8,
+  128x64x64 (absolute errors up to 4,672) and 64x128x64 (wrong at M = 16, 128 and
+  256, right at M = 1 and 64).
+- The same tiles with pointer loads, and TMA with block_k = 128 (a 128-byte box),
+  are exact to FP32 rounding. A BF16 operand through a 64-byte box and an int8 x
+  int8 `tl.dot` through a 64-byte box (no conversion) are exact at M = 1 to 256.
+  The fault therefore needs the int8 operand, a 64-byte TMA box and the BF16
+  conversion together. The host descriptors are standard (`TensorDescriptor` over
+  int8 `[V, K]`, strides `[K, 1]`, block `[block_v, block_k]`); whether a
+  descriptor constraint is violated or the fault lies in the generated code is not
+  established.
+- In the pass itself, which variant is wrong depends on the compiled epilogue:
+  at TMA 128x64x64 the raw product (epilogue 0) was wrong by up to 2.4 (about twice
+  the envelope's half-width) while the envelope epilogues happened to enclose. The
+  defaults for 17 <= M <= 64 (TMA 128x32x64 and 128x64x64) are in this family:
+  every check run on them passed (enclosure tests at M = 64, `large_m_check`, 0
+  differing rows in the SGLang checks), but they are treated as suspect.
+
+**Violations of the failing configuration's envelope** (128x128x64, per M = 1, 16,
+64, 128, 256, lower bounds): NaN 5, 128, 2,098, 4,692, 3,400; infinite 1 to 1,296,
+none on the wrong side; finite but on the wrong side of the exact logit 37, 1,810,
+18,576, 43,499, 38,137, with excess up to about 2.7e35, in every row of every
+batch. Finite violations exist, so a broken kernel can produce a wrong bound
+without a non-finite value to stop it. In every observed case each affected row
+also held a non-finite value and failed the threshold check, so 0 decided rows
+were wrong, but that was not guaranteed.
+
+**Exposure.** W8A16 calls at default tiles with more than 64 rows (the broken
+configuration) and with 17 to 64 rows (the suspect ones). In this PR: the GPU
+tests' W8A16 checks above 16 rows, the x2 partial runtime rows at M = 32 and 64
+in the PR description, and none of the committed evidence files (the replay ran
+the engine's batches of at most 16 rows, whose tiles have a 128-byte box). In the
+SGLang validation (PR #52): DFlash greedy verify at 32 rows, sampled verify above
+16 rows, and the DFlash draft projection (15 to 120 rows, whose 90% fallback was
+this fault). Every emitted token there was the stock token (0 differing rows);
+those results stay empirical and are rerun on the new defaults.
+
+**Fix.**
+
+- Defaults: W8A16 uses TMA tiles with block_k = 128 at every batch size (128x16,
+  128x32, 128x64, 128x128 by M); all W8A16, W8A8 and BF16 defaults were checked
+  on real rows at M = 1 to 256, twice, for the raw product, the envelope, the tile
+  summaries and both decision paths, with 0 violations (`tma_candidates.json`).
+- Int8 TMA boxes narrower than 128 bytes are refused for both int8 passes.
+- Fail-closed on non-finite values: a row with any non-finite approximate logit,
+  radius or bound (sampling scores: NaN) is marked `nonfinite`, and so is a row
+  with a non-finite lower bound.
+- Start-up self-test (`CertifiedHead.enclosure_self_test`,
+  `certified_head/selftest.py`): every tile configuration the dispatcher selects
+  is run at the smallest and largest batch size using it, on probe rows (64 real
+  decode rows shipped with the package, plus peaked and random rows): the raw
+  product within its accumulation bound, the envelope and the tile summaries
+  against FP64 logits, and the greedy and sampling decisions against stock. A
+  failing configuration's batch sizes take the stock path (status `refused`), with
+  a logged warning.
+- Runtime probes: every call computes 8 vocabulary rows (a hash of a per-call
+  device counter, so different rows on every call and every graph replay) exactly
+  in FP64 for every batch row, and the production kernel checks that its own lower
+  and upper bounds contain them. Any violation sends the whole batch to the stock
+  path (status `probe`), latches that batch size (its compiled variant) to the
+  stock path for the process, and is counted (`probe_stats()`, logged in eager
+  mode). The failing configuration above would have tripped on every call.
+- `bench/tune_gemv.py` lets a configuration win only if it passes the same
+  variant checks.
+- GPU tests: real-row enclosure and certification rates for every pass at its
+  default tiles for M = 1 to 256; NaN and Inf injected into the scales and
+  envelope coefficients (greedy and sampling); the self-test passing the defaults
+  and refusing a too-narrow envelope and the refused tiles, also in a CUDA graph;
+  a finite wrong envelope (zeroed scales) caught by the runtime probes and latched,
+  and no probe trip on a correct head over 50 calls.
 
 ## Pending in this PR
 
@@ -156,7 +259,10 @@ commit in one exclusive hold and committed here with their commands.
 | File | What | Command |
 |---|---|---|
 | `stock_invariance.json` | stock GEMM kernel per M, reduced-precision flag test, row/column-subset invariance, observed accumulation error, library versions | `python experiments/certified_head/stock_invariance.py --out evidence/certified_head/stock_invariance.json` (commit fd0fd4a, GPU) |
-| `fallback_vs_model.json` | undecided fraction versus the stock error bound | `python experiments/certified_head/fallback_vs_model.py --rows 20000 --out evidence/certified_head/fallback_vs_model.json` (CPU) |
+| `fallback_vs_model.json` | undecided fraction versus the stock error bound, 60,000 rows, with the check of tokens outside the top 64 | `python experiments/certified_head/fallback_vs_model.py --rows 60000 --threads 32 --out evidence/certified_head/fallback_vs_model.json` (CPU, shared lock; branch between 0c0bb7a and 90cc31a, see above) |
+| `large_m_check.json`, `large_m_tests.log` | W8A16 at seven tile configurations and M = 16 to 256 on real rows: enclosure, decisions, status bits; the real-row rate test at the old defaults | `python experiments/certified_head/large_m_check.py --out ...`, then `pytest tests/test_certified_head.py -k real_row_certification_rate` (commit d990b3b, GPU, shared lock) |
+| `tma_repro.json` | the raw W8A16 product (standalone kernel and the pass's epilogue 0) per tile configuration, and the failing envelope's violations by class | `python experiments/certified_head/tma_repro.py --out ...` (commit 7f8079f, GPU, shared lock) |
+| `tma_candidates.json` | every pass's candidate default tiles at M = 1 to 256, twice: raw product, envelope, tile summaries, decisions; minimal kernels isolating the fault | `python experiments/certified_head/tma_candidates.py --out ...` (commit 4a54503, GPU, shared lock) |
 
 Real head inputs come from the geometry workstream's plain-decode capture
 (SGLang `bd66ce34` with its capture patch, `--disable-cuda-graph`,

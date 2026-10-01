@@ -344,6 +344,13 @@ def main() -> None:
             head_cols.gemv_config = head.gemv_config
     v, k = w.shape
     pool = real_rows(args.pool_rows)
+    # Every configuration timed or used for row statuses must enclose the exact
+    # logits; a refused configuration's batch sizes run the stock path, so its
+    # times and rates would be the fallback's and are reported as such.
+    status_sizes = sorted({*args.batches, min(256, head.max_batch), pool.shape[0] % 256 or 256})
+    status_sizes = [m for m in status_sizes if m <= head.max_batch]
+    self_tests = {'w8a16': head.enclosure_self_test(status_sizes)}
+    head_cols._refused = set(head._refused)
     status = {'w8a16': row_status(head, pool, 'argmax'), 'sample': row_status(head, pool, 'sample')}
     # The same kernels under the Hopper wgmma error model: only the fallback rate changes.
     hopper = CertifiedHead.from_quantized(
@@ -355,6 +362,7 @@ def main() -> None:
         capacity=args.capacity,
         max_batch=max(args.batches),
     )
+    self_tests['w8a16_hopper'] = hopper.enclosure_self_test(status_sizes)
     status['w8a16_hopper'] = row_status(hopper, pool, 'argmax')
     status['sample_hopper'] = row_status(hopper, pool, 'sample')
     del hopper
@@ -375,7 +383,11 @@ def main() -> None:
             if table_fn is not None:
                 other.arith_config = table_fn
         heads_by_arith[arith] = other
+        self_tests[arith] = other.enclosure_self_test(status_sizes)
         status[arith] = row_status(other, pool, 'argmax')
+    for name, rep in self_tests.items():
+        if not rep['ok']:
+            print(f'{name}: refused batch sizes {rep["refused_batch_sizes"]}', file=sys.stderr)
     flush = torch.empty(256 * 2**20 // 4, dtype=torch.float32, device='cuda')
     marlin = marlin_arm(head.q, head.scale)
     has_int8pack = args.int8pack
@@ -400,9 +412,12 @@ def main() -> None:
             'gemv_configs': {m: head.gemv_config(m).__dict__ for m in args.batches},
             'weight_bytes_bf16': v * k * 2,
             'weight_bytes_int8': v * k,
+            'probe_rows_per_call': 8,
+            'probe_bytes_per_call': '8 * K * 2 (weight rows) + M * K * 2 (hidden) + M * 8 * 8 (FP64 out)',
         },
         'read_peak_tbps_1p27GB': read_peak_tbps(v * k * 2),
         'column_self_test': column_self_test,
+        'enclosure_self_test': self_tests,
         'batches': {},
     }
     for m in args.batches:
@@ -487,6 +502,9 @@ def build_arms(
         'int8_gemv': int8_gemv,
         'int8_envelope': int8_envelope,
         'stage_prep': lambda: head._prep(h, m),
+        # Runtime probes alone (included in stage_prep and every certified arm):
+        # reads PROBES weight rows plus the batch's hidden states.
+        'stage_probe': lambda: head._run_probe(h, m),
         'stage_to_select': lambda: _prefix(head, h, m, 1),
         'stage_to_refine': lambda: _prefix(head, h, m, 2),
         'stage_to_decide': lambda: _prefix(head, h, m, 3),

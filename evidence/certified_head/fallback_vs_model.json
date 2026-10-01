@@ -1,43 +1,51 @@
 {
- "rows": 20000,
- "steps": 1260,
+ "rows": 60000,
+ "steps": 3768,
  "top_tokens_checked": 64,
  "gammas": {
   "0.0006107": {
-   "row_fallback_rate": 0.02235,
-   "step_fallback_rate": 0.29444444444444445,
-   "rows_undecided": 447
+   "row_fallback_rate": 0.014633333333333333,
+   "step_fallback_rate": 0.20222929936305734,
+   "rows_undecided": 878,
+   "decided_rows_where_a_token_outside_the_top_could_compete": 0
   },
   "0.0001192": {
-   "row_fallback_rate": 0.0045,
-   "step_fallback_rate": 0.06825396825396825,
-   "rows_undecided": 90
+   "row_fallback_rate": 0.002766666666666667,
+   "step_fallback_rate": 0.04246284501061571,
+   "rows_undecided": 166,
+   "decided_rows_where_a_token_outside_the_top_could_compete": 0
   },
   "3e-05": {
-   "row_fallback_rate": 0.001,
-   "step_fallback_rate": 0.01507936507936508,
-   "rows_undecided": 20
+   "row_fallback_rate": 0.00065,
+   "step_fallback_rate": 0.010084925690021231,
+   "rows_undecided": 39,
+   "decided_rows_where_a_token_outside_the_top_could_compete": 0
   },
   "1e-05": {
-   "row_fallback_rate": 0.00045,
-   "step_fallback_rate": 0.007142857142857143,
-   "rows_undecided": 9
+   "row_fallback_rate": 0.00025,
+   "step_fallback_rate": 0.003980891719745223,
+   "rows_undecided": 15,
+   "decided_rows_where_a_token_outside_the_top_could_compete": 0
   },
   "3e-06": {
-   "row_fallback_rate": 0.0002,
-   "step_fallback_rate": 0.0031746031746031746,
-   "rows_undecided": 4
+   "row_fallback_rate": 8.333333333333333e-05,
+   "step_fallback_rate": 0.001326963906581741,
+   "rows_undecided": 5,
+   "decided_rows_where_a_token_outside_the_top_could_compete": 0
   },
   "1e-06": {
-   "row_fallback_rate": 0.0001,
-   "step_fallback_rate": 0.0015873015873015873,
-   "rows_undecided": 2
+   "row_fallback_rate": 3.3333333333333335e-05,
+   "step_fallback_rate": 0.0005307855626326964,
+   "rows_undecided": 2,
+   "decided_rows_where_a_token_outside_the_top_could_compete": 0
   },
   "0": {
    "row_fallback_rate": 0.0,
    "step_fallback_rate": 0.0,
-   "rows_undecided": 0
+   "rows_undecided": 0,
+   "decided_rows_where_a_token_outside_the_top_could_compete": 0
   }
  },
- "rows_whose_exact_bf16_top2_tie": 323
+ "population": "the first 60000 decode rows of the geometry plain-decode capture, in capture order (all prompt splits); each row decided over its top tokens, with every other token checked against the winning bucket",
+ "rows_whose_exact_bf16_top2_tie": 628
 }

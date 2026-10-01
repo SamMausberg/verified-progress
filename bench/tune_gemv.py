@@ -31,6 +31,7 @@ from micro_head import environment, summarize, time_graph
 
 from certified_head.head import CertifiedHead, GemvConfig
 from certified_head.quantize import load_or_build
+from certified_head.selftest import check_variants
 
 
 def candidates(m: int) -> list[GemvConfig]:
@@ -47,6 +48,12 @@ def candidates(m: int) -> list[GemvConfig]:
         out.append(GemvConfig(block_v, block_m, block_k, warps, stages))
         out.append(GemvConfig(block_v, block_m, block_k, warps, stages, tma=True))
     return out
+
+
+def passes(head: CertifiedHead, h: torch.Tensor) -> bool:
+    """Every kernel variant of this configuration computes the modelled arithmetic
+    and encloses the exact logits on ``h`` (:mod:`certified_head.selftest`)."""
+    return bool(check_variants(head, h)['ok'])
 
 
 def _fixed(cfg: GemvConfig) -> Callable[[int], GemvConfig]:
@@ -99,13 +106,27 @@ def main() -> None:
                 continue
             rows.append({'config': cfg.__dict__, **t})
         ok = sorted((r for r in rows if 'median_us' in r), key=lambda r: float(r['median_us']))
+        # A configuration wins only if all its kernel variants pass: the fastest
+        # W8A16 tiles once computed wrong products (TMA int8 64-byte box).
+        rejected = []
+        for r in ok:
+            cfg = GemvConfig(**r['config'])
+            head.gemv_config = _fixed(cfg)
+            head.arith_config = _fixed_arith(cfg)
+            if passes(head, h):
+                r['passes_self_test'] = True
+                break
+            r['passes_self_test'] = False
+            rejected.append(r['config'])
+        ok = [r for r in ok if r.get('passes_self_test', True)]
         best = ok[0]
         print(f'M={m:4d} best {best["median_us"]:8.1f} us {best["config"]}', flush=True)
         result['batches'][str(m)] = {
             'best': best,
             'top5': ok[:5],
             'n_configs': len(rows),
-            'failed': len(rows) - len(ok),
+            'failed': len(rows) - len(ok) - len(rejected),
+            'rejected_by_self_test': rejected,
         }
         if args.out:  # write after every batch size so a timeout keeps what was measured
             args.out.parent.mkdir(parents=True, exist_ok=True)

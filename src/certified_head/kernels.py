@@ -36,6 +36,12 @@ STATUS_NONFINITE = tl.constexpr(4)
 STATUS_THRESHOLD = tl.constexpr(8)
 STATUS_EMPTY = tl.constexpr(16)
 STATUS_TILE_OVERFLOW = tl.constexpr(32)
+STATUS_REFUSED = tl.constexpr(64)
+"""The batch size's tile configuration failed the enclosure self-test."""
+STATUS_PROBE = tl.constexpr(128)
+"""A runtime probe found an exact logit outside the envelope (whole batch falls back)."""
+PROBES = 8
+"""Vocabulary rows recomputed exactly on every call."""
 
 MODES = {'bf16': 0, 'fp32': 1, 'real': 2}
 
@@ -265,6 +271,38 @@ def logit_magnitude_bound(hnorm, wmax, t):
 
 
 @triton.jit
+def _probe_kernel(
+    h_ptr,
+    w_ptr,
+    idx_ptr,
+    x_ptr,
+    counter_ptr,
+    V,
+    K: tl.constexpr,
+    P: tl.constexpr,
+    CH: tl.constexpr,
+):
+    """Exact logits (FP64) of ``P`` vocabulary rows for batch row ``m``.
+
+    The rows are a hash of a per-call device counter, so they change on every
+    call (also under CUDA-graph replay) and are the same for every batch row.
+    """
+    m = tl.program_id(0)
+    j = tl.arange(0, P).to(tl.uint32)
+    c = tl.load(counter_ptr).to(tl.uint64)
+    tok = (murmur_hash32(c + 0x9E3779B9, j, j * 0 + 0x51ED) % V).to(tl.int32)
+    if m == 0:
+        tl.store(idx_ptr + tl.arange(0, P), tok)
+    acc = tl.zeros((P, CH), dtype=tl.float64)
+    for k0 in range(0, K, CH):
+        offs = k0 + tl.arange(0, CH)
+        x = tl.load(h_ptr + m * K + offs).to(tl.float64)
+        wv = tl.load(w_ptr + tok[:, None].to(tl.int64) * K + offs[None, :]).to(tl.float64)
+        acc += wv * x[None, :]
+    tl.store(x_ptr + m * P + tl.arange(0, P), tl.sum(acc, axis=1))
+
+
+@triton.jit
 def _prep_kernel(
     h_ptr,
     b_ptr,
@@ -275,6 +313,7 @@ def _prep_kernel(
     hnorm_ptr,
     ymax_ptr,
     const64_ptr,
+    probe_fail_ptr,
     K: tl.constexpr,
     G: tl.constexpr,
     GS: tl.constexpr,
@@ -303,6 +342,7 @@ def _prep_kernel(
     tl.store(status_ptr + m, tl.where(finite, 0, STATUS_NONFINITE))
     if m == 0:
         tl.store(any_ptr, 0)
+        tl.store(probe_fail_ptr, 0)
 
 
 @triton.jit
@@ -363,6 +403,10 @@ def _gemv_envelope_kernel(
     idx_ptr,
     rest_ptr,
     lower_ptr,
+    status_ptr,
+    probe_idx_ptr,
+    probe_x_ptr,
+    probe_fail_ptr,
     seed_ptr,
     pos_ptr,
     temp_ptr,
@@ -388,6 +432,7 @@ def _gemv_envelope_kernel(
     BLOCK_V: tl.constexpr,
     BLOCK_M: tl.constexpr,
     BLOCK_K: tl.constexpr,
+    P: tl.constexpr,
 ):
     """Epilogues:
 
@@ -463,10 +508,37 @@ def _gemv_envelope_kernel(
             b = tl.load(b_ptr + offs_m * BSTRIDE + g, mask=m_mask, other=0.0)
             beta = fma_ru(a[:, None], b[None, :], beta)
         lo = add_rd(z, -beta)
+        # Fail closed: a row with any non-finite approximate logit or radius cannot
+        # be certified (a NaN would otherwise drop out of the maxima below), so it
+        # is marked for the stock fallback whatever the rest of its envelope says.
+        bad = mask2 & ~((tl.abs(z) < float('inf')) & (beta < float('inf')))
+        bad = bad | (mask2 & ~(tl.abs(lo) < float('inf')))
+        row_bad = tl.max(bad.to(tl.int32), axis=0) > 0
+        tl.atomic_or(status_ptr + offs_m, STATUS_NONFINITE, mask=m_mask & row_bad)
+        # Runtime probes: the exact logits of P vocabulary rows (computed in FP64
+        # before this pass) must lie inside this variant's own envelope.
+        hi = add_ru(z, beta)
+        viol = tl.zeros((BLOCK_V, BLOCK_M), dtype=tl.int1)
+        for j in tl.static_range(P):
+            tok = tl.load(probe_idx_ptr + j)
+            px = tl.load(probe_x_ptr + offs_m * P + j, mask=m_mask, other=0.0)
+            slack = 1e-9 * (1.0 + tl.abs(px))
+            hit = mask2 & (offs_v[:, None] == tok)
+            out_lo = lo.to(tl.float64) > (px + slack)[None, :]
+            out_hi = hi.to(tl.float64) < (px - slack)[None, :]
+            if EPILOGUE == 2:  # noqa: SIM108 (constexpr branch)
+                viol = viol | (hit & out_lo)
+            else:
+                viol = viol | (hit & (out_lo | out_hi))
+        row_viol = tl.max(viol.to(tl.int32), axis=0) > 0
+        tl.atomic_or(status_ptr + offs_m, STATUS_PROBE, mask=m_mask & row_viol)
+        tl.atomic_or(probe_fail_ptr + offs_m * 0, 1, mask=m_mask & row_viol)
         if EPILOGUE == 2:
             tl.store(out_ptrs, lo, mask=mask2)
         else:
-            hi = add_ru(z, beta)
+            bad_hi = mask2 & ~(tl.abs(hi) < float('inf'))
+            row_bad_hi = tl.max(bad_hi.to(tl.int32), axis=0) > 0
+            tl.atomic_or(status_ptr + offs_m, STATUS_NONFINITE, mask=m_mask & row_bad_hi)
             if SAMPLE:
                 if MODE == 0:
                     lo = bf16_rn(lo)
@@ -485,6 +557,10 @@ def _gemv_envelope_kernel(
                 tl.atomic_max(ymax_ptr + offs_m, f64_to_f32_ru(tl.max(y_hi, axis=0)), mask=m_mask)
                 lo = f64_to_f32_rd(s_lo)
                 hi = f64_to_f32_ru(s_hi)
+                # Score bounds may be -inf (a probability that underflows), never NaN.
+                bad_s = mask2 & ((lo != lo) | (hi != hi))
+                row_bad_s = tl.max(bad_s.to(tl.int32), axis=0) > 0
+                tl.atomic_or(status_ptr + offs_m, STATUS_NONFINITE, mask=m_mask & row_bad_s)
             lo = tl.where(mask2, lo, float('-inf'))
             tl.atomic_max(lower_ptr + offs_m, tl.max(lo, axis=0), mask=m_mask)
             if EPILOGUE == 1:
@@ -674,7 +750,12 @@ def _decide_kernel(
     ids_ptr,
     any_ptr,
     dup_ptr,
+    probe_fail_ptr,
+    tripped_ptr,
+    trips_ptr,
+    counter_ptr,
     CAP,
+    M,
     MODE: tl.constexpr,
     SAMPLE: tl.constexpr,
     CAP_P2: tl.constexpr,
@@ -705,6 +786,8 @@ def _decide_kernel(
     amb = others & (((ids < k_id) & (hi >= best)) | ((ids > k_id) & (hi > best)))
     n_amb = tl.sum(amb.to(tl.int32), axis=0)
     lower = tl.load(lower_ptr + m)
+    # Fail closed on a non-finite lower bound (NaN, or +-inf from overflow).
+    lower_ok = tl.abs(lower) < float('inf')
     if SAMPLE:
         # Scores: rows outside the list have score < lower (an FP32 lower bound).
         thr_ok = lower.to(tl.float64) <= best
@@ -717,6 +800,17 @@ def _decide_kernel(
     status = status | tl.where(n_amb > 0, STATUS_AMBIGUOUS, 0)
     status = status | tl.where(thr_ok, 0, STATUS_THRESHOLD)
     status = status | tl.where(cnt == 0, STATUS_EMPTY, 0)
+    status = status | tl.where(lower_ok, 0, STATUS_NONFINITE)
+    # A probe violation anywhere in the batch, now or in an earlier call at this
+    # batch size (the compiled variant is latched as refused), fails every row.
+    failed = tl.load(probe_fail_ptr) != 0
+    latched = tl.load(tripped_ptr + M) != 0
+    status = status | tl.where(failed | latched, STATUS_PROBE, 0)
+    if m == 0:
+        tl.store(counter_ptr, tl.load(counter_ptr) + 1)
+        if failed:
+            tl.store(tripped_ptr + M, 1)
+            tl.store(trips_ptr, tl.load(trips_ptr) + 1)
     tl.store(status_ptr + m, status)
     tl.store(ids_ptr + m, tl.where(cnt > 0, k_id, 0).to(tl.int64))
     if status != 0:
