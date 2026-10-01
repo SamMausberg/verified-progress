@@ -18,6 +18,8 @@
 #                 directory; timed holds use the one behind the current gate (gate_plan)
 # STACK_CERT_SRC  directory holding the certified_head package; H arms exist only if set
 
+# The holds that source this file run the SGLang venv's python (scripts/sglang_env.sh).
+[ -n "${VIRTUAL_ENV:-}" ] || { echo "arms.sh: source scripts/sglang_env.sh first" >&2; exit 1; }
 STACK_ENGINE=${STACK_ENGINE:-$HOME/sglang-wt/stack}
 # Tree of the composed engine (experiments/stack/build_engine.sh); every hold checks it.
 # shellcheck disable=SC2034 # read by the scripts that source this file

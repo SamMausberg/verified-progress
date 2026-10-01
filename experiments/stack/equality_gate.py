@@ -1,6 +1,6 @@
 """The stack's equality gate: one decision, written once and checked before every timed run.
 
-`build` reads the summary.json that state's compare.py writes for the pairs of
+`build` (exit status 1 when the gate is rejected, i.e. ok is false) reads the summary.json that state's compare.py writes for the pairs of
 equality_pairs.py (plus the certified head's check-mode statistics) and writes
 gate.json. `check` is the single precondition every timed hold calls: it recomputes the
 decision from the same files, compares it with gate.json, verifies the routing table and
@@ -263,8 +263,12 @@ def main() -> int:
                 raise GateError(f'the table must be {args.run / TABLE}')
             package = fingerprint(args.cert_src) if args.cert_src else None
             gate = evaluate(args.run, sha256_file(args.table), package)
+            # Written either way so a rejected gate can be inspected; check() refuses it.
             (args.run / 'gate.json').write_text(json.dumps(gate, indent=1) + '\n')
             print(json.dumps(gate))
+            if not gate['ok']:
+                print('gate: rejected (ok is false)', file=sys.stderr)
+                return 1
         else:
             full, table = check(args.gate, args.cert_src, args.pin)
             print(f'full={full}')

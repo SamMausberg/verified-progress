@@ -75,7 +75,7 @@ for i in "${!order[@]}"; do
   (( status == 0 )) || failed+=("$i:$name")
   # Bind the run directory this sweep created to the campaign's gate.
   while read -r run; do
-    [ -n "$run" ] && cp "$STACK_PIN" "$OUT/stack-$name/$run/stack_gate.json"
+    [ -n "$run" ] && { cp "$STACK_PIN" "$OUT/stack-$name/$run/stack_gate.json" || failed+=("$i:$name:gate-copy"); }
   done < <(comm -13 <(printf '%s\n' "$before") \
     <(find "$OUT/stack-$name" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort))
 done

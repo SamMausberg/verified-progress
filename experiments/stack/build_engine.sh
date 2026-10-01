@@ -23,9 +23,8 @@ repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 P="$repo/engine/sglang/patches"
 name="${1:-stack}"
 wt="$HOME/sglang-wt/$name"
-# shellcheck source=experiments/stack/arms.sh
-source "$repo/experiments/stack/arms.sh"
-EXPECTED_TREE=$STACK_TREE
+EXPECTED_TREE=$(sed -n 's/^STACK_TREE=//p' "$repo/experiments/stack/arms.sh")
+[ -n "$EXPECTED_TREE" ] || { echo "no STACK_TREE in arms.sh" >&2; exit 1; }
 
 need() {
   local f

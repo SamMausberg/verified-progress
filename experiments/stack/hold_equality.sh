@@ -68,7 +68,7 @@ failed=()
 
 FOLD_ENV=(SGLANG_GDN_REPLAYSSM_FOLD=1)
 STACK_TABLE=$OUT/backbone_table_v1.json
-stack_table
+stack_table || { echo "routing table build failed"; exit 1; }
 echo "table $(sha256sum "$STACK_TABLE")"
 G_ENV=(SGLANG_BACKBONE_GEMM=1 SGLANG_BACKBONE_PDL=1 SGLANG_BACKBONE_MERGE_IN_PROJ=1
   "SGLANG_BACKBONE_GEMM_TABLE=$STACK_TABLE")
@@ -102,6 +102,8 @@ if [[ " ${failed[*]} " == *" compare "* ]]; then
 else
   cert=()
   [ -n "${STACK_CERT_SRC:-}" ] && cert=(--cert-src "$STACK_CERT_SRC")
+  # Non-zero when the gate is rejected (ok false): then current is not moved and the
+  # hold fails.
   python experiments/stack/equality_gate.py build "$OUT" --table "$STACK_TABLE" "${cert[@]}" ||
     failed+=(gate)
 fi

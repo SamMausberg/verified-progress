@@ -310,7 +310,8 @@ def _unclassified(p):
 def test_gate_check_refuses_every_failed_equality(tmp_path, monkeypatch, spoil):
     pairs = _passing()
     spoil(pairs)
-    _, path = _build(tmp_path, monkeypatch, pairs)
+    status, path = _build(tmp_path, monkeypatch, pairs)
+    assert status == 1  # build reports a rejected gate; the hold then fails and keeps current
     with pytest.raises(gate.GateError):
         gate.check(path, None)
 
