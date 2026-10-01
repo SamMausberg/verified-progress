@@ -82,10 +82,13 @@ LEVERS: dict[str, Lever] = {
             # scheduler reserves each request's full 512 output tokens and charges a
             # shared-mamba cost per request in token units.
             'max-total-tokens': 655360,
-            'max-mamba-cache-size': 128,
+            # 128 slots admitted only 127 long prompts (runs 20261001T082738Z and
+            # 20261001T104311Z): with chunked prefill the last admission saw no schedulable
+            # mamba slot while one was free. 132 leaves headroom; the running limit stays 128.
+            'max-mamba-cache-size': 132,
             'mamba-ssm-dtype': 'float32',
         },
-        note='pinned pools for the P4 A/B: 128 running, 655,360 KV tokens, 128 mamba slots, '
+        note='pinned pools for the P4 A/B: 128 running, 655,360 KV tokens, 132 mamba slots, '
         'FP32 state stated explicitly',
     ),
     'replayssm_spec': Lever(
