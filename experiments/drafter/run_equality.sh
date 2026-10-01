@@ -10,7 +10,7 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 unset SGLANG_WORKTREE
 # shellcheck source=/dev/null
-source "$HOME/verified-progress/scripts/sglang_env.sh"
+source "$here/../../scripts/sglang_env.sh"
 out="${1:-$HOME/vp-data/drafter/eval-logprobs}"
 panel="$here/panel-v2.jsonl"
 probe="python $here/accept_probe.py --port {port} --workload $panel --per-domain 32 \

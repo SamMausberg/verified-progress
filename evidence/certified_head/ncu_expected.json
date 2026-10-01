@@ -1,0 +1,98 @@
+[
+ {
+  "batch_size": 1,
+  "grid": 1940,
+  "config": {
+   "block_v": 128,
+   "block_m": 16,
+   "block_k": 128,
+   "num_warps": 4,
+   "num_stages": 4,
+   "tma": true
+  }
+ },
+ {
+  "batch_size": 1,
+  "grid": 1940,
+  "config": {
+   "block_v": 128,
+   "block_m": 16,
+   "block_k": 128,
+   "num_warps": 4,
+   "num_stages": 4,
+   "tma": true
+  }
+ },
+ {
+  "batch_size": 16,
+  "grid": 1940,
+  "config": {
+   "block_v": 128,
+   "block_m": 16,
+   "block_k": 128,
+   "num_warps": 4,
+   "num_stages": 4,
+   "tma": true
+  }
+ },
+ {
+  "batch_size": 16,
+  "grid": 1940,
+  "config": {
+   "block_v": 128,
+   "block_m": 16,
+   "block_k": 128,
+   "num_warps": 4,
+   "num_stages": 4,
+   "tma": true
+  }
+ },
+ {
+  "batch_size": 64,
+  "grid": 1940,
+  "config": {
+   "block_v": 128,
+   "block_m": 64,
+   "block_k": 128,
+   "num_warps": 4,
+   "num_stages": 3,
+   "tma": true
+  }
+ },
+ {
+  "batch_size": 64,
+  "grid": 1940,
+  "config": {
+   "block_v": 128,
+   "block_m": 64,
+   "block_k": 128,
+   "num_warps": 4,
+   "num_stages": 3,
+   "tma": true
+  }
+ },
+ {
+  "batch_size": 256,
+  "grid": 7760,
+  "config": {
+   "block_v": 128,
+   "block_m": 64,
+   "block_k": 128,
+   "num_warps": 4,
+   "num_stages": 3,
+   "tma": true
+  }
+ },
+ {
+  "batch_size": 256,
+  "grid": 7760,
+  "config": {
+   "block_v": 128,
+   "block_m": 64,
+   "block_k": 128,
+   "num_warps": 4,
+   "num_stages": 3,
+   "tma": true
+  }
+ }
+]

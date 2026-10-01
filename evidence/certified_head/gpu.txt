@@ -1,0 +1,2 @@
+name, driver_version, clocks.max.sm [MHz], clocks.max.memory [MHz]
+NVIDIA GH200 480GB, 570.195.03, 1980 MHz, 2619 MHz

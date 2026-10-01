@@ -1,0 +1,129 @@
+{
+  "kind": "derived from committed Stage A measurements (no new runs)",
+  "baseline": {
+    "run": "fresh_tritonverify_b16",
+    "C_D_us": 7301.8,
+    "A_D": 7.6033,
+    "f": 0.02388,
+    "us_per_token": 960.34,
+    "tokens_per_ms": 1.0413
+  },
+  "target_e2e": 5.0,
+  "decode_speedup_needed": 5.5423,
+  "us_per_token_needed": 173.27,
+  "tokens_per_ms_needed": 5.7712,
+  "tokens_needed_per_ms_of_cycle_saved": 5.7712,
+  "widths": {
+    "16": {
+      "source": "triton run force_tritonverify_b16 (measured)",
+      "phases_us": {
+        "cycle_us": 7302.0,
+        "verify_us": 4548.7,
+        "draft_us": 2338.8,
+        "commit_us": 113.0,
+        "append_us": 100.3,
+        "other_us": 201.2
+      },
+      "with_dflash_draft": {
+        "cycle_us": 7302.0,
+        "tokens_per_cycle_needed": 42.14,
+        "constant_alpha_needed": null
+      },
+      "free_drafter": {
+        "cycle_us": 4963.2,
+        "tokens_per_cycle_needed": 28.64,
+        "constant_alpha_needed": null
+      },
+      "verify_commit_only": {
+        "cycle_us": 4661.7,
+        "tokens_per_cycle_needed": 26.9,
+        "constant_alpha_needed": null
+      }
+    },
+    "64": {
+      "source": "triton run force_tritonverify_b64 (measured)",
+      "phases_us": {
+        "cycle_us": 10584.5,
+        "verify_us": 7583.5,
+        "draft_us": 2549.0,
+        "commit_us": 115.6,
+        "append_us": 105.3,
+        "other_us": 231.0
+      },
+      "with_dflash_draft": {
+        "cycle_us": 10584.5,
+        "tokens_per_cycle_needed": 61.09,
+        "constant_alpha_needed": 0.99851
+      },
+      "free_drafter": {
+        "cycle_us": 8035.4,
+        "tokens_per_cycle_needed": 46.37,
+        "constant_alpha_needed": 0.9892
+      },
+      "verify_commit_only": {
+        "cycle_us": 7699.1,
+        "tokens_per_cycle_needed": 44.43,
+        "constant_alpha_needed": 0.98766
+      }
+    },
+    "128": {
+      "source": "INTERPOLATED, not measured: Triton verify linear between B = 64 and 256; other phases from FlashInfer run force_b128",
+      "phases_us": {
+        "cycle_us": 14669.8,
+        "verify_us": 11450.3,
+        "draft_us": 2706.5,
+        "commit_us": 119.7,
+        "append_us": 113.5,
+        "other_us": 279.9
+      },
+      "with_dflash_draft": {
+        "cycle_us": 14669.8,
+        "tokens_per_cycle_needed": 84.66,
+        "constant_alpha_needed": 0.99299
+      },
+      "free_drafter": {
+        "cycle_us": 11963.4,
+        "tokens_per_cycle_needed": 69.04,
+        "constant_alpha_needed": 0.98906
+      },
+      "verify_commit_only": {
+        "cycle_us": 11570.0,
+        "tokens_per_cycle_needed": 66.77,
+        "constant_alpha_needed": 0.98838
+      }
+    },
+    "256": {
+      "source": "triton run force_tritonverify_b256 (measured)",
+      "phases_us": {
+        "cycle_us": 22902.3,
+        "verify_us": 19183.9,
+        "draft_us": 3130.7,
+        "commit_us": 145.4,
+        "append_us": 136.8,
+        "other_us": 305.6
+      },
+      "with_dflash_draft": {
+        "cycle_us": 22902.3,
+        "tokens_per_cycle_needed": 132.17,
+        "constant_alpha_needed": 0.9941
+      },
+      "free_drafter": {
+        "cycle_us": 19771.6,
+        "tokens_per_cycle_needed": 114.11,
+        "constant_alpha_needed": 0.99252
+      },
+      "verify_commit_only": {
+        "cycle_us": 19329.3,
+        "tokens_per_cycle_needed": 111.55,
+        "constant_alpha_needed": 0.99226
+      }
+    }
+  },
+  "note": "Triton verify figures carry the repair README pending-exactness label. The external proposals quote 111.6 tokens at B = 256 for a free drafter; that is the verify_commit_only accounting, which leaves out append and the rest of the cycle (free_drafter: 114.1).",
+  "sha256": {
+    "experiments/frontier/frame.py": "bd88525186ea02d0d07fe31126449d9dad2c277dcc56e4296566e2eafd83cdfd",
+    "evidence/repair/stage_a_oracle_triton.json": "48d176ef3f94043a577f4791896b298d09e3a6005d7f2b2b4b3e38371c73b06c",
+    "evidence/repair/stage_a_oracle.json": "5da7e63cf3595528920ff084e81c1a22620addf843c5d9be4ebf615619d8395d"
+  },
+  "repo_commit": "adc4865bc04351311f348bbfb6f80fcfcc024af0"
+}

@@ -113,11 +113,16 @@ Secondary investigations and supporting material:
   pre-registered 1.10x. The served A/B test has no valid run: both attempts were
   void, and the record keeps them with the amendments declared before each rerun
   (`evidence/moonshot/`).
-- **Backbone GEMMs.** Microbenchmarks only: at one request, SGLang's own
-  Hopper GEMV, which the engine does not dispatch to at the pin, runs `out_proj`
-  and `o_proj` in 0.77 of cuBLAS's time, and folding the norm and SiLU into the
-  GEMM, as implemented, is a measured loss. Serving throughput and exactness are
-  pending (`evidence/backbone/`).
+- **Backbone GEMMs.** A routing table that sends each projection to SGLang's
+  Hopper GEMV at one row, a Triton kernel with programmatic dependent launch at
+  2-16 rows and a packed GDN input projection from 64 rows serves tuned plain
+  decoding 3.4% faster at concurrency 1 and 1.0% at 128 (two pairs, one
+  session), with greedy outputs exact up to rounding against stock; at
+  concurrency 8 it gains 0.4%, a tenth of the microbenchmark prediction, for a
+  reason not yet traced. The packed projection alone gives the same tokens
+  and top-5 logprobs as stock on 320 prompts at concurrency 1. Folding the
+  norm and SiLU into the GEMM, as implemented, is a measured loss. Serving
+  against tuned MTP is pending (`evidence/backbone/`).
 - **Exact witnesses.** `tests/test_state_structure.py` and
   `tests/test_contracts.py` check in exact arithmetic why the recurrent state
   resists exact compression, why computation cannot be shared across unrelated

@@ -1,0 +1,21 @@
+{
+  "block16": {
+    "requests": 80,
+    "tokens_per_cycle_mean": 6.961960776993655,
+    "ms_per_cycle_mean": 7.7087922224996905,
+    "ms_per_cycle_median": 7.650383095360085,
+    "tok_per_s_mean": 900.7976674981047,
+    "foreign_cpu_cores_mean": 0.175,
+    "contended": false
+  },
+  "block8": {
+    "requests": 80,
+    "tokens_per_cycle_mean": 5.338553759213302,
+    "ms_per_cycle_mean": 7.0238661444496415,
+    "ms_per_cycle_median": 6.980187291574451,
+    "tok_per_s_mean": 759.3080939192272,
+    "foreign_cpu_cores_mean": 0.17,
+    "contended": false
+  },
+  "note": "Concurrency 1, panel-v1, greedy, thinking on, <=2048 new tokens, stock engine, exclusive GPU hold, one run. ms_per_cycle = request latency / verify cycles, so it includes prefill and client overhead spread over the cycles; tokens_per_cycle = completion tokens / verify cycles."
+}

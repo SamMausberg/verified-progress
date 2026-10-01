@@ -1,14 +1,96 @@
 {
-  "ref": "~/vp-data/drafter/eval/plain/requests.jsonl",
-  "test": "~/vp-data/drafter/eval/mtp3/requests.jsonl",
+  "ref": "~/vp-data/drafter/eval-logprobs/plain/requests.jsonl",
+  "test": "~/vp-data/drafter/eval-logprobs/mtp3/requests.jsonl",
   "convention": "experiments/state_safety/compare.py (PR #37): tie, one_ulp, near (<=0.5 nats), large",
   "requests": 80,
   "sequences_diverged": 77,
   "compared_tokens": 30801,
   "divergences_per_1000_tokens": 2.4999188338040974,
   "classes": {
-    "ref:tie": 40,
-    "ref:one_ulp": 37
+    "tie": 77
+  },
+  "bitwise_identical_sequences": 0,
+  "first_logprob_difference": {
+    "gsm8k-train-0066": 1,
+    "gsm8k-train-0361": 1,
+    "gsm8k-train-0680": 1,
+    "gsm8k-train-3190": 1,
+    "gsm8k-train-3454": 1,
+    "gsm8k-train-4205": 1,
+    "gsm8k-train-4640": 1,
+    "gsm8k-train-5144": 1,
+    "gsm8k-train-5345": 1,
+    "gsm8k-train-5989": 1,
+    "gsm8k-train-6045": 1,
+    "gsm8k-train-7047": 1,
+    "gsm8k-train-7063": 1,
+    "gsm8k-train-7247": 1,
+    "gsm8k-train-7305": 1,
+    "gsm8k-train-7453": 1,
+    "humaneval-105": 1,
+    "humaneval-162": 1,
+    "humaneval-78": 1,
+    "humaneval-87": 1,
+    "humaneval-97": 1,
+    "math500-test/algebra/1098.json": 1,
+    "math500-test/algebra/1529.json": 1,
+    "math500-test/algebra/1936.json": 1,
+    "math500-test/algebra/2264.json": 1,
+    "math500-test/algebra/2593.json": 1,
+    "math500-test/algebra/634.json": 1,
+    "math500-test/algebra/668.json": 1,
+    "math500-test/algebra/849.json": 1,
+    "math500-test/counting_and_probability/1009.json": 1,
+    "math500-test/counting_and_probability/14.json": 1,
+    "math500-test/counting_and_probability/389.json": 1,
+    "math500-test/counting_and_probability/731.json": 1,
+    "math500-test/counting_and_probability/765.json": 1,
+    "math500-test/geometry/106.json": 1,
+    "math500-test/geometry/1097.json": 1,
+    "math500-test/geometry/229.json": 1,
+    "math500-test/geometry/248.json": 1,
+    "math500-test/intermediate_algebra/117.json": 1,
+    "math500-test/intermediate_algebra/1197.json": 1,
+    "math500-test/intermediate_algebra/1388.json": 1,
+    "math500-test/intermediate_algebra/1410.json": 1,
+    "math500-test/intermediate_algebra/1467.json": 1,
+    "math500-test/intermediate_algebra/690.json": 1,
+    "math500-test/number_theory/612.json": 1,
+    "math500-test/prealgebra/1298.json": 1,
+    "math500-test/prealgebra/1961.json": 1,
+    "math500-test/prealgebra/1973.json": 1,
+    "math500-test/prealgebra/1995.json": 1,
+    "math500-test/prealgebra/846.json": 1,
+    "math500-test/precalculus/625.json": 1,
+    "math500-test/precalculus/681.json": 1,
+    "math500-test/precalculus/989.json": 1,
+    "mbpp-250": 1,
+    "mbpp-29": 1,
+    "mbpp-299": 1,
+    "mbpp-301": 1,
+    "mbpp-321": 1,
+    "mbpp-356": 1,
+    "mbpp-414": 1,
+    "mbpp-432": 1,
+    "mbpp-498": 1,
+    "mbpp-502": 1,
+    "mbpp-69": 1,
+    "mtbench-106": 1,
+    "mtbench-136": 1,
+    "oasst1-153e6420-910d-49f2-9ecb-f40b7ba76eb8": 1,
+    "oasst1-1a248423-814a-4ee9-b625-11cb28cd03ac": 1,
+    "oasst1-20a5ed43-7852-437e-a92c-870ddd542a15": 1,
+    "oasst1-2c629174-2898-4b56-9bd4-f88d073d5b39": 1,
+    "oasst1-5d5bda3c-4dc2-468b-b949-e4fbd9dafe70": 1,
+    "oasst1-5dad260e-3d2f-4dbb-a368-806905b4b34d": 1,
+    "oasst1-5e4bc56a-d2dc-4e64-9dfa-bb5a0afb119d": 1,
+    "oasst1-6215f73c-d012-4f98-b2b1-66bc66cd912a": 1,
+    "oasst1-65e4ec48-2687-472e-b985-79443e3d454b": 1,
+    "oasst1-72019671-c7e2-4752-a6c1-eda0007a86d9": 1,
+    "oasst1-776ac2a4-2e0f-40b5-bd1c-8022d80624ef": 1,
+    "oasst1-98cc2b70-cbea-4b78-8031-846e7db6b1ef": 1,
+    "oasst1-ba31123e-edca-435a-98a4-c84e33381d50": 1,
+    "oasst1-fe6a9022-314e-4ecc-a5ee-1ce6c31f7e81": 1
   },
   "divergences": [
     {
@@ -17,10 +99,11 @@
       "position": 145,
       "ref_token": 3889,
       "test_token": 5129,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "gsm8k-train-0361",
@@ -28,10 +111,11 @@
       "position": 540,
       "ref_token": 3804,
       "test_token": 7481,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "gsm8k-train-0680",
@@ -39,9 +123,10 @@
       "position": 705,
       "ref_token": 271,
       "test_token": 198,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -50,10 +135,11 @@
       "position": 546,
       "ref_token": 13,
       "test_token": 2393,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "gsm8k-train-3454",
@@ -61,9 +147,10 @@
       "position": 446,
       "ref_token": 24962,
       "test_token": 393,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.12500011920928955,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -72,10 +159,11 @@
       "position": 339,
       "ref_token": 220,
       "test_token": 1543,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "gsm8k-train-4640",
@@ -83,9 +171,10 @@
       "position": 491,
       "ref_token": 393,
       "test_token": 220,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -94,10 +183,11 @@
       "position": 299,
       "ref_token": 15103,
       "test_token": 22106,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "gsm8k-train-5345",
@@ -105,10 +195,11 @@
       "position": 522,
       "ref_token": 22,
       "test_token": 262,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "gsm8k-train-5989",
@@ -116,9 +207,10 @@
       "position": 642,
       "ref_token": 9077,
       "test_token": 13,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -127,10 +219,11 @@
       "position": 685,
       "ref_token": 283,
       "test_token": 682,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "gsm8k-train-7047",
@@ -138,10 +231,11 @@
       "position": 442,
       "ref_token": 18842,
       "test_token": 31547,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "gsm8k-train-7063",
@@ -149,10 +243,11 @@
       "position": 698,
       "ref_token": 11316,
       "test_token": 30394,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "gsm8k-train-7247",
@@ -160,10 +255,11 @@
       "position": 28,
       "ref_token": 357,
       "test_token": 8509,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "gsm8k-train-7305",
@@ -171,10 +267,11 @@
       "position": 216,
       "ref_token": 3219,
       "test_token": 6820,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "gsm8k-train-7453",
@@ -182,10 +279,11 @@
       "position": 408,
       "ref_token": 733,
       "test_token": 78193,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "humaneval-105",
@@ -193,10 +291,11 @@
       "position": 460,
       "ref_token": 1436,
       "test_token": 2688,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.12499994039535522,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "humaneval-87",
@@ -204,10 +303,11 @@
       "position": 322,
       "ref_token": 6820,
       "test_token": 13784,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.12500005960464478,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "humaneval-97",
@@ -215,9 +315,10 @@
       "position": 63,
       "ref_token": 369,
       "test_token": 8,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -226,10 +327,11 @@
       "position": 670,
       "ref_token": 13,
       "test_token": 314,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/algebra/1529.json",
@@ -237,9 +339,10 @@
       "position": 247,
       "ref_token": 1088,
       "test_token": 61,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -248,10 +351,11 @@
       "position": 752,
       "ref_token": 393,
       "test_token": 421,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/algebra/2264.json",
@@ -259,10 +363,11 @@
       "position": 312,
       "ref_token": 471,
       "test_token": 478,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/algebra/2593.json",
@@ -270,10 +375,11 @@
       "position": 333,
       "ref_token": 279,
       "test_token": 26782,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/algebra/634.json",
@@ -281,9 +387,10 @@
       "position": 815,
       "ref_token": 6558,
       "test_token": 348,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -292,10 +399,11 @@
       "position": 162,
       "ref_token": 62,
       "test_token": 14717,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/algebra/849.json",
@@ -303,10 +411,11 @@
       "position": 135,
       "ref_token": 25,
       "test_token": 1118,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/counting_and_probability/1009.json",
@@ -314,9 +423,10 @@
       "position": 1081,
       "ref_token": 2420,
       "test_token": 314,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -325,9 +435,10 @@
       "position": 80,
       "ref_token": 5823,
       "test_token": 318,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.25,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.25
     },
     {
@@ -336,10 +447,11 @@
       "position": 760,
       "ref_token": 3470,
       "test_token": 86588,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/counting_and_probability/731.json",
@@ -347,9 +459,10 @@
       "position": 1664,
       "ref_token": 1439,
       "test_token": 279,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -358,9 +471,10 @@
       "position": 19,
       "ref_token": 21397,
       "test_token": 5952,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -369,9 +483,10 @@
       "position": 197,
       "ref_token": 10744,
       "test_token": 2250,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -380,9 +495,10 @@
       "position": 92,
       "ref_token": 14606,
       "test_token": 3443,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.12499994039535522,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -391,10 +507,11 @@
       "position": 571,
       "ref_token": 32,
       "test_token": 88,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/geometry/248.json",
@@ -402,10 +519,11 @@
       "position": 142,
       "ref_token": 12669,
       "test_token": 20952,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/intermediate_algebra/117.json",
@@ -413,10 +531,11 @@
       "position": 1334,
       "ref_token": 8,
       "test_token": 14646,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/intermediate_algebra/1197.json",
@@ -424,10 +543,11 @@
       "position": 164,
       "ref_token": 2014,
       "test_token": 6140,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/intermediate_algebra/1388.json",
@@ -435,9 +555,10 @@
       "position": 3,
       "ref_token": 586,
       "test_token": 364,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -446,9 +567,10 @@
       "position": 36,
       "ref_token": 279,
       "test_token": 264,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -457,9 +579,10 @@
       "position": 19,
       "ref_token": 7258,
       "test_token": 2574,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -468,9 +591,10 @@
       "position": 29,
       "ref_token": 2099,
       "test_token": 716,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -479,9 +603,10 @@
       "position": 466,
       "ref_token": 1651,
       "test_token": 393,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -490,9 +615,10 @@
       "position": 281,
       "ref_token": 1439,
       "test_token": 279,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -501,10 +627,11 @@
       "position": 150,
       "ref_token": 14167,
       "test_token": 37317,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/prealgebra/1973.json",
@@ -512,9 +639,10 @@
       "position": 250,
       "ref_token": 1088,
       "test_token": 220,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -523,10 +651,11 @@
       "position": 688,
       "ref_token": 198,
       "test_token": 2302,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/prealgebra/846.json",
@@ -534,10 +663,11 @@
       "position": 478,
       "ref_token": 279,
       "test_token": 411,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/precalculus/625.json",
@@ -545,10 +675,11 @@
       "position": 998,
       "ref_token": 15,
       "test_token": 24,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "math500-test/precalculus/681.json",
@@ -556,9 +687,10 @@
       "position": 239,
       "ref_token": 2107,
       "test_token": 1608,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -567,9 +699,10 @@
       "position": 133,
       "ref_token": 36655,
       "test_token": 22868,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.25,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.25
     },
     {
@@ -578,10 +711,11 @@
       "position": 44,
       "ref_token": 264,
       "test_token": 449,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "mbpp-29",
@@ -589,10 +723,11 @@
       "position": 613,
       "ref_token": 11,
       "test_token": 303,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.12499994039535522,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "mbpp-299",
@@ -600,9 +735,10 @@
       "position": 777,
       "ref_token": 271,
       "test_token": 198,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -611,9 +747,10 @@
       "position": 283,
       "ref_token": 264,
       "test_token": 11,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -622,10 +759,11 @@
       "position": 45,
       "ref_token": 424,
       "test_token": 24217,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "mbpp-356",
@@ -633,10 +771,11 @@
       "position": 199,
       "ref_token": 760,
       "test_token": 2324,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "mbpp-414",
@@ -644,9 +783,10 @@
       "position": 28,
       "ref_token": 74988,
       "test_token": 1510,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -655,9 +795,10 @@
       "position": 182,
       "ref_token": 1368,
       "test_token": 318,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -666,9 +807,10 @@
       "position": 575,
       "ref_token": 262,
       "test_token": 256,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -677,9 +819,10 @@
       "position": 270,
       "ref_token": 2714,
       "test_token": 1325,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -688,9 +831,10 @@
       "position": 317,
       "ref_token": 48401,
       "test_token": 3925,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -699,9 +843,10 @@
       "position": 708,
       "ref_token": 29804,
       "test_token": 12193,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -710,10 +855,11 @@
       "position": 182,
       "ref_token": 13428,
       "test_token": 14235,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "oasst1-1a248423-814a-4ee9-b625-11cb28cd03ac",
@@ -721,9 +867,10 @@
       "position": 280,
       "ref_token": 66445,
       "test_token": 4355,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -732,10 +879,11 @@
       "position": 39,
       "ref_token": 5224,
       "test_token": 42351,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.12500011920928955,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "oasst1-2c629174-2898-4b56-9bd4-f88d073d5b39",
@@ -743,10 +891,11 @@
       "position": 143,
       "ref_token": 1459,
       "test_token": 5802,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "oasst1-5d5bda3c-4dc2-468b-b949-e4fbd9dafe70",
@@ -754,10 +903,11 @@
       "position": 295,
       "ref_token": 19137,
       "test_token": 41722,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "oasst1-5dad260e-3d2f-4dbb-a368-806905b4b34d",
@@ -765,10 +915,11 @@
       "position": 74,
       "ref_token": 10451,
       "test_token": 13188,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "oasst1-5e4bc56a-d2dc-4e64-9dfa-bb5a0afb119d",
@@ -776,10 +927,11 @@
       "position": 28,
       "ref_token": 8758,
       "test_token": 25562,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "oasst1-6215f73c-d012-4f98-b2b1-66bc66cd912a",
@@ -787,9 +939,10 @@
       "position": 168,
       "ref_token": 321,
       "test_token": 11,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -798,9 +951,10 @@
       "position": 747,
       "ref_token": 6912,
       "test_token": 5546,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -809,9 +963,10 @@
       "position": 49,
       "ref_token": 59369,
       "test_token": 20212,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -820,10 +975,11 @@
       "position": 126,
       "ref_token": 1746,
       "test_token": 348,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
-      "ulp": 0.125
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
+      "ulp": 0.0625
     },
     {
       "id": "oasst1-98cc2b70-cbea-4b78-8031-846e7db6b1ef",
@@ -831,10 +987,11 @@
       "position": 108,
       "ref_token": 4099,
       "test_token": 7786,
-      "class": "ref:tie",
+      "class": "tie",
       "margin_ref": 0.0,
-      "margin_test": null,
-      "ulp": null
+      "margin_test": 0.125,
+      "margin_lower_bound": false,
+      "ulp": 0.125
     },
     {
       "id": "oasst1-ba31123e-edca-435a-98a4-c84e33381d50",
@@ -842,9 +999,10 @@
       "position": 260,
       "ref_token": 1577,
       "test_token": 353,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     },
     {
@@ -853,9 +1011,10 @@
       "position": 74,
       "ref_token": 11352,
       "test_token": 348,
-      "class": "ref:one_ulp",
+      "class": "tie",
       "margin_ref": 0.125,
-      "margin_test": null,
+      "margin_test": 0.0,
+      "margin_lower_bound": false,
       "ulp": 0.125
     }
   ]

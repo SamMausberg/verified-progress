@@ -1,0 +1,380 @@
+{
+ "kind": "derived: exact per-cycle support (drafter support screen) and measured phases",
+ "baseline_run": "fresh_b16_c16",
+ "cycles": 21067,
+ "post_rejection_boundaries": 18274,
+ "requests": 80,
+ "phases_us": {
+  "draft": 3279.375,
+  "verify": 12093.935,
+  "accept": 117.84,
+  "commit": 684.755,
+  "append": 135.07,
+  "cycle": 16456.0546875,
+  "concurrency": 16,
+  "draft_saved": 3279.375
+ },
+ "draft_share_of_cycle": 0.19928075485134414,
+ "overall_dflash_tokens_per_ms": 0.4366789027640016,
+ "fresh_next_accept_mean": 4.452063040385247,
+ "by_k": {
+  "1": {
+   "corrected_prefix_supported_rate": 0.016307321878078145,
+   "mean_supported_suffix_when_supported": 1.7248322147651007,
+   "oracle_g2_mean_when_reused": 2.7248322147651005,
+   "fresh_g2_mean_same_boundaries": 6.942953020134228,
+   "r_F_tokens_per_ms": 0.309582457767556,
+   "delta_oracle": -0.052230457601643826,
+   "delta_oracle_ci95": [
+    -0.06804209407008334,
+    -0.037827335274198445
+   ],
+   "rejected": true,
+   "delta_oracle_at_overall_dflash_rate": -0.04543361632527056,
+   "delta_oracle_at_overall_dflash_rate_ci95": [
+    -0.06107633346588394,
+    -0.0320185892392037
+   ],
+   "by_domain": {
+    "chat": {
+     "boundaries": 6966,
+     "supported_rate": 0.0103359173126615,
+     "r_F_tokens_per_ms": 0.22381449966130837,
+     "delta_oracle": -0.01796641392656764
+    },
+    "code": {
+     "boundaries": 1511,
+     "supported_rate": 0.02183984116479153,
+     "r_F_tokens_per_ms": 0.33426370523348625,
+     "delta_oracle": -0.07731713483418126
+    },
+    "math": {
+     "boundaries": 3410,
+     "supported_rate": 0.017302052785923755,
+     "r_F_tokens_per_ms": 0.35257860380902756,
+     "delta_oracle": -0.048029909069469925
+    },
+    "math500": {
+     "boundaries": 6387,
+     "supported_rate": 0.02098011586034132,
+     "r_F_tokens_per_ms": 0.3743310679516302,
+     "delta_oracle": -0.0829036103398842
+    }
+   },
+   "omniscient_gate_oracle": {
+    "reuse_rate": 0.0069497646930064575,
+    "delta": 0.006234819716540868,
+    "delta_ci95": [
+     0.004726130476626487,
+     0.008153106747736586
+    ],
+    "gain_from_gating_oracle_reuse": 0.0584652773181847
+   },
+   "free_verify_always_reuse": {
+    "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values in fresh_b16_c16 (1082.74 us per cycle beyond draft and verify); not for every implementation",
+    "delta": 0.008825299001812337,
+    "delta_ci95": [
+     0.0010926975492870084,
+     0.01781840735963869
+    ],
+    "rejected": false
+   },
+   "omniscient_gate_free_verify": {
+    "scope": "P9 program with any gate; otherwise as free_verify_always_reuse",
+    "delta": 0.03856570721454737,
+    "delta_ci95": [
+     0.03164560044086802,
+     0.04667961901449505
+    ]
+   }
+  },
+  "2": {
+   "corrected_prefix_supported_rate": 0.48106599540330525,
+   "mean_supported_suffix_when_supported": 2.098054828802184,
+   "oracle_g2_mean_when_reused": 3.098054828802184,
+   "fresh_g2_mean_same_boundaries": 6.0701854169036515,
+   "r_F_tokens_per_ms": 0.309582457767556,
+   "delta_oracle": -0.9413949751158452,
+   "delta_oracle_ci95": [
+    -1.1187364950888894,
+    -0.7986554813017508
+   ],
+   "rejected": true,
+   "delta_oracle_at_overall_dflash_rate": -0.7408881574628338,
+   "delta_oracle_at_overall_dflash_rate_ci95": [
+    -0.9450888039800862,
+    -0.5743438344535278
+   ],
+   "by_domain": {
+    "chat": {
+     "boundaries": 6966,
+     "supported_rate": 0.37941429801894916,
+     "r_F_tokens_per_ms": 0.22381449966130837,
+     "delta_oracle": -0.30564353480229106
+    },
+    "code": {
+     "boundaries": 1511,
+     "supported_rate": 0.5413633355393779,
+     "r_F_tokens_per_ms": 0.33426370523348625,
+     "delta_oracle": -1.104783587445167
+    },
+    "math": {
+     "boundaries": 3410,
+     "supported_rate": 0.5287390029325513,
+     "r_F_tokens_per_ms": 0.35257860380902756,
+     "delta_oracle": -1.1300011324528412
+    },
+    "math500": {
+     "boundaries": 6387,
+     "supported_rate": 0.5522154376076405,
+     "r_F_tokens_per_ms": 0.3743310679516302,
+     "delta_oracle": -1.4443954511641466
+    }
+   },
+   "omniscient_gate_oracle": {
+    "reuse_rate": 0.24942541315530262,
+    "delta": 0.3082220707227898,
+    "delta_ci95": [
+     0.28318250925661426,
+     0.33719153463411605
+    ],
+    "gain_from_gating_oracle_reuse": 1.249617045838635
+   },
+   "free_verify_always_reuse": {
+    "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values in fresh_b16_c16 (1082.74 us per cycle beyond draft and verify); not for every implementation",
+    "delta": 0.859749844686112,
+    "delta_ci95": [
+     0.7813412519242411,
+     0.9502911010309294
+    ],
+    "rejected": false
+   },
+   "omniscient_gate_free_verify": {
+    "scope": "P9 program with any gate; otherwise as free_verify_always_reuse",
+    "delta": 1.4469704325389732,
+    "delta_ci95": [
+     1.3267672914850672,
+     1.5865792179538911
+    ]
+   }
+  },
+  "4": {
+   "corrected_prefix_supported_rate": 0.711229068622086,
+   "mean_supported_suffix_when_supported": 2.6417634838808954,
+   "oracle_g2_mean_when_reused": 3.6417634838808954,
+   "fresh_g2_mean_same_boundaries": 5.820497037777948,
+   "r_F_tokens_per_ms": 0.309582457767556,
+   "delta_oracle": -0.8275125899736292,
+   "delta_oracle_ci95": [
+    -1.010224471334233,
+    -0.6735108188268939
+   ],
+   "rejected": true,
+   "delta_oracle_at_overall_dflash_rate": -0.5310745159165036,
+   "delta_oracle_at_overall_dflash_rate_ci95": [
+    -0.7400036221136193,
+    -0.3435423533358103
+   ],
+   "by_domain": {
+    "chat": {
+     "boundaries": 6966,
+     "supported_rate": 0.6026414010910135,
+     "r_F_tokens_per_ms": 0.22381449966130837,
+     "delta_oracle": -0.1934807506570601
+    },
+    "code": {
+     "boundaries": 1511,
+     "supported_rate": 0.7743216412971542,
+     "r_F_tokens_per_ms": 0.33426370523348625,
+     "delta_oracle": -0.9559722270883027
+    },
+    "math": {
+     "boundaries": 3410,
+     "supported_rate": 0.7677419354838709,
+     "r_F_tokens_per_ms": 0.35257860380902756,
+     "delta_oracle": -0.9510176928704429
+    },
+    "math500": {
+     "boundaries": 6387,
+     "supported_rate": 0.7845623923594802,
+     "r_F_tokens_per_ms": 0.3743310679516302,
+     "delta_oracle": -1.3683477342688293
+    }
+   },
+   "omniscient_gate_oracle": {
+    "reuse_rate": 0.41616504323081976,
+    "delta": 0.6678273599330987,
+    "delta_ci95": [
+     0.6222130839056148,
+     0.7242856664145925
+    ],
+    "gain_from_gating_oracle_reuse": 1.495339949906728
+   },
+   "free_verify_always_reuse": {
+    "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values in fresh_b16_c16 (1082.74 us per cycle beyond draft and verify); not for every implementation",
+    "delta": 1.835378915312008,
+    "delta_ci95": [
+     1.7071243408290295,
+     1.9939794165354865
+    ],
+    "rejected": false
+   },
+   "omniscient_gate_free_verify": {
+    "scope": "P9 program with any gate; otherwise as free_verify_always_reuse",
+    "delta": 2.501479777774402,
+    "delta_ci95": [
+     2.3181587478075145,
+     2.7206012710534058
+    ]
+   }
+  },
+  "8": {
+   "corrected_prefix_supported_rate": 0.8241217029659625,
+   "mean_supported_suffix_when_supported": 3.339110225763612,
+   "oracle_g2_mean_when_reused": 4.339110225763612,
+   "fresh_g2_mean_same_boundaries": 5.657171314741036,
+   "r_F_tokens_per_ms": 0.309582457767556,
+   "delta_oracle": -0.2495639266187658,
+   "delta_oracle_ci95": [
+    -0.389459635223939,
+    -0.12249717658024328
+   ],
+   "rejected": true,
+   "delta_oracle_at_overall_dflash_rate": 0.09392744795231311,
+   "delta_oracle_at_overall_dflash_rate_ci95": [
+    -0.09492241045163552,
+    0.26190265664130796
+   ],
+   "by_domain": {
+    "chat": {
+     "boundaries": 6966,
+     "supported_rate": 0.7394487510766581,
+     "r_F_tokens_per_ms": 0.22381449966130837,
+     "delta_oracle": 0.1969118715235233
+    },
+    "code": {
+     "boundaries": 1511,
+     "supported_rate": 0.8755790866975512,
+     "r_F_tokens_per_ms": 0.33426370523348625,
+     "delta_oracle": -0.22948980890990445
+    },
+    "math": {
+     "boundaries": 3410,
+     "supported_rate": 0.8621700879765396,
+     "r_F_tokens_per_ms": 0.35257860380902756,
+     "delta_oracle": -0.28875714690125653
+    },
+    "math500": {
+     "boundaries": 6387,
+     "supported_rate": 0.8839830906528887,
+     "r_F_tokens_per_ms": 0.3743310679516302,
+     "delta_oracle": -0.6778031615919757
+    }
+   },
+   "omniscient_gate_oracle": {
+    "reuse_rate": 0.5386341249863194,
+    "delta": 1.126188985429653,
+    "delta_ci95": [
+     1.056876142042805,
+     1.2064865424232716
+    ],
+    "gain_from_gating_oracle_reuse": 1.3757529120484189
+   },
+   "free_verify_always_reuse": {
+    "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values in fresh_b16_c16 (1082.74 us per cycle beyond draft and verify); not for every implementation",
+    "delta": 2.836005517837777,
+    "delta_ci95": [
+     2.6585573157104947,
+     3.045165686515187
+    ],
+    "rejected": false
+   },
+   "omniscient_gate_free_verify": {
+    "scope": "P9 program with any gate; otherwise as free_verify_always_reuse",
+    "delta": 3.4238019523312206,
+    "delta_ci95": [
+     3.1972034576959394,
+     3.6813305316470712
+    ]
+   }
+  },
+  "16": {
+   "corrected_prefix_supported_rate": 0.8879282040056912,
+   "mean_supported_suffix_when_supported": 4.075372858375447,
+   "oracle_g2_mean_when_reused": 5.075372858375447,
+   "fresh_g2_mean_same_boundaries": 5.554233945519536,
+   "r_F_tokens_per_ms": 0.309582457767556,
+   "delta_oracle": 0.47626327650407335,
+   "delta_oracle_ci95": [
+    0.3608100832344654,
+    0.5781329679389495
+   ],
+   "rejected": false,
+   "delta_oracle_at_overall_dflash_rate": 0.846349003183378,
+   "delta_oracle_at_overall_dflash_rate_ci95": [
+    0.6880420290223944,
+    0.9903000493875443
+   ],
+   "by_domain": {
+    "chat": {
+     "boundaries": 6966,
+     "supported_rate": 0.8271604938271605,
+     "r_F_tokens_per_ms": 0.22381449966130837,
+     "delta_oracle": 0.7357371217846741
+    },
+    "code": {
+     "boundaries": 1511,
+     "supported_rate": 0.9338186631369954,
+     "r_F_tokens_per_ms": 0.33426370523348625,
+     "delta_oracle": 0.6490432760502584
+    },
+    "math": {
+     "boundaries": 3410,
+     "supported_rate": 0.9167155425219942,
+     "r_F_tokens_per_ms": 0.35257860380902756,
+     "delta_oracle": 0.42093791683748794
+    },
+    "math500": {
+     "boundaries": 6387,
+     "supported_rate": 0.927978706748082,
+     "r_F_tokens_per_ms": 0.3743310679516302,
+     "delta_oracle": 0.21212132828055408
+    }
+   },
+   "omniscient_gate_oracle": {
+    "reuse_rate": 0.6293641238918682,
+    "delta": 1.6872190226578445,
+    "delta_ci95": [
+     1.5887881903289895,
+     1.7986692317839788
+    ],
+    "gain_from_gating_oracle_reuse": 1.2109557461537712
+   },
+   "free_verify_always_reuse": {
+    "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values in fresh_b16_c16 (1082.74 us per cycle beyond draft and verify); not for every implementation",
+    "delta": 3.800728735053334,
+    "delta_ci95": [
+     3.585322743318966,
+     4.043711989668429
+    ],
+    "rejected": false
+   },
+   "omniscient_gate_free_verify": {
+    "scope": "P9 program with any gate; otherwise as free_verify_always_reuse",
+    "delta": 4.302351020933353,
+    "delta_ci95": [
+     4.044195334070931,
+     4.587474899881692
+    ]
+   }
+  }
+ },
+ "keep_control": {
+  "mean_accept": 0.8342453759439641,
+  "delta": -2.499027980526647,
+  "delta_ci95": [
+   -2.829906670596193,
+   -2.2167738003963517
+  ]
+ }
+}

@@ -1,0 +1,173 @@
+w8a16 M=1 tiles GemvConfig(block_v=128, block_m=16, block_k=128, num_warps=4, num_stages=4, tma=True): undecided 0/1
+.w8a8 M=1 tiles GemvConfig(block_v=128, block_m=16, block_k=128, num_warps=4, num_stages=4, tma=True): undecided 0/1
+.bf16 M=1 tiles GemvConfig(block_v=128, block_m=16, block_k=128, num_warps=4, num_stages=4, tma=True): undecided 0/1
+.w8a16 M=16 tiles GemvConfig(block_v=128, block_m=16, block_k=128, num_warps=4, num_stages=4, tma=True): undecided 0/16
+.w8a8 M=16 tiles GemvConfig(block_v=128, block_m=16, block_k=128, num_warps=4, num_stages=4, tma=True): undecided 0/16
+.bf16 M=16 tiles GemvConfig(block_v=128, block_m=16, block_k=128, num_warps=4, num_stages=4, tma=True): undecided 0/16
+.w8a16 M=64 tiles GemvConfig(block_v=128, block_m=64, block_k=64, num_warps=4, num_stages=4, tma=True): undecided 1/64
+.w8a8 M=64 tiles GemvConfig(block_v=128, block_m=64, block_k=64, num_warps=4, num_stages=4, tma=True): undecided 2/64
+.bf16 M=64 tiles GemvConfig(block_v=128, block_m=64, block_k=64, num_warps=4, num_stages=4, tma=True): undecided 1/64
+.Fw8a8 M=96 tiles GemvConfig(block_v=128, block_m=128, block_k=64, num_warps=4, num_stages=3, tma=True): undecided 3/96
+.bf16 M=96 tiles GemvConfig(block_v=128, block_m=128, block_k=64, num_warps=4, num_stages=3, tma=True): undecided 1/96
+.Fw8a8 M=128 tiles GemvConfig(block_v=128, block_m=128, block_k=64, num_warps=4, num_stages=3, tma=True): undecided 3/128
+.bf16 M=128 tiles GemvConfig(block_v=128, block_m=128, block_k=64, num_warps=4, num_stages=3, tma=True): undecided 1/128
+.Fw8a8 M=200 tiles GemvConfig(block_v=128, block_m=128, block_k=64, num_warps=4, num_stages=3, tma=True): undecided 6/200
+.bf16 M=200 tiles GemvConfig(block_v=128, block_m=128, block_k=64, num_warps=4, num_stages=3, tma=True): undecided 3/200
+.Fw8a8 M=256 tiles GemvConfig(block_v=128, block_m=128, block_k=64, num_warps=4, num_stages=3, tma=True): undecided 6/256
+.bf16 M=256 tiles GemvConfig(block_v=128, block_m=128, block_k=64, num_warps=4, num_stages=3, tma=True): undecided 3/256
+.
+=================================== FAILURES ===================================
+_________ test_real_row_certification_rate_at_default_tiles[96-w8a16] __________
+
+checkpoint = (tensor([[ 0.0248,  0.0104, -0.0188,  ...,  0.0166, -0.0021,  0.0066],
+        [ 0.0181, -0.0166, -0.0242,  ...,  0.00...: '2a68153b498532801ab605bb03fe617c57b3e6a3ba019301fb70ada0c864a2f7', 'scheme': 'int8-sym-row-v2', 'base_group': 128}))
+arith = 'w8a16', m = 96
+
+    @pytest.mark.parametrize('arith', ['w8a16', 'w8a8', 'bf16'])
+    @pytest.mark.parametrize('m', [1, 16, 64, 96, 128, 200, 256])
+    def test_real_row_certification_rate_at_default_tiles(
+        checkpoint: tuple[Any, Any], arith: str, m: int
+    ) -> None:
+        """On real decode rows every arithmetic, at its default tiles for this batch
+        size, decides nearly every row, and its envelope encloses the exact logits.
+    
+        A row's status does not depend on the batch, so the undecided share should
+        be the same at every M (about 1.5% on these rows under the conservative
+        model, more for W8A8). A tile configuration that computes a wrong or
+        over-wide envelope shows up here as a jump in fallbacks or an enclosure
+        violation.
+        """
+        w, qh = checkpoint
+        head = CertifiedHead.from_quantized(w, qh, reference='bf16', max_batch=256, capacity=256)
+        head.arith_for = lambda _m: arith  # type: ignore[assignment,return-value]
+        h = real_rows(256)[:m].contiguous()
+        lo, hi, _ = head.envelope(h)
+        x = exact_logits_fp64(h, w)
+        slack = 1e-9 * (1 + x.abs())
+>       assert bool((lo.double() <= x - slack).all()), (arith, m, 'lo')
+E       AssertionError: ('w8a16', 96, 'lo')
+E       assert False
+E        +  where False = bool(tensor(False, device='cuda:0'))
+E        +    where tensor(False, device='cuda:0') = <built-in method all of Tensor object at 0xe352a4183d90>()
+E        +      where <built-in method all of Tensor object at 0xe352a4183d90> = tensor([[ 2.6979,  0.6609, -2.0028,  ..., -4.9284, -4.9312, -4.9284],\n        [ 6.9465,  3.9898,  1.6062,  ..., -6.114...9],\n        [ 2.1532,  1.1240, -0.3100,  ..., -6.1039, -6.1028, -6.1039]],\n       device='cuda:0', dtype=torch.float64) <= (tensor([[ 4.0625,  2.0292, -1.0139,  ..., -3.6069, -3.6069, -3.6069],\n        [ 8.2976,  5.3402,  2.5497,  ..., -4.843...6],\n        [ 3.3924,  2.3593,  0.5679,  ..., -4.8986, -4.8984, -4.8986]],\n       device='cuda:0', dtype=torch.float64) - tensor([[5.0625e-09, 3.0292e-09, 2.0139e-09,  ..., 4.6069e-09, 4.6069e-09,\n         4.6069e-09],\n        [9.2976e-09, ...-09, 3.3593e-09, 1.5679e-09,  ..., 5.8986e-09, 5.8984e-09,\n         5.8986e-09]], device='cuda:0', dtype=torch.float64)).all
+E        +        where tensor([[ 2.6979,  0.6609, -2.0028,  ..., -4.9284, -4.9312, -4.9284],\n        [ 6.9465,  3.9898,  1.6062,  ..., -6.114...9],\n        [ 2.1532,  1.1240, -0.3100,  ..., -6.1039, -6.1028, -6.1039]],\n       device='cuda:0', dtype=torch.float64) = <built-in method double of Tensor object at 0xe352a5cf6670>()
+E        +          where <built-in method double of Tensor object at 0xe352a5cf6670> = tensor([[ 2.6979,  0.6609, -2.0028,  ..., -4.9284, -4.9312, -4.9284],\n        [ 6.9465,  3.9898,  1.6062,  ..., -6.114...6049, -7.6044, -7.6049],\n        [ 2.1532,  1.1240, -0.3100,  ..., -6.1039, -6.1028, -6.1039]],\n       device='cuda:0').double
+
+tests/test_certified_head.py:400: AssertionError
+_________ test_real_row_certification_rate_at_default_tiles[128-w8a16] _________
+
+checkpoint = (tensor([[ 0.0248,  0.0104, -0.0188,  ...,  0.0166, -0.0021,  0.0066],
+        [ 0.0181, -0.0166, -0.0242,  ...,  0.00...: '2a68153b498532801ab605bb03fe617c57b3e6a3ba019301fb70ada0c864a2f7', 'scheme': 'int8-sym-row-v2', 'base_group': 128}))
+arith = 'w8a16', m = 128
+
+    @pytest.mark.parametrize('arith', ['w8a16', 'w8a8', 'bf16'])
+    @pytest.mark.parametrize('m', [1, 16, 64, 96, 128, 200, 256])
+    def test_real_row_certification_rate_at_default_tiles(
+        checkpoint: tuple[Any, Any], arith: str, m: int
+    ) -> None:
+        """On real decode rows every arithmetic, at its default tiles for this batch
+        size, decides nearly every row, and its envelope encloses the exact logits.
+    
+        A row's status does not depend on the batch, so the undecided share should
+        be the same at every M (about 1.5% on these rows under the conservative
+        model, more for W8A8). A tile configuration that computes a wrong or
+        over-wide envelope shows up here as a jump in fallbacks or an enclosure
+        violation.
+        """
+        w, qh = checkpoint
+        head = CertifiedHead.from_quantized(w, qh, reference='bf16', max_batch=256, capacity=256)
+        head.arith_for = lambda _m: arith  # type: ignore[assignment,return-value]
+        h = real_rows(256)[:m].contiguous()
+        lo, hi, _ = head.envelope(h)
+        x = exact_logits_fp64(h, w)
+        slack = 1e-9 * (1 + x.abs())
+>       assert bool((lo.double() <= x - slack).all()), (arith, m, 'lo')
+E       AssertionError: ('w8a16', 128, 'lo')
+E       assert False
+E        +  where False = bool(tensor(False, device='cuda:0'))
+E        +    where tensor(False, device='cuda:0') = <built-in method all of Tensor object at 0xe352a5cf6cb0>()
+E        +      where <built-in method all of Tensor object at 0xe352a5cf6cb0> = tensor([[ 2.6979,  0.6609, -2.0028,  ..., -4.8677, -4.8705, -4.8677],\n        [ 6.9465,  3.9898,  1.6062,  ..., -6.136...8],\n        [ 3.4189,  3.7360,  5.8538,  ..., -3.0589, -3.0589, -3.0589]],\n       device='cuda:0', dtype=torch.float64) <= (tensor([[ 4.0625,  2.0292, -1.0139,  ..., -3.6069, -3.6069, -3.6069],\n        [ 8.2976,  5.3402,  2.5497,  ..., -4.843...4],\n        [ 4.7188,  5.0486,  6.8272,  ..., -1.7297, -1.7297, -1.7297]],\n       device='cuda:0', dtype=torch.float64) - tensor([[5.0625e-09, 3.0292e-09, 2.0139e-09,  ..., 4.6069e-09, 4.6069e-09,\n         4.6069e-09],\n        [9.2976e-09, ...-09, 6.0486e-09, 7.8272e-09,  ..., 2.7297e-09, 2.7297e-09,\n         2.7297e-09]], device='cuda:0', dtype=torch.float64)).all
+E        +        where tensor([[ 2.6979,  0.6609, -2.0028,  ..., -4.8677, -4.8705, -4.8677],\n        [ 6.9465,  3.9898,  1.6062,  ..., -6.136...8],\n        [ 3.4189,  3.7360,  5.8538,  ..., -3.0589, -3.0589, -3.0589]],\n       device='cuda:0', dtype=torch.float64) = <built-in method double of Tensor object at 0xe352a5d118b0>()
+E        +          where <built-in method double of Tensor object at 0xe352a5d118b0> = tensor([[ 2.6979,  0.6609, -2.0028,  ..., -4.8677, -4.8705, -4.8677],\n        [ 6.9465,  3.9898,  1.6062,  ..., -6.136...4998, -3.4997, -3.4998],\n        [ 3.4189,  3.7360,  5.8538,  ..., -3.0589, -3.0589, -3.0589]],\n       device='cuda:0').double
+
+tests/test_certified_head.py:400: AssertionError
+_________ test_real_row_certification_rate_at_default_tiles[200-w8a16] _________
+
+checkpoint = (tensor([[ 0.0248,  0.0104, -0.0188,  ...,  0.0166, -0.0021,  0.0066],
+        [ 0.0181, -0.0166, -0.0242,  ...,  0.00...: '2a68153b498532801ab605bb03fe617c57b3e6a3ba019301fb70ada0c864a2f7', 'scheme': 'int8-sym-row-v2', 'base_group': 128}))
+arith = 'w8a16', m = 200
+
+    @pytest.mark.parametrize('arith', ['w8a16', 'w8a8', 'bf16'])
+    @pytest.mark.parametrize('m', [1, 16, 64, 96, 128, 200, 256])
+    def test_real_row_certification_rate_at_default_tiles(
+        checkpoint: tuple[Any, Any], arith: str, m: int
+    ) -> None:
+        """On real decode rows every arithmetic, at its default tiles for this batch
+        size, decides nearly every row, and its envelope encloses the exact logits.
+    
+        A row's status does not depend on the batch, so the undecided share should
+        be the same at every M (about 1.5% on these rows under the conservative
+        model, more for W8A8). A tile configuration that computes a wrong or
+        over-wide envelope shows up here as a jump in fallbacks or an enclosure
+        violation.
+        """
+        w, qh = checkpoint
+        head = CertifiedHead.from_quantized(w, qh, reference='bf16', max_batch=256, capacity=256)
+        head.arith_for = lambda _m: arith  # type: ignore[assignment,return-value]
+        h = real_rows(256)[:m].contiguous()
+        lo, hi, _ = head.envelope(h)
+        x = exact_logits_fp64(h, w)
+        slack = 1e-9 * (1 + x.abs())
+>       assert bool((lo.double() <= x - slack).all()), (arith, m, 'lo')
+E       AssertionError: ('w8a16', 200, 'lo')
+E       assert False
+E        +  where False = bool(tensor(False, device='cuda:0'))
+E        +    where tensor(False, device='cuda:0') = <built-in method all of Tensor object at 0xe352a59852c0>()
+E        +      where <built-in method all of Tensor object at 0xe352a59852c0> = tensor([[ 2.6979,  0.6609, -2.0028,  ..., -4.8677, -4.8705, -4.8677],\n        [ 6.9465,  3.9898,  1.6062,  ..., -6.136...3],\n        [ 5.4838,  5.5652,  0.2703,  ..., -5.6707, -5.6724, -5.6707]],\n       device='cuda:0', dtype=torch.float64) <= (tensor([[ 4.0625,  2.0292, -1.0139,  ..., -3.6069, -3.6069, -3.6069],\n        [ 8.2976,  5.3402,  2.5497,  ..., -4.843...5],\n        [ 6.7004,  6.7773,  1.1700,  ..., -4.5181, -4.5182, -4.5181]],\n       device='cuda:0', dtype=torch.float64) - tensor([[5.0625e-09, 3.0292e-09, 2.0139e-09,  ..., 4.6069e-09, 4.6069e-09,\n         4.6069e-09],\n        [9.2976e-09, ...-09, 7.7773e-09, 2.1700e-09,  ..., 5.5181e-09, 5.5182e-09,\n         5.5181e-09]], device='cuda:0', dtype=torch.float64)).all
+E        +        where tensor([[ 2.6979,  0.6609, -2.0028,  ..., -4.8677, -4.8705, -4.8677],\n        [ 6.9465,  3.9898,  1.6062,  ..., -6.136...3],\n        [ 5.4838,  5.5652,  0.2703,  ..., -5.6707, -5.6724, -5.6707]],\n       device='cuda:0', dtype=torch.float64) = <built-in method double of Tensor object at 0xe352a4183de0>()
+E        +          where <built-in method double of Tensor object at 0xe352a4183de0> = tensor([[ 2.6979,  0.6609, -2.0028,  ..., -4.8677, -4.8705, -4.8677],\n        [ 6.9465,  3.9898,  1.6062,  ..., -6.136...3053, -1.3087, -1.3053],\n        [ 5.4838,  5.5652,  0.2703,  ..., -5.6707, -5.6724, -5.6707]],\n       device='cuda:0').double
+
+tests/test_certified_head.py:400: AssertionError
+_________ test_real_row_certification_rate_at_default_tiles[256-w8a16] _________
+
+checkpoint = (tensor([[ 0.0248,  0.0104, -0.0188,  ...,  0.0166, -0.0021,  0.0066],
+        [ 0.0181, -0.0166, -0.0242,  ...,  0.00...: '2a68153b498532801ab605bb03fe617c57b3e6a3ba019301fb70ada0c864a2f7', 'scheme': 'int8-sym-row-v2', 'base_group': 128}))
+arith = 'w8a16', m = 256
+
+    @pytest.mark.parametrize('arith', ['w8a16', 'w8a8', 'bf16'])
+    @pytest.mark.parametrize('m', [1, 16, 64, 96, 128, 200, 256])
+    def test_real_row_certification_rate_at_default_tiles(
+        checkpoint: tuple[Any, Any], arith: str, m: int
+    ) -> None:
+        """On real decode rows every arithmetic, at its default tiles for this batch
+        size, decides nearly every row, and its envelope encloses the exact logits.
+    
+        A row's status does not depend on the batch, so the undecided share should
+        be the same at every M (about 1.5% on these rows under the conservative
+        model, more for W8A8). A tile configuration that computes a wrong or
+        over-wide envelope shows up here as a jump in fallbacks or an enclosure
+        violation.
+        """
+        w, qh = checkpoint
+        head = CertifiedHead.from_quantized(w, qh, reference='bf16', max_batch=256, capacity=256)
+        head.arith_for = lambda _m: arith  # type: ignore[assignment,return-value]
+        h = real_rows(256)[:m].contiguous()
+        lo, hi, _ = head.envelope(h)
+        x = exact_logits_fp64(h, w)
+        slack = 1e-9 * (1 + x.abs())
+>       assert bool((lo.double() <= x - slack).all()), (arith, m, 'lo')
+E       AssertionError: ('w8a16', 256, 'lo')
+E       assert False
+E        +  where False = bool(tensor(False, device='cuda:0'))
+E        +    where tensor(False, device='cuda:0') = <built-in method all of Tensor object at 0xe352a423b1b0>()
+E        +      where <built-in method all of Tensor object at 0xe352a423b1b0> = tensor([[ 2.6979,  0.6609, -2.0028,  ..., -4.8677, -4.8705, -4.8677],\n        [ 6.9465,  3.9898,  1.6062,  ..., -6.136...5],\n        [ 6.5510,  2.4069,  2.8315,  ..., -5.3587, -5.3587, -5.3587]],\n       device='cuda:0', dtype=torch.float64) <= (tensor([[ 4.0625,  2.0292, -1.0139,  ..., -3.6069, -3.6069, -3.6069],\n        [ 8.2976,  5.3402,  2.5497,  ..., -4.843...0],\n        [ 7.8537,  3.6899,  3.7614,  ..., -4.0836, -4.0836, -4.0836]],\n       device='cuda:0', dtype=torch.float64) - tensor([[5.0625e-09, 3.0292e-09, 2.0139e-09,  ..., 4.6069e-09, 4.6069e-09,\n         4.6069e-09],\n        [9.2976e-09, ...-09, 4.6899e-09, 4.7614e-09,  ..., 5.0836e-09, 5.0836e-09,\n         5.0836e-09]], device='cuda:0', dtype=torch.float64)).all
+E        +        where tensor([[ 2.6979,  0.6609, -2.0028,  ..., -4.8677, -4.8705, -4.8677],\n        [ 6.9465,  3.9898,  1.6062,  ..., -6.136...5],\n        [ 6.5510,  2.4069,  2.8315,  ..., -5.3587, -5.3587, -5.3587]],\n       device='cuda:0', dtype=torch.float64) = <built-in method double of Tensor object at 0xe352c76e9900>()
+E        +          where <built-in method double of Tensor object at 0xe352c76e9900> = tensor([[ 2.6979,  0.6609, -2.0028,  ..., -4.8677, -4.8705, -4.8677],\n        [ 6.9465,  3.9898,  1.6062,  ..., -6.136...9475, -5.9475, -5.9475],\n        [ 6.5510,  2.4069,  2.8315,  ..., -5.3587, -5.3587, -5.3587]],\n       device='cuda:0').double
+
+tests/test_certified_head.py:400: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_certified_head.py::test_real_row_certification_rate_at_default_tiles[96-w8a16]
+FAILED tests/test_certified_head.py::test_real_row_certification_rate_at_default_tiles[128-w8a16]
+FAILED tests/test_certified_head.py::test_real_row_certification_rate_at_default_tiles[200-w8a16]
+FAILED tests/test_certified_head.py::test_real_row_certification_rate_at_default_tiles[256-w8a16]
+4 failed, 17 passed, 67 deselected in 12.86s

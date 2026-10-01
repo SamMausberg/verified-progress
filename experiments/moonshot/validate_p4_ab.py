@@ -13,8 +13,9 @@ Reads one fresh lever_sweep output directory and checks, for this run only:
   - every arm ran the declared workload (long2048.jsonl and its warm-up pool by SHA-256,
     512 prompts, mean input length 2,040-2,049 tokens, OSL 512 with ignore_eos, greedy
     request body) and resolved the pinned pools from its server log: max_running_requests
-    128, max_mamba_cache_size 132 and a KV pool (max_total_num_tokens; 360,448 requested)
-    of at least 327,680 tokens (128 x 2,560), identical in all eight arms;
+    129 (one above the 128 sent, see README 2c), max_mamba_cache_size 132 and a KV pool
+    (max_total_num_tokens; 655,360 requested) of at least 327,680 tokens (128 x 2,560),
+    identical in all eight arms;
   - every exact-replay server log shows the exact-replay kernel dispatch line, and no
     dense server log does; every exact-replay server was launched with
     SGLANG_GDN_EXACT_REPLAY_BV=32 (bench's launch.json records the arm's environment,
@@ -80,7 +81,8 @@ ORDER = [
 REQUESTS = 256  # --min-requests 256 at concurrency 128
 WORKLOAD_SHA256 = 'db376fa3aadf75a30933a649b5ded1dfcafac8289b8e2aed1dde7201afd2659c'
 WARMUP_SHA256 = 'b4b5b4e43b53f3c64083263113904868cccf23767aa0b3c5f1b45740c13130a6'
-POOLS = {'max_running_requests': 128, 'max_mamba_cache_size': 132}
+# 129, not 128: a pass carrying a chunked request's tail stops one request early (README 2c).
+POOLS = {'max_running_requests': 129, 'max_mamba_cache_size': 132}
 MIN_KV_TOKENS = 128 * (2048 + 512)
 POOL_PATTERNS = {
     'max_running_requests': re.compile(r'max_running_requests=(\d+)'),
