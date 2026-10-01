@@ -168,67 +168,7 @@ fi
 
 # Pools of both servers for every comparison in the evidence (team rule: equality
 # comparisons pin the pools; the earlier runs did not, so record what each had).
-nice -n 19 python - "$HOME/vp-data/state" "$evidence" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-from compare import pass_server
-from server import pools_known, resolved_pools
-
-root, evidence = Path(sys.argv[1]), Path(sys.argv[2])
-rows = []
-
-
-def row(source, label, where_a, where_b, server_a, server_b, pa, pb):
-    rows.append(
-        {
-            'evidence': source,
-            'comparison': label,
-            'server_a': where_a,
-            'server_b': where_b,
-            'same_server': server_a is not None and server_a == server_b,
-            'pools_a': pa,
-            'pools_b': pb,
-            'pools_identical': pa == pb if pools_known(pa) and pools_known(pb) else None,
-        }
-    )
-
-
-def add_sessions(source, label, dir_a, dir_b):
-    # Tap sessions: one server per directory, started once by tap_runs.py.
-    la, lb = dir_a / 'server.log', dir_b / 'server.log'
-    pa = resolved_pools(la) if la.exists() else None
-    pb = resolved_pools(lb) if lb.exists() else None
-    a, b = str(dir_a.relative_to(root)), str(dir_b.relative_to(root))
-    row(source, label, a, b, a, b, pa, pb)
-
-
-for floor, sub in (('noise_floor.json', 'runs'), ('noise_floor_pinned.json', 'runs_pinned')):
-    if not (evidence / floor).exists():
-        continue
-    for label, s in json.loads((evidence / floor).read_text())['pairs'].items():
-        # Matrix passes: the server that ran each pass, from the pass's own metadata.
-        (ka, pa), (kb, pb) = (pass_server(root / sub, r) for r in (s['run_a'], s['run_b']))
-        row(floor, label, f'{sub}/{s["run_a"]}', f'{sub}/{s["run_b"]}', ka, kb, pa, pb)
-for f in sorted(evidence.glob('mechanism_*.json')):
-    s = json.loads(f.read_text())['summary']
-    add_sessions(f.name, f'{Path(s["a"]).name} vs {Path(s["b"]).name}', Path(s['a']), Path(s['b']))
-sig = evidence / 'tap_signature.json'
-if sig.exists():
-    for e in json.loads(sig.read_text()):
-        add_sessions(sig.name, f'{e["a"]} vs {e["b"]}', root / 'tap' / e['a'], root / 'tap' / e['b'])
-chk = evidence / 'tap_check.json'
-if chk.exists():
-    for session, e in json.loads(chk.read_text()).items():
-        ka, pa = None, None
-        la = root / 'tap' / session / 'server.log'
-        if la.exists():
-            ka, pa = f'tap/{session}', resolved_pools(la)
-        kb, pb = pass_server(root / 'runs', e['untapped_run'])
-        row(chk.name, f'{session} vs untapped {e["untapped_run"]}', f'tap/{session}', f'runs/{e["untapped_run"]}', ka, kb, pa, pb)
-(evidence / 'pools.json').write_text(json.dumps(rows, indent=1) + '\n')
-PY
+nice -n 19 python pools.py --root "$HOME/vp-data/state" --evidence "$evidence"
 
 # Drift and divergences by rejection position, for every speculative config.
 for spec in mtp_s1 mtp_s3 mtp_s5 mtp_tree; do

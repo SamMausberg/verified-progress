@@ -121,3 +121,57 @@ def test_pools_match_uses_each_pass_server_and_treats_missing_fields_as_unknown(
         json.dumps({'started_at': '2026-10-01T09:00:00', 'server_info': {}})
     )
     assert pools_match(tmp_path, 'plain/c1', 'plain/c32') == (False, None)
+
+
+def test_pools_record_regenerates_under_another_home(tmp_path, monkeypatch):
+    import json
+
+    import pools
+
+    # Data root under a different home; committed summaries name /home/ubuntu paths.
+    home = tmp_path / 'home' / 'someone'
+    root = home / 'vp-data' / 'state'
+    monkeypatch.setenv('HOME', str(home))
+    log = (
+        'Mamba Cache is allocated. max_mamba_cache_size: 40, x\n'
+        'max_total_num_tokens=100, a=1, max_running_requests=8, b=2\n'
+    )
+    for name in ('v3_plain_c1', 'v3_plain_c32'):
+        (root / 'tap' / name).mkdir(parents=True)
+        (root / 'tap' / name / 'server.log').write_text(log)
+    evidence = tmp_path / 'evidence'
+    evidence.mkdir()
+    (evidence / 'mechanism_plain_c1_vs_c32.json').write_text(
+        json.dumps(
+            {
+                'summary': {
+                    'a': '/home/ubuntu/vp-data/state/tap/v3_plain_c1',
+                    'b': 'tap/v3_plain_c32',
+                }
+            }
+        )
+    )
+    rows = pools.build(root, evidence)
+    assert rows == [
+        {
+            'evidence': 'mechanism_plain_c1_vs_c32.json',
+            'comparison': 'v3_plain_c1 vs v3_plain_c32',
+            'server_a': 'tap/v3_plain_c1',
+            'server_b': 'tap/v3_plain_c32',
+            'same_server': False,
+            'pools_a': {
+                'max_total_tokens': 100,
+                'max_running_requests': 8,
+                'max_mamba_cache_size': 40,
+            },
+            'pools_b': {
+                'max_total_tokens': 100,
+                'max_running_requests': 8,
+                'max_mamba_cache_size': 40,
+            },
+            'pools_identical': True,
+        }
+    ]
+    assert pools.data_relative(str(root / 'tap' / 'x'), root).as_posix() == 'tap/x'
+    with pytest.raises(ValueError):
+        pools.data_relative('/elsewhere/tap/x', root)

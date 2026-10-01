@@ -132,7 +132,11 @@ applied in `~/sglang-wt/state`): `tap_runs.py` serves tagged prompts with the ta
 inside a run (`--repeat-of`). Both are run inside the GPU hold that collects the data;
 the exact commands are in `evidence/state_safety/README.md`. `tap_signature.py` (light,
 run by `analyze_all.sh`) finds where the v1 and v3 tapped sessions of the same
-configuration first part ways.
+configuration first part ways. `pools.py` (run by `analyze_all.sh`) writes
+`pools.json`, both servers' pools for every comparison in the evidence; it rebases
+data paths recorded under another home directory onto the current
+`~/vp-data/state`, and `mechanism.py` now records its run paths relative to that
+root.
 
 Raw outputs stay in `~/vp-data/state/` (`runs_pinned/`, `runs/`, `targeted/`); each
 run has a `.meta.json` with the flags, the pool pin, the resolved server settings

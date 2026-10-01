@@ -490,6 +490,14 @@ def compare_repeats(run_dir: Path, pid: str, prompt: list[int]) -> dict[str, Any
     return {'run': str(run_dir), 'prompt': pid, 'reference': reps[0], 'repeats': out}
 
 
+def data_root_relative(path: str) -> str:
+    """path relative to ~/vp-data/state when it lies there, else unchanged."""
+    try:
+        return str(Path(path).resolve().relative_to(Path.home().resolve() / 'vp-data/state'))
+    except ValueError:
+        return path
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--a', required=True)
@@ -549,8 +557,9 @@ def main() -> None:
         )
     fd = [c['first_difference'] for c in cases if c.get('first_difference')]
     summary = {
-        'a': args.a,
-        'b': args.b,
+        # Relative to the data root, so the committed summary does not name a home directory.
+        'a': data_root_relative(args.a),
+        'b': data_root_relative(args.b),
         'prompts': len(cases),
         'classes': dict(Counter(c['cls'] for c in cases)),
         'classes_hopper_model': dict(
@@ -587,7 +596,7 @@ def main() -> None:
             and r['top_logprobs'] == ref[pid]['top_logprobs'][: len(r['top_logprobs'])]
         ]
         summary['tap_check'] = {
-            'untapped_run': args.untapped_a,
+            'untapped_run': data_root_relative(args.untapped_a),
             'prompts': len(ca),
             'tokens_and_logprobs_bitwise_equal': len(same),
             'mismatched_ids': sorted(set(ca) - set(same)),
