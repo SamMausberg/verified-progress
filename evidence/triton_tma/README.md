@@ -2,7 +2,8 @@
 
 The certified head's int8 pass gave wrong products with NaN and Inf on this GH200 when its int8
 weight tile was loaded through a TMA descriptor with `BLOCK_K = 64`, a 64-byte inner box. That
-finding came from the kernel workstream's isolation runs on Triton 3.7.1. This directory answers
+finding came from the certified head's isolation runs on Triton 3.7.1 (`tma_repro.json` and
+"TMA faults in the W8A16 pass" in [`../certified_head/README.md`](../certified_head/README.md)). This directory answers
 two questions: does the fault lie in Triton's generated code or in `ptxas`, and which builds fix
 it? Both kernels, the checks and the commands are in `experiments/triton_tma/`.
 
