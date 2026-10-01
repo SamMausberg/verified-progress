@@ -875,6 +875,21 @@ def test_arm_classes_from_matched_references() -> None:
     assert series_label('plain-tuned', 'stock', math.nan) == 'plain-tuned'
 
 
+def test_series_styles_share_a_hue_per_family() -> None:
+    from bench.pareto import SERIES_COLOURS, series_styles
+
+    styles = series_styles(
+        ['dflash-tuned', 'dflash-tuned-b16', 'mtp-tuned', 'plain-tuned', 'eagle-x']
+    )
+    assert styles['dflash-tuned'][0] == styles['dflash-tuned-b16'][0] == SERIES_COLOURS[2]
+    assert styles['dflash-tuned'][1:] != styles['dflash-tuned-b16'][1:]
+    assert (
+        styles['mtp-tuned'][0] == SERIES_COLOURS[1]
+        and styles['plain-tuned'][0] == SERIES_COLOURS[0]
+    )
+    assert styles['eagle-x'][0] == SERIES_COLOURS[3]  # an unknown family takes the next slot
+
+
 def test_host_id_is_random_and_stable(tmp_path: Path) -> None:
     import socket
 

@@ -89,6 +89,26 @@ AGGREGATED = (
 )
 # Reference categorical order (dataviz palette, light surface), assigned per label in order.
 SERIES_COLOURS = ('#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7')
+# Hue encodes the family (first word of the label: plain, mtp, dflash); line style and
+# marker encode the variant within it, so nine arms need three hues, not nine.
+FAMILY_SLOTS = {'plain': 0, 'mtp': 1, 'dflash': 2}
+VARIANT_STYLES = (('-', 'o'), ('--', 's'), (':', '^'), ('-.', 'D'))
+
+
+def series_styles(labels: list[str]) -> dict[str, tuple[str, str, str]]:
+    """(colour, line style, marker) per label: hue by family, style by variant."""
+    slots = dict(FAMILY_SLOTS)
+    seen: dict[str, int] = {}
+    styles = {}
+    for label in labels:
+        family = label.split('-')[0]
+        if family not in slots:
+            slots[family] = len(slots)
+        variant = seen.get(family, 0)
+        seen[family] = variant + 1
+        line, marker = VARIANT_STYLES[variant % len(VARIANT_STYLES)]
+        styles[label] = (SERIES_COLOURS[slots[family] % len(SERIES_COLOURS)], line, marker)
+    return styles
 
 
 def invalid_reason(point: dict[str, Any]) -> str:
@@ -545,8 +565,10 @@ def plot(frontier: list[dict[str, Any]], path: Path, title: str) -> None:
             label=name,
             zorder=1,
         )
-    for index, label in enumerate(labels):
-        colour = SERIES_COLOURS[index % len(SERIES_COLOURS)]
+    styles = series_styles(labels)
+    for label in labels:
+        colour, line, marker = styles[label]
+        exact = status[label] in EXACT_CLASSES
         entries = [entry for entry in frontier if entry['label'] == label]
         xs = [entry['x_e2e_mean'] for entry in entries]
         ys = [entry['y_mean'] for entry in entries]
@@ -556,9 +578,10 @@ def plot(frontier: list[dict[str, Any]], path: Path, title: str) -> None:
             xerr=[entry['x_e2e_std'] for entry in entries],
             yerr=[entry['y_std'] for entry in entries],
             color=colour,
-            linewidth=2 if status[label] in EXACT_CLASSES else 1.5,
-            linestyle='-' if status[label] in EXACT_CLASSES else '--',
-            marker='o',
+            alpha=1.0 if exact else 0.5,
+            linewidth=2,
+            linestyle=line,
+            marker=marker,
             markersize=5,
             capsize=2,
             label=series_label(label, status[label], rates.get(label)),
