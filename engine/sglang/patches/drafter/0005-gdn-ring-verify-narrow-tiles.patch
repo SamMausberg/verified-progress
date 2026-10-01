@@ -1,4 +1,4 @@
-From 6b6407ebb36e597988149c4ebde5f3716430de70 Mon Sep 17 00:00:00 2001
+From 9292abd874842bb6e87dc47b2bdff0e2d6ecda31 Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <samuelmausberg@gmail.com>
 Date: Thu, 1 Oct 2026 18:41:50 +0000
 Subject: [PATCH] GDN: narrow value tiles for the ReplaySSM ring-writing verify

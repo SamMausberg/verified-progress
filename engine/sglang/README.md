@@ -67,7 +67,7 @@ Every change is off unless its flag or environment variable is set.
 Tests: `tests/test_moonshot_levers.py` and `tests/test_gdn_exact_replay.py` (the engine
 tests run in the SGLang venv with the worktree on `PYTHONPATH` and skip elsewhere).
 
-## drafter (`patches/drafter/0001-0004`, branch `engine/drafter`)
+## drafter (`patches/drafter/0001-0005`, branch `engine/drafter`)
 
 ```sh
 scripts/sglang_worktree.sh drafter
@@ -79,8 +79,9 @@ SGLANG_WORKTREE=~/sglang-wt/drafter source scripts/sglang_env.sh
 |---|---|---|
 | 0001 | `SGLANG_DFLASH_TRACE_PATH=<prefix>`: the DFLASH worker appends one JSON line per request per greedy verify cycle to `<prefix>.<pid>.jsonl` (request id, prefix length, the drafted block with the anchor first, the target's argmax at every block row, accepted length). Used for the per-cycle traces in `evidence/drafter/` (`experiments/drafter/run_trace.sh`). It copies to the host every cycle, a stream sync, so traced runs give tokens and acceptance, not timings. | unchanged unless the variable is set |
 | 0002 | `--enable-linear-replayssm-spec` for DFLASH on GDN models (Qwen3.5): the GDN circular-ring ReplaySSM commit in `update_mamba_state_after_mtp_verify`, which DFLASH calls directly (the same kernels, order and index sets as the GDN branch of `spec_utils.commit_mamba_states_after_verify` used by EAGLE/MTP), and the KDA-only refusal relaxed for DFLASH on GDN. The verify then writes compact per-token records to a ring instead of one FP32 GDN state per block position. Not bitwise: the circular verify output differs from the recurrent kernel's in about 20% of BF16 words (at most 2.4e-4 absolute), and served outputs diverge at ties (0/80 sequences bitwise at c=1 and 8; `experiments/drafter/run_replay_check.sh`). | refused without the patch; unchanged unless the flag is set |
-| 0003 | `SGLANG_GDN_REPLAYSSM_FOLD=1` with `--enable-linear-replayssm-spec`: the fold-every-commit protocol for GDN pools (verify with the recurrent kernel, which also writes the raw window to a ring; on commit, a bitwise clone of the recurrent update replays the accepted prefix into the checkpoint). SGLang implements it for GDN but enabled it only for KDA. The DFLASH commit hook routes to it, and EAGLE/MTP reach it through `spec_utils`. Validation (`experiments/drafter/run_replay_check.sh`, `evidence/drafter/README.md`): the verify output and the folded state are bitwise equal to the stock verify at the kernel level (batch 1, 8 and 16). With pools pinned identically in both arms (`run_fold_localize.sh`), served outputs are bitwise equal to stock (tokens and top-5 logprobs): DFlash at c=1 with the per-cycle trace also identical cycle by cycle, DFlash in deterministic waves of 4 and MTP s3 in waves of 8 on all 80 panel-v2 sequences, and MTP s3 at c=1 on all 80 in the first check. Per-phase split at c=8 and 16 (`run_phase_timing.sh`): the held-batch cycle is 8.6% and 11.9% shorter than stock's. | unchanged unless the variable is set |
-| 0004 | The recurrent GDN kernel's launch-config selection treats the ReplaySSM ring-writing verify (`cache_ring`, used by 0003's fold) as a target verify, so on sm_90 it uses value tiles of 4 for at most 64 sequences like the stock per-position-state verify, instead of 32. The two tilings were bitwise equal in the kernel check, so the arithmetic is unchanged; KDA and other GPUs are unaffected. It is meant to remove the fold's small-batch slowdown; its served A/B is pending. | changes only the ring-writing verify, which runs only with 0003's fold |
+| 0003 | `SGLANG_GDN_REPLAYSSM_FOLD=1` with `--enable-linear-replayssm-spec`: the fold-every-commit protocol for GDN pools (verify with the recurrent kernel, which also writes the raw window to a ring; on commit, a bitwise clone of the recurrent update replays the accepted prefix into the checkpoint). SGLang implements it for GDN but enabled it only for KDA. The DFLASH commit hook routes to it, and EAGLE/MTP reach it through `spec_utils`. Validation (`experiments/drafter/run_replay_check.sh`, `evidence/drafter/README.md`): the verify output and the folded state are bitwise equal to the stock verify at the kernel level (batch 1, 8 and 16). With pools pinned identically in both arms (`run_fold_localize.sh`), served outputs are bitwise equal to stock (tokens and top-5 logprobs): DFlash at c=1 with the per-cycle trace also identical cycle by cycle, DFlash in deterministic waves of 4 and MTP s3 in waves of 8 on all 80 panel-v2 sequences, and MTP s3 at c=1 on all 80 in the first check. Per-phase split at c=8 and 16 (`run_phase_timing.sh`): the held-batch cycle is 8.6% and 11.9% shorter than stock's. Served on the bench's tuned DFlash arms (`run_fold_timing.sh`, one session): 3.2% slower than stock at c=1 on block 16 (1.4% on block 8), about 6% faster at c=8 and 12% at c=32. | unchanged unless the variable is set |
+| 0004 | Gates the DFLASH ReplaySSM commit hook of 0002/0003 on `--enable-linear-replayssm-spec`: plain `--enable-linear-replayssm` also allocates replay rings, and without the gate a DFLASH server with only that flag would commit through a ring its verify never wrote instead of the stock scatter. No effect on any configuration measured here (either both ReplaySSM spec flags are on, or no ReplaySSM flag is set); the evidence was produced at 0003 (31bda3e674). | unchanged unless `--enable-linear-replayssm` is set without `-spec` |
+| 0005 | The recurrent GDN kernel's launch-config selection treats the ReplaySSM ring-writing verify (`cache_ring`, used by 0003's fold) as a target verify, so on sm_90 it uses value tiles of 4 for at most 64 sequences like the stock per-position-state verify, instead of 32. The two tilings were bitwise equal in the kernel check, so the arithmetic is unchanged; KDA and other GPUs are unaffected. It is meant to remove the fold's small-batch slowdown; its served A/B is pending. | changes only the ring-writing verify, which runs only with 0003's fold |
 
 The drafter's timed runs use the stock engine; trained drafters load through SGLang's
 unmodified `DFlashDraftModel` and `DFlash2DraftModel`.
@@ -189,3 +190,43 @@ does on CUDA).
 The routing table is JSON from `experiments/backbone/make_table.py`. Measured so far: the kernels
 and fusions in isolation and in layer skeletons (`evidence/backbone/README.md`). The exactness
 class and serving effect of the switches are pending.
+
+## hostgap (`patches/hostgap/0001-0005`, branch `engine/hostgap`)
+
+The series applies in order to `bd66ce343e` on its own. Patches 0001-0003 are the validated
+state (GPU plan check, in-engine validation and greedy output equality, all on 0001-0003):
+
+```sh
+scripts/sglang_worktree.sh hostgap
+git -C ~/sglang-wt/hostgap am "$PWD"/engine/sglang/patches/hostgap/000[1-3]-*.patch
+SGLANG_WORKTREE=~/sglang-wt/hostgap source scripts/sglang_env.sh
+```
+
+Patches 0004 and 0005 have not run on a GPU yet; their checks are queued. To apply them on
+top: `git -C ~/sglang-wt/hostgap am "$PWD"/engine/sglang/patches/hostgap/000[45]-*.patch`.
+
+With speculative decoding and FlashInfer attention, the scheduler blocks on device-to-host
+reads whose values it already knows and then plans while the GPU idles. Each patch
+computes those values from the batch's `seq_lens_cpu` (which the overlap scheduler
+resolves once per cycle anyway) and feeds them to the same planning calls, so the plan
+state, FlashInfer's pinned plan buffer and every device buffer the captured graphs read
+are the ones the stock path produces. Capture-time plans are unchanged; only replays (and
+eager draft passes in 0002) take the new path. Every change is off unless its variable is
+set; `SGLANG_HOSTGAP_VALIDATE=1` additionally runs the stock read-back path next to each
+sync-free plan and raises on any difference (it synchronizes, so it is for correctness
+runs only).
+
+| Patch | What it changes | Default behaviour |
+|---|---|---|
+| 0001 | `SGLANG_HOSTGAP_VERIFY_PLAN=1`: the EAGLE/NEXTN target-verify CUDA-graph wrappers plan with `fast_verify_plan` (`srt/layers/attention/flashinfer_hostgap.py`), FlashInfer 0.6.18's `plan()` for fa2 in CUDA-graph mode with its four blocking reads (`segment_packbits`'s `.item()` and three `.to("cpu")`) replaced by host-computed qo/kv indptr, kv lengths and packed-mask size. A per-wrapper CUDA event orders reuse of FlashInfer's pinned plan buffer after its previous asynchronous copy, which the stock blocking reads used to guarantee (this also covers the draft-extend wrapper's `fast_prefill_plan`). | stock `plan()` |
+| 0002 | `SGLANG_HOSTGAP_DRAFT_INDPTR=1`: `FlashInferMultiStepDraftBackend.common_template` builds the per-step draft `kv_indptr` rows on the host instead of copying them back with `.cpu()`. | stock `.cpu()` |
+| 0003 | `SGLANG_HOSTGAP_DFLASH_DRAFT_PLAN=1`: the DFlash draft forward (the drafter's sliding-window and full-attention wrappers, no custom mask) plans with `fast_verify_plan` from the worker's exact host copy of the committed lengths; without that copy (compact draft cache, GPU-only backends) the stock `plan()` runs. | stock `plan()` |
+| 0004 | Not yet validated. No new flag: the host-side plan inputs of 0001-0003 are computed with numpy, and `fast_verify_plan` uploads the custom-mask bit and byte offsets in one pinned copy instead of deriving them with about ten small device ops. It is meant to produce the same integers for the same packing kernel; the GPU check and equality runs that would confirm it are pending. | unchanged (only the flagged paths change) |
+| 0005 | Not yet validated. No new flag: `fast_verify_plan` passes `disable_split_kv` as `plan()` does, forced on for NVFP4 KV caches (FlashInfer's `_nvfp4_kv_requires_disabled_split_kv`); no change for BF16 or FP8 KV. Also corrects the module docstring. | unchanged (only the flagged paths change) |
+
+Checks: `experiments/hostgap/plan_equivalence.py` compares FlashInfer's stock `plan()`
+with `fast_verify_plan` on the GPU (plan state, pinned bytes, device buffers and a replayed
+attention graph's output, for the EAGLE verify and the DFlash draft block) and the draft
+rows with the Triton kernel; `tests/test_hostgap_plan.py` runs a small version (not yet run
+on a GPU). `experiments/hostgap/equality.py` compares greedy outputs with the stock engine.
+Results and commands: `evidence/hostgap/README.md`.

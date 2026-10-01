@@ -159,7 +159,25 @@ def load_prompts(path: Path) -> list[dict[str, Any]]:
     with_length = sum(1 for item in items if 'output_length' in item)
     if with_length not in (0, len(items)):
         raise ValueError(f'{path}: output_length on {with_length} of {len(items)} records')
+    if with_length:
+        # Lengths are matched to responses by text, so one text has one length.
+        lengths: dict[str, int] = {}
+        for item in items:
+            key = prompt_hash(item['text'])
+            if lengths.setdefault(key, int(item['output_length'])) != int(item['output_length']):
+                raise ValueError(f'{path}: one text with two output lengths ({item["id"]})')
     return items
+
+
+def prompts_match(rows: list[dict[str, Any]], measured: list[dict[str, Any]]) -> bool:
+    """True if the measured requests carried exactly the expected texts, counted.
+
+    Compares the multiset of sent prompt hashes with that of the measured prompts,
+    so repeated texts and ids shared with the warmup pool cannot confuse it.
+    """
+    sent = sorted(str(row.get('prompt_sha')) for row in rows)
+    expected = sorted(prompt_hash(item['text']) for item in measured)
+    return sent == expected
 
 
 def request_record(item: dict[str, Any]) -> dict[str, Any]:
@@ -222,9 +240,12 @@ class Sweep:
         self.run_dir = run_dir
         self.workload = load_prompts(args.workload)
         self.warmup_pool = load_prompts(args.warmup_pool)
+        # Text hash -> id and domain, the workload's entry winning over the warmup
+        # pool's. A text that occurs more than once maps to one id, so request ids are
+        # labels only; prompt identity checks use the hashes (prompts_match).
         self.prompt_index = {
             prompt_hash(item['text']): {'id': item['id'], 'domain': item['domain']}
-            for item in [*self.workload, *self.warmup_pool]
+            for item in [*self.warmup_pool, *self.workload]
         }
         self.body = request_body(args.ignore_eos, args.thinking)
         self.points: list[dict[str, Any]] = []
@@ -342,13 +363,11 @@ class Sweep:
         target_osl: int | dict[str, int] | None = None
         if args.ignore_eos:
             target_osl = (
-                {item['id']: int(item['output_length']) for item in measured}
+                {prompt_hash(item['text']): int(item['output_length']) for item in measured}
                 if 'output_length' in measured[0]
                 else args.osl
             )
         summary = summarise_point(rows, target_osl, concurrency, aiperf_summary)
-        expected_ids = [item['id'] for item in measured]
-        sent_ids = [row['prompt_id'] for row in rows]
         summary.update(
             {
                 'repeat': repeat,
@@ -364,7 +383,7 @@ class Sweep:
                 # Beyond the workload size prompts cycle, and repeats can hit the prefix cache.
                 'repeated_prompts': max(0, requests - len(self.workload)),
                 'cache_flushed': flushed,
-                'prompts_as_expected': sorted(map(str, sent_ids)) == sorted(map(str, expected_ids)),
+                'prompts_as_expected': prompts_match(rows, measured),
                 'server_counters': counter_deltas(before, after),
                 'server_log': log_segment_stats(segment),
                 'gpu_before': gpu_before['values'],
@@ -512,6 +531,12 @@ def build_parser() -> argparse.ArgumentParser:
         '--allow-busy-gpu', action='store_true', help='run even if other GPU processes exist'
     )
     parser.add_argument(
+        '--busy-gpu-wait',
+        type=float,
+        default=300.0,
+        help='seconds to wait for other GPU processes to exit before refusing to run',
+    )
+    parser.add_argument(
         '--streaming',
         action=argparse.BooleanOptionalAction,
         default=True,
@@ -534,9 +559,15 @@ def prepare(parser: argparse.ArgumentParser, argv: list[str] | None) -> argparse
         parser.error(f'concurrency above the arm capacity target {arm.max_concurrency}')
     if not args.allow_unlocked and not gpu_lock_held_by_someone():
         parser.error('run under scripts/gpu_lock.sh -x (the GPU lock is not held)')
+    # A previous lock holder's server can take a few seconds to leave the GPU after
+    # its job releases the lock; wait for it before refusing to measure.
+    deadline = time.monotonic() + args.busy_gpu_wait
     busy = gpu_snapshot()['compute_apps']
+    while busy and not args.allow_busy_gpu and time.monotonic() < deadline:
+        time.sleep(5)
+        busy = gpu_snapshot()['compute_apps']
     if busy and not args.allow_busy_gpu:
-        parser.error(f'GPU has running processes: {busy}')
+        parser.error(f'GPU has running processes after {args.busy_gpu_wait:.0f} s: {busy}')
     args.arm_resolved = arm
     return args
 

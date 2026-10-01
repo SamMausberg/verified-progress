@@ -111,8 +111,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.015619586091863895,
-    "gap_bound_b": 0.01561714533363207,
+    "gap_bound_a": 0.015647985227533946,
+    "gap_bound_b": 0.015645540031577348,
     "accumulator_order_source": [
      "bf16",
      "float64"
@@ -189,8 +189,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.01729575832529331,
-    "gap_bound_b": 0.01729110299287527,
+    "gap_bound_a": 0.017327205034848074,
+    "gap_bound_b": 0.017322541238222584,
     "accumulator_order_source": [
      "ambiguous",
      "bf16"
@@ -296,8 +296,8 @@
     "cls": "order_flip"
    },
    "model_hopper": {
-    "gap_bound_a": 0.015644199315405394,
-    "gap_bound_b": 0.01564378543787674,
+    "gap_bound_a": 0.01567264320221485,
+    "gap_bound_b": 0.015672228572184557,
     "accumulator_order_source": [
      "bf16",
      "bf16"
@@ -373,8 +373,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.01606052372121306,
-    "gap_bound_b": 0.01606475929610178,
+    "gap_bound_a": 0.016089724558508513,
+    "gap_bound_b": 0.016093967834412175,
     "accumulator_order_source": [
      "bf16",
      "float64"
@@ -452,8 +452,8 @@
     "run_against_accumulator_order": "a"
    },
    "model_hopper": {
-    "gap_bound_a": 0.01565117930964574,
-    "gap_bound_b": 0.01564895005690209,
+    "gap_bound_a": 0.01567963588730387,
+    "gap_bound_b": 0.015677402581389364,
     "accumulator_order_source": [
      "float64",
      "bf16"
@@ -530,8 +530,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.013838469967261482,
-    "gap_bound_b": 0.013830773999381782,
+    "gap_bound_a": 0.013863630722722915,
+    "gap_bound_b": 0.013855920762229414,
     "accumulator_order_source": [
      "bf16",
      "float64"
@@ -638,8 +638,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.01566388745794856,
-    "gap_bound_b": 0.015660180595068903,
+    "gap_bound_a": 0.015692367141239935,
+    "gap_bound_b": 0.015688653538636115,
     "accumulator_order_source": [
      "ambiguous",
      "bf16"
@@ -715,8 +715,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.015340006459398661,
-    "gap_bound_b": 0.015343474670439203,
+    "gap_bound_a": 0.015367897270464831,
+    "gap_bound_b": 0.015371371787318809,
     "accumulator_order_source": [
      "float64",
      "bf16"
@@ -793,8 +793,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.016437692850848444,
-    "gap_bound_b": 0.016442326357047423,
+    "gap_bound_a": 0.016467579447498853,
+    "gap_bound_b": 0.016472221378221404,
     "accumulator_order_source": [
      "bf16",
      "float64"
@@ -871,8 +871,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.015341812479809043,
-    "gap_bound_b": 0.01534540621666267,
+    "gap_bound_a": 0.015369706574535763,
+    "gap_bound_b": 0.015373306845430678,
     "accumulator_order_source": [
      "float64",
      "bf16"
@@ -949,8 +949,8 @@
     "run_against_accumulator_order": "b"
    },
    "model_hopper": {
-    "gap_bound_a": 0.01629251766157942,
-    "gap_bound_b": 0.016290751583553035,
+    "gap_bound_a": 0.016322140304379087,
+    "gap_bound_b": 0.016320371015314382,
     "accumulator_order_source": [
      "bf16",
      "float64"
@@ -1027,8 +1027,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.014676562299608937,
-    "gap_bound_b": 0.014680947919783784,
+    "gap_bound_a": 0.014703246853313832,
+    "gap_bound_b": 0.014707640447312159,
     "accumulator_order_source": [
      "float64",
      "bf16"
@@ -1105,8 +1105,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.015201989397588303,
-    "gap_bound_b": 0.01519274033296865,
+    "gap_bound_a": 0.015229629269529704,
+    "gap_bound_b": 0.015220363388495108,
     "accumulator_order_source": [
      "bf16",
      "ambiguous"
@@ -1183,8 +1183,8 @@
     "run_against_accumulator_order": "b"
    },
    "model_hopper": {
-    "gap_bound_a": 0.012965639265294246,
-    "gap_bound_b": 0.012968059583503055,
+    "gap_bound_a": 0.01298921306208876,
+    "gap_bound_b": 0.012991637780858814,
     "accumulator_order_source": [
      "bf16",
      "float64"
@@ -1261,8 +1261,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.019430033416597582,
-    "gap_bound_b": 0.01941719292840356,
+    "gap_bound_a": 0.01946536061104603,
+    "gap_bound_b": 0.019452496776601724,
     "accumulator_order_source": [
      "float64",
      "bf16"
@@ -1369,8 +1369,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.01806751115720358,
-    "gap_bound_b": 0.018062097726049716,
+    "gap_bound_a": 0.018100361048202993,
+    "gap_bound_b": 0.018094937774485766,
     "accumulator_order_source": [
      "float64",
      "bf16"
@@ -1448,8 +1448,8 @@
     "run_against_accumulator_order": "a"
    },
    "model_hopper": {
-    "gap_bound_a": 0.016448276988685947,
-    "gap_bound_b": 0.01643691791292507,
+    "gap_bound_a": 0.016478182829147595,
+    "gap_bound_b": 0.016466803100602983,
     "accumulator_order_source": [
      "float64",
      "bf16"
@@ -1526,8 +1526,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.016412426300236548,
-    "gap_bound_b": 0.01642222711554286,
+    "gap_bound_a": 0.016442266957884828,
+    "gap_bound_b": 0.016452085592785205,
     "accumulator_order_source": [
      "float64",
      "bf16"
@@ -1604,8 +1604,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.014325716491833737,
-    "gap_bound_b": 0.014332506136236945,
+    "gap_bound_a": 0.014351763146580512,
+    "gap_bound_b": 0.014358565135743141,
     "accumulator_order_source": [
      "bf16",
      "float64"
@@ -1682,8 +1682,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.015106372627521661,
-    "gap_bound_b": 0.015104524472097489,
+    "gap_bound_a": 0.015133838651474423,
+    "gap_bound_b": 0.015131987135780886,
     "accumulator_order_source": [
      "float64",
      "bf16"
@@ -1760,8 +1760,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.015783761534749297,
-    "gap_bound_b": 0.01578836459655268,
+    "gap_bound_a": 0.015812459170049798,
+    "gap_bound_b": 0.015817070601023525,
     "accumulator_order_source": [
      "float64",
      "bf16"
@@ -1838,8 +1838,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.01702322731184843,
-    "gap_bound_b": 0.017009518049871376,
+    "gap_bound_a": 0.017054178512419818,
+    "gap_bound_b": 0.017040444324609993,
     "accumulator_order_source": [
      "float64",
      "bf16"
@@ -1916,8 +1916,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.01510629019218951,
-    "gap_bound_b": 0.015107395793727949,
+    "gap_bound_a": 0.01513375606626044,
+    "gap_bound_b": 0.015134863677975582,
     "accumulator_order_source": [
      "bf16",
      "float64"
@@ -1994,8 +1994,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.01459841504162599,
-    "gap_bound_b": 0.014593598934220362,
+    "gap_bound_a": 0.014624957509966481,
+    "gap_bound_b": 0.014620132646036395,
     "accumulator_order_source": [
      "float64",
      "bf16"
@@ -2072,8 +2072,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.01574510687275778,
-    "gap_bound_b": 0.015748698921405537,
+    "gap_bound_a": 0.015773734227131263,
+    "gap_bound_b": 0.01577733280675086,
     "accumulator_order_source": [
      "ambiguous",
      "bf16"
@@ -2179,8 +2179,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.016879008351705912,
-    "gap_bound_b": 0.01688829641905264,
+    "gap_bound_a": 0.016909697337018123,
+    "gap_bound_b": 0.016919002291693564,
     "accumulator_order_source": [
      "float64",
      "bf16"
@@ -2258,8 +2258,8 @@
     "run_against_accumulator_order": "b"
    },
    "model_hopper": {
-    "gap_bound_a": 0.015983894997522743,
-    "gap_bound_b": 0.01598643802890662,
+    "gap_bound_a": 0.01601295651041437,
+    "gap_bound_b": 0.016015504165473468,
     "accumulator_order_source": [
      "bf16",
      "float64"
@@ -2336,8 +2336,8 @@
     "cls": "order_flip"
    },
    "model_hopper": {
-    "gap_bound_a": 0.015356913149501284,
-    "gap_bound_b": 0.015355077231315024,
+    "gap_bound_a": 0.015384834699883025,
+    "gap_bound_b": 0.015382995443676835,
     "accumulator_order_source": [
      "bf16",
      "bf16"
@@ -2443,8 +2443,8 @@
     "cls": "accumulator_ambiguous"
    },
    "model_hopper": {
-    "gap_bound_a": 0.016259328015064762,
-    "gap_bound_b": 0.016256140233943676,
+    "gap_bound_a": 0.01628889031329008,
+    "gap_bound_b": 0.01628569673622613,
     "accumulator_order_source": [
      "bf16",
      "ambiguous"
@@ -2550,8 +2550,8 @@
     "cls": "order_flip"
    },
    "model_hopper": {
-    "gap_bound_a": 0.015157788227239625,
-    "gap_bound_b": 0.015154061438984704,
+    "gap_bound_a": 0.015185347733733047,
+    "gap_bound_b": 0.01518161416952615,
     "accumulator_order_source": [
      "bf16",
      "bf16"

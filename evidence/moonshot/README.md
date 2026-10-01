@@ -4,9 +4,10 @@ Status: Phase 1 in progress. Measured results so far are single runs; every row 
 *pending* is queued on the shared GPU (FIFO lock) and will replace the placeholder.
 
 Setup for everything here: Qwen/Qwen3.5-4B @ `851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a` on one
-GH200 (96 GB HBM3, sm_90, aarch64), SGLang `bd66ce343e` plus the engine/moonshot patches
-(`engine/sglang/patches/moonshot/0001-0007`, branch head `233fe67ede`; each patch is off
-unless its flag or environment variable is set), FlashInfer attention, CUDA graphs and the
+GH200 (96 GB HBM3, sm_90, aarch64), SGLang `bd66ce343e` plus engine/moonshot patches from
+`engine/sglang/patches/moonshot/` (each patch is off unless its flag or environment variable
+is set; section 4 gives the patch set and commits each file was produced with), FlashInfer
+attention, CUDA graphs and the
 overlap scheduler on, greedy decoding. Serving numbers come from the bench workstream's
 harness (`bench.sweep`, `bench/` on main: aiperf 0.13.0, workload
 `mixed-v2/confirm.jsonl` sha256 `b65a50e4...`, OSL 512 fixed, thinking on). Labels:
@@ -173,11 +174,13 @@ the same token on a copy with a forced flush, so the reconstructed state is writ
 and compared at every step, not only at flushes. Result: **0 of 201,326,592 state words
 and 0 of 1,572,864 output words differ** at ring length 4 and 16, and at layer 20
 (`gdn_exact_replay_check_L4.json`, `_L16.json`, `_L4_layer20.json`;
-`tests/test_gdn_exact_replay.py`: 3 passed). This is a kernel-level result on synthetic
+`tests/test_gdn_exact_replay.py`: its 3 cases at the time passed in the same job). This is
+a kernel-level result on synthetic
 activations; the end-to-end bitwise probe (greedy tokens and top-20 logprobs at concurrency
-1 through the server) has not run yet: its first attempt failed before serving because the
-arm's 640-slot default survived radix-off (`exact_replay_e2e` inside run_p4_timed.sh), and
-it is queued again in run_p4b.sh. SGLang's ReplaySSM run on the same inputs
+1 through the server) has not run yet: its first attempt, in the same job (job B in
+section 4), failed before serving. Its servers were launched with the radix cache off but
+still 640 mamba slots at `--mem-fraction-static 0.25`, and reported that the loaded weights
+left no GPU memory for the KV cache. It is queued again in run_p4b.sh. SGLang's ReplaySSM run on the same inputs
 differs in 465,102 output words and in nearly every state word at a flush (largest state
 deviation 0.38% of the state's largest entry), confirming it is an approximation.
 
@@ -199,7 +202,7 @@ claim was >= 1.10x; the served paired A/B is queued. The first attempt, with
 `sglang.benchmark.one_batch`, aborted in both arms (base r0-r2 and exact_replay_l4 r0-r2):
 a single 262,144-token prefill hits an illegal memory access in
 `fused_qk_gemma_rmsnorm_rope_gate`. Both arms ran on the patched engine (patches
-0001-0009, exact replay off in the base arm); it has not been tried on stock `bd66ce343e`.
+0001-0008, engine `1101be8c5f`, exact replay off in the base arm); it has not been tried on stock `bd66ce343e`.
 The A/B now runs through the server with chunked prefill (run_p4b.sh).
 
 **Analysis of the served A/B, declared on 2026-10-01 at 07:12 UTC, before the run started**
@@ -214,7 +217,8 @@ with this declaration):
   `make_long_prompts.py` from mixed-v2 confirm and warm-up): `long2048.jsonl` `db376fa3aadf75a30933a649b5ded1dfcafac8289b8e2aed1dde7201afd2659c`
   (512 prompts, 91 distinct texts, templated length 2,046-2,048), warm-up pool `long2048_warmup.jsonl`
   `b4b5b4e43b53f3c64083263113904868cccf23767aa0b3c5f1b45740c13130a6`.
-- Pools pinned identically in both arms (`p4_pools` lever): `--max-running-requests 128`,
+- Pools pinned identically in both arms (`p4_pools` lever): `--max-running-requests 129`
+  (128 in the three void attempts; running-limit amendment of 14:29 UTC, below),
   `--max-total-tokens 655360` (360,448 in the void first run, below), `--max-mamba-cache-size
   132` (128 in the two void attempts, below); each server's resolved sizes are read from its
   log.
@@ -274,6 +278,61 @@ with this declaration):
   `validate_p4_ab.py`'s pinned-pool constant reads 132 accordingly (no other validator
   change). The admission preflight is run on its own first; the full job is queued only after
   it shows 128 running in both arms.
+- Third attempt void (admission preflight 20261001T115146Z, 11:51-11:55 UTC, repo 5207b02,
+  engine c29a91692b): both arms again peaked at 127 running with one request queued, now with
+  132 mamba slots (`mamba num: 127`, 5 free) and KV usage 0.40. Neither pool was the limit.
+  The full job was not queued; nothing from this attempt is reported.
+- Cause of the 127 plateau (read from the engine source and checked against every wave of the
+  three attempts; it replaces the KV-budget and mamba-slot explanations recorded above, which
+  were never tested). Line numbers are at `bd66ce343e`; the moonshot patches do not touch the
+  lines cited. A prefill pass stops taking requests from the queue once
+  `len(adder.can_run_list) >= get_num_allocatable_reqs(running_bs)`
+  (`managers/scheduler.py:3971`), and that limit is
+  `min(max_running_requests - running_bs, req_to_token_pool.available_size())`
+  (`scheduler.py:3784-3802`). A chunked request whose tail runs in the pass is appended to
+  `can_run_list` (`managers/schedule_policy.py:1166`) and keeps the `req_to_token` row it
+  took with its first chunk (`ChunkCache.cache_unfinished_req` frees nothing,
+  `mem_cache/chunk_cache.py:82-87`; `ReqToTokenPool.alloc` reuses held rows,
+  `mem_cache/memory_pool.py:317-327`), but `running_bs` excludes it
+  (`scheduler.py:3660-3663`). It is counted twice. With M = max_running_requests, R running
+  requests and a continuing chunk (C = 1), the limit is M - R - C while the pass already holds
+  C + n requests (n new), so admission stops at R + C + n = M - C = 127 and sets
+  `batch_is_full` (`scheduler.py:3976`). The flag is cleared only when a running request finishes
+  (`scheduler.py:4193-4197`, `4268-4269`) or a prefill batch shrinks (`3702-3703`); until
+  then the pass is skipped (`3846-3849`). The comment at `scheduler.py:3865-3867` assumes the
+  chunked request's row was released between chunks, which this version does not do. P4b's
+  waves are synchronised: each AIPerf phase is one wave of 128 requests with `ignore_eos` and
+  512 output tokens, nothing finishes while the wave is admitted, and with 2,046-2,048-token
+  prompts in 8,192-token passes the last pass of every wave carried a chunk tail. In all 56
+  wave plateaus of the three attempts (12 server logs: the eight A/B arms of the first, the two
+  preflight arms of the second and third; bench's server warm-up, AIPerf's warm-up and the
+  measured waves) the last pass had C = 1 and the batch stopped at 127 with one request
+  queued, as predicted (`p4_admission_plateaus.csv`; every log has 4 or 5 plateaus). Because
+  every wave had C = 1, these logs test the prediction M - C only at C = 1 and M = 128; the
+  amended preflight below is the discriminating test. The 128th request then decoded alone
+  after the wave: in the third attempt it ended 1.8 s (dense) and 2.1 s (exact replay) after
+  the 127th, in profiling phases of 11.1 and 11.4 s. Ruled out by the same logs: the client
+  (AIPerf sent all 128; the server shows the 128th queued), the decode CUDA graphs (captured
+  up to 128), speculation (off), the KV pool (usage 0.40), the mamba slots (127 of 132) and
+  the overlap scheduler (the plateau held for whole 40-pass log windows).
+- Running-limit amendment (2026-10-01 at 14:29 UTC, before any further run): both arms
+  set `--max-running-requests 129` with the client at concurrency 128, so at most 128
+  requests are ever in the server. The limit at the last pass becomes 129 - R - 1, and the
+  wave reaches 129 - C = 128 with a chunk tail and min(129, 128) = 128 without one. The
+  amended preflight therefore predicts a peak of 128 running in both arms and no
+  single-request tail after the wave. The other pins are unchanged (655,360 KV tokens, 132
+  mamba slots, FP32 state). Side effects, from the code: the request-to-token pool has 129
+  rows; `resolve_max_num_reqs` gives min(129, 655,360 / 2, 132 / 1) = 129
+  (`mem_cache/kv_cache_configurator.py:2317-2348`; one mamba slot per request with the radix
+  cache off, `2257-2259`), so the mamba pin does not bind; the decode graph list gains a
+  batch-129 entry (`model_executor/runner/base_cuda_graph_runner.py:73-93`) that a batch of
+  128 never replays (it replays the batch-128 graph, as before). `validate_p4_ab.py`'s
+  pinned-pool constant reads 129 accordingly; `check_admission.py` and the rest of the
+  validator are unchanged. Rejected alternatives: disabling chunked prefill changes the
+  prefill schedule and, with the radix cache off, the cache class (`ChunkCache` is built only
+  with chunked prefill on, `mem_cache/registry.py:90-94`); concurrency 127 changes the declared
+  batch. The admission preflight (`run_p4_admission.sh`) runs on its own first; the full job
+  is queued only if it shows 128 running in both arms.
 - Primary metric (amended on 2026-10-01 at 08:19 and 08:22 UTC, before the run started; the first
   version named bench's `logged_gen_tps_full_batch`, which averages windows with at least
   0.9 x the peak running count, i.e. 116-128 of 128): the server's decode rate at exactly
@@ -439,6 +498,90 @@ python experiments/moonshot/token_map_coverage.py \
   ~/vp-data/moonshot/sweeps/plain/20260930-200640 \
   --out evidence/moonshot/token_map_coverage.csv
 ```
+
+The other files came from two exclusive-lock jobs. Each committed JSON is a byte-identical
+copy of the job's raw output, and both CSVs regenerate byte for byte from the raw outputs
+with `summarise.py` at `e47f0e5` (checked on 2026-10-01; a later version may add columns).
+
+Job B (2026-10-01, about 01:40-02:19 UTC; repo `167bf99`, engine `1101be8c5f` =
+`bd66ce343e` + moonshot patches 0001-0008; the bench launch records of its servers carry both
+commits and no modified files). Kernel checks and kernel bench (2c), host-gap levers (2d) and
+P7 (2e), from the repository root with `PYTHONPATH=~/sglang-wt/moonshot/python`:
+
+```sh
+python experiments/moonshot/gdn_exact_replay_check.py check --batch 8 --steps 48 --ring 4 \
+  --force-rate 0.1 --out ~/vp-data/moonshot/exact_replay/check_L4.json
+python experiments/moonshot/gdn_exact_replay_check.py check --batch 8 --steps 48 --ring 16 \
+  --force-rate 0.1 --out ~/vp-data/moonshot/exact_replay/check_L16.json
+python experiments/moonshot/gdn_exact_replay_check.py check --batch 8 --steps 48 --ring 4 \
+  --layer 20 --seed 3 --out ~/vp-data/moonshot/exact_replay/check_L4_layer20.json
+python experiments/moonshot/gdn_exact_replay_check.py bench --batches 32 128 256 \
+  --rings 2 4 8 16 --out ~/vp-data/moonshot/exact_replay/bench.json
+PYTHONPATH=~/sglang-wt/moonshot/python:$PWD python experiments/moonshot/lever_sweep.py \
+  --out ~/vp-data/moonshot/sweeps_host --concurrency 1 4 --min-requests 16 --stream-interval 4 \
+  --configs mtp mtp+draft_attn_triton mtp+attn_triton mtp+plan_stream+glue_graph
+python experiments/moonshot/summarise.py sweeps ~/vp-data/moonshot/sweeps_host \
+  --baseline mtp --out evidence/moonshot/host_levers.csv
+python experiments/moonshot/gdn_fast_verify_check.py check --block-sizes 2 4 8 16 --blocks 4 \
+  --out ~/vp-data/moonshot/p7/fast_verify_check.json
+python experiments/moonshot/gdn_fast_verify_check.py bench --widths 4 16 64 128 256 \
+  --requests 1 --out ~/vp-data/moonshot/p7/verify_width_bench.json
+```
+
+The JSONs were copied from `exact_replay/check_L4.json`, `check_L16.json`,
+`check_L4_layer20.json` and `bench.json` to `gdn_exact_replay_check_L4.json`, `_L16.json`,
+`_L4_layer20.json` and `gdn_exact_replay_bench.json`, and from `p7/` with a `p7_` prefix.
+The commits of the kernel and P7 steps are inferred from the same job (neither tree changed
+during it). The plan-stream arm of the host sweep failed (2d) and has no row. Two generators
+have changed since. `gdn_exact_replay_check.py` now exits non-zero when a check is not
+bit-identical; its output is unchanged. `gdn_fast_verify_check.py bench` now also times
+FlashInfer's MTP verify and writes `flashinfer_*` fields, so rerunning it at main adds fields
+to `p7_verify_width_bench.json`. The same job's one-batch A/B (`decode_ceiling_sweep.py
+--configs base exact_replay_l4 --batch-sizes 128 --input-len 2048 --output-len 512 --repeats 3
+--timeout 420 --mem-fraction-static 0.60`) is the aborted first P4 attempt in 2c; it wrote no
+committed file.
+
+Job A (2026-09-30, 19:25-19:36 UTC; engine `d3a1d447cd` = `bd66ce343e` + patches 0001-0006,
+inferred from the engine's reflog): `decode_ceiling_try1.csv`. The repository commit it ran
+at was later rebased; its `decode_ceiling_sweep.py` is identical to the one at `751a59a` on
+main. Later versions add configurations, `--repeats` and a log-size cap, and route the FP8
+configurations to SGLang's Triton FP8 kernel.
+
+```sh
+SGLANG_WORKTREE=~/sglang-wt/moonshot PYTHONPATH=~/sglang-wt/moonshot/python \
+  python experiments/moonshot/decode_ceiling_sweep.py --out ~/vp-data/moonshot/decode_ceiling \
+  --configs base bf16_state fp16_state replayssm replayssm_fp16_state fp8_weights fp8_kv stack_lossy \
+  --batch-sizes 1 8 32 128 256 512 1024 --input-len 128 --output-len 32 --timeout 480
+python experiments/moonshot/summarise.py ceiling ~/vp-data/moonshot/decode_ceiling_try1 \
+  --out evidence/moonshot/decode_ceiling_try1.csv
+```
+
+The sweep was stopped by hand during `fp8_kv` after `fp8_weights` hit the aarch64 CUTLASS FP8
+abort loop, so `stack_lossy` never ran and `fp8_weights` has no rows. Every configuration ran
+out of memory at B = 1024 (the ReplaySSM ones at B = 512), so the CSV is parsed from the
+logged median decode latencies. The output directory was renamed to `decode_ceiling_try1`
+after the run, before the summary step.
+
+`p4_admission_plateaus.csv` (2c, the 127 plateau) is read from the server logs of the three
+void P4b attempts on CPU. It was first written at commit 591d060; the command below, with the
+declared plans (`--expect`), needs `admission_plateaus.py` from commit fd8f028 on and
+regenerates it byte for byte:
+
+```sh
+D=plain+no_radix+p4_pools; E=$D+exact_replay
+python experiments/moonshot/admission_plateaus.py \
+  ~/vp-data/moonshot/p4_ab_20261001T082738Z \
+  ~/vp-data/moonshot/p4_admission_20261001T104311Z \
+  ~/vp-data/moonshot/p4_admission_20261001T115146Z \
+  --expect "p4_ab_20261001T082738Z=$D#r1,$E#r1,$E#r2,$D#r2,$D#r3,$E#r3,$E#r4,$D#r4" \
+  --expect "p4_admission_20261001T104311Z=$D,$E" \
+  --expect "p4_admission_20261001T115146Z=$D,$E" \
+  --min-plateaus 4 --csv evidence/moonshot/p4_admission_plateaus.csv
+```
+
+The `--expect` lists are the configurations each run was launched with, in order (the A/B in
+`run_p4b.sh`'s declared A B B A order, the preflights in `run_p4_admission.sh`); the script
+fails unless each run's record and server logs match them exactly.
 
 Lever definitions (flags and environment per lever, lossy labels, conflicts):
 `experiments/moonshot/levers.py`.

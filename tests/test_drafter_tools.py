@@ -266,3 +266,21 @@ def test_phase_summary_splits_client_runs_at_gaps() -> None:
     assert [len(run) for run in runs] == [60, 60]
     # The second run's drain through bs = 8 stays out of the first run.
     assert sum(1 for r in runs[0] if r['bs'] == 8) == 60
+
+
+def test_ab_summary_running_limit_is_checked_per_group(tmp_path: Path) -> None:
+    summary = load('ab_timing_summary')
+    for label, limit in (('b16-stock-r1', 64), ('b16-fold-r1', 64), ('b8-stock-r1', 128)):
+        run = tmp_path / label / '20261001-000000'
+        (run / 'server').mkdir(parents=True)
+        (run / 'r0' / 'c001').mkdir(parents=True)
+        (run / 'sweep.json').write_text('{}')
+        info = {'internal_states': [{'effective_max_running_requests_per_dp': limit}]}
+        (run / 'server' / 'server_info.json').write_text(json.dumps(info))
+        point = {'concurrency': 1, 'completed': 64, 'requests': 64, 'y': 1.0, 'x_e2e': 1.0}
+        (run / 'r0' / 'c001' / 'point.json').write_text(json.dumps(point))
+    out = tmp_path / 'summary.json'
+    sys.argv = ['ab_timing_summary.py', str(tmp_path), '--base', 'stock', '--test', 'fold']
+    sys.argv += ['--out', str(out)]
+    summary.main()
+    assert json.loads(out.read_text())['running_limit_match'] == {'b16': True, 'b8': True}

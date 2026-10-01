@@ -52,7 +52,10 @@
    "effective_max_running_requests_per_dp": 128
   }
  },
- "running_limit_match": false,
+ "running_limit_match": {
+  "b16": true,
+  "b8": true
+ },
  "comparison": [
   {
    "group": "b16",
