@@ -4,7 +4,7 @@
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
-source "$HOME/verified-progress/scripts/sglang_env.sh"
+source "$here/../../scripts/sglang_env.sh"
 prompts="${1:-$HOME/vp-data/drafter/data/prompts-v2.jsonl}"
 out="${2:-$HOME/vp-data/drafter/data/targets-v2.jsonl}"
 log_dir="$HOME/vp-data/drafter/runs/gen-$(date +%Y%m%d-%H%M%S)"

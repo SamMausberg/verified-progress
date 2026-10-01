@@ -8,7 +8,7 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export SGLANG_WORKTREE="${SGLANG_WORKTREE:-$HOME/sglang-wt/drafter}"
 # shellcheck source=/dev/null
-source "$HOME/verified-progress/scripts/sglang_env.sh"
+source "$here/../../scripts/sglang_env.sh"
 out="${1:-$HOME/vp-data/drafter/replay-check}"
 for conc in 1 8; do
   for flag in off on; do

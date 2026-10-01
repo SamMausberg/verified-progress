@@ -7,7 +7,7 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 unset SGLANG_WORKTREE
 # shellcheck source=/dev/null
-source "$HOME/verified-progress/scripts/sglang_env.sh"
+source "$here/../../scripts/sglang_env.sh"
 label="$1"
 ckpt="$2"
 shift 2
