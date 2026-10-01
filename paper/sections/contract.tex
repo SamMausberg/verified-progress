@@ -56,17 +56,17 @@ Table~\ref{tab:assumptions} lists the assumptions behind the agreement claims: f
 \begin{table}[t]
 \caption{Numerical assumptions, in short (in full: Table~\ref{tab:assumptions-full}). ``Pin'': read from SGLang's code at \sourcepin{} with PyTorch 2.13.}\label{tab:assumptions}
 \vskip 0.05in
-\centering\scriptsize\renewcommand{\arraystretch}{1.08}
+\centering\scriptsize
 \begin{tabularx}{\columnwidth}{@{}Y>{\raggedright\arraybackslash}p{3.05cm}@{}}
 \toprule
 Assumption & Status\\\midrule
-Head weights and inputs are BF16, normal or zero; every product is exact in FP32, underflow being charged to the floor $\eta$ & Exact for normal operands\\
-The stock head rounds its FP32 accumulator to BF16 (nearest, ties to even); \code{torch.argmax} returns the first maximal index & Pin\\
-The stock kernel's error is at most $\gamma\sum_j|w_{ij}h_j|+\eta$ at every served shape, $\gamma$ from the \modelcons{} or the \modelhopper; no split-$K$ partial sums in BF16 & Assumed; consistent with all replayed positions and with the FP32-output kernel's error, 58 times inside the \modelhopper{} \ev{kernel-error}\\
-Agreement is checked at the same batch shape and configuration & Required (Section~\ref{sec:same-shape})\\
-For the per-position fallback: a position's stock logits do not depend on the other positions or on which entries are present & Measured at 20 batch sizes; re-checked at start-up \ev{kernel-invariance}\\
-The int8 kernel computes the modelled arithmetic & Checked per compiled variant at start-up and by runtime probes, not proved \ev{kernel-impl}; int8 TMA tiles with a 64-byte box gave wrong products under Triton 3.7.1 and are refused \ev{kernel-tma}\\
-Seeded noise is a function of (seed, position, token), with no top-$k$ or top-$p$; the seeded mode's GEMM is covered by the \modelcons{} only & Pin; matched on 60,000 replayed positions \ev{kernel-seeded}\\
+Head weights and inputs are BF16, normal or zero; every product is exact in FP32, underflow being charged to the floor $\eta$ & Exact for normal operands\\\addlinespace[2pt]
+The stock head rounds its FP32 accumulator to BF16 (nearest, ties to even); \code{torch.argmax} returns the first maximal index & Pin\\\addlinespace[2pt]
+The stock kernel's error is at most $\gamma\sum_j|w_{ij}h_j|+\eta$ at every served shape, $\gamma$ from the \modelcons{} or the \modelhopper; no split-$K$ partial sums in BF16 & Assumed; consistent with all replayed positions and with the FP32-output kernel's error, 58 times inside the \modelhopper{} \ev{kernel-error}\\\addlinespace[2pt]
+Agreement is checked at the same batch shape and configuration & Required (Section~\ref{sec:same-shape})\\\addlinespace[2pt]
+For the per-position fallback: a position's stock logits do not depend on the other positions or on which entries are present & Measured at 20 batch sizes; re-checked at start-up \ev{kernel-invariance}\\\addlinespace[2pt]
+The int8 kernel computes the modelled arithmetic & Checked per compiled variant at start-up and by runtime probes, not proved \ev{kernel-impl}; int8 TMA tiles with a 64-byte box gave wrong products under Triton 3.7.1 and are refused \ev{kernel-tma}\\\addlinespace[2pt]
+Seeded noise is a function of (seed, position, token), with no top-$k$ or top-$p$; the seeded mode's GEMM is covered by the \modelcons{} only & Pin; matched on 60,000 replayed positions \ev{kernel-seeded}\\\addlinespace[2pt]
 Replay evaluates real logits in FP64; transport is analysed in real arithmetic & Replay convention\\
 \bottomrule
 \end{tabularx}

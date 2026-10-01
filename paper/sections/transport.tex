@@ -44,21 +44,20 @@ For the public DFlash drafter at block size 16, over 40,000 held-out pairs, $\rh
 \paragraph{Why the drift is large} Two properties of the DFlash drafter set its $\rho$ (Figure~\ref{fig:rho}a) \ev{stats-dflash}. Its final RMSNorm has unit gain, so its head input always has norm $\sqrt{2{,}560}$, a third of the target's, and the triangle inequality alone gives $\rho\ge0.68$; the angle between the two is large as well, so even the best scalar rescaling of $h^d$ would leave $\rho$ near 0.91. The drafter is trained to rank the right token first under $Wh^d$, not to reproduce the target's head input, and its scores are softer (median top-token probability 0.17 against 0.69). Nor does the drift hide in directions the head ignores: after removing each position's mean logit, $\norm{W\Delta}_2/\norm{Wh^t}_2$ has a median of 0.85, and the largest realized transport error in a tile is a median 77 times the largest realized int8 error \ev{rho}. The MTP layer's head input is slightly longer than the target's (median norms 176 and 160), so its drift is mainly one of direction \ev{transport-mtp}.
 
 \begin{table}[t]
-\caption{Transport on held-out draft pairs over every certified bound family and tiling tested (contiguous, random and $k$-means tiles of 64 to 1,024 entries): single values are the best case, ranges span the tilings (in full: Table~\ref{tab:transport-full}). ``Skipped'': mean share of the vocabulary a greedy verifier skips. Oracle radii are the realized per-tile deviations, which no certified bound can undercut. $P_?$: mean probability, over proposals at $T=1$, that the sampled acceptance test stays undecided. Measured \ev{transport,transport-mtp}.}\label{tab:transport}
+\caption{Transport on held-out draft pairs (DFlash-4B: 4,020 pairs from 110 prompts; MTP-4B: 16,016 from 160), over every certified bound family and tiling tested (contiguous, random and $k$-means tiles of 64 to 1,024 entries). Single values are the best case; ranges span the tilings (in full: Table~\ref{tab:transport-full}). ``Skipped'': mean share of the vocabulary a greedy verifier skips. Oracle radii, the realized per-tile deviations, bound what any certified radius could achieve. $P_?$: mean probability, over proposals at $T=1$, that the sampled acceptance test stays undecided. Measured \ev{transport,transport-mtp}.}\label{tab:transport}
 \vskip 0.05in
-\centering\footnotesize\setlength{\tabcolsep}{4pt}
-\begin{tabular}{@{}lrr@{}}
+\centering\footnotesize
+\begin{tabular*}{\columnwidth}{@{}l@{\extracolsep{\fill}}rr@{}}
 \toprule
 & DFlash-4B & MTP-4B\\\midrule
-Pairs (prompts) & 4,020 (110) & 16,016 (160)\\
-Skipped by certified transport & 0.59\% & 0.64\%\\
-Skipped by the static screen (no draft) & 0.58\% & 0.64\%\\
-Skipped with oracle radii & 68--89\% & 86.8--98.5\%\\
-Vocabulary a real verify batch must read & $\ge$99.48\% & $\ge$99.4\%\\
+Skipped: certified transport & 0.59\% & 0.64\%\\
+Skipped: static screen (no draft) & 0.58\% & 0.64\%\\
+Skipped: oracle radii & 68--89\% & 86.8--98.5\%\\
+Read by a real verify batch & $\ge$99.48\% & $\ge$99.4\%\\
 Partition width, median (nats) & 133--244 & 146--268\\
 Sampled test undecided, $P_?$ & $\ge$0.964 & $\ge$0.998\\
 \bottomrule
-\end{tabular}
+\end{tabular*}
 \end{table}
 
 \paragraph{What certification achieves} Table~\ref{tab:transport} applies every certified bound family of Appendix~\ref{app:transport}, and their elementwise minimum, to contiguous, random and $k$-means tiles. For greedy verification the best of them skips at most 0.59\% of the vocabulary on DFlash-4B pairs and 0.64\% on MTP-4B pairs (0.65\% with a radius per entry), no more than the static screen, which ignores the draft \ev{transport,transport-mtp}. Oracle radii would skip most of the vocabulary for one pair, but a verifier that shares weight reads across a batch must read every tile that any of its positions needs, which over the capture's real verify batches is nearly all of it. Sampled acceptance stays undecided with probability 0.964 or more. The cause is geometric: the head inputs differ by order one, not one part in a hundred, while on the same DFlash-4B states the int8 copy needs 1.57 candidates per decision (Section~\ref{sec:candidates}). Only an extrapolation, not a measured drafter, shows how far a drafter would have to move: with the measured drift scaled down tenfold, greedy transport would skip 49\% (DFlash-4B) and 80\% (MTP-4B) of the vocabulary (Appendix~\ref{app:transport-scaling}) \ev{transport,transport-mtp}.
