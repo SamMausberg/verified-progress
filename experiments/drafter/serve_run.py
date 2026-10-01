@@ -109,6 +109,24 @@ class StartupLock:
         return process.wait(timeout=60)
 
 
+POOL_KEYS = (
+    'max_total_num_tokens',
+    'max_mamba_cache_size',
+    'max_running_requests',
+    'effective_max_running_requests_per_dp',
+    'mamba_ssm_dtype',
+    'disable_radix_cache',
+)
+
+
+def resolved_pools(server_info: Path) -> dict[str, object]:
+    """Pool sizes and running limits from /server_info (top level and internal state)."""
+    info = json.loads(server_info.read_text())
+    internal = info.get('internal_states') or [{}]
+    merged = {**info, **(internal[0] if isinstance(internal, list) else internal)}
+    return {key: merged.get(key) for key in POOL_KEYS}
+
+
 def stop(server: subprocess.Popen) -> None:
     """Stop the server's process group (it may already have exited)."""
     try:
@@ -266,6 +284,11 @@ def main() -> None:
             f'http://127.0.0.1:{args.port}/server_info', timeout=30
         ) as response:
             (args.out / 'server_info.json').write_bytes(response.read())
+        # The pools SGLang resolved (from free memory unless pinned) and the running
+        # limit they imply: two arms are comparable only if these match.
+        launch['pools'] = resolved_pools(args.out / 'server_info.json')
+        (args.out / 'launch.json').write_text(json.dumps(launch, indent=2) + '\n')
+        print(f'[serve_run] pools {launch["pools"]}', flush=True)
         # Foreign CPU load while the clients run (bench.hostload: everything outside
         # this process tree, i.e. outside the server and the clients); a mean above
         # two cores marks the run as contended.

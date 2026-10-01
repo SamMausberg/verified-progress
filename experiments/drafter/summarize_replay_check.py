@@ -6,8 +6,9 @@ with the stock arm), writes one row per (drafter, concurrency, arm): sequences,
 sequences bitwise identical to stock (tokens and top-5 logprobs at every
 position), sequences whose tokens differ, first-divergence classes (#37's
 convention), the earliest position where logprobs first differ, tokens per
-verify cycle, and the server's foreign CPU load. Also copies each run's launch
-record.
+verify cycle, the server's foreign CPU load and the pools it resolved (KV
+tokens, mamba slots, effective running limit: arms are comparable only if these
+match). Also copies each run's launch record.
 
     python experiments/drafter/summarize_replay_check.py \
         --run dflash:~/vp-data/drafter/replay-check --run mtp:~/vp-data/drafter/replay-check-mtp \
@@ -22,6 +23,18 @@ import json
 import re
 from pathlib import Path
 from typing import Any
+
+
+def pools(server_info: Path) -> dict[str, Any]:
+    """KV tokens, mamba slots and the running limit the server resolved."""
+    info = json.loads(server_info.read_text())
+    internal = info.get('internal_states') or [{}]
+    merged = {**info, **(internal[0] if isinstance(internal, list) else internal)}
+    return {
+        'kv_tokens': merged.get('max_total_num_tokens'),
+        'mamba_slots': merged.get('max_mamba_cache_size'),
+        'running_limit': merged.get('effective_max_running_requests_per_dp'),
+    }
 
 
 def main() -> None:
@@ -57,6 +70,7 @@ def main() -> None:
                 'tau_pooled': summary['accept_length'],
                 'tau_mean_per_request': summary.get('accept_length_mean_per_request'),
                 'foreign_cpu_cores_mean': cpu.get('foreign_cores_mean'),
+                **pools(run / 'server_info.json'),
             }
             equality = root / f'{run.name}-equality.json'
             if equality.exists():
