@@ -223,6 +223,7 @@ Progress per verify pass & MTP and DFlash drafting, deeper chains, trees where t
 & Relaxed greedy acceptance within $g$ logits & lossy & \pend{moonshot-patches}\\
 Bytes per verify pass & Certified int8 head (Section~\ref{sec:selfevidence}) & exact & Head alone (best mode, \modelcons{}): 0.62--0.69 of the stock chain's time up to $M=16$, slower from 128~\ev{kernel-path}; served \pend{bench-cert}\\
 & Replayed verification of the recurrent state & exact up to rounding$^\ast$ & MTP, three steps: $0.86\times$ plain decoding at $c=128$ on the confirmation split, against $0.68\times$ with snapshot verification (one session)~\ev{bench-frontier}; outputs rounding-level against stock MTP~\ev{bench-equality}; no detectable GSM8K loss~\ev{bench-quality}; beyond $c=128$ \pend{moonshot-state}\\
+& Fold-every-commit verification for DFlash & exact & Bitwise with matched pools; served, one session: $+$6--12\% at $c=8$--32, $-$3.2\% at $c=1$~\ev{drafter-fold}\\
 & FP8 W8A8 weights, FP8 KV; int4 target with a matched drafter~\cite{nota2026} & lossy & FP8 weights: no consistent gain; FP8 KV: no gain (single runs); int4 \pend{moonshot-repeat}\\
 Bytes per draft step & Hot-vocabulary or low-precision draft head & exact & \pend{moonshot-patches}\\
 Concurrency and state & One state slot per request (lifts the 133-request cap) & exact & \pend{bench-capacity}\\
