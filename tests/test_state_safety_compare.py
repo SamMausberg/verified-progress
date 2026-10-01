@@ -105,3 +105,24 @@ def test_commit_length_homogeneity_with_no_divergences():
         'divergences_per_fragile': 0.0,
     }
     assert 'not_applicable' in res['homogeneity_chi2']
+
+
+def test_first_verify_cycle_is_not_counted_as_commit_length_one():
+    from cycles import analyse, by_commit_length
+
+    top = [[-0.6, 1], [-0.7, 2]]  # fragile everywhere (top-2 gap 0.1)
+    ref = {'p': {'output_ids': [1, 1, 1, 1, 1, 1], 'top_logprobs': [top] * 6}}
+    # Chunks: the prefill token, a first verify cycle of 3, then a cycle of 2.
+    spec = {
+        'p': {
+            'output_ids': [1, 1, 1, 1, 1, 1],
+            'top_logprobs': [top] * 6,
+            'chunks': [[1, None], [3, None], [2, None]],
+            'spec_verify_ct': 2,
+        }
+    }
+    buckets = analyse(ref, spec)['buckets']
+    assert set(buckets) == {'prefill_token', 'prefill/0', 'prefill/1', 'prefill/2', '3/0', '3/1'}
+    res = by_commit_length(buckets)
+    assert set(res['by_length']) == {'3'}
+    assert res['first_cycle_after_prefill']['fragile'] == 3

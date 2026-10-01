@@ -1,40 +1,40 @@
 {
  "buckets": {
   "1/0": {
-   "positions": 2040,
-   "fragile": 157,
-   "divergences": 12,
+   "positions": 1720,
+   "fragile": 150,
+   "divergences": 10,
    "drift_max": 0.24218082427978516,
-   "drift_mean": 0.031389433457487244,
-   "divergences_per_1k": 5.882352941176471,
-   "divergences_per_fragile": 0.07643312101910828
+   "drift_mean": 0.03393900476450209,
+   "divergences_per_1k": 5.813953488372093,
+   "divergences_per_fragile": 0.06666666666666667
   },
   "1/1": {
-   "positions": 1593,
-   "fragile": 120,
+   "positions": 1317,
+   "fragile": 105,
    "divergences": 15,
    "drift_max": 0.4154059886932373,
-   "drift_mean": 0.028222739652971743,
-   "divergences_per_1k": 9.416195856873824,
-   "divergences_per_fragile": 0.125
+   "drift_mean": 0.031022354924637074,
+   "divergences_per_1k": 11.389521640091116,
+   "divergences_per_fragile": 0.14285714285714285
   },
   "1/2": {
-   "positions": 1173,
-   "fragile": 72,
-   "divergences": 6,
+   "positions": 936,
+   "fragile": 64,
+   "divergences": 5,
    "drift_max": 0.24585485458374023,
-   "drift_mean": 0.024958190403714817,
-   "divergences_per_1k": 5.115089514066496,
-   "divergences_per_fragile": 0.08333333333333333
+   "drift_mean": 0.028395825914190802,
+   "divergences_per_1k": 5.3418803418803416,
+   "divergences_per_fragile": 0.078125
   },
   "1/3": {
-   "positions": 833,
-   "fragile": 44,
+   "positions": 636,
+   "fragile": 42,
    "divergences": 2,
    "drift_max": 0.19753360748291016,
-   "drift_mean": 0.01968083586383697,
-   "divergences_per_1k": 2.4009603841536613,
-   "divergences_per_fragile": 0.045454545454545456
+   "drift_mean": 0.023477214270816477,
+   "divergences_per_1k": 3.1446540880503147,
+   "divergences_per_fragile": 0.047619047619047616
   },
   "2/0": {
    "positions": 2089,
@@ -144,6 +144,42 @@
    "divergences_per_1k": 2.459016393442623,
    "divergences_per_fragile": 0.09868421052631579
   },
+  "prefill/0": {
+   "positions": 320,
+   "fragile": 7,
+   "divergences": 2,
+   "drift_max": 0.19206881523132324,
+   "drift_mean": 0.017679474542407387,
+   "divergences_per_1k": 6.25,
+   "divergences_per_fragile": 0.2857142857142857
+  },
+  "prefill/1": {
+   "positions": 276,
+   "fragile": 15,
+   "divergences": 0,
+   "drift_max": 0.24265408515930176,
+   "drift_mean": 0.015015858914898343,
+   "divergences_per_1k": 0.0,
+   "divergences_per_fragile": 0.0
+  },
+  "prefill/2": {
+   "positions": 237,
+   "fragile": 8,
+   "divergences": 1,
+   "drift_max": 0.1883857250213623,
+   "drift_mean": 0.011397009639930318,
+   "divergences_per_1k": 4.219409282700422,
+   "divergences_per_fragile": 0.125
+  },
+  "prefill/3": {
+   "positions": 197,
+   "fragile": 2,
+   "divergences": 0,
+   "drift_max": 0.1219937801361084,
+   "drift_mean": 0.0074630495185323675,
+   "divergences_per_1k": 0.0,
+   "divergences_per_fragile": 0.0
+  },
   "prefill_token": {
    "positions": 320,
    "fragile": 34,
@@ -160,9 +196,9 @@
  "by_commit_length": {
   "by_length": {
    "1": {
-    "divergences": 35,
-    "fragile": 393,
-    "divergences_per_fragile": 0.0891
+    "divergences": 32,
+    "fragile": 361,
+    "divergences_per_fragile": 0.0886
    },
    "2": {
     "divergences": 39,
@@ -180,11 +216,16 @@
     "divergences_per_fragile": 0.079
    }
   },
+  "first_cycle_after_prefill": {
+   "divergences": 3,
+   "fragile": 32,
+   "divergences_per_fragile": 0.0938
+  },
   "homogeneity_chi2": {
    "lengths": 4,
-   "chi2": 1.345,
+   "chi2": 1.333,
    "dof": 3,
-   "p": 0.7185
+   "p": 0.7213
   }
  }
 }

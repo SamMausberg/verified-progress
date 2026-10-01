@@ -85,7 +85,8 @@ def analyse(run_a: dict[str, Any], run_b: dict[str, Any]) -> dict[str, Any]:
                     bk['drift_sum'] += dr
                     bk['drift_max'] = max(bk['drift_max'], dr)
             pos += commit_len
-            prev = str(commit_len)
+            # The cycle after the prefill token has no previous verify cycle.
+            prev = str(commit_len) if ci > 0 else 'prefill'
             if pos > last:
                 break
     for bk in buckets.values():
@@ -104,10 +105,16 @@ def by_commit_length(buckets: dict[str, dict[str, Any]]) -> dict[str, Any]:
     asks whether the observed rates are consistent with one common rate.
     """
     rows: dict[str, list[int]] = {}
+    after_prefill = [0, 0]
     for key, v in buckets.items():
-        if '/' not in key:
-            continue  # the prefill token has no previous cycle
         length = key.split('/')[0]
+        if not length.isdigit():
+            # The prefill token and the first verify cycle have no previous verify
+            # cycle, so they belong to no commit length.
+            if length == 'prefill' and '/' in key:
+                after_prefill[0] += v['divergences']
+                after_prefill[1] += v['fragile']
+            continue
         r = rows.setdefault(length, [0, 0])
         r[0] += v['divergences']
         r[1] += v['fragile']
@@ -130,7 +137,13 @@ def by_commit_length(buckets: dict[str, dict[str, Any]]) -> dict[str, Any]:
 
         chi2, p, dof, _ = chi2_contingency(used)
         test.update(chi2=round(float(chi2), 3), dof=int(dof), p=round(float(p), 4))
-    return {'by_length': table, 'homogeneity_chi2': test}
+    d, f = after_prefill
+    first_cycle = {
+        'divergences': d,
+        'fragile': f,
+        'divergences_per_fragile': round(d / f, 4) if f else None,
+    }
+    return {'by_length': table, 'first_cycle_after_prefill': first_cycle, 'homogeneity_chi2': test}
 
 
 def main() -> None:

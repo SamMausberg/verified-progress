@@ -297,17 +297,22 @@ Setup section. Rates are per 1,000 compared tokens
   reference's top-2 gap is at most 0.25 nats), by the previous cycle's commit length,
   including full acceptance (`cycles_*_pinned.json`):
 
-  | Configuration | Commit length 1, 2, 3, ... (full acceptance last) | All |
-  |---|---|---|
-  | MTP steps 1 | 0.092, 0.085 | 0.086 |
-  | MTP steps 3 | 0.089, 0.098, 0.089, 0.079 | 0.086 |
-  | MTP steps 5 | 0.074, 0.074, 0.097, 0.061, 0.080, 0.082 | 0.079 |
-  | MTP tree | 0.100, 0.075, 0.063, 0.090 | 0.083 |
+  | Configuration | Commit length 1, 2, 3, ... (full acceptance last) | All lengths | First cycle after prefill |
+  |---|---|---|---|
+  | MTP steps 1 | 0.092, 0.085 | 0.086 | 2/22 |
+  | MTP steps 3 | 0.089, 0.098, 0.088, 0.079 | 0.086 | 3/32 |
+  | MTP steps 5 | 0.064, 0.074, 0.097, 0.061, 0.080, 0.082 | 0.077 | 7/40 |
+  | MTP tree | 0.085, 0.075, 0.063, 0.090 | 0.081 | 6/33 |
 
   A state error at one rejection position (a wrong rollback for one accept length)
   would raise that position's rate. No length stands out. The rates are compatible
-  with one common rate: chi-square p = 0.74, 0.72, 0.71 and 0.27 for steps 1, 3, 5 and
-  the tree (`by_commit_length.homogeneity_chi2` in each file). That is a failure to
+  with one common rate: chi-square p = 0.75, 0.72, 0.54 and 0.38 for steps 1, 3, 5 and
+  the tree (`by_commit_length.homogeneity_chi2` in each file).
+- The first verify cycle after the prefill follows no earlier cycle, so it is counted
+  separately (`first_cycle_after_prefill`) and is not part of the test. Its rate is
+  higher for steps 5 and the tree (7/40 and 6/33 fragile positions), but the counts
+  are small and untested. Every prompt contributes this cycle, while later cycles only
+  count prompts that have not yet diverged, so the groups are not alike. That is a failure to
   reject, not a proof of equal rates. The test also treats positions as independent,
   although they cluster by prompt and a prompt's positions stop at its first
   divergence. No prompt-clustered analysis or bound on a per-length excess rate has
