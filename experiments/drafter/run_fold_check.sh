@@ -7,7 +7,8 @@
 # DFlash x4 and MTP s3 x8 with a stock rerun), then DFlash with decode-only ReplaySSM
 # (--enable-linear-replayssm without -spec, which patch 0004 keeps on the stock
 # commit) in the same waves against the stock DFlash waves. Engine: SGLANG_WORKTREE,
-# default ~/sglang-wt/drafter. Correctness only (shared slot, about 30 minutes):
+# default ~/sglang-wt/drafter. Exits non-zero if any part fails, differs or did not run.
+# Correctness only (shared slot, about 30 minutes):
 #   scripts/gpu_lock.sh -s experiments/drafter/run_fold_check.sh [OUT]
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,7 +21,10 @@ rm -f "$out/gdn_verify_parity.json"
 if [ "$status" -ne 0 ]; then
   echo "[fold-check] KERNEL PARITY FAILED (exit $status); running the served check anyway"
 fi
-"$here/run_fold_localize.sh" "$out/localize"
+"$here/run_fold_localize.sh" "$out/localize" || {
+  status=1
+  echo "[fold-check] SERVED CHECK FAILED (run_fold_localize.sh)"
+}
 # shellcheck source=/dev/null
 source "$here/../../scripts/sglang_env.sh"
 export GPU_STARTUP_TRIES="${GPU_STARTUP_TRIES:-60}"
@@ -34,8 +38,13 @@ if python "$here/serve_run.py" --arm dflash --block 16 --port 30087 --out "$run"
     --label w4-replayssm-decode --out {out} --workload $here/panel-v2.jsonl --per-domain 32 \
     --waves 4"; then
   python "$here/compare_outputs.py" --ref "$out/localize/dflash-w4-off/requests.jsonl" \
-    --test "$run/requests.jsonl" --out "$out/dflash-w4-replayssm-decode-vs-off.json"
+    --test "$run/requests.jsonl" --out "$out/dflash-w4-replayssm-decode-vs-off.json" \
+    --require-bitwise || {
+    status=1
+    echo "[fold-check] DECODE-ONLY REPLAYSSM DIFFERS FROM STOCK"
+  }
 else
-  echo "[fold-check] DFlash with --enable-linear-replayssm (no -spec) did not run; see $run"
+  status=1
+  echo "[fold-check] DECODE-ONLY REPLAYSSM CHECK DID NOT RUN; see $run"
 fi
 exit "$status"

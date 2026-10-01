@@ -110,6 +110,12 @@ def main() -> None:
     parser.add_argument('--ref', type=Path, required=True)
     parser.add_argument('--test', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument(
+        '--require-bitwise',
+        action='store_true',
+        help='exit 1 unless both runs have the same requests and every one is bitwise '
+        'identical (tokens and top-k logprobs); the report is written either way',
+    )
     args = parser.parse_args()
 
     sc = state_compare()
@@ -170,12 +176,20 @@ def main() -> None:
         'first_logprob_difference': first_logprob_difference,
         'divergences': divergences,
     }
+    missing = sorted(set(ref) ^ set(test))
+    summary['requests_in_one_run_only'] = missing
     args.out.write_text(json.dumps(summary, indent=2) + '\n')
+    rate = 1000 * len(divergences) / compared if compared else None
     print(
         f'{len(divergences)}/{len(shared)} sequences diverge, '
-        f'{summary["divergences_per_1000_tokens"]:.2f} per 1000 compared tokens; classes {classes};'
+        f'{rate if rate is None else round(rate, 2)} per 1000 compared tokens; classes {classes};'
         f' bitwise identical (tokens and top-k logprobs) {identical}/{len(shared)}'
     )
+    if args.require_bitwise and (missing or not shared or identical != len(shared)):
+        raise SystemExit(
+            f'NOT BITWISE: {len(shared) - identical} of {len(shared)} shared requests differ, '
+            f'{len(missing)} requests are in one run only ({args.test} vs {args.ref})'
+        )
 
 
 if __name__ == '__main__':

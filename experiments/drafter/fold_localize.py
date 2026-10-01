@@ -142,6 +142,12 @@ def main() -> None:
     parser.add_argument('--b', type=Path, required=True)
     parser.add_argument('--earlier', type=Path, action='append', default=[])
     parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument(
+        '--require-identical',
+        action='store_true',
+        help='exit 1 unless both runs traced the same requests and every one is identical in '
+        'tokens, top-5 logprobs and every cycle; the report is written either way',
+    )
     args = parser.parse_args()
     result: dict[str, Any] = {
         'a': str(args.a),
@@ -169,6 +175,25 @@ def main() -> None:
             f'cycle@{None if cycle is None else (cycle["cycle"], cycle["prefix_len"], cycle["differs"])} '
             f'computed-in={entry.get("logprob_cycle_a")}'
         )
+    if args.require_identical:
+        only_one = sorted(set(outputs(args.a)) ^ set(outputs(args.b)))
+        differing = [
+            rid
+            for rid, entry in result['requests'].items()
+            if any(
+                entry[key] is not None
+                for key in (
+                    'first_logprob_difference',
+                    'first_token_difference',
+                    'first_cycle_difference',
+                )
+            )
+        ]
+        if differing or only_one or not result['requests'] or not result['cycles_compared']:
+            raise SystemExit(
+                f'NOT IDENTICAL: {len(differing)} requests differ, {len(only_one)} in one run '
+                f'only, cycles compared: {result["cycles_compared"]} ({args.a} vs {args.b})'
+            )
 
 
 if __name__ == '__main__':
