@@ -1,38 +1,57 @@
-From 5f18d65fbd7ce971acb3dd143a0e7c8ea181d367 Mon Sep 17 00:00:00 2001
+From 8887fb927356a5893c0bac44939526900463c3f5 Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <sam@findtensor.com>
-Date: Wed, 30 Sep 2026 19:28:54 +0000
-Subject: [PATCH 2/2] Pin the FlashInfer target-verify KV split under
- deterministic inference
+Date: Thu, 1 Oct 2026 03:40:43 +0000
+Subject: [PATCH 2/2] Optionally pin the FlashInfer target-verify KV split
+ under deterministic inference
 
-Decode and extend already pass the deterministic split settings to the
-FlashInfer planner; target verify did not, so the planner chose the KV
-split from the batch and verify logits depended on batch composition.
-Pass prefill_split_tile_size (None unless deterministic inference is on)
-in both the eager and the CUDA-graph verify paths.
+Decode and extend pass the deterministic split settings to the FlashInfer
+planner; target verify does not, so the planner chooses the KV split from
+the batch. With SGLANG_STATE_VERIFY_FIXED_SPLIT=1 and deterministic
+inference on, pass prefill_split_tile_size in the eager and CUDA-graph
+verify paths. Off by default: it did not make MTP speculation
+batch-invariant.
 ---
- python/sglang/srt/layers/attention/flashinfer_backend.py | 5 +++++
- 1 file changed, 5 insertions(+)
+ python/sglang/srt/layers/attention/flashinfer_backend.py | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/python/sglang/srt/layers/attention/flashinfer_backend.py b/python/sglang/srt/layers/attention/flashinfer_backend.py
-index e4d318207c..d5403d29f9 100644
+index e4d318207c..7cc4498033 100644
 --- a/python/sglang/srt/layers/attention/flashinfer_backend.py
 +++ b/python/sglang/srt/layers/attention/flashinfer_backend.py
-@@ -761,6 +761,10 @@ class FlashInferAttnBackend(AttentionBackend):
+@@ -410,6 +410,7 @@ class FlashInferAttnBackend(AttentionBackend):
+             get_exec().deterministic.enable_deterministic_inference
+         )
+         self.prefill_split_tile_size = None
++        self.verify_split_tile_size = None
+         self.decode_split_tile_size = None
+         self.disable_cuda_graph_kv_split = False
+         if self.enable_deterministic:
+@@ -421,6 +422,10 @@ class FlashInferAttnBackend(AttentionBackend):
+                 "SGLANG_FLASHINFER_DECODE_SPLIT_TILE_SIZE", 2048
+             )
+             self.disable_cuda_graph_kv_split = True
++            # Off by default: passing the split to the target-verify plan did not
++            # make MTP batch-invariant; kept behind a flag for the state study.
++            if os.environ.get("SGLANG_STATE_VERIFY_FIXED_SPLIT") == "1":
++                self.verify_split_tile_size = self.prefill_split_tile_size
+             envs.SGLANG_FLASHINFER_WORKSPACE_SIZE.set(2048 * 1024 * 1024)
+ 
+         self.use_paged = envs.SGLANG_FLASHINFER_USE_PAGED.get()
+@@ -761,6 +766,9 @@ class FlashInferAttnBackend(AttentionBackend):
                  use_ragged=False,
                  encoder_lens=encoder_lens[:bs] if encoder_lens is not None else None,
                  spec_info=spec_info,
-+                # Deterministic inference: a batch-independent KV split, as
-+                # for extend; otherwise the planner picks the split from the
-+                # batch and verify logits change with batch composition.
-+                fixed_split_size=self.prefill_split_tile_size,
++                # Experimental (SGLANG_STATE_VERIFY_FIXED_SPLIT=1, deterministic
++                # inference only): a batch-independent KV split, as for extend.
++                fixed_split_size=self.verify_split_tile_size,
              )
          elif forward_mode.is_dllm_extend():
              self.indices_updater_prefill.update(
-@@ -985,6 +989,7 @@ class FlashInferAttnBackend(AttentionBackend):
+@@ -985,6 +993,7 @@ class FlashInferAttnBackend(AttentionBackend):
                  use_ragged=False,
                  encoder_lens=forward_batch.encoder_lens,
                  spec_info=forward_batch.spec_info,
-+                fixed_split_size=self.prefill_split_tile_size,
++                fixed_split_size=self.verify_split_tile_size,
              )
              self.forward_metadata = PrefillMetadata(
                  self.prefill_wrappers_verify,

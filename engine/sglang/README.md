@@ -111,9 +111,20 @@ diagnosis only. `experiments/state_safety/tap_runs.py` and `mechanism.py` drive 
 analyse it.
 
 `0002-verify-kv-split-deterministic.patch` passes the deterministic-inference KV
-split size to FlashInfer's target-verify plan, as decode and extend already do. It
-does not make MTP speculation batch-invariant under `--enable-deterministic-inference`
-(see `evidence/state_safety/README.md`); it is kept because a committed run used it.
+split size to FlashInfer's target-verify plan, as decode and extend already do, but
+only with `SGLANG_STATE_VERIFY_FIXED_SPLIT=1` and `--enable-deterministic-inference`;
+otherwise the plan is unchanged. It does not make MTP speculation batch-invariant
+(see `evidence/state_safety/README.md`); it is kept because a committed run used it
+(that run predates the variable and had the change on unconditionally, which is what
+setting the variable reproduces).
+
+| Variable | Patch | Effect when set |
+|---|---|---|
+| `SGLANG_STATE_TAP_DIR` | 0001 | enables the tap and sets its output directory |
+| `SGLANG_STATE_TAP_RID_PREFIX` | 0001 | rid prefix of tapped requests (default `tap-`) |
+| `SGLANG_STATE_TAP_FULL_GAP` | 0001 | top-2 gap below which full logit rows are saved (default 0.5) |
+| `SGLANG_STATE_TAP_PERTURB` | 0001 | module whose output gets a one-ulp change (positive control) |
+| `SGLANG_STATE_VERIFY_FIXED_SPLIT` | 0002 | `1`: fixed KV split in the verify plan under deterministic inference |
 
 ## repair (`patches/repair/0001-0002`, branch `engine/repair`, head `5d8e00e3e1`)
 

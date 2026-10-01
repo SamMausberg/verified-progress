@@ -29,6 +29,10 @@ def not_identical(test: str, case: dict[str, Any]) -> bool:
         return not case['warm_vs_cold']['identical'] or not case.get('truncated_identical', True)
     if test == 'abort':
         return not case['identical']
+    if test == 'history':
+        return not case['logprobs_identical']
+    if test == 'repeat':
+        return case['logprobs_bitwise_identical'] < case['repeats'] - 1
     return False
 
 
