@@ -34,7 +34,9 @@ state error perturbs the hidden state and shows up as drift even when no token
 flips. `cycles.py` buckets positions of a speculative run by the previous
 verify cycle's commit length (which draft position was rejected) and the
 offset inside the current cycle, so a rollback error for one accept length
-would stand out.
+would stand out. `perturbation.py` separates how many prompts a change perturbs at
+all (outputs not bitwise identical) from how often a perturbed trajectory then
+diverges in tokens, by the output index where the perturbation starts.
 
 ## Server configurations
 
