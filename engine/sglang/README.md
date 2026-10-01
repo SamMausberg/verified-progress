@@ -66,7 +66,7 @@ Every change is off unless its flag or environment variable is set.
 Tests: `tests/test_moonshot_levers.py` and `tests/test_gdn_exact_replay.py` (the engine
 tests run in the SGLang venv with the worktree on `PYTHONPATH` and skip elsewhere).
 
-## drafter (`patches/drafter/0001`, branch `engine/drafter`)
+## drafter (`patches/drafter/0001-0002`, branch `engine/drafter`)
 
 ```sh
 scripts/sglang_worktree.sh drafter
