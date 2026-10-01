@@ -1,0 +1,653 @@
+From 101e52731b360436ba585a3537539db757bfb1f6 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <sam@findtensor.com>
+Date: Wed, 30 Sep 2026 20:00:23 +0000
+Subject: [PATCH] Add env-gated repair probes to the DFlash worker
+
+Per-cycle GPU phase timing (CUDA events, no host sync), reference-continuation
+injection, Jacobi recycling and keep policies for the next block, and a probe
+mode that runs k extra full verify passes (Jacobi and correct-one sweeps) from
+the same committed prefix, restores the GDN conv/SSM state between passes and
+commits the plain DFlash pass. Everything is off unless SGLANG_REPAIR_* is set.
+---
+ .../srt/speculative/dflash_worker_v2.py       | 238 ++++++++++++++
+ python/sglang/srt/speculative/repair_probe.py | 311 ++++++++++++++++++
+ 2 files changed, 549 insertions(+)
+ create mode 100644 python/sglang/srt/speculative/repair_probe.py
+
+diff --git a/python/sglang/srt/speculative/dflash_worker_v2.py b/python/sglang/srt/speculative/dflash_worker_v2.py
+index 75e698ee80..5779f39379 100644
+--- a/python/sglang/srt/speculative/dflash_worker_v2.py
++++ b/python/sglang/srt/speculative/dflash_worker_v2.py
+@@ -81,6 +81,7 @@ from sglang.srt.speculative.lilicorr_utils import (
+     resolve_sampling_enabled,
+     target_input_embeddings,
+ )
++from sglang.srt.speculative.repair_probe import RepairProbe
+ from sglang.srt.speculative.spec_info import SpeculativeAlgorithm
+ from sglang.srt.speculative.spec_tp_sync import SpecTpSync, SpecTpSyncSite
+ from sglang.srt.speculative.spec_utils import (
+@@ -386,6 +387,7 @@ class DFlashWorkerV2(BaseSpecWorker):
+         self._target_worker = target_worker
+         self.model_runner = target_worker.model_runner
+         self._need_mamba_verify_commit = False
++        self._repair_probe: Optional[RepairProbe] = None
+         self.page_size = get_schedule().page_size
+         # Normalized in arg_groups.speculative_hook.handle_speculative_decoding.
+         self.draft_window_size: Optional[int] = get_spec().speculative_draft_window_size
+@@ -2252,6 +2254,175 @@ class DFlashWorkerV2(BaseSpecWorker):
+     ) -> DFlashDraftInputV2:
+         return make_draft_input_v2(bonus_tokens=bonus_tokens, new_seq_lens=new_seq_lens)
+
++    # --- Repair workstream probes (env-gated; see repair_probe.py). ---
++
++    def _get_repair_probe(self) -> RepairProbe:
++        if self._repair_probe is None:
++            num_slots = int(self.model_runner.req_to_token_pool.req_to_token.shape[0])
++            self._repair_probe = RepairProbe(
++                self.device, num_slots, int(self.block_size)
++            )
++        return self._repair_probe
++
++    def _repair_snapshot_state(self, req_pool_indices: torch.Tensor):
++        """Copy the committed GDN conv and SSM states of this batch's slots.
++
++        The verify conv kernel shifts the committed conv window in place (the
++        commit later overwrites it from the per-step windows), so a second
++        verify pass on the same prefix must start from a restored copy.
++        """
++        if not self._need_mamba_verify_commit:
++            return None
++        pool = self.target_worker.model_runner.req_to_token_pool
++        idx = pool.translate_mamba_indices(pool.get_mamba_indices(req_pool_indices))
++        idx = idx.to(torch.int64)
++        caches = pool.get_speculative_mamba2_params_all_layers()
++        conv = [c[:, idx].clone() for c in caches.conv]
++        ssm = caches.temporal[:, idx].clone()
++        return idx, caches, conv, ssm
++
++    @staticmethod
++    def _repair_restore_state(saved) -> None:
++        if saved is None:
++            return
++        idx, caches, conv, ssm = saved
++        for dst, src in zip(caches.conv, conv):
++            dst[:, idx] = src
++        caches.temporal[:, idx] = ssm
++
++    def _repair_verify(self, verify_forward_batch, saved_state, sampling_info):
++        self._repair_restore_state(saved_state)
++        out = self.target_worker.forward_batch_generation(
++            batch=None,
++            forward_batch=verify_forward_batch,
++            is_verify=True,
++            skip_attn_backend_init=True if not _is_npu else None,
++        )
++        if sampling_info is not None:
++            apply_dflash_verify_logits_adjustments(
++                next_token_logits=out.logits_output.next_token_logits,
++                sampling_info=sampling_info,
++                draft_token_num=int(self.block_size),
++            )
++        return out
++
++    def _repair_sweeps(
++        self,
++        *,
++        repair: RepairProbe,
++        draft_tokens: torch.Tensor,
++        verify_forward_batch,
++        target_out,
++        sampling_info,
++        bs: int,
++        saved_state,
++    ):
++        """Record Jacobi sweeps from this block's draft, then restore the draft pass.
++
++        Every pass is a full target verify of the whole block from the same
++        committed prefix. "recycle" sweeps set y'_j = argmax F(y)_{j-1} for
++        j >= 1; "keep" sweeps only replace the first mismatching draft token by
++        the target's token. The block that is finally verified and committed is
++        the original draft, so the decoding trajectory is plain DFlash.
++        """
++        block = int(self.block_size)
++        if sampling_info is not None:
++            apply_dflash_verify_logits_adjustments(
++                next_token_logits=target_out.logits_output.next_token_logits,
++                sampling_info=sampling_info,
++                draft_token_num=block,
++            )
++
++        def predict(out):
++            return torch.argmax(out.logits_output.next_token_logits, dim=-1).view(
++                bs, block
++            )
++
++        def accept(y, t):
++            a, _ = compute_dflash_correct_drafts_and_bonus(
++                candidates=y, target_predict=t
++            )
++            return a.to(torch.int64)
++
++        y0 = draft_tokens.clone()
++        t0 = predict(target_out)
++        a0 = accept(y0, t0)
++        rec = {"recycle": [], "keep": []}
++
++        y, t = y0, t0
++        for _ in range(repair.sweeps):
++            y_next = y.clone()
++            y_next[:, 1:] = t[:, :-1]
++            draft_tokens.copy_(y_next)
++            out = self._repair_verify(verify_forward_batch, saved_state, sampling_info)
++            t_next = predict(out)
++            rec["recycle"].append((y_next, t_next, accept(y_next, t_next)))
++            y, t = y_next, t_next
++
++        rows = torch.arange(bs, device=draft_tokens.device)
++        z, tz, az = y0, t0, a0
++        for _ in range(repair.sweeps):
++            z_next = z.clone()
++            idx = (az + 1).clamp(max=block - 1)
++            fix = az < block - 1
++            z_next[rows, idx] = torch.where(fix, tz[rows, idx - 1], z[rows, idx])
++            draft_tokens.copy_(z_next)
++            out = self._repair_verify(verify_forward_batch, saved_state, sampling_info)
++            tz_next = predict(out)
++            az_next = accept(z_next, tz_next)
++            rec["keep"].append((z_next, tz_next, az_next))
++            z, tz, az = z_next, tz_next, az_next
++
++        draft_tokens.copy_(y0)
++        target_out = self._repair_verify(verify_forward_batch, saved_state, None)
++        # The restored pass must reproduce the first pass bit for bit.
++        rec["replay_mismatch"] = (predict(target_out) != t0).sum(dim=1)
++        return target_out, rec
++
++    def _repair_write_trace(
++        self,
++        *,
++        repair: RepairProbe,
++        batch: ScheduleBatch,
++        prefix_lens: torch.Tensor,
++        fresh_tokens: Optional[torch.Tensor],
++        candidates: torch.Tensor,
++        target_predict: torch.Tensor,
++        accept_len: torch.Tensor,
++        commit_lens: torch.Tensor,
++        sweep_record,
++    ) -> None:
++        bs = candidates.shape[0]
++        fields = {
++            "prefix": prefix_lens[:bs].tolist(),
++            "cand": candidates.tolist(),
++            "tpred": target_predict.tolist(),
++            "accept": accept_len.tolist(),
++            "commit": commit_lens.tolist(),
++        }
++        if fresh_tokens is not None:
++            fields["fresh"] = fresh_tokens.tolist()
++        sweeps = None
++        if sweep_record is not None:
++            sweeps = {
++                kind: [
++                    (y.tolist(), t.tolist(), a.tolist())
++                    for (y, t, a) in sweep_record[kind]
++                ]
++                for kind in ("recycle", "keep")
++            }
++            fields["replay_mismatch"] = sweep_record["replay_mismatch"].tolist()
++        for i, req in enumerate(batch.reqs[:bs]):
++            record = {k: v[i] for k, v in fields.items()}
++            record["rid"] = req.rid
++            record["out_len"] = len(req.output_ids)
++            if sweeps is not None:
++                record["sweeps"] = {
++                    kind: [[y[i], t[i], a[i]] for (y, t, a) in passes]
++                    for kind, passes in sweeps.items()
++                }
++            repair.trace.write(record)
++
+     def forward_batch_generation(
+         self,
+         batch: ScheduleBatch,
+@@ -2274,6 +2445,9 @@ class DFlashWorkerV2(BaseSpecWorker):
+                 batch_output.next_token_ids,
+             )
+             self._tp_sync.sync(SpecTpSyncSite.DFLASH_TARGET, next_token_ids)
++            repair = self._get_repair_probe()
++            if repair.enabled and not batch.forward_mode.is_idle():
++                repair.on_prefill(batch)
+             new_seq_lens = batch.seq_lens
+             batch_output.new_seq_lens = new_seq_lens
+             if on_publish is not None:
+@@ -2397,6 +2571,9 @@ class DFlashWorkerV2(BaseSpecWorker):
+
+         bs = len(batch.seq_lens)
+         device = self.device
++        repair = self._get_repair_probe()
++        if repair.timer is not None:
++            repair.timer.begin(bs, batch.seq_lens_cpu, int(self.block_size))
+
+         # --- 1) Draft a fixed block with the draft model.
+         target_model = self.target_worker.model_runner.model
+@@ -2703,6 +2880,17 @@ class DFlashWorkerV2(BaseSpecWorker):
+         draft_tokens[:, 0].copy_(block_ids[:, 0])
+         draft_tokens[:, 1:].copy_(draft_next)
+
++        fresh_tokens = None
++        if repair.enabled:
++            if repair.timer is not None:
++                repair.timer.mark("draft")
++            if repair.trace is not None:
++                fresh_tokens = draft_tokens.clone()
++            if repair.oracle is not None:
++                repair.oracle.inject(draft_tokens, prefix_lens, batch.req_pool_indices)
++            if repair.policy is not None:
++                repair.policy.apply(draft_tokens, batch.req_pool_indices)
++
+         # Must stay ahead of the target verify launch below.
+         grammar_tree = (
+             GrammarTree.from_linear_chain(draft_tokens) if batch.has_grammar else None
+@@ -2761,12 +2949,31 @@ class DFlashWorkerV2(BaseSpecWorker):
+         if get_parallel().enable_dp_attention and batch.is_extend_in_batch:
+             verify_forward_batch.can_run_decode_cuda_graph = False
+
++        repair_saved_state = (
++            self._repair_snapshot_state(batch.req_pool_indices)
++            if repair.sweeps > 0
++            else None
++        )
+         target_out = self.target_worker.forward_batch_generation(
+             batch=None,
+             forward_batch=verify_forward_batch,
+             is_verify=True,
+             skip_attn_backend_init=True if not _is_npu else None,
+         )
++        sweep_record = None
++        if repair.enabled:
++            if repair.timer is not None:
++                repair.timer.mark("verify")
++            if repair.sweeps > 0:
++                target_out, sweep_record = self._repair_sweeps(
++                    repair=repair,
++                    draft_tokens=draft_tokens,
++                    verify_forward_batch=verify_forward_batch,
++                    target_out=target_out,
++                    sampling_info=batch.sampling_info,
++                    bs=bs,
++                    saved_state=repair_saved_state,
++                )
+         logits_output = target_out.logits_output
+         can_run_cuda_graph = target_out.can_run_cuda_graph
+
+@@ -2836,6 +3043,31 @@ class DFlashWorkerV2(BaseSpecWorker):
+             # accept_len; recompute it from the forced commit_lens.
+             new_seq_lens = None
+
++        if repair.enabled:
++            if repair.timer is not None:
++                repair.timer.mark("accept")
++            if repair.policy is not None or repair.trace is not None:
++                if target_predict is None:
++                    raise RuntimeError(
++                        "repair policy and trace need greedy verification"
++                    )
++            if repair.policy is not None:
++                repair.policy.record(
++                    candidates, target_predict, accept_len, batch.req_pool_indices
++                )
++            if repair.trace is not None:
++                self._repair_write_trace(
++                    repair=repair,
++                    batch=batch,
++                    prefix_lens=prefix_lens,
++                    fresh_tokens=fresh_tokens,
++                    candidates=candidates,
++                    target_predict=target_predict,
++                    accept_len=accept_len,
++                    commit_lens=commit_lens,
++                    sweep_record=sweep_record,
++                )
++
+         if batch.return_logprob:
+             compute_spec_logprobs(
+                 batch,
+@@ -2855,6 +3087,9 @@ class DFlashWorkerV2(BaseSpecWorker):
+                 commit_lens=commit_lens,
+             )
+
++        if repair.timer is not None:
++            repair.timer.mark("commit")
++
+         if new_seq_lens is None:
+             new_seq_lens = prefix_lens + commit_lens.to(prefix_lens.dtype)
+         if on_publish is not None:
+@@ -2881,6 +3116,9 @@ class DFlashWorkerV2(BaseSpecWorker):
+         # Avoid copying large hidden-state buffers to CPU in overlap scheduling.
+         logits_output.hidden_states = None
+
++        if repair.timer is not None:
++            repair.timer.end(commit_lens)
++
+         next_draft_input = self._make_next_draft_input_decode(
+             bonus_tokens=bonus,
+             new_seq_lens=new_seq_lens,
+diff --git a/python/sglang/srt/speculative/repair_probe.py b/python/sglang/srt/speculative/repair_probe.py
+new file mode 100644
+index 0000000000..dcffbc1f44
+--- /dev/null
++++ b/python/sglang/srt/speculative/repair_probe.py
+@@ -0,0 +1,311 @@
++"""Oracle and repair probes for the DFlash worker (repair workstream).
++
++Everything here is off unless one of these environment variables is set:
++
++SGLANG_REPAIR_TIMING_LOG=<path>
++    Append one JSON line per decode cycle with GPU phase times measured by CUDA
++    events (draft, control, verify, accept, commit, append) and the GPU-timeline
++    start of the cycle, so gaps between cycles are visible. Events are resolved
++    lazily with ``Event.query()``; the probe never synchronizes the host.
++
++SGLANG_REPAIR_ORACLE=<path.json>
++    Replace the drafted block with a reference continuation. The file holds
++    ``{"refs": [{"input_ids": [...], "continuation": [...]}, ...]}``; a request
++    whose prompt ids equal ``input_ids`` gets draft token j of each block set to
++    ``(input_ids + continuation)[seq_len + j]``. Positions past the end keep the
++    drafter's token. The target still verifies every token.
++
++SGLANG_REPAIR_POLICY=fresh|recycle|keep, SGLANG_REPAIR_MAX_PASSES=<r>
++    Choose the next block's draft tokens after a rejection. ``recycle`` uses the
++    target's own predictions after the first mismatch (a Jacobi step);
++    ``keep`` keeps the previous draft's tokens after the corrected one. Both
++    fall back to the fresh DFlash draft where no such token exists, and after
++    ``r`` consecutive repaired blocks. Only target-verified tokens are committed.
++
++SGLANG_REPAIR_SWEEPS=<k>
++    Probe mode: on every block, run k extra full target passes that iterate the
++    Jacobi map y'_j = argmax F(y_{<j}) ("recycle" sweeps) and k passes that only
++    correct the first mismatch ("keep" sweeps), record each pass's accepted
++    length, then re-run the pass on the original draft and commit it, so the
++    decoding trajectory is the plain DFlash one. Implies a trace (it syncs), so
++    no timing from probe runs.
++
++SGLANG_REPAIR_TRACE=<path>
++    Append one JSON line per request per cycle: prefix length, the fresh draft,
++    the verified candidate, the target argmax at every block position, the
++    accepted length and any probe sweeps. Syncs the host every cycle.
++"""
++
++from __future__ import annotations
++
++import collections
++import json
++import logging
++import os
++from typing import Dict, List, Optional
++
++import torch
++
++logger = logging.getLogger(__name__)
++
++
++def _env(name: str) -> Optional[str]:
++    value = os.environ.get(name)
++    return value if value else None
++
++
++class CycleTimer:
++    """Per-cycle GPU phase times from CUDA events, resolved without host syncs."""
++
++    _RING = 256
++
++    def __init__(self, path: str):
++        self._file = open(path, "a", buffering=1)
++        self._pending: collections.deque = collections.deque()
++        self._origin = torch.cuda.Event(enable_timing=True)
++        self._origin.record()
++        self._cur: Optional[dict] = None
++        self._ring: List[torch.Tensor] = []
++        self._ring_pos = 0
++        self._file.write(
++            json.dumps({"event": "timer_start", "pid": os.getpid()}) + "\n"
++        )
++
++    def _event(self) -> torch.cuda.Event:
++        ev = torch.cuda.Event(enable_timing=True)
++        ev.record()
++        return ev
++
++    def begin(self, bs: int, seq_lens_cpu: Optional[torch.Tensor], block: int) -> None:
++        seq = None
++        if seq_lens_cpu is not None:
++            seq = [int(x) for x in seq_lens_cpu[:bs].tolist()]
++        self._cur = {
++            "bs": bs,
++            "block": block,
++            "seq": seq,
++            "ev": [("start", self._event())],
++        }
++
++    def mark(self, name: str) -> None:
++        if self._cur is not None:
++            self._cur["ev"].append((name, self._event()))
++
++    def end(self, commit_lens: torch.Tensor) -> None:
++        cur = self._cur
++        if cur is None:
++            return
++        self._cur = None
++        n = commit_lens.numel()
++        if len(self._ring) < self._RING:
++            buf = torch.empty(max(n, 64), dtype=torch.int64, pin_memory=True)
++            self._ring.append(buf)
++        else:
++            buf = self._ring[self._ring_pos % self._RING]
++            if buf.numel() < n:
++                buf = torch.empty(n, dtype=torch.int64, pin_memory=True)
++                self._ring[self._ring_pos % self._RING] = buf
++        self._ring_pos += 1
++        buf[:n].copy_(commit_lens.to(torch.int64), non_blocking=True)
++        cur["commit_buf"] = (buf, n)
++        cur["ev"].append(("append", self._event()))
++        self._pending.append(cur)
++        self._drain(block=False)
++
++    def _drain(self, block: bool) -> None:
++        # The ring holds at most _RING outstanding copies; force the oldest out
++        # before its pinned buffer could be reused.
++        while self._pending:
++            rec = self._pending[0]
++            last = rec["ev"][-1][1]
++            must = block or len(self._pending) >= self._RING - 1
++            if not must and not last.query():
++                break
++            last.synchronize()
++            self._pending.popleft()
++            events = rec["ev"]
++            out: Dict[str, object] = {
++                "t0_ms": self._origin.elapsed_time(events[0][1]),
++                "bs": rec["bs"],
++                "block": rec["block"],
++                "seq": rec["seq"],
++            }
++            buf, n = rec["commit_buf"]
++            out["commit"] = buf[:n].tolist()
++            prev = events[0][1]
++            for name, ev in events[1:]:
++                out[name + "_us"] = round(prev.elapsed_time(ev) * 1000.0, 2)
++                prev = ev
++            self._file.write(json.dumps(out) + "\n")
++
++    def close(self) -> None:
++        self._drain(block=True)
++        self._file.close()
++
++
++class OracleInjector:
++    """Replace draft tokens with a reference continuation keyed by prompt ids."""
++
++    def __init__(self, path: str, device: torch.device, num_slots: int):
++        with open(path) as f:
++            data = json.load(f)
++        self._table: Dict[tuple, List[int]] = {}
++        for ref in data["refs"]:
++            ids = [int(x) for x in ref["input_ids"]]
++            self._table[tuple(ids)] = ids + [int(x) for x in ref["continuation"]]
++        self._max_len = max((len(v) for v in self._table.values()), default=1)
++        self._buf = torch.zeros(
++            (num_slots, self._max_len), dtype=torch.int64, device=device
++        )
++        self._lens = torch.zeros((num_slots,), dtype=torch.int64, device=device)
++        self.hits = 0
++        self.misses = 0
++        logger.info(
++            "repair oracle: %d reference continuations from %s", len(self._table), path
++        )
++
++    def register(self, reqs, req_pool_indices: torch.Tensor) -> None:
++        slots = req_pool_indices.tolist()
++        for req, slot in zip(reqs, slots):
++            full = self._table.get(tuple(int(x) for x in req.origin_input_ids))
++            if full is None:
++                self.misses += 1
++                self._lens[slot] = 0
++                continue
++            self.hits += 1
++            self._buf[slot, : len(full)] = torch.tensor(full, dtype=torch.int64)
++            self._lens[slot] = len(full)
++
++    def inject(
++        self,
++        draft_tokens: torch.Tensor,
++        seq_lens: torch.Tensor,
++        req_pool_indices: torch.Tensor,
++    ) -> None:
++        bs, block = draft_tokens.shape
++        offs = torch.arange(1, block, device=draft_tokens.device, dtype=torch.int64)
++        pos = seq_lens.to(torch.int64).unsqueeze(1) + offs.unsqueeze(0)
++        slots = req_pool_indices.to(torch.int64)
++        valid = pos < self._lens[slots].unsqueeze(1)
++        vals = self._buf[slots].gather(1, pos.clamp(max=self._max_len - 1))
++        draft_tokens[:, 1:] = torch.where(valid, vals, draft_tokens[:, 1:])
++
++
++class RepairPolicy:
++    """Next-block drafts from the previous verify pass (Jacobi recycling)."""
++
++    def __init__(
++        self,
++        mode: str,
++        max_passes: int,
++        device: torch.device,
++        num_slots: int,
++        block: int,
++    ):
++        if mode not in ("fresh", "recycle", "keep"):
++            raise ValueError(
++                f"SGLANG_REPAIR_POLICY must be fresh, recycle or keep, got {mode!r}"
++            )
++        self.mode = mode
++        self.max_passes = max_passes
++        self.block = block
++        self._prev_y = torch.zeros((num_slots, block), dtype=torch.int64, device=device)
++        self._prev_t = torch.zeros((num_slots, block), dtype=torch.int64, device=device)
++        self._prev_a = torch.full((num_slots,), -1, dtype=torch.int64, device=device)
++        self._streak = torch.zeros((num_slots,), dtype=torch.int64, device=device)
++        self._offs = torch.arange(1, block, device=device, dtype=torch.int64)
++        self._last_used: Optional[torch.Tensor] = None
++
++    def reset(self, req_pool_indices: torch.Tensor) -> None:
++        slots = req_pool_indices.to(torch.int64)
++        self._prev_a[slots] = -1
++        self._streak[slots] = 0
++
++    def apply(
++        self, draft_tokens: torch.Tensor, req_pool_indices: torch.Tensor
++    ) -> torch.Tensor:
++        """Overwrite draft_tokens[:, 1:] in place; return a per-position source mask."""
++        slots = req_pool_indices.to(torch.int64)
++        a = self._prev_a[slots].unsqueeze(1)
++        if self.mode == "recycle":
++            src = a + self._offs.unsqueeze(0)
++            table = self._prev_t[slots]
++        else:
++            src = a + 1 + self._offs.unsqueeze(0)
++            table = self._prev_y[slots]
++        allowed = (a >= 0) & (self._streak[slots].unsqueeze(1) < self.max_passes)
++        valid = allowed & (src <= self.block - 1)
++        vals = table.gather(1, src.clamp(min=0, max=self.block - 1))
++        draft_tokens[:, 1:] = torch.where(valid, vals, draft_tokens[:, 1:])
++        self._last_used = valid.any(dim=1)
++        return valid
++
++    def record(
++        self,
++        candidates: torch.Tensor,
++        target_predict: torch.Tensor,
++        accept_len: torch.Tensor,
++        req_pool_indices: torch.Tensor,
++    ) -> None:
++        slots = req_pool_indices.to(torch.int64)
++        self._prev_y[slots] = candidates.to(torch.int64)
++        self._prev_t[slots] = target_predict.to(torch.int64)
++        a = accept_len.to(torch.int64)
++        # A fully accepted block leaves nothing to repair.
++        self._prev_a[slots] = torch.where(
++            a >= self.block - 1, torch.full_like(a, -1), a
++        )
++        used = self._last_used
++        if used is None:
++            used = torch.zeros_like(a, dtype=torch.bool)
++        self._streak[slots] = torch.where(
++            used, self._streak[slots] + 1, torch.zeros_like(a)
++        )
++        self._last_used = None
++
++
++class TraceWriter:
++    def __init__(self, path: str):
++        self._file = open(path, "a", buffering=1)
++
++    def write(self, record: dict) -> None:
++        self._file.write(json.dumps(record) + "\n")
++
++
++class RepairProbe:
++    """Container the DFlash worker consults; every member is None when unused."""
++
++    def __init__(self, device: torch.device, num_slots: int, block: int):
++        timing = _env("SGLANG_REPAIR_TIMING_LOG")
++        oracle = _env("SGLANG_REPAIR_ORACLE")
++        policy = _env("SGLANG_REPAIR_POLICY")
++        trace = _env("SGLANG_REPAIR_TRACE")
++        sweeps = int(os.environ.get("SGLANG_REPAIR_SWEEPS", "0") or 0)
++        self.timer = CycleTimer(timing) if timing else None
++        self.oracle = OracleInjector(oracle, device, num_slots) if oracle else None
++        self.policy = None
++        if policy and policy != "fresh":
++            max_passes = int(os.environ.get("SGLANG_REPAIR_MAX_PASSES", "1000000"))
++            self.policy = RepairPolicy(policy, max_passes, device, num_slots, block)
++        self.sweeps = sweeps
++        self.trace = TraceWriter(trace) if trace else None
++        if self.sweeps > 0 and self.trace is None:
++            raise ValueError("SGLANG_REPAIR_SWEEPS needs SGLANG_REPAIR_TRACE")
++        self.enabled = any(
++            x is not None for x in (self.timer, self.oracle, self.policy, self.trace)
++        )
++        if self.enabled:
++            logger.warning(
++                "repair probe on: timing=%s oracle=%s policy=%s sweeps=%d trace=%s",
++                timing,
++                oracle,
++                policy,
++                sweeps,
++                trace,
++            )
++
++    def on_prefill(self, batch) -> None:
++        if self.oracle is not None:
++            self.oracle.register(batch.reqs, batch.req_pool_indices)
++        if self.policy is not None:
++            self.policy.reset(batch.req_pool_indices)
+--
+2.34.1
