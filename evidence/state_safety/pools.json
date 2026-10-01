@@ -144,6 +144,366 @@
   "pools_identical": true
  },
  {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "repeat session, plain c1",
+  "server_a": "runs_pinned/plain/c1",
+  "server_b": "runs_pinned/plain__rep/c1",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "repeat session, plain c32",
+  "server_a": "runs_pinned/plain/c32",
+  "server_b": "runs_pinned/plain__rep/c32",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "concurrency 1 vs 32 (cap 8), plain",
+  "server_a": "runs_pinned/plain/c1",
+  "server_b": "runs_pinned/plain/c32",
+  "same_server": true,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "concurrency 1 vs 32 (cap 8), mtp_s1",
+  "server_a": "runs_pinned/mtp_s1/c1",
+  "server_b": "runs_pinned/mtp_s1/c32",
+  "same_server": true,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "concurrency 1 vs 32 (cap 8), mtp_s3",
+  "server_a": "runs_pinned/mtp_s3/c1",
+  "server_b": "runs_pinned/mtp_s3/c32",
+  "same_server": true,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "concurrency 1 vs 32 (cap 8), mtp_s5",
+  "server_a": "runs_pinned/mtp_s5/c1",
+  "server_b": "runs_pinned/mtp_s5/c32",
+  "same_server": true,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "concurrency 1 vs 32 (cap 8), mtp_tree",
+  "server_a": "runs_pinned/mtp_tree/c1",
+  "server_b": "runs_pinned/mtp_tree/c32",
+  "same_server": true,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "same server repeat c1, plain",
+  "server_a": "runs_pinned/plain/c1",
+  "server_b": "runs_pinned/plain/c1_warm",
+  "same_server": true,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "same server repeat c32, plain",
+  "server_a": "runs_pinned/plain/c32",
+  "server_b": "runs_pinned/plain/c32_warm",
+  "same_server": true,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "spec vs plain c1, mtp_s1",
+  "server_a": "runs_pinned/plain/c1",
+  "server_b": "runs_pinned/mtp_s1/c1",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "spec vs plain c1, mtp_s3",
+  "server_a": "runs_pinned/plain/c1",
+  "server_b": "runs_pinned/mtp_s3/c1",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "spec vs plain c1, mtp_s5",
+  "server_a": "runs_pinned/plain/c1",
+  "server_b": "runs_pinned/mtp_s5/c1",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "spec vs plain c1, mtp_tree",
+  "server_a": "runs_pinned/plain/c1",
+  "server_b": "runs_pinned/mtp_tree/c1",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "spec vs plain c32, mtp_s1",
+  "server_a": "runs_pinned/plain/c32",
+  "server_b": "runs_pinned/mtp_s1/c32",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "spec vs plain c32, mtp_s3",
+  "server_a": "runs_pinned/plain/c32",
+  "server_b": "runs_pinned/mtp_s3/c32",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "spec vs plain c32, mtp_s5",
+  "server_a": "runs_pinned/plain/c32",
+  "server_b": "runs_pinned/mtp_s5/c32",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "spec vs plain c32, mtp_tree",
+  "server_a": "runs_pinned/plain/c32",
+  "server_b": "runs_pinned/mtp_tree/c32",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "spec vs spec c1, mtp_s1 vs mtp_s3",
+  "server_a": "runs_pinned/mtp_s1/c1",
+  "server_b": "runs_pinned/mtp_s3/c1",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "spec vs spec c1, mtp_s3 vs mtp_s5",
+  "server_a": "runs_pinned/mtp_s3/c1",
+  "server_b": "runs_pinned/mtp_s5/c1",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "spec vs spec c1, mtp_s3 vs mtp_tree",
+  "server_a": "runs_pinned/mtp_s3/c1",
+  "server_b": "runs_pinned/mtp_tree/c1",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
   "evidence": "mechanism_plain_c1_vs_c32.json",
   "comparison": "v3_plain_c1 vs v3_plain_c32",
   "server_a": "tap/v3_plain_c1",

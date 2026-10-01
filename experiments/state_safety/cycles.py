@@ -96,6 +96,39 @@ def analyse(run_a: dict[str, Any], run_b: dict[str, Any]) -> dict[str, Any]:
     return {'buckets': dict(sorted(buckets.items())), 'skipped_prompts': skipped}
 
 
+def by_commit_length(buckets: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """Divergences per fragile position for each previous-cycle commit length, and
+    a chi-square test that the rate is the same at every length.
+
+    A rollback error for one accept length would raise that length's rate; the test
+    asks whether the observed rates are consistent with one common rate.
+    """
+    rows: dict[str, list[int]] = {}
+    for key, v in buckets.items():
+        if '/' not in key:
+            continue  # the prefill token has no previous cycle
+        length = key.split('/')[0]
+        r = rows.setdefault(length, [0, 0])
+        r[0] += v['divergences']
+        r[1] += v['fragile']
+    table: dict[str, dict[str, Any]] = {
+        k: {
+            'divergences': d,
+            'fragile': f,
+            'divergences_per_fragile': round(d / f, 4) if f else None,
+        }
+        for k, (d, f) in sorted(rows.items(), key=lambda x: int(x[0]))
+    }
+    used = [(d, f - d) for d, f in rows.values() if f > 0]
+    test: dict[str, Any] = {'lengths': len(used)}
+    if len(used) >= 2:
+        from scipy.stats import chi2_contingency
+
+        chi2, p, dof, _ = chi2_contingency(used)
+        test.update(chi2=round(float(chi2), 3), dof=int(dof), p=round(float(p), 4))
+    return {'by_length': table, 'homogeneity_chi2': test}
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--runs', required=True, help='run root (runs_pinned or runs)')
@@ -106,6 +139,7 @@ def main() -> None:
     root = Path(args.runs)
     res = analyse(load_run(root / f'{args.ref}.jsonl'), load_run(root / f'{args.spec}.jsonl'))
     res.update(ref=args.ref, spec=args.spec)
+    res['by_commit_length'] = by_commit_length(res['buckets'])
     Path(args.out).write_text(json.dumps(res, indent=1) + '\n')
     print('bucket = previous cycle commit length / offset in the current cycle')
     print(

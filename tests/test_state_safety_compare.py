@@ -78,3 +78,13 @@ def test_self_consistency_flags_non_argmax_commit():
     run = {'p': rec([1, 2], [[[-0.1, 1], [-2.0, 2]], [[-0.1, 3], [-2.0, 2]]])}
     out = self_consistency(run)
     assert out['positions'] == 2 and out['not_argmax'] == 1
+
+
+def test_first_logprob_difference_without_a_token_change():
+    a = {'p': {'output_ids': [1, 2, 3], 'top_logprobs': [[[-0.1, 1]], [[-0.2, 2]], [[-0.3, 3]]]}}
+    b = {'p': {'output_ids': [1, 2, 3], 'top_logprobs': [[[-0.1, 1]], [[-0.2, 2]], [[-0.4, 3]]]}}
+    (row,) = compare_pair(a, b)
+    assert not row['diverged']
+    assert row['first_logprob_diff'] == 2
+    (same,) = compare_pair(a, a)
+    assert same['first_logprob_diff'] is None

@@ -1,0 +1,72 @@
+{
+ "buckets": {
+  "1/0": {
+   "positions": 2768,
+   "fragile": 210,
+   "divergences": 18,
+   "drift_max": 0.3556373119354248,
+   "drift_mean": 0.030946392816879945,
+   "divergences_per_1k": 6.502890173410405,
+   "divergences_per_fragile": 0.08571428571428572
+  },
+  "1/1": {
+   "positions": 2172,
+   "fragile": 160,
+   "divergences": 16,
+   "drift_max": 0.4154059886932373,
+   "drift_mean": 0.030182185902236237,
+   "divergences_per_1k": 7.366482504604051,
+   "divergences_per_fragile": 0.1
+  },
+  "2/0": {
+   "positions": 21652,
+   "fragile": 896,
+   "divergences": 72,
+   "drift_max": 0.3612947463989258,
+   "drift_mean": 0.0186620641112554,
+   "divergences_per_1k": 3.325327914280436,
+   "divergences_per_fragile": 0.08035714285714286
+  },
+  "2/1": {
+   "positions": 19635,
+   "fragile": 707,
+   "divergences": 64,
+   "drift_max": 0.6166682243347168,
+   "drift_mean": 0.01659130181644169,
+   "divergences_per_1k": 3.259485612426789,
+   "divergences_per_fragile": 0.09052333804809053
+  },
+  "prefill_token": {
+   "positions": 320,
+   "fragile": 34,
+   "divergences": 0,
+   "drift_max": 0.0,
+   "drift_mean": 0.0,
+   "divergences_per_1k": 0.0,
+   "divergences_per_fragile": 0.0
+  }
+ },
+ "skipped_prompts": 0,
+ "ref": "plain/c1",
+ "spec": "mtp_s1/c1",
+ "by_commit_length": {
+  "by_length": {
+   "1": {
+    "divergences": 34,
+    "fragile": 370,
+    "divergences_per_fragile": 0.0919
+   },
+   "2": {
+    "divergences": 136,
+    "fragile": 1603,
+    "divergences_per_fragile": 0.0848
+   }
+  },
+  "homogeneity_chi2": {
+   "lengths": 2,
+   "chi2": 0.111,
+   "dof": 1,
+   "p": 0.7392
+  }
+ }
+}
