@@ -25,21 +25,24 @@ for addr in $(hostname -I 2>/dev/null || true); do
 done
 [ "${#patterns[@]}" -gt 0 ] || exit 0
 
+staged=""
 if [ "$#" -gt 0 ]; then
   files=("$@")
 else
-  mapfile -t files < <(git diff --cached --name-only --diff-filter=ACMR)
+  # NUL-delimited, so unusual paths are not quoted; T covers a symlink replaced by a file.
+  staged=1
+  mapfile -d '' -t files < <(git diff --cached --name-only -z --diff-filter=ACMRT)
 fi
 args=()
 for p in "${patterns[@]}"; do args+=(-e "$p"); done
 
 status=0
 for f in "${files[@]}"; do
-  [ -f "$f" ] || continue
   # Staged content, not the working copy, when checking a commit.
-  if [ "$#" -eq 0 ]; then
-    hits="$(git show ":$f" 2>/dev/null | grep -n -I -F "${args[@]}" | cut -d: -f1 | tr '\n' ' ' || true)"
+  if [ -n "$staged" ]; then
+    hits="$(git cat-file blob ":$f" 2>/dev/null | grep -n -I -F "${args[@]}" | cut -d: -f1 | tr '\n' ' ' || true)"
   else
+    [ -f "$f" ] || continue
     hits="$(grep -n -I -F "${args[@]}" "$f" | cut -d: -f1 | tr '\n' ' ' || true)"
   fi
   if [ -n "$hits" ]; then

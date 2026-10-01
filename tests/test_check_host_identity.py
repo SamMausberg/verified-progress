@@ -58,3 +58,27 @@ def test_a_hostname_that_is_not_an_address_is_not_a_pattern(tmp_path: Path) -> N
     env = fake_host(tmp_path, 'ubuntu', '')
     (tmp_path / 'notes.md').write_text('runs on ubuntu\n')
     assert run(env, tmp_path, 'notes.md').returncode == 0
+
+
+def test_staged_unusual_paths_and_type_changes_are_checked(tmp_path: Path) -> None:
+    env = fake_host(tmp_path, '203-0-113-7', '203.0.113.7')
+    repo = tmp_path / 'repo'
+    repo.mkdir()
+    git = ['git', '-c', 'user.name=t', '-c', 'user.email=t@example.com']
+    subprocess.run(['git', 'init', '-q'], cwd=repo, check=True)
+    (repo / 'target.txt').write_text('clean\n')
+    (repo / 'link').symlink_to('target.txt')
+    subprocess.run(['git', 'add', '.'], cwd=repo, check=True)
+    subprocess.run([*git, 'commit', '-qm', 'base'], cwd=repo, check=True)
+    assert run(env, repo).returncode == 0
+    # A symlink replaced by a regular file is a type change (T), not a modification.
+    (repo / 'link').unlink()
+    (repo / 'link').write_text('203.0.113.7\n')
+    subprocess.run(['git', 'add', 'link'], cwd=repo, check=True)
+    assert run(env, repo).returncode == 1
+    subprocess.run(['git', 'reset', '-q', '--hard'], cwd=repo, check=True)
+    # A path git would quote (non-ASCII, tab).
+    odd = repo / 'r\u00e9sum\u00e9\tnotes.txt'
+    odd.write_text('host 203-0-113-7\n')
+    subprocess.run(['git', 'add', odd.name], cwd=repo, check=True)
+    assert run(env, repo).returncode == 1
