@@ -1084,6 +1084,102 @@ def bench_chain(args: argparse.Namespace) -> dict[str, Any]:
     return result
 
 
+MERGE_M_VALUES = (1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024)
+
+
+class InProj:
+    """The GDN input projections of all 24 layers as SGLang runs them on CUDA
+    (qkvz on the current stream, ba on a side stream under capture) and as one
+    GEMM over the concatenated 12352-row weight (``finalize_fused_in_proj``)."""
+
+    def __init__(self, ckpt: Checkpoint) -> None:
+        self.qkvz = ckpt.projection('gdn_in_proj_qkvz')
+        self.ba = ckpt.projection('gdn_in_proj_ba')
+        self.merged = [
+            torch.cat([a, b]).contiguous() for a, b in zip(self.qkvz, self.ba, strict=True)
+        ]
+        self.alt = torch.cuda.Stream()
+        self.xs: list[torch.Tensor] = []
+
+    def separate_side_stream(self) -> None:
+        cur = torch.cuda.current_stream()
+        for x, wq, wb in zip(self.xs, self.qkvz, self.ba, strict=True):
+            self.alt.wait_stream(cur)
+            F.linear(x, wq)
+            with torch.cuda.stream(self.alt):
+                F.linear(x, wb)
+            cur.wait_stream(self.alt)
+
+    def separate_serial(self) -> None:
+        for x, wq, wb in zip(self.xs, self.qkvz, self.ba, strict=True):
+            F.linear(x, wq)
+            F.linear(x, wb)
+
+    def merged_gemm(self) -> None:
+        for x, w in zip(self.xs, self.merged, strict=True):
+            F.linear(x, w)
+
+    def first_separate(self) -> None:
+        F.linear(self.xs[0], self.qkvz[0])
+        F.linear(self.xs[0], self.ba[0])
+
+    def first_merged(self) -> None:
+        F.linear(self.xs[0], self.merged[0])
+
+
+def bench_merge(args: argparse.Namespace) -> dict[str, Any]:
+    """Merged against separate GDN input projections: output bits and time."""
+    ckpt = Checkpoint('cuda')
+    ip = InProj(ckpt)
+    width = ip.qkvz[0].shape[0]
+    result: dict[str, Any] = {'meta': environment(args), 'layers': len(ip.qkvz), 'rows': []}
+    for m in args.m or list(MERGE_M_VALUES):
+        torch.manual_seed(2000 + m)
+        ip.xs = [
+            torch.randn(m, ip.qkvz[0].shape[1], device='cuda', dtype=torch.bfloat16)
+            for _ in ip.qkvz
+        ]
+        equal = total = 0
+        max_abs = 0.0
+        max_rel = 0.0
+        for x, wq, wb, w in zip(ip.xs, ip.qkvz, ip.ba, ip.merged, strict=True):
+            sep = torch.cat([F.linear(x, wq), F.linear(x, wb)], dim=1)
+            mrg = F.linear(x, w)
+            equal += int((sep.view(torch.int16) == mrg.view(torch.int16)).sum())
+            total += sep.numel()
+            d = (sep.float() - mrg.float()).abs()
+            max_abs = max(max_abs, float(d.max()))
+            max_rel = max(max_rel, float(d.max() / sep.float().abs().max()))
+        row: dict[str, Any] = {
+            'm': m,
+            'bitwise_equal_fraction': equal / total,
+            'max_abs_diff': max_abs,
+            'max_rel_diff': max_rel,
+            'qkvz_columns': width,
+            'kernels_separate': kernels_of(ip.first_separate),
+            'kernels_merged': kernels_of(ip.first_merged),
+        }
+        for name, fn in (
+            ('separate_side_stream', ip.separate_side_stream),
+            ('separate_serial', ip.separate_serial),
+            ('merged', ip.merged_gemm),
+        ):
+            graph = capture(fn)
+            row[f'{name}_us_per_layer'] = stats(
+                time_graph(graph, args.inner, args.repeats), 1.0 / len(ip.xs)
+            )
+            del graph
+        result['rows'].append(row)
+        print(
+            f'merge m={m:5d} equal={row["bitwise_equal_fraction"]:.4f} max_abs={max_abs:.3g} '
+            f'side={row["separate_side_stream_us_per_layer"]["median_us"]:.2f} '
+            f'serial={row["separate_serial_us_per_layer"]["median_us"]:.2f} '
+            f'merged={row["merged_us_per_layer"]["median_us"]:.2f} us/layer',
+            flush=True,
+        )
+    return result
+
+
 KEPT_ARMS = (
     'cublas',
     'cublas_nored',
@@ -1134,7 +1230,7 @@ def main() -> None:
         compile_worker(sys.argv[2], sys.argv[3])
         return
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument('what', choices=('gemm', 'norm', 'chain'))
+    ap.add_argument('what', choices=('gemm', 'norm', 'chain', 'merge'))
     ap.add_argument('--out', required=True, help='full result (raw, may exceed 1 MB)')
     ap.add_argument('--evidence', help='compact result for evidence/ (gemm)')
     ap.add_argument('--m', type=int, nargs='*')
@@ -1157,6 +1253,8 @@ def main() -> None:
         result = bench_gemm(args)
     elif args.what == 'norm':
         result = bench_norm(args)
+    elif args.what == 'merge':
+        result = bench_merge(args)
     else:
         if not args.gemm_json:
             ap.error('chain needs --gemm-json')
