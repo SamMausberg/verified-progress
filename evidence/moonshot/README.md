@@ -448,7 +448,8 @@ did not produce this table.
 ## 2g. GDN state reduced to rank r (proposal P13; offline, training-free; closed)
 
 The question was whether the GDN recurrent state can be cut to rank r in the key dimension,
-with the basis chosen offline, inside the lossy-stack quality budget (Section 3). Per layer
+with the basis chosen offline, while keeping output quality within criteria of the
+lossy-stack budget's form (Section 3). Per layer
 and head, `gdn_state_rank_study.py` projects the queries and keys (after the convolution and
 the L2 normalisation) onto an orthonormal basis U of 128 x r. It then runs the same chunked
 gated delta rule in r dimensions, so the state is V x r and holds r / 128 of the bytes. The
@@ -481,24 +482,31 @@ was one shared-lock run (`gdn_state_rank_study.json`; command in Section 4).
 | product | 64 | 0.50 | 0.540 | 83.3% | 24/24 |
 | product | 32 | 0.25 | 0.652 | 82.3% | 24/24 |
 
-No reduced configuration comes near the budget (KL at most 0.01 nats, top-1 agreement at least
-98%). The best one, the energy basis at r = 96, cuts only 25% of the state bytes and still
-has 16 times the floor's KL and 4.7 points less top-1 agreement than the floor. The
-budget is stated for the 48-prompt logit probe with top-20 KL, a different measure. A miss
-of 13 times in KL and more than 4 points in top-1 does not depend on that difference.
+On this measure no reduced configuration meets a criterion of the budget's form (KL at most
+0.01 nats, top-1 agreement at least 98%). The best one, the energy basis at r = 96, cuts only
+25% of the state bytes. It still has 16 times the floor's KL and 4.7 points less top-1
+agreement than the floor.
+
+This is not a measurement of the declared budget, which is defined on a different probe:
+top-20 KL and top-1 agreement on `logit_probe.py`'s 48 prompts at 256 tokens. That probe was
+not run on these configurations. The study measures full-vocabulary KL on the second halves
+of 2,048-token texts, where a reduced state has had longer to drift, so the declared probe
+might show smaller differences.
 
 The floor itself sits at the budget's edge, because the rotated BF16 path adds its own
 rounding. So these numbers bound the projection's damage only to within about 0.01 nats.
 
 Choosing the basis for output sensitivity made things worse, not better. The query and
 product bases have higher KL and lower top-1 agreement than the plain key-energy basis at
-every rank. The query basis also loses
-delayed retrieval at r = 64 (22 of 24 exact) and r = 32 (4 of 24). With the energy basis, retrieval survives at
-every rank while top-1 agreement falls, so the damage is spread over ordinary next-token
-prediction rather than concentrated on recalling early facts.
+every rank. The query basis also loses delayed retrieval at r = 64 (22 of 24 exact) and
+r = 32 (4 of 24). With the energy basis, retrieval survives at every rank while top-1
+agreement falls, so the damage is spread over ordinary next-token prediction rather than
+concentrated on recalling early facts.
 
-Decision: P13 closes. Its one planned training-free test (`TASKS.md`) misses the budget at
-every rank, and the untested variants would need training or a different design: recovering
+Decision: P13 closes on this evidence. Under long-context teacher forcing its one planned
+training-free test (`TASKS.md`) misses a criterion of the budget's form at every rank: by 13
+times in KL even at a 25% cut, and the output-sensitivity bases do worse. The declared probe
+was not run. The untested variants would need training or a different design: recovering
 quality by training, choosing ranks per layer or per head, and bases applied before the
 depthwise convolution.
 
