@@ -1,0 +1,7 @@
+[
+ ["stock c1 vs fresh-server repeat (floor)", "plain/c1", "plain__rep/c1"],
+ ["stock c32 vs fresh-server repeat (floor)", "plain/c32", "plain__rep/c32"],
+ ["stock c1 vs stock c32, one server (floor)", "plain/c1", "plain/c32"],
+ ["stock c1 vs lever_v1 c1", "plain/c1", "plain__bb_lever_v1/c1"],
+ ["stock c32 vs lever_v1 c32", "plain/c32", "plain__bb_lever_v1/c32"]
+]

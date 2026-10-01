@@ -1,0 +1,39 @@
+{
+  "command": [
+    "python",
+    "experiments/backbone/gemm_bench.py",
+    "chain",
+    "--gemm-json",
+    "evidence/backbone/gemm_microbench.json",
+    "--m",
+    "1",
+    "2",
+    "4",
+    "8",
+    "16",
+    "--variants",
+    "mlp_triton_pdl",
+    "mlp_act_pdl",
+    "mlp_normscaled_pdl",
+    "mlp_both_scaled_pdl",
+    "gdn_triton_pdl",
+    "gdn_normscaled_pdl",
+    "--out",
+    "~/vp-data/backbone/runs/h2/chain_fusion2.json"
+  ],
+  "exit_code": 0,
+  "interval_s": 1.0,
+  "samples": 45,
+  "foreign_cores_mean": 0.45,
+  "foreign_cores_max": 1.33,
+  "contended": false,
+  "contention_threshold_cores": 2.0,
+  "top_foreign_mean_cores": {
+    "claude": 0.08,
+    "node": 0.07
+  },
+  "own_peak_cores": {
+    "python gemm_bench.py": 5.24
+  },
+  "note": "bench/hostload.py record output for the hold-2 chain step (folding variants); process command lines are reduced to program names in this committed copy"
+}
