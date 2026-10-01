@@ -5,6 +5,9 @@ The second exact reference of Appendix~\paperref{app:checked} of the paper, with
 
 \begin{table}[htbp]
 \small\centering
+\caption{Instances checked by the exact rational reference for decisions and races~\ev{inherited}. It also contains counterexamples for biased depth selection, graph-cost cliffs, batch unions, invalid numerical bounds, support truncation and stale namespaces. No GPU code is exercised.}
+\label{tab:tests}
+\vskip 0.05in
 \begin{tabular}{@{}lrl@{}}\toprule
 Check & Instances & What agrees\\\midrule
 Top-$k$ plus tail composition & 250 & Exact union and associative merge (Proposition~\ref{prop:summary})\\
@@ -24,6 +27,4 @@ Finite-map execution & 400 & Scan, walk and composition agree (Proposition~\ref{
 Gated-delta replay & 150 trajectories & 868 accepted-prefix replay checks (Proposition~\ref{prop:gdn})\\
 Lease reuse & 300 schedules & Sequential epoch and base-prefix guards\\\bottomrule
 \end{tabular}
-\caption{Instances checked by the exact rational reference for decisions and races~\ev{inherited}. It also contains counterexamples for biased depth selection, graph-cost cliffs, batch unions, invalid numerical bounds, support truncation and stale namespaces. No GPU code is exercised.}
-\label{tab:tests}
 \end{table}

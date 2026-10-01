@@ -3,7 +3,7 @@
 % main branch (scripts/check_paper_references.py checks both registers).
 \section{Evidence register and pending results}\label{notes:register}
 \subsection{Evidence register}\label{notes:evidence}
-Every committed result these notes cite is listed below with the claims it supports, the files that hold it and the program that produced them. All paths are relative to the repository at \repourl. The exact command behind each evidence file is in the \code{README.md} of the file's directory, and the files record the commits of this repository and of the engine that produced them where the generator records them. The text cites an entry as [E$n$]. The paper numbers its own register (Appendix~\paperref{app:register} of the paper) separately; an entry that both documents cite lists the same files in both.
+Every committed result these notes cite is listed below with the claims it supports, the files that hold it and the program that produced them. All paths are relative to the repository at \repourl. The exact command behind each evidence file is in the \code{README.md} of the file's directory, and the files record the commits of this repository and of the engine that produced them where the generator records them. The text cites an entry as [N-E$n$]. The paper numbers its own register (Appendix~\paperref{app:register} of the paper) separately, as E$n$; an entry that both documents cite lists the same files in both.
 
 \input{sections/app_register_macros}
 {\small
@@ -84,7 +84,7 @@ Every committed result these notes cite is listed below with the claims it suppo
 A file name listed without a directory is in the directory of the entry's first file. Raw captures, traces and per-row arrays are not in the repository; each evidence README gives the command that regenerates them on the same hardware.
 
 \subsection{Pending results}\label{notes:pending}
-Each entry is designed work without a committed result, with the place its evidence is to be committed. The text marks it \mbox{[pending D$n$]} and says beside the marker what the result will decide; no number stands in for it.
+Each entry is designed work without a committed result, with the place its evidence is to be committed. The text marks it \mbox{[pending N-D$n$]} and says beside the marker what the result will decide; no number stands in for it.
 
 {\small
 \begin{longtable}{@{}P{.9cm}P{15.6cm}@{}}

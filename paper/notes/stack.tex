@@ -17,6 +17,9 @@ Table~\ref{tab:profile-ranked} ranks the measured costs of the stock engine (App
 
 \begin{table}[htbp]
 \small\centering
+\caption{Measured costs and their Amdahl ceilings $1/(1-f)$, with $f$ the share of the step or cycle in the stated configuration. For the idle time the parenthesized values are the share derived without the profiler and its ceiling. Measured~\ev{profile-attr,profile-host}.}
+\label{tab:profile-ranked}
+\vskip 0.05in
 \begin{tabularx}{\linewidth}{@{}YP{3.1cm}rr@{}}\toprule
 Cost & Configuration & $f$ & Ceiling\\\midrule
 FP32 recurrent state read and written every step & plain, $B=128$ ($B=32$) & 41.6\% (18.0\%) & $1.71\times$ ($1.22\times$)\\
@@ -29,8 +32,6 @@ The target head chain & plain, $B=1$ ($B=128$) & 10.3\% (6.1\%) & $1.11\times$ (
 Gaps between graph nodes & plain, $B=1$ & 3.0\% & $1.03\times$\\
 Eager sampling and bookkeeping after each replay & plain, $B=1$ & 2.6\% & $1.03\times$\\\bottomrule
 \end{tabularx}
-\caption{Measured costs and their Amdahl ceilings $1/(1-f)$, with $f$ the share of the step or cycle in the stated configuration. For the idle time the parenthesized values are the share derived without the profiler and its ceiling. Measured~\ev{profile-attr,profile-host}.}
-\label{tab:profile-ranked}
 \end{table}
 
 \subsection{Ceilings under a stated execution model}\label{app:ceilings}\label{sec:stack-ceilings}
@@ -48,6 +49,9 @@ Table~\ref{tab:stack-ceilings} and Figure~\ref{fig:stack-ceilings} evaluate the 
 
 \begin{table}[htbp]
 \small\centering
+\caption{Derived large-batch throughput ceilings under the layer-serial model of Equation~\eqref{eq:stack-floor}, which assumes that per-request kernels do not overlap the weight GEMMs, and under the overlapped roofline of Equation~\eqref{eq:stack-floor-overlap}, at a 334-token context, with the measured read bandwidth of 3.79~TB/s and the tensor-core rate assumed at 70\% (BF16) or 60\% (FP8) of the datasheet peak. The MTP rows are for the layer-serial model only. Not measurements~\ev{ceilings}.}
+\label{tab:stack-ceilings}
+\vskip 0.05in
 \begin{tabular}{@{}lrrr@{}}\toprule
 & MB per request & \multicolumn{2}{c}{Tokens/s at $B=2{,}048$}\\\cmidrule(l){3-4}
 Lever stack & per step & layer-serial & overlapped\\\midrule
@@ -61,8 +65,6 @@ Replayed, int8 state, FP8 weights, KV and head & 21.2 & 78.9k & 141.2k\\
 MTP (accepted length 3), stock verify, FP32 & -- & 19.5k & --\\
 MTP (accepted length 3), replayed verify, FP32 & -- & 34.3k & --\\\bottomrule
 \end{tabular}
-\caption{Derived large-batch throughput ceilings under the layer-serial model of Equation~\eqref{eq:stack-floor}, which assumes that per-request kernels do not overlap the weight GEMMs, and under the overlapped roofline of Equation~\eqref{eq:stack-floor-overlap}, at a 334-token context, with the measured read bandwidth of 3.79~TB/s and the tensor-core rate assumed at 70\% (BF16) or 60\% (FP8) of the datasheet peak. The MTP rows are for the layer-serial model only. Not measurements~\ev{ceilings}.}
-\label{tab:stack-ceilings}
 \end{table}
 
 \begin{figure}[htbp]
@@ -130,6 +132,9 @@ SGLang's packed GDN input projection, one GEMM over the concatenated $12{,}352\t
 
 \begin{table}[htbp]
 \small\centering
+\caption{Levers by axis. A change of the target's attention backend changes the target's arithmetic, so it is classed by its greedy outputs like any other lever. $^\ast$The replay fold is written as a bitwise clone of the verify kernel's state update, but the verify outputs come from a chunked transform on TF32 tensor cores, whose rounding differs from the recurrent kernel's by more than a reassociation; that mechanism suggested lossy, but every first divergence of the buffered MTP arm from stock MTP is rounding-level~\ev{bench-equality}.}
+\label{tab:axes}
+\vskip 0.05in
 \begin{tabularx}{\linewidth}{@{}P{2.9cm}YP{1.7cm}P{4.6cm}@{}}\toprule
 Axis & Lever & Class & Status\\\midrule
 Progress per verify pass & MTP and DFlash drafting, deeper chains, trees where the GDN path allows, n-gram drafting & exact & Chosen in single runs on the tuning split: MTP with three steps, DFlash blocks 16, 8 and 4 by concurrency (Table~\paperref{tab:tuning} of the paper); trees and n-gram drafting not searched; served comparison~\ev{bench-frontier}\\
@@ -144,8 +149,6 @@ Concurrency and state & One state slot per request (lifts the 133-request cap) &
 Backbone GEMMs and norms & Kernel routing per projection and $M$ (Hopper GEMV, Triton with programmatic dependent launch, cuBLASLt); packed GDN input projection; norm and SiLU folded into the GEMM & exact up to rounding (packed projection alone: identical outputs at $c=1$) & Best isolated kernel up to $M=16$: 0.77--0.92 of cuBLAS's time on the output projections, 0.91--1.00 on the other large ones; no folding variant pays; served on tuned plain decoding, one session: 3.4\% faster at $c=1$, 0.4\% at 8, 1.0\% at 128~\ev{backbone}; against tuned MTP \pend{backbone-served}\\
 System overheads & Host gaps and synchronizations, fusion, attention backend per shape & exact; Triton target attention exact up to rounding & Measured shares in Table~\ref{tab:profile-ranked}; Triton attention: MTP $1.18\times$ at $c=1$, draft only $1.08\times$ (single runs~\ev{host-levers}); blocking planning reads removed with token-identical outputs: tuned MTP $1.075$--$1.096\times$ per-request rate served at $c=1$--32 (interleaved, one session), held cycle 5.9--8.8\% shorter~\ev{hostgap}; DFlash with FlashInfer draft attention \pend{hostgap-served}\\\bottomrule
 \end{tabularx}
-\caption{Levers by axis. A change of the target's attention backend changes the target's arithmetic, so it is classed by its greedy outputs like any other lever. $^\ast$The replay fold is written as a bitwise clone of the verify kernel's state update, but the verify outputs come from a chunked transform on TF32 tensor cores, whose rounding differs from the recurrent kernel's by more than a reassociation; that mechanism suggested lossy, but every first divergence of the buffered MTP arm from stock MTP is rounding-level~\ev{bench-equality}.}
-\label{tab:axes}
 \end{table}
 
 \paragraph{What did not work}\label{sec:stack-failed} FP8 W8A8 weights, whose CUTLASS GEMM in the installed aarch64 \code{sgl-kernel} aborts at run time and whose Triton fallback showed no consistent gain in single runs; FP8 KV cache, which saves nothing at short contexts; BF16 recurrent state, which moves the same bytes as FP16 and is worse on quality in published measurements on another GDN model~\cite{damp}; folding the RMSNorm and the SiLU into the next GEMM's prologue, 12--90~\textmu s per layer slower up to $M=32$ and 82--543~\textmu s at 64 and 128 as built, with the single-pass and SiLU-only variants slower at every $M$ from 2 to 16, in isolated layer skeletons~\ev{backbone}; and 2:4 sparsity, which the engine does not support at the pin (its compressed-tensors loader raises an error for 2:4 schemes; code reading, \path{python/sglang/srt/layers/quantization/compressed_tensors/compressed_tensors.py}). An MTP server with BF16 state at 512 concurrent requests also failed to capture its verify graph, on a FlashInfer workspace overflow (Appendix~\paperref{app:serving-protocol} of the paper). Two proposals were rejected by their pre-registered tests: sharing computation across requests (P5, above) and a certified decoder tail (P1, Section~\ref{app:tail}). The repeated runs, with the mechanism of any lever that fails or regresses in them, are \pend{moonshot-repeat}.
