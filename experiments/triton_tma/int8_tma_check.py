@@ -13,7 +13,11 @@ dot product by more than ``K * 2^-22 * sum_k |a_k b_k|`` (NaN and Inf are wrong)
 twice on the same inputs. One JSON line per case, after a header line with the environment; an existing output file is
 replaced.
 
-    scripts/gpu_lock.sh -s python experiments/triton_tma/int8_tma_check.py --out cases.jsonl
+    scripts/gpu_lock.sh -s bash -c 'source scripts/sglang_env.sh &&
+        python experiments/triton_tma/int8_tma_check.py --out cases.jsonl'
+
+That runs it under the SGLang venv's Triton. ``run_versions.sh`` runs it under every build
+compared in ``evidence/triton_tma/``.
 
 ``--real`` adds the Qwen3.5-4B int8 head codes and captured decode rows (local files, see
 ``--codes`` and ``--hidden``) as a second data set.
