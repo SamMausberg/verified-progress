@@ -334,6 +334,17 @@ def test_log_segment_stats() -> None:
     assert stats['logged_accept_len_mean'] == pytest.approx(3.0)
     assert stats['prefill_log_lines'] == 1
     assert stats['kv_retractions'] == 3
+    # Only the 5-request window is at >= 0.9 x the largest batch.
+    assert stats['logged_gen_tps_full_batch_p50'] == pytest.approx(12.0)
+    assert stats['logged_gen_tps_full_batch'] == pytest.approx(12.0)
+    two = (
+        'Decode batch, #running-req: 10, accept len: 2.00, cuda graph: True, '
+        'gen throughput (token/s): 100.0\n'
+        'Decode batch, #running-req: 10, accept len: 4.00, cuda graph: True, '
+        'gen throughput (token/s): 400.0\n'
+    )
+    # Window tokens 20 and 40 at 100 and 400 tok/s: 60 tokens in 0.3 s.
+    assert log_segment_stats(two)['logged_gen_tps_full_batch'] == pytest.approx(200.0)
 
 
 def test_frontier_dominance_and_aggregation() -> None:

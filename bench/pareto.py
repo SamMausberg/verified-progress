@@ -73,8 +73,19 @@ POINT_FIELDS = (
     'max_running_logged',
     'kv_retractions',
     'session',
+    'server_full_batch_tps_p50',
+    'server_full_batch_tps',
 )
-AGGREGATED = ('x_e2e', 'x_decode', 'y', 'y_steady', 'ttft_p50_ms', 'itl_p50_ms', 'accept_length')
+AGGREGATED = (
+    'x_e2e',
+    'x_decode',
+    'y',
+    'y_steady',
+    'ttft_p50_ms',
+    'itl_p50_ms',
+    'accept_length',
+    'server_full_batch_tps',
+)
 # Reference categorical order (dataviz palette, light surface), assigned per label in order.
 SERIES_COLOURS = ('#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7')
 
@@ -137,6 +148,12 @@ def point_row(label: str, run: str, point: dict[str, Any], status: str = '') -> 
         # point (blank: not recorded); below-concurrency batches or retractions mean
         # the KV pool, not the client, limited the batch.
         'max_running_logged': (point.get('server_log') or {}).get('max_running_logged'),
+        # Scheduler-logged generation rate with at least 0.9 x the largest logged
+        # batch running: a diagnostic of what the GPU sustains, not seen by clients.
+        'server_full_batch_tps_p50': (point.get('server_log') or {}).get(
+            'logged_gen_tps_full_batch_p50'
+        ),
+        'server_full_batch_tps': (point.get('server_log') or {}).get('logged_gen_tps_full_batch'),
         'kv_retractions': (point.get('server_log') or {}).get('kv_retractions'),
         'isl_mean': point.get('isl_mean'),
         'span_s': point.get('span_s'),

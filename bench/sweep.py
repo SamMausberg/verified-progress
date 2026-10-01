@@ -170,13 +170,24 @@ def log_segment_stats(text: str) -> dict[str, Any]:
     top = max(running) if running else 0
     # The server's own decode rate while (nearly) the full batch is running: what
     # the GPU sustains, against which the client-observed y can be compared.
-    full = sorted(float(tps) for run, _, _, tps in lines if top and int(run) >= 0.9 * top)
+    full_lines = [
+        (int(run), float(acc) if acc else 1.0, float(tps))
+        for run, acc, _, tps in lines
+        if top and int(run) >= 0.9 * top
+    ]
+    full = sorted(tps for _, _, tps in full_lines)
+    # Tokens over time across those windows. Each window spans the same number of
+    # decode passes; a pass yields about running x accept-length tokens, so the
+    # window's tokens are proportional to that and its time to tokens / rate.
+    tokens = sum(run * acc for run, acc, _ in full_lines)
+    seconds = sum(run * acc / tps for run, acc, tps in full_lines if tps > 0)
     return {
         'decode_log_lines': len(lines),
         'decode_log_lines_without_graph': graph.count(False),
         'max_running_logged': top,
         'logged_accept_len_mean': sum(accept) / len(accept) if accept else None,
         'logged_gen_tps_full_batch_p50': full[len(full) // 2] if full else None,
+        'logged_gen_tps_full_batch': tokens / seconds if seconds > 0 else None,
         'prefill_log_lines': text.count('Prefill batch'),
         # Requests the scheduler evicted and recomputed because the KV pool was full:
         # a point with retractions measures a KV-limited server.

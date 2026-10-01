@@ -88,6 +88,50 @@ unexpected prompts or non-finite metrics out of the frontier and lists them with
 warmup at the top concurrency runs once after launch. Repeats alternate the
 concurrency order.
 
+### Declared sensitivity workload: natural output lengths
+
+Declared on 2026-10-01 at 03:50 UTC. At that point the tune split and repeat 0 of the
+confirmation sweep had been measured, and no arm had been timed on this workload.
+
+The fixed-length panel above is the primary, pre-declared result and stays as it is.
+With a closed-loop client and equal output lengths, plain requests start and finish
+in synchronised waves. Speculative arms advance requests at rates that vary with
+acceptance, so their completions spread out: more, smaller prefill passes and a
+drain tail when the point ends. The sensitivity workload removes the equal lengths
+and nothing else:
+
+- Prompts: the confirmation split (`mixed-v2/confirm.jsonl`, 1,152 prompts), in
+  stored order, with the request settings above (thinking on, greedy, same template).
+- Output lengths: each prompt's own greedy completion length under the target alone,
+  measured once with `plain-tuned` (stock arithmetic) with natural stopping and
+  `max_completion_tokens = 2048`. Each request is then sent with that length
+  (`output_length` per record, `ignore_eos = true`), so every arm generates exactly
+  the same number of tokens per request. On the tune split, the same cap leaves
+  45% of requests at 2,048 tokens and a mean of about 1,540 (from
+  `evidence/bench/workload/natural_requests_tune.csv`, measured with MTP).
+  The length file and its sha256 are committed before any arm is timed on it.
+- Points: c = 32 and 128 with `max(64, 8 c)` measured requests (eight waves; at
+  least four at c = 128 were required).
+- Arms, chosen by a rule fixed now: for each family (MTP, DFlash) and each of
+  c = 32 and 128, the family's arm with the highest confirmation y at that
+  concurrency, each with its matched plain baseline (`plain-tuned` for FlashInfer
+  arms, `plain-tuned-triton` for Triton arms). Plain decoding runs as both the
+  baseline and an arm.
+- Repeats: three sessions, each launching every selected arm with its matched
+  baseline in the same exclusive hold, in alternating order, with the sweep's
+  foreign-load recording and quiet-host wait.
+- Reporting: the same x, y and paired ratios as the primary panel, plus `y_steady`
+  and the server-side full-batch decode rate. The frontier text reports the
+  primary result as measured. Where this workload changes a ranking, it gives both
+  numbers and calls neither the true result.
+
+`points.csv` carries, for every point, the scheduler's logged generation rate
+while at least 0.9 x the largest logged batch is running
+(`server_full_batch_tps_p50`, the median over log windows, and
+`server_full_batch_tps`, tokens over time across those windows). This is a
+diagnostic of what the GPU sustains at full batch. Clients do not see it, so it is
+not a headline metric.
+
 ## Arms
 
 `arms.toml` defines each arm as launch flags without the leading dashes; `true`
