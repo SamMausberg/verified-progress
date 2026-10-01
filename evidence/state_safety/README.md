@@ -449,6 +449,53 @@ general.
   between near-equal FP32 logits, moved by the batch-dependent hidden state (the tap
   found the head input different in every divergence it examined).
 
+### Divergence given perturbation
+
+The rate per 1,000 compared tokens mixes two things: how many prompts a configuration
+change perturbs at all, and how often a perturbed trajectory then flips a near tie.
+`experiments/state_safety/perturbation.py` separates them (`perturbation.json` for the
+first matrix, `perturbation_pinned.json` for the pinned one). A prompt is perturbed when
+its two outputs are not bitwise identical in tokens and top-5 logprobs. Its onset is the
+first output index where they differ (output index 0 comes from the prefill alone). For
+perturbed prompts it reports the share whose tokens diverge within the 256 generated
+tokens, with a Wilson 95% interval, overall and by onset (0-31, 32-127, 128 and later).
+It also reports the median onset and the token divergences per 1,000 post-onset
+positions, which count from the onset to the divergence or the end.
+
+| Pair | Perturbed | Median onset | Diverged (share, 95%) | Per 1,000 post-onset |
+|---|---|---|---|---|
+| Plain, c1 vs c32, cap 16 (first matrix) | 320/320 | 3 | 167 (0.52, 0.47-0.58) | 3.55 |
+| Plain, c1 vs c32, cap 8 (pinned) | 75/320 | 0 | 41 (0.55, 0.43-0.65) | 4.11 |
+| MTP steps 3 vs plain, c1 (pinned) | 320/320 | 1 | 171 (0.53, 0.48-0.59) | 3.71 |
+| MTP steps 1, 5, tree vs plain, c1 (pinned) | 320/320 each | 1 | 164-170 (0.51-0.53) | 3.53-3.71 |
+| MTP vs plain, c32 (pinned) | 320/320 each | 1 | 166-181 (0.52-0.57) | 3.55-3.99 |
+| MTP steps 1 vs steps 3, c1 (pinned) | 241/320 | 41 | 92 (0.38, 0.32-0.44) | 3.47 |
+
+- Batch shape at cap 8 perturbs only 75 of 320 plain-decoding prompts, and 245 are
+  bitwise identical between c1 and c32. At cap 16 it perturbs all 320, and speculation
+  perturbs all 320 against plain decoding from the first verify forward.
+- In the onset bucket that holds almost all of them (0-31), the share that diverges is
+  about the same: 35 of 62 (0.56, 0.44-0.68) for plain at cap 8, 165 of 318 (0.52) at
+  cap 16, and 0.51 to 0.57 for every MTP configuration against plain decoding. The
+  post-onset rates, 3.5 to 4.1 per 1,000, agree as well.
+- So a perturbed trajectory flips a near tie at about the same rate whatever perturbed
+  it. The difference between the cap-8 floor (0.63 per 1,000 compared tokens) and the
+  speculative rate (3.5 to 4.0) is the number of prompts perturbed, not a higher rate of
+  divergence once perturbed. On this measure no excess of speculation is detected at
+  either concurrency. The cap-8 interval is wide (75 perturbed prompts), so a modest
+  difference is not excluded. A source that flipped near ties more often per perturbed
+  trajectory would raise the share or the post-onset rate; none does.
+- Onset matters where it varies. MTP steps 1 and 3 are perturbed later (median onset 41),
+  so fewer of their prompts diverge overall (0.38). In the 0-31 bucket the share is 51 of
+  103 (0.50), and the post-onset rate (3.47) is the same as elsewhere.
+- Other pinned pairs fall in the same range: MTP across concurrency, radix off, overlap
+  off, deterministic inference and the same-server repeats give shares of 0.44 to 0.60.
+  The FP32 head gives 0.41 (2.45 per 1,000 post-onset), since without BF16 ties there
+  are fewer near ties to flip.
+- These are counts over 320 prompts of 256 tokens, with intervals that assume prompts are
+  independent. The post-onset rate treats positions as independent, although they
+  cluster by prompt.
+
 **Pending** (queued, pinned): radix cache off, overlap off, deterministic inference
 and FP32 head for plain decoding, which give the radix-off noise floor (plain c1 vs
 c32 without the radix cache) and radix-off speculation against radix-off plain
