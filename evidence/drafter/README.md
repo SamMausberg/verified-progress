@@ -148,3 +148,17 @@ rerun with top-5 logprobs on every run (`run_equality.sh`, queued) gives both ma
     python experiments/drafter/summarize_acceptance.py \
         --run zlab:16:~/vp-data/drafter/eval/zlab/b16 --run mtp3:4:~/vp-data/drafter/eval/mtp3 \
         --out evidence/drafter/panel_v2
+
+## Timed panel at concurrency 1 (cycle statistics)
+
+`timed_panel/requests_c1.csv`, `timed_panel/summary.json`, `launch/zlab_b{16,8}_timed_panel.json`:
+untraced runs of the public drafter on panel-v1 at blocks 16 and 8, concurrency 1, greedy,
+thinking on, up to 2,048 new tokens, stock engine, one exclusive GPU hold, one run (no
+repeats, so no variance yet). Per request: verify cycles, tokens per cycle and
+milliseconds per cycle (request latency over verify cycles, so prefill and client time are
+spread over the cycles). Block 16: 6.96 tokens per cycle and 7.71 ms per cycle on average,
+901 tokens/s per request; block 8: 5.34 and 7.02 ms, 759 tokens/s. Foreign CPU load averaged
+0.18 and 0.17 cores. These per-request statistics feed the repair workstream's oracle
+(C_D, A_D); the served Pareto comparison is the bench harness's.
+
+    scripts/gpu_lock.sh -x experiments/drafter/run_timed_panel.sh

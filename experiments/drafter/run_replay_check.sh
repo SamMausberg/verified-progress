@@ -15,7 +15,7 @@ for conc in 1 8; do
     extra=""
     if [ "$flag" = on ]; then extra="--enable-linear-replayssm-spec"; fi
     python "$here/serve_run.py" --arm dflash --block 16 --port 30086 --out "$out/c$conc-$flag" \
-      --mem 0.25 --max-running 8 --extra "$extra" \
+      --mem 0.25 --max-running 8 --extra="$extra" \
       --client "python $here/accept_probe.py --port {port} --workload $here/panel-v2.jsonl \
         --per-domain 32 --max-new-tokens 2048 --concurrency $conc --logprobs \
         --label c$conc-$flag --out {out}"
