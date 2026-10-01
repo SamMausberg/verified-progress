@@ -1,0 +1,33 @@
+From 4b5e3e698eb7354c748aa18899b1d0449d0ef6b3 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Thu, 1 Oct 2026 06:46:47 +0000
+Subject: [PATCH 6/7] Forward the dense Qwen3.5 preparation hook only with the
+ merge switch
+
+Patch 0003 made Qwen3_5ForConditionalGeneration forward
+prepare_before_cuda_graph_capture to its language model unconditionally. On
+CUDA with every switch off that is a no-op, but under aiter (ROCm) it newly
+packs the GDN input projections of this class, a change of default behaviour.
+Forward only when SGLANG_BACKBONE_MERGE_IN_PROJ is set.
+---
+ python/sglang/srt/models/qwen3_5.py | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/python/sglang/srt/models/qwen3_5.py b/python/sglang/srt/models/qwen3_5.py
+index 520dd9bb66..b81058f699 100644
+--- a/python/sglang/srt/models/qwen3_5.py
++++ b/python/sglang/srt/models/qwen3_5.py
+@@ -2333,6 +2333,10 @@ class Qwen3_5ForConditionalGeneration(Qwen3VLForConditionalGeneration):
+         return self.model.get_hidden_dim(module_name, layer_idx)
+ 
+     def prepare_before_cuda_graph_capture(self, model_runner) -> None:
++        # Only for the opt-in merge: forwarding unconditionally would also enable
++        # the packed path for this class under aiter (ROCm), a default change.
++        if not _backbone_gemm.MERGE_IN_PROJ:
++            return
+         prepare = getattr(self.model, "prepare_before_cuda_graph_capture", None)
+         if prepare is not None:
+             prepare(model_runner)
+-- 
+2.34.1
+

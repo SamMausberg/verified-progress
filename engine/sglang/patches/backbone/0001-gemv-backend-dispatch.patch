@@ -1,7 +1,7 @@
 From 7e08b0c6455cdec81b922b52c14d841fbfe9ca53 Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <samuelmausberg@gmail.com>
 Date: Thu, 1 Oct 2026 06:40:56 +0000
-Subject: [PATCH 1/5] Reach --bf16-gemm-backend gemv from
+Subject: [PATCH 1/7] Reach --bf16-gemm-backend gemv from
  UnquantizedLinearMethod.apply
 
 The flag loads the Hopper GEMV (hopper_bf16_gemv), but apply() calls the

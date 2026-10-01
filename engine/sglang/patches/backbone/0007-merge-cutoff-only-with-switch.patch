@@ -1,0 +1,50 @@
+From 5758637531c8bed925231ef8ea67803267f39d9d Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Thu, 1 Oct 2026 06:47:54 +0000
+Subject: [PATCH 7/7] Limit the packed in_proj row cutoff to the merge switch
+
+Patch 0004 applied SGLANG_BACKBONE_MERGE_IN_PROJ_MIN_M to every packed GDN
+weight on the CUDA path, which changed the default for models whose loader
+packs the weights itself (Qwen4-Exp finalizes them at load). Apply the cutoff
+only when SGLANG_BACKBONE_MERGE_IN_PROJ is set, and also on the deferred-norm
+branch, which multiplied the packed weight below the cutoff.
+---
+ python/sglang/srt/models/qwen3_5.py | 15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
+
+diff --git a/python/sglang/srt/models/qwen3_5.py b/python/sglang/srt/models/qwen3_5.py
+index b81058f699..09962a6e4c 100644
+--- a/python/sglang/srt/models/qwen3_5.py
++++ b/python/sglang/srt/models/qwen3_5.py
+@@ -781,7 +781,10 @@ class Qwen3_5GatedDeltaNet(nn.Module):
+     def _forward_input_proj(self, hidden_states: torch.Tensor):
+         if isinstance(hidden_states, _backbone_gemm.DeferredNormInput):
+             # Opt-in norm fusion: the input norm runs in the merged GEMM's prologue.
+-            if self._fused_in_proj_weight is None:
++            if self._fused_in_proj_weight is None or (
++                _backbone_gemm.MERGE_IN_PROJ
++                and hidden_states.shape[0] < _backbone_gemm.MERGE_MIN_M
++            ):
+                 hidden_states = hidden_states.materialize()
+             else:
+                 fused_out = hidden_states.linear(self._fused_in_proj_weight)
+@@ -841,9 +844,13 @@ class Qwen3_5GatedDeltaNet(nn.Module):
+             # Measured on cuBLAS above ~1k rows:
+             # the merged (m, 4120) GEMM is ~10% slower than the two separate GEMMs.
+             and hidden_states.shape[0] <= 1024
+-            # On CUDA the merge comes from SGLANG_BACKBONE_MERGE_IN_PROJ, which
+-            # pays only from MERGE_MIN_M rows (GH200, Qwen3.5-4B).
+-            and hidden_states.shape[0] >= _backbone_gemm.MERGE_MIN_M
++            # With SGLANG_BACKBONE_MERGE_IN_PROJ the merge pays only from
++            # MERGE_MIN_M rows (GH200, Qwen3.5-4B). Weights packed by a model's own
++            # loader (Qwen4-Exp) keep the original gate.
++            and (
++                not _backbone_gemm.MERGE_IN_PROJ
++                or hidden_states.shape[0] >= _backbone_gemm.MERGE_MIN_M
++            )
+         ):
+             fused_out = bf16_gemm_dispatch(
+                 hidden_states, self._fused_in_proj_weight, None
+-- 
+2.34.1
+

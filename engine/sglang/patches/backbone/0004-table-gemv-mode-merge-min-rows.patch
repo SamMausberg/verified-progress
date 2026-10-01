@@ -1,7 +1,7 @@
 From 2c302bccca4b68b6878912f21a5797d63b07c155 Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <samuelmausberg@gmail.com>
 Date: Thu, 1 Oct 2026 06:41:07 +0000
-Subject: [PATCH 4/5] Backbone table: a Hopper GEMV mode, and the merged GDN
+Subject: [PATCH 4/7] Backbone table: a Hopper GEMV mode, and the merged GDN
  in_proj from 64 rows
 
 A table entry's mode "gemv" sends that (N, K) at M = 1 to SGLang's
