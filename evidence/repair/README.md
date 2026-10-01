@@ -37,7 +37,7 @@ provenance and is not kept.)
 
 `stage_a_timing.json` (measured), `stage_a_oracle.json`, `stage_a_oracle.csv` (derived).
 
-Session `~/vp-data/repair/runs/timing1/run_timing.sh` under the exclusive lock on
+Session `experiments/repair/runs/stage_a.sh` under the exclusive lock on
 2026-10-01 00:04-00:41 UTC: SGLang with the DFlash drafter at block widths B = 16, 32, 64,
 128 and 256, verification forced to accept the whole block (`SGLANG_SIMULATE_ACC_LEN=B`, so a
 cycle commits exactly B tokens and costs what a perfect B-token candidate would cost), and the
@@ -50,7 +50,7 @@ phase times come from CUDA events in the engine probe; the cycle period is measu
 GPU timeline between consecutive cycle starts.
 
 ```sh
-gpu_lock.sh -x ~/vp-data/repair/runs/timing1/run_timing.sh
+scripts/gpu_lock.sh -x experiments/repair/runs/stage_a.sh   # raw runs in ~/vp-data/repair/runs/timing1
 python experiments/repair/analyze_timing.py ~/vp-data/repair/runs/timing1/force_b* \
     ~/vp-data/repair/runs/timing1/fresh_b* --out evidence/repair/stage_a_timing.json
 python experiments/repair/stage_a.py --timing evidence/repair/stage_a_timing.json \
