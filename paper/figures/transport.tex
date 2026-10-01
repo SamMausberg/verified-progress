@@ -1,13 +1,15 @@
 % Figure fig:rho. (a) is drawn to scale from medians read from committed files:
 % ||h^t||_2 and ||h^d||_2 from evidence/head_geometry/transport_dflash4b.csv (metrics htnorm2
-% and hdnorm2, group all, column median), the threshold delta* from
+% and hdnorm2, group all, column median; 4,020 pairs), the threshold delta* from
 % evidence/head_geometry/rho_dflash4b_quantiles.csv (threshold_int8_row at q = 0.5), and
-% cos(h^d, h^t) = 0.40811888453704215 from evidence/head_geometry/stats_dflash4b.json
-% (pairs/cos_hd_ht/all/q50), which exists only in JSON and is copied here. Every number
-% printed in (a) is computed from these four values. (b) reads
+% cos(h^d, h^t) from evidence/head_geometry/stats_dflash4b.json (pairs/cos_hd_ht/all/q50), which
+% exists only in JSON and is read from figures/data/json_values.csv. Every number printed in (a)
+% is computed from these four values. Colours: h^t ink (the target), h^d and Delta purple (the
+% drafter and its drift), the ball blue (the int8 copy's threshold). (b) reads
 % evidence/head_geometry/rho_dflash4b_quantiles.csv (DFlash-4B drift and the per-row
 % thresholds) and evidence/head_geometry/rho_mtp4b_quantiles.csv (MTP-4B drift); both
-% hold 40,000 held-out pairs.
+% hold 40,000 held-out pairs. Thresholds are derived from the weights (lines without markers);
+% the drift is measured (sparse markers).
 % Both panels are one picture: (b)'s plot area is centred on y = 0, (a)'s drawing sits
 % beside it below the shared title line, and (a)'s title is set on (b)'s title line.
 \vpreadcsv{\transporttable}{../evidence/head_geometry/transport_dflash4b.csv}
@@ -16,7 +18,8 @@
 \vplookuptwo{\transporttable}{metric}{hdnorm2}{group}{all}{median}{\figHd}
 \vplookup{\rhotable}{q}{0.5}{threshold_int8_row}{\figDstar}
 \vplookup{\rhotable}{q}{0.5}{rho_all}{\figRho}
-\pgfmathsetmacro{\figCos}{0.40811888453704215}
+\vpjson{dflash4b_cos_hd_ht_median}{\figCosRaw}
+\pgfmathsetmacro{\figCos}{\figCosRaw}
 \pgfmathsetmacro{\figSin}{sqrt(1-\figCos*\figCos)}
 \pgfmathsetmacro{\figNormRatio}{\figHd/\figHt}
 \pgfmathsetmacro{\figDrel}{sqrt(1+\figNormRatio*\figNormRatio-2*\figNormRatio*\figCos)}
@@ -24,19 +27,19 @@
 % ---------------- (b) measured drift against the thresholds ----------------
 \begin{semilogxaxis}[name=b,at={(11.2cm,0)},anchor=center,
   width=8.7cm,height=3.95cm,xmin=1e-3,xmax=1.6,ymin=0,ymax=1,
-  xlabel={Drift ratio $\rho$ of a pair, or per-row threshold $\delta^\ast_i$},ylabel={Cumulative share},grid=major,
+  xlabel={Drift ratio $\rho$ of a pair, or threshold $\delta^\ast_i$ of an entry},ylabel={Cumulative share},grid=major,
   ytick={0,0.25,0.5,0.75,1},yticklabels={0,0.25,0.5,0.75,1},
   title={\paneltitle{b}{Measured drift against derived thresholds}},xminorticks=false]
-\addplot[series int8 g128] table[x=threshold_int8_g128,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};
-\addplot[series int8 row] table[x=threshold_int8_row,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};
-\addplot[series int4] table[x=threshold_int4_row,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};
-\addplot[series dflash] table[x=rho_all,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};
-\addplot[series mtp,mark repeat=25,mark phase=13] table[x=rho_all,y=q,col sep=comma]{../evidence/head_geometry/rho_mtp4b_quantiles.csv};
-\draw[{Stealth[length=1.6mm]}-{Stealth[length=1.6mm]},muted] (axis cs:\figDstar,0.5) -- (axis cs:\figRho,0.5);
+\addplot[copy int8 g128,derived] table[x=threshold_int8_g128,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};
+\addplot[copy int8 row,derived] table[x=threshold_int8_row,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};
+\addplot[copy int4,derived] table[x=threshold_int4_row,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};
+\addplot[drafter dflash,mark=*,mark size=1.4pt,mark repeat=50,mark phase=1] table[x=rho_all,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};
+\addplot[drafter mtp,mark repeat=50,mark phase=26] table[x=rho_all,y=q,col sep=comma]{../evidence/head_geometry/rho_mtp4b_quantiles.csv};
+\draw[{Stealth[length=1.6mm]}-{Stealth[length=1.6mm]},ink!70] (axis cs:\figDstar,0.5) -- (axis cs:\figRho,0.5);
 \node[annot,fill=white] at (axis cs:0.037,0.5) {medians $\vpnum{0}{\figRho/\figDstar}\times$ apart};
-\node[annot,anchor=east,align=right] at (axis cs:0.0052,0.3) {$\delta^\ast_i$: int8,\\128 cols};
-\node[annot,anchor=west] at (axis cs:0.0084,0.3) {$\delta^\ast_i$: int8, per row};
-\node[annot,anchor=east,align=right] at (axis cs:0.155,0.8) {$\delta^\ast_i$: int4,\\per row};
+\node[annot,anchor=east,align=right] at (axis cs:0.0052,0.3) {$\delta^\ast_i$: int8,\\128 columns};
+\node[annot,anchor=west] at (axis cs:0.0084,0.3) {$\delta^\ast_i$: int8, per entry};
+\node[annot,anchor=east,align=right] at (axis cs:0.155,0.8) {$\delta^\ast_i$: int4,\\per entry};
 \node[annot,anchor=east] at (axis cs:0.9,0.8) {$\rho$: DFlash-4B};
 \node[annot,anchor=east] at (axis cs:0.74,0.1) {$\rho$: MTP-4B};
 \end{semilogxaxis}
@@ -50,22 +53,22 @@
 \coordinate (F) at ({\figHt*\figCos*\figCos},{\figHt*\figCos*\figSin});
 \coordinate (amid) at (68,0);
 % the line through h^d and the foot of the perpendicular from h^t (best rescaling of h^d)
-\draw[muted,densely dotted] (O) -- ($(O)!1.04!(F)$);
-\draw[muted,densely dotted] (T) -- (F);
+\draw[cdraft,densely dotted] (O) -- ($(O)!1.04!(F)$);
+\draw[ink!60,densely dotted] (T) -- (F);
 \node[note,anchor=south west,align=left] at ($(T)!.4!(F)+(2,2)$) {closest rescaling of $h^d$:\\$\rho=\vpnum{2}{\figSin}$};
 % vectors
 \draw[flow,very thick,shorten >=2.2pt] (O) -- (T);
 \node[below,inner sep=2pt] at (80,-2) {$h^t$, $\norm{h^t}_2=\vpnum{0}{\figHt}$};
-\draw[flow,very thick,vpblue] (O) -- (D);
+\draw[flow,very thick,cdraft] (O) -- (D);
 \node[anchor=south east,align=right,inner sep=1pt] at ($(D)+(-1,1)$) {$h^d$, $\norm{h^d}_2=\vpnum{1}{\figHd}$};
-\draw[thick,vppurple,dashed,shorten >=2.2pt] (D) -- node[sloped,below,annot,text=black,pos=.52,yshift=-2.5pt]
+\draw[thick,cdraft,dashed,shorten >=2.2pt] (D) -- node[sloped,below,annot,text=black,pos=.52,yshift=-2.5pt]
   {$\Delta$, $\norm\Delta_2=\vpnum{2}{\figDrel}\,\norm{h^t}_2$} (T);
-\draw[muted] ($(O)+(13,0)$) arc[start angle=0,end angle={acos(\figCos)},radius=13];
+\draw[ink!60] ($(O)+(13,0)$) arc[start angle=0,end angle={acos(\figCos)},radius=13];
 \node[note,anchor=west] at (14,5) {$\cos=\vpnum{2}{\figCos}$};
 % the ball inside which transport would beat int8: radius delta* ||h^t||, to scale
-\fill[vpvermilion] (T) circle[radius={\figDstar*\figHt}];
-\draw[vpvermilion,thin] (T) circle[radius=2.6pt];
-\draw[vpvermilion,thin] (T) -- (148,-14);
+\fill[ccert] (T) circle[radius={\figDstar*\figHt}];
+\draw[ccert,thin] (T) circle[radius=2.6pt];
+\draw[ccert,thin] (T) -- (148,-14);
 \node[note,text=black,anchor=north,align=center] at (146,-14) {transport beats int8 only\\inside the dot in this circle:\\radius $\vpnum{4}{\figDstar}\,\norm{h^t}_2$};
 \end{scope}
 % (a)'s title on (b)'s title line
