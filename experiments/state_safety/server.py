@@ -82,6 +82,19 @@ def expected_pools(flags: list[str], pin: dict[str, int] = POOL_PIN) -> dict[str
     return out
 
 
+def mixed_pin_runs(root: Path, pin: bool) -> list[str]:
+    """Sessions under root (symlinks followed) whose pool regime differs from pin.
+
+    A run is pinned when its meta records a pool_pin; runs from before the pin
+    have no such key and count as unpinned.
+    """
+    out = set()
+    for meta in root.glob('*/*.meta.json'):
+        if (json.loads(meta.read_text()).get('pool_pin') is not None) != pin:
+            out.add(meta.parent.name)
+    return sorted(out)
+
+
 def min_free_gb(flags: list[str]) -> float:
     """Free memory a pinned server needs at start-up (4 x (weights + pools))."""
     env = os.environ.get('GPU_STARTUP_MIN_FREE_GB')

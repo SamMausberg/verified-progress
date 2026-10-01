@@ -50,3 +50,34 @@ def test_startup_lock_waits_for_free_memory(tmp_path, monkeypatch):
     monkeypatch.setattr(server, 'gpu_free_gb', lambda: 10.0)
     with pytest.raises(TimeoutError, match='memory failure'), server.startup_lock(min_free=65.0):
         pass
+
+
+def test_run_matrix_refuses_a_root_of_the_other_pool_regime(tmp_path):
+    import json
+
+    from server import mixed_pin_runs
+
+    legacy = tmp_path / 'legacy' / 'plain'
+    legacy.mkdir(parents=True)
+    (legacy / 'c1.meta.json').write_text(json.dumps({'config': 'plain'}))  # no pool_pin key
+    root = tmp_path / 'campaign'
+    root.mkdir()
+    (root / 'plain').symlink_to(legacy)  # a linked reference counts too
+    assert mixed_pin_runs(root, pin=True) == ['plain']
+    assert mixed_pin_runs(root, pin=False) == []
+    arm = root / 'mtp_s3__x'
+    arm.mkdir()
+    (arm / 'c1.meta.json').write_text(json.dumps({'pool_pin': POOL_PIN}))
+    assert mixed_pin_runs(root, pin=False) == ['mtp_s3__x']
+
+
+def test_compare_flags_pinned_state(tmp_path):
+    import json
+
+    from compare import pinned
+
+    (tmp_path / 'a.meta.json').write_text(json.dumps({'pool_pin': None}))
+    (tmp_path / 'b.meta.json').write_text(json.dumps({'pool_pin': POOL_PIN}))
+    assert pinned(tmp_path / 'a.meta.json') is False
+    assert pinned(tmp_path / 'b.meta.json') is True
+    assert pinned(tmp_path / 'missing.meta.json') is None

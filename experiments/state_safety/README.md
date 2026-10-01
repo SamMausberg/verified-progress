@@ -64,7 +64,12 @@ reproduces them. `analyze_all.sh` analyses both roots: `pairs_pinned.json` over
 `runs_pinned/` into the `*_pinned` evidence files, and `pairs.json` over `runs/` into
 the unsuffixed ones. `compare.py` and `cycles.py` take the root as a required
 `--runs`. Once `runs_pinned/` exists, a pair with a missing run fails the script
-unless `STATE_ALLOW_MISSING=1` is set. Targeted tests compare runs on one server and keep the
+unless `STATE_ALLOW_MISSING=1` is set. Pool regimes cannot be mixed silently.
+`run_matrix.py` refuses to write into a root that already holds runs of the other
+regime, including linked reference directories, unless `--allow-mixed-pins` is
+given. `compare.py` refuses a pair of a pinned and an unpinned run unless
+`--allow-mixed-pins` is given, and records `pinned_a`/`pinned_b` and
+`mixed_pin_pairs` either way. Targeted tests compare runs on one server and keep the
 earlier flags.
 
 | Name | Extra flags |

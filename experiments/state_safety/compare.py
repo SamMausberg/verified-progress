@@ -221,6 +221,13 @@ def summarize(rows: Iterable[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def pinned(meta_path: Path) -> bool | None:
+    """Whether a run had pinned pools (None if it has no meta file)."""
+    if not meta_path.exists():
+        return None
+    return json.loads(meta_path.read_text()).get('pool_pin') is not None
+
+
 def run_meta(root: Path, runs: list[str]) -> dict[str, Any]:
     """Flags, resolved server settings, commits and acceptance for each run."""
     out: dict[str, Any] = {}
@@ -285,6 +292,8 @@ def write_table(path: str, summary: dict[str, Any]) -> None:
         'drift_p99',
         'drift_max',
         'pools_identical',
+        'pinned_a',
+        'pinned_b',
     ]
     with open(path, 'w') as f:
         f.write(','.join(cols) + '\n')
@@ -309,6 +318,11 @@ def main() -> None:
     ap.add_argument(
         '--require-all', action='store_true', help='exit non-zero if any pair has a missing run'
     )
+    ap.add_argument(
+        '--allow-mixed-pins',
+        action='store_true',
+        help='compare a pinned-pool run with an unpinned one (flagged, not refused)',
+    )
     ap.add_argument('--pairs', required=True, help='JSON file: list of [label, run_a, run_b]')
     ap.add_argument('--out-json', required=True)
     ap.add_argument('--out-csv', required=True, help='one row per divergence event')
@@ -321,7 +335,8 @@ def main() -> None:
     summary = {}
     events = []
     consistency: dict[str, Any] = {}
-    missing = []
+    missing: list[str] = []
+    mixed: list[str] = []
     for label, ra, rb in pairs:
         pa, pb = root / f'{ra}.jsonl', root / f'{rb}.jsonl'
         if not (pa.exists() and pb.exists()):
@@ -335,6 +350,10 @@ def main() -> None:
         rows = compare_pair(run_a, run_b)
         s = summarize(rows)
         s.update(run_a=ra, run_b=rb)
+        pins = [pinned(root / f'{r}.meta.json') for r in (ra, rb)]
+        s['pinned_a'], s['pinned_b'] = pins
+        if None not in pins and pins[0] != pins[1]:
+            mixed.append(label)
         # Same server, or two servers that allocated the same pools (None: unknown).
         la, lb = ((root / r).parent / 'server.log' for r in (ra, rb))
         if la == lb:
@@ -364,6 +383,7 @@ def main() -> None:
                 'runs': str(root),
                 'pairs': summary,
                 'missing_pairs': missing,
+                'mixed_pin_pairs': mixed,
                 'self_consistency': consistency,
             },
             indent=2,
@@ -401,6 +421,11 @@ def main() -> None:
             f.write(','.join('' if e.get(c) is None else str(e.get(c)) for c in cols) + '\n')
     if args.require_all and missing:
         raise SystemExit(f'{len(missing)} pairs have missing runs under {root}: {missing}')
+    if mixed and not args.allow_mixed_pins:
+        raise SystemExit(
+            f'{len(mixed)} pairs compare a pinned-pool run with an unpinned one: {mixed} '
+            '(--allow-mixed-pins to report them anyway)'
+        )
 
 
 if __name__ == '__main__':

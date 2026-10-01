@@ -36,6 +36,7 @@ from server import (
     git_sha,
     launch_with_retry,
     min_free_gb,
+    mixed_pin_runs,
     pool_flags,
 )
 from server import sglang_source_dir as sglang_dir
@@ -51,6 +52,11 @@ def main() -> None:
     ap.add_argument('--prompts', default=str(Path.home() / 'vp-data/state/prompts/prompts.jsonl'))
     ap.add_argument('--out-dir', help='default: ~/vp-data/state/runs_pinned (runs with --no-pin)')
     ap.add_argument('--no-pin', action='store_true', help='let SGLang size the pools')
+    ap.add_argument(
+        '--allow-mixed-pins',
+        action='store_true',
+        help='write into a root that already holds runs of the other pool regime',
+    )
     ap.add_argument('--tag', default='', help='suffix for a repeated session of the same config')
     ap.add_argument('--max-new-tokens', type=int, default=256)
     ap.add_argument('--top-logprobs', type=int, default=5)
@@ -69,6 +75,14 @@ def main() -> None:
 
     pin = not args.no_pin
     root = Path(args.out_dir or Path.home() / 'vp-data/state' / ('runs_pinned' if pin else 'runs'))
+    clash = mixed_pin_runs(root, pin)
+    if clash and not args.allow_mixed_pins:
+        raise SystemExit(
+            f'{root} already holds {"unpinned" if pin else "pinned"} runs ({", ".join(clash)}); '
+            f'runs compared with them would mix pool regimes. Use '
+            f'{"--no-pin" if pin else "the default pinning"} to match them, another '
+            '--out-dir, or --allow-mixed-pins.'
+        )
     for name in args.configs.split(','):
         # Extra flags come last, so a test that changes a pool size (retraction) wins.
         flags = CONFIGS[name] + (pool_flags() if pin else []) + args.extra_flags.split()
