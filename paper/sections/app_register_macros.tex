@@ -5,6 +5,6 @@
 \providecommand{\regprefix}{}
 \newcounter{evitem}
 \newcommand{\evgroup}[1]{\multicolumn{2}{@{}l}{\emph{#1}}\\*[1pt]}
-\newcommand{\evitem}[4]{\refstepcounter{evitem}\label{ev:#1}\regprefix E\theevitem & #2\par\vspace{1pt}{\footnotesize\color{muted}#3\ifblank{#4}{}{; produced by #4}.\par}\vspace{2pt}\\}
+\newcommand{\evitem}[4]{\refstepcounter{evitem}\label{ev:#1}\regprefix E\theevitem & #2\par\vspace{1pt}{\footnotesize#3\ifblank{#4}{}{; produced by #4}.\par}\vspace{2pt}\\}
 \newcounter{devitem}
-\newcommand{\devitem}[3]{\refstepcounter{devitem}\label{dev:#1}\regprefix D\thedevitem & #2\ifblank{#3}{}{ {\footnotesize\color{muted}(#3)}}\\}
+\newcommand{\devitem}[3]{\refstepcounter{devitem}\label{dev:#1}\regprefix D\thedevitem & #2\ifblank{#3}{}{ {\footnotesize(#3)}}\\}
