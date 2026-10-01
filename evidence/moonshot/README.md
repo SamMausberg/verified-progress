@@ -500,7 +500,7 @@ python experiments/moonshot/token_map_coverage.py \
 
 The other files came from two exclusive-lock jobs. Each committed JSON is a byte-identical
 copy of the job's raw output, and both CSVs regenerate byte for byte from the raw outputs
-with `summarise.py` on main.
+with `summarise.py` at `e47f0e5` (checked on 2026-10-01; a later version may add columns).
 
 Job B (2026-10-01, about 01:40-02:19 UTC; repo `167bf99`, engine `1101be8c5f` =
 `bd66ce343e` + moonshot patches 0001-0008; the bench launch records of its servers carry both
