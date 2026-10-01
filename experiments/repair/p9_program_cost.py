@@ -8,8 +8,10 @@ message alpha_J = a^T M_1(y_1) ... M_J(z) over the verified prefix and the corre
 (3) a greedy walk over the remaining slots, picking argmax_v alpha_{t-1}^T M_t(v) beta_{t+1}
 and updating alpha. This script times those three steps for a batch of requests with random
 programs (the cost does not depend on the values), eagerly and as one CUDA graph, at ranks
-r = 2, 4, 8 and batch sizes 1, 8, 16. It does not time building the matrices M_t(v) from the
-drafter's state (the compiler), which a learned program would add.
+r = 2, 4, 8, batch sizes 1, 8, 16 and every correction slot J = 0..13 (0-based, so the walk
+covers m = 14 - J slots, 14 down to 1). It does not time building the matrices M_t(v) from the
+drafter's state (the compiler), which a learned program would add, nor the target's verify of
+the m + 1 positions (`runs/p9_verify_widths.sh` measures that).
 
     python experiments/repair/p9_program_cost.py --out ~/vp-data/repair/p9/program_cost.json
 """
@@ -68,6 +70,44 @@ def time_us(fn: Any, repeats: int) -> list[float]:
     return out
 
 
+def time_program(
+    M: torch.Tensor,
+    a: torch.Tensor,
+    b: torch.Tensor,
+    prefix: torch.Tensor,
+    J: int,
+    r: int,
+    n: int,
+    repeats: int,
+) -> dict[str, Any]:
+    """Median times of reuse_step eagerly and as one captured CUDA graph."""
+    eager = functools.partial(reuse_step, M, a, b, prefix, J)
+    for _ in range(5):
+        eager()
+    torch.cuda.synchronize()
+    stream = torch.cuda.Stream()
+    stream.wait_stream(torch.cuda.current_stream())
+    with torch.cuda.stream(stream):
+        for _ in range(3):
+            reuse_step(M, a, b, prefix, J)
+    torch.cuda.current_stream().wait_stream(stream)
+    graph = torch.cuda.CUDAGraph()
+    with torch.cuda.graph(graph):
+        reuse_step(M, a, b, prefix, J)
+    eager_us = time_us(eager, repeats)
+    graph_us = time_us(graph.replay, repeats)
+    return {
+        'rank': r,
+        'batch': n,
+        'correction_slot': J,
+        'walked_slots': H - 1 - J,
+        'eager_us_median': statistics.median(eager_us),
+        'graph_us_median': statistics.median(graph_us),
+        'graph_us_p90': sorted(graph_us)[int(0.9 * len(graph_us))],
+        'program_bytes_per_request': H * K * r * r * 4,
+    }
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -75,11 +115,18 @@ def main() -> None:
     ap.add_argument('--ranks', type=int, nargs='+', default=[2, 4, 8])
     ap.add_argument('--batches', type=int, nargs='+', default=[1, 8, 16])
     ap.add_argument(
-        '--correction-slot', type=int, default=4, help='J, the slot of the correction (0-based)'
+        '--correction-slots',
+        type=int,
+        nargs='+',
+        default=list(range(H - 1)),
+        help='J, the slots of the correction (0-based; at least one slot must remain)',
     )
     ap.add_argument('--repeats', type=int, default=200)
     ap.add_argument('--out', type=Path, required=True)
     args = ap.parse_args()
+    bad = [J for J in args.correction_slots if not 0 <= J < H - 1]
+    if bad:
+        raise SystemExit(f'correction slots {bad} leave no slot to walk (H = {H})')
     torch.manual_seed(0)
     dev = torch.device('cuda')
     rows = []
@@ -89,34 +136,9 @@ def main() -> None:
             a = torch.rand(n, r, device=dev)
             b = torch.rand(n, r, device=dev)
             prefix = torch.randint(0, K, (n, H), device=dev)
-            J = args.correction_slot
-
-            eager = functools.partial(reuse_step, M, a, b, prefix, J)
-            for _ in range(5):
-                eager()
-            torch.cuda.synchronize()
-            stream = torch.cuda.Stream()
-            stream.wait_stream(torch.cuda.current_stream())
-            with torch.cuda.stream(stream):
-                for _ in range(3):
-                    reuse_step(M, a, b, prefix, J)
-            torch.cuda.current_stream().wait_stream(stream)
-            graph = torch.cuda.CUDAGraph()
-            with torch.cuda.graph(graph):
-                reuse_step(M, a, b, prefix, J)
-            eager_us = time_us(eager, args.repeats)
-            graph_us = time_us(graph.replay, args.repeats)
-            row = {
-                'rank': r,
-                'batch': n,
-                'correction_slot': J,
-                'eager_us_median': statistics.median(eager_us),
-                'graph_us_median': statistics.median(graph_us),
-                'graph_us_p90': sorted(graph_us)[int(0.9 * len(graph_us))],
-                'program_bytes_per_request': H * K * r * r * 4,
-            }
-            rows.append(row)
-            print(json.dumps(row))
+            for J in args.correction_slots:
+                rows.append(time_program(M, a, b, prefix, J, r, n, args.repeats))
+                print(json.dumps(rows[-1]))
     out = {
         'kind': 'measured kernel microbenchmark (random programs; cost does not depend on values)',
         'device': torch.cuda.get_device_name(),
