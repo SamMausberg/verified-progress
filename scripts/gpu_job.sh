@@ -26,11 +26,11 @@ else
 fi
 
 set -m # background jobs get their own process group, so the whole group can be signalled
-"$@" &
-pid=$!
+pid=""
 # TERM the job's process group, then KILL whatever is still there after a grace period, so a
 # process that ignores TERM cannot outlive the job (GPU_JOB_KILL_GRACE seconds, default 10).
 stop_group() {
+  [ -n "$pid" ] || return 0
   kill -TERM -- "-$pid" 2>/dev/null || return 0
   local t=0
   while kill -0 -- "-$pid" 2>/dev/null && [ "$t" -lt "${GPU_JOB_KILL_GRACE:-10}" ]; do
@@ -39,7 +39,10 @@ stop_group() {
   done
   kill -KILL -- "-$pid" 2>/dev/null || true
 }
+# The trap is in place before the command starts, so a holder death at any moment is handled.
 trap 'stop_group; exit 143' TERM INT HUP
+"$@" &
+pid=$!
 wait "$pid"
 rc=$?
 stop_group # leftovers in the job's group do not outlive the job

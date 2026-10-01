@@ -20,11 +20,12 @@ def fake_smi(tmp_path: Path, script: str = '') -> dict[str, str]:
     smi = bin_dir / 'nvidia-smi'
     smi.write_text('#!/usr/bin/env bash\n' + script + '\n')
     smi.chmod(0o755)
-    # A marker no real process carries, so live SGLang servers on the host do not stall tests.
+    # Orphan names no real process carries, so live SGLang servers on the host do not stall tests.
     return dict(
         os.environ,
         PATH=f'{bin_dir}:{os.environ["PATH"]}',
-        GPU_LOCK_ORPHAN_PATTERN=f'gpu-lock-test-orphan-{os.getpid()}-never',
+        GPU_LOCK_ORPHAN_COMM=f'gltnever{os.getpid() % 10000}',
+        GPU_LOCK_ORPHAN_MODULE=f'gpu_lock_test_never_{os.getpid()}',
     )
 
 
@@ -239,10 +240,12 @@ def test_leftover_group_members_are_stopped_when_the_job_ends(tmp_path: Path) ->
 def test_exclusive_waits_for_a_detached_server_that_has_not_reached_the_gpu(tmp_path: Path) -> None:
     lock = tmp_path / 'gpu.lock'
     lock.touch()
-    marker = f'gpu-lock-test-server-{os.getpid()}'
-    orphan = subprocess.Popen(['bash', '-c', f'exec -a {marker} sleep 3'], start_new_session=True)
+    module = f'gpu_lock_test_server_{os.getpid()}'
+    orphan = subprocess.Popen(
+        ['python3', '-c', 'import time; time.sleep(3)', '-m', module], start_new_session=True
+    )
     try:
-        env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock), GPU_LOCK_ORPHAN_PATTERN=marker)
+        env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock), GPU_LOCK_ORPHAN_MODULE=module)
         ran = tmp_path / 'ran'
         start = time.time()
         done = subprocess.run(
@@ -290,17 +293,18 @@ def test_the_callers_own_command_line_is_not_an_orphan(tmp_path: Path) -> None:
     """A job whose command names the orphan pattern must not wait for its own ancestors."""
     lock = tmp_path / 'gpu.lock'
     lock.touch()
-    marker = f'gpu-lock-test-self-{os.getpid()}'
+    module = f'gpu_lock_test_self_{os.getpid()}'
     env = dict(
         fake_smi(tmp_path),
         GPU_LOCK_FILE=str(lock),
-        GPU_LOCK_ORPHAN_PATTERN=marker,
+        GPU_LOCK_ORPHAN_MODULE=module,
         GPU_LOCK_DRAIN_WAIT='3',
     )
     ran = tmp_path / 'ran'
-    # The marker appears in the command line of gpu_lock.sh, flock, setpriv and gpu_job.sh.
+    # The job is itself `python3 ... -m <module>`: gpu_lock.sh, flock, setpriv, env and gpu_job.sh
+    # all carry those tokens, and none of them may count as an orphan.
     done = subprocess.run(
-        ['bash', '-c', f'bash {SCRIPT} -x bash -c "touch {ran}; : {marker}"'],
+        ['bash', str(SCRIPT), '-x', 'python3', '-c', f'open({str(ran)!r}, "w")', '-m', module],
         env=env,
         timeout=60,
         check=False,
@@ -316,3 +320,67 @@ def test_the_drain_bound_is_enforced_for_short_waits(tmp_path: Path) -> None:
     done = subprocess.run(['bash', str(SCRIPT), '-x', 'true'], env=env, timeout=60, check=False)
     assert done.returncode == 75
     assert time.time() - start < 4
+
+
+def test_decoys_that_only_mention_the_server_are_not_orphans(tmp_path: Path) -> None:
+    """Shells, monitors and waiting lock clients that name the server must not block the drain."""
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    module = f'gpu_lock_test_decoy_{os.getpid()}'
+    decoys = [
+        subprocess.Popen(
+            ['bash', '-c', f'sleep 5; : python3 -m {module}']
+        ),  # one token mentions it
+        subprocess.Popen(['bash', '-c', f'exec -a bash sleep 5 -x python3 -m {module}']),
+        subprocess.Popen(['sleep', '5', '-m', module]),  # the tokens, but not a python process
+    ]
+    try:
+        env = dict(
+            fake_smi(tmp_path),
+            GPU_LOCK_FILE=str(lock),
+            GPU_LOCK_ORPHAN_MODULE=module,
+            GPU_LOCK_DRAIN_WAIT='2',
+        )
+        ran = tmp_path / 'ran'
+        done = subprocess.run(
+            ['bash', str(SCRIPT), '-x', 'touch', str(ran)], env=env, timeout=60, check=False
+        )
+        assert done.returncode == 0 and ran.exists()
+    finally:
+        for d in decoys:
+            d.kill()
+
+
+def test_an_ignored_term_in_the_caller_does_not_disable_holder_death_cleanup(
+    tmp_path: Path,
+) -> None:
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    pid_file = tmp_path / 'child.pid'
+    env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock), GPU_JOB_KILL_GRACE='1')
+    job = f'echo $$ > {pid_file}; exec sleep 60'
+    proc = subprocess.Popen(
+        ['bash', '-c', f"trap '' TERM; exec bash {SCRIPT} -x bash -c '{job}'"], env=env
+    )
+    try:
+        deadline = time.time() + 10
+        while not pid_file.exists() and time.time() < deadline:
+            time.sleep(0.05)
+        child = int(pid_file.read_text())
+        holder = subprocess.run(
+            ['pgrep', '-P', str(proc.pid), '-x', 'flock'],
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout.split()
+        os.kill(int(holder[0]), 9)
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            try:
+                os.kill(child, 0)
+            except ProcessLookupError:
+                return
+            time.sleep(0.1)
+        pytest.fail('an inherited ignored TERM let the job outlive the lock holder')
+    finally:
+        proc.kill()

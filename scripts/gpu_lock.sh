@@ -111,13 +111,14 @@ if [ "$kind" = x ]; then
   # -o: the lock is held by flock itself for the command's lifetime and is not inherited, so a
   # background process the job leaves behind (or a successor ticket it queues) cannot keep it.
   # gpu_job.sh drains the GPU of orphans first, runs the command in its own process group,
-  # and (via pdeathsig) terminates that group if this flock process dies.
+  # and (via pdeathsig) terminates that group if this flock process dies; env resets signal
+  # dispositions a caller may have set to ignore, so the TERM is not lost.
   flock -o -x -w "$WAIT" -E 75 "$LOCK_FILE" \
-    setpriv --pdeathsig TERM -- "$HERE/gpu_job.sh" -x "$@"
+    setpriv --pdeathsig TERM -- env --default-signal=TERM,INT,HUP "$HERE/gpu_job.sh" -x "$@"
 else
   wait_while older_ticket "$name" x
   # Drop the ticket as soon as the shared lock is held, then run the command (in its own
   # process group, terminated if this flock process dies).
   flock -o -s -w "$WAIT" -E 75 "$LOCK_FILE" \
-    setpriv --pdeathsig TERM -- "$HERE/gpu_job.sh" -s "$ticket" "$@"
+    setpriv --pdeathsig TERM -- env --default-signal=TERM,INT,HUP "$HERE/gpu_job.sh" -s "$ticket" "$@"
 fi
