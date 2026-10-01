@@ -125,6 +125,7 @@ def load_device(con: sqlite3.Connection) -> dict[str, Any]:
         if table in have:
             intervals += con.execute(f'select start, end from {table}').fetchall()
     graph_launches: dict[Any, list[int]] = defaultdict(list)
+    graph_spans: dict[Any, list[tuple[int, int]]] = defaultdict(list)
     graph_table = next((t for t in have if 'GRAPH_TRACE' in t), None)
     if graph_table is not None:
         gcols = columns(con, graph_table)
@@ -132,6 +133,7 @@ def load_device(con: sqlite3.Connection) -> dict[str, Any]:
         for start, end, gid in con.execute(f'select start, end, {key} from {graph_table}'):
             intervals.append((start, end))
             graph_launches[('graph', gid)].append(start)
+            graph_spans[gid].append((start, end))
     else:
         # Node-level trace: one launch per (graph, first node start) cluster.
         by_graph: dict[Any, list[int]] = defaultdict(list)
@@ -152,6 +154,7 @@ def load_device(con: sqlite3.Connection) -> dict[str, Any]:
         'intervals': np.array(intervals, dtype=np.int64).reshape(-1, 2),
         'kernels': kernels,
         'graph_launches': graph_launches,
+        'graph_spans': graph_spans,
     }
 
 
@@ -280,6 +283,56 @@ def sync_sites(
     }
 
 
+def eagle_seam(
+    spans: dict[Any, list[tuple[int, int]]], ranges: list[tuple[int, int, str]]
+) -> dict[str, Any]:
+    """Medians over cycles of the EAGLE seam after the previous verify completes.
+
+    The three graphs replay as draft, verify, draft extend; verify is the one with
+    the longest mean duration. For every FutureMap.resolve_seq_lens_cpu return
+    (the host learning the previous verify's lengths), the next draft graph's
+    start, the host's EAGLEDraftCudaGraphRunner.execute end and the following
+    verify graph's start give the host chain the GPU waits on.
+    """
+    verify = max(spans, key=lambda g: float(np.mean([e - s for s, e in spans[g]])))
+    sequence = sorted((s, e, g) for g, v in spans.items() for s, e in v)
+    gids = [g for _, _, g in sequence[:8]]
+    vi = gids.index(verify, 1)
+    draft = gids[vi - 1]
+    extend = next(g for g in spans if g not in (draft, verify))
+    resolves = sorted(e for s, e, t in ranges if t.endswith('resolve_seq_lens_cpu'))
+    executes = sorted(e for s, e, t in ranges if t.endswith('EAGLEDraftCudaGraphRunner.execute'))
+    drafts, verifies, extends = (sorted(spans[g]) for g in (draft, verify, extend))
+    rows = []
+    for r in resolves:
+        d = next((x for x in drafts if x[0] > r), None)
+        x = next((e for e in executes if e > r), None)
+        if d is None or x is None:
+            continue
+        v = next((y for y in verifies if y[0] >= d[1]), None)
+        prev_extend = [y for y in extends if y[1] <= d[0]]
+        if v is None or not prev_extend:
+            continue
+        rows.append(
+            (
+                x - r,  # host: resolve return -> draft graph launched
+                d[0] - prev_extend[-1][1],  # GPU: previous extend end -> draft start
+                d[1] - d[0],  # draft graph
+                v[0] - d[1],  # GPU: draft end -> verify start
+            )
+        )
+    if not rows:
+        return {}
+    med = np.median(np.array(rows, dtype=np.float64), axis=0) / 1e6
+    return {
+        'cycles': len(rows),
+        'host_resolve_to_draft_launched_ms': round(float(med[0]), 4),
+        'gpu_extend_end_to_draft_start_ms': round(float(med[1]), 4),
+        'draft_graph_ms': round(float(med[2]), 4),
+        'gpu_draft_end_to_verify_start_ms': round(float(med[3]), 4),
+    }
+
+
 def analyze(report: Path) -> dict[str, Any]:
     con = sqlite3.connect(export(report))
     device = load_device(con)
@@ -328,6 +381,27 @@ def analyze(report: Path) -> dict[str, Any]:
     out['kernel_ms_per_cycle_by_class'] = {
         k: round(v / cycles / 1e6, 4) for k, v in sorted(classes.items(), key=lambda kv: -kv[1])
     }
+    spans = device['graph_spans']
+    if spans:
+        # Whole-graph executions (graph-level traces): time per cycle per graph.
+        out['graph_ms_per_cycle'] = {
+            str(gid): {
+                'executions_per_cycle': round(len(v) / cycles, 3),
+                'mean_ms': round(float(np.mean([e - s for s, e in v])) / 1e6, 4),
+                'ms_per_cycle': round(sum(e - s for s, e in v) / cycles / 1e6, 4),
+            }
+            for gid, v in sorted(spans.items(), key=lambda kv: -sum(e - s for s, e in kv[1]))
+        }
+    else:
+        # Node-level traces: kernel classes per graph (graph id 0: eager kernels).
+        per_graph: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
+        for start, end, gid, name in device['kernels']:
+            if t0 <= start < t1:
+                per_graph[str(gid or 0)][classify(name)] += end - start
+        out['kernel_ms_per_cycle_by_graph'] = {
+            g: {k: round(v / cycles / 1e6, 4) for k, v in sorted(c.items(), key=lambda kv: -kv[1])}
+            for g, c in sorted(per_graph.items(), key=lambda kv: -sum(kv[1].values()))
+        }
     if host is not None:
         ranges = [r for r in host['ranges'] if r[1] > t0 and r[0] < t1]
         by_inner, by_chain, exposed = attribute(gaps, ranges)
@@ -357,6 +431,8 @@ def analyze(report: Path) -> dict[str, Any]:
             for k in sorted(inclusive, key=lambda k: -inclusive[k])
         }
         out['host_sync_sites'] = sync_sites(con, host, ranges, t0, t1, cycles)
+        if len(spans) == 3:
+            out['eagle_seam'] = eagle_seam(spans, ranges)
         api: dict[str, float] = defaultdict(float)
         rt = sorted(host['runtime'])
         rt_starts = np.array([r[0] for r in rt], dtype=np.int64)
