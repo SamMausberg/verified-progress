@@ -133,24 +133,25 @@ def test_column_fallback_needs_the_bf16_reference(reference: Reference) -> None:
     assert head.fallback_mode == 'batch'
 
 
-def test_a_sampled_winner_that_might_have_zero_probability_falls_back(
+def test_a_sampled_winner_near_the_small_probabilities_falls_back(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A token whose stock probability rounds to zero has score -inf, but its lower
-    bound stays finite; if the top token's noise is the clamped -709.8 (hash 0), such
-    a token can hold the best lower bound and would be certified although stock never
-    returns it. A winner whose lower bound is at most ymax - 64 must fall back. The
-    kernel stages are stubbed with the buffers such a call leaves."""
+    """A token whose stock probability is subnormal or zero has a score outside the
+    bounds' model (-inf when zero), yet finite bounds; if the top token's noise is the
+    clamped -709.8 (hash 0), such a token can hold the best lower bound, or beat the
+    winner, and a wrong token would be certified. A winner whose lower bound is at
+    most ymax - 52 must fall back. The kernel stages are stubbed with the buffers
+    such a call leaves."""
     gen = torch.Generator().manual_seed(3)
     w = (torch.randn(64, 256, generator=gen) * 0.02).to(torch.bfloat16)
     head = CertifiedHead.from_quantized(
         w, build_quantized_head(w), device='cpu', max_batch=8, capacity=16
     )
     ymax = 40.0
-    # Row 0: the winner's lower bound sits 70 below ymax (a zero-probability token
-    # carrying the largest noise); row 1: an ordinary winner; row 2: just inside the
-    # gap (head.ZERO_PROBABILITY_GAP = 64); row 3: just outside it.
-    best = [ymax - 70.0, ymax - 1.5, ymax - 64.0, ymax - 63.9]
+    # Row 0: the winner's lower bound sits 60 below ymax (a subnormal-probability
+    # token carrying large noise); row 1: an ordinary winner; row 2: at the gap
+    # (head.SMALL_PROBABILITY_GAP = 52); row 3: just outside it.
+    best = [ymax - 60.0, ymax - 1.5, ymax - 52.0, ymax - 51.9]
 
     def decide(m: int) -> None:
         head._status[:m].zero_()
@@ -169,4 +170,4 @@ def test_a_sampled_winner_that_might_have_zero_probability_falls_back(
     _, stats = head.gumbel_sample(h, seeds, seeds, torch.full((4,), 0.7), fallback=False)
     assert stats.fallback.tolist() == [True, False, True, False]
     assert bool(head._any)
-    assert bool((stats.status[stats.fallback] == STATUS_BITS['zero_probability']).all())
+    assert bool((stats.status[stats.fallback] == STATUS_BITS['small_probability']).all())

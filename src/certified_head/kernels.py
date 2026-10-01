@@ -246,13 +246,17 @@ def stock_score_bounds(z_lo, z_hi, t, zmax, ymax, g):
     ``fl(expf(.) / S)`` is a normal FP32 number. ``ymax >= m`` is an upper bound
     of the row's largest stock ``y`` (``+inf`` if unknown, then ``D = 2 zmax``).
     A probability that may be subnormal (``y_i`` possibly more than 74.8 below
-    ``m``) can round up by a factor 2, so its upper bound gets one more unit.
+    ``m``) gets one more unit on its upper bound, which covers rounding by up to a
+    factor 2 but not the absolute error of ``expf`` and the division there
+    (multiples of ``2^-149``); see the exception below.
     ``2^-30`` covers the FP64 addition of ``g`` and any last-bit difference in
     ``g`` between kernels. Returns FP64 ``(lo, hi)`` enclosing ``x_i`` minus the
-    common shift, and ``y_hi``, with one exception: a probability that rounds to
-    zero (``y_i`` more than 87.3 below ``m``) makes the stock score ``-inf``, below
-    the finite ``lo``. ``CertifiedHead.gumbel_sample`` therefore refuses a winner
-    that might be such a token (``ZERO_PROBABILITY_GAP``); ``hi`` stays valid.
+    common shift, and ``y_hi``, for every token whose stock probability is a
+    normal FP32 number. A subnormal or zero one (``y_i`` more than 74.8 below
+    ``m``; a zero one makes the stock score ``-inf``) need not be enclosed; such a
+    token's stock score is below ``m - 52.66`` in these units, and
+    ``CertifiedHead.gumbel_sample`` refuses any winner whose ``lo`` is within
+    ``SMALL_PROBABILITY_GAP`` of ``ymax``.
     """
     y_lo = tl.math.div_rn(z_lo, t).to(tl.float64)
     y_hi = tl.math.div_rn(z_hi, t).to(tl.float64)
