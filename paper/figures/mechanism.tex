@@ -1,53 +1,63 @@
-% Figure 1: the certified head as a mechanism. Schematic: the interval values below are
-% illustrative, chosen to show each case, and are not data.
-\begin{tikzpicture}[x=1cm,y=1cm,font=\footnotesize]
+% Figure fig:mechanism: the certified head as a mechanism. Schematic: the interval values
+% below are illustrative, chosen to show each case, and are not data.
+\begin{tikzpicture}[x=1cm,y=0.86cm,font=\footnotesize]
 % ---------------- (a) level 0 ----------------
 \begin{scope}
-\node[anchor=west,font=\footnotesize\bfseries] at (-.3,4.25) {(a) Level 0: enclose every row};
-\draw[-{Stealth[length=1.6mm]},ink!70] (0,0) -- (0,3.5) node[above,text=ink]{logit};
-\draw[ink!70] (0,0) -- (4.8,0);
+\node[panel title,anchor=north] at (2.2,4.45) {\paneltitle{a}{Level 0: enclose every row}};
+\draw[-{Stealth[length=1.6mm]},ink!70] (0,0) -- (0,3.45) node[above,inner sep=1pt]{logit};
+\draw[ink!70] (0,0) -- (4.4,0);
 % rows: x, lo, hi, kept (1) or dropped (0)
-\foreach \x/\lo/\hi/\k in {0.35/1.05/1.60/0, 0.75/0.35/0.90/0, 1.15/1.55/2.15/0, 1.55/2.58/3.12/1,
-                           1.95/0.60/1.15/0, 2.35/1.20/1.75/0, 2.75/2.22/2.76/1, 3.15/0.25/0.80/0,
-                           3.55/1.80/2.34/0, 3.95/0.85/1.40/0} {
+\foreach \x/\lo/\hi/\k in {0.3/1.05/1.60/0, 0.7/0.35/0.90/0, 1.1/1.55/2.15/0, 1.5/2.58/3.12/1,
+                           1.9/0.60/1.15/0, 2.3/1.20/1.75/0, 2.7/2.22/2.76/1, 3.1/0.25/0.80/0,
+                           3.5/1.80/2.34/0, 3.9/0.85/1.40/0} {
   \ifnum\k=1
     \draw[ink,line width=1.7pt] (\x,\lo) -- (\x,\hi);
     \draw[ink,semithick] (\x-.09,\lo) -- (\x+.09,\lo) (\x-.09,\hi) -- (\x+.09,\hi);
   \else
-    \draw[muted!55,line width=1.1pt] (\x,\lo) -- (\x,\hi);
-    \draw[muted!55] (\x-.07,\lo) -- (\x+.07,\lo) (\x-.07,\hi) -- (\x+.07,\hi);
+    \draw[muted!60,line width=1.1pt] (\x,\lo) -- (\x,\hi);
+    \draw[muted!60] (\x-.07,\lo) -- (\x+.07,\lo) (\x-.07,\hi) -- (\x+.07,\hi);
   \fi
 }
-\node[text=muted] at (4.4,.9) {$\cdots$};
-\draw[dashed,ink] (0,2.58) -- (4.8,2.58) node[right,text=ink,inner sep=2pt,yshift=3pt]{$\max_i lo_i$};
-\draw[densely dotted,brick,thick] (0,2.40) -- (4.8,2.40) node[right,text=brick,inner sep=2pt,yshift=-4pt]{$-\,\delta_{\max}$};
-\node[text=ink] at (2.4,-.33) {vocabulary rows (int8 pass)};
-\node[text=muted,font=\scriptsize,align=center] at (2.4,-.82) {dark: kept;\quad grey: $hi_i<\max_j lo_j-\delta_{\max}$,\\dropped for good};
+\node[text=muted] at (4.2,.9) {$\cdots$};
+\draw[dashed,ink] (0,2.58) -- (4.4,2.58) node[right,inner sep=2pt,yshift=3pt]{$\max_i lo_i$};
+\draw[densely dotted,vpvermilion,thick] (0,2.40) -- (4.4,2.40) node[right,inner sep=2pt,yshift=-5pt]{$\max_i lo_i-\delta_{\max}$};
+\node at (2.2,-.33) {vocabulary rows (int8 pass)};
+\node[note] at (2.2,-.86) {dark: kept (candidates)\\grey: $hi_i<\max_j lo_j-\delta_{\max}$, dropped for good};
 \end{scope}
-% ---------------- (b) re-score the survivors ----------------
-\begin{scope}[xshift=6.95cm]
-\node[anchor=west,font=\footnotesize\bfseries] at (-.3,4.25) {(b) Re-score and round};
-\draw[-{Stealth[length=1.6mm]},ink!70] (0,0) -- (0,3.5) node[above,text=ink]{logit};
-\foreach \y in {0.4,1.0,1.6,2.2,2.8} {\draw[ink!20] (0,\y) -- (2.05,\y); \draw[ink!60] (-.06,\y) -- (0,\y);}
-\draw[decorate,decoration={brace,amplitude=3pt,mirror},muted] (2.12,1.6) -- node[right=3pt,text=muted,align=left,font=\scriptsize]{one BF16\\spacing} (2.12,2.2);
-\fill[teal!22] (0.3,2.2) rectangle (0.9,2.8);
-\draw[ink,line width=1.7pt] (0.6,2.40) -- (0.6,2.56);
-\node[text=ink] at (0.6,3.05) {row $a$};
-\fill[ochre!20] (1.2,1.0) rectangle (1.8,1.6);
-\draw[ink,line width=1.7pt] (1.5,1.20) -- (1.5,1.35);
-\node[text=ink] at (1.5,1.85) {row $b$};
-\node[text=ink] at (1.35,-.33) {candidates, BF16 rows};
-\node[text=muted,font=\scriptsize,align=center] at (1.35,-.82) {bars: accumulator enclosures;\\shaded: BF16 buckets $[L_i^-,L_i^+]$};
+% ---------------- (b) re-score and round ----------------
+\begin{scope}[xshift=7.0cm]
+\node[panel title,anchor=north] at (2.05,4.45) {\paneltitle{b}{Re-score and round}};
+\draw[-{Stealth[length=1.6mm]},ink!70] (0,0) -- (0,3.45) node[above,inner sep=1pt]{logit};
+% BF16 rounding boundaries, one spacing apart
+\foreach \y in {1.2,1.8,2.4,3.0} {\draw[ink!25] (0,\y) -- (4.1,\y);}
+\draw[decorate,decoration={brace,amplitude=3pt,mirror},muted] (4.17,1.2) -- node[right=3pt,note,align=left]{one BF16\\spacing} (4.17,1.8);
+% \vprow{x}{enclosure lo}{enclosure hi}{BF16 range lo}{BF16 range hi}{name}: a candidate's
+% accumulator enclosure (bar) and the rounding intervals it reaches (shading)
+\newcommand{\vprow}[6]{%
+  \fill[ink!13] ({#1-.17},#4) rectangle ({#1+.17},#5);
+  \draw[ink,line width=1.7pt] (#1,#2) -- (#1,#3);
+  \node[inner sep=1pt] at (#1,3.22) {$#6$};}
+% separated: the buckets fix L_a > L_b
+\vprow{0.45}{2.55}{2.75}{2.4}{3.0}{a}\vprow{0.95}{1.95}{2.15}{1.8}{2.4}{b}
+% one bucket: L_a = L_b for every admissible accumulator, so the first index, a, wins
+\vprow{1.75}{2.48}{2.62}{2.4}{3.0}{a}\vprow{2.25}{2.66}{2.84}{2.4}{3.0}{b}
+% straddled boundary: either row can round above the other
+\vprow{3.05}{2.31}{2.52}{1.8}{3.0}{a}\vprow{3.55}{2.28}{2.46}{1.8}{3.0}{b}
+\node[note,text=black] at (0.7,0.75) {fixed: $a$};
+\node[note,text=black] at (2.0,0.75) {fixed: $a$\\(tie; first index)};
+\node[note,text=black] at (3.3,0.75) {open};
+\node at (2.05,-.33) {candidates, re-scored from BF16 rows};
+\node[note] at (2.05,-.86) {bars: enclosures of the stock accumulator;\\shading: the rounding cells each can land in};
 \end{scope}
 % ---------------- (c) decide ----------------
-\begin{scope}[xshift=11.0cm]
-\node[anchor=west,font=\footnotesize\bfseries] at (-.3,4.25) {(c) Decide};
-\node[good,font=\footnotesize,text width=2.75cm,anchor=north] (cert) at (2.1,3.45) {Certified token: R-stock under the modelled error $G_i$};
-\node[warn,font=\footnotesize,text width=2.75cm,anchor=north] (fb) at (2.1,1.75) {Stock head kernel at the same batch shape, and its argmax};
-\coordinate (split) at (-.4,2.3);
-\draw[semithick,ink] (-.7,2.3) -- (split);
-\draw[flow] (split) -- (split |- cert.west) -- node[above,label]{fixed} (cert.west);
-\draw[flow] (split) -- (split |- fb.west) -- node[below,label]{open} (fb.west);
-\node[text=muted,font=\scriptsize,align=center,below=2pt of fb] {a conditional node of\\the captured CUDA graph};
+\begin{scope}[xshift=13.15cm]
+\node[panel title,anchor=north] at (1.95,4.45) {\paneltitle{c}{Decide}};
+\node[good,text width=2.85cm,anchor=north] (cert) at (2.05,3.45) {Certified: the \Rstock{} token under the modelled error $G_i$};
+\node[warn,text width=2.85cm,anchor=north] (fb) at (2.05,1.75) {Stock head kernel at the same batch shape, and its argmax};
+\coordinate (split) at (-0.45,2.3);
+\draw[semithick,ink] (-1.95,2.3) -- (split);
+\draw[flow] (split) -- (split |- cert.west) -- node[above,note]{fixed} (cert.west);
+\draw[flow] (split) -- (split |- fb.west) -- node[below,note]{open} (fb.west);
+\node[note,below=2pt of fb] {a conditional node of\\the captured CUDA graph};
 \end{scope}
 \end{tikzpicture}

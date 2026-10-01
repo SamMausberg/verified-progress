@@ -1,0 +1,101 @@
+% Shared macros for the main text and the appendices (owner: main-text author).
+% Loaded by paper.tex after \usepackage[accepted]{mlsys2025}. Appendix-only macros belong
+% in the appendix files; a macro both parts use belongs here.
+% ---------------------------------------------------------------------------
+% Packages. The MLSys style already loads times, fancyhdr, color, natbib, algorithm,
+% algorithmic, eso-pic and forloop, and redefines \cite as \citep.
+\usepackage{amsmath,amssymb,amsthm,mathtools,bm}
+\usepackage{newtxmath}
+\usepackage[scaled=.86,varqu]{zi4}
+\usepackage[scaled=.9]{helvet}
+\usepackage{booktabs,tabularx,array,multirow,longtable}
+\usepackage{xcolor,tikz,pgfplots,pgfplotstable}
+\usetikzlibrary{arrows.meta,positioning,calc,fit,backgrounds,decorations.pathreplacing,patterns}
+\pgfplotsset{compat=1.18}
+\usepgfplotslibrary{groupplots,fillbetween}
+\usepackage{enumitem,etoolbox}
+\usepackage{xurl}
+% ---------------------------------------------------------------------------
+% Colours and figure styles: figures/style.tex (palette, series, axes, CSV look-ups).
+\input{figures/style}
+\hypersetup{colorlinks=true,linkcolor=ink,citecolor=ink,urlcolor=ink}
+% ---------------------------------------------------------------------------
+% Lists and layout helpers.
+\setlist{nosep,leftmargin=1.3em,topsep=.4ex,itemsep=.2ex}
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+% ---------------------------------------------------------------------------
+% Mathematics.
+\newcommand{\E}{\mathbb E}
+\newcommand{\R}{\mathbb R}
+\newcommand{\BF}{\mathbb B}
+\newcommand{\ind}{\mathbf 1}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator{\softmax}{softmax}
+\DeclareMathOperator{\TV}{TV}
+\DeclareMathOperator{\KL}{KL}
+\DeclareMathOperator{\fl}{fl}
+\DeclareMathOperator{\tok}{tok}
+\DeclareMathOperator{\diam}{diam}
+\newcommand{\lse}{\operatorname{LSE}}
+\newcommand{\clip}{\operatorname{clip}}
+\newcommand{\norm}[1]{\lVert #1\rVert}
+\newcommand{\rnb}{\operatorname{rn}_{\mathrm{B}}}
+\newcommand{\ulpb}{\operatorname{ulp}_{\mathrm{B}}}
+\newcommand{\code}[1]{\texttt{#1}}
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+% ---------------------------------------------------------------------------
+% Names used throughout. The four references of a single decision (Definition
+% def:contracts) and the two named models of the stock kernel's FP32 accumulation error
+% (Table tab:assumptions). Always name the model beside a fallback share or a
+% divergence class.
+\newcommand{\Rreal}{\mbox{R-real}}
+\newcommand{\Rbf}{\mbox{R-bf16}}
+\newcommand{\Rstock}{\mbox{R-stock}}
+\newcommand{\Srace}{\mbox{S-race}}
+\newcommand{\modelcons}{conservative model}
+\newcommand{\modelhopper}{Hopper model}
+\newcommand{\gcons}{6.11\times10^{-4}}
+\newcommand{\ghop}{1.193\times10^{-4}}
+% Pins.
+\newcommand{\sourcepin}{\texttt{bd66ce343e4f}}
+\newcommand{\modelpin}{\texttt{851bf6e806ef}}
+\newcommand{\repourl}{\url{https://github.com/SamMausberg/verified-progress}}
+% ---------------------------------------------------------------------------
+% Evidence status. A committed result cites its entry in the evidence register
+% (appendix, \label{ev:<key>}): \ev{key} or \ev{key1,key2} prints [E3] or [E3, E7]. A result
+% that is designed but not committed carries the single pending marker \pend{key}, which
+% prints [pending D4] and links to the pending list (\label{dev:<key>}); the prose beside
+% it says what the result will decide, and no number stands in for it.
+\newcommand{\evref}[1]{\hyperref[ev:#1]{E\ref*{ev:#1}}}
+\newcommand{\evloop}[1]{\evsep\evref{#1}\def\evsep{, }}
+\DeclareRobustCommand{\ev}[1]{{\def\evsep{}[\forcsvlist{\evloop}{#1}]}}
+\newcommand{\devref}[1]{\hyperref[dev:#1]{D\ref*{dev:#1}}}
+\newcommand{\devloop}[1]{\devsep\devref{#1}\def\devsep{, }}
+\DeclareRobustCommand{\pend}[1]{\mbox{{\def\devsep{}[pending~\forcsvlist{\devloop}{#1}]}}}
+% A figure that reads a committed data file: draw it if the file exists, otherwise a
+% pending box naming the file, so the source builds before the evidence merges.
+\newcommand{\pendingfigure}[2]{%
+  \begin{center}\setlength{\fboxsep}{6pt}%
+  \fbox{\parbox{.92\linewidth}{\centering\small Pending figure. #1\par\smallskip
+  \footnotesize Data: \texttt{\detokenize{#2}}}}\end{center}}
+\newcommand{\datafigure}[3]{\IfFileExists{#1}{#2}{\pendingfigure{#3}{#1}}}
+% ---------------------------------------------------------------------------
+% Terminology. paper/terminology.tex declares every term once with
+% \term{<scope>}{<term>}{<definition>}, scope main (printed in the main text's Table
+% tab:terms) or app (terms used only in the appendices). \termrows{<scope>} expands to the
+% rows "term & definition \\" of that scope, for use inside a two-column tabular.
+\makeatletter
+\@namedef{termrows@main}{}
+\@namedef{termrows@app}{}
+\newcommand{\term}[3]{\expandafter\g@addto@macro\csname termrows@#1\endcsname{#2 & #3\\}}
+\newcommand{\termrows}[1]{\@nameuse{termrows@#1}}
+\makeatother

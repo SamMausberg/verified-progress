@@ -353,6 +353,6 @@
   "max_rel_to_sum_abs": 2.0700643390195154e-06,
   "p50_row_max": 1.1397772554452016e-06,
   "model_conservative": 0.0006107243190423843,
-  "model_hopper_wgmma": 0.00011920965335560099
+  "model_hopper_wgmma": 0.00011922159170544789
  }
 }

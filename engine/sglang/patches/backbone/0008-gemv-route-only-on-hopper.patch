@@ -1,0 +1,57 @@
+From 59deb68e292cc07a68e660635d158b31e830c888 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Thu, 1 Oct 2026 13:13:11 +0000
+Subject: [PATCH 8/8] Take the table's Hopper GEMV route only on Hopper (SM
+ 9.x, not HIP)
+
+A table entry of mode gemv called hopper_bf16_gemv after shape checks only, so
+a table enabled on another GPU would run the Hopper kernel there, bypassing
+the capability check of SGLang's own gemv backend. Require compute capability
+9.x on CUDA (ROCm reports gfx94x as 9.x, so HIP is excluded); elsewhere the
+call falls back to cuBLAS (Codex on #91).
+---
+ python/sglang/srt/layers/backbone_gemm.py | 19 ++++++++++++++++---
+ 1 file changed, 16 insertions(+), 3 deletions(-)
+
+diff --git a/python/sglang/srt/layers/backbone_gemm.py b/python/sglang/srt/layers/backbone_gemm.py
+index f61842518b..d3d30276e1 100644
+--- a/python/sglang/srt/layers/backbone_gemm.py
++++ b/python/sglang/srt/layers/backbone_gemm.py
+@@ -33,6 +33,7 @@ and the fused RMSNorm sums squares in a different order than FlashInfer.
+ from __future__ import annotations
+ 
+ import contextlib
++import functools
+ import json
+ import os
+ from dataclasses import asdict, dataclass, replace
+@@ -637,11 +638,23 @@ def _entry(m: int, n: int, k: int) -> Optional[TableEntry]:
+     return None
+ 
+ 
++@functools.lru_cache(maxsize=None)
++def _is_hopper(device_index: int) -> bool:
++    # ROCm reports gfx94x as capability 9.x, so exclude HIP explicitly.
++    if torch.version.hip is not None:
++        return False
++    return torch.cuda.get_device_capability(device_index)[0] == 9
++
++
+ def _gemv_eligible(x: torch.Tensor, n: int, k: int) -> bool:
+-    # hopper_bf16_gemv's own limits: one row, K a multiple of its 512-wide
+-    # warp stride and small enough for its static shared memory, N % 8 == 0.
++    # hopper_bf16_gemv is Hopper-only (SGLang's gemv backend refuses other
++    # GPUs and HIP), so a table with gemv entries falls back to cuBLAS elsewhere. Its
++    # own limits: one row, K a multiple of its 512-wide warp stride and small
++    # enough for its static shared memory, N % 8 == 0.
+     return (
+-        x.shape[0] == 1
++        x.is_cuda
++        and _is_hopper(x.device.index or 0)
++        and x.shape[0] == 1
+         and x.is_contiguous()
+         and k % 512 == 0
+         and 512 <= k <= 17408
+-- 
+2.34.1
+

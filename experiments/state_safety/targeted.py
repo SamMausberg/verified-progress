@@ -111,8 +111,10 @@ async def run_truncation(url: str, prompts: list[dict[str, Any]], args: argparse
                 flush_cache(url)
                 rec = await generate(s, url, p['input_ids'], m)
                 d = diff(full, rec, expect_len=m)
-                # Ref prefix check: the truncated run must be the first m tokens.
+                # Ref prefix check: the truncated run must be the first m tokens; the
+                # top-5 logprobs at those positions are compared as well.
                 d['identical'] = rec['output_ids'] == full['output_ids'][:m]
+                d['logprobs_identical'] = rec['top_logprobs'] == full['top_logprobs'][:m]
                 cases.append(
                     {
                         'id': p['id'],
@@ -123,6 +125,7 @@ async def run_truncation(url: str, prompts: list[dict[str, Any]], args: argparse
                     }
                 )
     ok = sum(c['identical'] for c in cases)
+    ok_lp = sum(c['logprobs_identical'] for c in cases)
     by_j: dict[int, list[int]] = {}
     for c in cases:
         by_j.setdefault(c['kept_in_cycle'], [0, 0])
@@ -130,7 +133,9 @@ async def run_truncation(url: str, prompts: list[dict[str, Any]], args: argparse
         by_j[c['kept_in_cycle']][1] += c['identical']
     summary = {
         'cases': len(cases),
+        # 'identical' compares output token IDs only.
         'identical': ok,
+        'logprobs_identical': ok_lp,
         'by_tokens_kept_in_final_cycle': {
             str(k): {'cases': v[0], 'identical': v[1]} for k, v in by_j.items()
         },
@@ -180,6 +185,7 @@ async def run_stops(url: str, prompts: list[dict[str, Any]], args: argparse.Name
                 )
                 visible = full['output_ids'][: pos + 1]
                 ok = rec['output_ids'] == visible
+                ok_lp = rec['top_logprobs'] == full['top_logprobs'][: pos + 1]
                 ext_ids = _extension_ids(p['input_ids'] + rec['output_ids'], turn2)
                 warm = await generate(s, url, ext_ids, args.ext_len)
                 flush_cache(url)
@@ -192,6 +198,7 @@ async def run_stops(url: str, prompts: list[dict[str, Any]], args: argparse.Name
                         'stop_index_in_cycle': j,
                         'finish_reason': rec['finish_reason'],
                         'stop_output_identical': ok,
+                        'stop_logprobs_identical': ok_lp,
                         'stop_len': len(rec['output_ids']),
                         'warm_cached_tokens': warm['cached_tokens'],
                         'extension_warm_vs_cold': diff(cold, warm),
@@ -199,7 +206,9 @@ async def run_stops(url: str, prompts: list[dict[str, Any]], args: argparse.Name
                 )
     summary = {
         'cases': len(cases),
+        # Output token IDs; logprobs separately below.
         'stop_output_identical': sum(c['stop_output_identical'] for c in cases),
+        'stop_logprobs_identical': sum(c['stop_logprobs_identical'] for c in cases),
         'stop_inside_block': sum(1 for c in cases if c['stop_index_in_cycle'] < args.block),
         'extension_identical': sum(c['extension_warm_vs_cold']['identical'] for c in cases),
         'extension_divergence_classes': _count(

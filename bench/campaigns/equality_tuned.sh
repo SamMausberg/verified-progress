@@ -1,0 +1,187 @@
+#!/usr/bin/env bash
+# Greedy output classification of the tuned arms' numerics-changing flags against
+# plain decoding, with the state workstream's runner and comparator (320 prompts,
+# 256 tokens, top-5 logprobs, c=1). Correctness only: shared GPU lock.
+#   scripts/gpu_lock.sh -s bench/campaigns/equality_tuned.sh
+# Numerics-changing flags: buffered GDN verify and decode (replayssm), and Triton
+# target attention (the reference is FlashInfer), and --linear-attn-verify-backend
+# triton (which at this pin resolves to the default verify kernel when decode uses
+# Triton; its outputs matched dflash b16 triton bit for bit).
+# DFlash block 16 runs on the plain configuration with the DFlash flags appended, so
+# its runs are named plain__; it runs with capacity 4 (the runner's 16 leaves no KV
+# memory at its 0.25 memory fraction once 16 verify states per request are
+# reserved; a c=1 pass never batches more than one request).
+# Pair labels avoid commas: compare.py writes its pair table without CSV quoting.
+# The floor (plain c=1 vs c=32) and the first plain reference (plain c=1) are the
+# state workstream's runs, with the radix cache on, linked into the runs directory;
+# the matched plain reference is stock plain c=1 without it (plain__bench_noradix).
+# Configurations whose c=1 run already exists are not rerun. A configuration that
+# fails to run does not stop the others; the script fails at the end if any pair
+# could not be compared.
+set -uo pipefail
+# shellcheck source=/dev/null
+source "$(dirname "$0")/../../scripts/sglang_env.sh"
+cd "$(dirname "$0")/../.." || exit 1
+OUT=~/vp-data/bench/equality
+RUNS=$OUT/runs
+mkdir -p "$RUNS"
+ln -sfn ~/vp-data/state/runs/plain "$RUNS/plain"
+DFLASH_B16="--speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash \
+--speculative-draft-model-revision 9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf \
+--speculative-dflash-block-size 16 --max-running-requests 4"
+PROMPTS=~/vp-data/state/prompts/prompts.jsonl   # run_matrix.py's default prompt set
+failed=()
+# A run is complete when its c1.jsonl holds exactly the prompt set's ids; compare.py
+# compares only the prompts both runs hold, so a partial run must not count.
+complete() {
+  python - "$PROMPTS" "$1" <<'COMPLETE'
+import json, sys
+def ids(path):
+    with open(path) as handle:
+        return [json.loads(line)['id'] for line in handle if line.strip()]
+want, have = ids(sys.argv[1]), ids(sys.argv[2])
+sys.exit(0 if len(have) == len(set(have)) == len(want) and set(have) == set(want) else 1)
+COMPLETE
+}
+# run_matrix.py parses --extra-flags with argparse, so the value must be attached
+# with '=' (a separate value that starts with '--' is read as a new option).
+run_missing() {
+  local configs=$1 tag=$2 flags=$3 todo=()
+  local name
+  for name in ${configs//,/ }; do
+    { [ -s "$RUNS/${name}__${tag}/c1.jsonl" ] && complete "$RUNS/${name}__${tag}/c1.jsonl"; } ||
+      todo+=("$name")
+  done
+  [ "${#todo[@]}" -eq 0 ] && return 0
+  local joined
+  joined=$(IFS=,; echo "${todo[*]}")
+  # --no-pin: the reference (state's runs/plain) predates pinned pools, so the arms
+  # stay in the same unpinned regime (cap 16, pools sized from free memory).
+  python experiments/state_safety/run_matrix.py --passes c1 --port 30017 --out-dir "$RUNS" \
+    --no-pin --configs "$joined" --tag "$tag" "--extra-flags=$flags" || failed+=("$joined/$tag")
+}
+run_missing mtp_s3,mtp_s3_replayssm,plain_replayssm,plain bench_noradix "--disable-radix-cache"
+run_missing mtp_s3_replayssm,plain bench_noradix_triton "--disable-radix-cache --attention-backend triton"
+run_missing plain bench_dflash_b16 "$DFLASH_B16 --disable-radix-cache"
+run_missing plain bench_dflash_b16_triton "$DFLASH_B16 --disable-radix-cache --attention-backend triton"
+run_missing plain bench_dflash_b16_triton_gdnverify \
+  "$DFLASH_B16 --disable-radix-cache --attention-backend triton --linear-attn-verify-backend triton"
+cat > "$OUT/pairs.json" <<'PAIRS'
+[
+  ["floor plain c1 vs c32", "plain/c1", "plain/c32"],
+  ["mtp_s3 stock verify radix-off vs plain c1", "plain/c1", "mtp_s3__bench_noradix/c1"],
+  ["mtp_s3 buffered verify radix-off vs plain c1", "plain/c1", "mtp_s3_replayssm__bench_noradix/c1"],
+  ["mtp_s3 buffered verify radix-off triton vs plain c1", "plain/c1", "mtp_s3_replayssm__bench_noradix_triton/c1"],
+  ["plain buffered decode radix-off vs plain c1", "plain/c1", "plain_replayssm__bench_noradix/c1"],
+  ["plain radix-off triton vs plain c1", "plain/c1", "plain__bench_noradix_triton/c1"],
+  ["dflash b16 radix-off triton vs plain c1", "plain/c1", "plain__bench_dflash_b16_triton/c1"],
+  ["dflash b16 radix-off triton gdn-verify-triton vs plain c1", "plain/c1", "plain__bench_dflash_b16_triton_gdnverify/c1"],
+  ["mtp_s3 buffered vs stock verify radix-off c1", "mtp_s3__bench_noradix/c1", "mtp_s3_replayssm__bench_noradix/c1"],
+  ["mtp_s3 buffered triton vs stock verify radix-off c1", "mtp_s3__bench_noradix/c1", "mtp_s3_replayssm__bench_noradix_triton/c1"],
+  ["dflash b16 stock radix-off vs plain c1", "plain/c1", "plain__bench_dflash_b16/c1"],
+  ["plain radix-off vs plain c1", "plain/c1", "plain__bench_noradix/c1"],
+  ["plain radix-off triton vs plain radix-off c1", "plain__bench_noradix/c1", "plain__bench_noradix_triton/c1"],
+  ["plain buffered decode vs plain radix-off c1", "plain__bench_noradix/c1", "plain_replayssm__bench_noradix/c1"],
+  ["mtp_s3 stock verify vs plain radix-off c1", "plain__bench_noradix/c1", "mtp_s3__bench_noradix/c1"],
+  ["mtp_s3 buffered verify vs plain radix-off c1", "plain__bench_noradix/c1", "mtp_s3_replayssm__bench_noradix/c1"],
+  ["mtp_s3 buffered verify triton vs plain radix-off c1", "plain__bench_noradix/c1", "mtp_s3_replayssm__bench_noradix_triton/c1"],
+  ["dflash b16 stock vs plain radix-off c1", "plain__bench_noradix/c1", "plain__bench_dflash_b16/c1"],
+  ["dflash b16 triton vs plain radix-off c1", "plain__bench_noradix/c1", "plain__bench_dflash_b16_triton/c1"],
+  ["dflash b16 triton vs stock dflash b16 radix-off c1", "plain__bench_dflash_b16/c1", "plain__bench_dflash_b16_triton/c1"],
+  ["dflash b16 triton gdn-verify-triton vs stock dflash b16 radix-off c1", "plain__bench_dflash_b16/c1", "plain__bench_dflash_b16_triton_gdnverify/c1"]
+]
+PAIRS
+# Each arm with a numerics change against its matched stock reference (bench/README.md):
+# plain levers against stock plain c1 with the radix cache off, like the arms (the
+# state workstream's plain/c1 ran with it on, and with the radix cache on a request's
+# logprobs can depend on earlier requests, evidence/state_safety); speculative levers
+# against stock speculation with the same drafter and steps (radix cache off). Third
+# entry: the arm against stock plain c1 with the radix cache off (the rate shown beside
+# the class). The pairs against plain/c1 stay in the report as the first classification.
+# Stock arms have no matched pair (null) and are listed for their rate against plain.
+cat > "$OUT/arms.json" <<'ARMS'
+[
+  ["mtp-tuned", "mtp_s3 buffered vs stock verify radix-off c1", "mtp_s3 buffered verify vs plain radix-off c1"],
+  ["mtp-tuned-triton", "mtp_s3 buffered triton vs stock verify radix-off c1", "mtp_s3 buffered verify triton vs plain radix-off c1"],
+  ["plain-tuned-triton", "plain radix-off triton vs plain radix-off c1", "plain radix-off triton vs plain radix-off c1"],
+  ["plain-tuned-replayssm", "plain buffered decode vs plain radix-off c1", "plain buffered decode vs plain radix-off c1"],
+  ["dflash-tuned-b16", "dflash b16 triton vs stock dflash b16 radix-off c1", "dflash b16 triton vs plain radix-off c1"],
+  ["mtp-stockverify", null, "mtp_s3 stock verify vs plain radix-off c1"]
+]
+ARMS
+# Outputs of an earlier run must not pass for this one.
+rm -f "$OUT/summary.json" "$OUT/report.json" "$OUT/classes.json" "$OUT/divergences.csv" \
+  "$OUT/table.csv"
+python experiments/state_safety/compare.py --runs "$RUNS" --pairs "$OUT/pairs.json" \
+  --out-json "$OUT/summary.json" --out-csv "$OUT/divergences.csv" \
+  --out-table "$OUT/table.csv" | tee "$OUT/compare.log"
+compare_status=${PIPESTATUS[0]}
+# Pool sizes and capacity of every server, from its log.
+python - "$RUNS" "$OUT/pools.csv" <<'POOLS'
+import csv, re, sys
+from pathlib import Path
+rows = []
+for run in sorted(Path(sys.argv[1]).iterdir()):
+    log = run / 'server.log'
+    if not log.exists():
+        continue
+    text = log.read_text(errors='replace')
+    def last(pattern):
+        found = re.findall(pattern, text)
+        return found[-1] if found else ''
+    rows.append({
+        'run': run.name,
+        'max_running_requests': last(r'max_running_requests=(\d+)'),
+        'max_total_num_tokens': last(r'max_total_num_tokens=(\d+)'),
+        'max_mamba_cache_size': last(r'max_mamba_cache_size: (\d+)'),
+        'disable_radix_cache': last(r"'disable_radix_cache': (\w+)"),
+        'attention_backend': last(r"'attention_backend': '(\w+)'"),
+        'gdn_backends': last(r'Linear attention kernel backend: ([^\n\[]*)').strip(),
+    })
+with open(sys.argv[2], 'w', newline='') as handle:
+    writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+    writer.writeheader()
+    writer.writerows(rows)
+POOLS
+python -m bench.divergence "$OUT/summary.json" --out "$OUT/report.json" \
+  --arms "$OUT/arms.json" --classes-out "$OUT/classes.json" \
+  --expect-prompts "$(grep -c . "$PROMPTS")"
+divergence_status=$?
+status=0
+if [ "$compare_status" -ne 0 ] || [ "$divergence_status" -ne 0 ]; then
+  echo "compare.py exited $compare_status, bench.divergence exited $divergence_status" >&2
+  status=1
+fi
+if [ "${#failed[@]}" -gt 0 ]; then
+  echo "configurations that failed to run: ${failed[*]}" >&2
+  status=1
+fi
+if grep -q '^skip' "$OUT/compare.log"; then
+  echo "compare.py skipped a pair (missing run files)" >&2
+  status=1
+fi
+python - "$OUT/pairs.json" "$OUT/summary.json" "$RUNS" "$PROMPTS" <<'CHECK' || status=1
+import json, sys
+from pathlib import Path
+spec = json.load(open(sys.argv[1]))
+summary = json.load(open(sys.argv[2]))
+summary = summary.get('pairs', summary) if isinstance(summary, dict) else summary
+missing = [label for label, _, _ in spec if label not in summary]
+if missing:
+    sys.exit(f'pairs missing from summary.json: {missing}')
+# Both runs of every pair hold exactly the prompt set (compare.py compares only the
+# prompts both runs hold, so a partial run would pass unnoticed).
+def ids(path):
+    with open(path) as handle:
+        return [json.loads(line)['id'] for line in handle if line.strip()]
+want = set(ids(sys.argv[4]))
+bad = set()
+for _, run_a, run_b in spec:
+    for run in (run_a, run_b):
+        have = ids(Path(sys.argv[3]) / f'{run}.jsonl')
+        if len(have) != len(set(have)) or set(have) != want:
+            bad.add(run)
+if bad:
+    sys.exit(f'runs without exactly the {len(want)} prompts: {sorted(bad)}')
+CHECK
+exit "$status"

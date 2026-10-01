@@ -1,0 +1,58 @@
+From 6b1d3448872b47ba774aeb6ec077c6aec94c05a2 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Thu, 1 Oct 2026 14:51:38 +0000
+Subject: [PATCH 5/5] hostgap: follow plan()'s NVFP4 split-KV rule in
+ fast_verify_plan
+
+FlashInfer 0.6.18's plan() forces disable_split_kv on for NVFP4 KV
+caches (_nvfp4_kv_requires_disabled_split_kv, an empirical workaround
+for corrupted split-KV reads). fast_verify_plan passed False
+unconditionally, so with NVFP4 KV and validation off it would have
+planned differently from stock. It now passes the same value plan()
+computes; nothing changes for BF16 or FP8 KV.
+
+Also correct the module docstring: PlanGuard covers all three plan
+flags, not the first two.
+---
+ .../sglang/srt/layers/attention/flashinfer_hostgap.py | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/python/sglang/srt/layers/attention/flashinfer_hostgap.py b/python/sglang/srt/layers/attention/flashinfer_hostgap.py
+index 92ed629360..baa1ce1a00 100644
+--- a/python/sglang/srt/layers/attention/flashinfer_hostgap.py
++++ b/python/sglang/srt/layers/attention/flashinfer_hostgap.py
+@@ -32,7 +32,7 @@ Flags (all off by default; unset means the stock code path runs unchanged):
+     value, device buffer or pinned plan byte differs. It synchronizes, so use
+     it for correctness runs only.
+ 
+-With either of the first two flags on, :class:`PlanGuard` also protects every
++With any of the three plan flags on, :class:`PlanGuard` also protects every
+ sync-free plan: FlashInfer's C++ plan writes a per-wrapper pinned host buffer
+ and copies it to the device with ``cudaMemcpyAsync`` without waiting. The stock
+ blocking reads guaranteed that the previous copy had executed before the next
+@@ -172,7 +172,10 @@ def fast_verify_plan(
+     ``packed_mask_nnz``). Installed on the per-batch-size verify wrappers after
+     their capture-time ``plan`` resolved ``_cached_module``.
+     """
+-    from flashinfer.prefill import _compute_page_mask_indptr
++    from flashinfer.prefill import (
++        _compute_page_mask_indptr,
++        _nvfp4_kv_requires_disabled_split_kv,
++    )
+     from flashinfer.utils import canonicalize_torch_dtype
+ 
+     assert self.is_cuda_graph_enabled, "fast_verify_plan is cuda-graph only"
+@@ -305,7 +308,9 @@ def fast_verify_plan(
+         causal,
+         window_left,
+         fixed_split_size or -1,
+-        False,  # disable_split_kv (SGLang's verify call never sets it)
++        # disable_split_kv: SGLang's verify call never sets it, and plan() then
++        # forces it on for NVFP4 KV only (FlashInfer's empirical workaround).
++        _nvfp4_kv_requires_disabled_split_kv(kv_data_type),
+         0,  # num_colocated_ctas
+         0,  # uniform_q_len
+     )
+-- 
+2.34.1
+

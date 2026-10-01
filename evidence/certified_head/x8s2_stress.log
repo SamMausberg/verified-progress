@@ -1,0 +1,13 @@
+w8a16 GemvConfig(block_v=128, block_m=16, block_k=128, num_warps=4, num_stages=4, tma=True) M=1-16: 1,003,680 row-checks, missed {'lower': 0, 'upper': 0, 'summary': 0, 'probe_flag': 0}, 411.9 s
+w8a16 GemvConfig(block_v=128, block_m=32, block_k=128, num_warps=4, num_stages=4, tma=True) M=17-32: 1,003,520 row-checks, missed {'lower': 0, 'upper': 0, 'summary': 0, 'probe_flag': 0}, 267.4 s
+[W1001 15:19:34.249168150 CUDACachingAllocator.cpp:3933] memory allocation failed with OOM on device 0 while trying to allocate 367001600 bytes (free: 84869120, total: 101468602368).
+[W1001 15:19:37.079983883 CUDACachingAllocator.cpp:3933] memory allocation failed with OOM on device 0 while trying to allocate 421527552 bytes (free: 141492224, total: 101468602368).
+[W1001 15:19:40.910926178 CUDACachingAllocator.cpp:3933] memory allocation failed with OOM on device 0 while trying to allocate 471859200 bytes (free: 397344768, total: 101468602368).
+w8a16 GemvConfig(block_v=128, block_m=64, block_k=128, num_warps=4, num_stages=3, tma=True) M=33-256: 1,035,776 row-checks, missed {'lower': 0, 'upper': 0, 'summary': 0, 'probe_flag': 0}, 165.4 s
+w8a8 GemvConfig(block_v=128, block_m=16, block_k=128, num_warps=4, num_stages=3, tma=False) M=1-16: 1,003,680 row-checks, missed {'lower': 0, 'upper': 0, 'summary': 0, 'probe_flag': 0}, 261.8 s
+w8a8 GemvConfig(block_v=256, block_m=32, block_k=128, num_warps=4, num_stages=3, tma=False) M=17-32: 1,003,520 row-checks, missed {'lower': 0, 'upper': 0, 'summary': 0, 'probe_flag': 0}, 82.4 s
+w8a8 GemvConfig(block_v=128, block_m=64, block_k=128, num_warps=4, num_stages=4, tma=False) M=33-128: 1,004,640 row-checks, missed {'lower': 0, 'upper': 0, 'summary': 0, 'probe_flag': 0}, 88.7 s
+w8a8 GemvConfig(block_v=128, block_m=64, block_k=128, num_warps=4, num_stages=3, tma=True) M=129-256: 1,034,880 row-checks, missed {'lower': 0, 'upper': 0, 'summary': 0, 'probe_flag': 0}, 60.9 s
+bf16 GemvConfig(block_v=128, block_m=32, block_k=64, num_warps=4, num_stages=3, tma=False) M=1-32: 1,001,088 row-checks, missed {'lower': 0, 'upper': 0, 'summary': 0, 'probe_flag': 0}, 183.1 s
+bf16 GemvConfig(block_v=128, block_m=64, block_k=64, num_warps=4, num_stages=4, tma=False) M=33-64: 1,002,592 row-checks, missed {'lower': 0, 'upper': 0, 'summary': 0, 'probe_flag': 0}, 118.8 s
+bf16 GemvConfig(block_v=256, block_m=64, block_k=64, num_warps=8, num_stages=4, tma=False) M=65-256: 1,047,744 row-checks, missed {'lower': 0, 'upper': 0, 'summary': 0, 'probe_flag': 0}, 64.6 s

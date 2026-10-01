@@ -36,9 +36,11 @@ import torch
 from replay_data import load_decode, load_head, prompt_table
 
 F64 = torch.float64
+# 'gamma_1.19e-4' keeps its key for the evidence's readers; it is the Hopper model's
+# derived value rounded up to binary64 (1.19216e-4), which the key names to three digits.
 GAMMAS = {
     'tensor_core_model': B.accumulation_gamma(2560, 'tensor_core'),
-    'gamma_1.19e-4': 1.19e-4,
+    'gamma_1.19e-4': B.hopper_gamma(2560),
     'gamma_1e-5': 1e-5,
     'fp32_tree_model': B.accumulation_gamma(2560, 'fp32_tree'),
 }

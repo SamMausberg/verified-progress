@@ -27,6 +27,7 @@ import contextlib
 import json
 import os
 import re
+import secrets
 import shutil
 import signal
 import socket
@@ -40,6 +41,29 @@ from pathlib import Path
 from typing import Any
 
 from bench.arms import Arm, parse_overrides, resolve_arm, server_command
+
+HOST_ID_FILE = Path.home() / 'vp-data' / 'host_id'
+
+
+def host_id(path: Path = HOST_ID_FILE) -> str:
+    """A random id for this machine, made once and kept outside the repository.
+
+    It tells machines apart in run records without deriving anything from the
+    hostname, which encodes the machine's public address (a hash of it would not
+    hide it: the address space is small enough to enumerate).
+    """
+    try:
+        return path.read_text().strip()
+    except FileNotFoundError:
+        pass
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with path.open('x') as handle:
+            handle.write(secrets.token_hex(4) + '\n')
+    except FileExistsError:
+        pass  # another process created it first
+    return path.read_text().strip()
+
 
 DEFAULT_HOST = '127.0.0.1'
 REPO_DIR = Path(__file__).resolve().parents[1]
@@ -273,7 +297,10 @@ def verify_launch(log_text: str, server_info: dict[str, Any], arm: Arm) -> list[
 
     algorithm = str(args.get('speculative-algorithm', '')).upper()
     if algorithm in ('NEXTN', 'EAGLE', 'EAGLE3'):
-        decode_keys = ['target verify', 'draft decode', 'draft extend']
+        # With one draft step the draft token comes from the draft-extend pass and
+        # there is no separate draft-decode graph.
+        steps = int(str(args.get('speculative-num-steps', 3)))
+        decode_keys = ['target verify', 'draft extend', *(['draft decode'] if steps > 1 else [])]
         prefill_keys = ['target prefill', 'draft prefill']
     elif arm.speculative:
         # Other drafters (DFLASH, ...) run one draft pass per block; require the
@@ -503,7 +530,8 @@ class Server:
             'sglang_source': source,
             'repo': git_state(REPO_DIR),
             'python': self.python,
-            'hostname': socket.gethostname(),
+            # Never the hostname: it encodes the machine's public address.
+            'host_id': host_id(),
             'gpu_before_start': gpu_snapshot(),
             'gpu_lock_held': gpu_lock_held_by_someone(),
             'start_time_unix': time.time(),

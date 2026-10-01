@@ -1,0 +1,49 @@
+% Figure fig:candidates. (a) reads evidence/head_geometry/selfevidence_plain4b_ccdf.csv.
+% (b) is derived: 1-(1-p)^B with the per-row interval-form shares of
+% evidence/head_geometry/rstock_plain4b.json (rules/gamma_1.19e-4/bucket/
+% positions_needing_stock_kernel = 0.0034970857618651123 and rules/tensor_core_model/
+% bucket/positions_needing_stock_kernel = 0.013988343047460449); the markers are the
+% measured step shares of the same file (capture_batches_with_one_or_more = 0.028 and
+% 0.10933333333333334) at the mean of 8.006666666666666 held-out rows per step
+% (evidence/head_geometry/selfevidence_plain4b.json, batch_unions mean_rows_per_batch).
+% These five values exist only in JSON, so they are copied here at full precision; every
+% number printed in the panel (the legend's p and the shares at B = 128) is computed from them.
+\pgfmathsetmacro{\phop}{0.0034970857618651123}
+\pgfmathsetmacro{\pcons}{0.013988343047460449}
+\pgfmathsetmacro{\stephop}{0.028}
+\pgfmathsetmacro{\stepcons}{0.10933333333333334}
+\pgfmathsetmacro{\rowsperstep}{8.006666666666666}
+\pgfmathsetmacro{\fbhop}{100*(1-(1-\phop)^128)}
+\pgfmathsetmacro{\fbcons}{100*(1-(1-\pcons)^128)}
+\begin{tikzpicture}
+\begin{groupplot}[group style={group size=2 by 1,horizontal sep=1.55cm},
+  width=8.1cm,height=3.75cm,grid=major]
+\nextgroupplot[xmode=log,ymode=log,xmin=1,xmax=248320,ymin=1e-4,ymax=1.5,
+  xlabel={Candidate rows $k$},ylabel={Positions needing $\ge k$ rows},
+  title={\paneltitle{a}{Candidates per decision (measured)}},unbounded coords=discard,
+  xtick={1,10,100,1000,10000,100000,248320},
+  xticklabels={1,10,$10^2$,$10^3$,$10^4$,$10^5$,$V$},
+  ytick={1,0.1,0.01,0.001,0.0001},yticklabels={100\%,10\%,1\%,0.1\%,0.01\%},
+  minor tick num=0,xminorticks=false,yminorticks=false,
+  legend style={at={(0.89,0.03)},anchor=south east},
+  legend image post style={xscale=0.6}]
+\addplot[series int8 row] table[x=k,y=plain_int8_row_greedy,col sep=comma]{../evidence/head_geometry/selfevidence_plain4b_ccdf.csv};\addlegendentry{int8 per row}
+\addplot[series int8 g128] table[x=k,y=plain_int8_g128_greedy,col sep=comma]{../evidence/head_geometry/selfevidence_plain4b_ccdf.csv};\addlegendentry{int8 128 cols}
+\addplot[vpblue,semithick,only marks,mark=o,mark size=1.6pt] table[x=k,y=plain_int8_g128_gumbel_t1.0,col sep=comma]{../evidence/head_geometry/selfevidence_plain4b_ccdf.csv};\addlegendentry{same, race $T{=}1$}
+\addplot[series fp8] table[x=k,y=plain_fp8_row_greedy,col sep=comma]{../evidence/head_geometry/selfevidence_plain4b_ccdf.csv};\addlegendentry{FP8 per row}
+\addplot[series int4] table[x=k,y=plain_int4_g128_greedy,col sep=comma]{../evidence/head_geometry/selfevidence_plain4b_ccdf.csv};\addlegendentry{int4 128 cols}
+\nextgroupplot[xmode=log,log basis x=2,xmin=1,xmax=256,ymin=0,ymax=1,
+  xtick={1,2,4,8,16,32,64,128,256},xticklabels={1,2,4,8,16,32,64,128,256},
+  xlabel={Rows in the batch $B$},ylabel={Batches with a fallback},
+  ytick={0,0.2,0.4,0.6,0.8,1},yticklabels={0\%,20\%,40\%,60\%,80\%,100\%},
+  title={\paneltitle{b}{Whole-batch fallback (derived; markers measured)}},
+  legend style={at={(0.03,0.97)},anchor=north west}]
+\addplot[series conservative,domain=1:256,samples=120]{1-(1-\pcons)^x};\addlegendentry{\modelcons, $p=\vppct{2}{100*\pcons}$}
+\addplot[series hopper,domain=1:256,samples=120]{1-(1-\phop)^x};\addlegendentry{\modelhopper, $p=\vppct{2}{100*\phop}$}
+\addplot[only marks,mark=square*,mark size=1.8pt,vpgreen] coordinates {(\rowsperstep,\stepcons)};\addlegendentry{measured steps, \modelcons}
+\addplot[only marks,mark=*,mark size=1.9pt,ink] coordinates {(\rowsperstep,\stephop)};\addlegendentry{measured steps, \modelhopper}
+\draw[muted,densely dotted] (axis cs:128,0) -- (axis cs:128,1);
+\node[annot,anchor=south east] at (axis cs:124,{\fbcons/100}) {\vppct{0}{\fbcons}};
+\node[annot,anchor=north west] at (axis cs:132,{\fbhop/100}) {\vppct{0}{\fbhop}};
+\end{groupplot}
+\end{tikzpicture}

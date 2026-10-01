@@ -53,6 +53,8 @@ def build(config: str, args: argparse.Namespace) -> tuple[Any, list[str]]:
         # Verify graphs at hundreds of requests x draft tokens overflow the default
         # 384 MB FlashInfer workspace (bench: MTP s3 at 512 needed 670 MB).
         env['SGLANG_FLASHINFER_WORKSPACE_SIZE'] = str(1 << 30)
+    if args.stream_interval:
+        flags['stream-interval'] = args.stream_interval
     capacity = int(flags.get('max-running-requests') or 0)
     if capacity:
         points = [c for c in points if c <= capacity]
@@ -78,6 +80,10 @@ def build(config: str, args: argparse.Namespace) -> tuple[Any, list[str]]:
         '--waves', str(args.waves),
         '--repeats', str(args.repeats),
     ]  # fmt: skip
+    if args.workload:
+        argv += ['--workload', str(Path(args.workload).expanduser())]
+    if args.warmup_pool:
+        argv += ['--warmup-pool', str(Path(args.warmup_pool).expanduser())]
     return arm, argv
 
 
@@ -91,12 +97,19 @@ def main() -> None:
     parser.add_argument('--repeats', type=int, default=1)
     parser.add_argument('--capacity', type=int, default=0)
     parser.add_argument('--port', type=int, default=30070)
+    parser.add_argument(
+        '--stream-interval', type=int, default=0, help='server --stream-interval for every arm'
+    )
+    parser.add_argument('--workload', default=None, help='bench.sweep --workload')
+    parser.add_argument('--warmup-pool', default=None, help='bench.sweep --warmup-pool')
     args = parser.parse_args()
-    import bench.server as bench_server
+    from server_env import RecordingServer
+
     import bench.sweep as bench_sweep
 
     log = Path(args.out).expanduser() / 'lever_sweep_log.jsonl'
     log.parent.mkdir(parents=True, exist_ok=True)
+    statuses: dict[str, str] = {}
     for config in args.configs:
         started = time.time()
         status = 'ok'
@@ -108,7 +121,8 @@ def main() -> None:
             # NGRAM has no draft model, hence no draft-decode graph for bench's
             # launch check to find; record the checks but do not abort on them.
             ngram = arm.args.get('speculative-algorithm') == 'NGRAM'
-            vars(bench_sweep)['Server'] = functools.partial(bench_server.Server, strict=not ngram)
+            # RecordingServer also records the server's SGLANG_/TRITON_/... environment.
+            vars(bench_sweep)['Server'] = functools.partial(RecordingServer, strict=not ngram)
             code = bench_sweep.main(argv)
             status = f'exit {code}'
         except Exception:  # keep going: one failed configuration must not end the job
@@ -117,6 +131,10 @@ def main() -> None:
         with log.open('a') as handle:
             record = {'config': config, 'status': status, 'seconds': round(time.time() - started)}
             handle.write(json.dumps(record) + '\n')
+        statuses[config] = status
+    failed = [config for config, status in statuses.items() if status != 'exit 0']
+    if failed:
+        sys.exit(f'lever_sweep: failed configurations: {failed}')
 
 
 if __name__ == '__main__':

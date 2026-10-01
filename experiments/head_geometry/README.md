@@ -4,8 +4,9 @@ This experiment decides H2 and H3 in `TASKS.md` on real hidden states. It captur
 exact inputs of the shared LM head from a running SGLang server, then evaluates, offline
 and in FP64, two ways of certifying the head's decision without computing it densely:
 
-- **Transport (H2, the manuscript's Section 4):** draft-produced tile summaries
-  `M_c^d`, `Z_c^d` moved to the target state with `|z_t - z_d - <mu_c, Delta>| <= eps_c`.
+- **Transport (H2, the paper's transport section, `paper/sections/transport.tex`):**
+  draft-produced tile summaries `M_c^d`, `Z_c^d` moved to the target state with
+  `|z_t - z_d - <mu_c, Delta>| <= eps_c`.
 - **Self-evidence (H3):** a low-precision copy of the head with a rigorous per-row
   envelope `|z_i - z_hat_i| <= beta_i`, and exact rescoring of the rows whose interval
   can still win (greedy argmax, or Gumbel-max with the same noise field).

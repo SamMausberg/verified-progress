@@ -1,186 +1,95 @@
-% Section 4: the certified low-precision head (self-evidence).
+% Section 4: the certified low-precision head.
 % Claims and status:
-%  - Lemma tree, Theorems envelope/integer, Theorem ladder, Proposition candidates: proved.
-%    Lemmas norms/outward: proved in Appendix app:derivations. Hopper accumulation constants
-%    rest on the published model of Khattak and Mikaitis (an assumption, not a vendor contract).
-%  - Candidate sets and R-stock fallback shares on captured plain-decode states: committed.
-%  - Kernel implementation, head-path runtime: pending (kernel).
-%  - Certified tail (P1): rejected by its kill test (committed).
-\section{A certified low-precision head}\label{sec:selfevidence}
-A cheap approximation of the head can supply its own evidence. The approximate pass bounds every row; rows whose interval can still matter are re-scored more precisely; the stock kernel completes whatever remains. Certified greedy screening of this form exists in public code (Section~\ref{sec:prior-certified}). This section supplies what the contract of Section~\ref{sec:semantics} needs on top of it: an envelope that covers the floating-point arithmetic of the pass as the GPU performs it, including Hopper tensor-core accumulation under a published model; one refinement procedure for greedy selection and sampling; bounds on how much re-scoring each needs; and measurements on states captured from the engine. We call this source of evidence \emph{self-evidence}, to distinguish it from transport (Section~\ref{sec:transport}).
+%  - Lemma tree, Theorem envelope, Theorem ladder, Theorem race (inline proof), Theorem
+%    fixednoise: proved (proofs in Appendices A and B). The Hopper accumulation constants
+%    rest on Khattak and Mikaitis's published model (an assumption, not a vendor contract).
+%  - Candidate sets and R-stock fallback shares on captured states: committed evidence.
+%  - Head chain share and bandwidth: committed profile evidence.
+%  - Kernel implementation, head-path runtime, seeded-sampler agreement: pending.
+\section{The Certified Head}\label{sec:selfevidence}\label{sec:head}
+The evidence for a certificate comes from a low-precision copy of the head evaluated at the target's own head input, which we call \emph{self-evidence}. The copy bounds every row, the rows whose intervals can still matter are re-scored from their BF16 rows, Proposition~\ref{prop:stockinterval} decides, and the stock kernel completes whatever remains (Figure~\ref{fig:mechanism}).
 
-\subsection{Accumulation error}\label{sec:accumulation}
-Every envelope below charges the rounding of a sum by a reduction tree, whose shape is the only thing that distinguishes CUDA-core, tensor-core and split-$K$ accumulation.
+\subsection{An Envelope for Tensor-Core Accumulation}\label{sec:envelope}\label{sec:accumulation}
 \begin{lemma}[Accumulation trees]\label{lem:tree}
-Let $s=\sum_\ell p_\ell$ be evaluated by a rooted tree whose leaves carry the exact values $p_\ell$ and whose internal nodes $v$ return $\hat s_v$ with $|\hat s_v-\sum_c\hat s_c|\le u_v\sum_c|\hat s_c|+\eta_v$ over the children $c$ of $v$. Let $d$ be the largest number of internal nodes on a leaf-to-root path, $N$ the number of internal nodes, $u\ge\max_vu_v$, $\eta\ge\max_v\eta_v$ and $du<1$. Then
-\begin{equation}
-|\hat s_{\rm root}-s|\le\gamma_d\sum_\ell|p_\ell|+N\eta(1+\gamma_d),\qquad\gamma_d=(1+u)^d-1\le\frac{du}{1-du}.\label{eq:tree}
-\end{equation}
-A node that multiplies its only child by a constant $\sigma$ and rounds fits the model after multiplying the leaves below it by $\sigma$.
+Let $s=\sum_\ell p_\ell$ be evaluated by a tree whose internal nodes $v$ return $\hat s_v$ with $|\hat s_v-\sum_c\hat s_c|\le u_v\sum_c|\hat s_c|+\eta_v$ over their children $c$. With $d$ the largest number of internal nodes on a leaf-to-root path, $N$ the number of internal nodes, $u\ge\max u_v$, $\eta\ge\max\eta_v$ and $du<1$: $|\hat s-s|\le\gamma_d\sum_\ell|p_\ell|+N\eta(1+\gamma_d)$, where $\gamma_d=(1+u)^d-1\le du/(1-du)$.
 \end{lemma}
-\begin{proof}
-For a node $v$ and a leaf $\ell$ below it let $P_{v\ell}=\prod(1+u_x)$ over the internal nodes $x$ on the path from $\ell$ up to $v$, and for an internal node $w$ below $v$ let $P'_{vw}$ be the same product over the nodes strictly above $w$ up to $v$ ($P'_{vv}=1$). By induction on height,
-\[|\hat s_v|\le\sum_\ell|p_\ell|P_{v\ell}+\eta\sum_wP'_{vw},\qquad|\hat s_v-s_v|\le\sum_\ell|p_\ell|(P_{v\ell}-1)+\eta\sum_wP'_{vw}.\]
-Leaves satisfy both with equality. For an internal node, $|\hat s_v|\le(1+u_v)\sum_c|\hat s_c|+\eta$ and $|\hat s_v-s_v|\le\sum_c|\hat s_c-s_c|+u_v\sum_c|\hat s_c|+\eta$; substituting the hypotheses for the children multiplies every $P$ and $P'$ by $(1+u_v)$ and adds $P'_{vv}=1$. Finally $P_{v\ell}\le(1+u)^d$, $P'_{vw}\le(1+u)^{d-1}$, and there are $N$ internal nodes.
-\end{proof}
-The IEEE model gives $u_v=u$ for a rounded addition, since $|a+b|\le|a|+|b|$~\cite{higham2002}. Sequential accumulation from zero has $d=n$, pairwise summation $\lceil\log_2n\rceil$, blocks of $B$ summed as a tree and then accumulated $\lceil n/B\rceil+\lceil\log_2B\rceil$, and split-$K$ adds the number of partials. A multi-term adder that aligns $k+1$ addends to the largest, truncates each to $F$ fractional bits below its leading bit, adds exactly and rounds once has $u_v=(k+1)2^{-F}+2^{1-p}$ with truncation, and depth $\lceil n/k\rceil$. Tensor cores behave this way rather than as IEEE adders~\cite{fasi2021}. Khattak and Mikaitis model Hopper's BF16 \code{wgmma} with FP32 output as $k=16$, $F=25$ with truncation~\cite{khattak2026}, so $u_v=17\cdot2^{-25}+2^{-23}$ and $\gamma_{D/16}\approx1.0\times10^{-4}$ at $D=2560$; the conservative default $D\cdot2^{-22}\cdot1.001=6.1\times10^{-4}$ covers it about sixfold. This is a published model, not a documented contract, so kernels built on it are validated against exact arithmetic on adversarial inputs. The same model gives FP8 \code{wgmma} only 13 fractional bits in 32-term blocks, consistent with the accumulation limits reported for FP8 training~\cite{deepseekv3}; an FP8 tensor-core pass needs periodic promotion to FP32 and its own analysis. On CUDA cores with IEEE round-to-nearest, $\gamma$ at $D=2560$ is about $1.7\times10^{-6}$ for a blocked reduction and plays no role.
-
-\subsection{The envelope of the approximate pass}\label{sec:envelope}
-Row $i$ is quantized with group scales $s_{ig}>0$, integer codes $q_{ij}$ and a set $O$ of columns kept exact. The dequantized row is $\bar w_{ij}=s_{ig(j)}q_{ij}$ for $j\notin O$ and $\bar w_{ij}=w_{ij}$ for $j\in O$; the error $e_i=w_i-\bar w_i$ is computed exactly offline. The pass computes $\hat t_g=\sum_{j\in g}q_{ij}h_j$, $\hat v_g=\fl(s_{ig}\hat t_g)$, sums the groups, adds $\sum_{j\in O}w_{ij}h_j$ and returns $\tilde z_i$.
+The tree's shape is all that distinguishes CUDA-core, tensor-core and split-$K$ accumulation. An IEEE addition has $u_v=u$~\cite{higham2002}. A tensor-core adder aligns $k+1$ addends to the largest, truncates each to $F$ fractional bits and rounds once~\cite{fasi2021}, so $u_v=(k+1)2^{-F}+2^{1-p}$ over depth $\lceil n/k\rceil$. Khattak and Mikaitis model Hopper's BF16 \code{wgmma} as $k=16$, $F=25$ with truncation~\cite{khattak2026}, which gives $\gamma\approx1.0\times10^{-4}$ at $D=2{,}560$; the \modelcons, $\gamma=\gcons$, covers it about sixfold for any reduction order.
 
 \begin{theorem}[Envelope]\label{thm:envelope}
-Suppose every product $q_{ij}h_j$ and $w_{ij}h_j$ is exact in the accumulator format (true for int8 or BF16 weights times BF16 activations in FP32; underflow is covered by $\eta$) and every node obeys Lemma~\ref{lem:tree} with $(u,\eta)$ and depth $d$. Then $|z_i-\tilde z_i|\le\beta_i$ with
-\begin{equation}
-\beta_i=Q_i+\gamma_d\norm{\bar w_i}_2\norm h_2+N\eta(1+\gamma_d)\max\bigl(1,\max_gs_{ig}\bigr),\label{eq:envelope}
-\end{equation}
-where $Q_i$ may be any of $\norm{e_i}_2\norm h_2$, $\sum_b\norm{e_{i,b}}_2\norm{h_b}_2$, $\norm{e_i}_\infty\norm h_1$ or $\sum_b\norm{e_{i,b}}_\infty\norm{h_b}_1$ for any partition of the columns into blocks $b$ (in particular $O$ and its complement, so that only the norm of $h$ outside $O$ enters). Round-to-nearest codes without clipping have $\norm{e_{i,g}}_\infty\le s_{ig}/2$.
+Let row $i$ of the copy have group scales $s_{ig}$, integer codes and a set of columns kept exact, with dequantized row $\bar w_i$ and exact error $e_i=w_i-\bar w_i$. If every product is exact in the accumulator format and the pass's accumulation obeys Lemma~\ref{lem:tree}, its value $\tilde z_i$ satisfies $|z_i-\tilde z_i|\le\beta_i=Q_i+\gamma_d\norm{\bar w_i}_2\norm h_2+N\eta(1+\gamma_d)\max(1,\max_gs_{ig})$, where $Q_i$ is $\norm{e_i}_2\norm h_2$ or any blockwise Cauchy--Schwarz or Hölder form.
 \end{theorem}
-\begin{proof}
-$z_i-\tilde z_i=\langle e_i,h\rangle+(\langle\bar w_i,h\rangle-\tilde z_i)$. The first term is bounded blockwise by Cauchy--Schwarz or Hölder. The second is the rounding error of evaluating $\langle\bar w_i,h\rangle$ by a tree whose leaves are $s_{ig}q_{ij}h_j$ and $w_{ij}h_j$; apply Lemma~\ref{lem:tree} and $\sum_j|\bar w_{ij}h_j|\le\norm{\bar w_i}_2\norm h_2$.
-\end{proof}
-The componentwise midpoint-radius form $|z-\tilde z|\le|e|^\top|h|$ is tighter than any of these relaxations and costs the same to evaluate when $|e|$ is stored per group~\cite{rump2010}; the norm forms are used here because they need one constant per row or block.
+Proofs are in Appendix~\ref{app:proofs}. An int8 pass that also quantizes the activations and accumulates in int32 needs no floating-point accumulation model, at the price of the activations' quantization error (Theorem~\ref{thm:integer}); its kernel must still compute the analysed products. The norms of $h$ are rounded up and the endpoints $\tilde z_i\mp\beta_i$ rounded outward, so every computed comparison is sound (Lemmas~\ref{lem:norms} and~\ref{lem:outward}), provided the kernel evaluates the analysed operations (Table~\ref{tab:assumptions}). The envelope assumes worst-case alignment of $e_i$ and $h$: for per-row int8 its median half-width on captured states is 1.00 logit, 75 times the median realized error of 0.013 \ev{stats}.
 
-\begin{theorem}[Integer pass]\label{thm:integer}
-Let $s_h>0$ be any activation scale in the output format, $q_h$ integer codes, and $e_h=h-s_hq_h$ the exact residual. Let $I_i=\sum_jq_{ij}q_{h,j}$ be accumulated exactly in 32-bit integers ($D\,q^{\rm w}_{\max}q^{\rm h}_{\max}<2^{31}$; $2560\cdot127^2$ qualifies) and $\tilde z_i=\fl(\fl(s_i\fl(I_i))\,s_h)$ without overflow or underflow. Then
-\[|z_i-\tilde z_i|\le Q_i+\norm{s_iq_i}_2\norm{e_h}_2+\gamma_k\norm{s_iq_i}_2\norm{s_hq_h}_2,\]
-with $k=3$ in general and $k=2$ when $s_h$ is a power of two.
-\end{theorem}
-\begin{proof}
-$z_i=s_is_hI_i+s_i\langle q_i,e_h\rangle+\langle e_i,h\rangle$ holds in exact arithmetic for any $s_h$ and codes, because $e_h$ is defined as the residual. The computed value applies at most three roundings to the product chain, the conversion of $I_i$ and the two multiplications, so $|\tilde z_i-s_is_hI_i|\le\gamma_3s_is_h|I_i|$; when $s_h$ is a power of two the last multiplication is exact and $\gamma_2$ suffices. Apply Cauchy--Schwarz to $I_i=\langle q_i,q_h\rangle$ and to $\langle q_i,e_h\rangle$.
-\end{proof}
-This path needs no model of floating-point accumulation at all, because int8 products accumulated in int32 are exact for this shape~\cite{abdelfattah2025}; it pays instead for quantizing the activation. The bound holds however the scale and codes of $h$ were chosen; an implementation must bound $\norm{e_h}_2$ from above for the codes it actually produced, for example as $\sqrt D\,s_h/2$ only if every code is the nearest integer to $h_j/s_h$ and none is clipped.
-
-An envelope evaluated in floating point must itself be rounded the right way. Two further lemmas, proved in Appendix~\ref{app:outward}, make the computed interval sound: the norms of $h$ are computed and inflated so that they are never below the exact norms (Lemma~\ref{lem:norms}, which needs a reduction depth of at most $2^{13}$ for the $\ell_1$ norm), and the endpoints $\tilde z_i\mp\hat b_i$ are rounded outward so that every comparison between computed endpoints is sound (Lemma~\ref{lem:outward}). Offline constants ($\norm{e_i}_2$, $\norm{\bar w_i}_2$, $\norm{w_i}_2$) are computed exactly and stored rounded up. The exact CPU reference emulates every BF16, FP32 and FP64 rounding on rationals and checks each bound against real arithmetic, including witnesses that the accumulation term, the outward rounding and the norm inflation are each necessary (\code{tests/test\_precision.py}~\ev{precision}).
-
-\subsection{Certified argmax and its cost}\label{sec:ladder}
+\subsection{Refinement Against the Stock Kernel}\label{sec:ladder}
 \begin{theorem}[Refinement ladder]\label{thm:ladder}
-Let levels $\ell=0,\dots,L$ supply enclosures $lo^\ell_i\le z_i\le hi^\ell_i$, exact at level $L$, and let $f_i$ be nondecreasing maps. Starting from a row set $S$, at each level let $\tau=\max_{i\in S}f_i(lo^\ell_i)$ and keep $\{i\in S:f_i(hi^\ell_i)\ge\tau\}$; stop when one row remains, when every kept interval is a point, or at level $L$, and return the smallest kept index. The result is $\min\argmax_{i\in S}f_i(z_i)$. With $f_i=\mathrm{id}$ this is R-real, with $f_i=\rnb$ it is R-bf16, and with $f_i(x)=x/T+g_i$ it is S-race. The token does not depend on the precision or reduction order of any level.
+Let levels $\ell=0,\dots,L$ supply enclosures $lo^\ell_i\le z_i\le hi^\ell_i$, exact at level $L$, and let each $f_i$ be nondecreasing. Starting from rows $S$, at each level let $\tau=\max_{i\in S}f_i(lo^\ell_i)$ and keep $\{i\in S:f_i(hi^\ell_i)\ge\tau\}$; stop when one row remains, every kept interval is a point, or $\ell=L$, and return the smallest kept index. The result is $\min\argmax_{i\in S}f_i(z_i)$, whatever the precision or reduction order of each level; $f_i(x)=x$ gives \Rreal{} and $f_i(x)=x/T+g_i$ gives \Srace.
+\end{theorem}
+Lean proves the certificate and both filter properties in scaled integers, not under IEEE rounding \ev{lean}. For \Rstock{} the filter is not enough: a row dropped because $hi_i<\max_jlo_j$ is known to lose in real arithmetic, not by the margin of Theorem~\ref{thm:stock}. The certified head therefore widens the level-0 threshold by $\delta_{\max}$, re-scores the survivors in FP64, widens each by $G_i$ to an enclosure of the stock accumulator, and decides with Proposition~\ref{prop:stockinterval}. Given valid enclosures, a dropped row loses by more than $\delta_{\max}$, so the screen changes which rows are re-scored but never which rows the decision leaves open. How many rows survive depends on the envelope's width against the logit margins: for a Gumbel race at $T=1$ the expected number is at most $\min(V,e^{4\beta})$ (Proposition~\ref{prop:candidates}), 55 rows at $\beta=1$ and 2,981 at $\beta=2$, so exact sampling through the copy is cheap only for envelopes up to about two logits wide.
+
+\subsection{Sampled Decisions Within the Contract}\label{sec:decisions}\label{sec:race}
+\begin{theorem}[Certified race]\label{thm:race}
+For a fixed noise vector $g$ and $T>0$, the ladder with $f_i(x)=x/T+g_i$ returns the token of a dense race with the same $g$ and tie rule. If the $g_i$ are i.i.d.\ standard Gumbel and independent of $z$, that token has law $\softmax(z/T)$.
 \end{theorem}
 \begin{proof}
-$[f_i(lo_i),f_i(hi_i)]$ encloses $f_i(z_i)$. A maximizer $m$ is never dropped: for the row $j$ that attains $\tau$, $f_m(hi_m)\ge f_m(z_m)\ge f_j(z_j)\ge f_j(lo_j)=\tau$. A dropped row is strictly below the row attaining $\tau$. If one row remains it is the maximizer. If all kept intervals are points, each kept value is at least $\tau$ and at most $\tau$, so all kept rows are maximizers, and every maximizer is kept. The exact level produces points. The returned index is a function of the maximizer set alone.
+Theorem~\ref{thm:ladder} and the Gumbel-max identity~\cite{gumbel1954,papandreou2011}; ties have probability zero.
 \end{proof}
-The ladder decides R-real (or S-race). For the stock contract its filter is not enough on its own: rows dropped at $hi_i\ge\max_jlo_j$ are only known to lose, not to lose by the gap of Theorem~\ref{thm:stock}. Under R-stock the level-0 filter is therefore widened by $\delta_{\max}$ and the decision is taken on enclosures against every kept row (Section~\ref{sec:headcontracts}); a row that fails runs the stock kernel (Figure~\ref{fig:mechanism}). The Lean formalization proves the certificate, its uniqueness across levels and both filter properties in scaled integers (\code{formal/CertifiedArgmax.lean}~\ev{lean}).
+Bounding scores to skip most perturbations is the principle of A$^\ast$ Sampling and of lazy Gumbel sampling~\cite{astar,mussmann2017}; a fixed field adds pathwise equality with the dense race. That needs a counter-keyed field: in the exact reference, feeding a stream consumed in evaluation order to the candidate rows changed the winner in 247 of 300 cases \ev{precision}. The stock seeded sampler already has the required form.
 
-\begin{proposition}[Candidate counts]\label{prop:candidates}
-Let the level-0 intervals have widths $\omega_i=hi_i-lo_i\le\omega$ (with outward rounding, $\omega_i\approx2\beta_i$) and let $C$ be the rows kept at level 0.
-\begin{enumerate}
-\item Greedy: $C\subseteq\{i:z_i\ge z_{\max}-\omega_i-\omega_a\}$ for any maximizer $a$, hence $|C|\le e^{2\omega/T'}/p^{(T')}_{\max}$ for every $T'>0$, where $p^{(T')}=\softmax(z/T')$.
-\item Race: if the $g_i$ are i.i.d.\ standard Gumbel and $p=\softmax(z/T)$, then with $t=2\omega/T$,
-\[\E|C|\le\sum_i\frac{p_ie^t}{1+p_i(e^t-1)}\le\min(V,e^t).\]
-\end{enumerate}
-\end{proposition}
-\begin{proof}
-(1) $hi_i\le z_i+\omega_i$ and $lo_a\ge z_a-\omega_a$, so a kept row satisfies $z_i+\omega_i\ge\tau\ge z_a-\omega_a$. Each such row has $p^{(T')}_i\ge p^{(T')}_{\max}e^{-2\omega/T'}$, and the probabilities sum to at most one. (2) In score space the widths are $\omega_i/T$, so $C\subseteq\{i:y_i\ge M-t\}$ with $y_i=z_i/T+g_i$ and $M=\max_jy_j$. Row $i$ belongs to that set if and only if $y_i+t\ge\max_{j\ne i}y_j$. The maximum of independent Gumbels with locations $z_j/T$ is Gumbel with location $\log\sum_{j\ne i}e^{z_j/T}$, and two independent Gumbels with locations $a,b$ satisfy $P(G_a\ge G_b)=e^a/(e^a+e^b)$. Hence the probability is $p_ie^t/(p_ie^t+1-p_i)$; sum over $i$.
-\end{proof}
-At $T=1$ and envelope half-width $\beta$ (so $t\approx4\beta$), the expected re-scoring set for exact sampling is at most 55 rows for $\beta=1$, 2,981 for $\beta=2$ and up to $1.6\times10^5$ for $\beta=3$ (Figure~\ref{fig:candidates}a). Exact sampling through the cheap pass is therefore cheap only if the envelope is about two logits wide or less. Greedy selection has no distribution-free bound: a flat distribution (small $p_{\max}$) needs many rows. The envelope in logits is $\beta_i\approx\norm{e_i}_2\norm h_2$; with the int8 constants of Table~\ref{tab:headconstants} that is about $0.0063\norm h_2$, so the norm of the head input decides whether $\beta$ is a fraction of a logit or several. On the captured plain-decode states that norm has a median of 159 (1st percentile 132, 99th 169), which puts the int8 row envelope at about one logit~\ev{selfevidence}.
+\begin{theorem}[Fixed-noise verification]\label{thm:fixednoise}
+Let $G_{t,i}$ be keyed by (seed, absolute position $t$, token $i$) and i.i.d.\ standard Gumbel, and let $Y_t=\min\argmax_i(z_{t,i}(Y_{<t})/T+G_{t,i})$. A speculative decoder that accepts a drafted token if and only if it equals $\argmax_i(z_{t,i}(x_{<t})/T+G_{t,i})$ at its drafted prefix, and emits that argmax at the first mismatch, outputs $Y$ for every drafter and depth policy, and $Y$ has the target's autoregressive law.
+\end{theorem}\label{sec:fixednoise}
+This is the drafter-invariant construction of \citet{daliri2025}. Sampled verification becomes an argmax, which Theorem~\ref{thm:race} certifies without a partition function or a residual sampler. The certified path adopts it with exactly the stock seeded noise. The output is then equal in law to target sampling and independent of the drafter; for SGLang's default point-mass drafts a draft $d$ is accepted with probability $p(d)$, as under the stock rule; and with a seed and no truncation every committed token is the stock seeded sampler's token for the verify pass's own \Rstock{} logits, provided that rows whose race the certificate cannot decide under the stock rounding of the softmax and logarithm run the stock sampler. The reference is the engine in deterministic-inference mode, the only one with a seeded sampler, whose head GEMM (Section~\ref{sec:stock}) the \modelcons{} covers and the \modelhopper{} has not been checked for. It equals seeded decoding without speculation only where verify-pass and plain-decode logits agree, which the engine does not guarantee (Section~\ref{sec:same-shape}). The rounding slack and token agreement on replayed steps are \pend{kernel-seeded}; the standard acceptance rule and residual races are analysed, not built (Appendix~\ref{app:sampling}).
 
-\subsection{Candidate sets on captured hidden states}\label{sec:geometry-selfevidence}
-The certificate was replayed on 6,005 held-out plain-decode head inputs from 160 prompts, captured from the engine (Section~\ref{sec:transport-capture}), against the exact logits of the stored BF16 operands; the candidate counts therefore certify the R-real decision. The envelope is Theorem~\ref{thm:envelope} with the conservative tensor-core accumulation model ($\gamma=6.1\times10^{-4}$) unless stated. Across every head variant and position no envelope was violated and the exact winner was always a candidate~\ev{selfevidence}.
+\subsection{Candidates and Fallback on Captured States}\label{sec:geometry-selfevidence}\label{sec:rstock-share}
+Table~\ref{tab:candidates} and Figure~\ref{fig:candidates}a give the candidate sets on 6,005 held-out plain-decode positions for five copies of the head. No envelope was violated, and the exact winner was always a candidate \ev{selfevidence,selfevidence-csv}. An int8 copy with one scale per row needs 1.55 candidate rows on average (median 1, p99 8) and decides 75.4\% of positions without re-scoring; with 128-column groups the mean is 1.34 at 0.52 of the BF16 head's bytes. FP8 E4M3 needs 4.9 rows on average and 60 at p99, and int4 alone is useless. The reason int8 suffices is the margin distribution, not the envelope's tightness: the envelope is about one logit wide, but the median gap between the two largest logits is 7.3 logits (p10 0.68) \ev{stats}. Tightening the envelope helps little: 16 to 64 exact outlier columns or a 64-dimensional PCA rotation of $h$ lower the mean count by 3--7\% for 1--7\% more pass bytes, and centring $W$ raises it by 10\% \ev{selfevidence-csv,stats}. Races at $T=1$ and $0.7$ behave like greedy selection (mean 1.33 and p99 5 for the 128-group copy). Under the elementwise minimum of these rigorous bounds, the \emph{minimum envelope}, the per-row copy needs 1.54 rows on plain decoding, and 1.57 (DFlash-4B, 1,162 of 4,000 rows) and 1.51 (MTP-4B, 2,901 of 4,010) on the verify rows a greedy verifier needs \ev{selfevidence-csv,selfevidence-dflash,selfevidence-mtp}.
 
-\begin{table}[tbp]
-\small\centering
-\begin{tabular}{@{}lrrrrrr@{}}\toprule
-& & \multicolumn{3}{c}{Candidate rows} & \multicolumn{2}{c}{Positions decided with}\\\cmidrule(lr){3-5}\cmidrule(l){6-7}
-Cheap head & Bytes & mean & p99 & max & 1 row & $\le8$ rows\\\midrule
-int8, one scale per row & 0.50 & 1.55 & 8 & 30 & 75.4\% & 99.3\%\\
-int8, 128-column groups & 0.52 & 1.34 & 5 & 23 & 81.4\% & 99.8\%\\
-int8, 32-column groups & 0.54 & 1.26 & 5 & 20 & 84.0\% & 99.9\%\\
-FP8 E4M3, one scale per row & 0.51 & 4.89 & 60 & 605 & 56.2\% & 88.4\%\\
-int4, 32-column groups & 0.29 & 20,751 & 230,238 & 248,192 & 0.02\% & 2.8\%\\
-int4, 128-column groups & 0.27 & 72,847 & 248,295 & 248,320 & 0\% & 0\%\\\bottomrule
+\begin{table}[t]
+\caption{Candidate rows per greedy decision on 6,005 held-out plain-decode positions; \modelcons{} for the copy's accumulation; row Cauchy--Schwarz envelope for int8 per row, blockwise $\ell_2$ otherwise. ``Bytes'': the copy relative to the BF16 head; ``1 row'': decided without re-scoring. Measured on replayed states \ev{selfevidence-csv}.}\label{tab:candidates}\label{tab:geometry-candidates}
+\vskip 0.05in
+\centering\scriptsize\setlength{\tabcolsep}{3.8pt}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+& & \multicolumn{3}{c}{Candidate rows} & \multicolumn{2}{c}{Decided with}\\\cmidrule(lr){3-5}\cmidrule(l){6-7}
+Copy & Bytes & mean & p99 & max & 1 row & $\le8$\\\midrule
+int8, per row & 0.50 & 1.55 & 8 & 30 & 75.4\% & 99.3\%\\
+int8, 128 cols & 0.52 & 1.34 & 5 & 23 & 81.4\% & 99.8\%\\
+int8, 32 cols & 0.54 & 1.26 & 5 & 20 & 84.0\% & 99.9\%\\
+FP8 E4M3, row & 0.51 & 4.89 & 60 & 605 & 56.2\% & 88.4\%\\
+int4, 128 cols & 0.27 & 72,847 & 248,295 & 248,320 & 0\% & 0\%\\
+\bottomrule
 \end{tabular}
-\caption{Candidate rows per greedy decision on 6,005 held-out plain-decode positions (248,320 rows), conservative tensor-core accumulation model. The int8 per-row head uses the row Cauchy--Schwarz envelope and every other head the blockwise $\ell_2$ envelope. ``Bytes'' is the approximate pass relative to the BF16 head, before candidate rows; ``1 row'' is the share of positions decided without re-scoring. Measured on replayed engine states~\ev{selfevidence-csv}.}
-\label{tab:geometry-candidates}
 \end{table}
 
-An int8 head certifies almost every decision with one or two rows (Table~\ref{tab:geometry-candidates}, Figure~\ref{fig:candidates}b). With one scale per row and the row Cauchy--Schwarz envelope a position needs 1.55 candidate rows on average (median 1, p99 8, maximum 30), and 75.4\% are decided by a single candidate; with 128-column groups and the blockwise envelope the mean is 1.34, at 0.52 of the BF16 head's bytes. FP8 E4M3 keeps only three mantissa bits and needs 4.9 rows on average and 60 at p99. Int4 alone is useless as a certificate: with 128-column groups the median candidate set is 13,991 rows.
+\begin{table}[t]
+\caption{Share of the 6,005 held-out rows, and of the capture's 750 decode steps (counting each step's held-out rows, 8.0 on average), that the contract leaves to the stock kernel, by rule and by the model assumed for the stock kernel's accumulation. The last two rows are sensitivity rows that do not model the stock tensor-core GEMM. Measured on replayed states \ev{rstock}.}\label{tab:rstock}
+\vskip 0.05in
+\centering\scriptsize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+& & \multicolumn{2}{c}{Gap (Thm.~\ref{thm:stock})} & \multicolumn{2}{c}{Interval (Prop.~\ref{prop:stockinterval})}\\\cmidrule(lr){3-4}\cmidrule(l){5-6}
+Stock model & $\gamma$ & rows & steps & rows & steps\\\midrule
+Conservative & $\gcons$ & 3.03\% & 21.6\% & 1.40\% & 10.9\%\\
+Hopper & $\ghop$ & 2.18\% & 16.0\% & 0.35\% & 2.8\%\\
+Sensitivity & $10^{-5}$ & 1.97\% & 14.9\% & 0.017\% & 0.13\%\\
+IEEE FP32 tree & $1.7\times10^{-6}$ & 1.95\% & 14.8\% & 0\% & 0\%\\
+\bottomrule
+\end{tabular}
+\end{table}
 
-The reason int8 suffices is the margin distribution, not the envelope's tightness. The row envelope has a median half-width of 1.00 logit for int8 per row, about 75 times the median realized error of 0.013, because it assumes the worst alignment of $e_i$ and $h$. But the median top-two margin is 7.3 logits (p10 0.68) and the top token holds a median 99.9\% of the mass at $T=1$, so most decisions sit far outside an int8 envelope~\ev{stats}. Refinements that tighten the envelope a little barely matter: evaluating 16 or 64 columns exactly, a PCA rotation of $h$, or quantizing $W$ minus its mean row changes the mean candidate count by at most 7\% for 1--12\% more bytes. Centring is instructive: the mean row points along the bulk of the vocabulary (median cosine 0.39) but not along the rows that compete for the argmax (median cosine $-0.11$ over each position's top eight), so it lowers the median error norm over all rows by 14\% and raises it by 20\% on the rows that matter.
+Table~\ref{tab:rstock} gives how often the contract leaves a row to the stock kernel. The gap condition has a floor near 2\%; the interval form has none. Under the \modelhopper{} the interval form leaves 0.35\% of rows to the stock kernel, and 2.8\% of the capture's decode steps contain such a row; under the \modelcons, 1.40\% and 10.9\%. For every model, no row the interval form certified had a token different from the one the engine returned at the capture's batch shape \ev{rstock}; that is consistent with the error models on these rows, not a proof that cuBLAS stays within the smallest of them.
 
-The same holds on speculative states. On DFlash-4B verify rows that a greedy verifier needs (every earlier draft accepted; 1,162 of 4,000 captured rows), the int8 per-row head needs 1.57 candidate rows on average (p99 8) and the 128-group head 1.35; rows after the first rejection are conditioned on a wrong prefix, have flatter distributions and need 4.0, and the draft head's own rows need 1.28. No envelope was violated and no winner was missed; FP8 needs 28.9 rows on average over all verify rows and int4 is again useless~\ev{selfevidence-dflash}.
-
-Gumbel races with the same noise field behave like greedy selection: at $T=1$ and $T=0.7$ the int8 128-group candidate sets have mean 1.33 and p99 5, far inside the worst-case bound of Figure~\ref{fig:candidates}a. Over the capture run's decode batches (up to 16 running requests, 7--10 held-out rows per step on average) the int8 128-group candidates cover 9.5--12.5 distinct rows, so gathered rows cost tens of kilobytes against a 635~MB int8 pass. Re-scoring candidates with IEEE FP32 accumulation on CUDA cores leaves no position undecided; with the tensor-core error model applied to the re-scoring as well, 2.1\% of positions still overlap and need FP64. A two-plane cascade (an int4 plane for every row, an int4 residual plane only for rows the first cannot exclude) reads 0.32 of the BF16 bytes at batch one and 0.41--0.42 over real batches of 5--16 rows, at the price of an irregular second gather.
-
-\begin{figure}[tbp]
+\begin{figure*}[t]
 \centering
-\datafigure{../evidence/head_geometry/selfevidence_plain4b_ccdf.csv}{%
-\begin{tikzpicture}
-\begin{groupplot}[group style={group size=2 by 1,horizontal sep=1.9cm},height=5.4cm,width=.47\linewidth,grid=major]
-\nextgroupplot[ymode=log,xmin=0,xmax=3.5,ymin=1,ymax=4e5,
-  xlabel={Envelope half-width $\beta$ (logits)},ylabel={Bound on $\E|C|$ (rows)},
-  title={\small (a) Worst case for a race (analytic)},
-  legend style={at={(.03,.97)},anchor=north west}]
-\addplot[thick,ink,domain=0:3.5,samples=120]{min(248320,exp(4*x))};\addlegendentry{$T=1$}
-\addplot[thick,dashed,ochre,domain=0:3.5,samples=120]{min(248320,exp(4*x/0.7))};\addlegendentry{$T=0.7$}
-\addplot[thin,densely dotted,muted,domain=0:3.5,samples=2]{248320};\addlegendentry{vocabulary}
-\nextgroupplot[xmode=log,ymode=log,xmin=1,xmax=248320,ymin=1e-4,ymax=1.3,
-  xlabel={Candidate rows $k$},ylabel={Share of positions needing $\ge k$},
-  title={\small (b) Measured, 6,005 positions},
-  legend style={at={(.98,.03)},anchor=south east},unbounded coords=discard]
-\addplot[thick,ink] table[x=k,y=plain_int8_row_greedy,col sep=comma]{../evidence/head_geometry/selfevidence_plain4b_ccdf.csv};\addlegendentry{int8 per row}
-\addplot[thick,dashed,teal] table[x=k,y=plain_int8_g128_greedy,col sep=comma]{../evidence/head_geometry/selfevidence_plain4b_ccdf.csv};\addlegendentry{int8 128-groups}
-\addplot[semithick,teal,mark=o,mark size=1.3pt,mark repeat=1] table[x=k,y=plain_int8_g128_gumbel_t1.0,col sep=comma]{../evidence/head_geometry/selfevidence_plain4b_ccdf.csv};\addlegendentry{same, race $T=1$}
-\addplot[thick,dashdotted,ochre] table[x=k,y=plain_fp8_row_greedy,col sep=comma]{../evidence/head_geometry/selfevidence_plain4b_ccdf.csv};\addlegendentry{FP8 per row}
-\addplot[thick,densely dotted,muted] table[x=k,y=plain_int4_g32_greedy,col sep=comma]{../evidence/head_geometry/selfevidence_plain4b_ccdf.csv};\addlegendentry{int4 32-groups}
-\end{groupplot}
-\end{tikzpicture}}{Candidate rows: analytic bound and measured distribution.}
-\caption{How many rows a decision re-scores. (a)~The distribution-free bound $\min(V,e^{4\beta/T})$ on the expected number of rows an exact Gumbel race re-scores (Proposition~\ref{prop:candidates}, with $\omega\approx2\beta$); analytic, not a measurement. (b)~Measured share of decisions that need at least $k$ candidate rows under each low-precision head, greedy unless marked, on 6,005 held-out plain-decode positions with the conservative accumulation model~\ev{ccdf}. The int8 envelopes are about one logit wide, where (a) allows up to 55 rows on average; the measured sets are far smaller because most margins are several logits.}
+\input{figures/candidates}
+\caption{Re-scoring and fallback per decision. \textbf{(a)}~Measured share of the 6,005 held-out plain-decode positions that need at least $k$ candidate rows, greedy unless marked \ev{ccdf}. \textbf{(b)}~Share of batches of $B$ rows with a row the interval form leaves to the stock kernel, if rows fell back independently with the per-row shares of Table~\ref{tab:rstock} (derived, $1-(1-p)^B$); markers: the measured shares of the capture's decode steps.}
 \label{fig:candidates}\label{fig:geometry-candidates}
-\end{figure}
+\end{figure*}
 
-\subsection{How often the stock contract needs the stock kernel}\label{sec:rstock-share}
-Under R-stock a row is certified only when its token is the stock kernel's for every accumulator value the error model allows. Table~\ref{tab:rstock} gives, on the same positions, how often each rule leaves a row to the stock kernel, for four accumulation models of that kernel. The gap condition of Theorem~\ref{thm:stock} has a floor near 2\% even when the accumulation error is negligible, because it asks for a margin above one BF16 spacing at the winner's magnitude, which 1.95\% of positions lack. The interval form of Proposition~\ref{prop:stockinterval}, which rounds each accumulator interval into BF16 buckets and applies the first-index rule, has no such floor: two rows whose logits round to the same BF16 value under every admissible accumulation are decided by index, as the stock argmax decides them. Assuming the stock kernel follows the blocked model of Hopper accumulation ($\gamma=1.19\times10^{-4}$, from Khattak and Mikaitis's published model~\cite{khattak2026}), the interval form sends 0.35\% of rows and 2.8\% of the capture run's batches (up to 16 requests) to the stock kernel; under the conservative tensor-core model the shares are 1.40\% and 10.9\%. For every model and rule, no certified token differed from the token the engine returned at the capture's batch shape, which is consistent with the error models on these 6,005 rows but does not prove that cuBLAS stays within the smallest of them~\ev{rstock}.
+The shares grow with the batch. If rows fell back independently with probability $p$, a batch of $B$ rows would contain an undecided row with probability $1-(1-p)^B$. At the capture's mean of 8.0 rows per step this gives 2.8\% and 10.7\%, close to the measured 2.8\% and 10.9\%; at a serving batch of 128 it gives 36\% and 84\% (Figure~\ref{fig:candidates}b). A whole-batch fallback would then run the stock head for most large batches, so the certified head's value at serving batch sizes rests on the row-wise fallback, on the row invariance it needs, and on its cost \pend{kernel-invariance,kernel-rowwise}.
 
-\begin{table}[tbp]
-\small\centering
-\begin{tabular}{@{}llrrrr@{}}\toprule
-&& \multicolumn{2}{c}{Gap condition (Thm.~\ref{thm:stock})} & \multicolumn{2}{c}{Interval form (Prop.~\ref{prop:stockinterval})}\\\cmidrule(lr){3-4}\cmidrule(l){5-6}
-Stock accumulation model & $\gamma$ & rows & batches & rows & batches\\\midrule
-Conservative tensor-core & $6.1\times10^{-4}$ & 3.03\% & 21.6\% & 1.40\% & 10.9\%\\
-Blocked Hopper & $1.19\times10^{-4}$ & 2.18\% & 16.0\% & 0.35\% & 2.8\%\\
-Sensitivity only & $10^{-5}$ & 1.97\% & 14.9\% & 0.017\% & 0.13\%\\
-IEEE FP32 blocked tree & $1.7\times10^{-6}$ & 1.95\% & 14.8\% & 0\% & 0\%\\\bottomrule
-\end{tabular}
-\caption{Share of rows, and of the capture run's decode batches of up to 16 requests, that the stock contract leaves to the stock kernel on 6,005 held-out plain-decode positions, by rule and by the error model assumed for the stock kernel's FP32 accumulation. The first two rows model the stock tensor-core GEMM (the blocked row under Khattak and Mikaitis's published model, an assumption); the last two are sensitivity rows that do not model it. Measured on replayed engine states~\ev{rstock}.}
-\label{tab:rstock}
-\end{table}
-
-The batch shares grow with the batch. If the fallback reruns the stock head for the whole batch at the same shape, the batches in Table~\ref{tab:rstock} pay for both heads, and if rows fell back independently with probability $p$, a batch of $B$ rows would fall back with probability $1-(1-p)^B$: about 36\% at $B=128$ for $p=0.35\%$ and 84\% for $p=1.40\%$. At the capture run's batch sizes, under the published model, the whole-batch fallback is paid in about 3\% of batches; at a serving batch of 128 it would be paid in roughly 36\% (blocked model) to 84\% (conservative model) of batches. The certified head's runtime at serving batch sizes therefore depends on the row-wise fallback of Section~\ref{sec:kernel-fallback} and on the measured row invariance it requires \pend{kernel-invariance}, and on that fallback's own cost at $M=32$ to 256 \pend{kernel-rowwise}. This is the first measured term of Equation~\eqref{eq:headgate} below, and the question it leaves is open.
-
-\subsection{The certified head as a kernel pipeline}\label{sec:kernel-design}
-A certified head pays off only if the whole path beats the strongest dense head chain at the served shapes:
+\subsection{Kernel and Runtime}\label{sec:kernel-design}\label{sec:kernel-runtime}
+The path for $M$ head inputs is designed as a short pipeline with grids fixed by $M$, captured once per batch size with its fallback. An int8 pass accumulates on tensor cores in FP32, evaluates the envelope in its epilogue with directed rounding, and keeps per tile the four largest upper bounds and the largest remaining one instead of writing the $M\times V$ logits; compaction keeps every row above the threshold (all rows of a tile whose remaining bound reaches it), the candidates are re-scored in FP64, Proposition~\ref{prop:stockinterval} decides, and the stock head runs only as the conditional fallback. On capture steps with 5 to 16 held-out rows the 128-group candidates cover 9.5--12.5 distinct head rows, so the gather reads tens of kilobytes beside a 636~MB int8 pass. The path pays off only if
 \begin{equation}
-T_{\rm cheap\ pass}+T_{\rm bounds}+T_{\rm compaction}+T_{\rm re\mbox{-}score}+\Pr[\text{fallback}]\,T_{\rm stock\ head}<T_{\rm stock\ head\ chain}.\label{eq:headgate}
+T_{\rm pass}+T_{\rm select}+T_{\rm rescore}+P_{\rm fb}(M)\,T_{\rm stock}(M)<T_{\rm chain}(M),\label{eq:headgate}
 \end{equation}
-The right-hand side is the stock GEMM plus the FP32 copy and the argmax or top-1 that follow it; a fused dense epilogue that removes the copy and the argmax is a comparator in its own right, as is FlashSampling~\cite{flashsampling}. Equation~\eqref{eq:headgate} is a measurement criterion, not a prediction, and if the head chain is a fraction $f$ of a step, removing it entirely gives at most $1/(1-f)$.
-
-\paragraph{Sparse rows need not mean sparse traffic}\label{sec:union} For rows $i$ of a microbatch let $A_i$ be the set of retained vocabulary rows or tiles. A kernel that reuses weights across rows reads the union $\bigcup_iA_i$, not the average of the masks. If each row independently retained a tile with probability $f$, the batch would need that tile with probability
-\begin{equation}1-(1-f)^B,\label{eq:union}\end{equation}
-which is about $87.3\%$ at $f=1/16$ and $B=32$, so a per-row skip fraction of $93.75\%$ can coexist with nearly a full weight stream. This is a model of independent masks, not a measurement of mask correlation. Self-evidence is less exposed to it than transport, because its saving is in the bytes of the cheap pass, which every row shares, and its candidates are a few rows rather than whole tiles; the union matters only for the re-scoring gather, which the measurements above put at 9.5--12.5 distinct rows per batch.
-
-The path for a batch of $M$ head inputs is a short pipeline of kernels: input norms, the int8 pass with its envelope epilogue, compaction, re-scoring, the decision, and the conditional stock head. Every launch has a grid fixed by $M$ and by buffer capacities, so the whole path, fallback included, is captured once per batch size, and only the approximate pass streams the whole head, at half the bytes of BF16. The design is described below. The implementation, a package \code{src/certified\_head/} with its tests, is under review \pend{kernel-impl}, and no statement here about how it performs rests on it yet.
-
-\paragraph{Weights and metadata} Each row is stored as symmetric int8 codes $q_i$ with an FP32 scale $s_i=\fl(\max_j|w_{ij}|/127)$. The error $e_i=w_i-s_iq_i$ is computed offline in FP64, where it is exact, and its group norms, with those of $q_i$ and $w_i$, are stored as FP64 upper bounds over 128-column groups. From them the head builds one FP32 coefficient per row and group, rounded up,
-\[A_{ig}\ge\norm{e_{ig}}_2+\gamma_{\rm acc}s_i\norm{q_{ig}}_2+\gamma_{\rm ref}\norm{w_{ig}}_2,\]
-so that $\sum_gA_{ig}\norm{h_g}_2$ bounds the quantization error, the pass's own accumulation error and the stock kernel's accumulation error at once (Theorem~\ref{thm:envelope} with the reference's error folded in). With one group per row the metadata is about 1~MB beside 636~MB of codes (derived).
-
-\paragraph{The approximate pass} A Triton kernel first computes the input norms $\norm{h_g}_2$, rounded up. The pass tiles the vocabulary and covers all $M$ inputs in one or a few column blocks, so each weight tile is read from HBM once. Codes are converted to BF16 in registers, multiplied against the BF16 inputs on tensor cores, and accumulated in FP32; the per-row scale multiplies the accumulator once. The epilogue evaluates the envelope with directed rounding (PTX \code{fma.rp} and \code{add.rm}), so the stored bounds enclose the reference's value without the inflation of Lemma~\ref{lem:outward}, and it never writes the $M\times V$ logits. Per input it folds the largest lower bound into one word with an atomic maximum, and per input and vocabulary tile it keeps the four largest upper bounds with their indices and the largest remaining upper bound.
-
-\paragraph{Selection and re-scoring} A compaction kernel applies the threshold to the tile summaries and appends surviving indices to a fixed-capacity list. A tile whose remaining bound reaches the threshold may hold more than four candidates, so all of its rows are appended and the list stays complete; only a list longer than its capacity sends the row to the batch fallback. The re-scoring kernel re-reads the BF16 rows of the candidates, forms each product exactly in FP64 and sums in FP64; its own error is below $10^{-12}$ relative to $\sum_j|w_{ij}h_j|$, and the interval it stores is widened by the stock kernel's bound and rounded outward before Proposition~\ref{prop:stockinterval} decides. The stock head runs only when the device-side flag of an undecided row is set.
-
-\paragraph{Arithmetic by batch size} The int8 pass should be bandwidth-bound at small $M$; because the conversion of codes repeats for every column block of inputs, it may become bound by instruction issue at large $M$, which the kernel measurements will show \pend{kernel-micro}. Two further passes share the epilogue, selection and re-scoring: an integer pass that quantizes each input to int8 and accumulates exactly in int32 (Theorem~\ref{thm:integer}), and a BF16 pass over the stored head that keeps only the accumulation terms, a certified dense head that never writes logits and so removes the stock chain's FP32 copy and separate argmax. The pass is chosen per $M$ from measured times \pend{kernel-micro}.
-
-\paragraph{Sampling} For the seeded sampler the pipeline carries perturbed scores instead of logits. The stock chain divides FP32 logits by the temperature, takes \code{softmax} and \code{log} in FP32 and adds the FP64 keyed Gumbel field before the argmax. The normalization is a shift shared by a row, so it cancels from every comparison; what remains is the rounding of the exponential, the division and the logarithm, which the kernel bounds from CUDA's documented maximum errors for those functions and adds to the race's slack (Theorem~\ref{thm:race}), sending undecided rows to the stock sampler. The written derivation of that slack, with its tests, and token-for-token agreement with the stock seeded sampler on replayed steps are \pend{kernel-seeded}.
-
-\paragraph{Runtime protocol}\label{sec:kernel-runtime} Every timing is a CUDA-graph replay of the complete path (input norms, the int8 pass, compaction, re-scoring, the decision and the conditional fallback) on real decode head inputs, against the stock chain captured the same way. A graph holds 20 back-to-back calls; the median and spread are taken over 50 replays, with the L2 cache warm and with a 256~MB write between calls. Because a fallback costs the stock chain, the expected cost at batch size $M$ is $T_{\rm cert}(M)+P_{\rm fb}(M)\,T_{\rm stock}(M)$, with $P_{\rm fb}(M)$ the measured fraction of real batches of size $M$ that contain an undecided row. The complete head-path time and its variance for $M=1$ to 256, per error model, the stage times and the int8 pass's effective bandwidth, and the primitive costs used by the replay's predictions are \pend{kernel-micro,kernel-path}.
-
-Certifying a greedy head from a cheaper copy and re-scoring survivors is not new: sparkpipe screens with an E4M3 shadow on CUDA cores and re-scores in BF16~\cite{sparkpipehead}, dgpp uses int8 bit planes with a fixed floating-point slack~\cite{dgpphead}, a Metal implementation re-scores with a replica of the production kernel~\cite{lagunaprune}, and knlp reports that on an H100 such a head wins only at batch one under a CUDA graph~\cite{knlphead}. What this implementation adds is narrower: a contract stated against a closed-source stock kernel at the engine's own batch shapes, with that kernel as the fallback rather than a replica; a graph-safe path whose undecided rows cost a conditional stock head; the extension to the engine's seeded sampler; and a runtime measurement of the complete path against the engine's actual head chain, which is planned.
-
-\subsection{Beyond the head: a certified tail (rejected)}\label{sec:tail}\label{sec:skipped}
-Skipping a computation removes its cost only if nothing downstream needs its result, so every skipped result falls into one of three classes. It is \emph{dead} when it has no remaining consumer. It is \emph{deferred} when a later consumer needs it and a reconstruction path exists; the cost is moved, not eliminated, and must be charged where it lands. It is \emph{soundly enclosed} when a certificate bounds it well enough for every consumer that remains. A claimed saving should say which class it belongs to, because early exits and approximations can borrow time from future tokens.
-
-The head is dead work in this sense: once a token is committed, no future computation reads the logits. In target-only decoding of Qwen3.5-4B the same is true of more. The last decoder layer is a full-attention layer (Section~\ref{sec:setting-model}); its attention writes the key--value cache before its MLP runs, and the final MLP, the final norm and the head have no consumer in future state. A certificate that decides the token before that tail could therefore remove about 1.41~GB of the 8.41~GB streamed per step (the head plus the last layer's MLP, Table~\ref{tab:bytes}), and the removal would be permanent. The cut does not transfer to speculation without re-analysis: the MTP layer and the DFlash drafter consume target hidden states, so work that is dead in plain decoding becomes deferred there.
-
-The hypothesis (P1) was that a cheap surrogate of that tail with a sound enclosure could let the commit rule decide the token before the tail runs. A one-shot surrogate that costs $C$ (surrogate plus certificate) and certifies a fraction $p$ of positions pays only if $C<p\,T_{\rm tail}$, and the ceiling for a tail fraction $f$ of the step is $1/(1-f)$. The directional margin (Proposition~\ref{prop:directional}) is the natural certificate when the surrogate predicts the head input with a radius. The kill test was deliberately optimistic: record the residual stream at the cut, the reference head input, the logits and the tokens; freeze an int8 tail surrogate; take the oracle radius $\norm{h-\tilde h}_2$; and apply the directional certificate with no overhead. If the oracle certification rate $p_{\rm oracle}$ satisfies $p_{\rm oracle}T_{\rm tail}\le C_{\rm surrogate}$, the one-shot design cannot pay and is dropped; otherwise real bounds are compared against the dense tail and against the certified head alone, which is the decisive ablation.
-
-The kill test rejects the design~\ev{tail}. On 2,064 positions from 16 held-out prompts of mixed domains, with the head input from a reference BF16 forward pass teacher-forced on the engine's greedy outputs, an int8 per-row copy of the final MLP moves the head input by a median 0.94\% in relative $\ell_2$ norm. With that realized error as an oracle radius and no overhead, the directional certificate decides 85.4\% of positions with the exact head and 71.8\% when the head is int8 as well, while the int8 head alone, with the exact MLP, decides 79.3\% without any re-scoring. The MLP is 0.142 of the tail's 1.413~GB, so an int8 surrogate can save at most 0.071~GB per token, and it lowers the rate at which the certified head decides on its own. Certifying the head alone is the part worth building.
+where $T_{\rm chain}$ is the stock GEMM with its FP32 copy and argmax and $P_{\rm fb}(M)$ the share of batches that fall back. At $M=1$ the stock GEMM takes 354.5~\textmu s, 95\% of the 3.79~TB/s read bandwidth measured over the head's 1.27~GB, and the chain 369.0~\textmu s \ev{profile-head,profile-bw}, so a pass that reads half the bytes has a floor near 170~\textmu s (derived). The implementation and its head-path times for $M=1$ to 256, per error model, are \pend{kernel-impl,kernel-path}.

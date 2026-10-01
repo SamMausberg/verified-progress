@@ -61,6 +61,7 @@ _DECODE_LINE = re.compile(
     r'Decode batch.*?#running-req: (\d+).*?(?:accept len: ([\d.]+).*?)?cuda graph: (True|False)'
     r'.*?gen throughput \(token/s\): ([\d.]+)'
 )
+_RETRACT_LINE = re.compile(r'KV cache pool is full\. Retract requests\. #retracted_reqs: (\d+)')
 
 
 def requests_for(concurrency: int, min_requests: int, waves: int) -> int:
@@ -153,7 +154,38 @@ def aiperf_command(
 
 
 def load_prompts(path: Path) -> list[dict[str, Any]]:
-    return list(iter_jsonl(path))
+    """A workload split; per-prompt `output_length` must be on every record or none."""
+    items = list(iter_jsonl(path))
+    with_length = sum(1 for item in items if 'output_length' in item)
+    if with_length not in (0, len(items)):
+        raise ValueError(f'{path}: output_length on {with_length} of {len(items)} records')
+    if with_length:
+        # Lengths are matched to responses by text, so one text has one length.
+        lengths: dict[str, int] = {}
+        for item in items:
+            key = prompt_hash(item['text'])
+            if lengths.setdefault(key, int(item['output_length'])) != int(item['output_length']):
+                raise ValueError(f'{path}: one text with two output lengths ({item["id"]})')
+    return items
+
+
+def prompts_match(rows: list[dict[str, Any]], measured: list[dict[str, Any]]) -> bool:
+    """True if the measured requests carried exactly the expected texts, counted.
+
+    Compares the multiset of sent prompt hashes with that of the measured prompts,
+    so repeated texts and ids shared with the warmup pool cannot confuse it.
+    """
+    sent = sorted(str(row.get('prompt_sha')) for row in rows)
+    expected = sorted(prompt_hash(item['text']) for item in measured)
+    return sent == expected
+
+
+def request_record(item: dict[str, Any]) -> dict[str, Any]:
+    """aiperf single-turn record; a per-prompt length overrides the global --osl."""
+    record: dict[str, Any] = {'text': item['text']}
+    if 'output_length' in item:
+        record['output_length'] = int(item['output_length'])
+    return record
 
 
 def cycled(items: list[dict[str, Any]], count: int) -> list[dict[str, Any]]:
@@ -169,14 +201,31 @@ def log_segment_stats(text: str) -> dict[str, Any]:
     top = max(running) if running else 0
     # The server's own decode rate while (nearly) the full batch is running: what
     # the GPU sustains, against which the client-observed y can be compared.
-    full = sorted(float(tps) for run, _, _, tps in lines if top and int(run) >= 0.9 * top)
+    # The first decode line of a segment covers the time since the previous log line,
+    # which lies before the point (idle time, cache flush, client start-up), so its
+    # rate is not the point's; it is left out of the full-batch rates.
+    full_lines = [
+        (int(run), float(acc) if acc else 1.0, float(tps))
+        for run, acc, _, tps in lines[1:]
+        if top and int(run) >= 0.9 * top
+    ]
+    full = sorted(tps for _, _, tps in full_lines)
+    # Tokens over time across those windows. Each window spans the same number of
+    # decode passes; a pass yields about running x accept-length tokens, so the
+    # window's tokens are proportional to that and its time to tokens / rate.
+    tokens = sum(run * acc for run, acc, _ in full_lines)
+    seconds = sum(run * acc / tps for run, acc, tps in full_lines if tps > 0)
     return {
         'decode_log_lines': len(lines),
         'decode_log_lines_without_graph': graph.count(False),
         'max_running_logged': top,
         'logged_accept_len_mean': sum(accept) / len(accept) if accept else None,
         'logged_gen_tps_full_batch_p50': full[len(full) // 2] if full else None,
+        'logged_gen_tps_full_batch': tokens / seconds if seconds > 0 else None,
         'prefill_log_lines': text.count('Prefill batch'),
+        # Requests the scheduler evicted and recomputed because the KV pool was full:
+        # a point with retractions measures a KV-limited server.
+        'kv_retractions': sum(int(n) for n in _RETRACT_LINE.findall(text)),
     }
 
 
@@ -191,9 +240,12 @@ class Sweep:
         self.run_dir = run_dir
         self.workload = load_prompts(args.workload)
         self.warmup_pool = load_prompts(args.warmup_pool)
+        # Text hash -> id and domain, the workload's entry winning over the warmup
+        # pool's. A text that occurs more than once maps to one id, so request ids are
+        # labels only; prompt identity checks use the hashes (prompts_match).
         self.prompt_index = {
             prompt_hash(item['text']): {'id': item['id'], 'domain': item['domain']}
-            for item in [*self.workload, *self.warmup_pool]
+            for item in [*self.warmup_pool, *self.workload]
         }
         self.body = request_body(args.ignore_eos, args.thinking)
         self.points: list[dict[str, Any]] = []
@@ -228,9 +280,7 @@ class Sweep:
     ) -> subprocess.CompletedProcess[str]:
         point_dir.mkdir(parents=True, exist_ok=True)
         input_file = point_dir / 'inputs.jsonl'
-        input_file.write_text(
-            ''.join(json.dumps({'text': item['text']}) + '\n' for item in prompts)
-        )
+        input_file.write_text(''.join(json.dumps(request_record(item)) + '\n' for item in prompts))
         command = aiperf_command(
             model=self.server.arm.model,
             revision=self.server.arm.revision,
@@ -310,10 +360,14 @@ class Sweep:
         write_requests_csv(rows, point_dir / 'requests.csv')
         phase_summary = artifact_dir / 'phases/profiling/profile_export_aiperf.json'
         aiperf_summary = json.loads(phase_summary.read_text()) if phase_summary.exists() else None
-        target = args.osl if args.ignore_eos else None
-        summary = summarise_point(rows, target, concurrency, aiperf_summary)
-        expected_ids = [item['id'] for item in measured]
-        sent_ids = [row['prompt_id'] for row in rows]
+        target_osl: int | dict[str, int] | None = None
+        if args.ignore_eos:
+            target_osl = (
+                {prompt_hash(item['text']): int(item['output_length']) for item in measured}
+                if 'output_length' in measured[0]
+                else args.osl
+            )
+        summary = summarise_point(rows, target_osl, concurrency, aiperf_summary)
         summary.update(
             {
                 'repeat': repeat,
@@ -329,7 +383,7 @@ class Sweep:
                 # Beyond the workload size prompts cycle, and repeats can hit the prefix cache.
                 'repeated_prompts': max(0, requests - len(self.workload)),
                 'cache_flushed': flushed,
-                'prompts_as_expected': sorted(map(str, sent_ids)) == sorted(map(str, expected_ids)),
+                'prompts_as_expected': prompts_match(rows, measured),
                 'server_counters': counter_deltas(before, after),
                 'server_log': log_segment_stats(segment),
                 'gpu_before': gpu_before['values'],
@@ -367,6 +421,7 @@ class Sweep:
         args = self.args
         manifest = {
             'label': args.label,
+            'session': args.session,
             'arm': self.server.arm.to_json(),
             'launch': self.server.launch_record,
             'checks': [asdict(check) for check in self.server.checks],
@@ -417,6 +472,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     add_arm_arguments(parser)
     parser.add_argument('--label', default=None, help='run label (default: arm name)')
+    parser.add_argument(
+        '--session',
+        default='',
+        help='repeat this run belongs to (bench.pareto pairs matched arms within a session)',
+    )
     parser.add_argument('--out', type=Path, default=Path.home() / 'vp-data/bench/runs')
     parser.add_argument('--workload', type=Path, default=DEFAULT_WORKLOAD)
     parser.add_argument('--warmup-pool', type=Path, default=DEFAULT_WARMUP_POOL)
@@ -471,6 +531,12 @@ def build_parser() -> argparse.ArgumentParser:
         '--allow-busy-gpu', action='store_true', help='run even if other GPU processes exist'
     )
     parser.add_argument(
+        '--busy-gpu-wait',
+        type=float,
+        default=300.0,
+        help='seconds to wait for other GPU processes to exit before refusing to run',
+    )
+    parser.add_argument(
         '--streaming',
         action=argparse.BooleanOptionalAction,
         default=True,
@@ -493,9 +559,15 @@ def prepare(parser: argparse.ArgumentParser, argv: list[str] | None) -> argparse
         parser.error(f'concurrency above the arm capacity target {arm.max_concurrency}')
     if not args.allow_unlocked and not gpu_lock_held_by_someone():
         parser.error('run under scripts/gpu_lock.sh -x (the GPU lock is not held)')
+    # A previous lock holder's server can take a few seconds to leave the GPU after
+    # its job releases the lock; wait for it before refusing to measure.
+    deadline = time.monotonic() + args.busy_gpu_wait
     busy = gpu_snapshot()['compute_apps']
+    while busy and not args.allow_busy_gpu and time.monotonic() < deadline:
+        time.sleep(5)
+        busy = gpu_snapshot()['compute_apps']
     if busy and not args.allow_busy_gpu:
-        parser.error(f'GPU has running processes: {busy}')
+        parser.error(f'GPU has running processes after {args.busy_gpu_wait:.0f} s: {busy}')
     args.arm_resolved = arm
     return args
 

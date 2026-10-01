@@ -62,8 +62,14 @@ def load_head_weight(model_id: str = MODEL_ID, revision: str = MODEL_REVISION) -
     return w.contiguous()
 
 
-def head_sha256(w: torch.Tensor) -> str:
-    return hashlib.sha256(w.contiguous().view(torch.int16).numpy().tobytes()).hexdigest()
+def head_sha256(w: torch.Tensor, chunk_rows: int = 16384) -> str:
+    """SHA-256 of a BF16 head's bytes in row-major order. The rows are read in
+    chunks, so a device tensor reaches the host one chunk at a time."""
+    digest = hashlib.sha256()
+    bits = w.contiguous().view(torch.int16)
+    for r0 in range(0, bits.shape[0], chunk_rows):
+        digest.update(bits[r0 : r0 + chunk_rows].cpu().numpy().tobytes())
+    return digest.hexdigest()
 
 
 def quantize_int8_rows(w: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -157,6 +163,17 @@ class QuantizedHead:
 
 
 def build_quantized_head(w: torch.Tensor, info: dict[str, Any] | None = None) -> QuantizedHead:
+    """Quantize ``w`` and compute its envelope metadata. ``info`` records the
+    SHA-256 of ``w``, which ``CertifiedHead.from_quantized`` checks against the
+    weight it is handed. A ``head_sha256`` supplied in ``info`` must equal it:
+    metadata copied from another head would otherwise label these codes and
+    bounds with that head's digest and pass the check for the wrong weight."""
+    info = dict(info or {})
+    digest = head_sha256(w)
+    supplied = info.get('head_sha256')
+    if supplied is not None and supplied != digest:
+        raise ValueError('the supplied head_sha256 is not the digest of the weight being quantized')
+    info['head_sha256'] = digest
     q, scale = quantize_int8_rows(w)
     meta = error_metadata(w, q, scale)
     return QuantizedHead(
@@ -167,7 +184,7 @@ def build_quantized_head(w: torch.Tensor, info: dict[str, Any] | None = None) ->
         w_sumsq=meta['w_sumsq'],
         err_linf=meta['err_linf'],
         dup_rep=duplicate_representatives(w),
-        info=dict(info or {}, scheme=SCHEME, base_group=BASE_GROUP),
+        info=dict(info, scheme=SCHEME, base_group=BASE_GROUP),
     )
 
 

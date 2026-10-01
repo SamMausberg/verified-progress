@@ -36,6 +36,12 @@ STATUS_NONFINITE = tl.constexpr(4)
 STATUS_THRESHOLD = tl.constexpr(8)
 STATUS_EMPTY = tl.constexpr(16)
 STATUS_TILE_OVERFLOW = tl.constexpr(32)
+STATUS_REFUSED = tl.constexpr(64)
+"""The batch size's tile configuration failed the enclosure self-test."""
+STATUS_PROBE = tl.constexpr(128)
+"""A runtime probe found an exact logit outside the envelope (whole batch falls back)."""
+PROBES = 8
+"""Vocabulary rows recomputed exactly on every call."""
 
 MODES = {'bf16': 0, 'fp32': 1, 'real': 2}
 
@@ -44,6 +50,7 @@ MODES = {'bf16': 0, 'fp32': 1, 'real': 2}
 CONST_SUMSQ_INFLATE = tl.constexpr(0)
 CONST_SQRT_INFLATE = tl.constexpr(1)
 CONST_REFINE_RADIUS = tl.constexpr(2)
+CONST_SUMSQ_TOTAL_INFLATE = tl.constexpr(3)
 
 # --- directed-rounding primitives -------------------------------------------
 
@@ -239,10 +246,17 @@ def stock_score_bounds(z_lo, z_hi, t, zmax, ymax, g):
     ``fl(expf(.) / S)`` is a normal FP32 number. ``ymax >= m`` is an upper bound
     of the row's largest stock ``y`` (``+inf`` if unknown, then ``D = 2 zmax``).
     A probability that may be subnormal (``y_i`` possibly more than 74.8 below
-    ``m``) can round up by a factor 2, so its upper bound gets one more unit.
+    ``m``) gets one more unit on its upper bound, which covers rounding by up to a
+    factor 2 but not the absolute error of ``expf`` and the division there
+    (multiples of ``2^-149``); see the exception below.
     ``2^-30`` covers the FP64 addition of ``g`` and any last-bit difference in
     ``g`` between kernels. Returns FP64 ``(lo, hi)`` enclosing ``x_i`` minus the
-    common shift, and ``y_hi``.
+    common shift, and ``y_hi``, for every token whose stock probability is a
+    normal FP32 number. A subnormal or zero one (``y_i`` more than 74.8 below
+    ``m``; a zero one makes the stock score ``-inf``) need not be enclosed; such a
+    token's stock score is below ``m - 52.66`` in these units, and
+    ``CertifiedHead.gumbel_sample`` refuses any winner whose ``lo`` is within
+    ``SMALL_PROBABILITY_GAP`` of ``ymax``.
     """
     y_lo = tl.math.div_rn(z_lo, t).to(tl.float64)
     y_hi = tl.math.div_rn(z_hi, t).to(tl.float64)
@@ -265,6 +279,38 @@ def logit_magnitude_bound(hnorm, wmax, t):
 
 
 @triton.jit
+def _probe_kernel(
+    h_ptr,
+    w_ptr,
+    idx_ptr,
+    x_ptr,
+    counter_ptr,
+    V,
+    K: tl.constexpr,
+    P: tl.constexpr,
+    CH: tl.constexpr,
+):
+    """Exact logits (FP64) of ``P`` vocabulary rows for batch row ``m``.
+
+    The rows are a hash of a per-call device counter, so they change on every
+    call (also under CUDA-graph replay) and are the same for every batch row.
+    """
+    m = tl.program_id(0)
+    j = tl.arange(0, P).to(tl.uint32)
+    c = tl.load(counter_ptr).to(tl.uint64)
+    tok = (murmur_hash32(c + 0x9E3779B9, j, j * 0 + 0x51ED).to(tl.int64) % V).to(tl.int32)
+    if m == 0:
+        tl.store(idx_ptr + tl.arange(0, P), tok)
+    acc = tl.zeros((P, CH), dtype=tl.float64)
+    for k0 in range(0, K, CH):
+        offs = k0 + tl.arange(0, CH)
+        x = tl.load(h_ptr + m * K + offs).to(tl.float64)
+        wv = tl.load(w_ptr + tok[:, None].to(tl.int64) * K + offs[None, :]).to(tl.float64)
+        acc += wv * x[None, :]
+    tl.store(x_ptr + m * P + tl.arange(0, P), tl.sum(acc, axis=1))
+
+
+@triton.jit
 def _prep_kernel(
     h_ptr,
     b_ptr,
@@ -275,6 +321,7 @@ def _prep_kernel(
     hnorm_ptr,
     ymax_ptr,
     const64_ptr,
+    probe_fail_ptr,
     K: tl.constexpr,
     G: tl.constexpr,
     GS: tl.constexpr,
@@ -283,6 +330,7 @@ def _prep_kernel(
 ):
     m = tl.program_id(0)
     sumsq_inflate = tl.load(const64_ptr + CONST_SUMSQ_INFLATE)
+    total_inflate = tl.load(const64_ptr + CONST_SUMSQ_TOTAL_INFLATE)
     sqrt_inflate = tl.load(const64_ptr + CONST_SQRT_INFLATE)
     total = tl.zeros((), dtype=tl.float64)
     for g in tl.static_range(G):
@@ -295,7 +343,8 @@ def _prep_kernel(
         r = mul_ru64(sqrt_ru64(mul_ru64(s, sumsq_inflate)), sqrt_inflate)
         tl.store(b_ptr + m * BSTRIDE + g, f64_to_f32_ru(r))
     finite = total < float('inf')  # False for inf and NaN
-    norm = mul_ru64(sqrt_ru64(mul_ru64(total, sumsq_inflate)), sqrt_inflate)
+    # ``total`` adds G group sums: its factor covers all K terms, not one group.
+    norm = mul_ru64(sqrt_ru64(mul_ru64(total, total_inflate)), sqrt_inflate)
     tl.store(hnorm_ptr + m, f64_to_f32_ru(norm))
     tl.store(lower_ptr + m, float('-inf'))
     tl.store(ymax_ptr + m, float('-inf'))
@@ -303,6 +352,7 @@ def _prep_kernel(
     tl.store(status_ptr + m, tl.where(finite, 0, STATUS_NONFINITE))
     if m == 0:
         tl.store(any_ptr, 0)
+        tl.store(probe_fail_ptr, 0)
 
 
 @triton.jit
@@ -363,6 +413,10 @@ def _gemv_envelope_kernel(
     idx_ptr,
     rest_ptr,
     lower_ptr,
+    status_ptr,
+    probe_idx_ptr,
+    probe_x_ptr,
+    probe_fail_ptr,
     seed_ptr,
     pos_ptr,
     temp_ptr,
@@ -388,6 +442,7 @@ def _gemv_envelope_kernel(
     BLOCK_V: tl.constexpr,
     BLOCK_M: tl.constexpr,
     BLOCK_K: tl.constexpr,
+    P: tl.constexpr,
 ):
     """Epilogues:
 
@@ -463,10 +518,34 @@ def _gemv_envelope_kernel(
             b = tl.load(b_ptr + offs_m * BSTRIDE + g, mask=m_mask, other=0.0)
             beta = fma_ru(a[:, None], b[None, :], beta)
         lo = add_rd(z, -beta)
+        hi = add_ru(z, beta)
+        # Fail closed: a row with any non-finite bound cannot be certified (a NaN
+        # would otherwise drop out of the maxima below); a non-finite approximate
+        # logit or radius makes its bounds non-finite, so checking them suffices.
+        bad = mask2 & ~((tl.abs(lo) < float('inf')) & (tl.abs(hi) < float('inf')))
+        row_bad = tl.max(bad.to(tl.int32), axis=0) > 0
+        tl.atomic_or(status_ptr + offs_m, STATUS_NONFINITE, mask=m_mask & row_bad)
+        # Runtime probes: the exact logits of P vocabulary rows (computed in FP64
+        # before this pass) must lie inside this variant's own envelope. Only the
+        # few programs whose vocabulary tile holds a probe row do any work.
+        v0 = pid_v * BLOCK_V
+        for j in tl.static_range(P):
+            tok = tl.load(probe_idx_ptr + j)
+            if (tok >= v0) & (tok < v0 + BLOCK_V):
+                sel = (offs_v == tok)[:, None]
+                lo_j = tl.max(tl.where(sel, lo, float('-inf')), axis=0)
+                hi_j = tl.min(tl.where(sel, hi, float('inf')), axis=0)
+                px = tl.load(probe_x_ptr + offs_m * P + j, mask=m_mask, other=0.0)
+                slack = 1e-9 * (1.0 + tl.abs(px))
+                out = lo_j.to(tl.float64) > px + slack
+                if EPILOGUE != 2:
+                    out = out | (hi_j.to(tl.float64) < px - slack)
+                row_viol = m_mask & out
+                tl.atomic_or(status_ptr + offs_m, STATUS_PROBE, mask=row_viol)
+                tl.atomic_or(probe_fail_ptr + offs_m * 0, 1, mask=row_viol)
         if EPILOGUE == 2:
             tl.store(out_ptrs, lo, mask=mask2)
         else:
-            hi = add_ru(z, beta)
             if SAMPLE:
                 if MODE == 0:
                     lo = bf16_rn(lo)
@@ -485,6 +564,10 @@ def _gemv_envelope_kernel(
                 tl.atomic_max(ymax_ptr + offs_m, f64_to_f32_ru(tl.max(y_hi, axis=0)), mask=m_mask)
                 lo = f64_to_f32_rd(s_lo)
                 hi = f64_to_f32_ru(s_hi)
+                # Score bounds may be -inf (a probability that underflows), never NaN.
+                bad_s = mask2 & ((lo != lo) | (hi != hi))
+                row_bad_s = tl.max(bad_s.to(tl.int32), axis=0) > 0
+                tl.atomic_or(status_ptr + offs_m, STATUS_NONFINITE, mask=m_mask & row_bad_s)
             lo = tl.where(mask2, lo, float('-inf'))
             tl.atomic_max(lower_ptr + offs_m, tl.max(lo, axis=0), mask=m_mask)
             if EPILOGUE == 1:
@@ -674,7 +757,12 @@ def _decide_kernel(
     ids_ptr,
     any_ptr,
     dup_ptr,
+    probe_fail_ptr,
+    tripped_ptr,
+    trips_ptr,
+    counter_ptr,
     CAP,
+    VARIANT,
     MODE: tl.constexpr,
     SAMPLE: tl.constexpr,
     CAP_P2: tl.constexpr,
@@ -705,6 +793,8 @@ def _decide_kernel(
     amb = others & (((ids < k_id) & (hi >= best)) | ((ids > k_id) & (hi > best)))
     n_amb = tl.sum(amb.to(tl.int32), axis=0)
     lower = tl.load(lower_ptr + m)
+    # Fail closed on a non-finite lower bound (NaN, or +-inf from overflow).
+    lower_ok = tl.abs(lower) < float('inf')
     if SAMPLE:
         # Scores: rows outside the list have score < lower (an FP32 lower bound).
         thr_ok = lower.to(tl.float64) <= best
@@ -717,6 +807,18 @@ def _decide_kernel(
     status = status | tl.where(n_amb > 0, STATUS_AMBIGUOUS, 0)
     status = status | tl.where(thr_ok, 0, STATUS_THRESHOLD)
     status = status | tl.where(cnt == 0, STATUS_EMPTY, 0)
+    status = status | tl.where(lower_ok, 0, STATUS_NONFINITE)
+    # A probe violation anywhere in the batch, now or in an earlier call with this
+    # tile configuration (latched for the process, at every batch size that uses
+    # it), fails every row.
+    failed = tl.load(probe_fail_ptr) != 0
+    latched = tl.load(tripped_ptr + VARIANT) != 0
+    status = status | tl.where(failed | latched, STATUS_PROBE, 0)
+    if m == 0:
+        tl.store(counter_ptr, tl.load(counter_ptr) + 1)
+        if failed:
+            tl.store(tripped_ptr + VARIANT, 1)
+            tl.store(trips_ptr, tl.load(trips_ptr) + 1)
     tl.store(status_ptr + m, status)
     tl.store(ids_ptr + m, tl.where(cnt > 0, k_id, 0).to(tl.int64))
     if status != 0:

@@ -1,0 +1,32 @@
+{
+  "command": [
+    "python",
+    "bench/tune_gemv.py",
+    "--arith",
+    "w8a8",
+    "--batches",
+    "16",
+    "32",
+    "64",
+    "128",
+    "256",
+    "--out",
+    "/home/ubuntu/vp-data/kernel/runs/x6/gemv_sweep_w8a8.json"
+  ],
+  "exit_code": 0,
+  "interval_s": 1.0,
+  "samples": 453,
+  "foreign_cores_mean": 0.412,
+  "foreign_cores_max": 4.76,
+  "contended": false,
+  "contention_threshold_cores": 2.0,
+  "top_foreign_mean_cores": {
+    "/home/ubuntu/.cursor-server/bin/linux-arm64/e44a49c17e334d442e58bbde931d791200f014a0/node --dns-result-order=ipv4first -": 0.08,
+    "claude --dangerously-skip-permissions": 0.01
+  },
+  "own_peak_cores": {
+    "python bench/tune_gemv.py --arith w8a8 --batches 16 32 64 12": 5.25,
+    "/home/ubuntu/sglang/.venv/bin/python /home/ubuntu/sglang/.ve": 1.02,
+    "/home/ubuntu/sglang/.venv/lib/python3.12/site-packages/trito": 1.02
+  }
+}

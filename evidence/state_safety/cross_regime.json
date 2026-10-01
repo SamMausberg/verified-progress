@@ -1,0 +1,43 @@
+{
+  "runs": "/home/ubuntu/vp-data/state",
+  "pairs": {
+    "pinned (cap 8) vs unpinned (cap 16) plain c1": {
+      "prompts": 320,
+      "diverged": 0,
+      "identical": 320,
+      "length_mismatch": 0,
+      "exposure_tokens": 70042,
+      "per_1k_tokens": 0.0,
+      "classes": {},
+      "max_margin_median": null,
+      "max_margin_p90": null,
+      "max_margin_max": null,
+      "drift_median": 0.0,
+      "drift_p99": 0.0,
+      "drift_max": 0.23776817321777344,
+      "prompts_with_large_drift": 0,
+      "run_a": "runs/plain/c1",
+      "run_b": "runs_pinned/plain/c1",
+      "pinned_a": false,
+      "pinned_b": true,
+      "same_server": false,
+      "pools_identical": false
+    }
+  },
+  "missing_pairs": [],
+  "mixed_pin_pairs": [
+    "pinned (cap 8) vs unpinned (cap 16) plain c1"
+  ],
+  "self_consistency": {
+    "runs/plain/c1": {
+      "positions": 70042,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "runs_pinned/plain/c1": {
+      "positions": 70042,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "command": [
+    "python",
+    "experiments/backbone/gemm_bench.py",
+    "chain",
+    "--gemm-json",
+    "~/vp-data/backbone/runs/h1/gemm_full.json",
+    "--out",
+    "~/vp-data/backbone/runs/h1/chain_microbench.json"
+  ],
+  "exit_code": 0,
+  "interval_s": 1.0,
+  "samples": 75,
+  "foreign_cores_mean": 0.291,
+  "foreign_cores_max": 1.2,
+  "contended": false,
+  "contention_threshold_cores": 2.0,
+  "top_foreign_mean_cores": {
+    "node": 0.08,
+    "claude": 0.03
+  },
+  "own_peak_cores": {
+    "python gemm_bench.py": 5.23
+  },
+  "note": "bench/hostload.py record output for the hold-1 chain step; process command lines are reduced to program names in this committed copy"
+}

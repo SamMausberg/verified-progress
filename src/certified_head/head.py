@@ -20,8 +20,11 @@ rows are reported in ``stats.status`` instead of being recomputed.
 
 from __future__ import annotations
 
+import logging
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Literal
 
 import numpy as np
@@ -39,8 +42,16 @@ from certified_head.bounds import (
     scale_rel_error,
     sqrt_upper_f32,
 )
-from certified_head.quantize import MODEL_ID, MODEL_REVISION, QuantizedHead, load_or_build
+from certified_head.quantize import (
+    MODEL_ID,
+    MODEL_REVISION,
+    QuantizedHead,
+    head_sha256,
+    load_or_build,
+)
 from certified_head.reference import reference_argmax, stock_seeded_sample
+
+logger = logging.getLogger(__name__)
 
 STATUS_BITS = {
     'overflow': K.STATUS_OVERFLOW.value,
@@ -49,7 +60,30 @@ STATUS_BITS = {
     'threshold': K.STATUS_THRESHOLD.value,
     'empty': K.STATUS_EMPTY.value,
     'tile_overflow': K.STATUS_TILE_OVERFLOW.value,
+    'refused': K.STATUS_REFUSED.value,
+    'probe': K.STATUS_PROBE.value,
+    'temperature': 256,
+    'small_probability': 512,
 }
+"""Status bits. ``temperature`` and ``small_probability`` are set on the host side
+(device ops, no kernel): a sampled row whose temperature is not finite and
+positive, or whose winner is too close to the tokens whose stock probability may
+be subnormal or zero, takes the stock path."""
+
+SMALL_PROBABILITY_GAP = 52.0
+"""A sampled winner whose score lower bound is at most ``ymax - 52`` is not
+certified. ``stock_score_bounds`` models a normal FP32 probability. A subnormal or
+zero one has absolute rounding error (``expf`` and the division round to multiples
+of ``2^-149``), and a zero one makes the stock score ``log 0 = -inf``, so neither
+bound need hold for such a token. It needs ``expf(y - m) / S < 2^-126``, so
+``y < m - 87.34 + ln S <= m - 74.84`` (``S <= 1.02 V`` with ``V <= 2^18``), and then
+its stock score, in the bounds' units, is below ``m - 74.84 + 22.18 = m - 52.66``
+whatever the rounding (Gumbel noise is at most ``32 ln 2 = 22.18``); a lower bound
+``lo <= y + g`` is below the same value. If the winner's ``lo`` exceeds
+``ymax - 52 >= m - 52``, the winner's probability is therefore normal and its
+``lo`` is valid, and no token with a subnormal or zero probability can reach its
+score. Every other token is excluded through its upper bound, valid wherever the
+probability is normal."""
 
 Fallback = Literal['batch', 'columns']
 """How undecided greedy rows are completed.
@@ -77,7 +111,12 @@ epilogue and scan only those (``M x V / BLOCK_V x TOP`` entries).
 """
 
 TOP = 4
+MAX_VARIANTS = 64
+"""Tile configurations a head can latch (runtime probes) independently."""
 MIN_BLOCK_V = 64
+K_CHUNK = 256
+"""Coordinates the probe and refine kernels read per step, without a tail mask:
+the hidden size must be a multiple of it."""
 COLS_CAP = 64
 """Candidate slots per row that the column fallback gathers (larger lists use ``batch``)."""
 ARITH_CODES: dict[Arith, int] = {'w8a16': 0, 'w8a8': 1, 'bf16': 2}
@@ -99,29 +138,81 @@ class GemvConfig:
 
 
 def default_arith_config(arith: Arith, m: int) -> GemvConfig:
-    """Tile shape for the W8A8 and BF16 passes (from ``bench/tune_gemv.py`` on GH200)."""
+    """Tile shape for the W8A8 and BF16 passes.
+
+    Chosen by the rule fixed before the x7c evidence run (evidence README, "How
+    the defaults are chosen"): at each batch size the sweep timed
+    (``pointer_vs_tma_{w8a8,bf16}.json``: M = 16, 32, 64, 128, 256), pointer loads
+    replace the TMA default when they cost at most 5% more, and the stress test
+    found 0 misses for every TMA default. Each range below takes the decision at
+    the largest size in it that the sweep timed; the sizes between were not timed.
+    """
     if arith == 'w8a8':
-        if m <= 16:
-            return GemvConfig(128, 16, 128, 4, 3, tma=True)
-        if m <= 32:
-            return GemvConfig(256, 32, 128, 4, 3, tma=True)
+        if m <= 16:  # pointer loads +0.8% at M = 16
+            return GemvConfig(128, 16, 128, 4, 3)
+        if m <= 32:  # +2.0% at 32
+            return GemvConfig(256, 32, 128, 4, 3)
+        if m <= 128:  # -1.3% at 64, +1.5% at 128 (against the TMA default's 3 stages)
+            return GemvConfig(128, 64, 128, 4, 4)
+        # Pointer loads +8.6% at 256: TMA kept on a clean stress test.
         return GemvConfig(128, 64, 128, 4, 3, tma=True)
+    # BF16: pointer loads +1.3% at M = 32, -2.7% at 64; above 64 rows the earlier
+    # TMA default (128x128x64, never swept) took 957 us at M = 128 against 624 us
+    # for these pointer-load tiles and 491 us for the best TMA tiles.
     if m <= 32:
-        return GemvConfig(128, 32, 64, 4, 3, tma=True)
+        return GemvConfig(128, 32, 64, 4, 3)
     if m <= 64:
-        return GemvConfig(128, 64, 64, 4, 3, tma=True)
-    return GemvConfig(128, 128, 64, 4, 3, tma=True)
+        return GemvConfig(128, 64, 64, 4, 4)
+    return GemvConfig(256, 64, 64, 8, 4)
 
 
 def default_gemv_config(m: int) -> GemvConfig:
-    """W8A16 tile shape by batch size: the fastest in ``bench/tune_gemv.py`` on GH200."""
+    """W8A16 tile shape by batch size: TMA tiles with a 128-byte int8 box.
+
+    TMA loads of the int8 weights with ``block_k = 64`` (a 64-byte box) fed to the
+    BF16 conversion and ``tl.dot`` returned wrong products on GH200 (Triton 3.7.1,
+    ``experiments/certified_head/tma_repro.py``); these configurations were checked
+    on real rows at M = 1, 16, 17, 32, 33, 64, 65, 128, 200 and 256
+    (``tma_candidates.py``); the 64-byte-box tiles, and int8 TMA tiles with
+    ``block_m >= 128``, are refused, see :func:`check_gemv_config`.
+    """
     if m <= 16:
         return GemvConfig(128, 16, 128, 4, 4, tma=True)
     if m <= 32:
-        return GemvConfig(128, 32, 64, 4, 4, tma=True)
-    if m <= 64:
-        return GemvConfig(128, 64, 64, 4, 4, tma=True)
-    return GemvConfig(128, 128, 64, 4, 3, tma=True)
+        return GemvConfig(128, 32, 128, 4, 4, tma=True)
+    # Above 64 rows, several 64-row tiles: 128x128x128 took 1,458 us at M = 128
+    # against 626 us for this one (x6 primitives and sweep).
+    return GemvConfig(128, 64, 128, 4, 3, tma=True)
+
+
+def check_gemv_config(arith: Arith, cfg: GemvConfig) -> None:
+    """Refuse tile configurations of the two measured TMA faults.
+
+    With TMA loads of an int8 operand whose box is narrower than 128 bytes
+    (``block_k < 128``), the W8A16 pass (int8 weights converted to BF16 before
+    ``tl.dot``) computed wrong products, finite and non-finite, at several tile
+    shapes and batch sizes; pointer loads of the same tiles, TMA with a 128-byte
+    box, a BF16 operand through a 64-byte box and an int8 x int8 dot through a
+    64-byte box were exact.
+
+    With a 128-byte box and ``block_m = 128`` (64x128x128 with 4 warps and 3
+    stages, 128x128x128 with 8 warps and 3 or 4 stages), the W8A16 envelope
+    missed exact logits in counts that varied between identical runs, and one of
+    these configurations had a run with no miss, which the self-test would pass.
+    No default has ``block_m >= 128``.
+
+    Both are refused for both int8 passes until the causes are understood.
+    """
+    if arith in ('w8a16', 'w8a8') and cfg.tma and cfg.block_k < 128:
+        raise ValueError(
+            f'{arith} with TMA int8 loads narrower than 128 bytes is refused '
+            f'(measured wrong products): {cfg}'
+        )
+    if arith in ('w8a16', 'w8a8') and cfg.tma and cfg.block_m >= 128:
+        raise ValueError(
+            f'{arith} with TMA int8 loads and block_m >= 128 is refused '
+            f'(measured wrong envelopes): {cfg}'
+        )
 
 
 @dataclass
@@ -147,6 +238,12 @@ class HeadStats:
             'fallback_rows': int((s != 0).sum()),
             **{name: int(((s & bit) != 0).sum()) for name, bit in STATUS_BITS.items()},
         }
+
+
+def weight_sha256(weight: torch.Tensor, chunk_rows: int = 16384) -> str:
+    """SHA-256 of a BF16 weight, as :func:`certified_head.quantize.head_sha256`
+    (read from the device in chunks of ``chunk_rows`` rows)."""
+    return head_sha256(weight, chunk_rows)
 
 
 def _if_body(pred: torch.Tensor) -> Any:
@@ -182,6 +279,16 @@ class CertifiedHead:
             raise ValueError('inconsistent head shapes')
         if k % group_size:
             raise ValueError('group_size must divide the hidden size')
+        if k % K_CHUNK:
+            raise ValueError(
+                f'hidden size {k} is not a multiple of {K_CHUNK}: the probe and refine '
+                f'kernels read {K_CHUNK}-coordinate chunks without a tail mask'
+            )
+        for name, t in (('weight', weight), ('q', q), ('scale', scale)):
+            if not t.is_contiguous():
+                # The kernels index these as flat row-major storage, while the
+                # stock fallback would honour the strides: refuse a mismatch.
+                raise ValueError(f'{name} must be contiguous')
         self.weight = weight
         self.q = q
         self.scale = scale
@@ -238,9 +345,40 @@ class CertifiedHead:
         # Column mode is only switched on by enable_column_fallback(), after its self-test.
         self.fallback_mode: Fallback = 'batch'
         self._column_batches: set[int] = set()
+        # Batch sizes whose tile configuration failed the enclosure self-test.
+        # Kernel-variant self-test (see enclosure_self_test). A variant is an
+        # (arithmetic, tile configuration); a batch size is certified only after its
+        # variant passed the self-test at that size, otherwise it takes the stock path.
+        self._verified: set[tuple[tuple[Any, ...], int]] = set()
+        self._failed_variants: set[tuple[Any, ...]] = set()
+        self._variant_ids: dict[tuple[Any, ...], int] = {}
+        self._in_self_test = False
+        self.enclosure_report: dict[str, Any] | None = None
+        # Every self-test check this head ran (batch size, tiles, result, seconds).
+        self.self_test_log: list[dict[str, Any]] = []
+        # Runtime probes (see kernels._probe_kernel).
+        self._probe_idx = torch.zeros(K.PROBES, dtype=torch.int32, device=dev)
+        self._probe_x = torch.zeros(mb * K.PROBES, dtype=torch.float64, device=dev)
+        self._probe_counter = torch.zeros(1, dtype=torch.int64, device=dev)
+        self._probe_fail = torch.zeros(1, dtype=torch.int32, device=dev)
+        self._probe_trips = torch.zeros(1, dtype=torch.int64, device=dev)
+        self._probe_tripped = torch.zeros(MAX_VARIANTS, dtype=torch.int32, device=dev)
+        self._probe_trips_logged = 0
+        self._probes = K.PROBES
+        self.unsafe = False
+        """True once runtime probes are disabled: not a certified head any more."""
+        self.weight_check: dict[str, Any] = {
+            'ok': True,
+            'checked': False,
+            'reason': 'constructed directly: the caller supplies quantization data '
+            'that belongs to this weight (from_quantized checks it)',
+        }
+        """Whether the quantization data is known to belong to ``weight``; if not,
+        every batch takes the stock path (status ``refused``)."""
         c = self.const
-        const64 = [0.0] * 3
+        const64 = [0.0] * 4
         const64[K.CONST_SUMSQ_INFLATE.value] = c.sumsq_inflate
+        const64[K.CONST_SUMSQ_TOTAL_INFLATE.value] = c.sumsq_total_inflate
         const64[K.CONST_SQRT_INFLATE.value] = c.sqrt_inflate
         const64[K.CONST_REFINE_RADIUS.value] = c.refine_radius
         self._const64 = torch.tensor(const64, dtype=torch.float64, device=dev)
@@ -283,7 +421,7 @@ class CertifiedHead:
             for a in ARITH_CODES
         }
         wmax = f32_up(float(sqrt_upper_f32(qh.w_sumsq.sum(axis=1) * (1 + 2**-40)).max()))
-        return cls(
+        head = cls(
             weight.to(device),
             qh.q.to(device),
             qh.scale.to(device),
@@ -295,6 +433,36 @@ class CertifiedHead:
             ref_model=ref_model,
             **kwargs,
         )
+        head.check_weight(qh.info.get('head_sha256'))
+        return head
+
+    def check_weight(self, expected: str | None) -> dict[str, Any]:
+        """Check that the quantization data was built from this weight: its
+        ``head_sha256`` must equal the SHA-256 of ``self.weight``. The codes,
+        scales and error norms bound the approximation error only for the weight
+        they came from, and the self-test and probes check a few rows, not this.
+        On a mismatch, or with no digest, the head fails closed: every batch takes
+        the stock path (status ``refused``). The time taken is recorded."""
+        t0 = time.perf_counter()
+        digest = weight_sha256(self.weight) if expected else None
+        ok = expected is not None and digest == expected
+        if ok:
+            reason = 'digest matches'
+        elif expected is None:
+            reason = 'the quantization data carries no head_sha256'
+        else:
+            reason = 'the weight differs from the one the quantization data was built from'
+        self.weight_check = {
+            'ok': ok,
+            'checked': True,
+            'reason': reason,
+            'expected': expected,
+            'digest': digest,
+            'seconds': time.perf_counter() - t0,
+        }
+        if not ok:
+            logger.warning('certified head refused: %s; every batch takes the stock path', reason)
+        return self.weight_check
 
     def sibling(self, **kwargs: Any) -> CertifiedHead:
         """A head sharing this one's weights and metadata, with its own buffers.
@@ -318,6 +486,10 @@ class CertifiedHead:
         head.arith_for = self.arith_for
         head.arith_config = self.arith_config
         head.gemv_config = self.gemv_config
+        # Siblings share the weight and the quantization data, so they share the
+        # verdict on whether the data belongs to the weight: a refused head must
+        # not yield an accepted sibling.
+        head.weight_check = dict(self.weight_check)
         return head
 
     @classmethod
@@ -350,12 +522,15 @@ class CertifiedHead:
             self._hnorm,
             self._ymax,
             self._const64,
+            self._probe_fail,
             K=self.hidden,
             G=self.groups,
             GS=self.group_size,
             CH=self.chunk,
             BSTRIDE=2 * self.groups,
         )
+        if self._probes:
+            self._run_probe(hidden, m)
         if self.arith_for(m) == 'w8a8':
             K._quantize_hidden_kernel[(m,)](
                 hidden,
@@ -369,6 +544,35 @@ class CertifiedHead:
                 CH=self.chunk,
             )
 
+    @property
+    def probes(self) -> int:
+        """Probe rows checked per call. The certificate assumes this is positive."""
+        return self._probes
+
+    def disable_probes_for_measurement(self) -> None:
+        """Compile the runtime probes out, to measure their cost. Measurement only:
+        the head is marked ``unsafe``, no longer meets the certificate's assumption
+        (the probes check the compiled kernel on every call), and engine glue must
+        refuse it."""
+        logger.warning('certified head: runtime probes disabled; this head is unsafe')
+        self._probes = 0
+        self.unsafe = True
+
+    def _run_probe(self, hidden: torch.Tensor, m: int) -> None:
+        """Exact FP64 logits of ``K.PROBES`` vocabulary rows (new rows every call);
+        reads ``PROBES`` weight rows and the batch's hidden states."""
+        K._probe_kernel[(m,)](
+            hidden,
+            self.weight,
+            self._probe_idx,
+            self._probe_x,
+            self._probe_counter,
+            self.vocab,
+            K=self.hidden,
+            P=self._probes,
+            CH=K_CHUNK,
+        )
+
     def _sampling_args(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         if self._sampling is None:
             return self._no_seed, self._no_seed, self._no_temp
@@ -377,9 +581,13 @@ class CertifiedHead:
     def _gemv(self, hidden: torch.Tensor, m: int, out: torch.Tensor, epilogue: int) -> GemvConfig:
         arith = self.arith_for(m)
         cfg = self.gemv_config(m) if arith == 'w8a16' else self.arith_config(arith, m)
+        check_gemv_config(arith, cfg)
         seeds, positions, temps = self._sampling_args()
         if cfg.block_v < MIN_BLOCK_V:
             raise ValueError(f'block_v must be at least {MIN_BLOCK_V}')
+        if self.hidden % cfg.block_k:
+            # Pointer loads have no tail mask along K.
+            raise ValueError(f'block_k {cfg.block_k} must divide the hidden size {self.hidden}')
         grid = (triton.cdiv(self.vocab, cfg.block_v) * triton.cdiv(m, cfg.block_m),)
         coeff = self.coeff[arith]
         weights = self.weight if arith == 'bf16' else self.q
@@ -401,6 +609,10 @@ class CertifiedHead:
             self._top_idx,
             self._rest,
             self._lower,
+            self._status,
+            self._probe_idx,
+            self._probe_x,
+            self._probe_fail,
             seeds,
             positions,
             temps,
@@ -426,6 +638,7 @@ class CertifiedHead:
             BLOCK_V=cfg.block_v,
             BLOCK_M=cfg.block_m,
             BLOCK_K=cfg.block_k,
+            P=self._probes,
             num_warps=cfg.num_warps,
             num_stages=cfg.num_stages,
         )
@@ -493,7 +706,7 @@ class CertifiedHead:
             SAMPLE=sample,
             NSPLIT=self.refine_split,
             BLOCK_C=16,
-            BLOCK_K=256,
+            BLOCK_K=K_CHUNK,
             num_warps=4,
         )
 
@@ -509,12 +722,76 @@ class CertifiedHead:
             self._ids,
             self._any,
             self.dup_rep,
+            self._probe_fail,
+            self._probe_tripped,
+            self._probe_trips,
+            self._probe_counter,
             self.capacity,
+            self._variant_id(m),
             MODE=self.mode,
             SAMPLE=sample,
             CAP_P2=self.capacity_p2,
             num_warps=4,
         )
+        if not torch.cuda.is_current_stream_capturing():
+            self._log_probe_trips()
+
+    def _log_probe_trips(self) -> None:
+        trips = int(self._probe_trips.item())
+        if trips > self._probe_trips_logged:
+            logger.warning(
+                'certified head: runtime probe found an exact logit outside the envelope '
+                '(%d calls so far); tile configurations %s now take the stock path',
+                trips,
+                self.probe_stats()['latched_variants'],
+            )
+            self._probe_trips_logged = trips
+
+    def probe_stats(self) -> dict[str, Any]:
+        """Calls whose runtime probe failed, and the batch sizes latched to stock."""
+        latched = set((self._probe_tripped > 0).nonzero().flatten().tolist())
+        return {
+            'calls_with_probe_violation': int(self._probe_trips.item()),
+            'latched_variants': [
+                {'arith': key[0], 'config': key[1:]}
+                for key, i in self._variant_ids.items()
+                if i in latched
+            ],
+            'probe_rows_per_call': self.probes,
+        }
+
+    def _variant_key(self, m: int) -> tuple[Any, ...]:
+        """The compiled variant used at batch size ``m``: arithmetic and tiles."""
+        arith = self.arith_for(m)
+        cfg = self.gemv_config(m) if arith == 'w8a16' else self.arith_config(arith, m)
+        return (arith, *cfg.__dict__.values())
+
+    def _variant_id(self, m: int) -> int:
+        key = self._variant_key(m)
+        if key not in self._variant_ids:
+            if len(self._variant_ids) >= MAX_VARIANTS:
+                raise ValueError(f'more than {MAX_VARIANTS} tile configurations')
+            self._variant_ids[key] = len(self._variant_ids)
+        return self._variant_ids[key]
+
+    def _certifiable(self, m: int) -> bool:
+        """Whether batch size ``m`` may be certified: the quantization data belongs
+        to the weight (:meth:`check_weight`), and the variant has passed the
+        self-test at ``m`` (run now on first eager use; never under capture, where
+        an untested size takes the stock path) and has not failed it."""
+        if not self.weight_check['ok']:
+            return False
+        if self._in_self_test:
+            return True
+        key = self._variant_key(m)
+        if key in self._failed_variants:
+            return False
+        if (key, m) in self._verified:
+            return True
+        if torch.cuda.is_current_stream_capturing():
+            return False
+        self.enclosure_self_test([m])
+        return (key, m) in self._verified
 
     # -- public API -------------------------------------------------------------
 
@@ -546,10 +823,15 @@ class CertifiedHead:
         m = self._check(hidden)
         cols = fallback and self.fallback_mode == 'columns' and m in self._column_batches
 
+        certifiable = self._certifiable(m)  # outside the gated node: may run the self-test
+
         def stages() -> None:
-            self._approximate(hidden, m)
-            self._refine(hidden, m)
-            self._decide(m)
+            if not certifiable:
+                self._refuse(m)
+            else:
+                self._approximate(hidden, m)
+                self._refine(hidden, m)
+                self._decide(m)
             if cols:
                 K._route_kernel[(1,)](
                     self._status,
@@ -623,6 +905,128 @@ class CertifiedHead:
         report['ok'] = not report['failures']
         return report
 
+    def _refuse(self, m: int) -> None:
+        """Mark every row for the stock fallback (graph-safe: fills only)."""
+        self._status[:m].fill_(STATUS_BITS['refused'])
+        self._count[:m].zero_()
+        self._ids[:m].zero_()
+        self._any.fill_(True)
+
+    def enclosure_self_test(
+        self, batch_sizes: list[int], probe: torch.Tensor | None = None
+    ) -> dict[str, Any]:
+        """Check every compiled kernel variant used at each of these batch sizes
+        (:func:`certified_head.selftest.check_variants`: the raw product within
+        its accumulation bound, the envelope and the tile summaries against FP64
+        logits, and the greedy and sampling decisions against stock).
+
+        Mandatory: a batch size is certified only after its variant (arithmetic and
+        tile configuration) passed this test at that batch size; the first eager
+        call at a new batch size runs it, and under CUDA-graph capture an untested
+        size takes the stock path. Every batch size passed in is checked, on probe
+        rows (64 real decode rows shipped with the package, plus peaked and random
+        rows) tiled to that size. A failing variant is refused at every batch size
+        (status ``refused``) and latched like a runtime probe failure; the refusal is
+        logged. Returns a report with the time of each check.
+        """
+        import time
+
+        from certified_head.selftest import check_variants
+
+        rows = probe if probe is not None else self._probe_rows()
+        report: dict[str, Any] = {'checks': [], 'refused_batch_sizes': [], 'seconds': 0.0}
+        for m in sorted({m for m in batch_sizes if 0 < m <= self.max_batch}):
+            key = self._variant_key(m)
+            entry: dict[str, Any] = {
+                'batch_size': m,
+                'arith': key[0],
+                'config': dict(zip(GemvConfig.__dataclass_fields__, key[1:], strict=True)),
+            }
+            if key in self._failed_variants:
+                entry.update(ok=False, failure='variant failed earlier')
+            elif (key, m) in self._verified:
+                entry.update(ok=True, cached=True)
+            else:
+                reps = -(-m // rows.shape[0])
+                h = rows.repeat(reps, 1)[:m].contiguous()
+                t0 = time.perf_counter()
+                self._in_self_test = True
+                try:
+                    res = check_variants(self, h)
+                    ok = bool(res.pop('ok'))
+                    entry['checks'] = res
+                    if not ok:
+                        entry['failure'] = f'kernel variant check failed: {res}'
+                except Exception as exc:  # a refused or failing configuration
+                    ok = False
+                    entry['failure'] = f'{type(exc).__name__}: {exc}'[:200]
+                finally:
+                    self._in_self_test = False
+                torch.cuda.synchronize()
+                entry['seconds'] = time.perf_counter() - t0
+                report['seconds'] += entry['seconds']
+                entry['ok'] = ok
+                if ok:
+                    self._verified.add((key, m))
+                else:
+                    self._failed_variants.add(key)
+                    self._probe_tripped[self._variant_id(m)] = 1
+                    logger.warning(
+                        'certified head: %s tiles %s failed the kernel self-test at M=%d '
+                        '(%s); every batch size using them takes the stock path',
+                        key[0],
+                        entry['config'],
+                        m,
+                        entry.get('failure'),
+                    )
+            if not entry['ok']:
+                report['refused_batch_sizes'].append(m)
+            report['checks'].append(entry)
+        report['ok'] = not report['refused_batch_sizes']
+        torch.cuda.empty_cache()
+        self.enclosure_report = report
+        self.self_test_log.extend(c for c in report['checks'] if not c.get('cached'))
+        return report
+
+    def self_test_summary(self) -> dict[str, Any]:
+        """Cumulative self-test record: batch sizes certified and refused, and the
+        initialisation cost (seconds of checks)."""
+        return {
+            'verified_batch_sizes': sorted({m for _, m in self._verified}),
+            'refused_variants': [
+                {'arith': k[0], 'config': k[1:]} for k in sorted(self._failed_variants, key=str)
+            ],
+            'checks': len(self.self_test_log),
+            'seconds_total': sum(c.get('seconds', 0.0) for c in self.self_test_log),
+            'seconds_by_batch_size': {
+                c['batch_size']: round(c.get('seconds', 0.0), 3) for c in self.self_test_log
+            },
+        }
+
+    def _assume_verified(self, batch_sizes: list[int]) -> None:
+        """Mark batch sizes as self-tested without running the test. For tests of
+        the fail-closed mechanisms only (they need a head that certifies)."""
+        for m in batch_sizes:
+            self._verified.add((self._variant_key(m), m))
+
+    def _probe_rows(self) -> torch.Tensor:
+        """Real decode rows shipped with the package, plus peaked and random rows."""
+        dev = self.weight.device
+        path = Path(__file__).parent / 'data' / 'probe_rows.npy'
+        parts = []
+        if path.exists():
+            bits = torch.from_numpy(np.load(path)).view(torch.bfloat16)
+            if bits.shape[1] == self.hidden:
+                parts.append(bits.to(dev))
+        gen = torch.Generator(device=dev).manual_seed(20261001)
+        rows = torch.randint(0, self.vocab, (16,), device=dev, generator=gen)
+        target = self.weight[rows].float()
+        peaked = target / target.norm(dim=1, keepdim=True) * 30
+        parts.append(peaked.to(torch.bfloat16))
+        rand = torch.randn(16, self.hidden, device=dev, generator=gen) * 2
+        parts.append(rand.to(torch.bfloat16))
+        return torch.cat(parts).contiguous()
+
     def enable_column_fallback(
         self, batch_sizes: list[int], *, extend: bool = False
     ) -> dict[str, Any]:
@@ -630,7 +1034,16 @@ class CertifiedHead:
         every batch size the caller will use; otherwise stay in ``batch`` mode.
         Call it outside CUDA-graph capture, at start-up. With ``extend`` the
         checked sizes are added to those already enabled (a failure adds none).
+
+        Only for ``reference='bf16'``: the gathered GEMM and its self-test compute
+        BF16-output logits, which the FP32 reference (``out_dtype=float32``) does
+        not, so near ties could resolve differently there.
         """
+        if self.reference != 'bf16':
+            raise ValueError(
+                f"the column fallback serves reference='bf16' only, not {self.reference!r}: "
+                'its gathered GEMM and self-test compute BF16-output logits'
+            )
         report = self.column_invariance_self_test(batch_sizes)
         # Only the checked batch sizes use the column path; others keep 'batch'.
         passed = set(batch_sizes) if report['ok'] else set()
@@ -681,7 +1094,10 @@ class CertifiedHead:
         ``log``, then ``multinomial_with_seed``, whose noise is a function of
         ``(seeds[m], positions[m], token id)``. Rows the certificate cannot decide
         run that chain for the whole batch. ``seeds`` and ``positions`` are int64
-        ``[M]``, ``temperatures`` FP32 ``[M]`` and positive. The stock seeded
+        ``[M]`` (any values: both sides hash them as uint64 and uint32),
+        ``temperatures`` FP32 ``[M]``. The score bounds assume a finite, positive
+        temperature (a negative one reverses them); rows with any other value are
+        marked ``temperature`` and take the stock chain. The stock seeded
         sampler with top-k, top-p or min-p keys its noise by sorted rank and is
         not covered. ``gate`` works as in :meth:`argmax`.
         """
@@ -698,14 +1114,25 @@ class CertifiedHead:
             if t.dtype != dtype or t.shape != (m,) or not t.is_contiguous():
                 raise ValueError(f'expected contiguous {dtype} of shape ({m},)')
 
+        certifiable = self._certifiable(m)  # outside the gated node: may run the self-test
+
         def stages() -> None:
             self._sampling = (seeds, positions, temperatures)
             try:
-                self._approximate(hidden, m)
-                self._refine(hidden, m)
-                self._decide(m)
+                if not certifiable:
+                    self._refuse(m)
+                else:
+                    self._approximate(hidden, m)
+                    self._refine(hidden, m)
+                    self._decide(m)
             finally:
                 self._sampling = None
+            # Inside the gated stages, so a batch the gate skips sets no flag. Device
+            # ops only, so the guards are graph-safe and need no host sync.
+            bad_t = ~(torch.isfinite(temperatures) & (temperatures > 0))
+            self._status[:m].bitwise_or_(bad_t.to(torch.int32) * STATUS_BITS['temperature'])
+            self._any.logical_or_(bad_t.any())
+            self._small_probability_guard(m)
 
         self._gated(gate, hidden, stages)
         ids = self._ids[:m]
@@ -714,6 +1141,18 @@ class CertifiedHead:
             args = (hidden, self.weight, self.reference, seeds, positions, temperatures)
             self._when(self._any, lambda: self._merge(ids, m, stock_seeded_sample(*args)))
         return ids, stats
+
+    def _small_probability_guard(self, m: int) -> None:
+        """Send a sampled row to the stock chain if its winner's lower bound is
+        within :data:`SMALL_PROBABILITY_GAP` of ``ymax``: only then can its own
+        bound, or a competitor with a subnormal or zero stock probability, be
+        outside the model."""
+        rows = self._rlo64[:m]
+        valid = torch.arange(rows.shape[1], device=rows.device)[None, :] < self._count[:m, None]
+        best = torch.where(valid, rows, float('-inf')).amax(dim=1)
+        small = best <= self._ymax[:m].to(torch.float64) - SMALL_PROBABILITY_GAP
+        self._status[:m].bitwise_or_(small.to(torch.int32) * STATUS_BITS['small_probability'])
+        self._any.logical_or_(small.any())
 
     def _merge_fallback(
         self, hidden: torch.Tensor, ids: torch.Tensor, m: int, cols: bool = False

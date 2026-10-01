@@ -1,0 +1,451 @@
+{
+ "model": "Qwen/Qwen3.5-4B@851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+ "capture": "geometry plain4b (bd66ce34, --disable-cuda-graph, max-running-requests 16)",
+ "config": {
+  "limit_rows": 60000,
+  "capacity": 256,
+  "group_size": 2560,
+  "selection": "tiles",
+  "sample_temps": [
+   0.7,
+   1.0
+  ],
+  "out": "/home/ubuntu/vp-data/kernel/runs/x6/replay_decisions.json"
+ },
+ "steps": 3768,
+ "rows": 60000,
+ "elapsed_s": 128.1678261756897,
+ "agreement_counts": {
+  "bf16_ref_eq_engine": 60000,
+  "fp32_ref_eq_bf16_ref": 59704,
+  "real_eq_bf16_ref": 59704,
+  "real_eq_fp32_ref": 60000,
+  "bf16/conservative_decided_eq_reference": 59122,
+  "bf16/conservative_decided": 59122,
+  "bf16/conservative_with_fallback_eq_reference": 60000,
+  "bf16/hopper-wgmma_decided_eq_reference": 59834,
+  "bf16/hopper-wgmma_decided": 59834,
+  "bf16/hopper-wgmma_with_fallback_eq_reference": 60000,
+  "fp32/conservative_decided_eq_reference": 59134,
+  "fp32/conservative_decided": 59134,
+  "fp32/conservative_with_fallback_eq_reference": 60000,
+  "fp32/hopper-wgmma_decided_eq_reference": 59834,
+  "fp32/hopper-wgmma_decided": 59834,
+  "fp32/hopper-wgmma_with_fallback_eq_reference": 60000,
+  "real_decided_eq_reference": 60000,
+  "real_decided": 60000,
+  "sample_bf16/conservative@T=0.7_decided_eq_reference": 59164,
+  "sample_bf16/conservative@T=0.7_decided": 59164,
+  "sample_bf16/conservative@T=0.7_with_fallback_eq_reference": 60000,
+  "sample_bf16/hopper-wgmma@T=0.7_decided_eq_reference": 59825,
+  "sample_bf16/hopper-wgmma@T=0.7_decided": 59825,
+  "sample_bf16/hopper-wgmma@T=0.7_with_fallback_eq_reference": 60000,
+  "sample_fp32/conservative@T=0.7_decided_eq_reference": 59156,
+  "sample_fp32/conservative@T=0.7_decided": 59156,
+  "sample_fp32/conservative@T=0.7_with_fallback_eq_reference": 60000,
+  "sample_bf16/conservative@T=1.0_decided_eq_reference": 59169,
+  "sample_bf16/conservative@T=1.0_decided": 59169,
+  "sample_bf16/conservative@T=1.0_with_fallback_eq_reference": 60000,
+  "sample_bf16/hopper-wgmma@T=1.0_decided_eq_reference": 59836,
+  "sample_bf16/hopper-wgmma@T=1.0_decided": 59836,
+  "sample_bf16/hopper-wgmma@T=1.0_with_fallback_eq_reference": 60000,
+  "sample_fp32/conservative@T=1.0_decided_eq_reference": 59198,
+  "sample_fp32/conservative@T=1.0_decided": 59198,
+  "sample_fp32/conservative@T=1.0_with_fallback_eq_reference": 60000
+ },
+ "disagreements": [],
+ "contracts": {
+  "bf16/conservative": {
+   "candidates": {
+    "mean": 1.8449,
+    "quantiles": {
+     "0.5": 1.0,
+     "0.9": 3.0,
+     "0.99": 9.0,
+     "0.999": 132.0,
+     "1.0": 301.0
+    },
+    "histogram": {
+     "0-0": 0,
+     "1-1": 43462,
+     "2-2": 7868,
+     "3-3": 3483,
+     "4-5": 2997,
+     "6-7": 1104,
+     "8-11": 756,
+     "12-15": 179,
+     "16-23": 67,
+     "24-31": 11,
+     "32-47": 3,
+     "48-63": 0,
+     "64-127": 0,
+     "128-255": 68,
+     "256-1073741823": 2
+    }
+   },
+   "status_rows": {
+    "overflow": 2,
+    "ambiguous": 878,
+    "nonfinite": 0,
+    "threshold": 0,
+    "empty": 0,
+    "tile_overflow": 0,
+    "refused": 0,
+    "probe": 0,
+    "undecided_rows": 878
+   },
+   "row_fallback_rate": 0.014633333333333333,
+   "step_fallback_rate": 0.20222929936305734
+  },
+  "bf16/hopper-wgmma": {
+   "candidates": {
+    "mean": 1.77655,
+    "quantiles": {
+     "0.5": 1.0,
+     "0.9": 3.0,
+     "0.99": 9.0,
+     "0.999": 132.0,
+     "1.0": 168.0
+    },
+    "histogram": {
+     "0-0": 0,
+     "1-1": 43922,
+     "2-2": 7856,
+     "3-3": 3364,
+     "4-5": 2871,
+     "6-7": 1055,
+     "8-11": 660,
+     "12-15": 147,
+     "16-23": 57,
+     "24-31": 5,
+     "32-47": 2,
+     "48-63": 0,
+     "64-127": 0,
+     "128-255": 61,
+     "256-1073741823": 0
+    }
+   },
+   "status_rows": {
+    "overflow": 0,
+    "ambiguous": 166,
+    "nonfinite": 0,
+    "threshold": 0,
+    "empty": 0,
+    "tile_overflow": 0,
+    "refused": 0,
+    "probe": 0,
+    "undecided_rows": 166
+   },
+   "row_fallback_rate": 0.002766666666666667,
+   "step_fallback_rate": 0.04246284501061571
+  },
+  "fp32/conservative": {
+   "candidates": {
+    "mean": 1.8086166666666668,
+    "quantiles": {
+     "0.5": 1.0,
+     "0.9": 3.0,
+     "0.99": 9.0,
+     "0.999": 132.0,
+     "1.0": 295.0
+    },
+    "histogram": {
+     "0-0": 0,
+     "1-1": 43726,
+     "2-2": 7850,
+     "3-3": 3434,
+     "4-5": 2905,
+     "6-7": 1081,
+     "8-11": 705,
+     "12-15": 159,
+     "16-23": 63,
+     "24-31": 10,
+     "32-47": 2,
+     "48-63": 0,
+     "64-127": 0,
+     "128-255": 64,
+     "256-1073741823": 1
+    }
+   },
+   "status_rows": {
+    "overflow": 1,
+    "ambiguous": 866,
+    "nonfinite": 0,
+    "threshold": 0,
+    "empty": 0,
+    "tile_overflow": 0,
+    "refused": 0,
+    "probe": 0,
+    "undecided_rows": 866
+   },
+   "row_fallback_rate": 0.014433333333333333,
+   "step_fallback_rate": 0.2009023354564756
+  },
+  "fp32/hopper-wgmma": {
+   "candidates": {
+    "mean": 1.7505833333333334,
+    "quantiles": {
+     "0.5": 1.0,
+     "0.9": 3.0,
+     "0.99": 9.0,
+     "0.999": 32.099999999656575,
+     "1.0": 167.0
+    },
+    "histogram": {
+     "0-0": 0,
+     "1-1": 44205,
+     "2-2": 7844,
+     "3-3": 3297,
+     "4-5": 2785,
+     "6-7": 1000,
+     "8-11": 621,
+     "12-15": 130,
+     "16-23": 51,
+     "24-31": 5,
+     "32-47": 2,
+     "48-63": 0,
+     "64-127": 0,
+     "128-255": 60,
+     "256-1073741823": 0
+    }
+   },
+   "status_rows": {
+    "overflow": 0,
+    "ambiguous": 166,
+    "nonfinite": 0,
+    "threshold": 0,
+    "empty": 0,
+    "tile_overflow": 0,
+    "refused": 0,
+    "probe": 0,
+    "undecided_rows": 166
+   },
+   "row_fallback_rate": 0.002766666666666667,
+   "step_fallback_rate": 0.04325902335456475
+  },
+  "real": {
+   "candidates": {
+    "mean": 1.7359333333333333,
+    "quantiles": {
+     "0.5": 1.0,
+     "0.9": 3.0,
+     "0.99": 8.0,
+     "0.999": 30.000999999996566,
+     "1.0": 165.0
+    },
+    "histogram": {
+     "0-0": 0,
+     "1-1": 44322,
+     "2-2": 7827,
+     "3-3": 3281,
+     "4-5": 2759,
+     "6-7": 979,
+     "8-11": 592,
+     "12-15": 131,
+     "16-23": 44,
+     "24-31": 6,
+     "32-47": 1,
+     "48-63": 0,
+     "64-127": 0,
+     "128-255": 58,
+     "256-1073741823": 0
+    }
+   },
+   "status_rows": {
+    "overflow": 0,
+    "ambiguous": 0,
+    "nonfinite": 0,
+    "threshold": 0,
+    "empty": 0,
+    "tile_overflow": 0,
+    "refused": 0,
+    "probe": 0,
+    "undecided_rows": 0
+   },
+   "row_fallback_rate": 0.0,
+   "step_fallback_rate": 0.0
+  }
+ },
+ "sampling": {
+  "bf16/conservative@T=0.7": {
+   "candidates": {
+    "mean": 2.2286333333333332,
+    "quantiles": {
+     "0.5": 1.0,
+     "0.9": 4.0,
+     "0.99": 13.0,
+     "0.999": 137.0,
+     "1.0": 323.0
+    },
+    "histogram": {
+     "0-0": 0,
+     "1-1": 40978,
+     "2-2": 7887,
+     "3-3": 3733,
+     "4-5": 3680,
+     "6-7": 1583,
+     "8-11": 1271,
+     "12-15": 452,
+     "16-23": 251,
+     "24-31": 49,
+     "32-47": 10,
+     "48-63": 2,
+     "64-127": 0,
+     "128-255": 100,
+     "256-1073741823": 4
+    }
+   },
+   "row_fallback_rate": 0.013933333333333334
+  },
+  "bf16/hopper-wgmma@T=0.7": {
+   "candidates": {
+    "mean": 2.1450833333333335,
+    "quantiles": {
+     "0.5": 1.0,
+     "0.9": 4.0,
+     "0.99": 13.0,
+     "0.999": 134.0,
+     "1.0": 320.0
+    },
+    "histogram": {
+     "0-0": 0,
+     "1-1": 41345,
+     "2-2": 7942,
+     "3-3": 3698,
+     "4-5": 3599,
+     "6-7": 1472,
+     "8-11": 1192,
+     "12-15": 400,
+     "16-23": 208,
+     "24-31": 39,
+     "32-47": 9,
+     "48-63": 1,
+     "64-127": 0,
+     "128-255": 93,
+     "256-1073741823": 2
+    }
+   },
+   "row_fallback_rate": 0.002916666666666667
+  },
+  "fp32/conservative@T=0.7": {
+   "candidates": {
+    "mean": 2.2303,
+    "quantiles": {
+     "0.5": 1.0,
+     "0.9": 4.0,
+     "0.99": 13.0,
+     "0.999": 137.0,
+     "1.0": 322.0
+    },
+    "histogram": {
+     "0-0": 0,
+     "1-1": 40974,
+     "2-2": 7883,
+     "3-3": 3742,
+     "4-5": 3690,
+     "6-7": 1575,
+     "8-11": 1270,
+     "12-15": 453,
+     "16-23": 248,
+     "24-31": 46,
+     "32-47": 12,
+     "48-63": 2,
+     "64-127": 0,
+     "128-255": 101,
+     "256-1073741823": 4
+    }
+   },
+   "row_fallback_rate": 0.014066666666666667
+  },
+  "bf16/conservative@T=1.0": {
+   "candidates": {
+    "mean": 2.3928166666666666,
+    "quantiles": {
+     "0.5": 1.0,
+     "0.9": 5.0,
+     "0.99": 16.0,
+     "0.999": 135.00099999999657,
+     "1.0": 180.0
+    },
+    "histogram": {
+     "0-0": 0,
+     "1-1": 39760,
+     "2-2": 8039,
+     "3-3": 3709,
+     "4-5": 3948,
+     "6-7": 1782,
+     "8-11": 1520,
+     "12-15": 628,
+     "16-23": 364,
+     "24-31": 99,
+     "32-47": 45,
+     "48-63": 5,
+     "64-127": 1,
+     "128-255": 100,
+     "256-1073741823": 0
+    }
+   },
+   "row_fallback_rate": 0.01385
+  },
+  "bf16/hopper-wgmma@T=1.0": {
+   "candidates": {
+    "mean": 2.3027166666666665,
+    "quantiles": {
+     "0.5": 1.0,
+     "0.9": 4.0,
+     "0.99": 15.0,
+     "0.999": 132.0,
+     "1.0": 175.0
+    },
+    "histogram": {
+     "0-0": 0,
+     "1-1": 40147,
+     "2-2": 8046,
+     "3-3": 3706,
+     "4-5": 3871,
+     "6-7": 1721,
+     "8-11": 1422,
+     "12-15": 555,
+     "16-23": 314,
+     "24-31": 85,
+     "32-47": 37,
+     "48-63": 6,
+     "64-127": 0,
+     "128-255": 90,
+     "256-1073741823": 0
+    }
+   },
+   "row_fallback_rate": 0.0027333333333333333
+  },
+  "fp32/conservative@T=1.0": {
+   "candidates": {
+    "mean": 2.390233333333333,
+    "quantiles": {
+     "0.5": 1.0,
+     "0.9": 5.0,
+     "0.99": 16.0,
+     "0.999": 134.00099999999657,
+     "1.0": 180.0
+    },
+    "histogram": {
+     "0-0": 0,
+     "1-1": 39749,
+     "2-2": 8049,
+     "3-3": 3701,
+     "4-5": 3963,
+     "6-7": 1778,
+     "8-11": 1533,
+     "12-15": 606,
+     "16-23": 372,
+     "24-31": 99,
+     "32-47": 45,
+     "48-63": 5,
+     "64-127": 1,
+     "128-255": 99,
+     "256-1073741823": 0
+    }
+   },
+   "row_fallback_rate": 0.013366666666666667
+  }
+ }
+}

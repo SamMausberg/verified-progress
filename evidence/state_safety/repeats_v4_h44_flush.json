@@ -1,0 +1,35 @@
+{
+ "run": "tap/v4_h44_flush",
+ "prompt": "humaneval-0044",
+ "reference": "humaneval-0044-r0",
+ "repeats": [
+  {
+   "repeat": "humaneval-0044-r1",
+   "tokens_equal": true,
+   "logprobs_equal": true,
+   "first_difference": null,
+   "first_cache_difference": null
+  },
+  {
+   "repeat": "humaneval-0044-r2",
+   "tokens_equal": true,
+   "logprobs_equal": true,
+   "first_difference": null,
+   "first_cache_difference": null
+  },
+  {
+   "repeat": "humaneval-0044-r3",
+   "tokens_equal": true,
+   "logprobs_equal": true,
+   "first_difference": null,
+   "first_cache_difference": null
+  },
+  {
+   "repeat": "humaneval-0044-r4",
+   "tokens_equal": true,
+   "logprobs_equal": true,
+   "first_difference": null,
+   "first_cache_difference": null
+  }
+ ]
+}

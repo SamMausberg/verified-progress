@@ -136,6 +136,29 @@ def paired(args: argparse.Namespace) -> None:
     write_csv(summary, args.out)
 
 
+def server_decode_rate(point: dict[str, Any], kind: str) -> float | None:
+    """The server's logged decode rate during one point, with (nearly) the full batch running.
+
+    bench.sweep cuts the server log at each point's boundaries and keeps the decode log
+    lines with at least 0.9x the point's peak running count. `kind='weighted'` reads the
+    token-weighted rate over those windows (`logged_gen_tps_full_batch`, bench from
+    8f885eb on: each segment's first line, which spans the idle gap before the point, is
+    left out); `kind='p50'` reads the median window rate, which drops prefill-heavy windows
+    and so flatters speculation. Both are diagnostics beside the client throughput.
+    """
+    log = point.get('server_log') or {}
+    value = log.get(
+        'logged_gen_tps_full_batch' if kind == 'weighted' else 'logged_gen_tps_full_batch_p50'
+    )
+    return float(value) if value is not None else None
+
+
+def latency_stat(plist: list[dict[str, Any]], metric: str, stat: str) -> float | str:
+    """Mean over runs of each run's per-request latency statistic (e.g. TTFT p50)."""
+    values = [float(p[metric][stat]) for p in plist if (p.get(metric) or {}).get(stat) is not None]
+    return round(statistics.fmean(values), 2) if values else ''
+
+
 def sweeps(args: argparse.Namespace) -> None:
     root = Path(args.path).expanduser()
     points: dict[tuple[str, int], list[dict[str, Any]]] = {}
@@ -147,6 +170,8 @@ def sweeps(args: argparse.Namespace) -> None:
     for (label, conc), plist in sorted(points.items()):
         ys = [float(p['y']) for p in plist if p.get('y')]
         xs = [float(p['x_e2e']) for p in plist if p.get('x_e2e')]
+        rates = [r for p in plist if (r := server_decode_rate(p, 'p50')) is not None]
+        weighted = [r for p in plist if (r := server_decode_rate(p, 'weighted')) is not None]
         spec = [
             float(p['spec']['accept_length'])
             for p in plist
@@ -161,14 +186,16 @@ def sweeps(args: argparse.Namespace) -> None:
                 'y_tok_s_gpu': round(statistics.fmean(ys), 1) if ys else '',
                 'y_std': round(statistics.stdev(ys), 1) if len(ys) > 1 else '',
                 'accept_len': round(statistics.fmean(spec), 3) if spec else '',
-                'ttft_p50_ms': round(
-                    statistics.fmean(
-                        [float(p['ttft_ms']['p50']) for p in plist if p.get('ttft_ms')]
-                    ),
-                    1,
-                )
-                if any(p.get('ttft_ms') for p in plist)
-                else '',
+                'ttft_p50_ms': latency_stat(plist, 'ttft_ms', 'p50'),
+                'ttft_p99_ms': latency_stat(plist, 'ttft_ms', 'p99'),
+                'itl_p50_ms': latency_stat(plist, 'itl_ms', 'p50'),
+                'itl_p99_ms': latency_stat(plist, 'itl_ms', 'p99'),
+                'server_full_batch_tps': round(statistics.fmean(weighted), 1) if weighted else '',
+                'server_decode_tok_s': round(statistics.fmean(rates), 1) if rates else '',
+                'foreign_cpu_mean': round(
+                    statistics.fmean(float(p.get('foreign_cpu_during_mean') or 0) for p in plist),
+                    2,
+                ),
                 'completed': sum(p.get('completed', 0) for p in plist),
                 'requests': sum(p.get('requests', 0) for p in plist),
             }
@@ -179,6 +206,43 @@ def sweeps(args: argparse.Namespace) -> None:
         if ref and ref['y_tok_s_gpu'] and row['y_tok_s_gpu']:
             row['y_vs_baseline'] = round(row['y_tok_s_gpu'] / ref['y_tok_s_gpu'], 3)
             row['x_vs_baseline'] = round(row['x_tok_s_user'] / ref['x_tok_s_user'], 3)
+    write_csv(rows, args.out)
+
+
+def paired_sweeps(args: argparse.Namespace) -> None:
+    """Paired lever-over-baseline ratios from a sweeps CSV (client y and server decode rate).
+
+    Each pair is `baseline_label:candidate_label` (labels as in the CSV, e.g.
+    `plain_r1:plain+fp16_state_r1`); pairs run back to back (A B B A) so drift cancels.
+    Reports per concurrency the ratio in every pair and their mean.
+    """
+    with Path(args.sweeps_csv).expanduser().open() as handle:
+        table = list(csv.DictReader(handle))
+    by_key = {(row['config'], int(row['concurrency'])): row for row in table}
+    rows: list[dict[str, Any]] = []
+    concs = sorted({int(r['concurrency']) for r in table})
+    for conc in concs:
+        client, server = [], []
+        for pair in args.pairs:
+            base, cand = pair.split(':')
+            b, c = by_key.get((base, conc)), by_key.get((cand, conc))
+            if not b or not c or not b['y_tok_s_gpu'] or not c['y_tok_s_gpu']:
+                continue
+            client.append(float(c['y_tok_s_gpu']) / float(b['y_tok_s_gpu']))
+            if b.get('server_decode_tok_s') and c.get('server_decode_tok_s'):
+                server.append(float(c['server_decode_tok_s']) / float(b['server_decode_tok_s']))
+        if not client:
+            continue
+        rows.append(
+            {
+                'concurrency': conc,
+                'pairs': len(client),
+                'client_y_ratio_mean': round(statistics.fmean(client), 4),
+                'client_y_ratios': ' '.join(f'{r:.4f}' for r in client),
+                'server_decode_ratio_mean': round(statistics.fmean(server), 4) if server else '',
+                'server_decode_ratios': ' '.join(f'{r:.4f}' for r in server),
+            }
+        )
     write_csv(rows, args.out)
 
 
@@ -270,6 +334,11 @@ def main() -> None:
     pr.add_argument('--candidate', required=True)
     pr.add_argument('--out', type=Path, default=None)
     pr.set_defaults(func=paired)
+    ps = sub.add_parser('paired-sweeps')
+    ps.add_argument('sweeps_csv')
+    ps.add_argument('--pairs', nargs='+', required=True, help='baseline_label:candidate_label')
+    ps.add_argument('--out', type=Path, default=None)
+    ps.set_defaults(func=paired_sweeps)
     i = sub.add_parser('interactions')
     i.add_argument('sweeps_csv')
     i.add_argument('--pairs', nargs='+', required=True, help='base:leverA:leverB')

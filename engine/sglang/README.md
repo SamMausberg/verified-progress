@@ -40,7 +40,7 @@ the head read. The hooks run in Python between forwards, so the server must run 
 wrong forward mode or row count is skipped with a warning rather than misaligned. The
 patch adds device-to-host copies on every step and is for measurement only.
 
-## moonshot (`patches/moonshot/0001-0008`, branch `engine/moonshot`)
+## moonshot (`patches/moonshot/0001-0009`, branch `engine/moonshot`)
 
 The series applies in order to `bd66ce343e` on its own:
 
@@ -62,6 +62,7 @@ Every change is off unless its flag or environment variable is set.
 | 0006 | Under an 8-bit GDN state, the ReplaySSM decode ring keeps 16-bit (d, k) records, so the state is rounded to 8 bits only at a flush. | unchanged for FP32/FP16/BF16 state |
 | 0007 | `SGLANG_GDN_EXACT_REPLAY=1` with `--enable-linear-replayssm`: rounding-preserving live replay for GDN decode. The ring stores the packed decode's own FP32 operands (normalized key, raw value, g, beta) and every step replays them from the dense anchor in the packed kernel's order; the anchor is written every `--linear-replayssm-cache-len` steps. Designed to be bit-identical to the packed decode; validation pending (`tests/test_gdn_exact_replay.py`, `experiments/moonshot/gdn_exact_replay_check.py`). FP32 state only. | unchanged |
 | 0008 | With `SGLANG_GDN_EXACT_REPLAY=1` but no ring (no `--enable-linear-replayssm`, or no beta ring), decode raises instead of silently running another kernel; the first exact-replay dispatch is logged ("GDN decode: exact replay kernel, ring length L"). | unchanged when the flag is off |
+| 0009 | `SGLANG_GDN_EXACT_REPLAY_BV` selects the exact-replay value tile (default 32, the packed decode's); any other value must be re-checked for bit-equality. | unchanged (32) |
 
 Tests: `tests/test_moonshot_levers.py` and `tests/test_gdn_exact_replay.py` (the engine
 tests run in the SGLang venv with the worktree on `PYTHONPATH` and skip elsewhere).
@@ -110,9 +111,20 @@ diagnosis only. `experiments/state_safety/tap_runs.py` and `mechanism.py` drive 
 analyse it.
 
 `0002-verify-kv-split-deterministic.patch` passes the deterministic-inference KV
-split size to FlashInfer's target-verify plan, as decode and extend already do. It
-does not make MTP speculation batch-invariant under `--enable-deterministic-inference`
-(see `evidence/state_safety/README.md`); it is kept because a committed run used it.
+split size to FlashInfer's target-verify plan, as decode and extend already do, but
+only with `SGLANG_STATE_VERIFY_FIXED_SPLIT=1` and `--enable-deterministic-inference`;
+otherwise the plan is unchanged. It does not make MTP speculation batch-invariant
+(see `evidence/state_safety/README.md`); it is kept because a committed run used it
+(that run predates the variable and had the change on unconditionally, which is what
+setting the variable reproduces).
+
+| Variable | Patch | Effect when set |
+|---|---|---|
+| `SGLANG_STATE_TAP_DIR` | 0001 | enables the tap and sets its output directory |
+| `SGLANG_STATE_TAP_RID_PREFIX` | 0001 | rid prefix of tapped requests (default `tap-`) |
+| `SGLANG_STATE_TAP_FULL_GAP` | 0001 | top-2 gap below which full logit rows are saved (default 0.5) |
+| `SGLANG_STATE_TAP_PERTURB` | 0001 | module whose output gets a one-ulp change (positive control) |
+| `SGLANG_STATE_VERIFY_FIXED_SPLIT` | 0002 | `1`: fixed KV split in the verify plan under deterministic inference |
 
 ## kernel (`patches/kernel/0001-0006`, branch `engine/kernel`)
 
@@ -147,3 +159,104 @@ deterministic inference) run the stock head.
 Validation: `experiments/certified_head/engine_validate.sh` (check mode per path and
 one request at a time against the stock server; results in
 `evidence/certified_head/README.md`).
+
+## repair (`patches/repair/0001-0002`, branch `engine/repair`, head `5d8e00e3e1`)
+
+```sh
+scripts/sglang_worktree.sh repair
+git -C ~/sglang-wt/repair am "$PWD"/engine/sglang/patches/repair/*.patch
+SGLANG_WORKTREE=~/sglang-wt/repair source scripts/sglang_env.sh
+```
+
+`0001` adds `sglang/srt/speculative/repair_probe.py` and hooks in the DFlash worker
+(`dflash_worker_v2.py`) for the long-window repair oracles in `experiments/repair/`. Nothing
+changes unless one of these variables is set:
+
+| Variable | Effect |
+|---|---|
+| `SGLANG_REPAIR_TIMING_LOG=<path>` | one JSON line per decode cycle: GPU phase times from CUDA events (draft, verify, accept, commit, append) and the cycle start on the GPU timeline, resolved lazily without host syncs |
+| `SGLANG_REPAIR_ORACLE=<json>` | each block's draft tokens are replaced by the request's reference continuation; the target still verifies them |
+| `SGLANG_REPAIR_POLICY=recycle\|keep`, `SGLANG_REPAIR_MAX_PASSES=r` | after a rejection the next block is drafted from the previous pass's target predictions (a sliding Jacobi step) or from the previous draft's tail, falling back to the fresh draft; greedy only |
+| `SGLANG_REPAIR_SWEEPS=k` with `SGLANG_REPAIR_TRACE=<path>` | probe mode: k extra full verify passes per block (Jacobi and correct-one sweeps) from the same committed prefix, then the original draft's pass is re-run and committed, so the trajectory is plain DFlash; the committed GDN conv and SSM states are restored before every extra pass and the re-run must reproduce the first pass's argmax |
+| `SGLANG_REPAIR_TRACE=<path>` | one JSON line per request per cycle: prefix length, fresh draft, verified block, target argmax at every position, accepted length, sweeps (syncs the host; no timing from traced runs) |
+
+`0002` adds one variable to the FlashInfer GDN verify kernel:
+
+| Variable | Effect |
+|---|---|
+| `SGLANG_REPAIR_DROP_VERIFY_STATES=1` | the verify kernel skips the per-position FP32 state writes. Timing with forced acceptance only: the commit then copies stale scratch into the request's state, so it corrupts the committed state and every token after the first cycle |
+
+Forced full acceptance uses SGLang's existing `SGLANG_SIMULATE_ACC_LEN`.
+
+## backbone (`patches/backbone/0001-0008`, branch `engine/backbone`, head `59deb68e29`)
+
+```sh
+scripts/sglang_worktree.sh backbone
+git -C ~/sglang-wt/backbone am "$PWD"/engine/sglang/patches/backbone/*.patch
+SGLANG_WORKTREE=~/sglang-wt/backbone source scripts/sglang_env.sh
+```
+
+Faster kernels for the backbone's weight GEMMs at decode batch sizes, and the norm and SiLU
+folded into a GEMM's prologue (`evidence/backbone/`, `experiments/backbone/`). Every change is
+off unless its flag or variable is set; with the whole series applied and every switch off no
+code path changes, on CUDA or under aiter. `0001` also applies to the pin on its own. The tree
+after `0003` (`a1c6b5f6d3`) is the one the hold-1 microbenchmarks ran. Two later patches fix
+default changes in that stage of the series: `0006` (the dense model's preparation hook was
+forwarded unconditionally, which under aiter would pack the GDN input projections) and `0007`
+(`0004`'s row cutoff applied to packed weights that a model's own loader builds, as Qwen4-Exp's
+does on CUDA).
+
+| Patch | What it changes | Switch | Default behaviour |
+|---|---|---|---|
+| 0001 | `UnquantizedLinearMethod.apply` dispatches bias-free BF16 layers through `_bf16_gemm_dispatch_impl` when the backend is `gemv`, so SGLang's Hopper GEMV (M = 1, its own N policy) serves them; at the pin the flag reached only the packed GDN path | `--bf16-gemm-backend gemv` | unchanged (backend `auto`) |
+| 0002 | Adds `srt/layers/backbone_gemm.py`: a Triton skinny GEMM (optional deterministic split-K and PDL), add-RMSNorm and SiLU-mul prologues in the stock kernels' arithmetic, a probe kernel, and the routing policy | none (nothing calls it) | unchanged |
+| 0003 | Routes projections through it: `apply` and `_bf16_gemm_dispatch_impl` use the table for bias-free BF16 layers; packs the GDN `in_proj_qkvz`/`in_proj_ba` on CUDA and forwards `prepare_before_cuda_graph_capture` in the dense `Qwen3_5ForConditionalGeneration`; folds SiLU-mul into `Qwen2MoeMLP`'s down projection; defers the residual add and RMSNorm into the next projection (`DeferredNormInput`, never on aux-capture layers or under LoRA) | `SGLANG_BACKBONE_GEMM=1` with `SGLANG_BACKBONE_GEMM_TABLE=<json>`; `SGLANG_BACKBONE_PDL`, `SGLANG_BACKBONE_MERGE_IN_PROJ`, `SGLANG_BACKBONE_FUSE_ACT`, `SGLANG_BACKBONE_FUSE_NORM` (each `=1`) | unchanged |
+| 0004 | Table mode `gemv` (SGLang's Hopper GEMV for an (N, K) at M = 1); the packed GDN projection is used only from `SGLANG_BACKBONE_MERGE_IN_PROJ_MIN_M` rows (default 64), below that its two views are multiplied separately | `SGLANG_BACKBONE_MERGE_IN_PROJ_MIN_M` | unchanged after 0007 |
+| 0005 | A scaled RMSNorm prologue (row scale applied after the product), for the skeleton microbenchmarks | none | unchanged |
+| 0006 | `Qwen3_5ForConditionalGeneration.prepare_before_cuda_graph_capture` (added by 0003) forwards to the language model only when the merge is on | `SGLANG_BACKBONE_MERGE_IN_PROJ` | unchanged, also under aiter |
+| 0007 | The packed-projection row cutoff of 0004 applies only with the merge switch (Qwen4-Exp's own packed weights keep the original gate), and also on the deferred-norm branch | `SGLANG_BACKBONE_MERGE_IN_PROJ` | unchanged |
+| 0008 | A table entry of mode `gemv` calls the Hopper GEMV only on Hopper (CUDA compute capability 9.x; HIP excluded, since ROCm reports gfx94x as 9.x), as SGLang's own gemv backend requires; elsewhere the call falls back to cuBLAS | with `SGLANG_BACKBONE_GEMM` | unchanged |
+
+The routing table is JSON from `experiments/backbone/make_table.py`. Measured so far: the kernels
+and fusions in isolation and in layer skeletons (`evidence/backbone/README.md`). The exactness
+class and serving effect of the switches are pending.
+
+## hostgap (`patches/hostgap/0001-0005`, branch `engine/hostgap`)
+
+The series applies in order to `bd66ce343e` on its own. Patches 0001-0003 are the validated
+state (GPU plan check, in-engine validation and greedy output equality, all on 0001-0003):
+
+```sh
+scripts/sglang_worktree.sh hostgap
+git -C ~/sglang-wt/hostgap am "$PWD"/engine/sglang/patches/hostgap/000[1-3]-*.patch
+SGLANG_WORKTREE=~/sglang-wt/hostgap source scripts/sglang_env.sh
+```
+
+Patches 0004 and 0005 have not run on a GPU yet; their checks are queued. To apply them on
+top: `git -C ~/sglang-wt/hostgap am "$PWD"/engine/sglang/patches/hostgap/000[45]-*.patch`.
+
+With speculative decoding and FlashInfer attention, the scheduler blocks on device-to-host
+reads whose values it already knows and then plans while the GPU idles. Each patch
+computes those values from the batch's `seq_lens_cpu` (which the overlap scheduler
+resolves once per cycle anyway) and feeds them to the same planning calls, so the plan
+state, FlashInfer's pinned plan buffer and every device buffer the captured graphs read
+are the ones the stock path produces. Capture-time plans are unchanged; only replays (and
+eager draft passes in 0002) take the new path. Every change is off unless its variable is
+set; `SGLANG_HOSTGAP_VALIDATE=1` additionally runs the stock read-back path next to each
+sync-free plan and raises on any difference (it synchronizes, so it is for correctness
+runs only).
+
+| Patch | What it changes | Default behaviour |
+|---|---|---|
+| 0001 | `SGLANG_HOSTGAP_VERIFY_PLAN=1`: the EAGLE/NEXTN target-verify CUDA-graph wrappers plan with `fast_verify_plan` (`srt/layers/attention/flashinfer_hostgap.py`), FlashInfer 0.6.18's `plan()` for fa2 in CUDA-graph mode with its four blocking reads (`segment_packbits`'s `.item()` and three `.to("cpu")`) replaced by host-computed qo/kv indptr, kv lengths and packed-mask size. A per-wrapper CUDA event orders reuse of FlashInfer's pinned plan buffer after its previous asynchronous copy, which the stock blocking reads used to guarantee (this also covers the draft-extend wrapper's `fast_prefill_plan`). | stock `plan()` |
+| 0002 | `SGLANG_HOSTGAP_DRAFT_INDPTR=1`: `FlashInferMultiStepDraftBackend.common_template` builds the per-step draft `kv_indptr` rows on the host instead of copying them back with `.cpu()`. | stock `.cpu()` |
+| 0003 | `SGLANG_HOSTGAP_DFLASH_DRAFT_PLAN=1`: the DFlash draft forward (the drafter's sliding-window and full-attention wrappers, no custom mask) plans with `fast_verify_plan` from the worker's exact host copy of the committed lengths; without that copy (compact draft cache, GPU-only backends) the stock `plan()` runs. | stock `plan()` |
+| 0004 | Not yet validated. No new flag: the host-side plan inputs of 0001-0003 are computed with numpy, and `fast_verify_plan` uploads the custom-mask bit and byte offsets in one pinned copy instead of deriving them with about ten small device ops. It is meant to produce the same integers for the same packing kernel; the GPU check and equality runs that would confirm it are pending. | unchanged (only the flagged paths change) |
+| 0005 | Not yet validated. No new flag: `fast_verify_plan` passes `disable_split_kv` as `plan()` does, forced on for NVFP4 KV caches (FlashInfer's `_nvfp4_kv_requires_disabled_split_kv`); no change for BF16 or FP8 KV. Also corrects the module docstring. | unchanged (only the flagged paths change) |
+
+Checks: `experiments/hostgap/plan_equivalence.py` compares FlashInfer's stock `plan()`
+with `fast_verify_plan` on the GPU (plan state, pinned bytes, device buffers and a replayed
+attention graph's output, for the EAGLE verify and the DFlash draft block) and the draft
+rows with the Triton kernel; `tests/test_hostgap_plan.py` runs a small version (not yet run
+on a GPU). `experiments/hostgap/equality.py` compares greedy outputs with the stock engine.
+Results and commands: `evidence/hostgap/README.md`.

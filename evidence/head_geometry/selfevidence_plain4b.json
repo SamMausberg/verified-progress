@@ -36,6 +36,7 @@
   "sets": {
     "plain": {
       "rows": 6005,
+      "reached_rows": 6005,
       "prompts": 160,
       "checks": {
         "violations": 0,
@@ -70,7 +71,7 @@
       },
       "rstock_gammas": {
         "tensor_core_model": 0.0006112017390383282,
-        "gamma_1.19e-4": 0.000119,
+        "gamma_1.19e-4": 0.00011921636278483056,
         "fp32_tree_model": 1.6689328390431102e-06
       },
       "fp32_rescore_needs_fp64": {
@@ -979,5 +980,5 @@
       }
     }
   },
-  "elapsed_s": 581.6187164783478
+  "elapsed_s": 565.2541131973267
 }

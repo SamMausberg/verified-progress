@@ -1,0 +1,235 @@
+From 8febddb786dc50912c79de9d52a15673fc85c8de Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Thu, 1 Oct 2026 13:52:10 +0000
+Subject: [PATCH 4/5] hostgap: cheaper host-side planning inputs
+
+The host traces of patches 0001-0003 show the blocking reads gone but the
+host still on the critical path between learning the previous verify's
+lengths and launching the draft and verify graphs. The arithmetic that
+replaced the reads sits on that path: torch CPU ops for the draft
+kv_indptr rows and the verify plan inputs, plus about ten small device
+ops for the custom-mask offsets.
+
+The host-side plan inputs are now computed with numpy, and
+fast_verify_plan uploads the custom-mask bit and byte offsets, which
+plan() derives on the device, in one pinned copy before the same
+segment_packbits kernel. All values are integers computed from the same
+lengths; SGLANG_HOSTGAP_VALIDATE=1 also checks the uploaded bit offsets
+against the device computation. No new flag: only the flagged paths of
+0001-0003 change.
+---
+ .../layers/attention/flashinfer_hostgap.py    | 135 ++++++++++++------
+ 1 file changed, 92 insertions(+), 43 deletions(-)
+
+diff --git a/python/sglang/srt/layers/attention/flashinfer_hostgap.py b/python/sglang/srt/layers/attention/flashinfer_hostgap.py
+index cee160ff50..92ed629360 100644
+--- a/python/sglang/srt/layers/attention/flashinfer_hostgap.py
++++ b/python/sglang/srt/layers/attention/flashinfer_hostgap.py
+@@ -45,6 +45,7 @@ from __future__ import annotations
+ import logging
+ from typing import Optional
+ 
++import numpy as np
+ import torch
+ 
+ from sglang.srt.environ import envs
+@@ -115,17 +116,19 @@ def _segment_packbits_known_nnz(
+     return y, indptr_new
+ 
+ 
+-def _pinned_kv_lens(wrapper, kv_lens_host: torch.Tensor) -> torch.Tensor:
+-    """Stage kv_lens in a per-wrapper pinned buffer so the H2D copy never syncs."""
+-    staging = getattr(wrapper, "_hostgap_kv_lens_pinned", None)
+-    n = kv_lens_host.numel()
+-    if staging is None or staging.numel() < n:
+-        staging = torch.empty(
+-            max(n, wrapper._kv_lens_buffer.shape[0]), dtype=torch.int32
+-        ).pin_memory()
+-        wrapper._hostgap_kv_lens_pinned = staging
+-    staging[:n].copy_(kv_lens_host)
+-    return staging[:n]
++def _stage(wrapper, attr: str, values) -> torch.Tensor:
++    """Copy host values into a per-wrapper pinned int32 buffer (H2D never syncs).
++
++    Reuse of the buffer is ordered after its previous copy by PlanGuard.
++    """
++    values = np.asarray(values, dtype=np.int32)
++    buf = getattr(wrapper, attr, None)
++    n = values.size
++    if buf is None or buf.numel() < n:
++        buf = torch.empty(max(n, 1024), dtype=torch.int32).pin_memory()
++        setattr(wrapper, attr, buf)
++    buf.numpy()[:n] = values
++    return buf[:n]
+ 
+ 
+ def fast_verify_plan(
+@@ -158,6 +161,8 @@ def fast_verify_plan(
+     max_q_len: int,
+     max_kv_len: int,
+     packed_mask_nnz: Optional[int] = None,
++    mask_indptr_host: Optional[np.ndarray] = None,
++    packed_indptr_host: Optional[np.ndarray] = None,
+ ) -> None:
+     """Sync-free ``BatchPrefillWithPagedKVCacheWrapper.plan`` for EAGLE target verify.
+ 
+@@ -192,7 +197,36 @@ def fast_verify_plan(
+     self._num_qo_heads = num_qo_heads
+     self._num_kv_heads = num_kv_heads
+     packed_custom_mask = None
+-    if custom_mask is not None:
++    if custom_mask is not None and mask_indptr_host is not None:
++        # The bit and byte segment offsets plan() derives on the device
++        # (_compute_page_mask_indptr, then segment_packbits' cumsum), uploaded
++        # in one copy; the packing kernel and its inputs are otherwise the same.
++        assert packed_mask_nnz is not None and packed_indptr_host is not None
++        from flashinfer.quantization.packbits import get_quantization_module
++
++        n = batch_size + 1
++        staged = _stage(
++            self,
++            "_hostgap_mask_indptr_pinned",
++            np.concatenate([mask_indptr_host, packed_indptr_host]),
++        )
++        scratch = getattr(self, "_hostgap_mask_indptr_dev", None)
++        if scratch is None or scratch.numel() < 2 * n:
++            scratch = torch.empty(2 * n, dtype=torch.int32, device=self.device)
++            self._hostgap_mask_indptr_dev = scratch
++        scratch[: 2 * n].copy_(staged, non_blocking=True)
++        packed_custom_mask = torch.empty(
++            packed_mask_nnz, dtype=torch.uint8, device=custom_mask.device
++        )
++        mask_indptr = scratch[n : 2 * n]
++        get_quantization_module().segment_packbits(
++            custom_mask.contiguous().view(-1),
++            scratch[:n],
++            mask_indptr,
++            "little",
++            packed_custom_mask,
++        )
++    elif custom_mask is not None:
+         assert packed_mask_nnz is not None
+         mask_indptr = _compute_page_mask_indptr(
+             qo_indptr, paged_kv_indptr, paged_kv_last_page_len, page_size
+@@ -214,7 +248,8 @@ def fast_verify_plan(
+     required_size = kv_lens_host.numel()
+     assert required_size <= self._kv_lens_buffer.shape[0]
+     self._kv_lens_buffer[:required_size].copy_(
+-        _pinned_kv_lens(self, kv_lens_host), non_blocking=non_blocking
++        _stage(self, "_hostgap_kv_lens_pinned", kv_lens_host.numpy()),
++        non_blocking=non_blocking,
+     )
+     self._max_kv_len = max_kv_len
+ 
+@@ -296,22 +331,28 @@ def eagle_verify_plan_kwargs(
+     of ``draft_token_num`` and kv lengths as ``seq_lens + draft_token_num``
+     (page size 1, so the last page holds one token), and FlashInfer packs a
+     custom-mask segment of ``qo_len * kv_len`` bits per request into
+-    ``ceil(bits / 8)`` bytes.
++    ``ceil(bits / 8)`` bytes. Computed with numpy: these run on the host's
++    critical path every cycle.
+     """
+-    kv_lens = seq_lens_cpu[:bs].to(torch.int32) + draft_token_num
+-    kv_indptr = torch.zeros(bs + 1, dtype=torch.int32)
+-    kv_indptr[1:] = torch.cumsum(kv_lens, dim=0)
+-    qo_indptr = torch.arange(
+-        0, (bs + 1) * draft_token_num, step=draft_token_num, dtype=torch.int32
+-    )
+-    packed = (draft_token_num * kv_lens.to(torch.int64) + 7) // 8
++    kv_lens = seq_lens_cpu[:bs].numpy().astype(np.int32) + np.int32(draft_token_num)
++    kv_indptr = np.zeros(bs + 1, dtype=np.int32)
++    np.cumsum(kv_lens, out=kv_indptr[1:])
++    bits = draft_token_num * kv_lens.astype(np.int64)
++    mask_indptr = np.zeros(bs + 1, dtype=np.int64)
++    np.cumsum(bits, out=mask_indptr[1:])
++    packed_indptr = np.zeros(bs + 1, dtype=np.int64)
++    np.cumsum((bits + 7) // 8, out=packed_indptr[1:])
+     return dict(
+-        qo_indptr_host=qo_indptr,
+-        kv_indptr_host=kv_indptr,
+-        kv_lens_host=kv_lens,
++        qo_indptr_host=torch.from_numpy(
++            np.arange(0, (bs + 1) * draft_token_num, draft_token_num, dtype=np.int32)
++        ),
++        kv_indptr_host=torch.from_numpy(kv_indptr),
++        kv_lens_host=torch.from_numpy(kv_lens),
+         max_q_len=draft_token_num,
+         max_kv_len=int(kv_lens.max()),
+-        packed_mask_nnz=int(packed.sum()),
++        packed_mask_nnz=int(packed_indptr[-1]),
++        mask_indptr_host=mask_indptr.astype(np.int32),
++        packed_indptr_host=packed_indptr.astype(np.int32),
+     )
+ 
+ 
+@@ -325,16 +366,17 @@ def block_verify_plan_kwargs(
+     wrapper's paged lengths plus ``draft_token_num`` (page size 1).
+     """
+     bs = paged_kernel_lens_host.numel()
+-    kv_lens = paged_kernel_lens_host.to(torch.int32) + draft_token_num
+-    kv_indptr = torch.zeros(bs + 1, dtype=torch.int32)
+-    kv_indptr[1:] = torch.cumsum(kv_lens, dim=0)
+-    qo_indptr = torch.arange(
+-        0, (bs + 1) * draft_token_num, step=draft_token_num, dtype=torch.int32
++    kv_lens = paged_kernel_lens_host.numpy().astype(np.int32) + np.int32(
++        draft_token_num
+     )
++    kv_indptr = np.zeros(bs + 1, dtype=np.int32)
++    np.cumsum(kv_lens, out=kv_indptr[1:])
+     return dict(
+-        qo_indptr_host=qo_indptr,
+-        kv_indptr_host=kv_indptr,
+-        kv_lens_host=kv_lens,
++        qo_indptr_host=torch.from_numpy(
++            np.arange(0, (bs + 1) * draft_token_num, draft_token_num, dtype=np.int32)
++        ),
++        kv_indptr_host=torch.from_numpy(kv_indptr),
++        kv_lens_host=torch.from_numpy(kv_lens),
+         max_q_len=draft_token_num,
+         max_kv_len=int(kv_lens.max()),
+     )
+@@ -359,17 +401,16 @@ def draft_kv_indptr_host(
+     ``(num_steps, num_seqs * topk + 1)``.
+     """
+     raw = num_seqs - num_padding
+-    positions = torch.zeros(num_seqs * topk, dtype=torch.int64)
+-    positions[: raw * topk] = seq_lens_cpu[:raw].to(torch.int64).repeat_interleave(topk)
+-    if window_cap > 0:
+-        positions = torch.clamp(positions, max=window_cap)
+     rows = num_seqs * topk
+-    out = torch.zeros((num_steps, rows + 1), dtype=torch.int64)
+-    cum = torch.cumsum(positions, dim=0)
+-    z = torch.arange(1, rows + 1, dtype=torch.int64)
+-    for i in range(num_steps):
+-        out[i, 1:] = cum + z * (i + 1)
+-    return out.to(torch.int32)
++    positions = np.zeros(rows, dtype=np.int64)
++    positions[: raw * topk] = np.repeat(seq_lens_cpu[:raw].numpy(), topk)
++    if window_cap > 0:
++        np.minimum(positions, window_cap, out=positions)
++    out = np.zeros((num_steps, rows + 1), dtype=np.int64)
++    out[:, 1:] = np.cumsum(positions) + np.outer(
++        np.arange(1, num_steps + 1), np.arange(1, rows + 1)
++    )
++    return torch.from_numpy(out.astype(np.int32))
+ 
+ 
+ def check_equal(name: str, expected: torch.Tensor, actual: torch.Tensor) -> None:
+@@ -435,6 +476,14 @@ def validated_verify_plan(wrapper, args: tuple, kwargs: dict, host_kwargs: dict)
+     check_equal("kv_indptr", kv_indptr.cpu(), host_kwargs["kv_indptr_host"])
+     kv_lens = (kv_indptr[1:] - kv_indptr[:-1] - 1) + last_page_len
+     check_equal("kv_lens", kv_lens.cpu(), host_kwargs["kv_lens_host"])
++    if host_kwargs.get("mask_indptr_host") is not None:
++        from flashinfer.prefill import _compute_page_mask_indptr
++
++        check_equal(
++            "mask_indptr",
++            _compute_page_mask_indptr(qo_indptr, kv_indptr, last_page_len, 1).cpu(),
++            torch.from_numpy(host_kwargs["mask_indptr_host"]),
++        )
+ 
+     # Zero the pinned plan buffer before each plan so the comparison covers
+     # exactly the bytes each plan writes (the .cpu() reads above synchronized
+-- 
+2.34.1
+

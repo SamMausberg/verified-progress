@@ -1,165 +1,77 @@
-% Section 6: transport, the mechanism of the earlier revisions, and what it must beat.
+% Section 5: transport and why it fails on real draft states.
 % Claims and status:
-%  - Theorem transport, admission rule, Propositions suprema/exclusion/static, Theorem
-%    crossover: proved here. Top-k plus tail summary and the retained-tail bound: Appendix.
-%  - Table headconstants: derived from the weights (register entry head-constants).
-%  - Measured drift rho and transport certification on real draft states: pending (geometry).
-\section{Transport, and why it fails on real draft states}\label{sec:transport}
-Transport was the central mechanism of the earlier revisions of this manuscript. A drafter that projects its hidden state through the same head as the target has already computed, for every vocabulary tile, the tile's largest score and its probability mass. If the target's hidden state is close to the drafter's, a Hölder bound carries those summaries to the target, and the verifier projects only the tiles whose bounds leave the decision open. The evidence is paid for by the drafter, not by a second pass over the head. This section states the mechanism with the hypotheses its proofs need, derives the condition under which it can be tighter than the int8 envelope of Section~\ref{sec:selfevidence}, and then measures whether real draft states meet that condition. On both drafters measured they miss it by two orders of magnitude.
+%  - Theorem transport (inline proof), Theorem crossover (proof in Appendix C): proved.
+%  - Thresholds delta*: derived from the weights (head-constants).
+%  - Drift, its causes and certification on DFlash-4B and MTP-4B: committed evidence.
+%  - Drift scaling: a model extrapolation, labelled as such.
+\section{Transport and Why It Fails}\label{sec:transport}
+A drafter that projects through the target's head has already computed each vocabulary tile's largest score and probability mass. \emph{Transport} carries those summaries to the target's head input through a Hölder bound, so the verifier projects only tiles whose bounds leave its decision open.
 
-\subsection{Tile geometry and already-paid summaries}\label{sec:transport-def}
-Let $W\in\R^{V\times D}$ be the head used for both a draft hidden vector $h^d$ and an aligned target hidden vector $h^t$, both taken at the head input (after the final norm). Write $\Delta=h^t-h^d$, $z_i^d=\langle w_i,h^d\rangle$ and $z_i^t=\langle w_i,h^t\rangle$. A vocabulary partition $\mathcal C$ covers all admitted tokens with disjoint tiles. For each tile $c$ choose a centre $\mu_c$ and a radius
-\begin{equation}
-r_c\ge\max_{i\in c}\norm{w_i-\mu_c}_\infty,\qquad a_c=\langle\mu_c,\Delta\rangle,\qquad\epsilon_c=r_c\norm\Delta_1.\label{eq:geometry}
-\end{equation}
-The draft pass emits $M_c^d=\max_{i\in c}z_i^d$ and $Z_c^d=\sum_{i\in c}\exp(z_i^d)$; stable implementations store a maximum and a scaled mass. The centres and radii are checkpoint metadata; the maxima and masses belong to one request, position and draft vector.
+\subsection{Transported Tile Certificates}\label{sec:transport-def}
+Let $h^d$ and $h^t$ be aligned draft and target head inputs (each the final norm's output) behind the same verified draft token, $\Delta=h^t-h^d$, $z^d_i=\langle w_i,h^d\rangle$ and $z^t_i=\langle w_i,h^t\rangle$. A partition of the vocabulary into tiles $c$ carries, as checkpoint metadata, a centre $\mu_c$ and a radius $r_c\ge\max_{i\in c}\norm{w_i-\mu_c}_2$. The draft pass emits $M^d_c=\max_{i\in c}z^d_i$ and $Z^d_c=\sum_{i\in c}e^{z^d_i}$.
 
-\begin{theorem}[Transported tile certificates]\label{thm:transport}
-In real arithmetic, with the same head matrix for both passes and both masses taken at the same temperature, every $i\in c$ satisfies
-\begin{equation}
-z_i^d+a_c-\epsilon_c\le z_i^t\le z_i^d+a_c+\epsilon_c.\label{eq:transport-row}
-\end{equation}
-Consequently
-\begin{align}
-\max_{i\in c}z_i^t&\le M_c^d+a_c+\epsilon_c=:U_c,\label{eq:maxbound}\\
-e^{a_c-\epsilon_c}Z_c^d&\le Z_c^t\le e^{a_c+\epsilon_c}Z_c^d.\label{eq:massbound}
-\end{align}
+\begin{theorem}[Transported certificates]\label{thm:transport}
+In real arithmetic, with $a_c=\langle\mu_c,\Delta\rangle$ and $\epsilon_c=r_c\norm\Delta_2$, every $i\in c$ satisfies $|z^t_i-z^d_i-a_c|\le\epsilon_c$. Hence $\max_{i\in c}z^t_i\le M^d_c+a_c+\epsilon_c=:U_c$ and $e^{a_c-\epsilon_c}Z^d_c\le Z^t_c\le e^{a_c+\epsilon_c}Z^d_c$.
 \end{theorem}
 \begin{proof}
-$z_i^t-z_i^d-a_c=\langle w_i-\mu_c,\Delta\rangle$, whose absolute value is at most $r_c\norm\Delta_1$ by Hölder's inequality. Maximization gives~\eqref{eq:maxbound}; monotonicity of the exponential and summation give~\eqref{eq:massbound}.
+$z^t_i-z^d_i-a_c=\langle w_i-\mu_c,\Delta\rangle$, which Cauchy--Schwarz bounds by $\epsilon_c$. Maximizing over $c$ gives the first bound; exponentiating and summing gives the second.
 \end{proof}
-In the engine the draft maxima and masses come from BF16-rounded draft logits, so~\eqref{eq:maxbound} and~\eqref{eq:massbound} must be widened by the draft kernel's error before they enclose anything the engine computes; Section~\ref{sec:selfevidence} gives the terms. The Euclidean form replaces $r_c$ by $r^{(2)}_c\ge\max_{i\in c}\norm{w_i-\mu_c}_2$ and $\norm\Delta_1$ by $\norm\Delta_2$.
+Hölder, coordinate, grouped and low-rank radii trade metadata for width (Appendix~\ref{app:transport}). A greedy verifier may skip tile $c$ when $U_c<\tau$ for an exactly evaluated target score $\tau$, such as the draft token's.
 
-\subsection{Geometry decides the width}\label{sec:geometry}
-A good draft does not imply a small $\norm{h^t-h^d}$. The head can ignore directions in which the states differ, and probabilities ignore a common shift of all logits, yet a crude hidden-space norm charges both. With $W=((1,0),(0,0))$ and $\Delta=(0,L)$ both logits are unchanged for every $L$, while $r_c\norm\Delta_1$ grows with $L$; coordinate radii remove that particular failure. The bounds form a hierarchy: a scalar radius; coordinate radii with $\epsilon_c=\sum_jr_{cj}|\Delta_j|$; grouped norms
+\subsection{What Transport Must Beat}\label{sec:crossover}\label{sec:geometry}
+Self-evidence's error for row $i$ is $\langle e_i,h^t\rangle$, bounded by $\norm{e_i}_2\norm{h^t}_2$ with $e_i$ known offline; transport's is $\langle w_i-\mu_c,\Delta\rangle$, bounded by $r_c\norm\Delta_2$. Each bound is attained by some admissible vector, so each is optimal for the information it uses (Proposition~\ref{prop:suprema}), and the comparison reduces to one ratio, the \emph{drift ratio}
 \begin{equation}
-\epsilon_c=\sum_gr_{cg}\norm{\Delta_g}_2,\qquad r_{cg}\ge\max_{i\in c}\norm{(w_i-\mu_c)_g}_2;\label{eq:groupbound}
+\rho=\norm{h^t-h^d}_2/\norm{h^t}_2.\label{eq:rho}
 \end{equation}
-and a low-rank split $w_i=\mu_c+Qu_i+e_i$ with the projected part evaluated exactly and a norm bound on $e_i$. Richer geometry costs metadata and bound arithmetic, and a learned centre or subspace does not certify the residual radius; that radius must cover the stored weights.
 
-\paragraph{Greedy and top-$k$ admission} Suppose at least $k$ distinct target rows have been evaluated and $\tau$ is the $k$-th best evaluated score. A tile may be skipped only when $U_c<\tau$; then at least $k$ evaluated items outrank every skipped one. The strict inequality preserves unresolved ties. This establishes exact selection; it does not establish an exact unrestricted softmax, because an omitted logit still contributes to the normalizer even when it cannot win. Summaries that carry the top $k$ items of each tile together with the mass of the rest compose exactly across tiles, and retaining a few exact rows per tile tightens the mass bounds (Proposition~\ref{prop:summary} and Equation~\eqref{eq:tail}, Appendix~\ref{app:summary}).
-
-\subsection{What transport must beat}\label{sec:crossover}
-The alternative source of evidence (Section~\ref{sec:selfevidence}) evaluates a low-precision copy $\bar w_i=w_i-e_i$ of each row at the target state. In real arithmetic its error for row $i$ is $\langle e_i,h^t\rangle$, bounded by $\norm{e_i}_2\norm{h^t}_2$, where $e_i$ is known offline. Transport's error is $\langle w_i-\mu_c,\Delta\rangle$. The two can be compared exactly.
-
-\begin{proposition}[No better bound from the same information]\label{prop:suprema}
-For fixed $h$ and radii $\epsilon_b\ge0$ over a partition of the coordinates into blocks $b$,
-$\sup\{|\langle e,h\rangle|:\norm{e_b}_2\le\epsilon_b\ \forall b\}=\sum_b\epsilon_b\norm{h_b}_2$ and
-$\sup\{|\langle e,h\rangle|:\norm{e_b}_\infty\le\epsilon_b\ \forall b\}=\sum_b\epsilon_b\norm{h_b}_1$.
-Likewise $\sup\{\langle w-\mu,\Delta\rangle:\norm{w-\mu}_\infty\le r\}=r\norm\Delta_1$.
-\end{proposition}
-\begin{proof}
-The inequalities are Cauchy--Schwarz and Hölder. Equality holds at $e_b=\epsilon_bh_b/\norm{h_b}_2$, at $e_b=\epsilon_b\operatorname{sign}(h_b)$ and at $w=\mu+r\operatorname{sign}(\Delta)$.
-\end{proof}
-Both envelopes are therefore optimal for the metadata they use. For errors not aligned with $h$ the realized $|\langle e_i,h\rangle|$ is typically about $\norm{e_i}_2\norm h_2/\sqrt D$; closing that gap needs more arithmetic, not a better inequality.
-
-\begin{proposition}[Exclusion conditions]\label{prop:exclusion}
-After the winner $a$ is scored exactly, let $m_i=z_a-z_i$. Row-level transport excludes $i$ if and only if $m_i>r_c\norm\Delta_1-\langle w_i-\mu_c,\Delta\rangle$; tile-level transport excludes tile $c$ if and only if $z_a>M^d_c+\langle\mu_c,\Delta\rangle+r_c\norm\Delta_1$; self-evidence (in real arithmetic, with envelope $\beta_i$) excludes $i$ if and only if $m_i>\beta_i-\langle e_i,h\rangle$. The slack terms lie in $[0,2r_c\norm\Delta_1]$ and $[0,2\beta_i]$.
-\end{proposition}
-\begin{proof}
-Substitute $z_i^d+\langle\mu_c,\Delta\rangle=z_i-\langle w_i-\mu_c,\Delta\rangle$ and $\tilde z_i=z_i-\langle e_i,h\rangle$ into the upper bounds.
-\end{proof}
-
-\begin{theorem}[Transport cannot beat self-evidence unless drift is small]\label{thm:crossover}
-For every tile $c$ and every centre $\mu_c$, $r_c=\max_{k\in c}\norm{w_k-\mu_c}_\infty\ge\tfrac12\operatorname{diam}_\infty(c)$ and $r^{(2)}_c=\max_{k\in c}\norm{w_k-\mu_c}_2\ge\tfrac12\operatorname{diam}_2(c)$.
-\begin{enumerate}
-\item (Hölder family.) With $b$-bit round-to-nearest per-row codes, $s_i=\norm{w_i}_\infty/(2^{b-1}-1)$ and no clipping, $|\langle e_i,h\rangle|\le\tfrac{s_i}2\norm h_1$, and $\tfrac{s_i}2\norm h_1\le r_c\norm\Delta_1$ whenever $\norm\Delta_1/\norm h_1\ge\norm{w_i}_\infty/\bigl((2^{b-1}-1)\operatorname{diam}_\infty(c)\bigr)$. If some row of $c$ has the opposite sign, or zero, in the coordinate where $|w_{ij}|$ peaks, then $\operatorname{diam}_\infty(c)\ge\norm{w_i}_\infty$ and the condition is implied by $\norm\Delta_1/\norm h_1\ge1/(2^{b-1}-1)$: $1/127$ for int8 and $1/7$ for int4.
-\item (Euclidean family.) $\norm{e_i}_2\norm h_2\le r^{(2)}_c\norm\Delta_2$ if and only if $\norm\Delta_2/\norm h_2\ge\delta^\ast_i:=\norm{e_i}_2/r^{(2)}_c$.
-\end{enumerate}
+\begin{theorem}[Crossover]\label{thm:crossover}
+For every tile and centre, $r_c\ge\tfrac12\diam_2(c)$. Transport's envelope for row $i\in c$ is narrower than self-evidence's, $r_c\norm\Delta_2<\norm{e_i}_2\norm{h^t}_2$, if and only if $\rho<\delta^\ast_i:=\norm{e_i}_2/r_c$.
 \end{theorem}
-\begin{proof}
-For rows $k,l$ of the tile, $\norm{w_k-w_l}\le\norm{w_k-\mu_c}+\norm{w_l-\mu_c}\le2r_c$. Round-to-nearest codes give $|e_{ij}|\le s_i/2$, and Hölder gives the first inequality. The rest is algebra, and opposite signs at the peak coordinate give $|w_{ij}-w_{kj}|\ge|w_{ij}|$.
-\end{proof}
 
-\begin{proposition}[Transport against the static screen]\label{prop:static}
-If $\mu_c$ lies in the convex hull of the tile's rows, then $U^{\rm T}_c-U^{\rm static}_c\ge r_c(\norm\Delta_1-\norm h_1)$, where $U^{\rm T}_c=M^d_c+\langle\mu_c,\Delta\rangle+r_c\norm\Delta_1$ and $U^{\rm static}_c=\langle\mu_c,h\rangle+r_c\norm h_1$. Transport is therefore no tighter than the static screen with the same geometry once $\norm\Delta_1\ge\norm h_1$.
-\end{proposition}
-\begin{proof}
-$U^{\rm T}_c-U^{\rm static}_c=(M^d_c-\langle\mu_c,h^d\rangle)+r_c(\norm\Delta_1-\norm h_1)$, and $M^d_c=\max_k\langle w_k,h^d\rangle\ge\langle\mu_c,h^d\rangle$ for a convex combination $\mu_c$.
-\end{proof}
+The weights alone fix $\delta^\ast$. On the Qwen3.5-4B head, with 64-row tiles of contiguous token indices and tile-mean centres, $\delta^\ast$ has a median of 0.85\% over all rows (p10 0.67\%, p90 1.15\%) against int8 with one scale per row, 0.61\% against 128-column groups and 15.5\% against int4 \ev{head-constants}. Transport can compete with an int8 copy only if draft and target head inputs agree to about one part in a hundred, which a drafter trained to predict tokens has no reason to achieve. The tile radius itself exceeds the row norm (median $r_c/\norm{w_i}_2=1.14$), so a static tile bound $\langle\mu_c,h\rangle+r_c\norm h_2$ is wider than the plain row bound, and transport is no tighter than that static screen once the drift is as large as $h$ (Proposition~\ref{prop:static}).
 
-The quantity that decides the comparison is the \emph{drift ratio}
-\begin{equation}
-\rho=\frac{\norm{h^t-h^d}_2}{\norm{h^t}_2},\label{eq:rho}
-\end{equation}
-measured on the exact head inputs behind the same verified draft token. In the Euclidean family, with 64-row tiles of contiguous token indices and $\mu_c$ the tile mean, transport's envelope for row $i$ is narrower than the per-row int8 self-evidence envelope if and only if $\rho<\delta^\ast_i=\norm{e_i}_2/r^{(2)}_c(i)$. Table~\ref{tab:headconstants} evaluates $\delta^\ast$ on the Qwen3.5-4B head from the weights alone. Its median is 0.85\% against per-row int8 and 15.5\% against per-row int4. For the manuscript's original pairing of an $\ell_\infty$ radius with $\norm\Delta_1$ (Theorem~\ref{thm:crossover}, part~1, with the tile radius measured rather than bounded by the diameter), the corresponding threshold on $\norm\Delta_1/\norm h_1$ has a median of 0.30\%. The comparison is of envelope widths, not of certification rates, candidate counts or runtime; it uses no hidden states, and it ignores the BF16 rounding of the draft logits that transport also has to carry. The measured drift decides this width comparison, not which mechanism is faster. The Hölder condition of Theorem~\ref{thm:crossover} needs $\operatorname{diam}_\infty(c)\ge\norm{w_i}_\infty$, which holds for 99.9\% of rows with 64-row tiles~\ev{head-constants}. It says that transport can compete with an int8 copy only if draft and target states agree to better than about one part in a hundred at the head input, which a drafter trained to predict tokens has no particular reason to achieve. The static tile screen is weak on this head for a related reason: the 64-row tile radius exceeds the row norm (median $r^{(2)}_c/\norm{w_i}_2=1.14$), so $\langle\mu_c,h\rangle+r^{(2)}_c\norm h_2$ is wider than the plain row bound $\norm{w_i}_2\norm h_2$, and tiles in token order are barely tighter than random ones. A scalar $\ell_\infty$ radius paired with $\norm\Delta_1$ is about four times looser again than the Euclidean pairing for a spread-out $\Delta$ (derived from the same constants, $r_c\approx1.30\norm{w_i}_\infty$ and $\norm\Delta_1\approx0.8\sqrt D\norm\Delta_2$). The enclosures of the two mechanisms can be intersected, so a hybrid is never looser than either; the question is only whether transport's cheaper evidence excludes enough to pay for itself.
+\subsection{The Measured Drift}\label{sec:transport-measured}
+For the public DFlash drafter at block size 16, over 40,000 held-out pairs, $\rho$ has a median of 0.917 (p10 0.875, p90 0.964, smallest 0.823) \ev{rho}. For the model's own MTP layer with four draft steps, over 40,000 held-out pairs, the median is 0.954 (p10 0.767, p90 1.174) \ev{rho-mtp}; both medians lie two orders of magnitude above that of $\delta^\ast$ (Figure~\ref{fig:rho}b). Accepted DFlash drafts are no closer than rejected ones (medians 0.909 and 0.891). Transport's envelope is the narrower one only on 0.08\% of rows, three tiles of identical unused-token rows with zero radius.
 
-\begin{table}[tbp]
-\small\centering
-\begin{tabular}{@{}lrrr@{}}\toprule
-Quantity (tied head, $248{,}320\times2{,}560$) & p10 & p50 & p90\\\midrule
-Row $\norm{w_i}_2$ & 0.574 & 0.652 & 0.746\\
-int8 per-row $\norm{e_i}_2/\norm{w_i}_2$ & 0.81\% & 0.97\% & 1.25\%\\
-int8, 128-column groups & 0.64\% & 0.68\% & 0.75\%\\
-int4 per-row & 14.8\% & 17.5\% & 22.6\%\\
-64-row tile $r^{(2)}_c/\norm{w_i}_2$, token-index order & 0.99 & 1.14 & 1.31\\
-\quad random tiles (control) & 1.03 & 1.19 & 1.37\\
-$\delta^\ast$ against int8 per-row & 0.67\% & 0.85\% & 1.15\%\\
-$\delta^\ast$ against int8, 128-column groups & 0.51\% & 0.61\% & 0.72\%\\
-$\delta^\ast$ against int4 per-row & 12.2\% & 15.5\% & 20.8\%\\
-Hölder-family threshold on $\norm\Delta_1/\norm h_1$ against int8 per-row & 0.23\% & 0.30\% & 0.40\%\\\bottomrule
-\end{tabular}
-\caption{Weight-only constants of the Qwen3.5-4B head (float64 on CPU; quantiles over all 248,320 rows; no hidden states). $\delta^\ast_i=\norm{e_i}_2/r^{(2)}_c(i)$ is the drift ratio $\rho$ below which transport's Euclidean envelope for row $i$ is narrower than the Euclidean int8 envelope, with 64-row tiles of contiguous token indices and $\mu_c$ the tile mean (Theorem~\ref{thm:crossover}); the last row is the analogous threshold for the $\ell_\infty$/$\ell_1$ pairing, $s_i\norm h_1/2$ against $r_c\norm\Delta_1$. Widths are compared, not certification rates or runtime. Derived~\ev{head-constants}.}
-\label{tab:headconstants}
-\end{table}
-
-\subsection{The measured drift: transport fails on both drafters}\label{sec:transport-measured}
-The decisive measurement evaluates $\rho$ (Equation~\eqref{eq:rho}) on aligned held-out pairs captured as in Section~\ref{sec:transport-capture}, together with the certification rates of every transport variant, the static screen at $h^t$ and self-evidence on the same states. The bound families are those of Section~\ref{sec:geometry}: a scalar $\ell_\infty$ radius, coordinate radii, grouped $\ell_2$ radii with groups of 32 and 128, low-rank residual radii with bases from $W$ or from $\Delta$, and the elementwise minimum of all of them. Each is evaluated on contiguous tiles of 64, 256 and 1,024 rows, random 256-row tiles and $k$-means tiles of 64, 256 and 1,024 rows; with $k$-means tiles and an $\ell_2$ radius the static screen is CSV-Decode's~\cite{csvdecode}. A tile is skipped when its transported upper bound falls below the exactly computed target score of the draft token. Two controls bound what any geometry could achieve: oracle radii, the realized per-tile deviation, which no certified geometry can undercut; and a drift-scaling replay, $h^d(s)=h^t-s\Delta$, which scales $\rho$, the logit drift and every radius term by $s$. The drift-scaling replay is a model extrapolation, not a measured drafter.
-
-Two drafters were measured on the 160 held-out prompts: the public DFlash drafter at block size 16 and the model's own MTP layer with four draft steps. For the DFlash drafter, over 40,000 aligned pairs its drift ratio has a median of 0.917 (p10 0.875, p90 0.964, smallest 0.823), against a per-row int8 threshold whose median is 0.0085 (Figure~\ref{fig:rho}). Accepted drafts are no closer (median 0.909) than rejected ones (0.891), and the median varies little with block position (0.882 at position 1, 0.924 at position 15), domain (0.914--0.925) or context length~\ev{rho}. Transport's envelope is narrower than the int8 envelope on 0.08\% of rows in every pair, and those rows are three tiles of identical unused-token rows, whose radius is zero.
-
-\begin{figure}[tbp]
+\begin{figure*}[t]
 \centering
-\datafigure{../evidence/head_geometry/rho_dflash4b_quantiles.csv}{%
-\begin{tikzpicture}
-\begin{semilogxaxis}[width=.85\linewidth,height=5.6cm,xmin=2e-3,xmax=1.6,ymin=0,ymax=1,
-  xlabel={Relative drift $\rho$ of a draft pair, or per-row threshold $\delta^\ast_i$},ylabel={Cumulative share},grid=major,
-  legend style={at={(.5,-.3)},anchor=north},legend columns=2,legend style={/tikz/every even column/.append style={column sep=10pt}}]
-\addplot[name path=int8,thick,teal,dashed] table[x=threshold_int8_row,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};\addlegendentry{$\delta^\ast_i$, int8 per row (rows)}
-\addplot[thick,teal,densely dotted] table[x=threshold_int8_g128,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};\addlegendentry{$\delta^\ast_i$, int8 128-groups (rows)}
-\addplot[thick,ochre,dashdotted] table[x=threshold_int4_row,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};\addlegendentry{$\delta^\ast_i$, int4 per row (rows)}
-\addplot[very thick,ink] table[x=rho_all,y=q,col sep=comma]{../evidence/head_geometry/rho_dflash4b_quantiles.csv};\addlegendentry{$\rho$, DFlash-4B pairs}
-\draw[{Stealth[length=1.8mm]}-{Stealth[length=1.8mm]},muted] (axis cs:0.0092,0.5) -- node[above,font=\footnotesize,text=ink,fill=white,inner sep=1.5pt,pos=.42]{medians $100\times$ apart} (axis cs:0.86,0.5);
-\end{semilogxaxis}
-\end{tikzpicture}}{Cumulative distribution of the drift ratio on DFlash-4B pairs against the per-row thresholds.}
-\caption{Why transport fails on DFlash-4B. The thick line is the cumulative distribution of the drift ratio $\rho=\norm{h^t-h^d}_2/\norm{h^t}_2$ over 40,000 aligned held-out pairs; the broken lines are the distributions, over the 248,320 vocabulary rows, of the threshold $\delta^\ast_i$ below which transport's envelope for row $i$ is narrower than a low-precision envelope (64-row contiguous tiles, Theorem~\ref{thm:crossover}). Transport would be the tighter source only where $\rho$ lies left of a threshold; the two populations are two orders of magnitude apart. Measured drift, derived thresholds~\ev{rho,head-constants}.}
-\label{fig:rho}
-\end{figure}
+\input{figures/transport}
+\caption{Why transport fails. \textbf{(a)}~Median DFlash-4B head inputs, drawn to scale in the plane they span. Transport's envelope beats a per-row int8 envelope only if $h^d$ lies in the ball of radius $\delta^\ast\norm{h^t}_2$ around $h^t$, the dot at the tip of $h^t$ for the median $\delta^\ast$ (Theorem~\ref{thm:crossover}). \textbf{(b)}~Cumulative distributions of $\rho$ over 40,000 aligned held-out pairs of each drafter, and of the threshold $\delta^\ast_i$ over the 248,320 head rows (64-row contiguous tiles). Measured drift and medians, derived thresholds \ev{head-constants,rho,rho-mtp,transport,stats-dflash}.}
+\label{fig:rho}\label{fig:transport}
+\end{figure*}
 
-\paragraph{Why the drift is large} Two properties of the DFlash drafter set the size of its $\rho$~\ev{stats-dflash}. Its head input always has norm 50.6, which is $\sqrt{2560}$ because the draft's final RMSNorm has unit gain, while the target's is about 159; the triangle inequality alone then gives $\rho\ge0.68$. The angle between the two vectors is large as well (median cosine 0.41), so even the best scalar rescaling of $h^d$ would leave $\rho$ near 0.91. The drafter is trained to put the right token on top of $Wh^d$, and its softer logits (median top-token mass 0.17, against 0.69 for the target at the same positions) show that it does not reproduce the target's head input. The drift does not hide in directions the head ignores: after removing each position's mean logit, $\norm{W\Delta}_2/\norm{Wh^t}_2$ has a median of 0.85, and $W$'s leading 64 right singular directions carry 25\% of $\Delta$'s norm, against 16\% for an isotropic vector. Realized rather than certified errors tell the same story: the largest realized transport error in a tile is a median 77 times the largest realized int8 error, and the realized transport error is the smaller one on 0.9\% of rows.
+\paragraph{Why the drift is large} Two properties of the DFlash drafter set its $\rho$ (Figure~\ref{fig:rho}a) \ev{stats-dflash}. Its final RMSNorm has unit gain, so its head input always has norm $\sqrt{2{,}560}$, a third of the target's, and the triangle inequality alone gives $\rho\ge0.68$; the angle between them is large as well, so even the best scalar rescaling of $h^d$ would leave $\rho$ near 0.91. The drafter is trained to rank the right token first under $Wh^d$, not to reproduce the target's head input, and its logits are softer (median top-token probability 0.17 against 0.69). Nor does the drift hide in directions the head ignores: after removing each position's mean logit, $\norm{W\Delta}_2/\norm{Wh^t}_2$ has a median of 0.85, and the largest realized transport error in a tile is a median 77 times the largest realized int8 error \ev{rho}. The MTP layer's head input is slightly longer than the target's (median norms 176 and 160), so its drift is mainly one of direction \ev{transport-mtp}.
 
-\begin{table}[tbp]
-\small\centering
-\begin{tabular}{@{}lrrrrr@{}}\toprule
-& \multicolumn{3}{c}{Greedy: vocabulary skipped} & \multicolumn{2}{c}{Sampled, $T=1$}\\\cmidrule(lr){2-4}\cmidrule(l){5-6}
-Tiling & transport & static screen & oracle radii & $\log(Z^+/Z^-)$ & $\E_qP_?$\\\midrule
-\multicolumn{6}{@{}l}{\emph{DFlash-4B, block 16: 4,000 pairs from 110 prompts}}\\
-Contiguous, 64 rows & 0.08\% & 0.08\% & 89\% & 133 & 0.995\\
-Contiguous, 256 rows & 0\% & 0\% & 84\% & 213 & 1.000\\
-Contiguous, 1,024 rows & 0\% & 0\% & 77\% & 244 & 1.000\\
-Random, 256 rows & 0\% & 0\% & 76\% & 238 & 1.000\\
-$k$-means, 64 rows & 0.59\% & 0.58\% & 84\% & 135 & 0.964\\
-$k$-means, 256 rows & 0.10\% & 0.10\% & 77\% & 138 & 0.982\\
-$k$-means, 1,024 rows & 0.02\% & 0.02\% & 68\% & 146 & 0.991\\\midrule
-\multicolumn{6}{@{}l}{\emph{MTP-4B, four draft steps: 16,016 pairs from 160 prompts}}\\
-Contiguous, 64 rows & 0.08\% & 0.08\% & 98.5\% & 146 & 1.000\\
-Contiguous, 256 rows & 0\% & 0\% & 96.4\% & 233 & 1.000\\
-Contiguous, 1,024 rows & 0\% & 0\% & 92.9\% & 268 & 1.000\\
-Random, 256 rows & 0\% & 0\% & 94.7\% & 255 & 1.000\\
-$k$-means, 64 rows & 0.64\% & 0.64\% & 96.0\% & 146 & 0.998\\
-$k$-means, 256 rows & 0.11\% & 0.11\% & 92.3\% & 152 & 0.999\\
-$k$-means, 1,024 rows & 0.02\% & 0.02\% & 86.8\% & 162 & 1.000\\\bottomrule
+\begin{table}[t]
+\caption{Transport on held-out draft pairs with the best certified bound family per tiling (the elementwise minimum of all certified radii). ``Skipped'': mean share of the vocabulary a greedy verifier skips, by transport (T), by the static screen with the same geometry (S) and by oracle radii (O), the realized per-tile deviations that no certified geometry can undercut. ``Width'': median partition width $\log(Z^+/Z^-)$ in nats; $P_?$: mean probability, over proposals $x\sim q$ at $T=1$, that the acceptance test stays undecided. Measured \ev{transport,transport-mtp}.}\label{tab:transport}
+\vskip 0.05in
+\centering\footnotesize\setlength{\tabcolsep}{3.6pt}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+& \multicolumn{3}{c}{Skipped (greedy)} & \multicolumn{2}{c}{Sampled}\\\cmidrule(lr){2-4}\cmidrule(l){5-6}
+Tiling & T & S & O & Width & $P_?$\\\midrule
+\multicolumn{6}{@{}l}{\emph{DFlash-4B, block 16: 4,020 pairs, 110 prompts}}\\
+Contiguous 64 & 0.08\% & 0.08\% & 89\% & 133 & 0.995\\
+Contiguous 256 & 0\% & 0\% & 84\% & 213 & 1.000\\
+Contiguous 1,024 & 0\% & 0\% & 77\% & 244 & 1.000\\
+Random 256 & 0\% & 0\% & 76\% & 238 & 1.000\\
+$k$-means 64 & 0.59\% & 0.58\% & 84\% & 134 & 0.964\\
+$k$-means 256 & 0.10\% & 0.10\% & 77\% & 138 & 0.982\\
+$k$-means 1,024 & 0.02\% & 0.02\% & 68\% & 146 & 0.991\\\midrule
+\multicolumn{6}{@{}l}{\emph{MTP-4B, four steps: 16,016 pairs, 160 prompts}}\\
+Contiguous 64 & 0.08\% & 0.08\% & 98.5\% & 146 & 1.000\\
+Contiguous 256 & 0\% & 0\% & 96.4\% & 233 & 1.000\\
+Contiguous 1,024 & 0\% & 0\% & 92.9\% & 268 & 1.000\\
+Random 256 & 0\% & 0\% & 94.7\% & 255 & 1.000\\
+$k$-means 64 & 0.64\% & 0.64\% & 96.0\% & 146 & 0.998\\
+$k$-means 256 & 0.11\% & 0.11\% & 92.3\% & 152 & 0.999\\
+$k$-means 1,024 & 0.02\% & 0.02\% & 86.8\% & 162 & 1.000\\
+\bottomrule
 \end{tabular}
-\caption{Transport on held-out draft pairs of both drafters, with the best certified bound family per tiling (the elementwise minimum of all certified radii). Shares skipped are means over pairs; oracle radii are the realized per-tile deviations, a ceiling no certified geometry reaches. For sampled acceptance the partition width is a median in nats and $\E_qP_?$ the mean probability, over proposals $x\sim q$, that the acceptance test stays undecided. Measured~\ev{transport,transport-mtp}.}
-\label{tab:transport}
 \end{table}
 
-\paragraph{What certification achieves} Table~\ref{tab:transport} gives the result for every tiling and both drafters. For DFlash-4B~\ev{transport} and greedy verification, the best certified family skips at most 0.59\% of the vocabulary on average (p90 0.8\%, $k$-means 64-row tiles), no better than the static screen with the same geometry, which does not use the draft at all. For sampled acceptance the partition interval spans 133--244 nats at its median, and the test stays undecided with probability 0.92--0.96 on average (median 1) at $T=1$ and 0.7, whether $P_?$ is taken at the draft token or averaged over proposals; computing the exact top-64 draft rows and transporting only the tail lowers $P_?$ at the draft token to 0.58 on average, with a median still of 1. Over the capture's real verify batches of 9 to 128 paired rows, the union of tiles left unresolved is 99.48--100\% of the vocabulary for every certified family and tiling. Even oracle radii on $k$-means 256-row tiles need 63\%, 97\% and 99.9\% of the vocabulary for random groups of 4, 16 and 64 pairs, so the batch union defeats a perfect geometry at 16 rows.
+\paragraph{What certification achieves} Table~\ref{tab:transport} applies every certified bound family of Appendix~\ref{app:transport}, and their elementwise minimum, to contiguous, random and $k$-means tiles. For greedy verification the best certified family skips at most 0.59\% of the vocabulary on average on DFlash-4B pairs and 0.64\% on MTP-4B pairs (0.65\% for a row-level variant), no more than the static screen, which does not use the draft at all \ev{transport,transport-mtp}. Oracle radii would skip 68--98.5\% for one pair, but a verifier that reuses weights across a batch reads the union of the tiles its rows need: over the capture's real verify batches every certified family and tiling needs at least 99.48\% (DFlash-4B) and 99.4\% (MTP-4B) of the vocabulary. For sampled acceptance the partition interval spans 133--268 nats at its median, and the test stays undecided with probability 0.964 or more on average.
 
-How far would a drafter have to move? In the drift-scaling extrapolation with the best certified family on $k$-means 256-row tiles, the mean share skipped is 1.6\% at $s=0.3$, 49\% at $s=0.1$, 77\% at $s=0.03$ and 84\% at $s=0.01$ (medians 0.3\%, 49\%, 96\% and 99\%), and the mean $\E_qP_?$ at $T=1$ is 1.00, 1.00, 0.96 and 0.66~\ev{transport}. Greedy transport would become useful only at about a tenth of the measured drift, and sampled acceptance would need less than a hundredth; a single row-wise envelope beats int8 only below $\rho\approx0.0085$.
+A drift-scaling replay, $h^d(s)=h^t-s\Delta$, an extrapolation, not a measured drafter, shows how far a drafter would have to move: with the best certified family on $k$-means 256-row tiles, greedy transport skips 49\% (DFlash-4B) and 80\% (MTP-4B) of the vocabulary at $s=0.1$, while sampled acceptance stays undecided with mean probability 1.00 there and 0.66 at $s=0.01$ for DFlash-4B \ev{transport,transport-mtp}.
 
-\paragraph{The MTP drafter} The native MTP layer tells the same story from a different geometry~\ev{transport-mtp}. Over 16,016 held-out pairs its drift ratio has a median of 0.95 (p10 0.77); unlike the DFlash drafter, its head input is slightly longer than the target's (median norms 176 and 160). The largest certified skip is 0.65\% of the vocabulary on average (p90 0.78\%), for the row-level variant on $k$-means 64-row tiles, and accepted and rejected pairs differ little (0.12\% and 0.10\% with $k$-means 256-row tiles). The partition interval spans 146--268 nats depending on the tiling, so sampled acceptance stays undecided with probability at least 0.997 on average, and over the capture's real verify batches of 1 to 32 paired rows every certified family and tiling needs 99.4--100\% of the vocabulary. Oracle radii would skip 96\% of the rows of one pair on $k$-means 64-row tiles, but random groups of 16 and 64 pairs need 62\% and 92\% of the vocabulary with 256-row $k$-means tiles. In the drift-scaling extrapolation the mean share skipped is 80\% at $s=0.1$ and 96\% at $s=0.03$ (medians 96\% and 99.8\%), with mean $\E_qP_?$ of 1.00 and 0.97; in this extrapolation the MTP drafter would need a smaller reduction of its drift than the DFlash drafter before greedy transport became useful, but still about a tenfold one. The MTP capture's alignment, drift distribution and self-evidence files are \pend{geometry-drift}.
-
-\paragraph{The verdict} On both drafters tested, DFlash-4B and the native MTP layer, and for every bound family and tiling tested, H2 is refuted: transport's certificates skip almost nothing, no more than a static screen that ignores the draft, and the verify-batch union erases what little they skip. The reason is geometric and specific: each drafter's head input differs from the target's by amounts of order one, in norm and direction for DFlash and mainly in direction for MTP, whose head input is within about 10\% of the target's length, as Section~\ref{sec:crossover} feared, while an int8 envelope needs agreement to about one part in a hundred. On the rows a greedy verifier needs on the same DFlash states, int8 self-evidence certifies with 1.57 candidate rows on average (Section~\ref{sec:geometry-selfevidence}). The result does not exclude a drafter trained to match the target's head input, whose achievable drift is untested.
-
-A skipped tile saves time only if the GPU avoids the work. For each mechanism the replay counts the weight bytes read (refined tiles including their union over the real batch, gathered candidate rows, the low-precision pass), metadata and evidence bytes, sequential stages and fallbacks, and converts them to predicted time with the kernel's measured primitive costs. These are model predictions, and a runtime claim needs a measured kernel \pend{geometry-work}.
+\paragraph{The verdict} On both drafters and for every bound family and tiling tested, transport skips almost nothing, no more than a static screen that ignores the draft, and the batch union erases the rest. The cause is geometric: the head inputs differ by order one, not one part in a hundred. On the same DFlash-4B states the int8 copy needs 1.57 candidate rows (Section~\ref{sec:rstock-share}).

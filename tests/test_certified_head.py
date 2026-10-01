@@ -29,7 +29,7 @@ if not torch.cuda.is_available():
     pytest.skip('CUDA is required', allow_module_level=True)
 
 from certified_head.bounds import TENSOR_CORE_FP32, bf16_round
-from certified_head.head import STATUS_BITS, CertifiedHead
+from certified_head.head import STATUS_BITS, CertifiedHead, GemvConfig
 from certified_head.quantize import build_quantized_head, load_or_build
 from certified_head.reference import (
     exact_logits_fp64,
@@ -368,6 +368,46 @@ def test_argmax_matches_engine_on_real_states(head_bf16: CertifiedHead) -> None:
         fallback += int(stats.fallback.sum())
     assert n > 0
     print(f'real rows {n}, fallback rows {fallback}')
+
+
+def real_rows(n: int) -> torch.Tensor:
+    rows = torch.cat([as_bf16(rec['hidden']) for rec in load_real_hidden(limit=600)])
+    if rows.shape[0] < n:
+        pytest.skip(f'only {rows.shape[0]} real rows')
+    return rows[:n].cuda()
+
+
+@pytest.mark.parametrize('arith', ['w8a16', 'w8a8', 'bf16'])
+@pytest.mark.parametrize('m', [1, 16, 64, 96, 128, 200, 256])
+def test_real_row_certification_rate_at_default_tiles(
+    checkpoint: tuple[Any, Any], arith: str, m: int
+) -> None:
+    """On real decode rows every arithmetic, at its default tiles for this batch
+    size, decides nearly every row, and its envelope encloses the exact logits.
+
+    A row's status does not depend on the batch, so the undecided share should
+    be the same at every M (about 1.5% on these rows under the conservative
+    model, more for W8A8). A tile configuration that computes a wrong or
+    over-wide envelope shows up here as a jump in fallbacks or an enclosure
+    violation.
+    """
+    w, qh = checkpoint
+    head = CertifiedHead.from_quantized(w, qh, reference='bf16', max_batch=256, capacity=256)
+    head.arith_for = lambda _m: arith  # type: ignore[assignment,return-value]
+    h = real_rows(256)[:m].contiguous()
+    lo, hi, _ = head.envelope(h)
+    x = exact_logits_fp64(h, w)
+    slack = 1e-9 * (1 + x.abs())
+    assert bool((lo.double() <= x - slack).all()), (arith, m, 'lo')
+    assert bool((hi.double() >= x + slack).all()), (arith, m, 'hi')
+    del lo, hi, x
+    ids, stats = head.argmax(h, fallback=False)
+    undecided = int(stats.fallback.sum())
+    decided = ~stats.fallback
+    assert torch.equal(ids[decided], reference_argmax(h, w, 'bf16')[decided])
+    limit = max(2, int(0.15 * m)) if arith == 'w8a8' else max(2, int(0.08 * m))
+    print(f'{arith} M={m} tiles {head.gemv_config(m)}: undecided {undecided}/{m}')
+    assert undecided <= limit, (arith, m, undecided)
 
 
 def near_tie_batch(w: torch.Tensor, pairs: int, gaps: torch.Tensor) -> tuple[torch.Tensor, int]:
@@ -819,3 +859,327 @@ def test_p8_engine_real_witnesses(head_bf16: CertifiedHead) -> None:
         assert int(stock) == w['stock_token'], w['row']
         assert torch.equal(ids, stock), w['row']
     print(f"{len(cases)} engine-real P8 witnesses reproduce SGLang's token")
+
+
+# --- fail-closed behaviour and the enclosure self-test -------------------------
+
+
+def test_quantization_data_must_belong_to_the_weight(checkpoint: tuple[Any, Any]) -> None:
+    """from_quantized checks the quantization data's head_sha256 against the
+    supplied weight; a weight one bit off, or data without a digest, makes every
+    batch take the stock path (status ``refused``)."""
+    import dataclasses
+
+    w, qh = checkpoint
+    head = CertifiedHead.from_quantized(w, qh, max_batch=8, capacity=64)
+    assert head.weight_check['ok'] and head.weight_check['checked']
+    print(
+        f'weight digest check: {head.weight_check["seconds"]:.2f} s for {w.numel() * 2 / 1e9:.2f} GB'
+    )
+    gen = torch.Generator(device='cuda').manual_seed(3)
+    h = (torch.randn(8, w.shape[1], device='cuda', generator=gen) * 2).to(torch.bfloat16)
+    _, ok_stats = head.argmax(h)
+    assert not bool((ok_stats.status == STATUS_BITS['refused']).any())
+
+    w2 = w.clone()
+    w2.view(torch.int16)[1234, 56] ^= 1  # one element, one bit
+    no_digest = dataclasses.replace(
+        qh, info={k: v for k, v in qh.info.items() if k != 'head_sha256'}
+    )
+    for weight, data in ((w2, qh), (w, no_digest)):
+        bad = CertifiedHead.from_quantized(weight, data, max_batch=8, capacity=64)
+        assert not bad.weight_check['ok'], bad.weight_check
+        ids, stats = bad.argmax(h)
+        assert bool((stats.status == STATUS_BITS['refused']).all())
+        assert torch.equal(ids, reference_argmax(h, bad.weight, 'bf16'))
+        seeds = torch.arange(8, dtype=torch.int64, device='cuda')
+        temps = torch.full((8,), 0.7, dtype=torch.float32, device='cuda')
+        _, s_stats = bad.gumbel_sample(h, seeds, seeds + 3, temps)
+        assert bool((s_stats.status == STATUS_BITS['refused']).all())
+
+
+def test_noncontiguous_inputs_are_rejected(checkpoint: tuple[Any, Any]) -> None:
+    """The kernels index weight, q and scale as flat row-major storage."""
+    w, qh = checkpoint
+    base = CertifiedHead.from_quantized(w, qh, max_batch=8, capacity=64)
+    strided = [
+        (base.weight.t().contiguous().t(), base.q, base.scale),
+        (base.weight, base.q.t().contiguous().t(), base.scale),
+        (base.weight, base.q, torch.repeat_interleave(base.scale, 2)[::2]),
+    ]
+    for weight, q, scale in strided:
+        assert torch.equal(weight, base.weight) and torch.equal(q, base.q)
+        assert torch.equal(scale, base.scale)
+        with pytest.raises(ValueError, match='contiguous'):
+            CertifiedHead(
+                weight,
+                q,
+                scale,
+                base.coeff,
+                base.dup_rep,
+                wmax=base.wmax,
+                group_size=base.group_size,
+                max_batch=8,
+                capacity=64,
+            )
+        del weight, q, scale
+
+
+def _modified_head(base: CertifiedHead, scale: torch.Tensor, coeff: dict[Any, torch.Tensor]) -> Any:
+    return CertifiedHead(
+        base.weight,
+        base.q,
+        scale,
+        coeff,
+        base.dup_rep,
+        wmax=base.wmax,
+        group_size=base.group_size,
+        max_batch=base.max_batch,
+        capacity=base.capacity,
+    )
+
+
+@pytest.mark.parametrize('sample', [False, True])
+@pytest.mark.parametrize('kind', ['scale_nan', 'scale_inf', 'coeff_nan', 'coeff_inf'])
+def test_nonfinite_envelope_fails_closed(
+    checkpoint: tuple[Any, Any], kind: str, sample: bool
+) -> None:
+    """A non-finite approximate logit or radius for one token marks every row
+    undecided (status ``nonfinite``); with the fallback the stock token is returned."""
+    w, qh = checkpoint
+    base = CertifiedHead.from_quantized(w, qh, max_batch=8, capacity=64)
+    token = 12345
+    scale = base.scale.clone()
+    coeff = {a: c.clone() for a, c in base.coeff.items()}
+    value = float('nan') if kind.endswith('nan') else float('inf')
+    if kind.startswith('scale'):
+        scale[token] = value
+    else:
+        coeff['w8a16'][token, 0] = value
+    head = _modified_head(base, scale, coeff)
+    head._assume_verified([8])  # test the in-kernel guard, not the self-test
+    h = peaked_hidden(w, 8)
+    seeds = torch.arange(8, dtype=torch.int64, device='cuda') + 3
+    positions = torch.arange(8, dtype=torch.int64, device='cuda') + 50
+    temps = torch.full((8,), 0.8, dtype=torch.float32, device='cuda')
+    if sample:
+        _, stats = head.gumbel_sample(h, seeds, positions, temps, fallback=False)
+        status = stats.status.clone()
+        ids, _ = head.gumbel_sample(h, seeds, positions, temps)
+        ref = stock_seeded_sample(h, w, 'bf16', seeds, positions, temps)
+    else:
+        _, stats = head.argmax(h, fallback=False)
+        status = stats.status.clone()
+        ids, _ = head.argmax(h)
+        ref = reference_argmax(h, w, 'bf16')
+    assert bool(((status & STATUS_BITS['nonfinite']) != 0).all()), status.tolist()
+    assert torch.equal(ids, ref)
+
+
+def test_enclosure_self_test_passes_the_default_tiles(checkpoint: tuple[Any, Any]) -> None:
+    w, qh = checkpoint
+    head = CertifiedHead.from_quantized(w, qh, max_batch=256, capacity=256)
+    sizes = [1, 2, 3, 8, 16, 17, 24, 32, 33, 48, 64, 65, 96, 128, 200, 256]
+    report = head.enclosure_self_test(sizes)
+    assert report['ok'], report
+    assert [c['batch_size'] for c in report['checks']] == sizes  # every size, not endpoints
+    times = {c['batch_size']: round(c['seconds'], 3) for c in report['checks']}
+    print(f'self-test seconds per batch size {times}, total {report["seconds"]:.2f}')
+    summary = head.self_test_summary()
+    assert summary['checks'] == len(sizes) and summary['verified_batch_sizes'] == sizes
+    assert head.enclosure_self_test(sizes)['seconds'] == 0.0  # cached, not rerun
+
+
+def test_enclosure_self_test_refuses_a_bad_configuration(checkpoint: tuple[Any, Any]) -> None:
+    """An envelope that is too narrow (zeroed coefficients) or a refused tile
+    configuration sends its batch sizes to the stock path, also in a CUDA graph."""
+    w, qh = checkpoint
+    base = CertifiedHead.from_quantized(w, qh, max_batch=128, capacity=64)
+    coeff = {a: torch.zeros_like(c) for a, c in base.coeff.items()}
+    narrow = _modified_head(base, base.scale.clone(), coeff)
+    report = narrow.enclosure_self_test([4, 16, 128])
+    assert not report['ok'] and sorted(report['refused_batch_sizes']) == [4, 16, 128]
+    h = peaked_hidden(w, 16)
+    ids, stats = narrow.argmax(h)
+    assert torch.equal(ids, reference_argmax(h, w, 'bf16'))
+    assert bool((stats.status == STATUS_BITS['refused']).all())
+    static_h = h.clone()
+    out = torch.zeros(16, dtype=torch.int64, device='cuda')
+    stream = torch.cuda.Stream()
+    stream.wait_stream(torch.cuda.current_stream())
+    with torch.cuda.stream(stream):
+        narrow.argmax(static_h)
+    torch.cuda.current_stream().wait_stream(stream)
+    graph = torch.cuda.CUDAGraph()
+    with torch.cuda.graph(graph):
+        out.copy_(narrow.argmax(static_h)[0])
+    other = peaked_hidden(w, 16)
+    static_h.copy_(other)
+    graph.replay()
+    torch.cuda.synchronize()
+    assert torch.equal(out, reference_argmax(other, w, 'bf16'))
+    # The dispatcher itself refuses int8 TMA tiles with a box narrower than 128 bytes
+    # or block_m >= 128; this 128x128x64 tile is refused on both counts.
+    head = CertifiedHead.from_quantized(w, qh, max_batch=128, capacity=64)
+    head.gemv_config = lambda _m: GemvConfig(128, 128, 64, 4, 3, tma=True)
+    report = head.enclosure_self_test([96, 128])
+    assert sorted(report['refused_batch_sizes']) == [96, 128]
+    assert 'refused' in report['checks'][0]['failure']
+
+
+def test_runtime_probe_catches_a_finite_wrong_envelope(checkpoint: tuple[Any, Any]) -> None:
+    """Zeroed scales make every approximate logit 0 with a finite, too-narrow
+    envelope (no NaN anywhere). The runtime probes must find exact logits outside
+    it, fail the whole batch, count the call and latch the batch size, also in a
+    CUDA graph; a correct head must never trip over many calls."""
+    w, qh = checkpoint
+    base = CertifiedHead.from_quantized(w, qh, max_batch=16, capacity=64)
+    bad = _modified_head(
+        base, torch.zeros_like(base.scale), {a: c.clone() for a, c in base.coeff.items()}
+    )
+    bad._assume_verified([8])  # test the runtime probes, not the start-up self-test
+    # Random rows: |exact logit| exceeds the zero envelope's radius on most probes.
+    h = random_hidden(8)
+    _, stats = bad.argmax(h, fallback=False)
+    assert bool(((stats.status & STATUS_BITS['probe']) != 0).all())
+    report = bad.probe_stats()
+    assert report['calls_with_probe_violation'] == 1 and len(report['latched_variants']) == 1
+    ids, _ = bad.argmax(h)
+    assert torch.equal(ids, reference_argmax(h, w, 'bf16'))
+    static_h = h.clone()
+    out = torch.zeros(8, dtype=torch.int64, device='cuda')
+    stream = torch.cuda.Stream()
+    stream.wait_stream(torch.cuda.current_stream())
+    with torch.cuda.stream(stream):
+        bad.argmax(static_h)
+    torch.cuda.current_stream().wait_stream(stream)
+    graph = torch.cuda.CUDAGraph()
+    with torch.cuda.graph(graph):
+        out.copy_(bad.argmax(static_h)[0])
+    for _ in range(3):
+        other = random_hidden(8)
+        static_h.copy_(other)
+        graph.replay()
+        torch.cuda.synchronize()
+        assert torch.equal(out, reference_argmax(other, w, 'bf16'))
+    # A correct head: many calls, varying probe rows, no trip.
+    seen = set()
+    for _ in range(50):
+        base.argmax(torch.cat([peaked_hidden(w, 8), random_hidden(8)]))
+        seen.update(base._probe_idx.tolist())
+    assert base.probe_stats()['calls_with_probe_violation'] == 0
+    assert len(seen) > 300  # 8 new rows per call (up to rare hash collisions)
+    # The rows also change between CUDA-graph replays.
+    rows = []
+    for _ in range(3):
+        graph.replay()
+        torch.cuda.synchronize()
+        rows.append(tuple(bad._probe_idx.tolist()))
+    assert len(set(rows)) == 3
+
+
+def test_probe_latch_covers_every_batch_size_of_the_variant(checkpoint: tuple[Any, Any]) -> None:
+    """A probe trip latches the tile configuration: other batch sizes using the same
+    configuration go to stock, batch sizes using another configuration do not."""
+    w, qh = checkpoint
+    head = CertifiedHead.from_quantized(w, qh, max_batch=32, capacity=64)
+    assert head._variant_key(8) == head._variant_key(4) != head._variant_key(32)
+    head._probe_tripped[head._variant_id(8)] = 1  # as if a call at M = 8 had tripped
+    h4, h32 = peaked_hidden(w, 4), peaked_hidden(w, 32)
+    _, stats = head.argmax(h4, fallback=False)
+    assert bool(((stats.status & STATUS_BITS['probe']) != 0).all())
+    ids, _ = head.argmax(h4)
+    assert torch.equal(ids, reference_argmax(h4, w, 'bf16'))
+    _, stats = head.argmax(h32, fallback=False)
+    assert not bool(((stats.status & STATUS_BITS['probe']) != 0).any())
+
+
+def test_untested_batch_size_is_refused_under_capture(checkpoint: tuple[Any, Any]) -> None:
+    """The self-test is mandatory: a batch size first seen inside a CUDA-graph
+    capture (where it cannot run) takes the stock path."""
+    w, qh = checkpoint
+    head = CertifiedHead.from_quantized(w, qh, max_batch=8, capacity=64)
+    static_h = peaked_hidden(w, 8)
+    out = torch.zeros(8, dtype=torch.int64, device='cuda')
+    stream = torch.cuda.Stream()
+    stream.wait_stream(torch.cuda.current_stream())
+    with torch.cuda.stream(stream):
+        reference_argmax(static_h, w, 'bf16')  # cuBLAS handles, not the head
+    torch.cuda.current_stream().wait_stream(stream)
+    graph = torch.cuda.CUDAGraph()
+    with torch.cuda.graph(graph):
+        ids, stats = head.argmax(static_h)
+        out.copy_(ids)
+    other = peaked_hidden(w, 8)
+    static_h.copy_(other)
+    graph.replay()
+    torch.cuda.synchronize()
+    assert torch.equal(out, reference_argmax(other, w, 'bf16'))
+    assert bool((stats.status == STATUS_BITS['refused']).all())
+    # Eagerly, the first call runs the self-test and certifies.
+    _, stats = head.argmax(other, fallback=False)
+    assert (head._variant_key(8), 8) in head._verified
+    assert int(stats.fallback.sum()) == 0
+
+
+@pytest.mark.parametrize('m', [1, 2, 3, 8, 16, 17, 24, 32, 33, 48, 64, 65, 96, 128, 200, 256])
+def test_runtime_probe_catches_a_wrong_envelope_at_every_batch_size(
+    checkpoint: tuple[Any, Any], m: int
+) -> None:
+    """The reduced probe check (only the tiles holding a probe row compare) still
+    catches a finite wrong envelope at every batch size the self-test covers."""
+    w, qh = checkpoint
+    base = CertifiedHead.from_quantized(w, qh, max_batch=256, capacity=64)
+    # Negated, tripled scales: every approximate logit is -3x its value with a finite
+    # envelope sized for the true one, so a probe row lies outside it unless its
+    # exact logit is within a quarter radius of 0 (8 probes per row miss ~1e-8).
+    bad = _modified_head(base, -3 * base.scale, {a: c.clone() for a, c in base.coeff.items()})
+    bad._assume_verified([m])
+    h = random_hidden(m)
+    _, stats = bad.argmax(h, fallback=False)
+    assert bool(((stats.status & STATUS_BITS['probe']) != 0).all()), m
+    assert bad.probe_stats()['calls_with_probe_violation'] == 1
+    ids, _ = bad.argmax(h)
+    assert torch.equal(ids, reference_argmax(h, w, 'bf16'))
+
+
+def test_probes_are_on_unless_explicitly_disabled(checkpoint: tuple[Any, Any]) -> None:
+    w, qh = checkpoint
+    head = CertifiedHead.from_quantized(w, qh, max_batch=8, capacity=64)
+    assert head.probes > 0 and not head.unsafe
+    with pytest.raises(AttributeError):
+        head.probes = 0  # type: ignore[misc]
+    head.disable_probes_for_measurement()
+    assert head.probes == 0 and head.unsafe
+
+
+def test_fp64_references_bypass_a_deterministic_matmul_override(monkeypatch: Any) -> None:
+    """Under SGLang's deterministic inference aten::mm has no FP64 path; the
+    self-test's exact references switch the override off and then on again."""
+    import sys
+    import types
+
+    from certified_head.selftest import native_fp64_matmul
+
+    calls: list[str] = []
+    fake = types.ModuleType('sglang.srt.batch_invariant_ops.batch_invariant_ops')
+    state = {'on': True}
+
+    def disable() -> None:
+        calls.append('off')
+        state['on'] = False
+
+    def enable() -> None:
+        calls.append('on')
+        state['on'] = True
+
+    fake.is_batch_invariant_mode_enabled = lambda: state['on']  # type: ignore[attr-defined]
+    fake.disable_batch_invariant_mode = disable  # type: ignore[attr-defined]
+    fake.enable_batch_invariant_mode = enable  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, fake.__name__, fake)
+    with native_fp64_matmul():
+        assert not state['on']
+    assert state['on'] and calls == ['off', 'on']
+    with pytest.raises(RuntimeError), native_fp64_matmul():
+        raise RuntimeError('restored even on errors')
+    assert state['on']

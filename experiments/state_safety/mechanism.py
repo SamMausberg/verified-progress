@@ -47,11 +47,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+
+# The exact reference (src/precision_reference.py) supplies the Hopper model's gamma.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'src'))
 
 MODEL_DIR = (
     Path.home()
@@ -128,6 +132,14 @@ def first_cache_difference(
         if q0 > upto:
             break
         a, b = ca[q0], cb[q0]
+        if a['cached'] == 0 and b['cached'] == 0:
+            # A prefill with no cached prefix reads no earlier state. The tap hashes
+            # the caches in state_tap.begin, before _forward_raw runs the deferred
+            # mamba clear, so a fresh GDN slot is hashed with an earlier request's
+            # leftover state. The forward then reads zeros: clear_slots zeroes the
+            # slot first (mamba_needs_clear), the SSM chunk prefill reads that zeroed
+            # slot, and the conv reads no initial state (has_initial_state is false).
+            continue
         found: list[dict[str, Any]] = []
         for kind in ('k', 'v'):
             if a[kind] is None or b[kind] is None:
@@ -318,6 +330,10 @@ def analyse_prompt(
     rb = committed_rows(dir_b / 'tap' / f'tap-{pid}', prompt + ob)
     upto = P + (d if d is not None else n) - 1
     out: dict[str, Any] = {'id': pid, 'prompt_len': P, 'diverged_at': d}
+    la, lb = ca.get('top_logprobs') or [], cb.get('top_logprobs') or []
+    out['first_logprob_difference'] = next(
+        (i for i in range(min(len(la), len(lb))) if la[i] != lb[i]), None
+    )
     out['first_difference'] = first_hash_difference(ra, rb, names[0], names[1], upto, lo)
     cache_a = entering_caches(dir_a / 'tap' / f'tap-{pid}', prompt + oa)
     cache_b = entering_caches(dir_b / 'tap' / f'tap-{pid}', prompt + ob)
@@ -443,11 +459,18 @@ def error_models(k: int) -> dict[str, float]:
     conservative: the project's model, gamma(2k, 2**-23) = 2k u / (1 - 2k u) with
     u = 2**-23, covering any reduction order, split-K with FP32 partials and
     truncating adders. hopper: the blocked Hopper wgmma model used by the kernel
-    workstream (1.19e-4 at k = 2560, including an FP32 split-K allowance); it rests
-    on a published measurement-based hardware model, not vendor documentation.
+    workstream, including an FP32 split-K allowance, computed exactly by
+    precision_reference.hopper_wgmma_gamma and rounded up (1.19216e-4 at k = 2560);
+    it rests on a published measurement-based hardware model, not vendor
+    documentation.
     """
+    import precision_reference as ref
+
     u = 2.0**-23
-    return {'conservative': 2 * k * u / (1 - 2 * k * u), 'hopper': 1.19e-4}
+    return {
+        'conservative': 2 * k * u / (1 - 2 * k * u),
+        'hopper': ref.float_up(ref.hopper_wgmma_gamma(k)),
+    }
 
 
 def abs_products(head: Head, h: np.ndarray, toks: tuple[int, int]) -> float:
@@ -455,12 +478,60 @@ def abs_products(head: Head, h: np.ndarray, toks: tuple[int, int]) -> float:
     return float(sum(np.sum(np.abs(head.row(t) * h.astype(np.float64))) for t in toks))
 
 
+def compare_repeats(run_dir: Path, pid: str, prompt: list[int]) -> dict[str, Any]:
+    """First module-output and cache differences between repeats of one prompt.
+
+    Repeats are the rids tap-<pid>-r0, tap-<pid>-r1, ... written by
+    tap_runs.py --repeats; each later repeat is compared with r0.
+    """
+    names = json.loads((run_dir / 'tap' / 'slots.json').read_text())['names']
+    client = {
+        json.loads(line)['id']: json.loads(line)
+        for line in (run_dir / 'client.jsonl').read_text().splitlines()
+    }
+    reps = sorted(k for k in client if k.startswith(f'{pid}-r'))
+    base = client[reps[0]]
+    rows0 = committed_rows(run_dir / 'tap' / f'tap-{reps[0]}', prompt + base['output_ids'])
+    cache0 = entering_caches(run_dir / 'tap' / f'tap-{reps[0]}', prompt + base['output_ids'])
+    out = []
+    for r in reps[1:]:
+        rec = client[r]
+        rows = committed_rows(run_dir / 'tap' / f'tap-{r}', prompt + rec['output_ids'])
+        cache = entering_caches(run_dir / 'tap' / f'tap-{r}', prompt + rec['output_ids'])
+        upto = len(prompt) + min(len(base['output_ids']), len(rec['output_ids'])) - 1
+        out.append(
+            {
+                'repeat': r,
+                'tokens_equal': rec['output_ids'] == base['output_ids'],
+                'logprobs_equal': rec['top_logprobs'] == base['top_logprobs'],
+                'first_difference': first_hash_difference(rows0, rows, names, names, upto),
+                'first_cache_difference': first_cache_difference(cache0, cache, upto)
+                if cache0 and cache
+                else None,
+            }
+        )
+    run = data_root_relative(str(run_dir))
+    return {'run': run, 'prompt': pid, 'reference': reps[0], 'repeats': out}
+
+
+def data_root_relative(path: str) -> str:
+    """path relative to ~/vp-data/state when it lies there, else unchanged."""
+    try:
+        return str(Path(path).resolve().relative_to(Path.home().resolve() / 'vp-data/state'))
+    except ValueError:
+        return path
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--a', required=True)
-    ap.add_argument('--b', required=True)
+    ap.add_argument('--b', help='second run directory (not needed with --repeat-of)')
     ap.add_argument('--prompts', default=str(Path.home() / 'vp-data/state/prompts/prompts.jsonl'))
     ap.add_argument('--out', required=True)
+    ap.add_argument(
+        '--repeat-of',
+        help='compare the tapped repeats of this prompt id inside --a (ignores --b)',
+    )
     ap.add_argument(
         '--start-output-index',
         type=int,
@@ -474,6 +545,16 @@ def main() -> None:
         'the tap leaves tokens and logprobs bitwise unchanged',
     )
     args = ap.parse_args()
+    if args.repeat_of:
+        prompt = next(
+            json.loads(line)['input_ids']
+            for line in Path(args.prompts).read_text().splitlines()
+            if json.loads(line)['id'] == args.repeat_of
+        )
+        res = compare_repeats(Path(args.a), args.repeat_of, prompt)
+        Path(args.out).write_text(json.dumps(res, indent=1) + '\n')
+        print(json.dumps(res, indent=1))
+        return
     dir_a, dir_b = Path(args.a), Path(args.b)
     names = json.loads((dir_a / 'tap' / 'slots.json').read_text())['names']
     names_b = json.loads((dir_b / 'tap' / 'slots.json').read_text())['names']
@@ -500,14 +581,15 @@ def main() -> None:
         )
     fd = [c['first_difference'] for c in cases if c.get('first_difference')]
     summary = {
-        'a': args.a,
-        'b': args.b,
+        # Relative to the data root, so the committed summary does not name a home directory.
+        'a': data_root_relative(args.a),
+        'b': data_root_relative(args.b),
         'prompts': len(cases),
         'classes': dict(Counter(c['cls'] for c in cases)),
         'classes_hopper_model': dict(
             Counter(c['model_hopper']['cls'] if 'model_hopper' in c else c['cls'] for c in cases)
         ),
-        'first_difference_module': dict(Counter(f['module'] for f in fd).most_common(20)),
+        'first_difference_module': dict(Counter(f['module'] for f in fd).most_common()),
         'first_difference_modes': dict(Counter(f'{f["mode_a"]} vs {f["mode_b"]}' for f in fd)),
         'first_difference_output_index': dict(
             Counter(
@@ -538,9 +620,10 @@ def main() -> None:
             and r['top_logprobs'] == ref[pid]['top_logprobs'][: len(r['top_logprobs'])]
         ]
         summary['tap_check'] = {
-            'untapped_run': args.untapped_a,
+            'untapped_run': data_root_relative(args.untapped_a),
             'prompts': len(ca),
             'tokens_and_logprobs_bitwise_equal': len(same),
+            'mismatched_ids': sorted(set(ca) - set(same)),
         }
     Path(args.out).write_text(json.dumps({'summary': summary, 'cases': cases}, indent=1) + '\n')
     print(json.dumps(summary, indent=1))
