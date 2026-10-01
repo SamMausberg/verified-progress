@@ -524,3 +524,34 @@ def test_the_job_does_not_run_once_the_holder_is_gone(tmp_path: Path) -> None:
     )
     assert done.returncode == 75
     assert not ran.exists()
+
+
+def test_a_holder_death_before_the_job_pid_is_known_still_stops_the_job(tmp_path: Path) -> None:
+    """TERM between the fork and pid=$! must still stop the job once its pid is known."""
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    pid_file = tmp_path / 'child.pid'
+    env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock), GPU_JOB_TEST_SPAWN_DELAY='3')
+    job = f'echo $$ > {pid_file}; exec sleep 60'
+    proc = subprocess.Popen(['bash', str(SCRIPT), '-s', 'bash', '-c', job], env=env)
+    try:
+        deadline = time.time() + 10
+        while not pid_file.exists() and time.time() < deadline:
+            time.sleep(0.05)
+        child = int(pid_file.read_text())  # the job runs; gpu_job.sh has not set pid yet
+        holder = subprocess.run(
+            ['pgrep', '-P', str(proc.pid), '-x', 'flock'],
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout.split()
+        assert holder, 'no flock process under gpu_lock.sh'
+        os.kill(int(holder[0]), 9)
+        deadline = time.time() + 15
+        while alive(child) and time.time() < deadline:
+            time.sleep(0.1)
+        if alive(child):
+            os.kill(child, 9)
+            pytest.fail('a signal before pid was set let the job outlive the lock holder')
+    finally:
+        proc.kill()

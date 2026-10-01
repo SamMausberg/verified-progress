@@ -63,9 +63,27 @@ stop_group() {
   kill -KILL -- "-$pid" 2>/dev/null || true
 }
 # The trap is in place before the command starts, so a holder death at any moment is handled.
-trap 'stop_group; exit 143' TERM INT HUP
+# A signal that arrives before pid is set (between the fork and pid=$!) cannot reach the group
+# yet: it is recorded and acted on as soon as pid is known.
+pending=""
+# shellcheck disable=SC2329 # invoked by the trap below
+on_signal() {
+  if [ -z "$pid" ]; then
+    pending=1
+    return
+  fi
+  stop_group
+  exit 143
+}
+trap on_signal TERM INT HUP
 if [ -t 0 ]; then "$@" </dev/null & else "$@" & fi
+# Tests widen the window between the fork and pid=$! to deliver a signal inside it.
+if [ -n "${GPU_JOB_TEST_SPAWN_DELAY:-}" ]; then sleep "$GPU_JOB_TEST_SPAWN_DELAY"; fi
 pid=$!
+if [ -n "$pending" ]; then
+  stop_group
+  exit 143
+fi
 wait "$pid"
 rc=$?
 stop_group # leftovers in the job's group do not outlive the job
