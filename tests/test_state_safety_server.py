@@ -81,3 +81,43 @@ def test_compare_flags_pinned_state(tmp_path):
     assert pinned(tmp_path / 'a.meta.json') is False
     assert pinned(tmp_path / 'b.meta.json') is True
     assert pinned(tmp_path / 'missing.meta.json') is None
+
+
+def test_pools_match_uses_each_pass_server_and_treats_missing_fields_as_unknown(tmp_path):
+    import json
+
+    from compare import pools_match
+
+    run = tmp_path / 'plain'
+    run.mkdir()
+    pools = {'max_total_tokens': 100, 'max_running_requests': 8, 'max_mamba_cache_size': 40}
+
+    def meta(name, **info):
+        (run / f'{name}.meta.json').write_text(
+            json.dumps({'started_at': '2026-10-01T10:05:00', 'server_info': info})
+        )
+
+    # New runs: one server id per process; passes of two servers are told apart.
+    meta('c1', server_id='s1', resolved_pools=pools)
+    meta('c32', server_id='s2', resolved_pools={**pools, 'max_total_tokens': 200})
+    assert pools_match(tmp_path, 'plain/c1', 'plain/c32') == (False, False)
+    meta('c32', server_id='s1', resolved_pools=pools)
+    assert pools_match(tmp_path, 'plain/c1', 'plain/c32') == (True, True)
+    # A pool field that was not found is unknown, not equal.
+    missing = {**pools, 'max_mamba_cache_size': None}
+    meta('c1', server_id='s1', resolved_pools=missing)
+    meta('c32', server_id='s2', resolved_pools=missing)
+    assert pools_match(tmp_path, 'plain/c1', 'plain/c32') == (False, None)
+    # Older runs: the session log only counts for passes that started inside its span.
+    (run / 'server.log').write_text(
+        '[2026-10-01 10:00:00] Mamba Cache is allocated. max_mamba_cache_size: 40, x\n'
+        '[2026-10-01 10:00:01] max_total_num_tokens=100, a=1, max_running_requests=8, b=2\n'
+        '[2026-10-01 10:30:00] Decode batch\n'
+    )
+    meta('c1')
+    meta('c32')
+    assert pools_match(tmp_path, 'plain/c1', 'plain/c32') == (True, True)
+    (run / 'c32.meta.json').write_text(
+        json.dumps({'started_at': '2026-10-01T09:00:00', 'server_info': {}})
+    )
+    assert pools_match(tmp_path, 'plain/c1', 'plain/c32') == (False, None)

@@ -20,6 +20,7 @@
       "run_b": "plain__rep/c1",
       "pinned_a": false,
       "pinned_b": false,
+      "same_server": false,
       "pools_identical": false
     },
     "repeat session, plain c32": {
@@ -43,6 +44,7 @@
       "run_b": "plain__rep/c32",
       "pinned_a": false,
       "pinned_b": false,
+      "same_server": false,
       "pools_identical": false
     },
     "concurrency 1 vs 32 (cap 16), plain": {
@@ -68,6 +70,7 @@
       "run_b": "plain/c32",
       "pinned_a": false,
       "pinned_b": false,
+      "same_server": true,
       "pools_identical": true
     },
     "same server repeat c1, plain": {
@@ -89,6 +92,7 @@
       "run_b": "plain/c1_warm",
       "pinned_a": false,
       "pinned_b": false,
+      "same_server": true,
       "pools_identical": true
     },
     "same server repeat c32, plain": {
@@ -110,6 +114,7 @@
       "run_b": "plain/c32_warm",
       "pinned_a": false,
       "pinned_b": false,
+      "same_server": true,
       "pools_identical": true
     },
     "deterministic, plain c1 vs c8 (8-prompt validation)": {
@@ -131,6 +136,7 @@
       "run_b": "plain_det__validate/c8",
       "pinned_a": false,
       "pinned_b": false,
+      "same_server": true,
       "pools_identical": true
     },
     "deterministic, mtp_s3 c1 vs c8 (8-prompt validation)": {
@@ -154,6 +160,7 @@
       "run_b": "mtp_s3_det__validate/c8",
       "pinned_a": false,
       "pinned_b": false,
+      "same_server": true,
       "pools_identical": true
     },
     "deterministic + verify KV split patch, mtp_s3 c1 vs c32 (96 prompts)": {
@@ -177,6 +184,7 @@
       "run_b": "mtp_s3_det__verifyfix/c32",
       "pinned_a": false,
       "pinned_b": false,
+      "same_server": true,
       "pools_identical": true
     }
   },

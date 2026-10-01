@@ -2,8 +2,8 @@
  {
   "evidence": "noise_floor.json",
   "comparison": "repeat session, plain c1",
-  "server_a": "runs/plain",
-  "server_b": "runs/plain__rep",
+  "server_a": "runs/plain/c1",
+  "server_b": "runs/plain__rep/c1",
   "same_server": false,
   "pools_a": {
    "max_total_tokens": 97672,
@@ -20,8 +20,8 @@
  {
   "evidence": "noise_floor.json",
   "comparison": "repeat session, plain c32",
-  "server_a": "runs/plain",
-  "server_b": "runs/plain__rep",
+  "server_a": "runs/plain/c32",
+  "server_b": "runs/plain__rep/c32",
   "same_server": false,
   "pools_a": {
    "max_total_tokens": 97672,
@@ -38,8 +38,8 @@
  {
   "evidence": "noise_floor.json",
   "comparison": "concurrency 1 vs 32 (cap 16), plain",
-  "server_a": "runs/plain",
-  "server_b": "runs/plain",
+  "server_a": "runs/plain/c1",
+  "server_b": "runs/plain/c32",
   "same_server": true,
   "pools_a": {
    "max_total_tokens": 97672,
@@ -56,8 +56,8 @@
  {
   "evidence": "noise_floor.json",
   "comparison": "same server repeat c1, plain",
-  "server_a": "runs/plain",
-  "server_b": "runs/plain",
+  "server_a": "runs/plain/c1",
+  "server_b": "runs/plain/c1_warm",
   "same_server": true,
   "pools_a": {
    "max_total_tokens": 97672,
@@ -74,8 +74,8 @@
  {
   "evidence": "noise_floor.json",
   "comparison": "same server repeat c32, plain",
-  "server_a": "runs/plain",
-  "server_b": "runs/plain",
+  "server_a": "runs/plain/c32",
+  "server_b": "runs/plain/c32_warm",
   "same_server": true,
   "pools_a": {
    "max_total_tokens": 97672,
@@ -92,8 +92,8 @@
  {
   "evidence": "noise_floor.json",
   "comparison": "deterministic, plain c1 vs c8 (8-prompt validation)",
-  "server_a": "runs/plain_det__validate",
-  "server_b": "runs/plain_det__validate",
+  "server_a": "runs/plain_det__validate/c1",
+  "server_b": "runs/plain_det__validate/c8",
   "same_server": true,
   "pools_a": {
    "max_total_tokens": 125547,
@@ -110,8 +110,8 @@
  {
   "evidence": "noise_floor.json",
   "comparison": "deterministic, mtp_s3 c1 vs c8 (8-prompt validation)",
-  "server_a": "runs/mtp_s3_det__validate",
-  "server_b": "runs/mtp_s3_det__validate",
+  "server_a": "runs/mtp_s3_det__validate/c1",
+  "server_b": "runs/mtp_s3_det__validate/c8",
   "same_server": true,
   "pools_a": {
    "max_total_tokens": 55800,
@@ -128,8 +128,8 @@
  {
   "evidence": "noise_floor.json",
   "comparison": "deterministic + verify KV split patch, mtp_s3 c1 vs c32 (96 prompts)",
-  "server_a": "runs/mtp_s3_det__verifyfix",
-  "server_b": "runs/mtp_s3_det__verifyfix",
+  "server_a": "runs/mtp_s3_det__verifyfix/c1",
+  "server_b": "runs/mtp_s3_det__verifyfix/c32",
   "same_server": true,
   "pools_a": {
    "max_total_tokens": 299772,
@@ -219,7 +219,7 @@
   "evidence": "tap_check.json",
   "comparison": "v3_plain_c1 vs untapped plain/c1",
   "server_a": "tap/v3_plain_c1",
-  "server_b": "runs/plain",
+  "server_b": "runs/plain/c1",
   "same_server": false,
   "pools_a": {
    "max_total_tokens": 159322,
@@ -237,7 +237,7 @@
   "evidence": "tap_check.json",
   "comparison": "plain_c1 vs untapped plain/c1",
   "server_a": "tap/plain_c1",
-  "server_b": "runs/plain",
+  "server_b": "runs/plain/c1",
   "same_server": false,
   "pools_a": {
    "max_total_tokens": 93742,

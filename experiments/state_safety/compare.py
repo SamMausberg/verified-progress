@@ -31,6 +31,7 @@ would show up as drift even without a token divergence.
 from __future__ import annotations
 
 import argparse
+import csv
 import itertools
 import json
 import math
@@ -38,7 +39,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from server import resolved_pools
+from server import log_time_span, pools_known, resolved_pools
 
 NEAR_NATS = 0.5
 LARGE_DRIFT_NATS = 0.5
@@ -221,6 +222,38 @@ def summarize(rows: Iterable[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def pass_server(root: Path, run: str) -> tuple[str | None, dict[str, Any] | None]:
+    """The server that ran a pass, and its pools, from the pass's own metadata.
+
+    New runs record a server id and the allocated pools per pass. For older runs
+    the session's server.log (overwritten by each new server) is used only if the
+    pass started inside that log's time span, i.e. that server ran it; otherwise
+    both are unknown.
+    """
+    meta_path = root / f'{run}.meta.json'
+    if not meta_path.exists():
+        return None, None
+    meta = json.loads(meta_path.read_text())
+    info = meta.get('server_info', {})
+    if info.get('server_id') and 'resolved_pools' in info:
+        return info['server_id'], info['resolved_pools']
+    log = (root / run).parent / 'server.log'
+    span = log_time_span(log) if log.exists() else None
+    started = str(meta.get('started_at', '')).replace('T', ' ')
+    if span and span[0] <= started <= span[1]:
+        return f'log:{log}:{span[0]}', resolved_pools(log)
+    return None, None
+
+
+def pools_match(root: Path, ra: str, rb: str) -> tuple[bool, bool | None]:
+    """(same server, pools identical); identical is None when either is unknown."""
+    (ka, pa), (kb, pb) = pass_server(root, ra), pass_server(root, rb)
+    same = ka is not None and ka == kb
+    if not (pools_known(pa) and pools_known(pb)):
+        return same, None
+    return same, pa == pb
+
+
 def pinned(meta_path: Path) -> bool | None:
     """Whether a run had pinned pools (None if it has no meta file)."""
     if not meta_path.exists():
@@ -253,10 +286,10 @@ def run_meta(root: Path, runs: list[str]) -> dict[str, Any]:
                 'started_at',
             )
         }
-        log = (root / name).parent / 'server.log'
-        if 'resolved_pools' not in info and log.exists():
-            # Runs from before the pools were recorded: read them from the log.
-            info['resolved_pools'] = resolved_pools(log)
+        if 'resolved_pools' not in info:
+            # Runs from before the pools were recorded: from the log of the server
+            # that ran this pass, if it can be identified (else None).
+            info['resolved_pools'] = pass_server(root, name)[1]
         entry['server_info'] = info
         run = load_run(root / f'{name}.jsonl')
         verify = sum(r.get('spec_verify_ct') or 0 for r in run.values())
@@ -291,12 +324,15 @@ def write_table(path: str, summary: dict[str, Any]) -> None:
         'max_margin_max',
         'drift_p99',
         'drift_max',
+        'same_server',
         'pools_identical',
         'pinned_a',
         'pinned_b',
     ]
-    with open(path, 'w') as f:
-        f.write(','.join(cols) + '\n')
+    with open(path, 'w', newline='') as f:
+        # Pair labels contain commas, so fields are quoted where needed.
+        w = csv.writer(f, lineterminator='\n')
+        w.writerow(cols)
         for label, s in summary.items():
             row = {**s, **s['classes'], 'pair': label}
             vals = []
@@ -307,7 +343,7 @@ def write_table(path: str, summary: dict[str, Any]) -> None:
                 if isinstance(v, float):
                     v = f'{v:.4g}'
                 vals.append('' if v is None else str(v))
-            f.write(','.join(vals) + '\n')
+            w.writerow(vals)
 
 
 def main() -> None:
@@ -354,14 +390,8 @@ def main() -> None:
         s['pinned_a'], s['pinned_b'] = pins
         if None not in pins and pins[0] != pins[1]:
             mixed.append(label)
-        # Same server, or two servers that allocated the same pools (None: unknown).
-        la, lb = ((root / r).parent / 'server.log' for r in (ra, rb))
-        if la == lb:
-            s['pools_identical'] = True
-        elif la.exists() and lb.exists():
-            s['pools_identical'] = resolved_pools(la) == resolved_pools(lb)
-        else:
-            s['pools_identical'] = None
+        # Pools of the servers that ran each pass (None: unknown).
+        s['same_server'], s['pools_identical'] = pools_match(root, ra, rb)
         summary[label] = s
         for r in rows:
             if r['diverged'] or r['length_mismatch'] or r['max_drift'] > LARGE_DRIFT_NATS:
@@ -409,8 +439,9 @@ def main() -> None:
         'prev_cycle_len_b',
         'cycles_ok_b',
     ]
-    with open(args.out_csv, 'w') as f:
-        f.write(','.join(cols) + '\n')
+    with open(args.out_csv, 'w', newline='') as f:
+        w = csv.writer(f, lineterminator='\n')
+        w.writerow(cols)
         for e in events:
             cyc = e.get('cycle_b') or {}
             e = {
@@ -418,7 +449,7 @@ def main() -> None:
                 'cycle_offset_b': cyc.get('offset'),
                 'prev_cycle_len_b': cyc.get('prev_cycle_len'),
             }
-            f.write(','.join('' if e.get(c) is None else str(e.get(c)) for c in cols) + '\n')
+            w.writerow('' if e.get(c) is None else str(e.get(c)) for c in cols)
     if args.require_all and missing:
         raise SystemExit(f'{len(missing)} pairs have missing runs under {root}: {missing}')
     if mixed and not args.allow_mixed_pins:

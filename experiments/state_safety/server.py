@@ -110,6 +110,20 @@ _RESOLVED_RE = {
 }
 
 
+def pools_known(pools: dict[str, int | None] | None) -> bool:
+    """True when every pool size was found (a missing field is unknown, not equal)."""
+    return pools is not None and all(v is not None for v in pools.values())
+
+
+_LOG_TIME_RE = re.compile(r'^\[(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\]', re.M)
+
+
+def log_time_span(log_path: Path) -> tuple[str, str] | None:
+    """First and last timestamp of a server log ('YYYY-mm-dd HH:MM:SS', local time)."""
+    times = _LOG_TIME_RE.findall(log_path.read_text(errors='replace'))
+    return (times[0], times[-1]) if times else None
+
+
 def resolved_pools(log_path: Path) -> dict[str, int | None]:
     """Pool sizes the server actually allocated, from its log (last match)."""
     text = log_path.read_text(errors='replace')
@@ -383,6 +397,8 @@ def launch(
         summary['max_total_num_tokens'] = internal[0].get('max_total_num_tokens')
         log.flush()
         summary['resolved_pools'] = resolved_pools(log_path)
+        # One id per server process, so passes can be matched to the server that ran them.
+        summary['server_id'] = f'{socket.gethostname()}:{port}:{proc.pid}:{time.time_ns()}'
         summary['cmd'] = cmd
         yield {'base_url': base, 'server_info': summary}
     finally:
