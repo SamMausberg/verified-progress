@@ -169,9 +169,14 @@ follows decode onto FlashInfer. There, repair's #89 measured the Triton verify k
 stock default, and so already verify with it. The first DFlash attempt failed at launch: at a 0.25
 memory fraction, 16 requests' verify states left no KV memory. Its runs use capacity
 4, which is enough for a c=1 pass. The DFlash class comes from DFlash runs that all have
-capacity 4. Its rates against plain c=1 compare capacity 4 with the reference's 16 (pools
-sized from free memory, unpinned, like every run here), so they are reported as rates
-only.
+capacity 4 and run without the radix cache. The plain-relative DFlash rates compare
+different capacities (4 against 16) and different pools. At c=1 the capacity does not
+change the batch, and the DFlash arms run without the radix cache, but the plain
+reference ran with it on and so carries the request-history dependence described in
+evidence/state_safety (README, history section). For the same reason, plain levers
+are classified against a stock plain c=1 run without the radix cache.
+`pools.csv` lists each server's capacity, KV and GDN state pools, radix setting and
+GDN kernel backends.
 
 ```sh
 scripts/gpu_lock.sh -s bench/campaigns/equality_tuned.sh
