@@ -14,8 +14,8 @@ higher after rejections even without any state error. Each bucket therefore
 also counts fragile positions (reference top-2 gap at most FRAGILE_GAP) and
 reports divergences per fragile position, which removes that confound.
 
-    python experiments/state_safety/cycles.py --ref plain/c1 --spec mtp_s3/c1 \
-        --out evidence/state_safety/cycles_mtp_s3.json
+    python experiments/state_safety/cycles.py --runs ~/vp-data/state/runs_pinned \
+        --ref plain/c1 --spec mtp_s3/c1 --out evidence/state_safety/cycles_mtp_s3_pinned.json
 """
 
 from __future__ import annotations
