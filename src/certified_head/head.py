@@ -93,6 +93,9 @@ TOP = 4
 MAX_VARIANTS = 64
 """Tile configurations a head can latch (runtime probes) independently."""
 MIN_BLOCK_V = 64
+K_CHUNK = 256
+"""Coordinates the probe and refine kernels read per step, without a tail mask:
+the hidden size must be a multiple of it."""
 COLS_CAP = 64
 """Candidate slots per row that the column fallback gathers (larger lists use ``batch``)."""
 ARITH_CODES: dict[Arith, int] = {'w8a16': 0, 'w8a8': 1, 'bf16': 2}
@@ -243,6 +246,11 @@ class CertifiedHead:
             raise ValueError('inconsistent head shapes')
         if k % group_size:
             raise ValueError('group_size must divide the hidden size')
+        if k % K_CHUNK:
+            raise ValueError(
+                f'hidden size {k} is not a multiple of {K_CHUNK}: the probe and refine '
+                f'kernels read {K_CHUNK}-coordinate chunks without a tail mask'
+            )
         for name, t in (('weight', weight), ('q', q), ('scale', scale)):
             if not t.is_contiguous():
                 # The kernels index these as flat row-major storage, while the
@@ -501,7 +509,7 @@ class CertifiedHead:
             self.vocab,
             K=self.hidden,
             P=self._probes,
-            CH=256,
+            CH=K_CHUNK,
         )
 
     def _sampling_args(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -516,6 +524,9 @@ class CertifiedHead:
         seeds, positions, temps = self._sampling_args()
         if cfg.block_v < MIN_BLOCK_V:
             raise ValueError(f'block_v must be at least {MIN_BLOCK_V}')
+        if self.hidden % cfg.block_k:
+            # Pointer loads have no tail mask along K.
+            raise ValueError(f'block_k {cfg.block_k} must divide the hidden size {self.hidden}')
         grid = (triton.cdiv(self.vocab, cfg.block_v) * triton.cdiv(m, cfg.block_m),)
         coeff = self.coeff[arith]
         weights = self.weight if arith == 'bf16' else self.q
@@ -634,7 +645,7 @@ class CertifiedHead:
             SAMPLE=sample,
             NSPLIT=self.refine_split,
             BLOCK_C=16,
-            BLOCK_K=256,
+            BLOCK_K=K_CHUNK,
             num_warps=4,
         )
 
