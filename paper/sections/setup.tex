@@ -27,7 +27,7 @@ This section measures the certified head on states recorded from the running eng
 \caption{Where the numbers come from. A replay re-evaluates recorded head inputs offline; the held-out replay draws whole decode steps (750) at random from the held-out half until it has 6,000 positions.}\label{tab:sources}
 \vskip 0.05in
 \centering\scriptsize
-\begin{tabularx}{\columnwidth}{@{}>{\raggedright\arraybackslash}p{1.55cm}Y>{\raggedright\arraybackslash}p{1.6cm}@{}}
+\begin{tabularx}{\columnwidth}{@{}>{\raggedright\arraybackslash}p{1.8cm}Y>{\raggedright\arraybackslash}p{1.6cm}@{}}
 \toprule
 Source & What & Size\\\midrule
 Held-out replay & FP64 replay of held-out plain-decoding positions & 6,005 positions\\\addlinespace[2pt]
@@ -47,7 +47,7 @@ In the kernel replay the certified head recomputes about 1.8 entries per decisio
 \begin{figure*}[t]
 \centering
 \input{figures/transport}
-\caption{Why transport fails. \textbf{(a)}~Median DFlash-4B head inputs, to scale (norms over the 4,020 transport pairs, cosine over 20,000 drift pairs). Transport's bound beats the int8 copy's only if $h^d$ lies in the dot at the tip of $h^t$, of radius $\delta^\ast\norm{h^t}_2$ for the median $\delta^\ast$ (Proposition~\ref{thm:crossover}); the best rescaling of $h^d$ (dotted) leaves $\rho=0.91$. \textbf{(b)}~Cumulative distributions of the measured drift $\rho$ over 40,000 aligned held-out pairs of each drafter, and of the threshold $\delta^\ast_i$ derived from the weights for each of the 248,320 vocabulary entries (64-entry tiles of contiguous token indices) \ev{head-constants,rho,transport,rho-mtp,stats-dflash}.}
+\caption{Why transport fails. \textbf{(a)}~Median DFlash-4B head inputs, to scale: norms over the 4,020 transport pairs, cosine over 20,000 drift pairs drawn at random. Transport's bound beats the int8 copy's only if $h^d$ lies in the dot at the tip of $h^t$, of radius $\delta^\ast\norm{h^t}_2$ for the median $\delta^\ast$ (Proposition~\ref{thm:crossover}); the closest rescaling of $h^d$ (dotted, to the marked point) leaves $\rho=0.91$. \textbf{(b)}~Cumulative distributions of the measured drift $\rho$ over 40,000 aligned held-out pairs of each drafter, and of the threshold $\delta^\ast_i$ derived from the weights for each of the 248,320 vocabulary entries (64-entry tiles of contiguous token indices) \ev{head-constants,rho,transport,rho-mtp,stats-dflash}.}
 \label{fig:rho}\label{fig:transport}
 \end{figure*}
 
