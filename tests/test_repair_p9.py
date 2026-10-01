@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import random
+import statistics
 import sys
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 import pytest
 
@@ -234,3 +237,177 @@ def test_baseline_must_be_fresh_block16(tmp_path: Path, monkeypatch: pytest.Monk
         with pytest.raises(SystemExit, match='fresh block-16 run'):
             oracle.main()
         assert not out.exists()
+
+
+def write_widths(tmp_path: Path, verify_us: dict[int, float]) -> Path:
+    """An analyze_timing.py summary of forced-acceptance runs with the given verify medians."""
+    path = tmp_path / 'widths.json'
+    rows = [
+        {
+            'run': f'/runs/force_b{b}',
+            'mode': 'force',
+            'block': b,
+            'phase_us': {'verify': {'median': v}},
+        }
+        for b, v in verify_us.items()
+    ]
+    path.write_text(json.dumps(rows))
+    return path
+
+
+def run_oracle(
+    monkeypatch: pytest.MonkeyPatch, cycles: Path, timing: Path, out: Path, *extra: str
+) -> dict[str, Any]:
+    argv = ['p9_support_oracle.py', '--cycles', str(cycles), '--timing', str(timing)]
+    argv += ['--bootstrap', '50', '--out', str(out), *extra]
+    monkeypatch.setattr(sys, 'argv', argv)
+    load('p9_support_oracle').main()
+    return json.loads(out.read_text())
+
+
+def test_measured_width_spans_padded_and_free_verify(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cycles, _, timing = write_inputs(tmp_path)
+    # Every width costs what block 16 costs: nothing is saved, the padded oracle.
+    flat = write_widths(tmp_path, {b: 5000.0 for b in range(2, 17)})
+    data = run_oracle(
+        monkeypatch, cycles, timing, tmp_path / 'flat.json', '--width-timing', str(flat)
+    )
+    for v in data['by_k'].values():
+        assert v['measured_width_verify']['delta'] == pytest.approx(v['delta_oracle'])
+        assert v['measured_width_verify']['delta_ci95'] == pytest.approx(v['delta_oracle_ci95'])
+        gated = v['omniscient_gate_measured_width']
+        assert gated['delta'] == pytest.approx(v['omniscient_gate_oracle']['delta'])
+    # Narrower widths free and block 16 at the baseline's verify: the free-verify bound.
+    free = write_widths(tmp_path, {**{b: 0.0 for b in range(2, 16)}, 16: 4700.0})
+    data = run_oracle(
+        monkeypatch, cycles, timing, tmp_path / 'free.json', '--width-timing', str(free)
+    )
+    assert data['verify_us_by_width']['16'] == 4700.0
+    for v in data['by_k'].values():
+        assert v['measured_width_verify']['delta'] == pytest.approx(
+            v['free_verify_always_reuse']['delta']
+        )
+        assert v['omniscient_gate_measured_width']['delta'] == pytest.approx(
+            v['omniscient_gate_free_verify']['delta']
+        )
+
+
+def test_measured_width_charges_each_boundary_its_own_width(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cycles, _, timing = write_inputs(tmp_path)
+    widths = write_widths(tmp_path, {b: 300.0 * b for b in range(2, 17)})
+    data = run_oracle(
+        monkeypatch, cycles, timing, tmp_path / 'out.json', '--width-timing', str(widths)
+    )
+    oracle = load('p9_support_oracle')
+    rows = oracle.boundaries(oracle.load_cycles(cycles), [16])
+    supported = [r['U16'] >= r['J'] and r['m'] >= 1 for r in rows]
+    saved = [300.0 * (16 - (r['m'] + 1)) for r in rows]
+    v = data['by_k']['16']
+    r_f_per_us = v['r_F_tokens_per_ms'] / 1e3
+    gain = sum(s for s, u in zip(saved, supported, strict=True) if u) / len(rows)
+    assert v['measured_width_verify']['delta'] == pytest.approx(
+        v['delta_oracle'] + r_f_per_us * gain
+    )
+    assert v['measured_width_verify']['mean_saved_verify_us_when_reused'] == pytest.approx(
+        statistics.fmean(s for s, u in zip(saved, supported, strict=True) if u)
+    )
+
+
+def test_width_timing_needs_every_width_and_c1(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cycles, _, timing = write_inputs(tmp_path)
+    partial = write_widths(tmp_path, {b: 100.0 for b in range(2, 16)})  # no block-16 reference
+    with pytest.raises(SystemExit, match=r'lacks forced-acceptance widths \[16\]'):
+        run_oracle(monkeypatch, cycles, timing, tmp_path / 'a.json', '--width-timing', str(partial))
+    runs = json.loads(timing.read_text())
+    batched = {**runs[0], 'run': '/runs/fresh_b16_c8', 'concurrency': 8}
+    batched['commit_per_cycle_batch'] = {'mean': 8 * 7.6}
+    del batched['commit_per_cycle']
+    timing.write_text(json.dumps([*runs, batched]))
+    full = write_widths(tmp_path, {b: 100.0 for b in range(2, 17)})
+    with pytest.raises(SystemExit, match='c = 1 measurement'):
+        run_oracle(
+            monkeypatch,
+            cycles,
+            timing,
+            tmp_path / 'b.json',
+            '--baseline-run',
+            'fresh_b16_c8',
+            '--width-timing',
+            str(full),
+        )
+
+
+def test_batched_baseline_uses_per_request_rate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cycles, _, timing = write_inputs(tmp_path)
+    runs = json.loads(timing.read_text())
+    batched = {**runs[0], 'run': '/runs/fresh_b16_c8', 'concurrency': 8}
+    batched['commit_per_cycle_batch'] = {'mean': 8 * 7.6}
+    del batched['commit_per_cycle']
+    timing.write_text(json.dumps([*runs, batched]))
+    c1 = run_oracle(monkeypatch, cycles, timing, tmp_path / 'c1.json')
+    c8 = run_oracle(
+        monkeypatch, cycles, timing, tmp_path / 'c8.json', '--baseline-run', 'fresh_b16_c8'
+    )
+    # Same phases and the same per-request commit: the batched baseline reproduces c = 1.
+    assert c8['phases_us']['concurrency'] == 8
+    assert c8['overall_dflash_tokens_per_ms'] == pytest.approx(c1['overall_dflash_tokens_per_ms'])
+    assert c8['draft_share_of_cycle'] == pytest.approx(2300.0 / 7450.0)
+    for k, v in c8['by_k'].items():
+        assert v['delta_oracle'] == pytest.approx(c1['by_k'][k]['delta_oracle'])
+
+
+@pytest.mark.parametrize('gate', [False, True])
+@pytest.mark.parametrize('rate', [None, 0.001])
+def test_bootstrap_matches_concatenated_resamples(
+    tmp_path: Path, gate: bool, rate: float | None
+) -> None:
+    """The weighted bootstrap equals `estimate` on each resample's concatenated boundaries."""
+    oracle = load('p9_support_oracle')
+    cycles, _, timing = write_inputs(tmp_path)
+    rows = oracle.boundaries(oracle.load_cycles(cycles), [16])
+    supported = [r['U16'] >= r['J'] and r['m'] >= 1 for r in rows]
+    g2r = [
+        1 + min(r['m'], r['U16'] - r['J']) if s else 1 + r['next_L']
+        for r, s in zip(rows, supported, strict=True)
+    ]
+    ph = oracle.phases(timing, 'fresh_b16')
+    comp = oracle.components(rows, g2r, supported, ph, extra_us=[-10.0 * r['m'] for r in rows])
+    by_rid: dict[str, list[int]] = {}
+    for i, r in enumerate(rows):
+        by_rid.setdefault(r['rid'], []).append(i)
+    rids = list(by_rid)
+    rng = random.Random(3)
+    ref = []
+    for _ in range(40):
+        idx = [i for _ in rids for i in by_rid[rids[rng.randrange(len(rids))]]]
+        ref.append(oracle.estimate(comp, idx, rate, gate)[1])
+    ref.sort()
+    lo, hi = oracle.bootstrap(rows, comp, 40, seed=3, rate_per_us=rate, gate=gate)
+    assert lo == pytest.approx(ref[1], abs=1e-12)
+    assert hi == pytest.approx(ref[38], abs=1e-12)
+
+
+def test_draft_saving_override_scales_the_time_term(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cycles, _, timing = write_inputs(tmp_path)
+    base = run_oracle(monkeypatch, cycles, timing, tmp_path / 'base.json')
+    same = run_oracle(
+        monkeypatch, cycles, timing, tmp_path / 'same.json', '--draft-saving-us', '2300'
+    )
+    small = run_oracle(
+        monkeypatch, cycles, timing, tmp_path / 'small.json', '--draft-saving-us', '100'
+    )
+    assert small['phases_us']['draft_saved'] == 100.0
+    for k, v in base['by_k'].items():
+        assert same['by_k'][k]['delta_oracle'] == pytest.approx(v['delta_oracle'])
+        lost = v['r_F_tokens_per_ms'] / 1e3 * v['corrected_prefix_supported_rate'] * 2200.0
+        assert small['by_k'][k]['delta_oracle'] == pytest.approx(v['delta_oracle'] - lost)
