@@ -24,8 +24,9 @@ position needs a cheaper cycle.
 
 The measured side: alpha_k = S(k) / S(k-1) for the engine (what DFlash block 16
 accepts) and for U_16 (the target's token is among the drafter's top-16
-candidates at every position up to k; an upper bound for any selector over the
-frozen candidates, P6).
+candidates at every position up to k). U_16 bounds selection over the frozen
+candidates only at the anchors the stock trajectory visited (P6's screen); it is
+not a bound on another selector's anchors or on wider blocks.
 
     python experiments/drafter/drafting_requirement.py --out evidence/drafter/drafting_requirement.json
 """
@@ -34,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import subprocess
 from pathlib import Path
@@ -123,9 +125,15 @@ def main() -> None:
         }
     summary = {
         'kind': 'derived from committed measurements (no new runs)',
+        # The commit the generator ran at; rerunning at a later commit changes only this
+        # field. The SHA-256 of the generator and of every input pin the content.
         'repo_commit': subprocess.run(
             ['git', '-C', str(REPO), 'rev-parse', 'HEAD'], capture_output=True, text=True
         ).stdout.strip(),
+        'sha256': {
+            str(path.relative_to(REPO)): hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in (Path(__file__).resolve(), *ORACLES.values(), SURVIVAL)
+        },
         'target_e2e': 5.0,
         'verifiers': verifiers,
         'measured_block16': {'source': str(SURVIVAL.relative_to(REPO)), **measured},
