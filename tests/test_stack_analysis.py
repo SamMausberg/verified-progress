@@ -46,8 +46,10 @@ def _points(path: Path, rows: list[dict], levers: str = 'FG') -> None:
     (run / 'summary.json').write_text('{}')
     digest = gate.campaign_digest(run / 'gate.json')
     (path.parent / 'campaign_gate.json').write_text(json.dumps(digest))
-    for session in {r['session'] for r in rows}:
-        (path.parent / f'session_{session}.gate.json').write_text(json.dumps(digest))
+    for r in rows:
+        run_dir = path.parent / r['label'] / r['run']
+        run_dir.mkdir(parents=True, exist_ok=True)
+        (run_dir / 'stack_gate.json').write_text(json.dumps(digest))
 
 
 def test_full_stack_ratio_pairs_both_launches_with_both_baselines(tmp_path, monkeypatch):
@@ -80,7 +82,7 @@ def test_full_stack_ratio_pairs_both_launches_with_both_baselines(tmp_path, monk
             str(tmp_path / 'campaign_gate.json'),
             '--out',
             str(out),
-            '--session-gates',
+            '--runs-root',
             str(tmp_path),
         ],
     )
@@ -132,7 +134,7 @@ def test_invalid_point_drops_the_session_for_that_arm(tmp_path, monkeypatch):
             str(tmp_path / 'campaign_gate.json'),
             '--out',
             str(out),
-            '--session-gates',
+            '--runs-root',
             str(tmp_path),
         ],
     )
@@ -215,9 +217,13 @@ STATS = {'paths': {'verify': {'rows': 5000, 'mismatch_rows': 0, 'fallback_rows':
 RUN_OF = {'S0': 'S0', 'B0': 'B0', 'F': 'F', 'G': 'G', 'FG': 'FG'}
 
 
+def _top5(lp: float) -> list[list[float]]:
+    return [[-0.1, 1], [lp, 7], [-8.0, 9], [-9.0, 11], [-10.0, 13]]
+
+
 def _outputs(lp: float = -0.5) -> list[dict]:
     return [
-        {'id': f'p{i}', 'output_ids': [1, 2, 3], 'top_logprobs': [[[-0.1, 1], [lp, 7]]] * 3}
+        {'id': f'p{i}', 'output_ids': [1, 2, 3], 'top_logprobs': [_top5(lp)] * 3}
         for i in range(gate.PROMPTS)
     ]
 
@@ -407,7 +413,7 @@ def test_interaction_skips_a_session_with_one_invalid_full_launch(tmp_path, monk
             str(tmp_path / 'campaign_gate.json'),
             '--out',
             str(out),
-            '--session-gates',
+            '--runs-root',
             str(tmp_path),
         ],
     )
@@ -446,7 +452,7 @@ def test_all_invalid_full_stays_visible_with_n_zero(tmp_path, monkeypatch):
             str(tmp_path / 'campaign_gate.json'),
             '--out',
             str(out),
-            '--session-gates',
+            '--runs-root',
             str(tmp_path),
         ],
     )
@@ -498,7 +504,7 @@ def test_analysis_takes_the_full_arm_from_the_gate(tmp_path, monkeypatch):
             str(tmp_path / 'campaign_gate.json'),
             '--out',
             str(out),
-            '--session-gates',
+            '--runs-root',
             str(tmp_path),
         ],
     )
@@ -524,7 +530,8 @@ def test_analysis_refuses_sessions_under_different_gates(tmp_path, monkeypatch):
             )
     pts = tmp_path / 'points.csv'
     _points(pts, rows)
-    (tmp_path / 'session_stack-s2.gate.json').write_text(json.dumps({'gate_sha256': 'other'}))
+    record = tmp_path / 'stack-FG' / 'stack-s2-1' / 'stack_gate.json'
+    record.write_text(json.dumps({'gate_sha256': 'other'}))
     out = tmp_path / 'out.json'
     monkeypatch.setattr(
         sys,
@@ -537,13 +544,13 @@ def test_analysis_refuses_sessions_under_different_gates(tmp_path, monkeypatch):
             str(tmp_path / 'campaign_gate.json'),
             '--out',
             str(out),
-            '--session-gates',
+            '--runs-root',
             str(tmp_path),
         ],
     )
     with pytest.raises(SystemExit):
         analyze.main()
-    (tmp_path / 'session_stack-s2.gate.json').unlink()
+    record.unlink()
     with pytest.raises(SystemExit):
         analyze.main()
 
@@ -577,7 +584,7 @@ def test_analysis_refuses_a_changed_pinned_gate(tmp_path, monkeypatch):
             str(out),
             '--campaign',
             str(tmp_path / 'campaign_gate.json'),
-            '--session-gates',
+            '--runs-root',
             str(tmp_path),
         ],
     )
@@ -694,7 +701,7 @@ def test_each_declared_cell_rule(tmp_path, monkeypatch, spoil, void):
             str(out),
             '--campaign',
             str(tmp_path / 'campaign_gate.json'),
-            '--session-gates',
+            '--runs-root',
             str(tmp_path),
         ],
     )
@@ -702,3 +709,46 @@ def test_each_declared_cell_rule(tmp_path, monkeypatch, spoil, void):
     arms = json.loads(out.read_text())['arms']
     for arm in ('FG', 'F', 'G', 'B0'):
         assert arms[arm]['1']['x_e2e']['n'] == (0 if arm in void else 1), (spoil, arm)
+
+
+def _identical_case(tmp_path, spoil: str) -> bool:
+    run = tmp_path / 'cov'
+    a, b = _outputs(), _outputs()
+    if spoil == 'missing on one side':
+        for r in b:
+            r.pop('top_logprobs')
+    if spoil == 'missing on both sides':
+        for r in a + b:
+            r.pop('top_logprobs')
+    if spoil == 'truncated identically':
+        for r in a + b:
+            r['top_logprobs'] = r['top_logprobs'][:2]
+    if spoil == 'fewer than five entries':
+        for r in a + b:
+            r['top_logprobs'] = [t[:4] for t in r['top_logprobs']]
+    if spoil == 'low entry differs':
+        b[0]['top_logprobs'] = [[*_top5(-0.5)[:4], [-10.5, 13]]] * 3
+    if spoil == 'one prompt fewer':
+        a, b = a[1:], b[1:]
+    for name, recs in (('x', a), ('y', b)):
+        d = run / 'runs' / name
+        d.mkdir(parents=True, exist_ok=True)
+        (d / 'c1.jsonl').write_text('\n'.join(json.dumps(r) for r in recs) + '\n')
+    (run / 'pairs.json').write_text(json.dumps([['x vs y', 'x/c1', 'y/c1']]))
+    return gate.runs_identical(run, 'x vs y')
+
+
+@pytest.mark.parametrize(
+    ('spoil', 'identical'),
+    [
+        ('none', True),
+        ('missing on one side', False),
+        ('missing on both sides', False),
+        ('truncated identically', False),
+        ('fewer than five entries', False),
+        ('low entry differs', False),
+        ('one prompt fewer', False),
+    ],
+)
+def test_bitwise_needs_full_top5_coverage(tmp_path, spoil, identical):
+    assert _identical_case(tmp_path, spoil) is identical

@@ -179,13 +179,15 @@ server starts. A campaign is the set of sessions analysed together. It starts wh
 `~/vp-data/stack/campaign_gate.json` does not exist; the first session whose check
 passes writes it (the gate's and its comparison summary's SHA-256 and the run
 directory), and a failed check never writes it. A later session under any other gate
-refuses to start, each session copies the pin beside its runs, and the analysis takes
-its gate only from the pin (whose files must be unchanged) and refuses sessions with
-missing or differing records. Only the stack workstream deletes the pin, to start a new
+refuses to start. Each campaign's runs go to their own directory,
+`~/vp-data/stack/runs/<first 12 hex digits of the pin's SHA-256>`, and every sweep run
+directory gets a copy of the pin; the analysis takes its gate only from the pin (whose
+files must be unchanged) and refuses any run whose copy is missing or different. Only the stack workstream deletes the pin, to start a new
 campaign after a dated amendment that says why; the old pin is kept beside the
 campaign's runs. Bitwise (B0 against S0, or a
 lever against B0) compares the two runs' raw outputs, token ids and complete top-logprob
-arrays, prompt by prompt. The same hold runs a phase diagnostic: B0 and FG with the repair probe at
+arrays, prompt by prompt, and requires all five top-logprob entries at every output
+position in both runs (missing or truncated logprobs fail). The same hold runs a phase diagnostic: B0 and FG with the repair probe at
 c = 1 and 8 (`phases.py`).
 
 **Step 2, timing** (`hold_session.sh <k>`, sessions s1, s2, s3, one exclusive hold each).
@@ -288,10 +290,10 @@ Commands for the pending holds (one exclusive hold at a time, through the FIFO q
 experiments/stack/build_engine.sh                                   # ~/sglang-wt/stack
 scripts/gpu_lock.sh -x experiments/stack/hold_equality.sh           # step 1 and the phase diagnostic
 scripts/gpu_lock.sh -x experiments/stack/hold_session.sh 1          # then 2 and 3
-python -m bench.pareto ~/vp-data/stack/runs/stack-*/2026* --out ~/vp-data/stack/pareto \
+python -m bench.pareto ~/vp-data/stack/runs/<campaign>/stack-*/2026* --out ~/vp-data/stack/pareto \
     --points-only --status stack
 python experiments/stack/analyze.py --points ~/vp-data/stack/pareto/points.csv \
-    --campaign ~/vp-data/stack/campaign_gate.json --session-gates ~/vp-data/stack/runs \
+    --campaign ~/vp-data/stack/campaign_gate.json --runs-root ~/vp-data/stack/runs/<campaign> \
     --out evidence/stack/composition.json --csv evidence/stack/composition.csv
 scripts/gpu_lock.sh -x experiments/stack/hold_oracle.sh             # diagnostic, after the sessions
 ```

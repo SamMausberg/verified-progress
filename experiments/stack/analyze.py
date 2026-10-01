@@ -20,8 +20,9 @@ declared in evidence/stack/README.md ("Composition plan"):
 * The gate comes only from the campaign pin (`--campaign`, the campaign_gate.json the
   first session wrote): its pinned files must be unchanged, and the full stack is that
   gate's timed levers. Every session must have run under it: each session hold copies
-  the pin to `session_<session>.gate.json` beside its runs (`--session-gates`), and the
-  analysis stops if any session's record is missing or differs, so measurements from
+  the pin into every sweep run directory it creates (`stack_gate.json` under
+  `--runs-root`/<label>/<run>), and the analysis stops if any row's run has no record or
+  a different one, so measurements from
   different routing tables or packages are never pooled.
 * The four-way pattern for levers F and G on the composed tree (B0, F, G, FG): the
   interaction log(FG/B0) - log(F/B0) - log(G/B0) per session, with the same interval,
@@ -29,7 +30,7 @@ declared in evidence/stack/README.md ("Composition plan"):
   Isolated ratios are never multiplied into a composed estimate.
 
     python experiments/stack/analyze.py --points ~/vp-data/stack/pareto/points.csv \
-        --campaign ~/vp-data/stack/campaign_gate.json --session-gates ~/vp-data/stack/runs \
+        --campaign ~/vp-data/stack/campaign_gate.json --runs-root ~/vp-data/stack/runs/<campaign> \
         --out evidence/stack/composition.json --csv evidence/stack/composition.csv
 """
 
@@ -122,10 +123,10 @@ def main() -> None:
         help="the campaign pin (campaign_gate.json); the full stack is its gate's timed levers",
     )
     ap.add_argument(
-        '--session-gates',
+        '--runs-root',
         type=Path,
         required=True,
-        help="directory with each session hold's session_<session>.gate.json",
+        help='the bench.sweep --out directory of the campaign (runs at <label>/<run>)',
     )
     ap.add_argument('--out', type=Path, required=True)
     ap.add_argument('--csv', type=Path, help='one row per arm, concurrency and metric')
@@ -160,15 +161,12 @@ def main() -> None:
         vals['accept_length'] = float(r['accept_length'] or 'nan')
         data[r['session']][c][arm].append((r['run'], vals))
 
-    sessions = sorted({r['session'] for r in rows_in})
-    digests = {}
-    for session in sessions:
-        record = args.session_gates / f'session_{session}.gate.json'
+    for r in rows_in:
+        record = args.runs_root / r['label'] / r['run'] / 'stack_gate.json'
         if not record.is_file():
-            raise SystemExit(f'no gate record for session {session} ({record})')
-        digests[session] = json.loads(record.read_text())
-        if digests[session] != pin:
-            raise SystemExit(f'session {session} ran under another gate: {digests[session]}')
+            raise SystemExit(f'no gate record for run {r["label"]}/{r["run"]} ({record})')
+        if json.loads(record.read_text()) != pin:
+            raise SystemExit(f'run {r["label"]}/{r["run"]} ran under another gate')
     arms = sorted(all_arms - {'S0'})
     concurrencies = sorted(all_c)
     result: dict[str, Any] = {

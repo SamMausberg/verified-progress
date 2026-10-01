@@ -22,9 +22,7 @@ unset SGLANG_WORKTREE PYTHONPATH
 source "$repo/scripts/sglang_env.sh"
 # shellcheck source=/dev/null
 source "$repo/experiments/stack/arms.sh"
-OUT=$HOME/vp-data/stack/runs
 LOG=$HOME/vp-data/stack/session_s$k.log
-mkdir -p "$OUT"
 exec >>"$LOG" 2>&1
 [ "$(git -C "$STACK_ENGINE" rev-parse 'HEAD^{tree}')" = "$STACK_TREE" ] ||
   { echo "composed engine tree is not the declared one"; exit 1; }
@@ -34,8 +32,11 @@ exec >>"$LOG" 2>&1
 gate_plan || { echo "refused: the equality gate's preconditions do not hold"; exit 1; }
 # shellcheck disable=SC2153 # FULL is set by gate_plan (arms.sh)
 full=$FULL
-# The gate this session ran under, for analyze.py's one-gate check.
-cp "$STACK_PIN" "$OUT/session_stack-s$k.gate.json"
+# Runs of one campaign live in their own directory, named by the pin's hash, and every
+# sweep run directory gets a copy of the pin (stack_gate.json) for analyze.py's check.
+campaign=$(sha256sum "$STACK_PIN" | cut -c1-12)
+OUT=$HOME/vp-data/stack/runs/$campaign
+mkdir -p "$OUT"
 levers=()
 for (( j=0; j<${#full}; j++ )); do levers+=("${full:$j:1}"); done
 middle=()
@@ -53,7 +54,7 @@ order=(S0 "$full" "${middle[@]}" "$full" S0)
 start=$(date +%s)
 echo "session s$k start $(date -Is) repo $(git rev-parse HEAD) engine $(git -C "$STACK_ENGINE" rev-parse HEAD)" \
   "cert_src=${STACK_CERT_SRC:-none} order=${order[*]} table_sha=$(sha256sum "$STACK_TABLE" | cut -c1-16)" \
-  "gate=$(sha256sum "$STACK_CURRENT/gate.json" | cut -c1-16)"
+  "gate=$(sha256sum "$STACK_CURRENT/gate.json" | cut -c1-16) campaign=$campaign"
 last=$(( ${#order[@]} - 2 ))
 failed=()
 for i in "${!order[@]}"; do
@@ -64,12 +65,19 @@ for i in "${!order[@]}"; do
   fi
   load_args "$name" || { echo "no arguments for arm $name"; failed+=("$i:$name"); continue; }
   echo "=== $i $name $(date -Is)"
+  mkdir -p "$OUT/stack-$name"
+  before=$(find "$OUT/stack-$name" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
   python -m bench.sweep "${ARGS[@]}" --label "stack-$name" --session "stack-s$k" --out "$OUT" \
     --port 30061 --osl 512 --quiet-cpu-wait 300 --concurrency 1 2 4 8 2>&1 |
     grep -E '^r0|FAIL|[Ee]rror|refus' | tail -8
   status=${PIPESTATUS[0]}
   echo "exit $status $(date -Is)"
   (( status == 0 )) || failed+=("$i:$name")
+  # Bind the run directory this sweep created to the campaign's gate.
+  while read -r run; do
+    [ -n "$run" ] && cp "$STACK_PIN" "$OUT/stack-$name/$run/stack_gate.json"
+  done < <(comm -13 <(printf '%s\n' "$before") \
+    <(find "$OUT/stack-$name" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort))
 done
 echo "session s$k end $(date -Is) ($(( ($(date +%s) - start) / 60 )) min) failed=${failed[*]:-none}"
 (( ${#failed[@]} == 0 ))

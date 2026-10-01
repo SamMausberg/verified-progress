@@ -15,7 +15,9 @@ The decision is all or nothing:
   only if every first divergence is classified `tie`, `one_ulp` or `near` (anything else,
   including `unknown` when a run lacks the logprobs, fails); bitwise only if the two
   runs' raw outputs are identical, token ids and complete top-logprob arrays, prompt by
-  prompt (the comparator's drift statistic ignores low-probability entries).
+  prompt, and both runs carry all TOP_K entries at every output position (missing or
+  truncated logprobs fail; the comparator's drift statistic ignores low-probability
+  entries).
 * The routing table G ran with is recorded by its SHA-256; a session must use that file.
 * The certified head (H) joins FG only if the tokens-only B0 run reproduces the logprob
   B0 run, H and FGH reproduce B0 and FG (tokens and lengths, all 320 prompts), both
@@ -45,6 +47,7 @@ from typing import Any
 
 EXACT_CLASSES = ('tie', 'one_ulp', 'near')
 PROMPTS = 320
+TOP_K = 5  # top logprobs requested at every position by the equality runs
 TABLE = 'backbone_table_v1.json'
 
 
@@ -66,9 +69,24 @@ def runs_identical(run: Path, label: str) -> bool:
     if len(a) != PROMPTS or a.keys() != b.keys():
         return False
     return all(
-        a[k]['output_ids'] == b[k]['output_ids']
-        and (a[k].get('top_logprobs') or []) == (b[k].get('top_logprobs') or [])
+        full_coverage(a[k])
+        and full_coverage(b[k])
+        and a[k]['output_ids'] == b[k]['output_ids']
+        and a[k]['top_logprobs'] == b[k]['top_logprobs']
         for k in a
+    )
+
+
+def full_coverage(rec: dict[str, Any]) -> bool:
+    """The record carries TOP_K logprob entries at every output position."""
+    tops = rec.get('top_logprobs')
+    ids = rec.get('output_ids')
+    return (
+        isinstance(tops, list)
+        and isinstance(ids, list)
+        and len(ids) > 0
+        and len(tops) == len(ids)
+        and all(isinstance(t, list) and len(t) == TOP_K for t in tops)
     )
 
 
