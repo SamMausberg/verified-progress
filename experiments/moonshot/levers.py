@@ -180,9 +180,10 @@ LEVERS: dict[str, Lever] = {
         arm='mtp',
     ),
     # Arrival batching (scheduling only). At c = 128 a held MTP batch cycles in ~21 ms but
-    # the served cycle is ~35 ms: each arrival's prefill pass interrupts decode. The
-    # delayer holds prefill until min(running / 16, N) requests wait (5 s cap), so one
-    # pass admits several arrivals. Costs TTFT; report it beside throughput.
+    # the served cycle was estimated at ~35 ms; the hypothesis (untested) is that each
+    # arrival's prefill pass interrupts decode. The delayer holds prefill until
+    # min(running / 16, N) requests wait (5 s cap), so one pass admits several arrivals.
+    # Costs TTFT; report it beside throughput.
     'prefill_delay4': Lever(
         {
             'enable-prefill-delayer': True,
