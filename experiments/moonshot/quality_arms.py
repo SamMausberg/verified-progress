@@ -73,8 +73,9 @@ def parse_config(text: str) -> tuple[str, list[str]]:
 
 
 def launch(config: str, out_dir: Path, port: int, extra: dict[str, object]):
+    from server_env import RecordingServer as Server
+
     from bench.arms import Arm, resolve_arm
-    from bench.server import Server
 
     base, levers = parse_config(config)
     lever_flags = compose(levers, base)

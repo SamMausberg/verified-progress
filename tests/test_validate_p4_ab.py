@@ -37,7 +37,8 @@ ENGINE_HEAD = 'b' * 40
 ENGINE = '/engine'
 POOL_LOG = (
     'max_total_num_tokens=360448, max_running_requests=128\n'
-    'Mamba Cache is allocated. max_mamba_cache_size: 128, conv_state size: 0.1GB\n'
+    'Mamba Cache is allocated. max_mamba_cache_size: 128, conv_state size: 0.10GB, '
+    'ssm_state size: 6.05GB intermediate_ssm_state_cache size: 0.00GB\n'
 )
 
 
@@ -66,6 +67,8 @@ def make_run(
     tile: str = '32',
     engine_head: str = ENGINE_HEAD,
     dirty: list[str] | None = None,
+    extra_env: dict[str, str] | None = None,
+    state_dtype: str = 'float32',
     **overrides: Any,
 ) -> Path:
     """A synthetic A/B directory; `overrides` apply to the first exact-replay arm's point,
@@ -88,6 +91,7 @@ def make_run(
         env = {'SGLANG_GDN_EXACT_REPLAY': '1', 'SGLANG_GDN_EXACT_REPLAY_BV': tile} if exact else {}
         launch = {
             'env_overrides': env,
+            'env_prefixed': {'SGLANG_WORKTREE': ENGINE, **env, **(extra_env or {})},
             'repo': {'head': REPO_HEAD, 'dirty_files': dirty or []},
             'sglang_source': {
                 'module_file': f'{ENGINE}/python/sglang/__init__.py',
@@ -96,6 +100,7 @@ def make_run(
             },
         }
         (run / 'server/launch.json').write_text(json.dumps(launch))
+        (run / 'server/server_info.json').write_text(json.dumps({'mamba_ssm_dtype': state_dtype}))
     (root / 'lever_sweep_log.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in records))
     provenance = {
         'repo': '/repo',
@@ -196,3 +201,17 @@ def test_missing_provenance_fails(tmp_path: Path) -> None:
     root = make_run(tmp_path)
     (root / 'provenance.json').unlink()
     assert run(root).returncode == 1
+
+
+def test_inherited_variable_fails(tmp_path: Path) -> None:
+    extra = {'SGLANG_MAMBA_SSM_DTYPE': 'float8_e4m3fn'}
+    assert run(make_run(tmp_path, extra_env=extra)).returncode == 1
+
+
+def test_other_state_dtype_fails(tmp_path: Path) -> None:
+    assert run(make_run(tmp_path, state_dtype='float16')).returncode == 1
+
+
+def test_half_size_state_pool_fails(tmp_path: Path) -> None:
+    pool_log = POOL_LOG.replace('ssm_state size: 6.05GB', 'ssm_state size: 3.02GB')
+    assert run(make_run(tmp_path, pool_log=pool_log)).returncode == 1

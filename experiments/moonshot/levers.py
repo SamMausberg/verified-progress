@@ -76,8 +76,14 @@ LEVERS: dict[str, Lever] = {
     # KV tokens and mamba slots): 128 requests x (2,048 prompt + 512 output) = 327,680 KV
     # tokens, plus headroom for chunked prefill.
     'p4_pools': Lever(
-        {'max-running-requests': 128, 'max-total-tokens': 360448, 'max-mamba-cache-size': 128},
-        note='pinned pools for the P4 A/B: 128 running, 360,448 KV tokens, 128 mamba slots',
+        {
+            'max-running-requests': 128,
+            'max-total-tokens': 360448,
+            'max-mamba-cache-size': 128,
+            'mamba-ssm-dtype': 'float32',
+        },
+        note='pinned pools for the P4 A/B: 128 running, 360,448 KV tokens, 128 mamba slots, '
+        'FP32 state stated explicitly',
     ),
     'replayssm_spec': Lever(
         {'enable-linear-replayssm-spec': True},

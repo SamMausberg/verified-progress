@@ -18,6 +18,12 @@ Reads one fresh lever_sweep output directory and checks, for this run only:
     SGLANG_GDN_EXACT_REPLAY_BV=32 (bench's launch.json records the arm's environment,
     which overrides anything inherited);
   - the run forms exactly four complete dense/exact pairs (labels r1-r4);
+  - environment: each server's SGLANG_/FLASHINFER_/TRITON_/TORCH_/PYTORCH_/NCCL_ variables
+    (read from the process by RecordingServer, launch.json `env_prefixed`) equal the declared
+    set: SGLANG_WORKTREE only for dense arms, plus SGLANG_GDN_EXACT_REPLAY=1 and
+    SGLANG_GDN_EXACT_REPLAY_BV=32 for exact arms;
+  - state dtype: every server ran with mamba_ssm_dtype float32 (server_info.json) and its
+    log reports an SSM pool of FP32 size for its slot count;
   - provenance: the run's provenance file (written by run_p4b.sh after its clean-tree
     preflight) names both HEADs, and every arm's launch record (bench's launch.json) shows
     the same repository HEAD and the same engine HEAD (the imported sglang package lies in
@@ -95,6 +101,32 @@ def resolved_pools(label: str, server_log: Path) -> dict[str, int]:
     if pools['max_total_num_tokens'] < MIN_KV_TOKENS:
         fail(f'{label}: KV pool of {pools["max_total_num_tokens"]} tokens < {MIN_KV_TOKENS}')
     return pools
+
+
+EXACT_ENV = {'SGLANG_GDN_EXACT_REPLAY': '1', 'SGLANG_GDN_EXACT_REPLAY_BV': '32'}
+FP32_STATE_GIB_PER_SLOT = 24 * 32 * 128 * 128 * 4 / 2**30  # 24 GDN layers, 32 heads, 128 x 128
+SSM_SIZE = re.compile(r'max_mamba_cache_size: (\d+), .*?ssm_state size: ([\d.]+)GB')
+
+
+def check_environment(label: str, exact: bool, launch: dict[str, Any], engine: str) -> None:
+    declared = {'SGLANG_WORKTREE': engine, **(EXACT_ENV if exact else {})}
+    recorded = launch.get('env_prefixed')
+    if recorded != declared:
+        fail(f'{label}: server environment {recorded} != declared {declared}')
+
+
+def check_state_dtype(label: str, server_dir: Path, server_log_text: str) -> None:
+    info_json = server_dir / 'server_info.json'
+    info = json.loads(info_json.read_text()) if info_json.exists() else {}
+    if info.get('mamba_ssm_dtype') != 'float32':
+        fail(f'{label}: mamba_ssm_dtype {info.get("mamba_ssm_dtype")!r}, not float32')
+    sizes = {(int(n), float(g)) for n, g in SSM_SIZE.findall(server_log_text)}
+    if len(sizes) != 1:
+        fail(f'{label}: SSM pool lines in the server log: {sorted(sizes)}')
+    slots, gib = sizes.pop()
+    # The pool holds the slots plus one reserved slot; FP16 or FP8 would be half or less.
+    if not any(abs(gib - FP32_STATE_GIB_PER_SLOT * n) <= 0.01 for n in (slots, slots + 1)):
+        fail(f'{label}: SSM pool {gib} GiB for {slots} slots is not FP32')
 
 
 def check_provenance(label: str, launch: dict[str, Any], provenance: dict[str, str]) -> None:
@@ -188,6 +220,8 @@ def main() -> None:
                 fail(f'{label}: launch.json missing')
             launch = json.loads(launch_json.read_text())
             check_provenance(label, launch, provenance)
+            check_environment(label, arm == EXACT, launch, provenance['engine'])
+            check_state_dtype(label, server_log.parent, text)
             if arm == EXACT:
                 tile = (launch.get('env_overrides') or {}).get('SGLANG_GDN_EXACT_REPLAY_BV')
                 if tile != '32':

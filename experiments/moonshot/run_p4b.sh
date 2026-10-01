@@ -16,6 +16,14 @@
 #     the pinned pools and form four dense/exact pairs (validate_p4_ab.py).
 # Every step logs its start and exit status; any failed step makes the job exit non-zero
 # (required steps at once, optional steps at the end).
+# Drop every inherited variable that can change SGLang's numerics or kernels; the script
+# then sets its own allowlist: SGLANG_WORKTREE here, and per step or per server the
+# exact-replay variables (the exact_replay lever's arm environment).
+for name in $(compgen -e); do
+  case $name in
+    SGLANG_* | FLASHINFER_* | TRITON_* | TORCH_* | PYTORCH_* | NCCL_*) unset "$name" ;;
+  esac
+done
 # shellcheck source=/dev/null
 source ~/verified-progress/scripts/sglang_env.sh
 set -euo pipefail
@@ -24,9 +32,9 @@ export SGLANG_WORKTREE=~/sglang-wt/moonshot
 cd "$(dirname "$(readlink -f "$0")")/../.." || exit 1
 REPO=$(pwd)
 RUN_ID=$(date -u +%Y%m%dT%H%M%SZ)
-# The exact-replay value tile is pinned to 32 (the packed decode's tile) for every step and
-# server unless a step overrides it explicitly; the exact_replay lever also sets it per server.
-export SGLANG_GDN_EXACT_REPLAY_BV=32
+# The exact-replay value tile is 32 (the packed decode's tile): set explicitly for each kernel
+# step below, and per server by the exact_replay lever (dense servers get no exact-replay
+# variable).
 DATA=~/vp-data/moonshot
 OPTIONAL_FAILED=()
 
@@ -47,7 +55,8 @@ step() {  # step <required|optional> <name> <command...>
   fi
 }
 
-echo "SGLANG_GDN_EXACT_REPLAY_BV=$SGLANG_GDN_EXACT_REPLAY_BV"
+echo "environment after sanitising (allowlist only):"
+env | grep -E '^(SGLANG|FLASHINFER|TRITON|TORCH|PYTORCH|NCCL)_' | sort | sed 's/^/  /' || true
 # Provenance preflight: both trees must be clean (tracked and untracked files), and their
 # HEADs are recorded for the validator, which checks every arm's launch record against them.
 clean_tree() {  # clean_tree <path>
@@ -68,7 +77,8 @@ printf '{"run_id": "%s", "repo": "%s", "repo_head": "%s", "engine": "%s", "engin
   "$RUN_ID" "$REPO" "$REPO_HEAD" "$SGLANG_WORKTREE" "$ENGINE_HEAD" > "$PROVENANCE"
 echo "P4b run $RUN_ID, repo $REPO at $REPO_HEAD, engine $SGLANG_WORKTREE at $ENGINE_HEAD"
 export PYTHONPATH=$SGLANG_WORKTREE/python
-step required kernel-check-bv32 python experiments/moonshot/gdn_exact_replay_check.py check \
+step required kernel-check-bv32 env SGLANG_GDN_EXACT_REPLAY_BV=32 \
+  python experiments/moonshot/gdn_exact_replay_check.py check \
   --batch 8 --steps 48 --ring 4 --force-rate 0.1 \
   --out "$DATA/exact_replay/check_L4_bv32_$RUN_ID.json"
 step optional kernel-check-bv16 env SGLANG_GDN_EXACT_REPLAY_BV=16 \
