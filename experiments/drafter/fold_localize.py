@@ -14,6 +14,7 @@ requests (--earlier) to see whether a difference reproduces.
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 from pathlib import Path
 from typing import Any
@@ -99,6 +100,34 @@ def pools(directory: Path) -> dict[str, Any]:
     return {key: merged.get(key) for key in POOL_KEYS}
 
 
+def trace_coverage(cycles: list[dict[str, Any]], prompt: int, generated: int) -> str | None:
+    """Why a request's trace does not cover its whole output, or None if it does.
+
+    The first cycle's anchor is the prefill token at position `prompt`; each cycle commits
+    accept + 1 tokens after its anchor, so the next anchor is prefix_len + accept + 1. Some
+    cycle must reach the end of the output (it may overshoot where the output was cut at the
+    length cap or a stop token), and at most one cycle may follow it: under the overlap
+    scheduler the next verify is launched before the finish is processed.
+    """
+    if generated <= 1:
+        return None if not cycles else 'cycles for an output finished at prefill'
+    if not cycles:
+        return 'no cycles'
+    if cycles[0]['prefix_len'] != prompt:
+        return f'first anchor {cycles[0]["prefix_len"]} != prompt length {prompt}'
+    for index, (x, y) in enumerate(itertools.pairwise(cycles), start=1):
+        if y['prefix_len'] != x['prefix_len'] + x['accept'] + 1:
+            return f'cycle {index} does not follow cycle {index - 1}'
+    end = prompt + generated
+    reaching = [i for i, c in enumerate(cycles) if c['prefix_len'] + c['accept'] + 1 >= end]
+    if not reaching:
+        last = cycles[-1]
+        return f'cycles end at {last["prefix_len"] + last["accept"] + 1}, output ends at {end}'
+    if len(cycles) - 1 - reaching[0] > 1:
+        return f'{len(cycles) - 1 - reaching[0]} cycles after the one that reaches the end'
+    return None
+
+
 def compare(a_dir: Path, b_dir: Path) -> dict[str, Any]:
     a_out, b_out = outputs(a_dir), outputs(b_dir)
     a_tr, b_tr = traces(a_dir), traces(b_dir)
@@ -115,6 +144,10 @@ def compare(a_dir: Path, b_dir: Path) -> dict[str, Any]:
             'first_logprob_difference': logprob,
             'first_token_difference': first_token_difference(a_out[rid], b_out[rid]),
             'first_cycle_difference': cycle,
+            'trace_coverage': {
+                side: trace_coverage(tr.get(rid, []), prompt, len(out[rid]['output_ids']))
+                for side, tr, out in (('a', a_tr, a_out), ('b', b_tr, b_out))
+            },
         }
         if logprob is not None:
             # The cycle that computed output index `logprob`. Output index i is the
@@ -189,10 +222,16 @@ def main() -> None:
                 )
             )
         ]
-        if differing or only_one or not result['requests'] or not result['cycles_compared']:
+        # Every request of the run must be traced over its whole output in both runs.
+        uncovered = [
+            rid
+            for rid, entry in result['requests'].items()
+            if any(problem is not None for problem in entry['trace_coverage'].values())
+        ]
+        if differing or uncovered or only_one or not result['requests']:
             raise SystemExit(
-                f'NOT IDENTICAL: {len(differing)} requests differ, {len(only_one)} in one run '
-                f'only, cycles compared: {result["cycles_compared"]} ({args.a} vs {args.b})'
+                f'NOT IDENTICAL: {len(differing)} requests differ, {len(uncovered)} not fully '
+                f'traced, {len(only_one)} in one run only ({args.a} vs {args.b})'
             )
 
 

@@ -335,7 +335,7 @@ def test_localize_require_identical_exit_status(tmp_path: Path) -> None:
     import pytest
 
     localize = load('fold_localize')
-    record = {'rid': 'r', 'prefix_len': 4, 'draft': [1], 'target': [1], 'accept': 0}
+    record = {'rid': 'r', 'prefix_len': 4, 'draft': [1, 2], 'target': [1, 2], 'accept': 1}
     for name, token, traced in (
         ('a', 2, True),
         ('same', 2, True),
@@ -412,3 +412,45 @@ def test_fold_check_propagates_every_failure(tmp_path: Path) -> None:
             check=False,
         )
         assert (result.returncode != 0) == bool(expected), (env, result.stdout, result.stderr)
+
+
+def test_localize_trace_coverage_per_request(tmp_path: Path) -> None:
+    import pytest
+
+    localize = load('fold_localize')
+
+    def cyc(prefix: int, accept: int) -> dict[str, object]:
+        return {'prefix_len': prefix, 'draft': [0], 'target': [0], 'accept': accept}
+
+    full = [cyc(10, 2), cyc(13, 0), cyc(14, 3)]  # covers positions 10..17
+    assert localize.trace_coverage(full, 10, 8) is None
+    assert localize.trace_coverage(full, 10, 6) is None  # last cycle overshoots a cut output
+    assert localize.trace_coverage(full, 10, 4) is None  # one look-ahead cycle after the end
+    assert localize.trace_coverage(full, 10, 3) is not None  # two cycles after the end
+    assert localize.trace_coverage(full[:2], 10, 8) is not None  # truncated
+    assert localize.trace_coverage([], 10, 8) == 'no cycles'
+    assert localize.trace_coverage([cyc(10, 2), cyc(14, 3)], 10, 8) is not None  # gap
+    assert localize.trace_coverage([cyc(11, 2)], 10, 3) is not None  # wrong first anchor
+    assert localize.trace_coverage([], 10, 1) is None  # finished at prefill
+
+    # Two runs whose traces both stop early for request 's' must fail.
+    for name in ('a', 'b'):
+        run = tmp_path / name
+        run.mkdir()
+        rows = [
+            {
+                'id': rid,
+                'prompt_tokens': 10,
+                'output_ids': list(range(8)),
+                'top_logprobs': [[0]] * 8,
+            }
+            for rid in ('r', 's')
+        ]
+        (run / 'requests.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in rows))
+        traced = [dict(c, rid='r') for c in full] + [dict(c, rid='s') for c in full[:2]]
+        (run / 'trace.1.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in traced))
+    sys.argv = ['fold_localize.py', '--a', str(tmp_path / 'a'), '--b', str(tmp_path / 'b')]
+    sys.argv += ['--out', str(tmp_path / 'loc.json'), '--require-identical']
+    with pytest.raises(SystemExit) as exc:
+        localize.main()
+    assert 'not fully traced' in str(exc.value.code)
