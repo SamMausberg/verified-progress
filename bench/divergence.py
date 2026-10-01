@@ -10,9 +10,10 @@ configurations that should agree already show.
 Rates treat first-divergence events as Poisson counts over exposure tokens; the
 intervals use the normal approximation on the log scale (log rate +- 1.96 /
 sqrt(k), log ratio +- 1.96 * sqrt(1/k1 + 1/k2)), adequate for the 100+ events per
-pair seen here. Both members of a ratio share the plain c=1 reference run, so the
-ratio interval ignores that correlation and is conservative in neither direction;
-it is a screen, not a test of equivalence.
+pair seen here. The two members of a ratio can share a run (the floor and every
+pair against the radix-on plain c=1 run share that run); the ratio interval ignores
+that correlation and is conservative in neither direction. It is a screen, not a
+test of equivalence.
 
 With `--arms`, it also classifies arms by the rule recorded in bench/README.md
 (2026-10-01, set after the first results): an arm is `exact-up-to-rounding` when

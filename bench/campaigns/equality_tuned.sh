@@ -12,10 +12,12 @@
 # memory at its 0.25 memory fraction once 16 verify states per request are
 # reserved; a c=1 pass never batches more than one request).
 # Pair labels avoid commas: compare.py writes its pair table without CSV quoting.
-# The reference (plain c=1) and the floor (plain c=1 vs c=32) are the state
-# workstream's runs, linked into the runs directory. Configurations whose c=1 run
-# already exists are not rerun. A configuration that fails to run does not stop the
-# others; the script fails at the end if any pair could not be compared.
+# The floor (plain c=1 vs c=32) and the first plain reference (plain c=1) are the
+# state workstream's runs, with the radix cache on, linked into the runs directory;
+# the matched plain reference is stock plain c=1 without it (plain__bench_noradix).
+# Configurations whose c=1 run already exists are not rerun. A configuration that
+# fails to run does not stop the others; the script fails at the end if any pair
+# could not be compared.
 set -uo pipefail
 # shellcheck source=/dev/null
 source "$(dirname "$0")/../../scripts/sglang_env.sh"
@@ -66,6 +68,11 @@ cat > "$OUT/pairs.json" <<'PAIRS'
   ["plain radix-off vs plain c1", "plain/c1", "plain__bench_noradix/c1"],
   ["plain radix-off triton vs plain radix-off c1", "plain__bench_noradix/c1", "plain__bench_noradix_triton/c1"],
   ["plain buffered decode vs plain radix-off c1", "plain__bench_noradix/c1", "plain_replayssm__bench_noradix/c1"],
+  ["mtp_s3 stock verify vs plain radix-off c1", "plain__bench_noradix/c1", "mtp_s3__bench_noradix/c1"],
+  ["mtp_s3 buffered verify vs plain radix-off c1", "plain__bench_noradix/c1", "mtp_s3_replayssm__bench_noradix/c1"],
+  ["mtp_s3 buffered verify triton vs plain radix-off c1", "plain__bench_noradix/c1", "mtp_s3_replayssm__bench_noradix_triton/c1"],
+  ["dflash b16 stock vs plain radix-off c1", "plain__bench_noradix/c1", "plain__bench_dflash_b16/c1"],
+  ["dflash b16 triton vs plain radix-off c1", "plain__bench_noradix/c1", "plain__bench_dflash_b16_triton/c1"],
   ["dflash b16 triton vs stock dflash b16 radix-off c1", "plain__bench_dflash_b16/c1", "plain__bench_dflash_b16_triton/c1"],
   ["dflash b16 triton gdn-verify-triton vs stock dflash b16 radix-off c1", "plain__bench_dflash_b16/c1", "plain__bench_dflash_b16_triton_gdnverify/c1"]
 ]
@@ -75,16 +82,17 @@ PAIRS
 # state workstream's plain/c1 ran with it on, and with the radix cache on a request's
 # logprobs can depend on earlier requests, evidence/state_safety); speculative levers
 # against stock speculation with the same drafter and steps (radix cache off). Third
-# entry: the arm against plain/c1.
+# entry: the arm against stock plain c1 with the radix cache off (the rate shown beside
+# the class). The pairs against plain/c1 stay in the report as the first classification.
 # Stock arms have no matched pair (null) and are listed for their rate against plain.
 cat > "$OUT/arms.json" <<'ARMS'
 [
-  ["mtp-tuned", "mtp_s3 buffered vs stock verify radix-off c1", "mtp_s3 buffered verify radix-off vs plain c1"],
-  ["mtp-tuned-triton", "mtp_s3 buffered triton vs stock verify radix-off c1", "mtp_s3 buffered verify radix-off triton vs plain c1"],
-  ["plain-tuned-triton", "plain radix-off triton vs plain radix-off c1", "plain radix-off triton vs plain c1"],
-  ["plain-tuned-replayssm", "plain buffered decode vs plain radix-off c1", "plain buffered decode radix-off vs plain c1"],
-  ["dflash-tuned-b16", "dflash b16 triton vs stock dflash b16 radix-off c1", "dflash b16 radix-off triton vs plain c1"],
-  ["mtp-stockverify", null, "mtp_s3 stock verify radix-off vs plain c1"]
+  ["mtp-tuned", "mtp_s3 buffered vs stock verify radix-off c1", "mtp_s3 buffered verify vs plain radix-off c1"],
+  ["mtp-tuned-triton", "mtp_s3 buffered triton vs stock verify radix-off c1", "mtp_s3 buffered verify triton vs plain radix-off c1"],
+  ["plain-tuned-triton", "plain radix-off triton vs plain radix-off c1", "plain radix-off triton vs plain radix-off c1"],
+  ["plain-tuned-replayssm", "plain buffered decode vs plain radix-off c1", "plain buffered decode vs plain radix-off c1"],
+  ["dflash-tuned-b16", "dflash b16 triton vs stock dflash b16 radix-off c1", "dflash b16 triton vs plain radix-off c1"],
+  ["mtp-stockverify", null, "mtp_s3 stock verify vs plain radix-off c1"]
 ]
 ARMS
 # Outputs of an earlier run must not pass for this one.
