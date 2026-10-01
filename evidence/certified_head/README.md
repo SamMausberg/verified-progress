@@ -338,7 +338,10 @@ against 491.4 us for the best TMA configuration (128x64x64, 4 stages) and
 1,567.0 against 948.6 at M = 256. The BF16 tiles were never swept before x7c:
 `run_all.sh` sweeps only the W8A16 and W8A8 passes, and the BF16 defaults
 repeated the W8A16 defaults of that time (128x{32,64,128}x64); the docstring that
-attributed them to the sweep was wrong. The new pointer-load defaults (and the
+attributed them to the sweep was wrong. The rule was applied as declared there
+too: it compares pointer loads with the TMA default, so above 64 rows BF16 takes
+the pointer-load tiles (624.1 us at M = 128) although the best TMA tiles (491.4
+us) are faster still. The new pointer-load defaults (and the
 new W8A8 ones) get their own stress test in the shared hold that reruns the GPU
 tests; the head-path microbenchmark's W8A8 and BF16 rows below were timed on the
 earlier TMA tiles.
@@ -352,7 +355,7 @@ x6; for each reused step `steps.tsv` gives the reason it stands.
 | Steps | Commit | Run | Why the result stands |
 |---|---|---|---|
 | stress, micro, summarize, check_outputs | 46bcc84 | x7c | run at this commit |
-| compile, tests, tune_w8a16, primitives, ncu, ncu_export | d2712cb | x7 | the package's code and data are unchanged from d2712cb to 46bcc84 |
+| compile, tests, tune_w8a16, primitives, ncu, ncu_export | d2712cb | x7 | the package's code and data are unchanged from d2712cb to 46bcc84; `bench/tune_gemv.py` was refactored after d2712cb (c01d905: it also records the fastest TMA and pointer-load configurations, with the same winner selection), and x7c's own W8A16 sweep (`pointer_vs_tma_w8a16.json`) picks the same winners except at M = 256 (3 instead of 4 stages, within 0.2%) |
 | replay, invariance, tune_w8a8 | fff72dc | x6 | `kernels.py` is unchanged since; the replay's batches have at most 16 rows, whose tiles did not change; the invariance check runs only the stock head; the W8A8 sweep times every candidate tile explicitly |
 
 Also in x7c at 46bcc84, outside `run_all.sh`: `pointer_vs_tma_*.json`,
@@ -360,12 +363,13 @@ Also in x7c at 46bcc84, outside `run_all.sh`: `pointer_vs_tma_*.json`,
 the host's foreign CPU load (`*.hostload.json`); none was contended (the micro
 averaged 1.76 foreign cores against a threshold of 2). x7b's micro run (0d770c6)
 was flagged contended (2.03, the author's own CPU compiles during the hold) and is
-not used. Two commits follow 46bcc84 in this PR and change package code: the
-margin rule for the row's lower bound in the self-test (a9f1793) and the W8A8
-and BF16 default tiles (2d1794a); the GPU tests and the stress test of the new
-defaults are rerun on them in a shared-lock hold, x8s, whose results are added
-to this directory when it has run. W8A16, the pass the head uses by
-default, is unchanged by both. The SGLang engine checks are in the engine
+not used. Three commits follow 46bcc84 in this PR and change package code: the
+margin rule for the row's lower bound in the self-test (a9f1793), the W8A8 and
+BF16 default tiles (2d1794a), and the check that the quantization data belongs
+to the supplied weight, with contiguous inputs required (d3a2b13). The GPU tests
+and the stress test of every default under the margin rule are rerun on them in
+a shared-lock hold, x8s, whose results are added to this directory when it has
+run. None of them changes the W8A16 pass's tiles or kernels. The SGLang engine checks are in the engine
 follow-up, not in this PR.
 
 **Checks recorded under the earlier, more lenient row-lower rule.** Until a9f1793
@@ -590,8 +594,10 @@ stock GEMMs per graph, captured, replayed and deleted four times each way.
 | GEMMs inside conditional nodes | 1,405, 1,565, 1,725, 1,885 | 1,878, 2,508, 3,138, 3,768 |
 | the same, one shared memory pool | 2,045, 2,205, 2,365, 2,525 | 4,398, 5,028, 5,658, 6,288 |
 
-Each delete leaves 160 MiB allocated (five times the 32 MiB BF16 GEMM output of
-one body) and 630 MiB reserved behind; a shared pool does not help. The
+Each delete leaves 160 MiB allocated and 630 MiB reserved behind; a shared pool
+does not help. The 160 MiB is five times one body's BF16 GEMM output: 64 x
+248,320 x 2 bytes is 30.3 MiB (`call_output_mib` in the file), which PyTorch's
+caching allocator rounds up to 32 MiB (large blocks come in multiples of 2 MiB). The
 microbenchmark therefore runs batch sizes above 32 in their own processes, and
 `src/certified_head/INTEGRATION.md` records what this means for the engine.
 
