@@ -333,6 +333,17 @@ with this declaration):
   with chunked prefill on, `mem_cache/registry.py:90-94`); concurrency 127 changes the declared
   batch. The admission preflight (`run_p4_admission.sh`) runs on its own first; the full job
   is queued only if it shows 128 running in both arms.
+- Running-limit preflight passed (run 20261001T212044Z, 2026-10-01 21:20-21:24 UTC, repo
+  fc76655, engine c29a91692b, `run_p4_admission.sh`). The client sent 128 requests at
+  concurrency 128, and the servers resolved a running limit of 129. Every prediction of the
+  amendment held in both arms:
+  - `check_admission.py` reports a peak of 128 running in the profiling phase;
+  - no decode line shows fewer than 128 running while a request is queued;
+  - the 128th request finishes together with the 127th, so the profiling phase lasted 9.38 s,
+    against 11.1 and 11.4 s with the single-request tail in the third void attempt;
+  - the decode graphs were captured up to batch 129.
+
+  The full job (`run_p4b.sh`) is queued from main at 14c6dd1. Its results are not in yet.
 - Primary metric (amended on 2026-10-01 at 08:19 and 08:22 UTC, before the run started; the first
   version named bench's `logged_gen_tps_full_batch`, which averages windows with at least
   0.9 x the peak running count, i.e. 116-128 of 128): the server's decode rate at exactly
