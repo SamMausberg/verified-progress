@@ -3,8 +3,8 @@
 How to reproduce the evidence behind the paper and how to run new GPU
 experiments on this machine. `SETUP.md` describes the machine itself. Every
 committed result lives under `evidence/<topic>/` with a README that gives the
-exact command that produced it; this file indexes those directories and states
-the rules that make a run admissible as evidence.
+exact command that produced it; section 5 maps each experiment to its evidence,
+and section 6 states the rules that make a run admissible as evidence.
 
 ## 1. Environments
 
@@ -17,8 +17,9 @@ the rules that make a run admissible as evidence.
   `scripts/sglang_worktree.sh <name>` creates `~/sglang-wt/<name>` from the pin
   (`bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824`); run with
   `SGLANG_WORKTREE=~/sglang-wt/<name> source scripts/sglang_env.sh`. Patches are
-  delivered as `git format-patch` files under `engine/sglang/patches/`.
-- Models are pinned by revision (`--revision`); see `SETUP.md` for the list.
+  delivered as `git format-patch` files under `engine/sglang/patches/<workstream>/`,
+  and `engine/sglang/README.md` gives the commands that apply each series.
+- Models are pinned by revision (`--revision`); `SETUP.md` lists them.
 
 ## 2. CPU evidence and the paper
 
@@ -27,8 +28,9 @@ the rules that make a run admissible as evidence.
 python tests/test_precision.py              # certified-head reference, writes evidence/precision/
 python tests/test_state_structure.py        # P4/P5 witnesses, writes evidence/state_structure/
 python tests/test_contracts.py              # P7 contract witnesses, writes evidence/contracts/
-python -m pytest tests/                      # all CPU tests
+python -m pytest tests/                      # every CPU test; GPU tests skip without CUDA
 bash scripts/check_lean.sh                   # Lean 4.19.0 from ~/.elan
+python scripts/check_paper_references.py     # bibliography and evidence-register paths
 cd paper && latexmk -pdf -interaction=nonstopmode -halt-on-error paper.tex
 ```
 
@@ -39,9 +41,18 @@ downloads the official kit, checks the SHA-256 of the archive and of the file, a
 the build with an error naming the failed step if either check fails
 (`paper/template/README.md` lists the files, licences and digests).
 
-`python scripts/verify_artifact.py` reruns the earlier revision's CPU jobs and
-overwrites their files in `evidence/`; use a copy unless regenerating them is
-the point.
+`python scripts/verify_artifact.py` reruns the CPU jobs of the imported bundle
+(the earlier revision's exact references in `src/decision_reference.py`,
+`src/race_reference.py`, `src/v1_reference.py` and `src/v2_reference.py`, the
+auxiliary client test and `experiments/synthetic_drift.py`) and the Lean check.
+It overwrites their outputs: the logs and JSON files at the top of `evidence/`,
+`evidence/validation_run.json` and `data/synthetic_drift.csv`. These files record
+run times and the Python version, so a rerun changes them even when every check
+passes; use a copy unless regenerating them is the point. `evidence/claims.json`,
+`evidence/environment.json`, `evidence/latex_build.log` and
+`evidence/pdf_quality.json` are static records of the bundle's own run.
+`sources/bundle-v3.sha256` holds the bundle's checksums as imported; several of
+those files have changed since, so it records the import, not the current tree.
 
 ## 3. Using the GPU
 
@@ -53,76 +64,82 @@ scripts/gpu_lock.sh -s <command...>   # shared: correctness only, no timing clai
 scripts/gpu_lock.sh --status          # queued and running jobs
 ```
 
-Jobs run in arrival order. Start a server, run the client and stop the server
-inside one locked command, trap the exit so the server always dies, and check
-that `nvidia-smi` is clean afterwards. Shared holders keep servers at
-`--mem-fraction-static 0.25` or less and other jobs under 20 GB. CPU-heavy
-analysis also goes under `-s`: the scheduler and the benchmark client are
-single-threaded Python loops, and a busy CPU distorts timed runs.
+Jobs run in arrival order. The lock lasts exactly as long as the command:
+`scripts/gpu_job.sh` runs each job in its own process group and terminates the
+group when the job exits, and an exclusive job first waits
+(`scripts/gpu_drain_wait.sh`) until no GPU process or SGLang server from an
+earlier job is left. Start a server, run the client and stop the server inside
+one locked command, trap the exit so the server always dies, and check that
+`nvidia-smi` is clean afterwards. Shared holders keep servers at
+`--mem-fraction-static 0.25` or less and other jobs under 20 GB, and wrap only
+the server start-up in `scripts/gpu_startup_lock.sh` so that concurrent
+start-ups do not race in SGLang's free-memory probe. CPU-heavy analysis also
+goes under `-s`: the scheduler and the benchmark client are single-threaded
+Python loops, and a busy CPU distorts timed runs. The header of each script
+documents its usage and options.
 
-## 4. Baseline servers
+## 4. Serving arms
 
-Plain decoding, as used for the baselines (CUDA graphs and the overlap
-scheduler are on by default; FA3 is unavailable on aarch64):
-
-```sh
-python -m sglang.launch_server \
-  --model-path Qwen/Qwen3.5-4B --revision 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a \
-  --attention-backend flashinfer --mm-attention-backend triton_attn \
-  --host 127.0.0.1 --port <port>
-```
-
-The serving harness in `bench/` launches, verifies and sweeps these arms; its README
-gives the metric definitions and the commands, for example:
+`SETUP.md` gives the command that starts a plain Qwen3.5-4B server by hand (CUDA
+graphs and the overlap scheduler are on by default; FA3 is unavailable on
+aarch64). The serving harness in `bench/` defines every measured configuration
+in `bench/arms.toml`: launch flags, capacity, and the exactness class of each
+arm's outputs. The file's comments explain the capacity flags (the GDN state
+cache, not the KV cache, bounds the running requests for this model). The
+harness launches, verifies and sweeps an arm; `bench/README.md` gives the metric
+definitions and the protocol, for example:
 
 ```sh
 scripts/gpu_lock.sh -x python -m bench.sweep --arm mtp --label mtp \
     --concurrency 1 2 4 8 16 32 64 128 --repeats 1
-python -m bench.pareto <run dirs> --out evidence/bench/confirm --baseline plain
+python -m bench.pareto <run dirs> --out <output dir> --baseline plain
 ```
-
-Native MTP speculation adds `--speculative-algorithm NEXTN
---speculative-num-steps 3 --speculative-eagle-topk 1
---speculative-num-draft-tokens 4 --max-running-requests <N>` (the engine
-reports it as EAGLE). With speculation SGLang resets the running-request
-cap to 48 (it logs this) unless `--max-running-requests` is passed, and the GDN state
-cache caps capacity further (133 requests for plain decoding at default memory
-settings). The tuned speculative configurations, the DFlash arms and the
-capacity flags are defined by the serving harness and its arm file.
 
 ## 5. Experiments and where their evidence lives
 
-| Experiment | Evidence | Status |
-|---|---|---|
-| Certified-head exact reference, head constants, Lean | `evidence/precision/` | on `main` |
-| Earlier revision's CPU references and synthetic drift | `evidence/*.json`, `data/synthetic_drift.csv` | on `main` |
-| State-structure witnesses (P4, P5) | `evidence/state_structure/` | on `main` |
-| Contract witnesses (P7) | `evidence/contracts/` | on `main` |
-| Attribution, head microbenchmark, bytes per step | `evidence/profiles/` | pull request #13 |
-| Head-input capture, transport and self-evidence replay | `evidence/head_geometry/` | on `main` (plain decode); MTP and DFlash in progress |
-| Serving harness, frozen workload, quality check | `bench/`, `evidence/bench/` | on `main`; sweeps in progress |
-| Certified-head kernels and head-path runtime | `evidence/certified_head/` | in progress |
-| Divergence mechanisms and state safety | `evidence/state/` | in progress |
-| DFlash drafter on GH200 | `evidence/drafter/` | on `main` (acceptance); timing in progress |
-| Stack levers, ceilings, frontiers | `evidence/moonshot/` | on `main` (ceilings, first lever runs); repeats and frontiers in progress |
-| Long-window repair (P2, P3) | to be assigned | in progress |
+Status by task is in `TASKS.md`; this table only says where things are. Work
+still in review has no evidence directory on `main` yet.
 
-When a pull request merges, the paper replaces the matching pending items
-with its numbers, and this table records the directory as on `main`.
+| Experiment | Code | Evidence |
+|---|---|---|
+| Certified-head exact reference and weight-only head constants | `src/precision_reference.py`, `experiments/precision_head_constants/` | `evidence/precision/` |
+| The imported bundle's CPU references and synthetic drift | `src/*_reference.py`, `experiments/synthetic_drift.py` | files at the top of `evidence/`, `data/synthetic_drift.csv` |
+| State-structure witnesses (P4, P5) | `tests/test_state_structure.py` | `evidence/state_structure/` |
+| Contract witnesses (P7) | `tests/test_contracts.py` | `evidence/contracts/` |
+| Attribution, head microbenchmark, bytes per step | `experiments/profiling/` | `evidence/profiles/` |
+| Head geometry: transport and self-evidence on captured states | `experiments/head_geometry/` | `evidence/head_geometry/` |
+| Serving harness, tuned arms, workloads, quality | `bench/` | `evidence/bench/` |
+| State safety under speculation and the stock noise floor (H5) | `experiments/state_safety/` | `evidence/state_safety/` |
+| Public DFlash-4B drafter | `experiments/drafter/` | `evidence/drafter/` |
+| Stack levers, ceilings, P4 replay | `experiments/moonshot/` | `evidence/moonshot/` |
+| Long-window repair (P2, P3) and window reuse (P9) | `experiments/repair/` | `evidence/repair/` |
+| Backbone GEMMs and RMSNorm launches | `experiments/backbone/` | `evidence/backbone/` |
+
+When a pull request merges, the paper replaces the matching pending items with
+its numbers.
 
 ## 6. What makes a run admissible
 
-- Record the repository commit, the SGLang commit, the model revision, every
-  server flag and the hardware in the evidence directory, with the command.
+- Commit the code first, then produce the evidence, and record in the evidence
+  directory the repository commit, the SGLang commit, the model revision, every
+  server flag, the hardware and the command.
 - Compare against the strongest optimized baseline with CUDA graphs and
-  overlap on. Launch each server arm once at its maximum capacity and sweep
-  client concurrency against it.
+  overlap on, with identical flags apart from the change under test. Launch each
+  server arm once at its maximum capacity and sweep client concurrency against it.
 - Repeat timed runs and report their variation; a microbenchmark is not an
-  end-to-end result and a candidate count is not a runtime.
+  end-to-end result and a candidate count is not a runtime. Record the CPU load
+  of other processes during every timed point.
 - For exactness claims, name the reference. The certified head is compared
   with the stock head kernel at the same batch shape; stock configurations at
   different shapes already disagree, so any other comparison measures the stock
   noise floor.
+- Output comparisons above concurrency 1 pin the pools: SGLang sizes the KV and
+  GDN pools from the memory free at start-up, so both arms set
+  `--max-running-requests`, `--max-total-tokens` and `--max-mamba-cache-size`
+  identically and record the pools each server resolved. With the radix cache on,
+  a request's logprobs depend on which request computed its shared prefix, so
+  equality runs use `--disable-radix-cache` or the same request history in both
+  arms, and say which.
 - Keep failed and negative runs and label them. Large raw outputs (traces,
   hidden-state dumps) stay outside git under `~/vp-data/`; commit summaries and
   the commands that regenerate them.
