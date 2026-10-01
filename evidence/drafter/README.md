@@ -247,7 +247,9 @@ hook. Patch 0003 (`SGLANG_GDN_REPLAYSSM_FOLD=1`) turns on, for GDN pools, the fo
 protocol SGLang implements for KDA. The verify runs the stock recurrent kernel, which also
 writes the raw window to a ring, and the commit replays the accepted prefix into the
 checkpoint with a bitwise clone of the recurrent update. Engine: branch `engine/drafter` at
-31bda3e674 (bd66ce343e + 0001-0003).
+31bda3e674 (bd66ce343e + 0001-0003). Patch 0004, added after these runs, only gates the DFLASH
+ReplaySSM commit on `--enable-linear-replayssm-spec`; it changes nothing in any configuration
+measured here (either both fold flags are set or no ReplaySSM flag is).
 
 `buffered_verify/gdn_verify_parity.json` (`gdn_verify_parity.py`, the first step of
 `run_replay_check.sh`): random BF16 inputs at the 4B GDN layer shape (16 key heads, 32 value
@@ -389,7 +391,8 @@ commit (circular), or the exact fold (`gdn_replayssm_exact_fold_kernel`).
   for the six draft layers and the head over 16 positions per request).
 
     scripts/gpu_lock.sh -x experiments/drafter/run_phase_timing.sh
-    # its last step: phase_summary.py --run stock:DIR --run circular:DIR --run fold:DIR --segments 8 16
+    # its last step: phase_summary.py --run stock:DIR --run circular:DIR --run fold:DIR \
+    #     --segments 8 16 --out DIR/summary   (writes summary.csv and kernels.json)
     python experiments/drafter/compare_outputs.py \
         --ref ~/vp-data/drafter/phase-timing/stock/c8/requests.jsonl \
         --test ~/vp-data/drafter/phase-timing/fold/c8/requests.jsonl \
@@ -406,8 +409,10 @@ arms, each run as stock and with the fold (`--enable-linear-replayssm-spec` and
 draft attention, FlashInfer target attention, capacity 128). Bench confirm split, 512 output
 tokens with ignore_eos, greedy, one server launch per run; y is output tokens/s per GPU, the mean
 of the two runs per arm, and the ratio is fold over stock with its range over the four
-stock-fold run pairs. Every point passed bench's validity rule; foreign CPU load averaged
-0.27-0.83 cores per point.
+stock-fold run pairs. This is one session: a single stock, fold, fold, stock sequence per arm in
+one hold, so each arm has two runs and the ranges are within-session spreads, not
+between-session variance or confidence intervals. Every point passed bench's validity rule;
+foreign CPU load averaged 0.27-0.83 cores per point.
 
 | block | c | stock y | fold y | fold/stock (range) | tokens per cycle |
 |---|---|---|---|---|---|
@@ -424,12 +429,15 @@ stock-fold run pairs. Every point passed bench's validity rule; foreign CPU load
 | 8 | 16 | 5,260 | 5,691 | 1.082 (1.069-1.094) | 4.67 |
 | 8 | 32 | 6,754 | 7,552 | 1.118 (1.114-1.123) | 4.75 |
 
-- **From c = 8 up the fold is faster on both arms**: 5.8-6.1% at c = 8, 8.2-9.4% at 16 and
-  11.8-12.0% at 32, with every pairwise ratio at least 1.05. Tokens per cycle are the same in both
-  arms (identical at c <= 8; within the run-to-run spread of stock at 16 and 32), so the gain is
-  cycle time, as in the per-phase split.
-- **At c = 1-2 it is slower on block 16** (3.2% and 1.7%) and about even on block 8, so it does
-  not improve the best low-concurrency configuration (stock `dflash-tuned-b16` at c = 1).
+- **From c = 8 up the fold is faster on both arms in this session**: 5.8-6.1% at c = 8,
+  8.2-9.4% at 16 and 11.8-12.0% at 32; the smallest pairwise ratio at c >= 8 is 1.0498 (block 8,
+  c = 8). Tokens per cycle are the same in both arms at c <= 8 except one block-8 fold run at
+  c = 4 (4.80 against 4.78), and at 16 and 32 any two runs, stock against stock included, differ
+  by at most 0.04 tokens per cycle (0.7%), so the gain is cycle time, as in the per-phase split.
+- **At c = 1 the fold is slower**: 3.2% on block 16 (848 against 876 tokens/s; all four run
+  pairs between 0.966 and 0.970), which is the best configuration at c = 1, and 1.4% on block 8.
+  At c = 2 it is 1.7% slower on block 16 and 1.0% faster on block 8. So in this session the
+  fold does not improve low-concurrency serving and makes the c = 1 leader slower.
   A likely cause, from code reading and not yet measured: SGLang's recurrent GDN kernel uses
   value tiles of 4 on sm_90 for at most 64 sequences only when it writes per-position states
   (`_select_recurrent_launch_config`, `target_verify`); the ring-writing verify the fold uses
