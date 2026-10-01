@@ -354,7 +354,16 @@ def analyse(runs: dict[str, dict[str, dict[str, Any]]], fisher: bool = True) -> 
         for name, (r, c, lab) in pairs.items():
             per[f'{group}/{name}'] = np.array(
                 [counts(runs[r][p], runs[c][p], runs[lab][p]) for p in included], dtype=float
-            )
+            ).reshape(-1, 4)
+    if not included:
+        # Every prompt was excluded: no statistic can be computed, so no result.
+        return {
+            'prompts_declared': DECLARED_PROMPTS,
+            'prompts_common': len(ids),
+            'prompts_excluded_chunking': len(ids),
+            'prompts_included': 0,
+            'decision': 'void',
+        }
     prim = per['primary/mtp_s5'] + per['primary/mtp_tree']
     ctrl = per['control/mtp_s5'] + per['control/mtp_tree']
     lp, lc = float(log_odds(prim.sum(0))), float(log_odds(ctrl.sum(0)))
@@ -427,6 +436,8 @@ def main() -> None:
     runs = {r: load_run(root / f'{r}.jsonl') for r in RUNS}
     res = analyse(runs)
     Path(args.out).write_text(json.dumps(res, indent=1) + '\n')
+    if res['decision'] == 'void':
+        raise SystemExit('void: every prompt was excluded')
     print(json.dumps({k: v for k, v in res.items() if k != 'pairs'}, indent=1))
 
 

@@ -275,6 +275,8 @@ reason go in a new commit before the runs.
 - **Environment.** `analyze_all.sh` and `first_cycle.py` run in the SGLang venv
   (`scripts/sglang_env.sh`), which provides SciPy. The repository's `.venv` does not;
   its tests skip the SciPy calls.
+- **No prompts left.** If every prompt is excluded, the result is void: no statistic
+  is computed, and the output records only the counts.
 - **Implementation.** `first_cycle.py` implements this analysis.
   `tests/test_state_safety_first_cycle.py` tests it on synthetic runs, and
   `analyze_all.sh` runs it once all five runs exist. Missing runs, unpinned pools or

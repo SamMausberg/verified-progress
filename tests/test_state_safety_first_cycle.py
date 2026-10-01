@@ -488,3 +488,15 @@ def test_process_script_resolves_the_run_matrix_argument(tmp_path, monkeypatch):
     assert (
         attest_runner.process_script(7, '/w/experiments/state_safety') == '/elsewhere/run_matrix.py'
     )
+
+
+def test_all_prompts_excluded_is_void():
+    # One prompt, and its MTP chunk counters are inconsistent: nothing is left.
+    bad = rec([1] * 4, FRAGILE, chunks=[1, 3])
+    bad['spec_verify_ct'] = 5
+    runs = {r: {'p': bad} for r in RUNS}
+    runs['plain/c1'] = {'p': rec([1] * 4, FRAGILE)}
+    res = analyse(runs, fisher=False)
+    assert res['prompts_included'] == 0
+    assert res['prompts_excluded_chunking'] == 1
+    assert res['decision'] == 'void'
