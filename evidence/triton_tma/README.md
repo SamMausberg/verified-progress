@@ -18,29 +18,30 @@ of 150 per kernel and build (`int8_tma_summary.json`):
 | Build | Triton | ptxas | `head` kernel | `minimal` kernel |
 |---|---|---|---|---|
 | `t371` | 3.7.1 | 12.8.93 | 72 | 0 |
-| `t371_ptxas134` | 3.7.1 | 13.4.59 | 65 | 0 |
-| `t380` | 3.8.0 | 12.9.86 | 55 | 0 |
+| `t371_ptxas134` | 3.7.1 | 13.4.59 | 68 | 0 |
+| `t380` | 3.8.0 | 12.9.86 | 57 | 0 |
 | `t380_ptxas133` | 3.8.0 | 13.3.33 | 0 | 0 |
 | `t380_ptxas134` | 3.8.0 | 13.4.59 | 0 | 0 |
 | `tmain` | main (3931812707) | 13.4.59 | 0 | 0 |
-| `tmain_ptxas129` | main (3931812707) | 12.9.86 | 46 | 0 |
+| `tmain_ptxas129` | main (3931812707) | 12.9.86 | 49 | 0 |
 
 In the failing builds, every wrong case uses one of the four `BLOCK_K = 64` tiles (a 64-byte int8
-box), at 65,536 or 248,320 rows, and both random and real data produce them. Which of the four
-tiles fail differs between builds: on 3.8.0 with its own `ptxas`, for example, 64 x 128 x 64 never
-failed. On Triton 3.7.1 (10 cases per cell: two data sets times five BF16 row counts):
+box), at 65,536 or 248,320 rows, and both random and real data produce them. How often each tile
+fails differs between builds: on 3.8.0 with its own `ptxas`, for example, 64 x 128 x 64 failed in 2
+of 30 cases. On Triton 3.7.1 (10 cases per cell: two data sets times five BF16 row counts):
 
 | `head` tile (int8 rows x BF16 rows x `BLOCK_K`, warps) | 8,192 rows | 65,536 rows | 248,320 rows |
 |---|---|---|---|
-| 64 x 128 x 64, 4 warps | 0/10 | 6/10 | 8/10 |
+| 64 x 128 x 64, 4 warps | 0/10 | 7/10 | 5/10 |
 | 128 x 64 x 64, 4 warps | 0/10 | 10/10 | 10/10 |
 | 128 x 128 x 64, 4 warps | 0/10 | 10/10 (all with NaN or Inf) | 10/10 (all with NaN or Inf) |
-| 128 x 128 x 64, 8 warps | 0/10 | 8/10 | 10/10 |
+| 128 x 128 x 64, 8 warps | 0/10 | 10/10 | 10/10 |
 | 128 x 128 x 128, 4 warps | 0/10 | 0/10 | 0/10 |
 
-No case failed at 8,192 rows or with the 128-byte box. In 71 of the 72 wrong cases on 3.7.1, the
-two identical runs had different numbers of wrong entries, so the fault depends on timing. The
-other builds show the same pattern, in `int8_tma_summary.json`.
+No case failed at 8,192 rows or with the 128-byte box. In every wrong case on 3.7.1 (72 of 72),
+the two identical runs had different numbers of wrong entries, so the fault depends on timing; in
+the other failing builds this holds for 67 of 68, 57 of 57 and 48 of 49 cases
+(`repeats_differ` in `int8_tma_summary.json`).
 
 The version pattern matches a hazard reported in triton-lang/triton#9433, which is closed. When
 the A operand of a pipelined `wgmma` is in registers, later instructions can overwrite those
@@ -110,15 +111,19 @@ uv pip install --torch-backend cu130 torch==2.13.0 numpy
 uv pip install --no-deps ./triton-3.9.0+git39318127-cp312-abi3-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl
 ```
 
-The run, under the shared GPU lock, from the repository root:
+The run, under the shared GPU lock, from the repository root. `run_versions.sh` sources
+`scripts/sglang_env.sh` itself, clears any inherited `ptxas` override, and runs the builds one at
+a time, each with its own interpreter:
 
 ```sh
-scripts/gpu_lock.sh -s experiments/triton_tma/run_versions.sh ~/vp-data/upstream/triton/runs/evidence-20261001T160757Z
+scripts/gpu_lock.sh -s experiments/triton_tma/run_versions.sh ~/vp-data/upstream/triton/runs/evidence-20261001T171930Z
 ```
 
-The committed files come from run `evidence-20261001T160757Z` (2026-10-01 16:08 UTC) at
-repository commit deb77cf, with the generator unmodified (`repo_commit` and `repo_dirty` in each
-file's header line).
+The committed files come from run `evidence-20261001T171930Z` (2026-10-01 17:20 UTC) at
+repository commit 4b54d73, with the generator unmodified (`repo_commit` and `repo_dirty` in each
+file's header line). An earlier run at deb77cf, with the seven builds running concurrently (seven
+processes of about 3.5 GB each; GPU memory was not recorded), gave the same pattern: 72, 65, 55, 0,
+0, 0 and 46 wrong cases. It is superseded by this one, which follows the command above.
 
 ## Files
 
@@ -130,6 +135,7 @@ file's header line).
 ## Scope
 
 - This tests the 64-byte-box fault only. The certified head's second fault, envelope misses
-  with a 128-byte box at 64x128x128 with 3 stages, is not tested here.
+  with a 128-byte box in the 64 x 128 x 128 tile with 3 stages, is not tested here; this grid's
+  only 128-byte-box tile is 128 x 128 x 128.
 - Which change makes the minimal kernel immune is not identified.
 - The 3.7.1 runs used the SGLang venv's Triton, the one the certified head runs on.
