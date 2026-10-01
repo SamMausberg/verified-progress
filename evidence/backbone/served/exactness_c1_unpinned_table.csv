@@ -1,0 +1,6 @@
+pair,run_a,run_b,prompts,diverged,exposure_tokens,per_1k_tokens,tie,one_ulp,near,large,not_argmax,length_mismatch,max_margin_median,max_margin_max,drift_p99,drift_max,same_server,pools_identical,pinned_a,pinned_b
+stock c1 vs fresh-server repeat (floor),plain/c1,plain__rep/c1,320,0,70042,0,0,0,0,0,0,0,,,0,0,False,False,False,False
+"stock c1 vs stock c32, one server (floor)",plain/c1,plain/c32,320,167,48816,3.421,151,14,2,0,0,0,0.125,0.375,0.3596,0.6861,True,True,False,False
+stock c1 vs bb_off c1,plain/c1,plain__bb_off/c1,320,0,70042,0,0,0,0,0,0,0,,,0,0,False,False,False,False
+stock c1 vs bb_merge c1,plain/c1,plain__bb_merge/c1,320,0,70042,0,0,0,0,0,0,0,,,0,0,False,False,False,False
+stock c1 vs bb_gemv c1,plain/c1,plain__bb_gemv/c1,320,174,46406,3.75,164,8,2,0,0,0,0.125,0.25,0.3276,0.3678,False,False,False,False

@@ -1,0 +1,162 @@
+{
+  "runs": "/home/ubuntu/vp-data/backbone/compare/pinned",
+  "pairs": {
+    "stock c1 vs fresh-server repeat (floor)": {
+      "prompts": 320,
+      "diverged": 0,
+      "identical": 320,
+      "length_mismatch": 0,
+      "exposure_tokens": 70042,
+      "per_1k_tokens": 0.0,
+      "classes": {},
+      "max_margin_median": null,
+      "max_margin_p90": null,
+      "max_margin_max": null,
+      "drift_median": 0.0,
+      "drift_p99": 0.0,
+      "drift_max": 0.0,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain/c1",
+      "run_b": "plain__rep/c1",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": false,
+      "pools_identical": true
+    },
+    "stock c32 vs fresh-server repeat (floor)": {
+      "prompts": 320,
+      "diverged": 4,
+      "identical": 316,
+      "length_mismatch": 0,
+      "exposure_tokens": 69712,
+      "per_1k_tokens": 0.05737893045673629,
+      "classes": {
+        "tie": 4
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.125,
+      "drift_median": 0.0,
+      "drift_p99": 0.15454578399658203,
+      "drift_max": 0.21825218200683594,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain/c32",
+      "run_b": "plain__rep/c32",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": false,
+      "pools_identical": true
+    },
+    "stock c1 vs stock c32, one server (floor)": {
+      "prompts": 320,
+      "diverged": 41,
+      "identical": 279,
+      "length_mismatch": 0,
+      "exposure_tokens": 64845,
+      "per_1k_tokens": 0.6322769681548307,
+      "classes": {
+        "tie": 39,
+        "one_ulp": 2
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.25,
+      "max_margin_max": 0.25,
+      "drift_median": 0.0,
+      "drift_p99": 0.3463411331176758,
+      "drift_max": 0.5716531276702881,
+      "prompts_with_large_drift": 1,
+      "run_a": "plain/c1",
+      "run_b": "plain/c32",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": true,
+      "pools_identical": true
+    },
+    "stock c1 vs lever_v1 c1": {
+      "prompts": 320,
+      "diverged": 161,
+      "identical": 159,
+      "length_mismatch": 0,
+      "exposure_tokens": 47294,
+      "per_1k_tokens": 3.404237323973443,
+      "classes": {
+        "tie": 157,
+        "one_ulp": 3,
+        "near": 1
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.25,
+      "drift_median": 0.19990801811218262,
+      "drift_p99": 0.3512098789215088,
+      "drift_max": 0.3684718608856201,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain/c1",
+      "run_b": "plain__bb_lever_v1/c1",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": false,
+      "pools_identical": true
+    },
+    "stock c32 vs lever_v1 c32": {
+      "prompts": 320,
+      "diverged": 174,
+      "identical": 146,
+      "length_mismatch": 0,
+      "exposure_tokens": 45544,
+      "per_1k_tokens": 3.820481292815739,
+      "classes": {
+        "tie": 167,
+        "one_ulp": 6,
+        "near": 1
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.2500000596046448,
+      "drift_median": 0.1993401050567627,
+      "drift_p99": 0.35918164253234863,
+      "drift_max": 0.38722681999206543,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain/c32",
+      "run_b": "plain__bb_lever_v1/c32",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": false,
+      "pools_identical": true
+    }
+  },
+  "missing_pairs": [],
+  "mixed_pin_pairs": [],
+  "self_consistency": {
+    "plain/c1": {
+      "positions": 70042,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain__rep/c1": {
+      "positions": 70042,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain/c32": {
+      "positions": 70015,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain__rep/c32": {
+      "positions": 70042,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain__bb_lever_v1/c1": {
+      "positions": 70066,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain__bb_lever_v1/c32": {
+      "positions": 69816,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    }
+  }
+}

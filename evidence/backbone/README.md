@@ -7,9 +7,11 @@ This directory measures what SGLang runs for each projection, which kernels read
 weights are faster, and whether folding the norm (and the SiLU) into a GEMM pays. Scripts and
 commands are in [`experiments/backbone/`](../../experiments/backbone/).
 
-Status: everything below is a **microbenchmark** (measured) or a calculation from one
-(**derived**). Serving throughput and the exactness class of the engine levers are **pending**:
-a microbenchmark speed-up is not a served result.
+Status: the kernel, merge, norm and skeleton results are **microbenchmarks** (measured) or
+calculations from them (**derived**). [Served results](#served-results) add the exactness class
+of each engine switch (greedy outputs against stock plain decoding) and paired serving runs of
+the routing table against tuned plain decoding. The paired runs against tuned MTP and a trace of
+which GEMM kernels the served engine dispatches are **pending**.
 
 ## Setup
 
@@ -145,8 +147,206 @@ configuration:
   it streams any weight, and the A operand is formed in registers every iteration instead of being
   loaded asynchronously into the tensor-core pipeline.
 
+## Served results
+
+These runs use the backbone engine: SGLang at the paper's pin with patches 0001-0008
+(`engine/sglang/patches/backbone/`, branch head `59deb68e29`, clean worktree),
+`Qwen/Qwen3.5-4B@851bf6e8`, FlashInfer attention, one GH200. Every switch is off unless named.
+
+| Name | Switch | What it changes in plain decoding |
+|---|---|---|
+| off | none | nothing: the whole series with every switch off |
+| merge | `SGLANG_BACKBONE_MERGE_IN_PROJ=1` | the GDN `in_proj_qkvz` and `in_proj_ba` run as one packed cuBLAS GEMM from 64 rows (prefills of 64 or more tokens; decode batches of 64 or more requests); below 64 rows the two views are multiplied separately, as in stock |
+| gemv | `--bf16-gemm-backend gemv` (patch 0001) | SGLang's Hopper GEMV at M = 1 under SGLang's own size policy (N below 12,288 or at least 32,768: `out_proj`, `o_proj`, `down`, `qkv_proj`, `in_proj_ba`); `in_proj_qkvz` and `gate_up` stay on cuBLAS |
+| lever v1 | `SGLANG_BACKBONE_GEMM=1`, `SGLANG_BACKBONE_PDL=1`, `SGLANG_BACKBONE_MERGE_IN_PROJ=1`, `SGLANG_BACKBONE_GEMM_TABLE=<table>` | the routing table that `make_table.py --gemv-m1 --pdl --max-m 16` builds from `gemm_microbench.json` (SHA-256 `607479dec8ca5806b992c1d9381e99cf7d33f61b49329a07f09af04bde3ac2b3`; rebuilding it from the committed file gives the identical bytes): the Hopper GEMV for all seven projection shapes at M = 1, the Triton kernel with PDL at M = 2-16 for `in_proj_qkvz`, `out_proj`/`o_proj` and `gate_up` and at M = 8-16 for `down`, cuBLAS for `qkv_proj` and `in_proj_ba` from M = 2 and for every projection from M = 17, and the packed GDN input projection from 64 rows |
+
+### Exactness of each switch
+
+Each run generates greedy outputs for the state-safety prompt set (320 prompts, 256 new tokens,
+top-5 logprobs) with `experiments/state_safety/run_matrix.py`, configuration `plain`: radix cache,
+overlap scheduler and CUDA graphs on, static memory fraction 0.25. `experiments/state_safety/compare.py`
+finds each prompt's first token divergence from stock plain decoding and classifies it by the two
+runs' own margins between the competing tokens: an exact BF16 tie, one BF16 step, near (both
+margins at most 0.5 nats) or large ([`../state_safety/README.md`](../state_safety/README.md)).
+Classes follow `bench/arms.py`: **bitwise** means every token and every top-5 logprob is equal;
+**exact up to rounding** means every first divergence is a tie, one step or near, and no run
+commits a token that is not its own top-1.
+
+**Off, merge and gemv** ran at concurrency 1 with SGLang-sized pools, like the stock reference run
+(running limit 16; the five servers' KV pools held 93,544 to 160,610 tokens). No prefill in any of
+these runs reused a cached prefix, and two stock servers with different pools (97,672 and 133,885
+tokens) gave bitwise-equal outputs, so neither pool size nor request history entered the
+comparison ([`served/exactness_c1_unpinned.json`](served/exactness_c1_unpinned.json)).
+
+| Comparison | Prompts that diverge | Per 1,000 tokens | tie / one step / near / large | Class |
+|---|---|---|---|---|
+| stock, two fresh servers, c = 1 | 0 / 320 | 0 | - | bitwise (reference) |
+| stock, c = 1 against c = 32 on one server, cap 16 | 167 / 320 | 3.42 | 151 / 14 / 2 / 0 | batch-shape noise floor |
+| off against stock, c = 1 | 0 / 320 | 0 | - | **bitwise** |
+| merge against stock, c = 1 | 0 / 320 | 0 | - | **bitwise** |
+| gemv against stock, c = 1 | 174 / 320 | 3.75 | 164 / 8 / 2 / 0 | **exact up to rounding** |
+
+**Lever v1** ran with the pools pinned as in the state workstream's matrix (running limit 8,
+49,152 KV tokens, 40 GDN slots; the runner restarts a server until it gets exactly these), one
+server for a concurrency-1 pass and then, after a cache flush, a concurrency-32 pass, the session
+structure of the pinned stock repeat. At concurrency 32 the limit of 8 binds, so decode batches
+run at M = 1 to 8 and reach the Triton route
+([`served/exactness_lever_v1_pinned.json`](served/exactness_lever_v1_pinned.json)).
+
+| Comparison (pinned pools, cap 8) | Prompts that diverge | Per 1,000 tokens | tie / one step / near / large | Class |
+|---|---|---|---|---|
+| stock, two fresh servers, c = 1 | 0 / 320 | 0 | - | bitwise (reference) |
+| stock, two fresh servers, c = 32 | 4 / 320 | 0.06 | 4 / 0 / 0 / 0 | reference |
+| stock, c = 1 against c = 32 on one server | 41 / 320 | 0.63 | 39 / 2 / 0 / 0 | batch-shape noise floor at cap 8 |
+| lever v1 against stock, c = 1 | 161 / 320 | 3.40 | 157 / 3 / 1 / 0 | **exact up to rounding** |
+| lever v1 against stock, c = 32 | 174 / 320 | 3.82 | 167 / 6 / 1 / 0 | **exact up to rounding** |
+
+- **Off** is the no-op check of the series: all 320 outputs match stock in every token and
+  top-5 logprob.
+- **Merge** is bitwise in served outputs where it acts at concurrency 1: the 198 prompts of 64 or
+  more tokens are prefilled through the packed GEMM, and every output equals stock's, as the
+  per-GEMM microbenchmark predicted. Decode at concurrency 1 stays below the 64-row cutoff, so
+  this run does not cover the packed GEMM in decode.
+- **Gemv and lever v1** change exact ties. Every first divergence is rounding-level (the largest
+  margin is 0.25 nats; the one near event in each lever pass, `mt_bench-0079`, is two BF16 steps
+  against one), and no run commits a token that is not its own top-1 (0 of 69,816 to 70,066
+  positions per run). Both kernels sum each output in a different order from cuBLAS, which
+  changes 0.1-0.4% of output elements by one rounding (microbenchmark above); that is enough to
+  flip ties. Lever v1's rates, 3.40 and 3.82 per 1,000 tokens, are five to six times the
+  batch-shape floor at cap 8 (0.63); gemv's 3.75 compares with 3.42 at cap 16. A ratio to "the
+  floor" depends on which cap it names.
+
+### Paired serving: lever v1 against tuned plain decoding
+
+One exclusive hold (2026-10-01, 17:41-18:01 UTC) ran bench's harness (`bench.sweep`) on bench's
+workload (the mixed-v2 confirmation split, 512 output tokens with `ignore_eos`, greedy). The arm is
+`plain` with `disable-radix-cache`, `max-mamba-cache-size 128` and `max-total-tokens 1000000`,
+which are the flags of `plain-tuned` (static memory 0.85, running limit 128, stream interval 4;
+the harness's launch checks confirmed full CUDA-graph coverage and the overlap scheduler). Both
+arms run the backbone engine: A has every switch off, B sets lever v1's four variables. The order
+was B A A B, so the pairs (B1, A1) and (A2, B2) are adjacent, at c = 1, 8, 32 and 128 with 64, 64,
+256 and 1,024 measured requests. Foreign CPU load averaged 0.31-0.50 cores per point (largest
+single sample 1.74), below the 2-core limit, and no point is invalid
+([`served/plain_v1/`](served/plain_v1/)).
+
+| c | A: tokens/s, two runs | B: tokens/s, two runs | B/A per pair | A1-A2 spread | Decode step, A to B (derived) |
+|---|---|---|---|---|---|
+| 1 | 281.8, 282.0 | 291.8, 291.5 | 1.035, 1.034 | 0.07% | 3.482 to 3.366 ms (-116 us) |
+| 8 | 2,004.2, 1,998.9 | 2,011.6, 2,007.3 | 1.004, 1.004 | 0.26% | 3.870 to 3.860 ms (-10 us) |
+| 32 | 6,236.2, 6,229.3 | 6,253.2, 6,237.7 | 1.003, 1.001 | 0.11% | 4.940 to 4.932 ms (-8 us) |
+| 128 | 13,910.7, 13,913.9 | 14,052.5, 14,050.5 | 1.010, 1.010 | 0.02% | 8.891 to 8.805 ms (-86 us) |
+
+Throughput is `y` in `points.csv`; the decode step is the mean over the two runs of the inverse
+per-user decode rate (`x_decode`). A's rates are within 0.2% of bench's `plain-tuned`
+confirmation rates on stock SGLang, a different session, so carrying the patches costs nothing
+visible there.
+
+- **c = 1: 3.4% faster** in both pairs, 50 times the spread between the A runs. At M = 1 the table
+  sends every projection to the Hopper GEMV. The decode step is 116 us shorter; the
+  microbenchmarks bound the saving from all backbone GEMMs at 197 us (above), so the served step
+  keeps about 60% of the isolated gain.
+- **c = 8: 0.4% faster** in both pairs, just above the 0.26% spread. At M = 8 the Triton kernel
+  with PDL serves `in_proj_qkvz`, `out_proj`/`o_proj`, `gate_up` and `down`. The isolated
+  microbenchmarks give 98 us per step for those calls and the layer skeletons about 90 us; the
+  served decode step is 10 us shorter, about a tenth of that. Why is not known yet. A trace of
+  which GEMM kernels the served engine runs is pending (`experiments/backbone/insitu_gemm.py`).
+- **c = 32: no claim.** The ratios (1.001-1.003) are about the spread. At M = 32 the table keeps
+  every decode GEMM on cuBLAS and the packed projection is not used (cutoff 64), so only
+  prefills change.
+- **c = 128: 1.0% faster** in both pairs, 40 times the spread. At M = 128 only the packed GDN input
+  projection changes (cuBLAS either way). The merge microbenchmark predicts 81 us per step
+  (24 layers of 26.98 against 23.60 us); the served decode step is 86 us shorter.
+- These are two pairs from one session. The exactness class of what B serves is lever v1's
+  above: exact up to rounding.
+
+### GPU tests (hold 2)
+
+`tests/test_backbone_gemm.py` at repository commit `50978e2` (pull request #91's head) with the
+engine at `59deb68e29`: 25 passed, none skipped ([`gpu_tests_hold2.log`](gpu_tests_hold2.log)).
+They include the deferred-norm test of the merge cutoff and the test that the table's GEMV route
+is taken only on Hopper.
+
+### Folding variants in the layer skeletons (hold 2)
+
+Patch 0005's scaled norm prologue accumulates the sum of squares in the GEMM's main loop and
+applies the row scale to the product, so it reads x and the residual once instead of twice. It
+rounds the A operand before the scale rather than after it, so unlike the two-pass prologue it
+would not reproduce the stock norm's bits, and it needs a configuration without split-K. Hold 2
+timed it, and the SiLU fold alone, in the same skeletons as above (`chain_fold_variants_microbench.json`; foreign CPU 0.45 cores,
+[`hostload/h2_chain_fold_variants.json`](hostload/h2_chain_fold_variants.json)). Times are us per
+layer, medians of 30:
+
+| M | MLP stock | MLP Triton + PDL | SiLU folded | norm folded (scaled) | both folded | GDN stock | GDN Triton + PDL | GDN, norm folded (scaled) |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 48.33 | 46.81 | 46.98 | 182.74 | 182.80 | 32.70 | 30.77 | 122.59 |
+| 2 | 50.32 | 49.39 | 109.33 | 184.94 | 257.14 | 33.04 | 31.88 | 126.55 |
+| 4 | 51.10 | 49.92 | 110.25 | 183.64 | 255.48 | 33.61 | 32.45 | 125.20 |
+| 8 | 51.60 | 50.07 | 110.44 | 183.74 | 255.59 | 34.01 | 32.64 | 124.59 |
+| 16 | 51.01 | 49.97 | 102.58 | 111.06 | 184.99 | 34.69 | 32.78 | 123.52 |
+
+The scaled prologue is slower than the two-pass one: 2.2-3.8 times stock. The SiLU fold matches
+the unfused Triton kernel at M = 1 and doubles the MLP layer from M = 2. No folding variant built
+here pays at any M from 1 to 16, so folding the norm or the SiLU into the GEMM prologue is closed
+as a negative result. The stock and Triton rows repeat hold 1's to within 1.4 us.
+
 ## Pending
 
-The exactness class of each engine lever (greedy outputs against stock plain decode at c = 1,
-`experiments/state_safety/compare.py`, the #37 convention, against the 3.42 per 1,000 token noise
-floor) and paired serving runs against the tuned arms.
+- Paired serving of lever v1 against tuned MTP (B A A B at c = 1, 8, 32 and 128).
+- The in-situ trace: plain decoding under nsys at c = 1 and 16, with and without lever v1, read
+  by `insitu_gemm.py`, to see which GEMM kernels the served engine dispatches and why the c = 8
+  gain is a tenth of the isolated one.
+
+## Commands behind the served files
+
+The engine worktree is built as in [`engine/sglang/README.md`](../../engine/sglang/README.md);
+`<table>` is the output of
+`python experiments/backbone/make_table.py --gemm-json evidence/backbone/gemm_microbench.json --gemv-m1 --pdl --max-m 16 --out <table>`.
+Raw outputs stay in `~/vp-data/backbone/`.
+
+```sh
+SGLANG_WORKTREE=~/sglang-wt/backbone source scripts/sglang_env.sh
+# Exactness, off, merge and gemv: shared GPU lock, repository commit 50978e2, whose runner sized the
+# pools from free memory (on main that is run_matrix.py --no-pin).
+U=~/vp-data/backbone/state_runs
+python experiments/state_safety/run_matrix.py --configs plain --passes c1 --tag bb_off --out-dir $U --port 30470
+SGLANG_BACKBONE_MERGE_IN_PROJ=1 python experiments/state_safety/run_matrix.py --configs plain --passes c1 \
+    --tag bb_merge --out-dir $U --port 30470
+python experiments/state_safety/run_matrix.py --configs plain --passes c1 --tag bb_gemv --out-dir $U \
+    --port 30470 --extra-flags "--bf16-gemm-backend gemv"
+# Exactness, lever v1: shared GPU lock, repository commit 53e39a3 (pinned pools by default).
+SGLANG_BACKBONE_GEMM=1 SGLANG_BACKBONE_PDL=1 SGLANG_BACKBONE_MERGE_IN_PROJ=1 SGLANG_BACKBONE_GEMM_TABLE=<table> \
+    python experiments/state_safety/run_matrix.py --configs plain --passes c1,c32 --tag bb_lever_v1 \
+    --out-dir ~/vp-data/backbone/state_runs_pinned --port 30470
+# The stock references are the state workstream's runs (evidence/state_safety/README.md):
+# ~/vp-data/state/runs/plain{,__rep} (unpinned) and ~/vp-data/state/runs_pinned/plain{,__rep}.
+# compare.py reads one run root, so each regime gets a directory of links:
+#   unpinned: plain, plain__rep -> state's runs; plain__bb_{off,merge,gemv} -> $U
+#   pinned:   plain, plain__rep -> state's runs_pinned; plain__bb_lever_v1 -> state_runs_pinned
+for regime in unpinned pinned; do
+  out=evidence/backbone/served/exactness_$([ $regime = unpinned ] && echo c1_unpinned || echo lever_v1_pinned)
+  python experiments/state_safety/compare.py --runs ~/vp-data/backbone/compare/$regime --require-all \
+      --all-logprob-differences --pairs evidence/backbone/served/exactness_pairs_$regime.json \
+      --out-json $out.json --out-csv ${out}_events.csv --out-table ${out}_table.csv --out-meta ${out}_meta.json
+done
+# Paired serving: one exclusive hold, in the order B A A B (A: the same command without the --env
+# switches, label backbone-plain-v1-A), repository commit 50978e2.
+python -m bench.sweep --arm plain --set disable-radix-cache=true --set max-mamba-cache-size=128 \
+    --set max-total-tokens=1000000 --label backbone-plain-v1-B --sglang-worktree ~/sglang-wt/backbone \
+    --env SGLANG_BACKBONE_GEMM=1 --env SGLANG_BACKBONE_PDL=1 --env SGLANG_BACKBONE_MERGE_IN_PROJ=1 \
+    --env SGLANG_BACKBONE_GEMM_TABLE=<table> --concurrency 1 8 32 128 --repeats 1 --port 30471 \
+    --out ~/vp-data/backbone/e2e/plain-v1
+E=~/vp-data/backbone/e2e/plain-v1
+python -m bench.pareto $E/backbone-plain-v1-B/20261001-174115 $E/backbone-plain-v1-A/20261001-174617 \
+    $E/backbone-plain-v1-A/20261001-175126 $E/backbone-plain-v1-B/20261001-175633 --out <dir> \
+    --session-of 20261001-174115=abba-1 --session-of 20261001-174617=abba-1 \
+    --session-of 20261001-175126=abba-2 --session-of 20261001-175633=abba-2 \
+    --pair backbone-plain-v1-B:backbone-plain-v1-A --status paired --no-plot \
+    --class backbone-plain-v1-B=exact-up-to-rounding
+# served/plain_v1/ keeps points.csv, pairs.csv, launches.csv and frontier.csv from <dir>.
+# Hold 2, before the sweeps (exclusive lock, repository commit 50978e2):
+python -m pytest -q -p no:cacheprovider tests/test_backbone_gemm.py > evidence/backbone/gpu_tests_hold2.log
+python -m bench.hostload record --out <hostload.json> -- python experiments/backbone/gemm_bench.py chain \
+    --gemm-json evidence/backbone/gemm_microbench.json --m 1 2 4 8 16 --variants mlp_triton_pdl \
+    mlp_act_pdl mlp_normscaled_pdl mlp_both_scaled_pdl gdn_triton_pdl gdn_normscaled_pdl \
+    --out evidence/backbone/chain_fold_variants_microbench.json
+```

@@ -183,9 +183,12 @@ does on CUDA).
 | 0007 | The packed-projection row cutoff of 0004 applies only with the merge switch (Qwen4-Exp's own packed weights keep the original gate), and also on the deferred-norm branch | `SGLANG_BACKBONE_MERGE_IN_PROJ` | unchanged |
 | 0008 | A table entry of mode `gemv` calls the Hopper GEMV only on Hopper (CUDA compute capability 9.x; HIP excluded, since ROCm reports gfx94x as 9.x), as SGLang's own gemv backend requires; elsewhere the call falls back to cuBLAS | with `SGLANG_BACKBONE_GEMM` | unchanged |
 
-The routing table is JSON from `experiments/backbone/make_table.py`. Measured so far: the kernels
-and fusions in isolation and in layer skeletons (`evidence/backbone/README.md`). The exactness
-class and serving effect of the switches are pending.
+The routing table is JSON from `experiments/backbone/make_table.py`. Measured
+(`evidence/backbone/README.md`): the kernels and fusions in isolation and in layer skeletons;
+greedy outputs against stock plain decoding, where every switch off and the merge switch are
+bitwise equal and `--bf16-gemm-backend gemv` and the routing table (lever v1) are exact up to
+rounding; and paired serving of lever v1 against tuned plain decoding (3.4% faster at
+concurrency 1, 1.0% at 128). Serving against tuned MTP is pending.
 
 ## hostgap (`patches/hostgap/0001-0005`, branch `engine/hostgap`)
 
