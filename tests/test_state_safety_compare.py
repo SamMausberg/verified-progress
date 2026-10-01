@@ -88,3 +88,20 @@ def test_first_logprob_difference_without_a_token_change():
     assert row['first_logprob_diff'] == 2
     (same,) = compare_pair(a, a)
     assert same['first_logprob_diff'] is None
+
+
+def test_commit_length_homogeneity_with_no_divergences():
+    from cycles import by_commit_length
+
+    buckets = {
+        '1/0': {'divergences': 0, 'fragile': 10},
+        '2/1': {'divergences': 0, 'fragile': 5},
+        'prefill_token': {'divergences': 0, 'fragile': 3},
+    }
+    res = by_commit_length(buckets)
+    assert res['by_length']['1'] == {
+        'divergences': 0,
+        'fragile': 10,
+        'divergences_per_fragile': 0.0,
+    }
+    assert 'not_applicable' in res['homogeneity_chi2']

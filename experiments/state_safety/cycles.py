@@ -121,7 +121,11 @@ def by_commit_length(buckets: dict[str, dict[str, Any]]) -> dict[str, Any]:
     }
     used = [(d, f - d) for d, f in rows.values() if f > 0]
     test: dict[str, Any] = {'lengths': len(used)}
-    if len(used) >= 2:
+    if used and (sum(d for d, _ in used) == 0 or sum(r for _, r in used) == 0):
+        # No divergence at all (or every fragile position diverged): one common rate
+        # holds trivially and the test's expected counts would be zero.
+        test['not_applicable'] = 'an outcome has no observations at any commit length'
+    elif len(used) >= 2:
         from scipy.stats import chi2_contingency
 
         chi2, p, dof, _ = chi2_contingency(used)
