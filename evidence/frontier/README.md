@@ -23,7 +23,7 @@ carry the repair README's pending-exactness label for the Triton GDN verify kern
 |---|---|---|---|
 | P-A | A1: perfect-event oracle (the proposal's rule) | rejected for every budget r <= 16; not rejected at r = 32 (5.75x, 95% CI 5.60-5.90, with `copy`) | |
 | P-A | A2: controllers drawing tokens from DFlash's top-16 or the interpreter | support 0.924 per position (needs 0.9892 at B = 64, 0.9925 at B = 256): rejected at both widths | **no-go** |
-| P-B | B1: first-gap bound, anchor counts 2, 4, 8, 16 | E[G*] <= 13.7 to 37.0 at B = 64 (needs 44.4) and <= 39.7 at B = 256 (needs 111.6): all rejected | **no-go** |
+| P-B | B1: first-gap bound, anchor counts 2, 4, 8, 16 | E[G*] <= 14.4 to 37.0 at B = 64 (needs 44.4) and <= 43.4 at B = 256 (needs 111.6): all rejected | **no-go** |
 | P-C | C1: one-sweep bound with point-predictor interpreters | at most 1.60 (`copy`) and 2.00 (`mix`) accepted drafts per boundary against 3.56 for fresh DFlash: rejected | **no-go** |
 
 The common cause: each proposal still needs a drafter far more accurate per token than
@@ -153,12 +153,12 @@ given its correct first token, S'(m) = max(S_D(m), S_D(m+1)/S_D(1)) from
 
 | B | anchors r | spacing | E[G*] bound | best domain | each gap like the first (estimate) | gap acceptance needed | verdict |
 |---|---|---|---|---|---|---|---|
-| 64 | 2 | 32 | 13.7 | 21.1 (code) | 10.6 | 0.983 | rejected |
-| 64 | 4 | 16 | 13.7 | 21.1 (code) | 8.3 | 0.972 | rejected |
+| 64 | 2 | 32 | 14.4 | 21.9 (code) | 11.0 | 0.983 | rejected |
+| 64 | 4 | 16 | 14.4 | 21.9 (code) | 8.4 | 0.972 | rejected |
 | 64 | 8 | 8 | 23.3 | 29.8 (code) | 7.9 | 0.944 | rejected |
 | 64 | 16 | 4 | 37.0 | 43.9 (MATH-500) | 8.0 | 0.879 | rejected |
 | 64 | 32 | 2 | 55.3 | 58.1 (MATH-500) | 14.2 | 0.684 | not rejected |
-| 256 | 2 to 16 | 128 to 16 | 39.7 | 70.9 (code) | 8.3 to 25.4 | 0.944 to 0.990 | rejected |
+| 256 | 2 to 16 | 128 to 16 | 43.4 | 75.3 (code) | 8.4 to 27.7 | 0.944 to 0.990 | rejected |
 | 256 | 32 | 8 | 85.0 | 112.1 (code) | 7.9 | 0.885 | rejected |
 | 256 | 64 | 4 | 144.1 | 172.6 (MATH-500) | 8.0 | 0.755 | not rejected |
 
@@ -203,9 +203,13 @@ full logits, or one that is itself a strong drafter.
 ## Commands
 
 The pre-registered generators ran at `adc4865` (`frame.json`, `innovation_oracle.json`,
-`defect_oracle.json`); `anchor_bound.json` was regenerated at `61bc9cd`, which adds two
-reporting fields and leaves the rule unchanged. Each JSON records its repo commit and the
-SHA-256 of its generators and inputs.
+`defect_oracle.json`). `anchor_bound.json` was regenerated twice after the first run, with
+the rule unchanged: at `61bc9cd`, which adds two reporting fields, and at `f4a9665`, a
+correction. The first run's extension past slot 15 multiplied the slot-1-conditioned survival
+by DFlash's position-15 acceptance once more, an extra decay that the rule's no-further-decay
+extension excludes; it understated the bound for gaps longer than 15 (B = 256: 39.7 instead
+of 43.4; B = 64 with 2 or 4 anchors: 13.7 instead of 14.4). No verdict changed. Each JSON
+records its repo commit and the SHA-256 of its generators and inputs.
 
 ```sh
 source scripts/sglang_env.sh
