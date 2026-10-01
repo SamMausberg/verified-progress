@@ -39,6 +39,7 @@ Buffered GDN verify (engine patches 0002 and 0003):
 | `summarize_replay_check.py` | One table from those runs: bitwise-identical sequences, first-divergence classes, tokens per cycle, foreign CPU load and the resolved pools of each arm |
 | `run_fold_localize.sh`, `fold_localize.py` | Fold against stock with identical pinned pools: traced runs at concurrency 1 located cycle by cycle, and deterministic batched waves (DFlash waves of 4, MTP waves of 8) with a stock repeat |
 | `run_phase_timing.sh`, `phase_summary.py` | Per-phase GPU time of the DFlash cycle (draft, verify, commit, ...) for stock, circular and fold at concurrency 8 and 16 with identical pinned pools (the repair workstream's CUDA-event probe), and the GDN kernels each arm runs; exclusive hold |
+| `run_fold_timing.sh`, `ab_timing_summary.py` | Serving A/B of the fold against stock verify on the bench's tuned DFlash arms (blocks 16 and 8), c = 1-32, order stock, fold, fold, stock; the summary gives per-run throughput, tokens per cycle, the ratio of the means and its range over run pairs, foreign CPU load and pools; exclusive hold |
 
 Training data, training and the P6 screen:
 

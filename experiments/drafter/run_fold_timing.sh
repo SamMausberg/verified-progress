@@ -35,4 +35,4 @@ for block in "${blocks[@]}"; do
   python -m bench.sweep "${common[@]}" "${fold[@]}" --label "b$block-fold-r2"
   python -m bench.sweep "${common[@]}" --label "b$block-stock-r2"
 done
-python "$here/fold_timing_summary.py" "$out" --out "$out/summary.json"
+python "$here/ab_timing_summary.py" "$out" --base stock --test fold --out "$out/summary.json"
