@@ -43,6 +43,7 @@ import torch.nn.functional as F
 MODEL = 'Qwen/Qwen3.5-4B'
 REVISION = '851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a'
 K = 128
+KINDS = ('energy', 'query', 'product')
 
 
 def load_model() -> Any:
@@ -109,10 +110,14 @@ def bases(cq: torch.Tensor, ck: torch.Tensor, kind: str, r: int) -> torch.Tensor
         m = ck
     elif kind == 'query':
         m = cq
-    else:
+    elif kind == 'product':
         evals, evecs = torch.linalg.eigh(ck)
         root = evecs @ torch.diag_embed(evals.clamp_min(0).sqrt()) @ evecs.transpose(-1, -2)
         m = root @ cq @ root
+    else:
+        raise ValueError(f'unknown basis kind {kind!r}')
+    if not 1 <= r <= K:
+        raise ValueError(f'rank {r} outside 1..{K}')
     _, vecs = torch.linalg.eigh(m)
     return vecs[..., -r:].flip(-1).float().contiguous()  # [H, K, r]
 
@@ -162,6 +167,14 @@ def retrieval(model: Any, tok: Any, probes: list[dict[str, Any]]) -> tuple[float
     return hits / len(probes), sum(logps) / len(logps)
 
 
+def rank(text: str) -> int:
+    """An argparse type for a state rank: an integer in 1..K."""
+    value = int(text)
+    if not 1 <= value <= K:
+        raise argparse.ArgumentTypeError(f'rank {value} outside 1..{K}')
+    return value
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument(
@@ -173,8 +186,8 @@ def main() -> None:
     parser.add_argument('--calib-count', type=int, default=24)
     parser.add_argument('--eval-count', type=int, default=8)
     parser.add_argument('--probes', type=int, default=24)
-    parser.add_argument('--ranks', type=int, nargs='+', default=[32, 64, 96, 128])
-    parser.add_argument('--kinds', nargs='+', default=['energy', 'query', 'product'])
+    parser.add_argument('--ranks', type=rank, nargs='+', default=[32, 64, 96, 128])
+    parser.add_argument('--kinds', nargs='+', choices=KINDS, default=list(KINDS))
     parser.add_argument('--out', type=Path, required=True)
     args = parser.parse_args()
     from transformers import AutoTokenizer
