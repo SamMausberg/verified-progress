@@ -32,3 +32,33 @@ python experiments/repair/analyze_jacobi.py ~/vp-data/drafter/trace/b16 ~/vp-dat
 
 (`jacobi_summary.json`, which the same command writes, repeats the results without the
 provenance and is not kept.)
+
+## Stage A: perfect continuations at width B (P2 Arm A, P3 Stage A)
+
+`stage_a_timing.json` (measured), `stage_a_oracle.json`, `stage_a_oracle.csv` (derived).
+
+Session `~/vp-data/repair/runs/timing1/run_timing.sh` under the exclusive lock on
+2026-10-01 00:04-00:41 UTC: SGLang with the DFlash drafter at block widths B = 16, 32, 64,
+128 and 256, verification forced to accept the whole block (`SGLANG_SIMULATE_ACC_LEN=B`, so a
+cycle commits exactly B tokens and costs what a perfect B-token candidate would cost), and the
+real DFlash cycle at blocks 16 and 8. Eight MATH-500 problems (`panel.py math --n 8`), 2,048
+tokens each (forced runs ignore EOS), concurrency 1, `--max-running-requests 1`, the
+configuration of the drafter workstream's shared trace (flashinfer attention and GDN kernels,
+overlapped plan stream, default prefill graphs, `--stream-interval 4`). Foreign CPU load
+during every run stayed below 0.6 cores (`run.json` in each run directory). Per-cycle GPU
+phase times come from CUDA events in the engine probe; the cycle period is measured on the
+GPU timeline between consecutive cycle starts.
+
+```sh
+gpu_lock.sh -x ~/vp-data/repair/runs/timing1/run_timing.sh
+python experiments/repair/analyze_timing.py ~/vp-data/repair/runs/timing1/force_b* \
+    ~/vp-data/repair/runs/timing1/fresh_b* --out evidence/repair/stage_a_timing.json
+python experiments/repair/stage_a.py --timing evidence/repair/stage_a_timing.json \
+    --baseline fresh_b16 --state-bytes-bound --out-dir evidence/repair
+```
+
+The ReplaySSM spec protocol does not start with DFlash on this GDN model ("requires a KDA
+model"), and the session's GDN kernel microbenchmark was stopped after 16 minutes of CPU-bound
+kernel compilation without output, so this table bounds the per-position state writes inside
+V(B) by their bytes at 3.0 TB/s (labelled `state_writes_source`); measured no-state verify
+times replace the bound when the decomposition session lands.

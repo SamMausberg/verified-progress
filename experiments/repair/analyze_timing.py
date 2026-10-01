@@ -77,7 +77,8 @@ def match_groups(
 
     The log also holds the server's own warm-up request, health checks, the driver's
     warm-up and the flush request; a recorded request's group commits its output length
-    (plus at most one block past a max_new_tokens cut).
+    plus at most two blocks past the stop (the overlap scheduler runs one more cycle
+    before it sees that the request finished).
     """
     kept = []
     i = 0
@@ -87,7 +88,7 @@ def match_groups(
             group = groups[i]
             i += 1
             total = 1 + sum(r['commit'][0] for r in group)
-            if n <= total <= n + block:
+            if n <= total <= n + 2 * block + 1:
                 kept.append(group)
                 break
     return kept

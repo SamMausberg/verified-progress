@@ -68,7 +68,12 @@ def main() -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     ap.add_argument('--timing', type=Path, required=True)
-    ap.add_argument('--gdn', type=Path, required=True)
+    ap.add_argument('--gdn', type=Path, default=None, help='gdn_state_bench.py output (optional)')
+    ap.add_argument(
+        '--state-bytes-bound',
+        action='store_true',
+        help='without no-state runs, bound the state writes by their bytes at the HBM write rate',
+    )
     ap.add_argument(
         '--baseline', default='fresh_b16', help='run directory name of the real DFlash baseline'
     )
@@ -84,7 +89,7 @@ def main() -> None:
     args = ap.parse_args()
 
     rows = json.loads(args.timing.read_text())
-    gdn = json.loads(args.gdn.read_text())
+    gdn = json.loads(args.gdn.read_text()) if args.gdn else {'blocks': {}}
     by_name = {Path(r['run']).name: r for r in rows}
     base = by_name.get(args.baseline)
     cd = args.cd_us if args.cd_us is not None else med(base or {}, 'cycle_period_us', 'median')
@@ -102,8 +107,17 @@ def main() -> None:
         return 1.0 / (f + (1.0 - f) / s)
 
     table = []
+
+    def no_state(r: dict[str, Any]) -> bool:
+        return 'SGLANG_REPAIR_DROP_VERIFY_STATES' in (r.get('probe_env') or {})
+
+    nostate = {
+        int(r['block']): med(r, 'phase_us', 'verify', 'median')
+        for r in by_name.values()
+        if r['mode'] == 'force' and no_state(r)
+    }
     for name, row in sorted(by_name.items(), key=lambda kv: (kv[1]['mode'], kv[1]['block'])):
-        if row['mode'] != 'force':
+        if row['mode'] != 'force' or no_state(row):
             continue
         B = int(row['block'])
         replay_protocol = 'enable-linear-replayssm-spec' in ' '.join(row.get('command') or [])
@@ -116,6 +130,14 @@ def main() -> None:
         states = (med(g, 'verify_states', 'median_us') or 0.0) - (
             med(g, 'verify_outputs', 'median_us') or 0.0
         )
+        state_source = 'microbenchmark' if g else 'none'
+        no_state_verify = nostate.get(B)
+        if verify is not None and no_state_verify is not None:
+            states = verify - no_state_verify
+            state_source = 'measured: forced acceptance without per-position states'
+        elif not g and args.state_bytes_bound:
+            states = B * 24 * 32 * 128 * 128 * 4 / (write_tbps * 1e12) * 1e6
+            state_source = 'bound: per-position state bytes at the HBM write rate'
         replay_a = med(g, 'replay_a', 'median_us')
         if verify is None or commit is None or period is None:
             continue
@@ -134,6 +156,7 @@ def main() -> None:
                 'V_us': verify,
                 'V_without_state_writes_us': v0,
                 'state_writes_in_verify_us': 0.0 if replay_protocol else states,
+                'state_writes_source': state_source,
                 'commit_us': commit,
                 'C_state_us': c_state_sglang,
                 'C_state_boundary_replay_us': (replay_a or 0.0) if replay_a is not None else None,
