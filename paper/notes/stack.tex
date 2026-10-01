@@ -135,7 +135,7 @@ SGLang's packed GDN input projection, one GEMM over the concatenated $12{,}352\t
 \caption{Levers by axis. A change of the target's attention backend changes the target's arithmetic, so it is classed by its greedy outputs like any other lever. $^\ast$The replay fold is written as a bitwise clone of the verify kernel's state update, but the verify outputs come from a chunked transform on TF32 tensor cores, whose rounding differs from the recurrent kernel's by more than a reassociation; that mechanism suggested lossy, but every first divergence of the buffered MTP arm from stock MTP is rounding-level~\ev{bench-equality}.}
 \label{tab:axes}
 \vskip 0.05in
-\begin{tabularx}{\linewidth}{@{}P{2.9cm}YP{1.7cm}P{4.6cm}@{}}\toprule
+\begin{tabularx}{\linewidth}{@{}P{2.5cm}YP{1.7cm}P{5.7cm}@{}}\toprule
 Axis & Lever & Class & Status\\\midrule
 Progress per verify pass & MTP and DFlash drafting, deeper chains, trees where the GDN path allows, n-gram drafting & exact & Chosen in single runs on the tuning split: MTP with three steps, DFlash blocks 16, 8 and 4 by concurrency (Table~\paperref{tab:tuning} of the paper); trees and n-gram drafting not searched; served comparison~\ev{bench-frontier}\\
 & Relaxed greedy acceptance within $g$ logits & lossy & \pend{moonshot-patches}\\
