@@ -57,7 +57,7 @@ All are off by default; with none set the patched engine runs its stock code.
 
 ## The SGLang patch series
 
-`engine/sglang/patches/kernel/0001-0004` apply in order to `bd66ce34`:
+`engine/sglang/patches/kernel/0001-0005` apply in order to `bd66ce34`:
 
 ```sh
 scripts/sglang_worktree.sh kernel
@@ -72,6 +72,7 @@ export SGLANG_CERTIFIED_HEAD_SRC="$PWD/src" SGLANG_CERTIFIED_HEAD_DECODE=1
 | 0002 | greedy target verify: the same in the TARGET_VERIFY graphs; the ids replace the argmax in `eagle_sample` (EAGLE/MTP) and in DFlash's accept step | `VERIFY` |
 | 0003 | MTP draft top-1 (draft steps in the draft graph, and the draft-extend token) and DFlash's greedy draft projection | `DRAFT` |
 | 0004 | fixed-noise sampled verify for EAGLE/MTP (seeded, temperature only; needs `--enable-deterministic-inference`) | `SAMPLED_VERIFY` |
+| 0005 | the stats file records the row counts of certified steps | `STATS` |
 
 Patch 0004 needs `--enable-deterministic-inference`, which is what gives every
 request a seed; its reference is stock SGLang in that mode (a different engine
