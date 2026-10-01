@@ -82,7 +82,9 @@ def launch(config: str, out_dir: Path, port: int, extra: dict[str, object]):
     shared = SHARED_FLAGS['speculative' if speculative else 'plain']
     flags = {**lever_flags, **shared, **extra}
     if flags.get('disable-radix-cache'):
-        flags.pop('max-mamba-cache-size', None)
+        # One slot per request: drop the arm default's slot count (640 FP32 slots
+        # would not fit a shared-mode budget), and size the pool by max-running.
+        flags['max-mamba-cache-size'] = False
     arm = resolve_arm(base, flags)
     model = target_model(levers)
     arm = Arm(

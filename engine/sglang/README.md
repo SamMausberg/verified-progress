@@ -40,7 +40,7 @@ the head read. The hooks run in Python between forwards, so the server must run 
 wrong forward mode or row count is skipped with a warning rather than misaligned. The
 patch adds device-to-host copies on every step and is for measurement only.
 
-## moonshot (`patches/moonshot/0001-0008`, branch `engine/moonshot`)
+## moonshot (`patches/moonshot/0001-0009`, branch `engine/moonshot`)
 
 The series applies in order to `bd66ce343e` on its own:
 
@@ -62,6 +62,7 @@ Every change is off unless its flag or environment variable is set.
 | 0006 | Under an 8-bit GDN state, the ReplaySSM decode ring keeps 16-bit (d, k) records, so the state is rounded to 8 bits only at a flush. | unchanged for FP32/FP16/BF16 state |
 | 0007 | `SGLANG_GDN_EXACT_REPLAY=1` with `--enable-linear-replayssm`: rounding-preserving live replay for GDN decode. The ring stores the packed decode's own FP32 operands (normalized key, raw value, g, beta) and every step replays them from the dense anchor in the packed kernel's order; the anchor is written every `--linear-replayssm-cache-len` steps. Designed to be bit-identical to the packed decode; validation pending (`tests/test_gdn_exact_replay.py`, `experiments/moonshot/gdn_exact_replay_check.py`). FP32 state only. | unchanged |
 | 0008 | With `SGLANG_GDN_EXACT_REPLAY=1` but no ring (no `--enable-linear-replayssm`, or no beta ring), decode raises instead of silently running another kernel; the first exact-replay dispatch is logged ("GDN decode: exact replay kernel, ring length L"). | unchanged when the flag is off |
+| 0009 | `SGLANG_GDN_EXACT_REPLAY_BV` selects the exact-replay value tile (default 32, the packed decode's); any other value must be re-checked for bit-equality. | unchanged (32) |
 
 Tests: `tests/test_moonshot_levers.py` and `tests/test_gdn_exact_replay.py` (the engine
 tests run in the SGLang venv with the worktree on `PYTHONPATH` and skip elsewhere).
