@@ -18,12 +18,12 @@ Row-wise or column fallback & Per-position fallback\\
 The programme & The research behind the paper, organized as questions H1--H7 and proposals P1--P13 and P-A to P-C (Table~\ref{tab:status})\\
 H1--H7, P1--P13, P-A to P-C & Labels of those questions and proposals; Table~\ref{tab:status} gives each one, its test and its status\\
 Kill test & A test fixed before a proposal is built, designed to reject it cheaply\\
-First matrix, pinned matrix & The unpinned and pinned runs of Appendix~\paperref{app:divergence} of the paper\\
+First matrix, pinned matrix & The cap-16 and cap-8 runs of Appendix~\paperref{app:divergence} of the paper\\
 Second panel & The 80 prompts of the drafter's equality and acceptance runs (Section~\ref{app:drafter-acceptance})\\\bottomrule
 \end{tabularx}
 \end{table}
 
-Evidence is marked as in the paper. A committed result cites its entry in the register of these notes (Section~\ref{notes:register}), printed as [N-E$n$]; a designed result without a committed file carries [pending N-D$n$], and the pending list says where its evidence is to be committed. The paper numbers its own entries without the prefix, E$n$ and D$n$, so an ID never means two things; an entry that both documents cite appears in both registers with the same files. Oracle bounds, derived estimates and single runs are labelled as such where they are reported, and a refuted proposal stays with the mechanism that refuted it.
+Evidence is marked as in the paper. A committed result cites its entry in the register of these notes (Section~\ref{notes:register}), printed as [N-E$n$]; a designed result without a committed file carries [N-D$n$], with words beside it saying that the result is not yet measured, and the pending list says where its evidence is to be committed. The paper numbers its own entries without the prefix, E$n$ and D$n$, so an ID never means two things; an entry that both documents cite appears in both registers with the same files. Oracle bounds, derived estimates and single runs are labelled as such where they are reported, and a refuted proposal stays with the mechanism that refuted it.
 
 The notes build from the repository's \path{paper/} directory after the paper, with \code{latexmk -pdf notes/research\_notes.tex}.
 

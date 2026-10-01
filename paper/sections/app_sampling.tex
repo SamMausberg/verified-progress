@@ -1,14 +1,30 @@
 % Appendix B: sampled decisions, further analysis.
-% Proofs: Theorem fixednoise (statement in the main text), Propositions coupling,
-% commonmass, boundedrange, kl, frontier, Theorems guards, residualrace, residualself.
-% None of these constructions is implemented on the GPU; the synthetic experiment is a
-% CPU work count (register entry synthetic).
+% States and proves Theorems race and fixednoise (Definition srace); Proposition coupling and
+% Theorems guards, residualrace and residualself with their proofs. None of the alternatives
+% to fixed-noise verification is implemented on the GPU.
 \section{Sampled decisions: further analysis}\label{app:sampling}
-The engine path of Section~\ref{sec:decisions} verifies sampled drafts with a fixed noise field, which turns every sampled decision into a race. This appendix proves the theorem behind that choice and develops what the choice avoids: the standard acceptance rule evaluated with enclosures, residual races and adaptive verification depth. Every statement takes enclosures of the logits as input and does not depend on the mechanism that produced them, so it applies to transport as well as to the int8 copy. None of these alternatives is implemented on the GPU. Sampling before the scores are known, an approximate mode, a demand frontier and a CPU experiment that shows why the alternatives were not built are in the research notes.
+The engine path of Section~\ref{sec:decisions} verifies sampled drafts with a fixed noise field, which turns every sampled decision into a race. This appendix states and proves the two theorems behind that choice, the certified race and fixed-noise verification (Appendix~\ref{app:fixednoise}), and develops what the choice avoids: the standard acceptance rule evaluated with enclosures, residual races and adaptive verification depth. Every statement takes enclosures of the logits as input and does not depend on the mechanism that produced them, so it applies to transport as well as to the int8 copy. None of these alternatives is implemented on the GPU. The research notes treat sampling before the scores are known, an approximate mode, a demand frontier over a fixed protocol and a CPU experiment that shows why the alternatives were not built (their Sections~\notessec{app:commonmass}{7.4} to~\notessec{app:synthetic}{7.7}).
 
-\subsection{Fixed-noise verification and the rest of the random-number contract}\label{app:fixednoise}
-\begin{proof}[Proof of Theorem~\ref{thm:fixednoise}]
-By induction on positions, every accepted token equals the argmax at a prefix equal to $Y_{<t}$, so it is $Y_t$; at the first mismatch the prefix is $Y_{<t}$ and the emitted token is $Y_t$. The drafter changes only how many positions one target pass verifies, so the output is the same for every drafter and depth policy. Given $Y_{<t}$, the field $G_{t,\cdot}$ is independent of $z_t(Y_{<t})$, so $Y_t\mid Y_{<t}\sim\softmax(z_t(Y_{<t})/T)$ by the Gumbel-max identity.
+\subsection{The certified race and fixed-noise verification}\label{app:fixednoise}
+A sampled decision has a reference of its own beside the three of Definition~\ref{def:contracts}.
+\begin{definition}[Sampled reference]\label{def:srace}
+For $T>0$ and a fixed noise vector $g\in\R^V$, \Srace{} returns $\min\{i:z_i/T+g_i=\max_j(z_j/T+g_j)\}$.
+\end{definition}
+
+\begin{theorem}[Certified race]\label{thm:race}
+For a fixed noise vector $g$ and $T>0$, the ladder with $f_i(x)=x/T+g_i$ returns the token of a dense race with the same $g$ and tie rule. If the $g_i$ are i.i.d.\ standard Gumbel and independent of $z$, that token has law $\softmax(z/T)$.
+\end{theorem}
+\begin{proof}
+Each $f_i$ is nondecreasing, so Theorem~\ref{thm:ladder} returns $\min\argmax_i(z_i/T+g_i)$, which is \Srace. The law is the Gumbel-max identity~\cite{gumbel1954,papandreou2011}; ties have probability zero.
+\end{proof}
+Bounding the perturbed scores so that most of them need not be computed is the principle of A$^\ast$ Sampling and of lazy Gumbel sampling~\cite{astar,mussmann2017}; a keyed field adds pathwise equality with the dense race.
+
+\begin{theorem}[Fixed-noise verification]\label{thm:fixednoise}
+Let $g_{t,i}$ be keyed by (seed, absolute position $t$, token $i$) and i.i.d.\ standard Gumbel, and let $Y_t=\min\argmax_i(z_{t,i}(Y_{<t})/T+g_{t,i})$. A speculative decoder that accepts a drafted token if and only if it equals $\argmax_i(z_{t,i}(x_{<t})/T+g_{t,i})$ at its drafted prefix, and emits that argmax at the first mismatch, outputs $Y$ for every drafter and every rule for how many tokens to draft, and $Y$ has the target's autoregressive law.
+\end{theorem}
+This is the drafter-invariant construction of \citet{daliri2025}; it turns sampled verification into an argmax that Theorem~\ref{thm:race} certifies.
+\begin{proof}
+By induction on positions, every accepted token equals the argmax at a prefix equal to $Y_{<t}$, so it is $Y_t$; at the first mismatch the prefix is $Y_{<t}$ and the emitted token is $Y_t$. The drafter changes only how many positions one target pass verifies, so the output is the same for every drafter and depth policy. Given $Y_{<t}$, the field $g_{t,\cdot}$ is independent of $z_t(Y_{<t})$, so $Y_t\mid Y_{<t}\sim\softmax(z_t(Y_{<t})/T)$ by the Gumbel-max identity.
 \end{proof}
 The theorem treats $z_t$ as a function of the prefix alone, which the engine does not guarantee (Section~\ref{sec:same-shape} and Appendix~\ref{app:divergence}); the contract of Section~\ref{sec:decisions} is scoped accordingly.
 
@@ -16,7 +32,7 @@ A keyed field is what gives pathwise equality with the dense race: in the exact 
 
 Two further conditions complete the random-number contract of Section~\ref{sec:decisions}. Equality in distribution, as opposed to seeded equality, needs i.i.d.\ noise with the correct marginal that is independent of the proposal draw, the acceptance uniform and the scores; a residual race (Appendix~\ref{app:residual}) also needs independence from the acceptance event. And a hash with $2^{32}$ levels makes the law exact only for the idealized continuous field; the stock seeded sampler shares that approximation.
 
-\paragraph{Truncated sampling}\label{app:truncated} The Gumbel-max identity has a top-$k$ form that samples $k$ tokens without replacement~\cite{kool2019}. Top-$k$ sampling applies the ladder to membership (drop $i$ when $hi_i$ is below the $k$-th largest $lo$) and races over the certified set. With noise keyed by token, as in the full-vocabulary race, this gives equality in distribution with top-$k$ sampling from the reference scores and, once the engine's tie semantics at the $k$-th position are matched, pathwise equality with a token-keyed dense race over the same set. It does not give seeded equality with SGLang's sampler at the pin.
+\paragraph{Truncated sampling}\label{app:truncated} The Gumbel-max identity has a top-$k$ form that samples $k$ tokens without replacement~\cite{kool2019}. Top-$k$ sampling applies the ladder to membership (drop $i$ when $hi_i$ is below the $k$-th largest $lo$) and races over the certified set. With noise keyed by token, as in the full-vocabulary race, this gives equality in distribution with top-$k$ sampling from the reference scores and, once the engine's tie semantics at the $k$-th position are matched, pathwise equality with a token-keyed dense race over the same set. It does not give seeded equality with SGLang's sampler at the pinned SGLang commit (Appendix~\ref{app:pins}).
 
 That sampler's seeded top-$k$ and top-$p$ path sorts the probabilities, keys each token's Gumbel noise by the token's rank among the sorted probabilities rather than by its index, and maps the winner back to a token through the sort's permutation, so the noise a token receives depends on its rank~\cite{sglangsampler}. Seeded equality with that path therefore needs, beyond membership, the complete order within the certified set: enclosures of the FP32 probabilities the sampler sorts that are strictly separated for every pair of members whose ranks could otherwise differ, and \code{torch.sort}'s order where probabilities are equal. The pinned sampler also refuses min-$p$ with a seed. Its full-vocabulary seeded path keys the noise by token index, and that is the case the certified race of Section~\ref{sec:decisions} covers.
 
@@ -25,19 +41,19 @@ Other truncations differ in what they need. Min-$p$ admits $i$ when $z_i\ge z_{\
 \subsection{Acceptance under fixed-noise coupling}\label{app:coupling}
 Fixed-noise verification of a sampled draft accepts less often than the standard rule. The proposition says by how much.
 \begin{proposition}[Acceptance under fixed-noise coupling]\label{prop:coupling}
-Suppose that the drafter proposes the token $\argmax_i(\log q_i+G_i)$ and that the target accepts it exactly when it equals $\argmax_i(\log p_i+G_i)$. Then
+Suppose that the drafter proposes the token $\argmax_i(\log q_i+g_i)$ and that the target accepts it exactly when it equals $\argmax_i(\log p_i+g_i)$. Then
 \begin{gather*}
 P(\mathrm{accept})=\sum_i\Bigl(\sum_j\max\bigl(\tfrac{p_j}{p_i},\tfrac{q_j}{q_i}\bigr)\Bigr)^{-1},\\
 \tfrac12\sum_i\min(p_i,q_i)\le\sum_i\frac{p_iq_i}{p_i+q_i}\le P(\mathrm{accept})\le\sum_i\min(p_i,q_i).
 \end{gather*}
 \end{proposition}
 \begin{proof}
-Both choose $i$ if and only if $G_i>\max_{j\ne i}(G_j+m_j)$ with $e^{m_j}=\max(p_j/p_i,q_j/q_i)$, an event of probability $(1+\sum_{j\ne i}e^{m_j})^{-1}$. The bounds follow from $\max(x,y)\le x+y$, from $\max(x,y)\ge x$ and $\max(x,y)\ge y$ summed over $j$, and from $p+q\le2\max(p,q)$.
+Both choose $i$ if and only if $g_i>\max_{j\ne i}(g_j+m_j)$ with $e^{m_j}=\max(p_j/p_i,q_j/q_i)$, an event of probability $(1+\sum_{j\ne i}e^{m_j})^{-1}$. The bounds follow from $\max(x,y)\le x+y$, from $\max(x,y)\ge x$ and $\max(x,y)\ge y$ summed over $j$, and from $p+q\le2\max(p,q)$.
 \end{proof}
 Per position, fixed-noise acceptance of a sampled draft is therefore at most the standard rule's rate $1-\TV(p,q)$ and at least half of it, and the two agree when $p=q$. For SGLang's default point-mass drafts the question does not arise: the stock rule accepts a draft $d$ with probability $p(d)$, and so does the keyed race. Whether a cheaper certificate pays for any lost acceptance with sampled drafts is an empirical question, and the acceptance under fixed-noise coupling against standard verification on real drafts has not been measured~\pend{geometry-accept}.
 
 \subsection{The standard acceptance rule with enclosures}\label{app:guards}\label{sec:guards}\label{sec:standard-rule}
-At the pin, SGLang's sampled speculative verification uses point-mass drafts by default: a drafted token is accepted when a uniform coin falls below the target probability mass of the siblings tried so far, and a rejection samples the target restricted to the untried tokens by inverse CDF (code reading). In general, let $p$ be the target law at the reached prefix and $q$ the \emph{actual} proposal law, conditional on the information used to produce the proposal. A softmax buffer from a different selector is not $q$, and a deterministic proposal is a point mass. The standard one-step correction accepts $X\sim q$ with probability $\min(1,p_X/q_X)$ and otherwise samples $(p-q)_+$ normalized; the accepted mass at $i$ is $\min(p_i,q_i)$ and the residual contributes $(p_i-q_i)_+$, which sum to $p_i$~\cite{specdecode,chen2023specsampling}. SpecTr and block verification extend the rule to several drafts and to whole blocks~\cite{spectr,blockverify}. A certificate may change how this comparison is evaluated, never the law used in it.
+At that commit, SGLang's sampled speculative verification uses point-mass drafts by default: a drafted token is accepted when a uniform coin falls below the target probability mass of the siblings tried so far, and a rejection samples the target restricted to the untried tokens by inverse CDF (code reading). In general, let $p$ be the target law at the reached prefix and $q$ the \emph{actual} proposal law, conditional on the information used to produce the proposal. A softmax buffer from a different selector is not $q$, and a deterministic proposal is a point mass. The standard one-step correction accepts $X\sim q$ with probability $\min(1,p_X/q_X)$ and otherwise samples $(p-q)_+$ normalized; the accepted mass at $i$ is $\min(p_i,q_i)$ and the residual contributes $(p_i-q_i)_+$, which sum to $p_i$~\cite{specdecode,chen2023specsampling}. SpecTr and block verification extend the rule to several drafts and to whole blocks~\cite{spectr,blockverify}. A certificate may change how this comparison is evaluated, never the law used in it.
 
 For one reached proposal $X=x$ write $w_x=e^{z_x}$ and $Z=\sum_ie^{z_i}$, and draw $U\in[0,1)$ with the reference convention. For $q_x>0$, acceptance is equivalent to
 \begin{equation}Uq_xZ<w_x,\label{eq:accept}\end{equation}
@@ -66,7 +82,7 @@ r_i=(w_i-Zq_i)_+,\qquad\frac{r_i}{\sum_jr_j}=\frac{(p_i-q_i)_+}{\sum_j(p_j-q_j)_
 with $r_i=w_i$ outside $Q$. Given $Z^-\le Z\le Z^+$, positive-part monotonicity gives $(w_i-Z^+q_i)_+\le r_i\le(w_i-Z^-q_i)_+$ inside $Q$.
 
 \begin{theorem}[Bounded residual race]\label{thm:residualrace}
-Assume valid enclosures of the target weights and of $Z$, the actual proposal law, a nonzero residual, and a priority field $\pi_i=e^{G_i}>0$ that is fixed and independent of the proposal draw, the acceptance uniform and the rejection event. A refinement procedure that returns only an interval-certified ordered maximizer of $r_i\pi_i$, or completes the dense race, returns the same token as the dense race. With i.i.d.\ standard Gumbel $G_i$ it samples the residual law~\eqref{eq:residualweights} exactly.
+Assume valid enclosures of the target weights and of $Z$, the actual proposal law, a nonzero residual, and a priority field $\pi_i=e^{g_i}>0$ that is fixed and independent of the proposal draw, the acceptance uniform and the rejection event. A refinement procedure that returns only an interval-certified ordered maximizer of $r_i\pi_i$, or completes the dense race, returns the same token as the dense race. With i.i.d.\ standard Gumbel $g_i$ it samples the residual law~\eqref{eq:residualweights} exactly.
 \end{theorem}
 \begin{proof}
 The enclosures of $r_i$ multiplied by $\pi_i>0$ enclose the priorities. A certified maximizer dominates every possible competitor, including the actual one, and a completed evaluation yields the dense ordered maximizer. The distributional statement is Gumbel-max applied to the nonzero residual weights.
@@ -85,5 +101,5 @@ Avoiding work whose result is already determined differs from choosing which sam
 \begin{equation}
 \Pr(Y=0)=\tfrac14,\qquad\Pr(Y=1)=\tfrac34.\label{eq:bias}
 \end{equation}
-The acceptance formula was unchanged; admission selected proposals by their realized value. A mandatory progress floor on the first token does not help, since the same construction applies at the second position. Three settings avoid the issue: greedy decoding; target-only verification with point-mass proposals, where there is no proposal law to bias; and fixed-noise verification, under which every depth policy yields the same output (Theorem~\ref{thm:fixednoise}). The demand frontier below changes only the amount and order of arithmetic used to decide a fixed protocol, so it is exact pointwise.
+The acceptance formula was unchanged; admission selected proposals by their realized value. A mandatory progress floor on the first token does not help, since the same construction applies at the second position. Three settings avoid the issue: greedy decoding; target-only verification with point-mass proposals, where there is no proposal law to bias; and fixed-noise verification, under which every depth policy yields the same output (Theorem~\ref{thm:fixednoise}). The demand frontier of the research notes (their Section~\notessec{app:frontier}{7.6}) changes only the amount and order of arithmetic used to decide a fixed protocol, so it is exact pointwise.
 

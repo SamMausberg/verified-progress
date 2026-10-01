@@ -19,7 +19,10 @@ printed with its failures:
 7. an entry in both registers lists the same files and producer in both.
 8. the two documents print their register IDs with different prefixes (empty in the paper,
    ``N-`` in the notes), through ``\\regprefix`` in the register macros and in the notes'
-   ``\\evref`` and ``\\devref``, so that an ID such as E21 never means two things.
+   ``\\evref`` and ``\\devref``, so that an ID such as E21 never means two things;
+9. every pointer of the paper into the notes, ``\\notessec{label}{number}``, names a label the
+   notes define, and, if the notes have been built (``paper/research_notes.aux``), the number
+   the notes print for it.
 
 A document's sources are its root file and every file it reaches through ``\\input``.
 
@@ -197,6 +200,34 @@ def prefix_failures(files: dict[str, list[str]]) -> list[str]:
     return failures
 
 
+NOTESSEC = re.compile(r'\\notessec\{([^}]*)\}\{([^}]*)\}')
+NEWLABEL = re.compile(r'\\newlabel\{([^}]*)\}\{\{([^}]*)\}')
+
+
+def notessec_failures(files: dict[str, list[str]]) -> list[str]:
+    """Pointers of the paper into the notes whose label or section number is wrong."""
+    defined = {
+        m.group(1)
+        for name in files['notes']
+        for m in re.finditer(r'\\label\{([^}]*)\}', strip_comments((PAPER / name).read_text()))
+    }
+    aux = PAPER / 'research_notes.aux'
+    numbers = dict(NEWLABEL.findall(aux.read_text())) if aux.is_file() else {}
+    failures: list[str] = []
+    for name in files['paper']:
+        for m in NOTESSEC.finditer(strip_comments((PAPER / name).read_text())):
+            label, number = m.groups()
+            if '#' in label:
+                continue  # the macro's own definition
+            if label not in defined:
+                failures.append(f'{name}: {label} is not a label of the notes')
+            elif numbers and numbers.get(label) != number:
+                failures.append(
+                    f'{name}: {label} is {numbers.get(label)} in the notes, not {number}'
+                )
+    return failures
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--rev', default='origin/main', help='revision the evidence must exist at')
@@ -249,6 +280,8 @@ def main() -> int:
     )
 
     failures['register ID prefixes (paper none, notes distinct)'] = prefix_failures(files)
+    aux_note = '' if (PAPER / 'research_notes.aux').is_file() else ' (labels only; notes not built)'
+    failures[f'pointers into the notes{aux_note}'] = notessec_failures(files)
 
     counts = ', '.join(
         f'{doc}: {len(cited[doc])} cited keys, {len(registers[doc][0])} entries, '

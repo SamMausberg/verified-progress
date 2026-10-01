@@ -1,5 +1,5 @@
 % Appendix C: transport, supplementary analysis and results.
-% Proofs: Theorem crossover (statement in the main text); Propositions suprema, exclusion,
+% Proofs: Proposition crossover (statement in the main text); Propositions suprema, exclusion,
 % static, summary are stated and proved here.
 % Evidence: register entries head-constants, rho, transport, transport-mtp, rho-mtp, stats-mtp, stats-dflash,
 % selfevidence-dflash; numbers read from the committed JSON and CSV files named there.
@@ -37,7 +37,7 @@ After the winner $a$ is scored exactly, let $m_i=z_a-z_i$. With $\epsilon_c$ eit
 Substitute $z_i^d+\langle\mu_c,\Delta\rangle=z_i-\langle w_i-\mu_c,\Delta\rangle$ and $\tilde z_i=z_i-\langle e_i,h\rangle$ into the upper bounds.
 \end{proof}
 
-\begin{proof}[Proof of Theorem~\ref{thm:crossover}]
+\begin{proof}[Proof of Proposition~\ref{thm:crossover}]
 For entries $k$ and $l$ of the tile, $\norm{w_k-w_l}_2\le\norm{w_k-\mu_c}_2+\norm{w_l-\mu_c}_2\le2r_c$, so $r_c\ge\frac12\diam_2(c)$ for every centre. The equivalence is the definition of $\delta^\ast_i$ rearranged: $r_c\norm\Delta_2<\norm{e_i}_2\norm{h^t}_2$ exactly when $\norm\Delta_2/\norm{h^t}_2<\norm{e_i}_2/r_c$.
 \end{proof}
 The Hölder pairing has a crossover of the same kind, with a sufficient condition that depends on the tile only through one property of its entries.
@@ -81,9 +81,9 @@ Hölder threshold on $\norm\Delta_1/\norm h_1$ against int8 per entry (Propositi
 \end{table}
 
 \subsection{Captures and their alignment}\label{app:transport-capture}
-Every capture uses the same 320 public prompts, the \emph{capture prompts}, 40 from each of eight datasets in four domains: MT-Bench and No Robots (chat), HumanEval and MBPP (code), GSM8K and MATH-500 (mathematics), and m-ArenaHard and MGSM (multilingual), 112 of them in thinking mode (\path{evidence/head_geometry/prompt_manifest.csv}). They are split by prompt into analysis and held-out halves before any fitting. In plain decoding the FP64 argmax of the captured head input equals the engine's token at 99.51\% of 105,269 positions, and all 519 disagreements lie within one BF16 spacing of the FP64 winner~\ev{alignment}.
+Every capture uses the same 320 public prompts, the \emph{capture prompts}, 40 from each of eight datasets in four domains: MT-Bench and No Robots (chat), HumanEval and MBPP (code), GSM8K and MATH-500 (mathematics), and m-ArenaHard and MGSM (multilingual), 112 of them in thinking mode; Appendix~\ref{app:pins} names their manifest. They are split by prompt into analysis and held-out halves before any fitting. In plain decoding the FP64 argmax of the captured head input equals the engine's token at 99.51\% of 105,269 positions, and all 519 disagreements lie within one BF16 spacing of the FP64 winner~\ev{alignment}.
 
-Two drafters produce the speculative pairs. The model's own MTP layer drafts one token per step and projects it through the target's head. The public DFlash drafter for this target~\cite{dflash4bcard} is a six-layer transformer of width 2,560 with no embedding or head of its own: it embeds with the target's table, conditions on the target's hidden states after eight of its layers, and drafts a block of 16 positions in one forward pass, of which positions 1 to 15 go through the target's tied head, their argmaxes being the drafted tokens (read from the checkpoint and from SGLang's DFlash worker at the pin; the research notes give the details).
+Two drafters produce the speculative pairs. The model's own MTP layer drafts one token per step and projects it through the target's head. The public DFlash drafter for this target~\cite{dflash4bcard} is a six-layer transformer of width 2,560 with no embedding or head of its own: it embeds with the target's table, conditions on the target's hidden states after eight of its layers, and drafts a block of 16 positions in one forward pass, of which positions 1 to 15 go through the target's tied head, their argmaxes being the drafted tokens (read from the checkpoint and from SGLang's DFlash worker at the pinned SGLang commit; Section~\notessec{app:drafter-model}{5.1} of the research notes gives the details).
 
 Speculative pairs follow the verify layout. A verify step for one request holds $[x_0,d_1,\dots,d_S]$ with $x_0$ the last committed token; draft token $d_k$ came from the draft head input $h^d_k$ and is decided by the target head input at verify position $k-1$. Each pair is labelled accepted, rejected or unreached (after the first rejection). The target input at the last verify position, which produces the bonus token, has no draft anchor at all, so a transport-only verifier still streams the whole head for that position. The captures used the patch and the server configuration of Section~\ref{sec:transport-capture} (no CUDA graphs and no overlap scheduler, because the hooks run in Python between forwards), the same 320 prompts split by prompt into analysis and held-out halves, greedy decoding and 384 new tokens; the DFlash drafter ran at block size 16 with five concurrent requests, and the MTP layer with four draft steps, top-$k$ 1 and at most eight running requests~\ev{stats-dflash,transport-mtp}.
 

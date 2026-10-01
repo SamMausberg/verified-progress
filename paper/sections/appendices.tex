@@ -12,6 +12,10 @@
 \setlength{\@fpbot}{0pt plus 1fil}
 \makeatother
 \usetikzlibrary{shapes.geometric}
+% A pointer into the research notes, which build after the paper and cannot be cross-referenced
+% from it: \notessec{<label in the notes>}{<its section number>} prints the number.
+% scripts/check_paper_references.py checks the number against the notes' .aux file.
+\newcommand{\notessec}[2]{#2}
 \input{sections/app_proofs}
 \input{sections/app_sampling}
 \input{sections/app_transport}
