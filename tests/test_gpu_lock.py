@@ -284,3 +284,35 @@ def test_a_job_that_ignores_term_is_killed_when_the_holder_dies(tmp_path: Path) 
         pytest.fail('a TERM-ignoring job outlived the lock holder')
     finally:
         proc.kill()
+
+
+def test_the_callers_own_command_line_is_not_an_orphan(tmp_path: Path) -> None:
+    """A job whose command names the orphan pattern must not wait for its own ancestors."""
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    marker = f'gpu-lock-test-self-{os.getpid()}'
+    env = dict(
+        fake_smi(tmp_path),
+        GPU_LOCK_FILE=str(lock),
+        GPU_LOCK_ORPHAN_PATTERN=marker,
+        GPU_LOCK_DRAIN_WAIT='3',
+    )
+    ran = tmp_path / 'ran'
+    # The marker appears in the command line of gpu_lock.sh, flock, setpriv and gpu_job.sh.
+    done = subprocess.run(
+        ['bash', '-c', f'bash {SCRIPT} -x bash -c "touch {ran}; : {marker}"'],
+        env=env,
+        timeout=60,
+        check=False,
+    )
+    assert done.returncode == 0 and ran.exists()
+
+
+def test_the_drain_bound_is_enforced_for_short_waits(tmp_path: Path) -> None:
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    env = dict(fake_smi(tmp_path, 'echo 4242'), GPU_LOCK_FILE=str(lock), GPU_LOCK_DRAIN_WAIT='1')
+    start = time.time()
+    done = subprocess.run(['bash', str(SCRIPT), '-x', 'true'], env=env, timeout=60, check=False)
+    assert done.returncode == 75
+    assert time.time() - start < 4

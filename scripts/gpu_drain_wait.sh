@@ -13,6 +13,14 @@ set -euo pipefail
 limit="${GPU_LOCK_DRAIN_WAIT:-600}"
 deadline=$((SECONDS + limit))
 reported=""
+# This script's own ancestors (gpu_job.sh, setpriv, flock, gpu_lock.sh and its caller) carry
+# the job's command line, which may itself name an SGLang server; never count them as orphans.
+ancestors=" $$ "
+p="$PPID"
+while [ -n "$p" ] && [ "$p" -gt 1 ]; do
+  ancestors="$ancestors$p "
+  p="$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')"
+done
 if ! command -v nvidia-smi >/dev/null 2>&1; then
   echo "gpu_drain_wait: no nvidia-smi on PATH; nothing to drain" >&2
   exit 0
@@ -24,11 +32,15 @@ while true; do
   [ "$remaining" -ge 1 ] || remaining=1
   smi_limit="${GPU_LOCK_SMI_TIMEOUT:-30}"
   [ "$smi_limit" -le "$remaining" ] || smi_limit="$remaining"
-  if raw="$(timeout "$smi_limit" nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null)"; then
+  # --kill-after: a query that ignores TERM is killed, so the limit really bounds it.
+  if raw="$(timeout --kill-after=5 "$smi_limit" nvidia-smi --query-compute-apps=pid --format=csv,noheader 2>/dev/null)"; then
     pids="$(printf '%s\n' "$raw" | tr -d ' ' | grep -v '^$' || true)"
     # Under the exclusive lock any SGLang server is an orphan, even one that detached from
     # its job's process group and has not reached CUDA yet.
-    servers="$(pgrep -f -- "${GPU_LOCK_ORPHAN_PATTERN:-sglang[.]launch_server|sglang::}" 2>/dev/null | tr '\n' ' ' || true)"
+    servers=""
+    for spid in $(pgrep -f -- "${GPU_LOCK_ORPHAN_PATTERN:-sglang[.]launch_server|sglang::}" 2>/dev/null || true); do
+      case "$ancestors" in *" $spid "*) ;; *) servers="$servers$spid " ;; esac
+    done
     if [ -n "$servers" ]; then
       pids="${pids:+$pids }sglang:${servers% }"
     fi
@@ -46,5 +58,8 @@ while true; do
     echo "gpu_drain_wait: GPU still busy after ${limit}s (pids: $(echo "$pids" | tr '\n' ' ')); not starting" >&2
     exit 75
   fi
-  sleep 5
+  left=$((deadline - SECONDS))
+  [ "$left" -lt 5 ] || left=5
+  [ "$left" -ge 1 ] || left=1
+  sleep "$left"
 done
