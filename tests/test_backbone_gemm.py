@@ -180,3 +180,33 @@ def test_deferred_norm_respects_the_merge_cutoff(monkeypatch: Any) -> None:
         gemma_fused_add_rmsnorm(xs, rs, g, 1e-6)
         assert torch.equal(deferred.residual_out, rs)
         assert torch.equal(qkvz, F.linear(xs, wq)) and torch.equal(ba, F.linear(xs, wb))
+
+
+def test_gemv_table_route_only_on_hopper(monkeypatch: Any) -> None:
+    """A gemv table entry falls back (maybe_linear returns None, so the caller
+    keeps F.linear) on a non-Hopper capability and on HIP, which reports
+    gfx94x as 9.x; on this GPU it runs the Hopper GEMV (patch 0008)."""
+    if not hasattr(bg, '_is_hopper'):
+        pytest.skip('engine patch without the capability gate')
+    import torch.nn.functional as F
+
+    torch.manual_seed(7)
+    x, w = _rand(1, 4096), _rand(2560, 4096, scale=0.02)
+    monkeypatch.setattr(bg, 'GEMM_ENABLED', True)
+    monkeypatch.setitem(bg.TABLE, (2560, 4096), ((1, None, 'gemv'),))
+    try:
+        for capability, hip in (((8, 0), None), ((9, 4), '6.4')):
+            bg._is_hopper.cache_clear()
+            with monkeypatch.context() as mp:
+                mp.setattr(torch.cuda, 'get_device_capability', lambda *a, c=capability: c)
+                mp.setattr(torch.version, 'hip', hip)
+                assert not bg._gemv_eligible(x, 2560, 4096)
+                assert bg.maybe_linear(x, w) is None
+        bg._is_hopper.cache_clear()
+        if torch.cuda.get_device_capability()[0] == 9 and torch.version.hip is None:
+            y = bg.maybe_linear(x, w)
+            assert y is not None
+            ref = F.linear(x, w)
+            assert float((y.float() - ref.float()).abs().max()) <= 2.0**-6 * float(ref.abs().max())
+    finally:
+        bg._is_hopper.cache_clear()
