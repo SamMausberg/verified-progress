@@ -15,7 +15,12 @@ from __future__ import annotations
 
 import argparse
 import csv
+import sys
 from pathlib import Path
+
+REPO_DIR = Path(__file__).resolve().parents[2]
+if str(REPO_DIR) not in sys.path:
+    sys.path.insert(0, str(REPO_DIR))  # bench.token_map, when run from anywhere
 
 MAPS = Path.home() / 'vp-data/bench/token_map'
 DEFAULT_MAPS = ['hot4096_tune', 'hot8192_tune', 'hot16384_tune', 'hot32k_tune']
