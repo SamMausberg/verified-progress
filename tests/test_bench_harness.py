@@ -867,3 +867,15 @@ def test_arm_classes_from_matched_references() -> None:
         'mtp-tuned (exact-up-to-rounding, 4.2/1K vs plain)'
     )
     assert series_label('plain-tuned', 'stock', math.nan) == 'plain-tuned'
+
+
+def test_host_id_is_random_and_stable(tmp_path: Path) -> None:
+    import socket
+
+    from bench.server import host_id
+
+    path = tmp_path / 'vp-data' / 'host_id'
+    first = host_id(path)
+    assert len(first) == 8 and int(first, 16) >= 0
+    assert host_id(path) == first  # made once, then reused
+    assert first not in socket.gethostname()
