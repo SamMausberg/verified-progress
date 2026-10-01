@@ -1,5 +1,5 @@
 map,rows,held_out_coverage,output_tokens,source_run
-hot4096_tune,4096,0.8912,171968,mixed-v2 confirm plain sweep (c=1/32/128, OSL 512)
-hot8192_tune,8192,0.9327,171968,mixed-v2 confirm plain sweep (c=1/32/128, OSL 512)
-hot16384_tune,16384,0.9635,171968,mixed-v2 confirm plain sweep (c=1/32/128, OSL 512)
-hot32k_tune,22936,0.9754,171968,mixed-v2 confirm plain sweep (c=1/32/128, OSL 512)
+hot4096_tune,4096,0.8912,171968,"mixed-v2 confirm plain sweep (c=1/32/128, OSL 512)"
+hot8192_tune,8192,0.9327,171968,"mixed-v2 confirm plain sweep (c=1/32/128, OSL 512)"
+hot16384_tune,16384,0.9635,171968,"mixed-v2 confirm plain sweep (c=1/32/128, OSL 512)"
+hot32k_tune,22936,0.9754,171968,"mixed-v2 confirm plain sweep (c=1/32/128, OSL 512)"

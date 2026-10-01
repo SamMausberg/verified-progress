@@ -150,7 +150,8 @@ Each entry is designed work without a committed result. The text marks it \mbox{
 \devitem{bench-capacity}{Capacity limits per arm at default settings, from the server logs}{\nolinkurl{evidence/bench/}}
 \devitem{bench-equality}{Greedy outputs of the arms that replay the recurrent state (replayed verification and replayed decoding) or run the target's attention under Triton, classified against plain decoding}{\nolinkurl{evidence/bench/}}
 \devitem{bench-quality}{GSM8K accuracy for arms A, B and C with intervals and paired tests}{\nolinkurl{evidence/bench/quality/}}
-\devitem{bench-frontier}{Frontier plot, frontier table and run-to-run variance for arms A, B and C}{\nolinkurl{evidence/bench/confirm/frontier.csv}, \nolinkurl{evidence/bench/variance/}}
+\devitem{bench-frontier}{Frontier plot, frontier table, within-session speedups and run-to-run variance for arms A, B and C over three confirmation sessions, with the envelopes over all arms and over exact arms}{\nolinkurl{evidence/bench/confirm/}}
+\devitem{bench-sensitivity}{The declared natural-length sensitivity workload at concurrency 32 and 128, with the selected arms and their matched baselines}{\nolinkurl{evidence/bench/sensitivity/}}
 \devitem{bench-mtp}{Served MTP speculation against plain decoding on the confirmation split, with and without replayed GDN verification, and where the two cross}{\nolinkurl{evidence/bench/}}
 \devitem{bench-cert}{Before-and-after frontiers for the certified head in drafting, verification and plain decoding, with output equality at the same batch shape (H4)}{\nolinkurl{evidence/bench/}}
 \devitem{bench-frontend}{Frontend behaviour above concurrency 256 on a quiet host, and repeats of the single-point diagnosis}{\nolinkurl{evidence/bench/frontend/}}
