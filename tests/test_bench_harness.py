@@ -663,3 +663,30 @@ def test_runs_get_sessions_and_exactness_from_their_manifests(tmp_path: Path) ->
     assert exactness({'arm': {'name': 'x', 'args': {'attention-backend': 'triton'}}}) == 'pending'
     assert exactness({'arm': {'name': 'x', 'args': {}, 'lossy': 'FP8 KV'}}) == 'lossy'
     assert exactness({'arm': {'name': 'x', 'args': {}}}) == 'unclassified'
+
+
+def test_per_prompt_output_lengths(tmp_path: Path) -> None:
+    from bench.natural_workload import build
+    from bench.sweep import load_prompts, request_record
+
+    workload = [
+        {'id': 'a', 'domain': 'chat', 'text': 'x'},
+        {'id': 'b', 'domain': 'code', 'text': 'y'},
+    ]
+    records = build(workload, {'a': (300, 'stop'), 'b': (2048, 'length')}, cap=2048)
+    assert [r['output_length'] for r in records] == [300, 2048]
+    assert request_record(records[0]) == {'text': 'x', 'output_length': 300}
+    assert request_record(workload[0]) == {'text': 'x'}
+    with pytest.raises(SystemExit, match='no natural length'):
+        build(workload, {'a': (300, 'stop')}, cap=2048)
+    path = tmp_path / 'mixed.jsonl'
+    path.write_text(json.dumps(records[0]) + '\n' + json.dumps(workload[1]) + '\n')
+    with pytest.raises(ValueError, match='output_length on 1 of 2'):
+        load_prompts(path)
+    # Per-prompt targets are matched by prompt id.
+    _write_run(tmp_path)
+    rows = load_requests(tmp_path)
+    for index, row in enumerate(rows):
+        row['prompt_id'] = f'p{index}'
+    summary = summarise_point(rows, {'p0': 4, 'p1': 5}, concurrency=2)
+    assert summary['osl_mismatch'] == 1

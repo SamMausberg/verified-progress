@@ -154,7 +154,20 @@ def aiperf_command(
 
 
 def load_prompts(path: Path) -> list[dict[str, Any]]:
-    return list(iter_jsonl(path))
+    """A workload split; per-prompt `output_length` must be on every record or none."""
+    items = list(iter_jsonl(path))
+    with_length = sum(1 for item in items if 'output_length' in item)
+    if with_length not in (0, len(items)):
+        raise ValueError(f'{path}: output_length on {with_length} of {len(items)} records')
+    return items
+
+
+def request_record(item: dict[str, Any]) -> dict[str, Any]:
+    """aiperf single-turn record; a per-prompt length overrides the global --osl."""
+    record: dict[str, Any] = {'text': item['text']}
+    if 'output_length' in item:
+        record['output_length'] = int(item['output_length'])
+    return record
 
 
 def cycled(items: list[dict[str, Any]], count: int) -> list[dict[str, Any]]:
@@ -246,9 +259,7 @@ class Sweep:
     ) -> subprocess.CompletedProcess[str]:
         point_dir.mkdir(parents=True, exist_ok=True)
         input_file = point_dir / 'inputs.jsonl'
-        input_file.write_text(
-            ''.join(json.dumps({'text': item['text']}) + '\n' for item in prompts)
-        )
+        input_file.write_text(''.join(json.dumps(request_record(item)) + '\n' for item in prompts))
         command = aiperf_command(
             model=self.server.arm.model,
             revision=self.server.arm.revision,
@@ -328,8 +339,14 @@ class Sweep:
         write_requests_csv(rows, point_dir / 'requests.csv')
         phase_summary = artifact_dir / 'phases/profiling/profile_export_aiperf.json'
         aiperf_summary = json.loads(phase_summary.read_text()) if phase_summary.exists() else None
-        target = args.osl if args.ignore_eos else None
-        summary = summarise_point(rows, target, concurrency, aiperf_summary)
+        target_osl: int | dict[str, int] | None = None
+        if args.ignore_eos:
+            target_osl = (
+                {item['id']: int(item['output_length']) for item in measured}
+                if 'output_length' in measured[0]
+                else args.osl
+            )
+        summary = summarise_point(rows, target_osl, concurrency, aiperf_summary)
         expected_ids = [item['id'] for item in measured]
         sent_ids = [row['prompt_id'] for row in rows]
         summary.update(

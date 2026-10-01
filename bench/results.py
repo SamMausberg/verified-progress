@@ -187,7 +187,7 @@ def steady_throughput(rows: list[dict[str, Any]]) -> dict[str, float]:
 
 def summarise_point(
     rows: list[dict[str, Any]],
-    target_osl: int | None,
+    target_osl: int | dict[str, int] | None,
     concurrency: int,
     aiperf_summary: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -205,9 +205,15 @@ def summarise_point(
     osl = [row['osl'] for row in ok]
     summary['osl_min'] = min(osl)
     summary['osl_max'] = max(osl)
-    summary['osl_mismatch'] = (
-        sum(1 for value in osl if value != target_osl) if target_osl is not None else None
-    )
+    if isinstance(target_osl, dict):
+        # Per-prompt lengths (natural-length workload), matched by prompt id.
+        summary['osl_mismatch'] = sum(
+            1 for row in ok if row['osl'] != target_osl.get(str(row.get('prompt_id')), -1)
+        )
+    else:
+        summary['osl_mismatch'] = (
+            sum(1 for value in osl if value != target_osl) if target_osl is not None else None
+        )
     starts = [row['start_ns'] for row in ok]
     ends = [row['start_ns'] + row['latency_ms'] * 1e6 for row in ok]
     span_s = (max(ends) - min(starts)) / 1e9
