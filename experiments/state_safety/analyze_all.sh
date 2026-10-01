@@ -147,6 +147,54 @@ if [ ${#pairs[@]} -gt 0 ]; then
   nice -n 19 python tap_signature.py "${pairs[@]}" --out "$evidence/tap_signature.json" > /dev/null
 fi
 
+# Pools of both servers for every comparison in the evidence (team rule: equality
+# comparisons pin the pools; the earlier runs did not, so record what each had).
+nice -n 19 python - "$HOME/vp-data/state" "$evidence" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+from server import resolved_pools
+
+root, evidence = Path(sys.argv[1]), Path(sys.argv[2])
+rows = []
+
+
+def add(source, label, dir_a, dir_b):
+    la, lb = dir_a / 'server.log', dir_b / 'server.log'
+    pa = resolved_pools(la) if la.exists() else None
+    pb = resolved_pools(lb) if lb.exists() else None
+    rows.append(
+        {
+            'evidence': source,
+            'comparison': label,
+            'server_a': str(dir_a.relative_to(root)),
+            'server_b': str(dir_b.relative_to(root)),
+            'same_server': dir_a == dir_b,
+            'pools_a': pa,
+            'pools_b': pb,
+            'pools_identical': None if pa is None or pb is None else pa == pb,
+        }
+    )
+
+
+for label, s in json.loads((evidence / 'noise_floor.json').read_text())['pairs'].items():
+    add('noise_floor.json', label, *(root / 'runs' / Path(r).parent for r in (s['run_a'], s['run_b'])))
+for f in sorted(evidence.glob('mechanism_*.json')):
+    s = json.loads(f.read_text())['summary']
+    add(f.name, f'{Path(s["a"]).name} vs {Path(s["b"]).name}', Path(s['a']), Path(s['b']))
+sig = evidence / 'tap_signature.json'
+if sig.exists():
+    for e in json.loads(sig.read_text()):
+        add(sig.name, f'{e["a"]} vs {e["b"]}', root / 'tap' / e['a'], root / 'tap' / e['b'])
+chk = evidence / 'tap_check.json'
+if chk.exists():
+    for session, e in json.loads(chk.read_text()).items():
+        ref = Path(e['untapped_run']).parent
+        add(chk.name, f'{session} vs untapped {e["untapped_run"]}', root / 'tap' / session, root / 'runs' / ref)
+(evidence / 'pools.json').write_text(json.dumps(rows, indent=1) + '\n')
+PY
+
 # Drift and divergences by rejection position, for every speculative config.
 for spec in mtp_s1 mtp_s3 mtp_s5 mtp_tree; do
   if [ -f "$runs/$spec/c1.jsonl" ]; then

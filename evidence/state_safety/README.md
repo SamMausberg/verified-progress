@@ -76,8 +76,10 @@ Checks on the tool itself:
   `alpaca_eval-0500`, `mt_bench-0053`, `mt_bench-0056`, `mt_bench-0059`): all five first
   differ in logprobs at output index 2, and two of them keep identical tokens. In the
   other three, the top-2 logprob gap at the first changed token is 0 (an exact tie) or
-  0.125 in both runs. Four of the five change between the v1 and v3 tapped sessions
-  too, and there they show the signature described under "History dependence" below
+  0.125 in both runs. The tapped and untapped servers had different pools (159,322
+  vs 97,672 KV tokens, 199 vs 122 GDN slots; `pools.json`), so these exceptions are
+  not attributed to the tap itself. Four of the five change between the v1 and v3
+  tapped sessions too, and there they show the signature described under "History dependence" below
   (first difference at layer 3's attention, with identical projections). Of the five,
   only `mt_bench-0056` changes in the deterministic history test without the tap. The
   KV-level link for all five is pending.
@@ -155,6 +157,12 @@ concurrency comparison below, generated up to two tokens past their known diverg
 - 129 of the 167 diverged within the generated length. Tie rule: 0. Head GEMM: 0; the
   head input differs in every case. Conservative model: rounding flip 29, order flip 7,
   accumulator ambiguous 93. Hopper model: rounding flip 89, order flip 16, ambiguous 24.
+- The two tapped servers had different pools: 159,322 vs 166,522 KV tokens and 199
+  vs 97 GDN slots (`pools.json`). The pools were not pinned then. At batch 1 they do
+  not change the batch. With the radix cache on, they can change which copy of a shared
+  prefix's KV a request reads (history section). That would first show at a
+  full-attention layer's output, and here every first difference is at layer 0's GDN
+  recurrence, before any layer reads cached KV.
 
 **Plain decode at client concurrency 1 vs 32, with at most 16 requests running** (`mechanism_plain_c1_vs_c32.json`;
 40 tapped prompts: the 16 whose divergence in the matrix run was not an exact tie,
@@ -173,6 +181,12 @@ reproduction, whose batches differ from the matrix run's).
 - At the divergence: tie rule 0, head GEMM 0. Conservative model: rounding flip 3,
   order flip 15, accumulator ambiguous 22. Hopper model: rounding flip 14, order flip
   17, ambiguous 9.
+- The two tapped servers had different pools: 159,322 vs 89,652 KV tokens and 199 vs
+  111 GDN slots, both with at most 16 running (`pools.json`). A different copy of a
+  shared prefix's KV would first show at a full-attention layer's output. So for the 6
+  prompts that first differ there, the pools and the radix history are possible causes
+  besides the attention kernel's dependence on the batch. For the other 34, every
+  attention output before the first difference is identical.
 
 In words, subject to the pending cache-level check: the configurations first produce
 different module outputs at a kernel that is not invariant to the batch or to the
@@ -196,6 +210,12 @@ divergence of each prompt). `divergences.csv` lists every event with both runs'
 margins; `noise_floor.csv` has one row per pair; `run_meta.json` has flags, resolved
 server settings and commits per run. The margin classes there (`tie`, `one_ulp`,
 `near`, `large`) describe the observed logprob gap at the divergence, not its cause.
+`pools.json` lists the pools both servers allocated for every comparison in this
+directory: the noise-floor pairs, the tapped mechanism runs, the tap checks and the
+tap signature. These runs predate pinned pools. The concurrency 1 vs 32 floor, the
+same-server repeats and the deterministic rows compare passes on one server, so their
+pools are identical. Every comparison across two servers had different pools, and is
+flagged where it is reported.
 
 | Pair | Diverged | Compared tokens | Per 1,000 | Largest margin |
 |---|---|---|---|---|
@@ -288,8 +308,11 @@ depends on which earlier request computed its shared prefix. That is shown for t
 prompts. For the other four tap-changed prompts the history test does not reproduce
 the change, and the v1/v3 comparison shows they can change between two sessions that
 serve the same requests in the same order. Those sessions differ in the tap version,
-which changes the host time per forward, and in how many tokens the earlier requests
-generated (v3 capped them). For these four we still consider attention over a
+which changes the host time per forward, in how many tokens the earlier requests
+generated (v3 capped them), and in their pools: 93,742 vs 159,322 KV tokens and 118 vs
+199 GDN slots for plain, and 84,003 vs 166,522 tokens and 55 vs 97 slots for MTP
+(`pools.json`). The KV pool never filled in either plain session, which computed 72,056
+and 56,630 tokens in all. For these four we still consider attention over a
 different copy of cached KV the likely mechanism, because of the signature at the same
 batch shape. We do not know what decides which copy a decode step reads in those
 sessions. One candidate, which is reasoning and untested, is ordering. The repoint is a
