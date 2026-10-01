@@ -123,10 +123,16 @@ def _check_variants(head: CertifiedHead, h: torch.Tensor) -> dict[str, Any]:
         head._prep(h, m)
         cfg = head._gemv(h, m, head._top, 3)
         out['summary_violations'] = summary_violations(head, cfg.block_v, h, x)
+    # The 'real' contract's reference is the exact argmax (first index among exact
+    # maxima); the stock contracts' is the stock head.
+    exact_ids = x.argmax(dim=1)
     del x
     ids, stats = head.argmax(h, fallback=False)
     decided = ~stats.fallback
-    ref_ids = reference_argmax(h, head.weight, head.reference)
+    if head.reference == 'real':
+        ref_ids = exact_ids
+    else:
+        ref_ids = reference_argmax(h, head.weight, head.reference)
     out['decided_wrong'] = int((decided & (ids != ref_ids)).sum())
     if head.selection == 'tiles' and head.reference != 'real' and head.vocab <= 2**18:
         seeds = torch.arange(m, dtype=torch.int64, device=h.device) * 7 + 5

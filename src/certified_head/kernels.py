@@ -508,37 +508,34 @@ def _gemv_envelope_kernel(
             b = tl.load(b_ptr + offs_m * BSTRIDE + g, mask=m_mask, other=0.0)
             beta = fma_ru(a[:, None], b[None, :], beta)
         lo = add_rd(z, -beta)
-        # Fail closed: a row with any non-finite approximate logit or radius cannot
-        # be certified (a NaN would otherwise drop out of the maxima below), so it
-        # is marked for the stock fallback whatever the rest of its envelope says.
-        bad = mask2 & ~((tl.abs(z) < float('inf')) & (beta < float('inf')))
-        bad = bad | (mask2 & ~(tl.abs(lo) < float('inf')))
+        hi = add_ru(z, beta)
+        # Fail closed: a row with any non-finite bound cannot be certified (a NaN
+        # would otherwise drop out of the maxima below); a non-finite approximate
+        # logit or radius makes its bounds non-finite, so checking them suffices.
+        bad = mask2 & ~((tl.abs(lo) < float('inf')) & (tl.abs(hi) < float('inf')))
         row_bad = tl.max(bad.to(tl.int32), axis=0) > 0
         tl.atomic_or(status_ptr + offs_m, STATUS_NONFINITE, mask=m_mask & row_bad)
         # Runtime probes: the exact logits of P vocabulary rows (computed in FP64
-        # before this pass) must lie inside this variant's own envelope.
-        hi = add_ru(z, beta)
-        viol = tl.zeros((BLOCK_V, BLOCK_M), dtype=tl.int1)
+        # before this pass) must lie inside this variant's own envelope. Only the
+        # few programs whose vocabulary tile holds a probe row do any work.
+        v0 = pid_v * BLOCK_V
         for j in tl.static_range(P):
             tok = tl.load(probe_idx_ptr + j)
-            px = tl.load(probe_x_ptr + offs_m * P + j, mask=m_mask, other=0.0)
-            slack = 1e-9 * (1.0 + tl.abs(px))
-            hit = mask2 & (offs_v[:, None] == tok)
-            out_lo = lo.to(tl.float64) > (px + slack)[None, :]
-            out_hi = hi.to(tl.float64) < (px - slack)[None, :]
-            if EPILOGUE == 2:  # noqa: SIM108 (constexpr branch)
-                viol = viol | (hit & out_lo)
-            else:
-                viol = viol | (hit & (out_lo | out_hi))
-        row_viol = tl.max(viol.to(tl.int32), axis=0) > 0
-        tl.atomic_or(status_ptr + offs_m, STATUS_PROBE, mask=m_mask & row_viol)
-        tl.atomic_or(probe_fail_ptr + offs_m * 0, 1, mask=m_mask & row_viol)
+            if (tok >= v0) & (tok < v0 + BLOCK_V):
+                sel = (offs_v == tok)[:, None]
+                lo_j = tl.max(tl.where(sel, lo, float('-inf')), axis=0)
+                hi_j = tl.min(tl.where(sel, hi, float('inf')), axis=0)
+                px = tl.load(probe_x_ptr + offs_m * P + j, mask=m_mask, other=0.0)
+                slack = 1e-9 * (1.0 + tl.abs(px))
+                out = lo_j.to(tl.float64) > px + slack
+                if EPILOGUE != 2:
+                    out = out | (hi_j.to(tl.float64) < px - slack)
+                row_viol = m_mask & out
+                tl.atomic_or(status_ptr + offs_m, STATUS_PROBE, mask=row_viol)
+                tl.atomic_or(probe_fail_ptr + offs_m * 0, 1, mask=row_viol)
         if EPILOGUE == 2:
             tl.store(out_ptrs, lo, mask=mask2)
         else:
-            bad_hi = mask2 & ~(tl.abs(hi) < float('inf'))
-            row_bad_hi = tl.max(bad_hi.to(tl.int32), axis=0) > 0
-            tl.atomic_or(status_ptr + offs_m, STATUS_NONFINITE, mask=m_mask & row_bad_hi)
             if SAMPLE:
                 if MODE == 0:
                     lo = bf16_rn(lo)
