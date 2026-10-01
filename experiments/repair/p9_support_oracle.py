@@ -71,7 +71,24 @@ def phases(timing: Path, run: str) -> dict[str, float]:
     return ph
 
 
-def boundaries(cycles: list[dict[str, Any]], ks: list[int]) -> list[dict[str, Any]]:
+def load_rewalk(path: Path) -> dict[tuple[str, int], list[int]]:
+    """A selector's re-walk of the old slots after the correction, keyed by (rid, prefix_len)."""
+    import torch
+
+    data = torch.load(path, map_location='cpu', weights_only=False)
+    rids = list(data['rid'])
+    prefix = as_list(data['prefix_len'])
+    walks = as_list(data['rewalk'])
+    return {
+        (str(r), int(p)): [int(x) for x in w] for r, p, w in zip(rids, prefix, walks, strict=True)
+    }
+
+
+def boundaries(
+    cycles: list[dict[str, Any]],
+    ks: list[int],
+    rewalk: dict[tuple[str, int], list[int]] | None = None,
+) -> list[dict[str, Any]]:
     by_rid: dict[str, list[dict[str, Any]]] = collections.defaultdict(list)
     for c in cycles:
         by_rid[str(c['rid'])].append(c)
@@ -103,6 +120,15 @@ def boundaries(cycles: list[dict[str, Any]], ks: list[int]) -> list[dict[str, An
             }
             for k in ks:
                 rec[f'U{k}'] = int(cur[f'U_{k}'])
+            if rewalk is not None:
+                walk = rewalk.get((rid, int(cur['prefix_len'])))
+                if walk is not None:
+                    run = 0
+                    for j in range(J, H):
+                        if walk[j] != truth[j]:
+                            break
+                        run += 1
+                    rec['rewalk_accept'] = run
             out.append(rec)
     return out
 
@@ -159,10 +185,23 @@ def main() -> None:
     ap.add_argument('--ks', type=int, nargs='+', default=[1, 2, 4, 8, 16])
     ap.add_argument('--bootstrap', type=int, default=2000)
     ap.add_argument('--out', type=Path, required=True)
+    ap.add_argument(
+        '--rewalk',
+        type=Path,
+        default=None,
+        help='a selector re-walk of the old top-16 slots after the correction (rid, prefix_len, rewalk[n, 15])',
+    )
+    ap.add_argument(
+        '--rewalk-cost-us',
+        type=float,
+        default=0.0,
+        help='extra cost of one re-walk (charged as A + conditioning on every reused cycle)',
+    )
     args = ap.parse_args()
     cycles = load_cycles(args.cycles)
     ph = phases(args.timing, args.baseline_run)
-    rows = boundaries(cycles, args.ks)
+    rewalk = load_rewalk(args.rewalk) if args.rewalk is not None else None
+    rows = boundaries(cycles, args.ks, rewalk)
     # DFlash's overall rate on the timing panel, A_D / C_D, as an alternative value of time.
     timing_rows = {Path(r['run']).name: r for r in json.loads(args.timing.read_text())}
     base = timing_rows[args.baseline_run]
@@ -231,6 +270,28 @@ def main() -> None:
         'delta': d,
         'delta_ci95': [lo, hi],
     }
+    if rewalk is not None:
+        # The real refiner reuses exactly where the oracle at K = 16 could: the correction is
+        # supported, which is observable when the decision is made.
+        reuse16 = [r['U16'] >= r['J'] and r['m'] >= 1 and 'rewalk_accept' in r for r in rows]
+        g2w = [
+            (1 + r['rewalk_accept']) if u else (1 + r['next_L'])
+            for r, u in zip(rows, reuse16, strict=True)
+        ]
+        _, d, per = delta(rows, g2w, reuse16, ph, extra_us=args.rewalk_cost_us)
+        lo, hi = bootstrap(rows, per, args.bootstrap, seed=7)
+        result['rewalk_refiner'] = {
+            'reused_boundaries': sum(reuse16),
+            'mean_accept_when_reused': statistics.fmean(
+                r['rewalk_accept'] for r, u in zip(rows, reuse16, strict=True) if u
+            )
+            if any(reuse16)
+            else None,
+            'cost_us_per_reuse': args.rewalk_cost_us,
+            'delta': d,
+            'delta_ci95': [lo, hi],
+            'rejected': hi <= 0,
+        }
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=1))
     print(json.dumps({k: v for k, v in result.items() if k != 'by_k'}, indent=1))
