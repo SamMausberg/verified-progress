@@ -411,3 +411,31 @@ def test_draft_saving_override_scales_the_time_term(
         assert same['by_k'][k]['delta_oracle'] == pytest.approx(v['delta_oracle'])
         lost = v['r_F_tokens_per_ms'] / 1e3 * v['corrected_prefix_supported_rate'] * 2200.0
         assert small['by_k'][k]['delta_oracle'] == pytest.approx(v['delta_oracle'] - lost)
+
+
+def test_draft_saving_is_per_request_and_scaled_by_concurrency(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cycles, _, timing = write_inputs(tmp_path)
+    runs = json.loads(timing.read_text())
+    batched = {**runs[0], 'run': '/runs/fresh_b16_c8', 'concurrency': 8}
+    batched['commit_per_cycle_batch'] = {'mean': 8 * 7.6}
+    del batched['commit_per_cycle']
+    timing.write_text(json.dumps([*runs, batched]))
+    share = run_oracle(
+        monkeypatch, cycles, timing, tmp_path / 'share.json', '--baseline-run', 'fresh_b16_c8'
+    )
+    # s = draft(c) / c is the default even share: the same Delta.
+    even = run_oracle(
+        monkeypatch,
+        cycles,
+        timing,
+        tmp_path / 'even.json',
+        '--baseline-run',
+        'fresh_b16_c8',
+        '--draft-saving-us',
+        str(2300.0 / 8),
+    )
+    assert even['phases_us']['draft_saved'] == pytest.approx(2300.0)
+    for k, v in share['by_k'].items():
+        assert even['by_k'][k]['delta_oracle'] == pytest.approx(v['delta_oracle'])

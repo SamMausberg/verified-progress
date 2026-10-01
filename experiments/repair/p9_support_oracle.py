@@ -62,15 +62,16 @@ run, V(16) - V(m + 1); every other phase stays at its block-16 value
 measurement, so it needs a c = 1 baseline.
 
 At concurrency c > 1 (`--baseline-run` a fresh block-16 run at c, analyze_timing.py's batched
-summary) the cycle is the batch period and the draft phase is the batch's. Skipping one
-request's draft then shortens the batch period by that request's marginal share of the draft;
-charging it the whole batched draft divided by c, with the rate r_F per request, gives
-T2_R - T2_F = -draft(c), so the c = 1 formulas apply with the c-run's phases. That share is an
-upper bound on the marginal saving when the draft's cost is concave in the number of rows, so
-the result is an upper bound under that condition; the acceptance is still the c = 1 trace's.
-`--draft-saving-us` replaces that saving with a given value, for example the measured growth of
-the batched draft per added request, which a single reusing request saves when the others still
-draft.
+summary) the cycle is the batch period and the draft phase is the batch's, draft(c). When one
+request reuses, the batch drafts one row fewer and its period shortens by some s, which every
+request in the batch gains: the batch commits c r_F tokens per unit time (r_F per request), so
+the reuse is worth c r_F s tokens, which is the c = 1 formula with T2_R - T2_F = -c s. By default
+s = draft(c) / c, the request's even share of the batched draft, so T2_R - T2_F = -draft(c); that
+share bounds s from above when the draft's cost is concave in the number of rows, so the result
+is an upper bound under that condition. `--draft-saving-us` sets s instead, for example the
+measured growth of the batched draft per added request, which bounds one reusing request's s from
+above under the same condition. The acceptance is still the c = 1 trace's. The free-verify
+fields at c > 1 also credit the request's even share of the batched verify.
 
     python experiments/repair/p9_support_oracle.py --cycles ~/vp-data/drafter/support/zlab_b16_cycles/cycles.pt \\
         --timing evidence/repair/stage_a_timing.json --out evidence/repair/p9_support_oracle.json
@@ -306,7 +307,7 @@ def main() -> None:
         '--draft-saving-us',
         type=float,
         default=None,
-        help='what a reused cycle saves in place of the baseline draft phase (us)',
+        help='s: how much one reused cycle shortens the (batch) cycle, in place of draft(c) / c (us)',
     )
     ap.add_argument(
         '--width-timing',
@@ -322,7 +323,8 @@ def main() -> None:
     cycles = load_cycles(args.cycles)
     ph = phases(args.timing, args.baseline_run)
     if args.draft_saving_us is not None:
-        ph['draft_saved'] = args.draft_saving_us
+        # s shortens the batch period for all c requests (see the module docstring).
+        ph['draft_saved'] = args.draft_saving_us * ph['concurrency']
     widths = verify_by_width(args.width_timing) if args.width_timing is not None else None
     if widths is not None:
         if ph['concurrency'] != 1:
