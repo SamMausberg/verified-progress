@@ -1,0 +1,139 @@
+{
+  "command": [
+    "/home/ubuntu/sglang/.venv/bin/python",
+    "-m",
+    "sglang.launch_server",
+    "--model-path",
+    "Qwen/Qwen3.5-4B",
+    "--revision",
+    "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "30102",
+    "--attention-backend",
+    "flashinfer",
+    "--mm-attention-backend",
+    "triton_attn",
+    "--max-running-requests",
+    "128",
+    "--max-mamba-cache-size",
+    "128",
+    "--mem-fraction-static",
+    "0.85",
+    "--max-total-tokens",
+    "1000000",
+    "--enable-metrics",
+    "--random-seed",
+    "0",
+    "--stream-interval",
+    "4",
+    "--speculative-algorithm",
+    "NEXTN",
+    "--speculative-num-steps",
+    "3",
+    "--speculative-eagle-topk",
+    "1",
+    "--speculative-num-draft-tokens",
+    "4",
+    "--enable-linear-replayssm-spec",
+    "--disable-radix-cache"
+  ],
+  "env_overrides": {
+    "SGLANG_HOSTGAP_VERIFY_PLAN": "1",
+    "SGLANG_HOSTGAP_DRAFT_INDPTR": "1",
+    "SGLANG_HOSTGAP_DFLASH_DRAFT_PLAN": "1"
+  },
+  "sglang_source": {
+    "module_file": "/home/ubuntu/sglang-wt/hostgap/python/sglang/__init__.py",
+    "path": "/home/ubuntu/sglang-wt/hostgap",
+    "head": "6b1d3448872b47ba774aeb6ec077c6aec94c05a2",
+    "branch": "engine/hostgap",
+    "dirty_files": []
+  },
+  "repo": {
+    "path": "/home/ubuntu/vp-wt/hostgap",
+    "head": "02a980361e86b114b7658a60fcae7d2fd0b2876b",
+    "branch": "hostgap/hold-results",
+    "dirty_files": []
+  },
+  "checks": [
+    {
+      "name": "cuda_graph_decode",
+      "ok": true,
+      "required": true,
+      "detail": "captured: target prefill (breakable), target verify (full), draft prefill (breakable), draft decode (full), draft extend (full)"
+    },
+    {
+      "name": "cuda_graph_prefill",
+      "ok": true,
+      "required": true,
+      "detail": "captured"
+    },
+    {
+      "name": "cuda_graph_covers_capacity",
+      "ok": true,
+      "required": true,
+      "detail": "target verify graph batch sizes up to 128; server capacity 128"
+    },
+    {
+      "name": "overlap_scheduler",
+      "ok": true,
+      "required": true,
+      "detail": "scheduler disable_overlap_schedule=False"
+    },
+    {
+      "name": "capacity",
+      "ok": true,
+      "required": true,
+      "detail": "effective max_running_requests=128, target 128"
+    },
+    {
+      "name": "attention_backend",
+      "ok": true,
+      "required": true,
+      "detail": "scheduler attention_backend=flashinfer, requested flashinfer"
+    },
+    {
+      "name": "speculative_config",
+      "ok": true,
+      "required": true,
+      "detail": "resolved: speculative_algorithm=EAGLE, speculative_num_steps=3, speculative_eagle_topk=1, speculative_num_draft_tokens=4"
+    }
+  ],
+  "free_gib_at_start": 94.44921875,
+  "final_limits": {
+    "max_total_num_tokens": 1000000,
+    "chunked_prefill_size": 8192,
+    "max_prefill_tokens": 16384,
+    "max_running_requests": 128,
+    "context_len": 262144
+  },
+  "memory_usage": {
+    "weight": 8.62,
+    "kvcache": 30.518,
+    "startup_available": 36.986,
+    "token_capacity": 1000000,
+    "token_capacity_swa": null,
+    "graph": {
+      "prefill": 1.986,
+      "decode": 0.0,
+      "target_verify": 1.024,
+      "draft_prefill": 0.089,
+      "draft_decode": 1.075,
+      "draft_extend": 0.988
+    }
+  },
+  "prompts": 64,
+  "workload": "/home/ubuntu/vp-wt/hostgap/bench/workloads/mixed-v2/tune.jsonl",
+  "pools": {
+    "mamba_cache_slots": [
+      128
+    ],
+    "kv_cache_tokens": [
+      1000000,
+      1000000
+    ],
+    "max_running_reqs_seen": 32
+  }
+}

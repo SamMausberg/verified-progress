@@ -1,0 +1,132 @@
+{
+  "argv": [
+    "experiments/hostgap/plan_equivalence.py",
+    "--out",
+    "/home/ubuntu/vp-data/hostgap/prof4/plan_equivalence.json"
+  ],
+  "sglang_file": "/home/ubuntu/sglang-wt/hostgap/python/sglang/__init__.py",
+  "sglang_commit": "6b1d3448872b47ba774aeb6ec077c6aec94c05a2",
+  "torch": "2.13.0+cu130",
+  "gpu": "NVIDIA GH200 480GB",
+  "flashinfer": "0.6.18",
+  "packbits": {
+    "trials": 40,
+    "mismatches": 0
+  },
+  "verify_plan": {
+    "draft_token_num": 4,
+    "window": 0,
+    "per_bs": {
+      "1": {
+        "trials": 40,
+        "state_mismatches": 0,
+        "output_mismatches": 0,
+        "fields": []
+      },
+      "2": {
+        "trials": 40,
+        "state_mismatches": 0,
+        "output_mismatches": 0,
+        "fields": []
+      },
+      "4": {
+        "trials": 40,
+        "state_mismatches": 0,
+        "output_mismatches": 0,
+        "fields": []
+      },
+      "8": {
+        "trials": 40,
+        "state_mismatches": 0,
+        "output_mismatches": 0,
+        "fields": []
+      },
+      "32": {
+        "trials": 40,
+        "state_mismatches": 0,
+        "output_mismatches": 0,
+        "fields": []
+      },
+      "64": {
+        "trials": 40,
+        "state_mismatches": 0,
+        "output_mismatches": 0,
+        "fields": []
+      },
+      "128": {
+        "trials": 40,
+        "state_mismatches": 0,
+        "output_mismatches": 0,
+        "fields": []
+      }
+    }
+  },
+  "dflash_block_plan": {
+    "draft_token_num": 8,
+    "window": 4096,
+    "per_bs": {
+      "1": {
+        "trials": 40,
+        "state_mismatches": 0,
+        "output_mismatches": 0,
+        "fields": []
+      },
+      "2": {
+        "trials": 40,
+        "state_mismatches": 0,
+        "output_mismatches": 0,
+        "fields": []
+      },
+      "4": {
+        "trials": 40,
+        "state_mismatches": 0,
+        "output_mismatches": 0,
+        "fields": []
+      },
+      "8": {
+        "trials": 40,
+        "state_mismatches": 0,
+        "output_mismatches": 0,
+        "fields": []
+      },
+      "32": {
+        "trials": 40,
+        "state_mismatches": 0,
+        "output_mismatches": 0,
+        "fields": []
+      },
+      "64": {
+        "trials": 40,
+        "state_mismatches": 0,
+        "output_mismatches": 0,
+        "fields": []
+      },
+      "128": {
+        "trials": 40,
+        "state_mismatches": 0,
+        "output_mismatches": 0,
+        "fields": []
+      }
+    }
+  },
+  "draft_indptr": {
+    "topk1_steps3": {
+      "trials": 40,
+      "mismatches": 0
+    },
+    "topk1_steps5": {
+      "trials": 40,
+      "mismatches": 0
+    },
+    "topk2_steps3": {
+      "trials": 40,
+      "mismatches": 0
+    },
+    "topk2_steps5": {
+      "trials": 40,
+      "mismatches": 0
+    }
+  },
+  "seconds": 14.5,
+  "all_equal": true
+}
