@@ -493,13 +493,14 @@ rounding. So these numbers bound the projection's damage only to within about 0.
 Choosing the basis for output sensitivity made things worse, not better. The query and
 product bases have higher KL and lower top-1 agreement than the plain key-energy basis at
 every rank. The query basis also loses
-delayed retrieval at r = 32 (4 of 24 exact). With the energy basis, retrieval survives at
+delayed retrieval at r = 64 (22 of 24 exact) and r = 32 (4 of 24). With the energy basis, retrieval survives at
 every rank while top-1 agreement falls, so the damage is spread over ordinary next-token
 prediction rather than concentrated on recalling early facts.
 
-Decision: P13 is closed under its rule (one training-free run, closed if it misses the
-budget). Three variants were not tested: recovering quality by training, choosing ranks per
-layer or per head, and bases applied before the depthwise convolution.
+Decision: P13 closes. Its one planned training-free test (`TASKS.md`) misses the budget at
+every rank, and the untested variants would need training or a different design: recovering
+quality by training, choosing ranks per layer or per head, and bases applied before the
+depthwise convolution.
 
 ## 3. Ranked portfolio
 
