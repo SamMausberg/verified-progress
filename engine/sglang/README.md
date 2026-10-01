@@ -66,7 +66,7 @@ Every change is off unless its flag or environment variable is set.
 Tests: `tests/test_moonshot_levers.py` and `tests/test_gdn_exact_replay.py` (the engine
 tests run in the SGLang venv with the worktree on `PYTHONPATH` and skip elsewhere).
 
-## drafter (`patches/drafter/0001-0002`, branch `engine/drafter`)
+## drafter (`patches/drafter/0001-0003`, branch `engine/drafter`)
 
 ```sh
 scripts/sglang_worktree.sh drafter
@@ -76,6 +76,7 @@ SGLANG_WORKTREE=~/sglang-wt/drafter source scripts/sglang_env.sh
 
 | Patch | What it changes | Default behaviour |
 |---|---|---|
+| 0003 | `SGLANG_GDN_REPLAYSSM_FOLD=1` with `--enable-linear-replayssm-spec`: the fold-every-commit protocol for GDN pools (verify with the recurrent kernel, which also writes the raw window to a ring; on commit, a bitwise clone of the recurrent update replays the accepted prefix into the checkpoint). SGLang implements it for GDN but enabled it only for KDA. The DFLASH commit hook routes to it. Validation: the fold arm of `experiments/drafter/run_replay_check.sh`. | unchanged unless the variable is set |
 | 0002 | `--enable-linear-replayssm-spec` for DFLASH on GDN models (Qwen3.5): the GDN circular-ring ReplaySSM commit in `update_mamba_state_after_mtp_verify`, which DFLASH calls directly (the same kernels, order and index sets as the GDN branch of `spec_utils.commit_mamba_states_after_verify` used by EAGLE/MTP), and the KDA-only refusal relaxed for DFLASH on GDN. The verify then writes compact per-token records to a ring instead of one FP32 GDN state per block position. Validation: `experiments/drafter/run_replay_check.sh`. | refused without the patch; unchanged unless the flag is set |
 | 0001 | `SGLANG_DFLASH_TRACE_PATH=<prefix>`: the DFLASH worker appends one JSON line per request per greedy verify cycle to `<prefix>.<pid>.jsonl` (request id, prefix length, the drafted block with the anchor first, the target's argmax at every block row, accepted length). Used for the per-cycle traces in `evidence/drafter/` (`experiments/drafter/run_trace.sh`). It copies to the host every cycle, a stream sync, so traced runs give tokens and acceptance, not timings. | unchanged unless the variable is set |
 
