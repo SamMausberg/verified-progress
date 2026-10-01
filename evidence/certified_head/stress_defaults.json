@@ -1,0 +1,249 @@
+{
+ "row_checks_target": 1000000,
+ "configs": [
+  {
+   "arith": "w8a16",
+   "config": {
+    "block_v": 128,
+    "block_m": 16,
+    "block_k": 128,
+    "num_warps": 4,
+    "num_stages": 4,
+    "tma": true
+   },
+   "batch_sizes": [
+    1,
+    16
+   ],
+   "row_checks": 1003680,
+   "rows_missed": {
+    "lower": 0,
+    "upper": 0,
+    "summary": 0,
+    "probe_flag": 0
+   },
+   "logits_missed": 0,
+   "missed_by_batch_size": {},
+   "seconds": 174.2,
+   "ok": true,
+   "per_row_miss_rate_95pct_upper": 2.9890004782400766e-06
+  },
+  {
+   "arith": "w8a16",
+   "config": {
+    "block_v": 128,
+    "block_m": 32,
+    "block_k": 128,
+    "num_warps": 4,
+    "num_stages": 4,
+    "tma": true
+   },
+   "batch_sizes": [
+    17,
+    32
+   ],
+   "row_checks": 1003520,
+   "rows_missed": {
+    "lower": 0,
+    "upper": 0,
+    "summary": 0,
+    "probe_flag": 0
+   },
+   "logits_missed": 0,
+   "missed_by_batch_size": {},
+   "seconds": 73.5,
+   "ok": true,
+   "per_row_miss_rate_95pct_upper": 2.9894770408163264e-06
+  },
+  {
+   "arith": "w8a16",
+   "config": {
+    "block_v": 128,
+    "block_m": 64,
+    "block_k": 128,
+    "num_warps": 4,
+    "num_stages": 3,
+    "tma": true
+   },
+   "batch_sizes": [
+    33,
+    256
+   ],
+   "row_checks": 1035776,
+   "rows_missed": {
+    "lower": 0,
+    "upper": 0,
+    "summary": 0,
+    "probe_flag": 0
+   },
+   "logits_missed": 0,
+   "missed_by_batch_size": {},
+   "seconds": 50.2,
+   "ok": true,
+   "per_row_miss_rate_95pct_upper": 2.8963791398912508e-06
+  },
+  {
+   "arith": "w8a8",
+   "config": {
+    "block_v": 128,
+    "block_m": 16,
+    "block_k": 128,
+    "num_warps": 4,
+    "num_stages": 3,
+    "tma": true
+   },
+   "batch_sizes": [
+    1,
+    16
+   ],
+   "row_checks": 1003680,
+   "rows_missed": {
+    "lower": 0,
+    "upper": 0,
+    "summary": 0,
+    "probe_flag": 0
+   },
+   "logits_missed": 0,
+   "missed_by_batch_size": {},
+   "seconds": 190.9,
+   "ok": true,
+   "per_row_miss_rate_95pct_upper": 2.9890004782400766e-06
+  },
+  {
+   "arith": "w8a8",
+   "config": {
+    "block_v": 256,
+    "block_m": 32,
+    "block_k": 128,
+    "num_warps": 4,
+    "num_stages": 3,
+    "tma": true
+   },
+   "batch_sizes": [
+    17,
+    32
+   ],
+   "row_checks": 1003520,
+   "rows_missed": {
+    "lower": 0,
+    "upper": 0,
+    "summary": 0,
+    "probe_flag": 0
+   },
+   "logits_missed": 0,
+   "missed_by_batch_size": {},
+   "seconds": 74.9,
+   "ok": true,
+   "per_row_miss_rate_95pct_upper": 2.9894770408163264e-06
+  },
+  {
+   "arith": "w8a8",
+   "config": {
+    "block_v": 128,
+    "block_m": 64,
+    "block_k": 128,
+    "num_warps": 4,
+    "num_stages": 3,
+    "tma": true
+   },
+   "batch_sizes": [
+    33,
+    256
+   ],
+   "row_checks": 1035776,
+   "rows_missed": {
+    "lower": 0,
+    "upper": 0,
+    "summary": 0,
+    "probe_flag": 0
+   },
+   "logits_missed": 0,
+   "missed_by_batch_size": {},
+   "seconds": 44.2,
+   "ok": true,
+   "per_row_miss_rate_95pct_upper": 2.8963791398912508e-06
+  },
+  {
+   "arith": "bf16",
+   "config": {
+    "block_v": 128,
+    "block_m": 32,
+    "block_k": 64,
+    "num_warps": 4,
+    "num_stages": 3,
+    "tma": true
+   },
+   "batch_sizes": [
+    1,
+    32
+   ],
+   "row_checks": 1001088,
+   "rows_missed": {
+    "lower": 0,
+    "upper": 0,
+    "summary": 0,
+    "probe_flag": 0
+   },
+   "logits_missed": 0,
+   "missed_by_batch_size": {},
+   "seconds": 120.0,
+   "ok": true,
+   "per_row_miss_rate_95pct_upper": 2.9967395473724586e-06
+  },
+  {
+   "arith": "bf16",
+   "config": {
+    "block_v": 128,
+    "block_m": 64,
+    "block_k": 64,
+    "num_warps": 4,
+    "num_stages": 3,
+    "tma": true
+   },
+   "batch_sizes": [
+    33,
+    64
+   ],
+   "row_checks": 1002592,
+   "rows_missed": {
+    "lower": 0,
+    "upper": 0,
+    "summary": 0,
+    "probe_flag": 0
+   },
+   "logits_missed": 0,
+   "missed_by_batch_size": {},
+   "seconds": 68.5,
+   "ok": true,
+   "per_row_miss_rate_95pct_upper": 2.992244103284287e-06
+  },
+  {
+   "arith": "bf16",
+   "config": {
+    "block_v": 128,
+    "block_m": 128,
+    "block_k": 64,
+    "num_warps": 4,
+    "num_stages": 3,
+    "tma": true
+   },
+   "batch_sizes": [
+    65,
+    256
+   ],
+   "row_checks": 1047744,
+   "rows_missed": {
+    "lower": 0,
+    "upper": 0,
+    "summary": 0,
+    "probe_flag": 0
+   },
+   "logits_missed": 0,
+   "missed_by_batch_size": {},
+   "seconds": 57.4,
+   "ok": true,
+   "per_row_miss_rate_95pct_upper": 2.8632948506505407e-06
+  }
+ ],
+ "ok": true
+}

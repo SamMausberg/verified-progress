@@ -144,9 +144,9 @@ could a token outside the top 64 compete.
 | 1e-6 (about the largest observed cuBLAS error) | 0.0033% (2) | 0.05% |
 | 0 | 0 | 0 |
 
-The GPU replay of the same 60,000 rows at x3's commit gives the same undecided
-counts under both models (878 and 166). This CPU run started from the branch
-between 0c0bb7a and 90cc31a (its start commit was not recorded); the two differ
+The GPU replay of the same 60,000 rows (`replay_decisions.json`, fff72dc) gives
+the same undecided counts under both models (878 and 166). This CPU run started
+from the branch between 0c0bb7a and 90cc31a (its start commit was not recorded); the two differ
 only in the Hopper radius, by 1e-4 relative, and the count under the corrected
 radius equals the GPU replay's. An earlier version of this table used the first
 20,000 rows (2.24% and 0.45%): the rate depends on the population, and the
@@ -343,22 +343,279 @@ new W8A8 ones) get their own stress test in the shared hold that reruns the GPU
 tests; the head-path microbenchmark's W8A8 and BF16 rows below were timed on the
 earlier TMA tiles.
 
-## Pending in this PR
+## Results at the final commit
 
-The GPU tests, the replay of 60,000 real decode rows under every contract, the
-complete head-path microbenchmarks with both fallback modes and both error
-models, primitive costs and the Nsight Compute summary are rerun at the final
-commit in one exclusive hold and committed here with their commands.
+**Where each result comes from.** The final evidence run is x7c (`steps.tsv`,
+`run_commit.txt`). It reran what had changed and reused the rest from x7 and
+x6; for each reused step `steps.tsv` gives the reason it stands.
+
+| Steps | Commit | Run | Why the result stands |
+|---|---|---|---|
+| stress, micro, summarize, check_outputs | 46bcc84 | x7c | run at this commit |
+| compile, tests, tune_w8a16, primitives, ncu, ncu_export | d2712cb | x7 | the package's code and data are unchanged from d2712cb to 46bcc84 |
+| replay, invariance, tune_w8a8 | fff72dc | x6 | `kernels.py` is unchanged since; the replay's batches have at most 16 rows, whose tiles did not change; the invariance check runs only the stock head; the W8A8 sweep times every candidate tile explicitly |
+
+Also in x7c at 46bcc84, outside `run_all.sh`: `pointer_vs_tma_*.json`,
+`tma_m128_check.json` and `conditional_memory.json`. Every timed step recorded
+the host's foreign CPU load (`*.hostload.json`); none was contended (the micro
+averaged 1.76 foreign cores against a threshold of 2). x7b's micro run (0d770c6)
+was flagged contended (2.03, the author's own CPU compiles during the hold) and is
+not used. Two commits follow 46bcc84 in this PR and change package code: the
+margin rule for the row's lower bound in the self-test (a9f1793) and the W8A8
+and BF16 default tiles (2d1794a); the GPU tests and the stress test of the new
+defaults are rerun on them in a shared-lock hold, x8s, whose results are added
+to this directory when it has run. W8A16, the pass the head uses by
+default, is unchanged by both. The SGLang engine checks are in the engine
+follow-up, not in this PR.
+
+**Checks recorded under the earlier, more lenient row-lower rule.** Until a9f1793
+the self-test, the stress test and `tma_candidates` let the row's lower bound on
+its largest logit be up to `max(x + margin)`; it now has to be at most
+`max(x - margin)`. Every check recorded before passed under the old rule. The new
+rule could only add a miss where that lower bound lies within `2 margin` (about
+2e-9 relative) below the old limit. The bound is the maximum of the same
+per-logit lower bounds that epilogues 1 and 2 compute (the epilogues share the
+code that computes them), and each of those cleared its exact logit by the
+margin in every check (0 envelope misses), so on those inputs it cannot fall in
+that band unless epilogue 3's arithmetic differs from the other epilogues'. The
+GPU tests at a9f1793 and later rerun the self-test under the new rule.
+
+**GPU tests** (`gpu_tests.log`, d2712cb): 119 passed. x8s reruns them at
+2d1794a, with the CPU tests of the margin rule (`tests/test_enclosure_margin.py`).
+
+**Replay of 60,000 real decode rows** (`replay_decisions.json`, fff72dc). Each
+engine step is replayed at its own batch shape (at most 16 rows).
+
+| Contract | Stock error model | Certified rows | Rows needing the fallback | Steps with a fallback | Certified plus fallback equal to the reference |
+|---|---|---|---|---|---|
+| bf16 | conservative | 59,122 | 878 (1.46%) | 20.2% | 60,000 |
+| bf16 | Hopper wgmma | 59,834 | 166 (0.28%) | 4.2% | 60,000 |
+| fp32 | conservative | 59,134 | 866 (1.44%) | 20.1% | 60,000 |
+| fp32 | Hopper wgmma | 59,834 | 166 (0.28%) | 4.3% | 60,000 |
+| real (exact argmax) | none | 60,000 | 0 | 0 | 60,000 |
+
+Seeded sampling (bf16 reference): 59,164 and 59,169 rows certified at T = 0.7
+and 1.0 under the conservative model, 59,825 and 59,836 under the Hopper model;
+with the fallback every row equals SGLang's seeded sampler. The dense BF16
+reference equals the engine's token on all 60,000 rows; the stock BF16 argmax
+differs from the exact argmax on 296 rows (0.49%).
+
+**Head-path runtime** (`micro_head.json`, `head_path_time.csv`,
+`head_path_table.md`; 46bcc84). A microbenchmark of the LM head alone, not of
+decoding: each arm is captured in a CUDA graph with warm L2 and replayed 30
+times; a replay holds 20 calls (10 at M = 128, 5 at 256); times are medians over
+the replays, with standard deviations, in microseconds per call. The decided
+arms run on real decode rows that their own head decides at that batch size's
+tiles (checked, `batch_stats`). Runtimes are with the runtime probes on; "no
+probes" is the same kernel with them compiled out, a measurement-only head that
+engine glue refuses. The W8A16 pass uses the x7 sweep's winners, which differ
+from the defaults only in pipeline stages at M = 64 and 256 (within 0.2%).
+
+| M | Stock head + argmax | Certified, probes on | No probes | Probe cost | Speed-up (decided batch) |
+|---|---|---|---|---|---|
+| 1 | 370.5 +- 0.2 | 239.6 +- 0.2 | 231.9 +- 0.8 | 7.7 (3.3%) | 1.55x |
+| 8 | 382.2 +- 0.2 | 251.0 +- 1.2 | 243.9 +- 1.3 | 7.1 (2.9%) | 1.52x |
+| 32 | 411.6 +- 0.3 | 305.5 +- 2.7 | 300.9 +- 6.6 | 4.6 (1.5%) | 1.35x |
+
+A real batch sometimes needs a fallback, so the time per call to compare is the
+expected one: the time on a decided batch plus, for each fallback kind, the
+fraction of real batches that need it times its measured extra time. The
+fractions come from batches of M consecutive rows of the 60,000-row capture, with
+row statuses taken at each batch size's own tiles; the capture's engine batches
+held at most 16 requests, so above 16 rows these batches are not the engine's.
+
+| M | Batches with a fallback, conservative / Hopper | Expected, whole-batch fallback, conservative / Hopper | Expected, column fallback, conservative / Hopper |
+|---|---|---|---|
+| 1 | 1.5% / 0.3% | 244.9 / 240.6 | 249.3 / 248.7 |
+| 8 | 11.0% / 2.2% | 292.8 / 259.3 | 264.2 / 259.5 |
+| 32 | 35.6% / 8.2% | 443.4 / 337.3 | 331.8 / 316.2 |
+
+**Where it stops paying, the main limitation.** The certified head is faster than
+the stock head only at small batches. Under the conservative model the
+whole-batch fallback loses to stock from M = 32 (443.4 against 411.6). The column
+fallback keeps it ahead through M = 64 (420.5 against 451.6), and so does the
+Hopper model's lower fallback rate at M = 32 (337.3); at M = 64 the Hopper model
+with the whole-batch fallback ties (447.2 against 451.6). From M = 128 every mode
+loses (best 706.6 against 562.2 at M = 128, 1,330.5 against 830.6 at 256): the
+W8A16 pass alone is slower than the stock GEMM above 64 rows (primitives below),
+and 77% of 128-row batches need a fallback under the conservative model. All
+batch sizes (from `head_path_table.md`):
+
+| M | Stock | Certified (p10-p90) | No probes | Probe cost | Batch fallback rate, cons. / Hopper | Whole-batch expected, cons. / Hopper | Column expected, cons. / Hopper | Best mode / stock |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 370.5 | 239.6 (239.4-239.8) | 231.9 | 7.7 | 0.015 / 0.003 | 244.9 / 240.6 | 249.3 / 248.7 | 0.62 |
+| 2 | 371.8 | 248.6 (248.3-248.9) | 239.8 | 8.7 | 0.029 / 0.006 | 259.5 / 250.6 | 257.4 / 256.3 | 0.65 |
+| 4 | 374.5 | 247.2 (247.0-247.5) | 241.7 | 5.5 | 0.057 / 0.011 | 269.1 / 251.4 | 260.6 / 258.4 | 0.69 |
+| 8 | 382.2 | 251.0 (250.2-252.8) | 243.9 | 7.1 | 0.110 / 0.022 | 292.8 / 259.3 | 264.2 / 259.5 | 0.69 |
+| 16 | 395.1 | 256.9 (250.4-257.4) | 249.9 | 7.0 | 0.206 / 0.043 | 335.0 / 273.2 | 271.5 / 262.8 | 0.69 |
+| 32 | 411.6 | 305.5 (299.4-306.0) | 300.9 | 4.6 | 0.356 / 0.082 | 443.4 / 337.3 | 331.8 / 316.2 | 0.81 |
+| 64 | 451.6 | 385.1 (369.8-388.0) | 372.7 | 12.4 | 0.558 / 0.150 | 615.3 / 447.2 | 420.5 / 400.2 | 0.93 |
+| 128 | 562.2 | 676.3 (650.2-679.2) | 661.6 | 14.8 | 0.774 / 0.274 | 1,055.3 / 810.4 | 734.7 / 706.6 | 1.31 |
+| 256 | 830.6 | 1,283.3 (1,213.6-1,293.0) | 1,262.6 | 20.7 | 0.936 / 0.449 | 1,950.2 / 1,603.1 | 1,401.1 / 1,330.5 | 1.65 |
+
+"Best mode / stock" uses the conservative model and takes the fastest of the
+W8A16 whole-batch, W8A16 column, W8A8 and BF16 modes. The W8A8 and BF16 rows of
+the micro were timed on the earlier TMA tiles (see "The rule as applied"). The
+W8A8 pass is the fastest decided pass up to 16 rows (220.7 to 227.3), but it
+certifies fewer rows: 2.37% of rows need the fallback, against 1.46% for W8A16,
+and 6.1% at its 32-row tile, whose vocabulary tiles are 256 rows wide; there
+most batches with a fallback need the whole-batch one (59% of 32-row batches). The BF16 pass (a certified dense head) is slower than stock at every
+size. The kernel self-test costs about 7 s on the first call of a process (its
+FP64 references and compilation), then 0.02 to 0.3 s for each further batch size.
+
+**Seeded sampling against SGLang's seeded sampler** (T = 0.7, same runs):
+
+| M | Stock sampler | Certified, probes on | No probes | Probe cost | Batches with a fallback (cons.) |
+|---|---|---|---|---|---|
+| 1 | 689.9 | 275.2 | 260.1 | 15.1 | 1.5% |
+| 2 | 698.9 | 478.5 | 359.5 | 119.0 | 2.9% |
+| 4 | 706.1 | 480.2 | 359.6 | 120.6 | 5.6% |
+| 8 | 719.9 | 478.8 | 360.4 | 118.4 | 10.9% |
+| 16 | 746.6 | 467.3 | 360.4 | 106.9 | 20.5% |
+| 32 | 798.7 | 1,048.5 | 984.2 | 64.3 | 35.4% |
+| 64 | 941.7 | 2,002.2 | 1,969.5 | 32.7 | 55.5% |
+| 128 | 1,186.1 | 3,693.1 | 3,649.9 | 43.2 | 75.6% |
+| 256 | 2,012.6 | 7,340.8 | 7,255.0 | 85.8 | 93.6% |
+
+Limitations of the sampled path:
+
+- From M = 32 it is slower than the stock sampler (1.3 times at 32, 2.1 at 64,
+  3.6 at 256). The sampling epilogue computes FP64 Gumbel noise and score bounds
+  for every element of its tile, so its cost grows with the tile's rows, and at
+  the 32- and 64-row tiles the compiled kernel runs out of registers and spills
+  (`sample_kernel_sass.json`, regenerated in x8s with the 32- and 64-row tiles;
+  the committed file still holds the 16-row tile only):
+
+  | Sampled kernel (probes on / off) | Registers | Stack bytes | Local loads and stores |
+  |---|---|---|---|
+  | 16-row tile | 200 / 198 | 0 / 0 | 0 / 0 |
+  | 32-row tile | 255 / 255 | 336 / 376 | 146 / 147 |
+  | 64-row tile | 255 / 255 | 2,144 / 1,976 | 1,705 / 1,226 |
+
+- At the 16-row tile the runtime probes cost about 107 to 121 us (25%) at
+  M = 2 to 16, against 5 to 9 us on the greedy path. The cause is not
+  established. The probe check adds no kernel launch beyond the 4.7 us probe
+  kernel, no host synchronization and no recomputation of rows; statically it
+  adds about 2,050 SASS instructions (8 unrolled checks, each a reduction with
+  barriers, entered only by the programs whose vocabulary tile holds a probe row)
+  and 2 registers, with no spills, the same addition that costs the greedy path
+  5 to 9 us. Our hypothesis is instruction-cache pressure: the sampled kernel is
+  about 160 KB of SASS running a compute-bound FP64 epilogue with the probe
+  blocks inline. It is not tested; Nsight Compute profiled greedy launches only.
+- At M = 1 it costs 275 us because Triton compiles a separate kernel for an
+  integer argument equal to 1: with M known, the 15 masked batch columns of the
+  16-row tile drop out of the FP64 epilogue (542 FP64 instructions and 165
+  registers, against 1,607 and 200 for M as a runtime argument;
+  `sample_kernel_sass.json`). At M = 2 to 16 every column pays.
+- Proposed fixes, in a follow-up PR: the probe check as a masked store of the
+  probe tokens' bounds, compared in the decision kernel (no reductions or
+  barriers in the epilogue); and 16-row tiles for the sampled pass above 16 rows.
+
+**The approximate pass alone** (`head_primitives.json`, d2712cb, default tiles):
+the W8A16 pass against the stock head chain (cuBLAS BF16 GEMM, FP32 copy,
+argmax), median over 15 replays:
+
+| M | 1 | 8 | 16 | 32 | 64 | 128 | 256 |
+|---|---|---|---|---|---|---|---|
+| Stock chain | 369.2 | 380.4 | 394.0 | 411.1 | 451.1 | 565.7 | 854.8 |
+| W8A16 pass | 210.7 | 226.8 | 233.1 | 276.6 | 351.4 | 660.4 | 1,247.2 |
+| Ratio | 0.57 | 0.60 | 0.59 | 0.67 | 0.78 | 1.17 | 1.46 |
+
+The crossover lies between 64 and 128 rows; with the epilogue's checks and
+fallbacks the certified path crosses earlier, as above.
+
+**Nsight Compute** (`ncu_gemv_summary.json`, `ncu_expected.json`, d2712cb; the
+production W8A16 envelope launches, two per batch size, under Nsight's locked
+clocks):
+
+| M | Duration | DRAM throughput | SM throughput | Registers | Achieved occupancy |
+|---|---|---|---|---|---|
+| 1 | 254-257 us | 62-63% | 79% | 161 | 17.7% |
+| 16 | 266-268 us | 60% | 79% | 162 | 17.7% |
+| 64 | 408-414 us | 39% | 63% | 255 | 12.1% |
+| 256 | 1.47-1.48 ms | 11% | 68% | 255 | 12.4% |
+
+Even at M = 1 the pass is not limited by memory bandwidth alone: the envelope
+epilogue's directed-rounding arithmetic keeps the SMs busy (79%). At 64 rows and
+above the kernel uses all 255 registers; this export does not report spills.
+
+**Stress test of the default tiles** (`stress_defaults.json`, 46bcc84): every
+default tile configuration of every pass, at every batch size from 1 to 256
+that dispatches to it, on real and peaked rows, each call against FP64 logits.
+
+| Pass | Tile (TMA) | Batch sizes | Row-checks | Misses (lower, upper, summary, probe flag) |
+|---|---|---|---|---|
+| W8A16 | 128x16x128, 4 stages | 1-16 | 1,003,680 | 0, 0, 0, 0 |
+| W8A16 | 128x32x128, 4 stages | 17-32 | 1,003,520 | 0, 0, 0, 0 |
+| W8A16 | 128x64x128, 3 stages | 33-256 | 1,035,776 | 0, 0, 0, 0 |
+| W8A8 | 128x16x128, 3 stages | 1-16 | 1,003,680 | 0, 0, 0, 0 |
+| W8A8 | 256x32x128, 3 stages | 17-32 | 1,003,520 | 0, 0, 0, 0 |
+| W8A8 | 128x64x128, 3 stages | 33-256 | 1,035,776 | 0, 0, 0, 0 |
+| BF16 | 128x32x64, 3 stages | 1-32 | 1,001,088 | 0, 0, 0, 0 |
+| BF16 | 128x64x64, 3 stages | 33-64 | 1,002,592 | 0, 0, 0, 0 |
+| BF16 | 128x128x64, 3 stages | 65-256 | 1,047,744 | 0, 0, 0, 0 |
+
+With 0 misses in n row-checks the per-row miss probability is below 3/n (about
+3e-6) at 95% confidence if calls are independent trials; a race that depends on
+load or timing need not behave like independent trials. The new W8A8 and BF16
+defaults (2d1794a) are stressed the same way in x8s.
+
+**The faulty TMA tiles** (`tma_m128_check.json`, 46bcc84, the two families that
+missed in x7b; three identical runs each, lower and upper misses per run):
+
+| Tile (TMA) | M | Sweep rows | Real rows | Largest miss over the envelope's half-width |
+|---|---|---|---|---|
+| 64x128x128, 4 warps, 3 stages | 128 | 7/8, 10/18, 11/13 | 3,334/10, 3,040/8, 3,223/10 | 3.8 |
+| 64x128x128, 4 warps, 3 stages | 256 | 17/26, 37/39, 35/48 | 4,091/24, 4,410/24, 3,500/22 | 2.3 |
+| 128x128x128, 8 warps, 3 stages | 128 | 0 / 7,122 to 7,280 | 0 / 4,659 to 5,089 | 238 |
+| 128x128x128, 8 warps, 3 stages | 256 | 0 / 38,404 to 39,697 | 0 / 25,043 to 25,520 | 1,392 |
+| 128x128x128, 8 warps, 4 stages | 128 | 0/1, 0/2, 0/0 | 0/24, 0/18, 0/23 | 1.5 |
+| 128x128x128, 8 warps, 4 stages | 256 | 0/7, 0/6, 0/9 | 0/92, 0/55, 0/43 | 2.2 |
+
+In these two families, 64x128x128 with 4 warps and 4 stages or with 8 warps,
+128x128x128 with 4 warps, and every pointer-load configuration missed nothing,
+and the raw product (epilogue 0) was within its bound in every run, so the fault
+lies in the envelope's values, not in the GEMM.
+In x7b (0d770c6, a check with an inverted sign, whose counts are the logits each
+bound enclosed) the full neighbourhood at M = 128 and 256 (block_v 64 and 128,
+block_m 64 and 128, 4 and 8 warps, 3 and 4 stages, TMA and pointer loads) showed
+misses only in these three configurations. None is a default.
+
+**Conditional-node memory** (`conditional_memory.json`, 46bcc84): five M = 64
+stock GEMMs per graph, captured, replayed and deleted four times each way.
+
+| Graph | Allocated after each delete (MiB) | Reserved after each delete (MiB) |
+|---|---|---|
+| plain | 1,245, 1,245, 1,245, 1,245 | 1,248, 1,248, 1,248, 1,248 |
+| GEMMs inside conditional nodes | 1,405, 1,565, 1,725, 1,885 | 1,878, 2,508, 3,138, 3,768 |
+| the same, one shared memory pool | 2,045, 2,205, 2,365, 2,525 | 4,398, 5,028, 5,658, 6,288 |
+
+Each delete leaves 160 MiB allocated (five times the 32 MiB BF16 GEMM output of
+one body) and 630 MiB reserved behind; a shared pool does not help. The
+microbenchmark therefore runs batch sizes above 32 in their own processes, and
+`src/certified_head/INTEGRATION.md` records what this means for the engine.
 
 ## Files and commands
 
 | File | What | Command |
 |---|---|---|
-| `stock_invariance.json` | stock GEMM kernel per M, reduced-precision flag test, row/column-subset invariance, observed accumulation error, library versions | `python experiments/certified_head/stock_invariance.py --out evidence/certified_head/stock_invariance.json` (commit fd0fd4a, GPU) |
+| `stock_invariance.json` | stock GEMM kernel per M, reduced-precision flag test, row/column-subset invariance, observed accumulation error, library versions | `python experiments/certified_head/stock_invariance.py --out evidence/certified_head/stock_invariance.json` (run_all step `invariance`, fff72dc; first run at fd0fd4a) |
 | `fallback_vs_model.json` | undecided fraction versus the stock error bound, 60,000 rows, with the check of tokens outside the top 64 | `python experiments/certified_head/fallback_vs_model.py --rows 60000 --threads 32 --out evidence/certified_head/fallback_vs_model.json` (CPU, shared lock; branch between 0c0bb7a and 90cc31a, see above) |
 | `large_m_check.json`, `large_m_tests.log` | W8A16 at seven tile configurations and M = 16, 64, 96, 128, 200 and 256 on real rows: enclosure, decisions, status bits; the real-row rate test at the old defaults | `python experiments/certified_head/large_m_check.py --out ...`, then `pytest tests/test_certified_head.py -k real_row_certification_rate` (commit d990b3b, GPU, shared lock) |
 | `tma_repro.json` | the raw W8A16 product (standalone kernel and the pass's epilogue 0) per tile configuration, and the failing envelope's violations by class | `python experiments/certified_head/tma_repro.py --out ...` (commit 7f8079f, GPU, shared lock) |
 | `tma_candidates.json` | every pass's candidate default tiles at M = 1, 16, 17, 32, 33, 64, 65, 128, 200 and 256, twice; isolation kernels at M = 1, 16, 64 and 256: raw product, envelope, tile summaries, decisions; minimal kernels isolating the fault | `python experiments/certified_head/tma_candidates.py --out ...` (commit 4a54503, GPU, shared lock) |
+| `steps.tsv`, `run_commit.txt`, `gpu.txt` | x7c's steps with each one's commit and, for a reused step, why it stands; the run's commit; the GPU | `RUN_ALL_ONLY=stress,micro,summarize RUN_ALL_REUSE=~/vp-data/kernel/runs/x7b scripts/gpu_lock.sh -x experiments/certified_head/run_all.sh ~/vp-data/kernel/runs/x7c` (46bcc84) |
+| `gpu_tests.log` | the GPU tests | `python -m pytest tests/test_certified_head.py -q -s` (run_all step `tests`, d2712cb) |
+| `replay_decisions.json` | 60,000 real decode rows under every contract and both error models, greedy and seeded sampling | `python experiments/certified_head/replay_decisions.py --limit-rows 60000 --sample-temps 0.7 1.0 --out ...` (run_all step `replay`, fff72dc) |
+| `gemv_sweep_w8a16.json`, `gemv_sweep_w8a8.json`, `tune_*.hostload.json` | tile sweeps (the micro's tuned tiles) | `python bench/tune_gemv.py --arith w8a16 --out ...`; `--arith w8a8 --batches 16 32 64 128 256` (run_all steps `tune_w8a16`, d2712cb, and `tune_w8a8`, fff72dc) |
+| `micro_head.json`, `micro.hostload.json`, `head_path_time.csv`, `head_path_table.md` | head-path microbenchmark, both fallback modes, both error models, probes on and off, sampling, W8A8 and BF16 passes; its summary | `python bench/micro_head.py --trials 30 --pool-rows 60000 --gemv-configs gemv_sweep_w8a16.json --w8a8-configs gemv_sweep_w8a8.json --out ...`, then `python bench/summarize_head.py micro_head.json --csv head_path_time.csv` (46bcc84) |
+| `head_primitives.json`, `primitives.hostload.json` | primitive costs (stock chain, W8A16 pass, tile GEMMs, rescoring, draft summary) | `python bench/head_primitives.py --trials 15 --out ...` (d2712cb) |
+| `ncu_gemv_summary.json`, `ncu_expected.json` | Nsight Compute summary of the production envelope launches at M = 1, 16, 64 and 256, and the launches expected | run_all steps `ncu` and `ncu_export` (d2712cb), then `python experiments/certified_head/ncu_summary.py ncu_gemv_details.csv ncu_gemv_summary.json` |
+| `stress_defaults.json` | every default tile configuration of every pass, every batch size, about a million row-checks each | `python experiments/certified_head/stress_defaults.py --out ...` (run_all step `stress`, 46bcc84) |
+| `pointer_vs_tma_{w8a16,w8a8,bf16}.json`, `pointer_vs_tma_*.hostload.json` | fastest passing TMA and pointer-load configurations and the default's time per batch size | `python bench/tune_gemv.py --arith ARITH --out ...` (46bcc84, exclusive lock) |
+| `tma_m128_check.json` | the two faulty TMA tile families at M = 128 and 256: raw product and each side of the envelope, three runs | `python experiments/certified_head/tma_m128_check.py --configs 64x128x128 128x128x128 --out ...` (46bcc84) |
+| `conditional_memory.json` | device memory left behind by deleted graphs, with and without conditional nodes | `python experiments/certified_head/conditional_memory.py --out ...` (46bcc84) |
+| `sample_kernel_sass.json` | SASS statistics of the envelope kernel, greedy and sampled, probes on and off, at the three default tiles, and x3's kernel | `python experiments/certified_head/sample_kernel_sass.py --compare 9e3a39a --out ...` (CPU) |
 
 Real head inputs come from the geometry workstream's plain-decode capture
 (SGLang `bd66ce34` with its capture patch, `--disable-cuda-graph`,
