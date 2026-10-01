@@ -522,6 +522,16 @@ def test_quality_comparison_requires_the_same_complete_problem_set(tmp_path: Pat
         compare(partial, _quality_run(tmp_path / 'e', full[:2], task_file))
 
 
+def test_paired_accuracy_interval() -> None:
+    from bench.quality import paired_difference_interval
+
+    # mtp-stockverify against plain run b on GSM8K: 91 problems only plain solved,
+    # 73 only the arm solved, out of 1,319.
+    low, high = paired_difference_interval(91, 73, 1319)
+    assert (round(low * 100, 2), round(high * 100, 2)) == (-3.27, 0.54)
+    assert paired_difference_interval(0, 0, 10) == (0.0, 0.0)
+
+
 def test_quality_comparison_fails_closed_without_the_task_set(tmp_path: Path) -> None:
     from bench.quality import compare
 

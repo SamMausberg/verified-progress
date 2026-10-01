@@ -115,6 +115,23 @@ def mcnemar_exact(only_a: int, only_b: int) -> float:
     return min(1.0, 2 * tail)
 
 
+def paired_difference_interval(
+    only_a: int, only_b: int, total: int, z: float = 1.96
+) -> tuple[float, float]:
+    """95% interval for accuracy B minus accuracy A on the same problems (paired Wald).
+
+    The difference is (only_b - only_a) / total, with variance
+    (only_a + only_b - (only_b - only_a)**2 / total) / total**2 from the discordant
+    counts; problems both runs solved or both missed do not contribute.
+    """
+    if total <= 0:
+        return (math.nan, math.nan)
+    delta = (only_b - only_a) / total
+    variance = (only_a + only_b - (only_b - only_a) ** 2 / total) / total**2
+    half = z * math.sqrt(max(variance, 0.0))
+    return (delta - half, delta + half)
+
+
 def sgl_eval_command(
     base_url: str, model: str, task_file: Path, out_dir: Path, threads: int, seed: int = 0
 ) -> list[str]:
@@ -247,7 +264,8 @@ def task_count(summary: dict[str, Any]) -> int:
 
 
 def compare(run_a: Path, run_b: Path) -> dict[str, Any]:
-    """Paired comparison on the same problems: accuracy delta, McNemar, identity."""
+    """Paired comparison on the same problems: accuracy delta with its 95% interval,
+    McNemar, identity."""
 
     def load(run: Path) -> dict[Any, dict[str, Any]]:
         with (run / 'problems.csv').open() as handle:
@@ -283,6 +301,7 @@ def compare(run_a: Path, run_b: Path) -> dict[str, Any]:
         'accuracy_a': acc_a,
         'accuracy_b': acc_b,
         'accuracy_delta_b_minus_a': acc_b - acc_a,
+        'accuracy_delta_95': list(paired_difference_interval(only_a, only_b, len(shared))),
         'correct_only_a': only_a,
         'correct_only_b': only_b,
         'mcnemar_exact_p': mcnemar_exact(only_a, only_b),
