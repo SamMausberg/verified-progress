@@ -193,7 +193,12 @@ target features, SpecForge drafter module, BF16) whose top-1 token matches the e
 token at 97.4% of positions. Costs are the measured DFlash-16 phases at c = 1 in the drafter's
 configuration (`stage_a_timing.json`, run `fresh_b16`): a reused cycle skips the 2.33 ms draft
 phase and pays the rest of the 7.46 ms cycle, including the 4.73 ms verify of a full block of 16
-positions (a padded verify; see the scope note below the table).
+positions (a padded verify; see the scope note below the table). P9's protocol first picks the
+fastest valid fresh DFlash among blocks 4, 8 and 16. At c = 1 that is block 16: in the bench's slot
+T3 (serving workload, radix cache off, Triton attention) block 16 serves 851 tokens/s against 807
+for block 8 and 498 for block 4 (`evidence/bench/README.md`). At c = 8, blocks 16 and 8 are within
+1% (3,639 and 3,613), and from c = 32 block 8 or 4 is faster, so a P9 test at higher concurrency
+may need the support remeasured at block 8.
 
 At the 18,274 post-rejection cycle boundaries (the correction at block position J = L + 1, with
 m = 15 - J old positions left), P9's program conditions on the whole corrected prefix through the
