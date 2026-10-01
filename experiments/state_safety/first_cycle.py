@@ -25,7 +25,11 @@ inconclusive. The result is void, and no results are written, unless all five
 runs exist and are the declared runs: the declared configurations and
 concurrencies with the radix cache and overlap scheduler on, the pinned pools,
 256 tokens with top-5 logprobs at every output token, exactly the 960 frozen
-fresh prompts, the clean engine pin, and the declaration's runner code.
+fresh prompts, the clean engine pin, repo_sha equal to the declaration commit,
+both c1 and c32 passes of a configuration from one server, and a clean checkout
+of the declaration's runner files attested before and after each hold
+(attest_runner.py). Prompts whose MTP chunk counters do not fit one chunk per
+verify cycle are excluded from every pair, as declared.
 
     python experiments/state_safety/first_cycle.py \
         --runs ~/vp-data/state/runs_fresh --out evidence/state_safety/first_cycle_fresh.json
@@ -73,6 +77,14 @@ SGLANG_PIN = 'bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824'
 # The declaration's merge commit; the runs' runner code must be this commit's.
 DECLARATION = 'b918c8b80c04e98c5930dbc3624570e645c5390f'
 RUNNER_FILES = ['run_matrix.py', 'server.py', 'client.py']
+# run -> the hold that produced it (attest_runner.py labels)
+HOLD_OF = {
+    'plain/c1': 'plain',
+    'mtp_s5/c1': 'mtp',
+    'mtp_s5/c32': 'mtp',
+    'mtp_tree/c1': 'mtp',
+    'mtp_tree/c32': 'mtp',
+}
 # run -> (speculative algorithm, steps, top-k, concurrency), as declared
 DECLARED: dict[str, tuple[str | None, int | None, int | None, int]] = {
     'plain/c1': (None, None, None, 1),
@@ -81,6 +93,8 @@ DECLARED: dict[str, tuple[str | None, int | None, int | None, int]] = {
     'mtp_tree/c1': ('EAGLE', 3, 2, 1),
     'mtp_tree/c32': ('EAGLE', 3, 2, 32),
 }
+# The most tokens one verify cycle can commit: steps + 1.
+MAX_COMMIT = {run: steps + 1 for run, (_, steps, _, _) in DECLARED.items() if steps}
 
 
 def counts(r: dict[str, Any], c: dict[str, Any], lab: dict[str, Any]) -> list[int]:
@@ -133,21 +147,54 @@ def declared_prompt_ids(prompts: Path, manifest: Path) -> tuple[set[str] | None,
     return {it['id'] for it in items}, None
 
 
-def runner_code_matches(repo_sha: str) -> bool:
-    """repo_sha is the declaration's commit or a descendant, with its runner files."""
+def declaration_hashes() -> dict[str, str]:
+    """SHA-256 of the runner files at the declaration commit."""
     repo = str(HERE.parents[1])
-
-    def git(*args: str) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(['git', '-C', repo, *args], capture_output=True, text=True)
-
-    if git('merge-base', '--is-ancestor', DECLARATION, repo_sha).returncode != 0:
-        return False
+    out = {}
     for name in RUNNER_FILES:
-        path = f'experiments/state_safety/{name}'
-        a, b = git('show', f'{DECLARATION}:{path}'), git('show', f'{repo_sha}:{path}')
-        if a.returncode or b.returncode or a.stdout != b.stdout:
-            return False
-    return True
+        blob = subprocess.run(
+            ['git', '-C', repo, 'show', f'{DECLARATION}:experiments/state_safety/{name}'],
+            capture_output=True,
+            check=True,
+        ).stdout
+        out[name] = hashlib.sha256(blob).hexdigest()
+    return out
+
+
+def attestation_problems(root: Path, hold: str, expected: dict[str, str]) -> list[str]:
+    """Why the checkout attested around a hold was not the clean declaration commit."""
+    recs = {}
+    for when in ('before', 'after'):
+        path = root / 'attest' / f'{hold}-{when}.json'
+        if not path.exists():
+            return [f'hold {hold}: no {when} attestation']
+        recs[when] = json.loads(path.read_text())
+    problems = []
+    for when, r in recs.items():
+        if r.get('porcelain') != '':
+            problems.append(f'hold {hold}: checkout not clean ({when})')
+        if r.get('head') != DECLARATION:
+            problems.append(f'hold {hold}: checkout not at {DECLARATION[:7]} ({when})')
+        if r.get('files') != expected:
+            problems.append(f'hold {hold}: runner files differ from {DECLARATION[:7]} ({when})')
+    return problems
+
+
+def chunk_counters_ok(rec: dict[str, Any], max_commit: int) -> bool:
+    """The streamed chunks fit one chunk per verify cycle, as far as the data shows.
+
+    The server reports the cumulative spec_verify_ct only in the final chunk's meta
+    (earlier chunks carry 0), so per-chunk counters cannot be checked. Instead: 0 in
+    every chunk but the last; the last equal to the number of chunks after the
+    prefill token and to the request's spec_verify_ct; and every chunk after the
+    prefill token carrying 1 to max_commit tokens (steps + 1), the most one cycle
+    can commit.
+    """
+    c = [int(x[1]) for x in rec['chunks']]
+    n = len(c) - 1
+    sizes_ok = all(1 <= int(x[0]) <= max_commit for x in rec['chunks'][1:])
+    counts_ok = c[0] == 0 and all(x == 0 for x in c[1:-1]) and c[-1] == n == rec['spec_verify_ct']
+    return sizes_ok and counts_ok
 
 
 def record_shape_problems(run: dict[str, dict[str, Any]]) -> int:
@@ -204,8 +251,8 @@ def void_reasons(
             reasons.append(f'{run}: not a cold pass')
         if m.get('sglang_sha') != SGLANG_PIN or m.get('sglang_dirty') is not False:
             reasons.append(f'{run}: engine is not the clean pin {SGLANG_PIN[:10]}')
-        if not runner_code_matches(str(m.get('repo_sha'))):
-            reasons.append(f'{run}: runner code differs from the declaration ({DECLARATION[:7]})')
+        if m.get('repo_sha') != DECLARATION:
+            reasons.append(f'{run}: repo_sha is not the declaration commit {DECLARATION[:7]}')
         records = load_run(root / f'{run}.jsonl')
         bad = record_shape_problems(records)
         if bad:
@@ -217,12 +264,32 @@ def void_reasons(
                     f'{run}: prompt IDs differ from the declared set '
                     f'({len(ids - run_ids)} missing, {len(run_ids - ids)} extra)'
                 )
+    # The c1 and c32 passes of a configuration come from one server.
+    for config in ('mtp_s5', 'mtp_tree'):
+        ids_ = []
+        for run in (f'{config}/c1', f'{config}/c32'):
+            meta = root / f'{run}.meta.json'
+            if meta.exists():
+                ids_.append(json.loads(meta.read_text())['server_info'].get('server_id'))
+        if len(ids_) == 2 and (ids_[0] is None or ids_[0] != ids_[1]):
+            reasons.append(f'{config}: c1 and c32 were not served by the same server')
+    # The checkout around each hold (attest_runner.py).
+    expected = declaration_hashes()
+    for hold in sorted(set(HOLD_OF.values())):
+        reasons.extend(attestation_problems(root, hold, expected))
     return reasons
 
 
 def analyse(runs: dict[str, dict[str, dict[str, Any]]], fisher: bool = True) -> dict[str, Any]:
     ids = sorted(set.intersection(*(set(runs[r]) for r in RUNS)))
-    included = [p for p in ids if all(spec_cycles_consistent(runs[r][p]) for r in MTP_RUNS)]
+    included = [
+        p
+        for p in ids
+        if all(
+            spec_cycles_consistent(runs[r][p]) and chunk_counters_ok(runs[r][p], MAX_COMMIT[r])
+            for r in MTP_RUNS
+        )
+    ]
     per: dict[str, np.ndarray] = {}
     for group, pairs in (('primary', PRIMARY), ('control', CONTROL)):
         for name, (r, c, lab) in pairs.items():

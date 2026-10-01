@@ -13,7 +13,9 @@ from first_cycle import (
     RUNS,
     SGLANG_PIN,
     analyse,
+    chunk_counters_ok,
     counts,
+    declaration_hashes,
     log_odds,
     void_reasons,
 )
@@ -26,7 +28,9 @@ SURE = [[-0.01, 1], [-5.0, 2]]
 def rec(ids, top, chunks=None):
     r = {'output_ids': ids, 'top_logprobs': [top] * len(ids)}
     if chunks is not None:
-        r['chunks'] = [[n, None] for n in chunks]
+        # As the server streams them: the cumulative verify count only in the last chunk.
+        r['chunks'] = [[n, 0] for n in chunks]
+        r['chunks'][-1][1] = len(chunks) - 1
         r['spec_verify_ct'] = len(chunks) - 1
     return r
 
@@ -122,9 +126,16 @@ def _write_declared(tmp_path, ids):
                 'disable_radix_cache': False,
                 'disable_overlap_schedule': False,
                 'attention_backend': 'flashinfer',
+                'server_id': f'30058:{config}:1',
             },
         }
         (runs / f'{run}.meta.json').write_text(json.dumps(meta))
+    files = declaration_hashes()
+    (runs / 'attest').mkdir()
+    for hold in ('plain', 'mtp'):
+        for when in ('before', 'after'):
+            rec = {'head': DECLARATION, 'porcelain': '', 'files': files}
+            (runs / 'attest' / f'{hold}-{when}.json').write_text(json.dumps(rec))
     return runs, prompts, manifest
 
 
@@ -209,6 +220,24 @@ def test_each_departure_from_the_declaration_makes_the_result_void(tmp_path, mon
         rows[1]['top_logprobs'][1] = [[-0.1, 1]]
         path.write_text(''.join(json.dumps(r) + '\n' for r in rows))
 
+    def other_server_for_c32(runs, prompts, manifest):
+        _edit_meta(runs, 'mtp_tree/c32', server_id='30058:other:2')
+
+    def no_after_attestation(runs, prompts, manifest):
+        (runs / 'attest' / 'mtp-after.json').unlink()
+
+    def dirty_checkout(runs, prompts, manifest):
+        path = runs / 'attest' / 'plain-before.json'
+        rec = json.loads(path.read_text())
+        rec['porcelain'] = ' M experiments/state_safety/client.py\n'
+        path.write_text(json.dumps(rec))
+
+    def edited_runner_file(runs, prompts, manifest):
+        path = runs / 'attest' / 'mtp-after.json'
+        rec = json.loads(path.read_text())
+        rec['files'] = {**rec['files'], 'server.py': '0' * 64}
+        path.write_text(json.dumps(rec))
+
     def missing_prompt(runs, prompts, manifest):
         path = runs / 'mtp_s5/c1.jsonl'
         path.write_text(''.join(path.read_text().splitlines(keepends=True)[:2]))
@@ -229,7 +258,11 @@ def test_each_departure_from_the_declaration_makes_the_result_void(tmp_path, mon
         other_revision: 'mtp_tree/c1: model revision',
         other_engine: 'mtp_s5/c32: engine is not the clean pin',
         dirty_engine: 'plain/c1: engine is not the clean pin',
-        other_runner_code: 'mtp_tree/c32: runner code differs',
+        other_runner_code: 'mtp_tree/c32: repo_sha is not the declaration commit',
+        other_server_for_c32: 'mtp_tree: c1 and c32 were not served by the same server',
+        no_after_attestation: 'hold mtp: no after attestation',
+        dirty_checkout: 'hold plain: checkout not clean (before)',
+        edited_runner_file: 'hold mtp: runner files differ',
         short_logprobs: 'mtp_s5/c1: 1 records lack top-5 logprobs',
         one_candidate: 'plain/c1: 1 records lack top-5 logprobs',
         missing_prompt: 'mtp_s5/c1: prompt IDs differ',
@@ -238,3 +271,50 @@ def test_each_departure_from_the_declaration_makes_the_result_void(tmp_path, mon
     for edit, text in expected.items():
         got = reasons(edit)
         assert any(text in r for r in got), (edit.__name__, got)
+
+
+def test_chunks_must_fit_one_verify_cycle_each():
+    ok = {'chunks': [[1, 0], [6, 0], [2, 2]], 'spec_verify_ct': 2}
+    assert chunk_counters_ok(ok, max_commit=6)
+    # A chunk longer than one cycle can commit.
+    assert not chunk_counters_ok({**ok, 'chunks': [[1, 0], [7, 0], [2, 2]]}, max_commit=6)
+    # A counter in a middle chunk, or a final count that is not the chunk count.
+    assert not chunk_counters_ok({**ok, 'chunks': [[1, 0], [6, 1], [2, 2]]}, max_commit=6)
+    assert not chunk_counters_ok({**ok, 'chunks': [[1, 0], [6, 0], [2, 3]]}, max_commit=6)
+    assert not chunk_counters_ok({**ok, 'spec_verify_ct': 3}, max_commit=6)
+
+
+def test_attest_runner_records_and_detects_only_the_python_process(tmp_path, monkeypatch):
+    import subprocess
+
+    import attest_runner
+
+    repo = tmp_path / 'repo'
+    base = repo / 'experiments' / 'state_safety'
+    base.mkdir(parents=True)
+    for name in attest_runner.RUNNER_FILES:
+        (base / name).write_text(name)
+    git = ['git', '-C', str(repo)]
+    subprocess.run([*git, 'init', '-q'], check=True)
+    subprocess.run([*git, 'add', '.'], check=True)
+    subprocess.run(
+        [*git, '-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-qm', 'x'],
+        check=True,
+    )
+    rec = attest_runner.attest(repo)
+    assert rec['porcelain'] == '' and len(rec['head']) == 40
+    (base / 'server.py').write_text('edited')
+    assert attest_runner.attest(repo)['porcelain'] != ''
+
+    runs = tmp_path / 'runs'
+    waiting = f'bash gpu_lock.sh -x bash -c python run_matrix.py --configs plain --out-dir {runs}'
+    started = f'python run_matrix.py --configs mtp_s5,mtp_tree --passes c1,c32 --out-dir {runs}'
+
+    class Out:
+        def __init__(self, text):
+            self.stdout = text
+
+    monkeypatch.setattr(attest_runner.subprocess, 'run', lambda *a, **k: Out(waiting + '\n'))
+    assert attest_runner.running_hold(runs) is None
+    monkeypatch.setattr(attest_runner.subprocess, 'run', lambda *a, **k: Out(started + '\n'))
+    assert attest_runner.running_hold(runs) == 'mtp'

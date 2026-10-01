@@ -221,6 +221,26 @@ reason go in a new commit before the runs.
     exploratory effect.
 - **If supported.** Use the cache tap to compare the GDN state handed from prefill to
   the first verify forward with the state handed to the first plain decode step.
+- **Attestation.** `run_matrix.py` records only `repo_sha`, which does not show that
+  the checkout was clean. `attest_runner.py --watch` therefore runs outside the holds,
+  started before the first one.
+  - Whenever a `run_matrix.py` process writing to `runs_fresh/` appears or exits, it
+    records the checkout's HEAD, `git status --porcelain` and the SHA-256 of
+    `run_matrix.py`, `server.py` and `client.py` in
+    `runs_fresh/attest/<hold>-<before|after>.json`.
+  - The process table is polled every 2 s. An edit made and reverted inside that
+    window would not be seen.
+  - A hold's runs are void unless both of its records exist, are clean, are at
+    b918c8b and match b918c8b's files.
+  - Every run's `repo_sha` must be b918c8b.
+  - Both passes (c1 and c32) of a configuration must come from one server (equal
+    `server_id`).
+  - The server streams the cumulative verify count only in a response's last chunk,
+    so per-chunk counters cannot be checked. A prompt is excluded from every pair
+    unless all four MTP runs show:
+    - 0 in every chunk but the last;
+    - a last count equal to the chunk count and to `spec_verify_ct`;
+    - 1 to steps + 1 tokens in every chunk after the prefill token.
 - **Implementation.** `first_cycle.py` implements this analysis.
   `tests/test_state_safety_first_cycle.py` tests it on synthetic runs, and
   `analyze_all.sh` runs it once all five runs exist. Missing runs, unpinned pools or
