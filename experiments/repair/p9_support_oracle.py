@@ -26,23 +26,27 @@ with G2_R = G2_F and T2_R = T2_F where reuse is not possible; r_F is re-estimate
 same boundaries as Delta (each bootstrap replicate and each domain gets its own). Costs at concurrency 1 come
 from the measured DFlash-16 phases (`evidence/repair/stage_a_timing.json`, run fresh_b16):
 a reused cycle skips the draft phase and pays the rest of the cycle; the oracle's extra
-first-cycle cost A and conditioning cost are 0, so the oracle is an upper bound for every
-real program that verifies a padded block of 16 and reuses at every supported boundary. The
-unchanged cached unary control ("keep": the old draft's tail after the corrected token) is
-scored the same way. Confidence intervals: request-level bootstrap. Reject this finite-window
-reuse at the tested configuration if Delta's upper bound <= 0.
+first-cycle cost A and conditioning cost are 0, so the oracle is an upper bound for P9's
+program (which conditions on the whole corrected prefix through the frozen sets) when it
+verifies a padded block of 16 and reuses at every supported boundary; a program whose support
+starts at the correction is a different class and is not covered. The unchanged cached unary
+control ("keep": the old draft's tail after the corrected token) is scored the same way.
+Confidence intervals: request-level bootstrap. Reject this finite-window reuse at the tested
+configuration if Delta's upper bound <= 0.
 
 The always-reuse oracle above cannot speak for a gated program, one that may choose fresh
 DFlash on supported boundaries it judges unfavourable. The omniscient-gate oracle takes, per
 supported boundary, the better of reuse and fresh, max(0, (G2_R - G2_F) - r_F (T2_R - T2_F)),
 knowing G2_F in advance. It is >= 0 and >= the always-reuse Delta by construction (so it can
-reject nothing); it bounds gated programs over the same candidate sets with a padded verify, and
-its excess over always-reuse is the most a perfect gate could add.
+reject nothing); it bounds P9's program with any gate over the same candidate sets with a
+padded verify, and its excess over always-reuse is the most a perfect gate could add.
 
 A program could also verify only the m + 1 positions left after the correction instead of a
 padded block. `free_verify_always_reuse` charges the reused cycle no verify at all (the lower
-bound of any width's verify cost, every other phase still charged), so its Delta bounds
-always-reuse programs at any verify width from above.
+bound of any width's verify cost, every other phase still charged at its block-16 value), so its
+Delta bounds always-reuse programs at any verify width from above. `omniscient_gate_free_verify`
+applies the omniscient gate to that free-verify scoring and bounds gated programs at any verify
+width.
 
     python experiments/repair/p9_support_oracle.py --cycles ~/vp-data/drafter/support/zlab_b16_cycles/cycles.pt \\
         --timing evidence/repair/stage_a_timing.json --out evidence/repair/p9_support_oracle.json
@@ -272,6 +276,8 @@ def main() -> None:
         comp_free = components(rows, g2r, supported, ph, extra_us=-ph['verify'])
         _, d_free = estimate(comp_free, everything)
         lo_f, hi_f = bootstrap(rows, comp_free, args.bootstrap, seed=k)
+        _, d_gate_free = estimate(comp_free, everything, gate=True)
+        lo_gf, hi_gf = bootstrap(rows, comp_free, args.bootstrap, seed=k, gate=True)
         _, d_gate = estimate(comp, everything, gate=True)
         lo_g, hi_g = bootstrap(rows, comp, args.bootstrap, seed=k, gate=True)
         _, d_overall = estimate(comp, everything, overall_rate)
@@ -318,6 +324,11 @@ def main() -> None:
                 'delta': d_free,
                 'delta_ci95': [lo_f, hi_f],
                 'rejected': hi_f <= 0,
+            },
+            # Oracle: gate and free verify together; bounds gated programs at any verify width.
+            'omniscient_gate_free_verify': {
+                'delta': d_gate_free,
+                'delta_ci95': [lo_gf, hi_gf],
             },
         }
     # Unchanged cached unary control: reuse the old drafted tail wherever the horizon remains.

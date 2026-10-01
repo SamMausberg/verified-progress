@@ -209,3 +209,9 @@ def test_free_verify_shifts_delta_by_the_saved_verify(
         # Paired resamples: a free verify can only raise each replicate's Delta.
         assert free['delta_ci95'][0] >= v['delta_oracle_ci95'][0] - 1e-12
         assert free['delta_ci95'][1] >= v['delta_oracle_ci95'][1] - 1e-12
+        # The gate over free-verify scoring dominates both the gate and the free verify alone.
+        both = v['omniscient_gate_free_verify']
+        for other in (free, v['omniscient_gate_oracle']):
+            assert both['delta'] >= other['delta'] - 1e-12
+            assert both['delta_ci95'][0] >= other['delta_ci95'][0] - 1e-12
+            assert both['delta_ci95'][1] >= other['delta_ci95'][1] - 1e-12
