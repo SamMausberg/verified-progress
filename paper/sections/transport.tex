@@ -32,7 +32,7 @@ For every tile and centre, $r_c\ge\tfrac12\diam_2(c)$. Transport's bound for ent
 The weights alone fix $\delta^\ast$. On this head, with 64-entry tiles of contiguous token indices and tile-mean centres, its median over all entries is 0.85\% against int8 with one scale per entry \ev{head-constants}: draft and target head inputs must agree to about one part in a hundred, which a drafter trained to predict tokens has no reason to achieve. Transport must also beat the \emph{static screen}, the tile bound $\langle\mu_c,h\rangle+r_c\norm h_2$ at the target's head input with no draft at all. Since tile radii exceed row norms (median ratio 1.14), transport is no tighter than the static screen once the drift is as large as $h$ (Proposition~\ref{prop:static}).
 
 \subsection{The Measured Drift}\label{sec:transport-measured}
-The drift is measured on 40,000 held-out \emph{drift pairs} per drafter, all aligned pairs of the held-out prompts; certification (below) runs on the \emph{transport pairs}, the pairs of whole held-out capture steps (4,020 for DFlash-4B, 16,016 for MTP-4B). Its median is 0.917 for DFlash-4B \ev{rho} and 0.954 for MTP-4B \ev{rho-mtp}, two orders of magnitude above the median $\delta^\ast$ (Figure~\ref{fig:rho}b).
+The drift is measured on 40,000 held-out \emph{drift pairs} per drafter, all aligned pairs of the held-out prompts; certification (below) runs on the \emph{transport pairs}, the pairs of whole held-out capture steps (4,020 for DFlash-4B, 16,016 for MTP-4B). Its median is 0.917 for DFlash-4B \ev{rho} and 0.954 for MTP-4B \ev{rho-mtp}, two orders of magnitude above the median $\delta^\ast$ (Figure~\ref{fig:rho}b, c).
 
 \paragraph{Why the drift is large} Two properties of the DFlash drafter set its $\rho$ (Figure~\ref{fig:rho}a) \ev{stats-dflash}. Its final RMSNorm has unit gain, so its head input always has norm $\sqrt D\approx50.6$, about a third of the target's median of 159; the triangle inequality alone then gives $\rho\ge0.68$. The angle between the two is large as well: even the best rescaling of $h^d$ leaves $\rho$ near 0.91. The drafter is trained to rank the right token first under $Wh^d$, not to reproduce the target's head input. Nor does the drift hide in directions the head ignores: after removing each position's mean logit, $\norm{W\Delta}_2/\norm{Wh^t}_2$ has a median of 0.85 \ev{rho}. The MTP layer's head input is slightly longer than the target's, so its drift is mainly one of direction \ev{transport-mtp}.
 
@@ -45,8 +45,8 @@ The drift is measured on 40,000 held-out \emph{drift pairs} per drafter, all ali
 & DFlash-4B & MTP-4B\\\midrule
 Skipped: certified transport & 0.59\% & 0.64\%\\
 Skipped: static screen (no draft) & 0.58\% & 0.64\%\\
-Skipped: oracle radii & 68--89\% & 86.8--98.5\%\\
-Read by a real verify batch & $\ge$99.48\% & $\ge$99.4\%\\
+Skipped: oracle radii & 68.4--89.3\% & 86.8--98.5\%\\
+Read by a real verify batch & $\ge$99.48\% & $\ge$99.44\%\\
 Sampled test undecided, $P_?$ & $\ge$0.964 & $\ge$0.998\\
 \bottomrule
 \end{tabular*}
