@@ -69,14 +69,18 @@ weights.
 
 Checks on the tool itself:
 
-- Neutrality: tapped runs match the untapped matrix run in tokens and logprobs for
-  162 of 167 prompts (plain decode, batch 1). `tap_check.json` lists the five
-  exceptions (`alpaca_eval-0450`, `alpaca_eval-0500`, `mt_bench-0053`, `mt_bench-0056`,
-  `mt_bench-0059`): all five first differ in logprobs at output index 2, and two of
-  them keep identical tokens. They show the signature of the history dependence
-  described below (first difference at layer 3's attention at output index 2, with
-  identical projections), and one of them, `mt_bench-0056`, reproduces that dependence
-  deterministically without the tap; the KV-level link for all five is pending.
+- Neutrality: tapped runs of the current tap (v3, every module output per token)
+  match the untapped matrix run in tokens and logprobs for 162 of 167 prompts (plain
+  decode, batch 1); the earlier v1 tap session matched 166 of 167, all but
+  `mt_bench-0056`. `tap_check.json` lists the five v3 exceptions (`alpaca_eval-0450`,
+  `alpaca_eval-0500`, `mt_bench-0053`, `mt_bench-0056`, `mt_bench-0059`): all five first
+  differ in logprobs at output index 2, and two of them keep identical tokens. In the
+  other three, the top-2 logprob gap at the first changed token is 0 (an exact tie) or
+  0.125 in both runs. Four of the five change between the v1 and v3 tapped sessions
+  too, and there they show the signature described under "History dependence" below
+  (first difference at layer 3's attention, with identical projections). Of the five,
+  only `mt_bench-0056` changes in the deterministic history test without the tap. The
+  KV-level link for all five is pending.
 - Positive controls (`tap_control_*.json`, analysed with the current `mechanism.py`):
   a one-ulp change injected into the first element of layer 9's `mlp.down_proj` output
   in every forward is named as the first difference, at the first prompt token, for
@@ -220,11 +224,21 @@ queued.
 
 ## History dependence through radix-cache insertion
 
-For 5 of 167 prompts (plain decode, batch 1) the tapped run differed from the untapped
-one from output index 2 on (three changed tokens), and two tapped runs of four of them
-also differed, in MTP too. In each, the first differing module output at output index 2
-is layer 3's attention (the first full-attention layer), while its `qkv_proj` output and
-every earlier module output are identical: the attention read different KV.
+For 5 of 167 prompts (plain decode, batch 1) the tapped run (tap v3) differed from the
+untapped one from output index 2 on, and three of them changed tokens
+(`tap_check.json`). For four of them (`alpaca_eval-0450`, `alpaca_eval-0500`,
+`mt_bench-0053`, `mt_bench-0059`) the v1 and v3 tapped sessions also differ from each
+other, in plain decode and with MTP steps 3 (`tap_signature.json`). In all eight
+comparisons the first differing module output is layer 3's attention (the first
+full-attention layer). For plain decode it is at output index 2, and for MTP at a
+verify step at output index 3 or 5. Its `qkv_proj` output and every earlier module
+output that both tap versions hash are identical. Both sessions of each pair ran the
+same configuration at batch 1 and served the same 167 prompts in the same order. At the
+same batch shape that points to the attention reading different cached KV; the cache
+hashes that would show it directly are pending (below). For `mt_bench-0056` the only
+tapped comparison is plain at concurrency 1 vs 32 (`mechanism_plain_c1_vs_c32.json`),
+which shows the same signature but at different batch shapes, where the attention
+kernel itself can differ. The evidence for it is the deterministic reproduction below.
 
 The stock code path that does this, at this commit: after a request's prefill,
 `UnifiedRadixCache.cache_unfinished_req` (`srt/mem_cache/unified_radix_cache.py:1161`)
@@ -234,9 +248,14 @@ request's `req_to_token` row with the tree's indices (`req_to_token_pool.write`,
 For tokens the tree already held, such as a chat-template prefix shared with an
 earlier request, the request attends from then on over the earlier request's copy of
 that KV: valid values for the same tokens at the same positions, but computed in a
-prefill of another shape and not bitwise equal. Under the overlap scheduler, decode
-step 1 is already in flight with the request's own KV when this runs, so the switch
-shows from output index 2.
+prefill of another shape and so not necessarily bitwise equal (code reading). Under
+the overlap scheduler, decode step 1 is already in flight with the request's own KV
+when this runs, so the switch shows from output index 2 (code reading; the overlap-off
+control has not been run). No prefill in the tapped sessions or in the history test
+below reused a cached prefix (server logs; `prefill_cache_hits` in
+`tap_signature.json` and `targeted.json`). By the code, this hybrid cache only reuses a
+prefix at a stored GDN state, and these short shared prefixes had none, so the repoint
+is the only way one request's KV reaches another.
 
 A deterministic reproduction on stock SGLang (`targeted.json`, `history__*` entries,
 `targeted.py history`): each of 12 prompts is served on an empty cache, and again right
@@ -250,14 +269,35 @@ after the earlier prompt that shares the longest prefix with it (one request in 
 | MTP steps 3, radix cache on | 10/12 | 12/12 | output index 2 and 5 |
 
 The radix-off control was run for plain decoding only; the same control for MTP is
-**pending** (queued). The two prompts are `mt_bench-0056` after `mt_bench-0054` (6
-shared tokens) and `humaneval-0008` after `humaneval-0000` (22 shared tokens). So with the radix cache on, a
-request's output at a fixed configuration and batch shape depends on which earlier
-request computed its shared prefix, and under overlap scheduling on timing. The values
-involved are all valid; we found no case where this produced more than a near-tie flip,
-and it is not state corruption. The KV-level confirmation (hashes of every cached
-position entering each step) is **pending**: the first cache-hashing run crashed on long
-SSM rows, and the fixed tap is queued.
+**pending** (queued). The two prompts that change are `mt_bench-0056` after
+`mt_bench-0054` (6 shared tokens) and `humaneval-0008` after `humaneval-0000` (22
+shared tokens). `history__*.pairs` lists all 12 pairs. The 12 include all five prompts
+the tap changed, and only `mt_bench-0056` changes here. The other four do not change
+when served after their single longest-prefix predecessor, under plain decoding or
+MTP.
+
+So, with the radix cache on, a request's output at a fixed configuration and batch shape
+depends on which earlier request computed its shared prefix. That is shown for two
+prompts. For the other four tap-changed prompts the history test does not reproduce
+the change, and the v1/v3 comparison shows they can change between two sessions that
+serve the same requests in the same order. Those sessions differ in the tap version,
+which changes the host time per forward, and in how many tokens the earlier requests
+generated (v3 capped them). For these four we still consider attention over a
+different copy of cached KV the likely mechanism, because of the signature at the same
+batch shape. We do not know what decides which copy a decode step reads in those
+sessions. One candidate, which is reasoning and untested, is ordering. The repoint is a
+write to `req_to_token` issued from the host while, under the overlap scheduler, the
+next decode step is already queued. If the two are not ordered on the GPU, the step
+from which the switch shows could depend on timing.
+
+The values involved are valid by the code path, and we found no case where this
+produced more than a near-tie flip. No token changed in the history test, and where
+the tap changed tokens the top-2 gap was 0 or 0.125 in both runs. We do not consider
+it state corruption. The KV-level confirmation (hashes of every cached position
+entering each step) is **pending**. The first cache-hashing run crashed on long SSM
+rows, and the fixed tap is queued. It now includes both history pairs, each prompt
+served alone and after its predecessor on fresh servers, and radix on vs off for the
+five tap-changed prompts.
 
 ## Deterministic inference
 

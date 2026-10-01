@@ -1,7 +1,8 @@
 """Collect the targeted-test outputs into one evidence file.
 
 Keeps each test's summary, its run metadata and every case that was not
-identical (with its divergence position, margins and class), and adds the
+identical (with its divergence position, margins and class), lists every pair
+the history test served, and adds the
 chunked-prefill comparisons against the unchunked run of the same config.
 
     python experiments/state_safety/summarize_targeted.py \
@@ -12,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -63,6 +65,30 @@ def main() -> None:
         }
         if test != 'prefill':
             entry['non_identical_cases'] = [c for c in data['cases'] if not_identical(test, c)]
+        if test == 'history':
+            # Every pair tested, identical or not: which prompt followed which.
+            entry['pairs'] = [
+                {
+                    k: c[k]
+                    for k in (
+                        'id',
+                        'predecessor',
+                        'shared_prefix_tokens',
+                        'tokens_identical',
+                        'first_logprob_difference',
+                    )
+                }
+                for c in data['cases']
+            ]
+            # Prefills that reused a cached prefix, from the server log: with none, the
+            # only sharing between requests is the repoint after the prefill.
+            log = path.with_suffix('.server.log')
+            if log.exists():
+                cached = re.findall(r'#cached-token: (\d+)', log.read_text())
+                entry['prefill_cache_hits'] = {
+                    'prefills': len(cached),
+                    'with_cached_tokens': sum(int(c) > 0 for c in cached),
+                }
         out[path.stem] = entry
 
     # Chunked prefill: compare each chunked run with the unchunked run.
