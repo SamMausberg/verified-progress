@@ -82,9 +82,9 @@ Secondary investigations and supporting material:
 - **Speculation and the stock noise floor.** With identical pinned pools, every
   native-MTP configuration diverges from plain decoding at 3.5 to 4.0 per 1,000
   tokens, as often as from itself at another concurrency (3.1 to 3.5), and only
-  at near ties: at every divergence both runs' top-two logprob gaps are at most
-  two BF16 steps (0.25 nats), and no run commits a token that is not its own
-  top-1. In a cache-level check of plain decoding against three-step MTP on
+  at near ties: each divergence is an exact tie in one run or has both runs'
+  top-two gaps within two BF16 steps (0.25 nats), and no run commits a token
+  that is not its own top-1. In a cache-level check of plain decoding against three-step MTP on
   40 prompts, every cache entering the first differing module was identical, and
   that module is layer 0's GDN recurrence at the first verify. With the radix
   cache on, a request's logprobs depend on which request computed its shared
