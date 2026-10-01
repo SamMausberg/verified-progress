@@ -41,30 +41,30 @@
   legend image code/.code={\draw[mark repeat=2,mark phase=2,#1] plot coordinates {(0cm,0cm) (0.2cm,0cm) (0.4cm,0cm)};}]
 \addlegendimage{empty legend}\addlegendentry{int8:}
 \addplot[copy int8 row] table[x=k,y=plain_int8_row_greedy,col sep=comma]{\ccdf};\addlegendentry{per entry}
-\addplot[copy int8 g128] table[x=k,y=plain_int8_g128_greedy,col sep=comma]{\ccdf};\addlegendentry{128 columns}
-\addplot[ccert,only marks,mark=o,mark size=1.5pt] table[x=k,y=plain_int8_g128_gumbel_t1.0,col sep=comma]{\ccdf};\addlegendentry{128 columns, race at $T{=}1$}
+\addplot[copy int8 g128] table[x=k,y=plain_int8_g128_greedy,col sep=comma]{\ccdf};\addlegendentry{per 128 weights}
+\addplot[ccert,only marks,mark=o,mark size=1.8pt,mark options={line width=0.9pt}] table[x=k,y=plain_int8_g128_gumbel_t1.0,col sep=comma]{\ccdf};\addlegendentry{per 128 weights, race at $T{=}1$}
 \addplot[copy fp8,forget plot] table[x=k,y=plain_fp8_row_greedy,col sep=comma]{\ccdf};
 % FP8's label at the end of its curve (k = 256)
 \node[annot,anchor=west] at (axis cs:290,3.3e-4) {FP8, per entry};
 \addplot[copy int4,forget plot] table[x=k,y=plain_int4_g128_greedy,col sep=comma]{\ccdf};
-\node[annot,anchor=north] at (axis cs:1500,0.5) {int4, 128 columns};
+\node[annot,anchor=north] at (axis cs:1500,0.5) {int4, per 128 weights};
 % ---------------- (b) whole-batch fallback ----------------
 \nextgroupplot[xmode=log,log basis x=2,xmin=1,xmax=256,ymin=0,ymax=1,
   xtick={1,4,16,64,256},xticklabels={1,4,16,64,256},
   xlabel={Positions per head call, $M$},ylabel={Head calls needing\\a fallback},ylabel style={align=center},
   ytick={0,0.2,0.4,0.6,0.8,1},yticklabels={0\%,20\%,40\%,60\%,80\%,100\%},
   title={\paneltitle{b}{Whole-batch fallback}},
-  legend style={at={(0.02,0.98)},anchor=north west},legend image post style={xscale=0.8}]
+  legend style={at={(axis cs:1.05,0.6)},anchor=north west,fill=none},legend image post style={xscale=0.8}]
 \fill[wash] (axis cs:16,0) rectangle (axis cs:256,1);
 \draw[ink!45] (axis cs:16,0) -- (axis cs:16,1);
-\node[annot,anchor=north west,align=center] at (axis cs:17.5,0.985) {beyond the\\capture's\\batches};
+\node[annot,anchor=north west,align=center] at (axis cs:22,0.985) {beyond the\\capture's\\batches};
 \addplot[cfallback,thick,model cons,derived,domain=1:256,samples=120]{1-(1-\pcons)^x};
-  \addlegendentry{cons.}
+  \addlegendentry{conservative}
 \addplot[cfallback,thick,model hopper,derived,domain=1:256,samples=120]{1-(1-\phop)^x};
   \addlegendentry{Hopper}
 \addplot[cfallback,only marks,mark=square*,mark size=1.4pt] table[x=M,y=batch_fallback_rate,col sep=comma]{\headtime};
 \addplot[cfallback,only marks,mark=*,mark size=1.5pt] table[x=M,y=hopper_batch_fallback_rate,col sep=comma]{\headtime};
-\node[annot,anchor=north west,align=left] at (axis cs:1.1,0.64) {lines: derived\\marks: kernel replay,\\measured};
+\node[annot,anchor=north west,align=left] at (axis cs:1.3,0.985) {lines: derived\\marks: measured\\(kernel replay)};
 \draw[ink!50,densely dotted] (axis cs:128,0) -- (axis cs:128,1);
 % the measured shares at M = 128, beside their markers
 \node[annot,anchor=west] at (axis cs:136,\fbconsmeas) {\vppct{0}{100*\fbconsmeas}};
