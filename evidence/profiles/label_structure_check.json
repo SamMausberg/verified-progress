@@ -1,0 +1,499 @@
+{
+ "plain_bs1.nsys-rep": {
+  "replays_checked": 571,
+  "all_pass": true,
+  "unlabelled_gemms_per_step": 0.0,
+  "labels": {
+   "mlp_gate_up_gemm": {
+    "per_step": 32.0,
+    "expected_per_step": 32,
+    "kernel_configs": [
+     "nvjet_sm90_tst_256x8_64x6_4x1_v_bz_TNT grid=(4,18,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "mlp_down_gemm": {
+    "per_step": 32.0,
+    "expected_per_step": 32,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x8_64x16_4x1_v_bz_splitK_TNT grid=(4,30,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "gdn_in_proj_gemm": {
+    "per_step": 48.0,
+    "expected_per_step": 48,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x8_64x16_1x1_h_bz_TNT grid=(1,1,1)",
+     "nvjet_sm90_tst_64x8_64x16_4x1_v_bz_TNT grid=(4,30,1)"
+    ],
+    "expected_configs": 2,
+    "pass": true
+   },
+   "gdn_out_proj_gemm": {
+    "per_step": 24.0,
+    "expected_per_step": 24,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x8_64x16_4x1_v_bz_splitK_TNT grid=(4,20,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "attn_qkv_gemm": {
+    "per_step": 8.0,
+    "expected_per_step": 8,
+    "kernel_configs": [
+     "nvjet_sm90_tst_128x8_64x12_4x1_v_bz_TNT grid=(4,20,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "attn_o_proj_gemm": {
+    "per_step": 8.0,
+    "expected_per_step": 8,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x8_64x16_4x1_v_bz_splitK_TNT grid=(4,20,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "lm_head_gemm": {
+    "per_step": 1.0,
+    "expected_per_step": 1,
+    "kernel_configs": [
+     "nvjet_sm90_tst_512x8_64x3_2x1_v_bz_TNT grid=(2,66,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   }
+  }
+ },
+ "plain_bs8.nsys-rep": {
+  "replays_checked": 507,
+  "all_pass": true,
+  "unlabelled_gemms_per_step": 0.0,
+  "labels": {
+   "mlp_gate_up_gemm": {
+    "per_step": 32.0,
+    "expected_per_step": 32,
+    "kernel_configs": [
+     "nvjet_sm90_tst_256x8_64x6_4x1_v_bz_TNT grid=(4,18,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "mlp_down_gemm": {
+    "per_step": 32.0,
+    "expected_per_step": 32,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x8_64x16_4x1_v_bz_splitK_TNT grid=(4,30,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "gdn_in_proj_gemm": {
+    "per_step": 48.0,
+    "expected_per_step": 48,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x8_64x16_1x1_h_bz_TNT grid=(1,1,1)",
+     "nvjet_sm90_tst_64x8_64x16_4x1_v_bz_TNT grid=(4,30,1)"
+    ],
+    "expected_configs": 2,
+    "pass": true
+   },
+   "gdn_out_proj_gemm": {
+    "per_step": 24.0,
+    "expected_per_step": 24,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x8_64x16_4x1_v_bz_splitK_TNT grid=(4,20,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "attn_qkv_gemm": {
+    "per_step": 8.0,
+    "expected_per_step": 8,
+    "kernel_configs": [
+     "nvjet_sm90_tst_128x8_64x12_4x1_v_bz_TNT grid=(4,20,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "attn_o_proj_gemm": {
+    "per_step": 8.0,
+    "expected_per_step": 8,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x8_64x16_4x1_v_bz_splitK_TNT grid=(4,20,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "lm_head_gemm": {
+    "per_step": 1.0,
+    "expected_per_step": 1,
+    "kernel_configs": [
+     "nvjet_sm90_tst_512x8_64x3_2x1_v_bz_TNT grid=(2,66,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   }
+  }
+ },
+ "plain_bs32.nsys-rep": {
+  "replays_checked": 394,
+  "all_pass": true,
+  "unlabelled_gemms_per_step": 0.0,
+  "labels": {
+   "mlp_gate_up_gemm": {
+    "per_step": 32.0,
+    "expected_per_step": 32,
+    "kernel_configs": [
+     "nvjet_sm90_tst_192x32_64x7_4x1_v_bz_TNT grid=(4,24,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "mlp_down_gemm": {
+    "per_step": 32.0,
+    "expected_per_step": 32,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x32_64x16_4x1_v_bz_splitK_TNT grid=(4,30,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "gdn_in_proj_gemm": {
+    "per_step": 48.0,
+    "expected_per_step": 48,
+    "kernel_configs": [
+     "nvjet_sm90_tst_128x32_64x10_4x1_v_bz_TNT grid=(4,24,1)",
+     "nvjet_sm90_tst_64x8_64x16_1x4_h_bz_TNT grid=(4,1,1)"
+    ],
+    "expected_configs": 2,
+    "pass": true
+   },
+   "gdn_out_proj_gemm": {
+    "per_step": 24.0,
+    "expected_per_step": 24,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x32_64x16_4x1_v_bz_splitK_TNT grid=(4,20,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "attn_qkv_gemm": {
+    "per_step": 8.0,
+    "expected_per_step": 8,
+    "kernel_configs": [
+     "nvjet_sm90_tst_128x32_64x10_4x1_v_bz_TNT grid=(4,20,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "attn_o_proj_gemm": {
+    "per_step": 8.0,
+    "expected_per_step": 8,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x32_64x16_4x1_v_bz_splitK_TNT grid=(4,20,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "lm_head_gemm": {
+    "per_step": 1.0,
+    "expected_per_step": 1,
+    "kernel_configs": [
+     "nvjet_sm90_tst_384x32_64x4_2x1_v_bz_TNT grid=(2,66,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   }
+  }
+ },
+ "plain_bs128.nsys-rep": {
+  "replays_checked": 226,
+  "all_pass": true,
+  "unlabelled_gemms_per_step": 0.0,
+  "labels": {
+   "mlp_gate_up_gemm": {
+    "per_step": 32.0,
+    "expected_per_step": 32,
+    "kernel_configs": [
+     "nvjet_sm90_tst_144x128_64x6_2x1_v_bz_TNN grid=(2,64,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "mlp_down_gemm": {
+    "per_step": 32.0,
+    "expected_per_step": 32,
+    "kernel_configs": [
+     "nvjet_sm90_tst_128x64_64x8_4x2_h_bz_splitK_TNT grid=(8,15,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "gdn_in_proj_gemm": {
+    "per_step": 48.0,
+    "expected_per_step": 48,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x8_64x16_1x4_h_bz_TNT grid=(4,4,1)",
+     "nvjet_sm90_tst_96x128_64x7_2x1_v_bz_TNN grid=(2,64,1)"
+    ],
+    "expected_configs": 2,
+    "pass": true
+   },
+   "gdn_out_proj_gemm": {
+    "per_step": 24.0,
+    "expected_per_step": 24,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x64_64x13_4x2_h_bz_TNT grid=(8,10,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "attn_qkv_gemm": {
+    "per_step": 8.0,
+    "expected_per_step": 8,
+    "kernel_configs": [
+     "nvjet_sm90_tst_80x128_64x8_2x1_v_bz_TNN grid=(2,64,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "attn_o_proj_gemm": {
+    "per_step": 8.0,
+    "expected_per_step": 8,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x64_64x13_4x2_h_bz_TNT grid=(8,10,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "lm_head_gemm": {
+    "per_step": 1.0,
+    "expected_per_step": 1,
+    "kernel_configs": [
+     "nvjet_sm90_tst_320x128_64x3_2x1_v_bz_coopB_TNT grid=(2,66,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   }
+  }
+ },
+ "mtp_bs1.nsys-rep": {
+  "replays_checked": 240,
+  "all_pass": true,
+  "unlabelled_gemms_per_step": 0.0,
+  "labels": {
+   "mlp_gate_up_gemm": {
+    "per_step": 32.0,
+    "expected_per_step": 32,
+    "kernel_configs": [
+     "nvjet_sm90_tst_256x8_64x6_4x1_v_bz_TNT grid=(4,18,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "mlp_down_gemm": {
+    "per_step": 32.0,
+    "expected_per_step": 32,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x8_64x16_4x1_v_bz_splitK_TNT grid=(4,30,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "gdn_in_proj_gemm": {
+    "per_step": 48.0,
+    "expected_per_step": 48,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x8_64x16_1x1_h_bz_TNT grid=(1,1,1)",
+     "nvjet_sm90_tst_64x8_64x16_4x1_v_bz_TNT grid=(4,30,1)"
+    ],
+    "expected_configs": 2,
+    "pass": true
+   },
+   "gdn_out_proj_gemm": {
+    "per_step": 24.0,
+    "expected_per_step": 24,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x8_64x16_4x1_v_bz_splitK_TNT grid=(4,20,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "attn_qkv_gemm": {
+    "per_step": 8.0,
+    "expected_per_step": 8,
+    "kernel_configs": [
+     "nvjet_sm90_tst_128x8_64x12_4x1_v_bz_TNT grid=(4,20,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "attn_o_proj_gemm": {
+    "per_step": 8.0,
+    "expected_per_step": 8,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x8_64x16_4x1_v_bz_splitK_TNT grid=(4,20,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "lm_head_gemm": {
+    "per_step": 1.0,
+    "expected_per_step": 1,
+    "kernel_configs": [
+     "nvjet_sm90_tst_512x8_64x3_2x1_v_bz_TNT grid=(2,66,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   }
+  }
+ },
+ "mtp_bs8.nsys-rep": {
+  "replays_checked": 206,
+  "all_pass": true,
+  "unlabelled_gemms_per_step": 0.0,
+  "labels": {
+   "mlp_gate_up_gemm": {
+    "per_step": 32.0,
+    "expected_per_step": 32,
+    "kernel_configs": [
+     "nvjet_sm90_tst_192x32_64x7_4x1_v_bz_TNT grid=(4,24,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "mlp_down_gemm": {
+    "per_step": 32.0,
+    "expected_per_step": 32,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x32_64x16_4x1_v_bz_splitK_TNT grid=(4,30,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "gdn_in_proj_gemm": {
+    "per_step": 48.0,
+    "expected_per_step": 48,
+    "kernel_configs": [
+     "nvjet_sm90_tst_128x32_64x10_4x1_v_bz_TNT grid=(4,24,1)",
+     "nvjet_sm90_tst_64x8_64x16_1x4_h_bz_TNT grid=(4,1,1)"
+    ],
+    "expected_configs": 2,
+    "pass": true
+   },
+   "gdn_out_proj_gemm": {
+    "per_step": 24.0,
+    "expected_per_step": 24,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x32_64x16_4x1_v_bz_splitK_TNT grid=(4,20,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "attn_qkv_gemm": {
+    "per_step": 8.0,
+    "expected_per_step": 8,
+    "kernel_configs": [
+     "nvjet_sm90_tst_128x32_64x10_4x1_v_bz_TNT grid=(4,20,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "attn_o_proj_gemm": {
+    "per_step": 8.0,
+    "expected_per_step": 8,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x32_64x16_4x1_v_bz_splitK_TNT grid=(4,20,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "lm_head_gemm": {
+    "per_step": 1.0,
+    "expected_per_step": 1,
+    "kernel_configs": [
+     "nvjet_sm90_tst_384x32_64x4_2x1_v_bz_TNT grid=(2,66,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   }
+  }
+ },
+ "mtp_bs32.nsys-rep": {
+  "replays_checked": 145,
+  "all_pass": true,
+  "unlabelled_gemms_per_step": 0.0,
+  "labels": {
+   "mlp_gate_up_gemm": {
+    "per_step": 32.0,
+    "expected_per_step": 32,
+    "kernel_configs": [
+     "nvjet_sm90_tst_144x128_64x6_2x1_v_bz_TNN grid=(2,64,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "mlp_down_gemm": {
+    "per_step": 32.0,
+    "expected_per_step": 32,
+    "kernel_configs": [
+     "nvjet_sm90_tst_128x64_64x8_4x2_h_bz_splitK_TNT grid=(8,15,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "gdn_in_proj_gemm": {
+    "per_step": 48.0,
+    "expected_per_step": 48,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x8_64x16_1x4_h_bz_TNT grid=(4,4,1)",
+     "nvjet_sm90_tst_96x128_64x7_2x1_v_bz_TNN grid=(2,64,1)"
+    ],
+    "expected_configs": 2,
+    "pass": true
+   },
+   "gdn_out_proj_gemm": {
+    "per_step": 24.0,
+    "expected_per_step": 24,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x64_64x13_4x2_h_bz_TNT grid=(8,10,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "attn_qkv_gemm": {
+    "per_step": 8.0,
+    "expected_per_step": 8,
+    "kernel_configs": [
+     "nvjet_sm90_tst_80x128_64x8_2x1_v_bz_TNN grid=(2,64,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "attn_o_proj_gemm": {
+    "per_step": 8.0,
+    "expected_per_step": 8,
+    "kernel_configs": [
+     "nvjet_sm90_tst_64x64_64x13_4x2_h_bz_TNT grid=(8,10,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   },
+   "lm_head_gemm": {
+    "per_step": 1.0,
+    "expected_per_step": 1,
+    "kernel_configs": [
+     "nvjet_sm90_tst_320x128_64x3_2x1_v_bz_coopB_TNT grid=(2,66,1)"
+    ],
+    "expected_configs": 1,
+    "pass": true
+   }
+  }
+ }
+}

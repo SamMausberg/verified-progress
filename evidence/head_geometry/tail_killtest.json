@@ -1,0 +1,85 @@
+{
+  "positions": 2064,
+  "prompts": [
+    "p0003",
+    "p0008",
+    "p0010",
+    "p0018",
+    "p0081",
+    "p0082",
+    "p0085",
+    "p0089",
+    "p0161",
+    "p0162",
+    "p0167",
+    "p0168",
+    "p0242",
+    "p0244",
+    "p0245",
+    "p0246"
+  ],
+  "model": "Qwen/Qwen3.5-4B@851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+  "reference": "HF transformers 5.12 BF16 forward on CPU (teacher forced on the engine greedy outputs); head input h = final-norm output",
+  "hf_vs_engine_head_input": {
+    "matched_positions": 2064,
+    "rel_l2_diff_quantiles": [
+      0.018144580845297825,
+      0.03129308975990178,
+      0.13342710961867277,
+      0.918201518200848
+    ]
+  },
+  "hf_argmax_equals_engine_token": 0.9951550387596899,
+  "fp64_tail_vs_hf_rel_l2": [
+    0.004446713146985728,
+    0.005124549801168149,
+    0.006048308237084306
+  ],
+  "rho_oracle": [
+    1.2283058130671332,
+    1.475394663471747,
+    1.7743732633268268,
+    2.4236811331742087
+  ],
+  "rho_oracle_over_h": [
+    0.007958231796346362,
+    0.009417286235464836,
+    0.011138014931771448,
+    0.014907206112304098
+  ],
+  "p_oracle_ffn_surrogate_exact_head": 0.8541666666666666,
+  "p_oracle_ffn_and_head_int8": 0.7180232558139535,
+  "p_certified_head_only_int8": 0.7926356589147286,
+  "by_domain": {
+    "chat": {
+      "p_ffn_and_head": 0.7131782945736435,
+      "p_head_only": 0.7790697674418605
+    },
+    "code": {
+      "p_ffn_and_head": 0.9321705426356589,
+      "p_head_only": 0.9496124031007752
+    },
+    "maths": {
+      "p_ffn_and_head": 0.7984496124031008,
+      "p_head_only": 0.8546511627906976
+    },
+    "multilingual": {
+      "p_ffn_and_head": 0.42829457364341084,
+      "p_head_only": 0.5872093023255814
+    }
+  },
+  "bytes_gb": {
+    "dense_tail_bf16": 1.41295616,
+    "dense_ffn_bf16": 0.14155776,
+    "dense_head_bf16": 1.2713984,
+    "int8_ffn": 0.07077888,
+    "int8_head": 0.6356992
+  },
+  "expected_bytes_gb": {
+    "dense": 1.41295616,
+    "ffn_and_head_surrogate": 1.1048988576744185,
+    "head_only_certificate": 1.0408996514728683,
+    "note": "weights only; oracle radius (optimistic); a failed certificate reruns the dense tail (or the dense head for head-only); candidate rescoring would raise p toward 1 at a few BF16 rows"
+  },
+  "elapsed_s": 150.80245923995972
+}

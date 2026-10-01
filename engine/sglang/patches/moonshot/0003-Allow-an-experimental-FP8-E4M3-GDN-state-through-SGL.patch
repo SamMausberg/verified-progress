@@ -1,0 +1,27 @@
+From d4bb4b531cb6d0206aece991cc5f436a370b8b6c Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Wed, 30 Sep 2026 19:01:19 +0000
+Subject: [PATCH 3/7] Allow an experimental FP8 E4M3 GDN state through
+ SGLANG_MAMBA_SSM_DTYPE
+
+Unscaled float8_e4m3fn state storage for quality studies; the server flag's
+choices are unchanged.
+---
+ python/sglang/srt/configs/mamba_utils.py | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/python/sglang/srt/configs/mamba_utils.py b/python/sglang/srt/configs/mamba_utils.py
+index b8a00f50ee..eaefc94ac7 100644
+--- a/python/sglang/srt/configs/mamba_utils.py
++++ b/python/sglang/srt/configs/mamba_utils.py
+@@ -64,6 +64,8 @@ def mamba2_state_dtype(config=None) -> Mamba2StateDType:
+         "float32": torch.float32,
+         "bfloat16": torch.bfloat16,
+         "float16": torch.float16,
++        # Experimental (SGLANG_MAMBA_SSM_DTYPE only): unscaled FP8 E4M3 SSM state.
++        "float8_e4m3fn": torch.float8_e4m3fn,
+     }
+     conv_dtype = dtype_map.get(envs.SGLANG_MAMBA_CONV_DTYPE.get(), torch.bfloat16)
+
+--
+2.34.1
