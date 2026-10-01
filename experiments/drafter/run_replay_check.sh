@@ -7,7 +7,8 @@
 # run (off2, last) measures how often stock differs from itself when batch
 # composition changes between runs.
 # It starts with the kernel-level parity check (gdn_verify_parity.py) and ends
-# with the MTP s3 arms (run_replay_check_mtp.sh, output replay-check-mtp).
+# with the MTP s3 arms (run_replay_check_mtp.sh, output OUT-mtp, by default
+# replay-check-mtp).
 # Correctness only (shared slot):
 #   scripts/gpu_lock.sh -s experiments/drafter/run_replay_check.sh [OUT]
 set -euo pipefail
@@ -18,8 +19,10 @@ source "$here/../../scripts/sglang_env.sh"
 out="${1:-$HOME/vp-data/drafter/replay-check}"
 # Kernel-level parity first (seconds): stock vs fold vs circular GDN verify on
 # random inputs at the Qwen3.5-4B shape, with the launch tiles each path selects.
+# A failed check leaves no JSON behind (an older one would pass for this run's).
+rm -f "$out/gdn_verify_parity.json"
 python "$here/gdn_verify_parity.py" --out "$out/gdn_verify_parity.json" ||
-  echo "[replay-check] kernel parity failed; continuing with the served check"
+  echo "[replay-check] kernel parity failed (no gdn_verify_parity.json); continuing with the served check"
 for conc in 1 8; do
   arms=(off circular fold)
   if [ "$conc" = 8 ]; then arms+=(off2); fi
@@ -42,5 +45,6 @@ for conc in 1 8; do
       --test "$out/c$conc-$arm/requests.jsonl" --out "$out/c$conc-$arm-equality.json"
   done
 done
-# The MTP s3 arms (stock, fold, stock repeat at c=8; radix off) in the same hold.
-"$here/run_replay_check_mtp.sh"
+# The MTP s3 arms (stock, fold, stock repeat at c=8; radix off) in the same hold,
+# written next to OUT as OUT-mtp (default replay-check-mtp).
+"$here/run_replay_check_mtp.sh" "$out-mtp"
