@@ -67,6 +67,7 @@ run_eq() {
 failed=()
 
 FOLD_ENV=(SGLANG_GDN_REPLAYSSM_FOLD=1)
+STACK_TABLE=$OUT/backbone_table_v1.json
 stack_table
 echo "table $(sha256sum "$STACK_TABLE")"
 G_ENV=(SGLANG_BACKBONE_GEMM=1 SGLANG_BACKBONE_PDL=1 SGLANG_BACKBONE_MERGE_IN_PROJ=1
@@ -101,7 +102,8 @@ if [[ " ${failed[*]} " == *" compare "* ]]; then
 else
   cert=()
   [ -n "${STACK_CERT_SRC:-}" ] && cert=(--cert-src "$STACK_CERT_SRC")
-  python experiments/stack/equality_gate.py "$OUT" "${cert[@]}" || failed+=(gate)
+  python experiments/stack/equality_gate.py "$OUT" --table "$STACK_TABLE" "${cert[@]}" ||
+    failed+=(gate)
 fi
 # The gate is current only if every equality run, the comparison and the gate succeeded.
 if (( ${#failed[@]} == 0 )); then

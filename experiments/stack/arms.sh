@@ -14,49 +14,65 @@
 #   FGH    F + G + H
 #
 # STACK_ENGINE    composed SGLang worktree (default ~/sglang-wt/stack)
-# STACK_TABLE     backbone routing table (written by stack_table below)
+# STACK_TABLE     backbone routing table: built by stack_table in the equality hold's own
+#                 directory; sessions use the one behind the current gate (use_gate_table)
 # STACK_CERT_SRC  directory holding the certified_head package; H arms exist only if set
 
 STACK_ENGINE=${STACK_ENGINE:-$HOME/sglang-wt/stack}
 # Tree of the composed engine (experiments/stack/build_engine.sh); every hold checks it.
 # shellcheck disable=SC2034 # read by the scripts that source this file
 STACK_TREE=628f650ea031b0fc8a68233ff10d8878eb22686d
-STACK_TABLE=${STACK_TABLE:-$HOME/vp-data/stack/backbone_table_v1.json}
 STACK_ARM=dflash-tuned-b16
+# The equality gate the sessions obey and the routing table that passed with it.
+STACK_CURRENT=$HOME/vp-data/stack/equality/current
 
-# The routing table backbone's hold 2 used (lever v1), rebuilt from committed data.
+# Build the routing table backbone's hold 2 used (lever v1) from committed data into
+# $STACK_TABLE (the equality hold does this once, in its own directory).
 stack_table() {
   python experiments/backbone/make_table.py --gemm-json evidence/backbone/gemm_microbench.json \
     --gemv-m1 --pdl --max-m 16 --out "$STACK_TABLE" > /dev/null
 }
 
-# Overrides per lever; arm_args NAME prints the bench.sweep arguments of arm NAME.
-lever_F=(--set enable-linear-replayssm-spec=true --env SGLANG_GDN_REPLAYSSM_FOLD=1)
-lever_G=(
-  --env SGLANG_BACKBONE_GEMM=1 --env SGLANG_BACKBONE_PDL=1
-  --env SGLANG_BACKBONE_MERGE_IN_PROJ=1 --env "SGLANG_BACKBONE_GEMM_TABLE=$STACK_TABLE"
-)
-lever_H=(
-  --env SGLANG_CERTIFIED_HEAD_VERIFY=1 --env "SGLANG_CERTIFIED_HEAD_SRC=${STACK_CERT_SRC:-}"
-  --env SGLANG_CERTIFIED_HEAD_FALLBACK=columns --env SGLANG_CERTIFIED_HEAD_MODEL=conservative
-  --env SGLANG_CERTIFIED_HEAD_MAX_ROWS=64
-)
+# Point STACK_TABLE at the table that passed the current gate and check its hash.
+use_gate_table() {
+  STACK_TABLE=$STACK_CURRENT/backbone_table_v1.json
+  local want have
+  want=$(python -c "import json, sys; print(json.load(open(sys.argv[1]))['table_sha256'])" \
+    "$STACK_CURRENT/gate.json") || return 1
+  have=$(sha256sum "$STACK_TABLE" | cut -d' ' -f1)
+  [ "$want" = "$have" ] || { echo "routing table $have is not the one that passed ($want)" >&2; return 1; }
+}
 
+# Overrides of one lever (F, G or H), built when called so they use the current
+# STACK_TABLE and STACK_CERT_SRC.
+lever_args() {
+  case $1 in
+    F) printf '%s\n' --set enable-linear-replayssm-spec=true --env SGLANG_GDN_REPLAYSSM_FOLD=1 ;;
+    G)
+      printf '%s\n' --env SGLANG_BACKBONE_GEMM=1 --env SGLANG_BACKBONE_PDL=1 \
+        --env SGLANG_BACKBONE_MERGE_IN_PROJ=1 --env "SGLANG_BACKBONE_GEMM_TABLE=$STACK_TABLE"
+      ;;
+    H)
+      printf '%s\n' --env SGLANG_CERTIFIED_HEAD_VERIFY=1 \
+        --env "SGLANG_CERTIFIED_HEAD_SRC=${STACK_CERT_SRC:-}" \
+        --env SGLANG_CERTIFIED_HEAD_FALLBACK=columns --env SGLANG_CERTIFIED_HEAD_MODEL=conservative \
+        --env SGLANG_CERTIFIED_HEAD_MAX_ROWS=64
+      ;;
+    *) echo "unknown lever $1" >&2; return 64 ;;
+  esac
+}
+
+# arm_args NAME prints the bench.sweep arguments of arm NAME (S0, B0, or any
+# combination of the letters F, G, H).
 arm_args() {
-  local name=$1 out=(--arm "$STACK_ARM") i
+  local name=$1 i
+  local out=(--arm "$STACK_ARM")
   if [ "$name" != S0 ]; then out+=(--sglang-worktree "$STACK_ENGINE"); fi
+  printf '%s\n' "${out[@]}"
   case $name in
     S0 | B0) ;;
     *)
-      for (( i=0; i<${#name}; i++ )); do
-        case ${name:$i:1} in
-          F) out+=("${lever_F[@]}") ;;
-          G) out+=("${lever_G[@]}") ;;
-          H) out+=("${lever_H[@]}") ;;
-          *) echo "unknown arm $name" >&2; return 64 ;;
-        esac
-      done
+      for (( i=0; i<${#name}; i++ )); do lever_args "${name:$i:1}" || return; done
       ;;
   esac
-  printf '%s\n' "${out[@]}"
 }

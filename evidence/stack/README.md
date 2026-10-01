@@ -166,7 +166,10 @@ divergence is large or not_argmax. If any check fails, no session runs until a d
 amendment decides the composition. H joins FG only if its runs give the same tokens and
 lengths as B0's and FG's on all 320 prompts and both check-mode statistics show certified
 verify rows with exactly zero rows differing from the stock head; the gate records the
-SHA-256 of the package that passed, and a session runs H only with that exact package.
+SHA-256 of the package that passed, and a session runs H only with that exact package;
+H also needs the tokens-only B0 run to reproduce the logprob B0 run. The routing table G
+ran with is built once, in the equality hold's directory, and recorded by its SHA-256; the
+sessions use that file and refuse a different one.
 Otherwise FULL is FG. Every equality hold writes a fresh directory and reuses no earlier
 run; the sessions read the gate of the last hold whose equality runs, comparison and gate
 all succeeded. The same hold runs a phase diagnostic: B0 and FG with the repair probe at
@@ -272,7 +275,8 @@ scripts/gpu_lock.sh -x experiments/stack/hold_equality.sh           # step 1 and
 scripts/gpu_lock.sh -x experiments/stack/hold_session.sh 1          # then 2 and 3
 python -m bench.pareto ~/vp-data/stack/runs/stack-*/2026* --out ~/vp-data/stack/pareto \
     --points-only --status stack
-python experiments/stack/analyze.py --points ~/vp-data/stack/pareto/points.csv --full FG \
+python experiments/stack/analyze.py --points ~/vp-data/stack/pareto/points.csv \
+    --gate ~/vp-data/stack/equality/current/gate.json \
     --out evidence/stack/composition.json --csv evidence/stack/composition.csv
 scripts/gpu_lock.sh -x experiments/stack/hold_oracle.sh             # diagnostic, after the sessions
 ```

@@ -11,8 +11,11 @@ all-or-nothing, so that a session only ever times arms whose exact combination p
   `not_argmax` (bench's rule), bitwise if it also has no divergence and no logprob drift.
   If any of these fails, `ok` is false and no session runs; a different composition
   needs a dated amendment to the plan.
-* The certified head (H) joins FG only if its two tokens-only runs (H against B0, FGH
-  against FG) give identical tokens and lengths on all 320 prompts, both runs' check-mode
+* The routing table G used is recorded by its SHA-256 (`--table`); without it the gate
+  fails, and a session times G only with that exact table.
+* The certified head (H) joins FG only if the tokens-only B0 run reproduces the
+  logprob B0 run and its two tokens-only runs (H against B0, FGH against FG) give
+  identical tokens and lengths on all 320 prompts, both runs' check-mode
   statistics show certified verify rows with mismatch_rows exactly 0, and the package's
   fingerprint (SHA-256 over its files) is recorded; a timed session runs H only with that
   exact package (`--fingerprint` prints it). Otherwise the sessions run without H.
@@ -86,6 +89,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('equality_dir', type=Path, nargs='?')
     ap.add_argument('--cert-src', type=Path, help='certified_head source dir the H runs used')
+    ap.add_argument('--table', type=Path, help='the routing table the G runs used')
     ap.add_argument('--fingerprint', type=Path, help='print the fingerprint of this source dir')
     args = ap.parse_args()
     if args.fingerprint:
@@ -98,16 +102,22 @@ def main() -> None:
         'b0_bitwise_to_s0': bitwise(pairs.get('B0 vs S0')),
         'classes': {x: lever_class(pairs, x) for x in ('F', 'G', 'FG')},
     }
-    gate['ok'] = gate['b0_bitwise_to_s0'] and all(
-        c != 'not exact' for c in gate['classes'].values()
+    if args.table:
+        gate['table_sha256'] = hashlib.sha256(args.table.read_bytes()).hexdigest()
+    gate['ok'] = (
+        gate['b0_bitwise_to_s0']
+        and all(c != 'not exact' for c in gate['classes'].values())
+        and 'table_sha256' in gate
     )
     timed = ['F', 'G'] if gate['ok'] else []
     checks = [
         certified_check(args.equality_dir / f'certified_stats_{n}.json') for n in ('H', 'FGH')
     ]
     gate['certified'] = {
-        'tokens_identical': identical_tokens(pairs.get('H tokens vs B0 tokens'))
-        and identical_tokens(pairs.get('FGH tokens vs FG')),
+        'tokens_identical': all(
+            identical_tokens(pairs.get(k))
+            for k in ('B0 tokens vs B0', 'H tokens vs B0 tokens', 'FGH tokens vs FG')
+        ),
         'check_mode': checks,
     }
     if args.cert_src:

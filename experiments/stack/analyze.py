@@ -19,7 +19,8 @@ declared in evidence/stack/README.md ("Composition plan"):
   Isolated ratios are never multiplied into a composed estimate.
 
     python experiments/stack/analyze.py --points ~/vp-data/stack/pareto/points.csv \
-        --full FG --out evidence/stack/composition.json --csv evidence/stack/composition.csv
+        --gate ~/vp-data/stack/equality/current/gate.json \
+        --out evidence/stack/composition.json --csv evidence/stack/composition.csv
 """
 
 from __future__ import annotations
@@ -67,10 +68,17 @@ def load(path: Path) -> list[dict[str, Any]]:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--points', type=Path, required=True)
-    ap.add_argument('--full', required=True, help='arm name of the full stack (FG or FGH)')
+    ap.add_argument('--full', help='arm name of the full stack (FG or FGH)')
+    ap.add_argument(
+        '--gate', type=Path, help='equality gate.json: the full stack is its timed levers'
+    )
     ap.add_argument('--out', type=Path, required=True)
     ap.add_argument('--csv', type=Path, help='one row per arm, concurrency and metric')
     args = ap.parse_args()
+    if args.gate:
+        args.full = ''.join(json.loads(args.gate.read_text())['timed_levers'])
+    if not args.full:
+        ap.error('give --full or --gate')
 
     # session -> concurrency -> arm -> list of (run, metrics) in launch order
     data: dict[str, dict[int, dict[str, list[tuple[str, dict[str, float]]]]]] = defaultdict(

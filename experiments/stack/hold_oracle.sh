@@ -20,9 +20,10 @@ mkdir -p "$OUT"
 exec >>"$OUT/hold.log" 2>&1
 [ "$(git -C "$STACK_ENGINE" rev-parse 'HEAD^{tree}')" = "$STACK_TREE" ] ||
   { echo "composed engine tree is not the declared one"; exit 1; }
-stack_table
+use_gate_table || exit 1
 echo "hold_oracle start $(date -Is) repo $(git rev-parse HEAD) engine $(git -C "$STACK_ENGINE" rev-parse HEAD)"
 mapfile -t args < <(arm_args FG)
+failed=()
 for B in 16 32 64; do
   echo "=== B=$B $(date -Is)"
   python -m bench.sweep "${args[@]}" --set "speculative-dflash-block-size=$B" \
@@ -30,5 +31,9 @@ for B in 16 32 64; do
     --env "SGLANG_SIMULATE_ACC_LEN=$B" --env "SGLANG_REPAIR_TIMING_LOG=$OUT/phases_b$B.jsonl" \
     --label "stack-oracle-b$B" --session stack-oracle --out "$OUT/runs" --port 30061 --osl 512 \
     --quiet-cpu-wait 300 --concurrency 1 2>&1 | grep -E '^r0|FAIL|[Ee]rror' | tail -4
+  status=${PIPESTATUS[0]}
+  echo "B=$B exit $status"
+  (( status == 0 )) || failed+=("b$B")
 done
-echo "hold_oracle end $(date -Is)"
+echo "hold_oracle end $(date -Is) failed: ${failed[*]:-none}"
+(( ${#failed[@]} == 0 ))

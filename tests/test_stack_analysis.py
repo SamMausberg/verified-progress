@@ -171,9 +171,11 @@ def _passing() -> dict:
     }
 
 
-def _run_gate(tmp_path, monkeypatch, pairs, *extra):
+def _run_gate(tmp_path, monkeypatch, pairs, *extra, table=True):
     (tmp_path / 'summary.json').write_text(json.dumps({'pairs': pairs}))
-    monkeypatch.setattr(sys, 'argv', ['gate', str(tmp_path), *extra])
+    (tmp_path / 'table.json').write_text('{}')
+    tab = ['--table', str(tmp_path / 'table.json')] if table else []
+    monkeypatch.setattr(sys, 'argv', ['gate', str(tmp_path), *tab, *extra])
     gate.main()
     return json.loads((tmp_path / 'gate.json').read_text())
 
@@ -195,6 +197,7 @@ def test_equality_gate_is_all_or_nothing(tmp_path, monkeypatch):
         pairs = {**_passing(), key: bad}
         g = _run_gate(tmp_path, monkeypatch, pairs)
         assert not g['ok'] and g['timed_levers'] == [], key
+    assert not _run_gate(tmp_path, monkeypatch, _passing(), table=False)['ok']
 
 
 def test_interaction_skips_a_session_with_one_invalid_full_launch(tmp_path, monkeypatch):
@@ -232,7 +235,12 @@ def test_interaction_skips_a_session_with_one_invalid_full_launch(tmp_path, monk
 
 
 def test_certified_head_needs_tokens_counters_and_package(tmp_path, monkeypatch):
-    pairs = {**_passing(), 'H tokens vs B0 tokens': _pair(), 'FGH tokens vs FG': _pair()}
+    pairs = {
+        **_passing(),
+        'B0 tokens vs B0': _pair(),
+        'H tokens vs B0 tokens': _pair(),
+        'FGH tokens vs FG': _pair(),
+    }
     stats = {'paths': {'verify': {'rows': 5000, 'mismatch_rows': 0, 'fallback_rows': 40}}}
     (tmp_path / 'certified_stats_H.json').write_text(json.dumps(stats))
     g = _run_gate(tmp_path, monkeypatch, pairs)
@@ -249,6 +257,8 @@ def test_certified_head_needs_tokens_counters_and_package(tmp_path, monkeypatch)
     before = g['certified']['package_sha256']
     (pkg / 'head.py').write_text('x = 2\n')
     assert gate.fingerprint(tmp_path / 'src') != before
+    moved = {**pairs, 'B0 tokens vs B0': _pair(2, 0.0, tie=2)}
+    assert _run_gate(tmp_path, monkeypatch, moved, '--cert-src', src)['timed_levers'] == ['F', 'G']
     longer = {**_pair(), 'length_mismatch': 2}
     g = _run_gate(tmp_path, monkeypatch, {**pairs, 'FGH tokens vs FG': longer}, '--cert-src', src)
     assert g['timed_levers'] == ['F', 'G']
@@ -294,3 +304,30 @@ def test_idle_is_the_median_of_per_cycle_idle(tmp_path):
     log.write_text('\n'.join(json.dumps(r) for r in recs) + '\n')
     s = phases.summarize(log, max_period_ms=50.0)['by_batch']['1']
     assert s['idle_median_us'] == 2000.0
+
+
+def test_analysis_takes_the_full_arm_from_the_gate(tmp_path, monkeypatch):
+    rows = []
+    for i, arm in enumerate(['S0', 'FGH', 'F', 'FGH', 'S0']):
+        rows.append(
+            {
+                'label': f'stack-{arm}',
+                'run': f's1-{i}',
+                'session': 'stack-s1',
+                'concurrency': '1',
+                'x_e2e': 110.0 if arm == 'FGH' else 100.0,
+                'y': 100.0,
+            }
+        )
+    pts = tmp_path / 'points.csv'
+    _points(pts, rows)
+    gate_file = tmp_path / 'gate.json'
+    gate_file.write_text(json.dumps({'timed_levers': ['F', 'G', 'H']}))
+    out = tmp_path / 'out.json'
+    monkeypatch.setattr(
+        sys, 'argv', ['analyze', '--points', str(pts), '--gate', str(gate_file), '--out', str(out)]
+    )
+    analyze.main()
+    res = json.loads(out.read_text())
+    assert res['full'] == 'FGH'
+    assert res['arms']['FGH']['1']['x_e2e']['n'] == 1
