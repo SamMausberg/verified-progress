@@ -62,7 +62,10 @@ Pinned runs go to `~/vp-data/state/runs_pinned/`. The first matrix runs (cap
 16, pools sized from free memory) stay in `~/vp-data/state/runs/`; `--no-pin`
 reproduces them. `analyze_all.sh` analyses both roots: `pairs_pinned.json` over
 `runs_pinned/` into the `*_pinned` evidence files, and `pairs.json` over `runs/` into
-the unsuffixed ones. `compare.py` and `cycles.py` take the root as a required
+the unsuffixed ones. Two deliberate mixed-regime comparisons ask whether the pools
+alone change batch-1 output: `pairs_cross_regime.json` (pinned against unpinned plain
+decoding, radix cache on) and `pairs_cross_bench.json` (pinned radix-off runs against
+the bench workstream's unpinned radix-off equality runs in `~/vp-data/bench/equality/runs`). `compare.py` and `cycles.py` take the root as a required
 `--runs`. Once `runs_pinned/` exists, a pair with a missing run fails the script
 unless `STATE_ALLOW_MISSING=1` is set. Pool regimes cannot be mixed silently.
 `run_matrix.py` refuses to write into a root that already holds runs of the other
@@ -76,7 +79,7 @@ earlier flags.
 |---|---|
 | `plain` | none (radix cache with the `extra_buffer` GDN strategy, overlap scheduler, CUDA graphs) |
 | `plain_noradix` | `--disable-radix-cache` |
-| `plain_nooverlap` | `--disable-overlap-schedule` |
+| `plain_nooverlap` | `--disable-overlap-schedule` (at this pin this also switches the GDN radix strategy from `extra_buffer` to `no_buffer`; see `server_args` in the server log) |
 | `plain_det` | `--enable-deterministic-inference` (with FlashInfer this also disables the radix cache) |
 | `plain_fp32head` | `--enable-fp32-lm-head` |
 | `mtp_s1`, `mtp_s3`, `mtp_s5` | `--speculative-algorithm EAGLE` (native MTP), steps 1/3/5, top-k 1, steps+1 draft tokens |
