@@ -321,10 +321,6 @@ def main() -> int:
             'cuda,nvtx',
             '--cuda-graph-trace',
             'node',
-            '--sample',
-            'none',
-            '--cpuctxsw',
-            'none',
         ]
     cmd += [sys.executable, '-m', 'sglang.launch_server']
     for key, value in server_args.items():
@@ -415,6 +411,10 @@ def main() -> int:
                     str(args.nsys),
                     '--force-overwrite',
                     'true',
+                    '--sample',
+                    'none',
+                    '--cpuctxsw',
+                    'none',
                 ],
                 check=True,
             )
