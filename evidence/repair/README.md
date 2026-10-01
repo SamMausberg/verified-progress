@@ -192,23 +192,24 @@ candidate sets (K = 1, 2, 4, 8, 16). The candidate sets are an offline recomputa
 target features, SpecForge drafter module, BF16) whose top-1 token matches the engine's drafted
 token at 97.4% of positions. Costs are the measured DFlash-16 phases at c = 1 in the drafter's
 configuration (`stage_a_timing.json`, run `fresh_b16`): a reused cycle skips the 2.33 ms draft
-phase and pays the rest of the 7.46 ms cycle.
+phase and pays the rest of the 7.46 ms cycle, including the 4.73 ms verify of a full block of 16
+positions (a padded verify; see the scope note below the table).
 
 At the 18,274 post-rejection cycle boundaries (the correction at block position J = L + 1, with
-m = 15 - J old positions left), reuse is possible when the corrected prefix is supported
-(U_K >= J), which is observable at decision time. The greedy oracle program then proposes the true
-token wherever the old candidate set contains it, so its second cycle commits
-1 + min(m, U_K - J) tokens; fresh DFlash commits 1 + L' (the next cycle's accepted length). The
-oracle's extra first-cycle cost A and its conditioning cost are 0, so it bounds every real
-program from above.
+m = 15 - J old positions left), reuse is possible when the corrected prefix is supported (U_K >= J)
+and m >= 1, both observable at decision time. The greedy oracle program then proposes the true token
+wherever the old candidate set contains it, so its second cycle commits 1 + min(m, U_K - J) tokens;
+fresh DFlash commits 1 + L' (the next cycle's accepted length). The oracle's extra first-cycle cost
+A and its conditioning cost are 0, so it bounds from above every real program over the same
+candidate sets that verifies a padded block.
 
 | K | corrected prefix supported | mean supported suffix | oracle G2 / fresh G2 (reused) | Delta (95% CI) | rule |
 |---|---|---|---|---|---|
 | 1 | 1.6% | 1.72 | 2.72 / 6.94 | -0.04 (-0.06, -0.03) | rejected |
-| 2 | 48.1% | 2.10 | 3.10 / 6.07 | -0.67 (-0.81, -0.55) | rejected |
+| 2 | 48.1% | 2.10 | 3.10 / 6.07 | -0.66 (-0.81, -0.55) | rejected |
 | 4 | 71.1% | 2.64 | 3.64 / 5.82 | -0.42 (-0.56, -0.30) | rejected |
 | 8 | 82.4% | 3.34 | 4.34 / 5.66 | +0.22 (+0.12, +0.32) | not rejected |
-| 16 | 88.8% | 4.08 | 5.08 / 5.55 | +0.99 (+0.90, +1.07) | not rejected |
+| 16 | 88.8% | 4.08 | 5.08 / 5.55 | +0.99 (+0.89, +1.07) | not rejected |
 
 (Delta in tokens per post-rejection boundary, r_F = 0.683 tokens per ms; 95% intervals from a
 request-level bootstrap with 2,000 resamples, re-estimating r_F in every resample.)
@@ -218,22 +219,39 @@ r_F: chat +1.08, code +1.23, maths +1.02, MATH-500 +0.86. The unchanged cached u
 old draft's tail after the correction, no fresh fill) accepts 0.83 drafts and gives
 Delta = -1.93 (-2.22, -1.69): rejected.
 
-Assumptions of this oracle, stated plainly: (1) the candidate sets are the offline
-recomputation, whose top-1 token matches the engine's drafted token at 97.4% of positions, not
-the engine's own sets; (2) the costs are the c = 1 phases of one DFlash-16 run (`fresh_b16`, the
-drafter workstream's configuration), and a reused cycle is charged exactly a fresh cycle without
-its draft phase; (3) the oracle's extra first-cycle cost A is 0: compiling the program, retaining
-the candidate sets, conditioning on the correction and catching up the draft cache are not
-priced; (4) the oracle knows the true token wherever it lies in the old candidate set, so it
-bounds every real program from above.
+Scope: padded verify. The table charges every reused cycle the full block-16 verify, as an
+implementation that pads the remainder to the block width would pay. After a correction at J only
+m = 15 - J old positions remain, so a program could verify m + 1 positions instead, and a narrower
+verify that costs less lowers T2_R and raises Delta at every K. For a variable-width verify the
+oracle is therefore not an upper bound, and the rejections of top-1 to top-4 do not follow. With V_R
+the mean verify time of a reused cycle in place of 4.73 ms, and everything else unchanged,
+Delta = Delta_padded + r_F p_K (4.73 ms - V_R), where p_K is the supported rate in the table.
+With the variable-width verify cost at its lower bound of zero (V_R = 0, every other phase still
+charged; derived from the table, point estimates, no intervals), Delta would be +0.01 (K = 1),
++0.89 (2), +1.88 (4), +2.89 (8) and +3.86 (16): upper bounds for any verify width, and no K would
+be rejected. On the point estimates, top-1, top-2 and
+top-4 stay negative only while V_R exceeds 0.89, 2.71 and 3.87 ms. The only measured verify below
+width 16 at c = 1 is 4.16 ms at width 8 (`fresh_b8`, same session as `fresh_b16`), so these
+thresholds are not settled by the data here; a sweep of the verify phase over widths 2 to 16 at
+c = 1 is queued. The top-8 and top-16 verdicts (not rejected) hold for either implementation.
 
-- **Verdict at c = 1: reuse is not rejected for top-8 and top-16 candidate sets.** A program that
-  always found the true token inside the old top-16 sets would commit slightly fewer tokens than
-  fresh DFlash (5.08 against 5.55) but skip the 2.33 ms draft, and come out ahead by about one
-  token per post-rejection boundary. This is an upper bound: a real program must select the token
-  (the unary control shows that the old top-1 choices fail), and its compile, conditioning and
-  retention costs (A) are charged against the same margin. The c = 8 and 16 draft shares, which
-  set T2_R - T2_F beyond c = 1, are queued.
+Assumptions of this oracle, stated plainly: (1) the candidate sets are the offline recomputation,
+whose top-1 token matches the engine's drafted token at 97.4% of positions, not the engine's own
+sets; (2) the costs are the c = 1 phases of one DFlash-16 run (`fresh_b16`, the drafter workstream's
+configuration), and a reused cycle is charged exactly a fresh cycle without its draft phase, so its
+verify is padded to the full block; (3) the oracle's extra first-cycle cost A is 0: compiling the
+program, retaining the candidate sets, conditioning on the correction and catching up the draft
+cache are not priced; (4) the oracle knows the true token wherever it lies in the old candidate set,
+so it bounds from above every real program over the same candidate sets with a padded verify.
+
+- **Verdict at c = 1: reuse is not rejected for top-8 and top-16 candidate sets; top-1 to top-4 are
+  rejected for a padded verify only.** A program that always found the true token inside the old
+  top-16 sets would commit slightly fewer tokens than fresh DFlash (5.08 against 5.55) but skip the
+  2.33 ms draft, and come out ahead by about one token per post-rejection boundary. For a padded
+  verify this is an upper bound: a real program must select the token (the unary control shows that
+  the old top-1 choices fail), and its compile, conditioning and retention costs (A) are charged
+  against the same margin. The c = 8 and 16 draft shares, which set T2_R - T2_F beyond c = 1, are
+  queued.
 
 ```sh
 python experiments/repair/p9_support_oracle.py --cycles ~/vp-data/drafter/support/zlab_b16_cycles/cycles.pt \
