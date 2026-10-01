@@ -14,7 +14,7 @@ import pytest
 torch = pytest.importorskip('torch')
 pytest.importorskip('triton')
 
-from certified_head.bounds import Arith
+from certified_head.bounds import Arith, Reference
 from certified_head.head import (
     K_CHUNK,
     STATUS_BITS,
@@ -110,3 +110,17 @@ def test_sampled_rows_need_a_finite_positive_temperature(monkeypatch: pytest.Mon
     head._any.zero_()
     _, stats = head.gumbel_sample(h, seeds, seeds, good, fallback=False)
     assert not bool(stats.status.any()) and not bool(head._any)
+
+
+@pytest.mark.parametrize('reference', ['fp32', 'real'])
+def test_column_fallback_needs_the_bf16_reference(reference: Reference) -> None:
+    """The column fallback's gathered GEMM and self-test use BF16-output logits, so
+    it must not serve the FP32 reference (nor ``real``, which has no fallback)."""
+    gen = torch.Generator().manual_seed(2)
+    w = (torch.randn(64, 256, generator=gen) * 0.02).to(torch.bfloat16)
+    head = CertifiedHead.from_quantized(
+        w, build_quantized_head(w), device='cpu', reference=reference, max_batch=8
+    )
+    with pytest.raises(ValueError, match="reference='bf16' only"):
+        head.enable_column_fallback([1, 8])
+    assert head.fallback_mode == 'batch'

@@ -156,7 +156,10 @@ if ! ok compile; then
   echo "=== FAILED $(date +%T): kernels do not compile; see $OUT/compile.log"
   exit 1
 fi
-step tests 900 python -m pytest tests/test_certified_head.py -q -s -p no:cacheprovider
+# Every certified-head test file: the GPU tests and the CPU tests of the bounds, the
+# enclosure margin and the input checks (check_outputs requires them all to pass).
+step tests 900 python -m pytest tests/test_certified_head.py tests/test_certified_bounds.py \
+  tests/test_certified_head_inputs.py tests/test_enclosure_margin.py -q -s -p no:cacheprovider
 # Every default tile configuration of every pass, at every batch size it serves,
 # against exact logits, about a million row-checks each (two TMA faults so far).
 step stress 2400 python experiments/certified_head/stress_defaults.py --out "$OUT/stress_defaults.json"

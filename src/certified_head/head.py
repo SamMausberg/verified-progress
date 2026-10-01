@@ -952,7 +952,16 @@ class CertifiedHead:
         """Switch to ``fallback_mode='columns'`` only if the self-test passes for
         every batch size the caller will use; otherwise stay in ``batch`` mode.
         Call it outside CUDA-graph capture, once at start-up.
+
+        Only for ``reference='bf16'``: the gathered GEMM and its self-test compute
+        BF16-output logits, which the FP32 reference (``out_dtype=float32``) does
+        not, so near ties could resolve differently there.
         """
+        if self.reference != 'bf16':
+            raise ValueError(
+                f"the column fallback serves reference='bf16' only, not {self.reference!r}: "
+                'its gathered GEMM and self-test compute BF16-output logits'
+            )
         report = self.column_invariance_self_test(batch_sizes)
         self.fallback_mode = 'columns' if report['ok'] else 'batch'
         # Only the checked batch sizes use the column path; others keep 'batch'.

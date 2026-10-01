@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -30,6 +31,26 @@ def errors_in(obj: Any, path: str = '') -> list[str]:
     elif isinstance(obj, list):
         for i, v in enumerate(obj):
             found.extend(errors_in(v, f'{path}[{i}]'))
+    return found
+
+
+MIN_TESTS = 156
+"""Tests the tests step must pass: 121 GPU and 35 CPU tests when this check was
+added (x8s2 ran 145, before the later CPU tests). Raise it when tests are added,
+so that a test file dropped from the step shows as a shortfall."""
+
+
+def test_log_problems(text: str) -> list[str]:
+    """The pytest summary of the tests step: nothing failed, errored or skipped
+    (a skipped GPU test is an unchecked claim), and at least ``MIN_TESTS`` passed."""
+    summaries = [ln for ln in text.splitlines() if re.search(r'\d+ passed.* in [\d.]+s', ln)]
+    if not summaries:
+        return ['tests.log: no pytest summary with passed tests']
+    line = summaries[-1]
+    found = [f'tests.log: {w}' for w in ('failed', 'error', 'skipped') if w in line]
+    passed = int(re.search(r'(\d+) passed', line).group(1))  # type: ignore[union-attr]
+    if passed < MIN_TESTS:
+        found.append(f'tests.log: {passed} passed, expected at least {MIN_TESTS}')
     return found
 
 
@@ -132,6 +153,11 @@ def main() -> None:
             return None
         return json.loads(p.read_text())
 
+    tests = out / 'tests.log'
+    if not tests.exists():
+        problems.append('tests.log: missing')
+    else:
+        problems += test_log_problems(tests.read_text())
     replay = load('replay_decisions.json')
     if replay is not None:
         rows = replay['rows']
