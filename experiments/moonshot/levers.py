@@ -228,6 +228,12 @@ LEVERS: dict[str, Lever] = {
         note='draft head restricted to 8,192 frequent rows (MTP: patch 0001; DFlash: 0005)',
         conflicts=('hot16k',),
     ),
+    'hot23k': Lever(
+        {'speculative-token-map': str(BENCH_TOKEN_MAPS / 'hot32k_tune.pt')},
+        note='draft head restricted to the 22,936 tokens seen in the tune outputs '
+        '(held-out coverage 97.5%, evidence/moonshot/token_map_coverage.csv)',
+        conflicts=('hot8k', 'hot16k'),
+    ),
     'hot16k': Lever(
         {'speculative-token-map': str(BENCH_TOKEN_MAPS / 'hot16384_tune.pt')},
         note='draft head restricted to 16,384 frequent rows (MTP: patch 0001; DFlash: 0005)',

@@ -17,9 +17,10 @@ harness (`bench.sweep`, `bench/` on main: aiperf 0.13.0, workload
 
 ### 1.1 Bandwidth and bytes per step
 
-- HBM read bandwidth: **3.83 TB/s** over 4 GiB and **3.79 TB/s** over exactly the head's
-  1.27 GB (profile workstream, `evidence/profiles/hbm_bandwidth.json`); the ceilings below
-  use 3.79 TB/s.
+- HBM read bandwidth: **3.83 TB/s** for the best configuration of a 4 GiB read sweep, and
+  **3.79 TB/s** with that same configuration reused over exactly the head's 1.27 GB (not
+  swept at that size) (profile workstream, `evidence/profiles/hbm_bandwidth.json`, table in
+  `evidence/profiles/README.md`); the ceilings below use 3.79 TB/s.
 - Weights read once per decode step: 7.14 GB backbone + 1.27 GB tied head = **8.41 GB**
   (derived). Floor at batch 1: **2.22 ms/token, 451 tokens/s**. Measured plain decode at
   batch 1: 281 tokens/s end to end (Section 2), i.e. 3.56 ms per token, 62% of the floor.
