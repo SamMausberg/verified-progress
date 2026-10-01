@@ -6,8 +6,8 @@ Reads one fresh lever_sweep output directory and checks, for this run only:
   - every configuration has exactly one sweep.json with one concurrency-128 point that ran
     the configured number of requests (256) to completion: requests == completed == 256,
     failed 0, AIPerf exit code 0, the prompts sent as expected and no output-length
-    mismatch; and that carries the token-weighted server full-batch decode rate measured
-    with at least 128 requests running (server_log.max_running_logged >= 128);
+    mismatch; and whose measured phase has at least MIN_WINDOWS server decode-log windows
+    with exactly 128 requests running (see the primary metric below);
   - every arm ran the declared workload (long2048.jsonl and its warm-up pool by SHA-256,
     512 prompts, mean input length 2,040-2,049 tokens, OSL 512 with ignore_eos, greedy
     request body) and resolved the pinned pools from its server log: max_running_requests
@@ -28,8 +28,21 @@ Reads one fresh lever_sweep output directory and checks, for this run only:
     preflight) names both HEADs, and every arm's launch record (bench's launch.json) shows
     the same repository HEAD and the same engine HEAD (the imported sglang package lies in
     that engine tree), with no modified tracked files in either.
+Primary metric: the server's decode rate at exactly 128 running requests during the measured
+phase. The scheduler logs one `gen throughput` per 40 decode passes; a window counts when it
+shows `#running-req: 128`, the previous decode line also shows 128, no `Prefill batch` line
+lies between the two (a window that contains a prefill pass mixes prefill time into its
+rate), and both lines fall inside the AIPerf profiling phase (first request start to last
+request end, from profile_export_raw), so the AIPerf warm-up wave and the ramp-up and drain
+at the phase edges are excluded. The windows at 128 running that fail the previous-line or
+prefill condition are counted and recorded as excluded. Each window
+carries the same number of tokens (128 per pass, no speculation), so the token-weighted rate
+is the harmonic mean of the window rates. Bench's own diagnostic
+(`server_log.logged_gen_tps_full_batch`, windows with >= 0.9 x the peak running count) is
+recorded beside it but does not decide anything.
+
 Any failed check prints FAILED and exits 1. Otherwise it prints, per pair, the exact / dense
-ratio of the primary metric (`server_log.logged_gen_tps_full_batch`) and of client y, the
+ratio of the primary metric and of client y, the
 mean log ratio with a t(3) 95% interval, and the throughput decision at 1.10x (rejected if
 the upper end < 1.10, supported if the lower end >= 1.10, otherwise inconclusive). The
 verdict always states the throughput decision together with the server output probe's
@@ -42,11 +55,13 @@ output probe" when the probe refuted it, so a refuted run never reads as plain s
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import math
 import re
 import statistics
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -71,6 +86,12 @@ POOL_PATTERNS = {
 DISPATCH = 'GDN decode: exact replay kernel'
 T3_975 = 3.182446305284263  # Student t, 3 degrees of freedom, two-sided 95%
 THRESHOLD = 1.10
+MIN_WINDOWS = 8
+DECODE_WINDOW = re.compile(
+    r'^\[(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\] Decode batch, #running-req: (\d+),'
+    r'.*?gen throughput \(token/s\): ([\d.]+)'
+)
+PREFILL_LINE = re.compile(r'^\[[^\]]+\] Prefill batch')
 PROBE_WORDING = {
     'refuted': 'end-to-end exactness REFUTED by the output probe; P4 exact claim not supported',
     'undecided': 'output probe undecided (the dense repeat also differed); end-to-end '
@@ -151,6 +172,54 @@ def check_provenance(label: str, launch: dict[str, Any], provenance: dict[str, s
         fail(f'{label}: sglang imported from {module!r}, not {provenance["engine"]}')
 
 
+def profiling_span(point_dir: Path) -> tuple[float, float]:
+    """Wall-clock span (seconds) of the AIPerf profiling phase: first start to last end."""
+    raws = sorted((point_dir / 'aiperf').glob('profile_export_raw.jsonl*'))
+    if len(raws) != 1:
+        fail(f'{point_dir}: expected one profile_export_raw, found {len(raws)}')
+    opener = gzip.open if raws[0].suffix == '.gz' else open
+    starts, ends = [], []
+    with opener(raws[0], 'rt') as handle:
+        for line in handle:
+            meta = json.loads(line).get('metadata') or {}
+            if meta.get('benchmark_phase') == 'profiling':
+                starts.append(int(meta['request_start_ns']))
+                ends.append(int(meta['request_end_ns']))
+    if len(starts) != REQUESTS:
+        fail(f'{point_dir}: {len(starts)} profiling records, expected {REQUESTS}')
+    return min(starts) / 1e9, max(ends) / 1e9
+
+
+def exact_batch_rate(log_text: str, start: float, end: float) -> tuple[float, int, int]:
+    """Harmonic-mean decode rate over the steady windows inside [start, end] at exactly 128
+    running: (rate, windows counted, windows at 128 excluded for a prefill or a previous
+    line below 128)."""
+    rates: list[float] = []
+    excluded = 0
+    previous: tuple[float, int] | None = None  # (time, running) of the last decode line
+    prefill_since = False
+    for line in log_text.splitlines():
+        if PREFILL_LINE.search(line):
+            prefill_since = True
+            continue
+        match = DECODE_WINDOW.match(line)
+        if not match:
+            continue
+        stamp, running, rate = match.groups()
+        moment = datetime.strptime(stamp, '%Y-%m-%d %H:%M:%S').replace(tzinfo=UTC).timestamp()
+        in_phase = previous is not None and previous[0] >= start and moment <= end
+        if in_phase and int(running) == 128 and previous is not None:
+            if previous[1] == 128 and not prefill_since and float(rate) > 0:
+                rates.append(float(rate))
+            else:
+                excluded += 1
+        previous = (moment, int(running))
+        prefill_since = False
+    if not rates:
+        return 0.0, 0, excluded
+    return len(rates) / sum(1 / r for r in rates), len(rates), excluded
+
+
 def point_of(out: Path, label: str) -> tuple[dict[str, Any], Path]:
     runs = sorted((out / label).glob('*/sweep.json'))
     if len(runs) != 1:
@@ -178,8 +247,7 @@ def point_of(out: Path, label: str) -> tuple[dict[str, Any], Path]:
         fail(f'{label}: mean input length {point.get("isl_mean")}, expected about 2,048')
     if int((point.get('server_log') or {}).get('max_running_logged') or 0) < 128:
         fail(f'{label}: at most {point["server_log"].get("max_running_logged")} requests running')
-    if not (point.get('server_log') or {}).get('logged_gen_tps_full_batch'):
-        fail(f'{label}: no token-weighted server full-batch decode rate')
+    point['_point_dir'] = runs[0].parent / 'r0/c128'
     return point, runs[0].parent / 'server/server.log'
 
 
@@ -243,7 +311,18 @@ def main() -> None:
                 if tile != '32':
                     fail(f'{label}: launched with SGLANG_GDN_EXACT_REPLAY_BV={tile!r}, not 32')
             row[f'{key}_pools'] = resolved_pools(label, server_log)
-            row[f'{key}_server_tps'] = float(point['server_log']['logged_gen_tps_full_batch'])
+            start, end = profiling_span(point['_point_dir'])
+            rate, windows, excluded = exact_batch_rate(text, start, end)
+            if windows < MIN_WINDOWS:
+                fail(
+                    f'{label}: {windows} decode windows at exactly 128 running, need {MIN_WINDOWS}'
+                )
+            row[f'{key}_server_tps'] = rate
+            row[f'{key}_windows_at_128'] = windows
+            row[f'{key}_windows_excluded'] = excluded
+            row[f'{key}_bench_full_batch_tps'] = (point.get('server_log') or {}).get(
+                'logged_gen_tps_full_batch'
+            )
             row[f'{key}_client_y'] = float(point['y'])
         row['server_ratio'] = row['exact_server_tps'] / row['dense_server_tps']
         row['client_ratio'] = row['exact_client_y'] / row['dense_client_y']
@@ -268,7 +347,7 @@ def main() -> None:
         'output_probe': probe,
         'provenance': provenance,
         'pairs': rows,
-        'primary_metric': 'server_log.logged_gen_tps_full_batch',
+        'primary_metric': 'server decode rate, windows at exactly 128 running in the measured phase',
         'server_ratio_mean_ci95': server,
         'client_y_ratio_mean_ci95': client,
         'threshold': THRESHOLD,
