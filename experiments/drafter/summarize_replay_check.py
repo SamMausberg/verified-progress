@@ -59,7 +59,10 @@ def main() -> None:
                 else {}
             )
             (args.out / 'launch' / f'{drafter}_{run.name}.json').write_text(
-                json.dumps({'launch': launch, 'cpu_load': cpu}, indent=2) + '\n'
+                json.dumps({'launch': launch, 'cpu_load': cpu}, indent=2).replace(
+                    str(Path.home()), '~'
+                )
+                + '\n'
             )
             row: dict[str, Any] = {
                 'drafter': drafter,

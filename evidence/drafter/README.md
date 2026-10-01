@@ -167,3 +167,75 @@ spread over the cycles). Block 16: 6.96 tokens per cycle and 7.71 ms per cycle o
 (C_D, A_D); the served Pareto comparison is the bench harness's.
 
     scripts/gpu_lock.sh -x experiments/drafter/run_timed_panel.sh
+
+## Buffered GDN verify: exactness (engine patches drafter/0002-0003)
+
+Stock DFlash and MTP verification on Qwen3.5 writes one FP32 GDN state per block position per
+request (805 MB per request per cycle at block 16). SGLang's ReplaySSM spec path replaces that
+with a ring of per-token records, but at bd66ce343e it refused DFLASH on GDN models, and its
+GDN default (compact circular replay) reconstructs the verify output with a chunked formula
+instead of the recurrent kernel's. Patch 0002 adds the circular commit to the DFLASH commit
+hook. Patch 0003 (`SGLANG_GDN_REPLAYSSM_FOLD=1`) turns on, for GDN pools, the fold-every-commit
+protocol SGLang implements for KDA. The verify runs the stock recurrent kernel, which also
+writes the raw window to a ring, and the commit replays the accepted prefix into the
+checkpoint with a bitwise clone of the recurrent update. Engine: branch `engine/drafter` at
+31bda3e674 (bd66ce343e + 0001-0003).
+
+`buffered_verify/gdn_verify_parity.json` (`gdn_verify_parity.py`, the first step of
+`run_replay_check.sh`): random BF16 inputs at the 4B GDN layer shape (16 key heads, 32 value
+heads, head dimension 128, FP32 state, 16-token verify), batch 1, 8 and 16, three seeds each,
+random accepted lengths 1-16. In all nine cases the fold path's verify output and committed
+state are bitwise equal to the stock verify's output and its intermediate state at the
+accepted position. This holds although on sm_90 the stock intermediate-state verify launches
+value tiles of 4 (`_select_recurrent_launch_config`, `target_verify=True`) and the ring verify
+tiles of 32. The circular verify output is never bitwise equal: 19-20% of its BF16 words
+differ, by at most 2.4e-4 absolute and 5.2e-3 relative to the largest output.
+
+`buffered_verify/exactness.csv` and `buffered_verify/{dflash,mtp}_c*-equality.json`
+(`run_replay_check.sh`, which also runs `run_replay_check_mtp.sh`): panel-v2 (80 requests),
+greedy, thinking on, up to 2,048 tokens, top-5 logprobs, Triton GDN decode and verify kernels
+in every arm. DFlash runs at block 16 with radix cache on; MTP runs with 3 steps and radix
+cache off. Each test arm is compared with the stock arm of the same drafter and concurrency
+under PR #37's convention; "bitwise" means identical tokens and top-5 logprobs at every
+position. The table also records the pool sizes each server resolved and the foreign CPU load
+(0.3-2.2 cores; correctness runs, so the load does not bear on the result).
+
+| drafter, c | arm | bitwise / 80 | token divergences | stock pools (KV tokens, mamba slots, running limit) | arm pools |
+| --- | --- | --- | --- | --- | --- |
+| DFlash, 1 | circular | 0 | 75 (73 tie, 2 one_ulp) | 60,630, 10, 2 | 72,306, 69, 8 |
+| DFlash, 1 | fold | 76 | 4 (all tie) | 60,630, 10, 2 | 130,324, 108, 8 |
+| DFlash, 8 | circular | 0 | 77 (76 tie, 1 one_ulp) | 135,778, 26, 5 | 129,733, 127, 8 |
+| DFlash, 8 | fold | 3 | 72 (all tie) | 135,778, 26, 5 | 130,318, 108, 8 |
+| DFlash, 8 | stock rerun | 80 | 0 | 135,778, 26, 5 | 135,773, 26, 5 |
+| MTP, 1 | fold | 80 | 0 | 362,723, 8, 8 | 416,669, 8, 8 |
+| MTP, 8 | fold | 10 | 65 (63 tie, 2 one_ulp) | 362,722, 8, 8 | 416,669, 8, 8 |
+| MTP, 8 | stock rerun | 10 | 63 (62 tie, 1 one_ulp) | 362,722, 8, 8 | 362,659, 8, 8 |
+
+What this shows:
+
+- MTP at c=1: the fold is bitwise equal to stock on all 80 sequences, with the same running
+  limit in both arms.
+- DFlash: the stock and fold servers did not have the same pools. SGLang sizes them from the
+  memory that is free at start-up. Stock also reserves the per-position snapshots, so at
+  `--mem-fraction-static 0.25` on a shared GPU its running limit was 2 (c=1) and 5 (c=8),
+  against 8 for fold. At c=8 the stock arm therefore never ran more than 5 requests at once.
+  Its batches differed from fold's, and fold's logprobs already differ at the prefill output.
+  At c=1 the four fold differences begin at output index 2 or 3 (the first verify cycle),
+  and their token divergences come later, at ties (positions 455-1,325). This check does not
+  separate the fold from the pool difference.
+- With a client that keeps c requests in flight, stock does not reproduce itself at c=8 for
+  MTP (10 of 80 sequences bitwise against a stock rerun). It did for DFlash, whose stock arm
+  ran at most 5 requests. So batched served exactness needs deterministic batching.
+- The circular replay is not bitwise at any concurrency, as the kernel check predicts.
+
+Follow-up (`run_fold_localize.sh`, queued): every arm pins `--max-running-requests`,
+`--max-total-tokens` and `--max-mamba-cache-size` identically for stock and fold, and starts
+only when enough memory is free. (A) The four differing requests and four controls run at
+c=1 with the per-cycle trace, at the first check's stock pools and at a second pool size.
+(B) All of panel-v2 runs in waves sent as one batched request (deterministic batching):
+DFlash waves of 4 and MTP waves of 8, each with stock, fold and a stock rerun.
+
+    scripts/gpu_lock.sh -s experiments/drafter/run_replay_check.sh
+    python experiments/drafter/summarize_replay_check.py \
+        --run dflash:~/vp-data/drafter/replay-check --run mtp:~/vp-data/drafter/replay-check-mtp \
+        --out evidence/drafter/buffered_verify
