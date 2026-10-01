@@ -6,6 +6,7 @@
 # (+ SGLANG_GDN_REPLAYSSM_FOLD=1, patch 0003). At concurrency 8 a second stock
 # run (off2, last) measures how often stock differs from itself when batch
 # composition changes between runs.
+# It starts with the kernel-level parity check (gdn_verify_parity.py).
 # Correctness only (shared slot):
 #   scripts/gpu_lock.sh -s experiments/drafter/run_replay_check.sh [OUT]
 set -euo pipefail
@@ -14,6 +15,10 @@ export SGLANG_WORKTREE="${SGLANG_WORKTREE:-$HOME/sglang-wt/drafter}"
 # shellcheck source=/dev/null
 source "$here/../../scripts/sglang_env.sh"
 out="${1:-$HOME/vp-data/drafter/replay-check}"
+# Kernel-level parity first (seconds): stock vs fold vs circular GDN verify on
+# random inputs at the Qwen3.5-4B shape, with the launch tiles each path selects.
+python "$here/gdn_verify_parity.py" --out "$out/gdn_verify_parity.json" ||
+  echo "[replay-check] kernel parity failed; continuing with the served check"
 for conc in 1 8; do
   arms=(off circular fold)
   if [ "$conc" = 8 ]; then arms+=(off2); fi
