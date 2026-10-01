@@ -66,7 +66,7 @@ def build_input_ids(rows: list[dict[str, Any]], thinking: bool) -> list[list[int
     return out
 
 
-def post(url: str, body: dict[str, Any], timeout: float) -> dict[str, Any]:
+def post(url: str, body: dict[str, Any], timeout: float) -> Any:
     request = urllib.request.Request(
         url, data=json.dumps(body).encode(), headers={'Content-Type': 'application/json'}
     )
@@ -74,12 +74,15 @@ def post(url: str, body: dict[str, Any], timeout: float) -> dict[str, Any]:
         return json.loads(response.read())
 
 
-def run_one(
-    port: int, row: dict[str, Any], input_ids: list[int], args: argparse.Namespace
+def request_body(
+    rows: list[dict[str, Any]], input_ids: list[list[int]], args: argparse.Namespace
 ) -> dict[str, Any]:
+    """One /generate body; several rows make one batched request."""
+    single = len(rows) == 1
     body: dict[str, Any] = {
-        'rid': row['id'],  # lets the engine's DFlash trace name the request
-        'input_ids': input_ids,
+        # The rid lets the engine's DFlash trace name the request.
+        'rid': rows[0]['id'] if single else [row['id'] for row in rows],
+        'input_ids': input_ids[0] if single else input_ids,
         'sampling_params': {
             'temperature': 0.0,
             'max_new_tokens': args.max_new_tokens,
@@ -88,9 +91,12 @@ def run_one(
     }
     if args.logprobs:
         body.update(return_logprob=True, top_logprobs_num=5, logprob_start_len=-1)
-    start = time.perf_counter()
-    result = post(f'http://127.0.0.1:{port}/generate', body, args.timeout)
-    latency = time.perf_counter() - start
+    return body
+
+
+def make_record(
+    row: dict[str, Any], result: dict[str, Any], latency: float, args: argparse.Namespace
+) -> dict[str, Any]:
     meta = result['meta_info']
     record = {
         'id': row['id'],
@@ -104,7 +110,6 @@ def run_one(
         'output_ids': result.get('output_ids'),
     }
     if args.logprobs:
-        # [[logprob, token_id, text], [..]] per output position.
         # [[logprob, token_id], ...] (top 5) per output position, the format of the
         # state workstream's experiments/state_safety/compare.py.
         record['top_logprobs'] = [
@@ -112,6 +117,34 @@ def run_one(
             for position in meta.get('output_top_logprobs', [])
         ]
     return record
+
+
+def run_one(
+    port: int, row: dict[str, Any], input_ids: list[int], args: argparse.Namespace
+) -> dict[str, Any]:
+    start = time.perf_counter()
+    result = post(
+        f'http://127.0.0.1:{port}/generate', request_body([row], [input_ids], args), args.timeout
+    )
+    return make_record(row, result, time.perf_counter() - start, args)
+
+
+def run_wave(
+    port: int, rows: list[dict[str, Any]], input_ids: list[list[int]], args: argparse.Namespace
+) -> list[dict[str, Any]]:
+    """Send `rows` as one batched /generate: pre-tokenized batches reach the scheduler
+    as one message, so the wave is admitted together and its batches do not depend
+    on client timing."""
+    start = time.perf_counter()
+    results = post(
+        f'http://127.0.0.1:{port}/generate', request_body(rows, input_ids, args), args.timeout
+    )
+    latency = time.perf_counter() - start
+    if len(rows) == 1:
+        results = [results]
+    return [
+        make_record(row, result, latency, args) for row, result in zip(rows, results, strict=True)
+    ]
 
 
 def acceptance_table(histogram: list[int]) -> dict[str, Any]:
@@ -179,6 +212,13 @@ def main() -> None:
     parser.add_argument('--offset', type=int, default=0)
     parser.add_argument('--max-new-tokens', type=int, default=1024)
     parser.add_argument('--concurrency', type=int, default=1)
+    parser.add_argument(
+        '--waves',
+        type=int,
+        default=0,
+        help='send the prompts in batched requests of this many, one wave at a time '
+        '(deterministic batching; replaces --concurrency)',
+    )
     parser.add_argument('--ignore-eos', action='store_true')
     parser.add_argument('--no-thinking', action='store_true')
     parser.add_argument('--logprobs', action='store_true', help='record top-5 logprobs')
@@ -200,13 +240,19 @@ def main() -> None:
         server_info = None
 
     start = time.perf_counter()
-    with ThreadPoolExecutor(max_workers=args.concurrency) as pool:
-        records = list(
-            pool.map(
-                lambda pair: run_one(args.port, pair[0], pair[1], args),
-                zip(rows, input_ids, strict=True),
+    if args.waves:
+        records = []
+        for first in range(0, len(rows), args.waves):
+            wave = slice(first, first + args.waves)
+            records += run_wave(args.port, rows[wave], input_ids[wave], args)
+    else:
+        with ThreadPoolExecutor(max_workers=args.concurrency) as pool:
+            records = list(
+                pool.map(
+                    lambda pair: run_one(args.port, pair[0], pair[1], args),
+                    zip(rows, input_ids, strict=True),
+                )
             )
-        )
     wall = time.perf_counter() - start
 
     with (args.out / 'requests.jsonl').open('w') as handle:

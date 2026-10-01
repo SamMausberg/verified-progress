@@ -46,6 +46,11 @@ prof() {
   local label=$1
   shift
   echo "=== $(date -u +%H:%M:%S) $label: $*"
+  # cycle_profile.py appends windows; never mix a rerun into an earlier run's label.
+  if [ -e "$VP_DATA/$TAG/$label/windows.jsonl" ]; then
+    echo "!!! step $label skipped: $VP_DATA/$TAG/$label already holds windows (use a new TAG)"
+    return
+  fi
   python experiments/hostgap/cycle_profile.py --label "$label" --port "$PORT" \
     --out-dir "$VP_DATA/$TAG" "$@" || echo "!!! step $label failed ($?)"
 }

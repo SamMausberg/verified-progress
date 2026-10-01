@@ -101,10 +101,11 @@ def test_every_arm_declares_a_consistent_exactness_class(tmp_path: Path) -> None
 
     for name in arm_names():
         arm = resolve_arm(name)
-        assert arm.exactness in ('stock', 'exact-up-to-floor', 'pending', 'lossy')
+        assert arm.exactness in ('stock', 'exact-up-to-rounding', 'pending', 'lossy')
     assert resolve_arm('plain-tuned').exactness == 'stock'
-    assert resolve_arm('plain-tuned-triton').exactness == 'pending'
-    assert resolve_arm('dflash-tuned-b16').exactness == 'pending'
+    assert resolve_arm('plain-tuned-triton').exactness == 'exact-up-to-rounding'
+    assert resolve_arm('plain-tuned-replayssm').exactness == 'exact-up-to-rounding'
+    assert resolve_arm('dflash-tuned-b16').exactness == 'exact-up-to-rounding'
     assert resolve_arm('dflash-tuned').exactness == 'stock'  # FA4 is draft-only
     # Any flag outside the neutral allowlist makes a stock arm pending, whatever
     # its class: state dtype, compilation, kernel backends, precision, model dtype,
@@ -149,8 +150,13 @@ def test_every_arm_declares_a_consistent_exactness_class(tmp_path: Path) -> None
         ).exactness
         == 'stock'
     )
-    # A pending arm stays pending under overrides.
-    assert resolve_arm('mtp-tuned', {'cuda-graph-max-bs': 64}).exactness == 'pending'
+    # A pending arm stays pending under overrides; a classified arm keeps its class
+    # under a neutral override and becomes pending under a new numerics change.
+    assert resolve_arm('plain', {'quantization': 'fp8', 'cuda-graph-max-bs': 64}).exactness == (
+        'pending'
+    )
+    assert resolve_arm('mtp-tuned', {'cuda-graph-max-bs': 64}).exactness == 'exact-up-to-rounding'
+    assert resolve_arm('mtp-tuned', {'kv-cache-dtype': 'fp8_e4m3'}).exactness == 'pending'
     head = '[defaults]\nmodel = "m"\nrevision = "r"\n'
     missing = tmp_path / 'missing.toml'
     missing.write_text(head + '[arms.a]\ndescription = "d"\n')
@@ -167,13 +173,23 @@ def test_every_arm_declares_a_consistent_exactness_class(tmp_path: Path) -> None
     unexplained.write_text(head + '[arms.a]\ndescription = "d"\nexactness = "pending"\n')
     with pytest.raises(ValueError, match='lossy note'):
         resolve_arm('a', path=unexplained)
+    exact = tmp_path / 'exact.toml'
+    exact.write_text(
+        head + '[arms.a]\ndescription = "d"\nexactness = "exact-up-to-rounding"\n'
+        'lossy = "x"\n[arms.a.args]\nenable-linear-replayssm = true\n'
+    )
+    with pytest.raises(ValueError, match='exactness_note, not lossy'):
+        resolve_arm('a', path=exact)
     # An arm built in code with a lossy note takes its class from the note.
     base = resolve_arm('plain').to_json()
     assert Arm(**{**base, 'lossy': 'FP8 KV cache'}).exactness == 'lossy'
     assert Arm(**{**base, 'lossy': 'pending: check'}).exactness == 'pending'
     # An explicit lossy note on an arm that inherited the pending class.
-    pending = resolve_arm('mtp-tuned').to_json()
+    pending = resolve_arm('plain', {'quantization': 'fp8'}).to_json()
     assert Arm(**{**pending, 'lossy': 'BF16 GDN state'}).exactness == 'lossy'
+    # Also on an arm whose base is exact-up-to-rounding (an env-only lever).
+    exact_base = resolve_arm('mtp-tuned').to_json()
+    assert Arm(**{**exact_base, 'lossy': 'BF16 GDN state'}).exactness == 'lossy'
 
 
 def test_repository_arms_resolve() -> None:
@@ -405,8 +421,14 @@ def test_frontier_dominance_and_aggregation() -> None:
     ]
     from bench.pareto import point_row
 
-    row = point_row('a', 'run', {'concurrency': 4, 'foreign_cpu_during_max': 0.5}, 'probe')
+    row = point_row(
+        'a',
+        'run',
+        {'concurrency': 4, 'foreign_cpu_during_mean': 0.3, 'foreign_cpu_during_max': 0.5},
+        'probe',
+    )
     assert row['status'] == 'probe' and row['foreign_cpu_max'] == 0.5
+    assert row['foreign_cpu_mean'] == 0.3
     frontier = aggregate(rows, baseline='a')
     by_label = {entry['label']: entry for entry in frontier}
     assert by_label['a']['x_e2e_mean'] == pytest.approx(105.0)
@@ -628,7 +650,7 @@ def test_host_load_attributes_short_lived_own_children_to_the_run() -> None:
 
 
 def test_envelope_and_session_paired_ratios() -> None:
-    from bench.pareto import envelope, paired_ratios, pareto_envelope
+    from bench.pareto import PAIR_FIELDS, envelope, paired_ratios, pareto_envelope
 
     def row(label: str, session: str, c: int, y: float, invalid: str = '') -> dict[str, object]:
         return {
@@ -663,6 +685,7 @@ def test_envelope_and_session_paired_ratios() -> None:
     assert [e['label'] for e in pareto_envelope(frontier, exact_only=True)] == ['plain'] * 2
     assert {e['label'] for e in pareto_envelope(frontier, exact_only=False)} == {'plain', 'spec'}
     ratios = {r['concurrency']: r for r in paired_ratios(rows, [('spec', 'plain')])}
+    assert all(tuple(r) == PAIR_FIELDS for r in ratios.values())
     # Only r0 pairs at c=1: r1 and r2 each have an invalid side and are dropped, not
     # re-paired with another session's run.
     assert ratios[1]['n'] == 1 and ratios[1]['sessions'] == 'r0'
@@ -703,7 +726,7 @@ def test_runs_get_sessions_and_exactness_from_their_manifests(tmp_path: Path) ->
     plain = resolve_arm('plain-tuned').to_json()
     triton = resolve_arm('plain-tuned-triton').to_json()
     assert exactness({'arm': plain}) == 'stock'
-    assert exactness({'arm': triton}) == 'pending'
+    assert exactness({'arm': triton}) == 'exact-up-to-rounding'
     # Older manifests: no class recorded and flags no longer matching an arm.
     assert exactness({'arm': {'name': 'x', 'args': {'attention-backend': 'triton'}}}) == 'pending'
     assert exactness({'arm': {'name': 'x', 'args': {}, 'lossy': 'FP8 KV'}}) == 'lossy'
@@ -740,9 +763,31 @@ def test_per_prompt_output_lengths(tmp_path: Path) -> None:
     _write_run(tmp_path)
     rows = load_requests(tmp_path)
     for index, row in enumerate(rows):
-        row['prompt_id'] = f'p{index}'
-    summary = summarise_point(rows, {'p0': 4, 'p1': 5}, concurrency=2)
+        row['prompt_sha'] = f'h{index}'
+    summary = summarise_point(rows, {'h0': 4, 'h1': 5}, concurrency=2)
     assert summary['osl_mismatch'] == 1
+    conflicting = tmp_path / 'conflict.jsonl'
+    conflicting.write_text(
+        json.dumps({**records[0], 'id': 'a2', 'output_length': 999})
+        + '\n'
+        + json.dumps(records[0])
+        + '\n'
+    )
+    with pytest.raises(ValueError, match='two output lengths'):
+        load_prompts(conflicting)
+
+
+def test_prompts_match_by_text_with_repeats() -> None:
+    from bench.results import prompt_hash
+    from bench.sweep import prompts_match
+
+    measured = [{'id': 'p0', 'text': 'x'}, {'id': 'p1', 'text': 'x'}, {'id': 'p2', 'text': 'y'}]
+    # Two copies of 'x' are labelled with one id; the hashes still match.
+    rows = [{'prompt_id': 'p1', 'prompt_sha': prompt_hash(t)} for t in ('x', 'y', 'x')]
+    assert prompts_match(rows, measured)
+    assert not prompts_match(rows[:2], measured)
+    rows_wrong = [{'prompt_sha': prompt_hash(t)} for t in ('x', 'y', 'y')]
+    assert not prompts_match(rows_wrong, measured)
 
 
 def test_sensitivity_arm_rule() -> None:
@@ -789,3 +834,150 @@ def test_sensitivity_arm_rule() -> None:
     assert {'arm': 'dflash-tuned-b4', 'concurrency': 32, 'missing_sessions': ['confirm-r1'],
             'invalid_in': ['confirm-r1']} in result['ineligible']  # fmt: skip
     assert result['sessions'] == list(sessions)
+
+
+def test_arm_classes_from_matched_references() -> None:
+    from bench.divergence import classify
+    from bench.pareto import series_label
+
+    def entry(pair: str, per_1k: float, **classes: int) -> dict[str, object]:
+        counts = {'tie': 10, 'one_ulp': 1, 'near': 1, 'large': 0, 'not_argmax': 0, **classes}
+        return {
+            'pair': pair,
+            'per_1k': per_1k,
+            'per_1k_95': [per_1k - 1, per_1k + 1],
+            'ratio_to_floor': per_1k / 3.42,
+            'ratio_to_floor_95': [0.9, 1.4],
+            'classes': counts,
+        }
+
+    entries = [
+        entry('buffered vs stock', 3.8),
+        entry('buffered vs plain', 4.2),
+        entry('decode vs plain', 3.9, large=1),
+        entry('stock vs plain', 4.4),
+    ]
+    arms: list[tuple[str, str | None, str]] = [
+        ('mtp-tuned', 'buffered vs stock', 'buffered vs plain'),
+        ('plain-tuned-replayssm', 'decode vs plain', 'decode vs plain'),
+        ('mtp-stockverify', None, 'stock vs plain'),
+    ]
+    classes = {record['arm']: record for record in classify(entries, arms)}
+    assert classes['mtp-tuned']['exactness'] == 'exact-up-to-rounding'
+    # The class comes from the matched reference, not from the comparison with plain.
+    assert classes['mtp-tuned']['vs_plain']['per_1k'] == 4.2
+    assert classes['plain-tuned-replayssm']['exactness'] == 'lossy'
+    assert classes['mtp-stockverify']['exactness'] == 'stock'
+    # An output that stops early after an identical prefix has no class but is not rounding.
+    truncated = {**entry('buffered vs stock', 3.8), 'length_mismatch': 1}
+    (record,) = classify([truncated], [('mtp-tuned', 'buffered vs stock', 'absent')])
+    assert record['exactness'] == 'lossy' and record['matched']['length_mismatch'] == 1
+    with pytest.raises(SystemExit, match='missing'):
+        classify(entries, [('x', 'absent', 'stock vs plain')])
+    assert series_label('mtp-tuned', 'exact-up-to-rounding', 4.2) == (
+        'mtp-tuned (exact-up-to-rounding, 4.2/1K vs plain)'
+    )
+    assert series_label('plain-tuned', 'stock', math.nan) == 'plain-tuned'
+
+
+def test_envelope_ranks_only_points_with_enough_repeats(tmp_path: Path) -> None:
+    from bench.pareto import ENVELOPE_FIELDS, envelope, pareto_envelope, write_csv
+
+    def entry(label: str, n: int, x: float, y: float) -> dict[str, object]:
+        return {
+            'label': label,
+            'concurrency': 128,
+            'n': n,
+            'x_e2e_mean': x,
+            'y_mean': y,
+            'y_std': 0.0,
+            'exactness': 'stock',
+        }
+
+    frontier = [entry('plain', 3, 100.0, 1000.0), entry('single', 1, 110.0, 1100.0)]
+    (row,) = envelope(frontier, min_n=3)
+    assert row['best'] == 'plain' and row['n'] == 3
+    assert row['best_below_min_n'] == 'single' and row['best_below_min_n_n'] == 1
+    assert [e['label'] for e in pareto_envelope(frontier, exact_only=False, min_n=3)] == ['plain']
+    assert envelope(frontier)[0]['best'] == 'single'  # default: every point ranks
+    assert tuple(row) == ENVELOPE_FIELDS
+    # No point has enough repeats yet: envelope.csv is written as a header only.
+    assert envelope(frontier, min_n=4) == []
+    path = tmp_path / 'envelope.csv'
+    write_csv([], path, list(ENVELOPE_FIELDS))
+    assert path.read_text().strip() == ','.join(ENVELOPE_FIELDS)
+
+
+def test_envelope_threshold_counts_distinct_sessions() -> None:
+    from bench.pareto import aggregate, envelope
+
+    def row(label: str, run: str, session: str, y: float) -> dict[str, object]:
+        return {
+            'label': label,
+            'run': run,
+            'session': session,
+            'concurrency': 8,
+            'x_e2e': y / 8,
+            'y': y,
+            'failed': 0,
+            'invalid_reason': '',
+        }
+
+    rows = [row('plain', f'p{i}', f'r{i}', 100.0) for i in range(3)]
+    # Three reruns that share one session name are one session, however many rows.
+    rows += [row('rerun', f'q{i}', 'supp', 150.0) for i in range(3)]
+    # Runs without a session count as their own.
+    rows += [row('old', f'o{i}', '', 90.0) for i in range(3)]
+    frontier = {e['label']: e for e in aggregate(rows, None, min_n=3)}
+    assert frontier['rerun']['n'] == 3 and frontier['rerun']['n_sessions'] == 1
+    assert frontier['old']['n_sessions'] == 3
+    assert not frontier['rerun']['pareto_optimal']
+    (best,) = envelope(list(frontier.values()), min_n=3)
+    assert best['best'] == 'plain' and best['best_below_min_n'] == 'rerun'
+
+
+def test_classification_refuses_a_partial_comparison() -> None:
+    from bench.divergence import classify
+
+    entry = {
+        'pair': 'buffered vs stock',
+        'prompts': 300,
+        'per_1k': 3.8,
+        'per_1k_95': [3.0, 4.6],
+        'ratio_to_floor': 1.1,
+        'ratio_to_floor_95': [0.9, 1.4],
+        'classes': {'tie': 10, 'one_ulp': 1, 'near': 0, 'large': 0, 'not_argmax': 0},
+    }
+    arms: list[tuple[str, str | None, str]] = [('mtp-tuned', 'buffered vs stock', 'absent')]
+    with pytest.raises(SystemExit, match='incomplete'):
+        classify([entry], arms, expect_prompts=320)
+    assert classify([{**entry, 'prompts': 320}], arms, expect_prompts=320)[0]['exactness'] == (
+        'exact-up-to-rounding'
+    )
+
+
+def test_series_styles_share_a_hue_per_family() -> None:
+    from bench.pareto import SERIES_COLOURS, series_styles
+
+    styles = series_styles(
+        ['dflash-tuned', 'dflash-tuned-b16', 'mtp-tuned', 'plain-tuned', 'eagle-x']
+    )
+    assert styles['dflash-tuned'][0] == styles['dflash-tuned-b16'][0] == SERIES_COLOURS[2]
+    assert styles['dflash-tuned'][1:] != styles['dflash-tuned-b16'][1:]
+    assert (
+        styles['mtp-tuned'][0] == SERIES_COLOURS[1]
+        and styles['plain-tuned'][0] == SERIES_COLOURS[0]
+    )
+    assert styles['eagle-x'][0] == SERIES_COLOURS[3]  # an unknown family takes the next slot
+
+
+def test_host_id_is_random_and_stable(tmp_path: Path) -> None:
+    import socket
+
+    from bench.server import host_id
+
+    path = tmp_path / 'vp-data' / 'host_id'
+    first = host_id(path)
+    assert len(first) == 8 and int(first, 16) >= 0
+    assert host_id(path) == first  # made once, then reused
+    assert first not in socket.gethostname()

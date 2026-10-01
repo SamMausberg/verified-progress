@@ -38,11 +38,27 @@ if [ -d "$pinned" ]; then
     --out-csv "$evidence/divergences_pinned.csv" --out-meta "$evidence/run_meta_pinned.json"
 fi
 
+# Token divergence conditional on perturbation, by onset (both run roots).
+nice -n 19 python perturbation.py --runs "$runs" --pairs pairs.json \
+  --out "$evidence/perturbation.json" > /dev/null
+if [ -d "$pinned" ]; then
+  nice -n 19 python perturbation.py --runs "$pinned" --pairs pairs_pinned.json \
+    --out "$evidence/perturbation_pinned.json" > /dev/null
+fi
+
 # One deliberate cross-regime pair: does the pool regime alone change batch-1 output?
 if [ -f "$pinned/plain/c1.jsonl" ] && [ -f "$runs/plain/c1.jsonl" ]; then
   nice -n 19 python compare.py --runs "$HOME/vp-data/state" --pairs pairs_cross_regime.json \
     --allow-mixed-pins --all-logprob-differences --out-json "$evidence/cross_regime.json" \
     --out-csv "$evidence/divergences_cross_regime.csv" > /dev/null
+fi
+# The same question with the radix cache off: the pinned runs against the bench
+# workstream's unpinned equality runs of the same configuration at batch 1
+# (bench/campaigns/equality_tuned.sh), whose classes assume pools do not matter there.
+if [ -d "$HOME/vp-data/bench/equality/runs" ] && [ -f "$pinned/mtp_s3_noradix/c1.jsonl" ]; then
+  nice -n 19 python compare.py --runs "$HOME/vp-data" --pairs pairs_cross_bench.json \
+    --allow-mixed-pins --all-logprob-differences --out-json "$evidence/cross_bench.json" \
+    --out-csv "$evidence/divergences_cross_bench.csv" > /dev/null
 fi
 
 # Top-2 BF16 gap statistics of plain decode at batch 1, kept with the noise floor.

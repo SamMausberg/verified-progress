@@ -1,0 +1,35 @@
+{
+  "command": [
+    "python",
+    "bench/tune_gemv.py",
+    "--arith",
+    "w8a8",
+    "--batches",
+    "16",
+    "32",
+    "64",
+    "128",
+    "256",
+    "--out",
+    "/home/ubuntu/vp-data/kernel/runs/x7c/pointer_vs_tma_w8a8.json"
+  ],
+  "exit_code": 0,
+  "interval_s": 1.0,
+  "samples": 134,
+  "foreign_cores_mean": 1.031,
+  "foreign_cores_max": 6.52,
+  "contended": false,
+  "contention_threshold_cores": 2.0,
+  "top_foreign_mean_cores": {
+    "python compare.py --runs /home/ubuntu/vp-data/state/runs_pinned --pairs pairs_pinned.json --out-json /home/ubuntu/vp-wt/": 0.27,
+    "/home/ubuntu/.cursor-server/bin/linux-arm64/e44a49c17e334d442e58bbde931d791200f014a0/node --dns-result-order=ipv4first -": 0.1,
+    "claude --dangerously-skip-permissions": 0.07,
+    "python compare.py --runs /home/ubuntu/vp-data/state/runs --pairs pairs.json --out-json /home/ubuntu/vp-wt/review-110/evi": 0.04,
+    "python tap_signature.py --pair /home/ubuntu/vp-data/state/tap/plain_c1 /home/ubuntu/vp-data/state/tap/v3_plain_c1 --pair": 0.04
+  },
+  "own_peak_cores": {
+    "python bench/tune_gemv.py --arith w8a8 --batches 16 32 64 12": 5.2,
+    "/home/ubuntu/sglang/.venv/lib/python3.12/site-packages/trito": 1.02,
+    "/home/ubuntu/sglang/.venv/bin/python /home/ubuntu/sglang/.ve": 1.01
+  }
+}

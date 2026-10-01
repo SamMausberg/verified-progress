@@ -3,6 +3,21 @@
   "pairs": {
     "pinned (cap 8) vs unpinned (cap 16) plain c1": {
       "prompts": 320,
+      "bitwise_identical": 319,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {
+        "2": 1
+      },
       "diverged": 0,
       "identical": 320,
       "length_mismatch": 0,

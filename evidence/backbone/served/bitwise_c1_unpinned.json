@@ -1,0 +1,77 @@
+{
+ "command": "experiments/backbone/bitwise_runs.py --runs /home/ubuntu/vp-data/backbone/compare/unpinned --pairs evidence/backbone/served/exactness_pairs_unpinned.json --out evidence/backbone/served/bitwise_c1_unpinned.json",
+ "pairs": {
+  "stock c1 vs fresh-server repeat (floor)": {
+   "run_a": "plain/c1",
+   "run_b": "plain__rep/c1",
+   "prompts": 320,
+   "output_tokens_a": 70042,
+   "tokens_equal": 320,
+   "top_logprobs_equal": 320,
+   "bitwise_equal": 320,
+   "differing_ids_first_10": []
+  },
+  "stock c1 vs stock c32, one server (floor)": {
+   "run_a": "plain/c1",
+   "run_b": "plain/c32",
+   "prompts": 320,
+   "output_tokens_a": 70042,
+   "tokens_equal": 153,
+   "top_logprobs_equal": 0,
+   "bitwise_equal": 0,
+   "differing_ids_first_10": [
+    "alpaca_eval-0000",
+    "alpaca_eval-0010",
+    "alpaca_eval-0020",
+    "alpaca_eval-0030",
+    "alpaca_eval-0040",
+    "alpaca_eval-0050",
+    "alpaca_eval-0060",
+    "alpaca_eval-0070",
+    "alpaca_eval-0080",
+    "alpaca_eval-0090"
+   ]
+  },
+  "stock c1 vs bb_off c1": {
+   "run_a": "plain/c1",
+   "run_b": "plain__bb_off/c1",
+   "prompts": 320,
+   "output_tokens_a": 70042,
+   "tokens_equal": 320,
+   "top_logprobs_equal": 320,
+   "bitwise_equal": 320,
+   "differing_ids_first_10": []
+  },
+  "stock c1 vs bb_merge c1": {
+   "run_a": "plain/c1",
+   "run_b": "plain__bb_merge/c1",
+   "prompts": 320,
+   "output_tokens_a": 70042,
+   "tokens_equal": 320,
+   "top_logprobs_equal": 320,
+   "bitwise_equal": 320,
+   "differing_ids_first_10": []
+  },
+  "stock c1 vs bb_gemv c1": {
+   "run_a": "plain/c1",
+   "run_b": "plain__bb_gemv/c1",
+   "prompts": 320,
+   "output_tokens_a": 70042,
+   "tokens_equal": 146,
+   "top_logprobs_equal": 0,
+   "bitwise_equal": 0,
+   "differing_ids_first_10": [
+    "alpaca_eval-0000",
+    "alpaca_eval-0010",
+    "alpaca_eval-0020",
+    "alpaca_eval-0030",
+    "alpaca_eval-0040",
+    "alpaca_eval-0050",
+    "alpaca_eval-0060",
+    "alpaca_eval-0070",
+    "alpaca_eval-0080",
+    "alpaca_eval-0090"
+   ]
+  }
+ }
+}

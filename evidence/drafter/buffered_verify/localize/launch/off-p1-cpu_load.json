@@ -1,0 +1,19 @@
+{
+  "interval_s": 1.0,
+  "samples": 26,
+  "foreign_cores_mean": 3.284,
+  "foreign_cores_max": 4.78,
+  "contended": true,
+  "contention_threshold_cores": 2.0,
+  "top_foreign_mean_cores": {
+    "/home/ubuntu/vp-data/upstream/triton/venv-main/bin/python /home/ubuntu/vp-wt/upstream-triton/experiments/triton_tma/int8": 0.71,
+    "pdflatex -interaction=nonstopmode -halt-on-error -recorder paper.tex": 0.5,
+    "claude --dangerously-skip-permissions": 0.22,
+    "/home/ubuntu/.cursor-server/bin/linux-arm64/e44a49c17e334d442e58bbde931d791200f014a0/node --dns-result-order=ipv4first -": 0.1,
+    "pdftoppm -r 28 -png /tmp/claude-1000/-home-ubuntu-verified-progress/c04e8a57-2aee-4a91-b47b-d0eabcfb5650/scratchpad/appe": 0.08
+  },
+  "own_peak_cores": {
+    "python /home/ubuntu/vp-wt/drafter-run/experiments/drafter/ac": 5.04,
+    "sglang::scheduler": 1.04
+  }
+}

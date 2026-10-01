@@ -1,0 +1,157 @@
+{
+  "runs": "/home/ubuntu/vp-data/backbone/compare/unpinned",
+  "pairs": {
+    "stock c1 vs fresh-server repeat (floor)": {
+      "prompts": 320,
+      "diverged": 0,
+      "identical": 320,
+      "length_mismatch": 0,
+      "exposure_tokens": 70042,
+      "per_1k_tokens": 0.0,
+      "classes": {},
+      "max_margin_median": null,
+      "max_margin_p90": null,
+      "max_margin_max": null,
+      "drift_median": 0.0,
+      "drift_p99": 0.0,
+      "drift_max": 0.0,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain/c1",
+      "run_b": "plain__rep/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
+    },
+    "stock c1 vs stock c32, one server (floor)": {
+      "prompts": 320,
+      "diverged": 167,
+      "identical": 153,
+      "length_mismatch": 0,
+      "exposure_tokens": 48816,
+      "per_1k_tokens": 3.4210095050803013,
+      "classes": {
+        "tie": 151,
+        "near": 2,
+        "one_ulp": 14
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.375,
+      "drift_median": 0.19421052932739258,
+      "drift_p99": 0.3595924377441406,
+      "drift_max": 0.6860885620117188,
+      "prompts_with_large_drift": 1,
+      "run_a": "plain/c1",
+      "run_b": "plain/c32",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": true,
+      "pools_identical": true
+    },
+    "stock c1 vs bb_off c1": {
+      "prompts": 320,
+      "diverged": 0,
+      "identical": 320,
+      "length_mismatch": 0,
+      "exposure_tokens": 70042,
+      "per_1k_tokens": 0.0,
+      "classes": {},
+      "max_margin_median": null,
+      "max_margin_p90": null,
+      "max_margin_max": null,
+      "drift_median": 0.0,
+      "drift_p99": 0.0,
+      "drift_max": 0.0,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain/c1",
+      "run_b": "plain__bb_off/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
+    },
+    "stock c1 vs bb_merge c1": {
+      "prompts": 320,
+      "diverged": 0,
+      "identical": 320,
+      "length_mismatch": 0,
+      "exposure_tokens": 70042,
+      "per_1k_tokens": 0.0,
+      "classes": {},
+      "max_margin_median": null,
+      "max_margin_p90": null,
+      "max_margin_max": null,
+      "drift_median": 0.0,
+      "drift_p99": 0.0,
+      "drift_max": 0.0,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain/c1",
+      "run_b": "plain__bb_merge/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
+    },
+    "stock c1 vs bb_gemv c1": {
+      "prompts": 320,
+      "diverged": 174,
+      "identical": 146,
+      "length_mismatch": 0,
+      "exposure_tokens": 46406,
+      "per_1k_tokens": 3.7495151489031593,
+      "classes": {
+        "tie": 164,
+        "near": 2,
+        "one_ulp": 8
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.2500000596046448,
+      "drift_median": 0.19214844703674316,
+      "drift_p99": 0.32758569717407227,
+      "drift_max": 0.36778855323791504,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain/c1",
+      "run_b": "plain__bb_gemv/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
+    }
+  },
+  "missing_pairs": [],
+  "mixed_pin_pairs": [],
+  "self_consistency": {
+    "plain/c1": {
+      "positions": 70042,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain__rep/c1": {
+      "positions": 70042,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain/c32": {
+      "positions": 70060,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain__bb_off/c1": {
+      "positions": 70042,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain__bb_merge/c1": {
+      "positions": 70042,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain__bb_gemv/c1": {
+      "positions": 69906,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    }
+  }
+}

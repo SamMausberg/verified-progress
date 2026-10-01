@@ -1,0 +1,82 @@
+{
+  "a": "/home/ubuntu/vp-data/hostgap/equality_x/mtp/stock",
+  "b": "/home/ubuntu/vp-data/hostgap/equality_x/mtp-prof4/mtp/hostgap",
+  "only_in_a": 0,
+  "only_in_b": 0,
+  "pools_a": {
+    "final_limits": {
+      "max_total_num_tokens": 1000000,
+      "chunked_prefill_size": 8192,
+      "max_prefill_tokens": 16384,
+      "max_running_requests": 128,
+      "context_len": 262144
+    },
+    "mamba_cache_slots": [
+      128
+    ],
+    "kv_cache_tokens": [
+      1000000,
+      1000000
+    ]
+  },
+  "pools_b": {
+    "final_limits": {
+      "max_total_num_tokens": 1000000,
+      "chunked_prefill_size": 8192,
+      "max_prefill_tokens": 16384,
+      "max_running_requests": 128,
+      "context_len": 262144
+    },
+    "mamba_cache_slots": [
+      128
+    ],
+    "kv_cache_tokens": [
+      1000000,
+      1000000
+    ]
+  },
+  "pools_equal": true,
+  "by_concurrency": {
+    "1": {
+      "requests": 64,
+      "tokens": 22154,
+      "token_sequences_equal": 64,
+      "verify_steps_equal": 64,
+      "correct_drafts_equal": 64,
+      "histograms_equal": 64,
+      "verify_steps_a": 6718,
+      "verify_steps_b": 6718,
+      "accept_length_a": 3.297707651086633,
+      "accept_length_b": 3.297707651086633,
+      "all_equal": true
+    },
+    "8": {
+      "requests": 64,
+      "tokens": 22263,
+      "token_sequences_equal": 64,
+      "verify_steps_equal": 64,
+      "correct_drafts_equal": 64,
+      "histograms_equal": 64,
+      "verify_steps_a": 6777,
+      "verify_steps_b": 6777,
+      "accept_length_a": 3.2850818946436475,
+      "accept_length_b": 3.2850818946436475,
+      "all_equal": true
+    },
+    "32": {
+      "requests": 64,
+      "tokens": 22156,
+      "token_sequences_equal": 64,
+      "verify_steps_equal": 64,
+      "correct_drafts_equal": 64,
+      "histograms_equal": 64,
+      "verify_steps_a": 6746,
+      "verify_steps_b": 6746,
+      "accept_length_a": 3.2843166320782684,
+      "accept_length_b": 3.2843166320782684,
+      "all_equal": true
+    }
+  },
+  "mismatches": [],
+  "all_equal": true
+}

@@ -2,6 +2,15 @@
 % under \appendix. The appendices are set in one column: several of their tables are
 % longtables, which two-column mode does not support, or are wider than a column.
 \onecolumn
+% A page that holds only floats would otherwise centre them and spread them apart with
+% stretchable glue (LaTeX's default \@fptop, \@fpsep and \@fpbot). Stack them from the
+% top at the usual float separation instead; the main text's two-column float pages
+% (\@dblfp...) are not affected.
+\makeatletter
+\setlength{\@fptop}{0pt}
+\setlength{\@fpsep}{\floatsep}
+\setlength{\@fpbot}{0pt plus 1fil}
+\makeatother
 \usetikzlibrary{shapes.geometric}
 \input{sections/app_proofs}
 \input{sections/app_sampling}

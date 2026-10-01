@@ -1,3 +1,66 @@
 Lean (version 4.19.0, aarch64-unknown-linux-gnu, commit 6caaee842e94, Release)
 checking CertifiedArgmax.lean
 checking DecisionGuards.lean
+checking drafting/CausalDefect.lean
+'CausalDefect.weighted_depth' depends on axioms: [propext, Classical.choice, Quot.sound]
+'CausalDefect.causal_defect_converges' depends on axioms: [propext, Classical.choice, Quot.sound]
+'CausalDefect.guarded_unique_winner' depends on axioms: [propext, Quot.sound]
+'CausalDefect.verified_prefix' does not depend on any axioms
+'CausalDefect.first_correction' does not depend on any axioms
+'CausalDefect.teacher_forced_prefix_iff' does not depend on any axioms
+'CausalDefect.weighted_depth' depends on axioms: [propext, Classical.choice, Quot.sound]
+'CausalDefect.settles_from_locality' does not depend on any axioms
+'CausalDefect.causal_defect_converges' depends on axioms: [propext, Classical.choice, Quot.sound]
+'CausalDefect.bias_cancels' depends on axioms: [propext, Quot.sound]
+'CausalDefect.anchored_error_identity' depends on axioms: [propext, Quot.sound]
+'CausalDefect.margin_pair' depends on axioms: [propext, Quot.sound]
+'CausalDefect.guarded_unique_winner' depends on axioms: [propext, Quot.sound]
+'CausalDefect.verified_prefix' does not depend on any axioms
+'CausalDefect.first_correction' does not depend on any axioms
+'CausalDefect.teacher_forced_prefix_iff' does not depend on any axioms
+checking drafting/InnovationDrafting.lean
+drafting/InnovationDrafting.lean:133:0: warning: automatically included section variable(s) unused in theorem 'InnovationDrafting.decode_append_prefix':
+  [DecidableEq α]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [DecidableEq α] in theorem ...
+note: this linter can be disabled with `set_option linter.unusedSectionVars false`
+drafting/InnovationDrafting.lean:180:0: warning: automatically included section variable(s) unused in theorem 'InnovationDrafting.follows_eq_rollout':
+  [DecidableEq α]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [DecidableEq α] in theorem ...
+note: this linter can be disabled with `set_option linter.unusedSectionVars false`
+'InnovationDrafting.terminal_cost_lower_bound' depends on axioms: [propext, Quot.sound]
+'InnovationDrafting.decode_encode' depends on axioms: [propext]
+'InnovationDrafting.minimum_override_cost' depends on axioms: [propext, Quot.sound]
+'InnovationDrafting.prefix_realizable_iff' depends on axioms: [propext, Quot.sound]
+'InnovationDrafting.common_program_prefix' depends on axioms: [propext]
+'InnovationDrafting.interpreted_program_exact' depends on axioms: [propext]
+'InnovationDrafting.decode_encode' depends on axioms: [propext]
+'InnovationDrafting.writes_encode' depends on axioms: [propext, Quot.sound]
+'InnovationDrafting.innovations_decode_le' depends on axioms: [propext, Quot.sound]
+'InnovationDrafting.minimum_override_cost' depends on axioms: [propext, Quot.sound]
+'InnovationDrafting.realizable_iff' depends on axioms: [propext, Quot.sound]
+'InnovationDrafting.prefix_realizable_iff' depends on axioms: [propext, Quot.sound]
+'InnovationDrafting.decode_append_prefix' depends on axioms: [propext]
+'InnovationDrafting.common_program_prefix' depends on axioms: [propext]
+'InnovationDrafting.audit_follows' depends on axioms: [propext]
+'InnovationDrafting.follows_eq_rollout' depends on axioms: [propext]
+'InnovationDrafting.audit_exact' depends on axioms: [propext]
+'InnovationDrafting.interpreted_program_exact' depends on axioms: [propext]
+'InnovationDrafting.execution_potential_bound' depends on axioms: [propext, Quot.sound]
+'InnovationDrafting.terminal_cost_lower_bound' depends on axioms: [propext, Quot.sound]
+checking drafting/PrefixIsolatedPlanning.lean
+'PrefixIsolatedPlanning.oracle_clipping' depends on axioms: [propext, Quot.sound]
+'PrefixIsolatedPlanning.verified_prefix_sound' depends on axioms: [propext, Quot.sound]
+'PrefixIsolatedPlanning.verified_bonus_sound' depends on axioms: [propext, Quot.sound]
+'PrefixIsolatedPlanning.teacher_forced_first_error' depends on axioms: [propext, Quot.sound]
+'PrefixIsolatedPlanning.pooled_oracle_dominance' depends on axioms: [propext, Quot.sound]
+'PrefixIsolatedPlanning.firstMismatch_unique' depends on axioms: [propext, Quot.sound]
+'PrefixIsolatedPlanning.expander_eq_before' depends on axioms: [propext, Quot.sound]
+'PrefixIsolatedPlanning.wrong_anchor_fails' does not depend on any axioms
+'PrefixIsolatedPlanning.oracle_clipping' depends on axioms: [propext, Quot.sound]
+'PrefixIsolatedPlanning.committed_clipping' depends on axioms: [propext, Quot.sound]
+'PrefixIsolatedPlanning.verified_prefix_sound' depends on axioms: [propext, Quot.sound]
+'PrefixIsolatedPlanning.verified_bonus_sound' depends on axioms: [propext, Quot.sound]
+'PrefixIsolatedPlanning.teacher_forced_first_error' depends on axioms: [propext, Quot.sound]
+'PrefixIsolatedPlanning.pooled_oracle_dominance' depends on axioms: [propext, Quot.sound]

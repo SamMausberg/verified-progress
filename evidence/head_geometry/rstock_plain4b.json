@@ -3,7 +3,7 @@
   "reference": "R-stock: stock BF16 head token at the served batch shape; rules from src/precision_reference.py (stock_gap) and bucket-exact interval rounding",
   "gammas": {
     "tensor_core_model": 0.0006112017390383282,
-    "gamma_1.19e-4": 0.000119,
+    "gamma_1.19e-4": 0.00011921636278483056,
     "gamma_1e-5": 1e-05,
     "fp32_tree_model": 1.6689328390431102e-06
   },
@@ -53,5 +53,5 @@
       "certified_token_differs_from_engine": 0
     }
   },
-  "elapsed_s": 28.277812719345093
+  "elapsed_s": 28.325294017791748
 }

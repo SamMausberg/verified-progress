@@ -1,0 +1,4 @@
+[
+ ["pinned (cap 8) vs bench unpinned (cap 16) radix-off mtp_s3 c1", "state/runs_pinned/mtp_s3_noradix/c1", "bench/equality/runs/mtp_s3__bench_noradix/c1"],
+ ["pinned (cap 8) vs bench unpinned (cap 16) radix-off plain c1", "state/runs_pinned/plain_noradix/c1", "bench/equality/runs/plain__bench_noradix/c1"]
+]

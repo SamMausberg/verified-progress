@@ -9,23 +9,15 @@
 \usepackage[scaled=.86,varqu]{zi4}
 \usepackage[scaled=.9]{helvet}
 \usepackage{booktabs,tabularx,array,multirow,longtable}
-\usepackage{xcolor,tikz,pgfplots}
+\usepackage{xcolor,tikz,pgfplots,pgfplotstable}
 \usetikzlibrary{arrows.meta,positioning,calc,fit,backgrounds,decorations.pathreplacing,patterns}
 \pgfplotsset{compat=1.18}
 \usepgfplotslibrary{groupplots,fillbetween}
 \usepackage{enumitem,etoolbox}
 \usepackage{xurl}
 % ---------------------------------------------------------------------------
-% Colours. Every figure also separates its series by line style, marker or pattern, so a
-% greyscale print loses nothing; the colours differ in lightness as well as hue.
-\definecolor{ink}{HTML}{1B3A57}
-\definecolor{teal}{HTML}{1F7A73}
-\definecolor{muted}{HTML}{6B7780}
-\definecolor{ochre}{HTML}{9A5B13}
-\definecolor{brick}{HTML}{A33A2A}
-\definecolor{wash}{HTML}{F2F5F7}
-\definecolor{washgreen}{HTML}{E6F1EF}
-\definecolor{washamber}{HTML}{FAF0E0}
+% Colours and figure styles: figures/style.tex (palette, series, axes, CSV look-ups).
+\input{figures/style}
 \hypersetup{colorlinks=true,linkcolor=ink,citecolor=ink,urlcolor=ink}
 % ---------------------------------------------------------------------------
 % Lists and layout helpers.
@@ -71,8 +63,8 @@
 \newcommand{\Srace}{\mbox{S-race}}
 \newcommand{\modelcons}{conservative model}
 \newcommand{\modelhopper}{Hopper model}
-\newcommand{\gcons}{6.1\times10^{-4}}
-\newcommand{\ghop}{1.19\times10^{-4}}
+\newcommand{\gcons}{6.11\times10^{-4}}
+\newcommand{\ghop}{1.193\times10^{-4}}
 % Pins.
 \newcommand{\sourcepin}{\texttt{bd66ce343e4f}}
 \newcommand{\modelpin}{\texttt{851bf6e806ef}}
@@ -98,8 +90,9 @@
 \newcommand{\datafigure}[3]{\IfFileExists{#1}{#2}{\pendingfigure{#3}{#1}}}
 % ---------------------------------------------------------------------------
 % Terminology. paper/terminology.tex declares every term once with
-% \term{<scope>}{<term>}{<definition>}, scope main (printed in the main text's Table
-% tab:terms) or app (terms used only in the appendices). \termrows{<scope>} expands to the
+% \term{<scope>}{<term>}{<definition>}, scope main (terms the main text relies on) or app
+% (terms used only in the appendices); the glossary (Appendix app:glossary) prints both
+% scopes. \termrows{<scope>} expands to the
 % rows "term & definition \\" of that scope, for use inside a two-column tabular.
 \makeatletter
 \@namedef{termrows@main}{}
@@ -107,18 +100,3 @@
 \newcommand{\term}[3]{\expandafter\g@addto@macro\csname termrows@#1\endcsname{#2 & #3\\}}
 \newcommand{\termrows}[1]{\@nameuse{termrows@#1}}
 \makeatother
-% ---------------------------------------------------------------------------
-% TikZ and PGFPlots styles.
-\tikzset{box/.style={draw=ink!60,fill=wash,rounded corners=1.5pt,align=center,font=\footnotesize,inner sep=3.5pt},
-  good/.style={box,fill=washgreen,draw=teal!75},
-  warn/.style={box,fill=washamber,draw=ochre!75},
-  flow/.style={-{Stealth[length=1.8mm]},semithick,draw=ink},
-  dashedflow/.style={flow,dashed},
-  note/.style={font=\scriptsize,text=muted,align=center}}
-% Keep only rows whose column #1 equals #2 (long-form CSVs).
-\pgfplotsset{discard if not/.style 2 args={x filter/.append code={%
-  \edef\tempa{\thisrow{#1}}\edef\tempb{#2}%
-  \ifx\tempa\tempb\else\def\pgfmathresult{inf}\fi}}}
-\pgfplotsset{every axis/.append style={tick label style={font=\scriptsize},label style={font=\footnotesize},
-  title style={font=\footnotesize},grid style={draw=ink!10},
-  legend style={font=\scriptsize,draw=none,fill=white,fill opacity=.85,text opacity=1},legend cell align=left}}
