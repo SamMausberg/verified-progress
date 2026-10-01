@@ -24,7 +24,8 @@ pooled primary table. Supported only if (a) and (b) both hold; otherwise
 inconclusive. The result is void, and no results are written, unless all five
 runs exist and are the declared runs: the declared configurations and
 concurrencies with the radix cache and overlap scheduler on, the pinned pools,
-256 tokens with top-5 logprobs, and exactly the 960 frozen fresh prompts.
+256 tokens with top-5 logprobs at every output token, exactly the 960 frozen
+fresh prompts, the clean engine pin, and the declaration's runner code.
 
     python experiments/state_safety/first_cycle.py \
         --runs ~/vp-data/state/runs_fresh --out evidence/state_safety/first_cycle_fresh.json
@@ -36,6 +37,7 @@ import argparse
 import hashlib
 import json
 import math
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -65,6 +67,12 @@ HERE = Path(__file__).resolve().parent
 FRESH_MANIFEST = HERE.parents[1] / 'evidence' / 'state_safety' / 'prompt_manifest_fresh.json'
 FRESH_PROMPTS = Path.home() / 'vp-data' / 'state' / 'prompts' / 'prompts_fresh.jsonl'
 DECLARED_PROMPTS = 960
+# The engine the declared runs use: the paper's source pin in ~/sglang, unpatched and
+# clean (the state tap and the verify-split patch live in a separate worktree).
+SGLANG_PIN = 'bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824'
+# The declaration's merge commit; the runs' runner code must be this commit's.
+DECLARATION = 'b918c8b80c04e98c5930dbc3624570e645c5390f'
+RUNNER_FILES = ['run_matrix.py', 'server.py', 'client.py']
 # run -> (speculative algorithm, steps, top-k, concurrency), as declared
 DECLARED: dict[str, tuple[str | None, int | None, int | None, int]] = {
     'plain/c1': (None, None, None, 1),
@@ -125,6 +133,33 @@ def declared_prompt_ids(prompts: Path, manifest: Path) -> tuple[set[str] | None,
     return {it['id'] for it in items}, None
 
 
+def runner_code_matches(repo_sha: str) -> bool:
+    """repo_sha is the declaration's commit or a descendant, with its runner files."""
+    repo = str(HERE.parents[1])
+
+    def git(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(['git', '-C', repo, *args], capture_output=True, text=True)
+
+    if git('merge-base', '--is-ancestor', DECLARATION, repo_sha).returncode != 0:
+        return False
+    for name in RUNNER_FILES:
+        path = f'experiments/state_safety/{name}'
+        a, b = git('show', f'{DECLARATION}:{path}'), git('show', f'{repo_sha}:{path}')
+        if a.returncode or b.returncode or a.stdout != b.stdout:
+            return False
+    return True
+
+
+def record_shape_problems(run: dict[str, dict[str, Any]]) -> int:
+    """Records whose top-k logprobs do not cover every output token with 2+ candidates."""
+    bad = 0
+    for r in run.values():
+        top = r.get('top_logprobs') or []
+        if len(top) != len(r['output_ids']) or any(len(t) < 2 for t in top):
+            bad += 1
+    return bad
+
+
 def void_reasons(
     root: Path, prompts: Path = FRESH_PROMPTS, manifest: Path = FRESH_MANIFEST
 ) -> list[str]:
@@ -167,8 +202,16 @@ def void_reasons(
             reasons.append(f'{run}: model revision or attention backend differs')
         if m.get('warm') is not False:
             reasons.append(f'{run}: not a cold pass')
+        if m.get('sglang_sha') != SGLANG_PIN or m.get('sglang_dirty') is not False:
+            reasons.append(f'{run}: engine is not the clean pin {SGLANG_PIN[:10]}')
+        if not runner_code_matches(str(m.get('repo_sha'))):
+            reasons.append(f'{run}: runner code differs from the declaration ({DECLARATION[:7]})')
+        records = load_run(root / f'{run}.jsonl')
+        bad = record_shape_problems(records)
+        if bad:
+            reasons.append(f'{run}: {bad} records lack top-5 logprobs at every output token')
         if ids is not None:
-            run_ids = {r['id'] for r in load_run(root / f'{run}.jsonl').values()}
+            run_ids = {r['id'] for r in records.values()}
             if run_ids != ids:
                 reasons.append(
                     f'{run}: prompt IDs differ from the declared set '

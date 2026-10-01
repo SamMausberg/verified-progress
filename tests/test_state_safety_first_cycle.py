@@ -7,7 +7,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'experiments' / 'state_safety'))
 
 import numpy as np
-from first_cycle import DECLARED, RUNS, analyse, counts, log_odds, void_reasons
+from first_cycle import (
+    DECLARATION,
+    DECLARED,
+    RUNS,
+    SGLANG_PIN,
+    analyse,
+    counts,
+    log_odds,
+    void_reasons,
+)
 from server import CONFIGS, MODEL_REVISION, POOL_PIN, pool_flags
 
 FRAGILE = [[-0.6, 1], [-0.7, 2]]  # top-2 gap 0.1 nats
@@ -86,7 +95,11 @@ def _write_declared(tmp_path, ids):
     for run in RUNS:
         path = runs / f'{run}.jsonl'
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(''.join(json.dumps({'id': i}) + '\n' for i in ids))
+        rows = [
+            {'id': i, 'output_ids': [1, 2], 'top_logprobs': [[[-0.1, 1], [-0.2, 2]]] * 2}
+            for i in ids
+        ]
+        path.write_text(''.join(json.dumps(r) + '\n' for r in rows))
         algo, steps, topk, conc = DECLARED[run]
         config = run.split('/')[0]
         meta = {
@@ -94,6 +107,9 @@ def _write_declared(tmp_path, ids):
             'flags': CONFIGS[config] + pool_flags(),
             'model_revision': MODEL_REVISION,
             'warm': False,
+            'sglang_sha': SGLANG_PIN,
+            'sglang_dirty': False,
+            'repo_sha': DECLARATION,
             'concurrency': conc,
             'pool_pin': POOL_PIN,
             'max_new_tokens': 256,
@@ -172,6 +188,27 @@ def test_each_departure_from_the_declaration_makes_the_result_void(tmp_path, mon
     def other_revision(runs, prompts, manifest):
         _edit_meta(runs, 'mtp_tree/c1', model_revision='0' * 40)
 
+    def other_engine(runs, prompts, manifest):
+        _edit_meta(runs, 'mtp_s5/c32', sglang_sha='0' * 40)
+
+    def dirty_engine(runs, prompts, manifest):
+        _edit_meta(runs, 'plain/c1', sglang_dirty=True)
+
+    def other_runner_code(runs, prompts, manifest):
+        _edit_meta(runs, 'mtp_tree/c32', repo_sha='0' * 40)
+
+    def short_logprobs(runs, prompts, manifest):
+        path = runs / 'mtp_s5/c1.jsonl'
+        rows = [json.loads(x) for x in path.read_text().splitlines()]
+        rows[0]['top_logprobs'] = rows[0]['top_logprobs'][:1]
+        path.write_text(''.join(json.dumps(r) + '\n' for r in rows))
+
+    def one_candidate(runs, prompts, manifest):
+        path = runs / 'plain/c1.jsonl'
+        rows = [json.loads(x) for x in path.read_text().splitlines()]
+        rows[1]['top_logprobs'][1] = [[-0.1, 1]]
+        path.write_text(''.join(json.dumps(r) + '\n' for r in rows))
+
     def missing_prompt(runs, prompts, manifest):
         path = runs / 'mtp_s5/c1.jsonl'
         path.write_text(''.join(path.read_text().splitlines(keepends=True)[:2]))
@@ -190,6 +227,11 @@ def test_each_departure_from_the_declaration_makes_the_result_void(tmp_path, mon
         extra_flag: 'mtp_s5/c1: configuration or flags differ',
         warm_pass: 'plain/c1: not a cold pass',
         other_revision: 'mtp_tree/c1: model revision',
+        other_engine: 'mtp_s5/c32: engine is not the clean pin',
+        dirty_engine: 'plain/c1: engine is not the clean pin',
+        other_runner_code: 'mtp_tree/c32: runner code differs',
+        short_logprobs: 'mtp_s5/c1: 1 records lack top-5 logprobs',
+        one_candidate: 'plain/c1: 1 records lack top-5 logprobs',
         missing_prompt: 'mtp_s5/c1: prompt IDs differ',
         prompts_not_frozen: 'does not match the frozen manifest',
     }
