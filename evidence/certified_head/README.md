@@ -191,9 +191,15 @@ commit 7f8079f; `tma_candidates.json`, `tma_candidates.py`, commit 4a54503):
   In these minimal kernels the fault therefore needs the int8 operand, a 64-byte
   TMA box and the BF16 conversion together; the second fault below shows that a
   128-byte box is not enough to rule a TMA tile out. The host descriptors are standard (`TensorDescriptor` over
-  int8 `[V, K]`, strides `[K, 1]`, block `[block_v, block_k]`); whether a
-  descriptor constraint is violated or the fault lies in the generated code is not
-  established.
+  int8 `[V, K]`, strides `[K, 1]`, block `[block_v, block_k]`). The follow-up
+  investigation in [`../triton_tma/README.md`](../triton_tma/README.md) places
+  the 64-byte fault in the toolchain: across seven builds, this kernel was clean
+  only with both Triton 3.8.0 or newer and `ptxas` 13.3 or newer, either alone
+  still failing. That pattern matches the closed triton-lang/triton#9433, a
+  hazard on a register-operand `wgmma` whose fix has a Triton half (3.8.0) and a
+  `ptxas` half (CUDA 13.3); the SASS was not inspected, so the attribution rests
+  on the version pattern. The SGLang environment here uses Triton 3.7.1, so the
+  64-byte refusal stays.
 - In the pass itself, which variant is wrong depends on the compiled epilogue:
   at TMA 128x64x64 the raw product (epilogue 0) was wrong by up to 2.4 (about twice
   the envelope's half-width) while the envelope epilogues happened to enclose. The
@@ -279,7 +285,8 @@ varies between identical runs points to a race; that is not established.
 `tma_m128_neighbourhood.json` checks all 32 of its neighbours (block_v 64 and
 128, block_m 64 and 128, 4 and 8 warps, 3 and 4 stages, TMA and pointer loads)
 at M = 128 and 256.
-Neither fault's mechanism is known, so the defaults' clean record (the checks
+Neither fault's mechanism is established (the first matches a known Triton
+hazard by version pattern only, above), so the defaults' clean record (the checks
 above, the self-test at every batch size, 0 differing rows in the SGLang checks)
 is empirical, and a rare intermittent miss could pass 8 probe rows per call:
 `stress_defaults.json` checks every default configuration of every pass, at
@@ -705,6 +712,162 @@ caching allocator rounds up to 32 MiB (large blocks come in multiples of 2 MiB).
 microbenchmark therefore runs batch sizes above 32 in their own processes, and
 `src/certified_head/INTEGRATION.md` records what this means for the engine.
 
+## The head inside SGLang on the merged package (`engine_v2.json`)
+
+**Run.** x9e2, a shared-lock hold: first the merged package's GPU and CPU tests
+(`engine_v2_gpu_tests.log`, 167 passed), then the same eleven arms as
+`engine_v1.json` (method below), with `--max-mamba-cache-size 80` so that the GDN
+state cache no longer caps the running requests: up to 16 for plain decode and 8
+for speculation (`--max-running-requests`). Repository 4c9fc8f. Servers ran at
+`--mem-fraction-static 0.25`; SGLang sizes from the free memory at start-up, so a
+plain-decode server reached 48.9 GB with the GPU otherwise idle, and the
+speculative ones 28 to 30 GB.
+
+**Engine commit per arm** (`x9e2_commit.txt`; each arm's launch record in
+`engine_v2.json`). Patch 0009 was committed to the engine worktree during the
+hold, at 20:42. The first five arms (`plain_check`, `plain_check_columns`,
+`mtp_check`, `dflash_check`, `mtp_draft_check`) ran engine/kernel a28946e0d4
+(patches 0001-0008); the other six ran 9b5e82258d (0001-0009). `git diff
+a28946e0d4 9b5e82258d` is one hunk in one file
+(`python/sglang/srt/layers/certified_head.py`, 7 insertions, 2 deletions), the
+docstring and predicate of `_fixed_noise_eligible`, which runs only with
+`SAMPLED_VERIFY` on, that is, in `mtp_sampled_check`, which ran 0009.
+`mtp_draft_check`'s server was starting while 0009 was written; its log shows the
+head installed at 20:41:55 and the glue file was modified at 20:41:58, so it ran
+a28946e0d4, as recorded.
+
+Two changes came after x9e2. Neither alters what its arms ran:
+
+- **Patch 0010** (engine/kernel a3a4c8e99a; `git diff 9b5e82258d a3a4c8e99a`: one
+  file, `certified_head.py`, 17 insertions, 4 deletions). It moves the row-limit
+  check before the staging of the sampled-verify inputs. The sampled arm's batches
+  had at most 32 rows (8 requests x 4 draft rows; its certified graphs were 4 to
+  32 rows), always within the limit, so the same batches were staged and
+  certified.
+- **`quantize.publish`** writes the int8 cache entry through a process-unique
+  temporary file. It runs only when no cache entry exists. x9e2's servers loaded
+  the pinned entry, written on 2026-09-30, so none of them wrote one.
+
+| Arm | Path | Largest certified batch (rows) | Certified calls | Rows | Rows differing from stock | Rows falling back | Calls with a fallback |
+|---|---|---|---|---|---|---|---|
+| plain decode | decode | 16 | 1,036 | 14,946 | 0 | 207 (1.38%) | 253 (24.4%) |
+| plain decode, column fallback | decode | 16 | 1,042 | 14,949 | 0 | 207 (1.38%) | 229 (22.0%) |
+| MTP | greedy verify | 32 | 678 | 19,912 | 0 | 347 (1.74%) | 257 (37.9%) |
+| DFlash | greedy verify | 128 | 603 | 57,424 | 0 | 2,292 (3.99%) | 543 (90.0%) |
+| MTP | draft steps | 8 | 1,354 | 9,938 | 0 | 303 (3.05%) | 274 (20.2%) |
+| MTP | draft extend | 8 | 677 | 4,969 | 0 | 120 (2.41%) | 113 (16.7%) |
+| DFlash | draft projection | 120 | 599 | 53,580 | 0 | 2,120 (3.96%) | 525 (87.6%) |
+| MTP, seeded T = 0.7 | fixed-noise sampled verify | 32 | 700 | 21,016 | 0 | 386 (1.84%) | 279 (39.9%) |
+
+No row on any path was refused or tripped a runtime probe, and no sampled row took
+the temperature or small-probability guard. The committed check
+(`engine_validate.sh --check-only` at f80f7d8, `engine_v2_arm_checks.log`)
+passes every check arm: every path the arm must exercise made certified calls.
+`DRAFT` enables both draft families, so `mtp_draft_check` also lists
+`dflash_draft` and `dflash_draft_check` lists `draft` and `draft_extend`, with no
+calls; the check reports such paths and does not fail them.
+
+One request at a time, the certified and stock servers' outputs are identical on
+64 of 64 prompts for plain decode (14,995 tokens) and for MTP with certified
+greedy verify (14,990 tokens).
+
+Against `engine_v1.json`, which ran the pre-fix package, the DFlash draft
+projection now falls back on 3.96% of its rows instead of 89.6%, and DFlash
+verify was certified at up to 128 rows. This is consistent with the faulty TMA
+tiles causing the earlier fallback rate, though the two runs also differ in
+concurrency.
+
+**What went wrong in the hold.** I edited this branch's `engine_validate.sh` at
+about 20:42 while x9e2 was running it, and restored the committed bytes at
+20:42:51, before bash had read past its loop of arms. Every arm completed and
+printed its verdict. After the loop, though, bash failed to parse the rest of the
+script ("unexpected EOF while looking for matching" a quote, line 197, in
+`engine_v2_engine.log`), so the comparison of the one-request-at-a-time arms did
+not run and the hold ended FAILED. That comparison only reads the saved outputs:
+it was run afterwards with the committed `engine_equality.py`, and
+`engine_summary.py` regenerated `engine_v2.json` (both CPU steps). Patch 0009
+reaching the engine worktree mid-hold, above, was the same mistake.
+
+## The head inside SGLang (`engine_v1.json`)
+
+**Which package these results used.** `engine_v1.json` ran on the package as it
+was before the TMA-fault fix (repo 8f4f3d7, based on 9e3a39a; see "TMA faults in
+the W8A16 pass"). Its W8A16 defaults above 16 rows were the faulty TMA tiles
+(128x32x64 and 128x64x64, a 64-byte int8 box, at 17 to 64 rows; 128x128x64 above
+64 rows), and it had neither the per-variant self-test gate nor the runtime
+probes. The arms that reached more than 16 rows (DFlash greedy verify at 32,
+the DFlash draft projection at up to 120, whose 89.6% fallback was this fault,
+and the sampled verify at 32) ran those tiles; their 0 differing rows are
+empirical. The evidence for the package as merged here, with #45's final tiles,
+self-test gate, probes, weight digest and sampling guards, is the rerun of the
+same checks, `engine_v2.json`, in the section before this one.
+
+The SGLang patch series `engine/sglang/patches/kernel/` (see
+`engine/sglang/README.md`) was validated per path in check mode: every certified
+step also runs SGLang's own head at the same batch shape and counts, on the
+device, the rows whose token differs; the emitted tokens are the certified ones.
+For fixed-noise sampled verify the comparison is with SGLang's seeded sampler
+(`div_(T)`, FP32 softmax and log, `multinomial_with_seed`) applied to the same
+verify logits, outside the graph, under `--enable-deterministic-inference`; this is
+that path's contract, not plain seeded decoding. In that mode SGLang replaces
+`aten::mm` with its batch-invariant `matmul_persistent`, which at the pin's
+defaults on this GH200 is DeepGEMM's BF16 GEMM (one FP32 `wgmma` accumulator over
+K, BF16 round-to-nearest store), with a Triton kernel (FP32 accumulation over K
+tiles) only as its fallback; so the sampled arm's stock head, and the certified
+head's fallback, which calls the same `torch.matmul`, run that kernel instead of
+cuBLAS (a profiler check of the kernel name is in the second session). The sampled arm used the conservative error
+model, which covers any FP32 accumulation; the Hopper model is validated for the
+cuBLAS head only, and patch 0006 refuses it under deterministic inference.
+
+Setup: shared GPU lock, `--mem-fraction-static 0.25`, 64 prompts (every fifth of
+the geometry workstream's public prompt set), up to 256 new tokens, greedy except
+the sampled arm (seeded, T = 0.7), the conservative stock error model and the
+whole-batch fallback except where noted. MTP is NEXTN with 3 steps and top-1 (4
+verify rows per request); DFlash uses block size 16. Equality is claimed only at
+the batch sizes each arm reached: at this memory fraction SGLang's GDN state cache
+capped several arms at 2-4 running requests.
+
+| Arm | Path | Largest batch (requests; rows) | Certified steps | Rows | Rows differing from stock | Rows falling back | Steps with a fallback |
+|---|---|---|---|---|---|---|---|
+| plain decode | decode | 3; 3 | 5,085 | 14,966 | 0 | 184 (1.23%) | 180 (3.5%) |
+| plain decode, column fallback | decode | 16; 16 | 1,039 | 14,944 | 0 | 209 (1.40%) | 189 (18.2%) |
+| MTP | greedy verify | 4; 16 | 1,278 | 19,868 | 0 | 345 (1.74%) | 288 (22.5%) |
+| DFlash | greedy verify | 2; 32 | 1,809 | 56,080 | 0 | 2,118 (3.78%) | 1,154 (63.8%) |
+| MTP | draft steps | 4; 4 | 2,550 | 9,936 | 0 | 290 (2.92%) | 278 (10.9%) |
+| MTP | draft extend | 4; 4 | 1,275 | 4,968 | 0 | 118 (2.38%) | 112 (8.8%) |
+| DFlash | draft projection | 8; 120 | 602 | 53,820 | 0 | 48,212 (89.6%) | 541 (89.9%) |
+| MTP, seeded T = 0.7 | fixed-noise sampled verify | 8; 32 | 700 | 21,016 | 0 | 386 (1.84%) | 279 (39.9%) |
+
+The largest batch is the server's running-request cap where the state cache set
+one (plain 3, MTP 4, DFlash 2) and otherwise the largest batch in the server's
+decode log; the second session records the exact rows of every certified step. The
+fallback columns are rates, not runtime: a fallback reruns the stock head for the
+batch (or, in column mode, for the near-tie rows), and its cost is measured in the
+head microbenchmark, not here. The DFlash draft projection falls back on 90% of its
+rows (the threshold check fails on the flat logits of deep block positions); it is
+left off in the proposed bench arm, and its runtime was not measured. Whether
+column mode stays ahead of the stock head up to M = 64, which the proposed arms
+assume, is pending the final head microbenchmark.
+
+One request at a time (batch 1, so a certified server and a stock server see the
+same shapes), the two servers' outputs are identical on 64 of 64 prompts for plain
+decode (14,995 tokens) and for MTP with certified greedy verify (14,990 tokens,
+verify batches of 4 rows). The same run passed `tests/test_certified_engine.py` (7)
+and the W8A8 adversarial-activation and P8 witness tests (3) on the GH200.
+
+## Seeded sampling precision on real rows (`p8_witnesses.json`)
+
+On the first 60,000 real decode rows (seed 5, position = row index, SGLang's own
+noise), SGLang's temperature-only seeded token (FP32 softmax and log) never
+differs from the token with an FP64 log of the same FP32 probabilities (0 rows
+at T = 0.7 and at T = 1.0). It differs from the token under exact
+arithmetic (FP64 logits and log-softmax) on 184 rows (0.31%) at T = 0.7 and 211
+rows (0.35%) at T = 1.0; that difference combines the stock head's BF16 logits
+and the FP32 softmax, which this check does not separate. The first eight of
+these rows are kept with their inputs, and `tests/test_certified_head.py`
+replays them against the certified sampler. On real rows, therefore, the log's precision does not
+move a seeded token, while the BF16 logits and FP32 softmax together do.
+
 ## Files and commands
 
 | File | What | Command |
@@ -731,6 +894,11 @@ microbenchmark therefore runs batch sizes above 32 in their own processes, and
 | `tma_m128_neighbourhood.json` | all 32 configurations around the faulty TMA tiles at M = 128 and 256, random and real rows: raw product and each side of the envelope, three runs | `python experiments/certified_head/tma_m128_check.py --out ...` (x8s2, 9f7f369, shared lock) |
 | `conditional_memory.json` | device memory left behind by deleted graphs, with and without conditional nodes | `python experiments/certified_head/conditional_memory.py --out ...` (46bcc84) |
 | `sample_kernel_sass.json` | SASS statistics of the envelope kernel, greedy and sampled, probes on and off, at the three default tiles, and x3's kernel | `python experiments/certified_head/sample_kernel_sass.py --compare 9e3a39a --out ...` (x8s2, 9f7f369, CPU) |
+| `engine_v1.json` | per-arm counters, client summaries and comparisons of the SGLang validation | `scripts/gpu_lock.sh -s experiments/certified_head/engine_validate.sh OUT plain_check mtp_check dflash_check mtp_draft_check dflash_draft_check mtp_sampled_check plain_check_columns plain_c1 plain_c1_stock mtp_c1 mtp_c1_stock`, then `python experiments/certified_head/engine_summary.py OUT --out evidence/certified_head/engine_v1.json` (pre-fix package: repo 8f4f3d7, tag `kernel-engine-v1`, before the TMA-fault fix, see "The head inside SGLang"; rebased twin c58a859 has identical `src/certified_head`, `experiments/certified_head`, tests and patches; engine 71c521db = patches 0001-0004) |
+| `engine_v2.json`, `engine_v2_engine.log`, `x9e2_commit.txt` | the SGLang checks on the merged package: per-arm counters, client summaries, launch records and the one-request-at-a-time comparisons; the hold's log; the commits per arm | `scripts/gpu_lock.sh -s experiments/certified_head/engine_validate.sh OUT plain_check plain_check_columns mtp_check dflash_check mtp_draft_check dflash_draft_check mtp_sampled_check plain_c1 plain_c1_stock mtp_c1 mtp_c1_stock` with `MAMBA_SLOTS=80`, then `engine_equality.py compare` for each c1 pair and `python experiments/certified_head/engine_summary.py OUT --out engine_v2.json` (x9e2, repo 4c9fc8f; engine per arm in `x9e2_commit.txt`) |
+| `engine_v2_gpu_tests.log` | the merged package's GPU and CPU tests before the engine arms | `python -m pytest tests/test_certified_head.py tests/test_certified_engine.py tests/test_certified_bounds.py tests/test_certified_head_inputs.py tests/test_enclosure_margin.py -q -s` (x9e2, 4c9fc8f) |
+| `engine_v2_arm_checks.log` | the check arms' verdicts under the per-path rule | `experiments/certified_head/engine_validate.sh --check-only OUT plain_check ... mtp_sampled_check` (f80f7d8, CPU) |
+| `p8_witnesses.json` | seeded-token differences between SGLang's chain, an FP64 log and exact arithmetic on 60,000 real rows, with the first witnesses | `python experiments/certified_head/p8_witness_search.py --rows 60000 --out evidence/certified_head/p8_witnesses.json` (commit ab507a9, tag `kernel-p8-witness-search`; rebased twin 24e213a has an identical search script and the modules it imports; GPU, shared lock) |
 
 Real head inputs come from the geometry workstream's plain-decode capture
 (SGLang `bd66ce34` with its capture patch, `--disable-cuda-graph`,

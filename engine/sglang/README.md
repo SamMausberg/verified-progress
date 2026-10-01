@@ -129,6 +129,44 @@ setting the variable reproduces).
 | `SGLANG_STATE_TAP_PERTURB` | 0001 | module whose output gets a one-ulp change (positive control) |
 | `SGLANG_STATE_VERIFY_FIXED_SPLIT` | 0002 | `1`: fixed KV split in the verify plan under deterministic inference |
 
+## kernel (`patches/kernel/0001-0010`, branch `engine/kernel`)
+
+The certified LM head (`src/certified_head/`, PR #45) on SGLang's head paths. The
+engine imports the package from `SGLANG_CERTIFIED_HEAD_SRC`; it is not copied into
+SGLang. The series applies in order to `bd66ce343e`:
+
+```sh
+scripts/sglang_worktree.sh kernel
+git -C ~/sglang-wt/kernel am "$PWD"/engine/sglang/patches/kernel/*.patch
+SGLANG_WORKTREE=~/sglang-wt/kernel source scripts/sglang_env.sh
+export SGLANG_CERTIFIED_HEAD_SRC="$PWD/src"
+```
+
+Every change is off unless its variable is set. With a path enabled, each CUDA graph
+on that path captures the certified head under a device flag and SGLang's own head
+under its negation; the host sets the flag per replay only for batches that need no
+logits, so other batches, eager forwards and unsupported configurations (TP or PP > 1,
+DP attention, quantized, LoRA, FP32, scaled or softcapped heads, padded vocabularies,
+`SGLANG_SANITIZE_NAN_LOGITS`, `SGLANG_ENABLE_ASYNC_ASSERT`, the Hopper model under
+deterministic inference) run the stock head.
+
+| Patch | What it changes | Default behaviour |
+|---|---|---|
+| 0001 | `SGLANG_CERTIFIED_HEAD_DECODE=1`: greedy plain decode takes its tokens from the certified head (the stock head's tokens for the same batch); `SGLANG_CERTIFIED_HEAD_FALLBACK` (`batch` or `columns`), `_MODEL` (`conservative` or `hopper-wgmma`), `_MAX_ROWS`, `_CHECK` (also run the stock head and count differing rows), `_STATS`. | unchanged unless set |
+| 0002 | `SGLANG_CERTIFIED_HEAD_VERIFY=1`: greedy target verify for EAGLE/MTP (`eagle_sample`) and DFlash (`_accept_block`). | unchanged unless set |
+| 0003 | `SGLANG_CERTIFIED_HEAD_DRAFT=1`: MTP draft top-1 (draft steps inside the draft graph and the draft-extend token) and DFlash's greedy draft projection. | unchanged unless set |
+| 0004 | `SGLANG_CERTIFIED_HEAD_SAMPLED_VERIFY=1`: fixed-noise sampled verify for EAGLE/MTP with seeded temperature-only sampling (`--enable-deterministic-inference`); accepts a draft iff it equals SGLang's seeded sample of the verify row. It replaces the stock rejection-sampling verify. | unchanged unless set |
+| 0005 | Records the row counts of certified steps in the stats file. | unchanged unless `_STATS` is set |
+| 0006 | With `--enable-deterministic-inference` the head's stock GEMM is SGLang's batch-invariant `matmul_persistent` (DeepGEMM's BF16 GEMM at the pin's defaults, a Triton kernel as fallback), not cuBLAS; `SGLANG_CERTIFIED_HEAD_MODEL=hopper-wgmma` (derived for cuBLAS) then keeps the stock head with a warning. | unchanged unless set |
+| 0007 | The MTP draft and DFlash draft paths also write their counters after each graph replay (before, only the next replay's gate read them, so the last replay was never written). | unchanged unless `_STATS` is set |
+| 0008 | In check mode the counters are written again after the sampled-verify comparison with SGLang's seeded sampler, which runs after the replay's own write, so a mismatch on the last replay is recorded. | unchanged unless `_STATS` and `_CHECK` are set |
+| 0009 | Fixed-noise sampled verify refuses any batch with a greedy row, not only an all-greedy one. At the pin a greedy request is also normalised to `top_k = 1`, which already made such a batch ineligible; the patch makes the contract explicit. | unchanged unless `_SAMPLED_VERIFY` is set |
+| 0010 | Sampled verify checks the row limit before staging its seeds, positions and temperatures in the head's 256-row buffers, so a larger batch (65 MTP requests give 260 rows) takes the stock path instead of failing. | unchanged unless `_SAMPLED_VERIFY` is set |
+
+Validation: `experiments/certified_head/engine_validate.sh` (check mode per path and
+one request at a time against the stock server; results in
+`evidence/certified_head/README.md`).
+
 ## repair (`patches/repair/0001-0002`, branch `engine/repair`, head `5d8e00e3e1`)
 
 ```sh
