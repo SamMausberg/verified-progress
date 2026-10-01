@@ -182,7 +182,7 @@ position. The comparisons use 320 prompts x 256 tokens at c=1 with top-5 logprob
 - `stock`: only arithmetic-neutral flags (`NEUTRAL_FLAGS` in `bench/arms.py`) and
   FlashInfer target attention, with the reference model.
 - `exact-up-to-rounding`: every first divergence against the arm's matched stock
-  reference is a `tie`, `one_ulp` or `near` event. The matched reference is stock
+  reference is a `tie`, `one_ulp` or `near` event, and no output differs in length. The matched reference is stock
   plain decoding at c=1 without the radix cache for plain levers, and stock
   speculation with the same drafter and steps (radix cache off) for speculative
   levers: buffered MTP against stock MTP s3, Triton DFlash block 16 against stock
@@ -190,7 +190,11 @@ position. The comparisons use 320 prompts x 256 tokens at c=1 with top-5 logprob
   it on, a request's logprobs can depend on earlier requests
   (evidence/state_safety/README.md, "History dependence").
 - `lossy`: any `large` or `not_argmax` first divergence against the matched
-  reference; the arm needs the paired GSM8K run under the declared budget.
+  reference, or any length mismatch (one run stops where the other continues after
+  an identical prefix; the comparator counts these in `length_mismatch` without a
+  class). The arm needs the paired GSM8K run under the declared budget. The
+  length-mismatch condition was added on 2026-10-01 after review; no committed pair
+  has a length mismatch, so no class changed.
 - `pending`: a numerics change not yet compared.
 
 Each arm's divergence rate per 1,000 tokens, its ratio to the batch-shape floor
