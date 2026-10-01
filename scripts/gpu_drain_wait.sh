@@ -28,10 +28,14 @@ done
 # the name do not match, nor do this script's ancestors.
 orphan_servers() {
   local comm_prefix="${GPU_LOCK_ORPHAN_COMM:-sglang::}" module="${GPU_LOCK_ORPHAN_MODULE:-sglang.launch_server}"
-  local d pid comm prev tok argv0 found
+  local d pid stat comm prev tok argv0 found
   for d in /proc/[0-9]*; do
     pid="${d#/proc/}"
     case "$ancestors" in *" $pid "*) continue ;; esac
+    # A zombie cannot use the GPU; its comm may still carry the prefix until it is reaped.
+    stat="$(cat "$d/stat" 2>/dev/null)" || continue
+    stat="${stat##*) }"
+    [ "${stat%% *}" != Z ] || continue
     comm="$(cat "$d/comm" 2>/dev/null)" || continue
     if [ "${comm#"$comm_prefix"}" != "$comm" ]; then
       printf '%s ' "$pid"

@@ -381,3 +381,37 @@ def test_an_ignored_term_in_the_caller_does_not_disable_holder_death_cleanup(
             pytest.fail('an inherited ignored TERM let the job outlive the lock holder')
     finally:
         proc.kill()
+
+
+def test_a_zombie_server_process_is_not_an_orphan(tmp_path: Path) -> None:
+    """A dead SGLang worker that is not yet reaped keeps its comm but cannot use the GPU."""
+    lock = tmp_path / 'gpu.lock'
+    lock.touch()
+    prefix = f'gltz{os.getpid() % 100000}'
+    # The parent forks a child that renames itself and exits; the parent does not reap it.
+    code = (
+        'import os, time\n'
+        'pid = os.fork()\n'
+        'if pid == 0:\n'
+        f'    open("/proc/self/comm", "w").write("{prefix}x")\n'
+        '    os._exit(0)\n'
+        'time.sleep(8)\n'
+    )
+    holder = subprocess.Popen(['python3', '-c', code])
+    try:
+        time.sleep(1)  # the child is a zombie now
+        env = dict(
+            fake_smi(tmp_path),
+            GPU_LOCK_FILE=str(lock),
+            GPU_LOCK_ORPHAN_COMM=prefix,
+            GPU_LOCK_DRAIN_WAIT='5',
+        )
+        ran = tmp_path / 'ran'
+        start = time.time()
+        done = subprocess.run(
+            ['bash', str(SCRIPT), '-x', 'touch', str(ran)], env=env, timeout=60, check=False
+        )
+        assert done.returncode == 0 and ran.exists()
+        assert time.time() - start < 4, 'the drain waited for a zombie'
+    finally:
+        holder.kill()
