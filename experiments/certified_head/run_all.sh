@@ -15,7 +15,8 @@
 #
 # To rerun only some steps: RUN_ALL_ONLY=step1,step2 runs those (check_outputs
 # always runs); RUN_ALL_REUSE=DIR copies every other step's outputs from an earlier
-# run if that run recorded the step as ok, and records it with that run's commit.
+# run if that run recorded the step as ok and kept every output the step declares
+# (otherwise the step is recorded "missing"), and records it with that run's commit.
 # A reused step's fifth column says why its result does not depend on the default
 # tile configurations (if it does not) and whether the package or its kernel
 # source changed since.
@@ -44,6 +45,13 @@ declare -A OUTPUTS=(
   [ncu_export]="ncu_export.log ncu_gemv_details.csv"
   [summarize]="summarize.log head_path_time.csv head_path_table.md"
 )
+# check_outputs.py requires every declared output of every step.
+for s in "${!OUTPUTS[@]}"; do printf '%s\t%s\n' "$s" "${OUTPUTS[$s]}"; done | sort >"$OUT/outputs.tsv"
+
+clear_outputs() {  # name: remove the step's declared outputs, so none is stale
+  local f
+  for f in ${OUTPUTS[$1]:-}; do rm -f "$OUT/$f"; done
+}
 
 # Steps whose result does not depend on default_gemv_config, so an earlier run's
 # result stands after a change of default tiles (not after a kernel change).
@@ -64,7 +72,8 @@ want() {
 }
 
 reuse() {  # name: copy an earlier run's ok outputs, or record the step as not run
-  local name=$1 f src=
+  local name=$1 f src='' missing=''
+  clear_outputs "$name"
   # Without RUN_ALL_REUSE (or without its steps.tsv) there is nothing to reuse.
   if [ -n "$REUSE" ] && [ -f "$REUSE/steps.tsv" ]; then
     src=$(awk -F'\t' -v n="$name" '$1 == n && $2 == "ok" {print ($4 == "" ? "?" : $4)}' \
@@ -74,8 +83,16 @@ reuse() {  # name: copy an earlier run's ok outputs, or record the step as not r
     record "$name" not-run -
     return
   fi
+  # A step is reused only with every output it declares; otherwise it is "missing".
   for f in ${OUTPUTS[$name]:-}; do
-    [ -e "$REUSE/$f" ] && cp -p "$REUSE/$f" "$OUT/$f"
+    [ -e "$REUSE/$f" ] || missing="$missing $f"
+  done
+  if [ -n "$missing" ]; then
+    record "$name" missing - "$COMMIT" "not in $REUSE:$missing"
+    return
+  fi
+  for f in ${OUTPUTS[$name]:-}; do
+    cp -p "$REUSE/$f" "$OUT/$f"
   done
   if [ "$src" = "?" ]; then
     src=$(head -1 "$REUSE/commit.txt" | cut -c1-7)
@@ -95,6 +112,7 @@ reuse() {  # name: copy an earlier run's ok outputs, or record the step as not r
 step() {  # name timeout command...
   local name=$1 t=$2 rc=0
   shift 2
+  clear_outputs "$name"
   if ! want "$name"; then
     reuse "$name"
     return 0
@@ -121,6 +139,7 @@ ok() {  # all named steps succeeded
 skip() {  # name prerequisites...
   local name=$1
   shift
+  clear_outputs "$name"
   echo "=== $name skipped: prerequisite failed ($*)"
   record "$name" skipped -
 }

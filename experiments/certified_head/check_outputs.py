@@ -54,6 +54,28 @@ def test_log_problems(text: str) -> list[str]:
     return found
 
 
+def declared_output_problems(out: Path) -> list[str]:
+    """Every output that run_all.sh declares for a step (``outputs.tsv``) must
+    exist, and every step recorded so far (``steps.tsv``) must be ok."""
+    found = []
+    manifest = out / 'outputs.tsv'
+    if not manifest.exists():
+        found.append('outputs.tsv: missing (the outputs each step declares)')
+    else:
+        for line in manifest.read_text().splitlines():
+            step, files = line.split('\t', 1)
+            found += [f'{step}: {f} missing' for f in files.split() if not (out / f).exists()]
+    steps = out / 'steps.tsv'
+    if not steps.exists():
+        found.append('steps.tsv: missing')
+    else:
+        for line in steps.read_text().splitlines():
+            name, status = line.split('\t')[:2]
+            if status != 'ok':
+                found.append(f'{name}: {status}')
+    return found
+
+
 # Each micro_head arm timed on a batch its head decides, the arm that times the
 # same head with a row forced to fall back, and whether that fallback runs the
 # whole-batch stock head (column fallbacks run a small gathered GEMM instead).
@@ -153,6 +175,7 @@ def main() -> None:
             return None
         return json.loads(p.read_text())
 
+    problems += declared_output_problems(out)
     tests = out / 'tests.log'
     if not tests.exists():
         problems.append('tests.log: missing')
