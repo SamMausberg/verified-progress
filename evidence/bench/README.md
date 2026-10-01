@@ -59,10 +59,11 @@ points, 4 are invalid, all `plain-tuned` in confirm-supp: c=2, 8, 16 and 32 at 3
 during the hold). They stay in `points.csv` with their reason and out of every mean and
 pair, so `mtp-stockverify` at those concurrencies, `mtp-tuned` at c=2, 8, 16 and
 `plain-tuned-replayssm` at c=32 have no paired baseline in that session. The valid
-points saw a median of 0.56 and at most 1.81 foreign cores.
+points saw a median of 0.55 and at most 1.81 foreign cores.
 
-**Frontier.** Best arm by mean y at each concurrency (`envelope.csv`), n = sessions with
-a valid point (`plain-tuned` also ran in confirm-supp):
+**Frontier.** Best arm by mean y at each concurrency among points with at least three
+valid sessions (`envelope.csv`; the build passes `--envelope-min-n 3`). n counts sessions
+with a valid point, so `plain-tuned`, which also ran in confirm-supp, has up to four:
 
 | c | Best arm (class) | y, tok/s (sd) | x, tok/s/user | n | `plain-tuned` y (sd) | Runner-up, y |
 |---|---|---|---|---|---|---|
@@ -73,15 +74,17 @@ a valid point (`plain-tuned` also ran in confirm-supp):
 | 16 | `dflash-tuned` (stock) | 5,256 (45) | 370 | 3 | 3,646 (5) | `mtp-tuned-triton` 4,704 |
 | 32 | `dflash-tuned` (stock) | 6,844 (22) | 238 | 3 | 6,233 (4) | `mtp-tuned-triton` 6,688 |
 | 48 | `plain-tuned` (stock) | 8,286 (4) | 173 | 4 | 8,286 (4) | `mtp-tuned` 8,091 |
-| 64 | `plain-tuned-replayssm` (exact-up-to-rounding) | 9,917 | 155 | 1 | 9,901 (7) | `plain-tuned` 9,901 |
-| 96 | `plain-tuned-replayssm` (exact-up-to-rounding) | 12,773 | 133 | 1 | 12,180 (18) | `plain-tuned` 12,180 |
-| 128 | `plain-tuned-replayssm` (exact-up-to-rounding) | 15,012 | 117 | 1 | 13,898 (13) | `plain-tuned` 13,898 |
+| 64 | `plain-tuned` (stock) | 9,901 (7) | 155 | 4 | 9,901 (7) | `mtp-tuned` 9,033 |
+| 96 | `plain-tuned` (stock) | 12,180 (18) | 127 | 4 | 12,180 (18) | `mtp-tuned` 10,573 |
+| 128 | `plain-tuned` (stock) | 13,898 (13) | 109 | 4 | 13,898 (13) | `mtp-tuned` 12,003 |
 
-Buffered plain decoding (`plain-tuned-replayssm`) leads at c >= 64 in its one session,
-by 0.2%, 4.9% and 8.1% over `plain-tuned` in the same hold. That is a single session:
-it entered the frontier only when the radix-off reference made it exact (equality/),
-and two more sessions are queued (confirm-supp2 and confirm-supp3). Until they land,
-the declared n=3 frontier at c >= 64 is `plain-tuned`.
+Points with fewer sessions do not rank. The one that would change this table is
+buffered plain decoding (`plain-tuned-replayssm`, one session): against `plain-tuned`
+in the same hold it is level at c=64 (+0.2%) and higher at c=96 and 128 (+4.9% and
++8.1%; 15,012 tok/s at c=128). `envelope.csv` lists it as `best_below_min_n` and
+`pareto.png` draws it hollow. It became eligible for the exact frontier only when the
+radix-off reference made it exact (equality/); two more sessions (confirm-supp2 and
+confirm-supp3) are scheduled, and until they land this is not a result.
 
 y in tok/s per arm (mean over sessions; n=3 unless marked):
 
@@ -98,8 +101,8 @@ y in tok/s per arm (mean over sessions; n=3 unless marked):
 | `dflash-tuned-b4` |  |  |  |  |  | 6,161 | 7,327 | 7,922 | 8,796 | 11,582 |
 
 **Variance across sessions.** Over the 52 arm-concurrency points with three sessions,
-the coefficient of variation of y has a median of 0.4% and a maximum of 1.9%
-(`mtp-tuned` at c=48 and `dflash-tuned-b16` at c=16); x varies by at most 1.9%. These
+the coefficient of variation of y has a median of 0.35% and a maximum of 1.9%
+(`mtp-tuned` at c=48 and `dflash-tuned-b16` at c=16); for x the maximum is 1.95%. These
 are three server launches at different times of day on one machine, not independent
 machines.
 
@@ -122,7 +125,8 @@ baseline (987 against 286 tok/s/user) and `dflash-tuned` 2.89 times `plain-tuned
 Speculation leads plain decoding through c=32 and trails it from c=48 in every family:
 at c=48 the best speculative arm (`mtp-tuned`) delivers 0.98 times plain, and at c=128
 the best (`mtp-tuned`) 0.86 times. Acceptance does not explain the loss: accept length
-is flat across concurrency (3.24-3.28 for MTP, 4.67-4.81 for DFlash block 8). These
+is flat across concurrency (3.24-3.28 for MTP, 4.66-4.81 for DFlash block 8 over all
+points). These
 runs do not say where the cycle's time goes at large batch; evidence/profiles/
 attributes it by component.
 
@@ -145,7 +149,8 @@ attributes it by component.
 `frontier.csv` has per-arm means, standard deviations and ranges of x, y, y_steady,
 TTFT, ITL, accept length and the server's full-batch rate; `<arm>.dat` and
 `envelope-*.dat` are PGFPlots tables; `pareto.png` plots every arm (hue by family,
-line style by variant) with the envelope.
+line style by variant) with the envelope, and draws points with fewer than three
+sessions hollow.
 
 ```sh
 scripts/gpu_lock.sh -x bench/campaigns/confirm.sh 0 all          # confirm-r0

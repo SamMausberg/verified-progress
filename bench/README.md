@@ -277,3 +277,8 @@ once it is a result.
 - `SGLANG_RUST_SERVER=1` (SGLang's embedded Rust HTTP server, an alternative to the
   Python tokenizer manager) fails at launch here because it wants a local
   `tokenizer.json` path rather than a Hub model ID; untested with `--tokenizer-path`.
+- The exactness check reads an arm's flags, environment and model only. An arm run with
+  `--sglang-worktree` on a patched SGLang tree keeps the class its flags give it; such
+  an arm needs an `exactness_note` citing the patch's own equality evidence.
+- Both FlashInfer DFlash arms lose ground to plain decoding at c=96 and recover at
+  c=128 (evidence/bench/README.md, confirm/); not explained.
