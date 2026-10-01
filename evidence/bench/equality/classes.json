@@ -22,22 +22,22 @@
       0.896,
       1.372
     ],
-    "plain_pair": "mtp_s3 buffered verify radix-off vs plain c1",
+    "plain_pair": "mtp_s3 buffered verify vs plain radix-off c1",
     "vs_plain": {
-      "per_1k": 4.201,
+      "per_1k": 3.707,
       "per_1k_95": [
-        3.635,
-        4.856
+        3.192,
+        4.305
       ],
-      "ratio_to_floor": 1.228,
+      "ratio_to_floor": 1.084,
       "ratio_to_floor_95": [
-        0.996,
-        1.515
+        0.876,
+        1.341
       ],
       "classes": {
-        "tie": 166,
-        "one_ulp": 15,
-        "near": 2,
+        "tie": 159,
+        "one_ulp": 13,
+        "near": 0,
         "large": 0,
         "not_argmax": 0
       }
@@ -66,22 +66,22 @@
       0.96,
       1.463
     ],
-    "plain_pair": "mtp_s3 buffered verify radix-off triton vs plain c1",
+    "plain_pair": "mtp_s3 buffered verify triton vs plain radix-off c1",
     "vs_plain": {
-      "per_1k": 3.803,
+      "per_1k": 3.657,
       "per_1k_95": [
-        3.278,
-        4.412
+        3.149,
+        4.246
       ],
-      "ratio_to_floor": 1.112,
+      "ratio_to_floor": 1.069,
       "ratio_to_floor_95": [
-        0.899,
-        1.374
+        0.864,
+        1.323
       ],
       "classes": {
-        "tie": 162,
-        "one_ulp": 7,
-        "near": 5,
+        "tie": 161,
+        "one_ulp": 8,
+        "near": 3,
         "large": 0,
         "not_argmax": 0
       }
@@ -90,42 +90,42 @@
   {
     "arm": "plain-tuned-triton",
     "exactness": "exact-up-to-rounding",
-    "matched_pair": "plain radix-off triton vs plain c1",
+    "matched_pair": "plain radix-off triton vs plain radix-off c1",
     "matched": {
-      "per_1k": 4.085,
+      "per_1k": 3.89,
       "per_1k_95": [
-        3.528,
-        4.73
+        3.356,
+        4.509
       ],
       "classes": {
-        "tie": 170,
-        "one_ulp": 7,
-        "near": 2,
+        "tie": 167,
+        "one_ulp": 6,
+        "near": 3,
         "large": 0,
         "not_argmax": 0
       }
     },
-    "matched_ratio_to_floor": 1.194,
+    "matched_ratio_to_floor": 1.137,
     "matched_ratio_to_floor_95": [
-      0.967,
-      1.474
+      0.92,
+      1.405
     ],
-    "plain_pair": "plain radix-off triton vs plain c1",
+    "plain_pair": "plain radix-off triton vs plain radix-off c1",
     "vs_plain": {
-      "per_1k": 4.085,
+      "per_1k": 3.89,
       "per_1k_95": [
-        3.528,
-        4.73
+        3.356,
+        4.509
       ],
-      "ratio_to_floor": 1.194,
+      "ratio_to_floor": 1.137,
       "ratio_to_floor_95": [
-        0.967,
-        1.474
+        0.92,
+        1.405
       ],
       "classes": {
-        "tie": 170,
-        "one_ulp": 7,
-        "near": 2,
+        "tie": 167,
+        "one_ulp": 6,
+        "near": 3,
         "large": 0,
         "not_argmax": 0
       }
@@ -133,44 +133,44 @@
   },
   {
     "arm": "plain-tuned-replayssm",
-    "exactness": "lossy",
-    "matched_pair": "plain buffered decode radix-off vs plain c1",
+    "exactness": "exact-up-to-rounding",
+    "matched_pair": "plain buffered decode vs plain radix-off c1",
     "matched": {
-      "per_1k": 3.858,
+      "per_1k": 3.405,
       "per_1k_95": [
-        3.327,
-        4.474
+        2.921,
+        3.97
       ],
       "classes": {
         "tie": 160,
-        "one_ulp": 13,
-        "near": 1,
-        "large": 1,
+        "one_ulp": 3,
+        "near": 0,
+        "large": 0,
         "not_argmax": 0
       }
     },
-    "matched_ratio_to_floor": 1.128,
+    "matched_ratio_to_floor": 0.995,
     "matched_ratio_to_floor_95": [
-      0.912,
-      1.394
+      0.802,
+      1.235
     ],
-    "plain_pair": "plain buffered decode radix-off vs plain c1",
+    "plain_pair": "plain buffered decode vs plain radix-off c1",
     "vs_plain": {
-      "per_1k": 3.858,
+      "per_1k": 3.405,
       "per_1k_95": [
-        3.327,
-        4.474
+        2.921,
+        3.97
       ],
-      "ratio_to_floor": 1.128,
+      "ratio_to_floor": 0.995,
       "ratio_to_floor_95": [
-        0.912,
-        1.394
+        0.802,
+        1.235
       ],
       "classes": {
         "tie": 160,
-        "one_ulp": 13,
-        "near": 1,
-        "large": 1,
+        "one_ulp": 3,
+        "near": 0,
+        "large": 0,
         "not_argmax": 0
       }
     }
@@ -198,21 +198,21 @@
       0.903,
       1.382
     ],
-    "plain_pair": "dflash b16 radix-off triton vs plain c1",
+    "plain_pair": "dflash b16 triton vs plain radix-off c1",
     "vs_plain": {
-      "per_1k": 3.945,
+      "per_1k": 4.146,
       "per_1k_95": [
-        3.403,
-        4.573
+        3.587,
+        4.792
       ],
-      "ratio_to_floor": 1.153,
+      "ratio_to_floor": 1.212,
       "ratio_to_floor_95": [
-        0.933,
-        1.425
+        0.983,
+        1.495
       ],
       "classes": {
-        "tie": 167,
-        "one_ulp": 7,
+        "tie": 172,
+        "one_ulp": 9,
         "near": 2,
         "large": 0,
         "not_argmax": 0
@@ -222,22 +222,22 @@
   {
     "arm": "mtp-stockverify",
     "exactness": "stock",
-    "plain_pair": "mtp_s3 stock verify radix-off vs plain c1",
+    "plain_pair": "mtp_s3 stock verify vs plain radix-off c1",
     "vs_plain": {
-      "per_1k": 4.4,
+      "per_1k": 3.948,
       "per_1k_95": [
-        3.811,
-        5.08
+        3.407,
+        4.575
       ],
-      "ratio_to_floor": 1.286,
+      "ratio_to_floor": 1.154,
       "ratio_to_floor_95": [
-        1.044,
-        1.585
+        0.934,
+        1.426
       ],
       "classes": {
         "tie": 169,
-        "one_ulp": 14,
-        "near": 3,
+        "one_ulp": 6,
+        "near": 2,
         "large": 0,
         "not_argmax": 0
       }

@@ -1,4 +1,5 @@
 {
+  "runs": "/home/ubuntu/vp-data/bench/equality/runs",
   "pairs": {
     "floor plain c1 vs c32": {
       "prompts": 320,
@@ -20,7 +21,11 @@
       "drift_max": 0.6860885620117188,
       "prompts_with_large_drift": 1,
       "run_a": "plain/c1",
-      "run_b": "plain/c32"
+      "run_b": "plain/c32",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": true,
+      "pools_identical": true
     },
     "mtp_s3 stock verify radix-off vs plain c1": {
       "prompts": 320,
@@ -42,7 +47,11 @@
       "drift_max": 0.4684286117553711,
       "prompts_with_large_drift": 0,
       "run_a": "plain/c1",
-      "run_b": "mtp_s3__bench_noradix/c1"
+      "run_b": "mtp_s3__bench_noradix/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
     },
     "mtp_s3 buffered verify radix-off vs plain c1": {
       "prompts": 320,
@@ -64,7 +73,11 @@
       "drift_max": 0.46849656105041504,
       "prompts_with_large_drift": 0,
       "run_a": "plain/c1",
-      "run_b": "mtp_s3_replayssm__bench_noradix/c1"
+      "run_b": "mtp_s3_replayssm__bench_noradix/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
     },
     "mtp_s3 buffered verify radix-off triton vs plain c1": {
       "prompts": 320,
@@ -86,7 +99,11 @@
       "drift_max": 0.7646973133087158,
       "prompts_with_large_drift": 3,
       "run_a": "plain/c1",
-      "run_b": "mtp_s3_replayssm__bench_noradix_triton/c1"
+      "run_b": "mtp_s3_replayssm__bench_noradix_triton/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
     },
     "plain buffered decode radix-off vs plain c1": {
       "prompts": 320,
@@ -109,7 +126,11 @@
       "drift_max": 0.4756042957305908,
       "prompts_with_large_drift": 0,
       "run_a": "plain/c1",
-      "run_b": "plain_replayssm__bench_noradix/c1"
+      "run_b": "plain_replayssm__bench_noradix/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
     },
     "plain radix-off triton vs plain c1": {
       "prompts": 320,
@@ -131,7 +152,11 @@
       "drift_max": 0.9898490905761719,
       "prompts_with_large_drift": 3,
       "run_a": "plain/c1",
-      "run_b": "plain__bench_noradix_triton/c1"
+      "run_b": "plain__bench_noradix_triton/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
     },
     "dflash b16 radix-off triton vs plain c1": {
       "prompts": 320,
@@ -153,7 +178,11 @@
       "drift_max": 0.6827287673950195,
       "prompts_with_large_drift": 4,
       "run_a": "plain/c1",
-      "run_b": "plain__bench_dflash_b16_triton/c1"
+      "run_b": "plain__bench_dflash_b16_triton/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
     },
     "dflash b16 radix-off triton gdn-verify-triton vs plain c1": {
       "prompts": 320,
@@ -175,7 +204,11 @@
       "drift_max": 0.6827287673950195,
       "prompts_with_large_drift": 4,
       "run_a": "plain/c1",
-      "run_b": "plain__bench_dflash_b16_triton_gdnverify/c1"
+      "run_b": "plain__bench_dflash_b16_triton_gdnverify/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
     },
     "mtp_s3 buffered vs stock verify radix-off c1": {
       "prompts": 320,
@@ -197,7 +230,11 @@
       "drift_max": 0.6174538135528564,
       "prompts_with_large_drift": 1,
       "run_a": "mtp_s3__bench_noradix/c1",
-      "run_b": "mtp_s3_replayssm__bench_noradix/c1"
+      "run_b": "mtp_s3_replayssm__bench_noradix/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
     },
     "mtp_s3 buffered triton vs stock verify radix-off c1": {
       "prompts": 320,
@@ -219,7 +256,11 @@
       "drift_max": 0.4813191890716553,
       "prompts_with_large_drift": 0,
       "run_a": "mtp_s3__bench_noradix/c1",
-      "run_b": "mtp_s3_replayssm__bench_noradix_triton/c1"
+      "run_b": "mtp_s3_replayssm__bench_noradix_triton/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
     },
     "dflash b16 stock radix-off vs plain c1": {
       "prompts": 320,
@@ -241,7 +282,216 @@
       "drift_max": 0.46909213066101074,
       "prompts_with_large_drift": 0,
       "run_a": "plain/c1",
-      "run_b": "plain__bench_dflash_b16/c1"
+      "run_b": "plain__bench_dflash_b16/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
+    },
+    "plain radix-off vs plain c1": {
+      "prompts": 320,
+      "diverged": 96,
+      "identical": 224,
+      "length_mismatch": 0,
+      "exposure_tokens": 56760,
+      "per_1k_tokens": 1.6913319238900635,
+      "classes": {
+        "tie": 88,
+        "one_ulp": 6,
+        "near": 2
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.25,
+      "max_margin_max": 0.2500000596046448,
+      "drift_median": 0.12261557579040527,
+      "drift_p99": 0.3658945560455322,
+      "drift_max": 0.46745729446411133,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain/c1",
+      "run_b": "plain__bench_noradix/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
+    },
+    "plain radix-off triton vs plain radix-off c1": {
+      "prompts": 320,
+      "diverged": 176,
+      "identical": 144,
+      "length_mismatch": 0,
+      "exposure_tokens": 45247,
+      "per_1k_tokens": 3.8897606471147257,
+      "classes": {
+        "tie": 167,
+        "one_ulp": 6,
+        "near": 3
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.375,
+      "drift_median": 0.21041512489318848,
+      "drift_p99": 0.4617609977722168,
+      "drift_max": 0.5263941287994385,
+      "prompts_with_large_drift": 1,
+      "run_a": "plain__bench_noradix/c1",
+      "run_b": "plain__bench_noradix_triton/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
+    },
+    "plain buffered decode vs plain radix-off c1": {
+      "prompts": 320,
+      "diverged": 163,
+      "identical": 157,
+      "length_mismatch": 0,
+      "exposure_tokens": 47868,
+      "per_1k_tokens": 3.4051976268070527,
+      "classes": {
+        "tie": 160,
+        "one_ulp": 3
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.25,
+      "drift_median": 0.20586204528808594,
+      "drift_p99": 0.36246585845947266,
+      "drift_max": 0.4756042957305908,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain__bench_noradix/c1",
+      "run_b": "plain_replayssm__bench_noradix/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
+    },
+    "mtp_s3 stock verify vs plain radix-off c1": {
+      "prompts": 320,
+      "diverged": 177,
+      "identical": 143,
+      "length_mismatch": 0,
+      "exposure_tokens": 44834,
+      "per_1k_tokens": 3.9478966855511444,
+      "classes": {
+        "tie": 169,
+        "near": 2,
+        "one_ulp": 6
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.25,
+      "drift_median": 0.20380473136901855,
+      "drift_p99": 0.36182379722595215,
+      "drift_max": 0.4154059886932373,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain__bench_noradix/c1",
+      "run_b": "mtp_s3__bench_noradix/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
+    },
+    "mtp_s3 buffered verify vs plain radix-off c1": {
+      "prompts": 320,
+      "diverged": 172,
+      "identical": 148,
+      "length_mismatch": 0,
+      "exposure_tokens": 46398,
+      "per_1k_tokens": 3.707056338635286,
+      "classes": {
+        "tie": 159,
+        "one_ulp": 13
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.25,
+      "drift_median": 0.2045912742614746,
+      "drift_p99": 0.3410189151763916,
+      "drift_max": 0.4302027225494385,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain__bench_noradix/c1",
+      "run_b": "mtp_s3_replayssm__bench_noradix/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
+    },
+    "mtp_s3 buffered verify triton vs plain radix-off c1": {
+      "prompts": 320,
+      "diverged": 172,
+      "identical": 148,
+      "length_mismatch": 0,
+      "exposure_tokens": 47038,
+      "per_1k_tokens": 3.6566180534886685,
+      "classes": {
+        "tie": 161,
+        "near": 3,
+        "one_ulp": 8
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.375,
+      "drift_median": 0.21940374374389648,
+      "drift_p99": 0.38246679306030273,
+      "drift_max": 0.4813191890716553,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain__bench_noradix/c1",
+      "run_b": "mtp_s3_replayssm__bench_noradix_triton/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
+    },
+    "dflash b16 stock vs plain radix-off c1": {
+      "prompts": 320,
+      "diverged": 177,
+      "identical": 143,
+      "length_mismatch": 0,
+      "exposure_tokens": 45142,
+      "per_1k_tokens": 3.9209605245669223,
+      "classes": {
+        "tie": 172,
+        "one_ulp": 5
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.25,
+      "drift_median": 0.20242977142333984,
+      "drift_p99": 0.3677859306335449,
+      "drift_max": 0.4263925552368164,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain__bench_noradix/c1",
+      "run_b": "plain__bench_dflash_b16/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
+    },
+    "dflash b16 triton vs plain radix-off c1": {
+      "prompts": 320,
+      "diverged": 183,
+      "identical": 137,
+      "length_mismatch": 0,
+      "exposure_tokens": 44141,
+      "per_1k_tokens": 4.145805486962234,
+      "classes": {
+        "tie": 172,
+        "one_ulp": 9,
+        "near": 2
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.375,
+      "drift_median": 0.21895837783813477,
+      "drift_p99": 0.3718373775482178,
+      "drift_max": 0.4813191890716553,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain__bench_noradix/c1",
+      "run_b": "plain__bench_dflash_b16_triton/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
     },
     "dflash b16 triton vs stock dflash b16 radix-off c1": {
       "prompts": 320,
@@ -263,7 +513,11 @@
       "drift_max": 0.4813191890716553,
       "prompts_with_large_drift": 0,
       "run_a": "plain__bench_dflash_b16/c1",
-      "run_b": "plain__bench_dflash_b16_triton/c1"
+      "run_b": "plain__bench_dflash_b16_triton/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
     },
     "dflash b16 triton gdn-verify-triton vs stock dflash b16 radix-off c1": {
       "prompts": 320,
@@ -285,9 +539,15 @@
       "drift_max": 0.4813191890716553,
       "prompts_with_large_drift": 0,
       "run_a": "plain__bench_dflash_b16/c1",
-      "run_b": "plain__bench_dflash_b16_triton_gdnverify/c1"
+      "run_b": "plain__bench_dflash_b16_triton_gdnverify/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
     }
   },
+  "missing_pairs": [],
+  "mixed_pin_pairs": [],
   "self_consistency": {
     "plain/c1": {
       "positions": 70042,
@@ -336,6 +596,11 @@
     },
     "plain__bench_dflash_b16/c1": {
       "positions": 70097,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain__bench_noradix/c1": {
+      "positions": 70082,
       "not_argmax": 0,
       "worst_gap": 0.0
     }

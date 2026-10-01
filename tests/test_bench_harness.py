@@ -104,7 +104,7 @@ def test_every_arm_declares_a_consistent_exactness_class(tmp_path: Path) -> None
         assert arm.exactness in ('stock', 'exact-up-to-rounding', 'pending', 'lossy')
     assert resolve_arm('plain-tuned').exactness == 'stock'
     assert resolve_arm('plain-tuned-triton').exactness == 'exact-up-to-rounding'
-    assert resolve_arm('plain-tuned-replayssm').exactness == 'lossy'
+    assert resolve_arm('plain-tuned-replayssm').exactness == 'exact-up-to-rounding'
     assert resolve_arm('dflash-tuned-b16').exactness == 'exact-up-to-rounding'
     assert resolve_arm('dflash-tuned').exactness == 'stock'  # FA4 is draft-only
     # Any flag outside the neutral allowlist makes a stock arm pending, whatever

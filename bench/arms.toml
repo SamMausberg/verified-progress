@@ -118,7 +118,7 @@ max-mamba-cache-size = 128
 [arms.plain-tuned-triton]
 description = "Arm A, tuned, Triton attention: matched baseline for Triton speculative arms."
 exactness = "exact-up-to-rounding"
-exactness_note = "Triton target attention; every first divergence against plain c1 is rounding-level (equality report, 2026-10-01)"
+exactness_note = "Triton target attention; every first divergence against stock plain c1 with the radix cache off is rounding-level (equality report, 2026-10-01)"
 [arms.plain-tuned-triton.args]
 disable-radix-cache = true
 max-mamba-cache-size = 128
@@ -127,8 +127,8 @@ attention-backend = "triton"
 [arms.plain-tuned-replayssm]
 description = """Arm A with SGLang's buffered GDN decode (ReplaySSM ring, full state \
 flushed every 16 tokens): faster at high concurrency, slower at low."""
-exactness = "lossy"
-lossy = "buffered GDN decode; one first divergence against plain c1 outside the rounding classes (equality report, 2026-10-01); paired GSM8K run in the quality holds"
+exactness = "exact-up-to-rounding"
+exactness_note = "buffered GDN decode; every first divergence against stock plain c1 with the radix cache off is rounding-level (equality report, 2026-10-01). Classified lossy before that reference existed: its one large event was against the radix-on plain c1 run. Paired GSM8K run in evidence/bench/quality"
 [arms.plain-tuned-replayssm.args]
 disable-radix-cache = true
 max-mamba-cache-size = 128

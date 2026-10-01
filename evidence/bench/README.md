@@ -124,40 +124,85 @@ python -m bench.pareto ~/vp-data/bench/frontend/fe-plain*/2026* --out evidence/b
 Greedy output comparison of every arm that changes the target's arithmetic against its
 matched stock reference, with the state workstream's runner and comparator (PR #37:
 `experiments/state_safety/run_matrix.py`, `compare.py`): 320 prompts, 256 tokens,
-top-5 logprobs, c=1, memory fraction 0.25 under the shared GPU lock. The reference
-runs (plain at c=1 and c=32) are the state workstream's; the others ran in
-`bench/campaigns/equality_tuned.sh` on 2026-10-01. Each prompt contributes at most one
-event, its first divergence, classified by the logit gap there (#37: `tie`,
-`one_ulp`, `near`, `large`, `not_argmax`); the exposure is the number of tokens compared
-up to the first divergence or the end. Rates are first divergences per 1,000 tokens of
-exposure with 95% intervals; the ratio is to the floor (plain c=1 against c=32).
+top-5 logprobs, c=1, memory fraction 0.25 under the shared GPU lock. The runs labelled
+"plain, radix on" (c=1 and c=32) are the state workstream's; the others ran in
+`bench/campaigns/equality_tuned.sh` on 2026-10-01 without the radix cache, like every
+tuned arm. Each prompt contributes at most one event, its first divergence, classified
+by the logit gap there (#37: `tie`, `one_ulp`, `near`, `large`, `not_argmax`); the
+exposure is the number of tokens compared up to the first divergence or the end. Rates
+are first divergences per 1,000 tokens of exposure with 95% intervals; the ratio is to
+the floor (plain c=1 against c=32, one radix-on server).
+
+References and the matched comparisons that decide each class:
 
 | Pair | Diverged prompts | Exposure | Per 1,000 (95%) | Ratio to floor (95%) | tie / one_ulp / near / large / not_argmax |
 |---|---|---|---|---|---|
-| floor: plain c=1 vs c=32 | 167 | 48,816 | 3.42 (2.94-3.98) | 1.00 | 151 / 14 / 2 / 0 / 0 |
-| stock MTP s3, radix off vs plain | 186 | 42,274 | 4.40 (3.81-5.08) | 1.29 (1.04-1.58) | 169 / 14 / 3 / 0 / 0 |
-| stock DFlash b16, radix off vs plain | 186 | 42,419 | 4.38 (3.80-5.06) | 1.28 (1.04-1.58) | 174 / 9 / 3 / 0 / 0 |
+| floor: plain c=1 vs c=32, radix on | 167 | 48,816 | 3.42 (2.94-3.98) | 1.00 | 151 / 14 / 2 / 0 / 0 |
+| stock plain c=1: radix off vs radix on | 96 | 56,760 | 1.69 (1.39-2.07) | 0.49 (0.39-0.64) | 88 / 6 / 2 / 0 / 0 |
 | `mtp-tuned` vs stock MTP s3 | 171 | 45,091 | 3.79 (3.26-4.41) | 1.11 (0.90-1.37) | 161 / 8 / 2 / 0 / 0 |
-| `mtp-tuned` vs plain | 183 | 43,558 | 4.20 (3.63-4.86) | 1.23 (1.00-1.51) | 166 / 15 / 2 / 0 / 0 |
 | `mtp-tuned-triton` vs stock MTP s3 | 179 | 44,155 | 4.05 (3.50-4.69) | 1.19 (0.96-1.46) | 169 / 8 / 2 / 0 / 0 |
-| `mtp-tuned-triton` vs plain | 174 | 45,758 | 3.80 (3.28-4.41) | 1.11 (0.90-1.37) | 162 / 7 / 5 / 0 / 0 |
 | `dflash-tuned-b16` vs stock DFlash b16 | 173 | 45,274 | 3.82 (3.29-4.43) | 1.12 (0.90-1.38) | 161 / 11 / 1 / 0 / 0 |
-| `dflash-tuned-b16` vs plain | 176 | 44,617 | 3.94 (3.40-4.57) | 1.15 (0.93-1.43) | 167 / 7 / 2 / 0 / 0 |
-| `plain-tuned-triton` vs plain | 179 | 43,817 | 4.08 (3.53-4.73) | 1.19 (0.97-1.47) | 170 / 7 / 2 / 0 / 0 |
-| `plain-tuned-replayssm` vs plain | 175 | 45,360 | 3.86 (3.33-4.47) | 1.13 (0.91-1.39) | 160 / 13 / 1 / **1** / 0 |
+| `plain-tuned-triton` vs stock plain | 176 | 45,247 | 3.89 (3.36-4.51) | 1.14 (0.92-1.41) | 167 / 6 / 3 / 0 / 0 |
+| `plain-tuned-replayssm` vs stock plain | 163 | 47,868 | 3.40 (2.92-3.97) | 0.99 (0.80-1.24) | 160 / 3 / 0 / 0 / 0 |
+
+Every arm and stock speculator against stock plain c=1 without the radix cache (the
+rate shown beside each class in `classes.json` and on the frontier):
+
+| Pair | Diverged prompts | Exposure | Per 1,000 (95%) | Ratio to floor (95%) | tie / one_ulp / near / large / not_argmax |
+|---|---|---|---|---|---|
+| stock MTP s3 (`mtp-stockverify`) | 177 | 44,834 | 3.95 (3.41-4.58) | 1.15 (0.93-1.43) | 169 / 6 / 2 / 0 / 0 |
+| stock DFlash b16 | 177 | 45,142 | 3.92 (3.38-4.54) | 1.15 (0.93-1.42) | 172 / 5 / 0 / 0 / 0 |
+| `mtp-tuned` | 172 | 46,398 | 3.71 (3.19-4.30) | 1.08 (0.88-1.34) | 159 / 13 / 0 / 0 / 0 |
+| `mtp-tuned-triton` | 172 | 47,038 | 3.66 (3.15-4.25) | 1.07 (0.86-1.32) | 161 / 8 / 3 / 0 / 0 |
+| `dflash-tuned-b16` | 183 | 44,141 | 4.15 (3.59-4.79) | 1.21 (0.98-1.50) | 172 / 9 / 2 / 0 / 0 |
+
+First classification, against the radix-on plain c=1 run (comparisons from the run of
+05:53, unchanged and kept in `report.json`; superseded as the reference):
+
+| Pair | Diverged prompts | Exposure | Per 1,000 (95%) | Ratio to floor (95%) | tie / one_ulp / near / large / not_argmax |
+|---|---|---|---|---|---|
+| stock MTP s3 | 186 | 42,274 | 4.40 (3.81-5.08) | 1.29 (1.04-1.58) | 169 / 14 / 3 / 0 / 0 |
+| stock DFlash b16 | 186 | 42,419 | 4.38 (3.80-5.06) | 1.28 (1.04-1.58) | 174 / 9 / 3 / 0 / 0 |
+| `mtp-tuned` | 183 | 43,558 | 4.20 (3.63-4.86) | 1.23 (1.00-1.51) | 166 / 15 / 2 / 0 / 0 |
+| `mtp-tuned-triton` | 174 | 45,758 | 3.80 (3.28-4.41) | 1.11 (0.90-1.37) | 162 / 7 / 5 / 0 / 0 |
+| `dflash-tuned-b16` | 176 | 44,617 | 3.94 (3.40-4.57) | 1.15 (0.93-1.43) | 167 / 7 / 2 / 0 / 0 |
+| `plain-tuned-triton` | 179 | 43,817 | 4.08 (3.53-4.73) | 1.19 (0.97-1.47) | 170 / 7 / 2 / 0 / 0 |
+| `plain-tuned-replayssm` | 175 | 45,360 | 3.86 (3.33-4.47) | 1.13 (0.91-1.39) | 160 / 13 / 1 / **1** / 0 |
 
 Classes (`classes.json`, rule in `bench/README.md` "Exactness classes", set by the
-coordinator after these results were seen): `mtp-tuned`, `mtp-tuned-triton`,
-`dflash-tuned-b16` and `plain-tuned-triton` are `exact-up-to-rounding`, since every first
-divergence against their matched reference is rounding-level. `plain-tuned-replayssm` is
-`lossy`, from one `large` first divergence, and has a paired GSM8K run. The rates and
-ratios sit beside the classes but do not decide them. The ratio intervals ignore that
-every pair shares the plain reference.
+coordinator after the first results were seen): `mtp-tuned`, `mtp-tuned-triton`,
+`dflash-tuned-b16`, `plain-tuned-triton` and `plain-tuned-replayssm` are
+`exact-up-to-rounding`, since every first divergence against their matched reference is
+rounding-level. No tuned arm is `lossy`. The rates and ratios sit beside the classes but
+do not decide them. The ratio intervals ignore that some pairs share a run.
 
-Stock speculation diverges from plain decoding more often than batch shape alone does:
-1.29 times the floor for MTP s3 and 1.28 times for DFlash block 16, with both intervals
-above 1 and every event rounding-level. PR #37 attributes this to layer 0's GDN
-recurrence running different kernels in verify and in decode.
+**Buffered plain decoding, reclassified.** The plain levers were first classified
+against the state workstream's plain c=1 run, and that made `plain-tuned-replayssm`
+`lossy`: one `large` first divergence, at position 25 of `cnn_dailymail-0033`. That
+run has the radix cache on, which the arms do not, and with it on a request's logprobs
+can depend on which earlier request prefilled a shared prefix
+(evidence/state_safety/README.md, "History dependence"). The matched reference for plain
+levers is therefore stock plain c=1 without the radix cache, run at 10:47 at commit
+bb673eb with no other flag changed. The two plain runs differ on 96 of 320 prompts, all
+rounding-level, and position 25 of that prompt is one of them: the radix-on run picks
+its token by a logit gap of 0.0625, and the radix-off run picks the other (`near`).
+Buffered decoding agrees with the radix-off run there and first differs from it at
+position 53, a `tie`. Against that reference its rate is the floor's (3.40 against
+3.42 per 1,000) with no event above `one_ulp`, so it is `exact-up-to-rounding`. The
+Triton plain arm is `exact-up-to-rounding` under either reference. The GSM8K run of
+buffered plain decoding (quality/) was made while it was classed lossy, and its
+`quality.json` records that class.
+
+**Speculation against plain decoding.** Against the radix-on plain run, stock
+speculation diverged more often than batch shape alone explains: 1.29 times the floor
+for MTP s3 and 1.28 times for DFlash block 16, both intervals above 1. Against the
+radix-off reference both fall to 1.15 times the floor, with intervals of 0.93-1.43 and
+0.93-1.42, so the earlier excess came at least partly from the reference's radix cache.
+This check no longer detects an excess, but it cannot exclude one of up to about 40%.
+PR #37 traces some speculative divergences to layer 0's GDN recurrence, which runs
+different kernels in verify and in decode; these rates neither confirm nor rule out
+that contribution. The floor itself is a radix-on pair; a radix-off floor (plain c=1
+against c=32 without the radix cache) was not run.
 
 DFlash block 16 with `--linear-attn-verify-backend triton` (rows in `report.json`)
 produced the same tokens as without it on all 320 prompts. At this SGLang pin, verify
@@ -170,32 +215,35 @@ stock default, and so already verify with it. The first DFlash attempt failed at
 memory fraction, 16 requests' verify states left no KV memory. Its runs use capacity
 4, which is enough for a c=1 pass. The DFlash class comes from DFlash runs that all have
 capacity 4 and run without the radix cache. The plain-relative DFlash rates compare
-different capacities (4 against 16) and different pools. At c=1 the capacity does not
-change the batch, and the DFlash arms run without the radix cache, but the plain
-reference ran with it on and so carries the request-history dependence described in
-evidence/state_safety (README, history section). For the same reason, plain levers
-are classified against a stock plain c=1 run without the radix cache.
+different capacities (4 against 16) and different pools.
 `pools.csv` lists each server's capacity, KV and GDN state pools, radix setting and
 GDN kernel backends.
 
 Pools were sized from free memory and were not pinned, so every pair of servers had
 different KV pools:
 - stock MTP s3 426,043 tokens, buffered 247,851, buffered Triton 119,880;
-- plain Triton 265,839 and buffered decode 282,562, against the radix-on plain
-  reference's 97,672;
+- stock plain without the radix cache 316,021, plain Triton 265,839 and buffered
+  decode 282,562, against the radix-on plain run's 97,672;
 - DFlash block 16: stock 169,883, Triton 70,518, Triton with the Triton verify kernel
   24,980.
 
 GDN state slots matched within each capacity: 16 at capacity 16, 4 at capacity 4,
-and 122 for the radix-on reference. The floor pair is one server. At c=1 with the
+and 122 for the radix-on run. The floor pair is one server. At c=1 with the
 radix cache off and no pool near full (at most about 600 tokens per request), the
 pool size should not change outputs. That is reasoning, not a measurement. The runs
 were made with run_matrix.py before PR #102 pinned pools by default, so they are all
 in the unpinned regime.
 
+The comparisons in these files were rerun from the existing runs (no server started)
+after the radix-off pairs for speculation were added to the campaign (commit 21ad729).
+Every earlier pair's counts and rates reproduced exactly. The comparator now also
+records whether a pair shares one server and whether its pools were pinned
+(`table.csv`): only the floor pair shares a server, and no run is pinned.
+
 ```sh
 scripts/gpu_lock.sh -s bench/campaigns/equality_tuned.sh
-python -m bench.divergence evidence/bench/equality/summary.json --out /dev/null \
+python -m bench.divergence evidence/bench/equality/summary.json \
+    --out evidence/bench/equality/report.json \
     --arms evidence/bench/equality/arms.json --classes-out evidence/bench/equality/classes.json
 ```
 `divergences.csv` lists every first divergence (prompt, position, tokens, logit gap,
@@ -217,7 +265,7 @@ directory holds the run's `quality.json` (arm, launch checks, summary) and
 | mtp-tuned (exact-up-to-rounding) | 89.54% | 87.8-91.1 | 232 | 93 | 6,036 |
 | mtp-stockverify (stock) | 88.93% | 87.1-90.5 | 250 | 100 | 6,241 |
 | dflash-tuned (stock) | 89.69% | 87.9-91.2 | 239 | 88 | 6,223 |
-| plain-tuned-replayssm (lossy) | 91.05% | 89.4-92.5 | 226 | 74 | 6,106 |
+| plain-tuned-replayssm (exact-up-to-rounding; lossy when run) | 91.05% | 89.4-92.5 | 226 | 74 | 6,106 |
 
 Paired against each plain run (`comparisons.json`, exact McNemar test on the problems
 only one run solved):
@@ -232,9 +280,10 @@ only one run solved):
 
 No arm differs from plain decoding detectably. With about 150 discordant problems per
 pair, a difference below roughly 2.5 points would not reach p < 0.05 with 80%
-probability, so this check rules out large losses only. In particular, it rules out a
-large loss for buffered plain decoding, the one lossy arm (+1.06 and +0.76 points
-against the two plain runs). Two sampled runs of the same arm agree on the final answer
+probability, so this check rules out large losses only. Buffered plain decoding was
+classed lossy when it ran and is the reason it was included; it is now
+`exact-up-to-rounding` (equality/), and its +1.06 and +0.76 points against the two
+plain runs show no loss either. Two sampled runs of the same arm agree on the final answer
 for only 77% of problems, and none generated identical text, so a fixed request seed
 does not make sampled runs reproducible here. 17-19% of outputs in every arm reach the
 16,384-token limit (thinking loops; no answer counted). The sampled check compares
