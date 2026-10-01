@@ -177,10 +177,15 @@ Delta = E[G2_R - G2_F] - r_F E[A + T2_R - T2_F], r_F = E[G1 + G2_F] / E[T1 + T2_
 this finite-window reuse at the tested configuration if its upper confidence bound is <= 0".
 
 Input: the drafter workstream's per-cycle support table for its shared block-16 DFlash trace
-(`~/vp-data/drafter/support/zlab_b16_cycles/cycles.pt`, SHA-256 `a587d952...dc36b`, raw data
-outside git; its summary matches the committed `evidence/drafter/support/zlab_b16_panel_v1_summary.json`;
-21,067 cycles of 80 requests; 207 cycles whose block runs past the output end are excluded by
-the producer). Per
+(`~/vp-data/drafter/support/zlab_b16_cycles/cycles.pt`, SHA-256
+`a587d952074d93f5d135c75760a32587f3e7a631360c4f20884be1c7bdddc36b`, raw data outside git; its
+summary matches the committed `evidence/drafter/support/zlab_b16_panel_v1_summary.json`; 21,067
+cycles of 80 requests; 207 cycles whose block runs past the output end are excluded by the
+producer). It was written on 2026-10-01 at 08:27 UTC by `experiments/drafter/support_screen.py
+--save-cycles` at drafter commit `b631dc4` (identical diff to `1e66b99` in PR #104, branch
+`drafter/support-cycles`), run as `scripts/gpu_lock.sh -s experiments/drafter/run_support_screen.sh`
+with the stock engine; PR #104's `evidence/drafter/README.md` records the full command and
+environment. Per
 cycle it holds the engine's accepted length L, the realized greedy continuation (the committed
 stream, which after a rejection follows the target given the corrected prefix), the engine's
 drafted tokens and the leading supported length U_K of the continuation inside the drafter's top-K
