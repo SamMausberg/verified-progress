@@ -1,8 +1,9 @@
-% Appendix G: evidence register, status of the questions, pending results, reproduction,
-% pins, attribution. Every path in G.1 must exist on the main branch (checked by script
-% before each pull request). Every item in G.3 is pending: its evidence file does not exist
-% on main. No pull-request numbers, owners or queue status appear anywhere in the paper.
+% Appendix F: evidence register, pending results, reproduction, pins, attribution. Every
+% path in F.1 must exist on the main branch (checked by script before each pull request).
+% Every item in F.2 is pending: its evidence file does not exist on main. No pull-request numbers, owners or queue status appear anywhere in the paper.
 \section{Evidence register, pending results and reproduction}\label{app:record}
+This appendix connects the paper's claims to the repository. Appendix~\ref{app:register} lists every committed result the text cites, with the files that hold it and the program that produced them, and Appendix~\ref{app:devrecord} lists the results that are designed but not yet measured. Appendix~\ref{app:repro} gives the commands that rerun the CPU checks and says where the GPU commands are, Appendix~\ref{app:pins} lists the hardware, software and model versions, and Appendix~\ref{app:attribution} states who did the work and how AI tools were used.
+
 \subsection{Evidence register}\label{app:register}
 Every committed result the paper cites is listed below with the claims it supports, the files that hold it and the program that produced them. All paths are relative to the repository at \repourl. The exact command behind each evidence file is in the \code{README.md} of the file's directory, and the files record the commits of this repository and of the engine that produced them where the generator records them. The text cites an entry as [E$n$]. Proved statements are not listed; their proofs are in the text and Appendix~\ref{app:checked} says which are machine-checked.
 
@@ -73,7 +74,7 @@ Every committed result the paper cites is listed below with the claims it suppor
 A file name listed without a directory is in the directory of the entry's first file. Raw captures, traces and per-position arrays are not in the repository; each evidence README gives the command that regenerates them on the same hardware.
 
 \subsection{Pending results}\label{app:devrecord}
-Each entry is designed work without a committed result, with the place its evidence is to be committed. The text marks it \mbox{[pending D$n$]} and says beside the marker what the result will decide; no number stands in for it.
+Each entry is designed work without a committed result, with the place its evidence is to be committed. The text marks it \mbox{[D$n$]} and says beside the marker that the result is not yet measured and what it will decide; no number stands in for it.
 
 {\small
 \begin{longtable}{@{}P{.9cm}P{15.6cm}@{}}
