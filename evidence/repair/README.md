@@ -167,6 +167,79 @@ B = 64 and 256, where `audit_saving_needed_for_target_us` is 0.)
   tested here do not produce them (one-step recycling below; exact Jacobi about one token per
   pass, Stage B). P3 stays refuted by Stage B.
 
+### P9 support oracle: reuse a cached DFlash window once after a rejection (c = 1)
+
+`p9_support_oracle.json` (derived from a measured per-cycle table and measured phases).
+Sam's proposal P9 (2026-10-01) and its pre-registered rule: after a rejection, condition a program
+compiled from the first cycle's cached candidate sets on the actual correction and propose the
+rest of the old window, at most once; compare with fresh DFlash by the two-cycle aggregate
+Delta = E[G2_R - G2_F] - r_F E[A + T2_R - T2_F], r_F = E[G1 + G2_F] / E[T1 + T2_F], and "reject
+this finite-window reuse at the tested configuration if its upper confidence bound is <= 0".
+
+Input: the drafter workstream's per-cycle support table for its shared block-16 DFlash trace
+(`~/vp-data/drafter/support/zlab_b16_cycles/cycles.pt`, SHA-256
+`a587d952074d93f5d135c75760a32587f3e7a631360c4f20884be1c7bdddc36b`, raw data outside git; its
+summary matches the committed `evidence/drafter/support/zlab_b16_panel_v1_summary.json`; 21,067
+cycles of 80 requests; 207 cycles whose block runs past the output end are excluded by the
+producer). It was written on 2026-10-01 at 08:27 UTC by `experiments/drafter/support_screen.py
+--save-cycles` (on main since commit `1e66b99`; the run used `b631dc4`, an identical diff), run as
+`scripts/gpu_lock.sh -s experiments/drafter/run_support_screen.sh` with the stock engine;
+`evidence/drafter/README.md` records the full command and environment. Per
+cycle it holds the engine's accepted length L, the realized greedy continuation (the committed
+stream, which after a rejection follows the target given the corrected prefix), the engine's
+drafted tokens and the leading supported length U_K of the continuation inside the drafter's top-K
+candidate sets (K = 1, 2, 4, 8, 16). The candidate sets are an offline recomputation (Hugging Face
+target features, SpecForge drafter module, BF16) whose top-1 token matches the engine's drafted
+token at 97.4% of positions. Costs are the measured DFlash-16 phases at c = 1 in the drafter's
+configuration (`stage_a_timing.json`, run `fresh_b16`): a reused cycle skips the 2.33 ms draft
+phase and pays the rest of the 7.46 ms cycle.
+
+At the 18,274 post-rejection cycle boundaries (the correction at block position J = L + 1, with
+m = 15 - J old positions left), reuse is possible when the corrected prefix is supported
+(U_K >= J), which is observable at decision time. The greedy oracle program then proposes the true
+token wherever the old candidate set contains it, so its second cycle commits
+1 + min(m, U_K - J) tokens; fresh DFlash commits 1 + L' (the next cycle's accepted length). The
+oracle's extra first-cycle cost A and its conditioning cost are 0, so it bounds every real
+program from above.
+
+| K | corrected prefix supported | mean supported suffix | oracle G2 / fresh G2 (reused) | Delta (95% CI) | rule |
+|---|---|---|---|---|---|
+| 1 | 1.6% | 1.72 | 2.72 / 6.94 | -0.04 (-0.06, -0.03) | rejected |
+| 2 | 48.1% | 2.10 | 3.10 / 6.07 | -0.67 (-0.81, -0.55) | rejected |
+| 4 | 71.1% | 2.64 | 3.64 / 5.82 | -0.42 (-0.56, -0.30) | rejected |
+| 8 | 82.4% | 3.34 | 4.34 / 5.66 | +0.22 (+0.12, +0.32) | not rejected |
+| 16 | 88.8% | 4.08 | 5.08 / 5.55 | +0.99 (+0.90, +1.07) | not rejected |
+
+(Delta in tokens per post-rejection boundary, r_F = 0.683 tokens per ms; 95% intervals from a
+request-level bootstrap with 2,000 resamples, re-estimating r_F in every resample.)
+Valuing the saved time at DFlash's overall rate (1.029 tokens per ms) instead gives +0.89 (K = 8)
+and +1.70 (K = 16), with r_F then a constant. By domain at K = 16, each with its own two-cycle rate
+r_F: chat +1.08, code +1.23, maths +1.02, MATH-500 +0.86. The unchanged cached unary control (the
+old draft's tail after the correction, no fresh fill) accepts 0.83 drafts and gives
+Delta = -1.93 (-2.22, -1.69): rejected.
+
+Assumptions of this oracle, stated plainly: (1) the candidate sets are the offline
+recomputation, whose top-1 token matches the engine's drafted token at 97.4% of positions, not
+the engine's own sets; (2) the costs are the c = 1 phases of one DFlash-16 run (`fresh_b16`, the
+drafter workstream's configuration), and a reused cycle is charged exactly a fresh cycle without
+its draft phase; (3) the oracle's extra first-cycle cost A is 0: compiling the program, retaining
+the candidate sets, conditioning on the correction and catching up the draft cache are not
+priced; (4) the oracle knows the true token wherever it lies in the old candidate set, so it
+bounds every real program from above.
+
+- **Verdict at c = 1: reuse is not rejected for top-8 and top-16 candidate sets.** A program that
+  always found the true token inside the old top-16 sets would commit slightly fewer tokens than
+  fresh DFlash (5.08 against 5.55) but skip the 2.33 ms draft, and come out ahead by about one
+  token per post-rejection boundary. This is an upper bound: a real program must select the token
+  (the unary control shows that the old top-1 choices fail), and its compile, conditioning and
+  retention costs (A) are charged against the same margin. The c = 8 and 16 draft shares, which
+  set T2_R - T2_F beyond c = 1, are queued.
+
+```sh
+python experiments/repair/p9_support_oracle.py --cycles ~/vp-data/drafter/support/zlab_b16_cycles/cycles.pt \
+    --timing evidence/repair/stage_a_timing.json --bootstrap 2000 --out evidence/repair/p9_support_oracle.json
+```
+
 ### P3 Stage B: anchored residual evaluation on real DFlash blocks (block 16)
 
 `residual_eval_b16.json`, `residual_eval_b16.agree_by_distance.csv` (measured),

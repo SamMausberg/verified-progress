@@ -1,0 +1,246 @@
+{
+ "kind": "derived: exact per-cycle support (drafter support screen) and measured c = 1 phases",
+ "cycles": 21067,
+ "post_rejection_boundaries": 18274,
+ "requests": 80,
+ "phases_us": {
+  "draft": 2327.65,
+  "verify": 4734.27,
+  "accept": 22.88,
+  "commit": 109.63,
+  "append": 99.71,
+  "cycle": 7457.03125
+ },
+ "overall_dflash_tokens_per_ms": 1.0292651858211468,
+ "fresh_next_accept_mean": 4.452063040385247,
+ "by_k": {
+  "1": {
+   "corrected_prefix_supported_rate": 0.016307321878078145,
+   "mean_supported_suffix_when_supported": 1.7248322147651007,
+   "oracle_g2_mean_when_reused": 2.7248322147651005,
+   "fresh_g2_mean_same_boundaries": 6.942953020134228,
+   "r_F_tokens_per_ms": 0.683181508098623,
+   "delta_oracle": -0.04285422916038764,
+   "delta_oracle_ci95": [
+    -0.05675318256216266,
+    -0.02982097837343695
+   ],
+   "rejected": true,
+   "delta_oracle_at_overall_dflash_rate": -0.029717675675088956,
+   "delta_oracle_at_overall_dflash_rate_ci95": [
+    -0.043712180082937833,
+    -0.017818590496058072
+   ],
+   "by_domain": {
+    "chat": {
+     "boundaries": 6966,
+     "supported_rate": 0.0103359173126615,
+     "r_F_tokens_per_ms": 0.49391017990999314,
+     "delta_oracle": -0.013669996816069528
+    },
+    "code": {
+     "boundaries": 1511,
+     "supported_rate": 0.02183984116479153,
+     "r_F_tokens_per_ms": 0.737647681625128,
+     "delta_oracle": -0.06375875204338449
+    },
+    "math": {
+     "boundaries": 3410,
+     "supported_rate": 0.017302052785923755,
+     "r_F_tokens_per_ms": 0.7780647004696076,
+     "delta_oracle": -0.036700095101807384
+    },
+    "math500": {
+     "boundaries": 6387,
+     "supported_rate": 0.02098011586034132,
+     "r_F_tokens_per_ms": 0.8260676828251597,
+     "delta_oracle": -0.06831771986560987
+    }
+   }
+  },
+  "2": {
+   "corrected_prefix_supported_rate": 0.48106599540330525,
+   "mean_supported_suffix_when_supported": 2.098054828802184,
+   "oracle_g2_mean_when_reused": 3.098054828802184,
+   "fresh_g2_mean_same_boundaries": 6.0701854169036515,
+   "r_F_tokens_per_ms": 0.683181508098623,
+   "delta_oracle": -0.6647962360987877,
+   "delta_oracle_ci95": [
+    -0.805558543987898,
+    -0.5493083810992377
+   ],
+   "rejected": true,
+   "delta_oracle_at_overall_dflash_rate": -0.2772679082824765,
+   "delta_oracle_at_overall_dflash_rate_ci95": [
+    -0.4603852395233725,
+    -0.12862015111761393
+   ],
+   "by_domain": {
+    "chat": {
+     "boundaries": 6966,
+     "supported_rate": 0.37941429801894916,
+     "r_F_tokens_per_ms": 0.49391017990999314,
+     "delta_oracle": -0.14792922337108955
+    },
+    "code": {
+     "boundaries": 1511,
+     "supported_rate": 0.5413633355393779,
+     "r_F_tokens_per_ms": 0.737647681625128,
+     "delta_oracle": -0.7687000382672348
+    },
+    "math": {
+     "boundaries": 3410,
+     "supported_rate": 0.5287390029325513,
+     "r_F_tokens_per_ms": 0.7780647004696076,
+     "delta_oracle": -0.7837696988308822
+    },
+    "math500": {
+     "boundaries": 6387,
+     "supported_rate": 0.5522154376076405,
+     "r_F_tokens_per_ms": 0.8260676828251597,
+     "delta_oracle": -1.060481751889777
+    }
+   }
+  },
+  "4": {
+   "corrected_prefix_supported_rate": 0.711229068622086,
+   "mean_supported_suffix_when_supported": 2.6417634838808954,
+   "oracle_g2_mean_when_reused": 3.6417634838808954,
+   "fresh_g2_mean_same_boundaries": 5.820497037777948,
+   "r_F_tokens_per_ms": 0.683181508098623,
+   "delta_oracle": -0.4185768817487743,
+   "delta_oracle_ci95": [
+    -0.5601927295330631,
+    -0.2997394979026
+   ],
+   "rejected": true,
+   "delta_oracle_at_overall_dflash_rate": 0.15436199626608116,
+   "delta_oracle_at_overall_dflash_rate_ci95": [
+    -0.035711985865371165,
+    0.32249755404283764
+   ],
+   "by_domain": {
+    "chat": {
+     "boundaries": 6966,
+     "supported_rate": 0.6026414010910135,
+     "r_F_tokens_per_ms": 0.49391017990999314,
+     "delta_oracle": 0.05702423586892691
+    },
+    "code": {
+     "boundaries": 1511,
+     "supported_rate": 0.7743216412971542,
+     "r_F_tokens_per_ms": 0.737647681625128,
+     "delta_oracle": -0.4752659281418712
+    },
+    "math": {
+     "boundaries": 3410,
+     "supported_rate": 0.7677419354838709,
+     "r_F_tokens_per_ms": 0.7780647004696076,
+     "delta_oracle": -0.44828120189856935
+    },
+    "math500": {
+     "boundaries": 6387,
+     "supported_rate": 0.7845623923594802,
+     "r_F_tokens_per_ms": 0.8260676828251597,
+     "delta_oracle": -0.8229007404883166
+    }
+   }
+  },
+  "8": {
+   "corrected_prefix_supported_rate": 0.8241217029659625,
+   "mean_supported_suffix_when_supported": 3.339110225763612,
+   "oracle_g2_mean_when_reused": 4.339110225763612,
+   "fresh_g2_mean_same_boundaries": 5.657171314741036,
+   "r_F_tokens_per_ms": 0.683181508098623,
+   "delta_oracle": 0.2242817120567988,
+   "delta_oracle_ci95": [
+    0.11907551979019737,
+    0.3179102081657713
+   ],
+   "rejected": false,
+   "delta_oracle_at_overall_dflash_rate": 0.8881625694010875,
+   "delta_oracle_at_overall_dflash_rate_ci95": [
+    0.708656470218511,
+    1.0418240325253065
+   ],
+   "by_domain": {
+    "chat": {
+     "boundaries": 6966,
+     "supported_rate": 0.7394487510766581,
+     "r_F_tokens_per_ms": 0.49391017990999314,
+     "delta_oracle": 0.5042847123037423
+    },
+    "code": {
+     "boundaries": 1511,
+     "supported_rate": 0.8755790866975512,
+     "r_F_tokens_per_ms": 0.737647681625128,
+     "delta_oracle": 0.31407808297567597
+    },
+    "math": {
+     "boundaries": 3410,
+     "supported_rate": 0.8621700879765396,
+     "r_F_tokens_per_ms": 0.7780647004696076,
+     "delta_oracle": 0.27581324402972474
+    },
+    "math500": {
+     "boundaries": 6387,
+     "supported_rate": 0.8839830906528887,
+     "r_F_tokens_per_ms": 0.8260676828251597,
+     "delta_oracle": -0.06323646295202856
+    }
+   }
+  },
+  "16": {
+   "corrected_prefix_supported_rate": 0.8879282040056912,
+   "mean_supported_suffix_when_supported": 4.075372858375447,
+   "oracle_g2_mean_when_reused": 5.075372858375447,
+   "fresh_g2_mean_same_boundaries": 5.554233945519536,
+   "r_F_tokens_per_ms": 0.683181508098623,
+   "delta_oracle": 0.9867957687450901,
+   "delta_oracle_ci95": [
+    0.8945591964180224,
+    1.0731906873677384
+   ],
+   "rejected": false,
+   "delta_oracle_at_overall_dflash_rate": 1.7020766977801782,
+   "delta_oracle_at_overall_dflash_rate_ci95": [
+    1.550059482560489,
+    1.8365395892744525
+   ],
+   "by_domain": {
+    "chat": {
+     "boundaries": 6966,
+     "supported_rate": 0.8271604938271605,
+     "r_F_tokens_per_ms": 0.49391017990999314,
+     "delta_oracle": 1.079569835544259
+    },
+    "code": {
+     "boundaries": 1511,
+     "supported_rate": 0.9338186631369954,
+     "r_F_tokens_per_ms": 0.737647681625128,
+     "delta_oracle": 1.2287668553779634
+    },
+    "math": {
+     "boundaries": 3410,
+     "supported_rate": 0.9167155425219942,
+     "r_F_tokens_per_ms": 0.7780647004696076,
+     "delta_oracle": 1.0212260263783883
+    },
+    "math500": {
+     "boundaries": 6387,
+     "supported_rate": 0.927978706748082,
+     "r_F_tokens_per_ms": 0.8260676828251597,
+     "delta_oracle": 0.857274856944912
+    }
+   }
+  }
+ },
+ "keep_control": {
+  "mean_accept": 0.8342453759439641,
+  "delta": -1.9337169187680896,
+  "delta_ci95": [
+   -2.2225604776231864,
+   -1.6868083944715366
+  ]
+ }
+}
