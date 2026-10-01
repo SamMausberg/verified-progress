@@ -146,7 +146,7 @@ def retrieval_probes(tok: Any, filler: list[str], count: int, seed: int) -> list
 
 @torch.no_grad()
 def kl_and_agreement(model: Any, ids: torch.Tensor, ref_logp: torch.Tensor) -> tuple[float, float]:
-    logits = model(ids.unsqueeze(0)).logits[0].float()
+    logits = model(ids.unsqueeze(0), use_cache=False).logits[0].float()
     half = ids.shape[0] // 2
     logp = F.log_softmax(logits[half:-1], dim=-1)
     kl = (ref_logp.exp() * (ref_logp - logp)).sum(-1).mean().item()
@@ -161,7 +161,7 @@ def retrieval(model: Any, tok: Any, probes: list[dict[str, Any]]) -> tuple[float
         pre = tok.encode(p['prefix'], add_special_tokens=False)
         answer_ids = tok.encode(p['answer'], add_special_tokens=False)
         ids = torch.tensor(pre + answer_ids, device='cuda')
-        logits = model(ids.unsqueeze(0)).logits[0, len(pre) - 1 : -1].float()
+        logits = model(ids.unsqueeze(0), use_cache=False).logits[0, len(pre) - 1 : -1].float()
         lp = F.log_softmax(logits, -1)
         target = torch.tensor(answer_ids, device='cuda')
         logps.append(lp.gather(-1, target[:, None]).sum().item())
@@ -216,7 +216,7 @@ def main() -> None:
     with torch.no_grad():
         for text in texts(args.calib, args.calib_count):
             ids = torch.tensor(tok.encode(text, add_special_tokens=False)[:2048], device='cuda')
-            model(ids.unsqueeze(0))
+            model(ids.unsqueeze(0), use_cache=False)
     for st in states:
         st['record'] = None
     covs = [(rec.cq / rec.n, rec.ck / rec.n) for rec in recorders]
@@ -231,7 +231,7 @@ def main() -> None:
     refs, nlls = [], []
     with torch.no_grad():
         for ids in eval_ids:
-            logits = model(ids.unsqueeze(0)).logits[0].float()
+            logits = model(ids.unsqueeze(0), use_cache=False).logits[0].float()
             half = ids.shape[0] // 2
             logp = F.log_softmax(logits[half:-1], dim=-1)
             nlls.append(-logp.gather(-1, ids[half + 1 :, None]).mean().item())
