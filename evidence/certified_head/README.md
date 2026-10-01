@@ -151,6 +151,53 @@ complete head-path microbenchmarks with both fallback modes and both error
 models, primitive costs and the Nsight Compute summary are rerun at the final
 commit in one exclusive hold and committed here with their commands.
 
+## The head inside SGLang (`engine_v1.json`)
+
+The SGLang patch series `engine/sglang/patches/kernel/` (see
+`engine/sglang/README.md`) was validated per path in check mode: every certified
+step also runs SGLang's own head at the same batch shape and counts, on the
+device, the rows whose token differs; the emitted tokens are the certified ones.
+For fixed-noise sampled verify the comparison is with SGLang's seeded sampler
+(`div_(T)`, FP32 softmax and log, `multinomial_with_seed`) applied to the same
+verify logits, outside the graph, under `--enable-deterministic-inference`; this is
+that path's contract, not plain seeded decoding.
+
+Setup: shared GPU lock, `--mem-fraction-static 0.25`, 64 prompts (every fifth of
+the geometry workstream's public prompt set), up to 256 new tokens, greedy except
+the sampled arm (seeded, T = 0.7), the conservative stock error model and the
+whole-batch fallback except where noted. MTP is NEXTN with 3 steps and top-1 (4
+verify rows per request); DFlash uses block size 16. Equality is claimed only at
+the batch sizes each arm reached: at this memory fraction SGLang's GDN state cache
+capped several arms at 2-4 running requests.
+
+| Arm | Path | Largest batch (requests; rows) | Certified steps | Rows | Rows differing from stock | Rows falling back | Steps with a fallback |
+|---|---|---|---|---|---|---|---|
+| plain decode | decode | 3; 3 | 5,085 | 14,966 | 0 | 184 (1.23%) | 180 (3.5%) |
+| plain decode, column fallback | decode | 16; 16 | 1,039 | 14,944 | 0 | 209 (1.40%) | 189 (18.2%) |
+| MTP | greedy verify | 4; 16 | 1,278 | 19,868 | 0 | 345 (1.74%) | 288 (22.5%) |
+| DFlash | greedy verify | 2; 32 | 1,809 | 56,080 | 0 | 2,118 (3.78%) | 1,154 (63.8%) |
+| MTP | draft steps | 4; 4 | 2,550 | 9,936 | 0 | 290 (2.92%) | 278 (10.9%) |
+| MTP | draft extend | 4; 4 | 1,275 | 4,968 | 0 | 118 (2.38%) | 112 (8.8%) |
+| DFlash | draft projection | 8; 120 | 602 | 53,820 | 0 | 48,212 (89.6%) | 541 (89.9%) |
+| MTP, seeded T = 0.7 | fixed-noise sampled verify | 8; 32 | 700 | 21,016 | 0 | 386 (1.84%) | 279 (39.9%) |
+
+The largest batch is the server's running-request cap where the state cache set
+one (plain 3, MTP 4, DFlash 2) and otherwise the largest batch in the server's
+decode log; the second session records the exact rows of every certified step. The
+fallback columns are rates, not runtime: a fallback reruns the stock head for the
+batch (or, in column mode, for the near-tie rows), and its cost is measured in the
+head microbenchmark, not here. The DFlash draft projection falls back on 90% of its
+rows (the threshold check fails on the flat logits of deep block positions); it is
+left off in the proposed bench arm, and its runtime was not measured. Whether
+column mode stays ahead of the stock head up to M = 64, which the proposed arms
+assume, is pending the final head microbenchmark.
+
+One request at a time (batch 1, so a certified server and a stock server see the
+same shapes), the two servers' outputs are identical on 64 of 64 prompts for plain
+decode (14,995 tokens) and for MTP with certified greedy verify (14,990 tokens,
+verify batches of 4 rows). The same run passed `tests/test_certified_engine.py` (7)
+and the W8A8 adversarial-activation and P8 witness tests (3) on the GH200.
+
 ## Seeded sampling precision on real rows (`p8_witnesses.json`)
 
 On the first 60,000 real decode rows (seed 5, position = row index, SGLang's own
@@ -169,6 +216,7 @@ move a seeded token, while the BF16 logits and FP32 softmax together do.
 | File | What | Command |
 |---|---|---|
 | `stock_invariance.json` | stock GEMM kernel per M, reduced-precision flag test, row/column-subset invariance, observed accumulation error, library versions | `python experiments/certified_head/stock_invariance.py --out evidence/certified_head/stock_invariance.json` (commit fd0fd4a, GPU) |
+| `engine_v1.json` | per-arm counters, client summaries and comparisons of the SGLang validation | `scripts/gpu_lock.sh -s experiments/certified_head/engine_validate.sh OUT plain_check mtp_check dflash_check mtp_draft_check dflash_draft_check mtp_sampled_check plain_check_columns plain_c1 plain_c1_stock mtp_c1 mtp_c1_stock`, then `python experiments/certified_head/engine_summary.py OUT --out evidence/certified_head/engine_v1.json` (repo 8f4f3d7, engine 71c521db = patches 0001-0004) |
 | `p8_witnesses.json` | seeded-token differences between SGLang's chain, an FP64 log and exact arithmetic on 60,000 real rows, with the first witnesses | `python experiments/certified_head/p8_witness_search.py --rows 60000 --out evidence/certified_head/p8_witnesses.json` (commit ab507a9, GPU, shared lock) |
 | `fallback_vs_model.json` | undecided fraction versus the stock error bound | `python experiments/certified_head/fallback_vs_model.py --rows 20000 --out evidence/certified_head/fallback_vs_model.json` (CPU) |
 
