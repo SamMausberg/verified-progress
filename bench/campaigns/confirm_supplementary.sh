@@ -17,6 +17,7 @@ set -uo pipefail
 source "$(dirname "$0")/../../scripts/sglang_env.sh"
 cd "$(dirname "$0")/../.." || exit 1
 part=${1:-a}
+failed=()
 run() {
   local session=$1 arm=$2 levels=$3
   echo "=== $arm c=$levels"
@@ -30,6 +31,7 @@ run() {
   if [ "$status" -ne 0 ]; then
     echo "sweep for $arm exited $status:"
     tail -3 "$log"
+    failed+=("$arm")
   fi
   rm -f "$log"
 }
@@ -51,3 +53,7 @@ case $part in
     ;;
   *) echo "usage: $0 [a | rerun <session> arm:levels ...]" >&2; exit 64 ;;
 esac
+if [ "${#failed[@]}" -gt 0 ]; then
+  echo "sweeps that failed: ${failed[*]}" >&2
+  exit 1
+fi
