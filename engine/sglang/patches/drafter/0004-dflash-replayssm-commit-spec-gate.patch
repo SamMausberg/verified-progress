@@ -1,0 +1,42 @@
+From 761d69deb3c2f10617d5abb7d04d456fe1f18fe7 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Thu, 1 Oct 2026 18:47:13 +0000
+Subject: [PATCH] DFLASH: take the GDN ReplaySSM commit only under
+ --enable-linear-replayssm-spec
+
+Plain --enable-linear-replayssm also allocates the replay rings
+(replayssm_cache_base), so the DFLASH commit hook's ring check alone would
+route a speculative commit through the ring that its verify never wrote; with
+that flag alone the verify keeps per-position states and the stock scatter
+must commit. Gate the hook on the pool's enable_linear_replayssm_spec.
+---
+ .../layers/attention/hybrid_linear_attn_backend.py    | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/python/sglang/srt/layers/attention/hybrid_linear_attn_backend.py b/python/sglang/srt/layers/attention/hybrid_linear_attn_backend.py
+index c522fad003..45769ae970 100644
+--- a/python/sglang/srt/layers/attention/hybrid_linear_attn_backend.py
++++ b/python/sglang/srt/layers/attention/hybrid_linear_attn_backend.py
+@@ -1539,10 +1539,17 @@ class HybridLinearAttnBackend(AttentionBackend):
+         track crossing needs the exact state, then roll back the conv windows.
+         Fold-every-commit (SGLANG_GDN_REPLAYSSM_FOLD=1): replay the accepted raw
+         window into `temporal`, then roll back the conv windows. Returns False when
+-        the pool has no GDN spec ring (flag off, or a KDA model).
++        the pool has no GDN spec ring (--enable-linear-replayssm-spec off, or a KDA
++        model).
+         """
+         mamba_pool = getattr(req_pool, "mamba_pool", None)
+-        if mamba_pool is None or getattr(mamba_pool, "replayssm_is_kda", False):
++        if (
++            mamba_pool is None
++            or getattr(mamba_pool, "replayssm_is_kda", False)
++            # Plain --enable-linear-replayssm also allocates replay rings, but then
++            # the verify wrote per-position states and the stock scatter commits.
++            or not getattr(mamba_pool, "enable_linear_replayssm_spec", False)
++        ):
+             return False
+         fold = getattr(mamba_pool, "replayssm_spec_fold", False)
+         if not fold and getattr(mamba_pool, "replayssm_cache_base", None) is None:
+-- 
+2.34.1
+

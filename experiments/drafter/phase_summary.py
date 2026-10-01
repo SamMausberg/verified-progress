@@ -17,7 +17,7 @@ circular ring commit, or fold), i.e. what P10 could remove. It also lists the
 GDN kernels found in each run's torch-profiler trace.
 
     python experiments/drafter/phase_summary.py --run stock:DIR --run fold:DIR \
-        --out OUT_PREFIX
+        --segments 8 16 --out OUT_DIR/summary    # writes OUT_DIR/summary.csv, OUT_DIR/kernels.json
 """
 
 from __future__ import annotations
@@ -146,7 +146,8 @@ def main() -> None:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
         writer.writerows(rows)
-    args.out.with_suffix('.kernels.json').write_text(json.dumps(kernels, indent=2) + '\n')
+    # Beside the CSV, as committed: OUT_PREFIX.csv and kernels.json in the same directory.
+    (args.out.parent / 'kernels.json').write_text(json.dumps(kernels, indent=2) + '\n')
     for row in rows:
         print(
             f'{row["arm"]:9s} bs={row["bs"]:3d} period={row["period_us_median"]:8.1f}us '

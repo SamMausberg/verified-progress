@@ -1,20 +1,20 @@
 """Summarize an interleaved serving A/B made of bench.sweep runs.
 
 Reads every bench.sweep run under ROOT (any depth; ROOT/.../<label>/<timestamp>/
-r0/cNNN/point.json) whose label is <group>-<arm>-r<round>, for example
-b16-fold-r2 (run_fold_timing.sh) or sel-prefix-r1 (run_selector_timing.sh), and
-writes, per group and client concurrency, for every arm: the output throughput y
-(tokens/s/GPU) and per-user rate x of each run, tokens per verify cycle, and the
-mean y. For the pair --base/--test it adds the ratio test/base of the mean y and
-the smallest and largest ratio over all base-test run pairs. Only valid points
-enter the means and ratios, by bench's own rule (`bench.pareto.invalid_reason`:
-failed requests, a nonzero aiperf exit, outputs of the wrong length, an unflushed
-cache, unexpected prompts, or a mean foreign CPU load above 2 cores); invalid
-points are listed per entry with their reason. Each
-server's resolved pools (KV tokens, mamba slots, running limit) are recorded; the
-arms must share the running limit. In the fold A/B the fold arm needs no
-per-position GDN states, so SGLang gives it a larger KV pool from the same memory;
-at c <= 32 (requests of about 1,300 tokens) neither pool binds.
+r0/cNNN/point.json) whose label is <group>-<arm>-r<round>, for example b16-fold-r2
+(run_fold_timing.sh) or sel-prefix-r1 (run_selector_timing.sh), and writes, per group
+and client concurrency, for every arm: the output throughput y (tokens/s/GPU) and per-user
+rate x of each run, tokens per verify cycle, and the mean y. For the pair
+--base/--test it adds the ratio test/base of the mean y and the smallest and largest
+ratio over all base-test run pairs. Only valid points enter the means and ratios, by
+bench's own rule (`bench.pareto.invalid_reason`: failed requests, a nonzero aiperf
+exit, outputs of the wrong length, an unflushed cache, unexpected prompts, or a mean
+foreign CPU load above 2 cores); invalid points are listed per entry with their
+reason. Each server's resolved pools (KV tokens, mamba slots, running limit) are
+recorded; within each group the arms must share the running limit
+(`running_limit_match` per group). In the fold A/B the fold arm needs no per-position
+GDN states, so SGLang gives it a larger KV pool from the same memory; at c <= 32
+(requests of about 1,300 tokens) neither pool binds.
 
     python experiments/drafter/ab_timing_summary.py ~/vp-data/drafter/fold-timing \
         --base stock --test fold --out evidence/drafter/fold_timing/summary.json
@@ -130,13 +130,19 @@ def main() -> None:
         raise SystemExit(f'no sweep runs under {args.root}')
     pools = {r['run']: r['pools'] for r in rows}
     comparison = compare(rows, args.base, args.test)
-    limits = {p.get('effective_max_running_requests_per_dp') for p in pools.values()}
+    # The arms of one group must share the running limit; groups may differ (the
+    # tuned block-16 arm has capacity 64, block 8 has 128).
+    limits: dict[str, set[Any]] = {}
+    for r in rows:
+        limits.setdefault(r['group'], set()).add(
+            r['pools'].get('effective_max_running_requests_per_dp')
+        )
     summary: dict[str, Any] = {
         'source': str(args.root),
         'base': args.base,
         'test': args.test,
         'pools_by_run': pools,
-        'running_limit_match': len(limits) == 1,
+        'running_limit_match': {group: len(v) == 1 for group, v in limits.items()},
         'comparison': comparison,
         'points': rows,
     }
