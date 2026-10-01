@@ -96,6 +96,11 @@ def verifier_of(row: dict[str, Any]) -> str:
     return 'flashinfer' if decode == 'flashinfer' else 'triton'
 
 
+def no_state(row: dict[str, Any]) -> bool:
+    """Engine patch 0002 drops the per-position states only when the variable equals "1"."""
+    return str((row.get('probe_env') or {}).get('SGLANG_REPAIR_DROP_VERIFY_STATES')) == '1'
+
+
 def med(row: dict[str, Any], *path: str) -> float | None:
     cur: Any = row
     for key in path:
@@ -182,9 +187,6 @@ def main() -> None:
 
     table = []
 
-    def no_state(r: dict[str, Any]) -> bool:
-        return 'SGLANG_REPAIR_DROP_VERIFY_STATES' in (r.get('probe_env') or {})
-
     # Comparators that only one verify kernel honours. SGLANG_REPAIR_DROP_VERIFY_STATES (engine
     # patch 0002) acts only inside FlashInfer's GDN verify kernel, and gdn_state_bench.py times
     # only FlashInfer's gated_delta_rule_mtp; neither describes another verify kernel.
@@ -210,7 +212,7 @@ def main() -> None:
         if row['mode'] != 'force' or no_state(row) or verifier_of(row) != args.verifier:
             continue
         B = int(row['block'])
-        replay_protocol = 'enable-linear-replayssm-spec' in ' '.join(row.get('command') or [])
+        replay_protocol = verifier_of(row) == 'replayssm_spec'
         g = gdn['blocks'].get(str(B), {})
         verify = med(row, 'phase_us', 'verify', 'median')
         commit = med(row, 'phase_us', 'commit', 'median')

@@ -193,3 +193,29 @@ def test_outputs_are_written_together(
     assert data['verifier'] == ('triton' if overridden else 'flashinfer')
     if not overridden:
         assert data['rows'][0]['state_writes_source'].startswith('measured')
+
+
+def test_no_state_classification_reads_the_value() -> None:
+    stage_a = load('stage_a')
+    row = timing_row('force_b64', 'force', 64, *FI)
+    assert not stage_a.no_state(row)
+    row['probe_env'] = {'SGLANG_REPAIR_DROP_VERIFY_STATES': '0'}
+    assert not stage_a.no_state(row)
+    row['probe_env'] = {'SGLANG_REPAIR_DROP_VERIFY_STATES': ''}
+    assert not stage_a.no_state(row)
+    row['probe_env'] = {'SGLANG_REPAIR_DROP_VERIFY_STATES': '1'}
+    assert stage_a.no_state(row)
+
+
+def test_disabled_no_state_variable_is_an_ordinary_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A Triton run with the variable set to 0 is not a no-state run, so it is not rejected.
+    off = timing_row('force_tv_b64', 'force', 64, *TR)
+    off['probe_env'] = {'SGLANG_REPAIR_DROP_VERIFY_STATES': '0'}
+    rows = [timing_row('fresh_tv_b16', 'fresh', 16, *TR), off]
+    out = run_main(
+        tmp_path, monkeypatch, rows, '--verifier', 'triton', '--baseline', 'fresh_tv_b16'
+    )
+    data = json.loads((out / 'stage_a_oracle.json').read_text())
+    assert [row['B'] for row in data['rows']] == [64]
