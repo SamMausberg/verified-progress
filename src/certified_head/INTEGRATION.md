@@ -66,7 +66,9 @@ probes, not proved:
   capture (or call it with all sizes at start-up); a size first seen under capture
   takes the stock path. A failing configuration is refused at every size (logged);
 - every call checks 8 exactly computed vocabulary rows (new rows every call)
-  against the production kernel's own bounds; a violation sends the batch to the
+  against the production kernel's own bounds (the certificate assumes the probes
+  are on: `disable_probes_for_measurement()` is for measuring their cost, marks the
+  head `unsafe`, and engine glue must refuse such a head); a violation sends the batch to the
   stock path and latches that tile configuration for the process
   (`head.probe_stats()`).
 

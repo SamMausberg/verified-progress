@@ -361,7 +361,7 @@ def main() -> None:
         max_batch=max(args.batches),
     )
     head_np.gemv_config = head.gemv_config
-    head_np.probes = 0
+    head_np.disable_probes_for_measurement()
     head_np._verified = set(head._verified)
     head_cols._failed_variants = set(head._failed_variants)
     status = {'w8a16': row_status(head, pool, 'argmax'), 'sample': row_status(head, pool, 'sample')}

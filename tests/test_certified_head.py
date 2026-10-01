@@ -1049,3 +1049,13 @@ def test_runtime_probe_catches_a_wrong_envelope_at_every_batch_size(
     assert bad.probe_stats()['calls_with_probe_violation'] == 1
     ids, _ = bad.argmax(h)
     assert torch.equal(ids, reference_argmax(h, w, 'bf16'))
+
+
+def test_probes_are_on_unless_explicitly_disabled(checkpoint: tuple[Any, Any]) -> None:
+    w, qh = checkpoint
+    head = CertifiedHead.from_quantized(w, qh, max_batch=8, capacity=64)
+    assert head.probes > 0 and not head.unsafe
+    with pytest.raises(AttributeError):
+        head.probes = 0  # type: ignore[misc]
+    head.disable_probes_for_measurement()
+    assert head.probes == 0 and head.unsafe

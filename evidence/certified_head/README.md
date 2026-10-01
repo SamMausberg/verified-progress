@@ -45,7 +45,9 @@ accumulation and our pass's), without the BF16 rounding step.
 The certificate also assumes that the compiled approximate pass computes the
 modelled arithmetic (``s (q . h)`` with FP32 accumulation within gamma, or the
 exact int32 product for W8A8). That is checked per compiled kernel variant at
-start-up and by runtime probes on every call, not proved; a measured violation and
+start-up and by runtime probes on every call, not proved, and the certificate
+assumes both are on (`disable_probes_for_measurement` exists only to measure the
+probes' cost and marks the head `unsafe`); a measured violation and
 its fix are described below ("A TMA fault in the W8A16 pass").
 
 Rows the certificate cannot decide are completed by the stock kernel itself:
