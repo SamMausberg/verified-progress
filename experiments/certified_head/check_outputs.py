@@ -152,6 +152,16 @@ def main() -> None:
             for m, entry in sweep['batches'].items():
                 if 'best' not in entry:
                     problems.append(f'{name}: no passing configuration at M={m}')
+    stress = load('stress_defaults.json')
+    if stress is not None:
+        for c in stress['configs']:
+            name = f'stress_defaults: {c["arith"]} {c["config"]}'
+            if not c['ok']:
+                problems.append(f'{name}: missed {c["rows_missed"]}')
+            if c['row_checks'] < stress['row_checks_target']:
+                problems.append(f'{name}: only {c["row_checks"]} row-checks')
+        if not stress.get('ok'):
+            problems.append('stress_defaults: incomplete or failed')
     micro = load('micro_head.json')
     if micro is not None:
         problems += [f'micro_head{e}' for e in errors_in(micro['batches'])]

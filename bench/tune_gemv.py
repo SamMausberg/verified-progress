@@ -3,7 +3,9 @@
 Each configuration is timed in a CUDA graph (``--inner`` calls per replay,
 median over ``--trials`` replays) with the epilogue the pipeline uses
 (``tiles``: top-4 per vocabulary tile plus the atomic lower bound). The result
-feeds ``default_gemv_config`` in ``certified_head/head.py``. Run under the
+feeds ``default_gemv_config`` in ``certified_head/head.py``. For each batch size
+it also records the fastest configuration with TMA loads and with pointer loads
+that passes the kernel self-test, and the default's time. Run under the
 exclusive lock::
 
     scripts/gpu_lock.sh -x python bench/tune_gemv.py --out evidence/certified_head/gemv_sweep.json
@@ -29,7 +31,12 @@ sys.path.insert(0, str(ROOT / 'bench'))
 
 from micro_head import environment, summarize, time_graph
 
-from certified_head.head import CertifiedHead, GemvConfig
+from certified_head.head import (
+    CertifiedHead,
+    GemvConfig,
+    default_arith_config,
+    default_gemv_config,
+)
 from certified_head.quantize import load_or_build
 from certified_head.selftest import check_variants
 
@@ -54,6 +61,24 @@ def passes(head: CertifiedHead, h: torch.Tensor) -> bool:
     """Every kernel variant of this configuration computes the modelled arithmetic
     and encloses the exact logits on ``h`` (:mod:`certified_head.selftest`)."""
     return bool(check_variants(head, h)['ok'])
+
+
+def first_passing(
+    head: CertifiedHead, h: torch.Tensor, cands: list[dict[str, Any]], rejected: list[Any]
+) -> dict[str, Any] | None:
+    """The first timed configuration in ``cands`` whose kernel variants all pass
+    (each is checked once; failures are appended to ``rejected``)."""
+    for r in cands:
+        if 'passes_self_test' not in r:
+            cfg = GemvConfig(**r['config'])
+            head.gemv_config = _fixed(cfg)
+            head.arith_config = _fixed_arith(cfg)
+            r['passes_self_test'] = passes(head, h)
+            if not r['passes_self_test']:
+                rejected.append(r['config'])
+        if r['passes_self_test']:
+            return r
+    return None
 
 
 def _fixed(cfg: GemvConfig) -> Callable[[int], GemvConfig]:
@@ -108,24 +133,37 @@ def main() -> None:
         ok = sorted((r for r in rows if 'median_us' in r), key=lambda r: float(r['median_us']))
         # A configuration wins only if all its kernel variants pass: the fastest
         # W8A16 tiles once computed wrong products (TMA int8 64-byte box).
-        rejected = []
-        for r in ok:
-            cfg = GemvConfig(**r['config'])
-            head.gemv_config = _fixed(cfg)
-            head.arith_config = _fixed_arith(cfg)
-            if passes(head, h):
-                r['passes_self_test'] = True
-                break
-            r['passes_self_test'] = False
-            rejected.append(r['config'])
-        ok = [r for r in ok if r.get('passes_self_test', True)]
-        best = ok[0]
+        rejected: list[dict[str, Any]] = []
+        best = first_passing(head, h, ok, rejected)
+        assert best is not None, f'no configuration passes at M={m}'
+        # The fastest passing configuration of each load kind, and the default.
+        best_tma = first_passing(head, h, [r for r in ok if r['config']['tma']], rejected)
+        best_pointer = first_passing(head, h, [r for r in ok if not r['config']['tma']], rejected)
+        dflt = (
+            default_gemv_config(m) if args.arith == 'w8a16' else default_arith_config(args.arith, m)
+        )
+        default_row = first_passing(
+            head, h, [r for r in ok if r['config'] == dflt.__dict__], rejected
+        )
         print(f'M={m:4d} best {best["median_us"]:8.1f} us {best["config"]}', flush=True)
+        if best_pointer is not None and best_tma is not None:
+            print(
+                f'M={m:4d} pointer loads {best_pointer["median_us"]:8.1f} us '
+                f'({best_pointer["median_us"] / best_tma["median_us"]:.3f} x TMA) '
+                f'{best_pointer["config"]}',
+                flush=True,
+            )
         result['batches'][str(m)] = {
             'best': best,
-            'top5': ok[:5],
+            'best_tma': best_tma,
+            'best_pointer': best_pointer,
+            'pointer_over_tma': best_pointer['median_us'] / best_tma['median_us']
+            if best_pointer is not None and best_tma is not None
+            else None,
+            'default': default_row,
+            'top5': [r for r in ok if r.get('passes_self_test', True)][:5],
             'n_configs': len(rows),
-            'failed': len(rows) - len(ok) - len(rejected),
+            'failed': len(rows) - len(ok),
             'rejected_by_self_test': rejected,
         }
         if args.out:  # write after every batch size so a timeout keeps what was measured

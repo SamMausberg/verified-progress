@@ -48,7 +48,7 @@ exact int32 product for W8A8). That is checked per compiled kernel variant at
 start-up and by runtime probes on every call, not proved, and the certificate
 assumes both are on (`disable_probes_for_measurement` exists only to measure the
 probes' cost and marks the head `unsafe`); a measured violation and
-its fix are described below ("A TMA fault in the W8A16 pass").
+the measured violations are described below ("TMA faults in the W8A16 pass").
 
 Rows the certificate cannot decide are completed by the stock kernel itself:
 `fallback_mode='batch'` (default) reruns `torch.matmul` on the whole batch at
@@ -157,14 +157,17 @@ The fallback rate is set by the stock error model, not by the BF16 spacing:
 a decision that compares BF16 values exactly certifies BF16 ties, and only an
 accumulation interval that straddles a rounding boundary leaves a row undecided.
 
-## A TMA fault in the W8A16 pass (found, isolated, fixed)
+## TMA faults in the W8A16 pass
 
 The certificate rests on an assumption about the compiled approximate pass: that
 it computes the modelled arithmetic, ``s (q . h)`` with FP32 accumulation within
 the stated gamma (W8A16, BF16) or the exact int32 product (W8A8). This is checked
 per compiled kernel variant at start-up and by runtime probes on every call (both
-below); it is not proved. One family of tile configurations measurably violated it
-on this machine (GH200, Triton 3.7.1, torch 2.13.0+cu130).
+below); it is not proved. Two TMA tile configurations of the W8A16 pass have
+measurably violated it on this machine (GH200, Triton 3.7.1, torch 2.13.0+cu130):
+the first with a 64-byte int8 box (this section's isolation), the second with a
+128-byte box ("A second fault", below). Both were stopped by the checks, and the
+defaults' clean record since is empirical.
 
 **Finding.** The final evidence run (x3, commit 9e3a39a) found the W8A16 pass
 deciding 52 of 60,000 real rows when row statuses were computed 256 rows at a time
@@ -185,8 +188,9 @@ commit 7f8079f; `tma_candidates.json`, `tma_candidates.py`, commit 4a54503):
   are exact to FP32 rounding. A BF16 operand through a 64-byte box and an int8 x
   int8 `tl.dot` through a 64-byte box (no conversion) are exact at M = 1, 16, 64
   and 256.
-  The fault therefore needs the int8 operand, a 64-byte TMA box and the BF16
-  conversion together. The host descriptors are standard (`TensorDescriptor` over
+  In these minimal kernels the fault therefore needs the int8 operand, a 64-byte
+  TMA box and the BF16 conversion together; the second fault below shows that a
+  128-byte box is not enough to rule a TMA tile out. The host descriptors are standard (`TensorDescriptor` over
   int8 `[V, K]`, strides `[K, 1]`, block `[block_v, block_k]`); whether a
   descriptor constraint is violated or the fault lies in the generated code is not
   established.
@@ -260,6 +264,24 @@ those results stay empirical and are rerun on the new defaults.
   latched; a latch at one batch size covering the other batch sizes of the same
   tiles; no probe trip on a correct head over 50 calls, with new probe rows on
   every call and every graph replay.
+
+**A second fault, at a 128-byte box.** x7's W8A16 sweep (commit d2712cb) rejected
+TMA 64x128x128 with 3 stages (block_v 64, block_m 128, block_k 128: a 128-byte
+int8 box) at M = 256: it was the fastest configuration timed there and failed the
+sweep's self-test gate. Rerun three times on the sweep's own inputs (a scratch
+check at d2712cb; `tma_m128_check.json` repeats it with a committed script), its
+raw product (epilogue 0) was within its bound, but its envelope missed 56, 41
+and 50 exact logits in three identical runs; its tile summaries and decisions
+were right, and the runtime probe tripped and latched it. The same tiles with
+pointer loads, and the default (TMA 128x64x128), missed none. A count that
+varies between identical runs points to a race; that is not established.
+`tma_m128_check.json` checks its neighbours (block_v 64 and 128, block_m 64 and
+128, 4 and 8 warps, 3 and 4 stages, TMA and pointer loads) at M = 128 and 256.
+Neither fault's mechanism is known, so the defaults' clean record (the checks
+above, the self-test at every batch size, 0 differing rows in the SGLang checks)
+is empirical, and a rare intermittent miss could pass 8 probe rows per call:
+`stress_defaults.json` checks every default configuration of every pass, at
+every batch size that dispatches to it, about a million row-checks each.
 
 ## Pending in this PR
 

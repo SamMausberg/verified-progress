@@ -1,5 +1,5 @@
 #!/bin/bash
-# Regenerate the certified-head GPU evidence in one exclusive hold (about 25 minutes).
+# Regenerate the certified-head GPU evidence in one exclusive hold (about 45 minutes).
 #
 #   source scripts/sglang_env.sh
 #   scripts/gpu_lock.sh -x experiments/certified_head/run_all.sh [OUT_DIR]
@@ -33,6 +33,7 @@ REUSE="${RUN_ALL_REUSE:-}"
 declare -A OUTPUTS=(
   [compile]="compile.log"
   [tests]="tests.log"
+  [stress]="stress.log stress_defaults.json"
   [replay]="replay.log replay_decisions.json"
   [invariance]="invariance.log stock_invariance.json"
   [tune_w8a16]="tune_w8a16.log tune_w8a16.hostload.json gemv_sweep_w8a16.json"
@@ -78,8 +79,8 @@ reuse() {  # name: copy an earlier run's ok outputs, or record the step as not r
   fi
   src=${src#reused:}  # a step the earlier run itself reused keeps its own commit
   local note="${TILE_INDEPENDENT[$name]:-depends on the default tiles}"
-  if git diff --quiet "$src" HEAD -- src/certified_head/ 2>/dev/null; then
-    note="$note; src/certified_head unchanged since $src"
+  if git diff --quiet "$src" HEAD -- src/certified_head/ ':!src/certified_head/*.md' 2>/dev/null; then
+    note="$note; src/certified_head (code and data) unchanged since $src"
   elif git diff --quiet "$src" HEAD -- src/certified_head/kernels.py 2>/dev/null; then
     note="$note; kernels.py unchanged since $src (the package changed)"
   else
@@ -153,6 +154,9 @@ if ! ok compile; then
   exit 1
 fi
 step tests 900 python -m pytest tests/test_certified_head.py -q -s -p no:cacheprovider
+# Every default tile configuration of every pass, at every batch size it serves,
+# against exact logits, about a million row-checks each (two TMA faults so far).
+step stress 2400 python experiments/certified_head/stress_defaults.py --out "$OUT/stress_defaults.json"
 step replay 300 python experiments/certified_head/replay_decisions.py --limit-rows 60000 \
   --sample-temps 0.7 1.0 --out "$OUT/replay_decisions.json"
 step invariance 120 python experiments/certified_head/stock_invariance.py --out "$OUT/stock_invariance.json"

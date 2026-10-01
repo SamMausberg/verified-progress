@@ -72,11 +72,29 @@ probes, not proved:
   stock path and latches that tile configuration for the process
   (`head.probe_stats()`).
 
-A measured violation: TMA loads of the int8 weight tile with a 64-byte box
+Measured violations: TMA loads of the int8 weight tile with a 64-byte box
 (`block_k = 64`) feeding the BF16 conversion and `tl.dot` returned wrong products
 on GH200 with Triton 3.7.1 and torch 2.13.0+cu130
-(`experiments/certified_head/tma_repro.py`, `evidence/certified_head/tma_repro.json`).
-Such tiles are refused (`check_gemv_config`), and the defaults use 128-byte boxes.
+(`experiments/certified_head/tma_repro.py`, `evidence/certified_head/tma_repro.json`);
+such tiles are refused (`check_gemv_config`). A second TMA tile with a 128-byte
+box (64x128x128 at M = 256, not a default) produced a wrong envelope with a miss
+count that varied between identical runs; the self-test and the probes caught it.
+The defaults' clean record is empirical (see the evidence README).
+
+## Known limitation: conditional nodes keep their bodies' memory
+
+A CUDA graph that contains a conditional node does not give back what the node's
+body allocated when the graph is deleted, with or without a shared memory pool
+(torch 2.13.0+cu130; `experiments/certified_head/conditional_memory.py`: about
+160 MiB allocated and 630 MiB reserved stay behind per capture and delete of five
+M = 64 stock-GEMM bodies, none without the node). Every certified graph captures
+its fallback (the whole-batch stock head) in such a node, so in SGLang each
+captured batch size keeps its fallback body's allocations (about the stock
+logits, `M x vocab` BF16, by the measurement above) instead of sharing them with
+the other captures, and any recapture of the graphs (a resize, a restart of the
+graph runner) adds the same again. This is inferred from the microbenchmark, not
+measured in the engine; the engine follow-up measures memory after capture with
+and without the certified head.
 
 ## Call sites at the pin (paths under `python/sglang/`)
 
