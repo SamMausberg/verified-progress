@@ -373,8 +373,8 @@ cores).
 - The exactness class of lever v1 under MTP (greedy outputs against stock MTP).
 - Paired serving of lever v1 against `mtp-tuned-triton`, bench's low-concurrency MTP arm, at
   c = 1, 8 and 32 (queued as hold 4).
-- Why the step at c = 16 keeps only a third of the GPU span's saving, and why MTP at c = 1 is
-  slower; neither is traced.
+- Why the step at c = 16 keeps only a third of the GPU span's saving, and why `mtp-tuned` at
+  c = 1 is slower; neither is traced.
 
 ## Commands behind the served files
 
