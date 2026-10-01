@@ -247,8 +247,9 @@ after the earlier prompt that shares the longest prefix with it (one request in 
 | Plain, radix cache off | 12/12 | 12/12 | - |
 | MTP steps 3, radix cache on | 10/12 | 12/12 | output index 2 and 5 |
 
-The two prompts are `mt_bench-0056` after `mt_bench-0054` (6 shared tokens) and
-`humaneval-0008` after `humaneval-0000` (22 shared tokens). So with the radix cache on, a
+The radix-off control was run for plain decoding only; the same control for MTP is
+**pending** (queued). The two prompts are `mt_bench-0056` after `mt_bench-0054` (6
+shared tokens) and `humaneval-0008` after `humaneval-0000` (22 shared tokens). So with the radix cache on, a
 request's output at a fixed configuration and batch shape depends on which earlier
 request computed its shared prefix, and under overlap scheduling on timing. The values
 involved are all valid; we found no case where this produced more than a near-tie flip,
