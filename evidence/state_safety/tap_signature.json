@@ -1,0 +1,146 @@
+[
+ {
+  "a": "plain_c1",
+  "b": "v3_plain_c1",
+  "prompts": 167,
+  "same_order": true,
+  "prefill_cache_hits_a": {
+   "prefills": 169,
+   "with_cached_tokens": 0
+  },
+  "prefill_cache_hits_b": {
+   "prefills": 169,
+   "with_cached_tokens": 0
+  },
+  "differing": {
+   "alpaca_eval-0450": {
+    "position": 69,
+    "output_index": 2,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
+    "first_modules": [
+     "model.layers.3.attn",
+     "model.layers.3.o_proj",
+     "model.layers.3.post_attention_layernorm",
+     "model.layers.3.post_attention_layernorm#1"
+    ],
+    "differing_modules": 369,
+    "compared_modules": 411
+   },
+   "alpaca_eval-0500": {
+    "position": 68,
+    "output_index": 2,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
+    "first_modules": [
+     "model.layers.3.attn",
+     "model.layers.3.o_proj",
+     "model.layers.3.post_attention_layernorm",
+     "model.layers.3.post_attention_layernorm#1"
+    ],
+    "differing_modules": 369,
+    "compared_modules": 411
+   },
+   "mt_bench-0053": {
+    "position": 226,
+    "output_index": 2,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
+    "first_modules": [
+     "model.layers.3.attn",
+     "model.layers.3.o_proj",
+     "model.layers.3.post_attention_layernorm",
+     "model.layers.3.post_attention_layernorm#1"
+    ],
+    "differing_modules": 369,
+    "compared_modules": 411
+   },
+   "mt_bench-0059": {
+    "position": 354,
+    "output_index": 2,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
+    "first_modules": [
+     "model.layers.3.attn",
+     "model.layers.3.o_proj",
+     "model.layers.3.post_attention_layernorm",
+     "model.layers.3.post_attention_layernorm#1"
+    ],
+    "differing_modules": 369,
+    "compared_modules": 411
+   }
+  }
+ },
+ {
+  "a": "mtp_s3_c1",
+  "b": "v3_mtp_s3_c1",
+  "prompts": 167,
+  "same_order": true,
+  "prefill_cache_hits_a": {
+   "prefills": 169,
+   "with_cached_tokens": 0
+  },
+  "prefill_cache_hits_b": {
+   "prefills": 169,
+   "with_cached_tokens": 0
+  },
+  "differing": {
+   "alpaca_eval-0450": {
+    "position": 70,
+    "output_index": 3,
+    "mode_a": "TARGET_VERIFY",
+    "mode_b": "TARGET_VERIFY",
+    "first_modules": [
+     "model.layers.3.attn",
+     "model.layers.3.o_proj",
+     "model.layers.3.post_attention_layernorm",
+     "model.layers.3.post_attention_layernorm#1"
+    ],
+    "differing_modules": 369,
+    "compared_modules": 411
+   },
+   "alpaca_eval-0500": {
+    "position": 71,
+    "output_index": 5,
+    "mode_a": "TARGET_VERIFY",
+    "mode_b": "TARGET_VERIFY",
+    "first_modules": [
+     "model.layers.3.attn",
+     "model.layers.3.o_proj",
+     "model.layers.3.post_attention_layernorm",
+     "model.layers.3.post_attention_layernorm#1"
+    ],
+    "differing_modules": 369,
+    "compared_modules": 411
+   },
+   "mt_bench-0053": {
+    "position": 229,
+    "output_index": 5,
+    "mode_a": "TARGET_VERIFY",
+    "mode_b": "TARGET_VERIFY",
+    "first_modules": [
+     "model.layers.3.attn",
+     "model.layers.3.o_proj",
+     "model.layers.3.post_attention_layernorm",
+     "model.layers.3.post_attention_layernorm#1"
+    ],
+    "differing_modules": 369,
+    "compared_modules": 411
+   },
+   "mt_bench-0059": {
+    "position": 357,
+    "output_index": 5,
+    "mode_a": "TARGET_VERIFY",
+    "mode_b": "TARGET_VERIFY",
+    "first_modules": [
+     "model.layers.3.attn",
+     "model.layers.3.o_proj",
+     "model.layers.3.post_attention_layernorm",
+     "model.layers.3.post_attention_layernorm#1"
+    ],
+    "differing_modules": 369,
+    "compared_modules": 411
+   }
+  }
+ }
+]

@@ -110,10 +110,21 @@ for session, ref in (('v3_plain_c1', 'plain/c1'), ('plain_c1', 'plain/c1')):
             (i for i, (x, y) in enumerate(zip(r['top_logprobs'], b['top_logprobs'])) if x != y),
             None,
         )
-        mismatched[pid] = {
+        tok = next(
+            (i for i, (x, y) in enumerate(zip(r['output_ids'], b['output_ids'])) if x != y),
+            None,
+        )
+        entry = {
             'first_logprob_difference': first,
-            'tokens_equal': r['output_ids'] == b['output_ids'][:n],
+            'tokens_equal': tok is None,
         }
+        if tok is not None:
+            # Top-2 logprob gap at the first changed token, in each run (a gap of 0 is
+            # an exact tie; 0.125 is one BF16 step for logits in [16, 32)).
+            entry['first_token_difference'] = tok
+            entry['top2_gap_tapped'] = r['top_logprobs'][tok][0][0] - r['top_logprobs'][tok][1][0]
+            entry['top2_gap_untapped'] = b['top_logprobs'][tok][0][0] - b['top_logprobs'][tok][1][0]
+        mismatched[pid] = entry
     tag = 'tap v3 (module rows per token)' if session.startswith('v3') else 'tap v1'
     out[session] = {
         'tap_version': tag,
@@ -123,6 +134,18 @@ for session, ref in (('v3_plain_c1', 'plain/c1'), ('plain_c1', 'plain/c1')):
     }
 Path(sys.argv[2]).write_text(json.dumps(out, indent=1) + '\n')
 PY
+
+# Where the v1 and v3 tapped sessions (same prompts, same order) first part ways.
+tap="$HOME/vp-data/state/tap"
+pairs=()
+for cfg in plain_c1 mtp_s3_c1; do
+  if [ -f "$tap/$cfg/client.jsonl" ] && [ -f "$tap/v3_$cfg/client.jsonl" ]; then
+    pairs+=(--pair "$tap/$cfg" "$tap/v3_$cfg")
+  fi
+done
+if [ ${#pairs[@]} -gt 0 ]; then
+  nice -n 19 python tap_signature.py "${pairs[@]}" --out "$evidence/tap_signature.json" > /dev/null
+fi
 
 # Drift and divergences by rejection position, for every speculative config.
 for spec in mtp_s1 mtp_s3 mtp_s5 mtp_tree; do

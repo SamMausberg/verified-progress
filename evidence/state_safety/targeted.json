@@ -73,7 +73,97 @@
      "len_test": 64
     }
    }
-  ]
+  ],
+  "pairs": [
+   {
+    "id": "mt_bench-0053",
+    "predecessor": "mt_bench-0039",
+    "shared_prefix_tokens": 4,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "mt_bench-0056",
+    "predecessor": "mt_bench-0054",
+    "shared_prefix_tokens": 6,
+    "tokens_identical": true,
+    "first_logprob_difference": 5
+   },
+   {
+    "id": "mt_bench-0059",
+    "predecessor": "mt_bench-0053",
+    "shared_prefix_tokens": 6,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "alpaca_eval-0450",
+    "predecessor": "alpaca_eval-0290",
+    "shared_prefix_tokens": 4,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "alpaca_eval-0500",
+    "predecessor": "mt_bench-0021",
+    "shared_prefix_tokens": 4,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "gsm8k-0002",
+    "predecessor": "gsm8k-0000",
+    "shared_prefix_tokens": 3,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "gsm8k-0010",
+    "predecessor": "gsm8k-0001",
+    "shared_prefix_tokens": 4,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "humaneval-0008",
+    "predecessor": "humaneval-0000",
+    "shared_prefix_tokens": 22,
+    "tokens_identical": true,
+    "first_logprob_difference": 2
+   },
+   {
+    "id": "humaneval-0021",
+    "predecessor": "humaneval-0000",
+    "shared_prefix_tokens": 24,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "cnn_dailymail-0014",
+    "predecessor": "cnn_dailymail-0002",
+    "shared_prefix_tokens": 20,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "mt_bench-0012",
+    "predecessor": "mt_bench-0002",
+    "shared_prefix_tokens": 4,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "alpaca_eval-0020",
+    "predecessor": "mt_bench-0008",
+    "shared_prefix_tokens": 5,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   }
+  ],
+  "prefill_cache_hits": {
+   "prefills": 38,
+   "with_cached_tokens": 0
+  }
  },
  "history__plain": {
   "summary": {
@@ -139,7 +229,97 @@
      "len_test": 64
     }
    }
-  ]
+  ],
+  "pairs": [
+   {
+    "id": "mt_bench-0053",
+    "predecessor": "mt_bench-0039",
+    "shared_prefix_tokens": 4,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "mt_bench-0056",
+    "predecessor": "mt_bench-0054",
+    "shared_prefix_tokens": 6,
+    "tokens_identical": true,
+    "first_logprob_difference": 2
+   },
+   {
+    "id": "mt_bench-0059",
+    "predecessor": "mt_bench-0053",
+    "shared_prefix_tokens": 6,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "alpaca_eval-0450",
+    "predecessor": "alpaca_eval-0290",
+    "shared_prefix_tokens": 4,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "alpaca_eval-0500",
+    "predecessor": "mt_bench-0021",
+    "shared_prefix_tokens": 4,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "gsm8k-0002",
+    "predecessor": "gsm8k-0000",
+    "shared_prefix_tokens": 3,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "gsm8k-0010",
+    "predecessor": "gsm8k-0001",
+    "shared_prefix_tokens": 4,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "humaneval-0008",
+    "predecessor": "humaneval-0000",
+    "shared_prefix_tokens": 22,
+    "tokens_identical": true,
+    "first_logprob_difference": 2
+   },
+   {
+    "id": "humaneval-0021",
+    "predecessor": "humaneval-0000",
+    "shared_prefix_tokens": 24,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "cnn_dailymail-0014",
+    "predecessor": "cnn_dailymail-0002",
+    "shared_prefix_tokens": 20,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "mt_bench-0012",
+    "predecessor": "mt_bench-0002",
+    "shared_prefix_tokens": 4,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "alpaca_eval-0020",
+    "predecessor": "mt_bench-0008",
+    "shared_prefix_tokens": 5,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   }
+  ],
+  "prefill_cache_hits": {
+   "prefills": 38,
+   "with_cached_tokens": 0
+  }
  },
  "history__plain_noradix": {
   "summary": {
@@ -179,7 +359,97 @@
   "repo_sha": "a345be6438472369a393bd5af775cd3a2ab41235",
   "sglang_sha": "bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824",
   "wall_s": 70.5,
-  "non_identical_cases": []
+  "non_identical_cases": [],
+  "pairs": [
+   {
+    "id": "mt_bench-0053",
+    "predecessor": "mt_bench-0039",
+    "shared_prefix_tokens": 4,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "mt_bench-0056",
+    "predecessor": "mt_bench-0054",
+    "shared_prefix_tokens": 6,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "mt_bench-0059",
+    "predecessor": "mt_bench-0053",
+    "shared_prefix_tokens": 6,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "alpaca_eval-0450",
+    "predecessor": "alpaca_eval-0290",
+    "shared_prefix_tokens": 4,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "alpaca_eval-0500",
+    "predecessor": "mt_bench-0021",
+    "shared_prefix_tokens": 4,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "gsm8k-0002",
+    "predecessor": "gsm8k-0000",
+    "shared_prefix_tokens": 3,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "gsm8k-0010",
+    "predecessor": "gsm8k-0001",
+    "shared_prefix_tokens": 4,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "humaneval-0008",
+    "predecessor": "humaneval-0000",
+    "shared_prefix_tokens": 22,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "humaneval-0021",
+    "predecessor": "humaneval-0000",
+    "shared_prefix_tokens": 24,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "cnn_dailymail-0014",
+    "predecessor": "cnn_dailymail-0002",
+    "shared_prefix_tokens": 20,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "mt_bench-0012",
+    "predecessor": "mt_bench-0002",
+    "shared_prefix_tokens": 4,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   },
+   {
+    "id": "alpaca_eval-0020",
+    "predecessor": "mt_bench-0008",
+    "shared_prefix_tokens": 5,
+    "tokens_identical": true,
+    "first_logprob_difference": null
+   }
+  ],
+  "prefill_cache_hits": {
+   "prefills": 38,
+   "with_cached_tokens": 0
+  }
  },
  "stops__mtp_s3": {
   "summary": {
