@@ -66,15 +66,16 @@ def sweep_rows(hidden: int, m: int) -> torch.Tensor:
 def side(bound: torch.Tensor, x: torch.Tensor, half: torch.Tensor, lower: bool) -> dict[str, Any]:
     slack = 1e-9 * (1 + x.abs())
     b = bound.double()
-    miss = (x - slack - b) if lower else (b - x - slack)  # positive: the bound misses x
-    bad = ~(miss <= 0)
-    rel = torch.where(bad & torch.isfinite(miss), -miss / half.clamp_min(1e-30), 0.0)
+    # Positive where the bound misses x: a lower bound above x, an upper bound below.
+    miss = (b - (x - slack)) if lower else ((x + slack) - b)
+    bad = ~(miss <= 0)  # NaN counts as a miss
+    rel = torch.where(bad & torch.isfinite(miss), miss / half.clamp_min(1e-30), 0.0)
     return {
         'violations': int(bad.sum()),
         'nan': int(torch.isnan(bound).sum()),
         'inf': int(torch.isinf(bound).sum()),
         'rows_affected': int(bad.any(dim=1).sum()),
-        'max_miss_over_half_width': float(-rel.min()) if bad.any() else 0.0,
+        'max_miss_over_half_width': float(rel.max()) if bad.any() else 0.0,
     }
 
 
