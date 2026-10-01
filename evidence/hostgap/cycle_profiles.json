@@ -1,8 +1,69 @@
 {
+  "generated_by": {
+    "repo_head": "7e42b5797ed4da5cc8eae21ee654d1ec99e48724",
+    "argv": [
+      "experiments/hostgap/summarize.py",
+      "/home/ubuntu/vp-data/hostgap/prof2",
+      "--out",
+      "evidence/hostgap/cycle_profiles.json"
+    ]
+  },
   "tag_dir": "/home/ubuntu/vp-data/hostgap/prof2",
   "labels": {
     "dflash-none": {
       "label": "dflash-none",
+      "provenance": {
+        "started": "2026-10-01T13:37:37",
+        "repo_head": "3bf84799123df2cc7a78eed4ea515aa3064e1f2c",
+        "repo_dirty_files": [],
+        "sglang_head": "bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824",
+        "sglang_branch": "verified-progress",
+        "sglang_dirty_files": [],
+        "env_overrides": {},
+        "launch_command": [
+          "/home/ubuntu/sglang/.venv/bin/python",
+          "-m",
+          "sglang.launch_server",
+          "--model-path",
+          "Qwen/Qwen3.5-4B",
+          "--revision",
+          "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "30100",
+          "--attention-backend",
+          "flashinfer",
+          "--mm-attention-backend",
+          "triton_attn",
+          "--max-running-requests",
+          "128",
+          "--max-mamba-cache-size",
+          "128",
+          "--mem-fraction-static",
+          "0.85",
+          "--enable-metrics",
+          "--random-seed",
+          "0",
+          "--stream-interval",
+          "4",
+          "--speculative-algorithm",
+          "DFLASH",
+          "--speculative-draft-model-path",
+          "z-lab/Qwen3.5-4B-DFlash",
+          "--speculative-draft-model-revision",
+          "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
+          "--speculative-dflash-block-size",
+          "8",
+          "--disable-radix-cache",
+          "--max-total-tokens",
+          "1000000"
+        ],
+        "mode": "none",
+        "host_trace": false,
+        "graph_trace": "graph",
+        "nsys_version": "NVIDIA Nsight Systems version 2025.3.2.474-253236389321v0"
+      },
       "by_concurrency": {
         "1": {
           "counter_windows": {
@@ -27,7 +88,27 @@
               "n": 3
             },
             "foreign_cores_mean": 0.475,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 6.562725415040916,
+                "tokens_per_request_per_cycle": 5.163398692810458,
+                "foreign_cores_mean": 0.475
+              },
+              {
+                "repeat": 1,
+                "cycle_ms": 6.540827596095976,
+                "tokens_per_request_per_cycle": 3.452768729641694,
+                "foreign_cores_mean": 0.265
+              },
+              {
+                "repeat": 2,
+                "cycle_ms": 6.541745283383822,
+                "tokens_per_request_per_cycle": 3.3094462540716614,
+                "foreign_cores_mean": 0.33
+              }
+            ]
           },
           "excluded_windows": []
         },
@@ -54,7 +135,27 @@
               "n": 3
             },
             "foreign_cores_mean": 0.4,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 8.618879420637821,
+                "tokens_per_request_per_cycle": 4.242489270386266,
+                "foreign_cores_mean": 0.22
+              },
+              {
+                "repeat": 1,
+                "cycle_ms": 8.511208800867326,
+                "tokens_per_request_per_cycle": 4.735169491525424,
+                "foreign_cores_mean": 0.4
+              },
+              {
+                "repeat": 2,
+                "cycle_ms": 8.621568407722481,
+                "tokens_per_request_per_cycle": 4.84549356223176,
+                "foreign_cores_mean": 0.245
+              }
+            ]
           },
           "excluded_windows": []
         },
@@ -81,7 +182,21 @@
               "n": 2
             },
             "foreign_cores_mean": 0.585,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 15.813339692971295,
+                "tokens_per_request_per_cycle": 4.849409448818897,
+                "foreign_cores_mean": 0.27
+              },
+              {
+                "repeat": 1,
+                "cycle_ms": 15.703402585927506,
+                "tokens_per_request_per_cycle": 5.0068359375,
+                "foreign_cores_mean": 0.585
+              }
+            ]
           },
           "excluded_windows": [
             {
@@ -94,6 +209,69 @@
     },
     "dflash-patched-host": {
       "label": "dflash-patched-host",
+      "provenance": {
+        "started": "2026-10-01T13:43:32",
+        "repo_head": "3bf84799123df2cc7a78eed4ea515aa3064e1f2c",
+        "repo_dirty_files": [],
+        "sglang_head": "02b0e36ec881b96c387d0c134673b89236005f05",
+        "sglang_branch": "engine/hostgap",
+        "sglang_dirty_files": [],
+        "env_overrides": {
+          "SGLANG_HOSTGAP_VERIFY_PLAN": "1",
+          "SGLANG_HOSTGAP_DRAFT_INDPTR": "1",
+          "SGLANG_HOSTGAP_DFLASH_DRAFT_PLAN": "1"
+        },
+        "launch_command": [
+          "nsys",
+          "launch",
+          "--session-new=hostgap_197853",
+          "--trace=cuda,nvtx",
+          "--cuda-graph-trace=graph",
+          "--cuda-flush-interval=250",
+          "--python-functions-trace=/home/ubuntu/vp-wt/hostgap/experiments/hostgap/host_functions.json",
+          "/home/ubuntu/sglang/.venv/bin/python",
+          "-m",
+          "sglang.launch_server",
+          "--model-path",
+          "Qwen/Qwen3.5-4B",
+          "--revision",
+          "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "30100",
+          "--attention-backend",
+          "flashinfer",
+          "--mm-attention-backend",
+          "triton_attn",
+          "--max-running-requests",
+          "128",
+          "--max-mamba-cache-size",
+          "128",
+          "--mem-fraction-static",
+          "0.85",
+          "--enable-metrics",
+          "--random-seed",
+          "0",
+          "--stream-interval",
+          "4",
+          "--speculative-algorithm",
+          "DFLASH",
+          "--speculative-draft-model-path",
+          "z-lab/Qwen3.5-4B-DFlash",
+          "--speculative-draft-model-revision",
+          "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
+          "--speculative-dflash-block-size",
+          "8",
+          "--disable-radix-cache",
+          "--max-total-tokens",
+          "1000000"
+        ],
+        "mode": "nsys",
+        "host_trace": true,
+        "graph_trace": "graph",
+        "nsys_version": "NVIDIA Nsight Systems version 2025.3.2.474-253236389321v0"
+      },
       "by_concurrency": {
         "1": {
           "counter_windows": {
@@ -118,7 +296,15 @@
               "n": 1
             },
             "foreign_cores_mean": 0.245,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 7.046887056142288,
+                "tokens_per_request_per_cycle": 5.3052631578947365,
+                "foreign_cores_mean": 0.245
+              }
+            ]
           },
           "excluded_windows": [],
           "trace": {
@@ -430,7 +616,15 @@
               "n": 1
             },
             "foreign_cores_mean": 0.49,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 9.171090246596561,
+                "tokens_per_request_per_cycle": 4.175799086757991,
+                "foreign_cores_mean": 0.49
+              }
+            ]
           },
           "excluded_windows": [],
           "trace": {
@@ -753,7 +947,15 @@
               "n": 1
             },
             "foreign_cores_mean": 0.275,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 15.940795396870401,
+                "tokens_per_request_per_cycle": 4.785714285714286,
+                "foreign_cores_mean": 0.275
+              }
+            ]
           },
           "excluded_windows": [],
           "trace": {
@@ -1044,6 +1246,62 @@
     },
     "dflash-patched-none": {
       "label": "dflash-patched-none",
+      "provenance": {
+        "started": "2026-10-01T13:40:45",
+        "repo_head": "3bf84799123df2cc7a78eed4ea515aa3064e1f2c",
+        "repo_dirty_files": [],
+        "sglang_head": "02b0e36ec881b96c387d0c134673b89236005f05",
+        "sglang_branch": "engine/hostgap",
+        "sglang_dirty_files": [],
+        "env_overrides": {
+          "SGLANG_HOSTGAP_VERIFY_PLAN": "1",
+          "SGLANG_HOSTGAP_DRAFT_INDPTR": "1",
+          "SGLANG_HOSTGAP_DFLASH_DRAFT_PLAN": "1"
+        },
+        "launch_command": [
+          "/home/ubuntu/sglang/.venv/bin/python",
+          "-m",
+          "sglang.launch_server",
+          "--model-path",
+          "Qwen/Qwen3.5-4B",
+          "--revision",
+          "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "30100",
+          "--attention-backend",
+          "flashinfer",
+          "--mm-attention-backend",
+          "triton_attn",
+          "--max-running-requests",
+          "128",
+          "--max-mamba-cache-size",
+          "128",
+          "--mem-fraction-static",
+          "0.85",
+          "--enable-metrics",
+          "--random-seed",
+          "0",
+          "--stream-interval",
+          "4",
+          "--speculative-algorithm",
+          "DFLASH",
+          "--speculative-draft-model-path",
+          "z-lab/Qwen3.5-4B-DFlash",
+          "--speculative-draft-model-revision",
+          "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
+          "--speculative-dflash-block-size",
+          "8",
+          "--disable-radix-cache",
+          "--max-total-tokens",
+          "1000000"
+        ],
+        "mode": "none",
+        "host_trace": false,
+        "graph_trace": "graph",
+        "nsys_version": "NVIDIA Nsight Systems version 2025.3.2.474-253236389321v0"
+      },
       "by_concurrency": {
         "1": {
           "counter_windows": {
@@ -1068,7 +1326,27 @@
               "n": 3
             },
             "foreign_cores_mean": 0.755,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 6.498873449860496,
+                "tokens_per_request_per_cycle": 5.074433656957929,
+                "foreign_cores_mean": 0.32
+              },
+              {
+                "repeat": 1,
+                "cycle_ms": 6.458512041811349,
+                "tokens_per_request_per_cycle": 3.446945337620579,
+                "foreign_cores_mean": 0.575
+              },
+              {
+                "repeat": 2,
+                "cycle_ms": 6.499617430419152,
+                "tokens_per_request_per_cycle": 3.3009708737864076,
+                "foreign_cores_mean": 0.755
+              }
+            ]
           },
           "excluded_windows": [],
           "pyspy": {
@@ -1106,7 +1384,27 @@
               "n": 3
             },
             "foreign_cores_mean": 0.425,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 8.509749262699742,
+                "tokens_per_request_per_cycle": 4.266949152542373,
+                "foreign_cores_mean": 0.27
+              },
+              {
+                "repeat": 1,
+                "cycle_ms": 8.54946642555544,
+                "tokens_per_request_per_cycle": 4.793617021276596,
+                "foreign_cores_mean": 0.36
+              },
+              {
+                "repeat": 2,
+                "cycle_ms": 8.510407843228462,
+                "tokens_per_request_per_cycle": 5.004237288135593,
+                "foreign_cores_mean": 0.425
+              }
+            ]
           },
           "excluded_windows": []
         },
@@ -1133,7 +1431,27 @@
               "n": 3
             },
             "foreign_cores_mean": 0.46,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 15.56755517056219,
+                "tokens_per_request_per_cycle": 4.775193798449612,
+                "foreign_cores_mean": 0.22
+              },
+              {
+                "repeat": 1,
+                "cycle_ms": 15.453433107625013,
+                "tokens_per_request_per_cycle": 4.953846153846154,
+                "foreign_cores_mean": 0.46
+              },
+              {
+                "repeat": 2,
+                "cycle_ms": 15.451495115345237,
+                "tokens_per_request_per_cycle": 4.5278846153846155,
+                "foreign_cores_mean": 0.215
+              }
+            ]
           },
           "excluded_windows": []
         }
@@ -1141,6 +1459,59 @@
     },
     "mtp-none": {
       "label": "mtp-none",
+      "provenance": {
+        "started": "2026-10-01T13:27:39",
+        "repo_head": "3bf84799123df2cc7a78eed4ea515aa3064e1f2c",
+        "repo_dirty_files": [],
+        "sglang_head": "bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824",
+        "sglang_branch": "verified-progress",
+        "sglang_dirty_files": [],
+        "env_overrides": {},
+        "launch_command": [
+          "/home/ubuntu/sglang/.venv/bin/python",
+          "-m",
+          "sglang.launch_server",
+          "--model-path",
+          "Qwen/Qwen3.5-4B",
+          "--revision",
+          "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "30100",
+          "--attention-backend",
+          "flashinfer",
+          "--mm-attention-backend",
+          "triton_attn",
+          "--max-running-requests",
+          "128",
+          "--max-mamba-cache-size",
+          "128",
+          "--mem-fraction-static",
+          "0.85",
+          "--enable-metrics",
+          "--random-seed",
+          "0",
+          "--stream-interval",
+          "4",
+          "--speculative-algorithm",
+          "NEXTN",
+          "--speculative-num-steps",
+          "3",
+          "--speculative-eagle-topk",
+          "1",
+          "--speculative-num-draft-tokens",
+          "4",
+          "--enable-linear-replayssm-spec",
+          "--disable-radix-cache",
+          "--max-total-tokens",
+          "1000000"
+        ],
+        "mode": "none",
+        "host_trace": false,
+        "graph_trace": "graph",
+        "nsys_version": "NVIDIA Nsight Systems version 2025.3.2.474-253236389321v0"
+      },
       "by_concurrency": {
         "1": {
           "counter_windows": {
@@ -1165,7 +1536,27 @@
               "n": 3
             },
             "foreign_cores_mean": 0.445,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 6.928674482784619,
+                "tokens_per_request_per_cycle": 3.282758620689655,
+                "foreign_cores_mean": 0.44
+              },
+              {
+                "repeat": 1,
+                "cycle_ms": 6.927741068949248,
+                "tokens_per_request_per_cycle": 3.3241379310344827,
+                "foreign_cores_mean": 0.395
+              },
+              {
+                "repeat": 2,
+                "cycle_ms": 6.9283341793223,
+                "tokens_per_request_per_cycle": 3.268965517241379,
+                "foreign_cores_mean": 0.445
+              }
+            ]
           },
           "excluded_windows": []
         },
@@ -1192,7 +1583,27 @@
               "n": 3
             },
             "foreign_cores_mean": 0.385,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 7.727044484580312,
+                "tokens_per_request_per_cycle": 3.171153846153846,
+                "foreign_cores_mean": 0.385
+              },
+              {
+                "repeat": 1,
+                "cycle_ms": 7.728269849982238,
+                "tokens_per_request_per_cycle": 3.2807692307692307,
+                "foreign_cores_mean": 0.14
+              },
+              {
+                "repeat": 2,
+                "cycle_ms": 7.726739373062558,
+                "tokens_per_request_per_cycle": 3.1942307692307694,
+                "foreign_cores_mean": 0.18
+              }
+            ]
           },
           "excluded_windows": [],
           "pyspy": {
@@ -1233,7 +1644,27 @@
               "n": 3
             },
             "foreign_cores_mean": 0.475,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 10.046512879998772,
+                "tokens_per_request_per_cycle": 3.293125,
+                "foreign_cores_mean": 0.25
+              },
+              {
+                "repeat": 1,
+                "cycle_ms": 10.204881030417917,
+                "tokens_per_request_per_cycle": 3.328045685279188,
+                "foreign_cores_mean": 0.475
+              },
+              {
+                "repeat": 2,
+                "cycle_ms": 9.995791358254683,
+                "tokens_per_request_per_cycle": 3.128731343283582,
+                "foreign_cores_mean": 0.16
+              }
+            ]
           },
           "excluded_windows": []
         },
@@ -1260,7 +1691,27 @@
               "n": 3
             },
             "foreign_cores_mean": 0.76,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 13.13499473858993,
+                "tokens_per_request_per_cycle": 3.27859477124183,
+                "foreign_cores_mean": 0.76
+              },
+              {
+                "repeat": 1,
+                "cycle_ms": 13.13411128753644,
+                "tokens_per_request_per_cycle": 3.189542483660131,
+                "foreign_cores_mean": 0.19
+              },
+              {
+                "repeat": 2,
+                "cycle_ms": 13.307096271537436,
+                "tokens_per_request_per_cycle": 3.170115894039735,
+                "foreign_cores_mean": 0.295
+              }
+            ]
           },
           "excluded_windows": [],
           "pyspy": {
@@ -1301,7 +1752,27 @@
               "n": 3
             },
             "foreign_cores_mean": 0.455,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 20.51192743876564,
+                "tokens_per_request_per_cycle": 3.2346938775510203,
+                "foreign_cores_mean": 0.355
+              },
+              {
+                "repeat": 1,
+                "cycle_ms": 20.302086363598292,
+                "tokens_per_request_per_cycle": 3.1928661616161618,
+                "foreign_cores_mean": 0.455
+              },
+              {
+                "repeat": 2,
+                "cycle_ms": 20.09894870003336,
+                "tokens_per_request_per_cycle": 3.1653125,
+                "foreign_cores_mean": 0.225
+              }
+            ]
           },
           "excluded_windows": [],
           "pyspy": {
@@ -1323,6 +1794,70 @@
     },
     "mtp-patched-host": {
       "label": "mtp-patched-host",
+      "provenance": {
+        "started": "2026-10-01T13:35:04",
+        "repo_head": "3bf84799123df2cc7a78eed4ea515aa3064e1f2c",
+        "repo_dirty_files": [],
+        "sglang_head": "02b0e36ec881b96c387d0c134673b89236005f05",
+        "sglang_branch": "engine/hostgap",
+        "sglang_dirty_files": [],
+        "env_overrides": {
+          "SGLANG_HOSTGAP_VERIFY_PLAN": "1",
+          "SGLANG_HOSTGAP_DRAFT_INDPTR": "1",
+          "SGLANG_HOSTGAP_DFLASH_DRAFT_PLAN": "1"
+        },
+        "launch_command": [
+          "nsys",
+          "launch",
+          "--session-new=hostgap_128787",
+          "--trace=cuda,nvtx",
+          "--cuda-graph-trace=graph",
+          "--cuda-flush-interval=250",
+          "--python-functions-trace=/home/ubuntu/vp-wt/hostgap/experiments/hostgap/host_functions.json",
+          "/home/ubuntu/sglang/.venv/bin/python",
+          "-m",
+          "sglang.launch_server",
+          "--model-path",
+          "Qwen/Qwen3.5-4B",
+          "--revision",
+          "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "30100",
+          "--attention-backend",
+          "flashinfer",
+          "--mm-attention-backend",
+          "triton_attn",
+          "--max-running-requests",
+          "128",
+          "--max-mamba-cache-size",
+          "128",
+          "--mem-fraction-static",
+          "0.85",
+          "--enable-metrics",
+          "--random-seed",
+          "0",
+          "--stream-interval",
+          "4",
+          "--speculative-algorithm",
+          "NEXTN",
+          "--speculative-num-steps",
+          "3",
+          "--speculative-eagle-topk",
+          "1",
+          "--speculative-num-draft-tokens",
+          "4",
+          "--enable-linear-replayssm-spec",
+          "--disable-radix-cache",
+          "--max-total-tokens",
+          "1000000"
+        ],
+        "mode": "nsys",
+        "host_trace": true,
+        "graph_trace": "graph",
+        "nsys_version": "NVIDIA Nsight Systems version 2025.3.2.474-253236389321v0"
+      },
       "by_concurrency": {
         "1": {
           "counter_windows": {
@@ -1347,7 +1882,15 @@
               "n": 1
             },
             "foreign_cores_mean": 1.0,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 7.149868580041241,
+                "tokens_per_request_per_cycle": 3.373665480427046,
+                "foreign_cores_mean": 1.0
+              }
+            ]
           },
           "excluded_windows": [],
           "trace": {
@@ -1739,7 +2282,15 @@
               "n": 1
             },
             "foreign_cores_mean": 0.385,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 8.234248192612078,
+                "tokens_per_request_per_cycle": 3.1311475409836067,
+                "foreign_cores_mean": 0.385
+              }
+            ]
           },
           "excluded_windows": [],
           "trace": {
@@ -2132,7 +2683,15 @@
               "n": 1
             },
             "foreign_cores_mean": 0.205,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 10.3638604330289,
+                "tokens_per_request_per_cycle": 3.3588917525773194,
+                "foreign_cores_mean": 0.205
+              }
+            ]
           },
           "excluded_windows": [],
           "trace": {
@@ -2517,7 +3076,15 @@
               "n": 1
             },
             "foreign_cores_mean": 0.22,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 13.219210848738408,
+                "tokens_per_request_per_cycle": 3.333470394736842,
+                "foreign_cores_mean": 0.22
+              }
+            ]
           },
           "excluded_windows": [],
           "trace": {
@@ -2902,7 +3469,15 @@
               "n": 1
             },
             "foreign_cores_mean": 0.125,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 19.704073931315374,
+                "tokens_per_request_per_cycle": 3.221200980392157,
+                "foreign_cores_mean": 0.125
+              }
+            ]
           },
           "excluded_windows": [],
           "trace": {
@@ -3267,6 +3842,63 @@
     },
     "mtp-patched-none": {
       "label": "mtp-patched-none",
+      "provenance": {
+        "started": "2026-10-01T13:31:24",
+        "repo_head": "3bf84799123df2cc7a78eed4ea515aa3064e1f2c",
+        "repo_dirty_files": [],
+        "sglang_head": "02b0e36ec881b96c387d0c134673b89236005f05",
+        "sglang_branch": "engine/hostgap",
+        "sglang_dirty_files": [],
+        "env_overrides": {
+          "SGLANG_HOSTGAP_VERIFY_PLAN": "1",
+          "SGLANG_HOSTGAP_DRAFT_INDPTR": "1",
+          "SGLANG_HOSTGAP_DFLASH_DRAFT_PLAN": "1"
+        },
+        "launch_command": [
+          "/home/ubuntu/sglang/.venv/bin/python",
+          "-m",
+          "sglang.launch_server",
+          "--model-path",
+          "Qwen/Qwen3.5-4B",
+          "--revision",
+          "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "30100",
+          "--attention-backend",
+          "flashinfer",
+          "--mm-attention-backend",
+          "triton_attn",
+          "--max-running-requests",
+          "128",
+          "--max-mamba-cache-size",
+          "128",
+          "--mem-fraction-static",
+          "0.85",
+          "--enable-metrics",
+          "--random-seed",
+          "0",
+          "--stream-interval",
+          "4",
+          "--speculative-algorithm",
+          "NEXTN",
+          "--speculative-num-steps",
+          "3",
+          "--speculative-eagle-topk",
+          "1",
+          "--speculative-num-draft-tokens",
+          "4",
+          "--enable-linear-replayssm-spec",
+          "--disable-radix-cache",
+          "--max-total-tokens",
+          "1000000"
+        ],
+        "mode": "none",
+        "host_trace": false,
+        "graph_trace": "graph",
+        "nsys_version": "NVIDIA Nsight Systems version 2025.3.2.474-253236389321v0"
+      },
       "by_concurrency": {
         "1": {
           "counter_windows": {
@@ -3291,7 +3923,27 @@
               "n": 3
             },
             "foreign_cores_mean": 0.59,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 6.743319469817364,
+                "tokens_per_request_per_cycle": 3.140939597315436,
+                "foreign_cores_mean": 0.41
+              },
+              {
+                "repeat": 1,
+                "cycle_ms": 6.743440701383644,
+                "tokens_per_request_per_cycle": 3.0201342281879193,
+                "foreign_cores_mean": 0.59
+              },
+              {
+                "repeat": 2,
+                "cycle_ms": 6.741963862421947,
+                "tokens_per_request_per_cycle": 3.3422818791946307,
+                "foreign_cores_mean": 0.23
+              }
+            ]
           },
           "excluded_windows": [],
           "pyspy": {
@@ -3332,7 +3984,27 @@
               "n": 3
             },
             "foreign_cores_mean": 0.45,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 7.469144680313974,
+                "tokens_per_request_per_cycle": 3.1115241635687734,
+                "foreign_cores_mean": 0.45
+              },
+              {
+                "repeat": 1,
+                "cycle_ms": 7.497259164176909,
+                "tokens_per_request_per_cycle": 3.3955223880597014,
+                "foreign_cores_mean": 0.255
+              },
+              {
+                "repeat": 2,
+                "cycle_ms": 7.499981339538293,
+                "tokens_per_request_per_cycle": 3.125,
+                "foreign_cores_mean": 0.42
+              }
+            ]
           },
           "excluded_windows": [],
           "pyspy": {
@@ -3373,7 +4045,27 @@
               "n": 3
             },
             "foreign_cores_mean": 0.445,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 9.659634225919525,
+                "tokens_per_request_per_cycle": 3.225360576923077,
+                "foreign_cores_mean": 0.19
+              },
+              {
+                "repeat": 1,
+                "cycle_ms": 9.614008272726213,
+                "tokens_per_request_per_cycle": 3.312799043062201,
+                "foreign_cores_mean": 0.22
+              },
+              {
+                "repeat": 2,
+                "cycle_ms": 9.61404808133542,
+                "tokens_per_request_per_cycle": 3.1543062200956937,
+                "foreign_cores_mean": 0.445
+              }
+            ]
           },
           "excluded_windows": []
         },
@@ -3400,7 +4092,27 @@
               "n": 3
             },
             "foreign_cores_mean": 0.305,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 12.637567899333396,
+                "tokens_per_request_per_cycle": 3.3266509433962264,
+                "foreign_cores_mean": 0.27
+              },
+              {
+                "repeat": 1,
+                "cycle_ms": 12.569786406311323,
+                "tokens_per_request_per_cycle": 3.157421875,
+                "foreign_cores_mean": 0.305
+              },
+              {
+                "repeat": 2,
+                "cycle_ms": 12.569541012544505,
+                "tokens_per_request_per_cycle": 3.21953125,
+                "foreign_cores_mean": 0.205
+              }
+            ]
           },
           "excluded_windows": []
         },
@@ -3427,7 +4139,27 @@
               "n": 3
             },
             "foreign_cores_mean": 0.48,
-            "contended": false
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 19.318367211431344,
+                "tokens_per_request_per_cycle": 3.2154447115384617,
+                "foreign_cores_mean": 0.205
+              },
+              {
+                "repeat": 1,
+                "cycle_ms": 19.51218722331636,
+                "tokens_per_request_per_cycle": 3.1978155339805827,
+                "foreign_cores_mean": 0.48
+              },
+              {
+                "repeat": 2,
+                "cycle_ms": 19.142241742866602,
+                "tokens_per_request_per_cycle": 3.201488095238095,
+                "foreign_cores_mean": 0.39
+              }
+            ]
           },
           "excluded_windows": [],
           "pyspy": {
@@ -3449,9 +4181,66 @@
     }
   },
   "derived_idle": {
+    "dflash": {
+      "1": {
+        "unprofiled_cycle_ms": 6.548432764840238,
+        "gpu_busy_source": "dflash-patched-host (assumed equal: same graphs and kernels)",
+        "traced_gpu_busy_ms_per_cycle": 5.187602927480916,
+        "derived_unprofiled_idle_ms_per_cycle": 1.3608298373593222,
+        "derived_unprofiled_idle_fraction": 0.2078100037410283,
+        "tokens_per_s_per_user": {
+          "mean": 606.8508689225574,
+          "std": 156.20742677093816,
+          "n": 3
+        },
+        "tokens_per_request_per_cycle": {
+          "mean": 3.975204558841271,
+          "std": 1.0314985739204732,
+          "n": 3
+        },
+        "foreign_cores_mean": 0.475
+      },
+      "8": {
+        "unprofiled_cycle_ms": 8.583885543075876,
+        "gpu_busy_source": "dflash-patched-host (assumed equal: same graphs and kernels)",
+        "traced_gpu_busy_ms_per_cycle": 7.200277023809524,
+        "derived_unprofiled_idle_ms_per_cycle": 1.3836085192663523,
+        "derived_unprofiled_idle_fraction": 0.1611867390732428,
+        "tokens_per_s_per_user": {
+          "mean": 536.8657341727579,
+          "std": 38.75784747788077,
+          "n": 3
+        },
+        "tokens_per_request_per_cycle": {
+          "mean": 4.60771744138115,
+          "std": 0.32107096226614024,
+          "n": 3
+        },
+        "foreign_cores_mean": 0.4
+      },
+      "32": {
+        "unprofiled_cycle_ms": 15.758371139449402,
+        "gpu_busy_source": "dflash-patched-host (assumed equal: same graphs and kernels)",
+        "traced_gpu_busy_ms_per_cycle": 14.299603612903226,
+        "derived_unprofiled_idle_ms_per_cycle": 1.4587675265461755,
+        "derived_unprofiled_idle_fraction": 0.09257095886606621,
+        "tokens_per_s_per_user": {
+          "mean": 312.75169151311457,
+          "std": 8.60684142978735,
+          "n": 2
+        },
+        "tokens_per_request_per_cycle": {
+          "mean": 4.928122693159448,
+          "std": 0.11131733768479503,
+          "n": 2
+        },
+        "foreign_cores_mean": 0.585
+      }
+    },
     "dflash-patched": {
       "1": {
         "unprofiled_cycle_ms": 6.485667640696999,
+        "gpu_busy_source": "dflash-patched-host",
         "traced_gpu_busy_ms_per_cycle": 5.187602927480916,
         "derived_unprofiled_idle_ms_per_cycle": 1.2980647132160827,
         "derived_unprofiled_idle_fraction": 0.20014357582415107,
@@ -3472,6 +4261,7 @@
       },
       "8": {
         "unprofiled_cycle_ms": 8.523207843827882,
+        "gpu_busy_source": "dflash-patched-host",
         "traced_gpu_busy_ms_per_cycle": 7.200277023809524,
         "derived_unprofiled_idle_ms_per_cycle": 1.3229308200183576,
         "derived_unprofiled_idle_fraction": 0.15521513076515714,
@@ -3492,6 +4282,7 @@
       },
       "32": {
         "unprofiled_cycle_ms": 15.490827797844148,
+        "gpu_busy_source": "dflash-patched-host",
         "traced_gpu_busy_ms_per_cycle": 14.299603612903226,
         "derived_unprofiled_idle_ms_per_cycle": 1.1912241849409213,
         "derived_unprofiled_idle_fraction": 0.07689867839772278,
@@ -3511,15 +4302,109 @@
         "foreign_cores_mean": 0.46
       }
     },
+    "mtp": {
+      "1": {
+        "unprofiled_cycle_ms": 6.928249910352055,
+        "gpu_busy_source": "mtp-patched-host (assumed equal: same graphs and kernels)",
+        "traced_gpu_busy_ms_per_cycle": 5.491325537848605,
+        "derived_unprofiled_idle_ms_per_cycle": 1.4369243725034497,
+        "derived_unprofiled_idle_fraction": 0.20740077091567172,
+        "tokens_per_s_per_user": {
+          "mean": 475.14958969166963,
+          "std": 4.171022713813958,
+          "n": 3
+        },
+        "tokens_per_request_per_cycle": {
+          "mean": 3.291954022988506,
+          "std": 0.02871263447539499,
+          "n": 3
+        },
+        "foreign_cores_mean": 0.445
+      },
+      "8": {
+        "unprofiled_cycle_ms": 7.7273512358750365,
+        "gpu_busy_source": "mtp-patched-host (assumed equal: same graphs and kernels)",
+        "traced_gpu_busy_ms_per_cycle": 6.223740137931035,
+        "derived_unprofiled_idle_ms_per_cycle": 1.5036110979440016,
+        "derived_unprofiled_idle_fraction": 0.1945829886654213,
+        "tokens_per_s_per_user": {
+          "mean": 416.1038894816579,
+          "std": 7.437663692406311,
+          "n": 3
+        },
+        "tokens_per_request_per_cycle": {
+          "mean": 3.215384615384615,
+          "std": 0.05778838154352581,
+          "n": 3
+        },
+        "foreign_cores_mean": 0.385
+      },
+      "32": {
+        "unprofiled_cycle_ms": 10.082395089557124,
+        "gpu_busy_source": "mtp-patched-host (assumed equal: same graphs and kernels)",
+        "traced_gpu_busy_ms_per_cycle": 8.409593542553193,
+        "derived_unprofiled_idle_ms_per_cycle": 1.6728015470039317,
+        "derived_unprofiled_idle_fraction": 0.16591311212715137,
+        "tokens_per_s_per_user": {
+          "mean": 322.3052198236892,
+          "std": 8.097248097765924,
+          "n": 3
+        },
+        "tokens_per_request_per_cycle": {
+          "mean": 3.249967342854257,
+          "std": 0.10643537597536577,
+          "n": 3
+        },
+        "foreign_cores_mean": 0.475
+      },
+      "64": {
+        "unprofiled_cycle_ms": 13.192067432554602,
+        "gpu_busy_source": "mtp-patched-host (assumed equal: same graphs and kernels)",
+        "traced_gpu_busy_ms_per_cycle": 11.467703628378379,
+        "derived_unprofiled_idle_ms_per_cycle": 1.7243638041762228,
+        "derived_unprofiled_idle_fraction": 0.13071217328081117,
+        "tokens_per_s_per_user": {
+          "mean": 243.55975691674777,
+          "std": 5.723721050758196,
+          "n": 3
+        },
+        "tokens_per_request_per_cycle": {
+          "mean": 3.2127510496472325,
+          "std": 0.05784371055819302,
+          "n": 3
+        },
+        "foreign_cores_mean": 0.76
+      },
+      "128": {
+        "unprofiled_cycle_ms": 20.30432083413243,
+        "gpu_busy_source": "mtp-patched-host (assumed equal: same graphs and kernels)",
+        "traced_gpu_busy_ms_per_cycle": 18.51925990909091,
+        "derived_unprofiled_idle_ms_per_cycle": 1.7850609250415204,
+        "derived_unprofiled_idle_fraction": 0.08791532303019743,
+        "tokens_per_s_per_user": {
+          "mean": 157.48418237921427,
+          "std": 0.2151633138293195,
+          "n": 3
+        },
+        "tokens_per_request_per_cycle": {
+          "mean": 3.197624179722394,
+          "std": 0.034934552236199144,
+          "n": 3
+        },
+        "foreign_cores_mean": 0.455
+      }
+    },
     "mtp-patched": {
       "1": {
         "unprofiled_cycle_ms": 6.7429080112076525,
+        "gpu_busy_source": "mtp-patched-host",
         "traced_gpu_busy_ms_per_cycle": 5.491325537848605,
         "derived_unprofiled_idle_ms_per_cycle": 1.251582473359047,
         "derived_unprofiled_idle_fraction": 0.18561464449444404,
         "profiled_cycle_ms": 8.132404466135458,
         "profiled_idle_ms_per_cycle": 2.641078928286853,
         "profiled_idle_fraction": 0.3247599082515753,
+        "gpu_work_queued_at_resolve_ms": 0.5439,
         "tokens_per_s_per_user": {
           "mean": 469.7969837723413,
           "std": 24.19105182176794,
@@ -3534,12 +4419,14 @@
       },
       "8": {
         "unprofiled_cycle_ms": 7.488795061343058,
+        "gpu_busy_source": "mtp-patched-host",
         "traced_gpu_busy_ms_per_cycle": 6.223740137931035,
         "derived_unprofiled_idle_ms_per_cycle": 1.2650549234120234,
         "derived_unprofiled_idle_fraction": 0.16892636439501463,
         "profiled_cycle_ms": 8.769073314655172,
         "profiled_idle_ms_per_cycle": 2.545333176724138,
         "profiled_idle_fraction": 0.2902625038463632,
+        "gpu_work_queued_at_resolve_ms": 0.5691,
         "tokens_per_s_per_user": {
           "mean": 428.71775469401155,
           "std": 20.94406481330501,
@@ -3554,12 +4441,14 @@
       },
       "32": {
         "unprofiled_cycle_ms": 9.629230193327054,
+        "gpu_busy_source": "mtp-patched-host",
         "traced_gpu_busy_ms_per_cycle": 8.409593542553193,
         "derived_unprofiled_idle_ms_per_cycle": 1.219636650773861,
         "derived_unprofiled_idle_fraction": 0.1266598291127213,
         "profiled_cycle_ms": 10.832109186170213,
         "profiled_idle_ms_per_cycle": 2.422515643617021,
         "profiled_idle_fraction": 0.22364209979621918,
+        "gpu_work_queued_at_resolve_ms": 0.6228,
         "tokens_per_s_per_user": {
           "mean": 335.5249256332065,
           "std": 8.362604315140974,
@@ -3574,12 +4463,14 @@
       },
       "64": {
         "unprofiled_cycle_ms": 12.592298439396409,
+        "gpu_busy_source": "mtp-patched-host",
         "traced_gpu_busy_ms_per_cycle": 11.467703628378379,
         "derived_unprofiled_idle_ms_per_cycle": 1.1245948110180297,
         "derived_unprofiled_idle_fraction": 0.08930814469101285,
         "profiled_cycle_ms": 13.747656763513513,
         "profiled_idle_ms_per_cycle": 2.279953135135135,
         "profiled_idle_fraction": 0.16584303597004,
+        "gpu_work_queued_at_resolve_ms": 0.7005,
         "tokens_per_s_per_user": {
           "mean": 256.85465513583716,
           "std": 6.0537847261376205,
@@ -3594,12 +4485,14 @@
       },
       "128": {
         "unprofiled_cycle_ms": 19.324265392538102,
+        "gpu_busy_source": "mtp-patched-host",
         "traced_gpu_busy_ms_per_cycle": 18.51925990909091,
         "derived_unprofiled_idle_ms_per_cycle": 0.8050054834471929,
         "derived_unprofiled_idle_fraction": 0.04165775345633779,
         "profiled_cycle_ms": 20.58270721212121,
         "profiled_idle_ms_per_cycle": 2.063447303030303,
         "profiled_idle_fraction": 0.1002515015039,
+        "gpu_work_queued_at_resolve_ms": 0.9006,
         "tokens_per_s_per_user": {
           "mean": 165.8601189794609,
           "std": 1.75429316326916,
@@ -3611,6 +4504,144 @@
           "n": 3
         },
         "foreign_cores_mean": 0.48
+      }
+    }
+  },
+  "before_after": {
+    "dflash": {
+      "started": {
+        "stock": "2026-10-01T13:37:37",
+        "patched": "2026-10-01T13:40:45"
+      },
+      "by_concurrency": {
+        "1": {
+          "stock_cycle_ms": {
+            "mean": 6.548432764840238,
+            "std": 0.012386299883692848,
+            "n": 3
+          },
+          "patched_cycle_ms": {
+            "mean": 6.485667640696999,
+            "std": 0.023520380309354078,
+            "n": 3
+          },
+          "cycle_change_ms": -0.06276512414323943,
+          "cycle_change_fraction": -0.009584755069982107,
+          "removed_share_of_stock_idle": 0.046122683689119114
+        },
+        "8": {
+          "stock_cycle_ms": {
+            "mean": 8.583885543075876,
+            "std": 0.06295426360796708,
+            "n": 3
+          },
+          "patched_cycle_ms": {
+            "mean": 8.523207843827882,
+            "std": 0.02274298282625588,
+            "n": 3
+          },
+          "cycle_change_ms": -0.06067769924799471,
+          "cycle_change_fraction": -0.007068791742795301,
+          "removed_share_of_stock_idle": 0.04385467305460694
+        },
+        "32": {
+          "stock_cycle_ms": {
+            "mean": 15.758371139449402,
+            "std": 0.0777372738946948,
+            "n": 2
+          },
+          "patched_cycle_ms": {
+            "mean": 15.490827797844148,
+            "std": 0.06645491890506912,
+            "n": 3
+          },
+          "cycle_change_ms": -0.26754334160525417,
+          "cycle_change_fraction": -0.016977855086525277,
+          "removed_share_of_stock_idle": 0.1834036861505262
+        }
+      }
+    },
+    "mtp": {
+      "started": {
+        "stock": "2026-10-01T13:27:39",
+        "patched": "2026-10-01T13:31:24"
+      },
+      "by_concurrency": {
+        "1": {
+          "stock_cycle_ms": {
+            "mean": 6.928249910352055,
+            "std": 0.0004723783351563112,
+            "n": 3
+          },
+          "patched_cycle_ms": {
+            "mean": 6.7429080112076525,
+            "std": 0.0008199005856359725,
+            "n": 3
+          },
+          "cycle_change_ms": -0.1853418991444027,
+          "cycle_change_fraction": -0.026751618596706283,
+          "removed_share_of_stock_idle": 0.1289851454196541
+        },
+        "8": {
+          "stock_cycle_ms": {
+            "mean": 7.7273512358750365,
+            "std": 0.0008100383744180265,
+            "n": 3
+          },
+          "patched_cycle_ms": {
+            "mean": 7.488795061343058,
+            "std": 0.01707207268071703,
+            "n": 3
+          },
+          "cycle_change_ms": -0.2385561745319782,
+          "cycle_change_fraction": -0.030871661873535163,
+          "removed_share_of_stock_idle": 0.15865550264837341
+        },
+        "32": {
+          "stock_cycle_ms": {
+            "mean": 10.082395089557124,
+            "std": 0.10906545041132085,
+            "n": 3
+          },
+          "patched_cycle_ms": {
+            "mean": 9.629230193327054,
+            "std": 0.026330672125762955,
+            "n": 3
+          },
+          "cycle_change_ms": -0.4531648962300707,
+          "cycle_change_fraction": -0.04494615537328406,
+          "removed_share_of_stock_idle": 0.27090176778094865
+        },
+        "64": {
+          "stock_cycle_ms": {
+            "mean": 13.192067432554602,
+            "std": 0.09961887607148076,
+            "n": 3
+          },
+          "patched_cycle_ms": {
+            "mean": 12.592298439396409,
+            "std": 0.03920469432051624,
+            "n": 3
+          },
+          "cycle_change_ms": -0.5997689931581931,
+          "cycle_change_fraction": -0.04546436684200982,
+          "removed_share_of_stock_idle": 0.3478204493191155
+        },
+        "128": {
+          "stock_cycle_ms": {
+            "mean": 20.30432083413243,
+            "std": 0.20649843656829875,
+            "n": 3
+          },
+          "patched_cycle_ms": {
+            "mean": 19.324265392538102,
+            "std": 0.185043254488178,
+            "n": 3
+          },
+          "cycle_change_ms": -0.9800554415943274,
+          "cycle_change_fraction": -0.04826831931983721,
+          "removed_share_of_stock_idle": 0.549031928180004
+        }
       }
     }
   }
