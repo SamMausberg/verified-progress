@@ -743,3 +743,33 @@ def test_per_prompt_output_lengths(tmp_path: Path) -> None:
         row['prompt_id'] = f'p{index}'
     summary = summarise_point(rows, {'p0': 4, 'p1': 5}, concurrency=2)
     assert summary['osl_mismatch'] == 1
+
+
+def test_sensitivity_arm_rule() -> None:
+    from bench.sensitivity_arms import select
+
+    def entry(label: str, c: int, y: float, n: int = 3) -> dict[str, object]:
+        return {'label': label, 'concurrency': c, 'y_mean': y, 'n': n}
+
+    frontier = [
+        entry('plain-tuned', 32, 6000.0),
+        entry('plain-tuned', 128, 14000.0),
+        entry('mtp-tuned', 32, 6900.0),
+        entry('mtp-tuned-triton', 32, 7000.0),  # within 2% of each other: both run
+        entry('mtp-tuned', 128, 13000.0),
+        entry('mtp-stockverify', 128, 9000.0),
+        entry('dflash-tuned-b16', 32, 5200.0),
+        entry('dflash-tuned', 32, 6900.0),
+        entry('dflash-tuned-b4', 32, 9999.0, n=0),  # every point invalid: ignored
+        entry('dflash-tuned', 128, 10500.0),
+        entry('dflash-tuned-b4', 128, 11400.0),
+    ]
+    plan = select(frontier)['plan']
+    assert plan == {
+        'dflash-tuned': [32],
+        'dflash-tuned-b4': [128],
+        'mtp-tuned': [32, 128],
+        'mtp-tuned-triton': [32],
+        'plain-tuned': [32, 128],
+        'plain-tuned-triton': [32],
+    }
