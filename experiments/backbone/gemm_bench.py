@@ -888,14 +888,16 @@ def bench_norm(args: argparse.Namespace) -> dict[str, Any]:
 # Layer skeletons
 
 
-def best_configs(path: Path) -> dict[tuple[str, int], dict[str, Any]]:
-    """(projection, m) -> best Triton configuration from a gemm result file."""
+def best_configs(path: Path) -> dict[tuple[str, int, bool], dict[str, Any]]:
+    """(projection, m, pdl) -> best Triton configuration from a gemm result file
+    (the PDL-timed one for pdl=True when it exists)."""
     data = json.loads(path.read_text())
     out = {}
     for name, per_m in data['summary'].items():
         for m, arms in per_m.items():
             if 'triton' in arms:
-                out[(name, int(m))] = arms['triton']['config']
+                out[(name, int(m), False)] = arms['triton']['config']
+                out[(name, int(m), True)] = arms.get('triton_pdl', arms['triton'])['config']
     return out
 
 
@@ -911,7 +913,7 @@ class Skeletons:
     add PDL, and fold the norm and the SiLU-mul into the GEMM prologues.
     """
 
-    def __init__(self, ckpt: Checkpoint, cfgs: dict[tuple[str, int], dict[str, Any]]):
+    def __init__(self, ckpt: Checkpoint, cfgs: dict[tuple[str, int, bool], dict[str, Any]]):
         self.cfgs = cfgs
         self.m = 0  # set before each use
         self.eps = ckpt.config['rms_norm_eps']
@@ -932,7 +934,7 @@ class Skeletons:
     def cfg(self, name: str, pdl: bool) -> Any:
         from sglang.srt.layers.backbone_gemm import GemmConfig
 
-        c = self.cfgs.get((name, self.m))
+        c = self.cfgs.get((name, self.m, pdl))
         if c is None:
             raise KeyError(f'no Triton config for {name} m={self.m}')
         return GemmConfig(**{**c, 'pdl': pdl})
@@ -1023,6 +1025,58 @@ class Skeletons:
             x = bg.skinny_gemm(qkvz[:, :4096], self.w_out[j], c_out)
         return x
 
+    def mlp_split(
+        self, state: dict[str, torch.Tensor], norm: bool, act: bool, pdl: bool = True
+    ) -> torch.Tensor:
+        """Fold only the norm (scaled form), only the SiLU, or both."""
+        from sgl_kernel import gemma_fused_add_rmsnorm
+        from sglang.kernels.ops.activation.activation import silu_and_mul
+        from sglang.srt.layers import backbone_gemm as bg
+
+        x, r, r2 = state['x'], state['r'], state['r2']
+        c_gu, c_dn = self.cfg('mlp_gate_up', pdl), self.cfg('mlp_down', pdl)
+        for i in self.all_layers:
+            if norm:
+                gu = bg.skinny_gemm(
+                    x,
+                    self.w_gu[i],
+                    c_gu,
+                    prologue=bg.PROLOGUE_ADD_RMSNORM_SCALED,
+                    residual=r,
+                    norm_weight=self.g_post[i],
+                    eps=self.eps,
+                    residual_out=r2,
+                )
+                r, r2 = r2, r
+            else:
+                gemma_fused_add_rmsnorm(x, r, self.g_post[i], self.eps)
+                gu = bg.skinny_gemm(x, self.w_gu[i], c_gu)
+            if act:
+                x = bg.skinny_gemm(gu, self.w_dn[i], c_dn, prologue=bg.PROLOGUE_SILU_MUL)
+            else:
+                x = bg.skinny_gemm(silu_and_mul(gu), self.w_dn[i], c_dn)
+        return x
+
+    def gdn_norm_scaled(self, state: dict[str, torch.Tensor], pdl: bool = True) -> torch.Tensor:
+        from sglang.srt.layers import backbone_gemm as bg
+
+        x, r, r2 = state['x'], state['r'], state['r2']
+        c_in, c_out = self.cfg('gdn_in_proj_merged', pdl), self.cfg('gdn_out_proj', pdl)
+        for j, _ in enumerate(self.gdn_layers):
+            qkvz = bg.skinny_gemm(
+                x,
+                self.w_inm[j],
+                c_in,
+                prologue=bg.PROLOGUE_ADD_RMSNORM_SCALED,
+                residual=r,
+                norm_weight=self.g_in[j],
+                eps=self.eps,
+                residual_out=r2,
+            )
+            r, r2 = r2, r
+            x = bg.skinny_gemm(qkvz[:, :4096], self.w_out[j], c_out)
+        return x
+
     def variants(self) -> dict[str, tuple[int, Callable[[dict[str, torch.Tensor]], torch.Tensor]]]:
         nm, ng = len(self.all_layers), len(self.gdn_layers)
         return {
@@ -1037,6 +1091,10 @@ class Skeletons:
             'gdn_triton_pdl': (ng, functools.partial(self.gdn_triton, pdl=True, fused=False)),
             'gdn_fused': (ng, functools.partial(self.gdn_triton, pdl=False, fused=True)),
             'gdn_fused_pdl': (ng, functools.partial(self.gdn_triton, pdl=True, fused=True)),
+            'mlp_act_pdl': (nm, functools.partial(self.mlp_split, norm=False, act=True)),
+            'mlp_normscaled_pdl': (nm, functools.partial(self.mlp_split, norm=True, act=False)),
+            'mlp_both_scaled_pdl': (nm, functools.partial(self.mlp_split, norm=True, act=True)),
+            'gdn_normscaled_pdl': (ng, self.gdn_norm_scaled),
         }
 
 
@@ -1057,6 +1115,8 @@ def bench_chain(args: argparse.Namespace) -> dict[str, Any]:
         r_init = (torch.randn(m, hidden, device='cuda') * 4).to(torch.bfloat16)
         ref_out: dict[str, torch.Tensor] = {}
         for name, (n_layers, fn) in sk.variants().items():
+            if args.variants and name not in args.variants and not name.endswith('_stock'):
+                continue
             state = {'x': x_init.clone(), 'r': r_init.clone(), 'r2': torch.empty_like(r_init)}
             try:
                 # One eager pass from the initial state, for the numerical comparison.
@@ -1244,6 +1304,7 @@ def main() -> None:
     ap.add_argument('--build-dir', default=str(Path.home() / 'vp-data/backbone/build'))
     ap.add_argument('--hbm-json', default=str(REPO / 'evidence/profiles/hbm_bandwidth.json'))
     ap.add_argument('--gemm-json', help='gemm result with the Triton configs (chain)')
+    ap.add_argument('--variants', nargs='*', help='chain: only these skeleton variants')
     ap.add_argument('--skip-lt', action='store_true')
     ap.add_argument('--skip-triton', action='store_true')
     ap.add_argument('--skip-sgl-gemv', action='store_true')
