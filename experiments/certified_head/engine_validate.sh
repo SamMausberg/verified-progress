@@ -174,8 +174,13 @@ except (OSError, ValueError, KeyError) as exc:
     sys.exit(f'no certified counters: {exc}')
 bad = {p: v['mismatch_rows'] for p, v in paths.items() if v['mismatch_rows']}
 calls = sum(v['calls'] for v in paths.values())
-print(f'certified calls {calls}, rows differing from stock {bad or 0}')
-sys.exit(1 if bad or not calls else 0)
+# A refused or probe-tripped row ran on the stock path: equality there is trivial,
+# so any refusal or probe trip fails the check.
+refused = {p: v.get('status_refused', 0) for p, v in paths.items() if v.get('status_refused')}
+probed = {p: v.get('status_probe', 0) for p, v in paths.items() if v.get('status_probe')}
+print(f'certified calls {calls}, rows differing from stock {bad or 0}, '
+      f'refused rows {refused or 0}, probe-tripped rows {probed or 0}')
+sys.exit(1 if bad or refused or probed or not calls else 0)
 PY
   fi
   return "$rc"

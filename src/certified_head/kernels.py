@@ -290,7 +290,7 @@ def _probe_kernel(
     m = tl.program_id(0)
     j = tl.arange(0, P).to(tl.uint32)
     c = tl.load(counter_ptr).to(tl.uint64)
-    tok = (murmur_hash32(c + 0x9E3779B9, j, j * 0 + 0x51ED) % V).to(tl.int32)
+    tok = (murmur_hash32(c + 0x9E3779B9, j, j * 0 + 0x51ED).to(tl.int64) % V).to(tl.int32)
     if m == 0:
         tl.store(idx_ptr + tl.arange(0, P), tok)
     acc = tl.zeros((P, CH), dtype=tl.float64)
