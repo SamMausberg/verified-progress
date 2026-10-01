@@ -28,3 +28,11 @@ DIVERGENCE=()
   --pair dflash-tuned:plain-tuned --pair dflash-tuned-b4:plain-tuned \
   --pair plain-tuned-replayssm:plain-tuned --pair plain-tuned-triton:plain-tuned \
   --pair mtp-tuned-triton:plain-tuned-triton --pair dflash-tuned-b16:plain-tuned-triton
+# Run records may carry the machine's name, which encodes its public address; the
+# evidence must not (the files are published). Report file names only.
+host=$(hostname)
+dotted=$(echo "$host" | sed -E 's/^ip-//; s/-/./g')
+if grep -rlF -e "$host" -e "$dotted" evidence/bench; then
+  echo "the files above contain the hostname or address; scrub them before committing" >&2
+  exit 1
+fi
