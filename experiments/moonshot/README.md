@@ -26,6 +26,7 @@ their command in the docstring. The levers that need engine changes come from th
 | `logit_probe.py` | Quality proxy: first greedy divergence and top-k KL against a reference server, in decode and teacher-forced modes | pending |
 | `quality_arms.py` | Runs the logit probe (and optionally the token-map calibration) for a list of lever stacks, one small server each | pending |
 | `gsm8k_arms.py` | GSM8K accuracy per lever stack through `bench.quality`, for the declared quality budget | pending |
+| `gdn_state_rank_study.py` | P13: offline test of a GDN state reduced to rank r in the key dimension (energy, query and product bases), measuring KL, top-1 agreement and a delayed-retrieval probe on the HF model | pending |
 | `make_long_prompts.py` | The 2,048-token prompts of P4's served test, built from a bench split | input of the P4 test |
 | `run_p4_admission.sh`, `check_admission.py` | P4's admission preflight: every arm's server must run 128 requests at once during the measured phase | pending |
 | `run_p4b.sh` | P4's served test in one exclusive hold: admission preflight, server output probe, then the paired A/B validated by `validate_p4_ab.py` (the kernel checks are reused from an earlier run, as its header explains) | pending |
