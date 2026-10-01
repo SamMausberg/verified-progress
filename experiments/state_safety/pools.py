@@ -77,7 +77,8 @@ def build(root: Path, evidence: Path) -> list[dict[str, Any]]:
             # Matrix passes: the server that ran each pass, from the pass's own metadata.
             (ka, pa), (kb, pb) = (pass_server(root / sub, r) for r in (s['run_a'], s['run_b']))
             row(floor, label, f'{sub}/{s["run_a"]}', f'{sub}/{s["run_b"]}', ka, kb, pa, pb)
-    for f in sorted(evidence.glob('mechanism_*.json')):
+    tapped = [*evidence.glob('mechanism_*.json'), *evidence.glob('cachecheck_*.json')]
+    for f in sorted([*tapped, *evidence.glob('history_v4_*.json')]):
         s = json.loads(f.read_text())['summary']
         (a, pa), (b, pb) = (
             session(data_relative(s['a'], root)),

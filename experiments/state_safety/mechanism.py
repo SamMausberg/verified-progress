@@ -128,6 +128,11 @@ def first_cache_difference(
         if q0 > upto:
             break
         a, b = ca[q0], cb[q0]
+        if a['cached'] == 0 and b['cached'] == 0:
+            # A prefill with no cached prefix reads no cache: its GDN slot can still
+            # hold an earlier request's state, which the kernel ignores
+            # (has_initial_state is false, gdn_backend forward_extend).
+            continue
         found: list[dict[str, Any]] = []
         for kind in ('k', 'v'):
             if a[kind] is None or b[kind] is None:
@@ -487,7 +492,8 @@ def compare_repeats(run_dir: Path, pid: str, prompt: list[int]) -> dict[str, Any
                 else None,
             }
         )
-    return {'run': str(run_dir), 'prompt': pid, 'reference': reps[0], 'repeats': out}
+    run = data_root_relative(str(run_dir))
+    return {'run': run, 'prompt': pid, 'reference': reps[0], 'repeats': out}
 
 
 def data_root_relative(path: str) -> str:
