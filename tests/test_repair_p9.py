@@ -61,6 +61,8 @@ def write_inputs(tmp_path: Path) -> tuple[Path, Path, Path]:
             [
                 {
                     'run': '/runs/fresh_b16',
+                    'mode': 'fresh',
+                    'block': 16,
                     'phase_us': {
                         p: {'median': v}
                         for p, v in (
@@ -215,3 +217,20 @@ def test_free_verify_shifts_delta_by_the_saved_verify(
             assert both['delta'] >= other['delta'] - 1e-12
             assert both['delta_ci95'][0] >= other['delta_ci95'][0] - 1e-12
             assert both['delta_ci95'][1] >= other['delta_ci95'][1] - 1e-12
+
+
+def test_baseline_must_be_fresh_block16(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    oracle = load('p9_support_oracle')
+    cycles, _, timing = write_inputs(tmp_path)
+    runs = json.loads(timing.read_text())
+    for name, mode, block in (('fresh_b8', 'fresh', 8), ('force_b16', 'force', 16)):
+        runs.append({**runs[0], 'run': f'/runs/{name}', 'mode': mode, 'block': block})
+    timing.write_text(json.dumps(runs))
+    for name in ('fresh_b8', 'force_b16'):
+        out = tmp_path / f'{name}.json'
+        argv = ['p9_support_oracle.py', '--cycles', str(cycles), '--timing', str(timing)]
+        argv += ['--baseline-run', name, '--bootstrap', '20', '--out', str(out)]
+        monkeypatch.setattr(sys, 'argv', argv)
+        with pytest.raises(SystemExit, match='fresh block-16 run'):
+            oracle.main()
+        assert not out.exists()

@@ -67,7 +67,7 @@
     "gain_from_gating_oracle_reuse": 0.05308495831330279
    },
    "free_verify_always_reuse": {
-    "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values; not for every implementation",
+    "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values in fresh_b16 (395.11 us per cycle beyond draft and verify); not for every implementation",
     "delta": 0.009889613680103146,
     "delta_ci95": [
      0.002184872462070969,
@@ -137,7 +137,7 @@
     "gain_from_gating_oracle_reuse": 1.1164305525774356
    },
    "free_verify_always_reuse": {
-    "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values; not for every implementation",
+    "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values in fresh_b16 (395.11 us per cycle beyond draft and verify); not for every implementation",
     "delta": 0.8911471276956902,
     "delta_ci95": [
      0.8101244055384849,
@@ -207,7 +207,7 @@
     "gain_from_gating_oracle_reuse": 1.3256868500568841
    },
    "free_verify_always_reuse": {
-    "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values; not for every implementation",
+    "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values in fresh_b16 (395.11 us per cycle beyond draft and verify); not for every implementation",
     "delta": 1.8817980356937039,
     "delta_ci95": [
      1.7499942653478893,
@@ -277,7 +277,7 @@
     "gain_from_gating_oracle_reuse": 1.2116059866187758
    },
    "free_verify_always_reuse": {
-    "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values; not for every implementation",
+    "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values in fresh_b16 (395.11 us per cycle beyond draft and verify); not for every implementation",
     "delta": 2.889792695874889,
     "delta_ci95": [
      2.7083603785714843,
@@ -347,7 +347,7 @@
     "gain_from_gating_oracle_reuse": 1.06228903680835
    },
    "free_verify_always_reuse": {
-    "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values; not for every implementation",
+    "scope": "upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost at least their block-16 values in fresh_b16 (395.11 us per cycle beyond draft and verify); not for every implementation",
     "delta": 3.858680312133692,
     "delta_ci95": [
      3.6394587347454115,

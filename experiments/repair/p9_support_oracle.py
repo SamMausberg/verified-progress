@@ -45,12 +45,13 @@ gain more, and this excess does not bound that gain.
 
 A program could also verify only the m + 1 positions left after the correction instead of a
 padded block. `free_verify_always_reuse` charges the reused cycle no verify at all (the lower
-bound of any width's verify cost) and every other phase at its block-16 value, so its Delta
-bounds from above P9's always-reuse program at any verify width whose non-verify phases cost at
-least their block-16 values. A narrower cycle can also cut those (fresh_b8 keeps 383.81 us after
-draft and verify, fresh_b16 395.11 us), so it is not a bound for every implementation.
-`omniscient_gate_free_verify` applies the omniscient gate to that free-verify scoring and bounds
-P9's program with any gate, at any verify width, under the same condition.
+bound of any width's verify cost) and every other phase at its value in the baseline run
+(`--baseline-run`, which must be a fresh block-16 run), so its Delta bounds from above P9's
+always-reuse program at any verify width whose non-verify phases cost at least their block-16
+values. A narrower cycle can also cut those (fresh_b8 keeps 383.81 us after draft and verify,
+fresh_b16 395.11 us), so it is not a bound for every implementation.
+`omniscient_gate_free_verify` applies the omniscient gate to that free-verify scoring and
+bounds P9's program with any gate, at any verify width, under the same condition.
 
     python experiments/repair/p9_support_oracle.py --cycles ~/vp-data/drafter/support/zlab_b16_cycles/cycles.pt \\
         --timing evidence/repair/stage_a_timing.json --out evidence/repair/p9_support_oracle.json
@@ -68,10 +69,6 @@ from pathlib import Path
 from typing import Any
 
 H = 15  # drafted positions per block-16 cycle
-FREE_VERIFY_SCOPE = (
-    'upper bound for P9 always-reuse programs at any verify width whose non-verify phases cost '
-    'at least their block-16 values; not for every implementation'
-)
 
 
 def as_list(value: Any) -> list[Any]:
@@ -88,8 +85,16 @@ def load_cycles(path: Path) -> list[dict[str, Any]]:
 
 
 def phases(timing: Path, run: str) -> dict[str, float]:
+    """Median phases of the baseline run, which must be fresh DFlash at block 16 like the trace."""
     rows = {Path(r['run']).name: r for r in json.loads(timing.read_text())}
     row = rows[run]
+    # The cycles table is a block-16 trace (H = 15), and the free-verify bounds keep the
+    # baseline's non-verify phases as block-16 values, so only a fresh block-16 run qualifies.
+    if row.get('mode') != 'fresh' or row.get('block') != H + 1:
+        raise SystemExit(
+            f'--baseline-run {run} is mode {row.get("mode")!r}, block {row.get("block")!r}; '
+            f'the oracle needs a fresh block-16 run'
+        )
     ph = {
         p: row['phase_us'][p]['median'] for p in ('draft', 'verify', 'accept', 'commit', 'append')
     }
@@ -258,6 +263,12 @@ def main() -> None:
     base = timing_rows[args.baseline_run]
     overall_rate = base['commit_per_cycle']['mean'] / base['cycle_period_us']['median']
     everything = list(range(len(rows)))
+    free_scope = (
+        'upper bound for P9 always-reuse programs at any verify width whose non-verify phases '
+        f'cost at least their block-16 values in {args.baseline_run} '
+        f'({ph["cycle"] - ph["draft"] - ph["verify"]:.2f} us per cycle beyond draft and verify); '
+        'not for every implementation'
+    )
     result: dict[str, Any] = {
         'kind': 'derived: exact per-cycle support (drafter support screen) and measured c = 1 phases',
         'cycles': len(cycles),
@@ -329,9 +340,9 @@ def main() -> None:
                 'delta_ci95': [lo_g, hi_g],
                 'gain_from_gating_oracle_reuse': d_gate - d,
             },
-            # Reused verify costs 0, other phases at block 16 (see FREE_VERIFY_SCOPE).
+            # Reused verify costs 0, other phases as in the block-16 baseline run.
             'free_verify_always_reuse': {
-                'scope': FREE_VERIFY_SCOPE,
+                'scope': free_scope,
                 'delta': d_free,
                 'delta_ci95': [lo_f, hi_f],
                 'rejected': hi_f <= 0,
