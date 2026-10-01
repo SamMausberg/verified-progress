@@ -19,8 +19,11 @@
 # processes are discarded, so a crashed job cannot stall the queue. flock holds
 # the lock itself (-o) for exactly the command's lifetime: children do not inherit
 # it, so a job must stop its servers and background processes before it exits, and
-# killing the flock process releases the lock. GPU_LOCK_WAIT (seconds, default 4 h)
-# bounds each wait; a timeout exits 75. To extend a wait without losing your place, cancel
+# killing the flock process releases the lock. An exclusive job then waits
+# (scripts/gpu_drain_wait.sh, up to GPU_LOCK_DRAIN_WAIT s, default 600) until no compute
+# process is left on the GPU, so a killed job's surviving children cannot share an
+# exclusive run; it exits 75 if the GPU stays busy. GPU_LOCK_WAIT (seconds, default
+# 12 h) bounds each wait; a timeout exits 75. To extend a wait without losing your place, cancel
 # the waiting job and resubmit it with GPU_LOCK_ARRIVAL set to the arrival time
 # (nanoseconds) in its old ticket name; it must not lie in the future.
 set -euo pipefail
@@ -105,7 +108,11 @@ if [ "$kind" = x ]; then
   wait_while older_ticket "$name"
   # -o: the lock is held by flock itself for the command's lifetime and is not inherited, so a
   # background process the job leaves behind (or a successor ticket it queues) cannot keep it.
-  flock -o -x -w "$WAIT" -E 75 "$LOCK_FILE" "$@"
+  # Before the command, wait until no compute process is left on the GPU: holding the exclusive
+  # lock means every holder has exited, so anything still running is an orphan of a killed job.
+  # shellcheck disable=SC2016 # $0 and $@ belong to the inner shell
+  flock -o -x -w "$WAIT" -E 75 "$LOCK_FILE" \
+    bash -c '"$0" && exec "$@"' "$(dirname "${BASH_SOURCE[0]}")/gpu_drain_wait.sh" "$@"
 else
   wait_while older_ticket "$name" x
   # Drop the ticket as soon as the shared lock is held, then run the command.
