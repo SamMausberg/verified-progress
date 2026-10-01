@@ -41,7 +41,7 @@ For a fixed noise vector $g$ and $T>0$, the ladder with $f_i(x)=x/T+g_i$ returns
 \begin{proof}
 Theorem~\ref{thm:ladder} and the Gumbel-max identity~\cite{gumbel1954,papandreou2011}; ties have probability zero.
 \end{proof}
-Bounding scores to skip most perturbations is the principle of A$^\ast$ Sampling and of lazy Gumbel sampling~\cite{astar,mussmann2017}; a fixed field adds pathwise equality with the dense race. Pathwise equality requires keyed noise, which the stock seeded sampler already has: in the exact rational emulation, feeding the candidates noise from a stream consumed in evaluation order changed the winner in 247 of 300 cases \ev{precision}.
+Bounding the perturbed scores so that most of them need not be computed is the principle of A$^\ast$ Sampling and of lazy Gumbel sampling~\cite{astar,mussmann2017}; a fixed field adds pathwise equality with the dense race. Pathwise equality requires keyed noise, which the stock seeded sampler already has: in the exact rational emulation, feeding the candidates noise from a stream consumed in evaluation order changed the winner in 247 of 300 cases \ev{precision}.
 
 \begin{theorem}[Fixed-noise verification]\label{thm:fixednoise}
 Let $G_{t,i}$ be keyed by (seed, absolute position $t$, token $i$) and i.i.d.\ standard Gumbel, and let $Y_t=\min\argmax_i(z_{t,i}(Y_{<t})/T+G_{t,i})$. A speculative decoder that accepts a drafted token if and only if it equals $\argmax_i(z_{t,i}(x_{<t})/T+G_{t,i})$ at its drafted prefix, and emits that argmax at the first mismatch, outputs $Y$ for every drafter and depth policy, and $Y$ has the target's autoregressive law.
