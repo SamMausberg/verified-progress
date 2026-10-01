@@ -118,6 +118,7 @@ def _write_declared(tmp_path, ids):
             'flags': CONFIGS[config] + pool_flags(),
             'model_revision': MODEL_REVISION,
             'warm': False,
+            'started_at': '2026-10-01T14:10:00' if config == 'plain' else '2026-10-01T15:10:00',
             'sglang_sha': SGLANG_PIN,
             'sglang_dirty': False,
             'repo_sha': DECLARATION,
@@ -137,10 +138,16 @@ def _write_declared(tmp_path, ids):
             },
         }
         (runs / f'{run}.meta.json').write_text(json.dumps(meta))
+    import attest_runner
+
     files = declaration_hashes()
     (runs / 'attest').mkdir()
+    window = {
+        'plain': ('2026-10-01T14:00:00', '2026-10-01T14:30:00'),
+        'mtp': ('2026-10-01T15:00:00', '2026-10-01T15:30:00'),
+    }
     for hold in ('plain', 'mtp'):
-        for when in ('before', 'after'):
+        for k, when in enumerate(('before', 'after')):
             rec = {
                 'head': DECLARATION,
                 'porcelain': '',
@@ -149,7 +156,10 @@ def _write_declared(tmp_path, ids):
                 'process_cwd': '/w/experiments/state_safety',
                 'process_script': '/w/experiments/state_safety/run_matrix.py',
                 'runner_dir': '/w/experiments/state_safety',
+                'time_local': window[hold][k],
             }
+            if when == 'after':
+                rec['outputs'] = attest_runner.output_hashes(runs, hold)
             (runs / 'attest' / f'{hold}-{when}.json').write_text(json.dumps(rec))
     return runs, prompts, manifest
 
@@ -271,6 +281,16 @@ def test_each_departure_from_the_declaration_makes_the_result_void(tmp_path, mon
         rec['process_script'] = '/elsewhere/experiments/state_safety/run_matrix.py'
         path.write_text(json.dumps(rec))
 
+    def stale_file(runs, prompts, manifest):
+        path = runs / 'mtp_s5/c32.jsonl'
+        path.write_text(path.read_text() + '\n')
+
+    def started_outside_hold(runs, prompts, manifest):
+        path = runs / 'plain/c1.meta.json'
+        meta = json.loads(path.read_text())
+        meta['started_at'] = '2026-10-01T13:00:00'
+        path.write_text(json.dumps(meta))
+
     def unfinished_record(runs, prompts, manifest):
         path = runs / 'mtp_tree/c1.jsonl'
         rows = [json.loads(x) for x in path.read_text().splitlines()]
@@ -314,6 +334,8 @@ def test_each_departure_from_the_declaration_makes_the_result_void(tmp_path, mon
         other_process_after: 'hold mtp: attestations not bound to one run_matrix process',
         process_in_other_checkout: 'hold plain: run_matrix process not in the attested checkout',
         script_elsewhere: 'hold mtp: run_matrix process ran another script (before)',
+        stale_file: 'mtp_s5/c32: mtp_s5/c32.jsonl is not the file hold mtp wrote',
+        started_outside_hold: 'plain/c1: started_at 2026-10-01T13:00:00 outside hold plain',
         unfinished_record: 'mtp_tree/c1: 1 incomplete records',
         completion_count_differs: 'plain/c1: 1 incomplete records',
         aborted_by_client: 'mtp_s5/c32: 1 incomplete records',

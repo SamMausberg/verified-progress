@@ -15,6 +15,10 @@ Each record also holds the PID of the observed run_matrix.py process, its workin
 directory (/proc/<pid>/cwd) and the run_matrix.py path it runs (its
 /proc/<pid>/cmdline entry resolved against that directory), all read when the hold
 starts, so first_cycle.py can check that the runs came from the attested files.
+The "after" record also holds the SHA-256 of every run file the hold wrote, and
+each record holds its time in UTC and in local time (run_matrix.py's started_at is
+local time), so the analysis can check that it reads those files and that each
+pass started inside its hold.
 
 Timing: --watch polls the process table every 2 s. "before" is taken when a
 run_matrix.py process writing to <runs> appears, within 2 s of its start;
@@ -35,6 +39,18 @@ from typing import Any
 RUNNER_FILES = ['run_matrix.py', 'server.py', 'client.py']
 # hold label -> the --configs value its run_matrix.py call uses
 HOLDS = {'plain': 'plain', 'mtp': 'mtp_s5,mtp_tree'}
+TIME_FORMAT = '%Y-%m-%dT%H:%M:%S'  # run_matrix.py's started_at format (local time)
+
+
+def output_hashes(runs: Path, hold: str) -> dict[str, str]:
+    """SHA-256 of every run file the hold wrote (<config>/*.jsonl and *.meta.json)."""
+    out = {}
+    for config in HOLDS[hold].split(','):
+        for path in sorted((runs / config).glob('*.jsonl')) + sorted(
+            (runs / config).glob('*.meta.json')
+        ):
+            out[str(path.relative_to(runs))] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return out
 
 
 def process_cwd(pid: int) -> str | None:
@@ -71,8 +87,13 @@ def attest(
         return out.stdout
 
     base = checkout / 'experiments' / 'state_safety'
+    now = time.time()
     return {
-        'time_utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+        'time_utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(now)),
+        # The same instant in local time, the zone and format of run_matrix.py's
+        # started_at, so the two can be compared directly.
+        'time_local': time.strftime(TIME_FORMAT, time.localtime(now)),
+        'local_utc_offset': time.strftime('%z', time.localtime(now)),
         # The observed run_matrix.py process, and the directory it runs in: binds this
         # record to the checkout that actually produced the runs.
         'pid': pid,
@@ -99,6 +120,9 @@ def write(
     out = runs / 'attest'
     out.mkdir(parents=True, exist_ok=True)
     rec = attest(checkout, pid, cwd, script)
+    if when == 'after':
+        # Ties the analysed files to this hold: they must still hash to these values.
+        rec['outputs'] = output_hashes(runs, hold)
     (out / f'{hold}-{when}.json').write_text(json.dumps(rec, indent=1) + '\n')
     print(f'{hold}-{when} attested (pid {pid}, script {script})', flush=True)
 

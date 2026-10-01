@@ -252,6 +252,16 @@ reason go in a new commit before the runs.
     runs are void unless both records name one PID, and that process ran the attested
     checkout's `experiments/state_safety/run_matrix.py` from that directory. Python
     imports `server.py` and `client.py` from the script's own directory.
+  - The "after" record holds the SHA-256 of every `*.jsonl` and `*.meta.json` the hold
+    wrote. A run is void unless the analysed files still hash to those values.
+  - A run is also void unless its `started_at` lies between its hold's before and
+    after times.
+    - `started_at` is the host's local time (`run_matrix.py` uses `time.localtime`,
+      written without a zone).
+    - Each attestation records both `time_utc` and `time_local` (the same instant in
+      local time, in `started_at`'s format, with `local_utc_offset`).
+    - The check compares `started_at` with `time_local`, so both sides are in the
+      same zone. The host runs in UTC.
   - The watcher for the declared runs runs a copy byte-identical to this commit's
     `attest_runner.py`. It was restarted before either hold started, and each restart
     is logged in `~/vp-data/state/logs/attest_first_cycle.out`.

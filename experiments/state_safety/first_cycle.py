@@ -187,6 +187,23 @@ def attestation_problems(root: Path, hold: str, expected: dict[str, str]) -> lis
             problems.append(f'hold {hold}: checkout not at {DECLARATION[:7]} ({when})')
         if r.get('files') != expected:
             problems.append(f'hold {hold}: runner files differ from {DECLARATION[:7]} ({when})')
+    # The analysed files are the ones this hold wrote, and each pass started inside it.
+    # started_at and time_local are both the host's local time, in the same format.
+    outputs = recs['after'].get('outputs') or {}
+    start, end = recs['before'].get('time_local'), recs['after'].get('time_local')
+    for run, run_hold in HOLD_OF.items():
+        if run_hold != hold:
+            continue
+        for suffix in ('.jsonl', '.meta.json'):
+            rel = f'{run}{suffix}'
+            path = root / rel
+            got = hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
+            if got is None or outputs.get(rel) != got:
+                problems.append(f'{run}: {rel} is not the file hold {hold} wrote')
+        meta = root / f'{run}.meta.json'
+        started = json.loads(meta.read_text()).get('started_at') if meta.exists() else None
+        if not (start and end and started and start <= started <= end):
+            problems.append(f'{run}: started_at {started} outside hold {hold} ({start} to {end})')
     return problems
 
 
