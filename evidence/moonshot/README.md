@@ -453,14 +453,25 @@ lossy-stack budget's form (Section 3). Per layer
 and head, `gdn_state_rank_study.py` projects the queries and keys (after the convolution and
 the L2 normalisation) onto an orthonormal basis U of 128 x r. It then runs the same chunked
 gated delta rule in r dimensions, so the state is V x r and holds r / 128 of the bytes. The
-bases come from covariances on 24 calibration texts (`long2048_tune.jsonl`): the top-r
+bases come from covariances on the first 24 texts of `long2048_tune.jsonl`: the top-r
 eigenvectors of the key covariance (energy), of the query covariance (query), or of
 C_k^1/2 C_q C_k^1/2 (product, a first-order proxy for the output error).
 
 The measurement uses the HF model (BF16 weights, transformers 5.12.1, the torch reference GDN
 rule, teacher forcing) on the second halves of the first 8 texts of `long2048.jsonl`
-(2,048 tokens each). It compares each configuration with the same rule at full rank (U = I),
-which isolates the projection, using:
+(2,048 tokens each). Both files are in `~/vp-data/moonshot/workloads/`. `long2048.jsonl` is
+P4's declared workload (2c, sha256
+`db376fa3aadf75a30933a649b5ded1dfcafac8289b8e2aed1dde7201afd2659c`). `long2048_tune.jsonl`
+(sha256 `e68930de7103193e52291e1235d393ad9032c47da6d8de97370324b23c6aeaa0`, 48 texts) was
+made on 2026-10-01 at 03:29 UTC by `python make_long_prompts.py --split tune --count 48 --out
+~/vp-data/moonshot/workloads/long2048_tune.jsonl`, run in `experiments/moonshot` at repo
+`ed4682d`. That `make_long_prompts.py` is the version main carried from `f349045` to
+`8585e67`. The current version (from #101 on) writes distinct texts with split-prefixed ids,
+so it would not reproduce these bytes. The 24 calibration texts and the 8 evaluation texts
+are distinct, and no text appears in both sets.
+
+The study compares each configuration with the same rule at full rank (U = I), which isolates
+the projection, using:
 - the mean full-vocabulary KL(reference || reduced) per position;
 - top-1 agreement;
 - a delayed-retrieval probe: 24 prompts with facts, then filler, then a query, scored by
@@ -498,14 +509,15 @@ rounding. So these numbers bound the projection's damage only to within about 0.
 
 Choosing the basis for output sensitivity made things worse, not better. The query and
 product bases have higher KL and lower top-1 agreement than the plain key-energy basis at
-every rank. The query basis also loses delayed retrieval at r = 64 (22 of 24 exact) and
-r = 32 (4 of 24). With the energy basis, retrieval survives at every rank while top-1
+every tested rank. The query basis also loses delayed retrieval at r = 64 (22 of 24 exact)
+and r = 32 (4 of 24). With the energy basis, retrieval survives at every tested rank while top-1
 agreement falls, so the damage is spread over ordinary next-token prediction rather than
 concentrated on recalling early facts.
 
 Decision: P13 closes on this evidence. Under long-context teacher forcing its one planned
-training-free test (`TASKS.md`) misses a criterion of the budget's form at every rank: by 13
-times in KL even at a 25% cut, and the output-sensitivity bases do worse. The declared probe
+training-free test (`TASKS.md`) misses a criterion of the budget's form at every tested rank
+(r = 32, 64 and 96, so cuts of at least 25%): by 13 times in KL even at the 25% cut, and the
+output-sensitivity bases do worse. Smaller cuts (r between 97 and 127) were not tested. The declared probe
 was not run. The untested variants would need training or a different design: recovering
 quality by training, choosing ranks per layer or per head, and bases applied before the
 depthwise convolution.
