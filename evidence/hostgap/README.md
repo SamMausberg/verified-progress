@@ -14,10 +14,11 @@ not yet run).
 ## Short answer
 
 - With the full series (patches 0001-0005) on bench's tuned MTP arm, served per-user output
-  rate rises by 9.6% at c = 1-8, 8.9% at c = 16 and 7.5% at c = 32 (measured, hold 4: stock,
+  rate rises by 9.4-9.6% at c = 1-8, 8.9% at c = 16 and 7.5% at c = 32 (measured, hold 4: stock,
   hostgap, hostgap, stock in one hold; every one of the twelve stock/hostgap pairs has a ratio
-  of 1.067-1.101; `hold4/ab_mtp.json`). Outputs are bitwise equal to stock: 192/192 greedy
-  requests, and identical plan state and attention output bits on random batches.
+  of 1.067-1.101; `hold4/ab_mtp.json`). Outputs are token-identical to stock on 192/192
+  greedy requests (tokens, verify-step counts and correct-draft histograms), and plan state and
+  attention output bits are identical on random batches.
 - Without a profiler, stock SGLang leaves the GPU idle 1.39-1.81 ms of each tuned-MTP cycle at
   B = 1-128 requests: 20% of the cycle at B = 1, falling to 9% at B = 128 as the GPU work grows
   (**derived**, hold 4: untraced cycle time minus the GPU busy time per cycle in a host trace of
@@ -25,7 +26,7 @@ not yet run).
   agrees. Host-traced runs show 2.6-3.0 ms because tracing slows the host; they are used only
   to say where the idle sits.
 - The full series shortens the held decode cycle by 0.50 ms (7.3%) at B = 1 up to 1.20 ms
-  (6.0%) at B = 128, removing 36-71% of that idle. Patches 0001-0003 alone, which remove the
+  (5.9%) at B = 128, removing 36-71% of that idle. Patches 0001-0003 alone, which remove the
   blocking device-to-host reads, shortened it by 0.19-0.98 ms (2.7-4.8%) in hold 2: 13-16% of
   the idle at B = 1-8, 27-35% at B = 32-64 and 55% at B = 128. So at low batch most of the idle
   was host work rather than waiting on a read, and 0004, which makes that host work cheaper,
@@ -116,7 +117,7 @@ idle is the stock cycle minus the GPU busy time per cycle in the stock host trac
 | 8 | 7.689 (0.017) | 7.060 (0.028) | -8.2% | 1.47 (19%) | 0.63 | 43% |
 | 32 | 10.001 (0.045) | 9.148 (0.024) | -8.5% | 1.55 (16%) | 0.85 | 55% |
 | 64 | 13.088 (0.047) | 11.937 (0.041) | -8.8% | 1.62 (12%) | 1.15 | 71% |
-| 128 | 20.104 (0.006) | 18.908 (0.204) | -6.0% | 1.81 (9%) | 1.20 | 66% |
+| 128 | 20.104 (0.006) | 18.908 (0.204) | -5.9% | 1.81 (9%) | 1.20 | 66% |
 
 Each change is at least five times the larger window standard deviation. The stock and
 patched traces agree on GPU busy time per cycle within 0.02 ms at B <= 64 (5.49 / 5.47, 6.22 /
@@ -124,7 +125,7 @@ patched traces agree on GPU busy time per cycle within 0.02 ms at B <= 64 (5.49 
 At B = 128 they differ by 0.48 ms (18.29 stock, 18.77 patched), so the idle split there is less
 certain than the cycle change. The stock cycles of holds 2 and 4 differ by 0.5-1.0%, which
 bounds the launch-to-launch variation of these windows. Compared with 0001-0003 alone in hold
-2 (-2.7% to -4.8%), the full series gains another 1.2-5.1 percentage points (derived across
+2 (-2.7% to -4.8%), the full series gains another 1.1-5.1 percentage points (derived across
 the two holds); 0004 is the only change on the BF16 path.
 
 **Where the idle went** (measured, host traces with the same driver; `hold4/cycle_profiles.json`
@@ -162,10 +163,10 @@ TTFT included), mean of the two runs per side:
 |---|---|---|---|---|---|---|
 | 1 | 461.2 | 505.6 | 1.096 | 1.101, 1.091 | 2.02 / 1.84 | 42.8 / 40.2 |
 | 2 | 436.8 | 478.6 | 1.096 | 1.096, 1.096 | 2.11 / 1.92 | 46.1 / 43.0 |
-| 4 | 406.8 | 445.0 | 1.094 | 1.090, 1.098 | 2.29 / 2.10 | 46.4 / 43.4 |
+| 4 | 406.8 | 445.0 | 1.094 | 1.090, 1.098 | 2.29 / 2.09 | 46.4 / 43.4 |
 | 8 | 360.4 | 394.5 | 1.095 | 1.092, 1.097 | 2.58 / 2.36 | 47.4 / 43.9 |
 | 16 | 293.6 | 319.7 | 1.089 | 1.090, 1.089 | 3.23 / 2.97 | 48.8 / 45.5 |
-| 32 | 222.8 | 239.6 | 1.075 | 1.067, 1.084 | 4.46 / 4.16 | 51.4 / 48.6 |
+| 32 | 222.8 | 239.6 | 1.075 | 1.067, 1.084 | 4.45 / 4.15 | 51.4 / 48.6 |
 
 Output throughput per GPU moves by the same ratios within 0.006. Accept length is identical at
 c = 1-16 (3.244-3.279); at c = 32 it is 3.263 against 3.258, since arrival timing changes batch

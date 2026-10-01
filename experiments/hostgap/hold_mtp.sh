@@ -32,6 +32,8 @@ OK=0
 if SGLANG_WORKTREE="$SGLANG_PATCHED" bash -c 'source scripts/sglang_env.sh && python experiments/hostgap/plan_equivalence.py --out "$VP_DATA/$TAG/plan_equivalence.json"' > "$VP_DATA/$TAG/plan_equivalence.log" 2>&1; then
   OK=1
 fi
+# The GPU tests are part of the gate: a failure skips the patched steps.
+[ "$RC" = 0 ] || OK=0
 echo "=== equivalence ok=$OK ($((SECONDS - T0)) s)"
 if [ "$OK" = 1 ]; then
   OUT_NEW="$OUT/mtp-$TAG"
@@ -59,6 +61,6 @@ else
 fi
 echo "=== hold end $(date -u +%FT%TZ) ($((SECONDS - T0)) s)"
 nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader
-# A failed plan check, equality or validation check fails the hold (the stock
+# A failed GPU test, plan check, equality or validation check fails the hold (the stock
 # profiles above still ran, so the hold's output is usable for the stock side).
-[ "$OK" = 1 ] || { echo "=== hold failed: plan check, MTP equality or validation did not pass"; exit 1; }
+[ "$OK" = 1 ] || { echo "=== hold failed: GPU tests, plan check, MTP equality or validation did not pass"; exit 1; }

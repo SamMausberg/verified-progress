@@ -195,9 +195,11 @@ concurrency 1, 1.0% at 128). Serving against tuned MTP is pending.
 
 ## hostgap (`patches/hostgap/0001-0005`, branch `engine/hostgap`)
 
-The series applies in order to `bd66ce343e` on its own; the whole series (engine
-`6b1d344887`) passed the GPU plan check, the GPU tests, in-engine validation and greedy output
-equality with stock (`evidence/hostgap/README.md`, hold 4):
+The series applies in order to `bd66ce343e` on its own. The whole series (engine
+`6b1d344887`) passed the GPU tests and the GPU plan check, which covers the EAGLE verify and
+the DFlash draft block, and, on the tuned MTP arm, in-engine validation and token-identical
+greedy outputs (`evidence/hostgap/README.md`, hold 4). For DFlash, serving equality has run
+only on 0001-0003, with an unpinned KV pool; the full-series DFlash check is pending:
 
 ```sh
 scripts/sglang_worktree.sh hostgap
