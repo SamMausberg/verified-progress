@@ -137,11 +137,14 @@ PY
 
 # Where the v1 and v3 tapped sessions (same prompts, same order) first part ways.
 tap="$HOME/vp-data/state/tap"
-if [ -d "$tap/plain_c1" ] && [ -d "$tap/v3_plain_c1" ]; then
-  nice -n 19 python tap_signature.py \
-    --pair "$tap/plain_c1" "$tap/v3_plain_c1" \
-    --pair "$tap/mtp_s3_c1" "$tap/v3_mtp_s3_c1" \
-    --out "$evidence/tap_signature.json" > /dev/null
+pairs=()
+for cfg in plain_c1 mtp_s3_c1; do
+  if [ -f "$tap/$cfg/client.jsonl" ] && [ -f "$tap/v3_$cfg/client.jsonl" ]; then
+    pairs+=(--pair "$tap/$cfg" "$tap/v3_$cfg")
+  fi
+done
+if [ ${#pairs[@]} -gt 0 ]; then
+  nice -n 19 python tap_signature.py "${pairs[@]}" --out "$evidence/tap_signature.json" > /dev/null
 fi
 
 # Drift and divergences by rejection position, for every speculative config.
