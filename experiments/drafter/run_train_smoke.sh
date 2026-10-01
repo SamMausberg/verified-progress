@@ -15,13 +15,11 @@ smoke="$HOME/vp-data/drafter/trace/targets-smoke.jsonl"
 timeout 420 python "$here/support_screen.py" --trace "$HOME/vp-data/drafter/trace/b16" \
   --panel "$here/panel-v1.jsonl" --draft "$zlab" --out "$HOME/vp-data/drafter/support/zlab_b16" \
   || echo "support screen failed"
-for objective in prefix ce; do
-  rm -rf "$data/smoke-sel-$objective"
-  timeout 240 python "$here/train_selector.py" --run "$data/smoke-sel-$objective" --init "$zlab" \
-    --data "$smoke" --objective "$objective" --heldout-modulus 8 --eval-sequences 8 \
-    --eval-every 10 --log-every 5 --total-steps 20 --accumulate 2 --warmup-steps 5 \
-    --segment-minutes 3 || echo "selector smoke $objective failed"
-done
+rm -rf "$data/smoke-sel"
+timeout 300 python "$here/train_selector.py" --run "$data/smoke-sel" --init "$zlab" \
+  --data "$smoke" --objectives prefix,ce --heldout-modulus 8 --eval-sequences 8 \
+  --eval-every 10 --log-every 5 --total-steps 20 --accumulate 2 --warmup-steps 5 \
+  --segment-minutes 3 || echo "selector smoke failed"
 rm -rf "$data/smoke-dflash"
 timeout 420 python "$here/train_dflash.py" --run "$data/smoke-dflash" --init "$zlab" \
   --data "$smoke" --heldout-modulus 8 --eval-sequences 8 --eval-every 10 --log-every 5 \

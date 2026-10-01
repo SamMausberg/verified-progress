@@ -1,0 +1,176 @@
+{
+ "report": "mtp_bs8.nsys-rep",
+ "cycles": 203,
+ "scheduler_tid": 328400349343146,
+ "gpu_idle_us_per_cycle": 3357.6955369448006,
+ "idle_by_innermost_function_us_per_cycle": {
+  "sglang.srt.model_executor.runner.decode_cuda_graph_runner.DecodeCudaGraphRunner.load_batch": 1506.1864384236394,
+  "sglang.srt.layers.attention.flashinfer_backend.FlashInferMultiStepDraftBackend.common_template": 549.5349655172419,
+  "sglang.srt.model_executor.runner.decode_cuda_graph_runner.DecodeCudaGraphRunner.execute": 444.6568522167482,
+  "sglang.srt.speculative.eagle_draft_cuda_graph_runner.EAGLEDraftCudaGraphRunner.execute": 377.7039310344798,
+  "sglang.srt.speculative.eagle_worker_common.prepare_for_draft": 98.2773793103441,
+  "sglang.srt.managers.overlap_utils.FutureMap.resolve_seq_lens_cpu": 84.72250246305406,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch": 65.36453694581353,
+  "cub::DeviceScan::InclusiveScan": 50.20619211822661,
+  "sglang.srt.speculative.eagle_worker_common.run_eagle_verify": 27.418073891626097,
+  "sglang.srt.speculative.eagle_utils.eagle_prepare_for_verify": 24.187458128079083,
+  "sglang.srt.model_executor.model_runner.ModelRunner.forward": 21.471182266009837,
+  "sglang.srt.speculative.eagle_draft_extend_cuda_graph_runner.EAGLEDraftExtendCudaGraphRunner.execute": 19.915059113301147,
+  "(outside trace ranges)": 19.296448275862108,
+  "sglang.srt.speculative.eagle_worker_common.build_eagle_verify_input": 11.06231034482768,
+  "sglang.srt.speculative.eagle_worker_common.prepare_for_draft_extend": 10.945650246305748,
+  "sglang.srt.speculative.eagle_worker_v2.EagleDraftWorker._draft_extend_for_decode": 7.86543349753714,
+  "sglang.srt.speculative.eagle_worker_v2.EagleDraftWorker.draft": 7.646492610837436,
+  "(no annotated function)": 6.880068965517366,
+  "sglang.srt.managers.scheduler.Scheduler.get_next_batch_to_run": 6.510054187192183,
+  "sglang.srt.speculative.eagle_utils.eagle_sample": 5.104576354679768,
+  "sglang.srt.managers.scheduler_components.batch_result_processor.SchedulerBatchResultProcessor.process_batch_result_decode": 4.539556650246264,
+  "sglang.srt.managers.tp_worker.TpModelWorker.forward_batch_generation": 4.519093596059116,
+  "sglang.srt.speculative.eagle_worker_v2.EAGLEWorkerV2.forward_batch_generation": 2.7753448275861734,
+  "sglang.srt.managers.scheduler.Scheduler.process_batch_result": 0.9059359605911315
+ },
+ "host_function_exposure_inclusive": {
+  "sglang.srt.managers.scheduler.Scheduler.run_batch": {
+   "host_us_per_cycle": 9242.87650246306,
+   "exposed_us_per_cycle": 3316.5850394088557,
+   "hidden_fraction": 0.6411739312404481
+  },
+  "sglang.srt.speculative.eagle_worker_v2.EAGLEWorkerV2.forward_batch_generation": {
+   "host_us_per_cycle": 7170.864206896571,
+   "exposed_us_per_cycle": 3166.4979999999887,
+   "hidden_fraction": 0.5584217036274912
+  },
+  "sglang.srt.speculative.eagle_worker_common.run_eagle_verify": {
+   "host_us_per_cycle": 3769.5817142857127,
+   "exposed_us_per_cycle": 2080.186842364523,
+   "hidden_fraction": 0.4481650750582836
+  },
+  "sglang.srt.speculative.eagle_utils.eagle_prepare_for_verify": {
+   "host_us_per_cycle": 2274.4226995073927,
+   "exposed_us_per_cycle": 1502.2966748768383,
+   "hidden_fraction": 0.33948220126267026
+  },
+  "sglang.srt.model_executor.runner.decode_cuda_graph_runner.DecodeCudaGraphRunner.load_batch": {
+   "host_us_per_cycle": 1838.6909950738914,
+   "exposed_us_per_cycle": 1555.5171724137836,
+   "hidden_fraction": 0.15400838064621503
+  },
+  "sglang.srt.speculative.eagle_worker_v2.EagleDraftWorker._draft_extend_for_decode": {
+   "host_us_per_cycle": 1711.69954679803,
+   "exposed_us_per_cycle": 39.515216748769646,
+   "hidden_fraction": 0.9769146303609835
+  },
+  "sglang.srt.speculative.eagle_worker_v2.EagleDraftWorker.draft": {
+   "host_us_per_cycle": 1550.8541182266003,
+   "exposed_us_per_cycle": 1044.225078817731,
+   "hidden_fraction": 0.3266774311359466
+  },
+  "sglang.srt.managers.overlap_utils.FutureMap.resolve_seq_lens_cpu": {
+   "host_us_per_cycle": 1279.6199408866994,
+   "exposed_us_per_cycle": 84.72250246305406,
+   "hidden_fraction": 0.9337908860623518
+  },
+  "sglang.srt.speculative.eagle_draft_cuda_graph_runner.EAGLEDraftCudaGraphRunner.execute": {
+   "host_us_per_cycle": 975.756423645321,
+   "exposed_us_per_cycle": 927.2388965517217,
+   "hidden_fraction": 0.04972299020317272
+  },
+  "sglang.srt.speculative.eagle_draft_extend_cuda_graph_runner.EAGLEDraftExtendCudaGraphRunner.execute": {
+   "host_us_per_cycle": 946.7630344827596,
+   "exposed_us_per_cycle": 20.704133004926756,
+   "hidden_fraction": 0.9781316630974741
+  },
+  "sglang.srt.managers.tp_worker.TpModelWorker.forward_batch_generation": {
+   "host_us_per_cycle": 601.6977339901479,
+   "exposed_us_per_cycle": 548.0550837438417,
+   "hidden_fraction": 0.08915215600127979
+  },
+  "sglang.srt.model_executor.model_runner.ModelRunner.forward": {
+   "host_us_per_cycle": 589.9447487684732,
+   "exposed_us_per_cycle": 543.5359901477826,
+   "hidden_fraction": 0.0786662797110581
+  },
+  "sglang.srt.layers.attention.flashinfer_backend.FlashInferMultiStepDraftBackend.common_template": {
+   "host_us_per_cycle": 558.6132807881773,
+   "exposed_us_per_cycle": 549.5349655172419,
+   "hidden_fraction": 0.016251520655087837
+  },
+  "sglang.srt.model_executor.runner.decode_cuda_graph_runner.DecodeCudaGraphRunner.execute": {
+   "host_us_per_cycle": 555.0975369458133,
+   "exposed_us_per_cycle": 522.0648078817728,
+   "hidden_fraction": 0.05950797268132191
+  },
+  "sglang.srt.speculative.eagle_worker_common.prepare_for_draft_extend": {
+   "host_us_per_cycle": 478.63566502463055,
+   "exposed_us_per_cycle": 10.945650246305751,
+   "hidden_fraction": 0.9771315615485058
+  },
+  "sglang.srt.speculative.eagle_worker_common.prepare_for_draft": {
+   "host_us_per_cycle": 361.44252216748765,
+   "exposed_us_per_cycle": 98.2773793103441,
+   "hidden_fraction": 0.7280967974631284
+  },
+  "sglang.srt.managers.scheduler.Scheduler.get_next_batch_to_run": {
+   "host_us_per_cycle": 260.60799999999995,
+   "exposed_us_per_cycle": 6.510054187192183,
+   "hidden_fraction": 0.9750197454138315
+  },
+  "sglang.srt.managers.scheduler.Scheduler.process_batch_result": {
+   "host_us_per_cycle": 260.13903448275846,
+   "exposed_us_per_cycle": 5.4454926108373956,
+   "hidden_fraction": 0.979066991535258
+  },
+  "sglang.srt.speculative.eagle_utils.eagle_sample": {
+   "host_us_per_cycle": 249.09178325123165,
+   "exposed_us_per_cycle": 5.104576354679771,
+   "hidden_fraction": 0.9795072471357622
+  },
+  "sglang.srt.managers.scheduler_components.batch_result_processor.SchedulerBatchResultProcessor.process_batch_result_decode": {
+   "host_us_per_cycle": 220.61856157635464,
+   "exposed_us_per_cycle": 4.539556650246264,
+   "hidden_fraction": 0.9794235053577975
+  },
+  "sglang.srt.speculative.eagle_worker_common.build_eagle_verify_input": {
+   "host_us_per_cycle": 191.4653004926108,
+   "exposed_us_per_cycle": 11.06231034482768,
+   "hidden_fraction": 0.9422228972228072
+  },
+  "(no annotated function)": {
+   "host_us_per_cycle": 149.89887684729072,
+   "exposed_us_per_cycle": 6.880068965517366,
+   "hidden_fraction": 0.9541019311804022
+  },
+  "cub::DeviceScan::InclusiveScan": {
+   "host_us_per_cycle": 72.7426206896552,
+   "exposed_us_per_cycle": 50.2061921182266,
+   "hidden_fraction": 0.3098105121559571
+  }
+ },
+ "idle_by_call_path_us_per_cycle": {
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.speculative.eagle_worker_v2.EAGLEWorkerV2.forward_batch_generation > sglang.srt.speculative.eagle_worker_common.run_eagle_verify > sglang.srt.speculative.eagle_utils.eagle_prepare_for_verify > sglang.srt.model_executor.runner.decode_cuda_graph_runner.DecodeCudaGraphRunner.load_batch": 1428.7784827586113,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.speculative.eagle_worker_v2.EAGLEWorkerV2.forward_batch_generation > sglang.srt.speculative.eagle_worker_v2.EagleDraftWorker.draft > sglang.srt.speculative.eagle_draft_cuda_graph_runner.EAGLEDraftCudaGraphRunner.execute > sglang.srt.layers.attention.flashinfer_backend.FlashInferMultiStepDraftBackend.common_template": 549.5349655172419,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.speculative.eagle_worker_v2.EAGLEWorkerV2.forward_batch_generation > sglang.srt.speculative.eagle_worker_common.run_eagle_verify > sglang.srt.managers.tp_worker.TpModelWorker.forward_batch_generation > sglang.srt.model_executor.model_runner.ModelRunner.forward > sglang.srt.model_executor.runner.decode_cuda_graph_runner.DecodeCudaGraphRunner.execute": 442.48759605911266,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.speculative.eagle_worker_v2.EAGLEWorkerV2.forward_batch_generation > sglang.srt.speculative.eagle_worker_v2.EagleDraftWorker.draft > sglang.srt.speculative.eagle_draft_cuda_graph_runner.EAGLEDraftCudaGraphRunner.execute": 377.7039310344798,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.speculative.eagle_worker_v2.EAGLEWorkerV2.forward_batch_generation > sglang.srt.speculative.eagle_worker_v2.EagleDraftWorker.draft > sglang.srt.speculative.eagle_worker_common.prepare_for_draft": 98.2773793103441,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.managers.overlap_utils.FutureMap.resolve_seq_lens_cpu": 84.72250246305406,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.speculative.eagle_worker_v2.EAGLEWorkerV2.forward_batch_generation > sglang.srt.speculative.eagle_worker_common.run_eagle_verify > sglang.srt.managers.tp_worker.TpModelWorker.forward_batch_generation > sglang.srt.model_executor.model_runner.ModelRunner.forward > sglang.srt.model_executor.runner.decode_cuda_graph_runner.DecodeCudaGraphRunner.execute > sglang.srt.model_executor.runner.decode_cuda_graph_runner.DecodeCudaGraphRunner.load_batch": 77.0342019704433,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch": 65.36453694581353,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.speculative.eagle_worker_v2.EAGLEWorkerV2.forward_batch_generation > sglang.srt.speculative.eagle_worker_common.run_eagle_verify > sglang.srt.speculative.eagle_utils.eagle_prepare_for_verify > sglang.srt.model_executor.runner.decode_cuda_graph_runner.DecodeCudaGraphRunner.load_batch > cub::DeviceScan::InclusiveScan": 49.33073399014779,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.speculative.eagle_worker_v2.EAGLEWorkerV2.forward_batch_generation > sglang.srt.speculative.eagle_worker_common.run_eagle_verify": 27.418073891626097,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.speculative.eagle_worker_v2.EAGLEWorkerV2.forward_batch_generation > sglang.srt.speculative.eagle_worker_common.run_eagle_verify > sglang.srt.speculative.eagle_utils.eagle_prepare_for_verify": 24.187458128079083,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.speculative.eagle_worker_v2.EAGLEWorkerV2.forward_batch_generation > sglang.srt.speculative.eagle_worker_common.run_eagle_verify > sglang.srt.managers.tp_worker.TpModelWorker.forward_batch_generation > sglang.srt.model_executor.model_runner.ModelRunner.forward": 21.373605911330028,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.speculative.eagle_worker_v2.EAGLEWorkerV2.forward_batch_generation > sglang.srt.speculative.eagle_worker_v2.EagleDraftWorker._draft_extend_for_decode > sglang.srt.speculative.eagle_draft_extend_cuda_graph_runner.EAGLEDraftExtendCudaGraphRunner.execute": 19.807064039409518,
+  "(outside trace ranges)": 19.296448275862108,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.speculative.eagle_worker_v2.EAGLEWorkerV2.forward_batch_generation > sglang.srt.speculative.eagle_worker_v2.EagleDraftWorker.draft > sglang.srt.speculative.eagle_worker_common.build_eagle_verify_input": 11.06231034482768,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.speculative.eagle_worker_v2.EAGLEWorkerV2.forward_batch_generation > sglang.srt.speculative.eagle_worker_v2.EagleDraftWorker._draft_extend_for_decode > sglang.srt.speculative.eagle_worker_common.prepare_for_draft_extend": 10.893625615763877,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.speculative.eagle_worker_v2.EAGLEWorkerV2.forward_batch_generation > sglang.srt.speculative.eagle_worker_v2.EagleDraftWorker._draft_extend_for_decode": 7.823019704433687,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.speculative.eagle_worker_v2.EAGLEWorkerV2.forward_batch_generation > sglang.srt.speculative.eagle_worker_v2.EagleDraftWorker.draft": 7.646492610837436,
+  "(no annotated function)": 6.880068965517366,
+  "sglang.srt.managers.scheduler.Scheduler.get_next_batch_to_run": 6.510054187192183,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.speculative.eagle_worker_v2.EAGLEWorkerV2.forward_batch_generation > sglang.srt.speculative.eagle_worker_common.run_eagle_verify > sglang.srt.speculative.eagle_utils.eagle_sample": 5.0813990147782935,
+  "sglang.srt.managers.scheduler.Scheduler.process_batch_result > sglang.srt.managers.scheduler_components.batch_result_processor.SchedulerBatchResultProcessor.process_batch_result_decode": 4.539556650246264,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.speculative.eagle_worker_v2.EAGLEWorkerV2.forward_batch_generation > sglang.srt.speculative.eagle_worker_common.run_eagle_verify > sglang.srt.managers.tp_worker.TpModelWorker.forward_batch_generation": 4.495290640394091,
+  "sglang.srt.managers.scheduler.Scheduler.run_batch > sglang.srt.speculative.eagle_worker_v2.EAGLEWorkerV2.forward_batch_generation": 2.7753448275861734,
+  "sglang.srt.managers.tp_worker.TpModelWorker.forward_batch_generation > sglang.srt.model_executor.model_runner.ModelRunner.forward > sglang.srt.model_executor.runner.decode_cuda_graph_runner.DecodeCudaGraphRunner.execute": 2.169256157635468
+ }
+}

@@ -1,0 +1,154 @@
+{
+ "summary": {
+  "a": "/home/ubuntu/vp-data/state/tap/v3_smoke",
+  "b": "/home/ubuntu/vp-data/state/tap/v3_ctrl_core13",
+  "prompts": 4,
+  "classes": {
+   "accumulator_ambiguous": 1,
+   "no_divergence": 3
+  },
+  "classes_hopper_model": {
+   "accumulator_ambiguous": 1,
+   "no_divergence": 3
+  },
+  "first_difference_module": {
+   "model.layers.13.linear_attn.gdn_core": 4
+  },
+  "first_difference_modes": {
+   "DECODE vs DECODE": 4
+  },
+  "first_difference_output_index": {
+   "1": 4
+  },
+  "origin": {
+   "caches_not_hashed": 4
+  },
+  "first_cache_difference": {},
+  "no_hash_difference_before_divergence": 0
+ },
+ "cases": [
+  {
+   "id": "alpaca_eval-0000",
+   "prompt_len": 27,
+   "diverged_at": 6,
+   "first_difference": {
+    "position": 27,
+    "module": "model.layers.13.linear_attn.gdn_core",
+    "modules_differing_at_position": 294,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
+    "batch_a": 1,
+    "batch_b": 1,
+    "tokens_a": 1,
+    "tokens_b": 1,
+    "output_index": 1
+   },
+   "origin": "caches_not_hashed",
+   "argmax_a": 63049,
+   "argmax_b": 26310,
+   "bf16_logits_a": [
+    20.25,
+    20.125
+   ],
+   "bf16_logits_b": [
+    20.25,
+    20.25
+   ],
+   "logits_bitwise_equal": false,
+   "head_input_bitwise_equal": false,
+   "exact_logits_a": [
+    20.26015775918495,
+    20.182048435061006
+   ],
+   "exact_logits_b": [
+    20.227995616209228,
+    20.219464772118954
+   ],
+   "head_input_max_abs_diff": 0.25,
+   "exact_gap_a": 0.07810932412394322,
+   "exact_gap_b": 0.008530844090273604,
+   "bf16_gap_a": 0.125,
+   "bf16_gap_b": 0.0,
+   "abs_products_a": 131.25702598204953,
+   "abs_products_b": 131.2203721778642,
+   "model_conservative": {
+    "gap_bound_a": 0.08016185781241573,
+    "gap_bound_b": 0.08013947244281434,
+    "accumulator_order_source": [
+     "bf16",
+     "ambiguous"
+    ],
+    "float64_contradicts_bf16": false,
+    "cls": "accumulator_ambiguous"
+   },
+   "model_hopper": {
+    "gap_bound_a": 0.015619586091863895,
+    "gap_bound_b": 0.01561522428916584,
+    "accumulator_order_source": [
+     "bf16",
+     "ambiguous"
+    ],
+    "float64_contradicts_bf16": false,
+    "cls": "accumulator_ambiguous"
+   },
+   "cls": "accumulator_ambiguous"
+  },
+  {
+   "id": "alpaca_eval-0010",
+   "prompt_len": 32,
+   "diverged_at": null,
+   "first_difference": {
+    "position": 32,
+    "module": "model.layers.13.linear_attn.gdn_core",
+    "modules_differing_at_position": 297,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
+    "batch_a": 1,
+    "batch_b": 1,
+    "tokens_a": 1,
+    "tokens_b": 1,
+    "output_index": 1
+   },
+   "origin": "caches_not_hashed",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0020",
+   "prompt_len": 19,
+   "diverged_at": null,
+   "first_difference": {
+    "position": 19,
+    "module": "model.layers.13.linear_attn.gdn_core",
+    "modules_differing_at_position": 310,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
+    "batch_a": 1,
+    "batch_b": 1,
+    "tokens_a": 1,
+    "tokens_b": 1,
+    "output_index": 1
+   },
+   "origin": "caches_not_hashed",
+   "cls": "no_divergence"
+  },
+  {
+   "id": "alpaca_eval-0030",
+   "prompt_len": 19,
+   "diverged_at": null,
+   "first_difference": {
+    "position": 19,
+    "module": "model.layers.13.linear_attn.gdn_core",
+    "modules_differing_at_position": 310,
+    "mode_a": "DECODE",
+    "mode_b": "DECODE",
+    "batch_a": 1,
+    "batch_b": 1,
+    "tokens_a": 1,
+    "tokens_b": 1,
+    "output_index": 1
+   },
+   "origin": "caches_not_hashed",
+   "cls": "no_divergence"
+  }
+ ]
+}

@@ -1,0 +1,50 @@
+{
+ "1": {
+  "report": "plain_bs1.nsys-rep",
+  "steps": 572,
+  "layer0_in_proj_wall_us": 21.35311888111888,
+  "step_us": 3541.2934825174825,
+  "f": 0.006029751272108373,
+  "ceiling": 1.006066329731524,
+  "kernels": [
+   "nvjet_sm90_tst_64x8_64x16_1x1_h_bz_TNT",
+   "nvjet_sm90_tst_64x8_64x16_4x1_v_bz_TNT"
+  ]
+ },
+ "8": {
+  "report": "plain_bs8.nsys-rep",
+  "steps": 508,
+  "layer0_in_proj_wall_us": 22.84743307086614,
+  "step_us": 3982.35231496063,
+  "f": 0.005737170210941523,
+  "ceiling": 1.0057702752622852,
+  "kernels": [
+   "nvjet_sm90_tst_64x8_64x16_1x1_h_bz_TNT",
+   "nvjet_sm90_tst_64x8_64x16_4x1_v_bz_TNT"
+  ]
+ },
+ "32": {
+  "report": "plain_bs32.nsys-rep",
+  "steps": 395,
+  "layer0_in_proj_wall_us": 26.408830379746835,
+  "step_us": 5128.285569620253,
+  "f": 0.0051496411463884985,
+  "ceiling": 1.0051762972195362,
+  "kernels": [
+   "nvjet_sm90_tst_128x32_64x10_4x1_v_bz_TNT",
+   "nvjet_sm90_tst_64x8_64x16_1x4_h_bz_TNT"
+  ]
+ },
+ "128": {
+  "report": "plain_bs128.nsys-rep",
+  "steps": 227,
+  "layer0_in_proj_wall_us": 29.639189427312772,
+  "step_us": 8885.927189427313,
+  "f": 0.003335520176507656,
+  "ceiling": 1.0033466831055304,
+  "kernels": [
+   "nvjet_sm90_tst_64x8_64x16_1x4_h_bz_TNT",
+   "nvjet_sm90_tst_96x128_64x7_2x1_v_bz_TNN"
+  ]
+ }
+}

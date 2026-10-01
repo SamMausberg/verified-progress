@@ -1,6 +1,6 @@
 {
   "audit_date": "2026-09-30",
-  "source_count": 194,
+  "source_count": 223,
   "sources": [
     {
       "key": "sgcode",
@@ -2160,6 +2160,325 @@
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
       "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "mtbench",
+      "bibliography_text": "Lianmin Zheng, Wei-Lin Chiang, Ying Sheng, Siyuan Zhuang, Zhanghao Wu, Yonghao Zhuang, Zi Lin, Zhuohan Li, Dacheng Li, Eric P. Xing, Hao Zhang, Joseph E. Gonzalez and Ion Stoica. \\emph{Judging {LLM}-as-a-Judge with {MT-Bench} and {Chatbot Arena}}. Advances in Neural Information Processing Systems 36, Datasets and Benchmarks Track, 2023; arXiv:2306.05685. \\url{https://arxiv.org/abs/2306.05685}.",
+      "urls": [
+        "https://arxiv.org/abs/2306.05685"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry. Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "oasst1",
+      "bibliography_text": "Andreas K{\\\"o}pf, Yannic Kilcher, Dimitri von R{\\\"u}tte, Sotiris Anagnostidis, Zhi-Rui Tam, Keith Stevens, Abdullah Barhoum, Nguyen Minh Duc, Oliver Stanley, Rich{\\'a}rd Nagyfi, Shahul ES, Sameer Suri, David Glushkov, Arnav Dantuluri, Andrew Maguire, Christoph Schuhmann, Huu Nguyen and Alexander Mattick. \\emph{{OpenAssistant} Conversations -- Democratizing Large Language Model Alignment}. Advances in Neural Information Processing Systems 36, Datasets and Benchmarks Track, 2023; arXiv:2304.07327. \\url{https://arxiv.org/abs/2304.07327}.",
+      "urls": [
+        "https://arxiv.org/abs/2304.07327"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry. Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "humaneval",
+      "bibliography_text": "Mark Chen, Jerry Tworek, Heewoo Jun, Qiming Yuan, Henrique Ponde de Oliveira Pinto and others. \\emph{Evaluating Large Language Models Trained on Code}. 2021; arXiv:2107.03374. \\url{https://arxiv.org/abs/2107.03374}.",
+      "urls": [
+        "https://arxiv.org/abs/2107.03374"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: 58 authors). Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "mbpp",
+      "bibliography_text": "Jacob Austin, Augustus Odena, Maxwell Nye, Maarten Bosma, Henryk Michalewski, David Dohan, Ellen Jiang, Carrie Cai, Michael Terry, Quoc Le and Charles Sutton. \\emph{Program Synthesis with Large Language Models}. 2021; arXiv:2108.07732. \\url{https://arxiv.org/abs/2108.07732}.",
+      "urls": [
+        "https://arxiv.org/abs/2108.07732"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry. Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "gsm8k",
+      "bibliography_text": "Karl Cobbe, Vineet Kosaraju, Mohammad Bavarian, Mark Chen, Heewoo Jun, Lukasz Kaiser, Matthias Plappert, Jerry Tworek, Jacob Hilton, Reiichiro Nakano, Christopher Hesse and John Schulman. \\emph{Training Verifiers to Solve Math Word Problems}. 2021; arXiv:2110.14168. \\url{https://arxiv.org/abs/2110.14168}.",
+      "urls": [
+        "https://arxiv.org/abs/2110.14168"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry. Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "santilli2023jacobi",
+      "bibliography_text": "Andrea Santilli, Silvio Severino, Emilian Postolache, Valentino Maiorca, Michele Mancusi, Riccardo Marin and Emanuele Rodol{\\`a}. \\emph{Accelerating Transformer Inference for Translation via Parallel Decoding}. Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (ACL), 2023; arXiv:2305.10427. \\url{https://arxiv.org/abs/2305.10427}.",
+      "urls": [
+        "https://arxiv.org/abs/2305.10427"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry. Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "song2021parallel",
+      "bibliography_text": "Yang Song, Chenlin Meng, Renjie Liao and Stefano Ermon. \\emph{Accelerating Feedforward Computation via Parallel Nonlinear Equation Solving}. Proceedings of the 38th International Conference on Machine Learning (ICML), 2021; arXiv:2002.03629. \\url{https://arxiv.org/abs/2002.03629}.",
+      "urls": [
+        "https://arxiv.org/abs/2002.03629"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry. Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "tokenrecycling2024",
+      "bibliography_text": "Xianzhen Luo, Yixuan Wang, Qingfu Zhu, Zhiming Zhang, Xuanyu Zhang, Qing Yang and Dongliang Xu. \\emph{Turning Trash into Treasure: Accelerating Inference of Large Language Models with Token Recycling}. Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers), 2025; arXiv:2408.08696. \\url{https://aclanthology.org/2025.acl-long.338/}.",
+      "urls": [
+        "https://aclanthology.org/2025.acl-long.338/"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the ACL Anthology page and the arXiv abstract page (v3)). Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "sjd2025",
+      "bibliography_text": "Yao Teng, Han Shi, Xian Liu, Xuefei Ning, Guohao Dai, Yu Wang, Zhenguo Li and Xihui Liu. \\emph{Accelerating Auto-regressive Text-to-Image Generation with Training-free Speculative {Jacobi} Decoding}. International Conference on Learning Representations (ICLR), 2025; arXiv:2410.01699. \\url{https://arxiv.org/abs/2410.01699}.",
+      "urls": [
+        "https://arxiv.org/abs/2410.01699"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page; ICLR 2025 poster per OpenReview record LZfjxvqw0N). Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "so2026scd",
+      "bibliography_text": "Junhyuk So, Hyunho Kook, Chaeyeon Jang and Eunhyeok Park. \\emph{Speculative Coupled Decoding for Training-Free Lossless Acceleration of Autoregressive Visual Generation}. International Conference on Machine Learning (ICML), 2026; arXiv:2510.24211. \\url{https://arxiv.org/abs/2510.24211}.",
+      "urls": [
+        "https://arxiv.org/abs/2510.24211"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page; v1 was titled MC-SJD: Maximal Coupling Speculative Jacobi Decoding; ICML 2026 per the arXiv comment and OpenReview). Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "deltacnn2022",
+      "bibliography_text": "Mathias Parger, Chengcheng Tang, Christopher D. Twigg, Cem Keskin, Robert Wang and Markus Steinberger. \\emph{{DeltaCNN}: End-to-End {CNN} Inference of Sparse Frame Differences in Videos}. Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), 2022; arXiv:2203.03996. \\url{https://openaccess.thecvf.com/content/CVPR2022/html/Parger_DeltaCNN_End-to-End_CNN_Inference_of_Sparse_Frame_Differences_in_Videos_CVPR_2022_paper.html}.",
+      "urls": [
+        "https://openaccess.thecvf.com/content/CVPR2022/html/Parger_DeltaCNN_End-to-End_CNN_Inference_of_Sparse_Frame_Differences_in_Videos_CVPR_2022_paper.html"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the CVF open access page). Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "eventful2023",
+      "bibliography_text": "Matthew Dutson, Yin Li and Mohit Gupta. \\emph{Eventful Transformers: Leveraging Temporal Redundancy in Vision Transformers}. Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV), 2023; arXiv:2308.13494. \\url{https://openaccess.thecvf.com/content/ICCV2023/html/Dutson_Eventful_Transformers_Leveraging_Temporal_Redundancy_in_Vision_Transformers_ICCV_2023_paper.html}.",
+      "urls": [
+        "https://openaccess.thecvf.com/content/ICCV2023/html/Dutson_Eventful_Transformers_Leveraging_Temporal_Redundancy_in_Vision_Transformers_ICCV_2023_paper.html"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the CVF open access page). Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "cacheblend2025",
+      "bibliography_text": "Jiayi Yao, Hanchen Li, Yuhan Liu, Siddhant Ray, Yihua Cheng, Qizheng Zhang, Kuntai Du, Shan Lu and Junchen Jiang. \\emph{{CacheBlend}: Fast Large Language Model Serving for {RAG} with Cached Knowledge Fusion}. Proceedings of the Twentieth European Conference on Computer Systems (EuroSys '25), 2025; arXiv:2405.16444. \\url{https://doi.org/10.1145/3689031.3696098}.",
+      "urls": [
+        "https://doi.org/10.1145/3689031.3696098"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified via the Crossref record and the arXiv abstract page (v3)). Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "specspec",
+      "bibliography_text": "Tanishq Kumar, Tri Dao and Avner May. \\emph{Speculative Speculative Decoding}. International Conference on Learning Representations (ICLR), 2026; arXiv:2603.03251. \\url{https://arxiv.org/abs/2603.03251}.",
+      "urls": [
+        "https://arxiv.org/abs/2603.03251"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page (v3); OpenReview record aL1Wnml9Ef, ICLR 2026 poster). Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "hspec2026",
+      "bibliography_text": "Weifan Jiang, Krishna Teja Chitty-Venkata, Megan Flynn, Reed Meyerson, Zhenting Qi, Tianyu Wu, Eldar Kurtic, Minlan Yu and Alexandre Marques. \\emph{{H-Spec}: Parallel Speculative Decoding Without a Drafter-Side {KV} Cache}. 2026; arXiv:2609.24197. \\url{https://arxiv.org/abs/2609.24197}.",
+      "urls": [
+        "https://arxiv.org/abs/2609.24197"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page (v1)). Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "cure2026",
+      "bibliography_text": "Aofan Liu, Jingxiang Meng, Fangxin Liu and Yongbiao Chen. \\emph{{CURE}: Local Uncertainty Repair for Block-Parallel Speculative Decoding}. 2026; arXiv:2608.00531. \\url{https://arxiv.org/abs/2608.00531}.",
+      "urls": [
+        "https://arxiv.org/abs/2608.00531"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page (v1)). Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "card2025",
+      "bibliography_text": "Enyu Zhou, Kai Sheng, Hao Chen and Xin He. \\emph{{CARD}: A Cache-Assisted Parallel Speculative Decoding Framework via Query-and-Correct Paradigm for Accelerating {LLM} Inference}. 2025; arXiv:2508.04462. \\url{https://arxiv.org/abs/2508.04462}.",
+      "urls": [
+        "https://arxiv.org/abs/2508.04462"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page (v2; v1 had a different title)). Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "retrace2026",
+      "bibliography_text": "Luxi Lin, Zhanpeng Zeng, Shuang Peng, Songwei Liu and Rongrong Ji. \\emph{{ReTrace}: Rejected-Trajectory Conditioning for Speculative Decoding}. 2026; arXiv:2608.29748. \\url{https://arxiv.org/abs/2608.29748}.",
+      "urls": [
+        "https://arxiv.org/abs/2608.29748"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page (v2)). Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "carryover2026",
+      "bibliography_text": "Jahyun Koo, Sunghyeon Woo, Jaeeun Kil, Jeongtae Lee, Sungjae Lee, Kyomin Jung and Minsub Kim. \\emph{Carryover Drafting: Recycling Rejected States for Speculative Decoding}. 2026; arXiv:2609.14717. \\url{https://arxiv.org/abs/2609.14717}.",
+      "urls": [
+        "https://arxiv.org/abs/2609.14717"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page (v1)). Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "hu2026jacobiforcing",
+      "bibliography_text": "Lanxiang Hu, Siqi Kou, Yichao Fu, Samyam Rajbhandari, Tajana Rosing, Yuxiong He, Zhijie Deng and Hao Zhang. \\emph{Fast and Accurate Causal Parallel Decoding using {Jacobi} Forcing}. International Conference on Machine Learning (ICML), 2026; arXiv:2512.14681. \\url{https://arxiv.org/abs/2512.14681}.",
+      "urls": [
+        "https://arxiv.org/abs/2512.14681"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page (v1); ICML 2026 per OpenReview record ORy2hyPd4G). Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "dpace",
+      "bibliography_text": "Tianyu Wu, Yu Yao, Zhenting Qi, Han Zheng, Zhuohan Wang, Haoran Ma, Lawrence Liao, Himabindu Lakkaraju, Ju Li and Yilun Du. \\emph{{D-PACE}: Dynamic Position-Aware Cross-Entropy for Parallel Speculative Drafting}. 2026; arXiv:2605.18810. \\url{https://arxiv.org/abs/2605.18810v1}.",
+      "urls": [
+        "https://arxiv.org/abs/2605.18810v1"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2605.18810v1, 12 May 2026). Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "pard2",
+      "bibliography_text": "Zihao An, Taichi Liu, Ziqiong Liu, Dong Li, Ruofeng Liu and Emad Barsoum. \\emph{{PARD-2}: Target-Aligned Parallel Draft Model for Dual-Mode Speculative Decoding}. 2026; arXiv:2605.08632. \\url{https://arxiv.org/abs/2605.08632v1}.",
+      "urls": [
+        "https://arxiv.org/abs/2605.08632v1"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2605.08632v1, 9 May 2026). Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "vat",
+      "bibliography_text": "Geonmo Gu, Byeongho Heo, HeeJae Jun, Yoohoon Kang, Sangmin Lee, Sangdoo Yun and Dongyoon Han. \\emph{Verification-Aware Training for Speculative Decoding}. 2026; arXiv:2608.30135. \\url{https://arxiv.org/abs/2608.30135v1}.",
+      "urls": [
+        "https://arxiv.org/abs/2608.30135v1"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2608.30135v1, 31 Aug 2026). Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "caddtree",
+      "bibliography_text": "Shuai Zhang, Huachuan Qiu, Hongliang He and Yong Dai. \\emph{Cost-Aware Diffusion Draft Trees for Speculative Decoding}. 2026; arXiv:2606.01813. \\url{https://arxiv.org/abs/2606.01813v1}.",
+      "urls": [
+        "https://arxiv.org/abs/2606.01813v1"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2606.01813v1, 1 Jun 2026). Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "tiger",
+      "bibliography_text": "Quynh Vo, Cong-Duy Nguyen, Ponhvoan Srey, Luu Anh Tuan and Thong Nguyen. \\emph{{TIGER}: Text-Conditioned Visual Gated Routing with Acceptance Alignment for Multimodal Speculative Decoding}. 2026; arXiv:2607.11131. \\url{https://arxiv.org/abs/2607.11131v1}.",
+      "urls": [
+        "https://arxiv.org/abs/2607.11131v1"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2607.11131v1, 13 Jul 2026). Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "vsd",
+      "bibliography_text": "Xiandong Zou, Jianshu Li, Jing Huang and Pan Zhou. \\emph{Variational Speculative Decoding: Rethinking Draft Training from Token Likelihood to Sequence Acceptance}. 2026; arXiv:2602.05774. \\url{https://arxiv.org/abs/2602.05774v6}.",
+      "urls": [
+        "https://arxiv.org/abs/2602.05774v6"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2602.05774v6, 12 Aug 2026 (v1 5 Feb 2026)). Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "bvloss",
+      "bibliography_text": "Suyoung Kim, Jahyun Koo, Hyeonjin Kim, Inhyeok Bang, Seunghyun Lee, Hyunjae Oh, Baeseong Park and Dongsoo Lee. \\emph{{BV} Loss: Block Verification-Aware Loss for Block Diffusion Speculative Decoding}. 2026; arXiv:2609.34832. \\url{https://arxiv.org/abs/2609.34832v1}.",
+      "urls": [
+        "https://arxiv.org/abs/2609.34832v1"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2609.34832v1, 28 Sep 2026). Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "aadt",
+      "bibliography_text": "Tianhua Xia, Mugilan Ganesan, Yifei Feng, Haiyu Wang, Maximilian Egger and Sai Qian Zhang. \\emph{Acceptance-Aware Draft Model Training for Speculative Decoding}. 2026; arXiv:2609.24150. \\url{https://arxiv.org/abs/2609.24150v1}.",
+      "urls": [
+        "https://arxiv.org/abs/2609.24150v1"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2609.24150v1, 21 Sep 2026). Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "dblast",
+      "bibliography_text": "Amirmohammad Karimi, Chao Gao and Negar Hassanpour. \\emph{{DBLAST}: Dependent Block Drafting for Stochastic Speculative Decoding}. 2026; arXiv:2608.05448. \\url{https://arxiv.org/abs/2608.05448v1}.",
+      "urls": [
+        "https://arxiv.org/abs/2608.05448v1"
+      ],
+      "accessed": "2026-09-30",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2608.05448v1, 5 Aug 2026). Reported numbers are the authors' and were not reproduced."
     }
   ],
   "scope": "Public primary sources only. No confidential assignment text or downloaded third-party paper/code bodies redistributed. Entries added on 30 September 2026 come from the lit workstream's literature review; paper/references.bib holds the matching BibTeX.",

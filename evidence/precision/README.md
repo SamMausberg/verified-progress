@@ -8,14 +8,14 @@ Python 3.12, torch 2.13.0+cu130 on CPU, safetensors 0.9.0-rc.1.
 
 Exact tests of `src/precision_reference.py`. Every BF16, FP32 and FP64 rounding is emulated on
 Fractions, so each bound and decision is checked against real arithmetic. Produced at commit
-`8296b585` (recorded in the JSON as `repo_commit`), seed 20260930:
+`960aa802` (recorded in the JSON as `repo_commit`), seed 20260930:
 
 ```sh
 . .venv/bin/activate
 python tests/test_precision.py 2>&1 | tee evidence/precision/precision_tests.log
 ```
 
-Result: 20 test methods passed in 35 s; 39,761 generated checks (per-kind counts in the JSON).
+Result: 21 test methods passed in 37 s; 40,015 generated checks (per-kind counts in the JSON).
 Highlights:
 
 - 5,600 accumulation-bound checks across eight summation models (sequential, pairwise, blocked,
@@ -43,6 +43,10 @@ Highlights:
   the FP32-model gap condition certifies.
 - A stream of noise consumed in evaluation order changed the race winner in 247 of 300 cases; a
   counter-based field never can.
+- Subnormal operands: 160 heads with subnormal BF16 weights and hidden states, with and without
+  flush to zero; every FP32 rescoring interval enclosed the exact logit, and the 71 exact ties
+  between identical rows resolved to the smallest index. Underflowing products stay exact until
+  the modelled accumulator rounds them (for example `2^-149 + 2^-150` rounds to even, `2^-148`).
 
 Scope: synthetic heads with small V and D. The tensor-core adder is a model, not hardware. Tests
 are not proofs.
@@ -61,7 +65,8 @@ errors. See `formal/STATUS.md` for what is and is not formalized.
 Weight-only constants of the Qwen3.5-4B tied head
 (`Qwen/Qwen3.5-4B@851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a`, tensor
 `model.language_model.embed_tokens.weight`, 248,320 x 2,560 BF16), computed in float64 on CPU at
-commit `9df1e0c7`:
+the commit recorded in the JSON (`repo_commit`; first computed at `9df1e0c7`, regenerated with
+identical values after the quantile code stopped subsampling):
 
 ```sh
 ~/sglang/.venv/bin/python experiments/precision_head_constants/head_constants.py \
@@ -77,5 +82,5 @@ per-row round-to-nearest half-width `||e_i||_2 ||h_t||_2` if and only if rho < `
 with `r_c(i)` the l2 radius about the mean of row i's 64-row tile of contiguous token ids. Its
 median over rows is 0.85% (p10 0.67%, p90 1.15%); in the manuscript's l_inf/l_1 family the median
 is 0.30%. It compares envelope width only, not certification rate or runtime. Quantiles are
-over all 248,320 rows (the script's one-million-value sampling cap exceeds the row count). This is a derived calculation from the weights; no hidden states
+over all 248,320 rows. This is a derived calculation from the weights; no hidden states
 are involved, so it does not by itself decide whether either certificate is useful.

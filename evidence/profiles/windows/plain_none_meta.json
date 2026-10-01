@@ -1,0 +1,25 @@
+{
+  "argv": [
+    "/home/ubuntu/vp-wt/profile/experiments/profiling/run_profiles.py",
+    "--arm",
+    "plain",
+    "--mode",
+    "none",
+    "--concurrency",
+    "1",
+    "8",
+    "32",
+    "128",
+    "--repeats",
+    "3",
+    "--out-dir",
+    "/home/ubuntu/vp-data/profile/plain_none"
+  ],
+  "env": {},
+  "server_command": "/home/ubuntu/sglang/.venv/bin/python -m sglang.launch_server --model-path Qwen/Qwen3.5-4B --revision 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a --attention-backend flashinfer --mm-attention-backend triton_attn --host 127.0.0.1 --port 30020",
+  "started": "2026-09-30T22:51:03",
+  "sglang_sha": "bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824",
+  "repo_sha": "9ca975a1d4d361598e99a0304b0addf943de7b97",
+  "nsys_version": "NVIDIA Nsight Systems version 2025.3.2.474-253236389321v0",
+  "gpu": "NVIDIA GH200 480GB, 570.195.03, 1980 MHz, 2619 MHz"
+}
