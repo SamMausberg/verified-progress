@@ -148,7 +148,7 @@ The chosen arms (\path{bench/arms.toml}) all run without the prefix cache, which
 \begin{figure}[htbp]
 \centering
 \input{figures/frontier}
-\caption{The confirmed serving frontier for four of the nine tuned arms, from client concurrency 1 (lower right) to 128, or 64 for block 16 (upper left); each point averages its valid sessions (three or four; hollow: one) \ev{bench-frontier}. Grey: the envelope over all nine arms' points with at least three sessions. All arms are stock or exact up to rounding; none uses the certified head.}
+\caption{The confirmed serving frontier of the stock engine for four of the nine tuned arms, from client concurrency 1 (lower right) to 128, or 64 for block 16 (upper left); each point averages its valid sessions (three or four; hollow: one), and one standard deviation over sessions, below 2\% of each mean, is hidden by the markers \ev{bench-frontier}. Grey band: the envelope over all nine arms' points with at least three sessions. All arms are stock or exact up to rounding; none uses the certified head.}
 \label{fig:frontier}
 \end{figure}
 

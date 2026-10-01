@@ -68,7 +68,7 @@ MTP (accepted length 3), replayed verify, FP32 & -- & 34.3k & --\\\bottomrule
 \begin{figure}[htbp]
 \centering
 \input{figures/ceilings}
-\caption{Derived throughput ceilings per lever stack against batch size under the layer-serial model of Equation~\eqref{eq:stack-floor} and, for two stacks, the overlapped roofline of Equation~\eqref{eq:stack-floor-overlap}, at the measured bandwidth and assumed tensor-core rate (lines~\ev{ceilings}), and served output throughput of single benchmark runs at client concurrency 1, 32 and 128 (points~\ev{levers}; the two series are offset slightly left and right of their concurrency so that both stay visible). The gap between a line and a point at the same concurrency is overhead above the layer-serial floor; at high concurrency it includes the server's streaming path (Appendix~\paperref{app:serving-hazards} of the paper).}
+\caption{Derived throughput ceilings per lever stack against batch size under the layer-serial model of Equation~\eqref{eq:stack-floor} and, for two stacks, the overlapped roofline of Equation~\eqref{eq:stack-floor-overlap}, at the measured bandwidth and assumed tensor-core rate (lines~\ev{ceilings}; ink for the layer-serial model, grey for the overlapped roofline, one dash pattern per lever stack), and served output throughput of single benchmark runs at client concurrency 1, 32 and 128 (points~\ev{levers}; the two series are offset slightly left and right of their concurrency so that both stay visible). The gap between a line and a point at the same concurrency is overhead above the layer-serial floor; at high concurrency it includes the server's streaming path (Appendix~\paperref{app:serving-hazards} of the paper).}
 \label{fig:stack-ceilings}
 \end{figure}
 
