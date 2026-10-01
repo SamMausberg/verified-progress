@@ -1,0 +1,381 @@
+{
+ "kind": "derived: measured progress (residual_eval.py) and phase times (stage_a.py); repair cost is a bytes-only lower bound",
+ "block": 16,
+ "baseline": {
+  "run": "fresh_b16",
+  "C_D_us": 7457.03125,
+  "A_D": 7.675262655205349,
+  "f": 0.022795757950059725,
+  "us_per_token": 971.5669137319562
+ },
+ "dflash_us_per_token": 971.5669137319562,
+ "audit_us": 4897.775000000001,
+ "anchor_cache_MB": 63.127552,
+ "anchor_write_us": 21.042517333333333,
+ "hbm_read_TBps": 3.827,
+ "mean_a0": 2.975,
+ "rigorous_rejection": {
+  "audit_us_per_max_extra_token": 407.2993762993763,
+  "rejects": false
+ },
+ "rows": [
+  {
+   "evaluator": "exact_jacobi_faithful_reference",
+   "rank": null,
+   "sweeps": 0,
+   "extra_tokens": 1.35,
+   "cost_us": 4918.817517333334,
+   "us_per_token": 3643.5685313580248,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.2666525702399333
+  },
+  {
+   "evaluator": "exact_jacobi_faithful_reference",
+   "rank": null,
+   "sweeps": 1,
+   "extra_tokens": 2.3749999999999996,
+   "cost_us": 4948.464551563801,
+   "us_per_token": 2083.5640217110745,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.46630048494218157
+  },
+  {
+   "evaluator": "exact_jacobi_faithful_reference",
+   "rank": null,
+   "sweeps": 2,
+   "extra_tokens": 3.4,
+   "cost_us": 4978.11158579427,
+   "us_per_token": 1464.1504664100794,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.6635704021008998
+  },
+  {
+   "evaluator": "exact_jacobi_faithful_reference",
+   "rank": null,
+   "sweeps": 3,
+   "extra_tokens": 4.362500000000001,
+   "cost_us": 5007.758620024737,
+   "us_per_token": 1147.9102853924896,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.8463787859516925
+  },
+  {
+   "evaluator": "exact_jacobi_faithful_reference",
+   "rank": null,
+   "sweeps": 4,
+   "extra_tokens": 5.325000000000001,
+   "cost_us": 5037.405654255204,
+   "us_per_token": 945.9916721606015,
+   "beats_dflash": true,
+   "ratio_to_dflash": 1.0270353770799505
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 0,
+   "sweeps": 1,
+   "repair_us_lower_bound": 29.647034230467728,
+   "extra_tokens": 1.35,
+   "cost_us": 4948.464551563801,
+   "us_per_token": 3665.5292974546674,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.26505501249345065
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 0,
+   "sweeps": 2,
+   "repair_us_lower_bound": 29.647034230467728,
+   "extra_tokens": 1.35,
+   "cost_us": 4978.11158579427,
+   "us_per_token": 3687.4900635513104,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.263476483187122
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 0,
+   "sweeps": 3,
+   "repair_us_lower_bound": 29.647034230467728,
+   "extra_tokens": 1.35,
+   "cost_us": 5007.758620024737,
+   "us_per_token": 3709.450829647953,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.2619166443632744
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 0,
+   "sweeps": 4,
+   "repair_us_lower_bound": 29.647034230467728,
+   "extra_tokens": 1.35,
+   "cost_us": 5037.405654255204,
+   "us_per_token": 3731.4115957445956,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.26037516602026906
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 16,
+   "sweeps": 1,
+   "repair_us_lower_bound": 46.142344395087534,
+   "extra_tokens": 1.4125,
+   "cost_us": 4964.959861728421,
+   "us_per_token": 3515.015831312156,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.27640470494531744
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 16,
+   "sweeps": 2,
+   "repair_us_lower_bound": 46.142344395087534,
+   "extra_tokens": 1.4125,
+   "cost_us": 5011.102206123509,
+   "us_per_token": 3547.6829777865546,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.2738595640634523
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 16,
+   "sweeps": 3,
+   "repair_us_lower_bound": 46.142344395087534,
+   "extra_tokens": 1.4125,
+   "cost_us": 5057.244550518596,
+   "us_per_token": 3580.3501242609527,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.27136086695781036
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 16,
+   "sweeps": 4,
+   "repair_us_lower_bound": 46.142344395087534,
+   "extra_tokens": 1.4125,
+   "cost_us": 5103.386894913684,
+   "us_per_token": 3613.0172707353513,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.2689073538622236
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 32,
+   "sweeps": 1,
+   "repair_us_lower_bound": 62.63765455970734,
+   "extra_tokens": 1.4125,
+   "cost_us": 4981.455171893042,
+   "us_per_token": 3526.693927003923,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.27548943396892506
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 32,
+   "sweeps": 2,
+   "repair_us_lower_bound": 62.63765455970734,
+   "extra_tokens": 1.4125,
+   "cost_us": 5044.092826452748,
+   "us_per_token": 3571.039169170087,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.27206840017880546
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 32,
+   "sweeps": 3,
+   "repair_us_lower_bound": 62.63765455970734,
+   "extra_tokens": 1.4125,
+   "cost_us": 5106.730481012456,
+   "us_per_token": 3615.384411336252,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.2687312891778674
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 32,
+   "sweeps": 4,
+   "repair_us_lower_bound": 62.63765455970734,
+   "extra_tokens": 1.4125,
+   "cost_us": 5169.368135572163,
+   "us_per_token": 3659.729653502416,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.26547505026830387
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 64,
+   "sweeps": 1,
+   "repair_us_lower_bound": 95.62827488894696,
+   "extra_tokens": 1.4125,
+   "cost_us": 5014.445792222281,
+   "us_per_token": 3550.0501183874553,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.2736769570377988
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 64,
+   "sweeps": 2,
+   "repair_us_lower_bound": 95.62827488894696,
+   "extra_tokens": 1.4125,
+   "cost_us": 5110.074067111228,
+   "us_per_token": 3617.7515519371523,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.26855545489621124
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 64,
+   "sweeps": 3,
+   "repair_us_lower_bound": 95.62827488894696,
+   "extra_tokens": 1.4125,
+   "cost_us": 5205.702342000175,
+   "us_per_token": 3685.4529854868492,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.26362211580447337
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 64,
+   "sweeps": 4,
+   "repair_us_lower_bound": 95.62827488894696,
+   "extra_tokens": 1.4125,
+   "cost_us": 5301.330616889121,
+   "us_per_token": 3753.1544190365457,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.25886675720136304
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 128,
+   "sweeps": 1,
+   "repair_us_lower_bound": 161.60951554742618,
+   "extra_tokens": 1.35,
+   "cost_us": 5080.42703288076,
+   "us_per_token": 3763.279283615377,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.2581702925855062
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 128,
+   "sweeps": 2,
+   "repair_us_lower_bound": 161.60951554742618,
+   "extra_tokens": 1.35,
+   "cost_us": 5242.0365484281865,
+   "us_per_token": 3882.9900358727305,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.2502110241736918
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 128,
+   "sweeps": 3,
+   "repair_us_lower_bound": 161.60951554742618,
+   "extra_tokens": 1.35,
+   "cost_us": 5403.646063975612,
+   "us_per_token": 4002.700788130083,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.24272783931617262
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 128,
+   "sweeps": 4,
+   "repair_us_lower_bound": 161.60951554742618,
+   "extra_tokens": 1.35,
+   "cost_us": 5565.255579523038,
+   "us_per_token": 4122.411540387436,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.2356792630268655
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 256,
+   "sweeps": 1,
+   "repair_us_lower_bound": 293.57199686438463,
+   "extra_tokens": 1.4125,
+   "cost_us": 5212.389514197718,
+   "us_per_token": 3690.1872666886497,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.263283904993738
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 256,
+   "sweeps": 2,
+   "repair_us_lower_bound": 293.57199686438463,
+   "extra_tokens": 1.4125,
+   "cost_us": 5505.961511062103,
+   "us_per_token": 3898.025848539542,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.24924588791425523
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 256,
+   "sweeps": 3,
+   "repair_us_lower_bound": 293.57199686438463,
+   "extra_tokens": 1.4125,
+   "cost_us": 5799.533507926488,
+   "us_per_token": 4105.864430390434,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.23662907779923173
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 256,
+   "sweeps": 4,
+   "repair_us_lower_bound": 293.57199686438463,
+   "extra_tokens": 1.4125,
+   "cost_us": 6093.105504790872,
+   "us_per_token": 4313.703012241325,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.22522804907404761
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 512,
+   "sweeps": 1,
+   "repair_us_lower_bound": 557.4969594983015,
+   "extra_tokens": 1.3874999999999997,
+   "cost_us": 5476.314476831635,
+   "us_per_token": 3946.8933166354136,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.24615991256641884
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 512,
+   "sweeps": 2,
+   "repair_us_lower_bound": 557.4969594983015,
+   "extra_tokens": 1.4499999999999997,
+   "cost_us": 6033.811436329937,
+   "us_per_token": 4161.24926643444,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.23347962391218197
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 512,
+   "sweeps": 3,
+   "repair_us_lower_bound": 557.4969594983015,
+   "extra_tokens": 1.4625,
+   "cost_us": 6591.308395828239,
+   "us_per_token": 4506.877535609053,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.21557428753179114
+  },
+  {
+   "evaluator": "anchored_residual",
+   "rank": 512,
+   "sweeps": 4,
+   "repair_us_lower_bound": 557.4969594983015,
+   "extra_tokens": 1.4625,
+   "cost_us": 7148.80535532654,
+   "us_per_token": 4888.072037830113,
+   "beats_dflash": false,
+   "ratio_to_dflash": 0.1987628059105383
+  }
+ ]
+}
