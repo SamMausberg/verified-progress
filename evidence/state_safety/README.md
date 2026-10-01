@@ -70,11 +70,13 @@ weights.
 Checks on the tool itself:
 
 - Neutrality: tapped runs match the untapped matrix run in tokens and logprobs for
-  162 of 167 prompts (plain decode, batch 1). The five exceptions show the signature of
-  the history dependence described below (first difference at layer 3's attention at
-  output index 2, with identical projections), and one of them, `mt_bench-0056`,
-  reproduces that dependence deterministically without the tap; the KV-level link for
-  all five is pending.
+  162 of 167 prompts (plain decode, batch 1). `tap_check.json` lists the five
+  exceptions (`alpaca_eval-0450`, `alpaca_eval-0500`, `mt_bench-0053`, `mt_bench-0056`,
+  `mt_bench-0059`): all five first differ in logprobs at output index 2, and two of
+  them keep identical tokens. They show the signature of the history dependence
+  described below (first difference at layer 3's attention at output index 2, with
+  identical projections), and one of them, `mt_bench-0056`, reproduces that dependence
+  deterministically without the tap; the KV-level link for all five is pending.
 - Positive controls (`tap_control_*.json`, analysed with the current `mechanism.py`):
   a one-ulp change injected into the first element of layer 9's `mlp.down_proj` output
   in every forward is named as the first difference, at the first prompt token, for

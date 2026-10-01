@@ -98,7 +98,7 @@ python experiments/state_safety/prompts.py \
 experiments/state_safety/run_all.sh          # differential matrix, about 2 h of GPU time
 experiments/state_safety/run_targeted.sh     # targeted tests, about 1 h
 
-experiments/state_safety/analyze_all.sh     # noise floor, rejection-position drift, targeted summary
+experiments/state_safety/analyze_all.sh     # noise floor, rejection-position drift, targeted summary, tap check
 ```
 
 Tensor-level forensics (engine patch `engine/sglang/patches/state/0001-state-tap.patch`
