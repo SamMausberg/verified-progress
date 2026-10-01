@@ -48,8 +48,25 @@ step() {  # step <required|optional> <name> <command...>
 }
 
 echo "SGLANG_GDN_EXACT_REPLAY_BV=$SGLANG_GDN_EXACT_REPLAY_BV"
-echo "P4b run $RUN_ID, engine $(git -C "$SGLANG_WORKTREE" rev-parse --short HEAD), repo $REPO at $(git rev-parse --short HEAD)"
-git status --short -- experiments bench | sed 's/^/uncommitted: /'
+# Provenance preflight: both trees must be clean (tracked and untracked files), and their
+# HEADs are recorded for the validator, which checks every arm's launch record against them.
+clean_tree() {  # clean_tree <path>
+  local changes
+  changes=$(git -C "$1" status --porcelain)
+  if [ -n "$changes" ]; then
+    echo "$1 has changes:"
+    echo "$changes"
+    return 1
+  fi
+}
+step required preflight-repo-clean clean_tree "$REPO"
+step required preflight-engine-clean clean_tree "$SGLANG_WORKTREE"
+REPO_HEAD=$(git -C "$REPO" rev-parse HEAD)
+ENGINE_HEAD=$(git -C "$SGLANG_WORKTREE" rev-parse HEAD)
+PROVENANCE=$DATA/p4b_$RUN_ID.provenance.json
+printf '{"run_id": "%s", "repo": "%s", "repo_head": "%s", "engine": "%s", "engine_head": "%s"}\n' \
+  "$RUN_ID" "$REPO" "$REPO_HEAD" "$SGLANG_WORKTREE" "$ENGINE_HEAD" > "$PROVENANCE"
+echo "P4b run $RUN_ID, repo $REPO at $REPO_HEAD, engine $SGLANG_WORKTREE at $ENGINE_HEAD"
 export PYTHONPATH=$SGLANG_WORKTREE/python
 step required kernel-check-bv32 python experiments/moonshot/gdn_exact_replay_check.py check \
   --batch 8 --steps 48 --ring 4 --force-rate 0.1 \
@@ -84,7 +101,7 @@ step required ab-sweep python experiments/moonshot/lever_sweep.py --out "$AB" --
   'plain+no_radix+p4_pools#r3' 'plain+no_radix+p4_pools+exact_replay#r3' \
   'plain+no_radix+p4_pools+exact_replay#r4' 'plain+no_radix+p4_pools#r4'
 step required ab-validate-and-decide python experiments/moonshot/validate_p4_ab.py "$AB" \
-  --json "$AB/verdict.json"
+  --provenance "$PROVENANCE" --json "$AB/verdict.json"
 
 if [ ${#OPTIONAL_FAILED[@]} -gt 0 ]; then
   echo "P4b finished; optional steps FAILED: ${OPTIONAL_FAILED[*]}"

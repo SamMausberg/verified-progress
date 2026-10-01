@@ -32,6 +32,9 @@ MANIFEST: dict[str, Any] = {
     'ignore_eos': True,
     'request_body': {'temperature': 0.0, 'ignore_eos': True},
 }
+REPO_HEAD = 'a' * 40
+ENGINE_HEAD = 'b' * 40
+ENGINE = '/engine'
 POOL_LOG = (
     'max_total_num_tokens=360448, max_running_requests=128\n'
     'Mamba Cache is allocated. max_mamba_cache_size: 128, conv_state size: 0.1GB\n'
@@ -61,6 +64,8 @@ def make_run(
     manifest: dict[str, Any] = MANIFEST,
     pool_log: str = POOL_LOG,
     tile: str = '32',
+    engine_head: str = ENGINE_HEAD,
+    dirty: list[str] | None = None,
     **overrides: Any,
 ) -> Path:
     """A synthetic A/B directory; `overrides` apply to the first exact-replay arm's point,
@@ -81,15 +86,36 @@ def make_run(
         log = 'GDN decode: exact replay kernel, ring length 4\n' if exact else 'decode\n'
         (run / 'server/server.log').write_text(pool_log + log)
         env = {'SGLANG_GDN_EXACT_REPLAY': '1', 'SGLANG_GDN_EXACT_REPLAY_BV': tile} if exact else {}
-        (run / 'server/launch.json').write_text(json.dumps({'env_overrides': env}))
+        launch = {
+            'env_overrides': env,
+            'repo': {'head': REPO_HEAD, 'dirty_files': dirty or []},
+            'sglang_source': {
+                'module_file': f'{ENGINE}/python/sglang/__init__.py',
+                'head': engine_head,
+                'dirty_files': [],
+            },
+        }
+        (run / 'server/launch.json').write_text(json.dumps(launch))
     (root / 'lever_sweep_log.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in records))
+    provenance = {
+        'repo': '/repo',
+        'repo_head': REPO_HEAD,
+        'engine': ENGINE,
+        'engine_head': ENGINE_HEAD,
+    }
+    (root / 'provenance.json').write_text(json.dumps(provenance))
     return root
 
 
 def run(root: Path) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [sys.executable, str(SCRIPT), str(root)], capture_output=True, text=True, check=False
-    )
+    command = [
+        sys.executable,
+        str(SCRIPT),
+        str(root),
+        '--provenance',
+        str(root / 'provenance.json'),
+    ]
+    return subprocess.run(command, capture_output=True, text=True, check=False)
 
 
 def test_complete_run_is_decided(tmp_path: Path) -> None:
@@ -156,3 +182,17 @@ def test_small_kv_pool_fails(tmp_path: Path) -> None:
 
 def test_other_value_tile_fails(tmp_path: Path) -> None:
     assert run(make_run(tmp_path, tile='16')).returncode == 1
+
+
+def test_other_engine_commit_fails(tmp_path: Path) -> None:
+    assert run(make_run(tmp_path, engine_head='c' * 40)).returncode == 1
+
+
+def test_dirty_repository_fails(tmp_path: Path) -> None:
+    assert run(make_run(tmp_path, dirty=[' M experiments/moonshot/levers.py'])).returncode == 1
+
+
+def test_missing_provenance_fails(tmp_path: Path) -> None:
+    root = make_run(tmp_path)
+    (root / 'provenance.json').unlink()
+    assert run(root).returncode == 1

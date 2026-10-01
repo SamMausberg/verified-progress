@@ -17,7 +17,11 @@ Reads one fresh lever_sweep output directory and checks, for this run only:
     dense server log does; every exact-replay server was launched with
     SGLANG_GDN_EXACT_REPLAY_BV=32 (bench's launch.json records the arm's environment,
     which overrides anything inherited);
-  - the run forms exactly four complete dense/exact pairs (labels r1-r4).
+  - the run forms exactly four complete dense/exact pairs (labels r1-r4);
+  - provenance: the run's provenance file (written by run_p4b.sh after its clean-tree
+    preflight) names both HEADs, and every arm's launch record (bench's launch.json) shows
+    the same repository HEAD and the same engine HEAD (the imported sglang package lies in
+    that engine tree), with no modified tracked files in either.
 Any failed check prints FAILED and exits 1. Otherwise it prints, per pair, the exact / dense
 ratio of the primary metric (`server_log.logged_gen_tps_full_batch`) and of client y, the
 mean log ratio with a t(3) 95% interval, and the decision at 1.10x (rejected if the upper
@@ -93,6 +97,18 @@ def resolved_pools(label: str, server_log: Path) -> dict[str, int]:
     return pools
 
 
+def check_provenance(label: str, launch: dict[str, Any], provenance: dict[str, str]) -> None:
+    repo = launch.get('repo') or {}
+    engine = launch.get('sglang_source') or {}
+    if repo.get('head') != provenance['repo_head'] or repo.get('dirty_files'):
+        fail(f'{label}: repository {repo.get("head")} dirty={repo.get("dirty_files")}')
+    if engine.get('head') != provenance['engine_head'] or engine.get('dirty_files'):
+        fail(f'{label}: engine {engine.get("head")} dirty={engine.get("dirty_files")}')
+    module = str(engine.get('module_file') or '')
+    if not module.startswith(provenance['engine'].rstrip('/') + '/'):
+        fail(f'{label}: sglang imported from {module!r}, not {provenance["engine"]}')
+
+
 def point_of(out: Path, label: str) -> tuple[dict[str, Any], Path]:
     runs = sorted((out / label).glob('*/sweep.json'))
     if len(runs) != 1:
@@ -135,9 +151,16 @@ def interval(ratios: list[float]) -> tuple[float, float, float]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('out', type=Path)
+    parser.add_argument('--provenance', type=Path, required=True)
     parser.add_argument('--json', type=Path, default=None)
     args = parser.parse_args()
     out = args.out.expanduser()
+    if not args.provenance.exists():
+        fail(f'provenance file {args.provenance} missing')
+    provenance = json.loads(args.provenance.read_text())
+    for key in ('repo', 'repo_head', 'engine', 'engine_head'):
+        if not provenance.get(key):
+            fail(f'provenance lacks {key}')
     expected = ORDER
 
     log = out / 'lever_sweep_log.jsonl'
@@ -160,9 +183,12 @@ def main() -> None:
             dispatched = DISPATCH in text
             if dispatched != (arm == EXACT):
                 fail(f'{label}: exact-replay dispatch line present={dispatched}')
+            launch_json = server_log.parent / 'launch.json'
+            if not launch_json.exists():
+                fail(f'{label}: launch.json missing')
+            launch = json.loads(launch_json.read_text())
+            check_provenance(label, launch, provenance)
             if arm == EXACT:
-                launch_json = server_log.parent / 'launch.json'
-                launch = json.loads(launch_json.read_text()) if launch_json.exists() else {}
                 tile = (launch.get('env_overrides') or {}).get('SGLANG_GDN_EXACT_REPLAY_BV')
                 if tile != '32':
                     fail(f'{label}: launched with SGLANG_GDN_EXACT_REPLAY_BV={tile!r}, not 32')
@@ -187,6 +213,7 @@ def main() -> None:
     else:
         decision = 'inconclusive'
     verdict = {
+        'provenance': provenance,
         'pairs': rows,
         'primary_metric': 'server_log.logged_gen_tps_full_batch',
         'server_ratio_mean_ci95': server,
