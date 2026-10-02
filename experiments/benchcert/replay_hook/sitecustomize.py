@@ -81,20 +81,22 @@ def _patch_sample(module: Any) -> None:
     def eagle_sample(verify_input: Any, batch: Any, logits_output: Any, *args: Any, **kwargs: Any):
         result = original(verify_input, batch, logits_output, *args, **kwargs)
         record: dict[str, Any] = {'kind': 'sample', 'n': _COUNTER[0], 't': time.time()}
-        try:
-            predict, accept_lens, accept_index = result
-            reqs = list(batch.reqs)
-            record.update(
-                req_pool_indices=[int(r.req_pool_idx) for r in reqs],
-                prompt_lens=[len(r.origin_input_ids) for r in reqs],
-                output_lens=[len(r.output_ids) for r in reqs],
-                last_output_ids=[list(r.output_ids[-4:]) for r in reqs],
-                predict=predict.tolist(),
-                accept_lens=accept_lens.tolist(),
-                accept_index=accept_index.tolist(),
-            )
-        except Exception as exc:  # a debug log must not stop the server
-            record['error'] = repr(exc)
+        reqs = list(getattr(batch, 'reqs', None) or [])
+        fields = {
+            'req_pool_indices': lambda: [getattr(r.kv, 'req_pool_idx', None) for r in reqs],
+            'prompt_lens': lambda: [len(r.origin_input_ids) for r in reqs],
+            'output_lens': lambda: [len(r.output_ids) for r in reqs],
+            'last_output_ids': lambda: [list(r.output_ids[-4:]) for r in reqs],
+            'predict': lambda: result[0].tolist(),
+            'accept_lens': lambda: result[1].tolist(),
+            'accept_index': lambda: result[2].tolist(),
+        }
+        # One guard per field: a field this engine lacks must not drop the others.
+        for key, get in fields.items():
+            try:
+                record[key] = get()
+            except Exception as exc:  # a debug log must not stop the server
+                record[f'{key}_error'] = repr(exc)
         _write(record)
         return result
 

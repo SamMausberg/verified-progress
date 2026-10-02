@@ -72,7 +72,7 @@ from experiments.benchcert import plan
 from experiments.benchcert.analyze import NEAR_NATS
 from experiments.benchcert.rescore import OVERRIDES
 from experiments.benchcert.rescore import stop as stop_server
-from experiments.benchcert.run_session import provenance
+from experiments.benchcert.run_session import git, provenance
 
 HOLD = 'h6'  # README "Hold commit (h6)" pins h6a, h6b and h6s
 PORT = 30084
@@ -371,16 +371,25 @@ def requests(point_dir: Path) -> list[dict[str, Any]]:
 def gaps(meta: dict[str, Any], output: list[int]) -> list[tuple[int, int, float, int, float]]:
     """Per output position: (position, token, its logprob, top-1 token, top-1 logprob).
 
-    `input_token_logprobs` and `input_top_logprobs` start at logprob_start_len (the
-    prompt's length); each entry names the token it scores, so the alignment is checked
-    against the run's own output rather than assumed.
+    `input_token_logprobs` and `input_top_logprobs` start at logprob_start_len, one entry
+    per input position, and SGLang leaves the first entry's logprob empty (None): the
+    logits before it are not computed. `score_sequence` therefore starts one position
+    before the output (at the prompt's last token), and the output's entries follow at
+    offset 1. Each entry names the token it scores, so the alignment is checked against
+    the run's own output, with every logprob present, rather than assumed.
     """
     entries = meta.get('input_token_logprobs') or []
     tops = meta.get('input_top_logprobs') or []
     n = len(output)
-    for offset in (0, 1):
-        ids = [int(e[1]) if e else None for e in entries[offset : offset + n]]
-        if ids == output and len(tops) >= offset + n:
+    for offset in (1, 0):
+        window = entries[offset : offset + n]
+        ids = [int(e[1]) if e else None for e in window]
+        if (
+            ids == output
+            and len(tops) >= offset + n
+            and all(e[0] is not None for e in window)
+            and all(tops[offset + j] for j in range(n))
+        ):
             break
     else:
         raise ValueError(f'input logprobs do not align with the output ({len(entries)} entries)')
@@ -399,7 +408,8 @@ def score_sequence(url: str, input_ids: list[int], output: list[int]) -> dict[st
         'input_ids': input_ids + output,
         'sampling_params': {'max_new_tokens': 0, 'temperature': 0.0},
         'return_logprob': True,
-        'logprob_start_len': len(input_ids),
+        # One position before the output: SGLang reports no logprob for the first entry.
+        'logprob_start_len': len(input_ids) - 1,
         'top_logprobs_num': 1,
     }
     request = urllib.request.Request(
@@ -446,6 +456,14 @@ def score(out: Path, runs: Path, url: str, workers: int) -> int:
     points already scored are skipped, so an interrupted run resumes."""
     target = out / 'score'
     target.mkdir(parents=True, exist_ok=True)
+    started = time.time()
+    record = {
+        'repo_commit': git(plan.REPO, 'rev-parse', 'HEAD'),
+        'engine_tree': git(plan.ENGINE_WORKTREE, 'rev-parse', 'HEAD^{tree}'),
+        'url': url,
+        'start_unix': started,
+    }
+    (target / f'provenance-{int(started)}.json').write_text(json.dumps(record) + '\n')
     points = point_dirs(out, runs)
     total = 0
     for index, (name, point) in enumerate(points):

@@ -1013,10 +1013,13 @@ def check_counters(
 
     The verdict per family is False on positive evidence (a differing row, or a
     declared path never certified by a launch that completed), True when a complete
-    launch certified every declared path with no differing row and its device counters
-    cover every certified replay the host gated (`uncounted_calls` 0 at every point),
-    and None (exactness incomplete) otherwise: a missing or failed launch, missing
-    counters, or calls left uncounted (h1's `check` launches wrote every 25 calls).
+    launch certified every declared path with no differing row, wrote its counters on
+    every glue call (`SGLANG_CERTIFIED_HEAD_STATS_EVERY` 1 in its launch record) and its
+    device counters cover every certified replay the host gated (`uncounted_calls` 0
+    at every point), and None (exactness incomplete) otherwise. The two conditions go
+    together: the host and device counters are written in the same dump, so
+    `uncounted_calls` alone cannot see calls after the last dump; with a dump on every
+    call it shows that the last dump came after the last replay.
     """
     rows: list[dict[str, Any]] = []
     verdict: dict[str, bool | None] = {}
@@ -1025,7 +1028,9 @@ def check_counters(
         if info is None:
             verdict[fam] = None
             continue
-        complete = not info['problems']
+        env = ((info.get('manifest') or {}).get('arm') or {}).get('env') or {}
+        every = env.get('SGLANG_CERTIFIED_HEAD_STATS_EVERY')
+        complete = not info['problems'] and every == str(plan.CHECK_STATS_EVERY)
         mismatch = 0
         name = Path(info['stats_file']).name if info.get('stats_file') else ''
         seen_paths: set[str] = set()

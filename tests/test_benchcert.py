@@ -342,6 +342,7 @@ def _launch(
     manifest = {
         'points': points,
         'checks': [],
+        'arm': {'env': plan.certified_env(family, variant, Path('/src'), stats) if stats else {}},
         'launch': {
             'final_limits': {'max_total_num_tokens': pool, 'max_running_requests': 128},
             'sglang_source': {'head': 'enginehead', 'dirty_files': []},
@@ -681,6 +682,14 @@ def test_check_counters_need_every_certified_call_counted(tmp_path: Path) -> Non
     rows, verdict = analyze.check_counters(launches, 'check2')
     assert verdict['plain'] is None
     assert any(r['uncounted_calls'] == 1 for r in rows)
+    # Counters written less often than every glue call are incomplete even when the
+    # host and device counts agree (they lag together).
+    record['paths']['decode']['host_steps']['certified'] -= 1
+    snap.write_text(json.dumps(record))
+    launch = launches[('check2', 'plain', 'check')]
+    assert analyze.check_counters(launches, 'check2')[1]['plain'] is True
+    launch['manifest']['arm']['env']['SGLANG_CERTIFIED_HEAD_STATS_EVERY'] = '25'
+    assert analyze.check_counters(launches, 'check2')[1]['plain'] is None
 
 
 def test_hold_specific_pin() -> None:
@@ -791,9 +800,11 @@ def test_drain_gaps_check_the_alignment_against_the_output() -> None:
 def test_drain_score_flags_a_token_far_below_the_top(monkeypatch: pytest.MonkeyPatch) -> None:
     from experiments.benchcert import drain
 
+    # SGLang's format: one entry per input position from logprob_start_len (the prompt's
+    # last token here), the first entry without a logprob.
     meta = {
-        'input_token_logprobs': [[-0.1, 5, None], [-4.0, 7, None]],
-        'input_top_logprobs': [[[-0.1, 5, None]], [[-0.3, 8, None]]],
+        'input_token_logprobs': [[None, 3, None], [-0.1, 5, None], [-4.0, 7, None]],
+        'input_top_logprobs': [None, [[-0.1, 5, None]], [[-0.3, 8, None]]],
     }
 
     class Response:
@@ -815,10 +826,58 @@ def test_drain_score_flags_a_token_far_below_the_top(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(drain.urllib.request, 'urlopen', urlopen)
     result = drain.score_sequence('http://x', [1, 2, 3], [5, 7])
     assert sent[0]['input_ids'] == [1, 2, 3, 5, 7]
-    assert sent[0]['logprob_start_len'] == 3
+    assert sent[0]['logprob_start_len'] == 2
     assert (result['gross'], result['near']) == (1, 0)
     assert result['max_gap_position'] == 1
     assert result['max_gap'] == pytest.approx(3.7)
     assert result['disagree'] == [
         {'position': 1, 'token': 7, 'logprob': -4.0, 'top1': 8, 'top1_logprob': -0.3}
     ]
+
+
+def _sglang_meta(prompt: list[int], output: list[int], logprobs: list[float], tops: list[Any]):
+    """meta_info as SGLang returns it with logprob_start_len = len(prompt) - 1."""
+    return {
+        'input_token_logprobs': [[None, prompt[-1], None]]
+        + [[lp, t, None] for lp, t in zip(logprobs, output, strict=True)],
+        'input_top_logprobs': [None] + [[[tlp, tid, None]] for tlp, tid in tops],
+    }
+
+
+def test_drain_positive_control_is_found_in_sglang_format(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from experiments.benchcert import drain
+
+    # Session 1's certified 579ae7ce: 1756 at position 439, 3.81 nats below 8078.
+    prompt = list(range(100, 175))
+    output = [11 + (j % 7) for j in range(512)]
+    output[439] = 1756
+    logprobs = [-0.05] * 512
+    tops: list[Any] = [(-0.05, t) for t in output]
+    logprobs[439], tops[439] = -5.497, (-1.684, 8078)
+    meta = _sglang_meta(prompt, output, logprobs, tops)
+
+    class Response:
+        def __enter__(self) -> Response:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            pass
+
+        def read(self) -> bytes:
+            return json.dumps({'meta_info': meta}).encode()
+
+    monkeypatch.setattr(drain.urllib.request, 'urlopen', lambda request, timeout: Response())
+    result = drain.score_sequence('http://x', prompt, output)
+    assert (result['gross'], result['near'], result['max_gap_position']) == (1, 0, 439)
+    path = tmp_path / 'control.jsonl'
+    record = {'point': 's1', 'phase': 'profiling', 'prompt': '579ae7ce3d47d06c', **result}
+    path.write_text(json.dumps(record) + '\n')
+    assert drain.control_found(path)
+    # The first entry's empty logprob on an output token is not silently scored:
+    # without the leading prompt entry the alignment fails.
+    meta['input_token_logprobs'][1][0] = None
+    del meta['input_token_logprobs'][0], meta['input_top_logprobs'][0]
+    with pytest.raises(ValueError, match='do not align'):
+        drain.gaps(meta, output)
