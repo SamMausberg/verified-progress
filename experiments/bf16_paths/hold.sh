@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # BF16 references at the two gross positions (shared lane, untimed; evidence/bf16_paths/README.md):
 #
-#   scripts/gpu_lock.sh -s experiments/bf16_paths/hold.sh [all|hf|sglang|perturb ...]
+#   scripts/gpu_lock.sh -s experiments/bf16_paths/hold.sh [all|hf|sglang|perturb|perturb_gdn|rates ...]
 #
 # hf: transformers' Qwen3.5 in BF16 on the GPU (hf_paths.py), with its torch GDN kernels and
 #   then with flash-linear-attention 0.5.2's (installed with --no-deps into $out/pydeps and
@@ -12,13 +12,20 @@
 #   beta_fp32, on ~/sglang-wt/upstream-bf16: the pin plus the beta-in-FP32 patch): the
 #   targets along three prefills and one decode each.
 # perturb: FP32 on the CPU (8 cores) with BF16-sized relative noise after every decoder layer
-#   (perturb.py, 8 seeds), the positions' own sensitivity to rounding.
+#   (perturb.py, 8 seeds), the positions' own sensitivity to rounding; perturb_gdn the same
+#   with the noise on the GDN core's inputs (query, key, value, beta).
+# rates: whole outputs of 12 workload prompts (rates.py): SGLang's default variant decodes
+#   and prefills them, transformers BF16 reads the same text (FP32 and BF16 cached state),
+#   FP32 on the CPU scores every path's top-1.
 # Targets: ~/vp-data/exactness/paths/targets.jsonl (paths.py `targets`), copied once and hashed.
 # Output: ~/vp-data/upstream/bf16 (BF16_PATHS_OUT); log in logs/hold-<UTC>.log.
 set -euo pipefail
 steps=" ${*:-all} "
 for step in $steps; do
-  case "$step" in all | hf | sglang | perturb) ;; *) echo "usage: $0 [all|hf|sglang|perturb ...]"; exit 64 ;; esac
+  case "$step" in
+    all | hf | sglang | perturb | perturb_gdn | rates) ;;
+    *) echo "usage: $0 [all|hf|sglang|perturb|perturb_gdn|rates ...]"; exit 64 ;;
+  esac
 done
 want() { [[ $steps == *" all "* || $steps == *" $1 "* ]]; }
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -31,7 +38,8 @@ unset SGLANG_WORKTREE PYTHONPATH
 source "$repo/scripts/sglang_env.sh"
 python -c 'import sglang, torch, transformers' || { echo "not the SGLang environment: $(command -v python)"; exit 1; }
 [ -z "$(git status --porcelain --untracked-files=all)" ] || { echo "checkout not clean"; exit 65; }
-for done_file in hf:hf_bf16_torch.json sglang:default.json perturb:perturb.json; do
+for done_file in hf:hf_bf16_torch.json sglang:default.json perturb:perturb.json \
+  perturb_gdn:perturb_gdn.json rates:rates/prompts.jsonl; do
   if want "${done_file%%:*}" && [ -e "$out/${done_file#*:}" ]; then
     echo "$out/${done_file#*:} exists: ${done_file%%:*} already run"; exit 65
   fi
@@ -48,6 +56,7 @@ sha256sum "$out/targets.jsonl"
 # shellcheck disable=SC2329 # invoked by the EXIT trap
 kill_servers() {
   python -m experiments.bf16_paths.sglang_variants stop --out "$out" || true
+  python -m experiments.bf16_paths.sglang_variants stop --out "$out/rates" || true
   pkill -TERM -f -- 'sglang.launch_server.* --port (30240)( |$)' || true
   sleep 5
   pkill -KILL -f -- 'sglang.launch_server.* --port (30240)( |$)' || true
@@ -98,6 +107,31 @@ if want perturb; then
   timeout --foreground 900 taskset -c 32-39 python -m experiments.bf16_paths.perturb \
     --targets "$out/targets.jsonl" --out "$out/perturb.json" --seeds 8 --threads 8 \
     --fp32 "$HOME/vp-data/exactness/paths/fp32.json" || status=1
+fi
+if want perturb_gdn; then
+  timeout --foreground 900 taskset -c 32-39 python -m experiments.bf16_paths.perturb --site gdn \
+    --targets "$out/targets.jsonl" --out "$out/perturb_gdn.json" --seeds 8 --threads 8 \
+    --fp32 "$HOME/vp-data/exactness/paths/fp32.json" || status=1
+fi
+if want rates; then
+  r="$out/rates"
+  python -m experiments.bf16_paths.rates prompts --out "$r" --count 12
+  if GPU_STARTUP_MIN_FREE_GB=${GPU_STARTUP_MIN_FREE_GB:-48} GPU_STARTUP_TRIES=${GPU_STARTUP_TRIES:-10} \
+    scripts/gpu_startup_lock.sh \
+    python -m experiments.bf16_paths.sglang_variants start --variant default --out "$r"; then
+    timeout --foreground 600 python -m experiments.bf16_paths.rates sglang --out "$r" \
+      --url http://127.0.0.1:30240 || status=1
+  else
+    echo "rates server failed to start"; status=1
+  fi
+  python -m experiments.bf16_paths.sglang_variants stop --out "$r"
+  if [ -e "$r/sglang.jsonl.gz" ]; then
+    for state in float32 model; do
+      timeout --foreground 900 python -m experiments.bf16_paths.rates hf --out "$r" --state-dtype "$state" || status=1
+    done
+    timeout --foreground 1200 taskset -c 32-39 python -m experiments.bf16_paths.rates fp32 --out "$r" \
+      --threads 8 || status=1
+  fi
 fi
 echo "bf16 paths hold (${steps# }) end $(date -Is) exit $status"
 nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader || true

@@ -1,6 +1,7 @@
 """How far BF16-sized rounding moves the gross positions in FP32 (CPU).
 
-    python -m experiments.bf16_paths.perturb --targets TARGETS --out FILE [--seeds 8] [--threads 8]
+    python -m experiments.bf16_paths.perturb --targets TARGETS --out FILE [--site residual|gdn] \
+        [--seeds 8] [--threads 8]
 
 The transformers and SGLang readings show which BF16 implementations miss FP32 at
 579ae7ce/439 and a4db11ff/333, but not how sensitive the positions themselves are. This
@@ -10,8 +11,12 @@ own: one forward over the prompt and output[:position] (the `fp32_full` path of
 (1 + u), u drawn uniformly from [-2^-9, 2^-9] with a fixed seed per run. 2^-9 is the largest
 relative error of rounding to BF16 (round to nearest, 8 significand bits), so each run
 perturbs the residual stream about as much as storing it in BF16 after every layer would,
-at every position of the prefix. The unperturbed forward is repeated first and must match
-`paths.py fp32`'s within 0.001 nats on the tracked tokens.
+at every position of the prefix (`--site residual`). Projections average such elementwise
+noise down, so it understates the effect of rounding a quantity the GDN recurrence uses
+directly; `--site gdn` instead multiplies the GDN core's inputs (query, key, value and beta,
+all BF16 in SGLang and in transformers' BF16 model) by (1 + u) in every GDN layer. The
+unperturbed forward is repeated first and must match `paths.py fp32`'s within 0.001 nats on
+the tracked tokens.
 
 Readings (set before the run): the spread of the target's tracked logprobs over the seeds
 says how much of a BF16 implementation's miss these positions explain by themselves. A
@@ -48,7 +53,45 @@ def perturb_hook(generator: Any) -> Any:
     return hook
 
 
-def run(targets: Path, out: Path, seeds: int, threads: int, fp32_file: Path | None) -> int:
+def perturb_gdn_inputs(rule: Any, generator: Any) -> Any:
+    """Wrap a GDN layer's `chunk_gated_delta_rule` so its query, key, value and beta are
+    multiplied by (1 + u) elementwise before the recurrence."""
+    import torch
+
+    def jitter(x: Any) -> Any:
+        noise = torch.rand(x.shape, generator=generator, dtype=torch.float32)
+        return (x.float() * (1 + (2 * noise - 1) * EPS)).to(x.dtype)
+
+    def wrapped(query: Any, key: Any, value: Any, *args: Any, **kwargs: Any) -> Any:
+        kwargs['beta'] = jitter(kwargs['beta'])
+        return rule(jitter(query), jitter(key), jitter(value), *args, **kwargs)
+
+    return wrapped
+
+
+def install(model: Any, site: str, generator: Any) -> list[Any]:
+    """Install the perturbation; returns the callables that undo it."""
+    undo: list[Any] = []
+    for layer in model.model.layers:
+        if site == 'residual':
+            undo.append(layer.register_forward_hook(perturb_hook(generator)).remove)
+            continue
+        attn = getattr(layer, 'linear_attn', None)
+        if attn is None:
+            continue
+        original = attn.chunk_gated_delta_rule
+        attn.chunk_gated_delta_rule = perturb_gdn_inputs(original, generator)
+        undo.append(
+            lambda attn=attn, original=original: setattr(attn, 'chunk_gated_delta_rule', original)
+        )
+    if not undo:
+        raise SystemExit(f'no layer to perturb at site {site}')
+    return undo
+
+
+def run(
+    targets: Path, out: Path, site: str, seeds: int, threads: int, fp32_file: Path | None
+) -> int:
     import torch
     import transformers
     from transformers import AutoModelForCausalLM
@@ -82,19 +125,15 @@ def run(targets: Path, out: Path, seeds: int, threads: int, fp32_file: Path | No
         ids = torch.tensor([prompt + output[:pos]])
         runs: dict[str, Any] = {}
         for seed in [None, *range(seeds)]:
-            handles = []
+            undo = []
             if seed is not None:
-                generator = torch.Generator().manual_seed(seed)
-                handles = [
-                    layer.register_forward_hook(perturb_hook(generator))
-                    for layer in model.model.layers
-                ]
+                undo = install(model, site, torch.Generator().manual_seed(seed))
             try:
                 with torch.no_grad():
                     logits = model(input_ids=ids, use_cache=False).logits[0]
             finally:
-                for handle in handles:
-                    handle.remove()
+                for step in undo:
+                    step()
             runs['none' if seed is None else f'seed_{seed}'] = {
                 str(p): entry(logits[n + p - 1], output[p], track) for p in range(first, pos + 1)
             }
@@ -127,7 +166,11 @@ def run(targets: Path, out: Path, seeds: int, threads: int, fp32_file: Path | No
         'attn_implementation': 'eager',
         'transformers': transformers.__version__,
         'torch': torch.__version__,
-        'perturbation': 'each decoder layer output times (1 + u), u ~ U[-2^-9, 2^-9], per element',
+        'site': site,
+        'perturbation': {
+            'residual': 'each decoder layer output times (1 + u), u ~ U[-2^-9, 2^-9], per element',
+            'gdn': 'each GDN layer core input (query, key, value, beta) times (1 + u), per element',
+        }[site],
         'eps': EPS,
         'seeds': seeds,
         'trace': TRACE,
@@ -143,6 +186,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('--targets', type=Path, required=True, help="paths.py's targets.jsonl")
     parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument('--site', choices=('residual', 'gdn'), default='residual')
     parser.add_argument('--seeds', type=int, default=8)
     parser.add_argument('--threads', type=int, default=8)
     parser.add_argument(
@@ -153,7 +197,7 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit('--seeds and --threads must be positive')
     if args.out.exists():
         raise SystemExit(f'{args.out} exists')
-    return run(args.targets, args.out, args.seeds, args.threads, args.fp32)
+    return run(args.targets, args.out, args.site, args.seeds, args.threads, args.fp32)
 
 
 if __name__ == '__main__':
