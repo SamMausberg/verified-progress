@@ -37,7 +37,8 @@ review are marked as such there); they give three findings.
 3. **On positions nobody selected, SGLang's typical accuracy matches transformers'.** Over 15,360 positions
    per path (12 workload prompts decoded for 512 tokens, then 12 prompts decoded for 768 tokens so
    that 5,426 positions lie after the end of text), SGLang's mean logprob error on FP32's top token
-   (0.0039-0.0054 nats per path and sample) lies within transformers' range (0.0042-0.0057), and
+   (0.0039-0.0054 nats per path and sample) is no larger than transformers' (0.0042-0.0057) in either
+   sample, and
    SGLang misses FP32's top by more than 0.5 nats at 2 distinct positions (on 3 paths), both
    after the end of text and both also missed by transformers' torch GDN run (2 positions; the
    fla run misses 1 of them). The only miss above 2 nats, 3.2 nats at `6af1e245` position 247, is
@@ -118,8 +119,9 @@ path. The swaps are not isolating interventions (each replacement is BF16 arithm
 several families may contribute), so this does not show that no kernel family is involved in
 either error; it shows that none of these single changes removes them. For transformers, the reading called the error SGLang-specific only if every
 transformers run stayed within 1 nat of FP32 at both positions; at `a4db11ff` they miss by up to
-16.7 nats (not specific), and at `579ae7ce` two of sixteen readings exceed 1 nat (1.15 on 5715,
-the torch 576-token prefill; 3.08 on 5715 and 2.19 on 1756, the fla decode with a BF16 state),
+16.7 nats (not specific), and at `579ae7ce` three of sixteen readings exceed 1 nat (1.15 on 5715,
+the torch 576-token prefill, in both state configurations; 3.08 on 5715 and 2.19 on 1756, the fla
+decode with a BF16 state),
 which the reading reports as a partial BF16 sensitivity rather than an SGLang fault.
 
 On the 39 positions before each target every path gives the recorded token's logprob within 0.05
