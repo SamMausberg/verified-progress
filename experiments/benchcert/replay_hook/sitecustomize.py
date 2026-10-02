@@ -7,8 +7,11 @@ line per target verify replay: the time, the gated path, rows, request slots, se
 lengths, each row's position, the verify input ids (last committed token and drafts),
 the certified ids, the stock logits' top 5 per row (valid in check mode, which computes
 the stock head too) and every path's gate. Each row's position and input id say which
-token a request's verify read at that position. Nothing in the engine changes; without
-the variable this does nothing.
+token a request's verify read at that position. It also wraps the verify's `eagle_sample`
+(as imported by `sglang.srt.speculative.eagle_worker_common`) and logs what each verify
+committed: the predicted ids, accept lengths (bonus included) and accept index, with the
+host's view of each request (slot, prompt length, output length, last output ids).
+Nothing in the engine changes; without the variable this does nothing.
 """
 
 from __future__ import annotations
@@ -22,21 +25,27 @@ import time
 from typing import Any
 
 TARGET = 'sglang.srt.layers.certified_head'
+SAMPLE_TARGET = 'sglang.srt.speculative.eagle_worker_common'
+_LOCK = threading.Lock()
+_COUNTER = [0]
+
+
+def _write(record: dict[str, Any]) -> None:
+    with _LOCK, open(os.environ['BENCHCERT_REPLAY_LOG'], 'a') as handle:
+        handle.write(json.dumps(record) + '\n')
 
 
 def _patch(glue: Any) -> None:
     import torch
 
-    out = os.environ['BENCHCERT_REPLAY_LOG']
-    lock, counter = threading.Lock(), [0]
     original = glue.after_replay
 
     def after_replay(model_runner: Any, forward_batch: Any, logits_output: Any) -> None:
         original(model_runner, forward_batch, logits_output)
         if model_runner.is_draft_worker or not forward_batch.forward_mode.is_target_verify():
             return
-        record: dict[str, Any] = {'n': counter[0], 't': time.time()}
-        counter[0] += 1
+        record: dict[str, Any] = {'kind': 'replay', 'n': _COUNTER[0], 't': time.time()}
+        _COUNTER[0] += 1
         try:
             rows = int(forward_batch.input_ids.shape[0])
             ids = getattr(logits_output, 'certified_ids', None)
@@ -61,15 +70,43 @@ def _patch(glue: Any) -> None:
             ].tolist()
         except Exception as exc:
             record['positions_error'] = repr(exc)
-        with lock, open(out, 'a') as handle:
-            handle.write(json.dumps(record) + '\n')
+        _write(record)
 
     glue.after_replay = after_replay
 
 
+def _patch_sample(module: Any) -> None:
+    original = module.eagle_sample
+
+    def eagle_sample(verify_input: Any, batch: Any, logits_output: Any, *args: Any, **kwargs: Any):
+        result = original(verify_input, batch, logits_output, *args, **kwargs)
+        record: dict[str, Any] = {'kind': 'sample', 'n': _COUNTER[0], 't': time.time()}
+        try:
+            predict, accept_lens, accept_index = result
+            reqs = list(batch.reqs)
+            record.update(
+                req_pool_indices=[int(r.req_pool_idx) for r in reqs],
+                prompt_lens=[len(r.origin_input_ids) for r in reqs],
+                output_lens=[len(r.output_ids) for r in reqs],
+                last_output_ids=[list(r.output_ids[-4:]) for r in reqs],
+                predict=predict.tolist(),
+                accept_lens=accept_lens.tolist(),
+                accept_index=accept_index.tolist(),
+            )
+        except Exception as exc:  # a debug log must not stop the server
+            record['error'] = repr(exc)
+        _write(record)
+        return result
+
+    module.eagle_sample = eagle_sample
+
+
+_PATCHES = {TARGET: _patch, SAMPLE_TARGET: _patch_sample}
+
+
 class _Finder(importlib.abc.MetaPathFinder):
     def find_spec(self, name: str, path: Any, target: Any = None) -> Any:
-        if name != TARGET:
+        if name not in _PATCHES:
             return None
         for finder in sys.meta_path:
             if finder is self or not hasattr(finder, 'find_spec'):
@@ -78,9 +115,12 @@ class _Finder(importlib.abc.MetaPathFinder):
             if spec is not None and spec.loader is not None:
                 exec_module = spec.loader.exec_module
 
-                def run(module: Any, _exec: Any = exec_module) -> None:
+                def run(module: Any, _exec: Any = exec_module, _name: str = name) -> None:
                     _exec(module)
-                    _patch(module)
+                    try:
+                        _PATCHES[_name](module)
+                    except Exception as exc:  # never break the engine's import
+                        _write({'kind': 'patch_error', 'module': _name, 'error': repr(exc)})
 
                 spec.loader.exec_module = run  # type: ignore[method-assign]
                 return spec

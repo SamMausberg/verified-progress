@@ -1,6 +1,6 @@
-"""Closed-loop reruns of session 1's MTP c = 64 point (hold h6; exploratory, not declared).
+"""Closed-loop reruns of session 1's MTP c = 64 point (holds h6a, h6b, h6s; exploratory).
 
-    python -m experiments.benchcert.drain run --variant V --repeats N --out DIR
+    python -m experiments.benchcert.drain run --launch NAME --out DIR --timeout S
     python -m experiments.benchcert.drain start --out DIR    # inside gpu_startup_lock.sh
     python -m experiments.benchcert.drain score --out DIR --runs RUNS
     python -m experiments.benchcert.drain stop --out DIR
@@ -11,41 +11,47 @@ committed token 1756 at output position 439 during the point's final drain, when
 running batch fell from 49 to 10 requests and the certified verify head (at most 64
 rows, so at most 16 requests) could run. The settling hold's waves of 64 start all
 their requests together, so their drain reaches that prompt in a different state.
-This hold reruns the point itself, closed loop:
+These holds rerun the point itself, closed loop, with session 1's flags and pools (128
+running requests, 128 mamba slots, the arm's explicit 1,000,000-token KV cap) and
+prompt order (each point flushes the cache and sends the same 64 warmup and 512
+measured prompts in order at concurrency 64). LAUNCHES lists them in hold order:
 
-- `cert`: `mtp-tuned-triton` with session 1's certified environment (plan.certified_env,
-  `STATS_EVERY` 20,000) and session 1's flags and pools (128 running requests, 128 mamba
-  slots, the arm's explicit 1,000,000-token KV cap), one server, the c = 64 point
-  repeated N times (`--repeats`). Each repeat flushes the cache and sends the same 64
-  warmup and 512 measured prompts in the same order at concurrency 64.
-- `stock`: the same without the certified environment.
-- `certlog`: as `cert`, plus check mode (the stock head runs beside the certified head
-  and differing rows are counted; the certified ids are still the ones committed),
-  counters written on every glue call, and the per-replay log of every target verify
-  (replay_hook/sitecustomize.py: positions, verify input ids, gates, rows, certified
-  ids, stock top 5), which shows which token each request's verify read at every
-  position, so whether a wrong token entered the model's state or only the output.
+- `cert1`, `stock1`, `cert2`, `stock2` (hold h6a, timed): each a fresh server that runs
+  session 1's ladder (c = 1, 2, 4, 8, 16, 32, then 64, as session 1's launch did) and
+  then the c = 64 point 5 more times. `cert` is session 1's certified environment
+  (plan.certified_env, `STATS_EVERY` 20,000), `stock` none. No per-step log: a readback
+  syncs the GPU every step and would change the timing the event may depend on.
+- `certcheck` (hold h6b, timed): check mode (the stock head runs beside the certified
+  head and differing rows are counted; the certified ids are still the ones committed),
+  counters written every 2,000 glue calls, no log; c = 64 six times. A wrong token here
+  is put down to the head or not by the counters, at close to the timed conditions.
+- `certlog` (hold h6b): check mode, counters on every glue call, and every target verify
+  replay logged (replay_hook/sitecustomize.py: time, positions, verify input ids, gates,
+  rows, certified ids, stock top 5); c = 64 twice. The log says which token each
+  request's verify read at every position: whether a wrong token entered the model's
+  state or only the output.
 
-`score` scores every committed token of these runs, and of sessions 1-3's MTP points,
-teacher-forced on a stock plain-decoding server (rescore.py's `plain-tuned`): each
-prompt with its run's own 512 output tokens in one prefill, the logprob of every output
-token and the top-1 logprob at its position. The gap (top-1 minus the committed token's
-logprob) is at most rounding for a token the stock head would have chosen; session 1's
-certified 1756 sits 3.8 nats below the top, so it doubles as a positive control.
+`score` (hold h6s, untimed) scores every committed token, teacher-forced on a stock
+plain-decoding server (rescore.py's `plain-tuned`): each request's prompt with its own
+512 output tokens in one prefill, the logprob of every output token and the top-1
+logprob at its position. It covers every request of these launches (warmup included)
+and of every timed and check launch of the campaign. The gap (top-1 minus the committed
+token's logprob) is at most rounding for a token the stock head would have chosen.
+Session 1's certified 1756 sits 3.8 nats below the top and is scored first: if the
+scorer does not find it, scoring stops.
 
-Reading rule (set before the run): a committed token more than NEAR_NATS (0.5) below the
-teacher-forced top is a wrong-token event. Any event in a `cert` or `certlog` repeat and
-none in `stock` reproduces the session-1 failure; in `certlog` its log and counters say
-whether the head chose it (differing rows) and whether the verify fed it back. No event
-in any certified repeat: not reproduced in that many closed-loop draws, and the
-session-1 event stays unexplained. Events in `stock` too: the threshold is too tight for
-this reference, and certified events count only beyond the stock tail.
+Reading rule (set before the run; README, "Drain reruns"): a gap of at least GROSS_NATS
+(2) is a gross wrong-token event; any in a certified launch with none in stock
+reproduces the session-1 failure. Gaps between NEAR_NATS (0.5) and 2 are compared as
+rates, certified against stock. Whether 579ae7ce reproduces 1756 at position 439 is
+reported on its own.
 """
 
 from __future__ import annotations
 
 import argparse
 import contextlib
+import gzip
 import json
 import os
 import signal
@@ -54,42 +60,74 @@ import sys
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from bench import sweep as bench_sweep
 from bench.arms import resolve_arm
+from bench.results import prompt_hash
 from bench.server import Server, descendants
 from experiments.benchcert import plan
-from experiments.benchcert.analyze import NEAR_NATS, request_ids
+from experiments.benchcert.analyze import NEAR_NATS
 from experiments.benchcert.rescore import OVERRIDES
 from experiments.benchcert.rescore import stop as stop_server
 from experiments.benchcert.run_session import provenance
 
-HOLD = 'h6'
+HOLD = 'h6'  # README "Hold commit (h6)" pins h6a, h6b and h6s
 PORT = 30084
 SCORE_PORT = 30085
-CONCURRENCY = 64
+TOP = 64
 FAMILY = plan.FAMILIES['mtp']
-VARIANTS = ('cert', 'stock', 'certlog')
+LADDER = FAMILY.concurrency  # session 1's MTP launch: 1, 2, 4, 8, 16, 32, 64
+GROSS_NATS = 2.0
 HOOK_DIR = Path(__file__).resolve().parent / 'replay_hook'
 # Seconds each point waits for a quiet host before it starts (the timed runs waited up to
-# 120). This hold reports no timing, and other agents' CPU work may run during it.
+# 120 and found it quiet at once).
 QUIET_WAIT_S = 15
-TARGET_PROMPT = '579ae7ce'
+CHECK_STATS_EVERY = 2000  # certcheck: about one counter readback per second at c = 64
+TARGET = ('579ae7ce', 439, 1756)  # prompt, output position, session 1's certified token
+
+
+@dataclass(frozen=True)
+class Launch:
+    name: str
+    variant: str  # stock, cert, certcheck, certlog
+    levels: tuple[int, ...]  # run once, ascending
+    extra: int  # further points at the top level
+    hold: str
+
+
+LAUNCHES = {
+    launch.name: launch
+    for launch in (
+        Launch('cert1', 'cert', LADDER, 5, 'h6a'),
+        Launch('stock1', 'stock', LADDER, 5, 'h6a'),
+        Launch('cert2', 'cert', LADDER, 5, 'h6a'),
+        Launch('stock2', 'stock', LADDER, 5, 'h6a'),
+        Launch('certcheck', 'certcheck', (TOP,), 5, 'h6b'),
+        Launch('certlog', 'certlog', (TOP,), 1, 'h6b'),
+    )
+}
 
 
 def label(variant: str) -> str:
-    return {'stock': FAMILY.stock_label, 'cert': FAMILY.cert_label}.get(
-        variant, f'{FAMILY.arm}+cert-log'
-    )
+    if variant == 'stock':
+        return FAMILY.stock_label
+    if variant == 'cert':
+        return FAMILY.cert_label
+    return f'{FAMILY.arm}+{variant}'
 
 
 def variant_env(variant: str, src: Path, stats: Path) -> dict[str, str]:
-    """Session 1's certified environment (none for stock); certlog adds check mode,
-    counters on every glue call and the replay log."""
+    """Session 1's certified environment (none for stock), plus check mode for certcheck
+    and certlog, and the replay log for certlog."""
     if variant == 'stock':
         return {}
     env = plan.certified_env(FAMILY, 'cert', src, stats)
+    if variant == 'certcheck':
+        env['SGLANG_CERTIFIED_HEAD_CHECK'] = '1'
+        env['SGLANG_CERTIFIED_HEAD_STATS_EVERY'] = str(CHECK_STATS_EVERY)
     if variant == 'certlog':
         env['SGLANG_CERTIFIED_HEAD_CHECK'] = '1'
         env['SGLANG_CERTIFIED_HEAD_STATS_EVERY'] = str(plan.CHECK_STATS_EVERY)
@@ -99,41 +137,98 @@ def variant_env(variant: str, src: Path, stats: Path) -> dict[str, str]:
 
 
 def sweep_command(
-    variant: str, repeats: int, out: Path, python: str = 'python', src: Path | None = None
+    launch: Launch, out: Path, python: str = 'python', src: Path | None = None
 ) -> tuple[list[str], Path | None]:
-    """The bench.sweep command of one variant and its stats file (None for stock)."""
+    """The sweep command of one launch (bench.sweep's arguments, run by `sweep` below)
+    and its stats file (None for stock)."""
     src = src or plan.REPO / 'src'
     sweep = list(plan.TIMED_SWEEP)
     sweep[sweep.index('--quiet-cpu-wait') + 1] = str(QUIET_WAIT_S)
-    stats = out / variant / 'stats' / f'{label(variant)}.json' if variant != 'stock' else None
+    name = label(launch.variant)
+    stats = out / launch.name / 'stats' / f'{name}.json' if launch.variant != 'stock' else None
     command = [
         python,
         '-m',
-        'bench.sweep',
+        'experiments.benchcert.drain',
+        'sweep',
+        '--extra-top',
+        str(launch.extra),
         '--arm',
         FAMILY.arm,
         '--label',
-        label(variant),
+        name,
         '--session',
-        f'{plan.SESSION_PREFIX}{HOLD}',
+        f'{plan.SESSION_PREFIX}{launch.hold}-{launch.name}',
         '--out',
-        str(out / variant),
+        str(out / launch.name),
         '--port',
         str(PORT),
         '--sglang-worktree',
         str(plan.ENGINE_WORKTREE),
         *sweep,
-        '--repeats',
-        str(repeats),
     ]
     for item in FAMILY.sets:
         command += ['--set', item]
     if stats is not None:
-        for key, value in variant_env(variant, src, stats).items():
+        for key, value in variant_env(launch.variant, src, stats).items():
             command += ['--env', f'{key}={value}']
         command += ['--snapshot-file', str(stats)]
-    command += ['--concurrency', str(CONCURRENCY)]
+    command += ['--concurrency', *(str(c) for c in launch.levels)]
     return command, stats
+
+
+class LadderSweep(bench_sweep.Sweep):
+    """bench.sweep's points in session 1's order: every level once, ascending, then
+    `extra` more points at the top level (r1, r2, ... under the run directory)."""
+
+    def __init__(self, args: argparse.Namespace, server: Server, run_dir: Path, extra: int):
+        super().__init__(args, server, run_dir)
+        self.extra = extra
+
+    def order(self) -> list[tuple[int, int]]:
+        levels = sorted(self.args.concurrency)
+        return [(0, c) for c in levels] + [(r, levels[-1]) for r in range(1, self.extra + 1)]
+
+    def run(self) -> list[dict[str, Any]]:
+        self.server_warmup()
+        for repeat, concurrency in self.order():
+            summary = self.point(repeat, concurrency)
+            self.points.append(summary)
+            print(bench_sweep.format_point(summary), flush=True)
+            self.write_manifest({'extra_top_points': self.extra})
+        return self.points
+
+
+def sweep_main(argv: list[str]) -> int:
+    """bench.sweep.main with LadderSweep (`--extra-top N` before bench.sweep's arguments)."""
+    if argv[:1] != ['--extra-top']:
+        raise SystemExit('usage: drain sweep --extra-top N <bench.sweep arguments>')
+    extra, argv = int(argv[1]), argv[2:]
+    args = bench_sweep.prepare(bench_sweep.build_parser(), argv)
+    run_dir = args.out.expanduser() / args.label / time.strftime('%Y%m%d-%H%M%S')
+    run_dir.mkdir(parents=True, exist_ok=True)
+    server = Server(
+        args.arm_resolved,
+        run_dir / 'server',
+        args.port,
+        host=args.host,
+        sglang_worktree=args.sglang_worktree,
+        pyspy=args.pyspy,
+        strict=not args.no_strict,
+    )
+    print(f'run directory: {run_dir}', flush=True)
+    with server:
+        for check in server.checks:
+            print(f'[{"ok" if check.ok else "FAIL":4}] {check.name}: {check.detail}', flush=True)
+        sweep = LadderSweep(args, server, run_dir, extra)
+        sweep.write_manifest({'extra_top_points': extra})
+        sweep.run()
+        runtime = bench_sweep.log_segment_stats(server.log_text())
+    sweep.write_manifest(
+        {'extra_top_points': extra, 'server_log_totals': runtime, 'finished_unix': time.time()}
+    )
+    print(f'done: {run_dir / "sweep.json"}', flush=True)
+    return 0
 
 
 def _kill_tree(proc: subprocess.Popen[str]) -> None:
@@ -150,22 +245,24 @@ def _kill_tree(proc: subprocess.Popen[str]) -> None:
         proc.wait(timeout=10)
 
 
-def run(variant: str, repeats: int, out: Path, timeout: float) -> int:
-    """One variant's sweep inside gpu_startup_lock.sh, recorded in <out>/<variant>/launch.json."""
-    record_path = out / variant / 'launch.json'
+def run(name: str, out: Path, timeout: float) -> int:
+    """One launch inside gpu_startup_lock.sh, recorded in <out>/<launch>/launch.json."""
+    launch = LAUNCHES[name]
+    record_path = out / name / 'launch.json'
     if record_path.exists():
-        raise SystemExit(f'{record_path} exists: this variant already ran')
+        raise SystemExit(f'{record_path} exists: this launch already ran')
     src = plan.REPO / 'src'
-    command, stats = sweep_command(variant, repeats, out, python=sys.executable, src=src)
+    command, stats = sweep_command(launch, out, python=sys.executable, src=src)
     if stats is not None and stats.exists():
         raise SystemExit(f'stale stats file {stats}')
     wrapped = [str(plan.REPO / 'scripts/gpu_startup_lock.sh'), *command]
     record: dict[str, Any] = {
-        'hold': HOLD,
+        'hold': launch.hold,
         'declared': False,
-        'variant': variant,
-        'repeats': repeats,
-        'concurrency': CONCURRENCY,
+        'launch': name,
+        'variant': launch.variant,
+        'levels': list(launch.levels),
+        'extra_top_points': launch.extra,
         'provenance': provenance(src, HOLD),
         'command': wrapped,
         'stats_file': str(stats) if stats else None,
@@ -174,7 +271,7 @@ def run(variant: str, repeats: int, out: Path, timeout: float) -> int:
     }
     record_path.parent.mkdir(parents=True, exist_ok=True)
     record_path.write_text(json.dumps(record, indent=1) + '\n')
-    log_path = out / variant / 'sweep.log'
+    log_path = out / name / 'sweep.log'
     with log_path.open('w') as log:
         proc = subprocess.Popen(
             wrapped, stdout=log, stderr=subprocess.STDOUT, text=True, cwd=plan.REPO
@@ -184,15 +281,15 @@ def run(variant: str, repeats: int, out: Path, timeout: float) -> int:
         except subprocess.TimeoutExpired:
             _kill_tree(proc)
             status = 124
-    text = log_path.read_text(errors='replace')
+    prefix = 'run directory: '
     found = [
-        line[len('run directory: ') :]
-        for line in text.splitlines()
-        if line.startswith('run directory: ')
+        line[len(prefix) :]
+        for line in log_path.read_text(errors='replace').splitlines()
+        if line.startswith(prefix)
     ]
     record.update(end_unix=time.time(), exit_code=status, run_dir=found[-1] if found else None)
     record_path.write_text(json.dumps(record, indent=1) + '\n')
-    print(f'{variant}: exit {status}, run {record["run_dir"]}', flush=True)
+    print(f'{name}: exit {status}, run {record["run_dir"]}', flush=True)
     return 0 if status == 0 else 1
 
 
@@ -214,17 +311,61 @@ def start(out: Path) -> int:
 
 
 def point_dirs(out: Path, runs: Path) -> list[tuple[str, Path]]:
-    """(name, point directory) of every run to score: this hold's repeats, then every
-    MTP point of sessions 1-3, stock and certified."""
-    found: list[tuple[str, Path]] = []
-    for variant in VARIANTS:
-        for point in sorted((out / variant / label(variant)).glob('2026*/r*/c*')):
-            found.append((f'{HOLD}/{variant}/{point.parent.name}/{point.name}', point))
+    """(name, point directory) of every point to score, session 1's certified MTP c = 64
+    point (the positive control) first, then these launches, then sessions 1-3 (MTP,
+    plain, block 16, block 8; stock and certified) and the check launches."""
+    mtp_s1 = runs / 's1' / FAMILY.cert_label
+    found = [(f's1/{FAMILY.cert_label}/c064', p) for p in sorted(mtp_s1.glob('2026*/r0/c064'))]
+    for name, launch in LAUNCHES.items():
+        for point in sorted((out / name / label(launch.variant)).glob('2026*/r*/c*')):
+            found.append((f'{HOLD}/{name}/{point.parent.name}/{point.name}', point))
     for session in plan.DECISION_SESSIONS:
-        for name in (FAMILY.stock_label, FAMILY.cert_label):
-            for point in sorted((runs / session / name).glob('2026*/r0/c*')):
-                found.append((f'{session}/{name}/{point.name}', point))
-    return found
+        for family in plan.FAMILIES.values():
+            for arm in (family.stock_label, family.cert_label):
+                for point in sorted((runs / session / arm).glob('2026*/r0/c*')):
+                    found.append((f'{session}/{arm}/{point.name}', point))
+    for step in plan.CHECK_STEPS:
+        for family in plan.FAMILIES.values():
+            for point in sorted((runs / step / family.check_label).glob('2026*/r0/c*')):
+                found.append((f'{step}/{family.check_label}/{point.name}', point))
+    seen: set[Path] = set()
+    unique = []
+    for name, point in found:
+        if point not in seen:
+            seen.add(point)
+            unique.append((name, point))
+    return unique
+
+
+def requests(point_dir: Path) -> list[dict[str, Any]]:
+    """Every request of a point, warmup included: phase, prompt hash, token ids."""
+    raw = point_dir / 'aiperf/profile_export_raw.jsonl.gz'
+    opener = gzip.open if raw.exists() else open
+    if not raw.exists():
+        raw = point_dir / 'aiperf/profile_export_raw.jsonl'
+    out = []
+    with opener(raw, 'rt') as handle:
+        for line in handle:
+            record = json.loads(line)
+            messages = record.get('payload', {}).get('messages') or [{}]
+            found: dict[str, list[int]] = {}
+            for response in record.get('responses', []):
+                for packet in response.get('packets', []):
+                    value = packet.get('value')
+                    if isinstance(value, str) and value.startswith('{') and '_ids' in value:
+                        ext = json.loads(value).get('sglext') or {}
+                        if ext.get('output_ids'):
+                            found['output'] = list(ext['output_ids'][0])
+                        if ext.get('input_ids'):
+                            found['input'] = list(ext['input_ids'])
+            out.append(
+                {
+                    'phase': record.get('metadata', {}).get('benchmark_phase'),
+                    'prompt': prompt_hash(messages[-1].get('content', '')),
+                    **found,
+                }
+            )
+    return out
 
 
 def gaps(meta: dict[str, Any], output: list[int]) -> list[tuple[int, int, float, int, float]]:
@@ -272,6 +413,7 @@ def score_sequence(url: str, input_ids: list[int], output: list[int]) -> dict[st
     worst = max(rows, key=lambda r: r[4] - r[2])
     return {
         'positions': len(rows),
+        # Every position where the committed token is not the teacher-forced top-1.
         'disagree': [
             {'position': j, 'token': t, 'logprob': lp, 'top1': b, 'top1_logprob': blp}
             for j, t, lp, b, blp in rows
@@ -279,42 +421,70 @@ def score_sequence(url: str, input_ids: list[int], output: list[int]) -> dict[st
         ],
         'max_gap': worst[4] - worst[2],
         'max_gap_position': worst[0],
-        'events': sum(1 for r in rows if r[4] - r[2] > NEAR_NATS),
+        'near': sum(1 for r in rows if NEAR_NATS < r[4] - r[2] < GROSS_NATS),
+        'gross': sum(1 for r in rows if r[4] - r[2] >= GROSS_NATS),
     }
 
 
+def control_found(path: Path) -> bool:
+    """Session 1's certified 1756 at 579ae7ce/439 is scored as a gross event."""
+    prompt, position, token = TARGET
+    for line in path.read_text().splitlines():
+        record = json.loads(line)
+        if record['phase'] == 'profiling' and record['prompt'].startswith(prompt):
+            return 'error' not in record and any(
+                d['position'] == position
+                and d['token'] == token
+                and d['top1_logprob'] - d['logprob'] >= GROSS_NATS
+                for d in record['disagree']
+            )
+    return False
+
+
 def score(out: Path, runs: Path, url: str, workers: int) -> int:
-    """Teacher-forced scores of every point, one JSONL file per point under <out>/score."""
+    """Teacher-forced scores of every point, one JSONL file per point under <out>/score;
+    points already scored are skipped, so an interrupted run resumes."""
     target = out / 'score'
     target.mkdir(parents=True, exist_ok=True)
+    points = point_dirs(out, runs)
     total = 0
-    for name, point in point_dirs(out, runs):
+    for index, (name, point) in enumerate(points):
         path = target / (name.replace('/', '__') + '.jsonl')
-        if path.exists():
-            continue
-        items = sorted(request_ids(point).items())
+        if not path.exists():
+            items = requests(point)
 
-        def one(item: tuple[str, dict[str, list[int]]]) -> dict[str, Any]:
-            key, ids = item
-            return {'prompt': key, **score_sequence(url, ids['input'], ids['output'])}
+            def one(item: dict[str, Any]) -> dict[str, Any]:
+                head = {'phase': item['phase'], 'prompt': item['prompt']}
+                if 'input' not in item or 'output' not in item:
+                    return {**head, 'error': 'no token ids'}
+                try:
+                    return {**head, **score_sequence(url, item['input'], item['output'])}
+                except (
+                    Exception
+                ) as exc:  # recorded per request; the control check stops a broken scorer
+                    return {**head, 'error': repr(exc)}
 
-        tmp = path.with_suffix('.jsonl.tmp')
-        with ThreadPoolExecutor(workers) as pool, tmp.open('w') as handle:
-            for result in pool.map(one, items):
-                handle.write(json.dumps({'point': name, **result}) + '\n')
-        tmp.replace(path)
-        total += len(items)
-        print(f'scored {name}: {len(items)} sequences', flush=True)
-    print(f'scored {total} sequences -> {target}')
+            tmp = path.with_suffix('.jsonl.tmp')
+            with ThreadPoolExecutor(workers) as pool, tmp.open('w') as handle:
+                for result in pool.map(one, items):
+                    handle.write(json.dumps({'point': name, **result}) + '\n')
+            tmp.replace(path)
+            total += len(items)
+            print(f'scored {name}: {len(items)} requests', flush=True)
+        if index == 0 and not control_found(path):
+            raise SystemExit(f'positive control not found in {path}: the scorer is wrong')
+    print(f'scored {total} requests in {len(points)} points -> {target}')
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ['sweep']:
+        return sweep_main(argv[1:])
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     sub = parser.add_subparsers(dest='command', required=True)
     r = sub.add_parser('run')
-    r.add_argument('--variant', choices=VARIANTS, required=True)
-    r.add_argument('--repeats', type=int, required=True)
+    r.add_argument('--launch', choices=sorted(LAUNCHES), required=True)
     r.add_argument('--out', type=Path, required=True)
     r.add_argument('--timeout', type=float, required=True, help='seconds')
     r.add_argument('--dry-run', action='store_true', help='print the command only')
@@ -328,9 +498,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == 'run':
         if args.dry_run:
-            print(' '.join(sweep_command(args.variant, args.repeats, args.out)[0]))
+            print(' '.join(sweep_command(LAUNCHES[args.launch], args.out)[0]))
             return 0
-        return run(args.variant, args.repeats, args.out, args.timeout)
+        return run(args.launch, args.out, args.timeout)
     if args.command == 'start':
         args.out.mkdir(parents=True, exist_ok=True)
         return start(args.out)

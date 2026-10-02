@@ -1,19 +1,24 @@
 #!/usr/bin/env bash
-# Hold h6 (exclusive, untimed; README, "Drain reruns"): closed-loop reruns of session 1's
-# MTP c = 64 point, the shape of the one large divergence.
+# Holds h6a and h6b (exclusive, timed; README, "Drain reruns"): closed-loop reruns of
+# session 1's MTP c = 64 point, the shape of the one large divergence.
 #
-#   GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x experiments/benchcert/hold_drain.sh
+#   GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x experiments/benchcert/hold_drain.sh h6a
+#   GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x experiments/benchcert/hold_drain.sh h6b
 #
-# 1. cert: session 1's certified MTP server, the c = 64 point repeated 12 times.
-# 2. certlog: the same in check mode with the per-replay log, repeated twice.
-# 3. stock: the stock MTP server, the c = 64 point repeated 4 times.
-# 4. score: every committed token of these runs and of sessions 1-3's MTP points,
-#    teacher-forced on a stock plain-decoding server.
-# Sweeps on port 30084, scoring on 30085. Output under ~/vp-data/benchcert/drain
-# (BENCHCERT_DRAIN_OUT); log in ~/vp-data/benchcert/logs/drain-<UTC time>.log.
+# h6a: cert1, stock1, cert2, stock2 (each session 1's ladder c = 1-64, then 5 more c = 64
+# points). h6b: certcheck (c = 64 six times, check mode), certlog (c = 64 twice, check mode
+# with the per-replay log). Launches in drain.LAUNCHES; port 30084. Output under
+# ~/vp-data/benchcert/drain (BENCHCERT_DRAIN_OUT); log in logs/<hold>-<UTC time>.log.
 set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo"
+[ "$#" -eq 1 ] || { echo "usage: $0 <h6a|h6b>" >&2; exit 64; }
+hold=$1
+case "$hold" in
+  h6a) launches="cert1:660 stock1:630 cert2:660 stock2:630" ;;
+  h6b) launches="certcheck:540 certlog:360" ;;
+  *) echo "unknown hold $hold" >&2; exit 64 ;;
+esac
 runs=${BENCHCERT_OUT:-$HOME/vp-data/benchcert}
 out=${BENCHCERT_DRAIN_OUT:-$runs/drain}
 unset SGLANG_WORKTREE PYTHONPATH
@@ -21,30 +26,21 @@ unset SGLANG_WORKTREE PYTHONPATH
 source "$repo/scripts/sglang_env.sh"
 python -c 'import sglang, torch' || { echo "not the SGLang environment: $(command -v python)"; exit 1; }
 [ -z "$(git status --porcelain --untracked-files=all)" ] || { echo "checkout not clean"; exit 65; }
-[ ! -e "$out/cert/launch.json" ] || { echo "$out/cert/launch.json exists: already run"; exit 65; }
 mkdir -p "$out" "$runs/logs"
-exec >"$runs/logs/drain-$(date -u +%Y%m%dT%H%M%SZ).log" 2>&1
-echo "drain hold start $(date -Is) repo $(git rev-parse HEAD)"
+exec >"$runs/logs/drain-$hold-$(date -u +%Y%m%dT%H%M%SZ).log" 2>&1
+echo "hold $hold start $(date -Is) repo $(git rev-parse HEAD)"
 # shellcheck disable=SC2329 # invoked by the EXIT trap
 kill_servers() {
-  python -m experiments.benchcert.drain stop --out "$out/score" || true
-  pkill -TERM -f -- 'sglang.launch_server.* --port (30084|30085)( |$)' || true
+  pkill -TERM -f -- 'sglang.launch_server.* --port (30084)( |$)' || true
   sleep 5
-  pkill -KILL -f -- 'sglang.launch_server.* --port (30084|30085)( |$)' || true
+  pkill -KILL -f -- 'sglang.launch_server.* --port (30084)( |$)' || true
 }
 trap kill_servers EXIT
 status=0
-python -m experiments.benchcert.drain run --variant cert --repeats 12 --out "$out" --timeout 900 ||
-  status=1
-python -m experiments.benchcert.drain run --variant certlog --repeats 2 --out "$out" --timeout 480 ||
-  status=1
-python -m experiments.benchcert.drain run --variant stock --repeats 4 --out "$out" --timeout 420 ||
-  status=1
-mkdir -p "$out/score"
-scripts/gpu_startup_lock.sh python -m experiments.benchcert.drain start --out "$out/score"
-timeout --foreground 780 python -m experiments.benchcert.drain score --out "$out" --runs "$runs" ||
-  status=1
-python -m experiments.benchcert.drain stop --out "$out/score"
-echo "drain hold end $(date -Is) exit $status"
+for item in $launches; do
+  python -m experiments.benchcert.drain run --launch "${item%%:*}" --out "$out" \
+    --timeout "${item##*:}" || status=1
+done
+echo "hold $hold end $(date -Is) exit $status"
 nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader || true
 exit "$status"

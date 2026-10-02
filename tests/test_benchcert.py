@@ -710,8 +710,8 @@ def test_drain_reruns_use_session_1s_certified_launch(tmp_path: Path) -> None:
     from experiments.benchcert import drain
 
     s1, _ = plan.sweep_command(plan.FAMILIES['mtp'], 'cert', 's1', tmp_path)
-    cert, stats = drain.sweep_command('cert', 12, tmp_path)
-    assert stats == tmp_path / 'cert' / 'stats' / 'mtp-tuned-triton+cert.json'
+    cert, stats = drain.sweep_command(drain.LAUNCHES['cert1'], tmp_path)
+    assert stats == tmp_path / 'cert1' / 'stats' / 'mtp-tuned-triton+cert.json'
 
     def envs(command: list[str]) -> dict[str, str]:
         pairs = [command[i + 1] for i, token in enumerate(command) if token == '--env']
@@ -723,23 +723,51 @@ def test_drain_reruns_use_session_1s_certified_launch(tmp_path: Path) -> None:
         k: v for k, v in envs(s1).items() if k not in paths
     }
     assert envs(cert)['SGLANG_CERTIFIED_HEAD_STATS_EVERY'] == str(plan.TIMED_STATS_EVERY)
-    assert cert[cert.index('--concurrency') + 1 :] == ['64']
-    assert cert[cert.index('--repeats') + 1] == '12'
+    # Session 1's ladder, then five more c = 64 points.
+    assert cert[cert.index('--concurrency') + 1 :] == s1[s1.index('--concurrency') + 1 :]
+    assert cert[cert.index('--extra-top') + 1] == '5'
     assert cert[cert.index('--port') + 1] == str(drain.PORT) != str(plan.PORT)
     assert cert[cert.index('--quiet-cpu-wait') + 1] == str(drain.QUIET_WAIT_S)
-    for flag in ('--osl', '--min-requests', '--waves'):
+    for flag in ('--arm', '--osl', '--min-requests', '--waves'):
         assert cert[cert.index(flag) + 1] == s1[s1.index(flag) + 1]
     assert '--return-token-ids' in cert and '--set' not in cert
-    stock, none = drain.sweep_command('stock', 4, tmp_path)
+    stock, none = drain.sweep_command(drain.LAUNCHES['stock1'], tmp_path)
     assert none is None and not any('SGLANG_CERTIFIED_HEAD' in token for token in stock)
-    log, log_stats = drain.sweep_command('certlog', 2, tmp_path)
+    check, _ = drain.sweep_command(drain.LAUNCHES['certcheck'], tmp_path)
+    assert envs(check)['SGLANG_CERTIFIED_HEAD_CHECK'] == '1'
+    assert envs(check)['SGLANG_CERTIFIED_HEAD_STATS_EVERY'] == '2000'
+    assert 'PYTHONPATH' not in envs(check)
+    assert check[check.index('--concurrency') + 1 :] == ['64']
+    log, log_stats = drain.sweep_command(drain.LAUNCHES['certlog'], tmp_path)
     env = envs(log)
     assert env['SGLANG_CERTIFIED_HEAD_CHECK'] == '1'
     assert env['SGLANG_CERTIFIED_HEAD_STATS_EVERY'] == '1'
     assert env['PYTHONPATH'].endswith('replay_hook')
     assert log_stats is not None
     assert env['BENCHCERT_REPLAY_LOG'] == str(log_stats.parent / 'replay.jsonl')
-    assert log[log.index('--label') + 1] == 'mtp-tuned-triton+cert-log'
+    # Arms alternate in h6a, and the c = 64 draws balance between them.
+    h6a = [launch for launch in drain.LAUNCHES.values() if launch.hold == 'h6a']
+    assert [launch.variant for launch in h6a] == ['cert', 'stock', 'cert', 'stock']
+
+
+def test_drain_ladder_runs_every_level_then_the_extra_top_points() -> None:
+    from argparse import Namespace
+
+    from experiments.benchcert import drain
+
+    sweep = drain.LadderSweep.__new__(drain.LadderSweep)
+    sweep.args, sweep.extra = Namespace(concurrency=[64, 1, 2, 4, 8, 16, 32]), 2
+    assert sweep.order() == [
+        (0, 1),
+        (0, 2),
+        (0, 4),
+        (0, 8),
+        (0, 16),
+        (0, 32),
+        (0, 64),
+        (1, 64),
+        (2, 64),
+    ]
 
 
 def test_drain_gaps_check_the_alignment_against_the_output() -> None:
@@ -788,7 +816,7 @@ def test_drain_score_flags_a_token_far_below_the_top(monkeypatch: pytest.MonkeyP
     result = drain.score_sequence('http://x', [1, 2, 3], [5, 7])
     assert sent[0]['input_ids'] == [1, 2, 3, 5, 7]
     assert sent[0]['logprob_start_len'] == 3
-    assert result['events'] == 1
+    assert (result['gross'], result['near']) == (1, 0)
     assert result['max_gap_position'] == 1
     assert result['max_gap'] == pytest.approx(3.7)
     assert result['disagree'] == [
