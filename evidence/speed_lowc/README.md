@@ -36,6 +36,11 @@ that tree. The two trees differ only in that cutoff. The ring-writing verify run
 and no probe 4 arm enables the fold (`probe4/launches.csv`), so the change does not touch what probe 4
 measured. Probe 4's exact tree comes from `build_engines.sh confirm` at `48b2933`.
 
+Probe 4's gate (`check_probe3.py`, on probe 3's outputs and on its own microbenchmark) now also
+requires FA4 to meet the target kill rule: at least 200 us saved per target forward at B = 1, context
+512. That check was added after probes 3 and 4 ran. Both of their microbenchmarks pass it (233.3 and
+234.1 us, `probe3/` and `probe4/attn_microbench.json`).
+
 ## Results
 
 ### Attention at the served shapes (`probe1/attn_microbench.json`, measured)

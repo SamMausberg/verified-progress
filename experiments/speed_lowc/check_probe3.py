@@ -5,7 +5,9 @@ microbenchmark, the SM90 regression test log and the server smoke. This reads th
 such directory (or --dir) and checks:
 
 * attn_microbench.json: the FA4 target arm ran (no error) and its largest difference from
-  the FP32 reference is at most twice the Triton kernel's, and no FA4 timing row failed;
+  the FP32 reference is at most twice the Triton kernel's, no FA4 timing row failed, and FA4
+  meets the declared kill rule: it saves at least 200 us per 8-layer target forward against
+  Triton at B = 1, context 512 (both rows must exist);
 * regression_test.log: pytest reports passes and no failures or errors;
 * smoke/smoke.json: every configuration started and produced every requested token.
 
@@ -28,6 +30,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path.home() / 'vp-data/speed-lowc'
+# The declared target kill rule (attn_microbench.py's kill_rule): microseconds per 8-layer
+# target forward that FA4 must save against Triton at B = 1, context 512.
+KILL_SAVING_US = 200.0
 
 
 def main() -> None:
@@ -61,6 +66,19 @@ def main() -> None:
     fa4_errors = [e for e in attn.get('errors', []) if e.get('arm') == 'fa4']
     if fa4_errors:
         failures.append(f'{len(fa4_errors)} FA4 timing rows failed, first: {fa4_errors[0]}')
+    median = {
+        (r.get('shape'), r.get('batch'), r.get('ctx'), r.get('arm')): r.get('median_us_per_forward')
+        for r in attn.get('rows', [])
+    }
+    t_triton = median.get(('target', 1, 512, 'triton'))
+    t_fa4 = median.get(('target', 1, 512, 'fa4'))
+    if t_triton is None or t_fa4 is None:
+        failures.append('target timing rows at B = 1, context 512 missing (Triton or FA4)')
+    elif not t_triton - t_fa4 >= KILL_SAVING_US:
+        failures.append(
+            f'FA4 saves {t_triton - t_fa4:.1f} us per target forward at B = 1, context 512, '
+            f'below the declared {KILL_SAVING_US:.0f} us'
+        )
     if args.microbench_only:
         print(
             f'{run} (microbenchmark): '
