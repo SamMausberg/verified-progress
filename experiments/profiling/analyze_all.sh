@@ -43,18 +43,23 @@ for arm_kind in plain:plain mtp:spec dflash-tuned-b16:dflash dflash-tuned:dflash
 done
 
 # Plain rerun: attribution and comparison with the cited traces.
+# Every batch of the rerun must be present, so an interrupted rerun cannot mix fresh
+# and stale attributions in the comparison.
 if [ -n "$PLAIN_RERUN" ]; then
-  mkdir -p "$EV/attribution/plain_rerun"
-  for rep in "$PLAIN_RERUN"/plain_bs*.nsys-rep; do
-    have "$rep" || continue
-    b="$(basename "$rep" .nsys-rep)"
-    run attribute.py "$rep" --kind plain --out-prefix "$EV/attribution/plain_rerun/$b" | head -1
-    rm -f "$EV/attribution/plain_rerun/${b}_categories.csv"
+  for b in 1 8 32 128; do
+    if [ ! -e "$PLAIN_RERUN/plain_bs$b.nsys-rep" ]; then
+      echo "plain rerun in $PLAIN_RERUN lacks plain_bs$b.nsys-rep" >&2
+      exit 1
+    fi
   done
-  if have "$EV/attribution/plain_rerun/plain_bs1.json"; then
-    run compare_attribution.py --base "$EV/attribution" --test "$EV/attribution/plain_rerun" \
-      --arm plain --batch 1 8 32 128 --out "$EV/plain_rerun_check.csv"
-  fi
+  mkdir -p "$EV/attribution/plain_rerun"
+  for b in 1 8 32 128; do
+    run attribute.py "$PLAIN_RERUN/plain_bs$b.nsys-rep" --kind plain \
+      --out-prefix "$EV/attribution/plain_rerun/plain_bs$b" | head -1
+    rm -f "$EV/attribution/plain_rerun/plain_bs${b}_categories.csv"
+  done
+  run compare_attribution.py --base "$EV/attribution" --test "$EV/attribution/plain_rerun" \
+    --arm plain --batch 1 8 32 128 --out "$EV/plain_rerun_check.csv"
 fi
 
 # Client windows, server commands and startup logs (directory:name). The cited plain
