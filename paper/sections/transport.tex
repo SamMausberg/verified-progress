@@ -20,7 +20,7 @@ $z^t_i-z^d_i-a_c=\langle w_i-\mu_c,\Delta\rangle$, which Cauchy--Schwarz bounds 
 A greedy verifier may skip tile $c$ when $U_c<\tau$ for an exactly evaluated target score $\tau$, such as the draft token's. Other ways of measuring a tile's radius (\emph{bound families}: Hölder, coordinate, grouped and low-rank) trade metadata for width, and \emph{tilings} group the entries contiguously, at random or by $k$-means (Appendix~\ref{app:transport}).
 
 \subsection{What Transport Must Beat}\label{sec:crossover}\label{sec:geometry}
-The int8 copy's error for entry $i$ is $\langle e_i,h^t\rangle$, bounded by $\norm{e_i}_2\norm{h^t}_2$ with $e_i$ known offline; transport's is $\langle w_i-\mu_c,\Delta\rangle$, bounded by $r_c\norm\Delta_2$. Each bound is attained by some admissible vector, so neither can be tightened without more information (Proposition~\ref{prop:suprema}), and the comparison reduces to one ratio, the \emph{drift ratio}
+The int8 copy's error for entry $i$ is $\langle e_i,h^t\rangle$, bounded by $\norm{e_i}_2\norm{h^t}_2$ with $e_i$ known offline; transport's is $\langle w_i-\mu_c,\Delta\rangle$, bounded by $r_c\norm\Delta_2$. Each bound is attained by some admissible vector, so neither can be tightened without more information (Proposition~\ref{prop:suprema}), and the comparison reduces to one ratio, the \emph{drift}
 \begin{equation}
 \rho=\norm{h^t-h^d}_2/\norm{h^t}_2.\label{eq:rho}
 \end{equation}

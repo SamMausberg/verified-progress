@@ -63,7 +63,7 @@ Table~\ref{tab:headconstants} gives the constants of the tied head from which th
 
 \begin{table}[htbp]
 \small\centering
-\caption{Weight-only constants of the Qwen3.5-4B head, computed in float64 on the CPU; quantiles over all 248,320 vocabulary entries. $\delta^\ast_i=\norm{e_i}_2/r_c(i)$ is the drift ratio below which transport's Euclidean error bound for entry $i$ is narrower than that of the named low-precision copy (``per entry'': one scale per entry), with 64-entry tiles of contiguous token indices and $\mu_c$ the tile mean; the last row is the analogous threshold for the $\ell_\infty$/$\ell_1$ pairing, $s_i\norm h_1/2$ against $r^\infty_c\norm\Delta_1$. Error-bound widths are compared, not certification rates or runtime. Derived~\ev{head-constants}.}
+\caption{Weight-only constants of the Qwen3.5-4B head, computed in float64 on the CPU; quantiles over all 248,320 vocabulary entries. $\delta^\ast_i=\norm{e_i}_2/r_c(i)$ is the drift below which transport's Euclidean error bound for entry $i$ is narrower than that of the named low-precision copy (``per entry'': one scale per entry), with 64-entry tiles of contiguous token indices and $\mu_c$ the tile mean; the last row is the analogous threshold for the $\ell_\infty$/$\ell_1$ pairing, $s_i\norm h_1/2$ against $r^\infty_c\norm\Delta_1$. Error-bound widths are compared, not certification rates or runtime. Derived~\ev{head-constants}.}
 \label{tab:headconstants}
 \vskip 0.05in
 \begin{tabular}{@{}lrrr@{}}\toprule
@@ -95,7 +95,7 @@ The MTP-4B capture passes the same checks~\ev{stats-mtp}. It holds 30,328 verify
 The analyses use subsets of the held-out pairs: the DFlash drift on 40,000 pairs (9,296 accepted, 2,434 rejected and 28,270 unreached), DFlash transport on 4,020 pairs from 110 prompts, the MTP drift on 40,000 pairs from 160 prompts (24,835 accepted, 5,698 rejected and 9,467 unreached), and MTP transport on all 16,016 held-out pairs from 160 prompts (9,969 accepted, 2,298 rejected and 3,749 unreached)~\ev{rho,transport,rho-mtp,transport-mtp}.
 
 \subsection{The drift in detail}\label{app:transport-drift}
-Table~\ref{tab:rho-groups} breaks the DFlash drift ratio down. It barely depends on anything: accepted drafts are no closer than rejected ones, the median rises from 0.88 at block position 1 to 0.92 from position 6 on, and domain and context length move it by a few hundredths. For every pair, transport's error bound is narrower than any of the four low-precision bounds (int8 and int4, one scale per entry and in 128-column groups) on 0.08\% of entries, and those entries are the three tiles of identical unused-token entries, whose radius is zero~\ev{rho}.
+Table~\ref{tab:rho-groups} breaks the DFlash drift down. It barely depends on anything: accepted drafts are no closer than rejected ones, the median rises from 0.88 at block position 1 to 0.92 from position 6 on, and domain and context length move it by a few hundredths. For every pair, transport's error bound is narrower than any of the four low-precision bounds (int8 and int4, one scale per entry and in 128-column groups) on 0.08\% of entries, and those entries are the three tiles of identical unused-token entries, whose radius is zero~\ev{rho}.
 
 The main text explains the size of the drift by the draft input's fixed norm and its angle to the target's. The drafter's scores are also softer than the target's: the median top-token probability is 0.17 against 0.69~\ev{stats-dflash}. Further measurements show that the drift is not an artefact of the Euclidean metric~\ev{rho,transport}. In the head's own metric the drift stays of order one: $\norm{W\Delta}_2/\norm{Wh^t}_2$ has a median of 0.87 before and 0.85 after removing each position's mean logit, and the median over pairs of the largest logit drift $\max_i|\langle w_i,\Delta\rangle|$ is 13.6 logits (root mean square 2.0). The largest realized transport error in a tile is a median 77 times the largest realized int8 error. Restricted to $W$'s leading 64 right singular directions, the relative drift is 0.89, and those directions carry 25\% of $\Delta$'s norm, against 16\% for an isotropic vector. In the $\ell_1$ norm of the Hölder family the ratio is 0.93.
 
@@ -103,7 +103,7 @@ Table~\ref{tab:rho-groups-mtp} breaks down the drift of the MTP layer. It is wid
 
 \begin{table}[htbp]
 \small\centering
-\caption{Drift ratio $\rho=\norm{h^t-h^d}_2/\norm{h^t}_2$ of DFlash-4B pairs by outcome, domain, block position and context length (tokens before the verified position), on 40,000 held-out pairs. The smallest ratio over all pairs is 0.823. Measured~\ev{rho}.}
+\caption{Drift $\rho=\norm{h^t-h^d}_2/\norm{h^t}_2$ of DFlash-4B pairs by outcome, domain, block position and context length (tokens before the verified position), on 40,000 held-out pairs. The smallest ratio over all pairs is 0.823. Measured~\ev{rho}.}
 \label{tab:rho-groups}
 \vskip 0.05in
 \begin{tabular}[t]{@{}lrrrr@{}}\toprule
@@ -134,7 +134,7 @@ Context $\ge$1,024 & 267 & 0.877 & 0.930 & 0.966\\\bottomrule
 
 \begin{table}[htbp]
 \small\centering
-\caption{Drift ratio $\rho$ of MTP-4B pairs by outcome, domain, draft step and context length, on 40,000 held-out pairs from 160 prompts. Measured~\ev{rho-mtp}.}
+\caption{Drift $\rho$ of MTP-4B pairs by outcome, domain, draft step and context length, on 40,000 held-out pairs from 160 prompts. Measured~\ev{rho-mtp}.}
 \label{tab:rho-groups-mtp}
 \vskip 0.05in
 \begin{tabular}{@{}lrrrrr@{}}\toprule
