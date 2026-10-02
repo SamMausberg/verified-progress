@@ -69,14 +69,16 @@ start_server() {  # label, then env assignments
     done
     exit 1'
 }
-probe() {  # label
-  local label=$1 url=http://127.0.0.1:$PORT
+probe() {  # label; returns non-zero if any of its three runs failed (it is called on the left of ||,
+  # where set -e does not apply)
+  local label=$1 url=http://127.0.0.1:$PORT rc=0
   timeout --foreground 300 python experiments/moonshot/logit_probe.py run --url "$url" --mode generate \
-    --concurrency 48 --label "$label-c48" --out "$OUT/$label.gen48.json"
+    --concurrency 48 --label "$label-c48" --out "$OUT/$label.gen48.json" || rc=1
   timeout --foreground 300 python experiments/moonshot/logit_probe.py run --url "$url" --mode generate \
-    --concurrency 1 --label "$label-c1" --out "$OUT/$label.gen1.json"
+    --concurrency 1 --label "$label-c1" --out "$OUT/$label.gen1.json" || rc=1
   timeout --foreground 300 python experiments/moonshot/logit_probe.py run --url "$url" --mode score \
-    --reference "$OUT/bf16.gen48.json" --concurrency 48 --label "$label-score" --out "$OUT/$label.score.json"
+    --reference "$OUT/bf16.gen48.json" --concurrency 48 --label "$label-score" --out "$OUT/$label.score.json" || rc=1
+  return "$rc"
 }
 for spec in "bf16:SGLANG_FP8_DENSE=" "fp8tok:SGLANG_FP8_DENSE=target SGLANG_FP8_DENSE_ACT=token" \
             "fp8ten:SGLANG_FP8_DENSE=target SGLANG_FP8_DENSE_ACT=tensor"; do

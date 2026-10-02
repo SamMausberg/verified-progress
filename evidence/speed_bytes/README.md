@@ -43,7 +43,7 @@ one GH200, greedy decoding, bench's harness and arms (`bench/arms.toml`) at repo
   microbenchmark said). Two small kernels per layer take it back: the row-scale multiply (128 x
   3.79 us = 485 us) and the activation quantization (128 x 1.97 us = 252 us), plus 106 us of
   extra launch gaps and 37 us of lost programmatic-dependent-launch overlap: 880 us of the 931.
-  The rest of the step gives back 58 us (other kernels 202 to 153 us, norms 225 to 214 us, the
+  The rest of the step saves another 58 us (other kernels 202 to 153 us, norms 225 to 214 us, the
   remaining classes +2 us), so the traced step is 109 us shorter (3,535 to 3,426 us, 1.032x),
   close to the served 1.036x in x.
 - **Ceiling** (measured, kill3, timing only, outputs invalid). With the quantization and
