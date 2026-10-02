@@ -3,6 +3,7 @@
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -10,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'experiments' / 'ba
 
 from bitwise_runs import compare
 from insitu_gemm import complete_replays
+from stream_text_identity import compare_point, load_point
 
 
 def test_complete_replays_drops_cut_and_boundary_replays() -> None:
@@ -76,3 +78,77 @@ def test_bitwise_cli_fails_on_a_missing_run(tmp_path: Path) -> None:
     assert run.returncode != 0
     assert 'missing run' in run.stderr
     assert not (tmp_path / 'out.json').exists()
+
+
+Chunk = str | tuple[str, str]
+
+
+def write_point(
+    point: Path, texts: dict[str, list[Chunk]], *, ok: bool = True, tokens_per_chunk: int = 1
+) -> None:
+    """A sweep point with one profiling request per prompt.
+
+    A chunk is a reasoning delta or a (delta field, text) pair; each streams tokens_per_chunk.
+    """
+    (point / 'aiperf').mkdir(parents=True)
+    rows: list[dict[str, str]] = []
+    raws: list[dict[str, Any]] = []
+    for i, (pid, chunks) in enumerate(texts.items()):
+        rid = f'r{i}'
+        rows.append({'request_id': rid, 'prompt_id': pid, 'ok': str(ok)})
+        deltas = [dict([c]) if isinstance(c, tuple) else {'reasoning_content': c} for c in chunks]
+        packets = [
+            {'value': json.dumps({'choices': [{'delta': d}],
+                                  'usage': {'completion_tokens': (n + 1) * tokens_per_chunk}})}
+            for n, d in enumerate(deltas)
+        ] + [{'value': '[DONE]'}]  # fmt: skip
+        raws.append({'metadata': {'benchmark_phase': 'warmup', 'x_request_id': 'w'}})
+        raws.append({'metadata': {'benchmark_phase': 'profiling', 'x_request_id': rid},
+                     'status': 200, 'responses': [{'packets': packets}]})  # fmt: skip
+    with (point / 'requests.csv').open('w') as f:
+        f.write('request_id,prompt_id,ok\n')
+        f.writelines(f'{r["request_id"]},{r["prompt_id"]},{r["ok"]}\n' for r in rows)
+    with (point / 'aiperf' / 'profile_export_raw.jsonl').open('w') as f:
+        f.writelines(json.dumps(r) + '\n' for r in raws)
+
+
+def test_stream_text_identity_finds_the_first_divergent_chunk(tmp_path: Path) -> None:
+    write_point(tmp_path / 'a', {'p0': ['ab', 'cd', 'ef'], 'p1': ['xy', 'z']})
+    write_point(tmp_path / 'b', {'p0': ['ab', 'cX', 'ef'], 'p1': ['xy', 'z']})
+    s = compare_point(load_point(tmp_path / 'a'), load_point(tmp_path / 'b'))
+    assert (s['prompts'], s['identical'], s['differing']) == (2, 1, 1)
+    # 'abcd' and 'abcX' first differ at character 3, inside the second chunk: one token before it.
+    assert s['first_divergences'] == [{'prompt_id': 'p0', 'char_offset': 3, 'tokens_before': 1}]
+
+
+def test_stream_text_identity_refuses_different_prompts_and_failed_requests(tmp_path: Path) -> None:
+    write_point(tmp_path / 'a', {'p0': ['ab']})
+    write_point(tmp_path / 'b', {'p1': ['ab']})
+    with pytest.raises(ValueError, match='prompt sets differ'):
+        compare_point(load_point(tmp_path / 'a'), load_point(tmp_path / 'b'))
+    write_point(tmp_path / 'c', {'p0': ['ab']}, ok=False)
+    with pytest.raises(ValueError, match='failed'):
+        load_point(tmp_path / 'c')
+
+
+def test_stream_text_identity_keeps_the_arrival_order_of_both_channels(tmp_path: Path) -> None:
+    # Reasoning 'a', content 'c', reasoning 'b' streams 'acb'; buffering the channels
+    # separately would rebuild both requests as 'abc' and call them identical.
+    r, c = 'reasoning_content', 'content'
+    write_point(tmp_path / 'a', {'p0': [(r, 'a'), (c, 'c'), (r, 'b')]})
+    write_point(tmp_path / 'b', {'p0': [(r, 'a'), (r, 'b'), (c, 'c')]})
+    s = compare_point(load_point(tmp_path / 'a'), load_point(tmp_path / 'b'))
+    assert s['first_divergences'] == [{'prompt_id': 'p0', 'char_offset': 1, 'tokens_before': 1}]
+    # Same characters in the same order, but the second one on another channel.
+    write_point(tmp_path / 'c', {'p0': [(r, 'a'), (c, 'b'), (c, 'c')]})
+    write_point(tmp_path / 'd', {'p0': [(r, 'a'), (r, 'b'), (c, 'c')]})
+    s = compare_point(load_point(tmp_path / 'c'), load_point(tmp_path / 'd'))
+    assert s['first_divergences'] == [{'prompt_id': 'p0', 'char_offset': 1, 'tokens_before': 1}]
+
+
+def test_stream_text_identity_reports_token_counts_outside_the_identity(tmp_path: Path) -> None:
+    write_point(tmp_path / 'a', {'p0': ['ab', 'cd']}, tokens_per_chunk=1)
+    write_point(tmp_path / 'b', {'p0': ['ab', 'cd']}, tokens_per_chunk=2)
+    s = compare_point(load_point(tmp_path / 'a'), load_point(tmp_path / 'b'))
+    assert (s['identical'], s['differing']) == (1, 0)
+    assert s['completion_tokens_differ'] == ['p0']
