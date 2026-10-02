@@ -621,7 +621,11 @@ def scored(path: Path) -> bool:
 
 def score(out: Path, runs: Path, url: str, workers: int) -> int:
     """Teacher-forced scores of every point, one JSONL file per point under <out>/score;
-    points already scored are skipped, so an interrupted run resumes."""
+    points already scored are skipped, so an interrupted run resumes. `workers` requests
+    are in flight at once; only 1 (the default) gives batch-1 scores, since the server
+    batches concurrent prefills. h6s ran with 16 (the default then), so its scores are the
+    stock model's at the server's batch shapes; `score_report serial` re-scores its near and
+    gross contexts one at a time."""
     target = out / 'score'
     target.mkdir(parents=True, exist_ok=True)
     started = time.time()
@@ -745,7 +749,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument('--out', type=Path, required=True)
     s.add_argument('--runs', type=Path, default=Path.home() / 'vp-data/benchcert')
     s.add_argument('--url', default=f'http://127.0.0.1:{SCORE_PORT}')
-    s.add_argument('--workers', type=int, default=16)
+    s.add_argument('--workers', type=int, default=1, help='requests in flight (1: batch 1)')
     args = parser.parse_args(argv)
     if args.command == 'run':
         if args.dry_run:

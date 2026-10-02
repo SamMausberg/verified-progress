@@ -648,7 +648,9 @@ def report(
     predictions: Path | None,
     plot: bool,
     export_contexts: Path | None = None,
+    classes_path: Path | None = None,
 ) -> dict[str, Any]:
+    classes_path = classes_path or runs / 'rescore' / 'classes.jsonl'
     entries = load_holds(runs)
     index = index_launches(entries)
     launches: dict[tuple[str, str, str], dict[str, Any]] = {}
@@ -825,7 +827,7 @@ def report(
         row['predicted_decode_ratio'] = p['decode_ratio'] if p else None
 
     # Token comparisons, with the re-scored classes when they exist.
-    classes = load_classes(runs / 'rescore' / 'classes.jsonl')
+    classes = load_classes(classes_path)
     equality_rows, exactness, contexts = token_comparisons(launches, by_key, sessions, classes)
     if export_contexts is not None:
         export_contexts.parent.mkdir(parents=True, exist_ok=True)
@@ -878,7 +880,7 @@ def report(
     write_csv(launch_rows, out / 'launches.csv')
     write_csv(capture_rows, out / 'capture_memory.csv')
     write_csv(frontier_rows(point_rows), out / 'frontier.csv')
-    write_csv(class_rows(runs / 'rescore' / 'classes.jsonl'), out / 'classes.csv')
+    write_csv(class_rows(classes_path), out / 'classes.csv')
     slow_rows, slow_launches = slow_launch_diagnostic(point_rows)
     write_csv(slow_rows, out / 'launch_outliers.csv')
     summary['post_hoc_launch_outliers'] = outlier_effects(slow_launches, pair_rows, ratio_rows)
@@ -1311,6 +1313,12 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help='write every first-divergence context (JSONL) for rescore.py',
     )
+    r.add_argument(
+        '--classes',
+        type=Path,
+        default=None,
+        help="rescore.py's classes (default: <runs>/rescore/classes.jsonl)",
+    )
     s = sub.add_parser('replacement')
     s.add_argument('--runs', type=Path, default=Path.home() / 'vp-data/benchcert')
     args = parser.parse_args(argv)
@@ -1332,6 +1340,7 @@ def main(argv: list[str] | None = None) -> int:
             args.predictions,
             not args.no_plot,
             args.export_contexts,
+            args.classes,
         )
         print(json.dumps(summary['verdicts'], indent=1))
         return 0

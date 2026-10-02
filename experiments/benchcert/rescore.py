@@ -7,12 +7,14 @@
 
 A context is a prompt's token ids, the two runs' common output prefix and the two
 tokens they then chose. `score` sends each to a stock plain-decoding server
-(`plain-tuned` on the benchmark's engine, one request in flight per context, top-5
-logprobs and both tokens' logprobs), takes the margin between the two tokens and
-classes it as `experiments/state_safety/compare.py` does (tie, one ulp, near at
-most 0.5 nats, large), with the BF16 spacing inferred from the top-5 gaps. The
-margin is the stock model's at batch 1, not either timed run's own: it says
-whether the two tokens were close enough for batch-shape rounding to swap them.
+(`plain-tuned` on the benchmark's engine, top-5 logprobs and both tokens' logprobs), takes
+the margin between the two tokens and classes it as `experiments/state_safety/compare.py`
+does (tie, one ulp, near at most 0.5 nats, large), with the BF16 spacing inferred from the
+top-5 gaps. Contexts go one at a time (`--workers 1`, the default), so each is prefilled
+alone and the margin is the stock model's at batch 1, not either timed run's own: it says
+whether the two tokens were close enough for batch-shape rounding to swap them. With
+several requests in flight the server batches their prefills and the margin is no longer
+a batch-1 value; the first declared re-score ran with 16 in flight (README, "Amendments").
 """
 
 from __future__ import annotations
@@ -154,7 +156,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument('--contexts', type=Path, required=True)
     s.add_argument('--out', type=Path, required=True)
     s.add_argument('--url', default=f'http://127.0.0.1:{PORT}')
-    s.add_argument('--workers', type=int, default=16)
+    s.add_argument('--workers', type=int, default=1, help='requests in flight (1: batch 1)')
     args = parser.parse_args(argv)
     if args.command == 'start':
         args.out.mkdir(parents=True, exist_ok=True)

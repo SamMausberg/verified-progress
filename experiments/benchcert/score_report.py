@@ -549,6 +549,114 @@ def report(
     }
 
 
+# -- serial re-score (h6s ran with 16 requests in flight) ----------------------------
+
+
+def serial_contexts(out: Path, runs: Path) -> list[dict[str, Any]]:
+    """Every near and gross context of the h6s scores, and 579ae7ce's position 439 in every
+    scored MTP c = 64 point, in rescore.py's format for a re-score one request at a time.
+    Identical contexts are merged; each lists the events it stands for."""
+    from experiments.benchcert.analyze import context_id
+
+    merged: dict[str, dict[str, Any]] = {}
+
+    def add(input_ids: list[int], tokens: list[int], event: dict[str, Any]) -> None:
+        cid = context_id(input_ids, [], (tokens[0], tokens[1]))
+        line = merged.setdefault(
+            cid, {'id': cid, 'input_ids': input_ids, 'tokens': tokens, 'events': []}
+        )
+        line['events'].append(event)
+
+    prompt, position, wrong = TARGET
+    for name, point in point_dirs(out, runs):
+        path = score_file(out, name)
+        if not path.exists():
+            continue
+        records = read_jsonl(path)
+        items = timeline(point)
+        if len(items) != len(records) or any(
+            i['prompt'] != r.get('prompt') for i, r in zip(items, records, strict=True)
+        ):
+            raise SystemExit(f'{name}: export and score records do not align')
+        for item, record in zip(items, records, strict=True):
+            if 'input' not in item or 'output' not in item:
+                continue
+            for entry in record.get('disagree', []):
+                value = gap(entry)
+                if value <= NEAR_NATS:
+                    continue
+                pos = int(entry['position'])
+                event = {
+                    'point': name,
+                    'prompt': item['prompt'],
+                    'position': pos,
+                    'kind': gap_class(value),
+                    'token': int(entry['token']),
+                    'h6s_gap': round(value, 4),
+                }
+                add(item['input'] + item['output'][:pos], [event['token'], int(entry['top1'])], event)
+        found = describe(name)
+        target = next(
+            (i for i in items if i['phase'] == 'profiling' and i['prompt'].startswith(prompt)), None
+        )
+        if found['family'] != 'mtp' or found['concurrency'] != TOP or target is None:
+            continue
+        if len(target.get('output', [])) <= position or 'input' not in target:
+            continue
+        token = target['output'][position]
+        _, h6s_gap = target_gap(records)
+        event = {
+            'point': name,
+            'prompt': target['prompt'],
+            'position': position,
+            'kind': 'target',
+            'token': token,
+            'h6s_gap': None if h6s_gap is None else round(h6s_gap, 4),
+        }
+        other = wrong if token != wrong else NEAR_TIE_TOKEN
+        add(target['input'] + target['output'][:position], [token, other], event)
+    return list(merged.values())
+
+
+NEAR_TIE_TOKEN = 68189  # session 1's stock token at 579ae7ce's position 439
+
+
+def serial_readout(contexts: Path, rescored: Path) -> dict[str, Any]:
+    """Each h6s event's gap again from the serial re-score: the top-1 logprob minus the
+    committed token's, classed as h6s classed it; and how the classes move."""
+    classes = {r['id']: r for r in read_jsonl(rescored)}
+    rows = []
+    for line in read_jsonl(contexts):
+        found = classes.get(line['id'])
+        for event in line['events']:
+            row = dict(event)
+            if found is not None:
+                logprobs = dict(zip(found['tokens'], found['logprobs'], strict=True))
+                top = found['top5'][0][0] if found['top5'] else max(found['logprobs'])
+                value = max(0.0, top - logprobs[event['token']])
+                row.update(
+                    serial_gap=round(value, 4),
+                    serial_class=gap_class(value),
+                    serial_top1=found['stock_top1'],
+                )
+            rows.append(row)
+    events = [r for r in rows if r['kind'] != 'target']
+    moves: dict[str, int] = {}
+    for r in events:
+        key = f'{r["kind"]}->{r.get("serial_class")}'
+        moves[key] = moves.get(key, 0) + 1
+    return {
+        'events': events,
+        'class_moves': dict(sorted(moves.items())),
+        'gross_h6s': sum(r['kind'] == 'gross' for r in events),
+        'gross_serial': sum(r.get('serial_class') == 'gross' for r in events),
+        'near_h6s': sum(r['kind'] == 'near' for r in events),
+        'near_serial': sum(r.get('serial_class') == 'near' for r in events),
+        'target_439': [r for r in rows if r['kind'] == 'target'],
+        'missing': sum('serial_class' not in r for r in rows),
+    }
+
+
 def _count_by(events: list[dict[str, Any]], keys: tuple[str, ...]) -> list[dict[str, Any]]:
     counts: dict[tuple[Any, ...], int] = {}
     for event in events:
@@ -691,7 +799,27 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument('--events', type=Path, help='also write the gross events as CSV')
     r.add_argument('--contexts', type=Path, help='write the gross contexts for rescore.py')
     r.add_argument('--rescored', type=Path, help="rescore.py's classes for those contexts")
+    sc = sub.add_parser('serial-contexts', help='near and gross contexts for a serial re-score')
+    sc.add_argument('--out', type=Path, required=True, help='the drain output directory')
+    sc.add_argument('--runs', type=Path, default=Path.home() / 'vp-data/benchcert')
+    sc.add_argument('--contexts', type=Path, required=True)
+    sr = sub.add_parser('serial-readout', help='h6s classes against the serial re-score')
+    sr.add_argument('--contexts', type=Path, required=True)
+    sr.add_argument('--rescored', type=Path, required=True)
+    sr.add_argument('--json', type=Path, required=True)
     args = parser.parse_args(argv)
+    if args.command == 'serial-contexts':
+        lines = serial_contexts(args.out, args.runs)
+        args.contexts.parent.mkdir(parents=True, exist_ok=True)
+        args.contexts.write_text(''.join(json.dumps(c) + '\n' for c in lines))
+        print(f'{len(lines)} contexts, {sum(len(c["events"]) for c in lines)} events')
+        return 0
+    if args.command == 'serial-readout':
+        result = serial_readout(args.contexts, args.rescored)
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(json.dumps(result, indent=1) + '\n')
+        print(json.dumps({k: v for k, v in result.items() if k not in ('events', 'target_439')}))
+        return 0
     if args.command == 'summarize':
         write_csv(summarize(args.out, args.runs), args.csv)
         return 0
