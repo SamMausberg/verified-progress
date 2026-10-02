@@ -137,8 +137,16 @@ def main() -> None:
     args = parser.parse_args()
     points = load_points(args.root.expanduser())
     pairs = dict(item.split('=', 1) for item in args.pair)
+    # Every label named on the command line must have run: a failed sweep leaves no r0
+    # directory, and its absence must stop the summary rather than drop a comparison.
+    found = {label for label, _ in points}
+    missing = sorted({args.plain, *pairs, *pairs.values()} - found)
+    if missing:
+        raise SystemExit(f'{args.root}: no points for requested label(s) {", ".join(missing)}')
     for (label, c), row in points.items():
         plain = points.get((args.plain, c))
+        if plain is None and label in pairs:
+            raise SystemExit(f'{label} c={c}: no {args.plain} point at this concurrency')
         if plain:
             row['y_vs_plain'] = row['y'] / plain['y']
             row['x_vs_plain'] = row['x_e2e'] / plain['x_e2e']

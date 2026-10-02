@@ -3,6 +3,7 @@
 # session per hold, about 33 minutes each; three sessions (0, 1, 2), arm order reversed
 # in odd sessions:
 #   scripts/gpu_lock.sh -x experiments/admission/run_admission_confirm.sh <session index> [OUT]
+# OUT defaults to ~/vp-data/speed_highc/confirm/s<session index>.
 # Design as bench's confirm (bench/README.md): confirm split, 512 output tokens with
 # ignore_eos, eight waves per point, stock SGLang at the pin, every arm launched afresh
 # in each session. In the same hold: plain-tuned, plain-tuned-replayssm and plain-tuned
@@ -19,7 +20,8 @@ repo="$(cd "$here/../.." && pwd)"
 source "$repo/scripts/sglang_env.sh"
 cd "$repo" || exit 1
 index=${1:?usage: $0 <session index> [OUT]}
-out="${2:-$HOME/vp-data/speed_highc/confirm}"
+# One directory per session, so each label holds exactly one run (summarize_probe.py).
+out="${2:-$HOME/vp-data/speed_highc/confirm/s$index}"
 session="adm-confirm-s$index"
 high="32 48 64 96 128"
 # MTP with and without the delay also at c = 1 and 8: a default must do no harm at low c.
