@@ -17,31 +17,54 @@ mkdir -p "$EV/attribution" "$EV/windows" "$EV/diagnostics"
 run() { python "$REPO/experiments/profiling/$1" "${@:2}"; }
 have() { [ -e "$1" ] || { echo "skip: $1 missing"; return 1; }; }
 
+# The plain traces behind the committed plain evidence (2026-09-30 18:28) are kept in
+# plain_nsys_v0/; plain_nsys/ now holds the 2026-10-01 rerun with the committed driver,
+# which is attributed separately below and compared with them.
+PLAIN_CITED="$VP_DATA/plain_nsys_v0"
+
 # Attribution per configuration.
 for arm_kind in plain:plain mtp:spec dflash-tuned-b16:dflash dflash-tuned:dflash; do
   arm="${arm_kind%%:*}" kind="${arm_kind##*:}"
-  for rep in "$VP_DATA/${arm}_nsys/${arm}"_bs*.nsys-rep; do
+  dir="$VP_DATA/${arm}_nsys"
+  if [ "$arm" = plain ]; then dir="$PLAIN_CITED"; fi
+  for rep in "$dir/${arm}"_bs*.nsys-rep; do
     have "$rep" || continue
     b="$(basename "$rep" .nsys-rep)"
     run attribute.py "$rep" --kind "$kind" --out-prefix "$EV/attribution/$b" | head -1
   done
 done
 
-# Client windows, server commands and startup logs.
-for rundir in plain_nsys mtp_nsys plain_none mtp_none plain_sglang mtp_sglang \
-  plain_nsys_graphtrace mtp_nsys_graphtrace plain_eager_nsys mtp_eager_nsys \
+# Plain rerun: attribution and comparison with the cited traces.
+mkdir -p "$EV/attribution/plain_rerun"
+for rep in "$VP_DATA"/plain_nsys/plain_bs*.nsys-rep; do
+  have "$rep" || continue
+  b="$(basename "$rep" .nsys-rep)"
+  run attribute.py "$rep" --kind plain --out-prefix "$EV/attribution/plain_rerun/$b" | head -1
+  rm -f "$EV/attribution/plain_rerun/${b}_categories.csv"
+done
+if have "$EV/attribution/plain_rerun/plain_bs1.json"; then
+  run compare_attribution.py --base "$EV/attribution" --test "$EV/attribution/plain_rerun" \
+    --arm plain --batch 1 8 32 128 --out "$EV/plain_rerun_check.csv"
+fi
+
+# Client windows, server commands and startup logs. The cited plain windows
+# (windows/plain_nsys*) were copied before the rerun replaced the raw directory;
+# the rerun's are collected as plain_nsys_rerun.
+for entry in plain_nsys:plain_nsys_rerun mtp_nsys plain_none mtp_none plain_sglang \
+  mtp_sglang plain_nsys_graphtrace mtp_nsys_graphtrace plain_eager_nsys mtp_eager_nsys \
   mtp_nsys_hosttrace plain_nsys_hosttrace dflash-tuned-b16_nsys dflash-tuned-b16_none \
   dflash-tuned_nsys dflash-tuned_none; do
+  rundir="${entry%%:*}" name="${entry##*:}"
   have "$VP_DATA/$rundir/windows.jsonl" || continue
-  run collect_run.py "$VP_DATA/$rundir" --name "$rundir" --evidence "$EV/windows"
+  run collect_run.py "$VP_DATA/$rundir" --name "$name" --evidence "$EV/windows"
 done
 
 # Derived bytes and label checks.
 shopt -s nullglob
-windows=("$VP_DATA"/plain_nsys/windows.jsonl "$VP_DATA"/mtp_nsys/windows.jsonl)
+windows=("$EV"/windows/plain_nsys.jsonl "$VP_DATA"/mtp_nsys/windows.jsonl)
 run bytes_model.py --out "$EV/bytes_per_step.json" --attribution "$EV/attribution" \
   --windows "${windows[@]}" --csv "$EV/bytes_per_step_sweep.csv" > /dev/null
-plain=("$VP_DATA"/plain_nsys/plain_bs*.nsys-rep)
+plain=("$PLAIN_CITED"/plain_bs*.nsys-rep)
 mtp=("$VP_DATA"/mtp_nsys/mtp_bs*.nsys-rep)
 if [ "${#plain[@]}" -gt 0 ]; then
   run check_labels.py "${plain[@]}" "${mtp[@]}" --out "$EV/label_structure_check.json"
@@ -69,10 +92,19 @@ if [ "${#gl[@]}" -gt 0 ]; then
   run graph_level.py "${gl[@]}" --out "$EV/diagnostics/graph_level_trace.json"
 fi
 
-# Nsight Compute summaries.
+# Nsight Compute summaries, then achieved bandwidth by kernel, batch and source.
 ncu=("$VP_DATA"/ncu/*.ncu-rep)
 if [ "${#ncu[@]}" -gt 0 ]; then
   run ncu_summary.py "${ncu[@]}" --out "$EV/ncu_key_kernels.json" > /dev/null
+fi
+if have "$EV/ncu_key_kernels.json" && have "$EV/gdn_kernel_bench.json"; then
+  run kernel_bandwidth.py --evidence "$EV" --out "$EV/kernel_bandwidth.csv"
+fi
+
+# Clock and power log of the microbenchmark rerun (committed with it).
+if have "$EV/microbench_rerun/microbench_clocks.csv"; then
+  run clock_summary.py "$EV/microbench_rerun/microbench_clocks.csv" \
+    --out "$EV/microbench_rerun/microbench_clocks.json" > /dev/null
 fi
 
 run summarize.py --evidence "$EV" > /dev/null

@@ -171,6 +171,9 @@ def runs_table(evidence: Path) -> str:
                 kind = 'SGLang /start_profile (CUDA_PROFILER) under nsys'
             else:
                 continue
+            if p.stem.endswith('_rerun'):
+                # Reproduction runs (windows/<run>_rerun.jsonl) get their own rows.
+                kind += ', rerun'
             rows.setdefault((r['arm'], r['concurrency'], kind), []).append(r)
     lines = [
         '| Arm | B | Condition | windows | output tok/s (mean, sd) | tok/s/user | ms per step or cycle | accept len |',
