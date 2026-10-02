@@ -4728,43 +4728,50 @@
     "positions": 146,
     "mean": 0.07203368136579727,
     "p99": 0.5182738304138184,
-    "max": 0.6106411218643188
+    "max": 0.6106411218643188,
+    "over_1_nat": 0
    },
    "offset 1": {
     "positions": 146,
     "mean": 0.07927022681432802,
     "p99": 0.7564754486083984,
-    "max": 0.7677509784698486
+    "max": 0.7677509784698486,
+    "over_1_nat": 0
    },
    "offset 16-63": {
     "positions": 6725,
     "mean": 0.07714381930784778,
     "p99": 0.554140567779541,
-    "max": 3.084296941757202
+    "max": 3.084296941757202,
+    "over_1_nat": 19
    },
    "offset 2": {
     "positions": 146,
     "mean": 0.09541443750889787,
     "p99": 1.202425241470337,
-    "max": 1.3481941223144531
+    "max": 1.3481941223144531,
+    "over_1_nat": 2
    },
    "offset 3": {
     "positions": 146,
     "mean": 0.062346044933130465,
     "p99": 0.21244192123413086,
-    "max": 0.5731198787689209
+    "max": 0.5731198787689209,
+    "over_1_nat": 0
    },
    "offset 4-15": {
     "positions": 1745,
     "mean": 0.08021829459859592,
     "p99": 0.5468008518218994,
-    "max": 5.222395420074463
+    "max": 5.222395420074463,
+    "over_1_nat": 4
    },
    "offset 64+": {
     "positions": 16839,
     "mean": 0.07926823698636883,
     "p99": 0.5849578380584717,
-    "max": 4.474530383944511
+    "max": 4.474530383944511,
+    "over_1_nat": 64
    }
   },
   "prompt_drift_by_chunk": {
@@ -4772,14 +4779,303 @@
     "positions": 7960,
     "mean": 0.021102089416342378,
     "p99": 0.18456006050109863,
-    "max": 1.6558318138122559
+    "max": 1.6558318138122559,
+    "over_1_nat": 1
    },
    "chunk 1+": {
     "positions": 25893,
     "mean": 0.07873534749021455,
     "p99": 0.5779416561126709,
-    "max": 5.222395420074463
+    "max": 5.222395420074463,
+    "over_1_nat": 89
    }
+  },
+  "alignment_check": {
+   "largest": 40,
+   "max_shift": 16,
+   "matched_at_another_shift": 0,
+   "cases": [
+    {
+     "id": "mt_bench-0059",
+     "position": 206,
+     "drift": 5.222395420074463,
+     "shared_at_shift_0": 2,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0025",
+     "position": 1178,
+     "drift": 4.474530383944511,
+     "shared_at_shift_0": 1,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0039",
+     "position": 1530,
+     "drift": 4.149995744228363,
+     "shared_at_shift_0": 3,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0039",
+     "position": 1531,
+     "drift": 3.980367660522461,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0017",
+     "position": 876,
+     "drift": 3.794377088546753,
+     "shared_at_shift_0": 3,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0034",
+     "position": 331,
+     "drift": 3.245983362197876,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0036",
+     "position": 732,
+     "drift": 3.206061363220215,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0031",
+     "position": 1220,
+     "drift": 3.084296941757202,
+     "shared_at_shift_0": 3,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0006",
+     "position": 452,
+     "drift": 3.06240451335907,
+     "shared_at_shift_0": 2,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0039",
+     "position": 1552,
+     "drift": 3.059295654296875,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0039",
+     "position": 1417,
+     "drift": 2.846160411834717,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0039",
+     "position": 613,
+     "drift": 2.810793161392212,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0033",
+     "position": 501,
+     "drift": 2.6943154335021973,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0031",
+     "position": 866,
+     "drift": 2.477773904800415,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0013",
+     "position": 973,
+     "drift": 2.4722211956977844,
+     "shared_at_shift_0": 2,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0015",
+     "position": 507,
+     "drift": 2.4376380443573,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0033",
+     "position": 523,
+     "drift": 2.4175657629966736,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0006",
+     "position": 488,
+     "drift": 2.291813850402832,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0031",
+     "position": 1064,
+     "drift": 2.2824496030807495,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0025",
+     "position": 759,
+     "drift": 2.224594831466675,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0039",
+     "position": 1865,
+     "drift": 2.1128053665161133,
+     "shared_at_shift_0": 3,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0031",
+     "position": 1686,
+     "drift": 2.0861968398094177,
+     "shared_at_shift_0": 3,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0039",
+     "position": 1039,
+     "drift": 2.068004459142685,
+     "shared_at_shift_0": 2,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0021",
+     "position": 450,
+     "drift": 1.968534231185913,
+     "shared_at_shift_0": 3,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0008",
+     "position": 321,
+     "drift": 1.9416000545024872,
+     "shared_at_shift_0": 2,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0000",
+     "position": 252,
+     "drift": 1.9195315837860107,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0022",
+     "position": 1113,
+     "drift": 1.8698540925979614,
+     "shared_at_shift_0": 3,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0039",
+     "position": 663,
+     "drift": 1.859668344259262,
+     "shared_at_shift_0": 3,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0039",
+     "position": 1767,
+     "drift": 1.8231511116027832,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0031",
+     "position": 648,
+     "drift": 1.8089795112609863,
+     "shared_at_shift_0": 3,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0012",
+     "position": 399,
+     "drift": 1.7738633155822754,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0039",
+     "position": 1022,
+     "drift": 1.7488074898719788,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0014",
+     "position": 186,
+     "drift": 1.6558318138122559,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0036",
+     "position": 770,
+     "drift": 1.630251169204712,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0000",
+     "position": 299,
+     "drift": 1.619133710861206,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0006",
+     "position": 627,
+     "drift": 1.6097321510314941,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0039",
+     "position": 1811,
+     "drift": 1.5804502964019775,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0039",
+     "position": 555,
+     "drift": 1.549430012702942,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0032",
+     "position": 590,
+     "drift": 1.5474905967712402,
+     "shared_at_shift_0": 3,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0027",
+     "position": 487,
+     "drift": 1.5435826778411865,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    }
+   ]
   },
   "generation": {
    "prompts": 40,
@@ -4816,43 +5112,50 @@
     "positions": 112,
     "mean": 0.07201047333572726,
     "p99": 0.3857390880584717,
-    "max": 0.44342684745788574
+    "max": 0.44342684745788574,
+    "over_1_nat": 0
    },
    "offset 1": {
     "positions": 112,
     "mean": 0.0906047809694428,
     "p99": 0.941716268658638,
-    "max": 1.0528020858764648
+    "max": 1.0528020858764648,
+    "over_1_nat": 1
    },
    "offset 16-63": {
     "positions": 5046,
     "mean": 0.07747292362173391,
     "p99": 0.5447020530700684,
-    "max": 1.7921156883239746
+    "max": 1.7921156883239746,
+    "over_1_nat": 12
    },
    "offset 2": {
     "positions": 112,
     "mean": 0.07160186278737715,
     "p99": 0.5240082740783691,
-    "max": 0.8480637073516846
+    "max": 0.8480637073516846,
+    "over_1_nat": 0
    },
    "offset 3": {
     "positions": 112,
     "mean": 0.0841013781152599,
     "p99": 0.4933314323425293,
-    "max": 0.8957624435424805
+    "max": 0.8957624435424805,
+    "over_1_nat": 0
    },
    "offset 4-15": {
     "positions": 1338,
     "mean": 0.07974721242241482,
     "p99": 0.5527896881103516,
-    "max": 2.3952664136886597
+    "max": 2.3952664136886597,
+    "over_1_nat": 4
    },
    "offset 64+": {
     "positions": 16821,
     "mean": 0.08160281650645158,
     "p99": 0.5621079206466675,
-    "max": 3.5318616777658463
+    "max": 3.5318616777658463,
+    "over_1_nat": 64
    }
   },
   "prompt_drift_by_chunk": {
@@ -4860,14 +5163,303 @@
     "positions": 10200,
     "mean": 0.06412886703012316,
     "p99": 0.29932165145874023,
-    "max": 1.5958313941955566
+    "max": 1.5958313941955566,
+    "over_1_nat": 13
    },
    "chunk 1+": {
     "positions": 23653,
     "mean": 0.08057848013929553,
     "p99": 0.5562667846679688,
-    "max": 3.5318616777658463
+    "max": 3.5318616777658463,
+    "over_1_nat": 81
    }
+  },
+  "alignment_check": {
+   "largest": 40,
+   "max_shift": 16,
+   "matched_at_another_shift": 0,
+   "cases": [
+    {
+     "id": "cnn_dailymail-0020",
+     "position": 956,
+     "drift": 3.5318616777658463,
+     "shared_at_shift_0": 2,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0029",
+     "position": 642,
+     "drift": 3.4293453693389893,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0012",
+     "position": 399,
+     "drift": 2.460408329963684,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0036",
+     "position": 732,
+     "drift": 2.4303698539733887,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0033",
+     "position": 523,
+     "drift": 2.3952664136886597,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0013",
+     "position": 973,
+     "drift": 2.3448898792266846,
+     "shared_at_shift_0": 2,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0022",
+     "position": 629,
+     "drift": 2.329609513282776,
+     "shared_at_shift_0": 3,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0021",
+     "position": 744,
+     "drift": 2.327392101287842,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0035",
+     "position": 268,
+     "drift": 2.2531886100769043,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0039",
+     "position": 1530,
+     "drift": 2.0903255939483643,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0017",
+     "position": 876,
+     "drift": 2.0661444664001465,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0022",
+     "position": 1113,
+     "drift": 1.9826675653457642,
+     "shared_at_shift_0": 3,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0039",
+     "position": 661,
+     "drift": 1.9799784421920776,
+     "shared_at_shift_0": 3,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0034",
+     "position": 331,
+     "drift": 1.8760027885437012,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0036",
+     "position": 710,
+     "drift": 1.8575763702392578,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0018",
+     "position": 1020,
+     "drift": 1.8514738082885742,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0027",
+     "position": 353,
+     "drift": 1.8075298070907593,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0029",
+     "position": 533,
+     "drift": 1.7921156883239746,
+     "shared_at_shift_0": 3,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0018",
+     "position": 1019,
+     "drift": 1.7790017127990723,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0017",
+     "position": 1170,
+     "drift": 1.7409727573394775,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0002",
+     "position": 402,
+     "drift": 1.6869816780090332,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0031",
+     "position": 1193,
+     "drift": 1.6575969457626343,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0012",
+     "position": 340,
+     "drift": 1.6455483436584473,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0011",
+     "position": 326,
+     "drift": 1.5979080200195312,
+     "shared_at_shift_0": 2,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0014",
+     "position": 186,
+     "drift": 1.5958313941955566,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0006",
+     "position": 388,
+     "drift": 1.5846484303474426,
+     "shared_at_shift_0": 3,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0039",
+     "position": 335,
+     "drift": 1.5663127899169922,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0018",
+     "position": 1018,
+     "drift": 1.5619564950466156,
+     "shared_at_shift_0": 3,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0029",
+     "position": 708,
+     "drift": 1.5488380789756775,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0031",
+     "position": 866,
+     "drift": 1.5481412410736084,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0031",
+     "position": 648,
+     "drift": 1.5356628894805908,
+     "shared_at_shift_0": 2,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0031",
+     "position": 1875,
+     "drift": 1.526926040649414,
+     "shared_at_shift_0": 2,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0033",
+     "position": 211,
+     "drift": 1.5153257846832275,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0031",
+     "position": 1561,
+     "drift": 1.494239091873169,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0018",
+     "position": 381,
+     "drift": 1.4923017024993896,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0039",
+     "position": 1767,
+     "drift": 1.4922680854797363,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0019",
+     "position": 69,
+     "drift": 1.4860312938690186,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0039",
+     "position": 1546,
+     "drift": 1.4525599479675293,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0037",
+     "position": 834,
+     "drift": 1.450827717781067,
+     "shared_at_shift_0": 5,
+     "shifts": []
+    },
+    {
+     "id": "cnn_dailymail-0039",
+     "position": 653,
+     "drift": 1.422149658203125,
+     "shared_at_shift_0": 4,
+     "shifts": []
+    }
+   ]
   },
   "generation": {
    "prompts": 40,

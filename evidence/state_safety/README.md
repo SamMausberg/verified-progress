@@ -910,10 +910,21 @@ common flags of the Setup section, one request in flight, 40 prompts per test (t
     offset is 0.072 to 0.091 nats for chunk 256 and 0.062 to 0.095 for chunk 200.
   - A few prompt positions drift far more than anything seen in decoding. After the
     first boundary the 99th percentile is 0.56 (chunk 256) and 0.58 nats (chunk 200),
-    but the maximum is 3.53 and 5.22 nats (`prompt_drift_by_chunk`); before it, 1.60 and
-    1.66.
-  - These large drifts are not explained. Whether they are an artefact of how input
-    logprobs are returned under chunked prefill is being checked, and they are not
-    interpreted here.
+    but the maximum is 3.53 and 5.22 nats (`prompt_drift_by_chunk`). 94 and 90
+    of the 33,853 compared positions exceed 1 nat (`over_1_nat`), 13 and 1 of
+    them in the first chunk, where the maximum is 1.60 and 1.66 nats. Drifts of this
+    size therefore occur before any boundary too, where no state passes from one chunk
+    to the next.
+  - The check for an alignment artefact finds none (`alignment_check`). The chunked
+    top-5 list matches the unchunked list at another position within 16 (at least 4
+    shared tokens, every shared logprob within 0.1 nats) for 0 and 0 of the 40
+    largest drifts in each run, while 29 and 24 of the 40 share at least 4 of
+    their top-5 tokens with the unchunked list at the same position.
+  - What makes these positions so sensitive to the prefill's chunking is not known.
+    They are not read as a state error: the generated tokens, which start from the
+    state after the whole prompt, differ only at ties or one BF16 step, and the
+    positions right after a boundary do not stand out from the later offsets of their
+    chunk (mean drift 0.077 to 0.082 nats for chunk 256 and 0.077 to 0.080 for chunk 200 at offsets 4
+    and later). That is an observation, not a test.
 
 Per-rejection-position drift is under "Matrix with pinned pools" above.
