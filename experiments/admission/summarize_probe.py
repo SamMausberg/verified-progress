@@ -143,10 +143,18 @@ def main() -> None:
     missing = sorted({args.plain, *pairs, *pairs.values()} - found)
     if missing:
         raise SystemExit(f'{args.root}: no points for requested label(s) {", ".join(missing)}')
+    # A paired test and its base must cover the same concurrencies: a sweep that aborted
+    # part-way must not leave a comparison silently incomplete. Plain ratios are filled
+    # wherever a plain point exists (arms may run at concurrencies plain does not).
+    for test, base_label in pairs.items():
+        levels = {c for label, c in points if label == test}
+        base_levels = {c for label, c in points if label == base_label}
+        if levels != base_levels:
+            raise SystemExit(
+                f'{test} ran at c = {sorted(levels)} but {base_label} at c = {sorted(base_levels)}'
+            )
     for (label, c), row in points.items():
         plain = points.get((args.plain, c))
-        if plain is None and label in pairs:
-            raise SystemExit(f'{label} c={c}: no {args.plain} point at this concurrency')
         if plain:
             row['y_vs_plain'] = row['y'] / plain['y']
             row['x_vs_plain'] = row['x_e2e'] / plain['x_e2e']
