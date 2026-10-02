@@ -88,7 +88,7 @@ step() {
 
 main() {
   if [ "$#" -eq 0 ]; then
-    set -- microbench plain mtp baseline startprofile graphtrace eager host dflash gdn ncu
+    set -- microbench plain mtp baseline startprofile graphtrace eager host dflash gdn ncu wgmma
   fi
   for s in "$@"; do step "$s"; done
 }
