@@ -11,9 +11,11 @@
 #   S0  stock SGLang (~/sglang at the pin)
 #   B0  the confirm engine with every switch off
 #   A   exact GDN fold: snapshot-free verify, fold at commit (drafter 0001-0004) and BV=4
-#       ring-verify tiles up to 4 sequences (speed-lowc 0002, replacing drafter 0005)
+#       ring-verify tiles up to 4 sequences (speed-lowc 0003, replacing drafter 0005)
 #   B   FA4 draft attention (group L only; dflash-tuned already drafts with FA4)
 #   C   FA4 target attention (needs the paged-KV backport, speed-lowc 0001)
+# Engine: experiments/speed_lowc/build_engines.sh confirm (pin + drafter 0001-0004 + speed-lowc
+# 0001 and 0003); every switch off by default.
 #   any combination of the letters, e.g. ABC; FULL is every lever of CONFIRM_LEVERS that
 #   applies to the group
 # Not timed: FP8 draft head (speed-bytes kill2b: b16 x 1.012 at c = 1, b8 0.995 at c = 8,
@@ -36,7 +38,7 @@ for _v in $(compgen -e); do
 done
 unset _v
 CONFIRM_ENGINE=${CONFIRM_ENGINE:-$HOME/sglang-wt/speed-lowc-confirm}
-CONFIRM_TREE=${CONFIRM_TREE:-TO-BE-DECLARED}
+CONFIRM_TREE=${CONFIRM_TREE:-9a01a622f6e7f7f816ce6255ba5de56d52e09dbc}
 CONFIRM_LEVERS=${CONFIRM_LEVERS:?set CONFIRM_LEVERS (e.g. AB or ABC)}
 CONFIRM_GATE=${CONFIRM_GATE:-$HOME/vp-data/speed-lowc/confirm/current/gate.json}
 
