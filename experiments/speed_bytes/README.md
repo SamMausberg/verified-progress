@@ -15,7 +15,7 @@ engine side is `engine/sglang/patches/speed-bytes/` (switches `SGLANG_FP8_DENSE*
 
 The holds ran on 2026-10-02 from copies of these scripts in a scratch directory, before this
 commit. The committed hold scripts differ from those copies only in how they locate the
-repository and the helper scripts; `fp8_gemm_probe.py` differs only by formatting and a lint
+repository and the helper scripts (and `fp8_probe.sh` creates its output directory); `fp8_gemm_probe.py` differs only by formatting and a lint
 directive; `step_budget.py` is a cleaned version of the analysis that was run, and the committed
 evidence was regenerated with it. `kill3.sh` also ran a first cuBLASLt outer-vector-scale
 microbenchmark after its sweeps; that attempt was invalid (see `evidence/speed_bytes/README.md`)
