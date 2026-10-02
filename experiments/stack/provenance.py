@@ -133,7 +133,7 @@ def main() -> int:
         'uncommitted_or_untracked': hold['dirty'],
         'ok': hold['head'] == ident['repo']['head'] and not hold['dirty'],
     }
-    out = {
+    out: dict[str, Any] = {
         'equality_run': run.name,
         'hold_start': start.isoformat(timespec='seconds'),
         'checked_at': datetime.now(tz=UTC).isoformat(timespec='seconds'),
@@ -148,8 +148,9 @@ def main() -> int:
         'runs_provenance': {'problems': problems, 'ok': not problems},
         'sessions_worktree': sessions,
     }
-    out['ok'] = all(out[k]['ok'] for k in ('package', 'prompts', 'runs_provenance'))
-    out['ok'] = out['ok'] and sessions['ok']
+    out['ok'] = all(
+        out[k]['ok'] for k in ('package', 'prompts', 'runs_provenance', 'sessions_worktree')
+    )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     tmp = args.out.with_suffix('.tmp')
     tmp.write_text(json.dumps(out, indent=1) + '\n')

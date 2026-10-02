@@ -1,6 +1,9 @@
 """Figure data and figures for the stack campaign's results (evidence/stack/README.md).
 
-Builds three tables from committed inputs only, then draws each figure from its table:
+Builds the tables from committed inputs only, then draws each figure from its table:
+
+* sessions.csv: the plotted points in long form, one row per arm, concurrency and counted
+  session (the mean of the arm's launches in that session), with its exactness class.
 
 * frontier.csv (figure a): per arm and client concurrency, the mean over sessions of the
   per-user rate x_e2e and the throughput y (each session's value is the mean of the
@@ -10,8 +13,9 @@ Builds three tables from committed inputs only, then draws each figure from its 
   (S0's validity is not required here; it is for the ratios).
 * ratios.csv (figure b): analyze.py's session-paired ratios against S0 (geometric mean,
   95% t interval, decision, session ratios) beside the declared expected range
-  (expected.json) for F, G and the full stack. The declared full-stack range is FG's,
-  because H was left out of the derivation; it is shown for both FG and FULL.
+  (expected.json) for F, G and the full stack, and each arm's exactness class from the
+  equality gate. The declared full-stack range is FG's, because H was left out of the
+  derivation; it is shown for both FG and FULL.
 * gap_by_concurrency.csv and gap_by_block.csv (figure c): the measured full stack as a
   multiple of the tuned DFlash per-user rate next to the derived ceilings of ceiling.json,
   and the tokens a cycle must commit for 5x at each verify width from frame.json.
@@ -29,7 +33,8 @@ certified head in blue, the other arms in greys told apart by marker and dash pa
     python experiments/stack/figures.py --points evidence/stack/points.csv \
         --composition evidence/stack/composition.json --expected evidence/stack/expected.json \
         --ceiling evidence/stack/ceiling.json --frame evidence/frontier/frame.json \
-        --bench-frontier evidence/bench/confirm/frontier.csv --out-dir evidence/stack
+        --bench-frontier evidence/bench/confirm/frontier.csv \
+        --gate evidence/stack/equality/gate.json --out-dir evidence/stack
 """
 
 from __future__ import annotations
@@ -94,6 +99,52 @@ def session_means(
     return out
 
 
+def exactness(arm: str, gate: dict[str, Any]) -> str:
+    """An arm's exactness class from the equality gate (step 1 of the plan)."""
+    if arm == 'S0':
+        return 'stock'
+    if 'H' in arm:
+        base = arm.replace('H', '')
+        ok = gate['certified']['tokens_identical'] and all(
+            c['ok'] for c in gate['certified']['check_mode']
+        )
+        if not ok:
+            return 'not exact'
+        if not base:
+            return 'tokens identical to B0; 0 rows differing in check mode'
+        return f'{exactness(base, gate)}; tokens identical to {base}; 0 rows differing in check mode'
+    if arm == 'B0':
+        return 'bitwise to S0' if gate['b0_bitwise_to_s0'] else 'not exact'
+    cls = gate['classes'].get(arm, 'not exact')
+    return 'bitwise to B0' if cls == 'bitwise' else cls
+
+
+def session_rows(
+    points: list[dict[str, str]], comp: dict[str, Any], gate: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Long form: one row per arm, concurrency and counted session (means over the arm's
+    launches in that session: two for S0 and the full stack, one otherwise)."""
+    full = comp['full']
+    means = session_means(points, comp)
+    rows = []
+    for arm in arm_order(full):
+        for c in sorted(int(c) for c in comp['sessions_admitted']):
+            for s, v in sorted(means[(arm, c)].items()):
+                rows.append(
+                    {
+                        'arm': arm,
+                        'c': c,
+                        'session': s,
+                        'launches': launches_expected(arm, full),
+                        'x_e2e': round(v['x_e2e'], 2),
+                        'y': round(v['y'], 2),
+                        'accept_length': round(v['accept_length'], 3),
+                        'exactness': exactness(arm, gate),
+                    }
+                )
+    return rows
+
+
 def frontier_rows(points: list[dict[str, str]], comp: dict[str, Any]) -> list[dict[str, Any]]:
     means = session_means(points, comp)
     rows = []
@@ -146,7 +197,9 @@ def last_lever_rows(points: list[dict[str, str]], comp: dict[str, Any]) -> list[
     return rows
 
 
-def ratio_rows(comp: dict[str, Any], expected: dict[str, Any]) -> list[dict[str, Any]]:
+def ratio_rows(
+    comp: dict[str, Any], expected: dict[str, Any], gate: dict[str, Any] | None = None
+) -> list[dict[str, Any]]:
     full = comp['full']
     declared = {'F': 'F', 'G': 'G', 'FG': 'FG', full: 'FG'}
     rows = []
@@ -169,6 +222,7 @@ def ratio_rows(comp: dict[str, Any], expected: dict[str, Any]) -> list[dict[str,
                         'declared_lo': rng[0] if rng else '',
                         'declared_hi': rng[1] if rng else '',
                         'declared_for': ('FULL' if arm == full else arm) if rng else '',
+                        'exactness': exactness(arm, gate) if gate else '',
                     }
                 )
     return rows
@@ -319,7 +373,8 @@ def plot_frontier(rows: list[dict[str, str]], full: str, path: Path) -> None:
             f'c = {r["c"]}',
             (float(r['x_e2e_mean']), float(r['y_mean'])),
             textcoords='offset points',
-            xytext=(8, -12),
+            xytext=(-6, 7),
+            ha='right',
             fontsize=8,
             color=INK,
         )
@@ -486,7 +541,7 @@ def plot_gap(gap: list[dict[str, str]], blocks: list[dict[str, str]], path: Path
                 label=f'FULL = {full} (measured, 95% interval)' if i == 0 else None,
             )
     ax.axhline(GOAL, color=INK, linestyle='--', linewidth=1.2)
-    ax.text(len(cs) - 1, GOAL * 1.04, '5x goal', ha='right', fontsize=8, color=INK)
+    ax.text(1.5, GOAL * 0.93, '5x goal', ha='center', va='top', fontsize=8, color=INK)
     ax.axhline(1.0, color=INK, linewidth=0.6)
     ax.set_yscale('log')
     ax.set_yticks([1, 2, 3, 5, 8], ['1', '2', '3', '5', '8'])
@@ -512,7 +567,7 @@ def plot_gap(gap: list[dict[str, str]], blocks: list[dict[str, str]], path: Path
                 color=BLUE,
                 markerfacecolor=BLUE if r['measured'] == 'True' else 'white',
             )
-    tau = float(gap[0]['baseline_tau'])
+    tau = float(blocks[0]['baseline_tokens_per_cycle'])
     bx.plot(
         16,
         tau,
@@ -520,7 +575,7 @@ def plot_gap(gap: list[dict[str, str]], blocks: list[dict[str, str]], path: Path
         markersize=10,
         color=INK,
         linestyle='none',
-        label=f'tuned DFlash-16 tau at c = 1 ({tau:.2f})',
+        label=f'DFlash-16 baseline of the same runs ({tau:.2f} per cycle)',
     )
     bx.set_xscale('log', base=2)
     bx.set_yscale('log', base=2)
@@ -530,7 +585,7 @@ def plot_gap(gap: list[dict[str, str]], blocks: list[dict[str, str]], path: Path
     bx.xaxis.set_minor_formatter(NullFormatter())
     bx.set_xlabel('verify width (tokens per block)')
     bx.set_ylabel('tokens committed per cycle')
-    bx.set_title('(b) Tokens per cycle for 5x at c = 1 (derived; open: interpolated)', fontsize=9)
+    bx.set_title('(b) Tokens per cycle for 5x: repair Stage A cycles, Triton verify, c = 1\n(derived; open marker: interpolated width)', fontsize=9)
     bx.grid(True, color='#d9dde1', linewidth=0.6)
     bx.legend(fontsize=7, frameon=False, loc='upper left')
     fig.savefig(path, dpi=180)
@@ -553,13 +608,15 @@ def main() -> int:
     with args.points.open() as f:
         points = [r for r in csv.DictReader(f) if r['label'].startswith('stack-')]
     comp = json.loads(args.composition.read_text())
+    gate = json.loads(args.gate.read_text())
     frontier = frontier_rows(points, comp)
     tables = {
         'frontier.csv': frontier,
+        'sessions.csv': session_rows(points, comp, gate),
         'cross_session.csv': cross_session_rows(
             frontier, read_csv(args.bench_frontier), comp['full']
         ),
-        'ratios.csv': ratio_rows(comp, json.loads(args.expected.read_text())),
+        'ratios.csv': ratio_rows(comp, json.loads(args.expected.read_text()), gate),
         'gap_by_concurrency.csv': gap_rows(comp, json.loads(args.ceiling.read_text())),
         'gap_by_block.csv': block_rows(json.loads(args.frame.read_text())),
         'last_lever.csv': last_lever_rows(points, comp),

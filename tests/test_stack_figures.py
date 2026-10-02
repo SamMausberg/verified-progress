@@ -243,3 +243,37 @@ def test_cross_session_rows_divide_by_bench_confirmation_means():
     assert row['S0_over_bench_b16_y'] == 1.0 and row['full_over_bench_b8_y'] == 1.0
     with pytest.raises(SystemExit):
         figures.cross_session_rows(frontier, bench[:1], 'FGH')
+
+
+GATE: dict[str, Any] = {
+    'b0_bitwise_to_s0': True,
+    'classes': {'F': 'bitwise', 'G': 'exact-up-to-rounding', 'FG': 'exact-up-to-rounding'},
+    'certified': {'tokens_identical': True, 'check_mode': [{'ok': True}, {'ok': True}]},
+}
+
+
+def test_exactness_classes_follow_the_gate():
+    assert figures.exactness('S0', GATE) == 'stock'
+    assert figures.exactness('B0', GATE) == 'bitwise to S0'
+    assert figures.exactness('F', GATE) == 'bitwise to B0'
+    assert figures.exactness('FG', GATE) == 'exact-up-to-rounding'
+    assert figures.exactness('H', GATE).startswith('tokens identical to B0')
+    assert figures.exactness('FGH', GATE).startswith('exact-up-to-rounding; tokens identical to FG')
+    failed = {**GATE, 'certified': {'tokens_identical': True, 'check_mode': [{'ok': False}]}}
+    assert figures.exactness('FGH', failed) == 'not exact'
+    assert figures.exactness('B0', {**GATE, 'b0_bitwise_to_s0': False}) == 'not exact'
+
+
+def test_session_rows_list_each_counted_session_once():
+    points = [
+        _row('stack-s1', 1, 'S0', 100, 90),
+        _row('stack-s1', 1, 'S0', 102, 92),
+        _row('stack-s1', 1, 'F', 105, 95),
+        _row('stack-s2', 1, 'F', 107, 97, invalid='2 failed requests'),
+    ]
+    rows = figures.session_rows(points, _comp(), GATE)
+    assert [(r['arm'], r['session'], r['launches']) for r in rows] == [
+        ('S0', 'stack-s1', 2),
+        ('F', 'stack-s1', 1),
+    ]
+    assert rows[0]['x_e2e'] == 101.0 and rows[1]['exactness'] == 'bitwise to B0'
