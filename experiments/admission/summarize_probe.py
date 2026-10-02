@@ -91,7 +91,20 @@ def load_points(root: Path) -> dict[tuple[str, int], dict[str, Any]]:
             continue
         if len(runs) != 1:
             raise SystemExit(f'{label_dir}: expected one run, found {len(runs)}')
-        sweep = json.loads((runs[0].parent / 'sweep.json').read_text())
+        sweep_json = runs[0].parent / 'sweep.json'
+        if not sweep_json.exists():
+            raise SystemExit(f'{sweep_json} missing: the sweep did not finish')
+        sweep = json.loads(sweep_json.read_text())
+        # Every concurrency the sweep was asked for must have a point.
+        requested = {int(c) for c in sweep['concurrency']}
+        observed = {
+            int(json.loads(p.read_text())['concurrency']) for p in runs[0].glob('c*/point.json')
+        }
+        if observed != requested:
+            raise SystemExit(
+                f'{label_dir.name}: points at c = {sorted(observed)}, '
+                f'sweep asked for c = {sorted(requested)}'
+            )
         for point_json in sorted(runs[0].glob('c*/point.json')):
             p = json.loads(point_json.read_text())
             problems = []
