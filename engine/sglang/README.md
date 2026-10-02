@@ -318,6 +318,20 @@ SGLANG_WORKTREE=~/sglang-wt/lossy source scripts/sglang_env.sh
 |---|---|---|
 | 0001 | `DFlashDraftModel` builds its context projection `fc` as a `ReplicatedLinear` with the draft's quantization config whenever one is set, and refuses to load a checkpoint that leaves any `fc` parameter unset. Without it, a compressed-tensors drafter stores `fc` as `weight_packed`/`weight_scale`, which match no parameter of the plain `nn.Linear`; the loader skips them silently and `fc.weight` keeps uninitialised memory. | unquantized drafters (no quantization config) build and load `fc` exactly as before |
 
+## upstream (`patches/upstream/0001-0002`, base: upstream SGLang `f6fcda8827`)
+
+These two patches are for upstream SGLang, not for the paper's engine. Each is one commit on upstream
+`main` at `f6fcda8827` (2026-10-02). Both also apply to the pin with `git am`.
+
+```sh
+git -C <SGLang checkout at f6fcda8827> am "$PWD"/engine/sglang/patches/upstream/<patch>.patch
+```
+
+| Patch | What it changes | Upstream |
+|---|---|---|
+| 0001 | FA4 (CuTe DSL) paged KV on SM90. `PagedKVManager.create` ceil-divides the page-table entries per loader thread (`flash_attn/cute/paged_kv.py`), as Dao-AILab/flash-attention#2745 does. With floor division, the head_dim 256 tile (128 x 80) gets 0 entries for the 128 loader threads, and FA4 fails to compile for Qwen3.5-4B's full-attention layers at SGLang's default page size of 1. The patch adds an SM90 head_dim 256 test to `test_flash_attention_4.py`. Checked at head_dim 256 (tile_n 80 and 64) and 192 (tile_n 112). At head_dim 160 and 224 it gets past the compile error but not to correct output, so those need a separate fix (see the comment); other head dims on SM90's cp.async paged path are not covered. | Not opened as a PR: the same ceil-divide (written there as `cute.ceil_div`) is in the open sgl-project/sglang#35757. The test is offered there in [a comment](https://github.com/sgl-project/sglang/pull/35757#issuecomment-5961366446) |
+| 0002 | sgl-kernel's CMake adds the sm_90a gencode for `common_ops` and `spatial_ops` whenever CUDA >= 12.4, not only when FA3 is built. FA3 is off by default on aarch64, so `common_ops` in the aarch64 wheel (inspected: `sglang-kernel` 0.4.8) has no sm_90a code. On GH200 its SM90 CUTLASS GEMMs (`fp8_scaled_mm`, `int8_scaled_mm`, the FP8 and W4A8 MoE GEMMs) print CUTLASS's "Arch conditional MMA" error and return without computing. Builds with FA3 on (the x86_64 default) get the same flags as before. | [sgl-project/sglang#42263](https://github.com/sgl-project/sglang/pull/42263): the same diff on a newer upstream `main` |
+
 ## speed-lowc (`patches/speed-lowc/0001-0003`, built by `experiments/speed_lowc/build_engines.sh`)
 
 ```sh
