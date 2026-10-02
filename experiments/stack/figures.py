@@ -112,7 +112,9 @@ def exactness(arm: str, gate: dict[str, Any]) -> str:
             return 'not exact'
         if not base:
             return 'tokens identical to B0; 0 rows differing in check mode'
-        return f'{exactness(base, gate)}; tokens identical to {base}; 0 rows differing in check mode'
+        return (
+            f'{exactness(base, gate)}; tokens identical to {base}; 0 rows differing in check mode'
+        )
     if arm == 'B0':
         return 'bitwise to S0' if gate['b0_bitwise_to_s0'] else 'not exact'
     cls = gate['classes'].get(arm, 'not exact')
@@ -585,7 +587,10 @@ def plot_gap(gap: list[dict[str, str]], blocks: list[dict[str, str]], path: Path
     bx.xaxis.set_minor_formatter(NullFormatter())
     bx.set_xlabel('verify width (tokens per block)')
     bx.set_ylabel('tokens committed per cycle')
-    bx.set_title('(b) Tokens per cycle for 5x: repair Stage A cycles, Triton verify, c = 1\n(derived; open marker: interpolated width)', fontsize=9)
+    bx.set_title(
+        '(b) Tokens per cycle for 5x: repair Stage A cycles, Triton verify, c = 1\n(derived; open marker: interpolated width)',
+        fontsize=9,
+    )
     bx.grid(True, color='#d9dde1', linewidth=0.6)
     bx.legend(fontsize=7, frameon=False, loc='upper left')
     fig.savefig(path, dpi=180)
@@ -602,6 +607,7 @@ def main() -> int:
     ap.add_argument(
         '--bench-frontier', type=Path, required=True, help="bench's confirm frontier.csv"
     )
+    ap.add_argument('--gate', type=Path, required=True, help="the equality hold's gate.json")
     ap.add_argument('--out-dir', type=Path, required=True)
     ap.add_argument('--no-plot', action='store_true', help='write the tables only')
     args = ap.parse_args()

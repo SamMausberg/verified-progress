@@ -277,3 +277,82 @@ def test_session_rows_list_each_counted_session_once():
         ('F', 'stack-s1', 1),
     ]
     assert rows[0]['x_e2e'] == 101.0 and rows[1]['exactness'] == 'bitwise to B0'
+
+
+def test_figures_command_line_writes_every_table(tmp_path, monkeypatch):
+    """The command line as analyze_campaign.sh calls it (tables only)."""
+    import csv
+    import json
+
+    points = tmp_path / 'points.csv'
+    rows = [
+        _row('stack-s1', 1, 'S0', 100, 90),
+        _row('stack-s1', 1, 'S0', 102, 92),
+        _row('stack-s1', 1, 'FG', 110, 99),
+        _row('stack-s1', 1, 'FG', 112, 101),
+        _row('stack-s1', 1, 'F', 105, 95),
+        _row('stack-s1', 1, 'G', 101, 91),
+        _row('stack-s1', 1, 'B0', 100, 90),
+    ]
+    with points.open('w', newline='') as f:
+        w = csv.DictWriter(f, fieldnames=list(rows[0]))
+        w.writeheader()
+        w.writerows(rows)
+    entry = {'n': 1, 'ratio': 1.0, 'sessions': [1.0], 'decision': 'incomplete (n < 3)'}
+    comp = {
+        'full': 'FG',
+        'sessions_admitted': {'1': ['stack-s1']},
+        'arms': {a: {'1': {'x_e2e': entry, 'y': entry}} for a in ('B0', 'F', 'G', 'FG')},
+    }
+    expected = {'by_concurrency': {'1': {'expected_ratio': {'F': [0.97, 1.04], 'FG': [0.97, 1.07]}}}}
+    ceiling = {
+        'by_concurrency': {
+            '1': {
+                'baseline': {'x_e2e': 986.9, 'tau': 5.7},
+                'decode_ceiling_x_snapshot_free': 1.8,
+                'selector_bound_at_floor_x': 2.9,
+                'full_blocks_at_floor_x': 5.1,
+                'tau_for_5x_at_floor_snapshot_free': 15.8,
+            }
+        }
+    }
+    side = {'cycle_us': 1.0, 'tokens_per_cycle_needed': 42.1, 'constant_alpha_needed': None}
+    frame = {
+        'baseline': {'A_D': 7.6},
+        'widths': {
+            '16': {
+                'source': 'measured',
+                'with_dflash_draft': side,
+                'free_drafter': side,
+                'verify_commit_only': side,
+            }
+        },
+    }
+    bench = tmp_path / 'frontier.csv'
+    bench.write_text(
+        'label,concurrency,x_e2e_mean,y_mean\n'
+        'dflash-tuned-b16,1,986.9,874.4\ndflash-tuned,1,814.4,767.4\n'
+    )
+    files = {}
+    for key, value in {'comp': comp, 'exp': expected, 'ceil': ceiling, 'frame': frame, 'gate': GATE}.items():
+        files[key] = tmp_path / f'{key}.json'
+        files[key].write_text(json.dumps(value))
+    out = tmp_path / 'out'
+    argv = [
+        'figures.py', '--points', str(points), '--composition', str(files['comp']),
+        '--expected', str(files['exp']), '--ceiling', str(files['ceil']),
+        '--frame', str(files['frame']), '--bench-frontier', str(bench),
+        '--gate', str(files['gate']), '--out-dir', str(out), '--no-plot',
+    ]  # fmt: skip
+    monkeypatch.setattr(sys, 'argv', argv)
+    assert figures.main() == 0
+    written = {p.name for p in out.iterdir()}
+    assert written == {
+        'frontier.csv',
+        'sessions.csv',
+        'cross_session.csv',
+        'ratios.csv',
+        'gap_by_concurrency.csv',
+        'gap_by_block.csv',
+        'last_lever.csv',
+    }
