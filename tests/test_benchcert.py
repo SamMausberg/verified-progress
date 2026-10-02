@@ -704,3 +704,93 @@ def test_settling_controls() -> None:
     assert env['BENCHCERT_REPLAY_LOG'] == '/x/certlog/replay.jsonl'
     assert env['PYTHONPATH'].endswith('replay_hook')
     assert plan.CHECK_STATS_EVERY == 1
+
+
+def test_drain_reruns_use_session_1s_certified_launch(tmp_path: Path) -> None:
+    from experiments.benchcert import drain
+
+    s1, _ = plan.sweep_command(plan.FAMILIES['mtp'], 'cert', 's1', tmp_path)
+    cert, stats = drain.sweep_command('cert', 12, tmp_path)
+    assert stats == tmp_path / 'cert' / 'stats' / 'mtp-tuned-triton+cert.json'
+
+    def envs(command: list[str]) -> dict[str, str]:
+        pairs = [command[i + 1] for i, token in enumerate(command) if token == '--env']
+        return dict(pair.split('=', 1) for pair in pairs)
+
+    # The certified environment is session 1's apart from the stats file's path.
+    paths = ('SGLANG_CERTIFIED_HEAD_STATS', 'SGLANG_CERTIFIED_HEAD_SRC')
+    assert {k: v for k, v in envs(cert).items() if k not in paths} == {
+        k: v for k, v in envs(s1).items() if k not in paths
+    }
+    assert envs(cert)['SGLANG_CERTIFIED_HEAD_STATS_EVERY'] == str(plan.TIMED_STATS_EVERY)
+    assert cert[cert.index('--concurrency') + 1 :] == ['64']
+    assert cert[cert.index('--repeats') + 1] == '12'
+    assert cert[cert.index('--port') + 1] == str(drain.PORT) != str(plan.PORT)
+    assert cert[cert.index('--quiet-cpu-wait') + 1] == str(drain.QUIET_WAIT_S)
+    for flag in ('--osl', '--min-requests', '--waves'):
+        assert cert[cert.index(flag) + 1] == s1[s1.index(flag) + 1]
+    assert '--return-token-ids' in cert and '--set' not in cert
+    stock, none = drain.sweep_command('stock', 4, tmp_path)
+    assert none is None and not any('SGLANG_CERTIFIED_HEAD' in token for token in stock)
+    log, log_stats = drain.sweep_command('certlog', 2, tmp_path)
+    env = envs(log)
+    assert env['SGLANG_CERTIFIED_HEAD_CHECK'] == '1'
+    assert env['SGLANG_CERTIFIED_HEAD_STATS_EVERY'] == '1'
+    assert env['PYTHONPATH'].endswith('replay_hook')
+    assert log_stats is not None
+    assert env['BENCHCERT_REPLAY_LOG'] == str(log_stats.parent / 'replay.jsonl')
+    assert log[log.index('--label') + 1] == 'mtp-tuned-triton+cert-log'
+
+
+def test_drain_gaps_check_the_alignment_against_the_output() -> None:
+    from experiments.benchcert import drain
+
+    output = [5, 7, 9]
+    entries = [[-0.1, 5, None], [-4.0, 7, None], [-0.2, 9, None]]
+    tops = [[[-0.1, 5, None]], [[-0.5, 8, None]], [[-0.2, 9, None]]]
+    rows = drain.gaps({'input_token_logprobs': entries, 'input_top_logprobs': tops}, output)
+    assert rows[1] == (1, 7, -4.0, 8, -0.5)
+    # One leading entry (the last prompt token) is skipped by matching the token ids.
+    shifted = {
+        'input_token_logprobs': [[-1.0, 3, None], *entries],
+        'input_top_logprobs': [[[-1.0, 3, None]], *tops],
+    }
+    assert drain.gaps(shifted, output) == rows
+    with pytest.raises(ValueError, match='do not align'):
+        drain.gaps({'input_token_logprobs': entries, 'input_top_logprobs': tops}, [5, 7, 8])
+
+
+def test_drain_score_flags_a_token_far_below_the_top(monkeypatch: pytest.MonkeyPatch) -> None:
+    from experiments.benchcert import drain
+
+    meta = {
+        'input_token_logprobs': [[-0.1, 5, None], [-4.0, 7, None]],
+        'input_top_logprobs': [[[-0.1, 5, None]], [[-0.3, 8, None]]],
+    }
+
+    class Response:
+        def __enter__(self) -> Response:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            pass
+
+        def read(self) -> bytes:
+            return json.dumps({'meta_info': meta}).encode()
+
+    sent: list[dict[str, Any]] = []
+
+    def urlopen(request: Any, timeout: float) -> Response:
+        sent.append(json.loads(request.data))
+        return Response()
+
+    monkeypatch.setattr(drain.urllib.request, 'urlopen', urlopen)
+    result = drain.score_sequence('http://x', [1, 2, 3], [5, 7])
+    assert sent[0]['input_ids'] == [1, 2, 3, 5, 7]
+    assert sent[0]['logprob_start_len'] == 3
+    assert result['events'] == 1
+    assert result['max_gap_position'] == 1
+    assert result['max_gap'] == pytest.approx(3.7)
+    assert result['disagree'] == [
+        {'position': 1, 'token': 7, 'logprob': -4.0, 'top1': 8, 'top1_logprob': -0.3}
+    ]

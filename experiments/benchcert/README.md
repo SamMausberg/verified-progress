@@ -383,6 +383,42 @@ exclusive untimed hold (`hold_settle.sh`) runs:
 Reading (main's): any wrong token reproduced in 2 or 3 is an exactness failure of the
 certified engine; if none reproduces, the event stays an unexplained one-off.
 
+## Drain reruns (not declared; added 2026-10-02 after the settling hold was queued)
+
+Reviewer 1 placed the large event in the c = 64 point's final drain. `579ae7ce` was the
+570th of the point's 576 requests (64 warmup, then 512 measured) and started 2.2 s
+before the point ended; the token arrived while the server's running batch fell from
+49 to 26 to 10 requests. At 16 requests or fewer the MTP verify batch is at most 64
+rows, so the certified verify head could have chosen that token, not only the draft
+paths. The settling hold's waves start 64 requests together and drain differently. One
+exclusive untimed hold (`hold_drain.sh`, h6; `drain.py`) reruns the point itself, closed
+loop, with session 1's flags, pools (128 running requests, 128 mamba slots, the arm's
+1,000,000-token KV cap) and prompt order:
+
+1. `cert`: session 1's certified environment, the c = 64 point repeated 12 times on one
+   server (each repeat flushes the cache and sends the same 576 requests in order).
+2. `certlog`: the same in check mode, with counters written on every glue call and every
+   target verify replay logged (positions, verify input ids, gates, rows, certified ids,
+   stock top 5), repeated twice. Check mode commits the certified ids and counts the rows
+   where they differ from the stock argmax of the same replay; the log says which token
+   each request's verify read at every position.
+3. `stock`: the stock arm, the point repeated 4 times.
+4. Every committed token of these runs and of sessions 1-3's MTP points, scored
+   teacher-forced on rescore.py's stock `plain-tuned` server: the prompt and the run's
+   own 512 output tokens in one prefill, each output token's logprob against the top-1
+   logprob at its position. Session 1's certified 1756 (3.8 nats below the top) is the
+   positive control.
+
+The timed reruns carry no log: a per-replay readback syncs the GPU every step and would
+change the closed-loop timing the event may depend on. Reading rule (set before the run):
+a committed token more than 0.5 nats below the teacher-forced top is a wrong-token event.
+Any event in a certified repeat and none in `stock` reproduces the failure; in `certlog`,
+the counters and the log say whether the head chose the token and whether the verify fed
+it back. No event in 14 certified repeats: not reproduced in 14 closed-loop draws (with 0
+of 14, a per-draw rate above 19% is excluded at 95%), and the session-1 event stays
+unexplained. Events in `stock` too: the threshold is too tight for this reference, and
+certified events count only beyond the stock tail.
+
 ## Hold commit
 
 Every hold runs from a clean checkout at the commit recorded here; `run_session.py`

@@ -3,10 +3,12 @@
 Imported at interpreter start-up when this directory is on PYTHONPATH (control_waves.py's
 `certlog` variant). With BENCHCERT_REPLAY_LOG set, it wraps the certified-head glue's
 `after_replay` once `sglang.srt.layers.certified_head` is imported, and appends one JSON
-line per target verify replay: the gated path, rows, request slots, sequence lengths,
-the verify input ids (last committed token and drafts), the certified ids, the stock
-logits' top 5 per row (valid in check mode, which computes the stock head too) and every
-path's gate. Nothing in the engine changes; without the variable this does nothing.
+line per target verify replay: the time, the gated path, rows, request slots, sequence
+lengths, each row's position, the verify input ids (last committed token and drafts),
+the certified ids, the stock logits' top 5 per row (valid in check mode, which computes
+the stock head too) and every path's gate. Each row's position and input id say which
+token a request's verify read at that position. Nothing in the engine changes; without
+the variable this does nothing.
 """
 
 from __future__ import annotations
@@ -16,6 +18,7 @@ import json
 import os
 import sys
 import threading
+import time
 from typing import Any
 
 TARGET = 'sglang.srt.layers.certified_head'
@@ -32,7 +35,7 @@ def _patch(glue: Any) -> None:
         original(model_runner, forward_batch, logits_output)
         if model_runner.is_draft_worker or not forward_batch.forward_mode.is_target_verify():
             return
-        record: dict[str, Any] = {'n': counter[0]}
+        record: dict[str, Any] = {'n': counter[0], 't': time.time()}
         counter[0] += 1
         try:
             rows = int(forward_batch.input_ids.shape[0])
@@ -52,6 +55,12 @@ def _patch(glue: Any) -> None:
             )
         except Exception as exc:  # a debug log must not stop the server
             record['error'] = repr(exc)
+        try:
+            record['positions'] = forward_batch.positions[
+                : int(forward_batch.input_ids.shape[0])
+            ].tolist()
+        except Exception as exc:
+            record['positions_error'] = repr(exc)
         with lock, open(out, 'a') as handle:
             handle.write(json.dumps(record) + '\n')
 
