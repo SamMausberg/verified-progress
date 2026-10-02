@@ -17,7 +17,8 @@ The holds ran on 2026-10-02 from copies of these scripts in a scratch directory,
 commit. The committed hold scripts differ from those copies in how they locate the repository
 and the helper scripts, and in guards added after review that do not change what a run measures:
 they refuse a repository with tracked edits and an engine whose tree is not the recorded one,
-clear inherited `SGLANG_FP8_*` switches, `fp8_probe.sh` creates its output directory and checks
+clear inherited `SGLANG_FP8_*` switches and any override of the virtualenv or CUDA toolkit that
+`scripts/sglang_env.sh` would honour, `fp8_probe.sh` creates its output directory and checks
 the SGLang checkout, and `probe1.sh` refuses a port that already serves and stops only the
 servers it started. `fp8_gemm_probe.py` differs by formatting, a lint directive and
 fixes made after review: its `fp8_tensor` route now quantizes the weights per tensor, where the

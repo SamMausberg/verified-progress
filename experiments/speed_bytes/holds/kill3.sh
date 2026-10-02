@@ -12,7 +12,9 @@ ENGINE_TREE=1c2b81de6367850630de8ee1d4fffbda999bea38
 OUT=$HOME/vp-data/speed-bytes/kill3_$(date -u +%Y%m%dT%H%M%SZ)
 mkdir -p "$OUT"
 exec >"$OUT/hold.log" 2>&1
-unset PYTHONPATH
+# sglang_env.sh's defaults (the main checkout's virtualenv, the CUDA 13 toolkit and compat libraries),
+# never ones a calling shell names.
+unset PYTHONPATH SGLANG_DIR CUDA_HOME_13 CUDA_COMPAT_DIR
 # Only the switches each launch passes explicitly may reach a server.
 unset "${!SGLANG_FP8_@}"
 export SGLANG_WORKTREE=$ENGINE

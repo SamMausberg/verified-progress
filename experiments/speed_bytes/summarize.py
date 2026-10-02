@@ -103,18 +103,25 @@ def cmd_gemm(args: argparse.Namespace) -> None:
     write_csv(rows, Path(args.out))
 
 
-# The sweeps each committed hold launched (holds/kill1.sh, kill2b.sh, kill3.sh); a hold missing
-# one of them, or holding another, is refused.
-PLANNED = {
+# The sweeps each committed hold launches (holds/kill1.sh, kill2b.sh, kill3.sh) and the client
+# concurrencies of each; a hold missing a sweep or a point, or holding another, is refused.
+PLAIN = (1, 8, 64)
+B16 = (1, 4)
+PLANNED: dict[str, dict[str, tuple[int, ...]]] = {
     'kill1': {
-        'sb-plain-bf16',
-        'sb-plain-fp8',
-        'sb-b16-bf16',
-        'sb-b16-fp8target',
-        'sb-b16-fp8draft',
+        'sb-plain-bf16': PLAIN,
+        'sb-plain-fp8': PLAIN,
+        'sb-b16-bf16': B16,
+        'sb-b16-fp8target': B16,
+        'sb-b16-fp8draft': B16,
     },
-    'kill2b': {'sb2-b16-bf16', 'sb2-b16-fp8head', 'sb2-b8-bf16', 'sb2-b8-fp8head'},
-    'kill3': {'sb3-plain-bf16', 'sb3-plain-fp8oracle', 'sb3-plain-fp8tok'},
+    'kill2b': {
+        'sb2-b16-bf16': B16,
+        'sb2-b16-fp8head': B16,
+        'sb2-b8-bf16': (8,),
+        'sb2-b8-fp8head': (8,),
+    },
+    'kill3': {'sb3-plain-bf16': PLAIN, 'sb3-plain-fp8oracle': PLAIN, 'sb3-plain-fp8tok': PLAIN},
 }
 
 
@@ -141,10 +148,13 @@ def cmd_served(args: argparse.Namespace) -> None:
                 raise SystemExit(f'{f}: engine tree was dirty')
             if d['launch']['repo'].get('dirty_files'):
                 raise SystemExit(f'{f}: harness repository was dirty')
-            planned = set(d['concurrency'])
+            planned = set(PLANNED[name][f.parent.parent.name])
             got = {p['concurrency'] for p in d['points']}
-            if planned != got:
-                raise SystemExit(f'{f}: points {sorted(got)} != planned {sorted(planned)}')
+            if planned != got or planned != set(d['concurrency']):
+                raise SystemExit(
+                    f'{f}: points {sorted(got)}, sweep {sorted(d["concurrency"])}, '
+                    f'planned {sorted(planned)}'
+                )
             # The server's own log must show the FP8 switches exactly when the arm sets them.
             log = (f.parent / 'server' / 'server.log').read_text(errors='replace')
             wants = {k for k, v in d['arm'].get('env', {}).items() if v}
