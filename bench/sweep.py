@@ -74,14 +74,22 @@ def warmup_for(concurrency: int, min_warmup: int) -> int:
     return max(min_warmup, concurrency)
 
 
-def request_body(ignore_eos: bool, thinking: bool) -> dict[str, Any]:
-    """Fields merged into every chat request (aiperf --extra-inputs)."""
-    return {
+def request_body(ignore_eos: bool, thinking: bool, token_ids: bool = False) -> dict[str, Any]:
+    """Fields merged into every chat request (aiperf --extra-inputs).
+
+    `token_ids` asks SGLang for each request's prompt and output token ids in the
+    final `sglext` chunk; it reads no logits and leaves sampling unchanged.
+    """
+    body: dict[str, Any] = {
         'temperature': 0.0,
         'ignore_eos': ignore_eos,
         'chat_template_kwargs': {'enable_thinking': thinking},
         'return_spec_tokens_details': True,
     }
+    if token_ids:
+        body['return_input_ids_in_sglext'] = True
+        body['return_output_ids_in_sglext'] = True
+    return body
 
 
 def aiperf_command(
@@ -247,8 +255,16 @@ class Sweep:
             prompt_hash(item['text']): {'id': item['id'], 'domain': item['domain']}
             for item in [*self.warmup_pool, *self.workload]
         }
-        self.body = request_body(args.ignore_eos, args.thinking)
+        self.body = request_body(args.ignore_eos, args.thinking, args.return_token_ids)
         self.points: list[dict[str, Any]] = []
+
+    def snapshot(self, point_dir: Path, when: str) -> None:
+        """Copy each `--snapshot-file` into the point directory (before or after it)."""
+        for source in self.args.snapshot_file:
+            target = point_dir / f'snapshot_{when}' / source.name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if source.exists():
+                shutil.copyfile(source, target)
 
     @property
     def url(self) -> str:
@@ -346,12 +362,15 @@ class Sweep:
         before = self.metrics()
         log_start = self.server.log_path.stat().st_size
         gpu_before = gpu_snapshot()
+        point_dir.mkdir(parents=True, exist_ok=True)
+        self.snapshot(point_dir, 'before')
         started = time.time()
         with HostLoadSampler(os.getpid(), interval=1.0) as sampler:
             result = self.run_aiperf(point_dir, concurrency, requests, warmup, prompts, args.osl)
         elapsed = time.time() - started
         host_load = sampler.summary()
         after = self.metrics()
+        self.snapshot(point_dir, 'after')
         with self.server.log_path.open('rb') as handle:
             handle.seek(log_start)
             segment = handle.read().decode(errors='replace')
@@ -444,6 +463,7 @@ class Sweep:
             'export_level': args.export_level,
             'streaming': args.streaming,
             'aiperf_workers': args.aiperf_workers,
+            'snapshot_files': [str(path) for path in args.snapshot_file],
             'aiperf_version': subprocess.run(
                 [AIPERF, '--version'], capture_output=True, text=True, check=False
             ).stdout.strip(),
@@ -544,6 +564,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         '--aiperf-workers', type=int, default=None, help='aiperf --workers-max (default: aiperf)'
+    )
+    parser.add_argument(
+        '--return-token-ids',
+        action='store_true',
+        help='request every prompt and output token id (sglext) for token-level comparisons',
+    )
+    parser.add_argument(
+        '--snapshot-file',
+        type=Path,
+        action='append',
+        default=[],
+        help='copy this file into each point directory before and after the point (repeatable)',
     )
     return parser
 
