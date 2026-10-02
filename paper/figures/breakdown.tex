@@ -2,7 +2,12 @@
 % evidence/profiles/breakdown.csv (one row per configuration, columns in percent of the
 % profiled step or cycle; the components sum to 100). Rows 0-3 of the file are plain
 % decoding at B = 1, 8, 32, 128 and rows 4-6 the MTP cycle at B = 1, 8, 32 (column config);
-% the plot leaves a gap of 0.6 rows between the two groups.
+% the plot leaves a gap of 0.6 rows between the two groups. A third group, one bar, is the DFlash
+% cycle of the tuned arm with 16-token blocks at B = 1: the first row of
+% evidence/profiles/dflash_breakdown.csv (config dflash-tuned-b16-1), appended to the table below
+% (the plots skip that file's other rows) after another 0.6-row gap. Its config name has hyphens, so its arm and batch for the step_share.csv
+% lookup are set by hand, and its tick label is written out. Its idle is not hatched: that arm is
+% GPU-bound and tracing does not inflate its idle (evidence/profiles/README.md).
 % Components: head = target head GEMM, FP32 logits copy and argmax; draft_head = the draft
 % steps' head GEMMs, copies and top-1; weight_gemms = the target's weight GEMMs ("target
 % GEMMs"); "other kernels" = gdn_state (the Gated DeltaNet recurrence and the other non-GEMM
@@ -21,11 +26,14 @@
 % step_share.csv. The legend sits above the plot, over the column's header (a legend never sits
 % below an x label).
 \vpreadcsv{\breakdowntable}{../evidence/profiles/breakdown.csv}
+\vpreadcsv{\dflashrow}{../evidence/profiles/dflash_breakdown.csv}
+\pgfplotstablevertcat{\breakdowntable}{\dflashrow}
 \vpreadcsv{\stepsharetable}{../evidence/profiles/step_share.csv}
 \def\vpsplitconfig#1-#2\relax{\gdef\vparm{#1}\gdef\vpbatchsize{#2}}
-\foreach \row in {0,...,6}{%
+\foreach \row in {0,...,7}{%
+  \ifnum\row=7 \gdef\vparm{dflash-tuned-b16}\gdef\vpbatchsize{1}\else
   \pgfplotstablegetelem{\row}{config}\of\breakdowntable
-  \expandafter\vpsplitconfig\pgfplotsretval\relax
+  \expandafter\vpsplitconfig\pgfplotsretval\relax\fi
   \vplookupthree{\stepsharetable}{arm}{\vparm}{batch}{\vpbatchsize}{component}{head}{us_per_step}{\vphead}%
   \vplookupthree{\stepsharetable}{arm}{\vparm}{batch}{\vpbatchsize}{component}{draft_head}{us_per_step}{\vpdraft}%
   \vplookupthree{\stepsharetable}{arm}{\vparm}{batch}{\vpbatchsize}{component}{head}{step_us}{\vpstep}%
@@ -36,28 +44,28 @@
 \def\vpbatch#1-#2\relax{$B{=}#2$}
 \def\vppc#1{\pgfmathprintnumber[fixed,precision=1,fixed zerofill]{#1}}
 \begin{tikzpicture}
-\begin{axis}[xbar stacked,y dir=reverse,scale only axis,width=5.2cm,height=2.35cm,
-  bar width=6.5pt,xmin=0,xmax=100,ymin=-0.6,ymax=7.2,
+\begin{axis}[xbar stacked,y dir=reverse,scale only axis,width=5.2cm,height=2.83cm,
+  bar width=6.5pt,xmin=0,xmax=100,ymin=-0.6,ymax=8.8,
   xlabel={Share of the profiled step or cycle},xlabel style={yshift=2pt},
   xtick={0,20,40,60,80,100},xticklabels={0\%,20\%,40\%,60\%,80\%,100\%},
-  ytick=data,yticklabel={\pgfplotstablegetelem{\ticknum}{config}\of\breakdowntable
-    \expandafter\vpbatch\pgfplotsretval\relax},
+  ytick=data,yticklabel={\ifnum\ticknum=7 DFlash, $B{=}1$\else\pgfplotstablegetelem{\ticknum}{config}\of\breakdowntable
+    \expandafter\vpbatch\pgfplotsretval\relax\fi},
   major y tick style={draw=none},xmajorgrids,clip=false,
-  every axis plot/.append style={draw=white,line width=.4pt},
+  every axis plot/.append style={draw=white,line width=.4pt,skip coords between index={8}{100}},
   legend style={at={(0.5,1)},anchor=south,yshift=0.6cm,legend columns=3,fill=none,fill opacity=1,
     /tikz/every even column/.append style={column sep=4pt}},
   area legend,legend image code/.code={\draw[#1] (0cm,-0.09cm) rectangle (0.32cm,0.09cm);}]
-\addplot[fill=cstock] table[x=head,y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
+\addplot[fill=cstock] table[x=head,y expr={\coordindex+0.6*(\coordindex>3)+0.6*(\coordindex>6)}]{\breakdowntable};
   \addlegendentry{target head}
-\addplot[fill=cdraft] table[x=draft_head,y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
+\addplot[fill=cdraft] table[x=draft_head,y expr={\coordindex+0.6*(\coordindex>3)+0.6*(\coordindex>6)}]{\breakdowntable};
   \addlegendentry{draft heads}
-\addplot[fill=ccontext!40] table[x=weight_gemms,y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
+\addplot[fill=ccontext!40] table[x=weight_gemms,y expr={\coordindex+0.6*(\coordindex>3)+0.6*(\coordindex>6)}]{\breakdowntable};
   \addlegendentry{target GEMMs}
-\addplot[fill=ccontext!12] table[x expr={\thisrow{gdn_state}+\thisrow{attention}+\thisrow{small_kernels}+\thisrow{draft_model}},y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
+\addplot[fill=ccontext!12] table[x expr={\thisrow{gdn_state}+\thisrow{attention}+\thisrow{small_kernels}+\thisrow{draft_model}},y expr={\coordindex+0.6*(\coordindex>3)+0.6*(\coordindex>6)}]{\breakdowntable};
   \addlegendentry{other kernels}
-\addplot[fill=white,draw=ccontext] table[x expr={(\thisrow{x}>3)?0:\thisrow{idle}},y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
+\addplot[fill=white,draw=ccontext] table[x expr={(\coordindex>3)*(\coordindex<7)?0:\thisrow{idle}},y expr={\coordindex+0.6*(\coordindex>3)+0.6*(\coordindex>6)}]{\breakdowntable};
   \addlegendentry{GPU idle}
-\addplot[fill=white,draw=ccontext,pattern=north east lines,pattern color=ccontext,forget plot] table[x expr={(\thisrow{x}>3)?\thisrow{idle}:0},y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
+\addplot[fill=white,draw=ccontext,pattern=north east lines,pattern color=ccontext,forget plot] table[x expr={(\coordindex>3)*(\coordindex<7)?\thisrow{idle}:0},y expr={\coordindex+0.6*(\coordindex>3)+0.6*(\coordindex>6)}]{\breakdowntable};
 % head shares at the right: target alone for plain decoding, target + draft for MTP
 \pgfplotsinvokeforeach{0,...,3}{%
   \node[annot,anchor=west] at (axis cs:100.5,#1)
@@ -65,6 +73,8 @@
 \pgfplotsinvokeforeach{4,...,6}{%
   \node[annot,anchor=west] at (axis cs:100.5,{#1+0.6})
     {\vppc{\csname vpheadshare#1\endcsname}${}+{}$\vppc{\csname vpdraftshare#1\endcsname}\%};}
+\node[annot,anchor=west] at (axis cs:100.5,8.2)
+  {\vppc{\csname vpheadshare7\endcsname}${}+{}$\vppc{\csname vpdraftshare7\endcsname}\%};
 \node[annot,anchor=south west,align=left] at (axis cs:100.5,-0.6) {heads:\\target + draft};
 % group labels, rotated, left of the batch-size tick labels
 \draw[ink!60] ([xshift=-0.98cm]axis cs:0,-0.3) -- ([xshift=-0.98cm]axis cs:0,3.3)
