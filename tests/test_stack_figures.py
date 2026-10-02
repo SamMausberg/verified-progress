@@ -304,7 +304,9 @@ def test_figures_command_line_writes_every_table(tmp_path, monkeypatch):
         'sessions_admitted': {'1': ['stack-s1']},
         'arms': {a: {'1': {'x_e2e': entry, 'y': entry}} for a in ('B0', 'F', 'G', 'FG')},
     }
-    expected = {'by_concurrency': {'1': {'expected_ratio': {'F': [0.97, 1.04], 'FG': [0.97, 1.07]}}}}
+    expected = {
+        'by_concurrency': {'1': {'expected_ratio': {'F': [0.97, 1.04], 'FG': [0.97, 1.07]}}}
+    }
     ceiling = {
         'by_concurrency': {
             '1': {
@@ -334,7 +336,13 @@ def test_figures_command_line_writes_every_table(tmp_path, monkeypatch):
         'dflash-tuned-b16,1,986.9,874.4\ndflash-tuned,1,814.4,767.4\n'
     )
     files = {}
-    for key, value in {'comp': comp, 'exp': expected, 'ceil': ceiling, 'frame': frame, 'gate': GATE}.items():
+    for key, value in {
+        'comp': comp,
+        'exp': expected,
+        'ceil': ceiling,
+        'frame': frame,
+        'gate': GATE,
+    }.items():
         files[key] = tmp_path / f'{key}.json'
         files[key].write_text(json.dumps(value))
     out = tmp_path / 'out'

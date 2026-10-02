@@ -79,7 +79,9 @@ def cells(
     return out
 
 
-def drift_rows(valid: dict[tuple[str, int, str], list[dict[str, str]]], full: str) -> list[dict[str, Any]]:
+def drift_rows(
+    valid: dict[tuple[str, int, str], list[dict[str, str]]], full: str
+) -> list[dict[str, Any]]:
     out = []
     for s, c in sorted({(s, c) for s, c, _ in valid}):
         for arm in ('S0', full):
