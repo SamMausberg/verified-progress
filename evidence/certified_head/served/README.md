@@ -44,12 +44,14 @@ in 8 of 34 uninstrumented draws of engines carrying the certified graphs (1756 f
 one-sided Fisher p about 0.16), so the arms differ in which wrong token, not measurably in
 how often. No observation requires an error in the certified head:
 - `cert0` (`MAX_ROWS=0`, the head never decides) committed 1756;
-- the head matched the stock argmax on every check-mode row, every ring-logged row and
-  every stress-test row (the stress test covers batch-1 inputs in head-only graphs);
+- the head matched the stock argmax on every check-mode row (592,433) and every
+  stress-test row (967,680; batch-1 inputs in head-only graphs), and was consistent with
+  its own bounds on every ring-logged row;
 - stock batch-1 decode itself puts 1756 on top.
 
 The gate at the session-1 and h6a events is unknown, but with the gate on the head returns
-the argmax of the BF16 hidden state it receives. Under identical batch evolution the
+the stock head's argmax for the hidden state it receives (its contract; 0 differing rows in
+check mode and in the stress test). Under identical batch evolution the
 certified engine matches stock at the most sensitive position known. With 579ae7ce seeded
 through position 399, the certified engine with its verify head deciding all 3,708 verify
 steps commits stock's tokens on every one of 109 requests at batch 1, 8, 12 and 16; with
@@ -255,7 +257,9 @@ divergences per 1,000 tokens of exposure, pooled over c > 1 (`equality.csv`;
 | dflash8 | 529 in 603K, 0.878 | 517 in 605K, 0.854 | 1.03 (0.91-1.16) |
 
 MTP's lower bound sits just above 1. As declared, that is reported and investigated,
-not a failure. Two observations bear on it. Certified runs diverge from each other as
+not a failure. The excess fits the certified engine's different step times changing the
+batch evolution: under identical batch evolution the arms are identical (Seeded MTP control,
+below). Two further observations bear on it. Certified runs diverge from each other as
 often as from the stock arm (MTP c = 32: 1.68 per 1,000 certified against certified,
 1.68 against stock, 1.07 stock against stock), which is what timing-driven batch
 variation would give and not what a systematic head difference would give. And block 16
@@ -423,15 +427,18 @@ and check launch of the campaign was scored on rescore.py's stock plain-decoding
 (`drain_scores.csv`, `drain_score_report.json`, `drain_gross_events.csv`). Session 1's 1756 scored 3.81 nats below
 the top, the positive control. The scorer sent 16 requests at a time, so these are not
 batch-1 values; every near and gross context, and 579ae7ce's position 439 in every scored
-MTP c = 64 point, was re-scored one at a time (`drain_serial_rescore.json`), and the
-classes below hold serially.
+MTP c = 64 point, was re-scored one at a time (`drain_serial_rescore.json`). The contexts
+flagged near or gross concurrently keep their classes serially; contexts below 0.5 nats
+concurrently were not re-scored, except at 579ae7ce's position 439.
 
-- Gross events (2 nats or more), MTP family: only `579ae7ce`'s 1756 at position 439, in
-  session 1's certified point and in h6a's `cert1` repeat 1 (3.81 nats concurrently, 6.81
-  serially, 8.9 against FP32: a BF16 error by FP32's measure). There were none in any stock
-  MTP point (sessions 1-3, h6a) and none in check mode. Serially, though, the 5715 that four
-  stock draws committed at the same position is itself 2.19 nats below the prefill
-  reference's top, and 4.7 below FP32's.
+- Gross events (2 nats or more), MTP family, by the concurrent reference: only
+  `579ae7ce`'s 1756 at position 439, in session 1's certified point and in h6a's `cert1`
+  repeat 1 (3.81 nats concurrently, 6.81 serially, 8.9 against FP32: a BF16 error by FP32's
+  measure), and none in any stock MTP point (sessions 1-3, h6a) or in check mode. By the
+  serial reference the same position is gross in three more scored points: 5715, committed
+  by h6a's `stock2` repeat 2 and `cert1` repeats 3 and 5, is 2.19 nats below the top (0.125
+  concurrently; 4.7 below FP32's top). So serially a stock MTP draw is gross at this
+  position too.
 - Plain family: one context (prompt `a4db11ff`, position 333) is gross in all six c = 128
   points, stock and certified, in every session: stock decoding commits token 18299 there,
   6.19 nats below the reference's top-1 concurrently and 13.9 serially. FP32 puts 18299 on
