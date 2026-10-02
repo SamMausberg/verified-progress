@@ -228,3 +228,18 @@ def test_startup_memory_assigns_runs_to_their_session(tmp_path):
     assert startup.session_of('20261002-005317', windows) == 'stack-s2'
     with pytest.raises(SystemExit):
         startup.session_of('20261002-002000', windows)
+
+
+def test_cross_session_rows_divide_by_bench_confirmation_means():
+    frontier = [
+        {'arm': 'S0', 'c': 8, 'x_e2e_mean': 525.0, 'y_mean': 3500.0},
+        {'arm': 'FGH', 'c': 8, 'x_e2e_mean': 570.0, 'y_mean': 3760.0},
+    ]
+    bench = [
+        {'label': 'dflash-tuned-b16', 'concurrency': '8', 'x_e2e_mean': '530', 'y_mean': '3500'},
+        {'label': 'dflash-tuned', 'concurrency': '8', 'x_e2e_mean': '519', 'y_mean': '3760'},
+    ]
+    (row,) = figures.cross_session_rows(frontier, bench, 'FGH')
+    assert row['S0_over_bench_b16_y'] == 1.0 and row['full_over_bench_b8_y'] == 1.0
+    with pytest.raises(SystemExit):
+        figures.cross_session_rows(frontier, bench[:1], 'FGH')

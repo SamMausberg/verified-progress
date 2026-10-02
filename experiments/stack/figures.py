@@ -15,6 +15,9 @@ Builds three tables from committed inputs only, then draws each figure from its 
 * gap_by_concurrency.csv and gap_by_block.csv (figure c): the measured full stack as a
   multiple of the tuned DFlash per-user rate next to the derived ceilings of ceiling.json,
   and the tokens a cycle must commit for 5x at each verify width from frame.json.
+* cross_session.csv (no figure): the campaign's S0 and full stack against bench's
+  confirmation means for dflash-tuned-b16 (a consistency check of S0) and dflash-tuned
+  (block 8, the plan's cross-session comparison at c = 8 by throughput).
 * last_lever.csv (no figure; not declared): the full stack against the stack without its
   last lever (FGH / FG when FULL = FGH) per session, from the same launches. The order runs
   the shorter stack once, in the middle, so this is a reading, not a test.
@@ -26,7 +29,7 @@ certified head in blue, the other arms in greys told apart by marker and dash pa
     python experiments/stack/figures.py --points evidence/stack/points.csv \
         --composition evidence/stack/composition.json --expected evidence/stack/expected.json \
         --ceiling evidence/stack/ceiling.json --frame evidence/frontier/frame.json \
-        --out-dir evidence/stack
+        --bench-frontier evidence/bench/confirm/frontier.csv --out-dir evidence/stack
 """
 
 from __future__ import annotations
@@ -215,6 +218,33 @@ def block_rows(frame: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
+def cross_session_rows(
+    frontier: list[dict[str, Any]], bench: list[dict[str, str]], full: str
+) -> list[dict[str, Any]]:
+    """Cross-session comparison (declared for block 8 at c = 8 by throughput): the campaign's
+    S0 and full stack against bench's confirmation means for the same arm (dflash-tuned-b16,
+    a consistency check of S0) and for dflash-tuned (block 8). Different sessions, so no
+    interval."""
+    ours = {(r['arm'], r['c']): r for r in frontier}
+    ref = {(r['label'], int(r['concurrency'])): r for r in bench}
+    rows = []
+    for c in sorted({r['c'] for r in frontier}):
+        b16, b8 = ref.get(('dflash-tuned-b16', c)), ref.get(('dflash-tuned', c))
+        if b16 is None or b8 is None:
+            raise SystemExit(f'bench frontier lacks dflash-tuned or dflash-tuned-b16 at c={c}')
+        row: dict[str, Any] = {'c': c, 'full': full}
+        for m in METRICS:
+            s0, top = ours[('S0', c)][f'{m}_mean'], ours[(full, c)][f'{m}_mean']
+            row[f'bench_b16_{m}'] = round(float(b16[f'{m}_mean']), 2)
+            row[f'bench_b8_{m}'] = round(float(b8[f'{m}_mean']), 2)
+            row[f'S0_{m}'] = s0
+            row[f'full_{m}'] = top
+            row[f'S0_over_bench_b16_{m}'] = round(s0 / float(b16[f'{m}_mean']), 4) if s0 != '' else ''
+            row[f'full_over_bench_b8_{m}'] = round(top / float(b8[f'{m}_mean']), 4) if top != '' else ''
+        rows.append(row)
+    return rows
+
+
 def write_csv(rows: list[dict[str, Any]], path: Path) -> None:
     with path.open('w', newline='') as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0]))
@@ -277,13 +307,13 @@ def plot_frontier(rows: list[dict[str, str]], full: str, path: Path) -> None:
         ax.annotate(
             f'c = {r["c"]}', (float(r['x_e2e_mean']), float(r['y_mean'])), textcoords='offset points',
             xytext=(8, -12), fontsize=8, color=INK,
-        )  # fmt: skip
+        )
     missing = [a for a in arm_order(full) if a not in by_arm]
     if missing:
         ax.text(
             0.02, 0.03, 'no valid session: ' + ', '.join(name(a, full) for a in missing),
             transform=ax.transAxes, fontsize=8, color=MUTED,
-        )  # fmt: skip
+        )
     ax.set_xlabel('per-user rate x (output tokens/s per request, end to end)')
     ax.set_ylabel('throughput y (output tokens/s on the GPU)')
     ax.set_title('Stack arms on tuned DFlash-16, c = 1-8 (measured; mean over sessions)', fontsize=10)
@@ -320,7 +350,7 @@ def plot_ratios(rows: list[dict[str, str]], full: str, path: Path) -> None:
                             (x - slot * 0.45, lo), slot * 0.9, max(hi - lo, 0.002),
                             color='#e3d3a8', alpha=0.9, linewidth=0, zorder=1,
                         )
-                    )  # fmt: skip
+                    )
                 if r['sessions']:
                     sv = [float(v) for v in r['sessions'].split()]
                     ax.scatter([x] * len(sv), sv, s=9, color=st['color'], alpha=0.45, zorder=2)
@@ -332,7 +362,7 @@ def plot_ratios(rows: list[dict[str, str]], full: str, path: Path) -> None:
                     ax.plot(
                         x, ratio, marker=st['marker'], markersize=6, color=st['color'],
                         markerfacecolor=st['color'] if decided else 'white', zorder=4,
-                    )  # fmt: skip
+                    )
                 else:
                     ax.text(x, 1.0, 'n=0', fontsize=6, color=MUTED, ha='center', va='bottom', rotation=90)
         ax.set_ylabel(f'{titles[m]} / S0')
@@ -341,7 +371,7 @@ def plot_ratios(rows: list[dict[str, str]], full: str, path: Path) -> None:
     handles = [
         Line2D([], [], linestyle='none', marker=style(a, full)['marker'], color=style(a, full)['color'], label=name(a, full))
         for a in arms
-    ]  # fmt: skip
+    ]
     handles.append(Rectangle((0, 0), 1, 1, color='#e3d3a8', label='declared expected range'))
     axes[0].legend(handles=handles, fontsize=7, ncol=4, frameon=False, loc='upper left')
     axes[0].set_title(
@@ -376,7 +406,7 @@ def plot_gap(gap: list[dict[str, str]], blocks: list[dict[str, str]], path: Path
             if r['full_x_lo']:
                 ax.plot([i, i], [float(r['full_x_lo']), float(r['full_x_hi'])], color=BLUE, linewidth=1.6)
             ax.plot(i, float(r['full_x_ratio']), marker='D', color=BLUE, markersize=6,
-                    label=f'FULL = {full} (measured, 95% interval)' if i == 0 else None)  # fmt: skip
+                    label=f'FULL = {full} (measured, 95% interval)' if i == 0 else None)
     ax.axhline(GOAL, color=INK, linestyle='--', linewidth=1.2)
     ax.text(len(cs) - 1, GOAL * 1.04, '5x goal', ha='right', fontsize=8, color=INK)
     ax.axhline(1.0, color=INK, linewidth=0.6)
@@ -398,7 +428,7 @@ def plot_gap(gap: list[dict[str, str]], blocks: list[dict[str, str]], path: Path
         bx.plot(widths, [float(r[key]) for r in blocks], color=BLUE, linestyle=line, label=label)
         for r in blocks:
             bx.plot(int(r['block']), float(r[key]), marker='o', color=BLUE,
-                    markerfacecolor=BLUE if r['measured'] == 'True' else 'white')  # fmt: skip
+                    markerfacecolor=BLUE if r['measured'] == 'True' else 'white')
     tau = float(gap[0]['baseline_tau'])
     bx.plot(16, tau, marker='*', markersize=10, color=INK, linestyle='none', label=f'tuned DFlash-16 tau at c = 1 ({tau:.2f})')
     bx.set_xscale('log', base=2)
@@ -423,14 +453,17 @@ def main() -> int:
     ap.add_argument('--expected', type=Path, required=True)
     ap.add_argument('--ceiling', type=Path, required=True)
     ap.add_argument('--frame', type=Path, required=True)
+    ap.add_argument('--bench-frontier', type=Path, required=True, help="bench's confirm frontier.csv")
     ap.add_argument('--out-dir', type=Path, required=True)
     ap.add_argument('--no-plot', action='store_true', help='write the tables only')
     args = ap.parse_args()
     with args.points.open() as f:
         points = [r for r in csv.DictReader(f) if r['label'].startswith('stack-')]
     comp = json.loads(args.composition.read_text())
+    frontier = frontier_rows(points, comp)
     tables = {
-        'frontier.csv': frontier_rows(points, comp),
+        'frontier.csv': frontier,
+        'cross_session.csv': cross_session_rows(frontier, read_csv(args.bench_frontier), comp['full']),
         'ratios.csv': ratio_rows(comp, json.loads(args.expected.read_text())),
         'gap_by_concurrency.csv': gap_rows(comp, json.loads(args.ceiling.read_text())),
         'gap_by_block.csv': block_rows(json.loads(args.frame.read_text())),

@@ -61,7 +61,8 @@ for arm in B0 FG; do
 done
 run "$sgl_py" experiments/stack/figures.py --points "$out/points.csv" \
   --composition "$out/composition.json" --expected evidence/stack/expected.json \
-  --ceiling evidence/stack/ceiling.json --frame evidence/frontier/frame.json --out-dir "$out"
+  --ceiling evidence/stack/ceiling.json --frame evidence/frontier/frame.json \
+  --bench-frontier evidence/bench/confirm/frontier.csv --out-dir "$out"
 mkdir "$out/equality"
 for f in gate.json summary.json pairs.json table.csv divergences.csv plan.jsonl identity.json \
   certified_stats_H.json certified_stats_FGH.json backbone_table_v1.json compare.log hold.log; do
