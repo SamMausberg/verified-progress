@@ -210,7 +210,32 @@ AUDIT = ROOT / 'sources' / 'citation_audit.md'
 AUDIT_TABLE = '## Entries the paper and the notes cite'
 AUDIT_ROW = re.compile(r'(?m)^\| `([^`]+)` \|')
 AUDIT_REMARK = re.compile(r'(?i)\b(read|verified|licen[cs]ed?|checked)\b|arxiv comment')
-NOTE = re.compile(r'(?is)\bnote\s*=\s*\{(.*?)\}\s*(?:,\s*\w+\s*=|\}\s*$)')
+NOTE_FIELD = re.compile(r'(?i)(?<![\w-])note\s*=\s*')
+
+
+def note_value(entry: str) -> str | None:
+    """The value of an entry's ``note`` field in either BibTeX form, ``{...}`` or ``"..."``.
+
+    Braces nest in both forms; a quoted value ends at the first ``"`` outside braces. The field
+    may be the entry's last, with or without a trailing comma.
+    """
+    field = NOTE_FIELD.search(entry)
+    if field is None or field.end() >= len(entry) or entry[field.end()] not in '{"':
+        return None
+    start = field.end()
+    opener = entry[start]
+    depth = 0
+    for i in range(start, len(entry)):
+        char = entry[i]
+        if char == '{':
+            depth += 1
+        elif char == '}':
+            depth -= 1
+            if opener == '{' and depth == 0:
+                return entry[start + 1 : i]
+        elif char == '"' and opener == '"' and i > start and depth == 0:
+            return entry[start + 1 : i]
+    return None
 
 
 def audit_failures(paper_bib: dict[str, str]) -> tuple[list[str], list[str]]:
@@ -222,7 +247,7 @@ def audit_failures(paper_bib: dict[str, str]) -> tuple[list[str], list[str]]:
     remarks = [
         key
         for key, entry in paper_bib.items()
-        if (note := NOTE.search(entry)) and AUDIT_REMARK.search(note.group(1))
+        if (note := note_value(entry)) is not None and AUDIT_REMARK.search(note)
     ]
     return sorted(set(paper_bib) - rows), sorted(remarks)
 
