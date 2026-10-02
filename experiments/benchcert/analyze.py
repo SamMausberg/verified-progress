@@ -227,11 +227,15 @@ def _mib(text: str) -> float | None:
     return float(match.group(1)) if match else None
 
 
-def config_problems(info: dict[str, Any], family: plan.Family, variant: str) -> list[str]:
+def config_problems(
+    info: dict[str, Any], family: plan.Family, variant: str, all_levels: bool = True
+) -> list[str]:
     """Ways a launch did not run its declared configuration (head, engine, levels).
 
     A launch with any of these cannot stand for its arm in a token comparison either:
-    a certified launch without the head would trivially match the stock arm.
+    a certified launch without the head would trivially match the stock arm. With
+    `all_levels=False` (token comparisons) a launch cut short after some levels
+    still counts for the levels it completed.
     """
     problems = []
     server = info['server']
@@ -261,7 +265,7 @@ def config_problems(info: dict[str, Any], family: plan.Family, variant: str) -> 
     if info.get('points'):
         levels = sorted(int(p['concurrency']) for p in info['points'])
         wanted = sorted(family.check_concurrency if variant == 'check' else family.concurrency)
-        if levels != wanted:
+        if levels != wanted if all_levels else not set(levels) <= set(wanted):
             problems.append(f'concurrency levels {levels}, declared {wanted}')
     return problems
 
@@ -591,7 +595,7 @@ def report(
                 # Token comparisons need complete outputs from a correctly configured
                 # launch, not a valid timing.
                 'outputs_complete': outputs_complete(point)
-                and not config_problems(info, family, variant)
+                and not config_problems(info, family, variant, all_levels=False)
                 and bool(info.get('run_dir')),
                 'x_e2e': point.get('x_e2e'),
                 'x_decode': point.get('x_decode'),

@@ -184,8 +184,10 @@ of r with a 95% t interval on the log scale (2 degrees of freedom).
 **Power (derived** from the confirmation's session-to-session SD of log y, with
 the pair SD taken as sqrt(2) times it). The smallest detectable ratio at the
 primary points under the Bonferroni-4 quantile is about 1.010 (plain c = 1), 1.006
-(MTP) and 1.008 (block 16), against predicted 1.035, 1.086 and 1.045. Block 8 is
-weak everywhere: power at its predicted effect is about 0.5 at c = 4 and 0.2 at
+(MTP) and 1.008 (block 16) with the confirmation's 64 requests per point; with 32
+at c = 1 expect about 1.4 times that (about 1.014, 1.008, 1.012), against predicted
+1.035, 1.086 and 1.045. Block 8 is weak everywhere: power at its predicted effect
+is about 0.5 at c = 4 at Holm's last step (about 0.1 at its first) and 0.2 at
 c = 8, and c = 16 and 32 are gated off, so its pairs mainly measure gate overhead.
 They stay in the plan because block 8 is the envelope arm at c = 8-32 and its
 c = 8 pair is the only served measurement of the certified head there. A null at
@@ -235,7 +237,8 @@ in the analysis or the holds, shown with its outputs before and after.
 
 Tokens are compared whenever both launches ran their declared configuration and
 every request finished with its full length, whatever the point's timing validity
-(a point voided for foreign CPU load is still compared). Exactness is
+(a point voided for foreign CPU load is still compared, and so are the completed
+levels of a launch cut short). Exactness is
 **established** for a family when its check launch shows zero differing rows with
 every declared path certified, and every session with complete concurrency-1
 outputs on both arms has identical tokens (block 8 has no concurrency-1 point and

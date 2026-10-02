@@ -460,7 +460,18 @@ def test_report_end_to_end_on_synthetic_runs(tmp_path: Path) -> None:
                 }
             )
         )
+    # Session 3's certified launch was cut short after c = 1 and c = 4.
+    sweep = Path(json.loads((noisy / 'holds' / 'h2.json').read_text())['launches'][1]['run_dir'])
+    manifest = json.loads((sweep / 'sweep.json').read_text())
+    manifest['points'] = [p for p in manifest['points'] if p['concurrency'] <= 4]
+    (sweep / 'sweep.json').write_text(json.dumps(manifest))
     summary = analyze.report(noisy, noisy / 'evidence', None, plot=False)
+    rows = [
+        r
+        for r in csv.DictReader((noisy / 'evidence/equality.csv').open())
+        if r['kind'] == 'cert_vs_stock' and r['concurrency'] == '1'
+    ]
+    assert sorted(r['a'] for r in rows) == ['s1/cert', 's2/cert', 's3/cert']
     assert summary['exactness']['families']['plain']['c1_identical'] is False
     assert summary['verdicts']['plain'] == 'fails exactness'
     assert summary['h4'] == 'refuted' or summary['h4'] == 'incomplete'
