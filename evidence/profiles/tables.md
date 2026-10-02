@@ -24,17 +24,25 @@ Only the "no profiler" rows (repeated windows on a server without nsys) are thro
 | plain | 1 | no profiler | 3 | 289 (1) | 288.8 | 3.46 | - |
 | plain | 1 | nsys attached, not collecting | 1 | 286 (0) | 286.4 | 3.49 | - |
 | plain | 1 | nsys attached, not collecting (host NVTX server) | 1 | 290 (0) | 289.6 | 3.45 | - |
+| plain | 1 | nsys attached, not collecting, rerun | 1 | 289 (0) | 288.6 | 3.47 | - |
 | plain | 1 | nsys collecting (node-level graph trace) | 1 | 282 (0) | 282.5 | 3.54 | - |
 | plain | 1 | nsys collecting (node-level graph trace) + host NVTX and py-spy | 1 | 284 (0) | 283.9 | 3.52 | - |
+| plain | 1 | nsys collecting (node-level graph trace), rerun | 1 | 283 (0) | 282.9 | 3.53 | - |
 | plain | 8 | no profiler | 3 | 2048 (6) | 256.0 | 3.91 | - |
 | plain | 8 | nsys attached, not collecting | 1 | 2029 (0) | 253.6 | 3.94 | - |
+| plain | 8 | nsys attached, not collecting, rerun | 1 | 2046 (0) | 255.8 | 3.91 | - |
 | plain | 8 | nsys collecting (node-level graph trace) | 1 | 2011 (0) | 251.4 | 3.98 | - |
+| plain | 8 | nsys collecting (node-level graph trace), rerun | 1 | 2019 (0) | 252.4 | 3.96 | - |
 | plain | 32 | no profiler | 3 | 6298 (5) | 196.8 | 5.08 | - |
 | plain | 32 | nsys attached, not collecting | 1 | 6227 (0) | 194.6 | 5.14 | - |
+| plain | 32 | nsys attached, not collecting, rerun | 1 | 6307 (0) | 197.1 | 5.07 | - |
 | plain | 32 | nsys collecting (node-level graph trace) | 1 | 6240 (0) | 195.0 | 5.13 | - |
+| plain | 32 | nsys collecting (node-level graph trace), rerun | 1 | 6237 (0) | 194.9 | 5.13 | - |
 | plain | 128 | no profiler | 3 | 14388 (15) | 112.4 | 8.90 | - |
 | plain | 128 | nsys attached, not collecting | 1 | 14216 (0) | 111.1 | 9.00 | - |
+| plain | 128 | nsys attached, not collecting, rerun | 1 | 14412 (0) | 112.6 | 8.88 | - |
 | plain | 128 | nsys collecting (node-level graph trace) | 1 | 14404 (0) | 112.5 | 8.89 | - |
+| plain | 128 | nsys collecting (node-level graph trace), rerun | 1 | 14369 (0) | 112.3 | 8.91 | - |
 
 ## Attribution per decode step or speculative cycle (us per step, % of step)
 

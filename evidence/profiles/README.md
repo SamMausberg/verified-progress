@@ -145,10 +145,10 @@ rows spread: the SM clock holds 1980 MHz for the first 30 s of the 44 s run and 
 drops to 1305-1965 MHz for the last 14 s, at 458-691 W of board power
 (`microbench_rerun/microbench_clocks.json`, `throttled`), while the memory clock stays
 at 2619 MHz throughout. The rows run in increasing M, so the throttled samples fall on
-the largest M; at M = 256 the GEMM does 2 x 256 x 2560 x 248320 = 325 GFLOP in 570 us
-(571 TFLOP/s, derived), so it is no longer purely bound by memory and its time follows
-the SM clock. The log has no per-row timestamps, so this assignment rests on the order
-of the rows.
+the largest M; at M = 256 the GEMM does 2 x 256 x 2560 x 248320 = 325 GFLOP in 569 us
+(572 TFLOP/s, derived; `kernel_bandwidth.csv`), so it is no longer purely bound by
+memory and its time follows the SM clock. The log has no per-row timestamps, so this
+assignment rests on the order of the rows.
 
 ### Plain decode attribution (`attribution/plain_bs*.json`, measured)
 
@@ -502,14 +502,16 @@ python experiments/profiling/attribute.py ~/vp-data/profile/mtp_nsys/mtp_bs8.nsy
 | `ncu_key_kernels.json` | one Nsight Compute launch each of the head GEMM (M = 1, 32), the GDN decode kernel (B = 32) and the GDN verify kernel (B = 8): DRAM bytes, throughput against ncu's DRAM peak, SM throughput, occupancy, stalls | `run_ncu.sh` (`ncu_summary.py`) | measured (profiler timings) |
 | `gdn_kernel_bench.json` | one GDN layer's decode, verify and verify-without-saves kernels at B = 1-128 under CUDA graphs, L2 evicted | `run_all.sh gdn` (`gdn_kernel_bench.py`) | measured |
 | `kernel_bandwidth.csv` | achieved bandwidth of the head GEMM and the GDN kernels by batch and source (microbenchmark, GDN bench, serving traces, ncu), with the ncu regime | `kernel_bandwidth.py` | measured; regime by rule |
-| `microbench_rerun/` | 2026-10-01 rerun of `run_microbench.sh` with the clock log: `hbm_bandwidth.json`, `head_microbench.json`, `microbench_clocks.csv` (nvidia-smi, 100 ms), `microbench_clocks.json` | `run_all.sh microbench` (`clock_summary.py`) | measured; reproduction check |
+| `microbench_rerun/` | 2026-10-01 rerun of `run_microbench.sh` with the clock log: `hbm_bandwidth.json`, `head_microbench.json`, `microbench_clocks.csv` (nvidia-smi, 100 ms), `microbench_clocks.json` | `MICROBENCH_EVIDENCE=evidence/profiles/microbench_rerun experiments/profiling/run_all.sh microbench` (`clock_summary.py`) | measured; reproduction check |
 | `attribution/plain_rerun/plain_bs<B>.json`, `plain_rerun_check.csv` | attribution of the 2026-10-01 plain traces and its comparison with the cited ones | `attribute.py`, `compare_attribution.py` | measured; reproduction check |
 
 The `gdn`, `ncu` and `microbench` steps ran in one exclusive hold that ended on
 2026-10-01 at 11:25 UTC, from repository 0aec3e0 (SGLang `bd66ce34`, Nsight Compute 2025.3.1); the
-plain rerun ran at 02:44 UTC from the same commit. The microbenchmark step writes into
-`evidence/profiles/` directly, so its rerun outputs were moved to `microbench_rerun/` to
-keep the cited files. `ncu_key_kernels.json` was regenerated from the same reports after
+plain rerun ran at 02:44 UTC from the same commit. That hold's `run_microbench.sh` could
+write only into `evidence/profiles/`, so its outputs were moved to `microbench_rerun/` by
+hand, with the clock log copied from `$VP_DATA`, to keep the cited files;
+`MICROBENCH_EVIDENCE=evidence/profiles/microbench_rerun` now sends the same four files
+there. `ncu_key_kernels.json` was regenerated from the same reports after
 the fix to `ncu_summary.py`'s duration units (the hold's copy had `dram_tb_per_s` 10^12
 too small).
 

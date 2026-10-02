@@ -41,7 +41,7 @@ scripts/gpu_lock.sh -s experiments/profiling/analyze_all.sh
 | `pyspy_summary.py` | Where the scheduler thread spends CPU time, from py-spy samples | `diagnostics/pyspy_*.json` |
 | `graph_level.py` | Step composition from a graph-level trace, to calibrate the node-level attribution (the run was dropped) | `diagnostics/graph_level_trace.json` (not produced) |
 | `summarize.py` | Markdown tables and plot data from the JSON evidence | `tables.md`, `step_share.csv`, `breakdown.csv` |
-| `run_microbench.sh` | HBM bandwidth and the head microbenchmark under one lock, then one nsys trace of the microbenchmark | `hbm_bandwidth.json`, `head_microbench.json`, `microbench_clocks.json` (the 2026-10-01 rerun's copies are in `microbench_rerun/`) |
+| `run_microbench.sh` | HBM bandwidth and the head microbenchmark under one lock, then one nsys trace of the microbenchmark; `MICROBENCH_EVIDENCE` picks the output directory (default `evidence/profiles/`, the cited copies) | `hbm_bandwidth.json`, `head_microbench.json`, `microbench_clocks.csv`, `microbench_clocks.json` (the 2026-10-01 rerun's are in `microbench_rerun/`) |
 | `hbm_bandwidth.py` | Achievable read and copy bandwidth on this GPU | `hbm_bandwidth.json` |
 | `head_microbench.py` | The head GEMM, FP32 copy, argmax and Triton top-1 as SGLang calls them, under CUDA graphs, per row count | `head_microbench.json` |
 | `head_kernel_names.py` | The kernels behind each microbenchmark variant, run by hand on the trace `run_microbench.sh` leaves in `$VP_DATA` | `head_microbench_kernels.json` |
