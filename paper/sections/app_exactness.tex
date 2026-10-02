@@ -14,7 +14,7 @@ Section~\ref{sec:contract} names the stock head kernel at the same batch shape a
 An exactness claim needs a reference and a sense of equality. The reference is an executable specification, not an idealized network: the weights, the kernels, the decoding policy, the random-number protocol and the execution shape, together with whether it is stock plain decoding, stock speculative verification or a recorded execution. Mathematical equivalence over the reals does not imply that two GPU reductions choose the same token, because a different batch shape or reduction order can move logits that are close~\cite{floatguide,torchnumeric}; a certificate must therefore enclose the value the reference computes, casts included. Table~\ref{tab:contracts} lists the contracts a change can claim against such a reference and the results of this paper that rest on each. They are ordered roughly from strongest to weakest, but none implies the next in general.
 
 \begin{table}[htbp]
-\small\centering
+\tablefont\centering
 \caption{Exactness contracts and the results that claim them. ``Measured on replayed positions'' means captured engine states replayed offline, not a served run.}
 \label{tab:contracts}
 \vskip 0.05in
@@ -41,7 +41,7 @@ If the reference logits $z^\star$ lie in $Z(I)$, a committed $d$ equals $D(z^\st
 Table~\ref{tab:consumers} lists the information each consumer of the head requires. A fast path is admitted by these contracts, not by a request being labelled ``decode''. Grammar masks, repetition penalties and temperature transforms are part of the scores; they cannot be applied after candidates have been discarded.
 
 \begin{table}[htbp]
-\small\centering
+\tablefont\centering
 \caption{Consumers of the head and what each needs. The last rows are where a narrow fast path usually loses.}
 \label{tab:consumers}
 \vskip 0.05in
@@ -82,7 +82,7 @@ In brief: neither the tie rule nor the head GEMM caused a divergence~\ev{state-m
 \begin{figure}[htbp]
 \centering
 \input{figures/divergence}
-\caption{Where equivalent stock configurations first produce different module outputs, by decoder layer. Plain decoding and MTP speculation part at layer 0's GDN recurrence in every prompt, because decode and target verify use different recurrent kernels. Plain decoding at concurrency 1 and 32 (batches of up to 16) part at batch-dependent kernels spread over the depth: the gated RMSNorm of GDN layers (the number above each mark gives the count), layer 3's attention, or layer 0's MLP in a batched prefill. The plotted runs' two tapped servers had different pools in each pair. Reruns of 40 prompts that also hash the caches find them identical on entry: for plain decoding against MTP, every cache entering the differing recurrence; for the concurrency pair, with identical fixed pools, every cache entering every forward up to the first differing module output (gated norm 30, layer 3's attention 5, batched-prefill down-projection 5, against 29, 6 and 5 plotted). Measured with a bit-exact tap~\ev{state-mech,state-cache}.}
+\caption{Where equivalent stock configurations first produce different module outputs, by decoder layer; each number counts the prompts at its mark. Plain decoding and MTP speculation part at layer 0's GDN recurrence in every prompt, because decode and target verify use different recurrent kernels; plain decoding at concurrency 1 and 32 (batches of up to 16) part at batch-dependent kernels across the depth. The plotted runs' two tapped servers had different pools in each pair. Reruns of 40 prompts that also hash the caches find them identical on entry: for plain decoding against MTP, every cache entering the differing recurrence; for the concurrency pair, with identical fixed pools, every cache entering every forward up to the first differing module output (gated norm 30, layer 3's attention 5, batched-prefill down-projection 5, against 29, 6 and 5 plotted). Measured with a bit-exact tap~\ev{state-mech,state-cache}.}
 \label{fig:divergence}
 \end{figure}
 
@@ -92,7 +92,7 @@ Table~\ref{tab:floor} gives how often configurations that ought to agree diverge
 \paragraph{Deterministic mode} SGLang's deterministic mode, which replaces the default matrix multiplication with a batch-invariant one (DeepGEMM's deterministic BF16 GEMM with the pinned commit's defaults on this GPU, a persistent Triton kernel otherwise)~\cite{sglangdeterministic} and, with the FlashInfer backend, also switches sampling to PyTorch and disables the prefix cache, made plain decoding batch-invariant in an 8-prompt, 128-token check (concurrency 1 against 8: identical tokens and bitwise-identical log-probabilities) but not MTP speculation (2 of 8 prompts diverged). Passing the deterministic KV split to FlashInfer's target-verify plan, as an engine patch\footnote{\path{engine/sglang/patches/state/0002-verify-kv-split-deterministic.patch}.} behind an environment switch that is off by default and was on for this run, left 28 of 96 MTP prompts diverging between concurrency 1 and 32, 1.55 per 1,000 compared tokens, all at exact ties~\ev{state-noise}. A plausible reason, not tested, is that the draft is not batch-invariant, so accepted lengths, and with them a position's offset inside its verify block, differ between batch sizes.
 
 \begin{table}[htbp]
-\small\centering
+\tablefont\centering
 \caption{How often stock configurations that ought to agree diverge in tokens on the 320 divergence prompts within 256 tokens: prompts whose tokens diverge, divergences per 1,000 compared tokens, and the class of the divergences. Cap-16 runs: servers capped at 16 running requests, pools sized at start-up; cap-8 runs: capped at 8 with identical, fixed pools. ``One spacing'': both runs' top-two margins within one BF16 spacing. Measured~\ev{state-noise,state-pinned}.}\label{tab:floor}
 \vskip 0.05in
 \begin{tabularx}{\linewidth}{@{}P{6.6cm}rrY@{}}\toprule
@@ -124,11 +124,11 @@ A certified head is compared with the stock head at the same batch shape and in 
 The statements about the stock engine in this paper come from reading SGLang at the pinned commit (Appendix~\ref{app:pins}), a fixed commit rather than the latest revision. Table~\ref{tab:integration} lists the code paths that decide them and where a certified head would attach; the integration itself is not part of this paper's evidence.
 
 \begin{table}[htbp]
-\small\centering
+\tablefont\centering
 \caption{Code paths of the stock engine behind the paper's statements about it, read in the source at the pinned SGLang commit; observations, not measurements.}
 \label{tab:integration}
 \vskip 0.05in
-\begin{tabularx}{\linewidth}{@{}P{5.6cm}Y@{}}\toprule
+\begin{tabularx}{\linewidth}{@{}P{4.6cm}Y@{}}\toprule
 Path under \code{python/sglang/} & Observation\\\midrule
 \path{srt/layers/logits_processor.py} & \code{\_compute\_lm\_head} is the single hook through which plain decoding, the MTP drafter and the verifier compute logits: \code{torch.matmul} with BF16 output by default, \code{torch.mm(..., out\_dtype=float32)} under \code{-{}-enable-fp32-lm-head}. A certified head would replace this call for admitted consumers only; log-probability requests and unsupported transforms keep the ordinary path.\\
 \path{srt/models/qwen3_5_text.py} & The Qwen3.5 head is tied to \code{embed\_tokens}, which is not a \code{ParallelLMHead}, so SGLang's quantized-head paths do not apply; a low-precision copy must be separate, and the BF16 head stays resident for re-scoring and fallback.\\

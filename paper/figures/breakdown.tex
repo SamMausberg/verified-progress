@@ -12,11 +12,14 @@
 % which round as the README's table does (the rounded percentages of breakdown.csv would
 % give 12.5% instead of 12.4% for MTP at B = 32).
 % Colours follow style.tex: the target's head in ink (the stock engine), the drafter's heads in
-% purple, every other component in two clearly different greys, GPU idle as an empty white
-% segment. The MTP idle segments are hatched, with their own legend entry, because tracing inflates
-% them (the caption gives the untraced shares). The column at the right gives the target head's share and, for MTP,
-% the drafter's heads' share separately (target + draft), each from the microseconds of
-% step_share.csv; the legend sits below the axis to leave room for the column's header.
+% purple, the target GEMMs in a 40% grey and every other kernel in a 12% grey, GPU idle as an
+% empty white segment. The greys are chosen to stay apart from the purple and from each other in
+% a greyscale print (luminance about 52, 150, 207, 238 and 255 of 255 for the five fills). The
+% MTP idle segments are hatched because tracing inflates them; the legend has one idle entry and
+% the caption explains the hatching. The column at the right gives the target head's share and,
+% for MTP, the drafter's heads' share separately (target + draft), each from the microseconds of
+% step_share.csv. The legend sits above the plot, over the column's header (a legend never sits
+% below an x label).
 \vpreadcsv{\breakdowntable}{../evidence/profiles/breakdown.csv}
 \vpreadcsv{\stepsharetable}{../evidence/profiles/step_share.csv}
 \def\vpsplitconfig#1-#2\relax{\gdef\vparm{#1}\gdef\vpbatchsize{#2}}
@@ -33,29 +36,28 @@
 \def\vpbatch#1-#2\relax{$B{=}#2$}
 \def\vppc#1{\pgfmathprintnumber[fixed,precision=1,fixed zerofill]{#1}}
 \begin{tikzpicture}
-\begin{axis}[xbar stacked,y dir=reverse,scale only axis,width=5.2cm,height=2.05cm,
-  bar width=5.2pt,xmin=0,xmax=100,ymin=-0.6,ymax=7.2,
+\begin{axis}[xbar stacked,y dir=reverse,scale only axis,width=5.2cm,height=2.5cm,
+  bar width=6.5pt,xmin=0,xmax=100,ymin=-0.6,ymax=7.2,
   xlabel={Share of the profiled step or cycle},xlabel style={yshift=2pt},
   xtick={0,20,40,60,80,100},xticklabels={0\%,20\%,40\%,60\%,80\%,100\%},
   ytick=data,yticklabel={\pgfplotstablegetelem{\ticknum}{config}\of\breakdowntable
     \expandafter\vpbatch\pgfplotsretval\relax},
   major y tick style={draw=none},xmajorgrids,clip=false,
   every axis plot/.append style={draw=white,line width=.4pt},
-  legend style={at={(0.5,-0.42)},anchor=north,legend columns=3,fill=none,fill opacity=1,
+  legend style={at={(0.5,1)},anchor=south,yshift=0.6cm,legend columns=3,fill=none,fill opacity=1,
     /tikz/every even column/.append style={column sep=4pt}},
-  area legend]
+  area legend,legend image code/.code={\draw[#1] (0cm,-0.09cm) rectangle (0.32cm,0.09cm);}]
 \addplot[fill=cstock] table[x=head,y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
   \addlegendentry{target head}
 \addplot[fill=cdraft] table[x=draft_head,y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
   \addlegendentry{draft heads}
-\addplot[fill=ccontext!85] table[x=weight_gemms,y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
+\addplot[fill=ccontext!40] table[x=weight_gemms,y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
   \addlegendentry{target GEMMs}
-\addplot[fill=ccontext!20] table[x expr={\thisrow{gdn_state}+\thisrow{attention}+\thisrow{small_kernels}+\thisrow{draft_model}},y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
+\addplot[fill=ccontext!12] table[x expr={\thisrow{gdn_state}+\thisrow{attention}+\thisrow{small_kernels}+\thisrow{draft_model}},y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
   \addlegendentry{other kernels}
 \addplot[fill=white,draw=ccontext] table[x expr={(\thisrow{x}>3)?0:\thisrow{idle}},y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
   \addlegendentry{GPU idle}
-\addplot[fill=white,draw=ccontext,pattern=north east lines,pattern color=ccontext] table[x expr={(\thisrow{x}>3)?\thisrow{idle}:0},y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
-  \addlegendentry{GPU idle, inflated by tracing}
+\addplot[fill=white,draw=ccontext,pattern=north east lines,pattern color=ccontext,forget plot] table[x expr={(\thisrow{x}>3)?\thisrow{idle}:0},y expr={\thisrow{x}+0.6*(\thisrow{x}>3)},col sep=comma]{../evidence/profiles/breakdown.csv};
 % head shares at the right: target alone for plain decoding, target + draft for MTP
 \pgfplotsinvokeforeach{0,...,3}{%
   \node[annot,anchor=west] at (axis cs:100.5,#1)

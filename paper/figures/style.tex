@@ -31,50 +31,92 @@
 % Fills are light tints of the hue they belong to; wash is the neutral one for shaded regions.
 \colorlet{wash}{ink!6}
 % ---------------------------------------------------------------------------
-% Status of what a mark shows. Measured values carry markers (filled), and empirical
-% distributions carry sparse markers; values computed point by point from measurements carry the
-% same markers with their own dash pattern and say so in their label; curves derived from a
-% formula, a model or the weights are plain lines without markers; schematics have no numeric
-% ticks and say "schematic" in the panel title. Uncertainty is drawn where the data have it
-% (whiskers or a band), or the caption gives the spread when it is smaller than a marker.
-% Every panel title starts with its letter in bold and ends with that status.
+% Status of what a mark shows. Measured values carry filled markers, and empirical
+% distributions carry sparse markers (4 to 8 per curve); a hollow marker is a measured subset the
+% legend names; values computed point by point from measurements carry the same markers with
+% their own dash pattern and say so in their label; curves derived from a formula, a model or the
+% weights are plain lines without markers; schematics have no numeric ticks and say "schematic" in
+% the panel title, or once in the caption when every panel is one. Uncertainty is drawn where
+% the data have it (whiskers or a band), or the caption gives the spread when it is smaller than a
+% marker.
+% A figure with several panels titles each one above its plot area: its letter in bold, a short
+% title and the status (measured, derived, expected, schematic, to scale). A figure with one panel
+% has no title inside the figure; its caption names it and its status. Labels and legends, in
+% order of preference: a direct label beside its line, at least 2 pt from any other line, mark or
+% label; a legend inside the plot in an empty region, covering no data; one key shared by several
+% panels, above or to the right of them. Never a legend below an x label or under one panel only.
 \newcommand{\paneltitle}[2]{\textbf{(#1)}~#2}
+% ---------------------------------------------------------------------------
+% Lines and marks. Data series are thick (0.8 pt); reference lines (the stock head, a bound of
+% the text) semithick ink; leader lines, callouts and dimension arrows thin; very thick only for
+% vectors drawn to scale. Marker sizes give the four shapes about the same area. Marker shape
+% says what a series is: Hopper model a circle and conservative model a square wherever both models
+% are drawn; plain decoding a circle, DFlash a diamond and MTP a triangle wherever arms or
+% drafters are drawn.
+\pgfplotsset{
+  mark circle/.style={mark=*,mark size=1.6pt,mark options={solid}},
+  mark square/.style={mark=square*,mark size=1.4pt,mark options={solid}},
+  mark triangle/.style={mark=triangle*,mark size=2pt,mark options={solid}},
+  mark diamond/.style={mark=diamond*,mark size=2pt,mark options={solid}},
+  % a measured subset: the same shape, white inside, 0.6 pt outline
+  mark hollow/.style={mark options={solid,fill=white,line width=0.6pt}},
+  % a legend sample 0.5 cm long with the mark at its centre
+  short legend/.style={legend image code/.code={\draw[mark repeat=2,mark phase=2,##1]
+    plot coordinates {(0cm,0cm) (0.25cm,0cm) (0.5cm,0cm)};}},
+  % Plot-area heights, so that panels in one row match: a full panel, and each of two panels
+  % stacked on one x axis.
+  panel full/.style={scale only axis,height=2.8cm},
+  panel stacked/.style={scale only axis,height=1.9cm},
+}
+\tikzset{
+  ref line/.style={semithick,draw=cstock},
+  leader/.style={thin,draw=ink!70},
+}
 % ---------------------------------------------------------------------------
 % Series. One style per quantity that recurs across figures.
 \pgfplotsset{
   % The two error models of the stock kernel, the same pair everywhere: the Hopper model solid
   % with circles, the conservative model dashed with squares. Combine with a colour.
-  model hopper/.style={solid,mark=*,mark size=1.5pt},
-  model cons/.style={dashed,mark=square*,mark size=1.4pt,mark options={solid}},
+  model hopper/.style={solid,mark circle},
+  model cons/.style={dashed,mark square},
   derived/.style={mark=none},
   % Copies of the head: the int8 copies are the method (blue); FP8 and int4 are alternatives (grey).
   copy int8 row/.style={ccert,thick},
   copy int8 g128/.style={ccert,thick,dashed},
   copy fp8/.style={ccontext,thick,dashdotted},
   copy int4/.style={ccontext,thick,densely dotted},
-  % Drafters.
-  drafter dflash/.style={cdraft,very thick},
-  drafter mtp/.style={cdraft,thick,densely dashed,mark=triangle*,mark size=1.8pt,mark options={solid}},
+  % Arms and drafters, the same in the serving frontier and in the drift distributions: plain
+  % decoding ink with circles; DFlash purple with diamonds (16-token blocks dashed where both
+  % block sizes appear); MTP purple, dash-dotted, with triangles.
+  arm plain/.style={cstock,thick,mark circle},
+  arm dflash/.style={cdraft,thick,mark diamond},
+  arm dflash16/.style={cdraft,thick,dashed,mark diamond},
+  arm mtp/.style={cdraft,thick,dashdotted,mark triangle},
 }
 % ---------------------------------------------------------------------------
-% Text and axes. In the MLSys style \footnotesize is 9 pt and \scriptsize 7 pt (body 10 pt).
-% Axis labels and panel titles are \footnotesize; notes in diagrams are \figsmall (8 pt, style
-% note); tick labels, legends and direct labels inside plots are \scriptsize (7 pt, style annot),
-% the smallest size used. Text is black; the coloured line or mark beside a label carries the
-% identity. Figures are drawn at their final size: never scale a figure.
+% Text and axes. Three sizes, set in points so that a figure prints the same
+% in the paper (MLSys: \footnotesize 9 pt) and in the research notes (article 10 pt: \footnotesize
+% 8 pt): axis labels and panel titles 9 pt (\figlabel); sentences inside schematics and to-scale
+% diagrams 8 pt (\figsmall, style note); tick labels, legends, keys, direct labels and values
+% printed in a plot 7 pt (\scriptsize, style annot), the smallest size used. Text is black; the
+% coloured line or mark beside a label carries the identity. Labels and titles in sentence case.
+% Figures are drawn at their final size: never scale a figure.
+% Tables use \tablefont (9 pt) in both documents, never smaller than 7 pt, natural width when they fit.
 % \vpnum{digits}{expression} and \vppct{digits}{expression} print a computed value.
+\newcommand{\figlabel}{\fontsize{9}{10}\selectfont}
 \newcommand{\figsmall}{\fontsize{8}{9.5}\selectfont}
+\newcommand{\tablefont}{\fontsize{9}{10}\selectfont}
 \newcommand{\vpnum}[2]{\pgfmathparse{#2}\pgfmathprintnumber[fixed,precision=#1]{\pgfmathresult}}
 \newcommand{\vppct}[2]{\pgfmathparse{#2}\pgfmathprintnumber[fixed,precision=#1,fixed zerofill]{\pgfmathresult}\%}
 \tikzset{
-  panel title/.style={font=\footnotesize,text height=1.6ex,text depth=.4ex,inner sep=2pt},
+  panel title/.style={font=\figlabel,text height=1.6ex,text depth=.4ex,inner sep=2pt},
   % An arrow means "passes to"; every arrow carries a label saying what passes or when.
   flow/.style={-{Stealth[length=1.6mm]},semithick,draw=ink},
   note/.style={font=\figsmall,text=black,align=center},
-  annot/.style={font=\scriptsize,inner sep=1pt},
+  annot/.style={font=\scriptsize,inner sep=1pt,text=black},
 }
 \pgfplotsset{every axis/.append style={
-    tick label style={font=\scriptsize},label style={font=\footnotesize},
+    tick label style={font=\scriptsize},label style={font=\figlabel},
     title style={panel title,yshift=-2pt},
     axis line style={ink!60},tick style={ink!60},major tick length=2.5pt,
     grid style={draw=ink!10},
