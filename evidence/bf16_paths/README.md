@@ -22,16 +22,17 @@ readings (each set before its run, in the scripts' docstrings) give three findin
    18299 at -17.16, and its decode with an FP32 cached state at -15.63, where FP32 has -0.45 and
    SGLang's prefills -13.4 to -15.3. FP32 itself, under relative noise within the BF16 rounding
    bound, flips its top-1 between 18299 and 5500 and puts 18299 as low as -11.65.
-2. **At `579ae7ce`/439 only SGLang misses, and no single kernel carries the miss.** There, in 16
-   random draws of the same noise, FP32 kept 1756 within 0.52 nats of -9.79 (a probe of
+2. **At `579ae7ce`/439 only SGLang misses, and no single kernel swap removes the miss.** There,
+   in 16 random draws of the same noise, FP32 kept 1756 within 0.52 nats of -9.79 (a probe of
    sensitivity, not a bound), and transformers in BF16 (four configurations, four paths each)
-   keeps FP32's top-1 68189 on top and 1756 between -10.11 and -7.60. SGLang's decode puts 1756 on top at -0.32, and swapping one kernel family at a time moves
-   it between -8.9 and -0.32 on one path or another. One BF16 rounding of beta (the lines of the
-   open upstream PRs #38977 and #40362) moves the decode to -4.97 and the prefills by up to 5.6
-   nats without bringing any path to FP32, and at `a4db11ff`/333 it fixes the prefills (18299 at
-   -0.29 to -0.33) while sending the decode from -0.28 to -7.26. SGLang's arithmetic at this
-   position is therefore far more sensitive than FP32's or transformers', but that rests on one
-   position chosen because SGLang erred there.
+   keeps FP32's top-1 68189 on top and 1756 between -10.11 and -7.60. SGLang's decode puts 1756
+   on top at -0.32, and swapping one kernel family at a time moves it between -8.9 and -0.32 on
+   one path or another. One BF16 rounding of beta (the lines of the open upstream PRs #38977 and
+   #40362) moves the decode to -4.97 and the prefills by up to 5.6 nats without bringing any path
+   to FP32, and at `a4db11ff`/333 it restores the prefills (18299 at -0.29 to -0.33) while sending
+   the decode from -0.28 to -7.26. SGLang's arithmetic at this position is therefore far more
+   sensitive than FP32's or transformers', but that rests on one position chosen because SGLang
+   erred there.
 3. **On positions nobody selected, SGLang is as accurate as transformers.** Over 15,360 positions
    per path (12 workload prompts decoded for 512 tokens, then 12 prompts decoded for 768 tokens so
    that 5,426 positions lie after the end of text), SGLang's mean logprob error on FP32's top token
@@ -106,9 +107,12 @@ and the gating kernel round sigmoid(beta) through BF16).
 In the terms of the pre-set readings (largest difference from FP32 on the tracked tokens,
 `positions.json`): no variant brings `579ae7ce`'s decode within 1 nat of FP32 (the closest,
 Triton GDN prefill, is 2.75 off). At `a4db11ff` the Triton GDN prefill brings one of the three
-prefills within 1 nat (0.31; the others 1.18 and 1.34) and `beta_fp32` brings them to 1.06-1.72,
-but both then break the decode path (4.60 and 6.81 off), so no kernel family carries either
-error. For transformers, the reading called the error SGLang-specific only if every
+prefills within 1 nat (0.31; the others 1.18 and 1.34) and `beta_fp32` restores all three
+prefills' top token (18299 at -0.29 to -0.33 against FP32's -0.45; 1.06-1.72 off on the tracked
+tokens), but both then break the decode path (4.60 and 6.81 off). So no swap restores every
+path. The swaps are not isolating interventions (each replacement is BF16 arithmetic too, and
+several families may contribute), so this does not show that no kernel family is involved in
+either error; it shows that none of these single changes removes them. For transformers, the reading called the error SGLang-specific only if every
 transformers run stayed within 1 nat of FP32 at both positions; at `a4db11ff` they miss by up to
 16.7 nats (not specific), and at `579ae7ce` two of sixteen readings exceed 1 nat (1.15 on 5715,
 the torch 576-token prefill; 3.08 on 5715 and 2.19 on 1756, the fla decode with a BF16 state),
