@@ -569,17 +569,22 @@ def test_control_waves_compares_and_exports_contexts(tmp_path: Path) -> None:
     for variant, tail in (('stock', [5, 6]), ('cert', [5, 7])):
         (tmp_path / variant).mkdir()
         with (tmp_path / variant / 'outputs.jsonl').open('w') as handle:
-            handle.write(json.dumps({'prompt': 'a', 'wave': 0, 'input_ids': [1, 2],
-                                     'output_ids': [3, 4]}) + '\n')
-            handle.write(json.dumps({'prompt': 'b', 'wave': 0, 'input_ids': [8],
-                                     'output_ids': [3, *tail]}) + '\n')
+            handle.write(
+                json.dumps({'prompt': 'a', 'wave': 0, 'input_ids': [1, 2], 'output_ids': [3, 4]})
+                + '\n'
+            )
+            handle.write(
+                json.dumps({'prompt': 'b', 'wave': 0, 'input_ids': [8], 'output_ids': [3, *tail]})
+                + '\n'
+            )
     assert control_waves.compare_variants(tmp_path) == 0
     summary = json.loads((tmp_path / 'compare.json').read_text())
     assert summary['declared'] is False and summary['identical'] == 1
     assert summary['diverged'] == 1
     contexts = [json.loads(line) for line in (tmp_path / 'contexts.jsonl').open()]
-    assert contexts == [{'id': analyze.context_id([8], [3, 5], (6, 7)),
-                         'input_ids': [8, 3, 5], 'tokens': [6, 7]}]
+    assert contexts == [
+        {'id': analyze.context_id([8], [3, 5], (6, 7)), 'input_ids': [8, 3, 5], 'tokens': [6, 7]}
+    ]
 
 
 def test_control_waves_takes_the_first_64_prompts_in_workload_order(
