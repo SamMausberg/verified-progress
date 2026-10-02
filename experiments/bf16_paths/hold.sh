@@ -179,7 +179,8 @@ set_aside() {
 run_rates() {
   local r=$1 states=$2
   shift 2
-  # A new manifest invalidates SGLang's text and every trace on it; a new SGLang text, the traces.
+  # A new manifest invalidates SGLang's text and every trace on it; a new SGLang text, the traces;
+  # a new transformers trace, FP32's scores.
   if missing "$r/prompts.jsonl"; then
     set_aside "$r" "$r"/sglang.jsonl.gz "$r"/hf_bf16_*.jsonl.gz "$r"/fp32.jsonl.gz || { fail; return 0; }
     python -m experiments.bf16_paths.rates prompts --out "$r" "$@" || { fail; return 0; }
@@ -197,6 +198,13 @@ run_rates() {
     python -m experiments.bf16_paths.sglang_variants stop --out "$r"
   fi
   [ -e "$r/sglang.jsonl.gz" ] || { fail; return 0; }
+  # FP32 scores the union of every trace's tokens, so a trace about to be recreated invalidates it.
+  local trace
+  for trace in $states fla_float32; do
+    if [ ! -e "$r/hf_bf16_${trace}state.jsonl.gz" ]; then
+      set_aside "$r" "$r/fp32.jsonl.gz" || { fail; return 0; }
+    fi
+  done
   for state in $states; do
     ! missing "$r/hf_bf16_${state}state.jsonl.gz" ||
       timeout --foreground 1200 python -m experiments.bf16_paths.rates hf --out "$r" --state-dtype "$state" || fail
