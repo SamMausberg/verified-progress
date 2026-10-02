@@ -448,6 +448,11 @@ These two timed holds rerun the point with a device-side log that adds no per-st
 readback, to localise the decision (`hold_drain.sh h7a`, `hold_drain.sh h7b`; launches in
 `drain.LAUNCHES`).
 
+Note (2026-10-02, after h8's reference step; the paragraph above is left as set): "2 of 15
+certified against 0 of 15 stock" pools session 1's discovery with h6a, which the drain
+reruns' rule keeps apart; it is a post hoc description, not a count under that rule (h6a
+alone: 1 of 12 against 0 of 12).
+
 - Arms, alternating over the two holds. Each launch is a fresh server that replays session
   1's ladder (c = 1-32, then 64) and then 5 more c = 64 points, at session 1's flags,
   pools and prompt order:
@@ -711,6 +716,69 @@ Reading rule, set before the run, over the draws whose 579ae7ce output reaches p
   same;
 - none in either: inconclusive.
 
+## Serial references (not declared; approved by main 2026-10-02, after h8's reference step)
+
+    GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -s experiments/benchcert/hold_paths.sh
+
+h8's first step read 579ae7ce's distribution at output position 439 on the scorer's stock
+plain-decoding server, one request at a time. Three prefills (ending at absolute positions
+514, 576 and 587) put 1756 at -8.1 to -8.9 nats, below the near-tied 68189, 8078 and 5715;
+decoding from position 400, which reproduced session 1's tokens 400-438, put 1756 on top
+at -0.32. The declared re-score's context for this position is the same 514-token input,
+and with 16 requests in flight it gave 1756 at -5.50: rescore.py and drain.py's scorer sent
+16 requests at once, so their "batch-1" values were not batch 1 (both now default to one).
+This shared hold repeats and extends the reading (`paths.py`, `score_report.py`
+`serial-contexts`; commands in `hold_paths.sh`):
+
+- the targets (579ae7ce/439 and every h6s gross context, among them a4db11ff/333) along
+  the prefill and decode paths, one request at a time with a cache flush before each
+  (the server runs with the radix cache off), with every position's logprobs from 39
+  before the target;
+- the declared re-score's 1,113 contexts one at a time, the classing the pre-registration
+  specifies ("at concurrency 1"; Amendments);
+- every h6s near and gross context, and 579ae7ce's position 439 in every scored MTP c = 64
+  point, one at a time;
+- an FP32 reference on the CPU (transformers, eager attention, torch GDN kernels): one
+  full forward over prompt + output[:439], and a forward to position 400 followed by one
+  token at a time through the recurrent cache.
+
+Readings, set before the run. FP32's two paths should agree; if they agree with each other
+and with the stock prefills, the stock GDN decode path carries the error at this row (a
+stock-engine numerics fault, independent of the certified head); if they side with the
+stock decode path, the prefill and scorer references are the inaccurate ones and h6s's
+"gross" label at this row inverts; if they disagree with each other by more than 0.1 nats,
+the row is ill-conditioned even in FP32 and neither BF16 path is the accurate one. The
+serial re-scores replace the concurrent classes and h6s gaps where they differ, and the
+change in each class count is reported.
+
+## Seeded MTP control (not declared; approved by main 2026-10-02, after h8's reference step)
+
+    GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x experiments/benchcert/hold_seeded_waves.sh
+
+A mechanism probe at the most sensitive row known, not a reproduction of the closed-loop
+event. 579ae7ce's input is its prompt plus session 1's output through position 399, so MTP
+decodes from position 400 and the state at 439 comes from a prefill to 400 plus 39 decoded
+tokens, the path on which stock plain decoding chose 1756. `control_waves.py` `mtpsmall`
+runs `mtp-tuned-triton` at the timed pools (exclusive for memory, untimed) on four fresh
+servers in turn: stock, cert0, cert and stock again. Each serves the same 10 synchronized
+waves twice: 579ae7ce alone, and with 7, 11 or 15 companions (three fixed sets per size,
+from the c = 64 point's other measured prompts, never session_000527). Each wave is one
+batched `/generate` call (512 greedy tokens, `ignore_eos`), so the batch evolves as a
+function of the tokens alone; logprobs are requested where SGLang allows them with MTP.
+
+Readings, set before the run, over every request's tokens:
+
+- (i) Stock MTP's batch-1 token (and logprob) at 439 is the MTP path's own answer at this
+  row. If it is 1756, stock MTP produces the event's token itself, and the closed loop's
+  0 of 19 stock draws is batch-evolution luck.
+- Baseline: on each server the two passes of a wave are identical, and stock equals
+  stock2. If not, stock is not deterministic under identical batch evolution here, and the
+  arms are read only as divergence rates beside stock against stock.
+- (ii) With the baseline intact, any request on which cert0 or cert differs from both stock
+  servers, at batch 1 or within a size, means the certified graphs change the numerics.
+  All identical means they do not, at the most sensitive row known, so differences between
+  the arms in the closed loop need a different batch evolution (timing) or a race.
+
 ## Hold commit
 
 Every hold runs from a clean checkout at the commit recorded here; `run_session.py`
@@ -725,4 +793,11 @@ Hold commit (h8): `d0ef114eb8348c6c96701fbaecf645b63b42a363`
 
 ## Amendments
 
-None.
+- 2026-10-02, after h8's reference step (found by Codex on #190): the declared re-score
+  ("Exactness" item 4, "at concurrency 1") ran with 16 requests in flight
+  (`rescore.py --workers` defaulted to 16), so the server batched the contexts' prefills
+  and the margins were not batch-1 values; at 579ae7ce/439 the same context gave 1756 at
+  -5.50 that way and -8.12 alone. The re-score is rerun one context at a time
+  (`hold_paths.sh`), and `classes.csv` is regenerated from that run
+  (`analyze.py report --classes`). The concurrent run is kept and the change in each class
+  count is reported.

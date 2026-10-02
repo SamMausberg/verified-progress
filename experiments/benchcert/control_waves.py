@@ -33,12 +33,44 @@ differing from stock points to the gated-off path (an integration exactness bug)
 cert0 equal to stock while cert differs points to the head's certified ramp-down,
 which check mode should then have caught at that shape; all three equal points to
 closed-loop timing in the timed runs.
+
+The seeded MTP control `mtpsmall` (added after h8's reference step, approved by main with
+the red team's design) is a mechanism probe at the most sensitive row known, not a
+reproduction of the closed-loop event. h8's reference step found that at 579ae7ce's output
+position 439 stock plain decoding at batch 1, started at position 400, puts 1756 on top
+(-0.32 nats), while prefills put it near -8. Here 579ae7ce's input is its prompt plus
+session 1's output through position 399, so MTP decodes positions 400 onward and the state
+at 439 comes from a prefill to 400 plus 39 decoded tokens. `mtp-tuned-triton` runs at the
+timed pools (exclusive for memory, untimed) on four fresh servers in turn: stock, cert0
+(the timed certified environment with `SGLANG_CERTIFIED_HEAD_MAX_ROWS=0`, where h7 saw the
+event twice), cert, and stock again (`stock2`). Each serves the same 10 synchronized waves
+twice in a row: 579ae7ce alone, and with 7, 11 or 15 companions (three fixed sets per
+size, drawn once from a fixed seed from the c = 64 point's other measured prompts, never
+session_000527). Each wave is one batched /generate call (512 greedy tokens, ignore_eos),
+so the batch evolves as a function of the tokens alone; where SGLang allows it the call
+also returns logprobs (top 5, and 1756, 68189, 8078, 5715 and 9471), kept for 579ae7ce's
+positions 400-450.
+
+Reading rule (set before the run), over every request's tokens:
+- (i) Stock MTP's batch-1 token and logprob at 439 are the MTP path's own answer at this
+  row. If it is 1756, stock MTP produces the event's token itself, and the closed loop's
+  0 of 19 stock draws is batch-evolution luck.
+- Baseline: on each server the two passes of a wave are identical, and stock and stock2
+  are identical. If either fails, stock is not deterministic under identical batch
+  evolution here, and the arms are read only as divergence rates beside stock against
+  stock.
+- (ii) With the baseline intact, any request on which cert0 or cert differs from both
+  stock servers, at batch 1 or within a size: the certified graphs change the numerics
+  (located by its first divergence). All identical: they do not, under identical batch
+  evolution at the most sensitive row known, so differences between arms in the closed
+  loop need a different batch evolution (timing) or a race.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import random
 import sys
 import urllib.request
 from dataclasses import dataclass
@@ -74,8 +106,34 @@ CONTROLS = {
     # The settling hold (exclusive, untimed): waves of 64 at the timed pools, and a
     # logged check-mode replay of the large event's wave (certlog).
     'mtp64': Control('mtp', 64, 64, ('stock', 'cert', 'certlog'), None),
+    # Seeded MTP control (exclusive, untimed): stock, cert0, cert, stock again, at the
+    # timed pools; waves of SMALL_SIZES (wave_size is the largest).
+    'mtpsmall': Control('mtp', 64, 16, ('stock', 'cert0', 'cert', 'stock2'), None),
 }
 VARIANTS = {name: control.variants for name, control in CONTROLS.items()}
+SMALL_SIZES = (1, 8, 12, 16)
+SMALL_SETS = 3  # companion sets per size above 1
+SMALL_REPS = 2  # passes of every wave on each server
+SMALL_SEED = 20261003
+SMALL_TARGET, SMALL_PARTNER = '579ae7ce', 'session_000527'
+SEED_AT = 400  # 579ae7ce's input carries session 1's output through position 399
+SMALL_POSITION = 439
+SMALL_TRACK = (1756, 68189, 8078, 5715, 9471)
+SMALL_LOGPROB_SPAN = (400, 451)  # 579ae7ce's positions whose logprobs are kept
+
+
+def small_plan(keys: list[str], partner: int, seed: int = SMALL_SEED) -> list[dict[str, Any]]:
+    """The seeded control's waves: 579ae7ce first in each, companions drawn once from the
+    other prompts (never session_000527): one wave of 1, SMALL_SETS of each larger size."""
+    target = next(i for i, k in enumerate(keys) if k.startswith(SMALL_TARGET))
+    others = [i for i in range(len(keys)) if i not in (target, partner)]
+    rng = random.Random(seed)
+    waves = []
+    for size in SMALL_SIZES:
+        for _ in range(1 if size == 1 else SMALL_SETS):
+            members = [target, *rng.sample(others, size - 1)]
+            waves.append({'wave': len(waves), 'size': size, 'members': members})
+    return waves
 
 
 def overrides(name: str) -> dict[str, ArgValue]:
@@ -117,7 +175,7 @@ def prompts(runs: Path, name: str = 'mtp') -> list[tuple[str, list[int]]]:
 def variant_env(name: str, variant: str, stats: Path) -> dict[str, str]:
     """The timed certified environment; cert0 sets MAX_ROWS=0 so the head never runs;
     certlog adds check mode and the per-replay log (replay_hook/sitecustomize.py)."""
-    if variant == 'stock':
+    if variant in ('stock', 'stock2'):
         return {}
     env = plan.certified_env(plan.FAMILIES[CONTROLS[name].family], 'cert', plan.REPO / 'src', stats)
     if variant == 'cert0':
@@ -164,32 +222,204 @@ def waves(out: Path, name: str, variant: str, runs: Path) -> int:
     with tmp.open('w') as handle:
         for wave in selected:
             batch = items[wave * size : (wave + 1) * size]
-            body = {
-                'input_ids': [ids for _, ids in batch],
-                'sampling_params': {'max_new_tokens': OSL, 'temperature': 0.0, 'ignore_eos': True},
-            }
-            request = urllib.request.Request(
-                f'http://127.0.0.1:{PORT}/generate',
-                data=json.dumps(body).encode(),
-                headers={'Content-Type': 'application/json'},
-            )
-            with urllib.request.urlopen(request, timeout=900) as response:
-                results: list[dict[str, Any]] = json.loads(response.read())
-            if len(results) != len(batch):
-                raise SystemExit(f'wave {wave}: {len(results)} results for {len(batch)} prompts')
-            for (key, ids), result in zip(batch, results, strict=True):
-                output = list(result['output_ids'])
-                if len(output) != OSL:
-                    raise SystemExit(f'wave {wave}: {len(output)} output tokens, wanted {OSL}')
+            for (key, ids), output in zip(batch, generate_wave(batch, wave), strict=True):
                 record = {'prompt': key, 'wave': wave, 'input_ids': ids, 'output_ids': output}
                 handle.write(json.dumps(record) + '\n')
     tmp.replace(target)
     return 0
 
 
+def generate_wave(batch: list[tuple[str, list[int]]], wave: int) -> list[list[int]]:
+    """One synchronized wave: a single batched /generate call; OSL tokens per prompt."""
+    return [list(r['output_ids']) for r in generate_results(batch, wave, {})]
+
+
+def generate_results(
+    batch: list[tuple[str, list[int]]], wave: int, extra: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """The batched /generate call's per-request results (with `extra` request fields)."""
+    body = {
+        'input_ids': [ids for _, ids in batch],
+        'sampling_params': {'max_new_tokens': OSL, 'temperature': 0.0, 'ignore_eos': True},
+        **extra,
+    }
+    request = urllib.request.Request(
+        f'http://127.0.0.1:{PORT}/generate',
+        data=json.dumps(body).encode(),
+        headers={'Content-Type': 'application/json'},
+    )
+    with urllib.request.urlopen(request, timeout=900) as response:
+        results: list[dict[str, Any]] = json.loads(response.read())
+    if len(results) != len(batch):
+        raise SystemExit(f'wave {wave}: {len(results)} results for {len(batch)} prompts')
+    for result in results:
+        if len(result['output_ids']) != OSL:
+            raise SystemExit(f'wave {wave}: {len(result["output_ids"])} output tokens, wanted {OSL}')
+    return results
+
+
+def seeded_logprobs(meta: dict[str, Any], first: int) -> dict[str, Any]:
+    """579ae7ce's logprobs at positions SMALL_LOGPROB_SPAN from a seeded request's
+    meta_info (generated index i is output position first + i)."""
+    tops = meta.get('output_top_logprobs') or []
+    ids = meta.get('output_token_ids_logprobs') or []
+    kept = {}
+    for position in range(*SMALL_LOGPROB_SPAN):
+        i = position - first
+        if 0 <= i < len(tops):
+            kept[str(position)] = {
+                'top5': [[float(e[0]), int(e[1])] for e in tops[i] or [] if e[0] is not None],
+                'tracked': {
+                    str(int(e[1])): float(e[0])
+                    for e in (ids[i] if i < len(ids) else None) or []
+                    if e[0] is not None
+                },
+            }
+    return kept
+
+
+def small_waves(out: Path, variant: str, runs: Path) -> int:
+    """The seeded control on one server: every planned wave, SMALL_REPS passes each, with
+    579ae7ce's input seeded with session 1's output through SEED_AT - 1."""
+    import urllib.error
+
+    from experiments.benchcert.context_waves import partner_index
+    from experiments.benchcert.drain import point_dirs, requests
+
+    items = prompts(runs, 'mtp64')
+    keys = [key for key, _ in items]
+    planned = small_plan(keys, partner_index(runs, keys))
+    s1 = point_dirs(runs / 'drain', runs)[0][1]  # session 1's certified MTP c = 64 point
+    recorded = next(
+        r for r in requests(s1) if r['phase'] == 'profiling' and r['prompt'].startswith(SMALL_TARGET)
+    )
+    seeded = recorded['input'] + recorded['output'][:SEED_AT]
+    track = {'return_logprob': True, 'top_logprobs_num': 5, 'token_ids_logprob': list(SMALL_TRACK)}
+    logprobs_ok = True
+    target = out / variant / 'outputs.jsonl'
+    tmp = target.with_suffix('.jsonl.tmp')
+    with tmp.open('w') as handle:
+        for wave in planned:
+            batch = [items[i] for i in wave['members']]
+            batch[0] = (batch[0][0], seeded)
+            for rep in range(SMALL_REPS):
+                results = None
+                if logprobs_ok:
+                    try:
+                        results = generate_results(batch, wave['wave'], track)
+                    except urllib.error.HTTPError as exc:  # logprobs refused with MTP
+                        print(f'logprobs refused ({exc}); continuing without', flush=True)
+                        logprobs_ok = False
+                if results is None:
+                    results = generate_results(batch, wave['wave'], {})
+                for index, ((key, ids), result) in enumerate(zip(batch, results, strict=True)):
+                    record: dict[str, Any] = {
+                        'prompt': key,
+                        'wave': wave['wave'],
+                        'size': wave['size'],
+                        'rep': rep,
+                        'input_ids': ids,
+                        'output_ids': list(result['output_ids']),
+                    }
+                    if index == 0:
+                        meta = result.get('meta_info') or {}
+                        record['seeded_at'] = SEED_AT
+                        record['token_at_position'] = record['output_ids'][SMALL_POSITION - SEED_AT]
+                        record['logprobs'] = seeded_logprobs(meta, SEED_AT) if logprobs_ok else None
+                        record['spec_verify_ct'] = meta.get('spec_verify_ct')
+                    handle.write(json.dumps(record) + '\n')
+    tmp.replace(target)
+    return 0
+
+
+def small_compare(out: Path) -> dict[str, Any]:
+    """The seeded control's comparisons: the two passes on each server, each pair of
+    servers on every pass (keyed by wave and prompt), and 579ae7ce's token at 439 per wave."""
+    runs: dict[str, dict[int, dict[str, list[int]]]] = {}
+    seeded: dict[str, list[dict[str, Any]]] = {}
+    for variant in VARIANTS['mtpsmall']:
+        by_rep: dict[int, dict[str, list[int]]] = {}
+        for r in iter_jsonl(out / variant / 'outputs.jsonl'):
+            by_rep.setdefault(r['rep'], {})[f'{r["wave"]}:{r["prompt"]}'] = r['output_ids']
+            if 'seeded_at' in r:
+                at = (r.get('logprobs') or {}).get(str(SMALL_POSITION)) or {}
+                seeded.setdefault(variant, []).append(
+                    {
+                        'wave': r['wave'],
+                        'size': r['size'],
+                        'rep': r['rep'],
+                        'token_at_439': r['token_at_position'],
+                        'top5_at_439': at.get('top5'),
+                        'tracked_at_439': at.get('tracked'),
+                    }
+                )
+        runs[variant] = by_rep
+
+    def pair(a: dict[str, list[int]], b: dict[str, list[int]]) -> dict[str, Any]:
+        result = compare(a, b)
+        result['divergences'] = [
+            {'request': key, 'position': d, 'tokens': [ta, tb]}
+            for key, d, ta, tb in result.pop('events')
+        ]
+        del result['positions']
+        return result
+
+    def diverged(name: str) -> set[str]:
+        return {d['request'] for k, r in across.items() if k.startswith(name) for d in r['divergences']}
+
+    within = {v: pair(reps[0], reps[1]) for v, reps in runs.items()}
+    across: dict[str, dict[str, Any]] = {}
+    names = list(VARIANTS['mtpsmall'])
+    for i, left in enumerate(names):
+        for right in names[i + 1 :]:
+            for rep in range(SMALL_REPS):
+                across[f'{right}_vs_{left}/rep{rep}'] = pair(runs[left][rep], runs[right][rep])
+    baseline = all(r['identical'] == r['prompts'] for r in within.values()) and all(
+        r['identical'] == r['prompts'] for k, r in across.items() if k.startswith('stock2_vs_stock/')
+    )
+    # A request on which an arm differs from both stock servers.
+    arm_only = {
+        arm: sorted(diverged(f'{arm}_vs_stock/') & diverged(f'stock2_vs_{arm}/'))
+        for arm in ('cert0', 'cert')
+    }
+    batch1 = {
+        v: [s for s in rows if s['size'] == 1] for v, rows in seeded.items()
+    }
+    stock1 = {s['token_at_439'] for s in batch1.get('stock', [])}
+    if not baseline:
+        reading_ii = 'baseline failed: stock is not deterministic here; arms read as rates only'
+    elif any(arm_only.values()):
+        reading_ii = 'an arm differs from both stock servers: the certified graphs change the numerics'
+    else:
+        reading_ii = 'all identical: the certified graphs do not change the numerics here'
+    return {
+        'declared': False,
+        'reading_rule': (__doc__ or '').split('Reading rule (set before the run), over')[1].strip(),
+        'sizes': SMALL_SIZES,
+        'sets_per_size': SMALL_SETS,
+        'reps': SMALL_REPS,
+        'seeded_at': SEED_AT,
+        'osl': OSL,
+        'reading_i_stock_batch1_token_at_439': sorted(stock1),
+        'seeded_target': seeded,
+        'within_server': within,
+        'across_servers': across,
+        'baseline_identical': baseline,
+        'differs_from_both_stock': arm_only,
+        'reading_ii': reading_ii,
+    }
+
+
 def compare_variants(out: Path, family: str = 'mtp') -> int:
     """Every pair of the control's variants: identical outputs and first divergences
     (over the prompts both served: certlog serves one wave)."""
+    if family == 'mtpsmall':
+        summary = small_compare(out)
+        (out / 'compare.json').write_text(json.dumps(summary, indent=1) + '\n')
+        print(json.dumps({k: summary[k] for k in ('reading_i_stock_batch1_token_at_439', 'baseline_identical', 'reading_ii')}))
+        for name, result in {**summary['within_server'], **summary['across_servers']}.items():
+            print(name, {k: v for k, v in result.items() if k != 'divergences'})
+        return 0
     runs = {
         variant: {r['prompt']: r for r in iter_jsonl(out / variant / 'outputs.jsonl')}
         for variant in VARIANTS[family]
@@ -250,7 +480,7 @@ def main(argv: list[str] | None = None) -> int:
     for name in ('start', 'waves', 'stop'):
         p = sub.add_parser(name)
         p.add_argument('--family', choices=sorted(VARIANTS), required=True)
-        p.add_argument('--variant', choices=('stock', 'cert', 'cert0', 'certlog'), required=True)
+        p.add_argument('--variant', choices=('stock', 'cert', 'cert0', 'certlog', 'stock2'), required=True)
         p.add_argument('--out', type=Path, required=True)
         p.add_argument('--runs', type=Path, default=Path.home() / 'vp-data/benchcert')
     c = sub.add_parser('compare')
@@ -265,6 +495,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == 'start':
         return start(args.out, args.family, args.variant)
     if args.command == 'waves':
+        if args.family == 'mtpsmall':
+            return small_waves(args.out, args.variant, args.runs)
         return waves(args.out, args.family, args.variant, args.runs)
     return stop_server(args.out / args.variant)
 
