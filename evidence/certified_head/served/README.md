@@ -61,7 +61,8 @@ certified engine matches stock at the most sensitive position known. With 579ae7
 through position 399, the certified engine with its verify head deciding all 3,708 verify
 steps commits stock's tokens on every one of 109 requests at batch 1, 8, 12 and 16; with
 logprobs requested (which keep the verify on the stock head), `cert0` and the certified
-engine are also logprob-identical to stock. Stock MTP's verify there commits FP32's top
+engine also give stock's log-probabilities at position 439, the only position whose
+log-probabilities were compared. Stock MTP's verify there commits FP32's top
 token, 68189. Whether `session_000527`'s content feeds the event is
 untested (the planted-donor hold's unplanted control did not fire). The certified head's
 contract is identity with the stock engine's output for the same batch, and the stock
@@ -688,8 +689,8 @@ of the cert arm confirmed it (`control_seeded_stats.json`; same outputs as stock
 passes): over the server's life the certified verify ran 5 times, all at most 4 rows (the
 warm-up), against 3,713 certified draft and draft-extend steps (68,802 and 34,401 rows, at
 most 16), with no uncounted call. So the seeded control shows that the certified graphs,
-the certified draft and draft-extend heads and the gated-off verify leave tokens and
-logprobs unchanged. A token-only rerun then served the same waves twice without logprobs,
+the certified draft and draft-extend heads and the gated-off verify leave the tokens
+unchanged, and the log-probabilities at position 439 (the only position compared). A token-only rerun then served the same waves twice without logprobs,
 stock and certified in turn, reading the counters before and after every wave
 (`control_seeded_tokens.json`). In the waves alone the certified verify ran 3,708 steps and
 137,584 rows (272, 1,128, 1,166 and 1,142 steps at sizes 1, 8, 12 and 16, at most 4, 32,
