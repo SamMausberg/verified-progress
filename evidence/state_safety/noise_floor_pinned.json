@@ -76,6 +76,76 @@
       "same_server": false,
       "pools_identical": true
     },
+    "repeat session, mtp_s3 c1": {
+      "prompts": 320,
+      "bitwise_identical": 320,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {},
+      "diverged": 0,
+      "identical": 320,
+      "length_mismatch": 0,
+      "exposure_tokens": 69953,
+      "per_1k_tokens": 0.0,
+      "classes": {},
+      "max_margin_median": null,
+      "max_margin_p90": null,
+      "max_margin_max": null,
+      "drift_median": 0.0,
+      "drift_p99": 0.0,
+      "drift_max": 0.0,
+      "prompts_with_large_drift": 0,
+      "run_a": "mtp_s3/c1",
+      "run_b": "mtp_s3__rep/c1",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": false,
+      "pools_identical": true
+    },
+    "repeat session, mtp_s3 c32": {
+      "prompts": 320,
+      "bitwise_identical": 320,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {},
+      "diverged": 0,
+      "identical": 320,
+      "length_mismatch": 0,
+      "exposure_tokens": 70005,
+      "per_1k_tokens": 0.0,
+      "classes": {},
+      "max_margin_median": null,
+      "max_margin_p90": null,
+      "max_margin_max": null,
+      "drift_median": 0.0,
+      "drift_p99": 0.0,
+      "drift_max": 0.0,
+      "prompts_with_large_drift": 0,
+      "run_a": "mtp_s3/c32",
+      "run_b": "mtp_s3__rep/c32",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": false,
+      "pools_identical": true
+    },
     "concurrency 1 vs 32 (cap 8), plain": {
       "prompts": 320,
       "bitwise_identical": 245,
@@ -384,6 +454,48 @@
       "same_server": true,
       "pools_identical": true
     },
+    "radix off c1, plain": {
+      "prompts": 320,
+      "bitwise_identical": 122,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 192
+        }
+      },
+      "first_difference_index": {
+        "0": 192,
+        "2": 6
+      },
+      "diverged": 96,
+      "identical": 224,
+      "length_mismatch": 0,
+      "exposure_tokens": 56760,
+      "per_1k_tokens": 1.6913319238900635,
+      "classes": {
+        "tie": 88,
+        "one_ulp": 6,
+        "near": 2
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.25,
+      "max_margin_max": 0.2500000596046448,
+      "drift_median": 0.12261557579040527,
+      "drift_p99": 0.3658945560455322,
+      "drift_max": 0.46745729446411133,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain/c1",
+      "run_b": "plain_noradix/c1",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": false,
+      "pools_identical": true
+    },
     "radix off c1, mtp_s3": {
       "prompts": 320,
       "bitwise_identical": 122,
@@ -422,6 +534,49 @@
       "prompts_with_large_drift": 0,
       "run_a": "mtp_s3/c1",
       "run_b": "mtp_s3_noradix/c1",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": false,
+      "pools_identical": true
+    },
+    "radix off c32, plain": {
+      "prompts": 320,
+      "bitwise_identical": 116,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 7
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 167
+        }
+      },
+      "first_difference_index": {
+        "0": 174,
+        "2": 29,
+        "3": 1
+      },
+      "diverged": 103,
+      "identical": 217,
+      "length_mismatch": 0,
+      "exposure_tokens": 55862,
+      "per_1k_tokens": 1.8438294368264652,
+      "classes": {
+        "tie": 98,
+        "one_ulp": 3,
+        "near": 2
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.12500005960464478,
+      "max_margin_max": 0.2500000596046448,
+      "drift_median": 0.12282419204711914,
+      "drift_p99": 0.3673737049102783,
+      "drift_max": 0.46745729446411133,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain/c32",
+      "run_b": "plain_noradix/c32",
       "pinned_a": true,
       "pinned_b": true,
       "same_server": false,
@@ -471,6 +626,48 @@
       "same_server": false,
       "pools_identical": true
     },
+    "radix off, plain c1 vs c32": {
+      "prompts": 320,
+      "bitwise_identical": 258,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 9
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 33
+        }
+      },
+      "first_difference_index": {
+        "0": 42,
+        "1": 5,
+        "6+": 15
+      },
+      "diverged": 33,
+      "identical": 287,
+      "length_mismatch": 0,
+      "exposure_tokens": 66238,
+      "per_1k_tokens": 0.49820344817174433,
+      "classes": {
+        "tie": 30,
+        "one_ulp": 3
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.24999994039535522,
+      "max_margin_max": 0.25,
+      "drift_median": 0.0,
+      "drift_p99": 0.27144789695739746,
+      "drift_max": 0.5200629234313965,
+      "prompts_with_large_drift": 1,
+      "run_a": "plain_noradix/c1",
+      "run_b": "plain_noradix/c32",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": true,
+      "pools_identical": true
+    },
     "radix off, mtp_s3 c1 vs c32": {
       "prompts": 320,
       "bitwise_identical": 0,
@@ -515,6 +712,133 @@
       "same_server": true,
       "pools_identical": true
     },
+    "radix off, spec vs plain c1, mtp_s3": {
+      "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {
+        "1": 316,
+        "2": 4
+      },
+      "diverged": 177,
+      "identical": 143,
+      "length_mismatch": 0,
+      "exposure_tokens": 44834,
+      "per_1k_tokens": 3.9478966855511444,
+      "classes": {
+        "tie": 169,
+        "near": 2,
+        "one_ulp": 6
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.25,
+      "drift_median": 0.20380473136901855,
+      "drift_p99": 0.36182379722595215,
+      "drift_max": 0.4154059886932373,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain_noradix/c1",
+      "run_b": "mtp_s3_noradix/c1",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": false,
+      "pools_identical": true
+    },
+    "radix off, spec vs plain c32, mtp_s3": {
+      "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 16
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 42
+        }
+      },
+      "first_difference_index": {
+        "0": 58,
+        "1": 258,
+        "2": 4
+      },
+      "diverged": 178,
+      "identical": 142,
+      "length_mismatch": 0,
+      "exposure_tokens": 45665,
+      "per_1k_tokens": 3.8979524800175187,
+      "classes": {
+        "tie": 171,
+        "one_ulp": 7
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.375,
+      "drift_median": 0.20276713371276855,
+      "drift_p99": 0.35394811630249023,
+      "drift_max": 0.4320223331451416,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain_noradix/c32",
+      "run_b": "mtp_s3_noradix/c32",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": false,
+      "pools_identical": true
+    },
+    "overlap off c1, plain": {
+      "prompts": 320,
+      "bitwise_identical": 28,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 192
+        }
+      },
+      "first_difference_index": {
+        "0": 192,
+        "1": 91,
+        "2": 8,
+        "3": 1
+      },
+      "diverged": 166,
+      "identical": 154,
+      "length_mismatch": 0,
+      "exposure_tokens": 46707,
+      "per_1k_tokens": 3.554071124242619,
+      "classes": {
+        "tie": 157,
+        "one_ulp": 9
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.2500000596046448,
+      "drift_median": 0.2045292854309082,
+      "drift_p99": 0.3669893741607666,
+      "drift_max": 0.4674949645996094,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain/c1",
+      "run_b": "plain_nooverlap/c1",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": false,
+      "pools_identical": true
+    },
     "overlap off c1, mtp_s3": {
       "prompts": 320,
       "bitwise_identical": 28,
@@ -555,6 +879,49 @@
       "prompts_with_large_drift": 0,
       "run_a": "mtp_s3/c1",
       "run_b": "mtp_s3_nooverlap/c1",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": false,
+      "pools_identical": true
+    },
+    "overlap off vs radix off c1, plain": {
+      "prompts": 320,
+      "bitwise_identical": 140,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {
+        "1": 176,
+        "2": 3,
+        "3": 1
+      },
+      "diverged": 104,
+      "identical": 216,
+      "length_mismatch": 0,
+      "exposure_tokens": 57327,
+      "per_1k_tokens": 1.8141538890923998,
+      "classes": {
+        "tie": 100,
+        "one_ulp": 3,
+        "near": 1
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.25,
+      "drift_median": 0.1208503246307373,
+      "drift_p99": 0.2863539457321167,
+      "drift_max": 0.3669893741607666,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain_noradix/c1",
+      "run_b": "plain_nooverlap/c1",
       "pinned_a": true,
       "pinned_b": true,
       "same_server": false,
@@ -603,6 +970,49 @@
       "same_server": false,
       "pools_identical": true
     },
+    "overlap off, plain c1 vs c32": {
+      "prompts": 320,
+      "bitwise_identical": 243,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 11
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 29
+        }
+      },
+      "first_difference_index": {
+        "0": 40,
+        "1": 20,
+        "2": 1,
+        "6+": 16
+      },
+      "diverged": 35,
+      "identical": 285,
+      "length_mismatch": 0,
+      "exposure_tokens": 65287,
+      "per_1k_tokens": 0.5360944751635088,
+      "classes": {
+        "tie": 30,
+        "one_ulp": 5
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.25,
+      "drift_median": 0.0,
+      "drift_p99": 0.2952626943588257,
+      "drift_max": 0.46108245849609375,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain_nooverlap/c1",
+      "run_b": "plain_nooverlap/c32",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": true,
+      "pools_identical": true
+    },
     "overlap off, mtp_s3 c1 vs c32": {
       "prompts": 320,
       "bitwise_identical": 0,
@@ -644,6 +1054,47 @@
       "pinned_a": true,
       "pinned_b": true,
       "same_server": true,
+      "pools_identical": true
+    },
+    "overlap off, spec vs plain c1, mtp_s3": {
+      "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {
+        "1": 319,
+        "2": 1
+      },
+      "diverged": 167,
+      "identical": 153,
+      "length_mismatch": 0,
+      "exposure_tokens": 46385,
+      "per_1k_tokens": 3.6003018217096043,
+      "classes": {
+        "tie": 158,
+        "one_ulp": 9
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.25,
+      "drift_median": 0.20303452014923096,
+      "drift_p99": 0.36457228660583496,
+      "drift_max": 0.49067020416259766,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain_nooverlap/c1",
+      "run_b": "mtp_s3_nooverlap/c1",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": false,
       "pools_identical": true
     },
     "spec vs plain c1, mtp_s1": {
@@ -1115,6 +1566,41 @@
       "same_server": false,
       "pools_identical": true
     },
+    "deterministic, plain c1 vs c32": {
+      "prompts": 320,
+      "bitwise_identical": 320,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {},
+      "diverged": 0,
+      "identical": 320,
+      "length_mismatch": 0,
+      "exposure_tokens": 70113,
+      "per_1k_tokens": 0.0,
+      "classes": {},
+      "max_margin_median": null,
+      "max_margin_p90": null,
+      "max_margin_max": null,
+      "drift_median": 0.0,
+      "drift_p99": 0.0,
+      "drift_max": 0.0,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain_det/c1",
+      "run_b": "plain_det/c32",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": true,
+      "pools_identical": true
+    },
     "deterministic, mtp_s3 c1 vs c32": {
       "prompts": 320,
       "bitwise_identical": 0,
@@ -1152,6 +1638,176 @@
       "prompts_with_large_drift": 0,
       "run_a": "mtp_s3_det/c1",
       "run_b": "mtp_s3_det/c32",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": true,
+      "pools_identical": true
+    },
+    "deterministic, plain vs mtp_s3 c1": {
+      "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {
+        "1": 315,
+        "2": 5
+      },
+      "diverged": 175,
+      "identical": 145,
+      "length_mismatch": 0,
+      "exposure_tokens": 46845,
+      "per_1k_tokens": 3.7357241968192976,
+      "classes": {
+        "tie": 166,
+        "one_ulp": 8,
+        "near": 1
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.2500000596046448,
+      "drift_median": 0.20456194877624512,
+      "drift_p99": 0.3656494617462158,
+      "drift_max": 0.8570480346679688,
+      "prompts_with_large_drift": 1,
+      "run_a": "plain_det/c1",
+      "run_b": "mtp_s3_det/c1",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": false,
+      "pools_identical": true
+    },
+    "deterministic, plain vs mtp_s3 c32": {
+      "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {
+        "1": 315,
+        "2": 4,
+        "3": 1
+      },
+      "diverged": 168,
+      "identical": 152,
+      "length_mismatch": 0,
+      "exposure_tokens": 46706,
+      "per_1k_tokens": 3.596968269601336,
+      "classes": {
+        "tie": 158,
+        "one_ulp": 8,
+        "near": 2
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.2500000596046448,
+      "drift_median": 0.19297051429748535,
+      "drift_p99": 0.36780762672424316,
+      "drift_max": 0.6133582592010498,
+      "prompts_with_large_drift": 1,
+      "run_a": "plain_det/c32",
+      "run_b": "mtp_s3_det/c32",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": false,
+      "pools_identical": true
+    },
+    "deterministic on vs off, plain c1": {
+      "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 127
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 192
+        }
+      },
+      "first_difference_index": {
+        "0": 319,
+        "1": 1
+      },
+      "diverged": 187,
+      "identical": 133,
+      "length_mismatch": 0,
+      "exposure_tokens": 43373,
+      "per_1k_tokens": 4.311437991377124,
+      "classes": {
+        "tie": 173,
+        "one_ulp": 12,
+        "near": 2
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.25,
+      "drift_median": 0.21964406967163086,
+      "drift_p99": 0.35775065422058105,
+      "drift_max": 0.42568516731262207,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain/c1",
+      "run_b": "plain_det/c1",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": false,
+      "pools_identical": true
+    },
+    "fp32 head, plain c1 vs c32": {
+      "prompts": 320,
+      "bitwise_identical": 252,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 10
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 30
+        }
+      },
+      "first_difference_index": {
+        "0": 40,
+        "1": 6,
+        "2": 7,
+        "5": 1,
+        "6+": 14
+      },
+      "diverged": 24,
+      "identical": 296,
+      "length_mismatch": 0,
+      "exposure_tokens": 66910,
+      "per_1k_tokens": 0.35869077865789867,
+      "classes": {
+        "near": 24
+      },
+      "max_margin_median": 0.052440643310546875,
+      "max_margin_p90": 0.1330890655517578,
+      "max_margin_max": 0.1661052703857422,
+      "drift_median": 0.0,
+      "drift_p99": 0.24527502059936523,
+      "drift_max": 0.5402936935424805,
+      "prompts_with_large_drift": 1,
+      "run_a": "plain_fp32head/c1",
+      "run_b": "plain_fp32head/c32",
       "pinned_a": true,
       "pinned_b": true,
       "same_server": true,
@@ -1197,29 +1853,90 @@
       "pinned_b": true,
       "same_server": true,
       "pools_identical": true
+    },
+    "fp32 head, plain vs mtp_s3 c1": {
+      "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {
+        "1": 320
+      },
+      "diverged": 136,
+      "identical": 184,
+      "length_mismatch": 0,
+      "exposure_tokens": 51060,
+      "per_1k_tokens": 2.663533098315707,
+      "classes": {
+        "near": 136
+      },
+      "max_margin_median": 0.034748077392578125,
+      "max_margin_p90": 0.07155799865722656,
+      "max_margin_max": 0.15007400512695312,
+      "drift_median": 0.1167905330657959,
+      "drift_p99": 0.3079047203063965,
+      "drift_max": 0.5163059234619141,
+      "prompts_with_large_drift": 1,
+      "run_a": "plain_fp32head/c1",
+      "run_b": "mtp_s3_fp32head/c1",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": false,
+      "pools_identical": true
+    },
+    "fp32 head, plain vs mtp_s3 c32": {
+      "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 11
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 29
+        }
+      },
+      "first_difference_index": {
+        "0": 40,
+        "1": 280
+      },
+      "diverged": 138,
+      "identical": 182,
+      "length_mismatch": 0,
+      "exposure_tokens": 51403,
+      "per_1k_tokens": 2.6846682100266523,
+      "classes": {
+        "near": 138
+      },
+      "max_margin_median": 0.033969879150390625,
+      "max_margin_p90": 0.08056640625,
+      "max_margin_max": 0.2673931121826172,
+      "drift_median": 0.12288570404052734,
+      "drift_p99": 0.30140066146850586,
+      "drift_max": 0.38590192794799805,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain_fp32head/c32",
+      "run_b": "mtp_s3_fp32head/c32",
+      "pinned_a": true,
+      "pinned_b": true,
+      "same_server": false,
+      "pools_identical": true
     }
   },
   "missing_pairs": [
-    "repeat session, mtp_s3 c1",
-    "repeat session, mtp_s3 c32",
     "logprobs off, plain c1",
     "logprobs off, mtp_s3 c1",
-    "radix off c1, plain",
-    "radix off c32, plain",
-    "radix off, plain c1 vs c32",
-    "radix off, spec vs plain c1, mtp_s3",
-    "radix off, spec vs plain c32, mtp_s3",
-    "overlap off c1, plain",
-    "overlap off vs radix off c1, plain",
-    "overlap off, plain c1 vs c32",
-    "overlap off, spec vs plain c1, mtp_s3",
-    "deterministic, plain c1 vs c32",
-    "deterministic, plain vs mtp_s3 c1",
-    "deterministic, plain vs mtp_s3 c32",
-    "deterministic on vs off, plain c1",
-    "fp32 head, plain c1 vs c32",
-    "fp32 head, plain vs mtp_s3 c1",
-    "fp32 head, plain vs mtp_s3 c32",
     "retraction c32, plain",
     "retraction c32, mtp_s3",
     "state path c1, plain_fidecode vs plain",
@@ -1253,6 +1970,26 @@
       "not_argmax": 0,
       "worst_gap": 0.0
     },
+    "mtp_s3/c1": {
+      "positions": 69953,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "mtp_s3__rep/c1": {
+      "positions": 69953,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "mtp_s3/c32": {
+      "positions": 70005,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "mtp_s3__rep/c32": {
+      "positions": 70005,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
     "mtp_s1/c1": {
       "positions": 69974,
       "not_argmax": 0,
@@ -1260,16 +1997,6 @@
     },
     "mtp_s1/c32": {
       "positions": 70028,
-      "not_argmax": 0,
-      "worst_gap": 0.0
-    },
-    "mtp_s3/c1": {
-      "positions": 69953,
-      "not_argmax": 0,
-      "worst_gap": 0.0
-    },
-    "mtp_s3/c32": {
-      "positions": 70005,
       "not_argmax": 0,
       "worst_gap": 0.0
     },
@@ -1303,8 +2030,18 @@
       "not_argmax": 0,
       "worst_gap": 0.0
     },
+    "plain_noradix/c1": {
+      "positions": 70082,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
     "mtp_s3_noradix/c1": {
       "positions": 69960,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain_noradix/c32": {
+      "positions": 70084,
       "not_argmax": 0,
       "worst_gap": 0.0
     },
@@ -1313,13 +2050,33 @@
       "not_argmax": 0,
       "worst_gap": 0.0
     },
+    "plain_nooverlap/c1": {
+      "positions": 70110,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
     "mtp_s3_nooverlap/c1": {
       "positions": 70020,
       "not_argmax": 0,
       "worst_gap": 0.0
     },
+    "plain_nooverlap/c32": {
+      "positions": 70152,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
     "mtp_s3_nooverlap/c32": {
       "positions": 70065,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain_det/c1": {
+      "positions": 70113,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain_det/c32": {
+      "positions": 70113,
       "not_argmax": 0,
       "worst_gap": 0.0
     },
@@ -1330,6 +2087,16 @@
     },
     "mtp_s3_det/c32": {
       "positions": 70105,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain_fp32head/c1": {
+      "positions": 70109,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain_fp32head/c32": {
+      "positions": 70092,
       "not_argmax": 0,
       "worst_gap": 0.0
     },

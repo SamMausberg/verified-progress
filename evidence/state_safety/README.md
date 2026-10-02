@@ -196,12 +196,15 @@ reproduction, whose batches differ from the matrix run's).
 - The two tapped servers had different pools: 159,322 vs 89,652 KV tokens and 199 vs
   111 GDN slots, both with at most 16 running (`pools.json`). A different copy of a
   shared prefix's KV would first show at a full-attention layer's output. So for the 6
-  prompts that first differ there, the pools and the radix history are possible causes
+  prompts that first differ there, the pools and the radix history were possible causes
   besides the attention kernel's dependence on the batch. For the other 34, every
-  attention output before the first difference is identical.
+  attention output before the first difference is identical. The cache-level rerun with
+  pinned pools ("Cache-level checks (tap v4)" below) settles the 6: for 5 the entering
+  KV is identical, so the attention kernel itself differs with the batch; the sixth,
+  `mt_bench-0056`, no longer differs at the attention layer.
 
-In words (for the plain-vs-MTP pair the caches are confirmed below; for c1 vs c32 the
-cache check has not been run): the configurations first produce
+In words (the caches are confirmed for both pairs in "Cache-level checks (tap v4)"
+below): the configurations first produce
 different module outputs at a kernel that is not invariant to the batch or to the
 decode/verify path; the difference is carried forward through the recurrent state and
 the later layers; and it changes the chosen token only where the two leading logits
@@ -242,6 +245,13 @@ model; only the Hopper `gap_bound_*` values grew, by that 0.18%. Rerunning the c
 `first_logprob_difference` to every case, and lists the five tap-changed prompts as
 `mismatched_ids` in the two v3 tap checks.
 
+`cachecheck_v4_plain_c1_vs_c32.json` is the summary that `run_tap_v4_batch.sh` wrote in
+its hold (`mechanism.py --a $T/v4b_plain_c1 --b $T/v4b_plain_c32 --untapped-a
+~/vp-data/state/runs_cap16/plain/c1.jsonl`), copied here unchanged. The hold ran from a
+clean checkout at `be00c17` on the tap engine `9341fb82` (`repo_sha`, `repo_dirty` and
+`sglang_sha` in each session's `meta.json`); `mechanism.py`, `tap_runs.py` and
+`run_matrix.py` are unchanged since that commit.
+
 ## Noise floor
 
 Rate is divergences per 1,000 compared tokens (compared tokens stop at the first
@@ -278,8 +288,8 @@ arrival timing, and with it batch composition, differs between sessions, but the
 sessions also differ in their pools: their servers allocated 97,672 and 133,885 KV
 tokens and 122 and 167 GDN slots, with the same cap of 16 running requests
 (`run_meta.json`, `resolved_pools`; `pools_identical` is false for both repeat-session
-rows of `noise_floor.csv`). The 24 differences can therefore come from either. A rerun
-with identical pinned pools (cap 8) is queued; see `experiments/state_safety/README.md`.
+rows of `noise_floor.csv`). The 24 differences can therefore come from either. The rerun
+with identical pinned pools (cap 8) is under "Matrix with pinned pools" below.
 
 ## Matrix with pinned pools
 
@@ -298,6 +308,8 @@ Setup section. Rates are per 1,000 compared tokens
 | Plain, fresh-server repeat, c32 | 4/320 | 0.06 | 4 | 0 | 0 |
 | Plain, same-server warm repeat, c1 | 17/320 | 0.25 | 16 | 1 | 0 |
 | Plain, same-server warm repeat, c32 | 4/320 | 0.06 | 4 | 0 | 0 |
+| MTP steps 3, fresh-server repeat, c1 | 0/320 | 0 | - | - | - |
+| MTP steps 3, fresh-server repeat, c32 | 0/320 | 0 | - | - | - |
 | Plain, c1 vs c32 (one server) | 41/320 | 0.63 | 39 | 2 | 0 |
 | MTP steps 1, c1 vs c32 | 165/320 | 3.47 | 157 | 7 | 1 |
 | MTP steps 3, c1 vs c32 | 156/320 | 3.25 | 146 | 9 | 1 |
@@ -366,7 +378,13 @@ Setup section. Rates are per 1,000 compared tokens
 - **Pinning and the repeat floor.** The fresh-server repeat at concurrency 32 drops
   from 24/320 (unpinned: different pools, cap 16) to 4/320 (identical pools, cap 8).
   Both changed at once, and a smaller cap also narrows the batch compositions, so
-  these runs do not say how much of the drop is due to each.
+  these runs do not say how much of the drop is due to each. A second MTP steps 3
+  session on a fresh server (2026-10-02, same pins, commit `a493cbf`) reproduces the
+  first bitwise, in tokens and top-5 logprobs, for all 320 prompts at c1 and at c32
+  (`repeat session, mtp_s3`). At c32 that is despite request arrival timing, which can
+  change batch composition between sessions; plain decoding's c32 repeat perturbed 8
+  prompts (4 diverged). These runs do not say why one repeated exactly and the other
+  did not.
 - **Same-server warm repeats.** These now differ: 17/320 at c1 and 4/320 at c32, all
   at ties or one ulp. Before, the result was 0/320 with a larger KV pool. No prefill in
   any pass reused a cached prefix (`cached_tokens` and `requests_with_cached_tokens`
@@ -386,68 +404,115 @@ Setup section. Rates are per 1,000 compared tokens
   whose runs are still queued. They are listed under Pending below. This regeneration
   used `STATE_ALLOW_MISSING=1`.
 
-### Configuration switches for MTP steps 3
+### Configuration switches for plain decoding and MTP steps 3
 
-MTP steps 3 with the radix cache off, the overlap scheduler off, deterministic
-inference and the FP32 head ran with the same pinned pools, each at c1 and c32 on one
-server (runs at commit `a493cbf`, whose runner files are those of the runs above; the
-engine is the clean pin). The same switches for plain decoding are queued, so for now
-a switch's effect on speculation cannot be separated from its effect on decoding in
-general.
+Plain decoding and MTP steps 3 ran with the radix cache off, the overlap scheduler off,
+deterministic inference and the FP32 head, with the same pinned pools, each at c1 and
+c32 on one server (runs at commit `a493cbf`, whose runner files are those of the runs
+above; the engine is the clean pin; MTP on 2026-10-01 at 14:00-14:17 UTC, plain at
+20:55-21:20). Each switch can therefore be compared with the stock configuration in
+both, which separates its effect on speculation from its effect on decoding in general.
 
-| Pair (MTP steps 3) | Diverged | Per 1,000 | Tie | One ulp | Near |
-|---|---|---|---|---|---|
-| Radix cache off vs on, c1 | 98/320 | 1.73 | 87 | 11 | 0 |
-| Radix cache off vs on, c32 | 106/320 | 1.89 | 95 | 8 | 3 |
-| Radix cache off, c1 vs c32 | 169/320 | 3.62 | 159 | 8 | 2 |
-| Overlap off vs on, c1 | 161/320 | 3.40 | 145 | 14 | 2 |
-| Overlap off vs radix cache off, c1 | 111/320 | 2.00 | 105 | 5 | 1 |
-| Overlap off, c1 vs c32 | 174/320 | 3.64 | 166 | 8 | 0 |
-| Deterministic inference, c1 vs c32 | 168/320 | 3.48 | 164 | 4 | 0 |
-| FP32 head, c1 vs c32 | 130/320 | 2.44 | - | - | 130 |
+| Pair | Plain: diverged | Per 1,000 | MTP steps 3: diverged | Per 1,000 |
+|---|---|---|---|---|
+| Radix cache off vs on, c1 | 96/320 | 1.69 | 98/320 | 1.73 |
+| Radix cache off vs on, c32 | 103/320 | 1.84 | 106/320 | 1.89 |
+| Radix cache off, c1 vs c32 | 33/320 | 0.50 | 169/320 | 3.62 |
+| Overlap off vs on, c1 | 166/320 | 3.55 | 161/320 | 3.40 |
+| Overlap off vs radix cache off, c1 | 104/320 | 1.81 | 111/320 | 2.00 |
+| Overlap off, c1 vs c32 | 35/320 | 0.54 | 174/320 | 3.64 |
+| Deterministic inference, c1 vs c32 | 0/320 | 0 | 168/320 | 3.48 |
+| FP32 head, c1 vs c32 | 24/320 | 0.36 | 130/320 | 2.44 |
 
-- **Classes.** No divergence is `large`, and no run committed a token that was not
-  its own top-1. The eight `near` events with the BF16 head fall on three prompts
-  (`cnn_dailymail-0025`, `cnn_dailymail-0033` and `gsm8k-0015`); in each, one run's
-  margin is at most 0.375 nats and the other's at most 0.125. Logprob drift without a
-  token change is at most 0.62 nats.
+Speculation against plain decoding, with the switch on in both runs:
+
+| Pair (MTP steps 3 vs plain) | c1: diverged | Per 1,000 | c32: diverged | Per 1,000 |
+|---|---|---|---|---|
+| Stock (radix cache and overlap on; above) | 171/320 | 3.68 | 181/320 | 3.96 |
+| Radix cache off | 177/320 | 3.95 | 178/320 | 3.90 |
+| Overlap off | 167/320 | 3.60 | - | - |
+| Deterministic inference | 175/320 | 3.74 | 168/320 | 3.60 |
+| FP32 head | 136/320 | 2.66 | 138/320 | 2.68 |
+
+- **Classes.** No divergence in any of these pairs is `large`, and no run committed a
+  token that was not its own top-1 (`self_consistency`, all 32 pinned runs). With the
+  BF16 head the `near` events have margins of at most 0.375 nats; in the MTP pairs the
+  eight fall on three prompts (`cnn_dailymail-0025`, `cnn_dailymail-0033` and
+  `gsm8k-0015`), where one run's margin is at most 0.375 nats and the other's at most
+  0.125. Logprob drift before the first token difference is at most 0.62 nats in every
+  pair except deterministic MTP against deterministic plain decoding at c1, 0.86 nats.
+  The overlap-off pairs have no c32 counterpart for speculation against plain decoding
+  in `pairs_pinned.json`.
+- **The switches change plain decoding as often as speculation.** Against the stock
+  configuration, radix off changes 96 plain and 98 MTP outputs of 320 at c1, overlap off
+  166 and 161, and the two switches differ from each other in 104 and 111. So none of
+  these effects is specific to speculation.
 - **Both switches change the prefill of prompts longer than 64 tokens.** With the
   radix cache on, the GDN cache strategy at this pin is `extra_buffer`, and
   `--disable-overlap-schedule` switches it to `no_buffer`
   (`mamba_radix_cache_strategy` in `run_meta_pinned.json`). The overlap-off
   configuration therefore changes two things at once. Either switch changes the top-5
   logprobs of the first output token, which come from the prefill alone, in 192 of the
-  193 prompts longer than 64 tokens and in none of the 127 shorter ones (c1,
-  `output0_differs` in `noise_floor_pinned.json`). Radix off and overlap off agree
-  with each other on the first output token for all 320. This extends the tap v4 check
-  below, where all 6 prompts longer than 64 tokens differed in the prefill at layer 0's
-  GDN recurrence, from 40 prompts to 320. The prefill of a prompt longer than one
-  64-token chunk therefore depends on the GDN cache strategy: `extra_buffer` computes
-  it differently from `no_buffer` and from the radix-off path. That the cause is the
-  checkpoint tracking in `extra_buffer`'s extend kernel is still code reading. Of the
-  198 prompts whose outputs differ at all between radix on and off at c1, 192 differ
-  from the prefill on, before any speculative step (`first_difference_index`).
-  Overlap off and radix off still part later, in 177 prompts at output index 1 (the
-  first verify forward) and 7 later. Which kernel differs there has not been located;
-  the overlap-off server runs SGLang's synchronous speculative path.
-- **Pools at batch 1 without the radix cache.** The pinned radix-off c1 run is bitwise
-  identical, in tokens and top-5 logprobs on all 320 prompts, to the bench
-  workstream's unpinned radix-off MTP steps 3 run at c1 (cap 16 and a 426,043-token KV
-  pool; `evidence/bench/README.md`, equality/), which bench's equality classes use
-  (`cross_bench.json`, `divergences_cross_bench.csv`). So for MTP at batch 1 with the
-  radix cache off, the pool size did not change the output, as bench's comparison
-  assumed. The plain-decoding counterpart is queued.
-- **Deterministic inference does not make MTP batch-invariant.** Between c1 and c32,
-  168 of 320 prompts diverge (3.48 per 1,000, all ties or one ulp), about the rate
-  without it (3.25). This confirms the early 8-prompt check (under "Deterministic
-  inference") on the full prompt set with pinned pools.
+  193 prompts longer than 64 tokens and in none of the 127 shorter ones, for plain
+  decoding and for MTP alike (c1, `output0_differs` in `noise_floor_pinned.json`). Radix
+  off and overlap off agree with each other on the first output token for all 320, in
+  both. This extends the tap v4 check below, where all 6 prompts longer than 64 tokens
+  differed in the prefill at layer 0's GDN recurrence, from 40 prompts to 320. The
+  prefill of a prompt longer than one 64-token chunk therefore depends on the GDN cache
+  strategy: `extra_buffer` computes it differently from `no_buffer` and from the
+  radix-off path. That the cause is the checkpoint tracking in `extra_buffer`'s extend
+  kernel is still code reading. Of the 198 prompts whose outputs differ at all between
+  radix on and off at c1, 192 differ from the prefill on, in both
+  (`first_difference_index`).
+- **Overlap off and radix off part at output index 1 in plain decoding too.** After
+  agreeing on the first output token, the two configurations first differ at output
+  index 1 in 176 prompts with plain decoding (3 at index 2, 1 at index 3; 140 bitwise
+  identical) and in 177 with MTP (the first verify forward; 7 later). For plain decoding
+  index 1 is the first decode step, so a difference of this kind arises without
+  speculation and need not come from SGLang's synchronous speculative path, which the
+  overlap-off MTP server runs. Which kernel differs has not been located.
+- **The radix-off noise floor.** Without the radix cache, plain decoding at c1 and c32
+  (at most 8 running) diverges in 33 of 320 prompts (0.50 per 1,000), against 41 (0.63)
+  with it; 258 prompts are bitwise identical. Of the 62 perturbed prompts, 42 first
+  differ at output index 0, which comes from the prefill alone (at c32 prompts are
+  prefilled together with others). So plain decoding is not batch-invariant without the
+  radix cache either; its batch dependence does not need the radix history.
+- **Speculation against plain decoding without the radix cache** is unchanged: 177 of
+  320 at c1 (3.95 per 1,000) and 178 at c32 (3.90), against 171 and 181 with the radix
+  cache. No prompt is bitwise identical, and at c1 the outputs first differ at output
+  index 1, the first verify forward, in 316 prompts and at index 2 in 4. So the radix
+  cache, and with it the KV repoint ("History dependence" below), adds nothing visible to
+  the rate at which speculation departs from plain decoding.
+- **Pools at batch 1 without the radix cache.** The pinned radix-off c1 runs are bitwise
+  identical, in tokens and top-5 logprobs on all 320 prompts, to the bench workstream's
+  unpinned radix-off runs at c1 (cap 16; KV pools of 426,043 tokens for MTP steps 3 and
+  316,021 for plain decoding; `evidence/bench/README.md`, equality/), which bench's
+  equality classes use (`cross_bench.json`, `divergences_cross_bench.csv`). So at batch
+  1 with the radix cache off the pool size did not change the output, for plain decoding
+  or MTP, as bench's comparison assumed.
+- **Deterministic inference makes plain decoding batch-invariant, not MTP.** With
+  `--enable-deterministic-inference`, plain decoding at c1 and c32 is bitwise identical
+  in tokens and top-5 logprobs for all 320 prompts. MTP diverges between c1 and c32 in
+  168 of 320 prompts (3.48 per 1,000, all ties or one ulp), about the rate without it
+  (3.25), and deterministic MTP diverges from deterministic plain decoding in 175 (c1)
+  and 168 (c32), with no prompt bitwise identical and the first difference at output
+  index 1 in 315 prompts at both. This confirms the early 8-prompt checks (under
+  "Deterministic inference") on the full prompt set with pinned pools, and fits the
+  mechanism above: the batch-invariant kernels remove plain decoding's batch
+  dependence, but the decode and verify recurrent kernels still differ. Deterministic
+  inference also changes plain decoding itself: against the stock configuration at c1,
+  the first output token's logprobs differ in 319 of 320 prompts and 187 diverge in
+  tokens (4.31 per 1,000).
 - **The FP32 head removes BF16 ties, not divergences.** With `--enable-fp32-lm-head`,
-  MTP diverges between c1 and c32 in 130 of 320 prompts (2.44 per 1,000, against 3.25
-  with the BF16 head). The ulp classes of `compare.py` assume BF16 logits, so every
-  event falls under `near`. The larger of the two margins has median 0.036 nats and
-  maximum 0.19. Without BF16 rounding the remaining divergences are order flips
-  between near-equal FP32 logits, moved by the batch-dependent hidden state (the tap
-  found the head input different in every divergence it examined).
+  plain decoding diverges between c1 and c32 in 24 of 320 prompts (0.36 per 1,000,
+  against 0.63 with the BF16 head; 252 bitwise identical), MTP in 130 (2.44, against
+  3.25), and MTP against plain decoding in 136 at c1 and 138 at c32 (2.66 and 2.68,
+  against 3.68 and 3.96). The ulp classes of `compare.py` assume BF16 logits, so every
+  event falls under `near`; the larger of the two margins is at most 0.17 nats for plain
+  decoding across concurrency, 0.19 for MTP across concurrency and 0.27 for MTP against
+  plain decoding. Without BF16 rounding the remaining divergences are order flips
+  between near-equal FP32 logits, moved by the batch- or path-dependent hidden state
+  (the tap found the head input different in every divergence it examined).
 
 ### Divergence given perturbation
 
@@ -475,6 +540,8 @@ plain-decoding floors:
 | MTP steps 3 vs plain, c1 (pinned) | 320/320 | 1 | 171 (0.53, 0.48-0.59) | 3.71 |
 | MTP steps 1, 5, tree vs plain, c1 (pinned) | 320/320 each | 1 | 164-170 (0.51-0.53) | 3.53-3.71 |
 | MTP vs plain, c32 (pinned) | 320/320 each | 1 | 166-181 (0.52-0.57) | 3.55-3.99 |
+| Plain, c1 vs c32, cap 8, radix cache off (pinned) | 62/320 | 0 | 33 (0.53, 0.41-0.65) | 3.85 |
+| MTP steps 3 vs plain, radix cache off, c1 and c32 (pinned) | 320/320 each | 1 | 177, 178 (0.55, 0.56) | 3.98, 3.92 |
 
 - Batch shape at cap 8 perturbs only 75 of 320 plain-decoding prompts (245 are bitwise
   identical between c1 and c32); at cap 16 it perturbs all 320. Speculation perturbs
@@ -483,13 +550,15 @@ plain-decoding floors:
   63 prompts, which are prefilled in batches).
 - Nearly all of these prompts have their onset at output index 0-31. In that bucket the
   share that diverges is 35 of 62 (0.56, 0.44-0.68) for plain decoding at cap 8, 165 of
-  318 (0.52, 0.46-0.57) at cap 16, and 0.51 to 0.57 for every MTP configuration against
-  plain decoding, at c1 and c32. The post-onset rates are 3.5 to 4.1 per 1,000 for all
-  of them.
-- So the gap between the cap-8 floor (0.63 per 1,000 compared tokens) and the
-  speculative rate (3.5 to 4.0) is mainly the number of prompts perturbed. On this
-  measure no excess of speculation over either floor is detected. The cap-8 interval is
-  wide (62 prompts in the bucket), so a modest difference is not excluded.
+  318 (0.52, 0.46-0.57) at cap 16, 28 of 50 (0.56, 0.42-0.69) for plain decoding at cap 8
+  without the radix cache, and 0.51 to 0.57 for every MTP configuration against plain
+  decoding, at c1 and c32, with the radix cache on or off. The post-onset rates are 3.5
+  to 4.1 per 1,000 for all of them.
+- So the gap between the cap-8 floors (0.63 per 1,000 compared tokens with the radix
+  cache, 0.50 without) and the speculative rate (3.5 to 4.0) is mainly the number of
+  prompts perturbed. On this measure no excess of speculation over any of the three
+  floors is detected. The cap-8 intervals are wide (62 and 50 prompts in the bucket), so
+  a modest difference is not excluded.
 
 The conditional rate is not the same for every source of perturbation. Over the pairs
 in both files with at least 30 perturbed prompts, the share ranges from 0.29 to 0.60 and
@@ -515,15 +584,19 @@ the post-onset rate from 1.56 to 6.74 per 1,000. The pairs that differ most:
 The other pinned pairs, which are MTP across concurrency, the MTP configurations against
 each other, radix off, overlap off, deterministic inference without the patch and the
 same-server c1 repeat, have shares of 0.47 to 0.55 and post-onset rates of 2.97 to
-3.98 per 1,000. Counts are over 320 prompts
+3.98 per 1,000. The pairs added with the plain switch runs (radix off, overlap off,
+deterministic inference on against off, and speculation against plain decoding with each
+switch on in both) have shares of 0.45 to 0.58 and post-onset rates of 3.07 to 4.31 per
+1,000, apart from the FP32 head: plain decoding at c1 vs c32 diverges in 24 of 68
+perturbed prompts (0.35, 0.25-0.47) at 2.30 per 1,000, and MTP against plain decoding
+with the FP32 head in 136 and 138 of 320 (0.42 and 0.43) at 2.68 and 2.70.
+Deterministic plain decoding at c1 vs c32 and the second MTP session perturb no prompt.
+Counts are over 320 prompts
 (fewer where stated), and the intervals assume prompts are independent. The post-onset
 rate treats positions as independent, although they cluster by prompt.
 
-**Pending** (queued, pinned): radix cache off, overlap off, deterministic inference
-and FP32 head for plain decoding, which give the radix-off noise floor (plain c1 vs
-c32 without the radix cache) and radix-off speculation against radix-off plain
-decoding; the logprobs-off control, retraction, a second MTP session, and the
-ReplaySSM and FlashInfer GDN decode paths. The first-cycle test on fresh prompts is
+**Pending** (queued, pinned): the logprobs-off control, retraction, and the ReplaySSM
+and FlashInfer GDN decode paths. The first-cycle test on fresh prompts is
 declared, with its prompts, runs, analysis and decision rule fixed
 (`experiments/state_safety/README.md`, "Declared follow-up"), and is not yet run. The
 prefill-to-decode handoff check depends on its outcome.
@@ -609,9 +682,11 @@ prompts it has not been run.
 
 ## Cache-level checks (tap v4)
 
-These were run with the cache-hashing tap, at batch 1, on plain decoding with the
-unpinned flags of the first matrix (`cachecheck_v4_*.json`, `history_v4_*.json`,
-`repeats_v4_h44_*.json`).
+These were run with the cache-hashing tap on plain decoding: at batch 1 with the
+unpinned flags of the first matrix (`cachecheck_v4_plain_c1_vs_mtp_s3_c1.json`,
+`cachecheck_v4_plain_c1_radix_vs_noradix.json`, `history_v4_*.json`,
+`repeats_v4_h44_*.json`), and for the concurrency pair with pinned pools
+(`cachecheck_v4_plain_c1_vs_c32.json`, last bullet but one).
 - **Fresh prefills are not compared.** A prefill with no cached prefix reads no
   earlier state, so `mechanism.py` does not compare caches at such a forward.
   - The tap hashes the caches before the forward runs (`state_tap.begin`). The engine
@@ -664,8 +739,39 @@ unpinned flags of the first matrix (`cachecheck_v4_*.json`, `history_v4_*.json`,
   - So that prompt's same-server difference comes from the GDN prefill, which depends
     on what the radix tree already holds. This is a second history mechanism, separate
     from the KV repoint, and it shows from the first output token.
+- **Plain decoding, concurrency 1 vs 32 (40 prompts, pinned pools).** The 40 prompts
+  of `mechanism_plain_c1_vs_c32.json`, tapped again in two sessions that each served
+  all 320 prompts in the same order, with both servers pinned to the same pools (at
+  most 16 running, 98,304 KV tokens, 80 GDN slots; `run_tap_v4_batch.sh`).
+  - All 40 diverge in tokens again. In all 40, every cache entering every forward up to
+    the first differing module output is identical (`origin` is `module` in every case;
+    `no_hash_difference_before_divergence` is 0).
+  - That first difference is a GDN gated RMSNorm in decode in 30 prompts, layer 3's
+    full-attention output in decode in 5, and layer 0's `mlp.down_proj` in a prefill
+    batched with other requests in 5. The v3 run without cache hashes and with unpinned
+    pools gave 29, 6 and 5 for the same prompts.
+  - The 5 attention cases are the 5 CNN/DailyMail prompts that first differed there in
+    v3 too (prompts of 630 to 1,959 tokens), all at output index 1. Their entering KV
+    is identical, so FlashInfer's decode attention gives different bits in a decode
+    batch of 15 or 16 than alone, from the same inputs and cache.
+  - The sixth v3 attention case, `mt_bench-0056`, now first differs at a gated norm at
+    output index 29 instead of at layer 3's attention at output index 2. In v3 the c1
+    session served 167 prompts and the c32 session 320, so the two had different
+    request histories; here they have the same one. That fits the radix history
+    dependence ("History dependence" above), but this run alone does not show it.
+  - At the divergence: tie rule 0, head GEMM 0. Conservative model: rounding flip 3,
+    order flip 16, accumulator ambiguous 21. Hopper model: rounding flip 14, order flip
+    17, ambiguous 9.
+  - So both concurrency mechanisms named in "Results" above (the gated norm's
+    row-count-dependent reduction and the batch-dependent attention and GEMM kernels)
+    part the runs from identical caches, as the plain-vs-MTP check showed for the two
+    recurrent kernels.
 - **Tap neutrality.** The v4 tap changes the same five prompts as v3, relative to the
-  untapped matrix run (`tap_check` in both cachecheck files).
+  untapped matrix run (`tap_check` in the two batch-1 cachecheck files). In the
+  concurrency-pair hold, the tapped c1 session is bitwise identical in tokens and top-5
+  logprobs, for all 40 tapped prompts, to an untapped c1 pass on the same engine with
+  the same pinned pools (`runs_cap16/plain/c1`, `tap_check` in
+  `cachecheck_v4_plain_c1_vs_c32.json`).
 
 ## Deterministic inference
 
@@ -681,9 +787,10 @@ patch`; that run predates the patch's `SGLANG_STATE_VERIFY_FIXED_SPLIT` gate and
 the change on unconditionally). A plausible reason, not yet tested: the
 draft is not batch-invariant, so acceptance lengths, and with them the offset of a
 position inside its verify block, differ between batch sizes. On the full prompt set
-with pinned pools, deterministic MTP steps 3 diverges between c1 and c32 in 168 of 320
-prompts (3.48 per 1,000; "Configuration switches for MTP steps 3" above). **Pending**:
-the plain-decoding deterministic pairs.
+with pinned pools, deterministic plain decoding is bitwise identical between c1 and c32
+for all 320 prompts, while deterministic MTP steps 3 diverges between c1 and c32 in 168
+of 320 (3.48 per 1,000) and from deterministic plain decoding in 175 at c1 and 168 at
+c32 ("Configuration switches for plain decoding and MTP steps 3" above).
 
 ## Targeted state tests
 
@@ -750,6 +857,57 @@ common flags of the Setup section, one request in flight, 40 prompts per test (t
     no speculative state, shows them too (9 of 68 cases, against 21 of 153 for MTP
     steps 3 and 8 of 89 for the tree). None points to a wrong restored state.
 
-**Pending** (queued): aborts with slot reuse on a four-slot GDN pool; chunked prefill
-at 200 and 256 tokens; and run-to-run repeats. Per-rejection-position drift is under
-"Matrix with pinned pools" above.
+- **Aborts with GDN slot reuse** (`abort__*`, groups `abort_repeat` of
+  `run_targeted.sh`). The batch cap is 4 and the GDN pool is full: 4 slots with the
+  radix cache off (one per request), or 20 with it on (five per request under the
+  overlap scheduler). Each of 4 lanes starts a thinking-mode request with up to 1,024
+  tokens, aborts it mid-stream (after a seeded random target of 1 to 60 tokens; 3 to 62
+  were streamed), and then serves the next of 40 probe prompts (the first 40
+  non-thinking prompts, 160 tokens), which takes the freed slot while the other lanes
+  keep running. Each probe is compared, in tokens,
+  with the same probe served alone on the same server before the aborts.
+  - Plain decoding with deterministic inference (radix off): 40/40 probes
+    token-identical.
+  - MTP steps 3, radix off: 28/40 token-identical; the other 12 diverge at exact ties.
+  - MTP steps 3, radix on (`extra_buffer`): 28/40; 11 exact ties and 1 within one BF16
+    step.
+  - The probes ran in batches of up to 4 and their references alone. Deterministic
+    plain decoding is batch-invariant, so its 40/40 says the aborts and slot reuse left
+    no trace in its outputs. MTP is not batch-invariant, even with deterministic
+    inference ("Configuration switches for plain decoding and MTP steps 3"), and
+    differences of this kind are what the batch shape alone gives. So for MTP the test
+    finds no large divergence and no non-argmax token, but it cannot separate a near-tie
+    effect of the aborts from the batch shape. It compares tokens, not logprobs.
+- **Run-to-run repeats** (`repeat__*`). On one server (the common flags, at most 16
+  running), 44 prompts were each served 5 times at batch 1 with the cache flushed
+  before every request, 160 tokens each: 40 spread over the prompt set plus every
+  prompt whose length is a multiple of 64 (the GDN prefill chunk), 6 in all, among them
+  `humaneval-0044`. For plain decoding and for MTP steps 3, all 176 repeat pairs are
+  identical in tokens and bitwise identical in top-5 logprobs. At batch 1 with a
+  flushed cache, both are deterministic run to run; the same-server difference of
+  `humaneval-0044` in the first matrix needs a cache that is not flushed ("Cache-level
+  checks").
+- **Chunked prefill** (`prefill__*`, compared by `compare_prefill.py` in
+  `compare_prefill__*`). The 40 longest prompts were served one at a time on one server
+  each (MTP steps 3, the common flags, cache flushed before every request), returning
+  the top-5 logprobs at every prompt position and generating 160 tokens, with the
+  default chunked-prefill size (8,192: every prompt in one chunk) and with 256 and 200.
+  - Generation: the first output token's logprobs differ from the unchunked run's in all
+    40 prompts, and the tokens diverge in 20 (chunk 256: 18 exact ties, 2 within one BF16
+    step) and 21 (chunk 200: 19 and 2), with margins of at most 0.25 nats. Logprob drift
+    over the generated tokens before the divergence is at most 0.95 nats (chunk 256) and
+    0.51 (chunk 200).
+  - Prompt positions. Drift at a position is the largest logprob difference over tokens
+    in both top-5 lists with logprob above -4, as in `compare.py`. Mean drift before and
+    after the first chunk boundary: 0.064 and 0.081 nats for chunk 256, 0.021 and 0.079
+    for chunk 200. The first four positions
+    after a boundary have mean drift 0.05 to 0.08 nats, like the rest of their chunk.
+  - A few prompt positions drift far more than anything seen in decoding. After the
+    first boundary the 99th percentile is 0.56 (chunk 256) and 0.58 nats (chunk 200),
+    but the maximum is 3.53 and 5.22 nats (`prompt_drift_by_chunk`); before it, 1.60 and
+    1.66.
+  - These large drifts are not explained. Whether they are an artefact of how input
+    logprobs are returned under chunked prefill is being checked, and they are not
+    interpreted here.
+
+Per-rejection-position drift is under "Matrix with pinned pools" above.

@@ -156,9 +156,8 @@ the repository commit. An untapped c1 pass with the same pools on the same engin
 (`run_matrix.py`, into `~/vp-data/state/runs_cap16`) is the reference for the
 tap-neutrality check. The script refuses to start unless `~/sglang-wt/state` is a
 clean checkout of the tap tree (`9341fb82`) and the repository checkout is clean.
-The summary, `cachecheck_v4_plain_c1_vs_c32.json`, will be
-committed to `evidence/state_safety` once the hold has run; until then the check is
-pending.
+The hold ran on 2026-10-01 from `be00c17`; its summary is committed as
+`evidence/state_safety/cachecheck_v4_plain_c1_vs_c32.json`.
 
 `tap_signature.py` (light,
 run by `analyze_all.sh`) finds where the v1 and v3 tapped sessions of the same
