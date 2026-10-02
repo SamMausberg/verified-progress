@@ -17,8 +17,10 @@ unset SGLANG_WORKTREE PYTHONPATH
 source scripts/sglang_env.sh
 ENGINE=$HOME/sglang-wt/speed-lowc-confirm
 FA4_ENGINE=$HOME/sglang-wt/speed-lowc
-# Trees from experiments/speed_lowc/build_engines.sh (confirm and fa4).
-CONFIRM_TREE=9a01a622f6e7f7f816ce6255ba5de56d52e09dbc
+# Trees from experiments/speed_lowc/build_engines.sh (confirm and fa4). Probe 4 ran on confirm tree
+# 9a01a622, whose patch 0003 stopped at 4 sequences; the trees differ only in that cutoff, in the
+# fold's ring-writing verify, which no arm here enables.
+CONFIRM_TREE=5d6db54828d7fbdac62180810b68a87cee3b39ec
 FA4_TREE=dcd97db178c101495148fb7a361203f975bcf711
 PAGED_KV=python/sglang/kernels/ops/attention/flash_attn/cute/paged_kv.py
 [ "$(git -C "$ENGINE" rev-parse 'HEAD^{tree}')" = "$CONFIRM_TREE" ] ||

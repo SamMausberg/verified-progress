@@ -1,12 +1,12 @@
-From a3f9dc3faa7eb972fb6c36b767b541763f05d60d Mon Sep 17 00:00:00 2001
+From 7f0eac55fd3848342baa2a6528770f2b955ec20a Mon Sep 17 00:00:00 2001
 From: Samuel Mausberg <samuelmausberg@gmail.com>
 Date: Fri, 2 Oct 2026 19:16:59 +0000
 Subject: [PATCH 2/3] Test FA4 paged KV on SM90 with tile_n below the loader's
  128 threads
 
-Head dim 256 (tile 128 x 80) with page sizes 1 and 16, causal and not,
-against an FP32 reference over a shuffled page table; head dim 128 as the
-unchanged control. Skipped unless SM90.
+Head dim 256 (tile 128 x 80) against an FP32 reference over a shuffled
+page table: page size 1, causal and not; page size 16, causal. Head dim
+128 (page size 1, causal) as the unchanged control. Skipped unless SM90.
 ---
  .../test_flash_attention_4_paged_sm90.py      | 114 ++++++++++++++++++
  1 file changed, 114 insertions(+)

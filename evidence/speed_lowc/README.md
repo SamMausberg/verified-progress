@@ -20,10 +20,21 @@ probes 3 and 4 run the trees `experiments/speed_lowc/build_engines.sh` builds fr
 `experiments/speed_lowc/` scripts present but not yet committed (the hold logs record `dirty=1`);
 the committed scripts are the ones that ran, with ruff's formatting and two shellcheck fixes in the
 hold scripts (`cd ... || exit 1`, direct exit-status checks); no logic changed. Probe 4 ran from the
-committed tree (`09b6dc4`) and repeated both microbenchmarks there (`probe4/`): every Triton and FA4
-row is within 6.7% of probe 1's and every GDN-chain excess within 3 us, so no decision changes (the
-split-KV rows move by up to 13%, all still far from the 200 us rule). Probe 2's served A/B used only
-committed harness code (`bench.sweep` at `e690b3a`) and stock SGLang.
+committed tree (`09b6dc4`) and repeated both microbenchmarks there (`probe4/`). Against probe 1, every
+Triton row is within 6.2%, every FA4 drafter row within 3.0%, every split-KV row within 6.7% and every
+GDN-chain excess within 2.5 us; the FA4 target rows, which probe 1 could not run, are within 2.2% of
+probe 3's. No decision changes. Probe 2's served A/B used only committed harness code (`bench.sweep` at
+`e690b3a`) and stock SGLang. The microbenchmarks of probes 1 and 2 and the GDN-chain benchmark of
+probes 1 and 4 import stock `~/sglang`, and those holds do not record its commit or modified files;
+probe 2's stock launches record it as the pin with no modified files (`probe2/launches.csv`).
+
+Probe 4's engine was the confirm tree that `build_engines.sh confirm` built at `09b6dc4` (`9a01a622`),
+whose patch 0003 gave the fold's ring-writing verify narrow tiles up to 4 sequences. 0003 now stops at
+2 sequences, the threshold the drafter's pre-registered kernel sweep gives (`evidence/drafter/README.md`,
+"Ring-writing verify tiles by batch"), and the confirm tree is `5d6db548`; `hold_probe4.sh` now checks
+that tree. The two trees differ only in that cutoff. The ring-writing verify runs only with the fold,
+and no probe 4 arm enables the fold (`probe4/launches.csv`), so the change does not touch what probe 4
+measured. Probe 4's exact tree comes from `build_engines.sh confirm` at `48b2933`.
 
 ## Results
 
@@ -107,7 +118,7 @@ forward:
 | 1 | 537 | 148 | 34 | 801 | 264 |
 | 2 | 700 | 234 | 38 | 991 | 291 |
 | 4 | 1,080 | 260 | 51 | 1,365 | 285 |
-| 8 | 2,103 | 290 | 74 | 2,470 | 366 |
+| 8 | 2,103 | 289 | 74 | 2,470 | 366 |
 
 The declared rule kept a fused per-layer GDN kernel alive if the chain exceeded the recurrent kernel
 alone by at least 250 us at B = 1; it does by 264 us. A fused kernel would still write the
@@ -118,7 +129,8 @@ cycle at c = 1 (derived; cycle from `evidence/stack/ceiling.json`). Not built.
 
 `dflash-tuned-b16` stock against the same arm with `--speculative-draft-attention-backend fa4`,
 launches in the order S0 D D S0 in one exclusive hold, bench confirm split, 512 output tokens, 64
-measured requests per point. Foreign CPU 0.35-1.23 cores per point.
+measured requests per point. Foreign CPU averaged 0.17-0.35 cores per point (per-point maxima
+0.35-1.23).
 
 | c | x_e2e S0 (two launches) | x_e2e FA4 draft | x ratio | y ratio | accept S0 / FA4 draft |
 |---|---|---|---|---|---|
@@ -129,19 +141,22 @@ measured requests per point. Foreign CPU 0.35-1.23 cores per point.
 
 Ratios are the mean of the FA4 launches over the mean of the S0 launches. The two S0 launches differ
 by at most 0.15%, and at every c both FA4 launches are faster than both S0 launches. One session: a
-probe, not a confirmation. Accepted tokens per cycle move slightly with the drafter's rounding (the
-verifier decides every token, so outputs stay in the arm's exactness class; their equality run is
-part of the confirmation). The gain is larger than the microbenchmark alone suggests at these
+probe, not a confirmation. Accepted tokens per cycle move with the drafter's rounding. The verifier
+still decides every token, but which positions each verify covers changes, and in probe 1's smoke 5
+of 6 outputs matched stock. The arm's exactness class is pending (`launches.csv`); the confirmation's
+equality run decides it. The gain is larger than the microbenchmark alone suggests at these
 contexts (about 0.1-0.3 ms per cycle, derived, against 0.2-0.4 ms served); the per-cycle ratio (x over accepted tokens) is
 1.034-1.040.
 
 ### FA4 target attention, served (`probe4/points.csv`, measured)
 
-One exclusive hold from repository `09b6dc4` on the confirm engine (`build_engines.sh confirm`: pin +
-drafter 0001-0004 + speed-lowc 0001 and 0003, every switch off; tree `9a01a622`, clean), after the hold
+One exclusive hold from repository `09b6dc4` on the confirm engine (`build_engines.sh confirm` at that
+commit: pin + drafter 0001-0004 + speed-lowc 0001 and 0003, every switch off; tree `9a01a622`, clean;
+Provenance gives 0003's later change), after the hold
 had checked that engine's tree, that its `paged_kv.py` is the blob probe 3 validated, and FA4's numerics
 again on it (`probe4/probe3_check.txt`). Bench confirm split, 512 output tokens, 64 or 256 measured
-requests per point, foreign CPU at most 0.41 cores per point. Arms differ only in attention flags.
+requests per point. Foreign CPU averaged at most 0.41 cores per point (per-point maxima 0.63-2.14).
+Arms differ only in attention flags.
 
 | Group, c | Base (two launches) | Test (one launch) | x ratio | y ratio | base spread x / y | accept base / test | per cycle |
 |---|---|---|---|---|---|---|---|
@@ -152,7 +167,10 @@ requests per point, foreign CPU at most 0.41 cores per point. Arms differ only i
 
 x columns are x_e2e in tok/s/user; ratios are the test over the mean of the two base launches;
 "per cycle" divides x by accepted tokens per cycle, since FA4 changes the target's rounding and with
-it the token trajectories and acceptance. Every ratio is above 2% and outside the base launches'
+it the token trajectories and acceptance. The FA4 target arms' exactness class is pending as well
+(`probe4/launches.csv`): FA4's error against FP32 equals Triton's, but the two were not compared
+bitwise, and in probe 3's smoke (FA4 target and draft) 5 of 6 outputs matched stock; the confirmation's equality run decides
+it. Every ratio is above 2% and outside the base launches'
 spread. On `dflash-tuned` FA4 replaces FlashInfer target attention, whose verify planning runs on the
 host every cycle; the larger gain at c = 8 than at 32 fits removing a fixed per-cycle cost, but this
 probe does not separate the kernel from the host share. One session: a probe, not a confirmation.
@@ -167,5 +185,5 @@ probe does not separate the kernel from the host share. One session: a probe, no
 | `probe1/hold.log`, `probe2/hold.log` | hold logs | - |
 | `probe2/attn_microbench_rerun.json` | microbenchmark rerun, B = 1, 8 | `scripts/gpu_lock.sh -x experiments/speed_lowc/hold_probe2.sh` |
 | `probe3/attn_microbench.json`, `probe3/regression_test.log`, `probe3/fa4_smoke.json`, `probe3/hold.log` | FA4 with the backport: numerics and timing, regression test, server smoke | `scripts/gpu_lock.sh -x experiments/speed_lowc/hold_probe3.sh` after `experiments/speed_lowc/build_engines.sh fa4` |
-| `probe4/points.csv`, `probe4/launches.csv`, `probe4/attn_microbench.json`, `probe4/gdn_chain_bench.json`, `probe4/probe3_check.txt`, `probe4/hold.log` | served A/B of FA4 target attention on the confirm engine; microbenchmark reruns from the committed tree | `experiments/speed_lowc/build_engines.sh confirm`, then `scripts/gpu_lock.sh -x experiments/speed_lowc/hold_probe4.sh`; points: `python -m bench.pareto ~/vp-data/speed-lowc/probe4-20261002T204410Z/lowc-p4-*/* --out evidence/speed_lowc/probe4 --points-only --status probe` |
+| `probe4/points.csv`, `probe4/launches.csv`, `probe4/attn_microbench.json`, `probe4/gdn_chain_bench.json`, `probe4/probe3_check.txt`, `probe4/hold.log` | served A/B of FA4 target attention on the confirm engine; microbenchmark reruns from the committed tree | `experiments/speed_lowc/build_engines.sh confirm` (at `48b2933` for probe 4's exact tree; Provenance), then `scripts/gpu_lock.sh -x experiments/speed_lowc/hold_probe4.sh`; points: `python -m bench.pareto ~/vp-data/speed-lowc/probe4-20261002T204410Z/lowc-p4-*/* --out evidence/speed_lowc/probe4 --points-only --status probe` |
 | `probe2/points.csv`, `probe2/launches.csv` | served points and launches (commands, pools, commits) | `python -m bench.pareto ~/vp-data/speed-lowc/probe2-20261002T183524Z/lowc-*/* --out evidence/speed_lowc/probe2 --points-only --status probe` |
