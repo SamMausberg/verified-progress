@@ -523,9 +523,9 @@
       0.04367420685020914
      ],
      "classes": {
-      "tie": 57,
-      "one_ulp": 51,
-      "near": 3,
+      "tie": 51,
+      "one_ulp": 58,
+      "near": 2,
       "large": 0,
       "unscored": 0
      }
@@ -539,8 +539,8 @@
       0.036785067338663824
      ],
      "classes": {
-      "tie": 54,
-      "one_ulp": 38,
+      "tie": 46,
+      "one_ulp": 46,
       "near": 0,
       "large": 0,
       "unscored": 0
@@ -564,9 +564,9 @@
       0.6319756102222028
      ],
      "classes": {
-      "tie": 366,
-      "one_ulp": 406,
-      "near": 26,
+      "tie": 394,
+      "one_ulp": 392,
+      "near": 12,
       "large": 1,
       "unscored": 0
      }
@@ -580,9 +580,9 @@
       0.5733777540767492
      ],
      "classes": {
-      "tie": 344,
-      "one_ulp": 368,
-      "near": 17,
+      "tie": 354,
+      "one_ulp": 365,
+      "near": 10,
       "large": 0,
       "unscored": 0
      }
@@ -605,8 +605,8 @@
       0.08910949349671933
      ],
      "classes": {
-      "tie": 3,
-      "one_ulp": 6,
+      "tie": 6,
+      "one_ulp": 3,
       "near": 0,
       "large": 0,
       "unscored": 0
@@ -646,9 +646,9 @@
       0.9556584824797222
      ],
      "classes": {
-      "tie": 259,
-      "one_ulp": 259,
-      "near": 11,
+      "tie": 272,
+      "one_ulp": 250,
+      "near": 7,
       "large": 0,
       "unscored": 0
      }
@@ -663,8 +663,8 @@
      ],
      "classes": {
       "tie": 267,
-      "one_ulp": 241,
-      "near": 9,
+      "one_ulp": 243,
+      "near": 7,
       "large": 0,
       "unscored": 0
      }
@@ -761,7 +761,7 @@
   "SGLANG_CERTIFIED_HEAD_MODEL": "conservative",
   "SGLANG_CERTIFIED_HEAD_MAX_ROWS": "64"
  },
- "analysis_commit": "708c723f01e46f9351d2066268498a933d19c104",
+ "analysis_commit": "0ece39abb15895abe0f222bacb8ef7e1e73f8963",
  "holds": [
   {
    "hold": "h1",

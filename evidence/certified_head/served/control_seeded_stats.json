@@ -1,0 +1,65 @@
+{
+ "declared": false,
+ "reading_rule": "certified verify rows above zero, with every request\nidentical to stock on both passes, means the certified head decided and matched; zero\ncertified verify rows means a silent fallback, reported as such; certified rows with any\noutput differing from stock is a certified-head mismatch under identical batch evolution.\nUncounted calls (host-gated certified steps without a device count) must be zero.\n\nThe counter rerun counted 5 certified verify calls over the server's life, all at most 4\nrows (the warm-up): requests that ask for logprobs keep the verify on the stock head\n(SGLang's certified_head.py `_adjusts_logits`), so the seeded waves' verifies were stock in\ncert as in cert0, while the draft and draft-extend heads ran certified. `mtptokens` serves\nthe same waves twice without logprobs on two servers in turn, stock (`stocktokens`) and\ncertified with the counters on every glue call (`certtokens`), and reads the counters\nbefore and after every wave.\n\nToken-only rerun (set before it ran): certified verify steps during the waves above zero,\nwith every token equal to stocktokens on both passes, means the certified verify decided\nand matched; zero means it did not run; any token difference is a certified-verify\nmismatch under identical batch evolution. Each server's two passes must be identical, and\nstocktokens is compared with the seeded control's logprob stock run as a side check\n(logprob requests should not change stock tokens).",
+ "reference": "/home/ubuntu/vp-data/benchcert/control/seeded",
+ "paths": {
+  "verify": {
+   "calls": 5,
+   "rows": 20,
+   "fallback_rows": 2,
+   "mismatch_rows": 0,
+   "max_certified_rows": 4,
+   "host_certified_steps": 5,
+   "uncounted_calls": 0
+  },
+  "draft": {
+   "calls": 7426,
+   "rows": 68802,
+   "fallback_rows": 1672,
+   "mismatch_rows": 0,
+   "max_certified_rows": 16,
+   "host_certified_steps": 3713,
+   "uncounted_calls": 0
+  },
+  "draft_extend": {
+   "calls": 3713,
+   "rows": 34401,
+   "fallback_rows": 614,
+   "mismatch_rows": 0,
+   "max_certified_rows": 16,
+   "host_certified_steps": 3713,
+   "uncounted_calls": 0
+  },
+  "dflash_draft": {
+   "calls": 0,
+   "rows": 0,
+   "fallback_rows": 0,
+   "mismatch_rows": 0,
+   "max_certified_rows": 0,
+   "host_certified_steps": 0,
+   "uncounted_calls": 0
+  }
+ },
+ "uncounted_calls_zero": true,
+ "against_stock": {
+  "certstats_vs_stock/rep0": {
+   "prompts": 109,
+   "identical": 109,
+   "diverged": 0,
+   "length_mismatch": 0,
+   "exposure_tokens": 55808,
+   "first_divergence_median": null,
+   "divergences": []
+  },
+  "certstats_vs_stock/rep1": {
+   "prompts": 109,
+   "identical": 109,
+   "diverged": 0,
+   "length_mismatch": 0,
+   "exposure_tokens": 55808,
+   "first_divergence_median": null,
+   "divergences": []
+  }
+ },
+ "reading": "certified verify rows over the server life (warm-up included); outputs equal stock"
+}

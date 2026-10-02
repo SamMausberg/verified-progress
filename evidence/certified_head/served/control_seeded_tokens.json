@@ -1,0 +1,174 @@
+{
+ "declared": false,
+ "reading_rule": "certified verify steps during the waves above zero,\nwith every token equal to stocktokens on both passes, means the certified verify decided\nand matched; zero means it did not run; any token difference is a certified-verify\nmismatch under identical batch evolution. Each server's two passes must be identical, and\nstocktokens is compared with the seeded control's logprob stock run as a side check\n(logprob requests should not change stock tokens).",
+ "reference": "/home/ubuntu/vp-data/benchcert/control/seeded",
+ "within_server": {
+  "stocktokens": {
+   "prompts": 109,
+   "identical": 109,
+   "diverged": 0,
+   "length_mismatch": 0,
+   "exposure_tokens": 55808,
+   "first_divergence_median": null,
+   "divergences": []
+  },
+  "certtokens": {
+   "prompts": 109,
+   "identical": 109,
+   "diverged": 0,
+   "length_mismatch": 0,
+   "exposure_tokens": 55808,
+   "first_divergence_median": null,
+   "divergences": []
+  }
+ },
+ "certtokens_vs_stocktokens": {
+  "certtokens_vs_stocktokens/rep0": {
+   "prompts": 109,
+   "identical": 109,
+   "diverged": 0,
+   "length_mismatch": 0,
+   "exposure_tokens": 55808,
+   "first_divergence_median": null,
+   "divergences": []
+  },
+  "certtokens_vs_stocktokens/rep1": {
+   "prompts": 109,
+   "identical": 109,
+   "diverged": 0,
+   "length_mismatch": 0,
+   "exposure_tokens": 55808,
+   "first_divergence_median": null,
+   "divergences": []
+  }
+ },
+ "stocktokens_vs_logprob_stock": {
+  "stocktokens_vs_logprob_stock/rep0": {
+   "prompts": 109,
+   "identical": 109,
+   "diverged": 0,
+   "length_mismatch": 0,
+   "exposure_tokens": 55808,
+   "first_divergence_median": null,
+   "divergences": []
+  },
+  "stocktokens_vs_logprob_stock/rep1": {
+   "prompts": 109,
+   "identical": 109,
+   "diverged": 0,
+   "length_mismatch": 0,
+   "exposure_tokens": 55808,
+   "first_divergence_median": null,
+   "divergences": []
+  }
+ },
+ "baseline_identical": true,
+ "waves_counters_by_size": {
+  "verify": {
+   "1": {
+    "certified_steps": 272,
+    "stock_graph_steps": 0,
+    "rows": 1088,
+    "max_rows": 4
+   },
+   "8": {
+    "certified_steps": 1128,
+    "stock_graph_steps": 0,
+    "rows": 30328,
+    "max_rows": 32
+   },
+   "12": {
+    "certified_steps": 1166,
+    "stock_graph_steps": 0,
+    "rows": 46504,
+    "max_rows": 48
+   },
+   "16": {
+    "certified_steps": 1142,
+    "stock_graph_steps": 0,
+    "rows": 59664,
+    "max_rows": 64
+   }
+  },
+  "draft": {
+   "1": {
+    "certified_steps": 272,
+    "stock_graph_steps": 0,
+    "rows": 544,
+    "max_rows": 1
+   },
+   "8": {
+    "certified_steps": 1128,
+    "stock_graph_steps": 0,
+    "rows": 15164,
+    "max_rows": 8
+   },
+   "12": {
+    "certified_steps": 1166,
+    "stock_graph_steps": 0,
+    "rows": 23252,
+    "max_rows": 12
+   },
+   "16": {
+    "certified_steps": 1142,
+    "stock_graph_steps": 0,
+    "rows": 29832,
+    "max_rows": 16
+   }
+  },
+  "draft_extend": {
+   "1": {
+    "certified_steps": 272,
+    "stock_graph_steps": 0,
+    "rows": 272,
+    "max_rows": 1
+   },
+   "8": {
+    "certified_steps": 1128,
+    "stock_graph_steps": 0,
+    "rows": 7582,
+    "max_rows": 8
+   },
+   "12": {
+    "certified_steps": 1166,
+    "stock_graph_steps": 0,
+    "rows": 11626,
+    "max_rows": 12
+   },
+   "16": {
+    "certified_steps": 1142,
+    "stock_graph_steps": 0,
+    "rows": 14916,
+    "max_rows": 16
+   }
+  },
+  "dflash_draft": {
+   "1": {
+    "certified_steps": 0,
+    "stock_graph_steps": 0,
+    "rows": 0,
+    "max_rows": 0
+   },
+   "8": {
+    "certified_steps": 0,
+    "stock_graph_steps": 0,
+    "rows": 0,
+    "max_rows": 0
+   },
+   "12": {
+    "certified_steps": 0,
+    "stock_graph_steps": 0,
+    "rows": 0,
+    "max_rows": 0
+   },
+   "16": {
+    "certified_steps": 0,
+    "stock_graph_steps": 0,
+    "rows": 0,
+    "max_rows": 0
+   }
+  }
+ },
+ "waves_certified_verify_steps": 3708,
+ "reading": "the certified verify decided the waves' verifies and matched stock"
+}

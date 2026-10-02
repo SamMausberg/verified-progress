@@ -1,0 +1,989 @@
+{
+ "planted_token": 9471,
+ "by_launch": {
+  "plant1": {
+   "draws": 6,
+   "reached": 5,
+   "tokens_at_439": {
+    "68189": 3,
+    "8078": 2
+   }
+  },
+  "cert0c": {
+   "draws": 6,
+   "reached": 6,
+   "tokens_at_439": {
+    "68189": 5,
+    "5715": 1
+   }
+  },
+  "plant2": {
+   "draws": 6,
+   "reached": 6,
+   "tokens_at_439": {
+    "8078": 3,
+    "68189": 3
+   }
+  },
+  "cert0d": {
+   "draws": 6,
+   "reached": 6,
+   "tokens_at_439": {
+    "68189": 5,
+    "8078": 1
+   }
+  },
+  "plant3": {
+   "draws": 6,
+   "reached": 2,
+   "tokens_at_439": {
+    "68189": 1,
+    "8078": 1
+   }
+  },
+  "order1": {
+   "draws": 6,
+   "reached": 4,
+   "tokens_at_439": {
+    "5715": 1,
+    "68189": 3
+   }
+  }
+ },
+ "draws": [
+  {
+   "point": "h8/plant1/r0/c064",
+   "launch": "plant1",
+   "repeat": "r0",
+   "reached": true,
+   "token_at_439": 68189,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      9471
+     ],
+     "emitted_1756_at": [
+      240,
+      262,
+      509
+     ],
+     "emitted_planted_at": [
+      210,
+      493
+     ],
+     "end_to_439_ms": 886
+    }
+   ]
+  },
+  {
+   "point": "h8/plant1/r1/c064",
+   "launch": "plant1",
+   "repeat": "r1",
+   "reached": true,
+   "token_at_439": 68189,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      9471
+     ],
+     "emitted_1756_at": [
+      240,
+      262,
+      509
+     ],
+     "emitted_planted_at": [
+      210,
+      493
+     ],
+     "end_to_439_ms": 894
+    }
+   ]
+  },
+  {
+   "point": "h8/plant1/r2/c064",
+   "launch": "plant1",
+   "repeat": "r2",
+   "reached": true,
+   "token_at_439": 68189,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      9471
+     ],
+     "emitted_1756_at": [
+      240,
+      262,
+      509
+     ],
+     "emitted_planted_at": [
+      210,
+      493
+     ],
+     "end_to_439_ms": 880
+    }
+   ]
+  },
+  {
+   "point": "h8/plant1/r3/c064",
+   "launch": "plant1",
+   "repeat": "r3",
+   "reached": true,
+   "token_at_439": 8078,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      9471
+     ],
+     "emitted_1756_at": [
+      240,
+      262,
+      509
+     ],
+     "emitted_planted_at": [
+      210,
+      493
+     ],
+     "end_to_439_ms": 798
+    }
+   ]
+  },
+  {
+   "point": "h8/plant1/r4/c064",
+   "launch": "plant1",
+   "repeat": "r4",
+   "reached": false,
+   "token_at_439": 271,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      9471
+     ],
+     "emitted_1756_at": [
+      240,
+      262,
+      509
+     ],
+     "emitted_planted_at": [
+      210,
+      493
+     ],
+     "end_to_439_ms": 825
+    }
+   ]
+  },
+  {
+   "point": "h8/plant1/r5/c064",
+   "launch": "plant1",
+   "repeat": "r5",
+   "reached": true,
+   "token_at_439": 8078,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      9471
+     ],
+     "emitted_1756_at": [
+      241,
+      263
+     ],
+     "emitted_planted_at": [
+      211
+     ],
+     "end_to_439_ms": 801
+    }
+   ]
+  },
+  {
+   "point": "h8/cert0c/r0/c064",
+   "launch": "cert0c",
+   "repeat": "r0",
+   "reached": true,
+   "token_at_439": 68189,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      1756
+     ],
+     "emitted_1756_at": [
+      211,
+      241,
+      263,
+      389,
+      405,
+      427,
+      499
+     ],
+     "emitted_planted_at": [],
+     "end_to_439_ms": 835
+    }
+   ]
+  },
+  {
+   "point": "h8/cert0c/r1/c064",
+   "launch": "cert0c",
+   "repeat": "r1",
+   "reached": true,
+   "token_at_439": 68189,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      1756
+     ],
+     "emitted_1756_at": [
+      211,
+      241,
+      263,
+      389,
+      405,
+      427,
+      499
+     ],
+     "emitted_planted_at": [],
+     "end_to_439_ms": 846
+    }
+   ]
+  },
+  {
+   "point": "h8/cert0c/r2/c064",
+   "launch": "cert0c",
+   "repeat": "r2",
+   "reached": true,
+   "token_at_439": 68189,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      1756
+     ],
+     "emitted_1756_at": [
+      211,
+      241,
+      263,
+      389,
+      405,
+      427,
+      500
+     ],
+     "emitted_planted_at": [],
+     "end_to_439_ms": 837
+    }
+   ]
+  },
+  {
+   "point": "h8/cert0c/r3/c064",
+   "launch": "cert0c",
+   "repeat": "r3",
+   "reached": true,
+   "token_at_439": 68189,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      1756
+     ],
+     "emitted_1756_at": [
+      211,
+      241,
+      263,
+      389,
+      405,
+      427,
+      499
+     ],
+     "emitted_planted_at": [],
+     "end_to_439_ms": 854
+    }
+   ]
+  },
+  {
+   "point": "h8/cert0c/r4/c064",
+   "launch": "cert0c",
+   "repeat": "r4",
+   "reached": true,
+   "token_at_439": 5715,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      1756
+     ],
+     "emitted_1756_at": [
+      241,
+      269,
+      291
+     ],
+     "emitted_planted_at": [],
+     "end_to_439_ms": 792
+    }
+   ]
+  },
+  {
+   "point": "h8/cert0c/r5/c064",
+   "launch": "cert0c",
+   "repeat": "r5",
+   "reached": true,
+   "token_at_439": 68189,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      1756
+     ],
+     "emitted_1756_at": [
+      211,
+      241,
+      263,
+      389,
+      405,
+      427,
+      499
+     ],
+     "emitted_planted_at": [],
+     "end_to_439_ms": 844
+    }
+   ]
+  },
+  {
+   "point": "h8/plant2/r0/c064",
+   "launch": "plant2",
+   "repeat": "r0",
+   "reached": true,
+   "token_at_439": 8078,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      9471
+     ],
+     "emitted_1756_at": [
+      240,
+      262,
+      509
+     ],
+     "emitted_planted_at": [
+      210,
+      493
+     ],
+     "end_to_439_ms": 842
+    }
+   ]
+  },
+  {
+   "point": "h8/plant2/r1/c064",
+   "launch": "plant2",
+   "repeat": "r1",
+   "reached": true,
+   "token_at_439": 68189,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      9471
+     ],
+     "emitted_1756_at": [
+      240,
+      262,
+      509
+     ],
+     "emitted_planted_at": [
+      210,
+      493
+     ],
+     "end_to_439_ms": 889
+    }
+   ]
+  },
+  {
+   "point": "h8/plant2/r2/c064",
+   "launch": "plant2",
+   "repeat": "r2",
+   "reached": true,
+   "token_at_439": 68189,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      9471
+     ],
+     "emitted_1756_at": [
+      240,
+      262,
+      509
+     ],
+     "emitted_planted_at": [
+      210,
+      493
+     ],
+     "end_to_439_ms": 886
+    }
+   ]
+  },
+  {
+   "point": "h8/plant2/r3/c064",
+   "launch": "plant2",
+   "repeat": "r3",
+   "reached": true,
+   "token_at_439": 68189,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      9471
+     ],
+     "emitted_1756_at": [
+      240,
+      262,
+      509
+     ],
+     "emitted_planted_at": [
+      210,
+      493
+     ],
+     "end_to_439_ms": 887
+    }
+   ]
+  },
+  {
+   "point": "h8/plant2/r4/c064",
+   "launch": "plant2",
+   "repeat": "r4",
+   "reached": true,
+   "token_at_439": 8078,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      9471
+     ],
+     "emitted_1756_at": [
+      241,
+      263
+     ],
+     "emitted_planted_at": [
+      211
+     ],
+     "end_to_439_ms": 769
+    }
+   ]
+  },
+  {
+   "point": "h8/plant2/r5/c064",
+   "launch": "plant2",
+   "repeat": "r5",
+   "reached": true,
+   "token_at_439": 8078,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      9471
+     ],
+     "emitted_1756_at": [
+      241,
+      263
+     ],
+     "emitted_planted_at": [
+      211
+     ],
+     "end_to_439_ms": 837
+    }
+   ]
+  },
+  {
+   "point": "h8/cert0d/r0/c064",
+   "launch": "cert0d",
+   "repeat": "r0",
+   "reached": true,
+   "token_at_439": 68189,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      1756
+     ],
+     "emitted_1756_at": [
+      211,
+      241,
+      263,
+      389,
+      405,
+      427,
+      499
+     ],
+     "emitted_planted_at": [],
+     "end_to_439_ms": 832
+    }
+   ]
+  },
+  {
+   "point": "h8/cert0d/r1/c064",
+   "launch": "cert0d",
+   "repeat": "r1",
+   "reached": true,
+   "token_at_439": 68189,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      1756
+     ],
+     "emitted_1756_at": [
+      241,
+      269,
+      291
+     ],
+     "emitted_planted_at": [],
+     "end_to_439_ms": 990
+    }
+   ]
+  },
+  {
+   "point": "h8/cert0d/r2/c064",
+   "launch": "cert0d",
+   "repeat": "r2",
+   "reached": true,
+   "token_at_439": 68189,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      1756
+     ],
+     "emitted_1756_at": [
+      211,
+      241,
+      263,
+      389,
+      405,
+      427,
+      499
+     ],
+     "emitted_planted_at": [],
+     "end_to_439_ms": 802
+    }
+   ]
+  },
+  {
+   "point": "h8/cert0d/r3/c064",
+   "launch": "cert0d",
+   "repeat": "r3",
+   "reached": true,
+   "token_at_439": 8078,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      1756
+     ],
+     "emitted_1756_at": [
+      211,
+      241,
+      263,
+      389,
+      405,
+      427,
+      500
+     ],
+     "emitted_planted_at": [],
+     "end_to_439_ms": 662
+    }
+   ]
+  },
+  {
+   "point": "h8/cert0d/r4/c064",
+   "launch": "cert0d",
+   "repeat": "r4",
+   "reached": true,
+   "token_at_439": 68189,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      1756
+     ],
+     "emitted_1756_at": [
+      211,
+      241,
+      263,
+      389,
+      405,
+      427,
+      499
+     ],
+     "emitted_planted_at": [],
+     "end_to_439_ms": 844
+    }
+   ]
+  },
+  {
+   "point": "h8/cert0d/r5/c064",
+   "launch": "cert0d",
+   "repeat": "r5",
+   "reached": true,
+   "token_at_439": 68189,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      1756
+     ],
+     "emitted_1756_at": [
+      211,
+      241,
+      263,
+      389,
+      405,
+      427,
+      499
+     ],
+     "emitted_planted_at": [],
+     "end_to_439_ms": 831
+    }
+   ]
+  },
+  {
+   "point": "h8/plant3/r0/c064",
+   "launch": "plant3",
+   "repeat": "r0",
+   "reached": true,
+   "token_at_439": 68189,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      9471
+     ],
+     "emitted_1756_at": [
+      240,
+      262,
+      509
+     ],
+     "emitted_planted_at": [
+      210,
+      493
+     ],
+     "end_to_439_ms": 889
+    }
+   ]
+  },
+  {
+   "point": "h8/plant3/r1/c064",
+   "launch": "plant3",
+   "repeat": "r1",
+   "reached": false,
+   "token_at_439": 271,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      9471
+     ],
+     "emitted_1756_at": [
+      240,
+      262,
+      509
+     ],
+     "emitted_planted_at": [
+      210,
+      493
+     ],
+     "end_to_439_ms": 837
+    }
+   ]
+  },
+  {
+   "point": "h8/plant3/r2/c064",
+   "launch": "plant3",
+   "repeat": "r2",
+   "reached": true,
+   "token_at_439": 8078,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      9471
+     ],
+     "emitted_1756_at": [
+      240,
+      262,
+      509
+     ],
+     "emitted_planted_at": [
+      210,
+      493
+     ],
+     "end_to_439_ms": 791
+    }
+   ]
+  },
+  {
+   "point": "h8/plant3/r3/c064",
+   "launch": "plant3",
+   "repeat": "r3",
+   "reached": false,
+   "token_at_439": 271,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      9471
+     ],
+     "emitted_1756_at": [
+      240,
+      262,
+      509
+     ],
+     "emitted_planted_at": [
+      210,
+      493
+     ],
+     "end_to_439_ms": 839
+    }
+   ]
+  },
+  {
+   "point": "h8/plant3/r4/c064",
+   "launch": "plant3",
+   "repeat": "r4",
+   "reached": false,
+   "token_at_439": 271,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      9471
+     ],
+     "emitted_1756_at": [
+      240,
+      262,
+      509
+     ],
+     "emitted_planted_at": [
+      210,
+      493
+     ],
+     "end_to_439_ms": 830
+    }
+   ]
+  },
+  {
+   "point": "h8/plant3/r5/c064",
+   "launch": "plant3",
+   "repeat": "r5",
+   "reached": false,
+   "token_at_439": 271,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000527",
+     "suffix_tokens": [
+      9471
+     ],
+     "emitted_1756_at": [
+      240,
+      262,
+      509
+     ],
+     "emitted_planted_at": [
+      210,
+      493
+     ],
+     "end_to_439_ms": 840
+    }
+   ]
+  },
+  {
+   "point": "h8/order1/r0/c064",
+   "launch": "order1",
+   "repeat": "r0",
+   "reached": true,
+   "token_at_439": 5715,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000573",
+     "suffix_tokens": [
+      1756
+     ],
+     "emitted_1756_at": [
+      202,
+      240,
+      274
+     ],
+     "emitted_planted_at": [],
+     "end_to_439_ms": -344
+    }
+   ]
+  },
+  {
+   "point": "h8/order1/r1/c064",
+   "launch": "order1",
+   "repeat": "r1",
+   "reached": true,
+   "token_at_439": 68189,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000573",
+     "suffix_tokens": [
+      1756
+     ],
+     "emitted_1756_at": [
+      210,
+      240,
+      262,
+      388,
+      404,
+      426,
+      498
+     ],
+     "emitted_planted_at": [],
+     "end_to_439_ms": -201
+    }
+   ]
+  },
+  {
+   "point": "h8/order1/r2/c064",
+   "launch": "order1",
+   "repeat": "r2",
+   "reached": false,
+   "token_at_439": 271,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000573",
+     "suffix_tokens": [
+      1756
+     ],
+     "emitted_1756_at": [
+      211,
+      241,
+      263,
+      412,
+      489,
+      511
+     ],
+     "emitted_planted_at": [],
+     "end_to_439_ms": -277
+    }
+   ]
+  },
+  {
+   "point": "h8/order1/r3/c064",
+   "launch": "order1",
+   "repeat": "r3",
+   "reached": true,
+   "token_at_439": 68189,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000573",
+     "suffix_tokens": [
+      1756
+     ],
+     "emitted_1756_at": [
+      211,
+      241,
+      263,
+      412,
+      489,
+      511
+     ],
+     "emitted_planted_at": [],
+     "end_to_439_ms": -409
+    }
+   ]
+  },
+  {
+   "point": "h8/order1/r4/c064",
+   "launch": "order1",
+   "repeat": "r4",
+   "reached": false,
+   "token_at_439": 437,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000573",
+     "suffix_tokens": [
+      1756
+     ],
+     "emitted_1756_at": [
+      210,
+      240,
+      262,
+      388,
+      404,
+      426,
+      498
+     ],
+     "emitted_planted_at": [],
+     "end_to_439_ms": -212
+    }
+   ]
+  },
+  {
+   "point": "h8/order1/r5/c064",
+   "launch": "order1",
+   "repeat": "r5",
+   "reached": true,
+   "token_at_439": 68189,
+   "planted_in_target": [],
+   "donors": [
+    {
+     "conversation": "session_000573",
+     "suffix_tokens": [
+      1756
+     ],
+     "emitted_1756_at": [
+      210,
+      240,
+      262,
+      388,
+      404,
+      426,
+      499
+     ],
+     "emitted_planted_at": [],
+     "end_to_439_ms": -266
+    }
+   ]
+  }
+ ]
+}

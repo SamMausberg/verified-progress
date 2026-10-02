@@ -1,0 +1,59 @@
+{
+ "declared": false,
+ "reading_rule": "(set before the run; main's, with the red team's counts), over the waves\nwhose 579ae7ce output reaches position 439 with session 1's prefix. Each of cert0 and\ncert is compared with stock: any 1756 in the stock arm means the token is shared with the\nstock engine (fragile numerics at a near tie); 5 or more events in a certified-graph arm,\nwith a one-sided conditional binomial p < 0.05 against an equal split with stock, mean a\nfault of that configuration at this context (in cert0, of the certified integration\nwithout the head's decision); anything else is inconclusive and reported as counts.\nPower: at the timed drains' rate (2 events in 14 draws that reached the context) an arm\nwould expect about 11 events in 100 waves; at 3-5% per draw, 3-4, so a null is likely\nand decides little.",
+ "stock": {
+  "with_partner": {
+   "tokens_at_439": {
+    "other_prefix": 29,
+    "68189": 1
+   },
+   "reached_context": 1,
+   "wrong": 0,
+   "left_session_1_text_at": {
+    "154": 28,
+    "241": 1
+   }
+  },
+  "without_partner": {
+   "tokens_at_439": {
+    "other_prefix": 27,
+    "68189": 1,
+    "5715": 1,
+    "incomplete": 1
+   },
+   "reached_context": 2,
+   "wrong": 0,
+   "left_session_1_text_at": {
+    "154": 27
+   }
+  }
+ },
+ "cert0": {
+  "with_partner": {
+   "tokens_at_439": {},
+   "reached_context": 0,
+   "wrong": 0,
+   "left_session_1_text_at": {}
+  },
+  "without_partner": {
+   "tokens_at_439": {},
+   "reached_context": 0,
+   "wrong": 0,
+   "left_session_1_text_at": {}
+  }
+ },
+ "cert": {
+  "with_partner": {
+   "tokens_at_439": {},
+   "reached_context": 0,
+   "wrong": 0,
+   "left_session_1_text_at": {}
+  },
+  "without_partner": {
+   "tokens_at_439": {},
+   "reached_context": 0,
+   "wrong": 0,
+   "left_session_1_text_at": {}
+  }
+ }
+}

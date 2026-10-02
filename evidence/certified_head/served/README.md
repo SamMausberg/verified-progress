@@ -27,28 +27,41 @@ So the served envelope rises only at c = 1 and falls at c = 2, 4, 8 and 128. (Bu
 plain decoding, `plain-tuned-replayssm`, may lead at c = 96-128 with one confirmation
 session; it was not tested here.)
 
-**Open: a wrong token in MTP runs that carry the certified graphs, at c = 64.** Session 1's
-certified MTP run at c = 64 committed, at prompt `579ae7ce` position 439, a token (1756)
-that a batch-1 stock reference puts 3.8 nats below the top, where the position is a
-three-way near tie and every stock run chose one of the three (Exactness, below). That
-run is the discovery. The drain reruns' reading rule, set before they ran, reads
-reproduction from the teacher-forced scores of the reruns alone: in h6a, 1 of 12 certified
-c = 64 points committed the same token at the same position (output identical to session
-1's), 0 of 12 stock points and 0 of h6b's 8 check-mode points did. Under that rule the
-failure is reproduced. The event is not attributable to the certified head's decision:
-the ring-logged reruns (h7) saw it twice in 12 draws of `cert0`, the certified environment
-with `MAX_ROWS=0`, where the head never runs and the stock head inside the conditional
-node commits every token. The candidate locus is the certified integration that cert and
-cert0 share and stock lacks (conditional nodes, the gated stock path, graph memory). A
-probe found that graph allocations after a conditional node stay in the graph's pool, and
-a stress test cleared the head's decision path for batch-1 inputs in head-only graphs. The counts
-alone separate nothing: after the discovery, engines carrying the certified graphs
-committed it in 3 of 47 draws that reached the context, stock in 0 of 19. Post hoc
-grouping: it was observed only in uninstrumented runs of engines that carry the certified
-graphs, 4 of 22 draws reaching the context. One other request of the point,
-`session_000527`, puts the same token in the same syntactic slot (`check_type`); a
-planted-donor rerun, queued, tests whether its content causes the event. MTP exactness is
-claimed only at concurrency 1 and at the check-mode batches.
+**MTP at c = 64: one ill-conditioned position, and no observation that requires a
+certified-head error.** Session 1's certified MTP run at c = 64 committed token 1756 at
+prompt `579ae7ce`, output position 439, a single position in text the model wrote after its
+own end-of-text token. Stock runs there committed 68189, 8078 or 5715 (Exactness, below).
+The next-token distribution at that position is ill-conditioned. Every stock path agrees
+within 0.03 nats on each of the 39 preceding positions. At the position itself, an FP32
+forward puts 68189 on top (-0.87) and 1756 at -9.79, and the engine's BF16 paths disagree:
+batch-1 prefills put 1756 at -8.1 to -8.9, while batch-1 plain decoding from position 400
+puts it on top (-0.32), a token FP32 puts 8.9 nats below its top. At the plain c = 128 event
+(`a4db11ff`, position 333) the roles reverse: there the BF16 prefill misses FP32's top token
+by about 13-15 nats, and stock decoding commits it. Against FP32, closed-loop c = 64 runs
+commit a token at least 2 nats below the top at 439 in 4 of 19 stock MTP draws (5715) and
+in 8 of 34 uninstrumented draws of engines carrying the certified graphs (1756 four times,
+5715 four times). 1756 itself appears only in the latter (4 of 34 against 0 of 19; post hoc,
+one-sided Fisher p about 0.16), so the arms differ in which wrong token, not measurably in
+how often. No observation requires an error in the certified head:
+- `cert0` (`MAX_ROWS=0`, the head never decides) committed 1756;
+- the head matched the stock argmax on every check-mode row, every ring-logged row and
+  every stress-test row (the stress test covers batch-1 inputs in head-only graphs);
+- stock batch-1 decode itself puts 1756 on top.
+
+The gate at the session-1 and h6a events is unknown, but with the gate on the head returns
+the argmax of the BF16 hidden state it receives. Under identical batch evolution the
+certified engine matches stock at the most sensitive position known. With 579ae7ce seeded
+through position 399, the certified engine with its verify head deciding all 3,708 verify
+steps commits stock's tokens on every one of 109 requests at batch 1, 8, 12 and 16; with
+logprobs requested (which keep the verify on the stock head), `cert0` and the certified
+engine are also logprob-identical to stock. Stock MTP's verify there commits FP32's top
+token, 68189. Whether `session_000527`'s content feeds the event is
+untested (the planted-donor hold's unplanted control did not fire). The certified head's
+contract is identity with the stock engine's output for the same batch, and the stock
+engine is not FP32-exact at positions like this one. MTP identity is claimed at
+concurrency 1, in check mode and under identical batch evolution (the seeded control and
+the wave controls); closed-loop outputs at c >= 8 can differ through batch evolution, as
+stock runs differ from each other across timings.
 
 **Declared verdicts (measured).** By the pre-registered rule (one primary point per
 family, Holm-adjusted across the four) H4 is supported under the declared rule: at
@@ -112,8 +125,9 @@ H4: **supported** (`summary.json`, regenerated after the check rerun). The exact
 behind these verdicts rests on the complete check launches (`check2`: every certified
 call counted, 0 of 592,433 certified rows differ) and on concurrency-1 identity; block 8
 rests on check mode alone. Under the declared rule a large class is reported and
-investigated, not by itself a failure, so the wrong token at MTP c = 64 (Exactness)
-leaves these verdicts as computed; it is open. Block 8's loss rests on Holm's last step
+investigated, not by itself a failure, so the one large class, at MTP c = 64 (an
+ill-conditioned position where stock errs too; Exactness), leaves these verdicts as
+computed. Block 8's loss rests on Holm's last step
 at the nominal 0.05; its Bonferroni interval includes 1.
 
 ## Every point
@@ -208,6 +222,16 @@ difference, stay in `check.csv` labelled partial.
 No row was refused. Check mode compares the certified head with the stock head computed
 outside the conditional node; it does not test the gated-off stock path inside it.
 
+**Where the certified verify decides.** A batch's verify goes to the stock head if any of
+its requests asks for logprobs, penalties, a grammar or token mask, logit bias, a custom
+logit processor or logprob capture (SGLang's `certified_head.py`, `_adjusts_logits`). The
+benchmark workload has none of these (greedy, `ignore_eos`, no logprobs in the aiperf
+payload), and the check launches counted certified verify calls at every point, so the
+timed and check results are unaffected. The seeded control's logprob run is the one
+comparison here where it applied (Seeded MTP control, below). In a deployment, a batch that
+holds such a request gets the stock verify: a condition on both the exactness scope and the
+speedup.
+
 **Concurrency 1, timed.** One request at a time gives both arms the same batches, and
 every request's token ids were identical between the two arms in all three sessions:
 plain, MTP and block 16, 32 of 32 prompts each. Block 8 has no c = 1 point; its
@@ -215,7 +239,9 @@ exactness rests on its check launch alone. By the declared rule exactness was es
 for all four families from these and the complete check rerun: token identity at
 concurrency 1 and at the check-mode batches. The exploratory wave controls below
 add identity under fixed batch evolution for MTP at 8 requests and for block 16 at c = 8
-with the head gated off.
+with the head gated off, and the seeded MTP control adds it for MTP at batches of 1, 8, 12
+and 16 from 579ae7ce's position 400: tokens with the certified verify deciding every step,
+and tokens and logprobs with the verify on the stock head.
 
 **Concurrency above 1, timed.** Closed-loop batches vary from run to run. First
 divergences per 1,000 tokens of exposure, pooled over c > 1 (`equality.csv`;
@@ -243,26 +269,37 @@ conditional nodes, and points to the first.
 stock, and the stock floor pairs) was re-scored on a stock plain-decoding server at
 concurrency 1 with the common prefix and classed by the stock margin between the two
 tokens (`experiments/benchcert/rescore.py`; classes as in
-`experiments/state_safety/compare.py`, applied to one margin). Of 1,113 unique contexts,
-530 are ties, 550 one ulp apart, 32 near (at most 0.5 nats) and 1 large. Pooled over
+`experiments/state_safety/compare.py`, applied to one margin). The first re-score sent 16
+contexts at a time, so the server batched their prefills and the margins were not batch-1
+values (Codex on PR #190; amendment in `experiments/benchcert/README.md`). It was rerun one
+context at a time (`hold_paths.sh`), and `classes.csv` comes from that run. Of 1,113 unique
+contexts, 540 are ties, 553 one ulp apart, 19 near (at most 0.5 nats) and 1 large (the
+concurrent run: 530, 550, 32 and 1). 455 margins changed, almost all by swapping tie and
+one ulp; only the large context moved by more than 0.5 nats (3.6 to 6.8). Pooled over
 c > 1, counting every pair's first divergences (`summary.json`, `equality.csv`):
 
 | Family | Certified vs stock: tie / one ulp / near / large | Stock vs stock: tie / one ulp / near / large |
 |---|---|---|
-| plain | 57 / 51 / 3 / 0 | 54 / 38 / 0 / 0 |
-| mtp | 366 / 406 / 26 / 1 | 344 / 368 / 17 / 0 |
-| dflash16 | 3 / 6 / 0 / 0 | none |
-| dflash8 | 259 / 259 / 11 / 0 | 267 / 241 / 9 / 0 |
+| plain | 51 / 58 / 2 / 0 | 46 / 46 / 0 / 0 |
+| mtp | 394 / 392 / 12 / 1 | 354 / 365 / 10 / 0 |
+| dflash16 | 6 / 3 / 0 / 0 | none |
+| dflash8 | 272 / 250 / 7 / 0 | 267 / 243 / 7 / 0 |
+
+These classes are only as good as their reference. A BF16 batch-1 teacher-forced
+reference can be wrong by 13 nats or more at an ill-conditioned position (Reference paths
+and FP32, below), so a class says how far apart the two tokens are under the stock prefill
+path, not under the model's exact arithmetic.
 
 The block-16 events are the three recurring c = 8 divergences, all at the rounding
-level. The one large event is a wrong token committed by a certified run: MTP at c = 64,
-session 1. At an identical 514-token prefix (prompt `579ae7ce`, output position 439),
-the session-1 certified run committed `_type` (token 1756), 3.8 nats below the top of
-the batch-1 stock distribution, while the session-1 stock run and both arms of session 3,
-and session 2's certified run, committed `_triangle` (68189), 0.19 nats below the top
-(session 2's stock run had diverged earlier); all later tokens agree. A wrong draft is
-rejected by greedy verification, so the certified run's verify step committed a token it
-should not have produced. This shape was tested only in check mode. The check rerun ran
+level. The one large event is MTP at c = 64, session 1. At an identical 514-token prefix
+(prompt `579ae7ce`, output position 439), the session-1 certified run committed `_type`
+(token 1756), 6.8 nats below the top of the serial batch-1 prefill reference (8.9 below
+FP32's top), while the session-1 stock run and both arms of session 3, and session 2's
+certified run, committed `_triangle` (68189), the top of both references (session 2's
+stock run had diverged earlier); all later tokens agree. A wrong draft is rejected by
+greedy verification, so the certified run's verify step committed 1756 itself. Stock batch-1
+plain decoding from position 400 commits the same token (Reference paths and FP32, below).
+This shape was tested only in check mode. The check rerun ran
 MTP at c = 64 on all three certified paths, every call counted (verify 78 calls and 2,364
 rows, up to 64 certified rows in the drain; draft 1,156 and 60,886; draft extend 578 and
 30,443), with no differing row. In h1's first check run c = 64 was MTP's last point, so
@@ -278,10 +315,12 @@ active at the event, besides the draft and draft-extend paths, which run certifi
 it, and they do not recreate the drain. One closed-loop rerun of the timed point committed
 the same token, which the teacher-forced scores count as a reproduction under the reruns'
 pre-set rule, and two ring-logged reruns of `cert0`, where the head never runs, did too
-(Drain reruns, below). The cause is not established: it is reported as a reproduced
-wrong-token failure in MTP c = 64 drains of engines that carry the certified graphs,
-mechanism under investigation, and MTP exactness is claimed only at concurrency 1 and at
-the check-mode batches. The first
+(Drain reruns, below). What followed explains the position rather than a fault: the
+position is ill-conditioned, stock BF16 paths disagree there by up to 8 nats, stock MTP
+runs commit a token 4.7 nats below FP32's top there too, and the certified engine is
+identical to stock under identical batch evolution (Drain reruns: Reference paths and FP32,
+Seeded MTP control). MTP identity is claimed at concurrency 1, in check mode and under
+identical batch evolution. The first
 scoring run read the tokens' logprobs from the wrong response key, so every margin was
 NaN and every context classed large; it was discarded and the declared re-score rerun
 after the fix. The wave controls compare token ids and are unaffected.
@@ -358,17 +397,20 @@ Among the points that reached the prefix, that is 1 of 11 certified against 0 of
 Session 1's certified point, the discovery, committed 1756. Of the other five MTP c = 64
 points of sessions 1-3, four committed 68189 and one diverged earlier. Post hoc and
 descriptive only, against the stated rule: pooling session 1 with h6a gives 2 of 15
-certified against 0 of 15 stock (one-sided Fisher p = 0.24). The context is a three-way
-near tie at batch 1 (8078 at -1.684, 5715 at about -1.81, 68189 at -1.872), and stock runs
-move among those three from run to run; 1756 sits at -5.50.
+certified against 0 of 15 stock (one-sided Fisher p = 0.24). The concurrent re-score
+called the context a three-way near tie (8078 at -1.684, 5715 at about -1.81, 68189 at
+-1.872, 1756 at -5.50). Serially the prefill reference gives 68189 -1.31, 8078 -1.69, 5715
+-3.50 and 1756 -8.12, and FP32 gives 68189 -0.87, 8078 -1.89, 5715 -5.62 and 1756 -9.79
+(Reference paths and FP32, below): only 68189 and 8078 are close, and 5715, which stock
+runs also commit, is 4.7 nats below FP32's top.
 
 Both certified events came in the point's final drain. In h6a's, the server's running
 batch fell from 22 to 8 to 2 requests in the second the token was produced (session 1:
 49, 26, 10); the client had 10 requests in flight when the token arrived in both. The
 server's batch at the step that verified position 439 is not known for these runs: in the
 ring-logged reruns below, where the client also saw about 10 in flight, it was 14-19
-requests, so the certified verify head ran at that step in half of them and the stock head
-in the other half. The full output of h6a's event equals session 1's. The request's accepted-draft histogram indicates that the
+requests, so the certified verify head ran at that step in 9 of the 20 (batch 14-16) and
+the stock head in 11 (batch 17-19). The full output of h6a's event equals session 1's. The request's accepted-draft histogram indicates that the
 verify rejected the draft 68189 at position 439 and committed its own prediction, 1756,
 so the token was the verify step's decision, not a substitution after it. In session 1
 it moved exactly one verify cycle from three accepted drafts to one (7 12 16 108 against
@@ -379,22 +421,29 @@ that move.
 and check launch of the campaign was scored on rescore.py's stock plain-decoding server:
 214 points, 47,336 requests and 24.2 million tokens, with no unscored request
 (`drain_scores.csv`, `drain_score_report.json`, `drain_gross_events.csv`). Session 1's 1756 scored 3.81 nats below
-the top, the positive control.
+the top, the positive control. The scorer sent 16 requests at a time, so these are not
+batch-1 values; every near and gross context, and 579ae7ce's position 439 in every scored
+MTP c = 64 point, was re-scored one at a time (`drain_serial_rescore.json`), and the
+classes below hold serially.
 
 - Gross events (2 nats or more), MTP family: only `579ae7ce`'s 1756 at position 439, in
-  session 1's certified point and in h6a's `cert1` repeat 1. There were none in any stock
-  MTP point (sessions 1-3, h6a) and none in check mode.
+  session 1's certified point and in h6a's `cert1` repeat 1 (3.81 nats concurrently, 6.81
+  serially, 8.9 against FP32: a BF16 error by FP32's measure). There were none in any stock
+  MTP point (sessions 1-3, h6a) and none in check mode. Serially, though, the 5715 that four
+  stock draws committed at the same position is itself 2.19 nats below the prefill
+  reference's top, and 4.7 below FP32's.
 - Plain family: one context (prompt `a4db11ff`, position 333) is gross in all six c = 128
   points, stock and certified, in every session: stock decoding commits token 18299 there,
-  6.19 nats below the prefill reference's top-1, deterministically. So a gap of 2 nats is
-  not by itself beyond rounding. The 1756 event rests on the contrast between runs at an
-  identical prefix (certified runs only; the 11 stock runs that reached it moved only
-  among the three near-tied tokens) and on the acceptance histograms.
+  6.19 nats below the reference's top-1 concurrently and 13.9 serially. FP32 puts 18299 on
+  top (-0.45), so these six "gross" events are scorer errors: the served token is FP32's
+  top, and the BF16 prefill reference misses it by about 13-15 nats.
+- So a BF16 teacher-forced reference, even at batch 1, is not a ground truth at positions
+  like these, and the gross count is only as good as that reference.
 - Near events (0.5-2 nats) at h6a's c = 64 points: 9 certified against 6 stock, a rate
   ratio of 1.5 (exact conditional 95% interval 0.48-5.1).
 - Co-batched requests: the 21 requests whose tokens streamed within 300 ms of each event
   (client clock) committed no near or gross token, only exact ties and rounding-level
-  differences. So the wrong token did not come with wrong tokens in other requests of
+  differences. So the event did not come with near or gross tokens in other requests of
   the batch.
 - After the event: under the 1756 prefix, no position from 440 to 511 disagrees with the
   teacher-forced top-1. The outputs after 1756 and after 68189 are the same, so this does
@@ -429,14 +478,15 @@ split before h7b's log was read). Files: `drain_579ae7ce.csv`, `drain_ring_439.c
   (pre-set reading 5).
 - At the verify of position 439, located on the device in each of the 20 certring draws
   that reached the context (one hit per draw, its predicted id equal to the client's
-  token), the server batch held 14-19 requests. In the 10 draws with the gate on, the head
-  chose 68189 outright (status 0, 4-7 candidates), and 1756 was never a candidate. In the
-  10 with the gate off, the stock head chose 68189, 8078 or 5715. None of readings 1-4
+  token), the server batch held 14-19 requests. In the 9 draws with the gate on (batch
+  14-16), the head chose 68189 outright (status 0, 4-7 candidates), and 1756 was never a
+  candidate. In the 11 with the gate off (batch 17-19), the stock head chose 68189 (8),
+  5715 (2) or 8078 (1). None of readings 1-4
   applies in any draw.
-- Over every certified verify of the four certring launches (454,928 rows, 8,722 served by
-  the column fallback, 142 by the dense merge), no id lies outside its candidate list or
+- Over every certified verify of the four certring launches (911,240 rows, 909,733 with a
+  complete candidate list, 17,518 served by the column fallback, 286 by the dense merge), no id lies outside its candidate list or
   has a refined upper bound below another candidate's lower bound, every status-0 id has
-  the largest lower bound, and on all 363,952 accepted rows the verify committed the
+  the largest lower bound, and on all 729,006 accepted rows the verify committed the
   head's id. The device gate equalled the host's and the device row count equalled the
   batch's on every step. These checks show that the head and the verify followed their
   own bounds; correctness against the stock logits is tested by check mode and the stress
@@ -444,11 +494,9 @@ split before h7b's log was read). Files: `drain_579ae7ce.csv`, `drain_ring_439.c
 - At the gate-on draws, the refined bounds of the near-tied tokens differ from their
   batch-1 FP64 logits (from a plain server's hidden state at that position) by -0.03 to
   +1.47 nats for 68189, -0.22 to +0.28 for 8078 and +0.30 to +1.05 for 5715: the served
-  state at this row varies by more than a nat from draw to draw. Two batch-1 stock
-  references disagree at this position (1756 at -5.50 in the h6s scorer's 587-token
-  prefill, about -8.3 in the 586-token prefill of the hidden-state pull), so the event's
-  gap is given as 3.8 nats by the scorer's reference until the planted-donor hold's first
-  step measures prefills ending at 514, 576 and 587 and a decode on the scorer's server.
+  state at this row varies by more than a nat from draw to draw. (The two batch-1 stock
+  references that disagreed here, -5.50 and about -8.3 for 1756, are reconciled below: the
+  first was measured with 16 requests in flight.)
 - No ring draw committed 1756 (0 of 20 at the context), against 2 of 14 in uninstrumented
   timed certified draws, the discovery included. Post hoc, P(0 of 20) is about 0.05 at
   that rate and 0.15 at h6a's 1 of 11: chance or a perturbation by the ring, neither
@@ -516,6 +564,111 @@ near events come before it (`drain_context.json`). The requests in flight at 579
 position 439 in the two certified events form the same set as in eight stock draws that
 committed 68189, so the arm contrast is not a matter of which requests shared the batch
 at the client's resolution.
+
+**Reference paths and FP32 (h8's first step and the serial-references hold).** h8's first
+step, and then `hold_paths.sh` with a cache flush before every request, read each gross
+position on rescore.py's stock plain-decoding server (`plain-tuned`, radix cache off; the
+server log shows no cached token for any request) one request at a time, along three
+prefills and one decode. An FP32 forward on the CPU (transformers' Qwen3.5 in FP32, eager
+attention, its torch GDN kernels) read the same positions twice: one forward over the
+whole prefix, and a forward to 39 positions before followed by one token at a time through
+the recurrent cache (`reference_paths.json`; the flushed repeat reproduced h8's numbers
+exactly). Logprobs at the target:
+
+| Path | 579ae7ce/439: 1756 | 68189 | 8078 | 5715 | top | a4db11ff/333: 18299 | 5500 | top |
+|---|---|---|---|---|---|---|---|---|
+| BF16 prefill to the target | -8.12 | -1.31 | -1.69 | -3.50 | 68189 | -13.89 | -0.01 | 5500 |
+| BF16 prefill, 62 tokens longer | -8.89 | -1.20 | -1.77 | -3.77 | 68189 | -13.40 | -0.02 | 5500 |
+| BF16 prefill of the whole output | -8.32 | -1.57 | -1.51 | -3.32 | 8078 | -15.32 | -0.01 | 5500 |
+| BF16 decode from 39 positions before | -0.32 | -5.32 | -4.51 | -2.76 | 1756 | -0.28 | -3.03 | 18299 |
+| FP32, one forward | -9.79 | -0.87 | -1.89 | -5.62 | 68189 | -0.45 | -1.74 | 18299 |
+| FP32, recurrent from 39 before | -9.79 | -0.87 | -1.89 | -5.62 | 68189 | -0.45 | -1.74 | 18299 |
+
+FP32's two paths agree to 0.001 nats, and its top-1 follows the recorded text at all 39
+traced positions before each target. On each of those 39 positions every path, BF16 and
+FP32, gives the recorded token's logprob within about 0.03 nats; the paths part at the
+target alone. Taking as the measure FP32's top logprob minus FP32's logprob of the token a
+path puts on top, BF16 decode errs by 8.9 nats at 579ae7ce/439 and BF16 prefill by about
+13-15 at a4db11ff/333. Neither path is systematically wrong: these are single
+ill-conditioned positions, both after the request's first end of text, at an identifier
+the model copies into a regenerated prompt. The same 514-token prefill gave 1756 at -5.50
+when 16 requests shared the server (the concurrent re-score), so batching alone moves it
+by 2.6 nats. The planted token 9471 is never on top (-10.4 to -11.3 under the prefills,
+-3.57 under decode).
+
+At 579ae7ce/439, the tokens committed in every c = 64 draw that reached the position with
+session 1's prefix:
+
+| Draws | 68189 | 8078 | 5715 | 1756 | 2 or more nats below FP32's top |
+|---|---|---|---|---|---|
+| stock MTP (sessions 1-3, h6a, h7) | 12 | 3 | 4 | 0 | 4 of 19 |
+| certified graphs, uninstrumented (sessions 1-3, h6a cert, h7 and h8 `cert0`) | 21 | 5 | 4 | 4 | 8 of 34 |
+| certified graphs, instrumented (h6b check mode, h7 ring) | 23 | 1 | 2 | 0 | 2 of 26 |
+| h8 planted and reordered `cert0` | 10 | 6 | 1 | 0 | 1 of 17 |
+
+The rate of a token 2 or more nats below FP32's top is similar between stock and the
+certified-graph arms (4 of 19 against 8 of 34; 11 of 77 over all certified-graph draws).
+Only 1756, the larger error, is confined to the certified-graph arms: 4 of 34 against 0 of
+19, one-sided Fisher p about 0.16, a grouping chosen after seeing the data.
+
+**Planted donor (h8; `drain_donor_h8.json`).** Six cert0 launches alternated: three with
+`session_000527`'s `check_type` changed to `check_types` (token 9471, chosen by the pre-set
+rule as the candidate closest to 1756 under every stock path), two unplanted, and one with
+527 moved behind 579ae7ce. No draw committed 1756 or 9471 at 439: planted 13 of 18 draws
+reached the position (68189 7, 8078 6), unplanted 12 of 12 (68189 10, 5715, 8078),
+reordered 4 of 6 (68189 3, 5715), with 527 ending 662-990 ms before the position in the
+first two arms and still running 201-409 ms after it in the third. By the pre-set rule
+this is inconclusive: the unplanted control did not fire (at the uninstrumented rate of
+about 1 in 8.5, 0 of 12 has probability about 0.22). The planting was also weaker than
+designed: the planted 527 still emits 1756 two or three times, in a variable name
+(`first_type`), so 1756 left the function-name slot but not 527's content. Whether 527's
+content feeds the event is untested. Every launch's graphs matched h6a's; server time per
+pass at c = 64 was 23.10-23.32 ms planted, 23.53 and 23.76 unplanted and 23.77 reordered.
+
+**Small-batch waves at the context (stopped, descriptive).** The context-wave hold
+(`hold_context_waves.sh`) was stopped in its first block: in small batches 579ae7ce leaves
+session 1's text at output position 154 (1048 where session 1 has 3165) in 45 of 48 stock
+waves, so the waves almost never reach 439, and the pre-set power estimate, which assumed
+they would, did not hold. Two of the 48 reached 439, both 68189; an earlier stopped run of
+the same design gave 55 of 60 at 154 and 3 reaching 439 (68189 twice, 5715 once)
+(`context_waves_stopped_20261002T1346.json`, `context_waves_stopped_20261002T1255.json`).
+Closed-loop c = 64 draws leave at 154 in 13 of 85. No cert0 or certified wave ran.
+
+**Seeded MTP control (`control_seeded_mtp.json`).** A mechanism probe at the most sensitive
+position known, not a reproduction of the closed-loop event: 579ae7ce's input carried its
+prompt and session 1's output through position 399, so MTP decoded from 400 and the state
+at 439 came from a prefill to 400 plus 39 decoded tokens, the path on which stock plain
+decoding chose 1756. Four fresh servers at the timed pools (stock, cert0, certified, stock
+again) each served the same 10 synchronized waves twice: 579ae7ce alone, and with 7, 11 or
+15 companions (three fixed sets per size). By the pre-set readings:
+- (i) stock MTP's verify at batch 1 commits 68189, FP32's top, not 1756, so plain decode's
+  1756 is a property of the plain decode path, not of MTP at this state. 1756's logprob at
+  439 depends on the batch size alone: -8.02 at batch 1, -5.51 at 8 and 12, -6.16 at 16,
+  identical across companion sets and passes;
+- the baseline held: each server's two passes are identical, and stock equals stock again;
+- (ii) cert0 and the certified engine equal stock bitwise on all 109 requests, 512 tokens
+  each, on both passes, and their logprobs at 439 are identical to the bit.
+
+These requests asked for logprobs, and a request that asks for logprobs keeps the verify on
+the stock head by design (SGLang's `certified_head.py`, `_adjusts_logits`). A counter rerun
+of the cert arm confirmed it (`control_seeded_stats.json`; same outputs as stock on both
+passes): over the server's life the certified verify ran 5 times, all at most 4 rows (the
+warm-up), against 3,713 certified draft and draft-extend steps (68,802 and 34,401 rows, at
+most 16), with no uncounted call. So the seeded control shows that the certified graphs,
+the certified draft and draft-extend heads and the gated-off verify leave tokens and
+logprobs unchanged. A token-only rerun then served the same waves twice without logprobs,
+stock and certified in turn, reading the counters before and after every wave
+(`control_seeded_tokens.json`). In the waves alone the certified verify ran 3,708 steps and
+137,584 rows (272, 1,128, 1,166 and 1,142 steps at sizes 1, 8, 12 and 16, at most 4, 32,
+48 and 64 rows) with no stock-head verify step, so every verify, 579ae7ce's at 439 among
+them, was the certified head's decision; draft and draft-extend ran certified in the same
+steps. Every token of the 109 requests equals stock's on both passes, each server's passes
+are identical, and the token-only stock run equals the logprob stock run. By the pre-set
+reading, the certified verify decided and matched.
+
+The closed-loop 439 verifies ran at 14-19 requests, so batches up to 16 cover part of that
+range, not all of it; the closed-loop events need batch histories these runs did not
+produce.
 
 ## Memory
 
@@ -588,8 +741,11 @@ mechanism is a hypothesis.
 ## Files
 
 Generated by `python -m experiments.benchcert.analyze report --runs ~/vp-data/benchcert
---out evidence/certified_head/served` at the analysis commit recorded in `summary.json`
-(CPU only), from the holds' raw outputs under `~/vp-data/benchcert/` (not committed). The
+--out evidence/certified_head/served --no-plot --classes
+~/vp-data/exactness/paths/classes_serial.jsonl` at the analysis commit recorded in
+`summary.json` (CPU only; the figures come from the same command without `--no-plot` at the
+earlier analysis commit, and the declared re-score's classes from the serial rerun), from
+the holds' raw outputs under `~/vp-data/benchcert/` (not committed). The
 holds ran `GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x experiments/benchcert/hold.sh hN`
 for N = 1-4 at the hold commit; the re-score and the wave control ran
 `GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -s experiments/benchcert/hold_shared.sh`; the
@@ -601,7 +757,14 @@ h6a` (and `h6b`, `h7a`, `h7b`), each at its hold commit, and the scoring (h6s)
 The stress test ran `GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -s
 experiments/benchcert/hold_stress.sh` at commit `c3a4443`. The drain, score, ring and
 context files below were generated from those holds' outputs at the same commit (CPU only;
-the generators have changed since only in formatting).
+the generators have changed since only in formatting). After it: the planted donor ran
+`... -x experiments/benchcert/hold_drain.sh h8` at its hold commit `d0ef114`, the serial
+references `... -s experiments/benchcert/hold_paths.sh` at `12643a1`, the seeded control
+`... -x experiments/benchcert/hold_seeded_waves.sh` at `e0a282e` and its counter rerun
+`... -x experiments/benchcert/hold_seeded_stats.sh` at `5809538` and its token-only rerun
+`... -x experiments/benchcert/hold_seeded_tokens.sh` at `5a7ee16` (each
+`GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh`); the files from them were generated at
+`0ece39a` or copied as noted.
 
 | File | What |
 |---|---|
@@ -616,12 +779,19 @@ the generators have changed since only in formatting).
 | `frontier.csv`, `frontier.png`, `ratios.png` | figure data and figures |
 | `launch_outliers.csv` | the post hoc slow-launch diagnostic |
 | `predictions.json` | the derived predictions, written before the runs (`analyze.py predict`) |
-| `classes.csv` | every re-scored first-divergence context: class, margin, BF16 spacing, both tokens and their batch-1 stock logprobs (from `experiments/benchcert/rescore.py`'s output, copied by `analyze.py report`) |
+| `classes.csv` | every re-scored first-divergence context: class, margin, BF16 spacing, both tokens and their batch-1 stock logprobs (from `experiments/benchcert/rescore.py`'s serial rerun in `hold_paths.sh`, one context at a time, copied by `analyze.py report --classes`) |
 | `control_waves_mtp.json`, `control_waves_dflash16.json` | the exploratory wave controls' comparisons, with their reading rules (`experiments/benchcert/control_waves.py`, run by `hold_shared.sh`; `compare.json` under `~/vp-data/benchcert/control/<family>/`, copied) |
 | `control_waves_mtp64.json` | the settling hold's waves of 64 (`hold_settle.sh`; `~/vp-data/benchcert/control/mtp64/compare.json`, copied) |
-| `drain_579ae7ce.csv` | `579ae7ce` in every MTP c = 64 point of sessions 1-3 and holds h6a, h6b, h7a and h7b: token at position 439, first difference from session 1's certified run, verify count, accepted-draft histogram (`python -m experiments.benchcert.drain target --out ~/vp-data/benchcert/drain --csv evidence/certified_head/served/drain_579ae7ce.csv`) |
+| `drain_579ae7ce.csv` | `579ae7ce` in every MTP c = 64 point of sessions 1-3 and holds h6a, h6b, h7a, h7b and h8: token at position 439, first difference from session 1's certified run, verify count, accepted-draft histogram (`python -m experiments.benchcert.drain target --out ~/vp-data/benchcert/drain --csv evidence/certified_head/served/drain_579ae7ce.csv`) |
 | `drain_scores.csv` | the h6s teacher-forced scores per point (hold `hold_drain_score.sh`): requests, scored positions, near and gross counts over all and over measured requests, the gap at `579ae7ce`'s position 439 (`python -m experiments.benchcert.score_report summarize --out ~/vp-data/benchcert/drain --csv evidence/certified_head/served/drain_scores.csv`) |
 | `drain_score_report.json`, `drain_gross_events.csv` | the certified-against-stock rate comparisons (near and gross, exact conditional intervals), the positive control, `579ae7ce`'s positions 440-511 under the 1756 prefix, and every gross event with its client-side timing, requests in flight and co-batched disagreements by class (`python -m experiments.benchcert.score_report report --out ~/vp-data/benchcert/drain --json evidence/certified_head/served/drain_score_report.json --events evidence/certified_head/served/drain_gross_events.csv`) |
 | `drain_context.json` | where the h6s events sit: scored positions and near and gross counts before and after each request's first `<\|endoftext\|>`, per group, family and variant, and the requests in flight at `579ae7ce`'s position 439 in every MTP c = 64 draw that reached it (`python -m experiments.benchcert.score_report context --out ~/vp-data/benchcert/drain --json evidence/certified_head/served/drain_context.json`) |
 | `drain_ring_report.json`, `drain_ring_439.csv` | the h7 ring readings. Per `certring` launch: the locator check, the consistency counts over every certified row, the deviations, and `579ae7ce`'s position-439 verify in each draw that reached it (one CSV row per draw: server batch, device and host gate, device row count, fallback flags, committed ids, the head's id, status and candidate count, pre-set readings). Also the refined bounds' drift against batch-1 FP64 logits (`z_ref_batch1`) and the server time per pass of every h6a and h7 c = 64 point with its foreign CPU (`python -m experiments.benchcert.ring_report --out ~/vp-data/benchcert/drain --json evidence/certified_head/served/drain_ring_report.json --csv evidence/certified_head/served/drain_ring_439.csv --hidden ~/vp-data/exactness/stress/context_hidden_bits.npy` in the SGLang environment; the hidden states are the stress hold's batch-1 pull) |
 | `stress_summary.json`, `stress_pool_probe.json` | the stress test's setup (row pools, the context check against the plain server's top 5, captured graphs), replay counts per path, totals, mismatch and envelope-audit records and sentinel checks; and the minimal memory-pool probe (`hold_stress.sh`; `summary.json` and `probe_minimal.json` under `~/vp-data/exactness/stress/`, copied) |
+| `reference_paths.json` | the gross positions (579ae7ce/439, a4db11ff/333) along three BF16 prefills, BF16 decode and FP32 (one forward, and recurrent from 39 positions before): each path's top-1 and tracked tokens' logprobs at the target, and the recorded token's logprob at each of the 39 positions before it (`python -m experiments.benchcert.paths summary --out ~/vp-data/exactness/paths --json evidence/certified_head/served/reference_paths.json`, from `hold_paths.sh`'s `stock.json` and `fp32.json`) |
+| `drain_serial_rescore.json` | every h6s near and gross event, and 579ae7ce's position 439 in every scored MTP c = 64 point, re-scored one request at a time: h6s's gap and class against the serial gap and class (`python -m experiments.benchcert.score_report serial-readout --contexts ~/vp-data/exactness/paths/h6s_contexts.jsonl --rescored ~/vp-data/exactness/paths/h6s_classes_serial.jsonl --json evidence/certified_head/served/drain_serial_rescore.json`) |
+| `drain_donor_h8.json` | the planted-donor hold's draws: 579ae7ce's token at 439 and whether it reached the position, the planted token in its output, and the donor's suffix, its 1756 and planted emissions and its end-to-439 time (`python -m experiments.benchcert.score_report donor --out ~/vp-data/benchcert/drain --json evidence/certified_head/served/drain_donor_h8.json`) |
+| `context_waves_stopped_20261002T1255.json`, `context_waves_stopped_20261002T1346.json` | the two stopped context-wave runs (stock waves only): 579ae7ce's token at 439 by 527 stratum and where each wave left session 1's text (`python -m experiments.benchcert.context_waves compare --out ~/vp-data/benchcert/control/context_stopped_<time>`; `compare.json` there, copied) |
+| `control_seeded_mtp.json` | the seeded MTP control: the two passes on each server, every pair of servers on each pass, and 579ae7ce's token and logprobs at 439 per wave (`hold_seeded_waves.sh`; `~/vp-data/benchcert/control/seeded/compare.json`, copied) |
+| `control_seeded_stats.json` | the counter rerun of the seeded control's cert arm: counters per path over the server's life, warm-up included, and its outputs against the seeded stock run (`hold_seeded_stats.sh`; `python -m experiments.benchcert.control_waves compare --family mtpstats --out ~/vp-data/benchcert/control/seeded_stats --reference ~/vp-data/benchcert/control/seeded` at `5a7ee16`, copied) |
+| `control_seeded_tokens.json` | the token-only rerun of the seeded control: each server's two passes, certified against stock pass by pass, the stock run against the logprob stock run, and the certified head's counters over the waves only, per wave size (`hold_seeded_tokens.sh`; `~/vp-data/benchcert/control/seeded_tokens/compare.json`, copied) |
