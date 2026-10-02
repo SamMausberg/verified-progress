@@ -64,6 +64,23 @@ def main() -> None:
     bad = [r.get('config') for r in smoke if not r.get('ok')]
     if not smoke or bad:
         failures.append(f'smoke failed: {bad or "empty"}')
+    # fa4_smoke.py launches with strict=False: a server can decode while a required launch
+    # check (CUDA graphs, overlap, capacity, backend) failed, so check them here.
+    for r in smoke:
+        checks = r.get('checks') or []
+        failed_required = [c['name'] for c in checks if c.get('required') and not c.get('ok')]
+        if r.get('ok') and (not checks or failed_required):
+            failures.append(
+                f'{r.get("config")}: launch checks failed {failed_required or "missing"}'
+            )
+    both = next((r for r in smoke if r.get('config') == 'fa4_both'), None)
+    if both is None:
+        failures.append('smoke has no fa4_both configuration')
+    elif (both.get('attention_backend'), both.get('draft_attention_backend')) != ('fa4', 'fa4'):
+        failures.append(
+            'fa4_both resolved backends '
+            f'{both.get("attention_backend")} / {both.get("draft_attention_backend")}, not fa4 / fa4'
+        )
 
     print(f'{run}: ' + ('passed' if not failures else 'FAILED: ' + '; '.join(failures)))
     sys.exit(0 if not failures else 1)
