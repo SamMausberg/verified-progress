@@ -2,17 +2,20 @@
 # One GPU hold of the lossy-lever study (experiments/lossy/README.md):
 #
 #   scripts/gpu_lock.sh -x experiments/lossy/hold.sh load
+#   scripts/gpu_lock.sh -x experiments/lossy/hold.sh session lossy-s1   (s2, s3)
+#   scripts/gpu_lock.sh -x experiments/lossy/hold.sh quality q1         (q2)
 #
 # Runs from this checkout, which must be clean, against the declared engine
 # worktree (ENGINE_WORKTREE at ENGINE_COMMIT, clean). Servers use port 30101 and
-# start inside scripts/gpu_startup_lock.sh. Output under ~/vp-data/lossy
+# start inside scripts/gpu_startup_lock.sh (run_hold.py wraps each launch). Output under ~/vp-data/lossy
 # (LOSSY_OUT); the hold's log goes to <out>/logs/<hold>-<UTC>.log. The whole hold
 # stops after 44 minutes.
 set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo"
-[ "$#" -eq 1 ] || { echo "usage: $0 <load>" >&2; exit 64; }
+[ "$#" -ge 1 ] || { echo "usage: $0 load | session <lossy-sN> | quality <qN>" >&2; exit 64; }
 hold=$1
+name=${2:-}
 out=${LOSSY_OUT:-$HOME/vp-data/lossy}
 ENGINE_WORKTREE=$HOME/sglang-wt/lossy
 ENGINE_COMMIT=57560de6907090a34eb21774ba13dbe2a6b89b80
@@ -22,7 +25,7 @@ export SGLANG_WORKTREE=$ENGINE_WORKTREE
 source "$repo/scripts/sglang_env.sh"
 python -c 'import sglang, torch' || { echo "not the SGLang environment: $(command -v python)"; exit 1; }
 mkdir -p "$out/logs"
-exec >"$out/logs/$hold-$(date -u +%Y%m%dT%H%M%SZ).log" 2>&1
+exec >"$out/logs/$hold${name:+-$name}-$(date -u +%Y%m%dT%H%M%SZ).log" 2>&1
 echo "hold $hold start $(date -Is) repo $(git rev-parse HEAD)"
 if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
   echo "repository $repo is not clean"; exit 1
@@ -47,6 +50,11 @@ case $hold in
   load)
     timeout --foreground 2640 scripts/gpu_startup_lock.sh \
       python -m experiments.lossy.load_test --out "$out/load_test" || status=$?
+    ;;
+  session | quality)
+    [ -n "$name" ] || { echo "$hold needs a name"; exit 64; }
+    timeout --foreground 2640 python -m experiments.lossy.run_hold "$hold" "$name" \
+      --out "$out" || status=$?
     ;;
   *) echo "unknown hold $hold"; exit 64 ;;
 esac
