@@ -1,0 +1,18 @@
+{
+  "interval_s": 1.0,
+  "samples": 111,
+  "foreign_cores_mean": 0.296,
+  "foreign_cores_max": 1.89,
+  "contended": false,
+  "contention_threshold_cores": 2.0,
+  "top_foreign_mean_cores": {
+    "/home/ubuntu/.cursor-server/bin/linux-arm64/e44a49c17e334d442e58bbde931d791200f014a0/node --dns-result-order=ipv4first -": 0.09,
+    "claude --dangerously-skip-permissions": 0.04,
+    "pdflatex -interaction=nonstopmode -halt-on-error -recorder paper.tex": 0.01
+  },
+  "own_peak_cores": {
+    "python /home/ubuntu/vp-wt/drafter-run2/experiments/drafter/a": 5.11,
+    "sglang::scheduler": 1.03,
+    "/home/ubuntu/sglang/.venv/bin/python /home/ubuntu/sglang/.ve": 0.56
+  }
+}

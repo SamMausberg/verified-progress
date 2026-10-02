@@ -452,3 +452,125 @@ foreign CPU load averaged 0.27-0.83 cores per point.
 
     scripts/gpu_lock.sh -x experiments/drafter/run_fold_timing.sh
     # its last step: ab_timing_summary.py ~/vp-data/drafter/fold-timing --base stock --test fold
+
+## Buffered GDN verify: narrow value tiles for the fold's verify (patch drafter/0005)
+
+The served A/B above found the fold slower than stock at c = 1-2. At the pin, SGLang's recurrent
+GDN kernel picks value tiles of 4 on sm_90 for at most 64 sequences only when it writes
+per-position states; the ring-writing verify the fold uses kept tiles of 32, so at small
+batches it launched 8x fewer blocks than the stock verify it replaces. Patch 0005 treats the
+ring-writing verify as a target verify in that selection (engine `engine/drafter` 9292abd874 =
+bd66ce343e + 0001-0005).
+
+Exactness (`run_fold_check.sh`, one shared slot, 2026-10-01 22:27-23:15 UTC, repository at
+e8a9e6c, engine 9292abd874; `fold_narrow_tiles/`, resolved pools and foreign CPU load per run in
+`fold_narrow_tiles/launch/`, foreign load 0.22-0.63 cores):
+
+- **Kernel** (`gdn_verify_parity.json`, which now records the tile each verify actually selects):
+  both the stock and the ring-writing verify run with value tiles of 4 at batch 1, 8 and 16, and
+  the fold's verify output and committed state are bitwise equal to stock in all nine cases
+  (`fold_bitwise_in_every_case`).
+- **Served, matched pools** (`run_fold_localize.sh` as before): DFlash at c = 1 with the per-cycle
+  trace, eight requests at two pinned pool sizes, identical in every token, top-5 logprob and
+  cycle, with every request traced over its whole output in both runs (`off-p*_vs_fold-p*.json`,
+  `trace_coverage`; regenerated from the job's traces with `fold_localize.py --require-identical`
+  after the coverage rule was added; #133's c = 1 runs also pass it); deterministic waves, radix cache off: DFlash in waves of 4 and
+  MTP s3 in waves of 8 bitwise equal to stock on 80 of 80 sequences, as are the stock reruns
+  (`*-vs-*.json`, regenerated with `compare_outputs.py --require-bitwise`, which also requires
+  a full top-5 logprob entry for every output token on both sides; every comparison passes,
+  as do #133's runs).
+- **Patch 0004's gate:** DFlash with decode-only ReplaySSM (`--enable-linear-replayssm` without
+  `-spec`) in the same waves of 4 is bitwise equal to stock DFlash on 80 of 80 sequences
+  (`dflash-w4-replayssm-decode-vs-off.json`), so that combination commits through the stock
+  scatter as intended.
+
+    scripts/gpu_lock.sh -s experiments/drafter/run_fold_check.sh
+
+### Served timing with patch 0005 (c = 1-8)
+
+`fold_narrow_tiles/timing/` (`run_fold_timing.sh`, one exclusive hold, 2026-10-02 01:22-01:48 UTC;
+repository at e8a9e6c, engine `engine/drafter` 9292abd874 = bd66ce343e + 0001-0005). The
+protocol is that of #133's served A/B above, restricted to client concurrency 1, 2, 4 and 8
+(`FOLD_TIMING_CONCURRENCY`). Each of the bench's two tuned DFlash arms runs as stock and with the
+fold, in the order stock, fold, fold, stock, with one server launch per run. y is output tokens/s
+per GPU. The ratio is fold over stock of the two-run means, and its range is over the four
+stock-fold run pairs. This is one session, so the ranges are within-session spreads, not
+confidence intervals.
+
+| File | What | Kind | Command |
+|---|---|---|---|
+| `summary.json` | Per-run y, per-user rate, tokens per cycle and validity per point; ratio and range per block and c; resolved pools per server | measured (the hold's own summary; reproduced byte for byte from the raw runs) | the hold's last step, `ab_timing_summary.py` (below) |
+| `check.json` | The protocol check (runs, order, resolved arguments, engine and repository commits, launch checks, pools, points, prompts, y recomputed from per-request records), the two adjacent ABBA pair ratios, and each arm's mean y relative to #133's session | measured, except `reference` (derived across sessions) | `fold_timing_check.py` (below) |
+| `launch/*.json` | One launch record per server: the exact command, environment overrides, engine and repository commits with modified files, resolved limits, pools, launch checks, CUDA graph captures | measured | written by `fold_timing_check.py --launch-dir` |
+
+**Validity** (`check.json`; the checker exits non-zero on any failure):
+- Every run matches the protocol: one run per label, in the declared order, with each server
+  stopped before the next started.
+- The resolved server arguments in each server's own log are identical within each block except
+  `enable_linear_replayssm_spec` and `mamba_ssm_dtype`. That flag sets the dtype to float32
+  explicitly, while stock leaves it unset and takes the model config's `mamba_ssm_dtype`, which is
+  float32 at the pinned revision, so both arms keep the state in float32. The fold arm alone sets
+  `SGLANG_GDN_REPLAYSSM_FOLD=1`.
+- All eight servers ran the same engine and repository commits, with no modified files. Every
+  launch check passed: CUDA graphs captured and covering capacity 64 (block 16) and 128 (block
+  8), and the overlap scheduler on. No other GPU process was present before a server started or
+  after it stopped.
+- The running limit and the mamba slot count are equal within each block (64 and 128). The KV
+  pools were not pinned: stock reserves the per-position states, so SGLang gave it 307,897-307,940
+  (block 16) and 257,643-257,703 (block 8) tokens against the fold's 1,000,000 cap. At c ≤ 8 the
+  requests in flight hold a few thousand tokens (short prompts plus 512 output tokens each), so
+  neither pool binds.
+- Every point completed 64 of 64 requests at 512 tokens, with the same prompts in every run. y
+  recomputed from the per-request records equals the recorded y.
+- Foreign CPU load averaged 0.21-0.52 cores per point. The hold's log prints the
+  largest one-second sample instead (at most 1.84 cores).
+
+| block | c | stock y | fold y | fold/stock (range) | #133: fold/stock (range) | stock y / #133 | fold y / #133 |
+|---|---|---|---|---|---|---|---|
+| 16 | 1 | 871 | 888 | 1.020 (1.019-1.020) | 0.968 (0.966-0.970) | 0.994 | 1.047 |
+| 16 | 2 | 1,509 | 1,527 | 1.012 (1.008-1.015) | 0.983 (0.980-0.985) | 0.995 | 1.025 |
+| 16 | 4 | 2,441 | 2,484 | 1.018 (1.013-1.022) | 1.005 (1.000-1.010) | 1.000 | 1.013 |
+| 16 | 8 | 3,536 | 3,600 | 1.018 (1.017-1.019) | 1.061 (1.053-1.070) | 1.004 | 0.963 |
+| 8 | 1 | 765 | 775 | 1.012 (1.007-1.018) | 0.986 (0.981-0.990) | 1.003 | 1.030 |
+| 8 | 2 | 1,405 | 1,429 | 1.017 (1.015-1.020) | 1.010 (1.006-1.013) | 1.006 | 1.013 |
+| 8 | 4 | 2,372 | 2,406 | 1.014 (1.009-1.020) | 1.020 (1.016-1.023) | 1.007 | 1.002 |
+| 8 | 8 | 3,647 | 3,764 | 1.032 (1.028-1.036) | 1.058 (1.050-1.066) | 1.003 | 0.979 |
+
+The first five columns are measured in this session. The #133 column is that session's
+committed result (`fold_timing/summary.json`). The last two columns divide this session's mean y
+by #133's for the same arm. They compare two sessions and are derived and unpaired.
+
+- **The c = 1 loss is gone.** On block 16, the c = 1 leader, the fold is 2.0% faster than stock
+  (1.020, all four run pairs 1.019-1.020), where #133 measured it 3.2% slower. On block 8 it
+  is 1.2% faster, against 1.4% slower. At c ≤ 4 every run pair favours the fold on both blocks.
+- **The c = 8 gain shrinks.** The fold is 1.8% faster on block 16 (1.017-1.019), against 6.1%
+  (1.053-1.070) in #133, and 3.2% faster on block 8, against 5.8%. The ranges do not overlap.
+- **Patch 0005 is what moved.** Stock's verify already selected tiles of 4, so 0005 does not
+  touch the stock path. Stock y is within 0.8% of #133's at every point. The fold's y moved from
+  4.7% faster (block 16, c = 1) to 3.7% slower (block 16, c = 8). Narrow value tiles therefore
+  help the ring-writing verify at small batches and cost it at 8 sequences: on block 16 the fold
+  gains up to c = 4 (+1.3% there), on block 8 it gains at c = 1 and 2 and is level at c = 4
+  (+0.2%). Where the crossover lies has not been located. This attribution rests on two sessions
+  run seven hours apart. No session has timed the fold with and without 0005 side by side.
+- **Tokens per cycle are unchanged.** They are identical between the arms at every point except
+  one block-16 fold run at c = 8 (5.744 against 5.766 in the other three runs; closed-loop
+  batching), so the differences are cycle time.
+- **Not measured: c = 16-64.** Patch 0005 changes the tiles for up to 64 sequences, and #133
+  measured the fold's largest gains at c = 16 and 32 (1.08-1.12). Nothing here supports 0005 at
+  those concurrencies. #133's figures there hold for 0001-0004 only.
+
+As written, then, 0005 removes the fold's loss at c ≤ 4 and costs it about 4% at c = 8 on
+block 16 (fold y 3.7% below #133's fold; fold/stock 1.018 against 1.061). It is untimed at c ≥ 16.
+For serving at c ≥ 8, use the fold with patches 0001-0004 only. A rule that keeps the narrow
+tiles for the ring-writing verify only below a measured batch threshold would likely keep both
+gains. That rule has not been built or measured.
+
+    FOLD_TIMING_CONCURRENCY="1 2 4 8" scripts/gpu_lock.sh -x \
+        experiments/drafter/run_fold_timing.sh ~/vp-data/drafter/fold-timing-0005
+    # its last step: ab_timing_summary.py ~/vp-data/drafter/fold-timing-0005 --base stock \
+    #     --test fold --out ~/vp-data/drafter/fold-timing-0005/summary.json (copied here)
+    python experiments/drafter/fold_timing_check.py ~/vp-data/drafter/fold-timing-0005 \
+        --blocks 16 8 --concurrency 1 2 4 8 \
+        --reference evidence/drafter/fold_timing/summary.json \
+        --launch-dir evidence/drafter/fold_narrow_tiles/timing/launch \
+        --out evidence/drafter/fold_narrow_tiles/timing/check.json

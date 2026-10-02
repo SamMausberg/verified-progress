@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -284,3 +285,334 @@ def test_ab_summary_running_limit_is_checked_per_group(tmp_path: Path) -> None:
     sys.argv += ['--out', str(out)]
     summary.main()
     assert json.loads(out.read_text())['running_limit_match'] == {'b16': True, 'b8': True}
+
+
+def _write_runs(tmp_path: Path, test_logprob: float, test_ids: list[str]) -> tuple[Path, Path]:
+    ref, test = tmp_path / 'ref.jsonl', tmp_path / 'test.jsonl'
+    rows = [
+        {'id': i, 'domain': 'chat', 'output_ids': [1, 2], 'top_logprobs': [[[-0.1, 1]]] * 2}
+        for i in ('a', 'b')
+    ]
+    ref.write_text(''.join(json.dumps(r) + '\n' for r in rows))
+    test_rows = [
+        dict(r, top_logprobs=[[[test_logprob, 1]]] * 2) for r in rows if r['id'] in test_ids
+    ]
+    test.write_text(''.join(json.dumps(r) + '\n' for r in test_rows))
+    return ref, test
+
+
+def test_compare_require_bitwise_exit_status(tmp_path: Path) -> None:
+    import pytest
+
+    compare = load('compare_outputs')
+    out = tmp_path / 'eq.json'
+    for logprob, ids, fails in (
+        (-0.1, ['a', 'b'], False),
+        (-0.2, ['a', 'b'], True),
+        (-0.1, ['a'], True),
+    ):
+        ref, test = _write_runs(tmp_path, logprob, ids)
+        sys.argv = [
+            'compare_outputs.py',
+            '--ref',
+            str(ref),
+            '--test',
+            str(test),
+            '--out',
+            str(out),
+            '--require-bitwise',
+            '--top-k',
+            '1',
+        ]
+        if fails:
+            with pytest.raises(SystemExit) as exc:
+                compare.main()
+            assert exc.value.code != 0
+        else:
+            compare.main()
+        assert out.exists()  # the report is written either way
+
+
+def test_localize_require_identical_exit_status(tmp_path: Path) -> None:
+    import pytest
+
+    localize = load('fold_localize')
+    record = {'rid': 'r', 'prefix_len': 4, 'draft': [1, 2], 'target': [1, 2], 'accept': 1}
+    for name, token, traced in (
+        ('a', 2, True),
+        ('same', 2, True),
+        ('other', 3, True),
+        ('bare', 2, False),
+    ):
+        run = tmp_path / name
+        run.mkdir()
+        row = {'id': 'r', 'prompt_tokens': 4, 'output_ids': [1, token], 'top_logprobs': [[0], [0]]}
+        (run / 'requests.jsonl').write_text(json.dumps(row) + '\n')
+        if traced:
+            (run / 'trace.1.jsonl').write_text(json.dumps(record) + '\n')
+    out = tmp_path / 'loc.json'
+    for b, fails in (('same', False), ('other', True), ('bare', True)):
+        sys.argv = [
+            'fold_localize.py',
+            '--a',
+            str(tmp_path / 'a'),
+            '--b',
+            str(tmp_path / b),
+            '--out',
+            str(out),
+            '--require-identical',
+            '--top-k',
+            '1',
+        ]
+        if fails:
+            with pytest.raises(SystemExit) as exc:
+                localize.main()
+            assert exc.value.code != 0
+        else:
+            localize.main()
+
+
+def test_fold_check_propagates_every_failure(tmp_path: Path) -> None:
+    import shutil
+    import subprocess
+
+    tree = tmp_path / 'repo'
+    (tree / 'experiments' / 'drafter').mkdir(parents=True)
+    (tree / 'scripts').mkdir()
+    (tree / 'scripts' / 'sglang_env.sh').write_text('')
+    here = tree / 'experiments' / 'drafter'
+    shutil.copy(ROOT / 'run_fold_check.sh', here / 'run_fold_check.sh')
+    stubs = {
+        'run_gdn_parity.sh': '#!/usr/bin/env bash\nexit "${PARITY_RC:-0}"\n',
+        'run_fold_localize.sh': '#!/usr/bin/env bash\nmkdir -p "$1/dflash-w4-off"\n'
+        'touch "$1/dflash-w4-off/requests.jsonl"\nexit "${LOCALIZE_RC:-0}"\n',
+    }
+    for name, body in stubs.items():
+        (here / name).write_text(body)
+        (here / name).chmod(0o755)
+    (here / 'serve_run.py').write_text(
+        'import os, sys\nsys.exit(int(os.environ.get("SERVE_RC", 0)))\n'
+    )
+    (here / 'compare_outputs.py').write_text(
+        'import os, sys\nsys.exit(int(os.environ.get("COMPARE_RC", 0)))\n'
+    )
+    cases = [
+        ({}, 0),
+        ({'PARITY_RC': '1'}, 1),
+        ({'LOCALIZE_RC': '1'}, 1),
+        ({'SERVE_RC': '1'}, 1),
+        ({'COMPARE_RC': '1'}, 1),
+    ]
+    for env, expected in cases:
+        result = subprocess.run(
+            ['bash', str(here / 'run_fold_check.sh'), str(tmp_path / 'out')],
+            env={
+                **os.environ,
+                'PATH': f'{Path(sys.executable).parent}:{os.environ["PATH"]}',
+                **env,
+            },
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert (result.returncode != 0) == bool(expected), (env, result.stdout, result.stderr)
+
+
+def test_localize_trace_coverage_per_request(tmp_path: Path) -> None:
+    import pytest
+
+    localize = load('fold_localize')
+
+    def cyc(prefix: int, accept: int) -> dict[str, object]:
+        return {'prefix_len': prefix, 'draft': [0], 'target': [0], 'accept': accept}
+
+    full = [cyc(10, 2), cyc(13, 0), cyc(14, 3)]  # covers positions 10..17
+    assert localize.trace_coverage(full, 10, 8) is None
+    assert localize.trace_coverage(full, 10, 6) is None  # last cycle overshoots a cut output
+    assert localize.trace_coverage(full, 10, 4) is None  # one look-ahead cycle after the end
+    assert localize.trace_coverage(full, 10, 3) is not None  # two cycles after the end
+    assert localize.trace_coverage(full[:2], 10, 8) is not None  # truncated
+    assert localize.trace_coverage([], 10, 8) == 'no cycles'
+    assert localize.trace_coverage([cyc(10, 2), cyc(14, 3)], 10, 8) is not None  # gap
+    assert localize.trace_coverage([cyc(11, 2)], 10, 3) is not None  # wrong first anchor
+    assert localize.trace_coverage([], 10, 1) is None  # finished at prefill
+
+    # Two runs whose traces both stop early for request 's' must fail.
+    for name in ('a', 'b'):
+        run = tmp_path / name
+        run.mkdir()
+        rows = [
+            {
+                'id': rid,
+                'prompt_tokens': 10,
+                'output_ids': list(range(8)),
+                'top_logprobs': [[0]] * 8,
+            }
+            for rid in ('r', 's')
+        ]
+        (run / 'requests.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in rows))
+        traced = [dict(c, rid='r') for c in full] + [dict(c, rid='s') for c in full[:2]]
+        (run / 'trace.1.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in traced))
+    sys.argv = ['fold_localize.py', '--a', str(tmp_path / 'a'), '--b', str(tmp_path / 'b')]
+    sys.argv += ['--out', str(tmp_path / 'loc.json'), '--require-identical', '--top-k', '1']
+    with pytest.raises(SystemExit) as exc:
+        localize.main()
+    assert 'not fully traced' in str(exc.value.code)
+
+
+def _tops(n: int, k: int = 5) -> list[list[list[float]]]:
+    return [[[-0.1 * (j + 1), j] for j in range(k)] for _ in range(n)]
+
+
+def test_strict_checks_require_full_logprob_coverage(tmp_path: Path) -> None:
+    import pytest
+
+    compare = load('compare_outputs')
+    localize = load('fold_localize')
+    ids = [1, 2, 3]
+    full = _tops(3)
+    # (ref top_logprobs, test top_logprobs, passes)
+    cases = [
+        ('full on both sides', full, full, True),
+        ('truncated on one side', full, full[:2], False),
+        ('both sides equally truncated', full[:1], full[:1], False),
+        ('fewer than k candidates on both sides', _tops(3, 4), _tops(3, 4), False),
+        ('no logprobs on either side', [], [], False),
+    ]
+    record = {'rid': 'r', 'prefix_len': 4, 'draft': [0, 0, 0], 'target': [0, 0, 0], 'accept': 2}
+    for name, ref_tops, test_tops, passes in cases:
+        assert compare.full_logprob_coverage({'output_ids': ids, 'top_logprobs': ref_tops}, 5) == (
+            name == 'full on both sides' or ref_tops is full
+        )
+        runs = {}
+        for side, tops in (('a', ref_tops), ('b', test_tops)):
+            run = tmp_path / name.replace(' ', '-') / side
+            run.mkdir(parents=True)
+            row = {'id': 'r', 'domain': 'chat', 'prompt_tokens': 4, 'output_ids': ids}
+            row['top_logprobs'] = tops
+            (run / 'requests.jsonl').write_text(json.dumps(row) + '\n')
+            (run / 'trace.1.jsonl').write_text(json.dumps(record) + '\n')
+            runs[side] = run
+        checks = [
+            (
+                compare,
+                [
+                    'compare_outputs.py',
+                    '--ref',
+                    str(runs['a'] / 'requests.jsonl'),
+                    '--test',
+                    str(runs['b'] / 'requests.jsonl'),
+                    '--require-bitwise',
+                ],
+            ),
+            (
+                localize,
+                [
+                    'fold_localize.py',
+                    '--a',
+                    str(runs['a']),
+                    '--b',
+                    str(runs['b']),
+                    '--require-identical',
+                ],
+            ),
+        ]
+        for module, argv in checks:
+            sys.argv = [*argv, '--out', str(tmp_path / 'report.json')]
+            if passes:
+                module.main()
+            else:
+                with pytest.raises(SystemExit) as exc:
+                    module.main()
+                assert exc.value.code not in (None, 0), (name, argv[0])
+
+
+def _fold_timing_tree(root: Path, *, extra_arg: bool = False, swap: bool = False) -> None:
+    """Four bench.sweep runs of block 16 at c = 1 in the declared order."""
+    labels = ['stock-r1', 'fold-r1', 'fold-r2', 'stock-r2']
+    if swap:
+        labels[0], labels[1] = labels[1], labels[0]
+    for i, suffix in enumerate(labels):
+        arm = suffix.split('-')[0]
+        run = root / 'b16' / f'b16-{suffix}' / '20261002-000000'
+        (run / 'server').mkdir(parents=True)
+        (run / 'r0' / 'c001').mkdir(parents=True)
+        sweep = {
+            'label': f'b16-{suffix}',
+            'arm': {'name': 'dflash-tuned-b16'},
+            'concurrency': [1],
+            'session': 's',
+            'workload': {'sha256': 'w'},
+            'osl': 512,
+        }
+        (run / 'sweep.json').write_text(json.dumps(sweep))
+        launch = {
+            'env_overrides': {'SGLANG_GDN_REPLAYSSM_FOLD': '1'} if arm == 'fold' else {},
+            'sglang_worktree': '/e',
+            'sglang_source': {'head': 'e1', 'dirty_files': [], 'module_file': '/e/sglang.py'},
+            'repo': {'head': 'r1', 'dirty_files': []},
+            'checks': [{'name': 'capacity', 'ok': True}],
+            'gpu_before_start': {'compute_apps': []},
+            'gpu_after_stop': {'compute_apps': []},
+            'start_time_unix': 100.0 * i,
+            'stop_time_unix': 100.0 * i + 50,
+        }
+        (run / 'server' / 'launch.json').write_text(json.dumps(launch))
+        args = {
+            'enable_linear_replayssm_spec': arm == 'fold',
+            'mamba_ssm_dtype': 'float32' if arm == 'fold' else None,
+            'page_size': 2 if extra_arg and suffix == 'fold-r2' else 1,
+        }
+        (run / 'server' / 'server.log').write_text(f'[t] server_args={args!r}\n')
+        info = {
+            'max_mamba_cache_size': 64,
+            'internal_states': [{'effective_max_running_requests_per_dp': 64}],
+        }
+        (run / 'server' / 'server_info.json').write_text(json.dumps(info))
+        y = 1000.0 if arm == 'fold' else 900.0
+        span_ns = int(2 * 512 / y * 1e9)
+        rows = [
+            'request_id,prompt_id,ok,osl,start_ns,latency_ms',
+            'a,p1,True,512,0,1.0',
+            f'b,p2,True,512,1000000,{(span_ns - 1_000_000) / 1e6}',
+        ]
+        (run / 'r0' / 'c001' / 'requests.csv').write_text('\n'.join(rows) + '\n')
+        point = {
+            'concurrency': 1,
+            'requests': 2,
+            'completed': 2,
+            'failed': 0,
+            'osl_mismatch': 0,
+            'aiperf_exit_code': 0,
+            'y': 2 * 512 / (span_ns / 1e9),
+            'x_e2e': 1.0,
+            'foreign_cpu_during_mean': 0.5,
+            'foreign_cpu_during_max': 1.0,
+        }
+        (run / 'r0' / 'c001' / 'point.json').write_text(json.dumps(point))
+
+
+def test_fold_timing_check_passes_the_declared_protocol_only(tmp_path: Path) -> None:
+    import pytest
+
+    check = load('fold_timing_check')
+    for name, kwargs, passes in (
+        ('ok', {}, True),
+        ('extra-arg', {'extra_arg': True}, False),
+        ('swapped', {'swap': True}, False),
+    ):
+        root = tmp_path / name
+        _fold_timing_tree(root, **kwargs)
+        out = tmp_path / f'{name}.json'
+        sys.argv = ['fold_timing_check.py', str(root), '--blocks', '16']
+        sys.argv += ['--concurrency', '1', '--out', str(out)]
+        if passes:
+            check.main()
+            entry = json.loads(out.read_text())['comparison'][0]
+            assert abs(entry['ratio'] - 1000 / 900) < 1e-9
+            assert len(entry['abba_pairs']) == 2
+        else:
+            with pytest.raises(SystemExit) as exc:
+                check.main()
+            assert exc.value.code == 1, name
+            assert not out.exists(), name

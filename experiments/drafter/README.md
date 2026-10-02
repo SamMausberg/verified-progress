@@ -40,6 +40,8 @@ Buffered GDN verify (engine patches 0002 and 0003):
 | `run_fold_localize.sh`, `fold_localize.py` | Fold against stock with identical pinned pools: traced runs at concurrency 1 located cycle by cycle, and deterministic batched waves (DFlash waves of 4, MTP waves of 8) with a stock repeat |
 | `run_phase_timing.sh`, `phase_summary.py` | Per-phase GPU time of the DFlash cycle (draft, verify, commit, ...) for stock, circular and fold at concurrency 8 and 16 with identical pinned pools (the repair workstream's CUDA-event probe), and the GDN kernels each arm runs; exclusive hold |
 | `run_fold_timing.sh`, `ab_timing_summary.py` | Serving A/B of the fold against stock verify on the bench's tuned DFlash arms (blocks 16 and 8), c = 1-32, order stock, fold, fold, stock; the summary gives per-run throughput, tokens per cycle, the ratio of the means and its range over run pairs, foreign CPU load and pools; exclusive hold |
+| `run_fold_check.sh` | The fold's exactness after an engine change: the kernel parity check, then `run_fold_localize.sh`'s matched-pool served check; shared slot |
+| `fold_timing_check.py` | Checks a `run_fold_timing.sh` output against its declared protocol (runs and their order, each server's resolved arguments, engine and repository commits, launch checks, pools, points, prompts, throughput recomputed from per-request records), then gives the fold/stock ratios with their ABBA pairs and, optionally, the comparison with an earlier session; writes the launch records; CPU |
 
 Training data, training and the P6 screen:
 
@@ -70,6 +72,8 @@ Training data, training and the P6 screen:
   GDN pools, for DFLASH and EAGLE/MTP.
 - 0004 takes the DFLASH ReplaySSM commit only under `--enable-linear-replayssm-spec`
   (plain `--enable-linear-replayssm` also allocates replay rings).
+- 0005 gives the fold's ring-writing verify the stock verify's narrow value tiles on
+  sm_90 at small batches.
 
 ## Training environment
 

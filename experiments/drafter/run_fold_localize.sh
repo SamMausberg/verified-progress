@@ -18,7 +18,8 @@
 #    do not fit 8 requests at --mem-fraction-static 0.25 on a shared GPU) and MTP
 #    s3 waves of 8 (limit 8, 60,000 tokens, 8 slots), each with stock, fold and a
 #    stock repeat (is stock reproducible on its own?).
-# Correctness only (shared slot):
+# Exits 1 if any fold comparison (A: identical tokens, logprobs and cycles; B: bitwise)
+# or stock rerun differs. Correctness only (shared slot):
 #   scripts/gpu_lock.sh -s experiments/drafter/run_fold_localize.sh [OUT]
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -65,8 +66,11 @@ serve() {
     --client "python $here/accept_probe.py --port {port} --max-new-tokens 2048 --logprobs \
       --label loc-$run --out {out} $*"
 }
+# Comparisons that must show no difference set fail=1 (the job exits 1 at the end,
+# after every arm has run); a server or client failure stops the job at once.
+fail=0
 equal() { python "$here/compare_outputs.py" --ref "$out/$1/requests.jsonl" \
-  --test "$out/$2/requests.jsonl" --out "$out/$2-vs-$1.json"; }
+  --test "$out/$2/requests.jsonl" --out "$out/$2-vs-$1.json" --require-bitwise || fail=1; }
 loc() { python "$here/fold_localize.py" --a "$out/$1" --b "$2" --out "$out/$3.json" "${@:4}"; }
 
 # A. c=1, radix on, traced.
@@ -78,8 +82,10 @@ serve dflash fold-p1 "$p1" 66 1 "$c1"
 serve dflash off-p2 "$p2" 66 0 "$c1"
 serve dflash fold-p2 "$p2" 66 1 "$c1"
 # The first check's c=1 runs were untraced: compare them by outputs only (--earlier).
-loc off-p1 "$out/fold-p1" off-p1_vs_fold-p1 --earlier "$check/c1-off" --earlier "$check/c1-fold"
-loc off-p2 "$out/fold-p2" off-p2_vs_fold-p2
+loc off-p1 "$out/fold-p1" off-p1_vs_fold-p1 --earlier "$check/c1-off" --earlier "$check/c1-fold" \
+  --require-identical || fail=1
+loc off-p2 "$out/fold-p2" off-p2_vs_fold-p2 --require-identical || fail=1
+# Stock at two pool sizes: informational (a difference here is about pools, not the fold).
 loc off-p1 "$out/off-p2" off-p1_vs_off-p2
 
 # B. Deterministic waves, radix off.
@@ -103,3 +109,7 @@ out = Path(sys.argv[1])
 for run in sorted(p for p in out.iterdir() if (p / 'launch.json').exists()):
     print(run.name, json.loads((run / 'launch.json').read_text()).get('pools'))
 PY
+if [ "$fail" -ne 0 ]; then
+  echo "[localize] EXACTNESS FAILED: a fold or stock-rerun comparison differs (see the reports)" >&2
+  exit 1
+fi
