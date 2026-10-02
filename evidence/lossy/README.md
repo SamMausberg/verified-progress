@@ -17,30 +17,34 @@ microbenchmark.
 
 | Lever | Speed (declared decision, three sessions) | Quality against the declared budget | Within budget |
 |---|---|---|---|
-| INT4 target + INT4 DFlash drafter | x at c = 1: 1.015 (1.014-1.016), no detectable change (y 1.046, faster). y slower at every c from 2 to 256: 0.72-0.87 against the best exact arm | Logit probe fails in both modes on both probed arms (top-1 agreement 0.969-0.975 against the 0.98 floor, KL 0.0120-0.0125 nats against the 0.01 ceiling). GSM8K: the declared run failed (time limit at 1,305 of 1,319 problems) | No (probe) |
-| FP16 GDN state | y faster at c = 64, 128, 256: 1.163, 1.158, 1.171 against the best exact arm (`replayssm-cap256`), every session beyond +2% | Probe passes in both modes at about the reference's own noise. GSM8K misses the rule (at least -1.0 point against both references): -0.99 and -1.29 points (`plain-cap256-fp16`), -1.06 and -1.36 (`replayssm-cap256-fp16`); 95% intervals from -2.9 to -3.3 at their lower ends to +0.5 to +1.0 at their upper ends, McNemar p 0.18-0.36 | No (GSM8K) |
+| INT4 target + INT4 DFlash drafter | c = 1: x 1.015 (1.014-1.016), no detectable change, a consistent +1.5% inside the band; y 1.046 (1.045-1.046), faster. Slower in x and y at every c from 2 to 256: y 0.72-0.87 against the best exact arm | Logit probe fails in both modes on both probed arms (top-1 agreement 0.969-0.975 against the 0.98 floor, KL 0.0120-0.0125 nats against the 0.01 ceiling). GSM8K: the declared run failed (time limit at 1,305 of 1,319 problems) | No (probe) |
+| FP16 GDN state | y faster at c = 64, 128, 256: 1.163, 1.158, 1.171 against the best exact arm (`replayssm-cap256`), every session beyond +2% | Probe passes in both modes: at the reference's noise in score mode, which cannot see a state's decode-path error; on the decode path, the mode that sees it, 4-6.5 times the reference's divergence rate and about 7-8 times its KL, still 44-48 times inside the KL ceiling. GSM8K misses the rule (at least -1.0 point against both references): -0.99 and -1.29 points (`plain-cap256-fp16`), -1.06 and -1.36 (`replayssm-cap256-fp16`); 95% intervals from -2.9 to -3.3 at their lower ends to +0.5 to +1.0 at their upper ends, McNemar p 0.18-0.36 | No (GSM8K) |
 
 Both verdicts are measured outcomes of the declared rules. As the pre-registration anticipated, the
 GSM8K part cannot separate a 1-point loss from noise: bench's exact arms span -1.36 to +1.06
 points against the same two references, and `replayssm-cap256-fp16`'s -1.06 and -1.36 equal the
 exact `mtp-stockverify`'s. So the FP16 state is outside the declared band, and its cost is the
-trade stated below: about a point of GSM8K that this check cannot distinguish from run-to-run
-variation, a small and measured change in the logits, for 16-17% more throughput at c >= 64. The
-INT4 lever is outside the band on the probe alone, and on this GPU it is slower at every
-concurrency above 1 and shows no detectable change in per-user speed at c = 1.
+trade stated below: 16-17% more throughput at c >= 64 for a measured change in the logits and
+about 1.0-1.4 points of GSM8K against the declared references (`plain-tuned`), which this check
+cannot distinguish from run-to-run variation. Against `plain-tuned-replayssm`, the exact family of
+the speed headline's denominator (`replayssm-cap256`), the gap is larger, about 2.1 points
+(undeclared; see quality/). The INT4 lever is outside the band on the probe alone. On this GPU it
+is slower in both x and y at every concurrency above 1; at c = 1 its y is faster (1.046) and its x
+a consistent +1.5% inside the band.
 
 What is measured and what is derived. Measured: every ratio, accept length, probe statistic and
 GSM8K accuracy below, each on the runs named. Derived: the full-split bounds of the failed INT4
-GSM8K run (arithmetic on the finished problems), the per-pass quantities (y per accepted token;
-the slow-launch check's ITL p50 times accept length), and the explanation of INT4's slowdown from the GEMM microbenchmark, which times the quantized
-projections in isolation and is not an end-to-end result.
+GSM8K run (arithmetic on the finished problems), the time per pass (ITL p50 times accept length),
+the explanations of both levers' speed from a bandwidth model (FP16 state) and from the GEMM
+microbenchmark (INT4), which times the quantized projections in isolation and is not an
+end-to-end result, and the post hoc comparison of the FP16 runs with the six exact GSM8K runs.
 
 ## Failures and deviations
 
 - `q1`'s GSM8K run of `int4-dflash-b8` stopped at its 1,500 s limit (exit 124) with 1,305 of
   1,319 problems scored, so it wrote no `quality.json` and has no declared result. The limit was
-  too short for this arm; the server did not fail: the INT4 drafted arm decodes at 0.75-0.77 of stock DFlash
-  at c = 8-32 in the timed sessions, stock DFlash's GSM8K run took 933 s, and the INT4 run spent
+  too short for this arm; the server did not fail: the INT4 drafted arm decodes at 0.75-0.77 of
+  stock DFlash at c = 8-32 in the timed sessions, stock DFlash's GSM8K run took 933 s, and the INT4 run spent
   about 80 s launching and 1,419 s on 1,305 problems. Not rerun: the arm is already outside its
   band on the declared probe, so a GSM8K number cannot change its verdict.
 - `quality/int4-dflash-b8-seed0-partial/` (not declared) reports what the finished problems show,
@@ -143,9 +147,10 @@ length, the slow-launch check's definition, so it is derived):
 The INT4 drafter accepts 0.65-0.77 fewer tokens per verify pass at either block size (11-16%
 fewer). At c = 1 the INT4 pass takes 0.87 of the BF16 time, which about cancels the lower
 acceptance (x 1.015). From c = 2 the INT4 pass is itself slower (1.07 times at c = 2, 1.23 at
-c = 4, 1.10-1.14 at c = 8-32), and the lower acceptance adds to that. y at c = 1 is 1.046: y
-divides all output tokens by the session's span while x averages per-request rates, so the two
-weight requests differently; x is the declared headline at c = 1.
+c = 4, 1.10-1.14 at c = 8-32), and the lower acceptance adds to that. At c = 1, y is 1.046,
+faster under the declared rule, while x is 1.014-1.016 in every session (+1.5%, inside the band).
+x averages per-request rates including TTFT and y divides all output tokens by the session's span;
+why the two ratios differ at c = 1 was not examined.
 
 Slow-launch check: no launch flagged. The largest TTFT p50 excess over an arm's median was 6.7 ms,
 the largest per-pass excess 2.0%, never both beyond their thresholds at one point.
@@ -159,13 +164,42 @@ drafter crosses over at 32 rows too (1.01). A verify pass carries concurrency ti
 in rows (16 for `-b16`, 8 for `-b8`): 16 rows at c = 1, 32 at c = 2, and 64 or more at every
 other drafted point; plain decoding at c >= 64 has 64 or more rows. So every timed point except
 c = 1 sits past the crossover, where the INT4 weights' smaller reads no longer pay for Marlin's
-dequantization arithmetic. At the drafted points the microbenchmark predicts the per-pass change
-well: the change in projection time at the pass's row count (target plus drafter) is -0.82,
-+0.48 and +2.19 ms at c = 1, 2 and 4, against measured per-pass changes of -0.66, +0.41 and
-+1.64 ms. The BF16 tied head (1.27 GB of the INT4 checkpoint's 3.29 GB read per
-step) is not quantized, which limits the c = 1 gain as well. This accounts for the direction and
-rough size of the served ratios; it does not decompose them, since attention, the GDN layers and
-the head are not in the microbenchmark.
+dequantization arithmetic. The BF16 tied head (1.27 GB of the INT4 checkpoint's 3.29 GB read per
+step) is not quantized, which limits the c = 1 gain as well.
+
+How well the microbenchmark predicts the size of the change, at every timed INT4 point: the
+predicted change is the projection time at the pass's row count (target plus drafter on the
+drafted arms, target only for plain decoding), INT4 minus BF16; the measured change is the time
+per pass above (drafted) or ITL p50 (plain decoding, one token per step), INT4 minus BF16:
+
+| INT4 arm / BF16 arm | c | Rows per GEMM | Predicted | Measured | Predicted / measured |
+|---|---|---|---|---|---|
+| `int4-dflash-b16` / `dflash-tuned-b16` | 1 | 16 | -0.82 ms | -0.66 ms | 1.23 |
+| | 2 | 32 | +0.48 ms | +0.41 ms | 1.17 |
+| | 4 | 64 | +2.19 ms | +1.65 ms | 1.33 |
+| `int4-dflash-b8` / `dflash-tuned` | 8 | 64 | +2.19 ms | +1.18 ms | 1.87 |
+| | 16 | 128 | +1.99 ms | +1.16 ms | 1.72 |
+| | 32 | 256 | +3.69 ms | +2.29 ms | 1.61 |
+| `int4-plain-cap256` / `plain-cap256` | 64 | 64 | +1.95 ms | +1.72 ms | 1.13 |
+| | 128 | 128 | +1.79 ms | +1.64 ms | 1.09 |
+| | 256 | 256 | +3.31 ms | +3.24 ms | 1.02 |
+
+The sign is right at all nine points. The size agrees within 2-13% on plain decoding and within
+17-23% on the drafted arms at c = 1 and 2, but the microbenchmark overpredicts by 33% at c = 4 and
+by 61-87% at c = 8-32, so there it gives the direction, not the size. The likely cause, untested,
+is the per-pass estimator on the speculative arms: ITL p50 times the mean accept length multiplies
+a median per-token gap by a mean, and the two drafters' acceptance distributions differ; a
+server-side time per pass would settle it. Effects the microbenchmark leaves out (attention, the
+GDN layers, the head) may contribute as well. None of this decomposes the served time.
+
+### Why FP16 state is faster (derived)
+
+The GDN recurrent state is 50.3 MB per request in FP32, read and written once per decode step
+(`evidence/moonshot/README.md`, section 1, from the model code); storing it in FP16 saves 50.3 MB
+of traffic per request per step. At the 3.47-3.48 TB/s the profile workstream measured for that
+kernel (same section), the saving is 0.93, 1.85 and 3.70 ms per step at c = 64, 128 and 256. The
+measured ITL p50 changes of `plain-cap256-fp16` against `plain-cap256` (session means) are -0.93,
+-1.84 and -3.52 ms: the saved state traffic matches the measured change to within about 5%.
 
 ## quality/
 
@@ -196,11 +230,17 @@ bench's exact arms against the same references: `mtp-tuned` -0.45 and -0.76, `mt
 -1.06 and -1.36, `dflash-tuned` -0.30 and -0.61, `plain-tuned-replayssm` +1.06 and +0.76
 (`decisions.json`, `gsm8k_exact_spread`).
 
-Not declared, for context (`context/`): paired against `plain-tuned-replayssm`, the exact arm
-with the highest accuracy (91.05%), both FP16 runs come out about 2.1 points lower (-2.05,
-p 0.049; -2.12, p 0.032). The exact `mtp-stockverify` shows the same -2.12 points (p 0.031)
-against it, so that gap reflects `plain-tuned-replayssm`'s high draw at least as much as anything
-the FP16 state does. The two FP16 runs differ from each other by -0.08 points (p 1.0).
+Not declared, for context (`context/`). Paired against `plain-tuned-replayssm` (91.05%), the
+exact family of the speed headline's denominator (`replayssm-cap256`) and the most accurate of
+bench's six exact GSM8K runs, both FP16 runs come out about 2.1 points lower (-2.05, p 0.049;
+-2.12, p 0.032), and so does the exact `mtp-stockverify` (-2.12, p 0.031). These p-values are
+nominal: none would survive a correction for the several comparisons made here, and one run per
+arm cannot say how much of that gap is the reference's draw and how much the FP16 state. Post hoc
+(derived from the committed accuracies): the two FP16 runs (89.01%, 88.93%) sit level with the
+lowest of the six exact runs (88.93-91.05%) and below the other five; their mean is 0.95 points
+below the exact runs' mean, against an exact run-to-run standard deviation of 0.72 points (pooled
+two-sample t 1.76 with 6 degrees of freedom, p 0.13). The two FP16 runs differ from each other by
+-0.08 points (p 1.0).
 
 ```sh
 C=evidence/lossy/quality/context B=evidence/bench/quality L=evidence/lossy/quality
@@ -247,9 +287,11 @@ statistics computed from the raw files:
 Thresholds: agreement at least 0.98 and mean top-20 KL at most 0.01 nats, in both modes. The
 noise row is `plain-ref-1` scored against itself (score mode, prefill against the decode path) and
 a second launch's generate run against it (decode path). In score mode the FP16 arms disagree with
-the reference at 76 and 77 of 12,240 positions against the reference's own 74. On the decode path
-they diverge 4 to 6.5 times as often as a second launch of the reference does, still far inside the
-budget. The two INT4 arms give nearly the same values, as expected: greedy speculative decoding
+the reference at 76 and 77 of 12,240 positions against the reference's own 74, but score mode runs
+the chunked prefill kernel and cannot see a state's decode-path error (pre-registration). On the
+decode path, which can, they diverge 4 to 6.5 times as often as a second launch of the reference
+does, with about 7-8 times its KL (0.00021 and 0.00023 against 0.00003), still 44-48 times inside
+the KL ceiling. The two INT4 arms give nearly the same values, as expected: greedy speculative decoding
 emits the target's tokens, so both probe the same INT4 target, which first diverges from the
 reference at a median of 26-27 tokens per sequence.
 
