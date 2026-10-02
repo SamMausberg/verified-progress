@@ -402,12 +402,17 @@ and every step exited 0 (commands in section 4).
   the line "GDN decode: exact replay kernel, ring length 4" appears in the four exact-replay
   logs and in no dense log; the environment, the FP32 state and the provenance match the
   declaration. Every arm has 24 decode windows at exactly 128 running in the measured phase
-  (the minimum is 8), and one further window at 128 was excluded in each, for a prefill or a
-  previous line below 128 (`p4_ab_verdict.json`). Two checks outside the validator: the eight
-  servers' arguments (`server_info.json`) are identical except the lever's
+  (the minimum is 8). Two further windows at 128 were dropped in each: one for a prefill or a
+  previous line below 128, which `p4_ab_verdict.json` records, and the phase's first window,
+  whose previous decode line falls before the phase starts, which the validator drops
+  without counting it. The metric uses only the 24 counted windows. Two checks outside the
+  validator: the eight servers' arguments (`server_info.json`) are identical except the lever's
   `--enable-linear-replayssm`, `--linear-replayssm-cache-len 4` and
   `--mamba-radix-cache-strategy no_buffer`, and foreign CPU load averaged 0.19-0.26 cores per
-  arm during the measured phase, below the 2-core flag (`p4_ab_arms.csv`).
+  arm during the measured phase, below the 2-core flag (`p4_ab_arms.csv`). That file's
+  `server_decode_tok_s` and `server_full_batch_tps` columns are bench's p50 and weighted
+  rates, kept as diagnostics; the primary metric is the window harmonic mean in
+  `p4_ab_verdict.json`.
 - Throughput (`p4_ab_verdict.json`). Server decode rate at exactly 128 running (primary) and
   client throughput y, in tokens/s:
 
@@ -427,9 +432,15 @@ and every step exited 0 (commands in section 4).
 - Output probe (`p4_output_probe.csv`). At concurrency 1, on 48 prompts with 256 greedy
   tokens each, exact replay matched the dense server in all 48 sequences, in every token and
   top-20 log-probability, and so did the second dense server (the noise control). The probe can
-  see state rounding of this kind: SGLang's ReplaySSM matched in 22 of 48 sequences, FP16 state
-  in 20 and BF16 state in 17. A pass covers only the emitted tokens and top-20
-  log-probabilities at concurrency 1; it does not establish end-to-end exactness.
+  see state rounding of this kind: SGLang's ReplaySSM kept the dense server's greedy tokens in
+  22 of 48 sequences, FP16 state in 20 and BF16 state in 17, and all three changed the top-20
+  log-probabilities (`gen_kl_mean` above 0 in each). A pass covers only the emitted tokens and
+  top-20 log-probabilities at concurrency 1; it does not establish end-to-end exactness. The
+  `score_*` columns come from score mode, where each server re-scores the reference's
+  sequences in one teacher-forced prefill: `score_kl_*` compare its top-20 with the dense
+  reference's, and `score_argmax_agree` is the share of positions where its prefill argmax
+  equals the reference's decoded token. That share is 0.994 in every arm, the dense controls
+  included, so it reflects prefill against decode numerics, not the lever.
 - Measured against derived. The dense step at 128 running took 10.77 ms (128 / 11,882 tokens/s,
   the mean of the four dense arms) and the exact-replay step 10.73 ms, so replay saved 0.045 ms
   per step. If each of the 24 GDN layers saved what the one-layer bench measured at batch 128
