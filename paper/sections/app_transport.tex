@@ -159,7 +159,7 @@ Context $\ge$1{,}024 & 284 & 0.516 & 0.782 & 0.967 & 1.169\\\bottomrule
 \end{table}
 
 \subsection{Certification by bound family}\label{app:transport-families}
-Table~\ref{tab:transport-full} gives, per tiling, the best certified family, which is the elementwise minimum of all certified radii; Table~\ref{tab:transport} summarizes it in the main text. Table~\ref{tab:transport-families} gives every family on the tiling where transport did best, $k$-means tiles of 64 entries. The greedy skip hardly depends on the family: every certified family skips between 0.52\% and 0.64\% of the vocabulary on average, within 0.014 percentage points of the static screen with the same family. The family does matter for the partition interval of sampled acceptance, which the scalar $\ell_\infty$ radius leaves 820--901 nats wide and the grouped, low-rank and combined families narrow about sixfold, to 134--169 nats. No certified family brings it below 130 nats, and even oracle radii, at 12--13 nats, leave the acceptance test undecided most of the time (Appendix~\ref{app:transport-sampled}). On these tiles, entry-level transport, which bounds each entry by its own deviation from the tile centre instead of the tile's largest, adds at most 0.012 percentage points to the tile-level skip.
+Table~\ref{tab:transport-full} gives, per tiling, the best certified family, which is the elementwise minimum of all certified radii, and Table~\ref{tab:transport} summarizes both drafters over every family and tiling, with the share a real verify batch must still read. Table~\ref{tab:transport-families} gives every family on the tiling where transport did best, $k$-means tiles of 64 entries. The greedy skip hardly depends on the family: every certified family skips between 0.52\% and 0.64\% of the vocabulary on average, within 0.014 percentage points of the static screen with the same family. The family does matter for the partition interval of sampled acceptance, which the scalar $\ell_\infty$ radius leaves 820--901 nats wide and the grouped, low-rank and combined families narrow about sixfold, to 134--169 nats. No certified family brings it below 130 nats, and even oracle radii, at 12--13 nats, leave the acceptance test undecided most of the time (Appendix~\ref{app:transport-sampled}). On these tiles, entry-level transport, which bounds each entry by its own deviation from the tile centre instead of the tile's largest, adds at most 0.012 percentage points to the tile-level skip.
 
 \begin{table}[htbp]
 \caption{Transport on held-out draft pairs with the best certified bound family per tiling (the elementwise minimum of all certified radii). ``Skipped'': mean share of the vocabulary a greedy verifier skips, by transport (T), by the static screen with the same geometry (S) and by oracle radii (O), the realized per-tile deviations that no certified geometry can undercut. ``Width'': median partition width $\log(Z^+/Z^-)$ in nats; $P_?$: mean probability, over proposals $x\sim q$ at $T=1$, that the acceptance test stays undecided. Measured \ev{transport,transport-mtp}.}\label{tab:transport-full}
@@ -188,6 +188,23 @@ $k$-means 1,024 & 0.02\% & 0.02\% & 86.8\% & 162 & 1.000\\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{table}[htbp]
+\caption{Transport on the held-out transport pairs (DFlash-4B: 4,020 from 110 prompts; MTP-4B: 16,016 from 160), over every bound family and tiling tested (tiles of 64 to 1,024 entries). Single values are the best case; ranges span the tilings (by tiling: Table~\ref{tab:transport-full}). ``Skipped'': mean share of the vocabulary a greedy verifier skips; ``read by a real verify batch'': the share in tiles that at least one position of the batch still needs; $P_?$: mean probability, over proposals at $T=1$, that the sampled acceptance test stays undecided. Measured \ev{transport,transport-mtp}.}\label{tab:transport}
+\vskip 0.05in
+\centering\footnotesize
+\begin{tabular*}{0.62\linewidth}{@{}l@{\extracolsep{\fill}}rr@{}}
+\toprule
+& DFlash-4B & MTP-4B\\\midrule
+Skipped: certified transport & 0.59\% & 0.64\%\\
+Skipped: static screen (no draft) & 0.58\% & 0.64\%\\
+Skipped: oracle radii & 68.4--89.3\% & 86.8--98.5\%\\
+Read by a real verify batch & $\ge$99.48\% & $\ge$99.44\%\\
+Sampled test undecided, $P_?$ & $\ge$0.964 & $\ge$0.998\\
+\bottomrule
+\end{tabular*}
+\end{table}
+
 
 \begin{table}[htbp]
 \small\centering

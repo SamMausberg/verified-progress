@@ -3,7 +3,7 @@
 %  - Definition def:contracts, Lemma bf16gap (proof in Appendix A), Theorem stock and
 %    Proposition stockinterval (proofs inline): proved.
 %  - The stock kernel's error bound G_i: an assumption under two named models (Table
-%    tab:assumptions; in full, tab:assumptions-full); tested on replayed positions.
+%    tab:assumptions in Appendix A, beside tab:assumptions-full); tested on replayed positions.
 %  - The fixed-configuration rule and the stock divergences behind it are in Section 4.1
 %    (sec:same-shape), with committed state-safety evidence.
 \section{What the Engine Computes and What a Certificate Must Match}\label{sec:contract}\label{sec:semantics}
@@ -51,24 +51,4 @@ Two entries whose logits round to the same BF16 value under every admissible acc
 
 \paragraph{The contract and the fallback} A certified head promises \Rstock{} at the batch shape it serves. It certifies a position only when Proposition~\ref{prop:stockinterval} fixes that token for every accumulator value the named error model admits, and sends every other position to a fallback that runs the stock head. The \emph{whole-batch fallback} reruns the same \code{torch.matmul} on the whole batch at the same $M$, so cuBLAS selects the same kernel. It needs no error model, but one undecided position makes the whole batch pay. The \emph{per-position fallback} finishes one undecided position with a stock \code{matmul} over its gathered candidate entries; it applies only to a position left open by a near tie whose candidate list is complete and has at most 64 entries (Section~\ref{sec:kernel-design}). It is exact only if a position's BF16 logits stay the same when the rest of the batch, or the set of entries computed, changes. In principle cuBLAS may choose another kernel, and so another summation order, for each batch shape; on this build a position's logits were bitwise the same at 20 batch sizes from 1 to 256, with all entries or only gathered ones computed, and a start-up self-test re-checks the gathered case at the deployed batch sizes \ev{kernel-invariance}. Nothing guarantees that for other shapes or builds, so the contract still fixes $M$. Either fallback is a conditional node of the recorded CUDA graph, paid only when it runs.
 
-\subsection{Numerical Assumptions}\label{sec:assumptions}
-Table~\ref{tab:assumptions} lists the assumptions behind the agreement claims: facts about the formats and the stock head are read from the code, the stock kernel's error model is assumed and only tested, and the offline replay approximates real arithmetic in FP64.
-
-\begin{table}[!b]
-\caption{Numerical assumptions, in short (in full: Table~\ref{tab:assumptions-full}). ``Code'': read from SGLang's and PyTorch's code at the versions of Section~\ref{sec:setup}.}\label{tab:assumptions}
-\vskip 0.05in
-\centering\scriptsize
-\begin{tabularx}{\columnwidth}{@{}Y>{\raggedright\arraybackslash}p{3.05cm}@{}}
-\toprule
-Assumption & Status\\\midrule
-BF16 operands are normal or zero, so products are exact in FP32 (underflow is charged to $\eta$) & Exact for normal operands\\\addlinespace[2pt]
-The stock head rounds its FP32 accumulator to BF16 (nearest, ties to even); \code{torch.argmax} returns the first maximal index & Code\\\addlinespace[2pt]
-The stock kernel's error is at most $\gamma_{\rm stock}\sum_j|w_{ij}h_j|+\eta$ at every served shape, under the \modelcons{} or the \modelhopper; no split-$K$ partial sums in BF16 & Assumed; consistent with every replayed position and with the observed error of the stock GEMM's FP32-output variant, a separate kernel (Section~\ref{sec:limits}) \ev{kernel-error}\\\addlinespace[2pt]
-The int8 pass's own accumulation error is at most $\gamma_{\rm copy}=\gcons$ times $\sum_j|\bar w_{ij}h_j|$, and the kernel computes the modelled arithmetic & Assumed; checked per compiled variant at start-up and by runtime probes, not proved (Section~\ref{sec:kernel-design}) \ev{kernel-impl,kernel-tma}\\\addlinespace[2pt]
-Agreement is checked at the same batch shape and configuration & Required (Section~\ref{sec:same-shape})\\\addlinespace[2pt]
-Per-position fallback only: a position's stock logits do not depend on the rest of the batch or on which entries are present & Measured at 20 batch sizes; entry subsets re-checked at start-up \ev{kernel-invariance}\\\addlinespace[2pt]
-Seeded sampling (Section~\ref{sec:decisions}): noise is a function of (seed, position, token); no top-$k$ or top-$p$; the deterministic mode's head kernel is covered by the \modelcons{} only & Code; matched on replayed positions \ev{kernel-seeded}\\\addlinespace[2pt]
-The offline replay evaluates real logits in FP64; transport is analysed in real arithmetic & How the replay computes\\
-\bottomrule
-\end{tabularx}
-\end{table}
+\paragraph{Assumptions}\label{sec:assumptions} Table~\ref{tab:assumptions} in Appendix~\ref{app:proofs} lists the assumptions behind the agreement claims: facts about the formats and the stock head are read from the code, the stock kernel's error model is assumed and only tested, and the offline replay approximates real arithmetic in FP64.
