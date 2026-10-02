@@ -16,23 +16,23 @@ their command in the docstring. The levers that need engine changes come from th
 | `levers.py` | Each lever as server-flag and environment overrides on a bench arm, with what it changes numerically (`lossy`) | definitions, no output |
 | `lever_sweep.py` | Runs `<arm>[+lever...]` configurations through `bench.sweep` in one exclusive hold | raw sweeps |
 | `server_env.py` | bench's server plus a record of the server's numerics-relevant environment variables | `launch.json` of each run |
-| `summarise.py` | Tables from raw results: `ceiling` (decode-step sweeps), `sweeps` (lever sweeps), `quality` (probe summaries) | `decode_ceiling_try1.csv`, `lever_sweeps_quick.csv`, `host_levers.csv` |
+| `summarise.py` | Tables from raw results: `ceiling` (decode-step sweeps), `sweeps` (lever sweeps), `quality` (probe summaries) | `decode_ceiling_try1.csv`, `lever_sweeps_quick.csv`, `host_levers.csv`, `p4_ab_arms.csv`, `p4_output_probe.csv` |
 | `ceilings.py` | Derived step-time floors and throughput ceilings per lever stack under two execution models (a calculation, not a measurement) | `ceilings.json`, `ceilings.csv` |
 | `decode_ceiling_sweep.py` | Engine-only decode-step latency against batch size per configuration (`sglang.benchmark.one_batch`) | raw, summarised into `decode_ceiling_try1.csv` |
-| `gdn_exact_replay_check.py` | P4: bit-exactness of exact replay and of ReplaySSM against SGLang's packed GDN decode (`check`), and the kernel time of exact replay by ring length against the packed decode (`bench`) | `gdn_exact_replay_check_*.json`, `gdn_exact_replay_bench.json` |
+| `gdn_exact_replay_check.py` | P4: bit-exactness of exact replay and of ReplaySSM against SGLang's packed GDN decode (`check`), and the kernel time of exact replay by ring length against the packed decode (`bench`) | `gdn_exact_replay_check_*.json`, `gdn_exact_replay_bench*.json` |
 | `gdn_fast_verify_check.py` | P7: disagreement and time of SGLang's chunked GDN kernel used as a block-parallel verify path | `p7_fast_verify_check.json`, `p7_verify_width_bench.json` |
 | `token_map_coverage.py` | Held-out coverage of bench's hot-vocabulary draft maps on plain outputs of the confirm split | `token_map_coverage.csv` |
 | `build_token_map.py` | Builds hot-vocabulary maps for the MTP draft head from the model's own outputs on a calibration set | maps in `~/vp-data/moonshot/token_map/` |
-| `logit_probe.py` | Quality proxy: first greedy divergence and top-k KL against a reference server, in decode and teacher-forced modes | pending |
-| `quality_arms.py` | Runs the logit probe (and optionally the token-map calibration) for a list of lever stacks, one small server each | pending |
+| `logit_probe.py` | Quality proxy: first greedy divergence and top-k KL against a reference server, in decode and teacher-forced modes | `p4_output_probe.csv` (P4's output probe) |
+| `quality_arms.py` | Runs the logit probe (and optionally the token-map calibration) for a list of lever stacks, one small server each | `p4_output_probe.csv` (P4's output probe) |
 | `gsm8k_arms.py` | GSM8K accuracy per lever stack through `bench.quality`, for the declared quality budget | pending |
 | `gdn_state_rank_study.py` | P13: offline test of a GDN state reduced to rank r in the key dimension (energy, query and product bases), measuring KL, top-1 agreement and a delayed-retrieval probe on the HF model | `gdn_state_rank_study.json` |
 | `make_long_prompts.py` | The 2,048-token prompts of P4's served test, built from a bench split | input of the P4 test |
 | `run_p4_admission.sh`, `check_admission.py` | P4's admission preflight: every arm's server must run 128 requests at once during the measured phase | `evidence/moonshot/README.md` 2c (preflight 20261001T212044Z; a text record, raw outputs outside git) |
 | `admission_plateaus.py` | Explains each wave's running-request plateau in a server log (the chunked-tail double count behind P4's 127 cap) and checks it against the prediction | `p4_admission_plateaus.csv` |
-| `run_p4b.sh` | P4's served test in one exclusive hold: admission preflight, server output probe, then the paired A/B validated by `validate_p4_ab.py` (the kernel checks are reused from an earlier run, as its header explains) | pending |
-| `output_probe.py` | Outcome of P4's server output probe (refuted, undecided or no difference) | pending |
-| `validate_p4_ab.py` | Validates one P4 A/B run and applies the declared decision rule | pending |
+| `run_p4b.sh` | P4's served test in one exclusive hold: admission preflight, server output probe, then the paired A/B validated by `validate_p4_ab.py` (the kernel checks are reused from an earlier run, as its header explains) | `p4_ab_verdict.json`, `p4_ab_arms.csv`, `p4_output_probe.csv` (run 20261002T084035Z) |
+| `output_probe.py` | Outcome of P4's server output probe (refuted, undecided or no difference) | `output_probe` in `p4_ab_verdict.json` |
+| `validate_p4_ab.py` | Validates one P4 A/B run and applies the declared decision rule | `p4_ab_verdict.json` |
 
 "Pending" means no committed evidence yet; `evidence/moonshot/README.md` gives each run's status.
 Tests: `tests/test_moonshot_levers.py` (lever composition and the engine patches),

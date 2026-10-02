@@ -164,6 +164,13 @@ Assumptions for the components below: 3.8 TB/s, 650 TFLOPS BF16, context ~400 to
 
 ## 2c. Strict write-avoiding GDN decode (proposal P4, patch 0007)
 
+**Outcome.** The served test rejects P4's throughput claim. Its run, 20261002T084035Z, passed
+every declared validity check. Over four dense/exact pairs at exactly 128 running requests,
+exact replay decoded 1.0042 times as fast as dense decoding (95% interval 1.0026-1.0058,
+measured), below the pre-registered 1.10 and below the 1.08 derived before the run; client
+throughput rose by 0.14%. The server output probe found no difference from dense decoding,
+which does not establish end-to-end exactness. Details under "Served result" below.
+
 **Bit-exactness (measured at kernel level, on synthetic activations, one layer).**
 `gdn_exact_replay_check.py check` runs SGLang's packed decode and the exact-replay kernel
 side by side for 48 steps at batch 8 with random activations (randn q, k, v, a, b and a
@@ -176,11 +183,11 @@ and 0 of 1,572,864 output words differ** at ring length 4 and 16, and at layer 2
 (`gdn_exact_replay_check_L4.json`, `_L16.json`, `_L4_layer20.json`;
 `tests/test_gdn_exact_replay.py`: its 3 cases at the time passed in the same job). This is
 a kernel-level result on synthetic
-activations; the end-to-end bitwise probe (greedy tokens and top-20 logprobs at concurrency
-1 through the server) has not run yet: its first attempt, in the same job (job B in
-section 4), failed before serving. Its servers were launched with the radix cache off but
-still 640 mamba slots at `--mem-fraction-static 0.25`, and reported that the loaded weights
-left no GPU memory for the KV cache. It is queued again in run_p4b.sh. SGLang's ReplaySSM run on the same inputs
+activations; through the server, only the output probe of the served test (greedy tokens and
+top-20 logprobs at concurrency 1; "Served result" below) checks the outputs. The probe's first
+attempt, in the same job (job B in section 4), failed before serving: its servers were
+launched with the radix cache off but still 640 mamba slots at `--mem-fraction-static 0.25`,
+and reported that the loaded weights left no GPU memory for the KV cache. SGLang's ReplaySSM run on the same inputs
 differs in 465,102 output words and in nearly every state word at a flush (largest state
 deviation 0.38% of the state's largest entry), confirming it is an approximation.
 
@@ -198,12 +205,12 @@ The state traffic falls from 2D to 1.25D at L = 4 (1.6x fewer bytes), but the ke
 rings lose more than they save. With the GDN kernel at 41.6% of a B = 128 step (profile),
 1.22x on the kernel predicts about **1.08x per decode step** at B = 128 (derived; less with the
 pre-registered 2,048-token prompts, where attention takes a larger share). The pre-registered
-claim was >= 1.10x; the served paired A/B is queued. The first attempt, with
+claim was >= 1.10x; the served paired A/B rejected it ("Served result" below). The first attempt, with
 `sglang.benchmark.one_batch`, aborted in both arms (base r0-r2 and exact_replay_l4 r0-r2):
 a single 262,144-token prefill hits an illegal memory access in
 `fused_qk_gemma_rmsnorm_rope_gate`. Both arms ran on the patched engine (patches
 0001-0008, engine `1101be8c5f`, exact replay off in the base arm); it has not been tried on stock `bd66ce343e`.
-The A/B now runs through the server with chunked prefill (run_p4b.sh).
+The A/B then ran through the server with chunked prefill (run_p4b.sh).
 
 **Analysis of the served A/B, declared on 2026-10-01 at 07:12 UTC, before the run started**
 (agreed with the coordinator; the run script is `experiments/moonshot/run_p4b.sh`, committed
@@ -343,7 +350,7 @@ with this declaration):
     against 11.1 and 11.4 s with the single-request tail in the third void attempt;
   - the decode graphs were captured up to batch 129.
 
-  The full job (`run_p4b.sh`) is queued from main at 14c6dd1. Its results are not in yet.
+  The full job (`run_p4b.sh`) then ran from main at 14c6dd1 ("Served result" below).
 - Primary metric (amended on 2026-10-01 at 08:19 and 08:22 UTC, before the run started; the first
   version named bench's `logged_gen_tps_full_batch`, which averages windows with at least
   0.9 x the peak running count, i.e. 116-128 of 128): the server's decode rate at exactly
@@ -377,6 +384,70 @@ with this declaration):
   claim not supported", whatever the throughput interval says; it never reads as plain
   support.
 - Derived expectation before the run: about 1.08x at a 418-token context, less at 2,048.
+
+**Served result (measured; run 20261002T084035Z, 2026-10-02 08:40-09:11 UTC, repo 14c6dd1,
+engine c29a91692b).** `run_p4b.sh` ran in one exclusive hold from a clean checkout of main,
+and every step exited 0 (commands in section 4).
+
+- Validity. The engine was still at c29a91692b, so the kernel steps were reused from run
+  20261001T082738Z as declared: the checks at value tiles 32 (the tile the servers ran) and 16
+  are bit-identical, 0 of 201,326,592 state words and 0 of 1,572,864 output words differ
+  (`gdn_exact_replay_check_L4_bv32.json`, `_bv16.json`; the tile-16 bench,
+  `gdn_exact_replay_bench_bv16.json`, gives 145.2 against 162.1 us at batch 128, slower than
+  tile 32's 132.9 us above). The run's own admission preflight showed a peak of 128 running requests in the
+  profiling phase in both arms (`check_admission.py`). `validate_p4_ab.py` then passed every
+  declared check: the eight arms ran in the declared order and exited 0; each completed 256 of
+  256 requests with AIPerf exit 0, the declared prompts (by text hash) and no output-length
+  mismatch; every server resolved 129 running requests, 655,360 KV tokens and 132 mamba slots;
+  the line "GDN decode: exact replay kernel, ring length 4" appears in the four exact-replay
+  logs and in no dense log; the environment, the FP32 state and the provenance match the
+  declaration. Every arm has 24 decode windows at exactly 128 running in the measured phase
+  (the minimum is 8), and one further window at 128 was excluded in each, for a prefill or a
+  previous line below 128 (`p4_ab_verdict.json`). Two checks outside the validator: the eight
+  servers' arguments (`server_info.json`) are identical except the lever's
+  `--enable-linear-replayssm`, `--linear-replayssm-cache-len 4` and
+  `--mamba-radix-cache-strategy no_buffer`, and foreign CPU load averaged 0.19-0.26 cores per
+  arm during the measured phase, below the 2-core flag (`p4_ab_arms.csv`).
+- Throughput (`p4_ab_verdict.json`). Server decode rate at exactly 128 running (primary) and
+  client throughput y, in tokens/s:
+
+  | pair | dense decode | exact decode | ratio | dense y | exact y | ratio |
+  |---|---|---|---|---|---|---|
+  | r1 | 11,888.5 | 11,934.0 | 1.0038 | 7,011.6 | 7,021.4 | 1.0014 |
+  | r2 | 11,874.2 | 11,924.6 | 1.0042 | 7,003.3 | 7,014.8 | 1.0016 |
+  | r3 | 11,902.8 | 11,939.7 | 1.0031 | 7,010.0 | 7,018.9 | 1.0013 |
+  | r4 | 11,862.9 | 11,928.3 | 1.0055 | 7,005.4 | 7,014.2 | 1.0013 |
+  | mean (95% t interval) | | | **1.0042 (1.0026-1.0058)** | | | 1.0014 (1.0011-1.0017) |
+
+  The interval's upper end, 1.0058, is below 1.10, so the throughput claim is rejected under
+  the declared rule. The validator's verdict reads: "throughput rejected; output probe found
+  no difference (this does not establish end-to-end exactness; bit-exactness is shown at
+  kernel level)". The interval excludes 1 but not by much: all four pairs favour exact replay,
+  by 0.31 to 0.55%.
+- Output probe (`p4_output_probe.csv`). At concurrency 1, on 48 prompts with 256 greedy
+  tokens each, exact replay matched the dense server in all 48 sequences, in every token and
+  top-20 log-probability, and so did the second dense server (the noise control). The probe can
+  see state rounding of this kind: SGLang's ReplaySSM matched in 22 of 48 sequences, FP16 state
+  in 20 and BF16 state in 17. A pass covers only the emitted tokens and top-20
+  log-probabilities at concurrency 1; it does not establish end-to-end exactness.
+- Measured against derived. The dense step at 128 running took 10.77 ms (128 / 11,882 tokens/s,
+  the mean of the four dense arms) and the exact-replay step 10.73 ms, so replay saved 0.045 ms
+  per step. If each of the 24 GDN layers saved what the one-layer bench measured at batch 128
+  (161.5 - 132.9 = 28.6 us), a step would be 0.69 ms shorter, about 1.07x at this context
+  (derived; per layer, 128 FP32 states are 268 MB, far larger than the L2, so the bench's cold
+  L2 matches the server). About 6.5% of the kernel's saving reached the server. Even if all of
+  it had, about 1.07x would still be below the threshold.
+- Where the saving went (code reading, not measured). The bench times the GDN kernel alone. In
+  the server, `--enable-linear-replayssm` also enables SGLang's ring-cursor bookkeeping, which
+  runs outside the CUDA graph before every decode-graph replay (`_replay_metadata` in
+  `layers/attention/hybrid_linear_attn_backend.py`, lines 781-844 at c29a91692b; stock
+  SGLang code, not a moonshot patch). It selects the valid slots with a boolean mask and
+  deduplicates them with `torch.unique` on GPU tensors, and both make the host wait for the GPU.
+  Under the overlap scheduler such a wait would leave the GPU idle while the host prepares and
+  launches the next step, which could absorb most of the 0.69 ms. A trace of both arms (GPU idle
+  between decode-graph replays, and the GDN kernel's time inside them) would test this; it has
+  not been run. Either way the verdict stands: the declared test measured the lever as the
+  server runs it.
 
 ## 2d. Speculative host gap: configuration-level levers (measured, single runs)
 
@@ -549,7 +620,7 @@ to the measured noise floor); "lossy" changes them and needs the quality budget 
 | 1 | Public DFlash-4B drafter (z-lab) | latency | exact | drafter measured tau 6.18 at c=1, block 16 (`evidence/drafter/acceptance_summary.csv`); model card 3.4-4.6x on B200 | none | serving works | drafter owns baseline; I stack levers on it |
 | 2 | Remove the speculative host gap (MTP/DFlash, c=1-4) | latency | `--attention-backend triton`: class pending bench's equality classification (it changes the target's attention arithmetic; bench's first pair, 3.80/1K against the 3.42/1K plain c=1-vs-32 floor, combines Triton with ReplaySSM-spec, so it does not isolate Triton); `--speculative-draft-attention-backend triton`: exact (draft only) | measured: Triton for target and draft 1.18x at c=1, 1.14x at c=4; draft only 1.08x / 1.06x (2d) | none for draft-only | flag; engine fix by hostgap | DFlash + Triton attention queued |
 | 3 | FP16 GDN state + capacity lift (radix off, 256-1,024) | throughput | lossy, likely near-lossless | measured 1.24x at c=128; derived ceiling 1.46x | pending (DAMP: FP16 near-lossless, BF16 not) | flags only | quality and c>=256 sweeps queued |
-| 4 | Strict write-avoiding replay (P4, patch 0007) | throughput | bit-identical to the packed decode at kernel level (synthetic activations, one layer; 2c); end-to-end probe queued | kernel 1.22x at B=128/256 (L=4); traffic-only ceiling 1.18x at B=128 (f = 0.416); derived ~1.08x per decode step, below the pre-registered 1.10x gate | none | built | server A/B pending (run_p4b.sh) |
+| 4 | Strict write-avoiding replay (P4, patch 0007) | throughput | bit-identical to the packed decode at kernel level (synthetic activations, one layer; 2c); the server output probe at c=1 found no difference | kernel 1.22x at B=128/256 (L=4); traffic-only ceiling 1.18x at B=128 (f = 0.416); derived ~1.08x per decode step; measured served decode 1.0042x (95% interval 1.0026-1.0058) at 128 running requests | none | built | rejected by its served test (2c) |
 | 5 | MTP + ReplaySSM-spec at high batch | throughput | class pending measurement; mechanism suggests lossy (verify outputs from a chunked UT transform on TF32 tensor cores) | derived 34.3k vs plain 23.7k (FP32) | none | flags only | queued |
 | 6 | INT4 QAD target (nota-ai) with its INT4 DFlash drafter | latency | lossy | verify weight bytes 8.4 -> 3.3 GB (2.6x fewer, derived from the safetensors headers); arXiv 2607.04244 reports 6.98x over its baseline on an A10G | the same report: MMLU-Pro 0.690 -> 0.659, IFEval 0.857 -> 0.845, GPQA-D 0.700 -> 0.667; GSM8K here pending | checkpoints local | load test queued |
 | 7 | Hot-vocab draft head (patches 0001 MTP, 0005 DFlash) | latency | exact | MTP cycle floor -26% at c=1 | none | built | queued |
@@ -703,6 +774,73 @@ python experiments/moonshot/admission_plateaus.py \
 The `--expect` lists are the configurations each run was launched with, in order (the A/B in
 `run_p4b.sh`'s declared A B B A order, the preflights in `run_p4_admission.sh`); the script
 fails unless each run's record and server logs match them exactly.
+
+P4's served test (2c, "Served result") is run 20261002T084035Z: one exclusive hold
+(`scripts/gpu_lock.sh -x`) running `experiments/moonshot/run_p4b.sh` from a clean checkout of
+main at 14c6dd1, engine c29a91692b (`bd66ce343e` + moonshot patches 0001-0009). The script
+writes the admission preflight to `~/vp-data/moonshot/p4_admission_<run id>`, the output
+probe to `quality_exact_<run id>` and the A/B to `p4_ab_<run id>`, whose `verdict.json` comes
+from `validate_p4_ab.py`; its header gives each step. The committed files, from the
+repository root:
+
+```sh
+R=20261002T084035Z
+cp ~/vp-data/moonshot/p4_ab_$R/verdict.json evidence/moonshot/p4_ab_verdict.json
+python experiments/moonshot/summarise.py sweeps ~/vp-data/moonshot/p4_ab_$R \
+  --out evidence/moonshot/p4_ab_arms.csv
+python experiments/moonshot/summarise.py quality ~/vp-data/moonshot/quality_exact_$R/summary.json \
+  --out evidence/moonshot/p4_output_probe.csv
+```
+
+Rerun at this README's commit (both scripts unchanged since 14c6dd1), the validator writes a
+byte-identical `p4_ab_verdict.json` and `check_admission.py` prints the preflight's peak of 128
+running in both arms:
+
+```sh
+python experiments/moonshot/validate_p4_ab.py ~/vp-data/moonshot/p4_ab_$R \
+  --provenance ~/vp-data/moonshot/p4b_$R.provenance.json \
+  --output-probe ~/vp-data/moonshot/quality_exact_$R/output_probe.json --json verdict.json
+python experiments/moonshot/check_admission.py ~/vp-data/moonshot/p4_admission_$R \
+  --arms plain+no_radix+p4_pools plain+no_radix+p4_pools+exact_replay
+```
+
+The server-argument check compares each arm's `server_info.json` with that of the first dense
+arm, ignoring the start-up timings, the launch command and the internal-state record (which
+repeats the arguments next to memory figures):
+
+```python
+import glob, json, os
+run = os.path.expanduser('~/vp-data/moonshot/p4_ab_20261002T084035Z')
+skip = {'startup_time', 'launch_command', 'internal_states'}
+infos = {
+    path.split('/')[-4]: json.load(open(path))
+    for path in sorted(glob.glob(f'{run}/*/*/server/server_info.json'))
+}
+ref = infos['plain+no_radix+p4_pools_r1']
+for arm, info in infos.items():
+    print(arm, sorted(k for k in ref.keys() | info.keys() if k not in skip and ref.get(k) != info.get(k)))
+```
+
+It prints an empty list for the dense arms and `['enable_linear_replayssm',
+'linear_replayssm_cache_len', 'mamba_radix_cache_strategy']` for the exact-replay arms.
+
+The kernel files reused by that run come from run 20261001T082738Z (repo e67feb1, engine
+c29a91692b; `gdn_exact_replay_check.py` is unchanged since), with
+`PYTHONPATH=~/sglang-wt/moonshot/python`, copied from
+`~/vp-data/moonshot/exact_replay/{check_L4_bv32,check_L4_bv16,bench_bv16}_20261001T082738Z.json`
+to `gdn_exact_replay_check_L4_bv32.json`, `gdn_exact_replay_check_L4_bv16.json` and
+`gdn_exact_replay_bench_bv16.json`:
+
+```sh
+for bv in 32 16; do
+  SGLANG_GDN_EXACT_REPLAY_BV=$bv python experiments/moonshot/gdn_exact_replay_check.py check \
+    --batch 8 --steps 48 --ring 4 --force-rate 0.1 \
+    --out ~/vp-data/moonshot/exact_replay/check_L4_bv${bv}_20261001T082738Z.json
+done
+SGLANG_GDN_EXACT_REPLAY_BV=16 python experiments/moonshot/gdn_exact_replay_check.py bench \
+  --batches 128 256 --rings 2 4 \
+  --out ~/vp-data/moonshot/exact_replay/bench_bv16_20261001T082738Z.json
+```
 
 Lever definitions (flags and environment per lever, lossy labels, conflicts):
 `experiments/moonshot/levers.py`.

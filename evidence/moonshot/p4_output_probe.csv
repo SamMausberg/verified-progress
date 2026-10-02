@@ -1,0 +1,7 @@
+config,error,gen_seq_identical,gen_first_div_median,gen_div_per_1k,gen_kl_mean,gen_kl_p99,score_argmax_agree,score_kl_mean,score_kl_p99
+plain+no_radix,,/,,,,,,,
+plain+no_radix+exact_replay,,48/48,256.0,0.0,0.0,0.0,0.99428,0.0,0.0
+plain+no_radix+replayssm,,22/48,245.0,3.222,0.000191,0.00222,0.99428,0.0,0.0
+plain+no_radix#2,,48/48,256.0,0.0,0.0,0.0,0.99428,0.0,0.0
+plain+no_radix+fp16_state,,20/48,202.0,3.363,0.000225,0.00258,0.99379,0.000258,0.00284
+plain+no_radix+bf16_state,,17/48,191.5,3.799,0.000242,0.00303,0.99379,0.000258,0.00284

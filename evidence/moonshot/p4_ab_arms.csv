@@ -1,0 +1,9 @@
+config,concurrency,runs,x_tok_s_user,y_tok_s_gpu,y_std,accept_len,ttft_p50_ms,ttft_p99_ms,itl_p50_ms,itl_p99_ms,server_full_batch_tps,server_decode_tok_s,foreign_cpu_mean,completed,requests
+plain+no_radix+p4_pools+exact_replay_r1,128,1,54.9,7021.4,,,1881.84,3805.01,14.53,17.12,8033.9,11906.6,0.19,256,256
+plain+no_radix+p4_pools+exact_replay_r2,128,1,54.9,7014.8,,,1887.15,3812.45,14.55,17.1,8033.8,11914.5,0.26,256,256
+plain+no_radix+p4_pools+exact_replay_r3,128,1,54.9,7018.9,,,1881.61,3810.96,14.52,17.09,8032.2,11903.8,0.23,256,256
+plain+no_radix+p4_pools+exact_replay_r4,128,1,54.9,7014.2,,,1883.53,3811.56,14.57,17.11,8028.9,11897.1,0.2,256,256
+plain+no_radix+p4_pools_r1,128,1,54.9,7011.6,,,1880.36,3800.68,14.54,17.09,8020.0,11877.4,0.24,256,256
+plain+no_radix+p4_pools_r2,128,1,54.8,7003.3,,,1880.31,3802.57,14.57,17.15,8010.4,11837.4,0.24,256,256
+plain+no_radix+p4_pools_r3,128,1,54.9,7010.0,,,1879.51,3807.18,14.57,17.11,8017.8,11880.6,0.26,256,256
+plain+no_radix+p4_pools_r4,128,1,54.8,7005.4,,,1883.66,3794.99,14.56,17.15,8013.3,11857.5,0.23,256,256
