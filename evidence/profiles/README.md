@@ -435,7 +435,7 @@ same answer at every row count, so the measured behaviour matches the paper's Ho
 model (k = 16, F = 25, truncation) and lies within the conservative model, which covers
 adders that keep at least FP32's 23 fraction bits (F = 25 here). On the cuBLAS path the accumulator's rounding is read through the
 BF16 epilogue, whose round-to-nearest-even behaviour the control rows establish. Scope: this is a measurement on crafted inputs of one GH200 with driver
-570.195.03, CUDA 13.0 and PyTorch 2.13's cuBLAS, not a vendor contract and not a proof
+570.195.03, PyTorch 2.13 (CUDA 13.0) with cuBLASLt 13.1.1, and Triton 3.7.1 compiling with its bundled ptxas from CUDA 12.8 (`versions` in the JSON), not a vendor contract and not a proof
 for all inputs. Its operands are powers of two and short sums of them, with one operand
 of every product equal to 1. Products of two full 8-bit significands, subnormal
 operands, other K offsets than the first 128, and other GPUs or library versions were

@@ -1,11 +1,21 @@
 {
- "repo_commit": "02b921b69889377488ba3f7147721d70ebe36a3f",
+ "repo_commit": "5e3a1fc2acd66aa431fd04f7ef5713a38eb8a754",
  "gpu": "NVIDIA GH200 480GB",
- "torch": "2.13.0+cu130",
- "cuda": "13.0",
+ "versions": {
+  "torch": "2.13.0+cu130",
+  "torch_cuda": "13.0",
+  "triton": "3.7.1",
+  "triton_ptxas": "Build cuda_12.8.r12.8/compiler.35583870_0",
+  "cublaslt": "130101",
+  "cublaslt_library": "nvidia/cu13/lib/libcublasLt.so.13",
+  "driver": "570.195.03"
+ },
+ "tiny_exponent": 60,
  "triton": {
   "k": 64,
   "instructions": {
+   "ptx_version": "8.7",
+   "ptx_target": "sm_90a",
    "ptx_wgmma": 4,
    "ptx_mma_sync": 0,
    "sass_HGMMA": 4,
@@ -1329,7 +1339,6 @@
    }
   ]
  },
- "tiny_exponent": 60,
  "cublas": {
   "m1": {
    "kernels": [
