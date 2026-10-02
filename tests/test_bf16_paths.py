@@ -36,8 +36,16 @@ def test_readout_measures_against_fp32_and_scores_the_path_top1() -> None:
     assert r['positions_before'] == 1
 
 
-def events(sglang: int = 0, **runs: int) -> dict[str, int]:
-    return {'sglang': sglang, **dict.fromkeys(rates.COMPARATORS, 0), **runs}
+def missed(count: int, start: int = 0) -> set[tuple[str, int]]:
+    return {('p', start + i) for i in range(count)}
+
+
+def events(sglang: int = 0, **runs: int) -> dict[str, set[tuple[str, int]]]:
+    """SGLang misses positions 0..sglang-1; each comparator misses its own, disjoint ones."""
+    found = {'sglang': missed(sglang), **{name: set() for name in rates.COMPARATORS}}
+    for name, count in runs.items():
+        found[name] = missed(count, start=1000)
+    return found
 
 
 @pytest.mark.parametrize(
@@ -58,6 +66,20 @@ def test_decision_rule(sglang: int, hf: int, verdict: str) -> None:
 
 def test_decision_ignores_the_bf16_state_run() -> None:
     assert rates.decide(events(6, hf_bf16_modelstate=50))['verdict'] == 'sglang-specific'
+
+
+def test_decision_pairs_positions_both_miss() -> None:
+    # Six SGLang misses, one of them shared with the comparator: five discordant, p = 1/32.
+    shared = events(6)
+    shared['hf_bf16_float32state'] = {('p', 0)}
+    decision = rates.decide(shared)
+    assert (decision['sglang_only'], decision['comparator_only']) == (5, 0)
+    assert decision['paired_exact_p_one_sided'] == pytest.approx(1 / 32)
+    assert decision['verdict'] == 'sglang-specific'
+    # One shared miss and nothing else: no discordant position, p = 1.
+    one = events(1)
+    one['hf_bf16_float32state'] = {('p', 0)}
+    assert rates.decide(one)['paired_exact_p_one_sided'] == 1.0
 
 
 def test_decision_compares_against_the_worse_transformers_run() -> None:

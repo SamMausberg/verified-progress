@@ -42,8 +42,9 @@ readings (each set before its run, in the scripts' docstrings) give three findin
    shared by the prefill paths of all three implementations. The rule
    declared before the runs needed at least 5 positions where SGLang misses by more than 2 nats
    and 3 times transformers' count; both samples were inconclusive (0 against 0, then 1 against
-   1). A position missed on both of a source's paths now counts once, a correction made after the
-   runs (Codex on #222) that changes neither count.
+   1, the same position). Two corrections made after the runs (Codex on #222) change neither
+   verdict: a position missed on both of a source's paths counts once, and the exact test pairs
+   the implementations by position (SGLang-only against transformers-only misses).
 
 So `579ae7ce`/439 is a real SGLang outlier at one position, after the model's end-of-text token,
 but the samples cannot tell whether such outliers are more frequent in SGLang than in transformers:
@@ -166,8 +167,9 @@ FP32's logprob of FP32's top-1 token.
 Before the end of text in `rates_eot` (3,790 positions) no path misses by more than 0.2 nats.
 transformers with its default BF16 cached state, run on the first sample only, gives 17 decode
 positions above 0.05 nats and a mean error of 0.0063. The declared decision (`decide` in
-`rates.py`, in both files under `decision`) counts misses above 2 nats over both paths and compares
-SGLang with the worse of the two FP32-state transformers runs.
+`rates.py`, in both files under `decision`) counts the positions missed by more than 2 nats on
+either path and compares SGLang with the worse of the two FP32-state transformers runs, testing
+the positions only one of the two misses.
 
 ## What was run
 

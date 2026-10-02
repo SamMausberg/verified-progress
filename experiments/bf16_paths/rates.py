@@ -33,12 +33,12 @@ module compares the paths on positions nobody selected:
 
 Readings (set before the run; `decide`): events are positions where FP32's logprob of a
 path's top-1 falls more than 2 nats short of FP32's top, pooled over decode and prefill (a
-position missed on both paths counted once, a correction made after both runs; it changes
-neither verdict).
+position missed on both paths counted once, and the exact test paired by position; both
+corrections were made after the runs and change neither verdict).
 The comparator is the transformers configuration with more events among the two with an
 FP32 state (torch GDN, fla GDN). SGLang-specific: SGLang at least 5 events, at least 3 times
-the comparator's, and a one-sided exact binomial p below 0.05 for SGLang's share of the two
-counts under equal rates; then SGLang's BF16 arithmetic is less accurate than either
+the comparator's, and a one-sided exact binomial p below 0.05 for SGLang's share of the
+discordant positions (missed by one of the two only) under equal rates; then SGLang's BF16 arithmetic is less accurate than either
 transformers implementation at this model, and 579ae7ce/439 is an instance of that. Not
 specific: at least 10 events in the two counts and SGLang at most 1.5 times the
 comparator. Anything else is inconclusive.
@@ -284,20 +284,26 @@ def fp32(out: Path, threads: int) -> int:
     return 0
 
 
-def decide(event_positions: dict[str, int]) -> dict[str, Any]:
-    """The rule declared before the run (module docstring, "Readings"), on the number of
-    positions where a source's decode or prefill path (or both) misses by more than 2 nats.
-    A position missed on both paths counts once: the two paths share the prompt, the
-    position and most of the arithmetic, so they are not independent events."""
-    sglang_events = event_positions['sglang']
-    by_comparator = {name: event_positions[name] for name in COMPARATORS}
+def decide(event_positions: dict[str, set[tuple[str, int]]]) -> dict[str, Any]:
+    """The rule declared before the run (module docstring, "Readings"), on the positions where
+    a source's decode or prefill path (or both) misses by more than 2 nats. A position missed
+    on both paths counts once: the two paths share the prompt, the position and most of the
+    arithmetic. The implementations are read at the same positions, so the exact test is the
+    paired one (McNemar's): SGLang-only against comparator-only positions, with positions both
+    miss counted in neither. Both refinements came after the runs and change neither verdict."""
+    sglang = event_positions['sglang']
+    by_comparator = {name: len(event_positions[name]) for name in COMPARATORS}
     comparator = max(by_comparator, key=lambda name: by_comparator[name])
-    hf_events = by_comparator[comparator]
-    total = sglang_events + hf_events
-    p_value = sum(math.comb(total, k) for k in range(sglang_events, total + 1)) / 2**total
+    other = event_positions[comparator]
+    sglang_events, hf_events = len(sglang), len(other)
+    only_sglang, only_other = len(sglang - other), len(other - sglang)
+    discordant = only_sglang + only_other
+    p_value = (
+        sum(math.comb(discordant, k) for k in range(only_sglang, discordant + 1)) / 2**discordant
+    )
     if sglang_events >= 5 and sglang_events >= 3 * hf_events and p_value < 0.05:
         verdict = 'sglang-specific'
-    elif total >= 10 and sglang_events <= 1.5 * hf_events:
+    elif sglang_events + hf_events >= 10 and sglang_events <= 1.5 * hf_events:
         verdict = 'not specific'
     else:
         verdict = 'inconclusive'
@@ -307,7 +313,9 @@ def decide(event_positions: dict[str, int]) -> dict[str, Any]:
         'sglang_events': sglang_events,
         'transformers_events': by_comparator,
         'comparator': comparator,
-        'binomial_p_one_sided': round(p_value, 6),
+        'sglang_only': only_sglang,
+        'comparator_only': only_other,
+        'paired_exact_p_one_sided': round(p_value, 6),
         'verdict': verdict,
     }
 
@@ -386,7 +394,7 @@ def summary(out: Path) -> dict[str, Any]:
             name: sorted([prompt, position] for prompt, position in found)
             for name, found in event_positions.items()
         },
-        'decision': decide({name: len(found) for name, found in event_positions.items()}),
+        'decision': decide(event_positions),
         'worst': worst,
     }
 
