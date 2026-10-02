@@ -24,15 +24,15 @@ system overheads and the latency-throughput frontiers.
 
 Read `paper/paper.pdf`, typeset in the MLSys two-column format: a 10-page main
 text on the exactness contract, the certified head and transport, then the
-references and the appendices. The paper cites committed evidence as [E*n*] and
-marks work whose result is not yet committed as [D*n*]; the evidence register in
-the appendices lists every cited file with the program that produced it. The
-companion `paper/research_notes.pdf` (source in `paper/notes/`) holds the
-research notes behind the paper: the status of the questions and proposals, the
-serving stack and protocol, drafting and repair, the stock engine under
-speculation and further analysis, with its own evidence register. `TASKS.md`
-tracks the work and its status, `RUNBOOK.md` gives the commands and the rules
-for admissible runs, and `SETUP.md` describes the machine.
+references and the appendices. The paper cites committed evidence as [E*n*],
+and the evidence register in the appendices lists every cited file with the
+program that produced it; work that was not done is stated as not measured or
+not run. The companion `paper/research_notes.pdf` (source in `paper/notes/`)
+holds the research notes behind the paper: the status of the questions and
+proposals, the serving stack and protocol, drafting and repair, the stock
+engine under speculation and further analysis, with its own evidence register.
+`TASKS.md` tracks the work and its status, `RUNBOOK.md` gives the commands and
+the rules for admissible runs, and `SETUP.md` describes the machine.
 
 ## Main results
 
@@ -40,8 +40,8 @@ Every GPU number below was measured on Qwen3.5-4B (revision `851bf6e8`) on one
 GH200 with SGLang at the pinned commit: some in the running server, others with
 its kernels in isolation or offline on states captured from it. The README of
 each evidence directory says which, and gives the command, commits and flags
-behind every number. Results whose pull requests are still open are not listed;
-the paper shows them as pending items, never as numbers.
+behind every number. Results whose pull requests are still open are not listed,
+and the paper does not cite them.
 
 The main line of the paper:
 
