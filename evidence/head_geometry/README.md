@@ -45,7 +45,8 @@ BF16 output (R-stock).
   of positions to the stock kernel with the conservative accumulation model and 0.35% with
   the tighter model (assumed for the stock kernel: the largest error of the stock GEMM's
   FP32-output variant over 2,048 real head inputs is 1/58 of its bound,
-  `evidence/certified_head/stock_invariance.json`); the
+  `evidence/certified_head/stock_invariance.json`, but the BF16-output kernel SGLang runs
+  does not expose its accumulator); the
   `stock_gap` sufficient condition alone leaves 2-3%.
 
 ## Files
@@ -383,11 +384,15 @@ property of this build, not a guarantee, and without it R-stock requires the rer
 same batch shape. The certified head's column fallback needs a different property: it reruns
 the stock GEMM at the same batch shape over the gathered candidate rows, so it relies on
 column-subset invariance (the gathered rows' logits equal the same columns of the full
-stock head). The same file measures that at the 20 sizes (`column_subset_equal`), and the
-head's start-up self-test (`column_invariance_self_test` in `src/certified_head/head.py`)
-re-checks it at the deployed batch sizes; the self-test does not check row invariance. The
-cost of either fallback mode is not measured here; `evidence/certified_head/micro_head.json`
-times both.
+stock head). The same file measures that at the 20 sizes, for 64 random head rows
+(`column_subset_equal`) and at the fallback's own shape of 64 gathered rows per batch row,
+an M x 64M product (`gathered_candidates_equal`); cuBLAS chooses its kernel by shape, so the
+second is the one the fallback needs. The head's start-up self-test
+(`column_invariance_self_test` in `src/certified_head/head.py`) re-checks the gathered shape
+at the deployed batch sizes; it does not check row invariance. The cost of the two fallbacks
+the certified head implements, the whole-batch and the column fallback, is not measured
+here; `evidence/certified_head/micro_head.json` times both. Resolving rows one at a time is
+neither implemented nor timed.
 
 ## P1: certified decoder tail (plain decoding only) - negative result
 
