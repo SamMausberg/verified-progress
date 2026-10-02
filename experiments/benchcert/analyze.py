@@ -618,13 +618,20 @@ def class_rows(path: Path) -> list[dict[str, Any]]:
     for record in iter_jsonl(path):
         first, second = record['tokens']
         lp_first, lp_second = record['logprobs']
-        rows.append({
-            'context': record['id'], 'class': record['class'], 'margin_nats': record['margin'],
-            'ulp': record['ulp'], 'token_a': first, 'token_b': second,
-            'logprob_a': lp_first, 'logprob_b': lp_second,
-            'stock_top1': record.get('stock_top1'),
-            'prompt_and_prefix_tokens': record.get('prompt_and_prefix_tokens'),
-        })
+        rows.append(
+            {
+                'context': record['id'],
+                'class': record['class'],
+                'margin_nats': record['margin'],
+                'ulp': record['ulp'],
+                'token_a': first,
+                'token_b': second,
+                'logprob_a': lp_first,
+                'logprob_b': lp_second,
+                'stock_top1': record.get('stock_top1'),
+                'prompt_and_prefix_tokens': record.get('prompt_and_prefix_tokens'),
+            }
+        )
     return rows
 
 
@@ -1038,8 +1045,16 @@ def check_counters(
                 uncounted = expected - counters.get('calls', 0)
                 if uncounted != 0:
                     complete = False
-                rows.append({'step': step, 'family': fam, 'concurrency': c, 'path': path,
-                             **counters, 'uncounted_calls': uncounted})
+                rows.append(
+                    {
+                        'step': step,
+                        'family': fam,
+                        'concurrency': c,
+                        'path': path,
+                        **counters,
+                        'uncounted_calls': uncounted,
+                    }
+                )
         if mismatch > 0:
             verdict[fam] = False
         elif not complete or not info['points']:

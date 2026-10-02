@@ -75,7 +75,12 @@ def test_every_session_runs_each_pair_back_to_back() -> None:
     assert plan.SESSIONS['s2']['A'] == plan.SESSIONS['s1']['A'][::-1]
     held = [step for steps in plan.HOLDS.values() for step in steps]
     assert sorted(held, key=str) == sorted(
-        [('check', None), *[(s, p) for s in plan.DECISION_SESSIONS for p in 'AB']], key=str
+        [
+            ('check', None),
+            ('check2', None),
+            *[(s, p) for s in plan.DECISION_SESSIONS for p in 'AB'],
+        ],
+        key=str,
     )
 
 
@@ -629,12 +634,26 @@ def test_control_waves_cert0_never_certifies(tmp_path: Path) -> None:
 
 
 def test_stats_delta_treats_the_high_water_mark_as_a_gauge() -> None:
-    before = {'paths': {'verify': {'calls': 10, 'max_certified_rows': 64,
-                                   'certified_rows_histogram': {'32': 4, '64': 6},
-                                   'host_steps': {'certified': 10}}}}
-    after = {'paths': {'verify': {'calls': 15, 'max_certified_rows': 64,
-                                  'certified_rows_histogram': {'32': 9, '64': 6},
-                                  'host_steps': {'certified': 15}}}}
+    before = {
+        'paths': {
+            'verify': {
+                'calls': 10,
+                'max_certified_rows': 64,
+                'certified_rows_histogram': {'32': 4, '64': 6},
+                'host_steps': {'certified': 10},
+            }
+        }
+    }
+    after = {
+        'paths': {
+            'verify': {
+                'calls': 15,
+                'max_certified_rows': 64,
+                'certified_rows_histogram': {'32': 9, '64': 6},
+                'host_steps': {'certified': 15},
+            }
+        }
+    }
     delta = analyze.stats_delta(after, before)['verify']
     assert delta['calls'] == 5 and delta['host_certified_steps'] == 5
     # The point certified only 32-row batches, although the launch's maximum is 64.
@@ -645,8 +664,11 @@ def test_check_counters_need_every_certified_call_counted(tmp_path: Path) -> Non
     family = plan.FAMILIES['plain']
     same = {c: {'p0': [1, 2]} for c in family.concurrency}
     info = _launch(tmp_path, 'check2', family, 'check', 50.0, same)
-    launches = {('check2', 'plain', 'check'): analyze.load_launch(
-        {**info, 'hold': 'h5', 'provenance': {'engine_commit': 'enginehead'}})}
+    launches = {
+        ('check2', 'plain', 'check'): analyze.load_launch(
+            {**info, 'hold': 'h5', 'provenance': {'engine_commit': 'enginehead'}}
+        )
+    }
     launches[('check2', 'plain', 'check')]['problems'] = []
     rows, verdict = analyze.check_counters(launches, 'check2')
     assert verdict['plain'] is True and all(r['uncounted_calls'] == 0 for r in rows)

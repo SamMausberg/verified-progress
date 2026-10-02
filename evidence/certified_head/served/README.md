@@ -360,5 +360,5 @@ for N = 1-4 at the hold commit; the re-score and the wave control ran
 | `frontier.csv`, `frontier.png`, `ratios.png` | figure data and figures |
 | `launch_outliers.csv` | the post hoc slow-launch diagnostic |
 | `predictions.json` | the derived predictions, written before the runs (`analyze.py predict`) |
-| `classes.csv` (added with the settling hold's regeneration) | every re-scored first-divergence context: class, margin, BF16 spacing, both tokens and their batch-1 stock logprobs (from `experiments/benchcert/rescore.py`'s output, copied by `analyze.py report`) |
+| `classes.csv` | every re-scored first-divergence context: class, margin, BF16 spacing, both tokens and their batch-1 stock logprobs (from `experiments/benchcert/rescore.py`'s output, copied by `analyze.py report`) |
 | `control_waves_mtp.json`, `control_waves_dflash16.json` | the exploratory wave controls' comparisons, with their reading rules (`experiments/benchcert/control_waves.py`, run by `hold_shared.sh`) |

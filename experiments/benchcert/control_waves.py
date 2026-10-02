@@ -38,10 +38,10 @@ closed-loop timing in the timed runs.
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
 import json
 import sys
 import urllib.request
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -155,9 +155,7 @@ def waves(out: Path, name: str, variant: str, runs: Path) -> int:
     selected = range(WAVES)
     if variant == 'certlog':
         # Only the wave that holds the large event's prompt.
-        index = next(
-            (i for i, (key, _) in enumerate(items) if key.startswith(TARGET_PROMPT)), None
-        )
+        index = next((i for i, (key, _) in enumerate(items) if key.startswith(TARGET_PROMPT)), None)
         if index is None:
             raise SystemExit(f'prompt {TARGET_PROMPT} is not among the control prompts')
         selected = range(index // size, index // size + 1)
