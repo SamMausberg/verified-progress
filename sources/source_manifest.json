@@ -1,182 +1,182 @@
 {
-  "audit_date": "2026-10-01",
-  "source_count": 224,
+  "audit_date": "2026-10-02",
+  "source_count": 227,
   "sources": [
     {
       "key": "sgcode",
-      "bibliography_text": "SGLang contributors. \\emph{DFlash model and candidate-head implementation}. Frozen commit \\sourcepin, \\path{python/sglang/srt/models/dflash.py}. \\url{https://github.com/sgl-project/sglang/blob/bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824/python/sglang/srt/models/dflash.py}.",
+      "bibliography_text": "SGLang contributors. \\emph{DFlash model and candidate-head implementation (\\texttt{python/sglang/srt/models/dflash.py})}. Source code, commit \\texttt{bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824}, 2026. \\url{https://github.com/sgl-project/sglang/blob/bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824/python/sglang/srt/models/dflash.py}.",
       "urls": [
         "https://github.com/sgl-project/sglang/blob/bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824/python/sglang/srt/models/dflash.py"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): verified. Read at the pin: DFlash2DraftModel has no head (lm_head set to the target's); candidate_topk projects through the target lm_head (dense matmul or quant_method), radix top-k, and with_partition=True returns the full-vocabulary LSE via lilicorr_topk_lse. DFlash2's compute_candidates does not request the partition. See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row sgcode. Earlier: Citation audit 30 Sep 2026 (lit workstream): verified. Read at the pin: DFlash2DraftModel has no head (lm_head set to the target's); candidate_topk projects through the target lm_head (dense matmul or quant_method), radix top-k, and with_partition=True returns the full-vocabulary LSE via lilicorr_topk_lse. DFlash2's compute_candidates does not request the partition. See sources/citation_audit.md."
     },
     {
       "key": "qwenconfig",
-      "bibliography_text": "Qwen. \\emph{Qwen3.5-4B model configuration} (\\texttt{config.json}). Hugging Face, revision \\texttt{851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a}. \\url{https://huggingface.co/Qwen/Qwen3.5-4B/blob/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a/config.json}.",
+      "bibliography_text": "Qwen. \\emph{Qwen3.5-4B model configuration (\\texttt{config.json})}. Hugging Face, revision \\texttt{851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a}, 2026. \\url{https://huggingface.co/Qwen/Qwen3.5-4B/blob/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a/config.json}.",
       "urls": [
         "https://huggingface.co/Qwen/Qwen3.5-4B/blob/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a/config.json"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): corrected. Revision pinned (851bf6e, current main, last modified 2026-03-02). Hidden 2560, vocab 248320, 32 layers (24 linear_attention, 8 full_attention), mtp_num_hidden_layers 1, tied embeddings, 32 value heads of dim 128. The 1.271 GB head and 50.3 MB recurrent-state figures check out. Replace 'deployment revision still to be pinned'. See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row qwenconfig. Earlier: Citation audit 30 Sep 2026 (lit workstream): corrected. Revision pinned (851bf6e, current main, last modified 2026-03-02). Hidden 2560, vocab 248320, 32 layers (24 linear_attention, 8 full_attention), mtp_num_hidden_layers 1, tied embeddings, 32 value heads of dim 128. The 1.271 GB head and 50.3 MB recurrent-state figures check out. Replace 'deployment revision still to be pinned'. See sources/citation_audit.md."
     },
     {
       "key": "qwencard",
-      "bibliography_text": "Qwen. \\emph{Qwen3.5-4B model card}. Hugging Face, revision \\texttt{851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a}. \\url{https://huggingface.co/Qwen/Qwen3.5-4B/tree/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a}.",
+      "bibliography_text": "Qwen. \\emph{Qwen3.5-4B model card}. Hugging Face, revision \\texttt{851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a}, 2026. \\url{https://huggingface.co/Qwen/Qwen3.5-4B/tree/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a}.",
       "urls": [
         "https://huggingface.co/Qwen/Qwen3.5-4B/tree/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): corrected. Exists; Apache-2.0; pipeline image-text-to-text (multimodal checkpoint); base Qwen/Qwen3.5-4B-Base. Pin the revision. See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row qwencard. Earlier: Citation audit 30 Sep 2026 (lit workstream): corrected. Exists; Apache-2.0; pipeline image-text-to-text (multimodal checkpoint); base Qwen/Qwen3.5-4B-Base. Pin the revision. See sources/citation_audit.md."
     },
     {
       "key": "dflashcard",
-      "bibliography_text": "Inco AI. \\emph{Qwen3.8-27B-DFlash2 model card}. Hugging Face, revision \\texttt{015e795645c74b1a0eeef3b570031fb62e769bc5}, created 18 August 2026. \\url{https://huggingface.co/incoai/Qwen3.8-27B-DFlash2/tree/015e795645c74b1a0eeef3b570031fb62e769bc5}.",
+      "bibliography_text": "Inco AI. \\emph{Qwen3.8-27B-DFlash2 model card}. Hugging Face, revision \\texttt{015e795645c74b1a0eeef3b570031fb62e769bc5}, 2026. \\url{https://huggingface.co/incoai/Qwen3.8-27B-DFlash2/tree/015e795645c74b1a0eeef3b570031fb62e769bc5}.",
       "urls": [
         "https://huggingface.co/incoai/Qwen3.8-27B-DFlash2/tree/015e795645c74b1a0eeef3b570031fb62e769bc5"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): corrected. Exists; Apache-2.0; base Qwen/Qwen3.8-27B; mirrored at z-lab/Qwen3.8-27B-DFlash2; results from one H200 with FA3 at T=1.0/top-p 0.95/top-k 20. Asks users to also cite the DFlash paper (key dflashpaper). See sources/citation_audit.md. Correction (30 Sep 2026): the manuscript's 'no public Qwen3.5-4B DFlash2 checkpoint' is true for DFlash 2 only; a public DFlash (v1) drafter for Qwen3.5-4B exists (key dflash4bcard, z-lab/Qwen3.5-4B-DFlash)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row dflashcard. Earlier: Citation audit 30 Sep 2026 (lit workstream): corrected. Exists; Apache-2.0; base Qwen/Qwen3.8-27B; mirrored at z-lab/Qwen3.8-27B-DFlash2; results from one H200 with FA3 at T=1.0/top-p 0.95/top-k 20. Asks users to also cite the DFlash paper (key dflashpaper). See sources/citation_audit.md. Correction (30 Sep 2026): the manuscript's 'no public Qwen3.5-4B DFlash2 checkpoint' is true for DFlash 2 only; a public DFlash (v1) drafter for Qwen3.5-4B exists (key dflash4bcard, z-lab/Qwen3.5-4B-DFlash)."
     },
     {
       "key": "dflash",
-      "bibliography_text": "Inco AI. \\emph{DFlash 2: Keep Drafting Parallel}. Blog, 18 August 2026. \\url{https://inco.ai/blog/dflash2/}.",
+      "bibliography_text": "Inco AI. \\emph{DFlash 2: Keep Drafting Parallel}. Inco AI blog, 2026. \\url{https://inco.ai/blog/dflash2/}.",
       "urls": [
         "https://inco.ai/blog/dflash2/"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): verified. Blog dated 18 Aug 2026, no individual authors. Shows S_t(a,b)=U_t(b)+<A(a)(.)H(h_t),B(b)> with a hidden-state gate and a greedy walk; Table 3 reports Qwen3.5-4B acceptance lengths (MTP 4.54, DFlash 4.92, DSpark 5.49, DFlash 2 5.97). See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row dflash. Earlier: Citation audit 30 Sep 2026 (lit workstream): verified. Blog dated 18 Aug 2026, no individual authors. Shows S_t(a,b)=U_t(b)+<A(a)(.)H(h_t),B(b)> with a hidden-state gate and a greedy walk; Table 3 reports Qwen3.5-4B acceptance lengths (MTP 4.54, DFlash 4.92, DSpark 5.49, DFlash 2 5.97). See sources/citation_audit.md."
     },
     {
       "key": "flashsampling",
-      "bibliography_text": "Tomas Ruiz, Zhen Qin, Yifan Zhang, Xuyang Shen, Yiran Zhong and Mengdi Wang. \\emph{FlashSampling: Fast and Memory-Efficient Exact Sampling}. arXiv:2603.15854v3, 25 September 2026. \\url{https://arxiv.org/abs/2603.15854v3}.",
+      "bibliography_text": "Tomas Ruiz, Zhen Qin, Yifan Zhang et al. \\emph{FlashSampling: Fast and Memory-Efficient Exact Sampling}. arXiv:2603.15854v3, 2026. \\url{https://arxiv.org/abs/2603.15854v3}.",
       "urls": [
         "https://arxiv.org/abs/2603.15854v3"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): corrected. Full author list added; v3 (25 Sep 2026) supersedes the cited v2. Claims rechecked in v3: every tile computed (no pruning), FP32 accumulation and counter-based RNG (App. C), exact in distribution. Code github.com/FlashSampling/FlashSampling (Apache-2.0). See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row flashsampling. Earlier: Citation audit 30 Sep 2026 (lit workstream): corrected. Full author list added; v3 (25 Sep 2026) supersedes the cited v2. Claims rechecked in v3: every tile computed (no pruning), FP32 accumulation and counter-based RNG (App. C), exact in distribution. Code github.com/FlashSampling/FlashSampling (Apache-2.0). See sources/citation_audit.md."
     },
     {
       "key": "sonic",
-      "bibliography_text": "Pragaash Ponnusamy, Shivam Sahni, Jue Wang and Tri Dao. \\emph{SonicSampler: Unified Tile-Aware Kernels for LLM Sampling and Speculative Verification}. arXiv:2607.20475v1, submitted 24 May 2026. \\url{https://arxiv.org/abs/2607.20475v1}.",
+      "bibliography_text": "Pragaash Ponnusamy, Shivam Sahni, Jue Wang et al. \\emph{SonicSampler: Unified Tile-Aware Kernels for LLM Sampling and Speculative Verification}. arXiv:2607.20475v1, 2026. \\url{https://arxiv.org/abs/2607.20475v1}.",
       "urls": [
         "https://arxiv.org/abs/2607.20475v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): corrected. Authors added. Manuscript caution accurate: bounded top-128 pool; Sec. 4.5 calls top-p under bounded top-k 'theoretically lossy' but 'effectively lossless'. B200, Triton 3.5.1. See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row sonic. Earlier: Citation audit 30 Sep 2026 (lit workstream): corrected. Authors added. Manuscript caution accurate: bounded top-128 pool; Sec. 4.5 calls top-p under bounded top-k 'theoretically lossy' but 'effectively lossless'. B200, Triton 3.5.1. See sources/citation_audit.md."
     },
     {
       "key": "specvocab",
-      "bibliography_text": "Miles Williams, Young D. Kwon, Rui Li, Alexandros Kouris and Stylianos I. Venieris. \\emph{Speculative Decoding with a Speculative Vocabulary}. Findings of ACL 2026; arXiv:2602.13836v2, 17 July 2026. \\url{https://arxiv.org/abs/2602.13836v2}.",
+      "bibliography_text": "Miles Williams, Young D. Kwon, Rui Li et al. \\emph{Speculative Decoding with a Speculative Vocabulary}. Findings of the Association for Computational Linguistics: ACL 2026, pp. 40240--40254, 2026. doi:10.18653/v1/2026.findings-acl.2000.",
       "urls": [
-        "https://arxiv.org/abs/2602.13836v2"
+        "https://doi.org/10.18653/v1/2026.findings-acl.2000"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): corrected. Authors and venue added (Findings of ACL 2026, pp. 40240-40254, doi 10.18653/v1/2026.findings-acl.2000). Low-rank approximate draft logits, top-k, exact logits on the subset; no guarantee the draft argmax is in the subset. See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row specvocab. Earlier: Citation audit 30 Sep 2026 (lit workstream): corrected. Authors and venue added (Findings of ACL 2026, pp. 40240-40254, doi 10.18653/v1/2026.findings-acl.2000). Low-rank approximate draft logits, top-k, exact logits on the subset; no guarantee the draft argmax is in the subset. See sources/citation_audit.md."
     },
     {
       "key": "dynaspec",
-      "bibliography_text": "Jinbin Zhang, Nasib Ullah, Erik Schultheis and Rohit Babbar. \\emph{DynaSpec: Context-aware Dynamic Speculative Sampling for Large-Vocabulary Language Models}. arXiv:2510.13847v3, 3 February 2026. \\url{https://arxiv.org/abs/2510.13847v3}.",
+      "bibliography_text": "Jinbin Zhang, Nasib Ullah, Erik Schultheis et al. \\emph{DynaSpec: Context-Aware Dynamic Speculative Sampling for Large-Vocabulary Language Models}. arXiv:2510.13847v3, 2025. \\url{https://arxiv.org/abs/2510.13847v3}.",
       "urls": [
         "https://arxiv.org/abs/2510.13847v3"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): corrected. Authors added. Description accurate: meta-classifiers route to token clusters; target verifies over the full vocabulary. See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row dynaspec. Earlier: Citation audit 30 Sep 2026 (lit workstream): corrected. Authors added. Description accurate: meta-classifiers route to token clusters; target verifies over the full vocabulary. See sources/citation_audit.md."
     },
     {
       "key": "microspec",
-      "bibliography_text": "Zhiyang Chen, Daliang Xu, Yinyuan Zhang, Chenghua Wang, Mengwei Xu and Yun Ma. \\emph{NanoSpec: Accelerating Speculative Decoding using Minimalist In-Context Vocabularies}. arXiv:2605.26444v2, 1 June 2026 (v1, 8 April 2026, was titled ``MicroSpec: Accelerating Speculative Decoding with Lightweight In-Context Vocabularies''). \\url{https://arxiv.org/abs/2605.26444v2}.",
+      "bibliography_text": "Zhiyang Chen, Daliang Xu, Yinyuan Zhang et al. \\emph{NanoSpec: Accelerating Speculative Decoding Using Minimalist In-Context Vocabularies}. arXiv:2605.26444v2, 2026. \\url{https://arxiv.org/abs/2605.26444v2}. Version 1 was titled ``MicroSpec: Accelerating Speculative Decoding with Lightweight In-Context Vocabularies''.",
       "urls": [
         "https://arxiv.org/abs/2605.26444v2"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): corrected. Retitled: v2 is NanoSpec; v1 was MicroSpec. Cite the current title and write NanoSpec in the text. Mechanism unchanged in kind (training-free in-context active vocabulary, under 3k tokens). See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row microspec. Earlier: Citation audit 30 Sep 2026 (lit workstream): corrected. Retitled: v2 is NanoSpec; v1 was MicroSpec. Cite the current title and write NanoSpec in the text. Mechanism unchanged in kind (training-free in-context active vocabulary, under 3k tokens). See sources/citation_audit.md."
     },
     {
       "key": "replayssm",
-      "bibliography_text": "Ze-Wei Liou and Tri Dao. \\emph{ReplaySSM: Cache SSM Inputs, Not State}. Dao AI Lab blog, 15 June 2026. \\url{https://dao-lab.ai/blog/2026/replayssm/}.",
+      "bibliography_text": "Ze-Wei Liou, Tri Dao. \\emph{ReplaySSM: Cache SSM Inputs, Not State}. Dao AI Lab blog, 2026. \\url{https://dao-lab.ai/blog/2026/replayssm/}.",
       "urls": [
         "https://dao-lab.ai/blog/2026/replayssm/"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): corrected. Authors and date added from the page front matter. Implemented in a vLLM fork (github.com/Johnny-Liou/ReplaySSM, Apache-2.0); equivalence 'up to floating-point error'; up to 1.48x standard decode, 1.87-1.96x speculative, 3.0-3.3x concurrency. See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row replayssm. Earlier: Citation audit 30 Sep 2026 (lit workstream): corrected. Authors and date added from the page front matter. Implemented in a vLLM fork (github.com/Johnny-Liou/ReplaySSM, Apache-2.0); equivalence 'up to floating-point error'; up to 1.48x standard decode, 1.87-1.96x speculative, 3.0-3.3x concurrency. See sources/citation_audit.md."
     },
     {
       "key": "gdncode",
-      "bibliography_text": "SGLang contributors. \\emph{GDN ReplaySSM speculative fold}. Frozen commit \\sourcepin. \\url{https://github.com/sgl-project/sglang/blob/bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824/python/sglang/kernels/ops/attention/fla/gdn_replayssm_spec_fold.py}.",
+      "bibliography_text": "SGLang contributors. \\emph{GDN ReplaySSM speculative fold (\\texttt{python/sglang/kernels/ops/attention/fla/gdn\\_replayssm\\_spec\\_fold.py})}. Source code, commit \\texttt{bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824}, 2026. \\url{https://github.com/sgl-project/sglang/blob/bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824/python/sglang/kernels/ops/attention/fla/gdn_replayssm_spec_fold.py}.",
       "urls": [
         "https://github.com/sgl-project/sglang/blob/bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824/python/sglang/kernels/ops/attention/fla/gdn_replayssm_spec_fold.py"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): verified. Lines 1-95 read at the pin: docstring calls the fold a 'BITWISE CLONE', forbids tl.dot/reciprocal reordering and requires num_warps=1; accept_lens 'incl. bonus'. See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row gdncode. Earlier: Citation audit 30 Sep 2026 (lit workstream): verified. Lines 1-95 read at the pin: docstring calls the fold a 'BITWISE CLONE', forbids tl.dot/reciprocal reordering and requires num_warps=1; accept_lens 'incl. bonus'. See sources/citation_audit.md."
     },
     {
       "key": "sglangsampler",
-      "bibliography_text": "SGLang contributors. \\emph{Sampler}. Frozen commit \\sourcepin. \\url{https://github.com/sgl-project/sglang/blob/bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824/python/sglang/srt/layers/sampler.py#L746-L800}.",
+      "bibliography_text": "SGLang contributors. \\emph{Sampler (\\texttt{python/sglang/srt/layers/sampler.py})}. Source code, commit \\texttt{bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824}, 2026. \\url{https://github.com/sgl-project/sglang/blob/bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824/python/sglang/srt/layers/sampler.py}.",
       "urls": [
-        "https://github.com/sgl-project/sglang/blob/bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824/python/sglang/srt/layers/sampler.py#L746-L800"
+        "https://github.com/sgl-project/sglang/blob/bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824/python/sglang/srt/layers/sampler.py"
       ],
-      "accessed": "2026-10-01",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Read at the pin 1 Oct 2026 (appendix workstream). top_k_top_p_min_p_sampling_from_probs_torch (lines 746-800) sorts the probabilities, and with a seed calls multinomial_with_seed on the sorted row, whose hash keys each column by its index in that row (lines 899-902: col_indices = arange(m)), then maps back through probs_idx; min-p with a seed is refused by an assert (line 776). _sample_from_logprobs (lines 594-611) and the untruncated seeded path key the hash by token index."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row sglangsampler. Earlier: Read at the pin 1 Oct 2026 (appendix workstream). top_k_top_p_min_p_sampling_from_probs_torch (lines 746-800) sorts the probabilities, and with a seed calls multinomial_with_seed on the sorted row, whose hash keys each column by its index in that row (lines 899-902: col_indices = arange(m)), then maps back through probs_idx; min-p with a seed is refused by an assert (line 776). _sample_from_logprobs (lines 594-611) and the untruncated seeded path key the hash by token index."
     },
     {
       "key": "opttree",
-      "bibliography_text": "Jikai Wang, Yi Su, Juntao Li, Qingrong Xia, Zi Ye, Xinyu Duan, Zhefeng Wang and Min Zhang. \\emph{OPT-Tree: Speculative Decoding with Adaptive Draft Tree Structure}. Transactions of the Association for Computational Linguistics 13:188--199, 2025. \\url{https://aclanthology.org/2025.tacl-1.8/}.",
+      "bibliography_text": "Jikai Wang, Yi Su, Juntao Li et al. \\emph{OPT-Tree: Speculative Decoding with Adaptive Draft Tree Structure}. Transactions of the Association for Computational Linguistics 13, pp. 188--199, 2025. doi:10.1162/tacl_a_00735.",
       "urls": [
-        "https://aclanthology.org/2025.tacl-1.8/"
+        "https://doi.org/10.1162/tacl_a_00735"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): corrected. Authors and venue added (TACL 13:188-199, doi 10.1162/tacl_a_00735). Maximizes expected acceptance length, as described. See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row opttree. Earlier: Citation audit 30 Sep 2026 (lit workstream): corrected. Authors and venue added (TACL 13:188-199, doi 10.1162/tacl_a_00735). Maximizes expected acceptance length, as described. See sources/citation_audit.md."
     },
     {
       "key": "dcut",
-      "bibliography_text": "Tianyu Liu, Yuhao Shen, Rui Cen, Junhan Shi, Jiebin Zhang, Guangshuo Qin, Hong Liu, Song Liu, Guanghua Yu and Jianchen Zhu. \\emph{D-cut: Adaptive Verification Depth Pruning for Batched Speculative Decoding}. arXiv:2607.14647v1, 16 July 2026. \\url{https://arxiv.org/abs/2607.14647v1}.",
+      "bibliography_text": "Tianyu Liu, Yuhao Shen, Rui Cen et al. \\emph{D-cut: Adaptive Verification Depth Pruning for Batched Speculative Decoding}. arXiv:2607.14647v1, 2026. \\url{https://arxiv.org/abs/2607.14647v1}.",
       "urls": [
         "https://arxiv.org/abs/2607.14647v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): corrected. Authors added. Description incomplete with novelty consequences: App. B already states the non-anticipating condition for rejection sampling with a counterexample and a shifted-score fix (credits DSpark). The paper's sampled-depth counterexample must cite dcut and dspark. Cost table C(B,rho) aligned to piecewise CUDA-graph shapes; vLLM on H20/H800; deterministic drafts in its evaluation. See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row dcut. Earlier: Citation audit 30 Sep 2026 (lit workstream): corrected. Authors added. Description incomplete with novelty consequences: App. B already states the non-anticipating condition for rejection sampling with a counterexample and a shifted-score fix (credits DSpark). The paper's sampled-depth counterexample must cite dcut and dspark. Cost table C(B,rho) aligned to piecewise CUDA-graph shapes; vLLM on H20/H800; deterministic drafts in its evaluation. See sources/citation_audit.md."
     },
     {
       "key": "pr36136",
-      "bibliography_text": "SGLang PR 36136. \\emph{[Feature] Dynamic verification for DFlash2}. Opened 24 August 2026 by EthanWang555; open and unmerged on 30 September 2026; head \\texttt{c0235e700214f1de5044be25f795faf5b755e450}. \\url{https://github.com/sgl-project/sglang/pull/36136}.",
+      "bibliography_text": "SGLang contributors. \\emph{[Feature] Dynamic verification for DFlash2}. SGLang pull request 36136, opened by GitHub user EthanWang555, head commit \\texttt{c0235e700214f1de5044be25f795faf5b755e450}, 2026. \\url{https://github.com/sgl-project/sglang/pull/36136}.",
       "urls": [
         "https://github.com/sgl-project/sglang/pull/36136"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): verified. Metadata rechecked 2026-09-30 (open, unmerged, head c0235e7, last updated 2026-09-08). DSpark-style: confidence-ranked ragged verify prefixes, offline SPS table, STS calibration, graph-tier alignment; reuses DSpark ScheduleVerifyLensTopk. Greedy-only benchmarks (Qwen3-4B, H20). Code reading suggests unshifted scores (P(path_j|path_{j-1})); untested concern under sampled selector drafting. See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row pr36136. Earlier: Citation audit 30 Sep 2026 (lit workstream): verified. Metadata rechecked 2026-09-30 (open, unmerged, head c0235e7, last updated 2026-09-08). DSpark-style: confidence-ranked ragged verify prefixes, offline SPS table, STS calibration, graph-tier alignment; reuses DSpark ScheduleVerifyLensTopk. Greedy-only benchmarks (Qwen3-4B, H20). Code reading suggests unshifted scores (P(path_j|path_{j-1})); untested concern under sampled selector drafting. See sources/citation_audit.md."
     },
     {
       "key": "mirage",
@@ -191,58 +191,58 @@
     },
     {
       "key": "lilicorr",
-      "bibliography_text": "Matan Rusanovsky, Yoav Miron, Roy Uziel, Omer Belhasin, Hao Guo, Ran Zilberstein, Maor Ashkenazi and Michael Elad. \\emph{LiLiCorr: Lightweight Likelihood Correlation of Parallel Drafts for Speculative Decoding}. arXiv:2608.20530v2, 22 September 2026. \\url{https://arxiv.org/abs/2608.20530v2}.",
+      "bibliography_text": "Matan Rusanovsky, Yoav Miron, Roy Uziel et al. \\emph{LiLiCorr: Lightweight Likelihood Correlation of Parallel Drafts for Speculative Decoding}. arXiv:2608.20530v2, 2026. \\url{https://arxiv.org/abs/2608.20530v2}.",
       "urls": [
         "https://arxiv.org/abs/2608.20530v2"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): verified. Both manuscript statements confirmed: LiLiCorr describes DFlash2 as scoring pairs from token identities only; App. F's exact best-path DP 'decodes worse than the greedy rule'. See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row lilicorr. Earlier: Citation audit 30 Sep 2026 (lit workstream): verified. Both manuscript statements confirmed: LiLiCorr describes DFlash2 as scoring pairs from token identities only; App. F's exact best-path DP 'decodes worse than the greedy rule'. See sources/citation_audit.md."
     },
     {
       "key": "astar",
-      "bibliography_text": "Chris J. Maddison, Daniel Tarlow and Tom Minka. \\emph{A* Sampling}. Advances in Neural Information Processing Systems 27 (NIPS 2014), pp. 3086--3094; arXiv:1411.0030. \\url{https://proceedings.neurips.cc/paper_files/paper/2014/hash/937debc749f041eb5700df7211ac795c-Abstract.html}.",
+      "bibliography_text": "Chris J. Maddison, Daniel Tarlow, Tom Minka. \\emph{A* Sampling}. Advances in Neural Information Processing Systems 27 (NIPS 2014), pp. 3086--3094, 2014. \\url{https://proceedings.neurips.cc/paper_files/paper/2014/hash/937debc749f041eb5700df7211ac795c-Abstract.html}.",
       "urls": [
         "https://proceedings.neurips.cc/paper_files/paper/2014/hash/937debc749f041eb5700df7211ac795c-Abstract.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): corrected. Venue added (NIPS 2014, pp. 3086-3094). See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row astar. Earlier: Citation audit 30 Sep 2026 (lit workstream): corrected. Venue added (NIPS 2014, pp. 3086-3094). See sources/citation_audit.md."
     },
     {
       "key": "specdecode",
-      "bibliography_text": "Yaniv Leviathan, Matan Kalman and Yossi Matias. \\emph{Fast Inference from Transformers via Speculative Decoding}. ICML 2023, PMLR 202:19274--19286; arXiv:2211.17192. \\url{https://proceedings.mlr.press/v202/leviathan23a.html}.",
+      "bibliography_text": "Yaniv Leviathan, Matan Kalman, Yossi Matias. \\emph{Fast Inference from Transformers via Speculative Decoding}. Proceedings of the 40th International Conference on Machine Learning, pp. 19274--19286, 2023. \\url{https://proceedings.mlr.press/v202/leviathan23a.html}.",
       "urls": [
         "https://proceedings.mlr.press/v202/leviathan23a.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): verified. Verified on PMLR; pages added. See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row specdecode. Earlier: Citation audit 30 Sep 2026 (lit workstream): verified. Verified on PMLR; pages added. See sources/citation_audit.md."
     },
     {
       "key": "floatguide",
-      "bibliography_text": "NVIDIA. \\emph{Floating Point and IEEE 754}. Documentation inspected 30 September 2026. \\url{https://docs.nvidia.com/cuda/floating-point/index.html}.",
+      "bibliography_text": "NVIDIA. \\emph{Floating Point and IEEE 754}. CUDA 13.4 documentation, 2026. \\url{https://docs.nvidia.com/cuda/floating-point/index.html}. Accessed 30 September 2026.",
       "urls": [
         "https://docs.nvidia.com/cuda/floating-point/index.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): verified. CUDA 13.4 docs; FMA (Sec. 2.3, 4.3) and non-associativity example (Sec. 3) present. See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row floatguide. Earlier: Citation audit 30 Sep 2026 (lit workstream): verified. CUDA 13.4 docs; FMA (Sec. 2.3, 4.3) and non-associativity example (Sec. 3) present. See sources/citation_audit.md."
     },
     {
       "key": "torchnumeric",
-      "bibliography_text": "PyTorch. \\emph{Numerical accuracy}. PyTorch 2.14 documentation. \\url{https://docs.pytorch.org/docs/2.14/notes/numerical_accuracy.html}.",
+      "bibliography_text": "PyTorch contributors. \\emph{Numerical Accuracy}. PyTorch 2.14 documentation, 2026. \\url{https://docs.pytorch.org/docs/2.14/notes/numerical_accuracy.html}.",
       "urls": [
         "https://docs.pytorch.org/docs/2.14/notes/numerical_accuracy.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): verified. stable redirects to 2.14; text on non-guaranteed bitwise identity and batched computation present. Versioned URL recommended. See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row torchnumeric. Earlier: Citation audit 30 Sep 2026 (lit workstream): verified. stable redirects to 2.14; text on non-guaranteed bitwise identity and batched computation present. Versioned URL recommended. See sources/citation_audit.md."
     },
     {
       "key": "torchtopk",
@@ -290,14 +290,14 @@
     },
     {
       "key": "tritonautotune",
-      "bibliography_text": "Triton contributors. \\emph{triton.autotune}. Configuration pruning and reset/restore semantics. \\url{https://triton-lang.org/main/python-api/generated/triton.autotune.html}.",
+      "bibliography_text": "Triton contributors. \\emph{\\texttt{triton.autotune}}. Triton documentation, 2026. \\url{https://triton-lang.org/main/python-api/generated/triton.autotune.html}. Accessed 30 September 2026.",
       "urls": [
         "https://triton-lang.org/main/python-api/generated/triton.autotune.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): verified. Documents prune_configs_by, reset_to_zero and restore_value. See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row tritonautotune. Earlier: Citation audit 30 Sep 2026 (lit workstream): verified. Documents prune_configs_by, reset_to_zero and restore_value. See sources/citation_audit.md."
     },
     {
       "key": "hopper",
@@ -308,7 +308,7 @@
       "accessed": "2026-09-30",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): corrected. Guide covers TMA and clusters but not warp-group MMA; add the PTX ISA (key ptxisa, wgmma 'Requires sm_90a') for the warp-group claim. See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): no longer cited by the paper or the notes; see sources/citation_audit.md, 'Entries no longer cited'. Earlier: Citation audit 30 Sep 2026 (lit workstream): corrected. Guide covers TMA and clusters but not warp-group MMA; add the PTX ISA (key ptxisa, wgmma 'Requires sm_90a') for the warp-group claim. See sources/citation_audit.md."
     },
     {
       "key": "blackwell",
@@ -341,85 +341,84 @@
       "accessed": "2026-09-30",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): verified. Documents replay modes, cache control and clock control. See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): no longer cited by the paper or the notes; see sources/citation_audit.md, 'Entries no longer cited'. Earlier: Citation audit 30 Sep 2026 (lit workstream): verified. Documents replay modes, cache control and clock control. See sources/citation_audit.md."
     },
     {
       "key": "gdn",
-      "bibliography_text": "Songlin Yang, Jan Kautz and Ali Hatamizadeh. \\emph{Gated Delta Networks: Improving Mamba2 with Delta Rule}. ICLR 2025; arXiv:2412.06464v3. \\url{https://openreview.net/forum?id=r8H7xhYPwz}.",
+      "bibliography_text": "Songlin Yang, Jan Kautz, Ali Hatamizadeh. \\emph{Gated Delta Networks: Improving Mamba2 with Delta Rule}. International Conference on Learning Representations (ICLR 2025), 2025. \\url{https://openreview.net/forum?id=r8H7xhYPwz}.",
       "urls": [
         "https://openreview.net/forum?id=r8H7xhYPwz"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): verified. ICLR 2025. Paper eq. S_t = S_{t-1}(alpha_t(I - beta_t k_t k_t^T)) + beta_t v_t k_t^T expands to the manuscript's Eq. (gdn). See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row gdn. Earlier: Citation audit 30 Sep 2026 (lit workstream): verified. ICLR 2025. Paper eq. S_t = S_{t-1}(alpha_t(I - beta_t k_t k_t^T)) + beta_t v_t k_t^T expands to the manuscript's Eq. (gdn). See sources/citation_audit.md."
     },
     {
       "key": "sglangpaper",
-      "bibliography_text": "Lianmin Zheng, Liangsheng Yin, Zhiqiang Xie, Chuyue Sun, Jeff Huang, Cody Hao Yu, Shiyi Cao, Christos Kozyrakis, Ion Stoica, Joseph E. Gonzalez, Clark Barrett and Ying Sheng. \\emph{SGLang: Efficient Execution of Structured Language Model Programs}. NeurIPS 2024 (Advances in Neural Information Processing Systems 37, pp. 62557--62583); arXiv:2312.07104. \\url{https://proceedings.neurips.cc/paper_files/paper/2024/hash/724be4472168f31ba1c9ac630f15dec8-Abstract-Conference.html}.",
+      "bibliography_text": "Lianmin Zheng, Liangsheng Yin, Zhiqiang Xie et al. \\emph{SGLang: Efficient Execution of Structured Language Model Programs}. Advances in Neural Information Processing Systems 37 (NeurIPS 2024), pp. 62557--62583, 2024. \\url{https://proceedings.neurips.cc/paper_files/paper/2024/hash/724be4472168f31ba1c9ac630f15dec8-Abstract-Conference.html}.",
       "urls": [
         "https://proceedings.neurips.cc/paper_files/paper/2024/hash/724be4472168f31ba1c9ac630f15dec8-Abstract-Conference.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): corrected. Venue added: NeurIPS 2024, pp. 62557-62583. See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row sglangpaper. Earlier: Citation audit 30 Sep 2026 (lit workstream): corrected. Venue added: NeurIPS 2024, pp. 62557-62583. See sources/citation_audit.md."
     },
     {
       "key": "flashinfer",
-      "bibliography_text": "Zihao Ye et al. \\emph{FlashInfer: Efficient and Customizable Attention Engine for LLM Inference Serving}. MLSys 2025; arXiv:2501.01005v2. \\url{https://arxiv.org/abs/2501.01005}.",
+      "bibliography_text": "Zihao Ye, Lequn Chen, Ruihang Lai et al. \\emph{FlashInfer: Efficient and Customizable Attention Engine for LLM Inference Serving}. Proceedings of the Eighth Conference on Machine Learning and Systems (MLSys 2025), 2025. \\url{https://proceedings.mlsys.org/paper_files/paper/2025/hash/dbf02b21d77409a2db30e56866a8ab3a-Abstract-Conference.html}.",
       "urls": [
-        "https://arxiv.org/abs/2501.01005"
+        "https://proceedings.mlsys.org/paper_files/paper/2025/hash/dbf02b21d77409a2db30e56866a8ab3a-Abstract-Conference.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): verified. MLSys 2025 (Outstanding Paper Award); arXiv 2501.01005v2; eleven authors. See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row flashinfer. Earlier: Citation audit 30 Sep 2026 (lit workstream): verified. MLSys 2025 (Outstanding Paper Award); arXiv 2501.01005v2; eleven authors. See sources/citation_audit.md."
     },
     {
       "key": "aiperf",
-      "bibliography_text": "NVIDIA. \\emph{AIPerf Metrics Reference}. \\url{https://docs.nvidia.com/aiperf/reference/ai-perf-metrics-reference}.",
+      "bibliography_text": "NVIDIA. \\emph{AIPerf Metrics Reference}. AIPerf documentation, 2026. \\url{https://docs.nvidia.com/aiperf/reference/ai-perf-metrics-reference}. Accessed 30 September 2026.",
       "urls": [
         "https://docs.nvidia.com/aiperf/reference/ai-perf-metrics-reference"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Citation audit 30 Sep 2026 (lit workstream): verified. Metrics reference present (TTFT, ITL, ICL, output token throughput per user, etc.). See sources/citation_audit.md."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row aiperf. Earlier: Citation audit 30 Sep 2026 (lit workstream): verified. Metrics reference present (TTFT, ITL, ICL, output token throughput per user, etc.). See sources/citation_audit.md."
     },
     {
       "key": "dflashpaper",
-      "bibliography_text": "Jian Chen, Yesheng Liang and Zhijian Liu. \\emph{DFlash: Block Diffusion for Flash Speculative Decoding}. International Conference on Machine Learning (ICML), 2026; arXiv:2602.06036. \\url{https://arxiv.org/abs/2602.06036v2}.",
+      "bibliography_text": "Jian Chen, Yesheng Liang, Zhijian Liu. \\emph{DFlash: Block Diffusion for Flash Speculative Decoding}. International Conference on Machine Learning (ICML 2026), 2026. \\url{https://arxiv.org/abs/2602.06036v2}.",
       "urls": [
         "https://arxiv.org/abs/2602.06036v2"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions). Abstract page re-checked 30 Sep 2026 (v2, 28 May 2026; 'Accepted at ICML 2026. Camera-ready version.'). Code github.com/z-lab/dflash (MIT)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row dflashpaper. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions). Abstract page re-checked 30 Sep 2026 (v2, 28 May 2026; 'Accepted at ICML 2026. Camera-ready version.'). Code github.com/z-lab/dflash (MIT)."
     },
     {
       "key": "dflash4bcard",
-      "bibliography_text": "z-lab. \\emph{Qwen3.5-4B-DFlash model card}. Hugging Face, revision \\texttt{9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf} (created 5 March 2026, updated 19 June 2026; mirrored at \\texttt{modal-labs/Qwen3.5-4B-DFlash}). \\url{https://huggingface.co/z-lab/Qwen3.5-4B-DFlash/tree/9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf}.",
+      "bibliography_text": "z-lab. \\emph{Qwen3.5-4B-DFlash model card}. Hugging Face, revision \\texttt{9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf}, 2026. \\url{https://huggingface.co/z-lab/Qwen3.5-4B-DFlash/tree/9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf}.",
       "urls": [
-        "https://huggingface.co/z-lab/Qwen3.5-4B-DFlash/tree/9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
-        "https://huggingface.co/modal-labs/Qwen3.5-4B-DFlash"
+        "https://huggingface.co/z-lab/Qwen3.5-4B-DFlash/tree/9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review; not yet cited in paper.tex. Hugging Face API and card read: Apache-2.0, base model Qwen/Qwen3.5-4B, DFlash (v1) drafter, SGLang launch line (block size 8 recommended at high concurrency), B200 greedy benchmarks: 3.40-4.60x over autoregressive at concurrency 1 (block 16) and 2.15-2.61x at concurrency 32 (block 8), versus the best MTP setting per workload at 1.99-2.31x and 1.56-1.80x. Not reproduced. Siblings z-lab/Qwen3.5-9B-DFlash and z-lab/Qwen3.5-35B-A3B-DFlash also public."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row dflash4bcard. Earlier: Added 30 Sep 2026 by the lit review; not yet cited in paper.tex. Hugging Face API and card read: Apache-2.0, base model Qwen/Qwen3.5-4B, DFlash (v1) drafter, SGLang launch line (block size 8 recommended at high concurrency), B200 greedy benchmarks: 3.40-4.60x over autoregressive at concurrency 1 (block 16) and 2.15-2.61x at concurrency 32 (block 8), versus the best MTP setting per workload at 1.99-2.31x and 1.56-1.80x. Not reproduced. Siblings z-lab/Qwen3.5-9B-DFlash and z-lab/Qwen3.5-35B-A3B-DFlash also public."
     },
     {
       "key": "dspark",
-      "bibliography_text": "Xin Cheng, Xingkai Yu, Chenze Shao et al. \\emph{DSpark: Confidence-Scheduled Speculative Decoding with Semi-Autoregressive Generation}. 2026; arXiv:2607.05147. \\url{https://arxiv.org/abs/2607.05147v1}.",
+      "bibliography_text": "Xin Cheng, Xingkai Yu, Chenze Shao et al. \\emph{DSpark: Confidence-Scheduled Speculative Decoding with Semi-Autoregressive Generation}. arXiv:2607.05147v1, 2026. \\url{https://arxiv.org/abs/2607.05147v1}.",
       "urls": [
         "https://arxiv.org/abs/2607.05147v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row dspark. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "echo",
@@ -445,36 +444,36 @@
     },
     {
       "key": "dgpphead",
-      "bibliography_text": "Stephen Hawkins. \\emph{Head bit-plane exact argmax: read 25--33\\,\\% fewer head bytes on every draft/greedy head read, all families}. GitHub issue 69, \\texttt{HawkBearPig/dgpp}, opened 29 September 2026; implementation in \\texttt{src/kernels/packq\\_head.cu}, 2026. \\url{https://github.com/HawkBearPig/dgpp/issues/69}.",
+      "bibliography_text": "Stephen Hawkins. \\emph{Head bit-plane exact argmax: read 25--33\\,\\% fewer head bytes on every draft/greedy head read, all families}. GitHub issue 69, \\texttt{HawkBearPig/dgpp}; implementation in \\texttt{src/kernels/packq\\_head.cu} at commit \\texttt{a23d8b1}, 2026. \\url{https://github.com/HawkBearPig/dgpp/issues/69}.",
       "urls": [
         "https://github.com/HawkBearPig/dgpp/issues/69"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Repository, issue or pull request read through the GitHub API; numbers are self-reported by the authors and not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row dgpphead. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Repository, issue or pull request read through the GitHub API; numbers are self-reported by the authors and not reproduced."
     },
     {
       "key": "mussmann2017",
-      "bibliography_text": "Stephen Mussmann, Daniel Levy and Stefano Ermon. \\emph{Fast Amortized Inference and Learning in Log-linear Models with Randomly Perturbed Nearest Neighbor Search}. Proceedings of the Thirty-Third Conference on Uncertainty in Artificial Intelligence (UAI 2017), 2017. \\url{https://arxiv.org/abs/1707.03372}.",
+      "bibliography_text": "Stephen Mussmann, Daniel Levy, Stefano Ermon. \\emph{Fast Amortized Inference and Learning in Log-Linear Models with Randomly Perturbed Nearest Neighbor Search}. Proceedings of the Thirty-Third Conference on Uncertainty in Artificial Intelligence (UAI 2017), 2017. \\url{https://arxiv.org/abs/1707.03372}.",
       "urls": [
         "https://arxiv.org/abs/1707.03372"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from publisher or proceedings page."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row mussmann2017. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from publisher or proceedings page."
     },
     {
       "key": "mussmann2016",
-      "bibliography_text": "Stephen Mussmann and Stefano Ermon. \\emph{Learning and Inference via Maximum Inner Product Search}. Proceedings of the 33rd International Conference on Machine Learning, pp. 2587--2596, 2016. \\url{https://proceedings.mlr.press/v48/mussmann16.html}.",
+      "bibliography_text": "Stephen Mussmann, Stefano Ermon. \\emph{Learning and Inference via Maximum Inner Product Search}. Proceedings of the 33rd International Conference on Machine Learning, pp. 2587--2596, 2016. \\url{https://proceedings.mlr.press/v48/mussmann16.html}.",
       "urls": [
         "https://proceedings.mlr.press/v48/mussmann16.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from proceedings page."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row mussmann2016. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from proceedings page."
     },
     {
       "key": "slimspec",
@@ -500,14 +499,14 @@
     },
     {
       "key": "precisioninvariant",
-      "bibliography_text": "Gaoyuan Du, Anam Nawaz Khan, Rex Zhou et al. \\emph{Greedy Decoding Is Not Precision-Invariant: Cross-Precision Output Divergence in LLM Inference}. Transactions on Machine Learning Research, 2026; arXiv:2609.26621. \\url{https://arxiv.org/abs/2609.26621v1}.",
+      "bibliography_text": "Gaoyuan Du, Anam Nawaz Khan, Rex Zhou et al. \\emph{Greedy Decoding Is Not Precision-Invariant: Cross-Precision Output Divergence in LLM Inference}. Transactions on Machine Learning Research, 2026. \\url{https://openreview.net/forum?id=QDOKyg7a5e}.",
       "urls": [
-        "https://arxiv.org/abs/2609.26621v1"
+        "https://openreview.net/forum?id=QDOKyg7a5e"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row precisioninvariant. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "whyptq",
@@ -522,25 +521,25 @@
     },
     {
       "key": "ptxisa",
-      "bibliography_text": "NVIDIA. \\emph{Parallel Thread Execution ISA, Version 9.4}. CUDA documentation, 2026. \\url{https://docs.nvidia.com/cuda/parallel-thread-execution/index.html}.",
+      "bibliography_text": "NVIDIA. \\emph{Parallel Thread Execution ISA, Version 9.4}. CUDA documentation, 2026. \\url{https://docs.nvidia.com/cuda/parallel-thread-execution/index.html}. Accessed 30 September 2026.",
       "urls": [
         "https://docs.nvidia.com/cuda/parallel-thread-execution/index.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Documentation page read (PTX ISA 9.4)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row ptxisa. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Documentation page read (PTX ISA 9.4)."
     },
     {
       "key": "abdelfattah2025",
-      "bibliography_text": "Ahmad Abdelfattah, Jack Dongarra, Massimiliano Fasi, Mantas Mikaitis and Françoise Tisseur. \\emph{Analysis of Floating-Point Matrix Multiplication Computed via Integer Arithmetic}. 2025; arXiv:2506.11277. \\url{https://arxiv.org/abs/2506.11277}.",
+      "bibliography_text": "Ahmad Abdelfattah, Jack Dongarra, Massimiliano Fasi et al. \\emph{Analysis of Floating-Point Matrix Multiplication Computed via Integer Arithmetic}. arXiv:2506.11277v3, 2025. \\url{https://arxiv.org/abs/2506.11277v3}.",
       "urls": [
-        "https://arxiv.org/abs/2506.11277"
+        "https://arxiv.org/abs/2506.11277v3"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row abdelfattah2025. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "adaptivesoftmax",
@@ -580,14 +579,14 @@
     },
     {
       "key": "archead",
-      "bibliography_text": "Şuayp Talha Kocabay, Talha Rüzgar Akkuş and Kamer Ali Yuksel. \\emph{ARCHead: Activation-Metric Residual Correction for Large Language Model Output Heads}. 2026; arXiv:2608.02703. \\url{https://arxiv.org/abs/2608.02703}.",
+      "bibliography_text": "\\c{S}uayp Talha Kocabay, Talha Rüzgar Akkuş, Kamer Ali Yuksel. \\emph{ARCHead: Activation-Metric Residual Correction for Large Language Model Output Heads}. arXiv:2608.02703v1, 2026. \\url{https://arxiv.org/abs/2608.02703v1}.",
       "urls": [
-        "https://arxiv.org/abs/2608.02703"
+        "https://arxiv.org/abs/2608.02703v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row archead. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "awq",
@@ -602,14 +601,14 @@
     },
     {
       "key": "benshoham2026",
-      "bibliography_text": "Ofir Ben Shoham. \\emph{Balancing Coverage and Draft Latency in Vocabulary Trimming for Faster Speculative Decoding}. 2026; arXiv:2603.05210. \\url{https://arxiv.org/abs/2603.05210}.",
+      "bibliography_text": "Ofir Ben Shoham. \\emph{Balancing Coverage and Draft Latency in Vocabulary Trimming for Faster Speculative Decoding}. arXiv:2603.05210v1, 2026. \\url{https://arxiv.org/abs/2603.05210v1}.",
       "urls": [
-        "https://arxiv.org/abs/2603.05210"
+        "https://arxiv.org/abs/2603.05210v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row benshoham2026. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "bitnet",
@@ -624,25 +623,25 @@
     },
     {
       "key": "blockverify",
-      "bibliography_text": "Ziteng Sun, Uri Mendlovic, Yaniv Leviathan et al. \\emph{Block Verification Accelerates Speculative Decoding}. The Thirteenth International Conference on Learning Representations (ICLR), 2025; arXiv:2403.10444. \\url{https://arxiv.org/abs/2403.10444}.",
+      "bibliography_text": "Ziteng Sun, Uri Mendlovic, Yaniv Leviathan et al. \\emph{Block Verification Accelerates Speculative Decoding}. International Conference on Learning Representations (ICLR 2025), 2025. \\url{https://arxiv.org/abs/2403.10444v3}.",
       "urls": [
-        "https://arxiv.org/abs/2403.10444"
+        "https://arxiv.org/abs/2403.10444v3"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row blockverify. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "bole",
-      "bibliography_text": "Li Wang, Yi Su, Xiabao Wu et al. \\emph{Bole: Efficient Tree Speculation for Hybrid-Attention Language Models}. 2026; arXiv:2608.01651. \\url{https://arxiv.org/abs/2608.01651}.",
+      "bibliography_text": "Li Wang, Yi Su, Xiabao Wu et al. \\emph{Bole: Efficient Tree Speculation for Hybrid-Attention Language Models}. arXiv:2608.01651v1, 2026. \\url{https://arxiv.org/abs/2608.01651v1}.",
       "urls": [
-        "https://arxiv.org/abs/2608.01651"
+        "https://arxiv.org/abs/2608.01651v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row bole. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "cce",
@@ -657,14 +656,14 @@
     },
     {
       "key": "chen2023specsampling",
-      "bibliography_text": "Charlie Chen, Sebastian Borgeaud, Geoffrey Irving, Jean-Baptiste Lespiau, Laurent Sifre and John Jumper. \\emph{Accelerating Large Language Model Decoding with Speculative Sampling}. 2023; arXiv:2302.01318. \\url{https://arxiv.org/abs/2302.01318}.",
+      "bibliography_text": "Charlie Chen, Sebastian Borgeaud, Geoffrey Irving et al. \\emph{Accelerating Large Language Model Decoding with Speculative Sampling}. arXiv:2302.01318v1, 2023. \\url{https://arxiv.org/abs/2302.01318v1}.",
       "urls": [
-        "https://arxiv.org/abs/2302.01318"
+        "https://arxiv.org/abs/2302.01318v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row chen2023specsampling. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "cooper2026",
@@ -679,26 +678,25 @@
     },
     {
       "key": "csvdecode",
-      "bibliography_text": "Dong Liu, Shu Wang, Yanxuan Yu, Haisheng Wang and Ben Lengerich. \\emph{CSV-Decode: Certifiable Sub-Vocabulary Decoding for Efficient Large Language Model Inference}. 2025; arXiv:2511.21702. \\url{https://arxiv.org/abs/2511.21702}.",
+      "bibliography_text": "Dong Liu, Shu Wang, Yanxuan Yu et al. \\emph{CSV-Decode: Certifiable Sub-Vocabulary Decoding for Efficient Large Language Model Inference}. arXiv:2511.21702v2, 2025. \\url{https://arxiv.org/abs/2511.21702v2}.",
       "urls": [
-        "https://arxiv.org/abs/2511.21702"
+        "https://arxiv.org/abs/2511.21702v2"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row csvdecode. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "daliri2025",
-      "bibliography_text": "Majid Daliri, Christopher Musco and Ananda Theertha Suresh. \\emph{Coupling without Communication and Drafter-Invariant Speculative Decoding}. 2025 IEEE International Symposium on Information Theory (ISIT), pp. 1--6, 2025; arXiv:2408.07978. doi:10.1109/ISIT63088.2025.11195663. \\url{https://arxiv.org/abs/2408.07978}.",
+      "bibliography_text": "Majid Daliri, Christopher Musco, Ananda Theertha Suresh. \\emph{Coupling without Communication and Drafter-Invariant Speculative Decoding}. 2025 IEEE International Symposium on Information Theory (ISIT), pp. 1--6, 2025. doi:10.1109/ISIT63088.2025.11195663.",
       "urls": [
-        "https://arxiv.org/abs/2408.07978",
         "https://doi.org/10.1109/ISIT63088.2025.11195663"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), Crossref DOI record."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row daliri2025. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), Crossref DOI record."
     },
     {
       "key": "ddtree",
@@ -713,26 +711,25 @@
     },
     {
       "key": "deepseekv3",
-      "bibliography_text": "DeepSeek-AI. \\emph{DeepSeek-V3 Technical Report}. 2024; arXiv:2412.19437. \\url{https://arxiv.org/abs/2412.19437}.",
+      "bibliography_text": "DeepSeek-AI. \\emph{DeepSeek-V3 Technical Report}. arXiv:2412.19437v2, 2024. \\url{https://arxiv.org/abs/2412.19437v2}.",
       "urls": [
-        "https://arxiv.org/abs/2412.19437"
+        "https://arxiv.org/abs/2412.19437v2"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row deepseekv3. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "deltanet",
-      "bibliography_text": "Songlin Yang, Bailin Wang, Yu Zhang, Yikang Shen and Yoon Kim. \\emph{Parallelizing Linear Transformers with the Delta Rule over Sequence Length}. Advances in Neural Information Processing Systems 37 (NeurIPS 2024), 2024; arXiv:2406.06484. \\url{https://proceedings.neurips.cc/paper_files/paper/2024/hash/d13a3eae72366e61dfdc7eea82eeb685-Abstract-Conference.html}.",
+      "bibliography_text": "Songlin Yang, Bailin Wang, Yu Zhang et al. \\emph{Parallelizing Linear Transformers with the Delta Rule over Sequence Length}. Advances in Neural Information Processing Systems 37 (NeurIPS 2024), pp. 115491--115522, 2024. \\url{https://proceedings.neurips.cc/paper_files/paper/2024/hash/d13a3eae72366e61dfdc7eea82eeb685-Abstract-Conference.html}.",
       "urls": [
-        "https://proceedings.neurips.cc/paper_files/paper/2024/hash/d13a3eae72366e61dfdc7eea82eeb685-Abstract-Conference.html",
-        "https://arxiv.org/abs/2406.06484"
+        "https://proceedings.neurips.cc/paper_files/paper/2024/hash/d13a3eae72366e61dfdc7eea82eeb685-Abstract-Conference.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), proceedings page."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row deltanet. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), proceedings page."
     },
     {
       "key": "dssoftmax",
@@ -747,48 +744,47 @@
     },
     {
       "key": "eagle",
-      "bibliography_text": "Yuhui Li, Fangyun Wei, Chao Zhang and Hongyang Zhang. \\emph{EAGLE: Speculative Sampling Requires Rethinking Feature Uncertainty}. Proceedings of the 41st International Conference on Machine Learning, pp. 28935--28948, 2024; arXiv:2401.15077. \\url{https://arxiv.org/abs/2401.15077}.",
+      "bibliography_text": "Yuhui Li, Fangyun Wei, Chao Zhang et al. \\emph{EAGLE: Speculative Sampling Requires Rethinking Feature Uncertainty}. Proceedings of the 41st International Conference on Machine Learning, pp. 28935--28948, 2024. \\url{https://proceedings.mlr.press/v235/li24bt.html}.",
       "urls": [
-        "https://arxiv.org/abs/2401.15077"
+        "https://proceedings.mlr.press/v235/li24bt.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row eagle. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "eagle2",
-      "bibliography_text": "Yuhui Li, Fangyun Wei, Chao Zhang and Hongyang Zhang. \\emph{EAGLE-2: Faster Inference of Language Models with Dynamic Draft Trees}. Proceedings of the 2024 Conference on Empirical Methods in Natural Language Processing, pp. 7421--7432, 2024; arXiv:2406.16858. doi:10.18653/v1/2024.emnlp-main.422. \\url{https://arxiv.org/abs/2406.16858}.",
+      "bibliography_text": "Yuhui Li, Fangyun Wei, Chao Zhang et al. \\emph{EAGLE-2: Faster Inference of Language Models with Dynamic Draft Trees}. Proceedings of the 2024 Conference on Empirical Methods in Natural Language Processing, pp. 7421--7432, 2024. doi:10.18653/v1/2024.emnlp-main.422.",
       "urls": [
-        "https://arxiv.org/abs/2406.16858",
         "https://doi.org/10.18653/v1/2024.emnlp-main.422"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), Crossref DOI record."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row eagle2. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), Crossref DOI record."
     },
     {
       "key": "eagle3",
-      "bibliography_text": "Yuhui Li, Fangyun Wei, Chao Zhang and Hongyang Zhang. \\emph{EAGLE-3: Scaling up Inference Acceleration of Large Language Models via Training-Time Test}. Advances in Neural Information Processing Systems 38 (NeurIPS 2025), 2025; arXiv:2503.01840. \\url{https://arxiv.org/abs/2503.01840}.",
+      "bibliography_text": "Yuhui Li, Fangyun Wei, Chao Zhang et al. \\emph{EAGLE-3: Scaling up Inference Acceleration of Large Language Models via Training-Time Test}. Advances in Neural Information Processing Systems 38 (NeurIPS 2025), 2025. \\url{https://neurips.cc/virtual/2025/poster/119930}.",
       "urls": [
-        "https://arxiv.org/abs/2503.01840"
+        "https://neurips.cc/virtual/2025/poster/119930"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row eagle3. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "eahr",
-      "bibliography_text": "Chunran Zhang. \\emph{Exact Adaptive Hybrid Retrieval Without Fixed Top-L Cutoffs}. 2026; arXiv:2608.07152. \\url{https://arxiv.org/abs/2608.07152}.",
+      "bibliography_text": "Chunran Zhang. \\emph{Exact Adaptive Hybrid Retrieval without Fixed Top-L Cutoffs}. arXiv:2608.07152v1, 2026. \\url{https://arxiv.org/abs/2608.07152v1}.",
       "urls": [
-        "https://arxiv.org/abs/2608.07152"
+        "https://arxiv.org/abs/2608.07152v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row eahr. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "epic",
@@ -826,14 +822,14 @@
     },
     {
       "key": "fastmtp",
-      "bibliography_text": "Yuxuan Cai, Xiaozhuan Liang, Xinghua Wang et al. \\emph{FastMTP: Accelerating LLM Inference with Enhanced Multi-Token Prediction}. 2025; arXiv:2509.18362. \\url{https://arxiv.org/abs/2509.18362}.",
+      "bibliography_text": "Yuxuan Cai, Xiaozhuan Liang, Xinghua Wang et al. \\emph{FastMTP: Accelerating LLM Inference with Enhanced Multi-Token Prediction}. arXiv:2509.18362v1, 2025. \\url{https://arxiv.org/abs/2509.18362v1}.",
       "urls": [
-        "https://arxiv.org/abs/2509.18362"
+        "https://arxiv.org/abs/2509.18362v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row fastmtp. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "fgd",
@@ -871,37 +867,36 @@
     },
     {
       "key": "frieder2024",
-      "bibliography_text": "Ophir Frieder, Ida Mele, Cristina Ioana Muntean, Franco Maria Nardini, Raffaele Perego and Nicola Tonellotto. \\emph{Caching Historical Embeddings in Conversational Search}. ACM Transactions on the Web, 18(4), 2024; arXiv:2211.14155. doi:10.1145/3578519. \\url{https://arxiv.org/abs/2211.14155}.",
+      "bibliography_text": "Ophir Frieder, Ida Mele, Cristina Ioana Muntean et al. \\emph{Caching Historical Embeddings in Conversational Search}. ACM Transactions on the Web 18(4), pp. 1--19, 2024. doi:10.1145/3578519.",
       "urls": [
-        "https://arxiv.org/abs/2211.14155",
         "https://doi.org/10.1145/3578519"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), Crossref DOI record."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row frieder2024. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), Crossref DOI record."
     },
     {
       "key": "gdntreescan",
-      "bibliography_text": "Zhiyuan Ma. \\emph{GDN Tree-Scan: Served Tree Verification for Recurrent-Hybrid Language Models}. 2026; arXiv:2609.23900. \\url{https://arxiv.org/abs/2609.23900}.",
+      "bibliography_text": "Zhiyuan Ma. \\emph{GDN Tree-Scan: Served Tree Verification for Recurrent-Hybrid Language Models}. arXiv:2609.23900v1, 2026. \\url{https://arxiv.org/abs/2609.23900v1}. Version 2 (1 October 2026) is titled ``LumoTree: Path-Parallel Speculative Verification for Hybrid Language Models''.",
       "urls": [
-        "https://arxiv.org/abs/2609.23900"
+        "https://arxiv.org/abs/2609.23900v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row gdntreescan. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "gloeckle2024",
-      "bibliography_text": "Fabian Gloeckle, Badr Youbi Idrissi, Baptiste Rozière, David Lopez-Paz and Gabriel Synnaeve. \\emph{Better \\& Faster Large Language Models via Multi-token Prediction}. Proceedings of the 41st International Conference on Machine Learning, pp. 15706--15734, 2024; arXiv:2404.19737. \\url{https://arxiv.org/abs/2404.19737}.",
+      "bibliography_text": "Fabian Gloeckle, Badr Youbi Idrissi, Baptiste Rozière et al. \\emph{Better \\& Faster Large Language Models via Multi-Token Prediction}. Proceedings of the 41st International Conference on Machine Learning, pp. 15706--15734, 2024. \\url{https://proceedings.mlr.press/v235/gloeckle24a.html}.",
       "urls": [
-        "https://arxiv.org/abs/2404.19737"
+        "https://proceedings.mlr.press/v235/gloeckle24a.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row gloeckle2024. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "gptq",
@@ -916,14 +911,14 @@
     },
     {
       "key": "hire",
-      "bibliography_text": "Yashas Samaga B L, Varun Yerram, Chong You et al. \\emph{HiRE: High Recall Approximate Top-$k$ Estimation for Efficient LLM Inference}. 2024; arXiv:2402.09360. \\url{https://arxiv.org/abs/2402.09360}.",
+      "bibliography_text": "Yashas Samaga B L, Varun Yerram, Chong You et al. \\emph{HiRE: High Recall Approximate Top-$k$ Estimation for Efficient LLM Inference}. arXiv:2402.09360v1, 2024. \\url{https://arxiv.org/abs/2402.09360v1}.",
       "urls": [
-        "https://arxiv.org/abs/2402.09360"
+        "https://arxiv.org/abs/2402.09360v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row hire. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "jean2015",
@@ -939,26 +934,25 @@
     },
     {
       "key": "khattak2026",
-      "bibliography_text": "Faizan A. Khattak and Mantas Mikaitis. \\emph{Accurate Models of NVIDIA Tensor Cores}. ACM Transactions on Architecture and Code Optimization, 23(3), pp. 1--25, 2026; arXiv:2512.07004. doi:10.1145/3830409. \\url{https://arxiv.org/abs/2512.07004}.",
+      "bibliography_text": "Faizan A. Khattak, Mantas Mikaitis. \\emph{Accurate Models of NVIDIA Tensor Cores}. ACM Transactions on Architecture and Code Optimization 23(3), pp. 1--25, 2026. doi:10.1145/3830409.",
       "urls": [
-        "https://arxiv.org/abs/2512.07004",
         "https://doi.org/10.1145/3830409"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), Crossref DOI record."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row khattak2026. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), Crossref DOI record."
     },
     {
       "key": "kool2019",
-      "bibliography_text": "Wouter Kool, Herke van Hoof and Max Welling. \\emph{Stochastic Beams and Where to Find Them: The Gumbel-Top-k Trick for Sampling Sequences Without Replacement}. Proceedings of the 36th International Conference on Machine Learning, pp. 3499--3508, 2019; arXiv:1903.06059. \\url{https://arxiv.org/abs/1903.06059}.",
+      "bibliography_text": "Wouter Kool, Herke van Hoof, Max Welling. \\emph{Stochastic Beams and Where to Find Them: The Gumbel-Top-$k$ Trick for Sampling Sequences without Replacement}. Proceedings of the 36th International Conference on Machine Learning, pp. 3499--3508, 2019. \\url{https://proceedings.mlr.press/v97/kool19a.html}.",
       "urls": [
-        "https://arxiv.org/abs/1903.06059"
+        "https://proceedings.mlr.press/v97/kool19a.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row kool2019. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "l2s",
@@ -1039,15 +1033,14 @@
     },
     {
       "key": "mambainllama",
-      "bibliography_text": "Junxiong Wang, Daniele Paliotta, Avner May, Alexander M. Rush and Tri Dao. \\emph{The Mamba in the Llama: Distilling and Accelerating Hybrid Models}. Advances in Neural Information Processing Systems 37 (NeurIPS 2024), 2024; arXiv:2408.15237. \\url{https://proceedings.neurips.cc/paper_files/paper/2024/hash/723933067ad315269b620bc0d2c05cba-Abstract-Conference.html}.",
+      "bibliography_text": "Junxiong Wang, Daniele Paliotta, Avner May et al. \\emph{The Mamba in the Llama: Distilling and Accelerating Hybrid Models}. Advances in Neural Information Processing Systems 37 (NeurIPS 2024), pp. 62432--62457, 2024. \\url{https://proceedings.neurips.cc/paper_files/paper/2024/hash/723933067ad315269b620bc0d2c05cba-Abstract-Conference.html}.",
       "urls": [
-        "https://proceedings.neurips.cc/paper_files/paper/2024/hash/723933067ad315269b620bc0d2c05cba-Abstract-Conference.html",
-        "https://arxiv.org/abs/2408.15237"
+        "https://proceedings.neurips.cc/paper_files/paper/2024/hash/723933067ad315269b620bc0d2c05cba-Abstract-Conference.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), proceedings page."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row mambainllama. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), proceedings page."
     },
     {
       "key": "margingate",
@@ -1062,14 +1055,14 @@
     },
     {
       "key": "medusa",
-      "bibliography_text": "Tianle Cai, Yuhong Li, Zhengyang Geng et al. \\emph{Medusa: Simple LLM Inference Acceleration Framework with Multiple Decoding Heads}. Proceedings of the 41st International Conference on Machine Learning, pp. 5209--5235, 2024; arXiv:2401.10774. \\url{https://arxiv.org/abs/2401.10774}.",
+      "bibliography_text": "Tianle Cai, Yuhong Li, Zhengyang Geng et al. \\emph{Medusa: Simple LLM Inference Acceleration Framework with Multiple Decoding Heads}. Proceedings of the 41st International Conference on Machine Learning, pp. 5209--5235, 2024. \\url{https://proceedings.mlr.press/v235/cai24b.html}.",
       "urls": [
-        "https://arxiv.org/abs/2401.10774"
+        "https://proceedings.mlr.press/v235/cai24b.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row medusa. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "mnih2012",
@@ -1151,14 +1144,14 @@
     },
     {
       "key": "rowan2025",
-      "bibliography_text": "Joseph Rowan, Buu Phan and Ashish Khisti. \\emph{List-Level Distribution Coupling with Applications to Speculative Decoding and Lossy Compression}. Advances in Neural Information Processing Systems 38 (NeurIPS 2025), 2025; arXiv:2506.05632. \\url{https://arxiv.org/abs/2506.05632}.",
+      "bibliography_text": "Joseph Rowan, Buu Phan, Ashish Khisti. \\emph{List-Level Distribution Coupling with Applications to Speculative Decoding and Lossy Compression}. Advances in Neural Information Processing Systems 38 (NeurIPS 2025), 2025. \\url{https://neurips.cc/virtual/2025/poster/118977}.",
       "urls": [
-        "https://arxiv.org/abs/2506.05632"
+        "https://neurips.cc/virtual/2025/poster/118977"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row rowan2025. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "safronov2026",
@@ -1184,15 +1177,14 @@
     },
     {
       "key": "sequoia",
-      "bibliography_text": "Zhuoming Chen, Avner May, Ruslan Svirschevski et al. \\emph{Sequoia: Scalable, Robust, and Hardware-aware Speculative Decoding}. Advances in Neural Information Processing Systems 37 (NeurIPS 2024), 2024; arXiv:2402.12374. \\url{https://proceedings.neurips.cc/paper_files/paper/2024/hash/ea1f5f0878d43ff4fb8bf64ef4a2326c-Abstract-Conference.html}.",
+      "bibliography_text": "Zhuoming Chen, Avner May, Ruslan Svirschevski et al. \\emph{Sequoia: Scalable and Robust Speculative Decoding}. Advances in Neural Information Processing Systems 37 (NeurIPS 2024), pp. 129531--129563, 2024. \\url{https://proceedings.neurips.cc/paper_files/paper/2024/hash/ea1f5f0878d43ff4fb8bf64ef4a2326c-Abstract-Conference.html}.",
       "urls": [
-        "https://proceedings.neurips.cc/paper_files/paper/2024/hash/ea1f5f0878d43ff4fb8bf64ef4a2326c-Abstract-Conference.html",
-        "https://arxiv.org/abs/2402.12374"
+        "https://proceedings.neurips.cc/paper_files/paper/2024/hash/ea1f5f0878d43ff4fb8bf64ef4a2326c-Abstract-Conference.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), proceedings page."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row sequoia. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), proceedings page."
     },
     {
       "key": "simple2025",
@@ -1240,37 +1232,36 @@
     },
     {
       "key": "specdecpp",
-      "bibliography_text": "Kaixuan Huang, Xudong Guo and Mengdi Wang. \\emph{SpecDec++: Boosting Speculative Decoding via Adaptive Candidate Lengths}. Second Conference on Language Modeling (COLM), 2025; arXiv:2405.19715. \\url{https://arxiv.org/abs/2405.19715}.",
+      "bibliography_text": "Kaixuan Huang, Xudong Guo, Mengdi Wang. \\emph{SpecDec++: Boosting Speculative Decoding via Adaptive Candidate Lengths}. Second Conference on Language Modeling (COLM 2025), 2025. \\url{https://arxiv.org/abs/2405.19715v3}.",
       "urls": [
-        "https://arxiv.org/abs/2405.19715"
+        "https://arxiv.org/abs/2405.19715v3"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row specdecpp. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "specla",
-      "bibliography_text": "Zhibin Wang, Xuying Han, Zhaohua Yang et al. \\emph{SpecLA: Efficient Speculative Decoding for Linear-Attention Models}. 2026; arXiv:2607.16673. \\url{https://arxiv.org/abs/2607.16673}.",
+      "bibliography_text": "Zhibin Wang, Xuying Han, Zhaohua Yang et al. \\emph{SpecLA: Efficient Speculative Decoding for Linear-Attention Models}. arXiv:2607.16673v1, 2026. \\url{https://arxiv.org/abs/2607.16673v1}.",
       "urls": [
-        "https://arxiv.org/abs/2607.16673"
+        "https://arxiv.org/abs/2607.16673v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row specla. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "spectr",
-      "bibliography_text": "Ziteng Sun, Ananda Theertha Suresh, Jae Hun Ro, Ahmad Beirami, Himanshu Jain and Felix Yu. \\emph{SpecTr: Fast Speculative Decoding via Optimal Transport}. Advances in Neural Information Processing Systems 36 (NeurIPS 2023), 2023; arXiv:2310.15141. \\url{https://proceedings.neurips.cc/paper_files/paper/2023/hash/6034a661584af6c28fd97a6f23e56c0a-Abstract-Conference.html}.",
+      "bibliography_text": "Ziteng Sun, Ananda Theertha Suresh, Jae Hun Ro et al. \\emph{SpecTr: Fast Speculative Decoding via Optimal Transport}. Advances in Neural Information Processing Systems 36 (NeurIPS 2023), pp. 30222--30242, 2023. \\url{https://proceedings.neurips.cc/paper_files/paper/2023/hash/6034a661584af6c28fd97a6f23e56c0a-Abstract-Conference.html}.",
       "urls": [
-        "https://proceedings.neurips.cc/paper_files/paper/2023/hash/6034a661584af6c28fd97a6f23e56c0a-Abstract-Conference.html",
-        "https://arxiv.org/abs/2310.15141"
+        "https://proceedings.neurips.cc/paper_files/paper/2023/hash/6034a661584af6c28fd97a6f23e56c0a-Abstract-Conference.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), proceedings page."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row spectr. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), proceedings page."
     },
     {
       "key": "specverify",
@@ -1309,26 +1300,25 @@
     },
     {
       "key": "stree",
-      "bibliography_text": "Yangchao Wu, Zongyue Qin, Alex Wong and Stefano Soatto. \\emph{STree: Speculative Tree Decoding for Hybrid State-Space Models}. Advances in Neural Information Processing Systems 38 (NeurIPS 2025), 2025; arXiv:2505.14969. \\url{https://arxiv.org/abs/2505.14969}.",
+      "bibliography_text": "Yangchao Wu, Zongyue Qin, Alex Wong et al. \\emph{STree: Speculative Tree Decoding for Hybrid State-Space Models}. Advances in Neural Information Processing Systems 38 (NeurIPS 2025), 2025. \\url{https://neurips.cc/virtual/2025/poster/117297}.",
       "urls": [
-        "https://arxiv.org/abs/2505.14969"
+        "https://neurips.cc/virtual/2025/poster/117297"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row stree. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "tao2024vocab",
-      "bibliography_text": "Chaofan Tao, Qian Liu, Longxu Dou et al. \\emph{Scaling Laws with Vocabulary: Larger Models Deserve Larger Vocabularies}. Advances in Neural Information Processing Systems 37 (NeurIPS 2024), 2024; arXiv:2407.13623. \\url{https://proceedings.neurips.cc/paper_files/paper/2024/hash/cf5a019ae9c11b4be88213ce3f85d85c-Abstract-Conference.html}.",
+      "bibliography_text": "Chaofan Tao, Qian Liu, Longxu Dou et al. \\emph{Scaling Laws with Vocabulary: Larger Models Deserve Larger Vocabularies}. Advances in Neural Information Processing Systems 37 (NeurIPS 2024), pp. 114147--114179, 2024. \\url{https://proceedings.neurips.cc/paper_files/paper/2024/hash/cf5a019ae9c11b4be88213ce3f85d85c-Abstract-Conference.html}.",
       "urls": [
-        "https://proceedings.neurips.cc/paper_files/paper/2024/hash/cf5a019ae9c11b4be88213ce3f85d85c-Abstract-Conference.html",
-        "https://arxiv.org/abs/2407.13623"
+        "https://proceedings.neurips.cc/paper_files/paper/2024/hash/cf5a019ae9c11b4be88213ce3f85d85c-Abstract-Conference.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), proceedings page."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row tao2024vocab. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), proceedings page."
     },
     {
       "key": "tetris",
@@ -1355,14 +1345,14 @@
     },
     {
       "key": "treewy",
-      "bibliography_text": "Sneha Murthy Ghantasala. \\emph{TreeWY: Speculative Verification for Gated DeltaNet Hybrids}. 2026; arXiv:2608.20961. \\url{https://arxiv.org/abs/2608.20961}.",
+      "bibliography_text": "Sneha Murthy Ghantasala. \\emph{TreeWY: Speculative Verification for Gated DeltaNet Hybrids}. arXiv:2608.20961v1, 2026. \\url{https://arxiv.org/abs/2608.20961v1}.",
       "urls": [
-        "https://arxiv.org/abs/2608.20961"
+        "https://arxiv.org/abs/2608.20961v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row treewy. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "turbospec",
@@ -1377,14 +1367,14 @@
     },
     {
       "key": "vocabtrim",
-      "bibliography_text": "Raghavv Goel, Sudhanshu Agrawal, Mukul Gagrani et al. \\emph{VOCABTRIM: Vocabulary Pruning for Efficient Speculative Decoding in LLMs}. 2025; arXiv:2506.22694. \\url{https://arxiv.org/abs/2506.22694}.",
+      "bibliography_text": "Raghavv Goel, Sudhanshu Agrawal, Mukul Gagrani et al. \\emph{VOCABTRIM: Vocabulary Pruning for Efficient Speculative Decoding in LLMs}. arXiv:2506.22694v2, 2025. \\url{https://arxiv.org/abs/2506.22694v2}. ICML 2025 Workshop on Efficient Systems for Foundation Models.",
       "urls": [
-        "https://arxiv.org/abs/2506.22694"
+        "https://arxiv.org/abs/2506.22694v2"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row vocabtrim. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "yang2018softmax",
@@ -1399,14 +1389,14 @@
     },
     {
       "key": "yuan2025nondeterminism",
-      "bibliography_text": "Jiayi Yuan, Hao Li, Xinheng Ding et al. \\emph{Understanding and Mitigating Numerical Sources of Nondeterminism in LLM Inference}. Advances in Neural Information Processing Systems 38 (NeurIPS 2025), 2025; arXiv:2506.09501. \\url{https://arxiv.org/abs/2506.09501}.",
+      "bibliography_text": "Jiayi Yuan, Hao Li, Xinheng Ding et al. \\emph{Understanding and Mitigating Numerical Sources of Nondeterminism in LLM Inference}. Advances in Neural Information Processing Systems 38 (NeurIPS 2025), 2025. \\url{https://neurips.cc/virtual/2025/poster/118169}. Version 1 of the arXiv preprint was titled ``Give Me FP32 or Give Me Death? Challenges and Solutions for Reproducible Reasoning''.",
       "urls": [
-        "https://arxiv.org/abs/2506.09501"
+        "https://neurips.cc/virtual/2025/poster/118169"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row yuan2025nondeterminism. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "specinfer",
@@ -1422,39 +1412,36 @@
     },
     {
       "key": "frspec",
-      "bibliography_text": "Weilin Zhao, Tengyu Pan, Xu Han et al. \\emph{FR-Spec: Accelerating Large-Vocabulary Language Models via Frequency-Ranked Speculative Sampling}. Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers), pp. 3909--3921, 2025; arXiv:2502.14856. doi:10.18653/v1/2025.acl-long.198. \\url{https://arxiv.org/abs/2502.14856}.",
+      "bibliography_text": "Weilin Zhao, Tengyu Pan, Xu Han et al. \\emph{FR-Spec: Accelerating Large-Vocabulary Language Models via Frequency-Ranked Speculative Sampling}. Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers), pp. 3909--3921, 2025. doi:10.18653/v1/2025.acl-long.198.",
       "urls": [
-        "https://arxiv.org/abs/2502.14856",
         "https://doi.org/10.18653/v1/2025.acl-long.198"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), Crossref DOI record."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row frspec. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), Crossref DOI record."
     },
     {
       "key": "ramgray2012",
-      "bibliography_text": "Parikshit Ram and Alexander G. Gray. \\emph{Maximum Inner-Product Search Using Cone Trees}. Proceedings of the 18th ACM SIGKDD International Conference on Knowledge Discovery and Data Mining, pp. 931--939, 2012; arXiv:1202.6101. doi:10.1145/2339530.2339677. \\url{https://arxiv.org/abs/1202.6101}.",
+      "bibliography_text": "Parikshit Ram, Alexander G. Gray. \\emph{Maximum Inner-Product Search Using Cone Trees}. Proceedings of the 18th ACM SIGKDD International Conference on Knowledge Discovery and Data Mining, pp. 931--939, 2012. doi:10.1145/2339530.2339677.",
       "urls": [
-        "https://arxiv.org/abs/1202.6101",
         "https://doi.org/10.1145/2339530.2339677"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), Crossref DOI record."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row ramgray2012. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), Crossref DOI record."
     },
     {
       "key": "maximus",
-      "bibliography_text": "Firas Abuzaid, Geet Sethi, Peter Bailis and Matei Zaharia. \\emph{To Index or Not to Index: Optimizing Exact Maximum Inner Product Search}. 2019 IEEE 35th International Conference on Data Engineering (ICDE), pp. 1250--1261, 2019; arXiv:1706.01449. doi:10.1109/ICDE.2019.00114. \\url{https://arxiv.org/abs/1706.01449}.",
+      "bibliography_text": "Firas Abuzaid, Geet Sethi, Peter Bailis et al. \\emph{To Index or Not to Index: Optimizing Exact Maximum Inner Product Search}. 2019 IEEE 35th International Conference on Data Engineering (ICDE), pp. 1250--1261, 2019. doi:10.1109/ICDE.2019.00114.",
       "urls": [
-        "https://arxiv.org/abs/1706.01449",
         "https://doi.org/10.1109/ICDE.2019.00114"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), Crossref DOI record."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row maximus. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions), Crossref DOI record."
     },
     {
       "key": "gumbel1954",
@@ -1463,29 +1450,29 @@
       "accessed": "2026-09-30",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Bibliographic record only; the book text was not read."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): no longer cited by the paper or the notes; see sources/citation_audit.md, 'Entries no longer cited'. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Bibliographic record only; the book text was not read."
     },
     {
       "key": "papandreou2011",
-      "bibliography_text": "George Papandreou and Alan L. Yuille. \\emph{Perturb-and-MAP Random Fields: Using Discrete Optimization to Learn and Sample from Energy Models}. 2011 International Conference on Computer Vision (ICCV), pp. 193--200, 2011. doi:10.1109/ICCV.2011.6126242.",
+      "bibliography_text": "George Papandreou, Alan L. Yuille. \\emph{Perturb-and-MAP Random Fields: Using Discrete Optimization to Learn and Sample from Energy Models}. 2011 International Conference on Computer Vision (ICCV), pp. 193--200, 2011. doi:10.1109/ICCV.2011.6126242.",
       "urls": [
         "https://doi.org/10.1109/ICCV.2011.6126242"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from Crossref DOI record."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row papandreou2011. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from Crossref DOI record."
     },
     {
       "key": "svdsoftmax",
-      "bibliography_text": "Kyuhong Shim, Minjae Lee, Iksoo Choi, Yoonho Boo and Wonyong Sung. \\emph{SVD-Softmax: Fast Softmax Approximation on Large Vocabulary Neural Networks}. Advances in Neural Information Processing Systems 30 (NIPS 2017), 2017. \\url{https://proceedings.neurips.cc/paper_files/paper/2017/hash/4e2a6330465c8ffcaa696a5a16639176-Abstract.html}.",
+      "bibliography_text": "Kyuhong Shim, Minjae Lee, Iksoo Choi et al. \\emph{SVD-Softmax: Fast Softmax Approximation on Large Vocabulary Neural Networks}. Advances in Neural Information Processing Systems 30 (NIPS 2017), 2017. \\url{https://proceedings.neurips.cc/paper_files/paper/2017/hash/4e2a6330465c8ffcaa696a5a16639176-Abstract.html}.",
       "urls": [
         "https://proceedings.neurips.cc/paper_files/paper/2017/hash/4e2a6330465c8ffcaa696a5a16639176-Abstract.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from proceedings page."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row svdsoftmax. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from proceedings page."
     },
     {
       "key": "mnih2008",
@@ -1522,25 +1509,25 @@
     },
     {
       "key": "vafile",
-      "bibliography_text": "Roger Weber, Hans-J. Schek and Stephen Blott. \\emph{A Quantitative Analysis and Performance Study for Similarity-Search Methods in High-Dimensional Spaces}. Proceedings of the 24th International Conference on Very Large Data Bases (VLDB 1998), 1998. \\url{https://www.vldb.org/conf/1998/p194.pdf}.",
+      "bibliography_text": "Roger Weber, Hans-J. Schek, Stephen Blott. \\emph{A Quantitative Analysis and Performance Study for Similarity-Search Methods in High-Dimensional Spaces}. Proceedings of the 24th International Conference on Very Large Data Bases (VLDB 1998), pp. 194--205, 1998. \\url{https://www.vldb.org/conf/1998/p194.pdf}.",
       "urls": [
         "https://www.vldb.org/conf/1998/p194.pdf"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from publisher or proceedings page."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row vafile. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from publisher or proceedings page."
     },
     {
       "key": "lemp",
-      "bibliography_text": "Christina Teflioudi, Rainer Gemulla and Olga Mykytiuk. \\emph{LEMP: Fast Retrieval of Large Entries in a Matrix Product}. Proceedings of the 2015 ACM SIGMOD International Conference on Management of Data, pp. 107--122, 2015. doi:10.1145/2723372.2747647.",
+      "bibliography_text": "Christina Teflioudi, Rainer Gemulla, Olga Mykytiuk. \\emph{LEMP: Fast Retrieval of Large Entries in a Matrix Product}. Proceedings of the 2015 ACM SIGMOD International Conference on Management of Data, pp. 107--122, 2015. doi:10.1145/2723372.2747647.",
       "urls": [
         "https://doi.org/10.1145/2723372.2747647"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from Crossref DOI record."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row lemp. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from Crossref DOI record."
     },
     {
       "key": "lemptods",
@@ -1555,14 +1542,14 @@
     },
     {
       "key": "fexipro",
-      "bibliography_text": "Hui Li, Tsz Nam Chan, Man Lung Yiu and Nikos Mamoulis. \\emph{FEXIPRO: Fast and Exact Inner Product Retrieval in Recommender Systems}. Proceedings of the 2017 ACM International Conference on Management of Data (SIGMOD), pp. 835--850, 2017. doi:10.1145/3035918.3064009.",
+      "bibliography_text": "Hui Li, Tsz Nam Chan, Man Lung Yiu et al. \\emph{FEXIPRO: Fast and Exact Inner Product Retrieval in Recommender Systems}. Proceedings of the 2017 ACM International Conference on Management of Data (SIGMOD), pp. 835--850, 2017. doi:10.1145/3035918.3064009.",
       "urls": [
         "https://doi.org/10.1145/3035918.3064009"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from Crossref DOI record."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row fexipro. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from Crossref DOI record."
     },
     {
       "key": "pq",
@@ -1577,26 +1564,25 @@
     },
     {
       "key": "dppscreening",
-      "bibliography_text": "Jie Wang, Peter Wonka and Jieping Ye. \\emph{Lasso Screening Rules via Dual Polytope Projection}. Journal of Machine Learning Research, 16, pp. 1063--1101, 2015; arXiv:1211.3966. \\url{https://jmlr.org/papers/v16/wang15a.html}.",
+      "bibliography_text": "Jie Wang, Peter Wonka, Jieping Ye. \\emph{Lasso Screening Rules via Dual Polytope Projection}. Journal of Machine Learning Research 16, pp. 1063--1101, 2015. \\url{https://jmlr.org/papers/v16/wang15a.html}.",
       "urls": [
-        "https://jmlr.org/papers/v16/wang15a.html",
-        "https://arxiv.org/abs/1211.3966"
+        "https://jmlr.org/papers/v16/wang15a.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row dppscreening. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from arXiv abstract page (title, authors, versions)."
     },
     {
       "key": "higham2002",
-      "bibliography_text": "Nicholas J. Higham. \\emph{Accuracy and Stability of Numerical Algorithms}. Second edition, Society for Industrial and Applied Mathematics, 2002. doi:10.1137/1.9780898718027.",
+      "bibliography_text": "Nicholas J. Higham. \\emph{Accuracy and Stability of Numerical Algorithms}. 2002. doi:10.1137/1.9780898718027.",
       "urls": [
         "https://doi.org/10.1137/1.9780898718027"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from Crossref DOI record."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row higham2002. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from Crossref DOI record."
     },
     {
       "key": "jeannerodrump2013",
@@ -1644,14 +1630,14 @@
     },
     {
       "key": "fasi2021",
-      "bibliography_text": "Massimiliano Fasi, Nicholas J. Higham, Mantas Mikaitis and Srikara Pranesh. \\emph{Numerical Behavior of NVIDIA Tensor Cores}. PeerJ Computer Science, 7, pp. e330, 2021. doi:10.7717/peerj-cs.330.",
+      "bibliography_text": "Massimiliano Fasi, Nicholas J. Higham, Mantas Mikaitis et al. \\emph{Numerical Behavior of NVIDIA Tensor Cores}. PeerJ Computer Science 7, pp. e330, 2021. doi:10.7717/peerj-cs.330.",
       "urls": [
         "https://doi.org/10.7717/peerj-cs.330"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from Crossref DOI record."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row fasi2021. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from Crossref DOI record."
     },
     {
       "key": "marymikaitis2025",
@@ -1666,14 +1652,14 @@
     },
     {
       "key": "rump2010",
-      "bibliography_text": "Siegfried M. Rump. \\emph{Verification Methods: Rigorous Results Using Floating-Point Arithmetic}. Acta Numerica, 19, pp. 287--449, 2010. doi:10.1017/S096249291000005X.",
+      "bibliography_text": "Siegfried M. Rump. \\emph{Verification Methods: Rigorous Results Using Floating-Point Arithmetic}. Acta Numerica 19, pp. 287--449, 2010. doi:10.1017/S096249291000005X.",
       "urls": [
         "https://doi.org/10.1017/S096249291000005X"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from Crossref DOI record."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row rump2010. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Metadata verified from Crossref DOI record."
     },
     {
       "key": "ogita2005",
@@ -1699,15 +1685,15 @@
     },
     {
       "key": "he2025nondeterminism",
-      "bibliography_text": "Horace He and Thinking Machines Lab. \\emph{Defeating Nondeterminism in LLM Inference}. Thinking Machines Lab: Connectionism, 2025. doi:10.64434/tml.20250910. \\url{https://thinkingmachines.ai/blog/defeating-nondeterminism-in-llm-inference/}.",
+      "bibliography_text": "Horace He, Thinking Machines Lab. \\emph{Defeating Nondeterminism in LLM Inference}. Thinking Machines Lab: Connectionism, 2025. doi:10.64434/tml.20250910. \\url{https://thinkingmachines.ai/blog/defeating-nondeterminism-in-llm-inference/}.",
       "urls": [
         "https://thinkingmachines.ai/blog/defeating-nondeterminism-in-llm-inference/",
         "https://doi.org/10.64434/tml.20250910"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Blog page read; title, authors and date taken from the page."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row he2025nondeterminism. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Blog page read; title, authors and date taken from the page."
     },
     {
       "key": "sglangdeterministic",
@@ -1715,21 +1701,21 @@
       "urls": [
         "https://www.lmsys.org/blog/2025-09-22-sglang-deterministic/"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Blog page read; title, authors and date taken from the page."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row sglangdeterministic. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Blog page read; title, authors and date taken from the page."
     },
     {
       "key": "flashinfersamplingblog",
-      "bibliography_text": "Shanli Xing, Zihao Ye, Bohan Hou, Luis Ceze and Tianqi Chen. \\emph{Sorting-Free GPU Kernels for LLM Sampling}. FlashInfer blog, 2025. \\url{https://flashinfer.ai/2025/03/10/sampling.html}.",
+      "bibliography_text": "Shanli Xing, Zihao Ye, Bohan Hou et al. \\emph{Sorting-Free GPU Kernels for LLM Sampling}. FlashInfer blog, 2025. \\url{https://flashinfer.ai/2025/03/10/sampling.html}.",
       "urls": [
         "https://flashinfer.ai/2025/03/10/sampling.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Blog page read; title, authors and date taken from the page."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row flashinfersamplingblog. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Blog page read; title, authors and date taken from the page."
     },
     {
       "key": "nvfp4blog",
@@ -1744,47 +1730,47 @@
     },
     {
       "key": "sparkpipehead",
-      "bibliography_text": "sparkpipe contributors. \\emph{Certified screened LM head (\\texttt{SparkLmHeadCertifiedFp8QuantizeKernel}, \\texttt{SparkLmHeadCertifiedFp8ScoreKernel})}. Source code, \\texttt{model-families/common/include/sparkpipe/spark\\_lm\\_kernels.cuh}, commit \\texttt{84efd5b63d8d} (16 August 2026); pull request 744 (merged 29 August 2026), 2026. \\url{https://github.com/sparkpipe/sparkpipe/pull/744}.",
+      "bibliography_text": "sparkpipe contributors. \\emph{Certified screened LM head (\\texttt{SparkLmHeadCertifiedFp8QuantizeKernel}, \\texttt{SparkLmHeadCertifiedFp8ScoreKernel})}. Source code, \\texttt{model-families/common/include/sparkpipe/spark\\_lm\\_kernels.cuh}, commit \\texttt{84efd5b63d8d}; pull request 744, 2026. \\url{https://github.com/sparkpipe/sparkpipe/pull/744}.",
       "urls": [
         "https://github.com/sparkpipe/sparkpipe/pull/744"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Repository, issue or pull request read through the GitHub API; numbers are self-reported by the authors and not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row sparkpipehead. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Repository, issue or pull request read through the GitHub API; numbers are self-reported by the authors and not reproduced."
     },
     {
       "key": "lagunaprune",
-      "bibliography_text": "Layr Labs. \\emph{Laguna LM-head prune (\\texttt{Sources/MLXFastModel/LagunaLmHeadPrune.swift})}. Source code, \\texttt{Layr-Labs/mlxfast-challenge}, commit \\texttt{4f4f68959cfe} (28 July 2026), 2026. \\url{https://github.com/Layr-Labs/mlxfast-challenge}.",
+      "bibliography_text": "Layr Labs. \\emph{Laguna LM-head prune (\\texttt{Sources/MLXFastModel/LagunaLmHeadPrune.swift})}. Source code, \\texttt{Layr-Labs/mlxfast-challenge}, commit \\texttt{4f4f68959cfe}, 2026. \\url{https://github.com/Layr-Labs/mlxfast-challenge/blob/4f4f68959cfec94e31ef6cc3b22c9df468120b51/Sources/MLXFastModel/LagunaLmHeadPrune.swift}.",
       "urls": [
-        "https://github.com/Layr-Labs/mlxfast-challenge"
+        "https://github.com/Layr-Labs/mlxfast-challenge/blob/4f4f68959cfec94e31ef6cc3b22c9df468120b51/Sources/MLXFastModel/LagunaLmHeadPrune.swift"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Repository, issue or pull request read through the GitHub API; numbers are self-reported by the authors and not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row lagunaprune. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Repository, issue or pull request read through the GitHub API; numbers are self-reported by the authors and not reproduced."
     },
     {
       "key": "knlphead",
-      "bibliography_text": "Luis Chamberlain. \\emph{Certified LM-head decode: read a quarter of the output head, losslessly}. \\texttt{mcgrof/knlp}, \\texttt{docs/lm-head-decode.md}, first committed 23 June 2026 (commit \\texttt{1dd92463092d}), 2026. \\url{https://github.com/mcgrof/knlp/blob/main/docs/lm-head-decode.md}.",
+      "bibliography_text": "Luis Chamberlain. \\emph{Certified LM-head decode: read a quarter of the output head, losslessly}. \\texttt{mcgrof/knlp}, \\texttt{docs/lm-head-decode.md}, commit \\texttt{1dd92463092d}, 2026. \\url{https://github.com/mcgrof/knlp/blob/1dd92463092d8959ba5d00cc7cf95bb8e34904f0/docs/lm-head-decode.md}.",
       "urls": [
-        "https://github.com/mcgrof/knlp/blob/main/docs/lm-head-decode.md"
+        "https://github.com/mcgrof/knlp/blob/1dd92463092d8959ba5d00cc7cf95bb8e34904f0/docs/lm-head-decode.md"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Repository, issue or pull request read through the GitHub API; numbers are self-reported by the authors and not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row knlphead. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Repository, issue or pull request read through the GitHub API; numbers are self-reported by the authors and not reproduced."
     },
     {
       "key": "e142",
-      "bibliography_text": "qwen38-challenge\\_senpai contributors. \\emph{E142: The verify readout streams 715 MB per round to answer a two-element question}. GitHub pull request 142, \\texttt{morganmcg1/qwen38-challenge\\_senpai}, opened 22 August 2026, 2026. \\url{https://github.com/morganmcg1/qwen38-challenge_senpai/pull/142}.",
+      "bibliography_text": "qwen38-challenge\\_senpai contributors. \\emph{The verify readout streams 715~MB per round to answer a two-element question. Prove most of the vocabulary cannot win, and skip it}. GitHub pull request 142 (experiment E142), \\texttt{morganmcg1/qwen38-challenge\\_senpai}, 2026. \\url{https://github.com/morganmcg1/qwen38-challenge_senpai/pull/142}.",
       "urls": [
         "https://github.com/morganmcg1/qwen38-challenge_senpai/pull/142"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Repository, issue or pull request read through the GitHub API; numbers are self-reported by the authors and not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row e142. Earlier: Added 30 Sep 2026 by the lit review (sources/literature_review.md); not yet cited in paper.tex. Repository, issue or pull request read through the GitHub API; numbers are self-reported by the authors and not reproduced."
     },
     {
       "key": "jetspec",
@@ -1821,14 +1807,14 @@
     },
     {
       "key": "dflow",
-      "bibliography_text": "Yaojie Zhang, Linfeng Zhang, Bin Cui and Xupeng Miao. \\emph{DFlow: Enabling Verifier Information Flow in Block Diffusion Speculative Decoding}. 2026; arXiv:2609.06498. \\url{https://arxiv.org/abs/2609.06498}.",
+      "bibliography_text": "Yaojie Zhang, Linfeng Zhang, Bin Cui et al. \\emph{DFlow: Enabling Verifier Information Flow in Block Diffusion Speculative Decoding}. arXiv:2609.06498v1, 2026. \\url{https://arxiv.org/abs/2609.06498v1}.",
       "urls": [
-        "https://arxiv.org/abs/2609.06498"
+        "https://arxiv.org/abs/2609.06498v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row dflow. Earlier: Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "d2sd",
@@ -1865,25 +1851,25 @@
     },
     {
       "key": "lookahead",
-      "bibliography_text": "Yichao Fu, Peter Bailis, Ion Stoica and Hao Zhang. \\emph{Break the Sequential Dependency of LLM Inference Using Lookahead Decoding}. Proceedings of the 41st International Conference on Machine Learning, pp. 14060--14079, 2024; arXiv:2402.02057. \\url{https://arxiv.org/abs/2402.02057}.",
+      "bibliography_text": "Yichao Fu, Peter Bailis, Ion Stoica et al. \\emph{Break the Sequential Dependency of LLM Inference Using Lookahead Decoding}. Proceedings of the 41st International Conference on Machine Learning, pp. 14060--14079, 2024. \\url{https://proceedings.mlr.press/v235/fu24a.html}.",
       "urls": [
-        "https://arxiv.org/abs/2402.02057"
+        "https://proceedings.mlr.press/v235/fu24a.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row lookahead. Earlier: Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "cllm",
-      "bibliography_text": "Siqi Kou, Lanxiang Hu, Zhezhi He, Zhijie Deng and Hao Zhang. \\emph{CLLMs: Consistency Large Language Models}. 2024; arXiv:2403.00835. \\url{https://arxiv.org/abs/2403.00835}.",
+      "bibliography_text": "Siqi Kou, Lanxiang Hu, Zhezhi He et al. \\emph{CLLMs: Consistency Large Language Models}. Proceedings of the 41st International Conference on Machine Learning, pp. 25426--25440, 2024. \\url{https://proceedings.mlr.press/v235/kou24a.html}.",
       "urls": [
-        "https://arxiv.org/abs/2403.00835"
+        "https://proceedings.mlr.press/v235/kou24a.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row cllm. Earlier: Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "judgedecoding",
@@ -1920,14 +1906,14 @@
     },
     {
       "key": "marginsnotwindows",
-      "bibliography_text": "Oszkár Urbán, Young D. Kwon, Stylianos I. Venieris and Cecilia Mascolo. \\emph{Margins, Not Windows: Training-Free Per-Step Lossy Speculative Decoding}. 2026; arXiv:2609.02897. \\url{https://arxiv.org/abs/2609.02897}.",
+      "bibliography_text": "Oszkár Urbán, Young D. Kwon, Stylianos I. Venieris et al. \\emph{Margins, Not Windows: Training-Free Per-Step Lossy Speculative Decoding}. arXiv:2609.02897v2, 2026. \\url{https://arxiv.org/abs/2609.02897v2}.",
       "urls": [
-        "https://arxiv.org/abs/2609.02897"
+        "https://arxiv.org/abs/2609.02897v2"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row marginsnotwindows. Earlier: Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "fuzzysd",
@@ -2008,14 +1994,14 @@
     },
     {
       "key": "nota2026",
-      "bibliography_text": "Jaeyeon Kim, Jewon Lee and Bo-Kyeong Kim. \\emph{Quantize the Target, Quantize the Drafter: Efficient Inference with Qwen3.5-4B}. 2026; arXiv:2607.04244. \\url{https://arxiv.org/abs/2607.04244}.",
+      "bibliography_text": "Jaeyeon Kim, Jewon Lee, Bo-Kyeong Kim. \\emph{Quantize the Target, Quantize the Drafter: Efficient Inference with Qwen3.5-4B}. arXiv:2607.04244v2, 2026. \\url{https://arxiv.org/abs/2607.04244v2}. Submission to the Efficient Qwen Competition, ICML 2026 Workshop on AdaptFM.",
       "urls": [
-        "https://arxiv.org/abs/2607.04244"
+        "https://arxiv.org/abs/2607.04244v2"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row nota2026. Earlier: Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "qspec",
@@ -2041,25 +2027,25 @@
     },
     {
       "key": "damp",
-      "bibliography_text": "Tao Zhang, Jianchao Tan, Pingwei Sun et al. \\emph{DAMP: Decay-Aware Mixed-Precision Recurrent-State Quantization}. 2026; arXiv:2608.27513. \\url{https://arxiv.org/abs/2608.27513}.",
+      "bibliography_text": "Tao Zhang, Jianchao Tan, Pingwei Sun et al. \\emph{DAMP: Decay-Aware Mixed-Precision Recurrent-State Quantization}. arXiv:2608.27513v2, 2026. \\url{https://arxiv.org/abs/2608.27513v2}.",
       "urls": [
-        "https://arxiv.org/abs/2608.27513"
+        "https://arxiv.org/abs/2608.27513v2"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row damp. Earlier: Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "leapquant",
-      "bibliography_text": "Yi Pan, Haocheng Xi, Kan Zhu et al. \\emph{LeapQuant: Efficient Linear Attention with Accurate Recurrent State Quantization}. 2026; arXiv:2609.38166. \\url{https://arxiv.org/abs/2609.38166}.",
+      "bibliography_text": "Yi Pan, Haocheng Xi, Kan Zhu et al. \\emph{LeapQuant: Efficient Linear Attention with Accurate Recurrent State Quantization}. arXiv:2609.38166v1, 2026. \\url{https://arxiv.org/abs/2609.38166v1}.",
       "urls": [
-        "https://arxiv.org/abs/2609.38166"
+        "https://arxiv.org/abs/2609.38166v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row leapquant. Earlier: Added 30 Sep 2026 for the moonshot section of the lit review (sources/literature_review.md Sec. 12); not cited in paper.tex. Metadata verified from the arXiv abstract page; reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "stepquant",
@@ -2174,331 +2160,364 @@
     },
     {
       "key": "mtbench",
-      "bibliography_text": "Lianmin Zheng, Wei-Lin Chiang, Ying Sheng, Siyuan Zhuang, Zhanghao Wu, Yonghao Zhuang, Zi Lin, Zhuohan Li, Dacheng Li, Eric P. Xing, Hao Zhang, Joseph E. Gonzalez and Ion Stoica. \\emph{Judging {LLM}-as-a-Judge with {MT-Bench} and {Chatbot Arena}}. Advances in Neural Information Processing Systems 36, Datasets and Benchmarks Track, 2023; arXiv:2306.05685. \\url{https://arxiv.org/abs/2306.05685}.",
+      "bibliography_text": "Lianmin Zheng, Wei-Lin Chiang, Ying Sheng et al. \\emph{Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena}. Advances in Neural Information Processing Systems 36 (NeurIPS 2023), Datasets and Benchmarks Track, pp. 46595--46623, 2023. \\url{https://proceedings.neurips.cc/paper_files/paper/2023/hash/91f18a1287b398d378ef22505bf41832-Abstract-Datasets_and_Benchmarks.html}.",
       "urls": [
-        "https://arxiv.org/abs/2306.05685"
+        "https://proceedings.neurips.cc/paper_files/paper/2023/hash/91f18a1287b398d378ef22505bf41832-Abstract-Datasets_and_Benchmarks.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry. Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row mtbench. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry. Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "oasst1",
-      "bibliography_text": "Andreas K{\\\"o}pf, Yannic Kilcher, Dimitri von R{\\\"u}tte, Sotiris Anagnostidis, Zhi-Rui Tam, Keith Stevens, Abdullah Barhoum, Nguyen Minh Duc, Oliver Stanley, Rich{\\'a}rd Nagyfi, Shahul ES, Sameer Suri, David Glushkov, Arnav Dantuluri, Andrew Maguire, Christoph Schuhmann, Huu Nguyen and Alexander Mattick. \\emph{{OpenAssistant} Conversations -- Democratizing Large Language Model Alignment}. Advances in Neural Information Processing Systems 36, Datasets and Benchmarks Track, 2023; arXiv:2304.07327. \\url{https://arxiv.org/abs/2304.07327}.",
+      "bibliography_text": "Andreas K\\\"opf, Yannic Kilcher, Dimitri von R\\\"utte et al. \\emph{OpenAssistant Conversations -- Democratizing Large Language Model Alignment}. Advances in Neural Information Processing Systems 36 (NeurIPS 2023), Datasets and Benchmarks Track, pp. 47669--47681, 2023. \\url{https://proceedings.neurips.cc/paper_files/paper/2023/hash/949f0f8f32267d297c2d4e3ee10a2e7e-Abstract-Datasets_and_Benchmarks.html}.",
       "urls": [
-        "https://arxiv.org/abs/2304.07327"
+        "https://proceedings.neurips.cc/paper_files/paper/2023/hash/949f0f8f32267d297c2d4e3ee10a2e7e-Abstract-Datasets_and_Benchmarks.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry. Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row oasst1. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry. Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "humaneval",
-      "bibliography_text": "Mark Chen, Jerry Tworek, Heewoo Jun, Qiming Yuan, Henrique Ponde de Oliveira Pinto and others. \\emph{Evaluating Large Language Models Trained on Code}. 2021; arXiv:2107.03374. \\url{https://arxiv.org/abs/2107.03374}.",
+      "bibliography_text": "Mark Chen, Jerry Tworek, Heewoo Jun et al. \\emph{Evaluating Large Language Models Trained on Code}. arXiv:2107.03374v2, 2021. \\url{https://arxiv.org/abs/2107.03374v2}.",
       "urls": [
-        "https://arxiv.org/abs/2107.03374"
+        "https://arxiv.org/abs/2107.03374v2"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: 58 authors). Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row humaneval. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: 58 authors). Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "mbpp",
-      "bibliography_text": "Jacob Austin, Augustus Odena, Maxwell Nye, Maarten Bosma, Henryk Michalewski, David Dohan, Ellen Jiang, Carrie Cai, Michael Terry, Quoc Le and Charles Sutton. \\emph{Program Synthesis with Large Language Models}. 2021; arXiv:2108.07732. \\url{https://arxiv.org/abs/2108.07732}.",
+      "bibliography_text": "Jacob Austin, Augustus Odena, Maxwell Nye et al. \\emph{Program Synthesis with Large Language Models}. arXiv:2108.07732v1, 2021. \\url{https://arxiv.org/abs/2108.07732v1}.",
       "urls": [
-        "https://arxiv.org/abs/2108.07732"
+        "https://arxiv.org/abs/2108.07732v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry. Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row mbpp. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry. Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "gsm8k",
-      "bibliography_text": "Karl Cobbe, Vineet Kosaraju, Mohammad Bavarian, Mark Chen, Heewoo Jun, Lukasz Kaiser, Matthias Plappert, Jerry Tworek, Jacob Hilton, Reiichiro Nakano, Christopher Hesse and John Schulman. \\emph{Training Verifiers to Solve Math Word Problems}. 2021; arXiv:2110.14168. \\url{https://arxiv.org/abs/2110.14168}.",
+      "bibliography_text": "Karl Cobbe, Vineet Kosaraju, Mohammad Bavarian et al. \\emph{Training Verifiers to Solve Math Word Problems}. arXiv:2110.14168v2, 2021. \\url{https://arxiv.org/abs/2110.14168v2}.",
       "urls": [
-        "https://arxiv.org/abs/2110.14168"
+        "https://arxiv.org/abs/2110.14168v2"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry. Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row gsm8k. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry. Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "santilli2023jacobi",
-      "bibliography_text": "Andrea Santilli, Silvio Severino, Emilian Postolache, Valentino Maiorca, Michele Mancusi, Riccardo Marin and Emanuele Rodol{\\`a}. \\emph{Accelerating Transformer Inference for Translation via Parallel Decoding}. Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (ACL), 2023; arXiv:2305.10427. \\url{https://arxiv.org/abs/2305.10427}.",
+      "bibliography_text": "Andrea Santilli, Silvio Severino, Emilian Postolache et al. \\emph{Accelerating Transformer Inference for Translation via Parallel Decoding}. Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers), pp. 12336--12355, 2023. doi:10.18653/v1/2023.acl-long.689.",
       "urls": [
-        "https://arxiv.org/abs/2305.10427"
+        "https://doi.org/10.18653/v1/2023.acl-long.689"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry. Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row santilli2023jacobi. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry. Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "song2021parallel",
-      "bibliography_text": "Yang Song, Chenlin Meng, Renjie Liao and Stefano Ermon. \\emph{Accelerating Feedforward Computation via Parallel Nonlinear Equation Solving}. Proceedings of the 38th International Conference on Machine Learning (ICML), 2021; arXiv:2002.03629. \\url{https://arxiv.org/abs/2002.03629}.",
+      "bibliography_text": "Yang Song, Chenlin Meng, Renjie Liao et al. \\emph{Accelerating Feedforward Computation via Parallel Nonlinear Equation Solving}. Proceedings of the 38th International Conference on Machine Learning, pp. 9791--9800, 2021. \\url{https://proceedings.mlr.press/v139/song21a.html}.",
       "urls": [
-        "https://arxiv.org/abs/2002.03629"
+        "https://proceedings.mlr.press/v139/song21a.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry. Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row song2021parallel. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry. Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "tokenrecycling2024",
-      "bibliography_text": "Xianzhen Luo, Yixuan Wang, Qingfu Zhu, Zhiming Zhang, Xuanyu Zhang, Qing Yang and Dongliang Xu. \\emph{Turning Trash into Treasure: Accelerating Inference of Large Language Models with Token Recycling}. Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers), 2025; arXiv:2408.08696. \\url{https://aclanthology.org/2025.acl-long.338/}.",
+      "bibliography_text": "Xianzhen Luo, Yixuan Wang, Qingfu Zhu et al. \\emph{Turning Trash into Treasure: Accelerating Inference of Large Language Models with Token Recycling}. Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers), pp. 6816--6831, 2025. doi:10.18653/v1/2025.acl-long.338.",
       "urls": [
-        "https://aclanthology.org/2025.acl-long.338/"
+        "https://doi.org/10.18653/v1/2025.acl-long.338"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the ACL Anthology page and the arXiv abstract page (v3)). Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row tokenrecycling2024. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the ACL Anthology page and the arXiv abstract page (v3)). Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "sjd2025",
-      "bibliography_text": "Yao Teng, Han Shi, Xian Liu, Xuefei Ning, Guohao Dai, Yu Wang, Zhenguo Li and Xihui Liu. \\emph{Accelerating Auto-regressive Text-to-Image Generation with Training-free Speculative {Jacobi} Decoding}. International Conference on Learning Representations (ICLR), 2025; arXiv:2410.01699. \\url{https://arxiv.org/abs/2410.01699}.",
+      "bibliography_text": "Yao Teng, Han Shi, Xian Liu et al. \\emph{Accelerating Auto-Regressive Text-to-Image Generation with Training-Free Speculative Jacobi Decoding}. International Conference on Learning Representations (ICLR 2025), 2025. \\url{https://arxiv.org/abs/2410.01699v2}.",
       "urls": [
-        "https://arxiv.org/abs/2410.01699"
+        "https://arxiv.org/abs/2410.01699v2"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page; ICLR 2025 poster per OpenReview record LZfjxvqw0N). Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row sjd2025. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page; ICLR 2025 poster per OpenReview record LZfjxvqw0N). Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "so2026scd",
-      "bibliography_text": "Junhyuk So, Hyunho Kook, Chaeyeon Jang and Eunhyeok Park. \\emph{Speculative Coupled Decoding for Training-Free Lossless Acceleration of Autoregressive Visual Generation}. International Conference on Machine Learning (ICML), 2026; arXiv:2510.24211. \\url{https://arxiv.org/abs/2510.24211}.",
+      "bibliography_text": "Junhyuk So, Hyunho Kook, Chaeyeon Jang et al. \\emph{Speculative Coupled Decoding for Training-Free Lossless Acceleration of Autoregressive Visual Generation}. International Conference on Machine Learning (ICML 2026), 2026. \\url{https://arxiv.org/abs/2510.24211v2}. Version 1 of the arXiv preprint was titled ``MC-SJD: Maximal Coupling Speculative Jacobi Decoding for Autoregressive Visual Generation Acceleration''.",
       "urls": [
-        "https://arxiv.org/abs/2510.24211"
+        "https://arxiv.org/abs/2510.24211v2"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page; v1 was titled MC-SJD: Maximal Coupling Speculative Jacobi Decoding; ICML 2026 per the arXiv comment and OpenReview). Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row so2026scd. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page; v1 was titled MC-SJD: Maximal Coupling Speculative Jacobi Decoding; ICML 2026 per the arXiv comment and OpenReview). Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "deltacnn2022",
-      "bibliography_text": "Mathias Parger, Chengcheng Tang, Christopher D. Twigg, Cem Keskin, Robert Wang and Markus Steinberger. \\emph{{DeltaCNN}: End-to-End {CNN} Inference of Sparse Frame Differences in Videos}. Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), 2022; arXiv:2203.03996. \\url{https://openaccess.thecvf.com/content/CVPR2022/html/Parger_DeltaCNN_End-to-End_CNN_Inference_of_Sparse_Frame_Differences_in_Videos_CVPR_2022_paper.html}.",
+      "bibliography_text": "Mathias Parger, Chengcheng Tang, Christopher D. Twigg et al. \\emph{DeltaCNN: End-to-End CNN Inference of Sparse Frame Differences in Videos}. Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), pp. 12497--12506, 2022. \\url{https://openaccess.thecvf.com/content/CVPR2022/html/Parger_DeltaCNN_End-to-End_CNN_Inference_of_Sparse_Frame_Differences_in_Videos_CVPR_2022_paper.html}.",
       "urls": [
         "https://openaccess.thecvf.com/content/CVPR2022/html/Parger_DeltaCNN_End-to-End_CNN_Inference_of_Sparse_Frame_Differences_in_Videos_CVPR_2022_paper.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the CVF open access page). Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row deltacnn2022. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the CVF open access page). Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "eventful2023",
-      "bibliography_text": "Matthew Dutson, Yin Li and Mohit Gupta. \\emph{Eventful Transformers: Leveraging Temporal Redundancy in Vision Transformers}. Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV), 2023; arXiv:2308.13494. \\url{https://openaccess.thecvf.com/content/ICCV2023/html/Dutson_Eventful_Transformers_Leveraging_Temporal_Redundancy_in_Vision_Transformers_ICCV_2023_paper.html}.",
+      "bibliography_text": "Matthew Dutson, Yin Li, Mohit Gupta. \\emph{Eventful Transformers: Leveraging Temporal Redundancy in Vision Transformers}. Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV), pp. 16911--16923, 2023. \\url{https://openaccess.thecvf.com/content/ICCV2023/html/Dutson_Eventful_Transformers_Leveraging_Temporal_Redundancy_in_Vision_Transformers_ICCV_2023_paper.html}.",
       "urls": [
         "https://openaccess.thecvf.com/content/ICCV2023/html/Dutson_Eventful_Transformers_Leveraging_Temporal_Redundancy_in_Vision_Transformers_ICCV_2023_paper.html"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the CVF open access page). Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row eventful2023. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the CVF open access page). Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "cacheblend2025",
-      "bibliography_text": "Jiayi Yao, Hanchen Li, Yuhan Liu, Siddhant Ray, Yihua Cheng, Qizheng Zhang, Kuntai Du, Shan Lu and Junchen Jiang. \\emph{{CacheBlend}: Fast Large Language Model Serving for {RAG} with Cached Knowledge Fusion}. Proceedings of the Twentieth European Conference on Computer Systems (EuroSys '25), 2025; arXiv:2405.16444. \\url{https://doi.org/10.1145/3689031.3696098}.",
+      "bibliography_text": "Jiayi Yao, Hanchen Li, Yuhan Liu et al. \\emph{CacheBlend: Fast Large Language Model Serving for RAG with Cached Knowledge Fusion}. Proceedings of the Twentieth European Conference on Computer Systems (EuroSys '25), pp. 94--109, 2025. doi:10.1145/3689031.3696098.",
       "urls": [
         "https://doi.org/10.1145/3689031.3696098"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified via the Crossref record and the arXiv abstract page (v3)). Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row cacheblend2025. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified via the Crossref record and the arXiv abstract page (v3)). Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "specspec",
-      "bibliography_text": "Tanishq Kumar, Tri Dao and Avner May. \\emph{Speculative Speculative Decoding}. International Conference on Learning Representations (ICLR), 2026; arXiv:2603.03251. \\url{https://arxiv.org/abs/2603.03251}.",
+      "bibliography_text": "Tanishq Kumar, Tri Dao, Avner May. \\emph{Speculative Speculative Decoding}. International Conference on Learning Representations (ICLR 2026), 2026. \\url{https://arxiv.org/abs/2603.03251v3}.",
       "urls": [
-        "https://arxiv.org/abs/2603.03251"
+        "https://arxiv.org/abs/2603.03251v3"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page (v3); OpenReview record aL1Wnml9Ef, ICLR 2026 poster). Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row specspec. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page (v3); OpenReview record aL1Wnml9Ef, ICLR 2026 poster). Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "hspec2026",
-      "bibliography_text": "Weifan Jiang, Krishna Teja Chitty-Venkata, Megan Flynn, Reed Meyerson, Zhenting Qi, Tianyu Wu, Eldar Kurtic, Minlan Yu and Alexandre Marques. \\emph{{H-Spec}: Parallel Speculative Decoding Without a Drafter-Side {KV} Cache}. 2026; arXiv:2609.24197. \\url{https://arxiv.org/abs/2609.24197}.",
+      "bibliography_text": "Weifan Jiang, Krishna Teja Chitty-Venkata, Megan Flynn et al. \\emph{H-Spec: Parallel Speculative Decoding without a Drafter-Side KV Cache}. arXiv:2609.24197v1, 2026. \\url{https://arxiv.org/abs/2609.24197v1}.",
       "urls": [
-        "https://arxiv.org/abs/2609.24197"
+        "https://arxiv.org/abs/2609.24197v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page (v1)). Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row hspec2026. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page (v1)). Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "cure2026",
-      "bibliography_text": "Aofan Liu, Jingxiang Meng, Fangxin Liu and Yongbiao Chen. \\emph{{CURE}: Local Uncertainty Repair for Block-Parallel Speculative Decoding}. 2026; arXiv:2608.00531. \\url{https://arxiv.org/abs/2608.00531}.",
+      "bibliography_text": "Aofan Liu, Jingxiang Meng, Fangxin Liu et al. \\emph{CURE: Local Uncertainty Repair for Block-Parallel Speculative Decoding}. arXiv:2608.00531v1, 2026. \\url{https://arxiv.org/abs/2608.00531v1}.",
       "urls": [
-        "https://arxiv.org/abs/2608.00531"
+        "https://arxiv.org/abs/2608.00531v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page (v1)). Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row cure2026. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page (v1)). Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "card2025",
-      "bibliography_text": "Enyu Zhou, Kai Sheng, Hao Chen and Xin He. \\emph{{CARD}: A Cache-Assisted Parallel Speculative Decoding Framework via Query-and-Correct Paradigm for Accelerating {LLM} Inference}. 2025; arXiv:2508.04462. \\url{https://arxiv.org/abs/2508.04462}.",
+      "bibliography_text": "Enyu Zhou, Kai Sheng, Hao Chen et al. \\emph{CARD: A Cache-Assisted Parallel Speculative Decoding Framework via Query-and-Correct Paradigm for Accelerating LLM Inference}. arXiv:2508.04462v2, 2025. \\url{https://arxiv.org/abs/2508.04462v2}. Version 1 was titled ``CARD: Cache-Assisted Parallel Speculative Decoding for Efficient Large Language Model Inference''.",
       "urls": [
-        "https://arxiv.org/abs/2508.04462"
+        "https://arxiv.org/abs/2508.04462v2"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page (v2; v1 had a different title)). Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row card2025. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page (v2; v1 had a different title)). Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "retrace2026",
-      "bibliography_text": "Luxi Lin, Zhanpeng Zeng, Shuang Peng, Songwei Liu and Rongrong Ji. \\emph{{ReTrace}: Rejected-Trajectory Conditioning for Speculative Decoding}. 2026; arXiv:2608.29748. \\url{https://arxiv.org/abs/2608.29748}.",
+      "bibliography_text": "Luxi Lin, Zhanpeng Zeng, Shuang Peng et al. \\emph{ReTrace: Rejected-Trajectory Conditioning for Speculative Decoding}. arXiv:2608.29748v2, 2026. \\url{https://arxiv.org/abs/2608.29748v2}.",
       "urls": [
-        "https://arxiv.org/abs/2608.29748"
+        "https://arxiv.org/abs/2608.29748v2"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page (v2)). Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row retrace2026. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page (v2)). Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "carryover2026",
-      "bibliography_text": "Jahyun Koo, Sunghyeon Woo, Jaeeun Kil, Jeongtae Lee, Sungjae Lee, Kyomin Jung and Minsub Kim. \\emph{Carryover Drafting: Recycling Rejected States for Speculative Decoding}. 2026; arXiv:2609.14717. \\url{https://arxiv.org/abs/2609.14717}.",
+      "bibliography_text": "Jahyun Koo, Sunghyeon Woo, Jaeeun Kil et al. \\emph{Carryover Drafting: Recycling Rejected States for Speculative Decoding}. arXiv:2609.14717v1, 2026. \\url{https://arxiv.org/abs/2609.14717v1}.",
       "urls": [
-        "https://arxiv.org/abs/2609.14717"
+        "https://arxiv.org/abs/2609.14717v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page (v1)). Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row carryover2026. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page (v1)). Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "hu2026jacobiforcing",
-      "bibliography_text": "Lanxiang Hu, Siqi Kou, Yichao Fu, Samyam Rajbhandari, Tajana Rosing, Yuxiong He, Zhijie Deng and Hao Zhang. \\emph{Fast and Accurate Causal Parallel Decoding using {Jacobi} Forcing}. International Conference on Machine Learning (ICML), 2026; arXiv:2512.14681. \\url{https://arxiv.org/abs/2512.14681}.",
+      "bibliography_text": "Lanxiang Hu, Siqi Kou, Yichao Fu et al. \\emph{Fast and Accurate Causal Parallel Decoding Using Jacobi Forcing}. International Conference on Machine Learning (ICML 2026), 2026. \\url{https://arxiv.org/abs/2512.14681v1}.",
       "urls": [
-        "https://arxiv.org/abs/2512.14681"
+        "https://arxiv.org/abs/2512.14681v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page (v1); ICML 2026 per OpenReview record ORy2hyPd4G). Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row hu2026jacobiforcing. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: Verified on the arXiv abstract page (v1); ICML 2026 per OpenReview record ORy2hyPd4G). Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "dpace",
-      "bibliography_text": "Tianyu Wu, Yu Yao, Zhenting Qi, Han Zheng, Zhuohan Wang, Haoran Ma, Lawrence Liao, Himabindu Lakkaraju, Ju Li and Yilun Du. \\emph{{D-PACE}: Dynamic Position-Aware Cross-Entropy for Parallel Speculative Drafting}. 2026; arXiv:2605.18810. \\url{https://arxiv.org/abs/2605.18810v1}.",
+      "bibliography_text": "Tianyu Wu, Yu Yao, Zhenting Qi et al. \\emph{D-PACE: Dynamic Position-Aware Cross-Entropy for Parallel Speculative Drafting}. arXiv:2605.18810v1, 2026. \\url{https://arxiv.org/abs/2605.18810v1}.",
       "urls": [
         "https://arxiv.org/abs/2605.18810v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2605.18810v1, 12 May 2026). Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row dpace. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2605.18810v1, 12 May 2026). Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "pard2",
-      "bibliography_text": "Zihao An, Taichi Liu, Ziqiong Liu, Dong Li, Ruofeng Liu and Emad Barsoum. \\emph{{PARD-2}: Target-Aligned Parallel Draft Model for Dual-Mode Speculative Decoding}. 2026; arXiv:2605.08632. \\url{https://arxiv.org/abs/2605.08632v1}.",
+      "bibliography_text": "Zihao An, Taichi Liu, Ziqiong Liu et al. \\emph{PARD-2: Target-Aligned Parallel Draft Model for Dual-Mode Speculative Decoding}. arXiv:2605.08632v1, 2026. \\url{https://arxiv.org/abs/2605.08632v1}.",
       "urls": [
         "https://arxiv.org/abs/2605.08632v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2605.08632v1, 9 May 2026). Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row pard2. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2605.08632v1, 9 May 2026). Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "vat",
-      "bibliography_text": "Geonmo Gu, Byeongho Heo, HeeJae Jun, Yoohoon Kang, Sangmin Lee, Sangdoo Yun and Dongyoon Han. \\emph{Verification-Aware Training for Speculative Decoding}. 2026; arXiv:2608.30135. \\url{https://arxiv.org/abs/2608.30135v1}.",
+      "bibliography_text": "Geonmo Gu, Byeongho Heo, HeeJae Jun et al. \\emph{Verification-Aware Training for Speculative Decoding}. arXiv:2608.30135v1, 2026. \\url{https://arxiv.org/abs/2608.30135v1}.",
       "urls": [
         "https://arxiv.org/abs/2608.30135v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2608.30135v1, 31 Aug 2026). Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row vat. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2608.30135v1, 31 Aug 2026). Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "caddtree",
-      "bibliography_text": "Shuai Zhang, Huachuan Qiu, Hongliang He and Yong Dai. \\emph{Cost-Aware Diffusion Draft Trees for Speculative Decoding}. 2026; arXiv:2606.01813. \\url{https://arxiv.org/abs/2606.01813v1}.",
+      "bibliography_text": "Shuai Zhang, Huachuan Qiu, Hongliang He et al. \\emph{Cost-Aware Diffusion Draft Trees for Speculative Decoding}. arXiv:2606.01813v1, 2026. \\url{https://arxiv.org/abs/2606.01813v1}.",
       "urls": [
         "https://arxiv.org/abs/2606.01813v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2606.01813v1, 1 Jun 2026). Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row caddtree. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2606.01813v1, 1 Jun 2026). Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "tiger",
-      "bibliography_text": "Quynh Vo, Cong-Duy Nguyen, Ponhvoan Srey, Luu Anh Tuan and Thong Nguyen. \\emph{{TIGER}: Text-Conditioned Visual Gated Routing with Acceptance Alignment for Multimodal Speculative Decoding}. 2026; arXiv:2607.11131. \\url{https://arxiv.org/abs/2607.11131v1}.",
+      "bibliography_text": "Quynh Vo, Cong-Duy Nguyen, Ponhvoan Srey et al. \\emph{TIGER: Text-Conditioned Visual Gated Routing with Acceptance Alignment for Multimodal Speculative Decoding}. arXiv:2607.11131v1, 2026. \\url{https://arxiv.org/abs/2607.11131v1}.",
       "urls": [
         "https://arxiv.org/abs/2607.11131v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2607.11131v1, 13 Jul 2026). Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row tiger. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2607.11131v1, 13 Jul 2026). Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "vsd",
-      "bibliography_text": "Xiandong Zou, Jianshu Li, Jing Huang and Pan Zhou. \\emph{Variational Speculative Decoding: Rethinking Draft Training from Token Likelihood to Sequence Acceptance}. 2026; arXiv:2602.05774. \\url{https://arxiv.org/abs/2602.05774v6}.",
+      "bibliography_text": "Xiandong Zou, Jianshu Li, Jing Huang et al. \\emph{Variational Speculative Decoding: Rethinking Draft Training from Token Likelihood to Sequence Acceptance}. arXiv:2602.05774v6, 2026. \\url{https://arxiv.org/abs/2602.05774v6}.",
       "urls": [
         "https://arxiv.org/abs/2602.05774v6"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2602.05774v6, 12 Aug 2026 (v1 5 Feb 2026)). Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row vsd. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2602.05774v6, 12 Aug 2026 (v1 5 Feb 2026)). Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "bvloss",
-      "bibliography_text": "Suyoung Kim, Jahyun Koo, Hyeonjin Kim, Inhyeok Bang, Seunghyun Lee, Hyunjae Oh, Baeseong Park and Dongsoo Lee. \\emph{{BV} Loss: Block Verification-Aware Loss for Block Diffusion Speculative Decoding}. 2026; arXiv:2609.34832. \\url{https://arxiv.org/abs/2609.34832v1}.",
+      "bibliography_text": "Suyoung Kim, Jahyun Koo, Hyeonjin Kim et al. \\emph{BV Loss: Block Verification-Aware Loss for Block Diffusion Speculative Decoding}. arXiv:2609.34832v1, 2026. \\url{https://arxiv.org/abs/2609.34832v1}.",
       "urls": [
         "https://arxiv.org/abs/2609.34832v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2609.34832v1, 28 Sep 2026). Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row bvloss. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2609.34832v1, 28 Sep 2026). Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "aadt",
-      "bibliography_text": "Tianhua Xia, Mugilan Ganesan, Yifei Feng, Haiyu Wang, Maximilian Egger and Sai Qian Zhang. \\emph{Acceptance-Aware Draft Model Training for Speculative Decoding}. 2026; arXiv:2609.24150. \\url{https://arxiv.org/abs/2609.24150v1}.",
+      "bibliography_text": "Tianhua Xia, Mugilan Ganesan, Yifei Feng et al. \\emph{Acceptance-Aware Draft Model Training for Speculative Decoding}. arXiv:2609.24150v1, 2026. \\url{https://arxiv.org/abs/2609.24150v1}.",
       "urls": [
         "https://arxiv.org/abs/2609.24150v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2609.24150v1, 21 Sep 2026). Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row aadt. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2609.24150v1, 21 Sep 2026). Reported numbers are the authors' and were not reproduced."
     },
     {
       "key": "dblast",
-      "bibliography_text": "Amirmohammad Karimi, Chao Gao and Negar Hassanpour. \\emph{{DBLAST}: Dependent Block Drafting for Stochastic Speculative Decoding}. 2026; arXiv:2608.05448. \\url{https://arxiv.org/abs/2608.05448v1}.",
+      "bibliography_text": "Amirmohammad Karimi, Chao Gao, Negar Hassanpour. \\emph{DBLAST: Dependent Block Drafting for Stochastic Speculative Decoding}. arXiv:2608.05448v1, 2026. \\url{https://arxiv.org/abs/2608.05448v1}.",
       "urls": [
         "https://arxiv.org/abs/2608.05448v1"
       ],
-      "accessed": "2026-09-30",
+      "accessed": "2026-10-02",
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
-      "audit_note": "Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2608.05448v1, 5 Aug 2026). Reported numbers are the authors' and were not reproduced."
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row dblast. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry (its note: arXiv:2608.05448v1, 5 Aug 2026). Reported numbers are the authors' and were not reproduced."
+    },
+    {
+      "key": "sgdflashworker",
+      "bibliography_text": "SGLang contributors. \\emph{DFlash speculative worker (\\texttt{python/sglang/srt/speculative/dflash\\_worker\\_v2.py})}. Source code, commit \\texttt{bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824}, 2026. \\url{https://github.com/sgl-project/sglang/blob/bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824/python/sglang/srt/speculative/dflash_worker_v2.py}.",
+      "urls": [
+        "https://github.com/sgl-project/sglang/blob/bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824/python/sglang/srt/speculative/dflash_worker_v2.py"
+      ],
+      "accessed": "2026-10-02",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): added. python/sglang/srt/speculative/dflash_worker_v2.py at the pin bd66ce3 holds the DFlash worker cycle the notes describe (positions 1-15 to the target head, _commit_accept). See sources/citation_audit.md."
+    },
+    {
+      "key": "flashsamplingcode",
+      "bibliography_text": "FlashSampling contributors. \\emph{Fused matrix multiplication and Gumbel-max sampling kernel (\\texttt{src/fused\\_mm\\_sampling/core.py})}. Source code, commit \\texttt{6e376af5184d9d3a572755b5260c9c4368562828}, 2026. \\url{https://github.com/FlashSampling/FlashSampling/blob/6e376af5184d9d3a572755b5260c9c4368562828/src/fused_mm_sampling/core.py}.",
+      "urls": [
+        "https://github.com/FlashSampling/FlashSampling/blob/6e376af5184d9d3a572755b5260c9c4368562828/src/fused_mm_sampling/core.py"
+      ],
+      "accessed": "2026-10-02",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): added. src/fused_mm_sampling/core.py at 6e376af (25 Sep 2026, Apache-2.0), lines 589-596: tile_noise_offsets = (pid_v_c * num_pid_h + pid_h_c) * noise_size + noise_offsets, so a token's noise depends on the tiling; the paper (App. C) keys the RNG by logical position. See sources/citation_audit.md."
+    },
+    {
+      "key": "nsys",
+      "bibliography_text": "NVIDIA. \\emph{Nsight Systems User Guide}. Nsight Systems 2025.3 documentation, 2025. \\url{https://docs.nvidia.com/nsight-systems/2025.3/UserGuide/index.html}.",
+      "urls": [
+        "https://docs.nvidia.com/nsight-systems/2025.3/UserGuide/index.html"
+      ],
+      "accessed": "2026-10-02",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Citation audit 2 Oct 2026 (writing team): added; replaces nsight for the Nsight Systems tracing of app_stack.tex (the run used Nsight Systems 2025.3.2). The 2025.3 User Guide documents --cuda-graph-trace graph|node. See sources/citation_audit.md."
     }
   ],
-  "scope": "Public primary sources only. No confidential assignment text or downloaded third-party paper/code bodies redistributed. Entries added on 30 September 2026 come from the lit workstream's literature review; sglangsampler was added on 1 October 2026 after reading the pinned file; paper/references.bib holds the matching BibTeX.",
+  "scope": "Public primary sources only. No confidential assignment text or downloaded third-party paper/code bodies redistributed. Entries added on 30 September 2026 come from the lit workstream's literature review; sglangsampler was added on 1 October 2026 after reading the pinned file; paper/references.bib holds the matching BibTeX. On 2 October 2026 the writing team rechecked every entry the paper and the research notes cite, and every citing sentence (sources/citation_audit.md); nsys, flashsamplingcode and sgdflashworker were added.",
   "limitations": [
     "This is a targeted prior-art audit, not proof of novelty or completeness.",
     "Model/deployment revisions remain unresolved until the GPU experiment.",
     "Integration paths inherited from v2 are candidate seams unless separately marked as directly read.",
     "Third-party performance numbers are not reproduced or credited to this artifact.",
-    "Citation audit of 30 September 2026: every original entry exists; corrections and required text changes are in sources/citation_audit.md.",
+    "Citation audit of 30 September 2026: every original entry exists; corrections and required text changes are in sources/citation_audit.md. The audit of 2 October 2026 covers every entry the paper and the notes cite (sources/citation_audit.md); Gumbel (1954) could not be read and is no longer cited.",
     "Numbers reported in GitHub issues, pull requests and blogs are the authors' own and were not reproduced.",
     "Novelty verdicts in sources/literature_review.md reflect searches up to 30 September 2026; the shared web-search budget ran out, so coverage of very recent work and of GitHub code is incomplete."
   ]
