@@ -135,9 +135,20 @@ gain. At M >= 64 the FP32 copy and the argmax, each re-reading an M x 248320 ten
 add 22-50% on top of the GEMM. Cold L2 (a 256 MB read-only reduction inside the graph
 before the timed work, its own time subtracted) changes the GEMM by under 2 us because
 the 1.27 GB weight is 21 times the 60 MB L2. The M = 128 and M = 256 medians sit
-10-15% above their p10, which we attribute to clock or power variation under sustained
-back-to-back replays; the rerun with clock logging is pending
-(`microbench_clocks.json`).
+10-15% above their p10 (warm L2).
+
+A rerun on 2026-10-01 with the SM clock and board power sampled every 100 ms
+(`microbench_rerun/`, measured) reproduces every GEMM median of the table within 1.2 us
+(0.3%) and both read peaks within 0.4% (3.833 and 3.805 TB/s). The numbers above stay
+those of the first run, which the paper cites. The clock log shows why the large-M
+rows spread: the SM clock holds 1980 MHz for the first 30 s of the 44 s run and then
+drops to 1305-1965 MHz for the last 14 s, at 458-691 W of board power
+(`microbench_rerun/microbench_clocks.json`, `throttled`), while the memory clock stays
+at 2619 MHz throughout. The rows run in increasing M, so the throttled samples fall on
+the largest M; at M = 256 the GEMM does 2 x 256 x 2560 x 248320 = 325 GFLOP in 570 us
+(571 TFLOP/s, derived), so it is no longer purely bound by memory and its time follows
+the SM clock. The log has no per-row timestamps, so this assignment rests on the order
+of the rows.
 
 ### Plain decode attribution (`attribution/plain_bs*.json`, measured)
 
@@ -196,9 +207,12 @@ running request's 24 x 2 MiB state once per step: 100.7 MB per request per step.
 | Logits traffic | 0.10 GB | 0.38 GB |
 | Total | 12.5 GB | 23.7 GB |
 
-The recurrent kernel's time is linear in batch (28.9 us per request per step), and the
-implied 3.47-3.48 TB/s shows it streams the state exactly once each way at 92% of the
-read peak. State bytes equal weight bytes (8.41 GB) at **B = 84** (derived). In time the
+The recurrent kernel's time is linear in batch from B = 32 to 128 (28.9 us per request
+per step), which implies 3.47-3.48 TB/s if every state byte reached DRAM during the
+kernel. Nsight Compute shows that it does not: at B = 32, 27 MB of the 67 MB the
+kernel writes are still in L2 when it ends, and DRAM runs at 2.68 TB/s during the
+launch, so the implied figure overstates the kernel's DRAM rate (see "Bandwidth- or
+latency-bound?" below). State bytes equal weight bytes (8.41 GB) at **B = 84** (derived). In time the
 crossover is later, near B = 110-120, because the weight GEMMs run below the peak; at
 B = 128 the recurrent kernel (3.70 ms wall) already exceeds all weight GEMMs together,
 head included (3.47 ms).
@@ -276,8 +290,10 @@ Without the profiler the idle time shrinks, mainly because `cudaGraphLaunch` cos
 about 350 us per call under node-level tracing: subtracting the traced GPU-busy time
 (5.27, 6.62 and 10.62 ms) from the cycle measured with no profiler attached (6.70, 8.27
 and 12.49 ms) leaves about 1.4, 1.7 and 1.9 ms per cycle (21%, 20%, 15%). This combines
-two measurements (derived); the graph-level-trace calibration
-(`diagnostics/graph_level_trace.json`, pending) measures it in one.
+two measurements (derived). For a related MTP arm (the bench's tuned arm: ReplaySSM verify,
+radix cache off), the hostgap workstream's traced and untraced servers in one session give
+1.44-1.67 ms per cycle at B = 1-32 (`evidence/hostgap/README.md`), the same size; the
+graph-level-trace calibration planned here was dropped.
 
 **Recurrent state in verification** (derived from the code path, checked against the
 trace): the verify kernel `fused_sigmoid_gating_delta_rule_update_kernel` runs with
@@ -290,6 +306,84 @@ plain step. At B = 32 the verify kernel (2.54 ms, 3.2 TB/s implied) and the comm
 fewer bytes per output token than plain decode at small batch, but the advantage shrinks
 with batch and disappears near B = 256 (`bytes_per_step_sweep.csv`, context 700,
 acceptance 2.8).
+
+### Bandwidth- or latency-bound? The head GEMM and the GDN kernels (`kernel_bandwidth.csv`, measured)
+
+Three measurements answer this. They count bytes differently, and the difference matters
+for the write-heavy GDN kernels:
+
+- **Nsight Compute** (`run_ncu.sh`; `ncu_key_kernels.json`) profiles one launch of each
+  kernel in its standalone driver, with caches flushed and clocks free. It reports the
+  DRAM bytes that move during the launch and the throughput against its own DRAM peak,
+  1,536 bytes per DRAM cycle at 2.619 GHz = 4.02 TB/s. Its durations come from a
+  serialised replay, so they are profiler timings, not served times.
+- **The serving traces** above give each kernel's served duration (mean per call). A
+  launch ends with part of its writes still dirty in L2; they reach DRAM during the
+  following kernels.
+- **The GDN kernel bench** (`gdn_kernel_bench.py`; `gdn_kernel_bench.json`) replays one
+  layer under CUDA graphs and reads 256 MB before each launch to evict L2, subtracting the
+  read's own time. The eviction also writes back the lines the previous launch left
+  dirty, so its times include every byte the kernel writes.
+
+`kernel_bandwidth.csv` puts the four sources side by side. Bytes there are the modelled
+traffic (head: weight, activations and BF16 logits; GDN: the FP32 state read and written),
+except in ncu rows, which carry the DRAM bytes ncu counted. "Read peak" is the 3.79 TB/s
+measured over the head's footprint. A kernel's regime is read from its ncu launch by the
+rule of Nsight Compute's speed-of-light analysis: bandwidth-bound when DRAM throughput
+reaches 80% of peak; latency-bound when neither memory nor SM throughput reaches 70% and
+warps mostly wait on memory (`long_scoreboard`).
+
+| ncu launch | DRAM bytes | Duration (ncu) | DRAM TB/s (% of ncu peak) | SM throughput | Occupancy achieved / theoretical | Regime |
+|---|---|---|---|---|---|---|
+| Head GEMM, M = 1 (`nvjet_sm90_tst_512x8_64x3_2x1_v_bz_TNT`) | 1.274 GB | 353.4 us | 3.61 (89.6%) | 4.5% | 14.7% / 18.8% | bandwidth |
+| Head GEMM, M = 32 (`nvjet_sm90_tst_384x32_64x4_2x1_v_bz_TNT`) | 1.289 GB | 364.8 us | 3.53 (87.8%) | 11.9% | 14.7% / 18.8% | bandwidth |
+| GDN decode, B = 32 | 107.7 MB | 40.3 us | 2.68 (66.6%) | 18.8% | 11.0% / 12.5% | latency |
+| GDN verify, B = 8 (four states saved per request) | 57.7 MB | 26.7 us | 2.16 (53.8%) | 50.7% | 42.1% / 50.0% | latency |
+
+| TB/s by batch (modelled bytes / time) | B = 1 | 8 | 32 | 128 |
+|---|---|---|---|---|
+| Head GEMM, served (M = B) | 3.62 | 3.58 | 3.59 | 3.48 |
+| GDN decode, served | 0.81 | 2.94 | 3.47 | 3.48 |
+| GDN decode, bench (every write counted) | 0.61 | 1.86 | 2.73 | 3.30 |
+| GDN verify, served (MTP, four positions per request) | 1.22 | 2.90 | 2.87 | - |
+| GDN verify, bench | 0.98 | 2.41 | 3.00 | 3.10 |
+| GDN verify without the saves, bench | 0.15 | 0.87 | 0.98 | 1.18 |
+
+**The head GEMM is bandwidth-bound** at every row count served here. Under ncu it reads
+1.27 GB, the weight itself (L2 hit rate 3-6%), at 88-90% of the DRAM peak, while the SM
+throughput is 4.5-12% and the tensor pipe is busy 3% of the time. Its served time gives
+3.48-3.62 TB/s (92-96% of the read peak) up to M = 128. The rate falls clearly only at
+M = 256, which runs in the microbenchmark alone (2.46 TB/s), as the arithmetic grows. The
+microbenchmark's M = 128 median (398 us, 3.35 TB/s) is slower than the served M = 128
+launch (384 us), which fits the clock throttling in that part of the sweep (see the clock
+log above).
+
+**The GDN decode kernel is latency-bound up to at least B = 32.** At B = 32 the launch
+moves 107.7 MB in 40.3 us: the 67.7 MB state read and 40.1 of the 67.1 MB it writes, so
+27 MB of its writes are still in L2 when it ends. DRAM runs at 67% of peak and the SMs at
+19%. Each one-warp block holds a 32 x 128 FP32 state tile in 205 registers per thread,
+which limits an SM to 8 resident blocks (12.5% theoretical occupancy), and those warps
+mostly wait on memory. At B = 1 the launch has only 128 such blocks for 132 SMs (0.61 TB/s
+in the bench, 0.81 TB/s served). One full wave is 132 x 8 = 1,056 blocks, or 8.25
+requests, so from B = 32 on every launch runs at the same occupancy, and the served time
+per request is the same at B = 32 and 128 (1.21 and 1.20 us per layer). At B = 128 that
+rate puts DRAM at about 82% of peak (derived: 537 MB less the ~27 MB left in L2, in
+154 us), close to the bandwidth limit. That is consistent with the bench, which counts
+every write and gives 3.30 TB/s at B = 128, 87% of the read peak and above the 2.60 TB/s
+of PyTorch's device-to-device copy. No ncu run at B = 128 classifies it directly.
+
+**The GDN verify kernel is latency-bound at B = 8.** The launch reads the 17.3 MB of
+state and writes 40.4 of the 67.1 MB of per-position states before it ends, at 54% of the
+DRAM peak and 51% SM throughput. The served verify kernel at B = 32 (116.8 us per layer)
+agrees with the bench (111.9 us, 3.00 TB/s with every write counted). Without the saves,
+the kernel only reads the state and runs at 0.15-1.18 TB/s, so the saves multiply its
+traffic by five and lengthen it by 63-89% at B = 8-128. Below B = 128 that comparison
+mixes in a second change: SGLang gives target verify with up to 64 requests a 4-wide
+value tile on SM90 and every other launch a 32-wide one
+(`_select_recurrent_launch_config` in `fused_sigmoid_gating_recurrent.py`), which is why
+at B = 1 the launch without saves is the slower one (14.1 against 10.7 us). At B = 128
+both use the 32-wide tile, and the saves add 204 us to 228 us per layer (+89%), about
+4.9 ms over the 24 GDN layers of one verify forward (derived).
 
 ## Ranked stack-wide opportunities
 
@@ -356,8 +450,15 @@ plain step (`p5_layer0_in_proj.json`).
   which differs from the committed `run_profiles.py` only in not passing
   `--cuda-flush-interval` and in writing no `repo_sha`/`nsys_version` to
   `windows/plain_nsys_meta.json` (the SGLang SHA and server command are recorded). Their
-  eager-kernel records are complete (checked against launch calls). A rerun with the
-  committed code is queued and will replace them in a follow-up.
+  eager-kernel records are complete (checked against launch calls). On 2026-10-01 the
+  same four configurations were traced again with the committed driver (repository
+  0aec3e0, recorded in `windows/plain_nsys_rerun_meta.json`; foreign CPU load 0.24-0.50
+  cores). Attributed with the same code (`attribution/plain_rerun/`), the rerun gives
+  the same step time within 0.4%, the same head share within 0.03 percentage points and
+  every kernel component within 1.8% at every batch size; only the GPU idle time, 144-160
+  us per step, moves by up to 16 us (`plain_rerun_check.csv`). The plain
+  numbers in this README and in the paper stay those of the first traces, which
+  `analyze_all.sh` reads from `~/vp-data/profile/plain_nsys_v0/`.
 - **Workload.** Greedy decoding of essay-style prompts at contexts under 1000 tokens.
   Attention and KV shares grow with context, and MTP acceptance depends on the text.
 - **Microbenchmark versus serving.** The head microbenchmark isolates the head; its
@@ -368,7 +469,7 @@ plain step (`p5_layer0_in_proj.json`).
 ```sh
 # GPU runs (each step takes its own exclusive lock; raw data to ~/vp-data/profile):
 experiments/profiling/run_all.sh plain mtp baseline host dflash
-experiments/profiling/run_all.sh microbench gdn ncu startprofile graphtrace eager
+experiments/profiling/run_all.sh microbench gdn ncu
 # Analysis (CPU only) regenerates every file here from the raw runs:
 experiments/profiling/analyze_all.sh
 ```
@@ -398,8 +499,23 @@ python experiments/profiling/attribute.py ~/vp-data/profile/mtp_nsys/mtp_bs8.nsy
 | `label_structure_check.json` | per-replay GEMM label counts and kernel configurations against the model's structure | `check_labels.py` | measured |
 | `diagnostics/host_gaps_*.json`, `diagnostics/pyspy_*.json` | host functions during GPU idle time; scheduler CPU samples | `host_gaps.py`, `pyspy_summary.py` on `run_all.sh host` | diagnostic |
 | `windows/<run>.jsonl`, `_meta.json`, `_server_startup.log` | client window records (with host load), server commands, startup logs | `run_profiles.py`, `collect_run.py` | measured |
+| `ncu_key_kernels.json` | one Nsight Compute launch each of the head GEMM (M = 1, 32), the GDN decode kernel (B = 32) and the GDN verify kernel (B = 8): DRAM bytes, throughput against ncu's DRAM peak, SM throughput, occupancy, stalls | `run_ncu.sh` (`ncu_summary.py`) | measured (profiler timings) |
+| `gdn_kernel_bench.json` | one GDN layer's decode, verify and verify-without-saves kernels at B = 1-128 under CUDA graphs, L2 evicted | `run_all.sh gdn` (`gdn_kernel_bench.py`) | measured |
+| `kernel_bandwidth.csv` | achieved bandwidth of the head GEMM and the GDN kernels by batch and source (microbenchmark, GDN bench, serving traces, ncu), with the ncu regime | `kernel_bandwidth.py` | measured; regime by rule |
+| `microbench_rerun/` | 2026-10-01 rerun of `run_microbench.sh` with the clock log: `hbm_bandwidth.json`, `head_microbench.json`, `microbench_clocks.csv` (nvidia-smi, 100 ms), `microbench_clocks.json` | `run_all.sh microbench` (`clock_summary.py`) | measured; reproduction check |
+| `attribution/plain_rerun/plain_bs<B>.json`, `plain_rerun_check.csv` | attribution of the 2026-10-01 plain traces and its comparison with the cited ones | `attribute.py`, `compare_attribution.py` | measured; reproduction check |
 
-Pending (queued GPU runs, follow-up PR): regenerated plain traces from the committed code,
-`label_validation.json` (GEMM labels against module NVTX ranges in an eager run),
-`gdn_kernel_bench.json`, `ncu_key_kernels.json`, `microbench_clocks.json`, the DFlash
-attribution, the `/start_profile` comparison and `diagnostics/graph_level_trace.json`.
+The `gdn`, `ncu` and `microbench` steps ran in one exclusive hold that ended on
+2026-10-01 at 11:25 UTC, from repository 0aec3e0 (SGLang `bd66ce34`, Nsight Compute 2025.3.1); the
+plain rerun ran at 02:44 UTC from the same commit. The microbenchmark step writes into
+`evidence/profiles/` directly, so its rerun outputs were moved to `microbench_rerun/` to
+keep the cited files. `ncu_key_kernels.json` was regenerated from the same reports after
+the fix to `ncu_summary.py`'s duration units (the hold's copy had `dram_tb_per_s` 10^12
+too small).
+
+Pending: the DFlash attribution (`run_all.sh dflash`, the two tuned DFlash arms of
+`bench/arms.toml` at c = 1, 4, 16 and 64, queued). Dropped, because nothing in the paper
+depends on them: the `/start_profile` comparison, `diagnostics/graph_level_trace.json`
+(the hostgap workstream measured the MTP cycle's idle time traced and untraced) and
+`label_validation.json` (the eager run; `label_structure_check.json` checks the GEMM labels
+against the model's structure instead).

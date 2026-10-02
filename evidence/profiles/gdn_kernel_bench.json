@@ -1,0 +1,123 @@
+{
+  "gpu": "NVIDIA GH200 480GB",
+  "layer_shapes": {
+    "H": 16,
+    "HV": 32,
+    "K": 128,
+    "V": 128,
+    "state_dtype": "float32"
+  },
+  "draft_tokens": 4,
+  "l2_evict_reduction_us_median": 79.40640151500702,
+  "note": "per GDN layer; Qwen3.5-4B has 24 GDN layers per forward",
+  "rows": [
+    {
+      "mode": "decode",
+      "batch": 1,
+      "median_us": 6.869596242904663,
+      "p10_us": 6.755200028419495,
+      "p90_us": 6.958398222923279,
+      "state_bytes": 4194304,
+      "state_tb_per_s": 0.6105604829879387
+    },
+    {
+      "mode": "decode",
+      "batch": 8,
+      "median_us": 18.07119846343994,
+      "p10_us": 17.91999638080597,
+      "p90_us": 18.28159987926483,
+      "state_bytes": 33554432,
+      "state_tb_per_s": 1.8567906311185933
+    },
+    {
+      "mode": "decode",
+      "batch": 32,
+      "median_us": 49.17519390583038,
+      "p10_us": 49.02719557285309,
+      "p90_us": 49.39359724521637,
+      "state_bytes": 134217728,
+      "state_tb_per_s": 2.72937872409867
+    },
+    {
+      "mode": "decode",
+      "batch": 128,
+      "median_us": 162.79039680957794,
+      "p10_us": 162.55359947681427,
+      "p90_us": 163.00480663776398,
+      "state_bytes": 536870912,
+      "state_tb_per_s": 3.297927411701061
+    },
+    {
+      "mode": "verify",
+      "batch": 1,
+      "median_us": 10.717597603797913,
+      "p10_us": 10.614398121833801,
+      "p90_us": 10.900798439979553,
+      "state_bytes": 10485760,
+      "state_tb_per_s": 0.978368510148603
+    },
+    {
+      "mode": "verify",
+      "batch": 8,
+      "median_us": 34.85199511051178,
+      "p10_us": 34.71199572086334,
+      "p90_us": 35.182395577430725,
+      "state_bytes": 83886080,
+      "state_tb_per_s": 2.4069233263119263
+    },
+    {
+      "mode": "verify",
+      "batch": 32,
+      "median_us": 111.940798163414,
+      "p10_us": 111.70560419559479,
+      "p90_us": 112.24159300327301,
+      "state_bytes": 335544320,
+      "state_tb_per_s": 2.9975158789752774
+    },
+    {
+      "mode": "verify",
+      "batch": 128,
+      "median_us": 432.43360817432404,
+      "p10_us": 432.06081688404083,
+      "p90_us": 432.7744036912918,
+      "state_bytes": 1342177280,
+      "state_tb_per_s": 3.1037765211323194
+    },
+    {
+      "mode": "verify_nosave",
+      "batch": 1,
+      "median_us": 14.124000072479248,
+      "p10_us": 14.003196358680725,
+      "p90_us": 14.260795712471008,
+      "state_bytes": 2097152,
+      "state_tb_per_s": 0.14848144925220733
+    },
+    {
+      "mode": "verify_nosave",
+      "batch": 8,
+      "median_us": 19.338396191596985,
+      "p10_us": 19.016000628471375,
+      "p90_us": 19.468799233436584,
+      "state_bytes": 16777216,
+      "state_tb_per_s": 0.867559844869148
+    },
+    {
+      "mode": "verify_nosave",
+      "batch": 32,
+      "median_us": 68.51679980754852,
+      "p10_us": 68.35840046405792,
+      "p90_us": 68.86719763278961,
+      "state_bytes": 67108864,
+      "state_tb_per_s": 0.9794512322305893
+    },
+    {
+      "mode": "verify_nosave",
+      "batch": 128,
+      "median_us": 228.37359011173248,
+      "p10_us": 227.83038914203644,
+      "p90_us": 229.0319949388504,
+      "state_bytes": 268435456,
+      "state_tb_per_s": 1.1754224990230575
+    }
+  ]
+}
