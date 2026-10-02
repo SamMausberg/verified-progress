@@ -371,7 +371,7 @@ cycle. "Head chains" adds the verify head and the draft head.
 | Acceptance, small eager kernels, copies | 91 (1.1%) | 91 (1.0%) | 92 (0.5%) | 161 (0.3%) |
 | GPU gaps inside graph replays | 152 (1.9%) | 157 (1.7%) | 163 (1.0%) | 531 (1.0%) |
 | GPU idle outside graph replays (host gap, traced) | 117 (1.5%) | 116 (1.3%) | 119 (0.7%) | 114 (0.2%) |
-| **Head chains, share of the traced / untraced cycle** | **9.5% / 9.3%** | **9.1% / 8.6%** | **7.6% / 7.3%** | **8.6% / 8.4%** |
+| **Head chains, share of the traced / untraced cycle (untraced: derived)** | **9.5% / 9.3%** | **9.1% / 8.6%** | **7.6% / 7.3%** | **8.6% / 8.4%** |
 | Ceiling 1 / (1 - f) for the head chains, untraced f (derived) | 1.103x | 1.095x | 1.079x | 1.091x |
 | Untraced cycle minus traced GPU work, ms (derived) | 0.30 | 0.58 | 0.85 | 1.56 |
 | Traced cycle / cycle estimate on the same window | 0.947 | 0.994 | 0.986 | 1.010 |
@@ -396,7 +396,7 @@ cycle. "Head chains" adds the verify head and the draft head.
 | Acceptance, small eager kernels, copies | 73 (1.1%) | 73 (0.9%) | 76 (0.7%) | 119 (0.5%) |
 | GPU gaps inside graph replays | 157 (2.3%) | 52 (0.7%) | 164 (1.5%) | 408 (1.6%) |
 | GPU idle outside graph replays (host gap, traced) | 1814 (26.2%) | 1852 (23.9%) | 1637 (15.0%) | 999 (3.9%) |
-| **Head chains, share of the traced / untraced cycle** | **10.7% / 12.8%** | **10.0% / 11.3%** | **8.9% / 8.5%** | **9.5% / 9.6%** |
+| **Head chains, share of the traced / untraced cycle (untraced: derived)** | **10.7% / 12.8%** | **10.0% / 11.3%** | **8.9% / 8.5%** | **9.5% / 9.6%** |
 | Ceiling 1 / (1 - f) for the head chains, untraced f (derived) | 1.147x | 1.128x | 1.093x | 1.107x |
 | Untraced cycle minus traced GPU work, ms (derived) | 0.66 | 0.97 | 2.11 | 0.52 |
 | Traced cycle / cycle estimate on the same window | 1.012 | 0.990 | 0.947 | 1.008 |
@@ -431,19 +431,19 @@ on block 8; the drafter's KV projection after each verify takes at most 1%.
 
 **The head's share.** The two head chains take 9.5% of the traced `dflash-tuned-b16`
 cycle at c = 1, split evenly between the verify head (16 rows) and the draft head (15 rows),
-each a 360 us GEMM that streams the weight once. Over the untraced cycle that is 9.3%, so
+each a 360 us GEMM that streams the weight once. Over the untraced cycle, itself an estimate, that is 9.3% (derived), so
 removing both heads entirely could make the cycle at most 1.103x faster at c = 1 (derived;
 1.079-1.095x at c = 4-64), and a head that read half the weight bytes at the same bandwidth at
 most 1/(1 - 0.093/2) = 1.049x (derived). The shares are similar on `dflash-tuned` (8.5-12.8% of
-the untraced cycle). At c = 64 the head GEMMs run over 1,024 and 960 rows on block 16 (1,613 and
+the untraced cycle; derived). At c = 64 the head GEMMs run over 1,024 and 960 rows on block 16 (1,613 and
 1,491 us), and the FP32 copy and argmax over the verify logits grow with them, so the head
 there is no longer one pass over the weight.
 
 **Host gap on the tuned arms.** The two arms differ.
 
-- `dflash-tuned-b16` has none. With Triton attention nothing is planned on the host, and the
-  host issues each graph launch 6.0-55 ms before the GPU starts it, a full cycle ahead, as in
-  plain decoding. The GPU is busy 96.6-98.8% of the traced cycle and idles 114-119 us per cycle
+- `dflash-tuned-b16` has none. With Triton attention nothing is planned on the host (from reading the code), and
+  the host issues each graph launch 6.0-55 ms before the GPU starts it, 0.75-1.06 of a cycle
+  ahead, as in plain decoding. The GPU is busy 96.6-98.8% of the traced cycle and idles 114-119 us per cycle
   outside graph replays even with tracing slowing the host. The untraced cycle minus the traced
   GPU work (0.30-1.56 ms) cannot be host idle when the host runs a cycle ahead. It is consistent
   with the attention work the untraced windows' longer contexts add on this arm (at c = 1,
@@ -459,7 +459,7 @@ there is no longer one pass over the weight.
   (2.11 ms) exceeds the traced gap, which tracing can only lengthen: the estimator read 5.6%
   high on the traced server's collected window at that concurrency, and an error of that size
   (0.64 ms) covers the excess. Either way the gap is smaller than the 1.36-1.46 ms per cycle
-  that `evidence/hostgap/README.md` measured on the untuned block-8 arm with FlashInfer
+  that `evidence/hostgap/README.md` estimated on the untuned block-8 arm with FlashInfer
   drafting, but it remains.
 
 **Profiler perturbation.** `dflash-tuned-b16` is GPU-bound: its traced cycle is 2.2-4.8%
@@ -632,11 +632,11 @@ plain step (`p5_layer0_in_proj.json`).
 
 On the tuned DFlash arms (section above; same convention, f from the traced cycle unless
 marked): the GDN verify kernel and the commit take 40% (`dflash-tuned-b16`) and 45%
-(`dflash-tuned`) of the cycle at c = 64 (ceilings 1.67x and 1.81x); `dflash-tuned-b16`'s
+(`dflash-tuned`) of the cycle at c = 64 (ceilings 1.67x and 1.80x); `dflash-tuned-b16`'s
 Triton attention takes 30% at c = 1 and 14% at c = 64 (1.43x, 1.17x; a faster attention
 kernel recovers part of it, not all); `dflash-tuned`'s host gap is at most 11-14% of the
 untraced cycle at c = 1-4 (derived, at most 1.13-1.17x); the head chains take 7.3-12.8% of the
-untraced cycle (1.08-1.15x).
+untraced cycle (derived; 1.08-1.15x).
 
 ## Caveats
 
@@ -669,8 +669,8 @@ untraced cycle (1.08-1.15x).
   0.9991-0.9996 then); the plain, MTP and plain-rerun attributions were regenerated with the
   corrected check, which changed only that field, added `eager_launch_calls_after_collection`
   and filled `host_sync_calls` for plain B = 8 and 32 (absent before); every category and
-  kernel row is unchanged. On `dflash-tuned-b16`, whose host runs a cycle ahead, 42-77
-  launches per window fall after collection.
+  kernel row is unchanged. On `dflash-tuned-b16`, whose host runs up to a cycle ahead, 42-77
+  launches per window fall after collection, and on `dflash-tuned` at c = 64, 8.
 - **py-spy.** The sampler hung on the traced scheduler for the MTP B = 8 host-trace
   window (the driver now bounds the wait), so py-spy summaries exist for B = 1 and 32
   only; the NVTX host-gap attribution covers all three.
