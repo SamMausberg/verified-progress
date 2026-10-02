@@ -131,8 +131,7 @@ def read_target(model: Any, target: dict[str, Any], device: str) -> dict[str, An
             ids = torch.tensor([prompt + output[:end]], device=device)
             logits = model(input_ids=ids, use_cache=False).logits[0]
             paths[f'prefill_{n + end}'] = {
-                str(p): entry(logits[n + p - 1], output[p], track)
-                for p in range(first, min(end, pos + 1))
+                str(p): entry(logits[n + p - 1], output[p], track) for p in range(first, pos + 1)
             }
         ids = torch.tensor([prompt + output[:pos]], device=device)
         step = model(input_ids=ids[:, : n + first], use_cache=True)
@@ -198,7 +197,7 @@ def run(targets: Path, out: Path, dtype: str, device: str, state_dtype: str) -> 
             ),
         )
     try:
-        import fla  # type: ignore[import-not-found]
+        import fla
 
         fla_version = getattr(fla, '__version__', 'unknown')
     except ImportError:
