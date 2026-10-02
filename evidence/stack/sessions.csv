@@ -1,0 +1,73 @@
+arm,c,session,launches,x_e2e,y,accept_length,exactness
+S0,1,stack-s1,2,981.08,868.64,5.701,stock
+S0,1,stack-s2,2,981.59,869.19,5.701,stock
+S0,1,stack-s3,2,982.96,870.05,5.701,stock
+S0,2,stack-s1,2,871.95,1502.3,5.693,stock
+S0,2,stack-s2,2,873.12,1503.94,5.693,stock
+S0,2,stack-s3,2,875.11,1507.42,5.693,stock
+S0,4,stack-s1,2,707.72,2416.04,5.682,stock
+S0,4,stack-s2,2,708.97,2419.92,5.682,stock
+S0,4,stack-s3,2,711.16,2426.88,5.682,stock
+S0,8,stack-s1,2,527.5,3486.09,5.766,stock
+S0,8,stack-s2,2,528.48,3492.57,5.766,stock
+S0,8,stack-s3,2,530.41,3504.47,5.766,stock
+B0,1,stack-s1,1,979.01,867.15,5.701,bitwise to S0
+B0,1,stack-s2,1,981.15,868.62,5.701,bitwise to S0
+B0,1,stack-s3,1,983.44,870.16,5.701,bitwise to S0
+B0,2,stack-s1,1,869.15,1497.88,5.693,bitwise to S0
+B0,2,stack-s2,1,872.89,1503.63,5.693,bitwise to S0
+B0,2,stack-s3,1,873.92,1505.3,5.693,bitwise to S0
+B0,4,stack-s1,1,704.61,2405.83,5.682,bitwise to S0
+B0,4,stack-s2,1,711.53,2427.86,5.682,bitwise to S0
+B0,4,stack-s3,1,710.52,2424.96,5.682,bitwise to S0
+B0,8,stack-s1,1,521.97,3451.15,5.766,bitwise to S0
+B0,8,stack-s2,1,527.75,3487.93,5.766,bitwise to S0
+B0,8,stack-s3,1,528.47,3493.94,5.766,bitwise to S0
+F,1,stack-s1,1,950.77,842.75,5.701,bitwise to B0
+F,1,stack-s2,1,953.81,844.74,5.701,bitwise to B0
+F,1,stack-s3,1,953.5,844.95,5.701,bitwise to B0
+F,2,stack-s1,1,859.68,1481.12,5.693,bitwise to B0
+F,2,stack-s2,1,862.54,1485.55,5.693,bitwise to B0
+F,2,stack-s3,1,862.92,1486.44,5.693,bitwise to B0
+F,4,stack-s1,1,712.99,2431.11,5.682,bitwise to B0
+F,4,stack-s2,1,717.39,2445.09,5.682,bitwise to B0
+F,4,stack-s3,1,715.98,2440.91,5.682,bitwise to B0
+F,8,stack-s1,1,565.96,3723.12,5.766,bitwise to B0
+F,8,stack-s2,1,568.93,3740.07,5.766,bitwise to B0
+F,8,stack-s3,1,567.42,3731.86,5.766,bitwise to B0
+G,1,stack-s1,1,991.83,883.03,5.743,exact-up-to-rounding
+G,1,stack-s2,1,988.52,880.11,5.743,exact-up-to-rounding
+G,1,stack-s3,1,991.01,882.5,5.743,exact-up-to-rounding
+G,2,stack-s1,1,862.99,1498.57,5.671,exact-up-to-rounding
+G,2,stack-s2,1,862.56,1497.28,5.671,exact-up-to-rounding
+G,2,stack-s3,1,864.14,1500.09,5.671,exact-up-to-rounding
+G,4,stack-s1,1,719.71,2458.46,5.685,exact-up-to-rounding
+G,4,stack-s2,1,719.13,2456.36,5.685,exact-up-to-rounding
+G,4,stack-s3,1,724.34,2473.29,5.685,exact-up-to-rounding
+G,8,stack-s1,1,534.76,3531.84,5.766,exact-up-to-rounding
+G,8,stack-s2,1,530.68,3505.32,5.766,exact-up-to-rounding
+G,8,stack-s3,1,533.59,3518.98,5.744,exact-up-to-rounding
+FG,1,stack-s1,1,959.28,854.71,5.743,exact-up-to-rounding
+FG,1,stack-s2,1,955.89,852.02,5.743,exact-up-to-rounding
+FG,1,stack-s3,1,954.96,850.45,5.743,exact-up-to-rounding
+FG,2,stack-s1,1,852.16,1479.33,5.671,exact-up-to-rounding
+FG,2,stack-s2,1,845.32,1468.15,5.671,exact-up-to-rounding
+FG,2,stack-s3,1,847.85,1472.39,5.671,exact-up-to-rounding
+FG,4,stack-s1,1,726.47,2478.37,5.685,exact-up-to-rounding
+FG,4,stack-s2,1,720.93,2460.61,5.685,exact-up-to-rounding
+FG,4,stack-s3,1,724.24,2471.1,5.685,exact-up-to-rounding
+FG,8,stack-s1,1,576.38,3787.06,5.766,exact-up-to-rounding
+FG,8,stack-s2,1,567.13,3729.49,5.766,exact-up-to-rounding
+FG,8,stack-s3,1,573.43,3768.9,5.766,exact-up-to-rounding
+FGH,1,stack-s1,2,967.64,860.94,5.743,exact-up-to-rounding; tokens identical to FG; 0 rows differing in check mode
+FGH,1,stack-s2,2,968.22,861.27,5.743,exact-up-to-rounding; tokens identical to FG; 0 rows differing in check mode
+FGH,1,stack-s3,2,967.18,860.72,5.743,exact-up-to-rounding; tokens identical to FG; 0 rows differing in check mode
+FGH,2,stack-s1,2,850.35,1476.26,5.671,exact-up-to-rounding; tokens identical to FG; 0 rows differing in check mode
+FGH,2,stack-s2,2,848.4,1473.34,5.671,exact-up-to-rounding; tokens identical to FG; 0 rows differing in check mode
+FGH,2,stack-s3,2,848.89,1473.92,5.671,exact-up-to-rounding; tokens identical to FG; 0 rows differing in check mode
+FGH,4,stack-s1,2,719.45,2455.69,5.685,exact-up-to-rounding; tokens identical to FG; 0 rows differing in check mode
+FGH,4,stack-s2,2,716.82,2446.71,5.685,exact-up-to-rounding; tokens identical to FG; 0 rows differing in check mode
+FGH,4,stack-s3,2,720.25,2453.16,5.708,exact-up-to-rounding; tokens identical to FG; 0 rows differing in check mode
+FGH,8,stack-s1,2,572.03,3760.89,5.766,exact-up-to-rounding; tokens identical to FG; 0 rows differing in check mode
+FGH,8,stack-s2,2,570.67,3750.08,5.766,exact-up-to-rounding; tokens identical to FG; 0 rows differing in check mode
+FGH,8,stack-s3,2,568.57,3737.46,5.766,exact-up-to-rounding; tokens identical to FG; 0 rows differing in check mode

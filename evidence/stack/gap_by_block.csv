@@ -1,0 +1,5 @@
+block,measured,tokens_needed_with_draft,tokens_needed_free_drafter,alpha_needed_with_draft,cycle_us_with_draft,baseline_tokens_per_cycle
+16,True,42.14,28.64,,7302.0,7.6033
+64,True,61.09,46.37,0.99851,10584.5,7.6033
+128,False,84.66,69.04,0.99299,14669.8,7.6033
+256,True,132.17,114.11,0.9941,22902.3,7.6033

@@ -1,0 +1,30 @@
+{
+ "repo": {
+  "path": "/home/ubuntu/vp-wt/stack-hold",
+  "head": "84717d2e883f1aae6992ad8a1d4c65d857e71aad",
+  "tree": "8c1d0f0fc8ba3ca077ad0f0703d999c7cb5a0e1b",
+  "dirty": []
+ },
+ "s0": {
+  "path": "/home/ubuntu/sglang",
+  "head": "bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824",
+  "tree": "04b956b119d9f9f19507b7b033d0133863aeeb68",
+  "dirty": []
+ },
+ "stack_engine": {
+  "path": "/home/ubuntu/sglang-wt/stack",
+  "head": "7f6f891b9e7fcfa983e896197e7fc0dfba9b44d1",
+  "tree": "628f650ea031b0fc8a68233ff10d8878eb22686d",
+  "dirty": []
+ },
+ "packages": {
+  "torch": "2.13.0",
+  "triton": "3.7.1",
+  "flashinfer-python": "0.6.18",
+  "sgl-kernel": null,
+  "transformers": "5.12.1"
+ },
+ "env": {
+  "CUDA_HOME": "/home/ubuntu/.local/cuda-13.0"
+ }
+}

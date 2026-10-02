@@ -1,0 +1,458 @@
+{
+ "12288,2560": [
+  [
+   1,
+   null,
+   "gemv"
+  ],
+  [
+   2,
+   {
+    "block_m": 16,
+    "block_n": 32,
+    "block_k": 128,
+    "split_k": 1,
+    "use_dot": true,
+    "num_warps": 4,
+    "num_stages": 3,
+    "pdl": false
+   },
+   "gemm"
+  ],
+  [
+   4,
+   {
+    "block_m": 16,
+    "block_n": 32,
+    "block_k": 128,
+    "split_k": 1,
+    "use_dot": true,
+    "num_warps": 4,
+    "num_stages": 3,
+    "pdl": false
+   },
+   "gemm"
+  ],
+  [
+   8,
+   {
+    "block_m": 16,
+    "block_n": 32,
+    "block_k": 128,
+    "split_k": 1,
+    "use_dot": true,
+    "num_warps": 4,
+    "num_stages": 3,
+    "pdl": false
+   },
+   "gemm"
+  ],
+  [
+   16,
+   {
+    "block_m": 16,
+    "block_n": 32,
+    "block_k": 128,
+    "split_k": 1,
+    "use_dot": true,
+    "num_warps": 4,
+    "num_stages": 3,
+    "pdl": false
+   },
+   "gemm"
+  ],
+  [
+   32,
+   null,
+   "gemm"
+  ],
+  [
+   64,
+   null,
+   "gemm"
+  ],
+  [
+   128,
+   null,
+   "gemm"
+  ]
+ ],
+ "64,2560": [
+  [
+   1,
+   null,
+   "gemv"
+  ],
+  [
+   2,
+   null,
+   "gemm"
+  ],
+  [
+   4,
+   null,
+   "gemm"
+  ],
+  [
+   8,
+   null,
+   "gemm"
+  ],
+  [
+   16,
+   null,
+   "gemm"
+  ],
+  [
+   32,
+   null,
+   "gemm"
+  ],
+  [
+   64,
+   null,
+   "gemm"
+  ],
+  [
+   128,
+   null,
+   "gemm"
+  ]
+ ],
+ "12352,2560": [
+  [
+   1,
+   null,
+   "gemv"
+  ],
+  [
+   2,
+   {
+    "block_m": 16,
+    "block_n": 32,
+    "block_k": 128,
+    "split_k": 1,
+    "use_dot": true,
+    "num_warps": 4,
+    "num_stages": 3,
+    "pdl": false
+   },
+   "gemm"
+  ],
+  [
+   4,
+   {
+    "block_m": 16,
+    "block_n": 32,
+    "block_k": 128,
+    "split_k": 1,
+    "use_dot": true,
+    "num_warps": 4,
+    "num_stages": 3,
+    "pdl": false
+   },
+   "gemm"
+  ],
+  [
+   8,
+   {
+    "block_m": 16,
+    "block_n": 32,
+    "block_k": 128,
+    "split_k": 1,
+    "use_dot": true,
+    "num_warps": 4,
+    "num_stages": 3,
+    "pdl": false
+   },
+   "gemm"
+  ],
+  [
+   16,
+   {
+    "block_m": 16,
+    "block_n": 32,
+    "block_k": 128,
+    "split_k": 1,
+    "use_dot": true,
+    "num_warps": 4,
+    "num_stages": 3,
+    "pdl": false
+   },
+   "gemm"
+  ],
+  [
+   32,
+   null,
+   "gemm"
+  ],
+  [
+   64,
+   null,
+   "gemm"
+  ],
+  [
+   128,
+   null,
+   "gemm"
+  ]
+ ],
+ "2560,4096": [
+  [
+   1,
+   null,
+   "gemv"
+  ],
+  [
+   2,
+   {
+    "block_m": 16,
+    "block_n": 32,
+    "block_k": 128,
+    "split_k": 2,
+    "use_dot": true,
+    "num_warps": 4,
+    "num_stages": 5,
+    "pdl": false
+   },
+   "gemm"
+  ],
+  [
+   4,
+   {
+    "block_m": 16,
+    "block_n": 32,
+    "block_k": 128,
+    "split_k": 2,
+    "use_dot": true,
+    "num_warps": 4,
+    "num_stages": 5,
+    "pdl": false
+   },
+   "gemm"
+  ],
+  [
+   8,
+   {
+    "block_m": 16,
+    "block_n": 32,
+    "block_k": 128,
+    "split_k": 2,
+    "use_dot": true,
+    "num_warps": 4,
+    "num_stages": 5,
+    "pdl": false
+   },
+   "gemm"
+  ],
+  [
+   16,
+   {
+    "block_m": 16,
+    "block_n": 32,
+    "block_k": 128,
+    "split_k": 2,
+    "use_dot": true,
+    "num_warps": 4,
+    "num_stages": 5,
+    "pdl": false
+   },
+   "gemm"
+  ],
+  [
+   32,
+   null,
+   "gemm"
+  ],
+  [
+   64,
+   null,
+   "gemm"
+  ],
+  [
+   128,
+   null,
+   "gemm"
+  ]
+ ],
+ "10240,2560": [
+  [
+   1,
+   null,
+   "gemv"
+  ],
+  [
+   2,
+   null,
+   "gemm"
+  ],
+  [
+   4,
+   null,
+   "gemm"
+  ],
+  [
+   8,
+   null,
+   "gemm"
+  ],
+  [
+   16,
+   null,
+   "gemm"
+  ],
+  [
+   32,
+   null,
+   "gemm"
+  ],
+  [
+   64,
+   null,
+   "gemm"
+  ],
+  [
+   128,
+   null,
+   "gemm"
+  ]
+ ],
+ "18432,2560": [
+  [
+   1,
+   null,
+   "gemv"
+  ],
+  [
+   2,
+   {
+    "block_m": 16,
+    "block_n": 32,
+    "block_k": 128,
+    "split_k": 1,
+    "use_dot": true,
+    "num_warps": 4,
+    "num_stages": 3,
+    "pdl": false
+   },
+   "gemm"
+  ],
+  [
+   4,
+   {
+    "block_m": 16,
+    "block_n": 32,
+    "block_k": 128,
+    "split_k": 1,
+    "use_dot": true,
+    "num_warps": 4,
+    "num_stages": 3,
+    "pdl": false
+   },
+   "gemm"
+  ],
+  [
+   8,
+   {
+    "block_m": 16,
+    "block_n": 32,
+    "block_k": 128,
+    "split_k": 1,
+    "use_dot": true,
+    "num_warps": 4,
+    "num_stages": 3,
+    "pdl": false
+   },
+   "gemm"
+  ],
+  [
+   16,
+   {
+    "block_m": 16,
+    "block_n": 64,
+    "block_k": 128,
+    "split_k": 1,
+    "use_dot": true,
+    "num_warps": 4,
+    "num_stages": 3,
+    "pdl": false
+   },
+   "gemm"
+  ],
+  [
+   32,
+   null,
+   "gemm"
+  ],
+  [
+   64,
+   null,
+   "gemm"
+  ],
+  [
+   128,
+   null,
+   "gemm"
+  ]
+ ],
+ "2560,9216": [
+  [
+   1,
+   null,
+   "gemv"
+  ],
+  [
+   2,
+   null,
+   "gemm"
+  ],
+  [
+   4,
+   null,
+   "gemm"
+  ],
+  [
+   8,
+   {
+    "block_m": 16,
+    "block_n": 32,
+    "block_k": 128,
+    "split_k": 2,
+    "use_dot": true,
+    "num_warps": 4,
+    "num_stages": 5,
+    "pdl": false
+   },
+   "gemm"
+  ],
+  [
+   16,
+   {
+    "block_m": 16,
+    "block_n": 32,
+    "block_k": 128,
+    "split_k": 2,
+    "use_dot": true,
+    "num_warps": 4,
+    "num_stages": 5,
+    "pdl": false
+   },
+   "gemm"
+  ],
+  [
+   32,
+   null,
+   "gemm"
+  ],
+  [
+   64,
+   null,
+   "gemm"
+  ],
+  [
+   128,
+   null,
+   "gemm"
+  ]
+ ]
+}

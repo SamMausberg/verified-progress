@@ -24,6 +24,12 @@ declared in evidence/stack/README.md ("Composition plan"):
   stack-s1 to stack-s5 (three sessions and at most two replacements, as declared); its server's environment overrides must be exactly the arm's declared
   variables (and the fold flag present exactly for arms with F), and the ambient engine
   environment the session recorded beside the run must equal the gate's.
+* Replacements (`admitted_sessions`): s4 and s5 exist only as the plan's replacements.
+  s4 is accepted only if s1-s3 all ran and leave fewer than three sessions with a valid
+  FULL-against-S0 ratio at some concurrency, and s5 only if that still holds after s4;
+  any other s4 or s5 stops the analysis. A replacement counts only at the concurrencies
+  where the sessions before it fell short, for every arm and the four-way pattern, so a
+  session can never be added to a concurrency that already had three valid ones.
 * Every row's launch record (the run's server/launch.json, written by bench.server when
   the server started) must show the engine the gate recorded, S0's checkout for S0 and
   the composed worktree's commit for every other arm, and the gate's repository commit,
@@ -159,6 +165,40 @@ def cell_valid(
     return True
 
 
+def admitted_sessions(
+    present: set[str], full_valid: Any, concurrencies: tuple[int, ...] = DECLARED_C
+) -> dict[int, list[str]]:
+    """The sessions that count at each concurrency under the declared replacement rule.
+
+    `present` holds the session names (all matching SESSION_RE); `full_valid(session, c)`
+    says whether the session has a valid FULL-against-S0 ratio at c. s1-s3 count at every
+    concurrency. s4 must follow all of s1-s3 and counts only where they leave fewer than
+    MIN_SESSIONS valid ratios; s5 must follow s4 and counts only where s1-s4 still do. A
+    replacement with no such concurrency is refused."""
+    ks = {int(name.removeprefix('stack-s')) for name in present}
+    if ks & {4, 5} and not {1, 2, 3} <= ks:
+        raise SystemExit(f'replacement session before s1-s3 all ran: sessions {sorted(ks)}')
+    if 5 in ks and 4 not in ks:
+        raise SystemExit('stack-s5 without stack-s4: s5 can only replace after s4')
+    admitted = {c: [f'stack-s{k}' for k in (1, 2, 3) if k in ks] for c in concurrencies}
+    for k in (4, 5):
+        if k not in ks:
+            break
+        short = [
+            c
+            for c in concurrencies
+            if sum(bool(full_valid(s, c)) for s in admitted[c]) < MIN_SESSIONS
+        ]
+        if not short:
+            raise SystemExit(
+                f'stack-s{k} is not a declared replacement: the sessions before it already '
+                f'give {MIN_SESSIONS} valid FULL-against-S0 ratios at every concurrency'
+            )
+        for c in short:
+            admitted[c].append(f'stack-s{k}')
+    return admitted
+
+
 def load(path: Path) -> list[dict[str, Any]]:
     with path.open() as f:
         return [r for r in csv.DictReader(f) if r['label'].startswith('stack-')]
@@ -258,10 +298,17 @@ def main() -> None:
             raise SystemExit(f'run {r["label"]}/{r["run"]} ran under another gate')
     arms = sorted(all_arms - {'S0'})
     concurrencies = sorted(all_c)
+
+    def full_valid(session: str, c: int) -> bool:
+        cell = data.get(session, {}).get(c, {})
+        return cell_valid(session, c, args.full, cell, touched, args.full)
+
+    admitted = admitted_sessions({r['session'] for r in rows_in}, full_valid)
     result: dict[str, Any] = {
         'full': args.full,
         'gate': pin,
         'invalid_points': invalid,
+        'sessions_admitted': {str(c): admitted[c] for c in concurrencies},
         'arms': {},
     }
     rows = []
@@ -271,8 +318,8 @@ def main() -> None:
             entry: dict[str, Any] = {}
             for m in METRICS:
                 logs = []
-                for session in sorted(data):
-                    cell = data[session].get(c, {})
+                for session in admitted[c]:
+                    cell = data.get(session, {}).get(c, {})
                     base = [v[m] for _, v in sorted(cell.get('S0', []))]
                     test = [v[m] for _, v in sorted(cell.get(arm, []))]
                     if cell_valid(session, c, arm, cell, touched, args.full):
@@ -286,8 +333,8 @@ def main() -> None:
         four[str(c)] = {}
         for m in METRICS:
             logs = []
-            for session in sorted(data):
-                cell = data[session].get(c, {})
+            for session in admitted[c]:
+                cell = data.get(session, {}).get(c, {})
                 got = {a: cell.get(a, []) for a in ('B0', 'F', 'G', 'FG')}
                 # Every launch of all four arms must be valid in this session.
                 if all(cell_valid(session, c, a, cell, touched, args.full) for a in got):

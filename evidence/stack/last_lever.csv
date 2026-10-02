@@ -1,0 +1,9 @@
+test,against,c,metric,n,geomean,min,max,sessions,status
+FGH,FG,1,x_e2e,3,1.01147,1.00872,1.0129,stack-s1:1.00872 stack-s2:1.01290 stack-s3:1.01279,"not declared; unbalanced order; a reading, not a test"
+FGH,FG,1,y,3,1.01007,1.00728,1.01207,stack-s1:1.00728 stack-s2:1.01086 stack-s3:1.01207,"not declared; unbalanced order; a reading, not a test"
+FGH,FG,2,x_e2e,3,1.00091,0.99787,1.00365,stack-s1:0.99787 stack-s2:1.00365 stack-s3:1.00123,"not declared; unbalanced order; a reading, not a test"
+FGH,FG,2,y,3,1.00083,0.99792,1.00354,stack-s1:0.99792 stack-s2:1.00354 stack-s3:1.00104,"not declared; unbalanced order; a reading, not a test"
+FGH,FG,4,x_e2e,3,0.99304,0.99034,0.99449,stack-s1:0.99034 stack-s2:0.99430 stack-s3:0.99449,"not declared; unbalanced order; a reading, not a test"
+FGH,FG,4,y,3,0.99265,0.99085,0.99435,stack-s1:0.99085 stack-s2:0.99435 stack-s3:0.99274,"not declared; unbalanced order; a reading, not a test"
+FGH,FG,8,x_e2e,3,0.99671,0.99151,1.00624,stack-s1:0.99245 stack-s2:1.00624 stack-s3:0.99151,"not declared; unbalanced order; a reading, not a test"
+FGH,FG,8,y,3,0.99674,0.99166,1.00552,stack-s1:0.99309 stack-s2:1.00552 stack-s3:0.99166,"not declared; unbalanced order; a reading, not a test"

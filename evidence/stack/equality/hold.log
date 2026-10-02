@@ -1,0 +1,44 @@
+hold_equality start 2026-10-01T21:24:16+00:00 repo 84717d2e883f1aae6992ad8a1d4c65d857e71aad dirty=0
+engine 7f6f891b9e7fcfa983e896197e7fc0dfba9b44d1 tree 628f650ea031b0fc8a68233ff10d8878eb22686d cert_src=/home/ubuntu/vp-wt/stack-cert/src
+{"repo": {"path": "/home/ubuntu/vp-wt/stack-hold", "head": "84717d2e883f1aae6992ad8a1d4c65d857e71aad", "tree": "8c1d0f0fc8ba3ca077ad0f0703d999c7cb5a0e1b", "dirty": []}, "s0": {"path": "/home/ubuntu/sglang", "head": "bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824", "tree": "04b956b119d9f9f19507b7b033d0133863aeeb68", "dirty": []}, "stack_engine": {"path": "/home/ubuntu/sglang-wt/stack", "head": "7f6f891b9e7fcfa983e896197e7fc0dfba9b44d1", "tree": "628f650ea031b0fc8a68233ff10d8878eb22686d", "dirty": []}, "packages": {"torch": "2.13.0", "triton": "3.7.1", "flashinfer-python": "0.6.18", "sgl-kernel": null, "transformers": "5.12.1"}, "env": {"CUDA_HOME": "/home/ubuntu/.local/cuda-13.0"}}
+table 607479dec8ca5806b992c1d9381e99cf7d33f61b49329a07f09af04bde3ac2b3  /home/ubuntu/vp-data/stack/equality/20261001T212416Z/backbone_table_v1.json
+=== stack_S0 2026-10-01T21:24:16+00:00 worktree=stock env= top_logprobs=5
+plain__stack_S0/c1: 69976 tokens in 108 s
+exit 0 2026-10-01T21:27:01+00:00
+=== stack_B0 2026-10-01T21:27:01+00:00 worktree=/home/ubuntu/sglang-wt/stack env= top_logprobs=5
+plain__stack_B0/c1: 69976 tokens in 108 s
+exit 0 2026-10-01T21:29:48+00:00
+=== stack_F 2026-10-01T21:29:48+00:00 worktree=/home/ubuntu/sglang-wt/stack env=SGLANG_GDN_REPLAYSSM_FOLD=1 top_logprobs=5
+plain__stack_F/c1: 69976 tokens in 111 s
+exit 0 2026-10-01T21:32:38+00:00
+=== stack_G 2026-10-01T21:32:38+00:00 worktree=/home/ubuntu/sglang-wt/stack env=SGLANG_BACKBONE_GEMM=1 SGLANG_BACKBONE_PDL=1 SGLANG_BACKBONE_MERGE_IN_PROJ=1 SGLANG_BACKBONE_GEMM_TABLE=/home/ubuntu/vp-data/stack/equality/20261001T212416Z/backbone_table_v1.json top_logprobs=5
+plain__stack_G/c1: 70117 tokens in 108 s
+exit 0 2026-10-01T21:35:23+00:00
+=== stack_FG 2026-10-01T21:35:23+00:00 worktree=/home/ubuntu/sglang-wt/stack env=SGLANG_GDN_REPLAYSSM_FOLD=1 SGLANG_BACKBONE_GEMM=1 SGLANG_BACKBONE_PDL=1 SGLANG_BACKBONE_MERGE_IN_PROJ=1 SGLANG_BACKBONE_GEMM_TABLE=/home/ubuntu/vp-data/stack/equality/20261001T212416Z/backbone_table_v1.json top_logprobs=5
+plain__stack_FG/c1: 70117 tokens in 110 s
+exit 0 2026-10-01T21:38:12+00:00
+=== stack_B0_tokens 2026-10-01T21:38:12+00:00 worktree=/home/ubuntu/sglang-wt/stack env= top_logprobs=0
+plain__stack_B0_tokens/c1: 69976 tokens in 105 s
+exit 0 2026-10-01T21:40:53+00:00
+=== stack_H_tokens 2026-10-01T21:40:53+00:00 worktree=/home/ubuntu/sglang-wt/stack env=SGLANG_CERTIFIED_HEAD_VERIFY=1 SGLANG_CERTIFIED_HEAD_SRC=/home/ubuntu/vp-wt/stack-cert/src SGLANG_CERTIFIED_HEAD_FALLBACK=columns SGLANG_CERTIFIED_HEAD_MODEL=conservative SGLANG_CERTIFIED_HEAD_MAX_ROWS=64 SGLANG_CERTIFIED_HEAD_CHECK=1 SGLANG_CERTIFIED_HEAD_STATS=/home/ubuntu/vp-data/stack/equality/20261001T212416Z/certified_stats_H.json top_logprobs=0
+plain__stack_H_tokens/c1: 69976 tokens in 168 s
+exit 0 2026-10-01T21:44:42+00:00
+=== stack_FGH_tokens 2026-10-01T21:44:42+00:00 worktree=/home/ubuntu/sglang-wt/stack env=SGLANG_GDN_REPLAYSSM_FOLD=1 SGLANG_BACKBONE_GEMM=1 SGLANG_BACKBONE_PDL=1 SGLANG_BACKBONE_MERGE_IN_PROJ=1 SGLANG_BACKBONE_GEMM_TABLE=/home/ubuntu/vp-data/stack/equality/20261001T212416Z/backbone_table_v1.json SGLANG_CERTIFIED_HEAD_VERIFY=1 SGLANG_CERTIFIED_HEAD_SRC=/home/ubuntu/vp-wt/stack-cert/src SGLANG_CERTIFIED_HEAD_FALLBACK=columns SGLANG_CERTIFIED_HEAD_MODEL=conservative SGLANG_CERTIFIED_HEAD_MAX_ROWS=64 SGLANG_CERTIFIED_HEAD_CHECK=1 SGLANG_CERTIFIED_HEAD_STATS=/home/ubuntu/vp-data/stack/equality/20261001T212416Z/certified_stats_FGH.json top_logprobs=0
+plain__stack_FGH_tokens/c1: 70117 tokens in 171 s
+exit 0 2026-10-01T21:48:35+00:00
+16 pairs -> /home/ubuntu/vp-data/stack/equality/20261001T212416Z/pairs.json
+{"b0_bitwise_to_s0": true, "classes": {"F": "bitwise", "G": "exact-up-to-rounding", "FG": "exact-up-to-rounding"}, "table_sha256": "607479dec8ca5806b992c1d9381e99cf7d33f61b49329a07f09af04bde3ac2b3", "identity": {"repo": {"path": "/home/ubuntu/vp-wt/stack-hold", "head": "84717d2e883f1aae6992ad8a1d4c65d857e71aad", "tree": "8c1d0f0fc8ba3ca077ad0f0703d999c7cb5a0e1b", "dirty": []}, "s0": {"path": "/home/ubuntu/sglang", "head": "bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824", "tree": "04b956b119d9f9f19507b7b033d0133863aeeb68", "dirty": []}, "stack_engine": {"path": "/home/ubuntu/sglang-wt/stack", "head": "7f6f891b9e7fcfa983e896197e7fc0dfba9b44d1", "tree": "628f650ea031b0fc8a68233ff10d8878eb22686d", "dirty": []}, "packages": {"torch": "2.13.0", "triton": "3.7.1", "flashinfer-python": "0.6.18", "sgl-kernel": null, "transformers": "5.12.1"}, "env": {"CUDA_HOME": "/home/ubuntu/.local/cuda-13.0"}}, "provenance_problems": [], "references_sha256": {"ref_dflash_b16": "d3d25eae21b9981d8ac83626c82b73f9b63d1820abbb655dd2012714e4eca050", "ref_dflash_b16_triton": "d7ec642c7c20f1a6c0f1c7e5f33645c0cf35830af976bb4ea512fa8a8e6bc4fd"}, "ok": true, "certified": {"tokens_identical": true, "check_mode": [{"file": "certified_stats_H.json", "ok": true, "rows": 249392, "mismatch_rows": 0, "fallback_rows": 9551}, {"file": "certified_stats_FGH.json", "ok": true, "rows": 250464, "mismatch_rows": 0, "fallback_rows": 9444}], "package_sha256": "2b4de803e032f9c76b5eb4e08350515253a878d75446bf66141215d5a9655735"}, "timed_levers": ["F", "G", "H"]}
+current -> /home/ubuntu/vp-data/stack/equality/20261001T212416Z
+=== phases B0 2026-10-01T21:48:48+00:00
+[ok  ] speculative_config: resolved: speculative_algorithm=DFLASH, speculative_num_steps=1, speculative_eagle_topk=1, speculative_num_draft_tokens=16
+r0 c=  1 ok=64/64 x=  977.0 tok/s/user y=   865.1 tok/s ttft_p50=   40.1 ms accept=5.701 osl_mismatch=0 foreign_cpu=0.88
+r0 c=  8 ok=64/64 x=  528.0 tok/s/user y=  3486.2 tok/s ttft_p50=   51.3 ms accept=5.772 osl_mismatch=0 foreign_cpu=1.05
+done: /home/ubuntu/vp-data/stack/equality/20261001T212416Z/diag/stack-phases-B0/20261001-214848/sweep.json
+phases B0 exit 0
+=== phases FG 2026-10-01T21:51:10+00:00
+[ok  ] speculative_config: resolved: speculative_algorithm=DFLASH, speculative_num_steps=1, speculative_eagle_topk=1, speculative_num_draft_tokens=16
+r0 c=  1 ok=64/64 x=  955.9 tok/s/user y=   851.5 tok/s ttft_p50=   39.8 ms accept=5.743 osl_mismatch=0 foreign_cpu=1.3
+r0 c=  8 ok=64/64 x=  574.2 tok/s/user y=  3772.9 tok/s ttft_p50=   48.9 ms accept=5.766 osl_mismatch=0 foreign_cpu=0.78
+done: /home/ubuntu/vp-data/stack/equality/20261001T212416Z/diag/stack-phases-FG/20261001-215110/sweep.json
+phases FG exit 0
+hold_equality end 2026-10-01T21:53:26+00:00 failed: none

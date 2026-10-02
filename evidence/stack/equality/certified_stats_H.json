@@ -1,0 +1,84 @@
+{
+ "flags": {
+  "decode": false,
+  "verify": true,
+  "draft": false,
+  "sampled_verify": false,
+  "fallback": "columns",
+  "model": "conservative",
+  "check": true,
+  "stats": "/home/ubuntu/vp-data/stack/equality/20261001T212416Z/certified_stats_H.json"
+ },
+ "paths": {
+  "verify": {
+   "calls": 15587,
+   "rows": 249392,
+   "padding_rows": 0,
+   "fallback_rows": 9551,
+   "fallback_calls": 6549,
+   "mismatch_rows": 0,
+   "status_overflow": 283,
+   "status_ambiguous": 9313,
+   "status_nonfinite": 0,
+   "status_threshold": 0,
+   "status_empty": 0,
+   "status_tile_overflow": 0,
+   "status_refused": 0,
+   "status_probe": 0,
+   "host_steps": {
+    "certified": 15587,
+    "stock_graph": 0,
+    "eager": 0
+   },
+   "certified_rows_histogram": {
+    "16": 15587
+   },
+   "max_certified_rows": 16,
+   "graph_sizes_certified": [
+    16,
+    32,
+    48,
+    64
+   ],
+   "graph_sizes_stock_only": []
+  }
+ },
+ "column_reports": {
+  "verify": {
+   "batch_sizes": [
+    16,
+    32,
+    48,
+    64
+   ],
+   "failures": [],
+   "ok": true
+  }
+ },
+ "self_test": {
+  "verify": {
+   "verified_batch_sizes": [
+    16,
+    32,
+    48,
+    64
+   ],
+   "refused_variants": [],
+   "checks": 4,
+   "seconds_total": 0.8431399209948722,
+   "seconds_by_batch_size": {
+    "64": 0.619,
+    "48": 0.071,
+    "32": 0.078,
+    "16": 0.076
+   }
+  }
+ },
+ "probe_stats": {
+  "verify": {
+   "calls_with_probe_violation": 0,
+   "latched_variants": [],
+   "probe_rows_per_call": 8
+  }
+ }
+}
