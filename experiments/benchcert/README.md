@@ -550,8 +550,14 @@ After each replay, device copies record the gate and `valid` the graph read and 
 fallback flags. For each row they record the committed id (as `attach_ids` clones it),
 the status, the candidates and their refined bounds, and the stock argmax of the same
 batch at the same shape, computed eagerly. Every 256 replays the host compares them
-bitwise. It logs each mismatch with the row's state and an eager re-run of the same
-batch. Gate-off replays compare the graph's stock argmax with the eager one; the draft
+bitwise. A bitwise match can hold by luck when a row's margin is large, so certified
+replays also audit the envelope against the stock logits of the same batch: for each row
+with a complete candidate list, every candidate's stock logit must lie in its refined
+interval, the stock argmax must be a candidate, and no excluded token's stock logit may
+reach the winner's lower bound. (The bounds enclose the reference's BF16 logit, the value
+the stock GEMM returns at this shape, not the exact real logit.) 579ae7ce's position-439
+row also enters as 128 near-tie variants of itself. The host logs each mismatch or audit
+failure with the row's state and an eager re-run of the same batch. Gate-off replays compare the graph's stock argmax with the eager one; the draft
 paths are checked the same way. The hold starts with the plain server (port 30091,
 started under the start-up lock), which also re-scores each gross context from the h6s
 report at batch 1 with the top 5. A run with no mismatch rules out a fault of the head

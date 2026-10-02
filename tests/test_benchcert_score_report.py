@@ -187,6 +187,7 @@ def test_report_times_gross_events_and_classes_co_batched_disagreements(
         1000.0, abs=0.1
     )
     assert event['co_batched_requests_in_window'] == 1
+    assert event['running_upper_bound'] == {'0ms': 2, '20ms': 2, '50ms': 2, '100ms': 2}
     assert event['co_batched_disagreements_by_class'] == {
         'tie': 1,
         'rounding': 0,

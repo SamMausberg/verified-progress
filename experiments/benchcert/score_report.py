@@ -52,6 +52,7 @@ from experiments.benchcert.analyze import NEAR_NATS
 from experiments.benchcert.drain import FAMILY, GROSS_NATS, LAUNCHES, TARGET, TOP, point_dirs
 
 WINDOW_MS = 300.0
+UNFINISHED_SLACK_MS = (0, 20, 50, 100)
 ROUNDING = 1e-6  # a gap below this is an exact tie at the BF16 logit
 CONFIDENCE = 0.95
 
@@ -372,6 +373,21 @@ def event_context(
         for i in items
         if i.get('start') is not None and i.get('end') is not None and i['start'] <= t <= i['end']
     )
+    # Requests still unfinished at the server when it produced the event's token: their
+    # final chunk reaches the client after the event's chunk. Chunks of one server step
+    # can arrive out of order, so requests whose final chunk came up to `slack` before
+    # the event's are counted too: an upper bound on the server's running batch.
+    unfinished = {
+        f'{slack}ms': sum(
+            1
+            for i in items
+            if i.get('start') is not None
+            and i.get('end') is not None
+            and i['start'] <= t
+            and i['end'] >= t - slack * 1_000_000
+        )
+        for slack in UNFINISHED_SLACK_MS
+    }
     half = int(WINDOW_MS * 1e6)
     co: dict[str, int] = {'tie': 0, 'rounding': 0, 'near': 0, 'gross': 0}
     co_events = []
@@ -403,6 +419,7 @@ def event_context(
         'time_found': True,
         'ms_before_point_end': round((max(ends) - t) / 1e6, 1) if ends else None,
         'in_flight': in_flight,
+        'running_upper_bound': unfinished,
         'co_batched_requests_in_window': co_requests,
         'co_batched_disagreements_by_class': co,
         'co_batched_events_above_near': co_events,

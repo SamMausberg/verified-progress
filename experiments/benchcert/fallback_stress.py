@@ -38,8 +38,10 @@ read, the fallback flags, and per row the committed id (``_ids[:rows]``, as
 the stock argmax of the same batch at the same shape computed eagerly
 (``torch.matmul(h, W.T)``, the engine's ``_compute_lm_head``). Every ``CHUNK`` steps
 the host compares them bitwise and logs each mismatch with the row's full state and an
-eager re-run of the same batch. Gate-off replays compare the graph's stock argmax with
-the eager one; the draft paths are compared the same way.
+eager re-run of the same batch. Certified replays also audit the envelope against those
+stock logits (every candidate inside its refined interval, the stock argmax a candidate,
+no excluded token reaching the winner's lower bound). Gate-off replays compare the
+graph's stock argmax with the eager one; the draft paths are compared the same way.
 """
 
 from __future__ import annotations
@@ -412,6 +414,12 @@ class Rig:
         if ctx is not None:
             parts.append(ctx)
         ties, tie_meta = self.synthesize_ties(real, n_ties)
+        if ctx is not None and len(ctx) > TARGET[1]:
+            # Near-tie variants of 579ae7ce's own position-439 row (its top tokens are the
+            # three-way tie), moved within an ulp of each other.
+            own, _ = self.synthesize_ties(np.repeat(ctx[TARGET[1] : TARGET[1] + 1], 128, 0), 128)
+            ties = np.concatenate([ties, own])
+            tie_meta['context_439_variants'] = len(own)
         dense = self.synthesize_dense(real)
         parts += [ties, dense, drafts]
         bits = np.concatenate(parts)
@@ -625,10 +633,43 @@ class Rig:
             'extend_ids': z(n, 64, dtype=torch.int64),
             'extend_ref': z(n, 64, dtype=torch.int64),
             'dgate': z(n, dtype=torch.bool),
+            # Envelope audit (certified replays, first 64 rows): candidates whose stock
+            # logit lies outside [rlo, rhi], whether the stock argmax is a candidate, the
+            # largest stock logit among excluded tokens and the winner's lower bound.
+            'env_outside': z(n, MAX_ROWS, dtype=torch.int32),
+            'env_top_in': z(n, MAX_ROWS, dtype=torch.bool),
+            'env_excl_max': z(n, MAX_ROWS, dtype=torch.float32),
+            'env_best_rlo': z(n, MAX_ROWS, dtype=torch.float32),
         }
 
     def argmax_stock(self, h: Any) -> Any:
         return self.torch.matmul(h, self.weight.T).argmax(-1)
+
+    def audit(self, s: int, full: Any, r: int) -> None:
+        """Envelope containment against the stock logits of the same batch (device ops).
+
+        The refined bounds enclose the reference's BF16 logit, which is what the stock
+        GEMM at this shape returns, so every candidate's stock logit must lie in
+        [rlo, rhi], and every excluded token's stock logit must be below the winner's
+        lower bound (a row with status 0 or exactly AMBIGUOUS passed the threshold test,
+        which implies that)."""
+        torch = self.torch
+        head = self.verify.head
+        log = self.log
+        cand = head._cand[:r, :CANDS].long()
+        cnt = head._count[:r].clamp(max=CANDS)
+        valid = torch.arange(CANDS, device=self.dev)[None, :] < cnt[:, None]
+        z = full[:r]
+        zc = torch.gather(z, 1, cand).float()
+        rlo, rhi = head._rlo[:r, :CANDS], head._rhi[:r, :CANDS]
+        outside = valid & ((zc < rlo) | (zc > rhi))
+        log['env_outside'][s, :r].copy_(outside.sum(1).to(torch.int32))
+        top = z.argmax(-1)
+        log['env_top_in'][s, :r].copy_((valid & (cand == top[:, None])).any(1))
+        log['env_best_rlo'][s, :r].copy_(torch.where(valid, rlo, float('-inf')).amax(1))
+        excluded = z.clone()
+        excluded.scatter_(1, torch.where(valid, cand, cand[:, :1]), float('-inf'))
+        log['env_excl_max'][s, :r].copy_(excluded.amax(1).float())
 
     def run_step(self, s: int, step: Step, pools: Pools) -> dict[str, Any]:
         """One MTP cycle: draft graph, verify graph, draft-extend graph; device logs only."""
@@ -675,7 +716,12 @@ class Rig:
         log['cand'][s, :r].copy_(head._cand[:r, :CANDS])
         log['rlo'][s, :r].copy_(head._rlo[:r, :CANDS])
         log['rhi'][s, :r].copy_(head._rhi[:r, :CANDS])
-        log['ref'][s, :m].copy_(self.argmax_stock(self.v_in[:m]))
+        if step.gate:
+            full = self.torch.matmul(self.v_in[:m], self.weight.T)  # the stock logits
+            log['ref'][s, :m].copy_(full.argmax(-1))
+            self.audit(s, full, r)
+        else:
+            log['ref'][s, :m].copy_(self.argmax_stock(self.v_in[:m]))
         if not step.gate:
             log['graph_stock'][s, :m].copy_(self.logits_buf[:m].argmax(-1))
         # Draft extend.
@@ -724,6 +770,7 @@ class Rig:
                     problems.append(
                         self.record('verify_committed', start + s, entry, host, s, int(row))
                     )
+                self.check_envelope(start + s, entry, host, s, totals, problems)
                 pad_bad = np.nonzero(host['ids'][s, rows:m] != host['ref'][s, rows:m])[0]
                 for row in pad_bad:
                     problems.append(
@@ -750,6 +797,39 @@ class Rig:
         for name in self.log:
             self.log[name].zero_()
         return problems
+
+    def check_envelope(
+        self,
+        step_no: int,
+        entry: dict[str, Any],
+        host: dict[str, Any],
+        s: int,
+        totals: dict[str, Any],
+        problems: list[dict[str, Any]],
+    ) -> None:
+        """Host side of the envelope audit, for rows with a complete candidate list."""
+        step: Step = entry['step']
+        r = min(step.m, MAX_ROWS)
+        st, cnt = host['status'][s, :r], host['count'][s, :r]
+        complete = ((st == 0) | (st == STATUS_AMBIGUOUS)) & (cnt > 0) & (cnt <= CANDS)
+        totals['audited_rows'] += int(complete.sum())
+        rows_c = np.nonzero(complete)[0]
+        excl, best = host['env_excl_max'][s, rows_c], host['env_best_rlo'][s, rows_c]
+        for name, bad in (
+            ('envelope_candidate', host['env_outside'][s, rows_c] > 0),
+            ('envelope_top_not_candidate', ~host['env_top_in'][s, rows_c]),
+            ('envelope_excluded', excl >= best),
+        ):
+            totals[name] += int(bad.sum())
+            for row in rows_c[bad]:
+                rec = self.record(name, step_no, entry, host, s, int(row))
+                rec['env'] = {
+                    'outside': int(host['env_outside'][s, row]),
+                    'top_in': bool(host['env_top_in'][s, row]),
+                    'excluded_max': float(host['env_excl_max'][s, row]),
+                    'best_rlo': float(host['env_best_rlo'][s, row]),
+                }
+                problems.append(rec)
 
     def record(
         self,
@@ -856,6 +936,10 @@ def stress(out: Path, replay: Path, seconds: float, seed: int, n_real: int, n_ti
         'dense_rows': 0,
         'steps_column_ran': 0,
         'steps_dense_ran': 0,
+        'audited_rows': 0,
+        'envelope_candidate': 0,
+        'envelope_top_not_candidate': 0,
+        'envelope_excluded': 0,
         'draft_rows': 0,
         'extend_rows': 0,
         'gate_toggles': 0,
