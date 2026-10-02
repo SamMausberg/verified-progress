@@ -682,6 +682,35 @@ anywhere. `order1` is reported descriptively: an event with 527 still running at
 would point to shared state between concurrent requests and, for that draw, rule out the
 reuse of 527's freed KV pages or state slot.
 
+## Coarse write-after-read barrier (not declared; approved by main 2026-10-02, after h8)
+
+    GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x experiments/benchcert/hold_drain.sh h9
+
+The overlap scheduler writes the next batch's scheduler-shared data on its own stream and
+fences those writes only on a read-done event (SGLang `managers/scheduler.py`,
+`_apply_war_barrier`). For MTP that event is recorded before the draft-extend replay, so
+the draft-extend graph runs concurrently with the next batch's writes. Reading the code
+did not find a path from that overlap to the target verify's inputs: the verify graph is
+fenced by stream order, and its GDN slot indices are copied into static buffers before the
+replay. h9 tests the route anyway, with the engine's own switch
+`SGLANG_FORCE_COARSE_WAR_BARRIER=1`, which makes the scheduler wait for the whole forward.
+Launches, interleaved: `coarse1`, `cert0e`, `coarse2`, `cert0f`, `coarse3`. The coarse
+ones are cert0 with the switch, the others plain cert0. Each replays session 1's ladder and
+then 5 more c = 64 points (graph check against h6a's `cert1`): 18 coarse and 12 plain
+cert0 draws. Server time per pass is reported for each arm, since the coarse barrier costs
+some overlap. Estimate: about 40 min, timed like h7.
+
+Reading rule, set before the run, over the draws whose 579ae7ce output reaches position
+439 with session 1's prefix:
+
+- 1756 in a coarse draw: the write-after-read overlap is not the sole route (refuted as
+  the mechanism if events occur at cert0's rate);
+- 1756 in plain cert0 draws and none in coarse ones: consistent with the route, but weak:
+  at cert0's 2 of 12 (or the uninstrumented 4 of 22), about 15 coarse draws at the context
+  show none by chance with probability 0.05-0.06, and any ordering effect predicts the
+  same;
+- none in either: inconclusive.
+
 ## Hold commit
 
 Every hold runs from a clean checkout at the commit recorded here; `run_session.py`

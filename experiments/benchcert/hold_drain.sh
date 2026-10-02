@@ -14,7 +14,7 @@
 set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo"
-[ "$#" -eq 1 ] || { echo "usage: $0 <h6a|h6b|h7a|h7b|h8>" >&2; exit 64; }
+[ "$#" -eq 1 ] || { echo "usage: $0 <h6a|h6b|h7a|h7b|h8|h9>" >&2; exit 64; }
 hold=$1
 case "$hold" in
   h6a) launches="cert1:660 stock1:630 cert2:660 stock2:630" ;;
@@ -22,6 +22,7 @@ case "$hold" in
   h7a) launches="certring1:660 stock3:630 cert0a:660 certring2:660" ;;
   h7b) launches="certring3:660 cert0b:660 stock4:630 certring4:660" ;;
   h8) launches="plant1:660 cert0c:660 plant2:660 cert0d:660 plant3:660 order1:660" ;;
+  h9) launches="coarse1:660 cert0e:660 coarse2:660 cert0f:660 coarse3:660" ;;
   *) echo "unknown hold $hold" >&2; exit 64 ;;
 esac
 runs=${BENCHCERT_OUT:-$HOME/vp-data/benchcert}
