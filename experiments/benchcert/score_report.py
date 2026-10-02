@@ -622,7 +622,8 @@ def eot_split(out: Path, runs: Path, eot: int = EOT_ID) -> list[dict[str, Any]]:
                     side = 'before' if entry['position'] < first else 'after'
                     bucket[f'{kind}_{side}'] = bucket.get(f'{kind}_{side}', 0) + 1
     return [
-        {'group': k[0], 'family': k[1], 'variant': k[2], **v} for k, v in sorted(acc.items(), key=str)
+        {'group': k[0], 'family': k[1], 'variant': k[2], **v}
+        for k, v in sorted(acc.items(), key=str)
     ]
 
 
@@ -639,9 +640,14 @@ def companions(out: Path, runs: Path) -> list[dict[str, Any]]:
     for name, point in names:
         items = timeline(point)
         target = next(
-            (i for i in items if i['phase'] == 'profiling' and i['prompt'].startswith(TARGET[0])), None
+            (i for i in items if i['phase'] == 'profiling' and i['prompt'].startswith(TARGET[0])),
+            None,
         )
-        if target is None or 'output' not in target or target['output'][:TARGET[1]] != ref[:TARGET[1]]:
+        if (
+            target is None
+            or 'output' not in target
+            or target['output'][: TARGET[1]] != ref[: TARGET[1]]
+        ):
             continue
         t = arrival(target, TARGET[1])
         if t is None:
@@ -649,7 +655,9 @@ def companions(out: Path, runs: Path) -> list[dict[str, Any]]:
         flying = sorted(
             f'{i["phase"]}:{i["prompt"]}'
             for i in items
-            if i is not target and i.get('start') is not None and i.get('end') is not None
+            if i is not target
+            and i.get('start') is not None
+            and i.get('end') is not None
             and i['start'] <= t <= i['end']
         )
         rows.append(
@@ -696,7 +704,12 @@ def main(argv: list[str] | None = None) -> int:
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(json.dumps(result, indent=1) + '\n')
         for row in result['companions_at_439']:
-            print(row['point'], row['token_at_439'], len(row['in_flight_others']), row['overlap_with_events'])
+            print(
+                row['point'],
+                row['token_at_439'],
+                len(row['in_flight_others']),
+                row['overlap_with_events'],
+            )
         return 0
     result = report(args.out, args.runs, args.contexts, args.rescored)
     args.json.parent.mkdir(parents=True, exist_ok=True)

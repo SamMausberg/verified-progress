@@ -213,3 +213,29 @@ def test_point_files_with_errors_are_scored_again(tmp_path: Path) -> None:
     assert scored(path)
     path.write_text(path.read_text() + json.dumps({'phase': 'profiling', 'error': 'x'}) + '\n')
     assert not scored(path)
+
+
+def test_planted_and_order_workloads_change_only_the_donor(tmp_path: Path) -> None:
+    from experiments.benchcert import drain
+
+    base = [json.loads(line) for line in drain.WORKLOAD.read_text().splitlines()]
+    planted = [
+        json.loads(line)
+        for line in drain.workload_file('planted', tmp_path).read_text().splitlines()
+    ]
+    assert len(planted) == len(base)
+    changed = [i for i, (a, b) in enumerate(zip(base, planted, strict=True)) if a != b]
+    assert changed == [drain.DONOR]
+    assert planted[drain.DONOR]['text'].count('check_kind') == 3
+    assert 'check_type' not in planted[drain.DONOR]['text']
+    order = [
+        json.loads(line) for line in drain.workload_file('order', tmp_path).read_text().splitlines()
+    ]
+    assert sorted(r['id'] for r in order) == sorted(r['id'] for r in base)
+    victim = next(i for i, r in enumerate(order) if r['id'] == 'mbpp-176')
+    donor = next(i for i, r in enumerate(order) if r['id'] == 'mbpp-222')
+    assert victim == drain.VICTIM - 1 and donor == drain.ORDER_INDEX and donor > victim
+    assert drain.workload_file('', tmp_path) == drain.WORKLOAD
+    command, _ = drain.sweep_command(drain.LAUNCHES['plant1'], tmp_path)
+    assert command[command.index('--workload') + 1].endswith('confirm-planted.jsonl')
+    assert '--workload' not in drain.sweep_command(drain.LAUNCHES['cert0a'], tmp_path)[0]

@@ -4,7 +4,8 @@
 #
 #   GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x experiments/benchcert/hold_drain.sh h6a
 #   GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x experiments/benchcert/hold_drain.sh h6b
-#   (and h7a, h7b: the ring-logged reruns, README "Ring-logged reruns")
+#   (and h7a, h7b: the ring-logged reruns, README "Ring-logged reruns"; h8: the planted
+#   donor, README "Planted donor")
 #
 # h6a: cert1, stock1, cert2, stock2 (each session 1's ladder c = 1-64, then 5 more c = 64
 # points). h6b: certcheck (c = 64 six times, check mode), certlog (c = 64 twice, check mode
@@ -13,13 +14,14 @@
 set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo"
-[ "$#" -eq 1 ] || { echo "usage: $0 <h6a|h6b|h7a|h7b>" >&2; exit 64; }
+[ "$#" -eq 1 ] || { echo "usage: $0 <h6a|h6b|h7a|h7b|h8>" >&2; exit 64; }
 hold=$1
 case "$hold" in
   h6a) launches="cert1:660 stock1:630 cert2:660 stock2:630" ;;
   h6b) launches="certcheck:540 certlog:360" ;;
   h7a) launches="certring1:660 stock3:630 cert0a:660 certring2:660" ;;
   h7b) launches="certring3:660 cert0b:660 stock4:630 certring4:660" ;;
+  h8) launches="plant1:660 plant2:660 order1:660 plant3:660 plant4:660" ;;
   *) echo "unknown hold $hold" >&2; exit 64 ;;
 esac
 runs=${BENCHCERT_OUT:-$HOME/vp-data/benchcert}

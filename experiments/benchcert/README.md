@@ -629,6 +629,42 @@ would expect about 11 events in 100 waves; at a per-draw rate of 3-5% it would e
 so a null is likely and decides little. The first submission (four blocks, 150 waves,
 without cert0) was stopped after its first block to add cert0.
 
+## Planted donor (not declared; designed 2026-10-02 after h7, awaiting main's go)
+
+    GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x experiments/benchcert/hold_drain.sh h8
+
+The wrong token 1756 (`_type`) is the suffix that one other request of the c = 64 point,
+`session_000527` (measured index 463, "check if all the elements in tuple have same data
+type"), puts in the same syntactic slot: its prompt asserts `check_type(...)` three times
+and its output repeats `def check_type(`. 579ae7ce went wrong at the function name of its
+own third regenerated assert (`perimeter_▢`). No other request of the point has that
+pattern. h8 tests whether 527's content causes the event.
+
+- `plant1`-`plant4` run cert0, the arm where the event occurred twice in 12 draws without
+  the head, with the confirmation split changed in one place. 527's prompt reads
+  `check_kind` for `check_type`, so its token 1756 becomes 32061 (`_kind`). That token is
+  absent from the point's prompts and outputs, and 13.6 nats below the top at 579ae7ce's
+  position 439 (batch-1 stock logits from the stress hold's hidden state).
+- `order1` runs cert0 with 527's prompt moved behind 579ae7ce (to measured index 509), so
+  527 starts after it and is still running at position 439, instead of finishing about
+  0.85 s before.
+- Each launch replays session 1's ladder and then 5 more c = 64 points, as h7 did (graph
+  check against h6a's `cert1`). The 24 planted draws expect 3-4 events at cert0's 2/12.
+  Estimate: about 40 min (five launches of about 8 min).
+
+Reading rule, set before the run, over the planted draws whose 579ae7ce output reaches
+position 439 with session 1's prefix:
+
+- 32061 at position 439 in any draw: 527's content reaches 579ae7ce's row, a causal
+  contamination (through a KV page, a GDN state slot or a buffer);
+- 1756 at position 439: the wrong token arises without its in-batch source, so not from
+  527's content;
+- neither: inconclusive, reported with the number of draws that reached the context.
+
+`order1` is reported descriptively: an event with 527 still running at 439 would point to
+shared state between concurrent requests; with its slot not yet freed, the reuse of 527's
+freed KV pages or state slot is ruled out for that draw.
+
 ## Hold commit
 
 Every hold runs from a clean checkout at the commit recorded here; `run_session.py`

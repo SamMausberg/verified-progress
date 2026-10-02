@@ -96,6 +96,7 @@ class Launch:
     levels: tuple[int, ...]  # run once, ascending
     extra: int  # further points at the top level
     hold: str
+    workload: str = ''  # '' (the confirmation split), 'planted' or 'order' (WORKLOADS)
 
 
 LAUNCHES = {
@@ -117,8 +118,21 @@ LAUNCHES = {
         Launch('cert0b', 'cert0', LADDER, 5, 'h7b'),
         Launch('stock4', 'stock', LADDER, 5, 'h7b'),
         Launch('certring4', 'certring', LADDER, 5, 'h7b'),
+        # h8: cert0 (where the event occurred without the head) with session_000527's
+        # function name changed (planted donor), and with 527 moved behind 579ae7ce (order).
+        Launch('plant1', 'cert0', LADDER, 5, 'h8', 'planted'),
+        Launch('plant2', 'cert0', LADDER, 5, 'h8', 'planted'),
+        Launch('order1', 'cert0', LADDER, 5, 'h8', 'order'),
+        Launch('plant3', 'cert0', LADDER, 5, 'h8', 'planted'),
+        Launch('plant4', 'cert0', LADDER, 5, 'h8', 'planted'),
     )
 }
+WORKLOAD = plan.REPO / 'bench/workloads/mixed-v2/confirm.jsonl'
+DONOR = 463  # session_000527's prompt (mbpp-222, check_type), measured index 463
+VICTIM = 505  # 579ae7ce (mbpp-176), measured index 505
+PLANT = ('check_type', 'check_kind')  # tokens [1716, 1756] -> [1716, 32061]
+PLANTED_TOKEN = 32061  # '_kind': absent from the point's prompts and outputs
+ORDER_INDEX = 509  # the donor moved behind the victim (issued 573 against 569)
 # h7 launches must capture the same graphs as h6a's (sizes equal, capture memory within
 # GRAPH_MEM_TOL GB per graph family); otherwise the launch stops before its first point.
 # Five identical certified MTP launches (sessions 1-3, h6a) spread by up to 0.40 GB per
@@ -127,6 +141,35 @@ LAUNCHES = {
 GRAPH_REF = {'stock': 'stock1', 'cert': 'cert1', 'certring': 'cert1', 'cert0': 'cert1'}
 GRAPH_MEM_TOL = 0.5
 GRAPH_MISMATCH = 3
+
+
+def workload_file(kind: str, out: Path) -> Path:
+    """The confirmation split, or a copy with session_000527's prompt changed (planted:
+    'check_type' becomes 'check_kind' in its three asserts) or moved behind 579ae7ce
+    (order), written under <out>/workloads (deterministic; the sweep records its sha256)."""
+    if not kind:
+        return WORKLOAD
+    rows = [json.loads(line) for line in WORKLOAD.read_text().splitlines() if line.strip()]
+    if rows[DONOR]['id'] != 'mbpp-222' or rows[VICTIM]['id'] != 'mbpp-176':
+        raise SystemExit('the confirmation split changed: donor or victim not at their indices')
+    if kind == 'planted':
+        old, new = PLANT
+        if rows[DONOR]['text'].count(old) != 3:
+            raise SystemExit(f'expected three {old!r} in the donor prompt')
+        rows[DONOR] = {
+            **rows[DONOR],
+            'id': 'mbpp-222-planted',
+            'text': rows[DONOR]['text'].replace(old, new),
+        }
+    elif kind == 'order':
+        donor = rows.pop(DONOR)
+        rows.insert(ORDER_INDEX, donor)
+    else:
+        raise ValueError(f'unknown workload {kind!r}')
+    path = out / 'workloads' / f'confirm-{kind}.jsonl'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(''.join(json.dumps(r) + '\n' for r in rows))
+    return path
 
 
 def label(variant: str) -> str:
@@ -187,7 +230,7 @@ def sweep_command(
                     / label(LAUNCHES[GRAPH_REF[launch.variant]].variant)
                 ),
             ]
-            if launch.hold.startswith('h7')
+            if launch.hold.startswith(('h7', 'h8'))
             else []
         ),
         '--arm',
@@ -204,6 +247,8 @@ def sweep_command(
         str(plan.ENGINE_WORKTREE),
         *sweep,
     ]
+    if launch.workload:
+        command += ['--workload', str(workload_file(launch.workload, out))]
     for item in FAMILY.sets:
         command += ['--set', item]
     if stats is not None:
@@ -610,8 +655,10 @@ def target_rows(out: Path, runs: Path) -> list[dict[str, Any]]:
     differs from session 1's certified run, and the request's verify statistics."""
     prompt, position, _ = TARGET
     points = [(n, p) for n, p in point_dirs(out, runs) if p.name == f'c{TOP:03d}']
-    points = [(n, p) for n, p in points if n.startswith(('h6', 'h7', *plan.DECISION_SESSIONS))]
-    points = [(n, p) for n, p in points if FAMILY.arm in n or n.startswith(('h6', 'h7'))]
+    points = [
+        (n, p) for n, p in points if n.startswith(('h6', 'h7', 'h8', *plan.DECISION_SESSIONS))
+    ]
+    points = [(n, p) for n, p in points if FAMILY.arm in n or n.startswith(('h6', 'h7', 'h8'))]
     records = {name: target_record(point) for name, point in points}
     reference = records[f's1/{FAMILY.cert_label}/c064']
     assert reference is not None

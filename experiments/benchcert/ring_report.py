@@ -110,14 +110,22 @@ def find_target(
     found = []
     for index, rec in enumerate(records):
         present = set()
-        lists = zip(rec.get('slots') or [], rec.get('prompt_lens') or [], rec.get('output_lens') or [], strict=False)
+        lists = zip(
+            rec.get('slots') or [],
+            rec.get('prompt_lens') or [],
+            rec.get('output_lens') or [],
+            strict=False,
+        )
         for i, (slot, pl, host_ol) in enumerate(lists):
             if pl != prompt_len or slot is None:
                 continue
             present.add(slot)
             st = runs.get(slot)
             if st is None or host_ol < st['host_ol']:  # a new request in this slot
-                st = runs[slot] = {'pos': dict.fromkeys(offsets, 0), 'ok': dict.fromkeys(offsets, True)}
+                st = runs[slot] = {
+                    'pos': dict.fromkeys(offsets, 0),
+                    'ok': dict.fromkeys(offsets, True),
+                }
                 for o in offsets:
                     st['pos'][o] = o
             st['host_ol'] = host_ol
@@ -373,7 +381,8 @@ def launch_report(launch: str, out: Path, ref: list[int], prompt_len: int) -> di
         name: {'reached_prefix': reached[name], 'hits': hits[name]} for name in tokens
     }
     report['locator_ok'] = all(
-        (v['hits'] == 1) == v['reached_prefix'] and v['hits'] <= 1 for v in report['locator'].values()
+        (v['hits'] == 1) == v['reached_prefix'] and v['hits'] <= 1
+        for v in report['locator'].values()
     ) and all(e['predict_matches_client'] for e in report['target_steps'])
     report['events'] = sorted(name for name, tok in tokens.items() if tok == WRONG)
     report['pass_ms_c64'] = pass_times(launch_dir)
