@@ -18,7 +18,8 @@
 #      first divergences, check-mode statistics, plan, routing table, logs), whose gate and
 #      summary must hash to the campaign pin's values.
 # Steps 1-5 run with the repository venv; step 6 needs matplotlib (SGLang venv). Any
-# failing step stops the script with its exit status.
+# failing step stops the script with its exit status, except step 3, whose failure is
+# recorded and returned at the end.
 set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo"
@@ -49,9 +50,12 @@ run "$repo_py" -m bench.pareto "${sweeps[@]}" --out "$out" --points-only --statu
 run "$repo_py" experiments/stack/analyze.py --points "$out/points.csv" --campaign "$pin" \
   --runs-root "$runs" --out "$out/composition.json" --csv "$out/composition.csv" |
   tee "$out/analyze.log"
+# A failed provenance check is a result (provenance.json records it); the remaining steps
+# still run and the script exits non-zero at the end.
+prov=0
 run "$repo_py" experiments/stack/provenance.py --campaign "$pin" --cert-src "$cert_src" \
   --cert-commit 01502cc --prompts "$HOME/vp-data/state/prompts/prompts.jsonl" \
-  --out "$out/provenance.json"
+  --out "$out/provenance.json" || prov=$?
 run "$repo_py" experiments/stack/startup_memory.py --runs-root "$runs" \
   --session-logs "$HOME"/vp-data/stack/session_s*.log \
   --equality "$eq_run" \
@@ -75,3 +79,4 @@ for f in gate summary; do
     { echo "copied $f.json does not match the campaign pin" >&2; exit 1; }
 done
 echo "analysis in $out"
+(( prov == 0 )) || { echo "provenance checks failed (provenance.json)" >&2; exit "$prov"; }
