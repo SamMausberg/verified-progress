@@ -18,6 +18,7 @@ given), or **pending** (queued, not yet run).
 | Model | `Qwen/Qwen3.5-4B@851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a` (24 Gated DeltaNet + 8 full-attention layers, tied 248320 x 2560 BF16 head, one MTP layer) |
 | Server (plain) | `python -m sglang.launch_server --model-path Qwen/Qwen3.5-4B --revision 851bf6e8... --attention-backend flashinfer --mm-attention-backend triton_attn --host 127.0.0.1 --port 30020` (CUDA graphs for prefill and decode, overlap scheduler, max 133 running requests) |
 | Server (MTP) | the same plus `--speculative-algorithm NEXTN --speculative-num-steps 3 --speculative-eagle-topk 1 --speculative-num-draft-tokens 4` (resolves to EAGLE v2; the MTP layer loads from the target checkpoint; max 48 running requests) |
+| Servers (DFlash) | the bench's `dflash-tuned-b16` and `dflash-tuned` arms, resolved from `bench/arms.toml`: drafter `z-lab/Qwen3.5-4B-DFlash@9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf`, radix cache off, `--mem-fraction-static 0.85 --max-total-tokens 1000000 --stream-interval 4`; block 16 with `--attention-backend triton` (the drafter then also uses Triton) and capacity 64, or block 8 with FlashInfer target attention, `--speculative-draft-attention-backend fa4` and capacity 128 |
 | Profilers | Nsight Systems 2025.3.2 (CUDA 13.0 toolkit copy), Nsight Compute 2025.3.1 |
 
 The exact server command, SGLang SHA and start time of every run are in
@@ -69,7 +70,9 @@ which any kernel of the category runs. Idle time is split into gaps inside graph
 replays and gaps outside them. The summary of each configuration also records the host
 lead of each graph launch (how long before the GPU starts a replay its launch call
 began), host synchronizations per step, and a completeness check that every eager
-launch call has a kernel record.
+launch call has a kernel record. A launch issued after the last recorded kernel of the
+main stream ran after collection stopped (the host can lead the GPU by a whole cycle), so
+it is reported (`eager_launch_calls_after_collection`) but not counted as dropped.
 
 **Bandwidth reference** (`hbm_bandwidth.py`). All efficiency figures use bandwidth
 measured on this GPU, not the 4.0 TB/s datasheet value.
@@ -307,6 +310,166 @@ fewer bytes per output token than plain decode at small batch, but the advantage
 with batch and disappears near B = 256 (`bytes_per_step_sweep.csv`, context 700,
 acceptance 2.8).
 
+### DFlash speculation on the bench's tuned arms (`dflash_cycle.json`, `attribution/dflash-tuned*_bs*.json`, measured; derived rows marked)
+
+**Runs.** `run_all.sh dflash` profiled the serving benchmark's two tuned DFlash arms with the
+server flags `bench/arms.toml` resolves to (`windows/dflash-tuned*_meta.json`; the start-up
+logs beside them show each flag as the server resolved it). `dflash-tuned-b16` drafts blocks
+of 16 with Triton attention for the target and the drafter and admits 64 requests; it is the
+frontier's best arm at c <= 4 (`evidence/bench/README.md`). `dflash-tuned` drafts blocks of 8
+with FlashInfer target attention and FA4 draft attention and admits 128. Each arm ran on two
+servers: one under nsys, which served an uncollected and then a collected 2 s window at each
+of c = 1, 4, 16 and 64, and one without a profiler, which served three 5 s windows at each.
+The hold ran on 2026-10-02 from 07:45 to 08:00 UTC, from repository `5bc91db` and SGLang
+`bd66ce34`. Every planned window is present, every window held its batch at c with no request
+finishing inside it, and the foreign CPU load stayed between 0.12 and 0.71 cores;
+`dflash_cycle.py` checks all of this before it writes anything.
+
+**The cycle**, from the traces. A cycle runs from one target-verify replay to the next:
+
+1. the target-verify graph: all 32 layers over the block (16 or 8 tokens per request), then
+   the head GEMM over every block row and the FP32 logits copy;
+2. eager: the argmax over the verify logits, SGLang's Triton accept kernel, and the GDN commit
+   (`_fused_mamba_state_scatter_with_mask_kernel`, `_fused_conv_window_scatter_multi_kernel`);
+3. eager: the verified target features projected into the drafter's KV cache (two GEMMs, an
+   RMSNorm, a fused norm and RoPE, and one KV write for each of the drafter's six layers;
+   `attribute.py` labels these `draft_context_kv`);
+4. eager: the next block's token ids, their embedding and the draft attention metadata;
+5. the draft graph: the drafter's six layers over the block, then its projection through the
+   target head over the 15 or 7 draft rows per request and the argmax, both captured in the
+   graph (`_DflashDraftSampler`).
+
+Each cycle therefore streams the 1.27 GB head twice, once for the draft rows and once for
+the verify rows.
+
+**Workload.** The client is the one used above: essay prompts in thinking mode, greedy. DFlash
+accepts few tokens on this text, 2.5-3.8 per cycle, against 6.18 (block 16) and 5.04 (block 8)
+pooled over the drafter's panel (`evidence/drafter/acceptance_summary.csv`). The per-token
+rates here are therefore not the frontier's: block 8 beats block 16 at c = 1 here (462
+against 302 tok/s), while on the bench's held-out split block 16 leads up to c = 4 (874
+against 767 tok/s at c = 1). The cycle's composition depends little on acceptance; only the
+GDN commit and the drafter's KV projection grow with the accepted tokens. Contexts are those
+of the windows (mean completion length at mid-window, last rows of the tables).
+
+Phases in microseconds per traced cycle (percent of the traced cycle); the phases sum to the
+cycle. "Head chains" adds the verify head and the draft head.
+
+`dflash-tuned-b16`:
+
+| | c = 1 | c = 4 | c = 16 | c = 64 |
+|---|---|---|---|---|
+| Untraced output tok/s, mean of 3 (sd) | 302 (0) | 1,241 (2) | 3,169 (1) | 4,513 (41) |
+| Untraced accept length (tokens per cycle) | 2.47 | 3.01 | 3.50 | 3.75 |
+| Untraced cycle, ms (estimate) | 8.16 | 9.72 | 17.66 | 53.20 |
+| **Traced cycle, us** | **7976** | **9254** | **16925** | **51757** |
+| Draft forward (drafter layers, draft graph) | 1474 (18.5%) | 1504 (16.3%) | 2776 (16.4%) | 6250 (12.1%) |
+| Drafter KV from the verified target features (eager) | 70 (0.9%) | 73 (0.8%) | 106 (0.6%) | 334 (0.6%) |
+| Draft head (GEMM over the draft rows, argmax) | 373 (4.7%) | 393 (4.2%) | 516 (3.0%) | 1774 (3.4%) |
+| Verify forward (target graph without its head) | 5277 (66.2%) | 6344 (68.6%) | 11876 (70.2%) | 37926 (73.3%) |
+| Verify head (GEMM over the block rows, FP32 copy, argmax) | 385 (4.8%) | 447 (4.8%) | 776 (4.6%) | 2684 (5.2%) |
+| GDN commit (accepted-state scatter) | 37 (0.5%) | 128 (1.4%) | 501 (3.0%) | 1982 (3.8%) |
+| Acceptance, small eager kernels, copies | 91 (1.1%) | 91 (1.0%) | 92 (0.5%) | 161 (0.3%) |
+| GPU gaps inside graph replays | 152 (1.9%) | 157 (1.7%) | 163 (1.0%) | 531 (1.0%) |
+| GPU idle outside graph replays (host gap, traced) | 117 (1.5%) | 116 (1.3%) | 119 (0.7%) | 114 (0.2%) |
+| **Head chains, share of the traced / untraced cycle** | **9.5% / 9.3%** | **9.1% / 8.6%** | **7.6% / 7.3%** | **8.6% / 8.4%** |
+| Ceiling 1 / (1 - f) for the head chains, untraced f (derived) | 1.103x | 1.095x | 1.079x | 1.091x |
+| Untraced cycle minus traced GPU work, ms (derived) | 0.30 | 0.58 | 0.85 | 1.56 |
+| Traced cycle / cycle estimate on the same window | 0.947 | 0.994 | 0.986 | 1.010 |
+| GPU busy, traced | 96.6% | 97.1% | 98.3% | 98.8% |
+| Host lead of the draft / verify graph launch, us | 5,996 / 6,556 | 7,138 / 7,709 | 14,568 / 16,538 | 48,360 / 54,997 |
+| Mid-window completion tokens, untraced / traced | 1973 / 1645 | 1874 / 1535 | 1063 / 844 | 438 / 349 |
+
+`dflash-tuned`:
+
+| | c = 1 | c = 4 | c = 16 | c = 64 |
+|---|---|---|---|---|
+| Untraced output tok/s, mean of 3 (sd) | 462 (0) | 1,812 (3) | 4,637 (2) | 8,977 (7) |
+| Untraced accept length (tokens per cycle) | 2.66 | 3.11 | 3.30 | 3.54 |
+| Untraced cycle, ms (estimate) | 5.77 | 6.86 | 11.38 | 25.24 |
+| **Traced cycle, us** | **6922** | **7738** | **10902** | **25714** |
+| Draft forward (drafter layers, draft graph) | 578 (8.3%) | 638 (8.2%) | 772 (7.1%) | 1592 (6.2%) |
+| Drafter KV from the verified target features (eager) | 68 (1.0%) | 71 (0.9%) | 81 (0.7%) | 179 (0.7%) |
+| Draft head (GEMM over the draft rows, argmax) | 365 (5.3%) | 377 (4.9%) | 421 (3.9%) | 996 (3.9%) |
+| Verify forward (target graph without its head) | 3461 (50.0%) | 4147 (53.6%) | 6719 (61.6%) | 18036 (70.1%) |
+| Verify head (GEMM over the block rows, FP32 copy, argmax) | 372 (5.4%) | 401 (5.2%) | 544 (5.0%) | 1435 (5.6%) |
+| GDN commit (accepted-state scatter) | 33 (0.5%) | 128 (1.7%) | 487 (4.5%) | 1949 (7.6%) |
+| Acceptance, small eager kernels, copies | 73 (1.1%) | 73 (0.9%) | 76 (0.7%) | 119 (0.5%) |
+| GPU gaps inside graph replays | 157 (2.3%) | 52 (0.7%) | 164 (1.5%) | 408 (1.6%) |
+| GPU idle outside graph replays (host gap, traced) | 1814 (26.2%) | 1852 (23.9%) | 1637 (15.0%) | 999 (3.9%) |
+| **Head chains, share of the traced / untraced cycle** | **10.7% / 12.8%** | **10.0% / 11.3%** | **8.9% / 8.5%** | **9.5% / 9.6%** |
+| Ceiling 1 / (1 - f) for the head chains, untraced f (derived) | 1.147x | 1.128x | 1.093x | 1.107x |
+| Untraced cycle minus traced GPU work, ms (derived) | 0.66 | 0.97 | 2.11 | 0.52 |
+| Traced cycle / cycle estimate on the same window | 1.012 | 0.990 | 0.947 | 1.008 |
+| GPU busy, traced | 71.5% | 75.4% | 83.5% | 94.5% |
+| Host lead of the draft / verify graph launch, us | 93 / 405 | 94 / 413 | 86 / 391 | 27 / 1,221 |
+| Mid-window completion tokens, untraced / traced | 2423 / 1767 | 2290 / 1593 | 1547 / 1160 | 746 / 554 |
+
+How the untraced rows are obtained. No profiler counts cycles on the untraced server, so its
+cycle is estimated as c x accept length / output tokens per second, with the accept length
+averaged over the server's log lines inside the window (each covers the last 40 cycles). On
+the collected windows, where the trace counts the cycles exactly, the estimate lies between
+1.2% below and 5.6% above the traced cycle (row "traced cycle / cycle estimate"), so the untraced
+cycles carry an error of a few percent. The derived "untraced cycle minus traced GPU work" is
+the untraced cycle less the traced cycle's time inside graph replays and eager kernels. It
+would equal the untraced host gap if both windows did the same GPU work, but the untraced
+windows sit 90-700 tokens further into their generations (last row), where attention costs
+more, so it overestimates that gap, on top of the estimator's error.
+
+**Where the cycle goes (measured).** The verify forward dominates: 50-73% of the traced cycle,
+more with batch. Two parts of it change with the arm and the batch. The GDN verify kernel,
+which writes one FP32 state per block position, grows with batch: on `dflash-tuned-b16` it
+takes 376 us of the cycle at c = 1 and 18.8 ms (36%) at c = 64, and with the commit 40% of
+the cycle at c = 64; on `dflash-tuned`, 9.5 ms (37%) and with the commit 45% at c = 64
+(`gdn_recurrent` and `spec_gdn_state` in the attributions). And `dflash-tuned-b16`'s Triton
+attention is slow at small batch: SGLang's extend-attention kernel `_fwd_kernel` runs one CTA
+per query tile and head, so at c = 1 it launches 16 CTAs in the target and 32 in the drafter
+on a GPU with 132 SMs. It takes 1,447 us of the target forward and 955 us of the drafter's
+forward per cycle at c = 1, together 30% of the traced cycle, and 14% at c = 64 (`full_attention`, and the drafter's `_fwd_kernel` rows of the
+kernel tables). `dflash-tuned`'s FlashInfer and FA4 kernels take 130 us and 78 us per cycle at
+c = 1 for blocks half as long. The draft forward is 12-19% of the cycle on block 16 and 6-8%
+on block 8; the drafter's KV projection after each verify takes at most 1%.
+
+**The head's share.** The two head chains take 9.5% of the traced `dflash-tuned-b16`
+cycle at c = 1, split evenly between the verify head (16 rows) and the draft head (15 rows),
+each a 360 us GEMM that streams the weight once. Over the untraced cycle that is 9.3%, so
+removing both heads entirely could make the cycle at most 1.103x faster at c = 1 (derived;
+1.079-1.095x at c = 4-64), and a head that read half the weight bytes at the same bandwidth at
+most 1/(1 - 0.093/2) = 1.049x (derived). The shares are similar on `dflash-tuned` (8.5-12.8% of
+the untraced cycle). At c = 64 the head GEMMs run over 1,024 and 960 rows on block 16 (1,613 and
+1,491 us), and the FP32 copy and argmax over the verify logits grow with them, so the head
+there is no longer one pass over the weight.
+
+**Host gap on the tuned arms.** The two arms differ.
+
+- `dflash-tuned-b16` has none. With Triton attention nothing is planned on the host, and the
+  host issues each graph launch 6.0-55 ms before the GPU starts it, a full cycle ahead, as in
+  plain decoding. The GPU is busy 96.6-98.8% of the traced cycle and idles 114-119 us per cycle
+  outside graph replays even with tracing slowing the host. The untraced cycle minus the traced
+  GPU work (0.30-1.56 ms) cannot be host idle when the host runs a cycle ahead. It is consistent
+  with the attention work the untraced windows' longer contexts add on this arm (at c = 1,
+  attention scaled linearly from 2.4 ms per cycle by 328 more tokens of a 1,645-token context
+  adds about 0.5 ms; derived) and with the estimator's error.
+- `dflash-tuned` keeps one. Under tracing the GPU idles 1.81, 1.85, 1.64 and 1.00 ms per cycle
+  outside graph replays at c = 1, 4, 16 and 64 (26%, 24%, 15% and 4% of the traced cycle). The
+  draft graph's launch is issued only 86-94 us before the GPU starts it at c <= 16, and the
+  scheduler blocks once per cycle in `cudaStreamSynchronize` (1.7 ms at c = 1;
+  `host_sync_calls`), so the GPU waits while the host prepares the draft; the call site was not
+  traced. Untraced, the gap is at most about 0.66 ms at c = 1 and 0.97 ms at c = 4 (11% and 14%
+  of the cycle; derived, and an overestimate as explained above). At c = 16 the derived value
+  (2.11 ms) exceeds the traced gap, which tracing can only lengthen: the estimator read 5.6%
+  high on the traced server's collected window at that concurrency, and an error of that size
+  (0.64 ms) covers the excess. Either way the gap is smaller than the 1.36-1.46 ms per cycle
+  that `evidence/hostgap/README.md` measured on the untuned block-8 arm with FlashInfer
+  drafting, but it remains.
+
+**Profiler perturbation.** `dflash-tuned-b16` is GPU-bound: its traced cycle is 2.2-4.8%
+shorter than the untraced one, as the shorter contexts of the collected windows imply.
+`dflash-tuned` is host-bound at small batch, and collecting lengthens its cycle by 20% at c = 1
+and 13% at c = 4 (6.92 against 5.77 ms and 7.74 against 6.86 ms), through host time on the
+critical path (see the MTP caveat below on CUPTI's cost per CUDA call). Kernel durations are
+barely affected, so the phase times above stand; the traced host gap overstates the untraced
+one.
+
 ### Bandwidth- or latency-bound? The head GEMM and the GDN kernels (`kernel_bandwidth.csv`, measured)
 
 Three measurements answer this. They count bytes differently, and the difference matters
@@ -467,6 +630,14 @@ For comparison, the head chain itself: 10.3% (B=1) to 6.1% (B=128) of a plain st
 1.14x). Removing layer 0's input projection (proposal P5) is worth at most 0.60% of a
 plain step (`p5_layer0_in_proj.json`).
 
+On the tuned DFlash arms (section above; same convention, f from the traced cycle unless
+marked): the GDN verify kernel and the commit take 40% (`dflash-tuned-b16`) and 45%
+(`dflash-tuned`) of the cycle at c = 64 (ceilings 1.67x and 1.81x); `dflash-tuned-b16`'s
+Triton attention takes 30% at c = 1 and 14% at c = 64 (1.43x, 1.17x; a faster attention
+kernel recovers part of it, not all); `dflash-tuned`'s host gap is at most 11-14% of the
+untraced cycle at c = 1-4 (derived, at most 1.13-1.17x); the head chains take 7.3-12.8% of the
+untraced cycle (1.08-1.15x).
+
 ## Caveats
 
 - **Profiler perturbation.** Every configuration was also measured with no profiler
@@ -493,7 +664,13 @@ plain step (`p5_layer0_in_proj.json`).
   (`~/vp-data/profile/mtp_nsys_cupti_drop/`) and the runs repeated with
   `--cuda-flush-interval=250`, which lets CUPTI allocate more buffers; `attribute.py`
   checks every configuration (`eager_kernel_records_per_launch_call` in each summary,
-  1.00 for all committed MTP traces).
+  1.00 for every committed trace). Until 2026-10-02 the check also counted the last few
+  launches of a window, whose kernels ran after collection stopped (4 per plain window,
+  0.9991-0.9996 then); the plain, MTP and plain-rerun attributions were regenerated with the
+  corrected check, which changed only that field, added `eager_launch_calls_after_collection`
+  and filled `host_sync_calls` for plain B = 8 and 32 (absent before); every category and
+  kernel row is unchanged. On `dflash-tuned-b16`, whose host runs a cycle ahead, 42-77
+  launches per window fall after collection.
 - **py-spy.** The sampler hung on the traced scheduler for the MTP B = 8 host-trace
   window (the driver now bounds the wait), so py-spy summaries exist for B = 1 and 32
   only; the NVTX host-gap attribution covers all three.
@@ -544,6 +721,28 @@ python experiments/profiling/attribute.py ~/vp-data/profile/mtp_nsys/mtp_bs8.nsy
   --kind spec --out-prefix evidence/profiles/attribution/mtp_bs8
 ```
 
+The DFlash files came from these commands (repository `ba8c325` for the analysis; the hold
+ran `run_all.sh dflash` from `5bc91db`, whose `run_profiles.py` resolves the same server
+commands):
+
+```sh
+# GPU, one exclusive hold: per arm, an nsys server (c = 1, 4, 16, 64) and an untraced one (3 windows each)
+scripts/gpu_lock.sh -x env VP_LOCKED=1 experiments/profiling/run_all.sh dflash
+# CPU: check each run against its recorded command, attribute, collect, split, summarize
+for d in dflash-tuned-b16_nsys dflash-tuned-b16_none dflash-tuned_nsys dflash-tuned_none; do
+  python experiments/profiling/check_run.py ~/vp-data/profile/$d
+  python experiments/profiling/collect_run.py ~/vp-data/profile/$d --name $d \
+    --evidence evidence/profiles/windows
+done
+for rep in ~/vp-data/profile/dflash-tuned*_nsys/*.nsys-rep; do
+  python experiments/profiling/attribute.py $rep --kind dflash \
+    --out-prefix evidence/profiles/attribution/$(basename $rep .nsys-rep)
+done
+python experiments/profiling/dflash_cycle.py --evidence evidence/profiles \
+  --out evidence/profiles/dflash_cycle.json --csv evidence/profiles/dflash_cycle.csv
+python experiments/profiling/summarize.py --evidence evidence/profiles
+```
+
 ## Files
 
 | File | Content | Produced by | Status |
@@ -553,7 +752,9 @@ python experiments/profiling/attribute.py ~/vp-data/profile/mtp_nsys/mtp_bs8.nsy
 | `attribution/<arm>_bs<B>.json`, `_categories.csv` | per-step attribution, kernel table, head GEMM stats, host lead, syncs, completeness | `attribute.py` | measured |
 | `bytes_per_step.json` | bytes by component per profiled configuration, implied bandwidths, GEMM efficiency | `bytes_model.py` | derived + measured check |
 | `bytes_per_step_sweep.csv`, `_wide.csv` | bytes by component over batch size at context 700 | `bytes_model.py --csv` | derived |
-| `tables.md`, `step_share.csv`, `breakdown.csv` | generated tables and figure data | `summarize.py` | measured |
+| `tables.md`, `step_share.csv`, `breakdown.csv`, `dflash_breakdown.csv` | generated tables and figure data; `breakdown.csv` holds the plain and MTP rows the paper's Figure 1 plots, `dflash_breakdown.csv` the DFlash rows with the same columns (`draft_model` includes the drafter's KV from the verified target features) | `summarize.py` | measured |
+| `dflash_cycle.json`, `dflash_cycle.csv` | the DFlash cycle by phase per arm and concurrency (traced), the untraced cycle, accept length and throughput of the repeated windows, the head chains' share and ceiling, the untraced cycle minus the traced GPU work, mid-window contexts, the estimator check | `dflash_cycle.py` | measured; derived columns as marked in the section above |
+| `attribution/dflash-tuned*_bs<C>.json`, `windows/dflash-tuned*_{nsys,none}*` | the eight DFlash traces' attributions; the two arms' client windows, server commands and start-up logs | `attribute.py --kind dflash`, `run_profiles.py`, `collect_run.py` | measured |
 | `p5_layer0_in_proj.json` | layer 0's GDN input projections as a share of a plain step | `layer0_share.py` | measured |
 | `label_structure_check.json` | per-replay GEMM label counts and kernel configurations against the model's structure | `check_labels.py` | measured |
 | `diagnostics/host_gaps_*.json`, `diagnostics/pyspy_*.json` | host functions during GPU idle time; scheduler CPU samples | `host_gaps.py`, `pyspy_summary.py` on `run_all.sh host` | diagnostic |
@@ -576,8 +777,8 @@ there. `ncu_key_kernels.json` was regenerated from the same reports after
 the fix to `ncu_summary.py`'s duration units (the hold's copy had `dram_tb_per_s` 10^12
 too small).
 
-Pending: the DFlash attribution (`run_all.sh dflash`, the two tuned DFlash arms of
-`bench/arms.toml` at c = 1, 4, 16 and 64, queued). Dropped, because nothing in the paper
+The `dflash` step ran in one exclusive hold on 2026-10-02 from 07:45 to 08:00 UTC, from
+repository 5bc91db (SGLang `bd66ce34`, Nsight Systems 2025.3.2). Dropped, because nothing in the paper
 depends on them: the `/start_profile` comparison, `diagnostics/graph_level_trace.json`
 (the hostgap workstream measured the MTP cycle's idle time traced and untraced) and
 `label_validation.json` (the eager run; `label_structure_check.json` checks the GEMM labels

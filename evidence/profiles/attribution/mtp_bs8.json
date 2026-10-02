@@ -25,6 +25,7 @@
   },
   "eager_launch_calls_per_step": 91.0,
   "eager_kernel_records_per_launch_call": 1.0,
+  "eager_launch_calls_after_collection": 0,
   "graph_roles": {
    "5789": "target",
    "6206": "draft",
