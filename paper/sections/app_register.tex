@@ -20,7 +20,7 @@ Kernel replay & the GPU kernel on the first captured positions, both halves, at 
 Engine check & the kernel inside SGLang, \modelcons & interval condition; fixed-noise verification & 64 prompts\\\addlinespace[2pt]
 Microbenchmark & the head alone, CUDA graphs, warm L2 cache & time only & $M=1$ to 256\\\addlinespace[2pt]
 Speculative captures & aligned draft and target head inputs; verification positions & \Rreal{}, gap condition; drift & 40,000 pairs per drafter\\\addlinespace[2pt]
-Served sweeps & the serving engine at full capacity, swept over client concurrency & time; output equality & 1, 3 or 4 sessions\\
+Served sweeps & the serving engine at full capacity, swept over client concurrency, with and without engine changes & time; output equality; for the certified head, the interval condition under the \modelcons & 1, 3 or 4 sessions\\
 \bottomrule
 \end{tabularx}
 \end{table}
