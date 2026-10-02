@@ -660,3 +660,13 @@ def test_ring_tile_threshold_follows_the_declared_rule() -> None:
     assert result['n_star_by_block'] == {'T16': 2, 'T8': 4}
     assert result['n_star'] == 2
     assert result['wins']['T16_N4'] is False and result['wins']['T8_N16'] is True
+
+
+def test_ring_tile_threshold_only_on_the_declared_grid() -> None:
+    import pytest
+
+    pytest.importorskip('torch')
+    sweep = load('gdn_ring_tile_sweep')
+    for blocks, batches in (([16], sweep.DECLARED_BATCHES), ([16, 8], [2, 4, 8])):
+        result = sweep.threshold_for_grid([], blocks, batches)
+        assert result['n_star'] is None and 'declared' in result['reason']

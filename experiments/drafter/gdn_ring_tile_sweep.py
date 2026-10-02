@@ -44,6 +44,9 @@ from typing import Any
 import torch
 
 H, HV, K, V = 16, 32, 128, 128
+# The grid the threshold rule was declared on (evidence README); other grids get no threshold.
+DECLARED_BLOCKS = [16, 8]
+DECLARED_BATCHES = [1, 2, 3, 4, 5, 6, 8, 12, 16, 24, 32, 48, 64]
 
 
 def gpu_state() -> list[str]:
@@ -118,6 +121,19 @@ def declared_threshold(
         result['n_star_by_block'][f'T{T}'] = star
     result['n_star'] = min(result['n_star_by_block'].values())
     return result
+
+
+def threshold_for_grid(
+    rows: list[dict[str, Any]], blocks: list[int], batches: list[int]
+) -> dict[str, Any]:
+    """The declared threshold on the declared grid; on any other grid, none, with the reason."""
+    if sorted(blocks) == sorted(DECLARED_BLOCKS) and sorted(batches) == DECLARED_BATCHES:
+        return declared_threshold(rows, DECLARED_BLOCKS, DECLARED_BATCHES)
+    return {
+        'n_star': None,
+        'reason': f'grid differs from the declared one (blocks {DECLARED_BLOCKS}, '
+        f'batches {DECLARED_BATCHES}), so the declared rule does not apply',
+    }
 
 
 class Sweep:
@@ -250,12 +266,12 @@ class Sweep:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=(__doc__ or '').split('\n\n')[0])
-    parser.add_argument('--blocks', type=int, nargs='+', default=[16, 8])
+    parser.add_argument('--blocks', type=int, nargs='+', default=DECLARED_BLOCKS)
     parser.add_argument(
         '--batches',
         type=int,
         nargs='+',
-        default=[1, 2, 3, 4, 5, 6, 8, 12, 16, 24, 32, 48, 64],
+        default=DECLARED_BATCHES,
     )
     parser.add_argument('--tiles', type=int, nargs='+', default=[4, 8, 16, 32])
     parser.add_argument('--layers', type=int, default=24, help='GDN layers of Qwen3.5-4B')
@@ -306,7 +322,7 @@ def main() -> None:
                 'fastest_tile': min(by_bv, key=lambda bv: by_bv[bv]),
                 'bv4_over_bv32': by_bv[4] / by_bv[32] if 4 in by_bv else None,
             }
-    threshold = declared_threshold(rows, args.blocks, sorted(args.batches))
+    threshold = threshold_for_grid(rows, args.blocks, args.batches)
     report = {
         'shape': {'H': H, 'HV': HV, 'K': K, 'V': V, 'layers': args.layers},
         'iters': args.iters,

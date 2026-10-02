@@ -581,10 +581,13 @@ gains. That rule has not been built or measured.
 
 Declared before `run_ring_tile_sweep.sh` ran (its exclusive ticket was still queued when this was
 committed), so that a restricted version of patch 0005 cannot be tuned on noise.
-`gdn_ring_tile_sweep.py` gives, for blocks T = 16 and 8 and batches N = 1-64, the GPU time per
-layer of the fold's ring-writing verify at value tiles 4, 8, 16 and 32. There are four repeats,
-the tile order rotates between repeats, and every tile is checked bitwise against tile 32 first.
-The threshold is read as follows; the script applies the rule itself (`threshold` in `sweep.json`):
+`gdn_ring_tile_sweep.py` gives, for blocks T = 16 and 8 and batches N = 1, 2, 3, 4, 5, 6, 8, 12,
+16, 24, 32, 48 and 64, the GPU time per layer of the fold's ring-writing verify at value tiles
+4, 8, 16 and 32. There are four repeats, the tile order rotates between repeats, and every tile
+is checked bitwise against tile 32 first.
+The threshold is read as follows, on this grid only; the script applies the rule itself
+(`threshold` in `sweep.json`) and writes no threshold (`n_star` null, with the reason) for any
+other grid of blocks or batches:
 
 1. Tile 4 wins at (T, N) when it is faster than tile 32 in every repeat and the gap between the
    two medians exceeds the larger of the two tiles' repeat ranges (maximum minus minimum).
