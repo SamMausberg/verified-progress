@@ -1,0 +1,168 @@
+{
+ "command": "experiments/speed_lowc/gdn_chain_bench.py --out /home/ubuntu/vp-data/speed-lowc/probe4-20261002T204410Z/gdn_chain_bench.json",
+ "repo_commit": "09b6dc48783e622d02467a4cb75706ef1954fe76",
+ "gpu": "NVIDIA GH200 480GB",
+ "torch": "2.13.0+cu130",
+ "rows": [
+  {
+   "batch": 1,
+   "block": 16,
+   "mode": "recurrent",
+   "layers": 24,
+   "median_us_per_forward": 537.8328084945679,
+   "p10_us": 537.1024131774902,
+   "p90_us": 538.5327816009521
+  },
+  {
+   "batch": 1,
+   "block": 16,
+   "mode": "conv",
+   "layers": 24,
+   "median_us_per_forward": 158.26879739761353,
+   "p10_us": 158.15680027008057,
+   "p90_us": 158.515202999115
+  },
+  {
+   "batch": 1,
+   "block": 16,
+   "mode": "norm",
+   "layers": 24,
+   "median_us_per_forward": 33.47040116786957,
+   "p10_us": 33.41439962387085,
+   "p90_us": 33.507201075553894
+  },
+  {
+   "batch": 1,
+   "block": 16,
+   "mode": "chain",
+   "layers": 24,
+   "median_us_per_forward": 800.8599758148193,
+   "p10_us": 800.432014465332,
+   "p90_us": 801.4863967895508
+  },
+  {
+   "batch": 2,
+   "block": 16,
+   "mode": "recurrent",
+   "layers": 24,
+   "median_us_per_forward": 698.6535787582397,
+   "p10_us": 697.8975772857666,
+   "p90_us": 699.5471954345703
+  },
+  {
+   "batch": 2,
+   "block": 16,
+   "mode": "conv",
+   "layers": 24,
+   "median_us_per_forward": 233.41200351715088,
+   "p10_us": 232.95199871063232,
+   "p90_us": 233.83359909057617
+  },
+  {
+   "batch": 2,
+   "block": 16,
+   "mode": "norm",
+   "layers": 24,
+   "median_us_per_forward": 38.00880014896393,
+   "p10_us": 37.98080086708069,
+   "p90_us": 38.0623996257782
+  },
+  {
+   "batch": 2,
+   "block": 16,
+   "mode": "chain",
+   "layers": 24,
+   "median_us_per_forward": 990.7760143280029,
+   "p10_us": 990.2000427246094,
+   "p90_us": 991.5887832641602
+  },
+  {
+   "batch": 4,
+   "block": 16,
+   "mode": "recurrent",
+   "layers": 24,
+   "median_us_per_forward": 1078.5912036895752,
+   "p10_us": 1076.8927574157715,
+   "p90_us": 1080.1088333129883
+  },
+  {
+   "batch": 4,
+   "block": 16,
+   "mode": "conv",
+   "layers": 24,
+   "median_us_per_forward": 259.5896005630493,
+   "p10_us": 259.2751979827881,
+   "p90_us": 262.7552032470703
+  },
+  {
+   "batch": 4,
+   "block": 16,
+   "mode": "norm",
+   "layers": 24,
+   "median_us_per_forward": 51.81040167808533,
+   "p10_us": 51.792001724243164,
+   "p90_us": 51.844799518585205
+  },
+  {
+   "batch": 4,
+   "block": 16,
+   "mode": "chain",
+   "layers": 24,
+   "median_us_per_forward": 1364.1632080078125,
+   "p10_us": 1363.1744384765625,
+   "p90_us": 1365.28959274292
+  },
+  {
+   "batch": 8,
+   "block": 16,
+   "mode": "recurrent",
+   "layers": 24,
+   "median_us_per_forward": 2100.7760047912598,
+   "p10_us": 2098.1359481811523,
+   "p90_us": 2102.777671813965
+  },
+  {
+   "batch": 8,
+   "block": 16,
+   "mode": "conv",
+   "layers": 24,
+   "median_us_per_forward": 289.1119956970215,
+   "p10_us": 288.87040615081787,
+   "p90_us": 292.4175977706909
+  },
+  {
+   "batch": 8,
+   "block": 16,
+   "mode": "norm",
+   "layers": 24,
+   "median_us_per_forward": 76.83919966220856,
+   "p10_us": 76.75999999046326,
+   "p90_us": 76.95199847221375
+  },
+  {
+   "batch": 8,
+   "block": 16,
+   "mode": "chain",
+   "layers": 24,
+   "median_us_per_forward": 2464.6008491516113,
+   "p10_us": 2462.7792358398438,
+   "p90_us": 2466.783905029297
+  }
+ ],
+ "excess": {
+  "1": {
+   "chain_minus_recurrent_us": 263.02716732025146
+  },
+  "2": {
+   "chain_minus_recurrent_us": 292.1224355697632
+  },
+  "4": {
+   "chain_minus_recurrent_us": 285.5720043182373
+  },
+  "8": {
+   "chain_minus_recurrent_us": 363.82484436035156
+  }
+ },
+ "kill_rule": "kill if chain - recurrent < 250 us per verify forward at B = 1",
+ "killed": false
+}
