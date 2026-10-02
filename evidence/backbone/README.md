@@ -394,7 +394,8 @@ over their mean.
   switch off costs nothing visible here either.
 - **Streamed text (measured; not token ids or logprobs).** `stream_text_identity.py` rebuilds
   every request's streamed text from aiperf's raw export and compares the runs prompt by prompt
-  ([`served/mtp_triton_v1/text_identity.json`](served/mtp_triton_v1/text_identity.json)). At
+  ([`served/mtp_triton_v1/text_identity.json`](served/mtp_triton_v1/text_identity.json); every
+  request here streamed `content` deltas only, all 512 tokens). At
   c = 1 and 8 each arm reproduces its own text on all 64 prompts across its two launches, while A
   and B differ on 7 of 64 prompts at c = 1 and 15 of 64 at c = 8, the same prompts in both
   sessions. At c = 1 each first difference comes after at least 177 of the 512 output tokens
@@ -572,7 +573,7 @@ python -m bench.pareto $T/backbone-mtp-triton-v1-B/20261002-123648 $T/backbone-m
     --pair backbone-mtp-triton-v1-B:backbone-mtp-triton-v1-A --status paired --no-plot \
     --class backbone-mtp-triton-v1-B=pending
 # served/mtp_triton_v1/ keeps points.csv, pairs.csv, launches.csv and frontier.csv from <dir>.
-# Streamed-text identity, at repository commit 47c7ccd:
+# Streamed-text identity, at repository commit 1e7b6b3:
 python experiments/backbone/stream_text_identity.py --run B1=$T/backbone-mtp-triton-v1-B/20261002-123648 \
     --run A1=$T/backbone-mtp-triton-v1-A/20261002-124002 --run A2=$T/backbone-mtp-triton-v1-A/20261002-124317 \
     --run B2=$T/backbone-mtp-triton-v1-B/20261002-124631 --pair B1:A1 --pair B2:A2 --pair A2:A1 --pair B2:B1 \

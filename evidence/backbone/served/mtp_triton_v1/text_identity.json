@@ -1,7 +1,7 @@
 {
  "command": "experiments/backbone/stream_text_identity.py --run B1=/home/ubuntu/vp-data/backbone/e2e/mtp-triton-v1/backbone-mtp-triton-v1-B/20261002-123648 --run A1=/home/ubuntu/vp-data/backbone/e2e/mtp-triton-v1/backbone-mtp-triton-v1-A/20261002-124002 --run A2=/home/ubuntu/vp-data/backbone/e2e/mtp-triton-v1/backbone-mtp-triton-v1-A/20261002-124317 --run B2=/home/ubuntu/vp-data/backbone/e2e/mtp-triton-v1/backbone-mtp-triton-v1-B/20261002-124631 --pair B1:A1 --pair B2:A2 --pair A2:A1 --pair B2:B1 --out evidence/backbone/served/mtp_triton_v1/text_identity.json",
- "repo_commit": "47c7ccd97c73b9ac66dca4e1d28292a966e5a7b8",
- "comparison": "streamed text (reasoning_content then content deltas, in arrival order) and completion token count per prompt; not token ids or logprobs",
+ "repo_commit": "1e7b6b356a31a0fa782bedc8f9658581c6aa7a49",
+ "comparison": "streamed text per prompt (reasoning_content and content deltas in one buffer, in arrival order, each character on the same channel); not token ids or logprobs; completion_tokens_differ lists prompts whose token counts differ, which does not enter the identity",
  "tokens_before": "output tokens streamed before the chunk that holds the first difference, the smaller count of the two runs; the first differing token is at or after this index",
  "runs": {
   "B1": "20261002-123648",
@@ -20,6 +20,7 @@
    "completion_tokens": [
     512
    ],
+   "completion_tokens_differ": [],
    "tokens_before_min": 177,
    "tokens_before_median": 329,
    "first_divergences": [
@@ -70,6 +71,7 @@
    "completion_tokens": [
     512
    ],
+   "completion_tokens_differ": [],
    "tokens_before_min": 1,
    "tokens_before_median": 253,
    "first_divergences": [
@@ -160,6 +162,7 @@
    "completion_tokens": [
     512
    ],
+   "completion_tokens_differ": [],
    "tokens_before_min": 0,
    "tokens_before_median": 173.0,
    "first_divergences": [
@@ -775,6 +778,7 @@
    "completion_tokens": [
     512
    ],
+   "completion_tokens_differ": [],
    "tokens_before_min": 177,
    "tokens_before_median": 329,
    "first_divergences": [
@@ -825,6 +829,7 @@
    "completion_tokens": [
     512
    ],
+   "completion_tokens_differ": [],
    "tokens_before_min": 1,
    "tokens_before_median": 253,
    "first_divergences": [
@@ -915,6 +920,7 @@
    "completion_tokens": [
     512
    ],
+   "completion_tokens_differ": [],
    "tokens_before_min": 1,
    "tokens_before_median": 211.0,
    "first_divergences": [
@@ -1420,6 +1426,7 @@
    "completion_tokens": [
     512
    ],
+   "completion_tokens_differ": [],
    "tokens_before_min": null,
    "tokens_before_median": null,
    "first_divergences": []
@@ -1434,6 +1441,7 @@
    "completion_tokens": [
     512
    ],
+   "completion_tokens_differ": [],
    "tokens_before_min": null,
    "tokens_before_median": null,
    "first_divergences": []
@@ -1448,6 +1456,7 @@
    "completion_tokens": [
     512
    ],
+   "completion_tokens_differ": [],
    "tokens_before_min": 29,
    "tokens_before_median": 301,
    "first_divergences": [
@@ -1688,6 +1697,7 @@
    "completion_tokens": [
     512
    ],
+   "completion_tokens_differ": [],
    "tokens_before_min": null,
    "tokens_before_median": null,
    "first_divergences": []
@@ -1702,6 +1712,7 @@
    "completion_tokens": [
     512
    ],
+   "completion_tokens_differ": [],
    "tokens_before_min": null,
    "tokens_before_median": null,
    "first_divergences": []
@@ -1716,6 +1727,7 @@
    "completion_tokens": [
     512
    ],
+   "completion_tokens_differ": [],
    "tokens_before_min": 0,
    "tokens_before_median": 217,
    "first_divergences": [
