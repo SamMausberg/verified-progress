@@ -7,7 +7,7 @@ REPO="$(cd "$SP/../.." && pwd)"
 SGLANG_DIR=${SGLANG_DIR:-$HOME/sglang}
 [ "$(git -C "$SGLANG_DIR" rev-parse --short=10 HEAD)" = bd66ce343e ] || { echo "$SGLANG_DIR is not at bd66ce343e"; exit 1; }
 [ -z "$(git -C "$SGLANG_DIR" status --porcelain --untracked-files=no)" ] || { echo "$SGLANG_DIR is dirty"; exit 1; }
-unset SGLANG_WORKTREE
+unset SGLANG_WORKTREE PYTHONPATH
 # shellcheck source=/dev/null
 source "$REPO/scripts/sglang_env.sh"
 mkdir -p "$HOME/vp-data/speed-bytes"
