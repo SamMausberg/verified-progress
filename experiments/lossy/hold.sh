@@ -15,9 +15,10 @@
 # run_hold.py ends the running launch with its whole process tree and writes the manifest.
 # The outer `timeout` is a backstop two minutes later, so it cannot cut that cleanup short.
 # The load test and the GEMM benchmark stop at their outer timeout. `--foreground` signals
-# only the direct child, but no process outlives the hold: scripts/gpu_job.sh is a child
-# subreaper and, before it releases the lock, terminates every process the hold started,
-# orphans and servers in their own session included.
+# only the direct child, but scripts/gpu_job.sh is a child subreaper and, before it releases
+# the lock, terminates every process the hold started, orphans and servers in their own
+# session included. The exception is a wrapper killed with SIGKILL, which cannot clean up;
+# scripts/gpu_drain_wait.sh, which runs before the next exclusive job, covers that case.
 set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo"

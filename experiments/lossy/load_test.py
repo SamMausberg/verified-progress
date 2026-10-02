@@ -437,11 +437,15 @@ def main(argv: list[str] | None = None) -> int:
         if not record['port_cleared']:
             print(f'    port {PORT} still in use after {name}; stopping', flush=True)
             break
-    failed = [s['step'] for s in summary['steps'] if not s['ok']]
+    # A step that left its port occupied failed even if its own checks passed, and the steps
+    # after it never ran: either makes the run incomplete.
+    failed = [s['step'] for s in summary['steps'] if not (s['ok'] and s['port_cleared'])]
+    skipped = names[len(summary['steps']) :]
     summary['failed'] = failed
+    summary['skipped'] = skipped
     path.write_text(json.dumps(summary, indent=1, default=str) + '\n')
-    print(f'wrote {path}; failed: {failed}', flush=True)
-    return 1 if failed else 0
+    print(f'wrote {path}; failed: {failed}; skipped: {skipped}', flush=True)
+    return 1 if failed or skipped else 0
 
 
 if __name__ == '__main__':
