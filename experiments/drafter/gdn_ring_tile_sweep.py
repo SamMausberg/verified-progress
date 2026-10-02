@@ -263,8 +263,11 @@ def main() -> None:
     parser.add_argument('--repeats', type=int, default=4)
     parser.add_argument('--out', type=Path, required=True)
     args = parser.parse_args()
-    if 32 not in args.tiles or any(t not in (4, 8, 16, 32) for t in args.tiles):
-        parser.error('tiles must be among 4, 8, 16, 32 and include 32 (the reference)')
+    if not {4, 32} <= set(args.tiles) or any(t not in (4, 8, 16, 32) for t in args.tiles):
+        parser.error(
+            'tiles must be among 4, 8, 16, 32 and include 4 and 32 '
+            '(the declared threshold compares them)'
+        )
     if min(args.batches) < 1 or min(args.blocks) < 1 or args.layers < 1 or args.iters < 1:
         parser.error('batches, blocks, layers and iters must be positive')
     if args.repeats < 1:
