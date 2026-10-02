@@ -1,0 +1,1909 @@
+{
+ "meta": {
+  "fp32": {
+   "model": "Qwen/Qwen3.5-4B",
+   "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+   "dtype": "float32",
+   "torch": "2.13.0+cu130"
+  },
+  "hf_bf16_torch": {
+   "model": "Qwen/Qwen3.5-4B",
+   "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+   "implementation": "transformers",
+   "transformers": "5.12.1",
+   "torch": "2.13.0+cu130",
+   "fla": null,
+   "dtype": "bfloat16",
+   "device": "cuda",
+   "device_name": "NVIDIA GH200 480GB",
+   "attn_implementation": "eager",
+   "tf32": false,
+   "bf16_reduced_precision_reduction": true,
+   "state_dtype_requested": "model",
+   "gdn_kernels": {
+    "chunk": "transformers.models.qwen3_5.modeling_qwen3_5.torch_chunk_gated_delta_rule",
+    "recurrent": "transformers.models.qwen3_5.modeling_qwen3_5.torch_recurrent_gated_delta_rule",
+    "conv_prefill": "torch.nn.Conv1d",
+    "conv_update": "transformers.models.qwen3_5.modeling_qwen3_5.torch_causal_conv1d_update",
+    "gated_norm": "transformers.models.qwen3_5.modeling_qwen3_5.Qwen3_5RMSNormGated"
+   },
+   "trace": 39
+  },
+  "hf_bf16_torch_fp32state": {
+   "model": "Qwen/Qwen3.5-4B",
+   "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+   "implementation": "transformers",
+   "transformers": "5.12.1",
+   "torch": "2.13.0+cu130",
+   "fla": null,
+   "dtype": "bfloat16",
+   "device": "cuda",
+   "device_name": "NVIDIA GH200 480GB",
+   "attn_implementation": "eager",
+   "tf32": false,
+   "bf16_reduced_precision_reduction": true,
+   "state_dtype_requested": "float32",
+   "gdn_kernels": {
+    "chunk": "transformers.models.qwen3_5.modeling_qwen3_5.torch_chunk_gated_delta_rule",
+    "recurrent": "transformers.models.qwen3_5.modeling_qwen3_5.torch_recurrent_gated_delta_rule",
+    "conv_prefill": "torch.nn.Conv1d",
+    "conv_update": "transformers.models.qwen3_5.modeling_qwen3_5.torch_causal_conv1d_update",
+    "gated_norm": "transformers.models.qwen3_5.modeling_qwen3_5.Qwen3_5RMSNormGated"
+   },
+   "trace": 39
+  },
+  "hf_bf16_fla": {
+   "model": "Qwen/Qwen3.5-4B",
+   "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+   "implementation": "transformers",
+   "transformers": "5.12.1",
+   "torch": "2.13.0+cu130",
+   "fla": "0.5.2",
+   "dtype": "bfloat16",
+   "device": "cuda",
+   "device_name": "NVIDIA GH200 480GB",
+   "attn_implementation": "eager",
+   "tf32": false,
+   "bf16_reduced_precision_reduction": true,
+   "state_dtype_requested": "model",
+   "gdn_kernels": {
+    "chunk": "fla.ops.gated_delta_rule.chunk.chunk_gated_delta_rule",
+    "recurrent": "fla.ops.gated_delta_rule.fused_recurrent.fused_recurrent_gated_delta_rule",
+    "conv_prefill": "torch.nn.Conv1d",
+    "conv_update": "transformers.models.qwen3_5.modeling_qwen3_5.torch_causal_conv1d_update",
+    "gated_norm": "fla.modules.fused_norm_gate.FusedRMSNormGated"
+   },
+   "trace": 39
+  },
+  "hf_bf16_fla_fp32state": {
+   "model": "Qwen/Qwen3.5-4B",
+   "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+   "implementation": "transformers",
+   "transformers": "5.12.1",
+   "torch": "2.13.0+cu130",
+   "fla": "0.5.2",
+   "dtype": "bfloat16",
+   "device": "cuda",
+   "device_name": "NVIDIA GH200 480GB",
+   "attn_implementation": "eager",
+   "tf32": false,
+   "bf16_reduced_precision_reduction": true,
+   "state_dtype_requested": "float32",
+   "gdn_kernels": {
+    "chunk": "fla.ops.gated_delta_rule.chunk.chunk_gated_delta_rule",
+    "recurrent": "fla.ops.gated_delta_rule.fused_recurrent.fused_recurrent_gated_delta_rule",
+    "conv_prefill": "torch.nn.Conv1d",
+    "conv_update": "transformers.models.qwen3_5.modeling_qwen3_5.torch_causal_conv1d_update",
+    "gated_norm": "fla.modules.fused_norm_gate.FusedRMSNormGated"
+   },
+   "trace": 39
+  },
+  "sglang_pin_default": {
+   "flags": {},
+   "sglang_source": {
+    "module_file": "/home/ubuntu/sglang/python/sglang/__init__.py",
+    "path": "/home/ubuntu/sglang",
+    "head": "bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824",
+    "branch": "verified-progress",
+    "dirty_files": []
+   },
+   "server_version": "0.5.21.dev861+gbd66ce343",
+   "gdn_dispatcher": [
+    "decode=TritonGDNKernel, extend=FlashInferGDNKernel, verify=TritonGDNKernel packed_decode=True"
+   ]
+  },
+  "sglang_pin_prefill_triton": {
+   "flags": {
+    "linear-attn-prefill-backend": "triton"
+   },
+   "sglang_source": {
+    "module_file": "/home/ubuntu/sglang/python/sglang/__init__.py",
+    "path": "/home/ubuntu/sglang",
+    "head": "bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824",
+    "branch": "verified-progress",
+    "dirty_files": []
+   },
+   "server_version": "0.5.21.dev861+gbd66ce343",
+   "gdn_dispatcher": [
+    "decode=TritonGDNKernel, extend=TritonGDNKernel, verify=TritonGDNKernel packed_decode=True"
+   ]
+  },
+  "sglang_pin_decode_flashinfer": {
+   "flags": {
+    "linear-attn-decode-backend": "flashinfer"
+   },
+   "sglang_source": {
+    "module_file": "/home/ubuntu/sglang/python/sglang/__init__.py",
+    "path": "/home/ubuntu/sglang",
+    "head": "bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824",
+    "branch": "verified-progress",
+    "dirty_files": []
+   },
+   "server_version": "0.5.21.dev861+gbd66ce343",
+   "gdn_dispatcher": [
+    "decode=FlashInferGDNKernel, extend=FlashInferGDNKernel, verify=FlashInferGDNKernel packed_decode=False"
+   ]
+  },
+  "sglang_pin_no_cuda_graph": {
+   "flags": {
+    "disable-cuda-graph": true
+   },
+   "sglang_source": {
+    "module_file": "/home/ubuntu/sglang/python/sglang/__init__.py",
+    "path": "/home/ubuntu/sglang",
+    "head": "bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824",
+    "branch": "verified-progress",
+    "dirty_files": []
+   },
+   "server_version": "0.5.21.dev861+gbd66ce343",
+   "gdn_dispatcher": [
+    "decode=TritonGDNKernel, extend=FlashInferGDNKernel, verify=TritonGDNKernel packed_decode=True"
+   ]
+  },
+  "sglang_pin_attn_triton": {
+   "flags": {
+    "attention-backend": "triton"
+   },
+   "sglang_source": {
+    "module_file": "/home/ubuntu/sglang/python/sglang/__init__.py",
+    "path": "/home/ubuntu/sglang",
+    "head": "bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824",
+    "branch": "verified-progress",
+    "dirty_files": []
+   },
+   "server_version": "0.5.21.dev861+gbd66ce343",
+   "gdn_dispatcher": [
+    "decode=TritonGDNKernel, extend=FlashInferGDNKernel, verify=TritonGDNKernel packed_decode=True"
+   ]
+  },
+  "sglang_pin_beta_fp32": {
+   "flags": {},
+   "sglang_source": {
+    "module_file": "/home/ubuntu/sglang-wt/upstream-bf16/python/sglang/__init__.py",
+    "path": "/home/ubuntu/sglang-wt/upstream-bf16",
+    "head": "4608661757c5c3891f0a40d8980fd99fd0547abd",
+    "branch": "engine/upstream-bf16",
+    "dirty_files": []
+   },
+   "server_version": "0.5.21.dev861+gbd66ce343",
+   "gdn_dispatcher": [
+    "decode=TritonGDNKernel, extend=FlashInferGDNKernel, verify=TritonGDNKernel packed_decode=True"
+   ]
+  }
+ },
+ "targets": [
+  {
+   "id": "s1/mtp-tuned-triton+cert/c064|579ae7ce3d47d06c|439",
+   "position": 439,
+   "track": [
+    1756,
+    5715,
+    8078,
+    9471,
+    68189
+   ],
+   "fp32_top1": 68189,
+   "paths": {
+    "fp32_cpu/fp32_full": {
+     "top1": 68189,
+     "top1_logprob": -0.8737,
+     "tracked": {
+      "1756": -9.7868,
+      "5715": -5.6146,
+      "8078": -1.8905,
+      "9471": -12.0136,
+      "68189": -0.8737
+     },
+     "max_abs_diff_from_fp32_tracked": 0.0,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0,
+     "positions_before": 39
+    },
+    "fp32_cpu/fp32_recurrent_from_400": {
+     "top1": 68189,
+     "top1_logprob": -0.8737,
+     "tracked": {
+      "1756": -9.7868,
+      "5715": -5.6147,
+      "8078": -1.8905,
+      "9471": -12.0136,
+      "68189": -0.8737
+     },
+     "max_abs_diff_from_fp32_tracked": 0.0,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0,
+     "positions_before": 39
+    },
+    "sglang_benchcert_stock/prefill_514": {
+     "top1": 68189,
+     "top1_logprob": -1.3115,
+     "tracked": {
+      "1756": -8.124,
+      "5715": -3.499,
+      "8078": -1.6865,
+      "9471": -10.374,
+      "68189": -1.3115
+     },
+     "max_abs_diff_from_fp32_tracked": 2.1156,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0436,
+     "positions_before": 39
+    },
+    "sglang_benchcert_stock/prefill_576": {
+     "top1": 68189,
+     "top1_logprob": -1.2036,
+     "tracked": {
+      "1756": -8.8911,
+      "5715": -3.7661,
+      "8078": -1.7661,
+      "9471": -11.2661,
+      "68189": -1.2036
+     },
+     "max_abs_diff_from_fp32_tracked": 1.8485,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0456,
+     "positions_before": 39
+    },
+    "sglang_benchcert_stock/prefill_587": {
+     "top1": 8078,
+     "top1_logprob": -1.5074,
+     "tracked": {
+      "1756": -8.3199,
+      "5715": -3.3199,
+      "8078": -1.5074,
+      "9471": -10.6012,
+      "68189": -1.5699
+     },
+     "max_abs_diff_from_fp32_tracked": 2.2947,
+     "fp32_top_minus_fp32_of_path_top1": 1.0167,
+     "max_abs_diff_from_fp32_recorded_before": 0.0329,
+     "positions_before": 39
+    },
+    "sglang_benchcert_stock/decode_from_400": {
+     "top1": 1756,
+     "top1_logprob": -0.3215,
+     "tracked": {
+      "1756": -0.3215,
+      "5715": -2.759,
+      "8078": -4.509,
+      "9471": -3.5715,
+      "68189": -5.3215
+     },
+     "max_abs_diff_from_fp32_tracked": 9.4653,
+     "fp32_top_minus_fp32_of_path_top1": 8.9131,
+     "max_abs_diff_from_fp32_recorded_before": 0.0139,
+     "positions_before": 39
+    },
+    "hf_bf16_torch/prefill_514": {
+     "top1": 68189,
+     "top1_logprob": -1.0092,
+     "tracked": {
+      "1756": -9.478,
+      "5715": -4.8842,
+      "8078": -1.7592,
+      "9471": -11.728,
+      "68189": -1.0092
+     },
+     "max_abs_diff_from_fp32_tracked": 0.7304,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0199,
+     "positions_before": 39
+    },
+    "hf_bf16_torch/prefill_576": {
+     "top1": 68189,
+     "top1_logprob": -1.2118,
+     "tracked": {
+      "1756": -9.0243,
+      "5715": -4.4618,
+      "8078": -1.5868,
+      "9471": -11.2118,
+      "68189": -1.2118
+     },
+     "max_abs_diff_from_fp32_tracked": 1.1529,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0197,
+     "positions_before": 39
+    },
+    "hf_bf16_torch/prefill_587": {
+     "top1": 68189,
+     "top1_logprob": -0.9477,
+     "tracked": {
+      "1756": -9.7914,
+      "5715": -5.8227,
+      "8078": -1.8227,
+      "9471": -11.8852,
+      "68189": -0.9477
+     },
+     "max_abs_diff_from_fp32_tracked": 0.2081,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0092,
+     "positions_before": 39
+    },
+    "hf_bf16_torch/decode_from_400": {
+     "top1": 68189,
+     "top1_logprob": -1.0275,
+     "tracked": {
+      "1756": -9.6525,
+      "5715": -5.5275,
+      "8078": -1.7775,
+      "9471": -11.84,
+      "68189": -1.0275
+     },
+     "max_abs_diff_from_fp32_tracked": 0.1736,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0037,
+     "positions_before": 39
+    },
+    "hf_bf16_torch_fp32state/prefill_514": {
+     "top1": 68189,
+     "top1_logprob": -1.0092,
+     "tracked": {
+      "1756": -9.478,
+      "5715": -4.8842,
+      "8078": -1.7592,
+      "9471": -11.728,
+      "68189": -1.0092
+     },
+     "max_abs_diff_from_fp32_tracked": 0.7304,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0199,
+     "positions_before": 39
+    },
+    "hf_bf16_torch_fp32state/prefill_576": {
+     "top1": 68189,
+     "top1_logprob": -1.2118,
+     "tracked": {
+      "1756": -9.0243,
+      "5715": -4.4618,
+      "8078": -1.5868,
+      "9471": -11.2118,
+      "68189": -1.2118
+     },
+     "max_abs_diff_from_fp32_tracked": 1.1529,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0197,
+     "positions_before": 39
+    },
+    "hf_bf16_torch_fp32state/prefill_587": {
+     "top1": 68189,
+     "top1_logprob": -0.9477,
+     "tracked": {
+      "1756": -9.7914,
+      "5715": -5.8227,
+      "8078": -1.8227,
+      "9471": -11.8852,
+      "68189": -0.9477
+     },
+     "max_abs_diff_from_fp32_tracked": 0.2081,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0092,
+     "positions_before": 39
+    },
+    "hf_bf16_torch_fp32state/decode_from_400": {
+     "top1": 68189,
+     "top1_logprob": -1.0371,
+     "tracked": {
+      "1756": -9.8184,
+      "5715": -5.4746,
+      "8078": -1.7871,
+      "9471": -12.0059,
+      "68189": -1.0371
+     },
+     "max_abs_diff_from_fp32_tracked": 0.1634,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0349,
+     "positions_before": 39
+    },
+    "hf_bf16_fla/prefill_514": {
+     "top1": 68189,
+     "top1_logprob": -0.9114,
+     "tracked": {
+      "1756": -9.7864,
+      "5715": -6.0989,
+      "8078": -1.6614,
+      "9471": -11.9114,
+      "68189": -0.9114
+     },
+     "max_abs_diff_from_fp32_tracked": 0.4843,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0305,
+     "positions_before": 39
+    },
+    "hf_bf16_fla/prefill_576": {
+     "top1": 68189,
+     "top1_logprob": -0.6691,
+     "tracked": {
+      "1756": -10.1066,
+      "5715": -6.2316,
+      "8078": -2.1066,
+      "9471": -12.0754,
+      "68189": -0.6691
+     },
+     "max_abs_diff_from_fp32_tracked": 0.617,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0227,
+     "positions_before": 39
+    },
+    "hf_bf16_fla/prefill_587": {
+     "top1": 68189,
+     "top1_logprob": -0.681,
+     "tracked": {
+      "1756": -10.0248,
+      "5715": -6.2435,
+      "8078": -2.2435,
+      "9471": -12.2123,
+      "68189": -0.681
+     },
+     "max_abs_diff_from_fp32_tracked": 0.6289,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0229,
+     "positions_before": 39
+    },
+    "hf_bf16_fla/decode_from_400": {
+     "top1": 68189,
+     "top1_logprob": -1.4131,
+     "tracked": {
+      "1756": -7.6006,
+      "5715": -2.5381,
+      "8078": -1.6631,
+      "9471": -10.1006,
+      "68189": -1.4131
+     },
+     "max_abs_diff_from_fp32_tracked": 3.0766,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0247,
+     "positions_before": 39
+    },
+    "hf_bf16_fla_fp32state/prefill_514": {
+     "top1": 68189,
+     "top1_logprob": -0.9114,
+     "tracked": {
+      "1756": -9.7864,
+      "5715": -6.0989,
+      "8078": -1.6614,
+      "9471": -11.9114,
+      "68189": -0.9114
+     },
+     "max_abs_diff_from_fp32_tracked": 0.4843,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0305,
+     "positions_before": 39
+    },
+    "hf_bf16_fla_fp32state/prefill_576": {
+     "top1": 68189,
+     "top1_logprob": -0.6691,
+     "tracked": {
+      "1756": -10.1066,
+      "5715": -6.2316,
+      "8078": -2.1066,
+      "9471": -12.0754,
+      "68189": -0.6691
+     },
+     "max_abs_diff_from_fp32_tracked": 0.617,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0227,
+     "positions_before": 39
+    },
+    "hf_bf16_fla_fp32state/prefill_587": {
+     "top1": 68189,
+     "top1_logprob": -0.681,
+     "tracked": {
+      "1756": -10.0248,
+      "5715": -6.2435,
+      "8078": -2.2435,
+      "9471": -12.2123,
+      "68189": -0.681
+     },
+     "max_abs_diff_from_fp32_tracked": 0.6289,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0229,
+     "positions_before": 39
+    },
+    "hf_bf16_fla_fp32state/decode_from_400": {
+     "top1": 68189,
+     "top1_logprob": -0.9447,
+     "tracked": {
+      "1756": -9.6009,
+      "5715": -5.1947,
+      "8078": -2.0072,
+      "9471": -11.9447,
+      "68189": -0.9447
+     },
+     "max_abs_diff_from_fp32_tracked": 0.4199,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0239,
+     "positions_before": 39
+    },
+    "sglang_pin_default/prefill_514": {
+     "top1": 68189,
+     "top1_logprob": -1.3115,
+     "tracked": {
+      "1756": -8.124,
+      "5715": -3.499,
+      "8078": -1.6865,
+      "9471": -10.374,
+      "68189": -1.3115
+     },
+     "max_abs_diff_from_fp32_tracked": 2.1156,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0436,
+     "positions_before": 39
+    },
+    "sglang_pin_default/prefill_576": {
+     "top1": 68189,
+     "top1_logprob": -1.2036,
+     "tracked": {
+      "1756": -8.8911,
+      "5715": -3.7661,
+      "8078": -1.7661,
+      "9471": -11.2661,
+      "68189": -1.2036
+     },
+     "max_abs_diff_from_fp32_tracked": 1.8485,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0456,
+     "positions_before": 39
+    },
+    "sglang_pin_default/prefill_587": {
+     "top1": 8078,
+     "top1_logprob": -1.5074,
+     "tracked": {
+      "1756": -8.3199,
+      "5715": -3.3199,
+      "8078": -1.5074,
+      "9471": -10.6012,
+      "68189": -1.5699
+     },
+     "max_abs_diff_from_fp32_tracked": 2.2947,
+     "fp32_top_minus_fp32_of_path_top1": 1.0167,
+     "max_abs_diff_from_fp32_recorded_before": 0.0329,
+     "positions_before": 39
+    },
+    "sglang_pin_default/decode_from_400": {
+     "top1": 1756,
+     "top1_logprob": -0.3215,
+     "tracked": {
+      "1756": -0.3215,
+      "5715": -2.759,
+      "8078": -4.509,
+      "9471": -3.5715,
+      "68189": -5.3215
+     },
+     "max_abs_diff_from_fp32_tracked": 9.4653,
+     "fp32_top_minus_fp32_of_path_top1": 8.9131,
+     "max_abs_diff_from_fp32_recorded_before": 0.0139,
+     "positions_before": 39
+    },
+    "sglang_pin_prefill_triton/prefill_514": {
+     "top1": 5715,
+     "top1_logprob": -1.3876,
+     "tracked": {
+      "1756": -3.7626,
+      "5715": -1.3876,
+      "8078": -1.7001,
+      "9471": -6.3251,
+      "68189": -2.3251
+     },
+     "max_abs_diff_from_fp32_tracked": 6.0243,
+     "fp32_top_minus_fp32_of_path_top1": 4.7409,
+     "max_abs_diff_from_fp32_recorded_before": 0.0037,
+     "positions_before": 39
+    },
+    "sglang_pin_prefill_triton/prefill_576": {
+     "top1": 5715,
+     "top1_logprob": -1.4584,
+     "tracked": {
+      "1756": -3.2709,
+      "5715": -1.4584,
+      "8078": -1.8334,
+      "9471": -5.8959,
+      "68189": -2.2709
+     },
+     "max_abs_diff_from_fp32_tracked": 6.516,
+     "fp32_top_minus_fp32_of_path_top1": 4.7409,
+     "max_abs_diff_from_fp32_recorded_before": 0.0265,
+     "positions_before": 39
+    },
+    "sglang_pin_prefill_triton/prefill_587": {
+     "top1": 5715,
+     "top1_logprob": -1.4584,
+     "tracked": {
+      "1756": -3.2709,
+      "5715": -1.4584,
+      "8078": -1.8334,
+      "9471": -5.8959,
+      "68189": -2.2709
+     },
+     "max_abs_diff_from_fp32_tracked": 6.516,
+     "fp32_top_minus_fp32_of_path_top1": 4.7409,
+     "max_abs_diff_from_fp32_recorded_before": 0.0265,
+     "positions_before": 39
+    },
+    "sglang_pin_prefill_triton/decode_from_400": {
+     "top1": 8078,
+     "top1_logprob": -1.5534,
+     "tracked": {
+      "1756": -7.6784,
+      "5715": -2.8659,
+      "8078": -1.5534,
+      "9471": -9.9596,
+      "68189": -1.5534
+     },
+     "max_abs_diff_from_fp32_tracked": 2.7487,
+     "fp32_top_minus_fp32_of_path_top1": 1.0167,
+     "max_abs_diff_from_fp32_recorded_before": 0.0061,
+     "positions_before": 39
+    },
+    "sglang_pin_decode_flashinfer/prefill_514": {
+     "top1": 68189,
+     "top1_logprob": -1.3115,
+     "tracked": {
+      "1756": -8.124,
+      "5715": -3.499,
+      "8078": -1.6865,
+      "9471": -10.374,
+      "68189": -1.3115
+     },
+     "max_abs_diff_from_fp32_tracked": 2.1156,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0436,
+     "positions_before": 39
+    },
+    "sglang_pin_decode_flashinfer/prefill_576": {
+     "top1": 68189,
+     "top1_logprob": -1.2036,
+     "tracked": {
+      "1756": -8.8911,
+      "5715": -3.7661,
+      "8078": -1.7661,
+      "9471": -11.2661,
+      "68189": -1.2036
+     },
+     "max_abs_diff_from_fp32_tracked": 1.8485,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0456,
+     "positions_before": 39
+    },
+    "sglang_pin_decode_flashinfer/prefill_587": {
+     "top1": 8078,
+     "top1_logprob": -1.5074,
+     "tracked": {
+      "1756": -8.3199,
+      "5715": -3.3199,
+      "8078": -1.5074,
+      "9471": -10.6012,
+      "68189": -1.5699
+     },
+     "max_abs_diff_from_fp32_tracked": 2.2947,
+     "fp32_top_minus_fp32_of_path_top1": 1.0167,
+     "max_abs_diff_from_fp32_recorded_before": 0.0329,
+     "positions_before": 39
+    },
+    "sglang_pin_decode_flashinfer/decode_from_400": {
+     "top1": 1756,
+     "top1_logprob": -0.9385,
+     "tracked": {
+      "1756": -0.9385,
+      "5715": -1.501,
+      "8078": -2.8135,
+      "9471": -4.126,
+      "68189": -3.4385
+     },
+     "max_abs_diff_from_fp32_tracked": 8.8483,
+     "fp32_top_minus_fp32_of_path_top1": 8.9131,
+     "max_abs_diff_from_fp32_recorded_before": 0.0309,
+     "positions_before": 39
+    },
+    "sglang_pin_no_cuda_graph/prefill_514": {
+     "top1": 68189,
+     "top1_logprob": -1.3115,
+     "tracked": {
+      "1756": -8.124,
+      "5715": -3.499,
+      "8078": -1.6865,
+      "9471": -10.374,
+      "68189": -1.3115
+     },
+     "max_abs_diff_from_fp32_tracked": 2.1156,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0436,
+     "positions_before": 39
+    },
+    "sglang_pin_no_cuda_graph/prefill_576": {
+     "top1": 68189,
+     "top1_logprob": -1.2036,
+     "tracked": {
+      "1756": -8.8911,
+      "5715": -3.7661,
+      "8078": -1.7661,
+      "9471": -11.2661,
+      "68189": -1.2036
+     },
+     "max_abs_diff_from_fp32_tracked": 1.8485,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0456,
+     "positions_before": 39
+    },
+    "sglang_pin_no_cuda_graph/prefill_587": {
+     "top1": 8078,
+     "top1_logprob": -1.5074,
+     "tracked": {
+      "1756": -8.3199,
+      "5715": -3.3199,
+      "8078": -1.5074,
+      "9471": -10.6012,
+      "68189": -1.5699
+     },
+     "max_abs_diff_from_fp32_tracked": 2.2947,
+     "fp32_top_minus_fp32_of_path_top1": 1.0167,
+     "max_abs_diff_from_fp32_recorded_before": 0.0329,
+     "positions_before": 39
+    },
+    "sglang_pin_no_cuda_graph/decode_from_400": {
+     "top1": 1756,
+     "top1_logprob": -0.3215,
+     "tracked": {
+      "1756": -0.3215,
+      "5715": -2.759,
+      "8078": -4.509,
+      "9471": -3.5715,
+      "68189": -5.3215
+     },
+     "max_abs_diff_from_fp32_tracked": 9.4653,
+     "fp32_top_minus_fp32_of_path_top1": 8.9131,
+     "max_abs_diff_from_fp32_recorded_before": 0.0139,
+     "positions_before": 39
+    },
+    "sglang_pin_attn_triton/prefill_514": {
+     "top1": 68189,
+     "top1_logprob": -1.3497,
+     "tracked": {
+      "1756": -7.8497,
+      "5715": -3.0997,
+      "8078": -1.7247,
+      "9471": -10.1622,
+      "68189": -1.3497
+     },
+     "max_abs_diff_from_fp32_tracked": 2.5149,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0472,
+     "positions_before": 39
+    },
+    "sglang_pin_attn_triton/prefill_576": {
+     "top1": 68189,
+     "top1_logprob": -1.3497,
+     "tracked": {
+      "1756": -7.8497,
+      "5715": -3.0997,
+      "8078": -1.7247,
+      "9471": -10.1622,
+      "68189": -1.3497
+     },
+     "max_abs_diff_from_fp32_tracked": 2.5149,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0472,
+     "positions_before": 39
+    },
+    "sglang_pin_attn_triton/prefill_587": {
+     "top1": 5715,
+     "top1_logprob": -1.4459,
+     "tracked": {
+      "1756": -2.2584,
+      "5715": -1.4459,
+      "8078": -1.9459,
+      "9471": -5.1334,
+      "68189": -2.8834
+     },
+     "max_abs_diff_from_fp32_tracked": 7.5285,
+     "fp32_top_minus_fp32_of_path_top1": 4.7409,
+     "max_abs_diff_from_fp32_recorded_before": 0.023,
+     "positions_before": 39
+    },
+    "sglang_pin_attn_triton/decode_from_400": {
+     "top1": 1756,
+     "top1_logprob": -0.3536,
+     "tracked": {
+      "1756": -0.3536,
+      "5715": -2.6661,
+      "8078": -4.2286,
+      "9471": -3.6661,
+      "68189": -5.0411
+     },
+     "max_abs_diff_from_fp32_tracked": 9.4332,
+     "fp32_top_minus_fp32_of_path_top1": 8.9131,
+     "max_abs_diff_from_fp32_recorded_before": 0.0354,
+     "positions_before": 39
+    },
+    "sglang_pin_beta_fp32/prefill_514": {
+     "top1": 5715,
+     "top1_logprob": -1.5363,
+     "tracked": {
+      "1756": -4.4113,
+      "5715": -1.5363,
+      "8078": -1.7238,
+      "9471": -7.0363,
+      "68189": -2.4113
+     },
+     "max_abs_diff_from_fp32_tracked": 5.3756,
+     "fp32_top_minus_fp32_of_path_top1": 4.7409,
+     "max_abs_diff_from_fp32_recorded_before": 0.0168,
+     "positions_before": 39
+    },
+    "sglang_pin_beta_fp32/prefill_576": {
+     "top1": 8078,
+     "top1_logprob": -1.5492,
+     "tracked": {
+      "1756": -7.5492,
+      "5715": -2.8617,
+      "8078": -1.5492,
+      "9471": -9.8617,
+      "68189": -1.6742
+     },
+     "max_abs_diff_from_fp32_tracked": 2.7529,
+     "fp32_top_minus_fp32_of_path_top1": 1.0167,
+     "max_abs_diff_from_fp32_recorded_before": 0.0392,
+     "positions_before": 39
+    },
+    "sglang_pin_beta_fp32/prefill_587": {
+     "top1": 5715,
+     "top1_logprob": -1.0101,
+     "tracked": {
+      "1756": -2.7601,
+      "5715": -1.0101,
+      "8078": -2.0101,
+      "9471": -5.7601,
+      "68189": -2.7601
+     },
+     "max_abs_diff_from_fp32_tracked": 7.0267,
+     "fp32_top_minus_fp32_of_path_top1": 4.7409,
+     "max_abs_diff_from_fp32_recorded_before": 0.0028,
+     "positions_before": 39
+    },
+    "sglang_pin_beta_fp32/decode_from_400": {
+     "top1": 8078,
+     "top1_logprob": -1.5998,
+     "tracked": {
+      "1756": -4.9748,
+      "5715": -1.8498,
+      "8078": -1.5998,
+      "9471": -7.4748,
+      "68189": -2.2248
+     },
+     "max_abs_diff_from_fp32_tracked": 4.812,
+     "fp32_top_minus_fp32_of_path_top1": 1.0167,
+     "max_abs_diff_from_fp32_recorded_before": 0.029,
+     "positions_before": 39
+    }
+   }
+  },
+  {
+   "id": "s1/plain-tuned/c128|a4db11ff3ac4ceb6|333",
+   "position": 333,
+   "track": [
+    5500,
+    18299
+   ],
+   "fp32_top1": 18299,
+   "paths": {
+    "fp32_cpu/fp32_full": {
+     "top1": 18299,
+     "top1_logprob": -0.446,
+     "tracked": {
+      "5500": -1.7397,
+      "18299": -0.446
+     },
+     "max_abs_diff_from_fp32_tracked": 0.0,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0,
+     "positions_before": 39
+    },
+    "fp32_cpu/fp32_recurrent_from_294": {
+     "top1": 18299,
+     "top1_logprob": -0.4468,
+     "tracked": {
+      "5500": -1.7373,
+      "18299": -0.4468
+     },
+     "max_abs_diff_from_fp32_tracked": 0.0023,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0,
+     "positions_before": 39
+    },
+    "sglang_benchcert_stock/prefill_393": {
+     "top1": 5500,
+     "top1_logprob": -0.0142,
+     "tracked": {
+      "5500": -0.0142,
+      "18299": -13.8892
+     },
+     "max_abs_diff_from_fp32_tracked": 13.4431,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0028,
+     "positions_before": 39
+    },
+    "sglang_benchcert_stock/prefill_455": {
+     "top1": 5500,
+     "top1_logprob": -0.0212,
+     "tracked": {
+      "5500": -0.0212,
+      "18299": -13.3962
+     },
+     "max_abs_diff_from_fp32_tracked": 12.9502,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0029,
+     "positions_before": 39
+    },
+    "sglang_benchcert_stock/prefill_572": {
+     "top1": 5500,
+     "top1_logprob": -0.0079,
+     "tracked": {
+      "5500": -0.0079,
+      "18299": -15.3204
+     },
+     "max_abs_diff_from_fp32_tracked": 14.8744,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0023,
+     "positions_before": 39
+    },
+    "sglang_benchcert_stock/decode_from_294": {
+     "top1": 18299,
+     "top1_logprob": -0.282,
+     "tracked": {
+      "5500": -3.032,
+      "18299": -0.282
+     },
+     "max_abs_diff_from_fp32_tracked": 1.2923,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0035,
+     "positions_before": 39
+    },
+    "hf_bf16_torch/prefill_393": {
+     "top1": 18299,
+     "top1_logprob": -0.6219,
+     "tracked": {
+      "5500": -1.2469,
+      "18299": -0.6219
+     },
+     "max_abs_diff_from_fp32_tracked": 0.4927,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0085,
+     "positions_before": 39
+    },
+    "hf_bf16_torch/prefill_455": {
+     "top1": 5500,
+     "top1_logprob": -0.0224,
+     "tracked": {
+      "5500": -0.0224,
+      "18299": -4.3974
+     },
+     "max_abs_diff_from_fp32_tracked": 3.9514,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0066,
+     "positions_before": 39
+    },
+    "hf_bf16_torch/prefill_572": {
+     "top1": 5500,
+     "top1_logprob": -0.0006,
+     "tracked": {
+      "5500": -0.0006,
+      "18299": -17.1569
+     },
+     "max_abs_diff_from_fp32_tracked": 16.7108,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0035,
+     "positions_before": 39
+    },
+    "hf_bf16_torch/decode_from_294": {
+     "top1": 18299,
+     "top1_logprob": -0.3254,
+     "tracked": {
+      "5500": -3.0754,
+      "18299": -0.3254
+     },
+     "max_abs_diff_from_fp32_tracked": 1.3357,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0057,
+     "positions_before": 39
+    },
+    "hf_bf16_torch_fp32state/prefill_393": {
+     "top1": 18299,
+     "top1_logprob": -0.6219,
+     "tracked": {
+      "5500": -1.2469,
+      "18299": -0.6219
+     },
+     "max_abs_diff_from_fp32_tracked": 0.4927,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0085,
+     "positions_before": 39
+    },
+    "hf_bf16_torch_fp32state/prefill_455": {
+     "top1": 5500,
+     "top1_logprob": -0.0224,
+     "tracked": {
+      "5500": -0.0224,
+      "18299": -4.3974
+     },
+     "max_abs_diff_from_fp32_tracked": 3.9514,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0066,
+     "positions_before": 39
+    },
+    "hf_bf16_torch_fp32state/prefill_572": {
+     "top1": 5500,
+     "top1_logprob": -0.0006,
+     "tracked": {
+      "5500": -0.0006,
+      "18299": -17.1569
+     },
+     "max_abs_diff_from_fp32_tracked": 16.7108,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0035,
+     "positions_before": 39
+    },
+    "hf_bf16_torch_fp32state/decode_from_294": {
+     "top1": 5500,
+     "top1_logprob": -0.0028,
+     "tracked": {
+      "5500": -0.0028,
+      "18299": -15.6278
+     },
+     "max_abs_diff_from_fp32_tracked": 15.1818,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0057,
+     "positions_before": 39
+    },
+    "hf_bf16_fla/prefill_393": {
+     "top1": 5500,
+     "top1_logprob": -0.1824,
+     "tracked": {
+      "5500": -0.1824,
+      "18299": -4.0574
+     },
+     "max_abs_diff_from_fp32_tracked": 3.6114,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.003,
+     "positions_before": 39
+    },
+    "hf_bf16_fla/prefill_455": {
+     "top1": 5500,
+     "top1_logprob": -0.208,
+     "tracked": {
+      "5500": -0.208,
+      "18299": -3.708
+     },
+     "max_abs_diff_from_fp32_tracked": 3.262,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0018,
+     "positions_before": 39
+    },
+    "hf_bf16_fla/prefill_572": {
+     "top1": 5500,
+     "top1_logprob": -0.159,
+     "tracked": {
+      "5500": -0.159,
+      "18299": -3.534
+     },
+     "max_abs_diff_from_fp32_tracked": 3.088,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0091,
+     "positions_before": 39
+    },
+    "hf_bf16_fla/decode_from_294": {
+     "top1": 18299,
+     "top1_logprob": -0.3251,
+     "tracked": {
+      "5500": -2.8251,
+      "18299": -0.3251
+     },
+     "max_abs_diff_from_fp32_tracked": 1.0854,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0096,
+     "positions_before": 39
+    },
+    "hf_bf16_fla_fp32state/prefill_393": {
+     "top1": 5500,
+     "top1_logprob": -0.1824,
+     "tracked": {
+      "5500": -0.1824,
+      "18299": -4.0574
+     },
+     "max_abs_diff_from_fp32_tracked": 3.6114,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.003,
+     "positions_before": 39
+    },
+    "hf_bf16_fla_fp32state/prefill_455": {
+     "top1": 5500,
+     "top1_logprob": -0.208,
+     "tracked": {
+      "5500": -0.208,
+      "18299": -3.708
+     },
+     "max_abs_diff_from_fp32_tracked": 3.262,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0018,
+     "positions_before": 39
+    },
+    "hf_bf16_fla_fp32state/prefill_572": {
+     "top1": 5500,
+     "top1_logprob": -0.159,
+     "tracked": {
+      "5500": -0.159,
+      "18299": -3.534
+     },
+     "max_abs_diff_from_fp32_tracked": 3.088,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0091,
+     "positions_before": 39
+    },
+    "hf_bf16_fla_fp32state/decode_from_294": {
+     "top1": 18299,
+     "top1_logprob": -0.2521,
+     "tracked": {
+      "5500": -2.8771,
+      "18299": -0.2521
+     },
+     "max_abs_diff_from_fp32_tracked": 1.1375,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0096,
+     "positions_before": 39
+    },
+    "sglang_pin_default/prefill_393": {
+     "top1": 5500,
+     "top1_logprob": -0.0142,
+     "tracked": {
+      "5500": -0.0142,
+      "18299": -13.8892
+     },
+     "max_abs_diff_from_fp32_tracked": 13.4431,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0028,
+     "positions_before": 39
+    },
+    "sglang_pin_default/prefill_455": {
+     "top1": 5500,
+     "top1_logprob": -0.0212,
+     "tracked": {
+      "5500": -0.0212,
+      "18299": -13.3962
+     },
+     "max_abs_diff_from_fp32_tracked": 12.9502,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0029,
+     "positions_before": 39
+    },
+    "sglang_pin_default/prefill_572": {
+     "top1": 5500,
+     "top1_logprob": -0.0079,
+     "tracked": {
+      "5500": -0.0079,
+      "18299": -15.3204
+     },
+     "max_abs_diff_from_fp32_tracked": 14.8744,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0023,
+     "positions_before": 39
+    },
+    "sglang_pin_default/decode_from_294": {
+     "top1": 18299,
+     "top1_logprob": -0.282,
+     "tracked": {
+      "5500": -3.032,
+      "18299": -0.282
+     },
+     "max_abs_diff_from_fp32_tracked": 1.2923,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0035,
+     "positions_before": 39
+    },
+    "sglang_pin_prefill_triton/prefill_393": {
+     "top1": 18299,
+     "top1_logprob": -0.2094,
+     "tracked": {
+      "5500": -3.0844,
+      "18299": -0.2094
+     },
+     "max_abs_diff_from_fp32_tracked": 1.3447,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.003,
+     "positions_before": 39
+    },
+    "sglang_pin_prefill_triton/prefill_455": {
+     "top1": 5500,
+     "top1_logprob": -0.5548,
+     "tracked": {
+      "5500": -0.5548,
+      "18299": -1.5548
+     },
+     "max_abs_diff_from_fp32_tracked": 1.1849,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0078,
+     "positions_before": 39
+    },
+    "sglang_pin_prefill_triton/prefill_572": {
+     "top1": 18299,
+     "top1_logprob": -0.6787,
+     "tracked": {
+      "5500": -1.4287,
+      "18299": -0.6787
+     },
+     "max_abs_diff_from_fp32_tracked": 0.311,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0068,
+     "positions_before": 39
+    },
+    "sglang_pin_prefill_triton/decode_from_294": {
+     "top1": 5500,
+     "top1_logprob": -0.1037,
+     "tracked": {
+      "5500": -0.1037,
+      "18299": -5.0412
+     },
+     "max_abs_diff_from_fp32_tracked": 4.5952,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0025,
+     "positions_before": 39
+    },
+    "sglang_pin_decode_flashinfer/prefill_393": {
+     "top1": 5500,
+     "top1_logprob": -0.0142,
+     "tracked": {
+      "5500": -0.0142,
+      "18299": -13.8892
+     },
+     "max_abs_diff_from_fp32_tracked": 13.4431,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0028,
+     "positions_before": 39
+    },
+    "sglang_pin_decode_flashinfer/prefill_455": {
+     "top1": 5500,
+     "top1_logprob": -0.0212,
+     "tracked": {
+      "5500": -0.0212,
+      "18299": -13.3962
+     },
+     "max_abs_diff_from_fp32_tracked": 12.9502,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0029,
+     "positions_before": 39
+    },
+    "sglang_pin_decode_flashinfer/prefill_572": {
+     "top1": 5500,
+     "top1_logprob": -0.0079,
+     "tracked": {
+      "5500": -0.0079,
+      "18299": -15.3204
+     },
+     "max_abs_diff_from_fp32_tracked": 14.8744,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0023,
+     "positions_before": 39
+    },
+    "sglang_pin_decode_flashinfer/decode_from_294": {
+     "top1": 18299,
+     "top1_logprob": -0.2933,
+     "tracked": {
+      "5500": -3.4183,
+      "18299": -0.2933
+     },
+     "max_abs_diff_from_fp32_tracked": 1.6786,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0023,
+     "positions_before": 39
+    },
+    "sglang_pin_no_cuda_graph/prefill_393": {
+     "top1": 5500,
+     "top1_logprob": -0.0142,
+     "tracked": {
+      "5500": -0.0142,
+      "18299": -13.8892
+     },
+     "max_abs_diff_from_fp32_tracked": 13.4431,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0028,
+     "positions_before": 39
+    },
+    "sglang_pin_no_cuda_graph/prefill_455": {
+     "top1": 5500,
+     "top1_logprob": -0.0212,
+     "tracked": {
+      "5500": -0.0212,
+      "18299": -13.3962
+     },
+     "max_abs_diff_from_fp32_tracked": 12.9502,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0029,
+     "positions_before": 39
+    },
+    "sglang_pin_no_cuda_graph/prefill_572": {
+     "top1": 5500,
+     "top1_logprob": -0.0079,
+     "tracked": {
+      "5500": -0.0079,
+      "18299": -15.3204
+     },
+     "max_abs_diff_from_fp32_tracked": 14.8744,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0023,
+     "positions_before": 39
+    },
+    "sglang_pin_no_cuda_graph/decode_from_294": {
+     "top1": 18299,
+     "top1_logprob": -0.282,
+     "tracked": {
+      "5500": -3.032,
+      "18299": -0.282
+     },
+     "max_abs_diff_from_fp32_tracked": 1.2923,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0035,
+     "positions_before": 39
+    },
+    "sglang_pin_attn_triton/prefill_393": {
+     "top1": 5500,
+     "top1_logprob": -0.0431,
+     "tracked": {
+      "5500": -0.0431,
+      "18299": -13.6368
+     },
+     "max_abs_diff_from_fp32_tracked": 13.1908,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.003,
+     "positions_before": 39
+    },
+    "sglang_pin_attn_triton/prefill_455": {
+     "top1": 5500,
+     "top1_logprob": -0.0431,
+     "tracked": {
+      "5500": -0.0431,
+      "18299": -13.6368
+     },
+     "max_abs_diff_from_fp32_tracked": 13.1908,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.003,
+     "positions_before": 39
+    },
+    "sglang_pin_attn_triton/prefill_572": {
+     "top1": 5500,
+     "top1_logprob": -0.0431,
+     "tracked": {
+      "5500": -0.0431,
+      "18299": -13.6368
+     },
+     "max_abs_diff_from_fp32_tracked": 13.1908,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.003,
+     "positions_before": 39
+    },
+    "sglang_pin_attn_triton/decode_from_294": {
+     "top1": 18299,
+     "top1_logprob": -0.2835,
+     "tracked": {
+      "5500": -3.2835,
+      "18299": -0.2835
+     },
+     "max_abs_diff_from_fp32_tracked": 1.5438,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0055,
+     "positions_before": 39
+    },
+    "sglang_pin_beta_fp32/prefill_393": {
+     "top1": 18299,
+     "top1_logprob": -0.3303,
+     "tracked": {
+      "5500": -3.4553,
+      "18299": -0.3303
+     },
+     "max_abs_diff_from_fp32_tracked": 1.7156,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0036,
+     "positions_before": 39
+    },
+    "sglang_pin_beta_fp32/prefill_455": {
+     "top1": 18299,
+     "top1_logprob": -0.2949,
+     "tracked": {
+      "5500": -2.7949,
+      "18299": -0.2949
+     },
+     "max_abs_diff_from_fp32_tracked": 1.0552,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0041,
+     "positions_before": 39
+    },
+    "sglang_pin_beta_fp32/prefill_572": {
+     "top1": 18299,
+     "top1_logprob": -0.3308,
+     "tracked": {
+      "5500": -2.8308,
+      "18299": -0.3308
+     },
+     "max_abs_diff_from_fp32_tracked": 1.0911,
+     "fp32_top_minus_fp32_of_path_top1": 0.0,
+     "max_abs_diff_from_fp32_recorded_before": 0.0037,
+     "positions_before": 39
+    },
+    "sglang_pin_beta_fp32/decode_from_294": {
+     "top1": 5500,
+     "top1_logprob": -0.01,
+     "tracked": {
+      "5500": -0.01,
+      "18299": -7.26
+     },
+     "max_abs_diff_from_fp32_tracked": 6.814,
+     "fp32_top_minus_fp32_of_path_top1": 1.2936,
+     "max_abs_diff_from_fp32_recorded_before": 0.0019,
+     "positions_before": 39
+    }
+   }
+  }
+ ],
+ "perturbation": {
+  "perturb": {
+   "meta": {
+    "model": "Qwen/Qwen3.5-4B",
+    "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+    "dtype": "float32",
+    "device": "cpu",
+    "attn_implementation": "eager",
+    "transformers": "5.12.1",
+    "torch": "2.13.0+cu130",
+    "site": "residual",
+    "perturbation": "each decoder layer output times (1 + u), u ~ U[-2^-8, 2^-8], per element",
+    "eps": 0.00390625,
+    "seeds": 8,
+    "trace": 39
+   },
+   "targets": {
+    "s1/mtp-tuned-triton+cert/c064|579ae7ce3d47d06c|439": {
+     "position": 439,
+     "at_target": {
+      "none": {
+       "top1": 68189,
+       "tracked": {
+        "1756": -9.7868,
+        "5715": -5.6146,
+        "8078": -1.8905,
+        "9471": -12.0136,
+        "68189": -0.8737
+       }
+      },
+      "seed_0": {
+       "top1": 68189,
+       "tracked": {
+        "1756": -9.8496,
+        "5715": -5.7656,
+        "8078": -1.8211,
+        "9471": -11.9052,
+        "68189": -0.8251
+       }
+      },
+      "seed_1": {
+       "top1": 68189,
+       "tracked": {
+        "1756": -9.2703,
+        "5715": -4.4172,
+        "8078": -1.7761,
+        "9471": -11.5976,
+        "68189": -1.205
+       }
+      },
+      "seed_2": {
+       "top1": 68189,
+       "tracked": {
+        "1756": -9.769,
+        "5715": -5.3335,
+        "8078": -1.9621,
+        "9471": -11.9662,
+        "68189": -0.8638
+       }
+      },
+      "seed_3": {
+       "top1": 68189,
+       "tracked": {
+        "1756": -10.0359,
+        "5715": -6.305,
+        "8078": -1.9085,
+        "9471": -11.9824,
+        "68189": -0.7134
+       }
+      },
+      "seed_4": {
+       "top1": 68189,
+       "tracked": {
+        "1756": -9.82,
+        "5715": -5.5081,
+        "8078": -1.7675,
+        "9471": -11.9433,
+        "68189": -0.8356
+       }
+      },
+      "seed_5": {
+       "top1": 68189,
+       "tracked": {
+        "1756": -9.9232,
+        "5715": -6.0607,
+        "8078": -1.9616,
+        "9471": -12.0532,
+        "68189": -0.7879
+       }
+      },
+      "seed_6": {
+       "top1": 68189,
+       "tracked": {
+        "1756": -9.7283,
+        "5715": -5.4938,
+        "8078": -1.7449,
+        "9471": -11.9219,
+        "68189": -0.9301
+       }
+      },
+      "seed_7": {
+       "top1": 68189,
+       "tracked": {
+        "1756": -9.4911,
+        "5715": -4.9968,
+        "8078": -1.8762,
+        "9471": -11.8301,
+        "68189": -0.9206
+       }
+      }
+     },
+     "range_over_seeds": {
+      "1756": [
+       -10.0359,
+       -9.2703
+      ],
+      "5715": [
+       -6.305,
+       -4.4172
+      ],
+      "8078": [
+       -1.9621,
+       -1.7449
+      ],
+      "9471": [
+       -12.0532,
+       -11.5976
+      ],
+      "68189": [
+       -1.205,
+       -0.7134
+      ]
+     },
+     "top1_over_seeds": [
+      68189
+     ],
+     "max_abs_change_recorded_before": 0.0219
+    },
+    "s1/plain-tuned/c128|a4db11ff3ac4ceb6|333": {
+     "position": 333,
+     "at_target": {
+      "none": {
+       "top1": 18299,
+       "tracked": {
+        "5500": -1.7397,
+        "18299": -0.446
+       }
+      },
+      "seed_0": {
+       "top1": 18299,
+       "tracked": {
+        "5500": -1.5728,
+        "18299": -0.4619
+       }
+      },
+      "seed_1": {
+       "top1": 18299,
+       "tracked": {
+        "5500": -3.0088,
+        "18299": -0.2153
+       }
+      },
+      "seed_2": {
+       "top1": 18299,
+       "tracked": {
+        "5500": -3.6153,
+        "18299": -0.2787
+       }
+      },
+      "seed_3": {
+       "top1": 5500,
+       "tracked": {
+        "5500": -0.0241,
+        "18299": -7.4579
+       }
+      },
+      "seed_4": {
+       "top1": 5500,
+       "tracked": {
+        "5500": -0.0603,
+        "18299": -3.426
+       }
+      },
+      "seed_5": {
+       "top1": 5500,
+       "tracked": {
+        "5500": -0.0061,
+        "18299": -11.653
+       }
+      },
+      "seed_6": {
+       "top1": 18299,
+       "tracked": {
+        "5500": -3.7788,
+        "18299": -0.3434
+       }
+      },
+      "seed_7": {
+       "top1": 5500,
+       "tracked": {
+        "5500": -0.4243,
+        "18299": -1.5152
+       }
+      }
+     },
+     "range_over_seeds": {
+      "5500": [
+       -3.7788,
+       -0.0061
+      ],
+      "18299": [
+       -11.653,
+       -0.2153
+      ]
+     },
+     "top1_over_seeds": [
+      5500,
+      18299
+     ],
+     "max_abs_change_recorded_before": 0.0049
+    }
+   }
+  },
+  "perturb_gdn": {
+   "meta": {
+    "model": "Qwen/Qwen3.5-4B",
+    "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+    "dtype": "float32",
+    "device": "cpu",
+    "attn_implementation": "eager",
+    "transformers": "5.12.1",
+    "torch": "2.13.0+cu130",
+    "site": "gdn",
+    "perturbation": "each GDN layer core input (query, key, value, beta) times (1 + u), per element",
+    "eps": 0.00390625,
+    "seeds": 8,
+    "trace": 39
+   },
+   "targets": {
+    "s1/mtp-tuned-triton+cert/c064|579ae7ce3d47d06c|439": {
+     "position": 439,
+     "at_target": {
+      "none": {
+       "top1": 68189,
+       "tracked": {
+        "1756": -9.7868,
+        "5715": -5.6146,
+        "8078": -1.8905,
+        "9471": -12.0136,
+        "68189": -0.8737
+       }
+      },
+      "seed_0": {
+       "top1": 68189,
+       "tracked": {
+        "1756": -9.8567,
+        "5715": -5.7834,
+        "8078": -1.884,
+        "9471": -12.0563,
+        "68189": -0.8438
+       }
+      },
+      "seed_1": {
+       "top1": 68189,
+       "tracked": {
+        "1756": -9.7956,
+        "5715": -5.7382,
+        "8078": -1.8621,
+        "9471": -12.0226,
+        "68189": -0.8403
+       }
+      },
+      "seed_2": {
+       "top1": 68189,
+       "tracked": {
+        "1756": -9.8035,
+        "5715": -5.8941,
+        "8078": -1.8167,
+        "9471": -11.9428,
+        "68189": -0.8369
+       }
+      },
+      "seed_3": {
+       "top1": 68189,
+       "tracked": {
+        "1756": -9.7775,
+        "5715": -5.5041,
+        "8078": -1.9662,
+        "9471": -12.058,
+        "68189": -0.9016
+       }
+      },
+      "seed_4": {
+       "top1": 68189,
+       "tracked": {
+        "1756": -9.8132,
+        "5715": -5.96,
+        "8078": -1.8609,
+        "9471": -11.9957,
+        "68189": -0.847
+       }
+      },
+      "seed_5": {
+       "top1": 68189,
+       "tracked": {
+        "1756": -9.9041,
+        "5715": -5.8085,
+        "8078": -1.9048,
+        "9471": -12.0096,
+        "68189": -0.7972
+       }
+      },
+      "seed_6": {
+       "top1": 68189,
+       "tracked": {
+        "1756": -9.6939,
+        "5715": -5.2639,
+        "8078": -1.8813,
+        "9471": -11.9584,
+        "68189": -0.936
+       }
+      },
+      "seed_7": {
+       "top1": 68189,
+       "tracked": {
+        "1756": -9.8149,
+        "5715": -5.6997,
+        "8078": -1.8735,
+        "9471": -11.9927,
+        "68189": -0.8422
+       }
+      }
+     },
+     "range_over_seeds": {
+      "1756": [
+       -9.9041,
+       -9.6939
+      ],
+      "5715": [
+       -5.96,
+       -5.2639
+      ],
+      "8078": [
+       -1.9662,
+       -1.8167
+      ],
+      "9471": [
+       -12.058,
+       -11.9428
+      ],
+      "68189": [
+       -0.936,
+       -0.7972
+      ]
+     },
+     "top1_over_seeds": [
+      68189
+     ],
+     "max_abs_change_recorded_before": 0.02
+    },
+    "s1/plain-tuned/c128|a4db11ff3ac4ceb6|333": {
+     "position": 333,
+     "at_target": {
+      "none": {
+       "top1": 18299,
+       "tracked": {
+        "5500": -1.7397,
+        "18299": -0.446
+       }
+      },
+      "seed_0": {
+       "top1": 5500,
+       "tracked": {
+        "5500": -0.2904,
+        "18299": -1.7966
+       }
+      },
+      "seed_1": {
+       "top1": 5500,
+       "tracked": {
+        "5500": -0.293,
+        "18299": -1.7502
+       }
+      },
+      "seed_2": {
+       "top1": 5500,
+       "tracked": {
+        "5500": -0.813,
+        "18299": -0.9379
+       }
+      },
+      "seed_3": {
+       "top1": 18299,
+       "tracked": {
+        "5500": -3.1222,
+        "18299": -0.2523
+       }
+      },
+      "seed_4": {
+       "top1": 18299,
+       "tracked": {
+        "5500": -2.1584,
+        "18299": -0.3293
+       }
+      },
+      "seed_5": {
+       "top1": 18299,
+       "tracked": {
+        "5500": -2.0475,
+        "18299": -0.3505
+       }
+      },
+      "seed_6": {
+       "top1": 18299,
+       "tracked": {
+        "5500": -2.7519,
+        "18299": -0.2652
+       }
+      },
+      "seed_7": {
+       "top1": 5500,
+       "tracked": {
+        "5500": -0.1447,
+        "18299": -2.7161
+       }
+      }
+     },
+     "range_over_seeds": {
+      "5500": [
+       -3.1222,
+       -0.1447
+      ],
+      "18299": [
+       -2.7161,
+       -0.2523
+      ]
+     },
+     "top1_over_seeds": [
+      5500,
+      18299
+     ],
+     "max_abs_change_recorded_before": 0.0007
+    }
+   }
+  }
+ }
+}
