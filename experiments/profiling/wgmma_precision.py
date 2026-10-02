@@ -153,6 +153,40 @@ def epilogue_mode(res: dict[str, float]) -> str:
     return found[0] if found else f'unclassified {signature}'
 
 
+def versions() -> dict[str, str]:
+    """Versions of every component that compiled or ran the probed kernels."""
+    import ctypes
+    import sysconfig
+
+    from triton.backends.nvidia.compiler import get_ptxas_version
+
+    lib = Path(sysconfig.get_paths()['purelib']) / 'nvidia/cu13/lib/libcublasLt.so.13'
+    lt = ctypes.CDLL(str(lib))
+    lt.cublasLtGetVersion.restype = ctypes.c_size_t
+    driver = subprocess.run(
+        ['nvidia-smi', '--query-gpu=driver_version', '--format=csv,noheader'],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    return {
+        'torch': torch.__version__,
+        'torch_cuda': str(torch.version.cuda),
+        'triton': triton.__version__,
+        'triton_ptxas': get_ptxas_version(90).strip().splitlines()[-1],
+        'cublaslt': str(lt.cublasLtGetVersion()),
+        'cublaslt_library': '/'.join(lib.parts[-4:]),
+        'driver': driver,
+    }
+
+
+def ptx_directive(ptx: str, name: str) -> str:
+    match = re.search(rf'^\.{name}\s+(\S+)', ptx, re.M)
+    if match is None:
+        raise RuntimeError(f'no .{name} directive in the PTX')
+    return match.group(1)
+
+
 def exactly_bf16(x: float) -> bool:
     return torch.tensor(x, dtype=torch.bfloat16).item() == x
 
@@ -182,9 +216,12 @@ def run_triton(k: int, batch: list[Case]) -> tuple[list[float], dict]:
         out += d[: len(chunk), 0].tolist()
         if not info:
             sass = compiled.asm['sass']
+            ptx = compiled.asm['ptx']
             info = {
-                'ptx_wgmma': len(re.findall(r'wgmma\.mma_async', compiled.asm['ptx'])),
-                'ptx_mma_sync': len(re.findall(r'\bmma\.sync', compiled.asm['ptx'])),
+                'ptx_version': ptx_directive(ptx, 'version'),
+                'ptx_target': ptx_directive(ptx, 'target'),
+                'ptx_wgmma': len(re.findall(r'wgmma\.mma_async', ptx)),
+                'ptx_mma_sync': len(re.findall(r'\bmma\.sync', ptx)),
                 'sass_HGMMA': len(re.findall(r'\bHGMMA\.', sass)),
                 'sass_HMMA': len(re.findall(r'\bHMMA\.', sass)),
                 'sass_HGMMA_forms': sorted(set(re.findall(r'HGMMA\.[\w.]+', sass))),
@@ -325,9 +362,7 @@ def main() -> None:
             check=True,
         ).stdout.strip(),
         'gpu': torch.cuda.get_device_name(0),
-        'torch': torch.__version__,
-        'cuda': torch.version.cuda,
-        'triton': triton.__version__,
+        'versions': versions(),
         'tiny_exponent': TINY,
     }
 
