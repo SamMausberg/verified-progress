@@ -3,7 +3,7 @@
 #  1. the attention microbenchmark on the confirm engine (~/sglang-wt/speed-lowc-confirm: the pin
 #     plus the FA4 paged-KV backport and switched-off levers; Triton, split-KV and head-dim-128
 #     FA4 paths are the pin's) and the GDN chain benchmark on the stock tree;
-#  2. only if probe 3 (FA4 target numerics, regression test, smoke) ended with "failed: none":
+#  2. only if probe 3's outputs pass check_probe3.py (FA4 target numerics, regression test, smoke):
 #     a served A/B of FA4 target attention (lever C) on the confirm engine,
 #       L: dflash-tuned-b16 with FA4 draft (B) against FA4 target + draft (BC), c = 1, 4: B BC B
 #       H: dflash-tuned (FlashInfer target, FA4 draft) against FA4 target (C), c = 8, 32: B0 C B0
@@ -15,7 +15,6 @@ unset SGLANG_WORKTREE PYTHONPATH
 # shellcheck disable=SC1091
 source scripts/sglang_env.sh
 ENGINE=$HOME/sglang-wt/speed-lowc-confirm
-P3=$HOME/vp-data/speed-lowc/logs/probe3.log
 OUT=~/vp-data/speed-lowc/probe4-$(date -u +%Y%m%dT%H%M%SZ)
 mkdir -p "$OUT"
 cleanup() { pkill -TERM -f 'sglang.launch_server.*--port 30216' 2>/dev/null || true; }
@@ -46,9 +45,13 @@ sweep() {
 ) || failed+=(attn)
 timeout --foreground 180 python experiments/speed_lowc/gdn_chain_bench.py \
   --out "$OUT/gdn_chain_bench.json" > "$OUT/gdn_chain_bench.log" 2>&1 || failed+=(gdn)
-if ! grep -q "probe3 end .* failed: none" "$P3"; then
-  echo "probe 3 did not pass ($(grep 'probe3 end' "$P3" || echo 'no end line')); served A/B skipped"
-  echo "probe4 end $(date -Is) failed: ${failed[*]:-none} (served skipped)"
+# Probe 3's verdict from its own outputs (newest ~/vp-data/speed-lowc/probe3-*/):
+# 0 passed, 1 failed a check (served A/B skipped), 2 outputs missing (an error).
+python experiments/speed_lowc/check_probe3.py | tee "$OUT/probe3_check.txt"
+p3=${PIPESTATUS[0]}
+if (( p3 != 0 )); then
+  (( p3 == 1 )) || failed+=(probe3_outputs_missing)
+  echo "probe4 end $(date -Is) failed: ${failed[*]:-none} (served A/B skipped: probe 3 check exit $p3)"
   (( ${#failed[@]} == 0 ))
   exit
 fi

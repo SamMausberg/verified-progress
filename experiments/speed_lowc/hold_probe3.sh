@@ -29,5 +29,5 @@ timeout --foreground 900 python experiments/speed_lowc/fa4_smoke.py --out "$OUT/
   --configs stock fa4_both 2>&1 | tee "$OUT/smoke.log" | tail -6
 (( PIPESTATUS[0] == 0 )) || failed+=(smoke)
 nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader
-echo "probe3 end $(date -Is) failed: ${failed[*]:-none}"
+echo "probe3 end $(date -Is) failed: ${failed[*]:-none}" | tee "$OUT/status.txt"
 (( ${#failed[@]} == 0 ))
