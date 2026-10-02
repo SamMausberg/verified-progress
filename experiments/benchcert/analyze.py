@@ -1037,6 +1037,10 @@ def check_counters(
         for point in info['points']:
             c = int(point['concurrency'])
             point_dir = Path(info['run_dir']) / 'r0' / f'c{c:03d}'
+            if not outputs_complete(point):
+                # A failed request, a wrong output length or a nonzero client status:
+                # the counters may not cover the batches the point should have served.
+                complete = False
             after = _snapshot(point_dir, 'after', name)
             if after is None:
                 complete = False

@@ -528,6 +528,14 @@ def control_found(path: Path) -> bool:
     return False
 
 
+def scored(path: Path) -> bool:
+    """A point's score file exists and holds no per-request error (a point with an error,
+    for example a transient server failure, is scored again in full)."""
+    if not path.exists():
+        return False
+    return not any('error' in json.loads(line) for line in path.read_text().splitlines() if line)
+
+
 def score(out: Path, runs: Path, url: str, workers: int) -> int:
     """Teacher-forced scores of every point, one JSONL file per point under <out>/score;
     points already scored are skipped, so an interrupted run resumes."""
@@ -545,7 +553,7 @@ def score(out: Path, runs: Path, url: str, workers: int) -> int:
     total = 0
     for index, (name, point) in enumerate(points):
         path = target / (name.replace('/', '__') + '.jsonl')
-        if not path.exists():
+        if not scored(path):
             items = requests(point)
 
             def one(item: dict[str, Any]) -> dict[str, Any]:

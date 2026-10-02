@@ -603,6 +603,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     for entry in result['gross_by_variant']:
         print(f'  {entry}')
+    if result['errors']:
+        # Counts from points with unscored requests understate the events: rescore them
+        # (drain.py score retries any point file holding an error record).
+        print(f'ERROR: {result["errors"]} requests were not scored')
+        return 2
     return 0
 
 

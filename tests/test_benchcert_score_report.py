@@ -201,3 +201,14 @@ def test_report_times_gross_events_and_classes_co_batched_disagreements(
     assert result['gross_by_variant'] == [
         {'group': 'h6', 'family': 'mtp', 'variant': 'cert', 'gross_events': 1}
     ]
+
+
+def test_point_files_with_errors_are_scored_again(tmp_path: Path) -> None:
+    from experiments.benchcert.drain import scored
+
+    path = tmp_path / 'p.jsonl'
+    assert not scored(path)
+    path.write_text(json.dumps({'phase': 'warmup', 'positions': 512}) + '\n')
+    assert scored(path)
+    path.write_text(path.read_text() + json.dumps({'phase': 'profiling', 'error': 'x'}) + '\n')
+    assert not scored(path)

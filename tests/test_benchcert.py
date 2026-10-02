@@ -690,6 +690,12 @@ def test_check_counters_need_every_certified_call_counted(tmp_path: Path) -> Non
     assert analyze.check_counters(launches, 'check2')[1]['plain'] is True
     launch['manifest']['arm']['env']['SGLANG_CERTIFIED_HEAD_STATS_EVERY'] = '25'
     assert analyze.check_counters(launches, 'check2')[1]['plain'] is None
+    # A point with a failed request (or a wrong length, or a nonzero client status) is
+    # incomplete coverage, whatever its counters say.
+    launch['manifest']['arm']['env']['SGLANG_CERTIFIED_HEAD_STATS_EVERY'] = '1'
+    assert analyze.check_counters(launches, 'check2')[1]['plain'] is True
+    launch['points'][0]['failed'] = 1
+    assert analyze.check_counters(launches, 'check2')[1]['plain'] is None
 
 
 def test_hold_specific_pin() -> None:
