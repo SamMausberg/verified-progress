@@ -19,6 +19,7 @@ runs with the backbone engine worktree on the path.
 | `make_table.py` | The engine's routing table (JSON) from a `gemm` result |
 | `summarize.py` | Markdown tables from the results |
 | `bitwise_runs.py` | Counts the prompts whose greedy outputs two state-safety runs reproduce bit for bit (output token ids and every top-k logprob array), for the served exactness classes |
+| `stream_text_identity.py` | Compares the streamed greedy text of two `bench.sweep` runs prompt by prompt, from aiperf's raw export: identical prompts per sweep point and the first difference of the others (streamed text, not token ids or logprobs; CPU only) |
 | `insitu_gemm.py` | From nsys reports of served plain decoding (`experiments/profiling/run_profiles.py`, node-level graph trace): which weight-GEMM kernels each decode-graph replay runs (cuBLAS, the Triton kernel or the Hopper GEMV), per projection, with their median summed time and the replay span |
 
 GPU tests of the kernel: `tests/test_backbone_gemm.py` (skip without CUDA or the patch).
