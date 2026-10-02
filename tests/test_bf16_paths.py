@@ -139,6 +139,7 @@ def test_rates_summary_counts_regret_by_region(tmp_path: Path) -> None:
     assert decode['regret_above']['before_eot']['0.05'] == 0  # the path's top-1 is FP32's there
     # FP32's top-1 (7) at -0.05 against the path's -0.1 (two positions) and -3.0 (one).
     assert decode['fp32_top1_logprob_abs_diff']['max'] == pytest.approx(2.95)
+    assert decode['fp32_top1_logprob_abs_diff']['complete']
     assert decode['top1_differs'] == {'before_eot': 0, 'after_eot': 1}
     assert result['worst']['sglang/decode'][0]['regret'] == pytest.approx(2.55)
     assert result['decision']['sglang_events'] == 1
@@ -149,6 +150,7 @@ def test_rates_summary_counts_a_position_missed_on_both_paths_once(tmp_path: Pat
     output = [5, 6]
     good = [[-0.1, 7], [-3.0, 8]]
     bad = [[-0.1, 8], [-3.0, 7]]
+    bad_without_7 = [[-0.1, 8], [-3.0, 9]]  # FP32's top token is not among the returned ones
     write_gz(
         tmp_path / 'sglang.jsonl.gz',
         [
@@ -157,7 +159,7 @@ def test_rates_summary_counts_a_position_missed_on_both_paths_once(tmp_path: Pat
                 'prompt_ids': [1],
                 'output_ids': output,
                 'decode': [good, bad],
-                'prefill': [good, bad],
+                'prefill': [good, bad_without_7],
             }
         ],
     )
@@ -166,12 +168,15 @@ def test_rates_summary_counts_a_position_missed_on_both_paths_once(tmp_path: Pat
             tmp_path / f'{name}.jsonl.gz',
             [{'prompt': 'a', 'decode': [good] * 2, 'prefill': [good] * 2}],
         )
-    fp = {'top': [[-0.05, 7]], 'lp': {'7': -0.05, '8': -2.6}}
+    fp = {'top': [[-0.05, 7]], 'lp': {'7': -0.05, '8': -2.6, '9': -4.0}}
     write_gz(tmp_path / 'fp32.jsonl.gz', [{'prompt': 'a', 'positions': [fp, fp]}])
     result = rates.summary(tmp_path)
     assert result['counts']['sglang/decode']['regret_above']['before_eot']['2.0'] == 1
     assert result['counts']['sglang/prefill']['regret_above']['before_eot']['2.0'] == 1
     assert result['decision']['sglang_events'] == 1
+    # FP32's top token (7) is outside the prefill path's returned top entries at position 1.
+    prefill = result['counts']['sglang/prefill']['fp32_top1_logprob_abs_diff']
+    assert (prefill['complete'], prefill['outside_top20'], prefill['positions']) == (False, 1, 1)
 
 
 def test_rates_summary_requires_every_source(tmp_path: Path) -> None:

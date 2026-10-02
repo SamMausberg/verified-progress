@@ -29,7 +29,9 @@ module compares the paths on positions nobody selected:
 - `summary`: per path, the positions where FP32's logprob of the path's top-1 falls short
   of FP32's top logprob by more than 2 nats (the decision) and by 0.05-5 nats (secondary),
   before and after the output's first end-of-text token; the path's absolute logprob error
-  on FP32's top-1 token (mean, 99th percentile, maximum; secondary); the worst positions.
+  on FP32's top-1 token (mean, 99th percentile, maximum; secondary; marked incomplete, with
+  the count, when FP32's top token falls outside the path's top-20 somewhere); the worst
+  positions.
 
 Readings (set before the run; `decide`): events are positions where FP32's logprob of a
 path's top-1 falls more than 2 nats short of FP32's top, pooled over decode and prefill (a
@@ -353,6 +355,7 @@ def summary(out: Path) -> dict[str, Any]:
             table = {r: dict.fromkeys(map(str, THRESHOLDS), 0) for r in regions}
             disagree = dict.fromkeys(regions, 0)
             differences: list[float] = []
+            outside = 0  # positions where FP32's top token is not in the path's top-20
             missed = event_positions.setdefault(name, set())
             events = []
             for item in sg:
@@ -371,6 +374,8 @@ def summary(out: Path) -> dict[str, Any]:
                     own = {int(e[1]): float(e[0]) for e in entries}
                     if fp['top'][0][1] in own:
                         differences.append(abs(own[fp['top'][0][1]] - fp['top'][0][0]))
+                    else:
+                        outside += 1
                     if regret > THRESHOLDS[0]:
                         events.append(
                             {
@@ -387,6 +392,9 @@ def summary(out: Path) -> dict[str, Any]:
                 'regret_above': table,
                 'top1_differs': disagree,
                 'fp32_top1_logprob_abs_diff': {
+                    # Statistics over `positions` only; complete when no position was outside.
+                    'complete': outside == 0,
+                    'outside_top20': outside,
                     'positions': len(ranked),
                     'mean': round(sum(ranked) / len(ranked), 5) if ranked else None,
                     'p99': round(ranked[int(0.99 * (len(ranked) - 1))], 5) if ranked else None,
