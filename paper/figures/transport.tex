@@ -55,7 +55,7 @@
 \node[annot,anchor=west] at (axis cs:1.1,0.3) {$\rho$, DFlash-4B};
 \end{semilogxaxis}
 \begin{semilogxaxis}[drift panel,name=c,at={(7.85cm,-2.25cm)},anchor=south west,
-  xlabel={Drift ratio $\rho$ of a pair, or threshold $\delta^\ast_i$ of an entry},
+  xlabel={Drift $\rho$ of a pair, or threshold $\delta^\ast_i$ of an entry},
   title={\paneltitle{c}{MTP-4B: measured drift, same thresholds}}]
 \addplot[copy int8 g128,derived] table[x=threshold_int8_g128,y=q,col sep=comma]{\rhodflash};
 \addplot[copy int8 row,derived] table[x=threshold_int8_row,y=q,col sep=comma]{\rhodflash};
