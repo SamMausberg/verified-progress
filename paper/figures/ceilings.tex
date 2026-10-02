@@ -1,0 +1,25 @@
+% Derived throughput ceilings per lever stack and single served runs (research notes,
+% fig:stack-ceilings); data: evidence/moonshot/ceilings.csv and lever_sweeps_quick.csv. Owner: figures.
+% The ceilings are derived (lines without markers): ink for the layer-serial model, grey for the
+% overlapped roofline, one dash pattern per lever stack. The served runs are measured (filled
+% markers, single runs), offset by a factor 1.12 left and right of their concurrency so that both
+% stay visible.
+\datafigure{../evidence/moonshot/ceilings.csv}{%
+\begin{tikzpicture}
+\begin{axis}[width=.78\linewidth,height=6.0cm,xmode=log,log basis x=2,ymode=log,xmin=0.8,xmax=2400,ymin=100,ymax=2e5,
+  xtick={1,8,32,128,512,2048},xticklabels={1,8,32,128,512,2048},
+  xlabel={Batch size $B$ (lines) or client concurrency $c$ (points)},ylabel={Output tokens/s},grid=major,
+  title={Ceilings per lever stack (derived) and served runs (measured)},
+  legend style={at={(.5,-.22)},anchor=north},legend columns=2,transpose legend,
+  legend style={/tikz/every even column/.append style={column sep=10pt}},
+  every axis plot/.append style={mark size=1.7pt}]
+\addplot[thick,cstock,derived,discard if not={stack}{"baseline (FP32 state)"}] table[x=batch,y=tokens_per_s_ceiling,col sep=comma]{../evidence/moonshot/ceilings.csv};\addlegendentry{plain, FP32 state, layer-serial}
+\addplot[thick,cstock,dashed,derived,discard if not={stack}{"16-bit state (FP16 or BF16)"}] table[x=batch,y=tokens_per_s_ceiling,col sep=comma]{../evidence/moonshot/ceilings.csv};\addlegendentry{16-bit state, layer-serial}
+\addplot[thick,cstock,dashdotted,derived,discard if not={stack}{"ReplaySSM + 16-bit state"}] table[x=batch,y=tokens_per_s_ceiling,col sep=comma]{../evidence/moonshot/ceilings.csv};\addlegendentry{replayed, 16-bit state, layer-serial}
+\addplot[very thick,cstock,densely dotted,derived,discard if not={stack}{"ReplaySSM + int8 state + FP8 W8A8 + FP8 KV + FP8 head"}] table[x=batch,y=tokens_per_s_ceiling,col sep=comma]{../evidence/moonshot/ceilings.csv};\addlegendentry{replayed, int8 state, FP8, layer-serial}
+\addplot[thick,ccontext,derived,discard if not={stack}{"baseline (FP32 state)"}] table[x=batch,y=overlapped_tokens_per_s_ceiling,col sep=comma]{../evidence/moonshot/ceilings.csv};\addlegendentry{plain, FP32 state, overlapped}
+\addplot[very thick,ccontext,densely dotted,derived,discard if not={stack}{"ReplaySSM + int8 state + FP8 W8A8 + FP8 KV + FP8 head"}] table[x=batch,y=overlapped_tokens_per_s_ceiling,col sep=comma]{../evidence/moonshot/ceilings.csv};\addlegendentry{replayed, int8 state, FP8, overlapped}
+\addplot[only marks,mark=*,cstock,discard if not={config}{plain}] table[x expr=\thisrow{concurrency}/1.12,y=y_tok_s_gpu,col sep=comma]{../evidence/moonshot/lever_sweeps_quick.csv};\addlegendentry{plain, served (single run)}
+\addplot[only marks,mark=square*,mark size=1.5pt,cstock,discard if not={config}{plain+fp16_state}] table[x expr=\thisrow{concurrency}*1.12,y=y_tok_s_gpu,col sep=comma]{../evidence/moonshot/lever_sweeps_quick.csv};\addlegendentry{FP16 state, served (single run)}
+\end{axis}
+\end{tikzpicture}}{Derived throughput ceilings per lever stack against batch size, with measured served throughput.}

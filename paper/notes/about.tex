@@ -1,0 +1,33 @@
+% Research notes: what they hold, how they relate to the paper, attribution (owner: appendix editor).
+\section{About these notes}\label{notes:about}
+These notes accompany the paper ``The Work a Verifier Needs'' (``the paper'' below). They hold the investigations made during the work that the paper's claims do not rely on: the programme's other questions and proposals with their tests and verdicts, the rest of the serving stack, drafting and repair, the stock engine's recurrent state under speculation, and further analysis of sampled decisions and transport. Most of the text was moved unchanged from the paper's appendices when the paper was edited for length; only cross-references changed, and a reference into the paper names it, as in ``Appendix~\paperref{app:divergence} of the paper''.
+
+Moved text keeps the paper's earlier vocabulary, which differs from the paper's present terms as Table~\ref{tab:vocabulary} shows; Section~\ref{notes:glossary} defines the other terms these notes use.
+
+\begin{table}[htbp]
+\small\centering
+\caption{The older words that moved text keeps, and what the paper now calls them.}\label{tab:vocabulary}
+\vskip 0.05in
+\begin{tabularx}{\linewidth}{@{}P{4.2cm}Y@{}}\toprule
+In these notes & In the paper\\\midrule
+Self-evidence & The int8 (or other low-precision) copy of the head evaluated at the target's own head input\\
+Envelope $\beta_i$ & The error bound $\beta_i$ on that copy's score of vocabulary entry~$i$\\
+Row (of the head, of $W$) & Vocabulary entry: a token and its weight row $w_i$\\
+Row (of a batch), verify row, draft row & Position: one head input and the decision made from it\\
+Row-wise or column fallback & Per-position fallback\\
+The programme & The research behind the paper, organized as questions H1--H7 and proposals P1--P13 and P-A to P-C (Table~\ref{tab:status})\\
+H1--H7, P1--P13, P-A to P-C & Labels of those questions and proposals; Table~\ref{tab:status} gives each one, its test and its status\\
+Kill test & A test fixed before a proposal is built, designed to reject it cheaply\\
+First matrix, pinned matrix & The cap-16 and cap-8 runs of Appendix~\paperref{app:divergence} of the paper\\
+Second panel & The 80 prompts of the drafter's equality and acceptance runs (Section~\ref{app:drafter-acceptance})\\\bottomrule
+\end{tabularx}
+\end{table}
+
+Evidence is marked as in the paper. A committed result cites its entry in the register of these notes (Section~\ref{notes:register}), printed as [N-E$n$]; a designed result without a committed file carries [N-D$n$], with words beside it saying that the result is not yet measured, and the pending list says where its evidence is to be committed. The paper numbers its own entries without the prefix, E$n$ and D$n$, so an ID never means two things. The two registers are numbered separately: an entry that both documents cite lists the same files in both but usually has a different number, so N-E$n$ and the paper's E$n$ for the same files differ; the paper's numbers are in its register (Appendix~\paperref{app:register} of the paper). Oracle bounds, derived estimates and single runs are labelled as such where they are reported, and a refuted proposal stays with the mechanism that refuted it.
+
+The notes build from the repository's \path{paper/} directory after the paper, with \code{latexmk -pdf notes/research\_notes.tex}.
+
+\paragraph{Attribution and disclosure} These notes share the paper's authorship and its disclosure (Appendix~\paperref{app:attribution} of the paper), which reads:
+\begin{quote}
+Samuel Mausberg is the author of this paper and is responsible for its claims. The earlier draft of the manuscript, its derivations and its reference code were prepared with GPT-6 Astra Pro (OpenAI). This version, including the literature review, theory, measurements, implementation and text, was produced with Claude Code using Claude Opus 5.5 agents, with an independent agent reviewing the changes, and the author directed the work and reviewed it as it progressed, including in discussions of specific points with Claude and with OpenAI models. No AI system is an author. The confidential assignment that motivated the work is not reproduced or quoted, and no model weights are redistributed.
+\end{quote}

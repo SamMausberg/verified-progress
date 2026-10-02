@@ -1,0 +1,23 @@
+% Work counts on constructed heads (research notes, fig:synthetic); data: data/synthetic_drift.csv
+% (experiments/synthetic_drift.py). Owner: figures. The two head families have no paper-wide colour,
+% so they are ink (clustered) and grey (unstructured); solid lines count the decision alone and
+% dashed lines add the dense residual. Counts are computed exactly on synthetic heads: work, not time.
+\def\synthdata{../data/synthetic_drift.csv}
+\begin{tikzpicture}
+\begin{axis}[width=.55\linewidth,height=5.2cm,xmin=-.2,xmax=4.2,ymin=0,ymax=1.05,xtick={0,1,2,4},
+  xlabel={Drift scale $d$},ylabel={Share of the target's\\vocabulary entries projected},ylabel style={align=center},
+  title={Work on constructed heads (synthetic counts)},
+  grid=major,legend style={at={(1.03,.5)},anchor=west,cells={align=left}},
+  every axis plot/.append style={unbounded coords=discard,mark size=1.6pt}]
+\addplot[thick,cstock,mark=*,discard if not={family}{clustered}] table[x=drift,y=accept_projected_fraction,col sep=comma]{\synthdata};
+\addlegendentry{clustered: decision}
+\addplot[thick,cstock,dashed,mark=o,mark options={solid,fill=white},discard if not={family}{clustered}] table[x=drift,y=decision_plus_residual_projected_fraction,col sep=comma]{\synthdata};
+\addlegendentry{clustered: decision\\+ dense residual}
+\addplot[thick,ccontext,mark=square*,discard if not={family}{unstructured}] table[x=drift,y=accept_projected_fraction,col sep=comma]{\synthdata};
+\addlegendentry{unstructured: decision}
+\addplot[thick,ccontext,dashed,mark=square,mark options={solid,fill=white},discard if not={family}{unstructured}] table[x=drift,y=decision_plus_residual_projected_fraction,col sep=comma]{\synthdata};
+\addlegendentry{unstructured: decision\\+ dense residual}
+\addplot[semithick,cstock,densely dotted,mark=triangle*,mark options={solid},discard if not={family}{clustered}] table[x=drift,y=acceptance_fraction,col sep=comma]{\synthdata};
+\addlegendentry{clustered: share of\\proposals accepted}
+\end{axis}
+\end{tikzpicture}
