@@ -1,0 +1,101 @@
+{
+ "declared": false,
+ "note": "Outside the pre-registration: the run did not score every problem, so the declared paired comparison does not exist. The unfinished problems are not a random sample; only the full-split bounds are free of that selection.",
+ "source": {
+  "predictions": "/home/ubuntu/vp-data/lossy/quality/int4-dflash-b8-seed0/20261002-091151/sgl_eval/sgl_eval_gsm8k_20261002-091312/output-rs0.jsonl",
+  "predictions_sha256": "68771ef25ccb7bbc886f8cbf5040ce478062031755238cfaea0307cf0016a2b8"
+ },
+ "task_file_sha256": "01680346c8530cfc7edaf42642adc5367750de72e24ba6b2420b8a1073a8a704",
+ "task_problems": 1319,
+ "finished": 1305,
+ "unfinished_ids": [
+  "gsm8k-test-1213",
+  "gsm8k-test-1216",
+  "gsm8k-test-1233",
+  "gsm8k-test-1279",
+  "gsm8k-test-1283",
+  "gsm8k-test-1288",
+  "gsm8k-test-1292",
+  "gsm8k-test-1293",
+  "gsm8k-test-1294",
+  "gsm8k-test-1296",
+  "gsm8k-test-1298",
+  "gsm8k-test-1302",
+  "gsm8k-test-1312",
+  "gsm8k-test-1313"
+ ],
+ "correct": 1167,
+ "truncated": 231,
+ "budget_pt": -1.0,
+ "vs": {
+  "plain-tuned-a-seed0": {
+   "finished_problems": 1305,
+   "reference_accuracy_on_finished": 0.9011494252873563,
+   "accuracy_on_finished": 0.8942528735632184,
+   "delta_pt_on_finished": -0.6896551724137931,
+   "delta_ci95_pt_on_finished": [
+    -2.606807664238741,
+    1.2274973194111551
+   ],
+   "correct_only_reference": 86,
+   "correct_only_run": 77,
+   "mcnemar_exact_p": 0.5310454494607927,
+   "reference_on_unfinished": {
+    "correct": 11,
+    "truncated": 6
+   },
+   "reference_accuracy_full": 0.8999241849886277,
+   "full_split_delta_bounds_pt": [
+    -1.5163002274450341,
+    -0.45489006823351025
+   ],
+   "declared_rule_on_bounds": "undetermined (met at the upper bound, missed at the lower)"
+  },
+  "plain-tuned-b-seed0": {
+   "finished_problems": 1305,
+   "reference_accuracy_on_finished": 0.903448275862069,
+   "accuracy_on_finished": 0.8942528735632184,
+   "delta_pt_on_finished": -0.9195402298850575,
+   "delta_ci95_pt_on_finished": [
+    -2.830515683888525,
+    0.9914352241184101
+   ],
+   "correct_only_reference": 87,
+   "correct_only_run": 75,
+   "mcnemar_exact_p": 0.3875190848490529,
+   "reference_on_unfinished": {
+    "correct": 12,
+    "truncated": 9
+   },
+   "reference_accuracy_full": 0.9029567854435178,
+   "full_split_delta_bounds_pt": [
+    -1.819560272934041,
+    -0.7581501137225171
+   ],
+   "declared_rule_on_bounds": "undetermined (met at the upper bound, missed at the lower)"
+  },
+  "dflash-tuned-seed0": {
+   "finished_problems": 1305,
+   "reference_accuracy_on_finished": 0.896551724137931,
+   "accuracy_on_finished": 0.8942528735632184,
+   "delta_pt_on_finished": -0.22988505747126436,
+   "delta_ci95_pt_on_finished": [
+    -2.228015018351415,
+    1.7682449034088863
+   ],
+   "correct_only_reference": 90,
+   "correct_only_run": 87,
+   "mcnemar_exact_p": 0.8805599174040932,
+   "reference_on_unfinished": {
+    "correct": 13,
+    "truncated": 2
+   },
+   "reference_accuracy_full": 0.8968915845337376,
+   "full_split_delta_bounds_pt": [
+    -1.2130401819560273,
+    -0.1516300227445034
+   ],
+   "declared_rule_on_bounds": "undetermined (met at the upper bound, missed at the lower)"
+  }
+ }
+}

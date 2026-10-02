@@ -24,6 +24,7 @@ one. Every hold runs every arm, exact or lossy, on that one engine worktree.
 | `figures.py` | Frontier with and without each lever; quality against speed |
 | `gemm_w4a16_bench.py` | Exploratory, not declared (approved after s1): W4A16 Marlin against BF16 GEMMs at the target's and drafters' layer shapes, M = 1-256, CUDA graphs, cold L2, achieved bandwidth |
 | `checkpoint_check.py` | CPU only: weight bytes per decode step from the safetensors headers, tokenizer file hashes, end-of-sequence ids as SGLang resolves them |
+| `gsm8k_partial.py` | Not declared (added after the holds): GSM8K comparison of a run that stopped before scoring every problem, on the finished problems and as full-split bounds |
 
 ## Load test L0 (untimed)
 
@@ -260,3 +261,17 @@ Times are the commits' own (UTC, 2026-10-02); the times written in the subjects 
   Nsight step because nsys exited while the server it launched kept the port; `load_test.py`
   now kills that server's process group and clears the port after every step, and the seven
   steps that did not run are rerun as L0b (`hold.sh load <steps>`).
+
+### After the holds (2026-10-02, not part of the pre-registration)
+
+Results and their commands are in `evidence/lossy/README.md`. Two things departed from the plan
+above:
+
+- `q1`'s GSM8K run of `int4-dflash-b8` stopped at `plan.GSM8K_TIMEOUT` (1,500 s) with 1,305 of
+  1,319 problems scored. The limit was set from bench's GSM8K runs (13.5-18 minutes), and the
+  INT4 drafted arm decodes about a quarter slower. The run has no declared result and was not
+  rerun, because the arm is already outside its budget on the declared probe.
+  `gsm8k_partial.py` reports the finished problems and the full-split bounds, labelled as not
+  declared.
+- `figures.py`'s quality-against-speed figure was redrawn: it had shifted each reference's point
+  by 0.12 points; points now sit at their values, with the exact arms' spread and the INT4 bounds.
