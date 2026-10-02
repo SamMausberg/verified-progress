@@ -12,8 +12,10 @@ byte-identical to `modal-labs/Qwen3.5-4B-DFlash@58aa4cb`) on
 DFLASH with FlashInfer target and draft attention, FlashInfer GDN prefill and decode
 kernels, the default breakable prefill CUDA graph, and `SGLANG_ENABLE_OVERLAP_PLAN_STREAM=1`.
 The card's `--cuda-graph-backend-prefill tc_piecewise` crashes prefill graph capture for
-this target at `bd66ce34`, and its TRT-LLM/FA4 backends do not run on this host, so they
-are replaced. Decode, verify and draft CUDA graphs and the overlap scheduler are on in
+this target at `bd66ce34`, and its TRT-LLM target attention does not run on this host, so
+both are replaced. These runs also use FlashInfer in place of the card's FA4 draft
+attention, which does run here: bench's `dflash-tuned` arm uses it (`bench/arms.toml`,
+`evidence/bench/README.md`). Decode, verify and draft CUDA graphs and the overlap scheduler are on in
 every run here (`launch/*.json`: exact command, environment, engine revision and the
 resolved server settings).
 
