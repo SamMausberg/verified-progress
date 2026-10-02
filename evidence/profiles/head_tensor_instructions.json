@@ -1,0 +1,61 @@
+{
+ "question": "tensor-core instruction of the stock head GEMM kernels: HGMMA (wgmma) or HMMA",
+ "repo_commit": "f850e97b923bb7cefcb192cac5f3a9ad35567ca5",
+ "ncu_executed": [
+  {
+   "report": "head_gemm_m1.ncu-rep",
+   "kernel": "nvjet_sm90_tst_512x8_64x3_2x1_v_bz_TNT",
+   "hgmma_bf16_fp32_ops": 10192158720.0,
+   "hmma_bf16_fp32_ops": 0.0,
+   "hmma_bf16_fp32_sparse_ops": 0.0,
+   "all_bf16_fp32_tensor_ops": 10192158720.0,
+   "sass_shared_gmma_instructions": 2488320.0,
+   "sass": {
+    "instructions": 1192,
+    "HGMMA_instructions": 64,
+    "HGMMA_executed": 2488320,
+    "HGMMA_forms": [
+     "HGMMA.64x8x16.F32.BF16"
+    ],
+    "HMMA_instructions": 0,
+    "HMMA_executed": 0,
+    "HMMA_forms": []
+   }
+  },
+  {
+   "report": "head_gemm_m32.ncu-rep",
+   "kernel": "nvjet_sm90_tst_384x32_64x4_2x1_v_bz_TNT",
+   "hgmma_bf16_fp32_ops": 40768634880.0,
+   "hmma_bf16_fp32_ops": 0.0,
+   "hmma_bf16_fp32_sparse_ops": 0.0,
+   "all_bf16_fp32_tensor_ops": 40768634880.0,
+   "sass_shared_gmma_instructions": 2488320.0,
+   "sass": {
+    "instructions": 1272,
+    "HGMMA_instructions": 48,
+    "HGMMA_executed": 2488320,
+    "HGMMA_forms": [
+     "HGMMA.64x32x16.F32.BF16"
+    ],
+    "HMMA_instructions": 0,
+    "HMMA_executed": 0,
+    "HMMA_forms": []
+   }
+  }
+ ],
+ "cuobjdump": "Build cuda_13.0.r13.0/compiler.36400806_0",
+ "library_search": [
+  {
+   "library": "nvidia/cu13/lib/libcublasLt.so.13",
+   "sha256": "930418840b747413584867cb7167dd5911dcf4184135589e0334527e9abbac9f",
+   "symbol_lines": 197056,
+   "nvjet_sm90_symbols": 0
+  },
+  {
+   "library": "nvidia/cu13/lib/libcublas.so.13",
+   "sha256": "4e346a7b60a01552bd9bf4bbc6c862e11eb851559c3da3572293345de6aaed75",
+   "symbol_lines": 53793,
+   "nvjet_sm90_symbols": 0
+  }
+ ]
+}

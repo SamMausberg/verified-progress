@@ -385,6 +385,59 @@ at B = 1 the launch without saves is the slower one (14.1 against 10.7 us). At B
 both use the 32-wide tile, and the saves add 204 us to 228 us per layer (+89%), about
 4.9 ms over the 24 GDN layers of one verify forward (derived).
 
+### Which tensor-core instruction the head uses, and how it accumulates (`head_tensor_instructions.json`, `wgmma_precision.json`, measured)
+
+The certified head's Hopper error model assumes that the stock head GEMM adds each block
+of 16 BF16 products and the FP32 accumulator in one multi-term adder. That adder aligns
+the 17 addends to the largest, keeps F = 25 fractional bits below its leading bit,
+truncates the bits it drops, and truncates the normalised sum to FP32. Khattak and
+Mikaitis published a model of that form from measurements made through the warp-level
+`mma` instruction (SASS `HMMA`). Two measurements here check it on this GPU for the
+instruction the stock kernels issue.
+
+**Instruction.** In the ncu reports of the head GEMM at M = 1
+(`nvjet_sm90_tst_512x8_64x3_2x1_v_bz_TNT`) and M = 32 (`..._384x32_64x4_...`), ncu counts
+every BF16-to-FP32 tensor operation on the HGMMA path (warpgroup `wgmma`) and none on the
+HMMA path. The captured SASS has 64 and 48 `HGMMA` instructions (`HGMMA.64x8x16.F32.BF16`
+and `HGMMA.64x32x16.F32.BF16`, 2,488,320 executions each) and no `HMMA`
+(`tensor_instructions.py`). The SASS of the other head kernels could not be read
+statically: `cuobjdump -symbols` lists no `nvjet_sm90` function in `libcublasLt.so.13`
+or `libcublas.so.13`, so for those kernels only the behaviour below is measured.
+
+**Accumulation** (`wgmma_precision.py`). Each test is a row whose nonzero products and
+accumulator are chosen so that the exact sum is known and one property of the adder
+decides the result. The products are the row's BF16 entries times a multiplier of 1.
+The probe runs on two paths:
+
+- one Triton `tl.dot` of a 64 x 64 tile, which compiles to four `wgmma.mma_async`
+  instructions (`HGMMA.64x16x16.F32.BF16` in the SASS); its FP32 result is read
+  directly;
+- the head's own `torch.matmul(x, W.T)`, with x of ones and W of the head's shape, at
+  one row count for each of the 14 head kernels of `evidence/certified_head/README.md`
+  (M = 1, 16, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 224, 256; the profiler records
+  the kernel each one runs). Its logits are BF16, so the tests use results that BF16
+  represents exactly, and the rounding test is built around a BF16 tie.
+
+| Test (products in k order; C = accumulator) | Result if ... | Observed, Triton and all 14 head kernels |
+|---|---|---|
+| {1, 2^-e, -1}, e = 1-40 | 2^-e when e <= F, else 0 | 2^-e up to e = 25, 0 from 26: **F = 25** |
+| {1, -2^-e, -1}, e = 1-40 | beyond F: 0 if dropped bits are truncated toward zero, -2^-F if toward minus infinity | -2^-e up to 25, then 0: **toward zero** |
+| C = 1, {2^-e, -1} (Triton only; the cuBLAS call has no accumulator input) | 2^-e up to e = F if C is one of the aligned addends | 2^-e up to 25: **accumulator inside the aligned sum** |
+| {1 at k = 0, -1 at 1, 2^-60 at j} | 0 while j shares the pair's block, 2^-60 once it is in a later block | 0 for j <= 15, 2^-60 from j = 16: **blocks of 16** |
+| {2^-60 at 0, 1 at j, -1 at j + 1} | 2^-60 if block sums are added afterwards; 0 if the running FP32 accumulator joins the next block's aligned sum | 0 at every j: **running accumulator joins the next block** |
+| {1, 2^-23, 2^-24}, {1, 2^-24}, {-1, -2^-23, -2^-24} (Triton) | 1 + 2^-22, 1, -1 - 2^-22 if round to nearest even; 1 + 2^-23, 1, -1 - 2^-23 if toward zero; other modes differ in at least one | 1 + 2^-23, 1, -1 - 2^-23: **truncated to FP32 (toward zero)** |
+| {1, 2^-7, 2^-8, -2^-24} and its negative (cuBLAS) | the FP32 sum lands on, or one step below, a BF16 tie; toward zero moves both BF16 logits down one step | both down: **toward zero** |
+
+There are 249 Triton rows and 334 rows at each cuBLAS row count. Every row gives the
+same answer at every row count, so the measured behaviour matches the paper's Hopper
+model (k = 16, F = 25, truncation) and satisfies the conservative model, which needs
+FP32's 24 bits. Scope: this is a measurement on crafted inputs of one GH200 with driver
+570.195.03, CUDA 13.0 and PyTorch 2.13's cuBLAS, not a vendor contract and not a proof
+for all inputs. Its operands are powers of two and short sums of them, with one operand
+of every product equal to 1. Products of two full 8-bit significands, subnormal
+operands, other K offsets than the first 128, and other GPUs or library versions were
+not probed. The probe makes no timing claim.
+
 ## Ranked stack-wide opportunities
 
 Ceilings are Amdahl bounds 1/(1-f) for removing a component entirely under otherwise
@@ -506,6 +559,8 @@ python experiments/profiling/attribute.py ~/vp-data/profile/mtp_nsys/mtp_bs8.nsy
 | `gdn_kernel_bench.json` | one GDN layer's decode, verify and verify-without-saves kernels at B = 1-128 under CUDA graphs, L2 evicted | `run_all.sh gdn` (`gdn_kernel_bench.py`) | measured |
 | `kernel_bandwidth.csv` | achieved bandwidth of the head GEMM and the GDN kernels by batch and source (microbenchmark, GDN bench, serving traces, ncu), with the ncu regime | `kernel_bandwidth.py` | measured; regime by rule |
 | `microbench_rerun/` | 2026-10-01 rerun of `run_microbench.sh` with the clock log: `hbm_bandwidth.json`, `head_microbench.json`, `microbench_clocks.csv` (nvidia-smi, 100 ms), `microbench_clocks.json` | `MICROBENCH_EVIDENCE=evidence/profiles/microbench_rerun experiments/profiling/run_all.sh microbench` (`clock_summary.py`) | measured; reproduction check |
+| `head_tensor_instructions.json` | HGMMA- and HMMA-path tensor operations and executed SASS of the head GEMM at M = 1 and 32 (from the ncu reports); `cuobjdump -symbols` search of cuBLAS's libraries for the nvjet kernels | `tensor_instructions.py` (`analyze_all.sh`) | measured |
+| `wgmma_precision.json` | BF16 accumulation probe: every test row and result, the kernel each cuBLAS row count ran, and the derived F, truncation direction, block size, accumulator handling and rounding to FP32, for Triton's `wgmma` and the 14 head kernels | `run_all.sh wgmma` (`wgmma_precision.py`) | measured |
 | `attribution/plain_rerun/plain_bs<B>.json`, `plain_rerun_check.csv` | attribution of the 2026-10-01 plain traces and its comparison with the cited ones | `attribute.py`, `compare_attribution.py` | measured; reproduction check |
 
 The `gdn`, `ncu` and `microbench` steps ran in one exclusive hold that ended on
