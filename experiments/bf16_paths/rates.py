@@ -2,7 +2,7 @@
 
     python -m experiments.bf16_paths.rates prompts --out DIR [--count 16]          # CPU
     python -m experiments.bf16_paths.rates sglang --out DIR --url URL              # server up
-    python -m experiments.bf16_paths.rates hf --out DIR [--state-dtype float32]    # GPU, BF16
+    python -m experiments.bf16_paths.rates hf --out DIR [--state-dtype float32] [--gdn fla]  # GPU
     python -m experiments.bf16_paths.rates fp32 --out DIR [--threads 8]            # CPU
     python -m experiments.bf16_paths.rates summary --out DIR --json FILE           # CPU
 
@@ -213,15 +213,16 @@ def load_model(dtype: Any, device: str, state_dtype: str) -> Any:
     return model.to(device).eval()
 
 
-def hf(out: Path, state_dtype: str) -> int:
+def hf(out: Path, state_dtype: str, gdn: str) -> int:
     import torch
 
-    from experiments.bf16_paths.hf_paths import gdn_kernels
+    from experiments.bf16_paths.hf_paths import require_gdn
 
+    target = out / f'hf_bf16_{"fla_" if gdn == "fla" else ""}{state_dtype}state.jsonl.gz'
+    if target.exists():
+        raise SystemExit(f'{target} exists')
     model = load_model(torch.bfloat16, 'cuda', state_dtype)
-    kernels = gdn_kernels(model)
-    fla = kernels['chunk'].startswith('fla.')
-    print('GDN kernels', kernels, flush=True)
+    print('GDN kernels', require_gdn(model, gdn), flush=True)
     rows = []
     for item in read_jsonl(out / 'sglang.jsonl.gz'):
         prompt, output = item['prompt_ids'], item['output_ids']
@@ -241,7 +242,7 @@ def hf(out: Path, state_dtype: str) -> int:
                 decode.append(top_entries(step.logits[0, -1]))
         rows.append({'prompt': item['prompt'], 'decode': decode, 'prefill': prefill})
         print(item['prompt'], 'hf done', flush=True)
-    write_jsonl(out / f'hf_bf16_{"fla_" if fla else ""}{state_dtype}state.jsonl.gz', rows)
+    write_jsonl(target, rows)
     return 0
 
 
@@ -428,6 +429,9 @@ def main(argv: list[str] | None = None) -> int:
     h = sub.add_parser('hf')
     h.add_argument('--out', type=Path, required=True)
     h.add_argument('--state-dtype', choices=('model', 'float32'), default='float32')
+    h.add_argument(
+        '--gdn', choices=('torch', 'fla'), default='torch', help='GDN kernels to require'
+    )
     f = sub.add_parser('fp32')
     f.add_argument('--out', type=Path, required=True)
     f.add_argument('--threads', type=int, default=8)
@@ -445,7 +449,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == 'sglang':
         return sglang(args.out, args.url)
     if args.command == 'hf':
-        return hf(args.out, args.state_dtype)
+        return hf(args.out, args.state_dtype, args.gdn)
     if args.command == 'fp32':
         return fp32(args.out, args.threads)
     result = summary(args.out)

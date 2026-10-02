@@ -104,7 +104,7 @@ if want hf; then
       ! missing "$out/hf_bf16_fla$suffix.json" ||
         PYTHONPATH="$deps" timeout --foreground 600 python -m experiments.bf16_paths.hf_paths \
           --targets "$out/targets.jsonl" --out "$out/hf_bf16_fla$suffix.json" --dtype bfloat16 \
-          --device cuda --state-dtype "$state" || fail
+          --device cuda --state-dtype "$state" --gdn fla || fail
     done
   else
     echo "no fla $fla_version: kernel-path runs skipped"; fail
@@ -166,7 +166,7 @@ run_rates() {
   if [ -d "$out/pydeps/fla_core-$fla_version.dist-info" ]; then
     ! missing "$r/hf_bf16_fla_float32state.jsonl.gz" ||
       PYTHONPATH="$out/pydeps" timeout --foreground 1200 python -m experiments.bf16_paths.rates hf \
-        --out "$r" --state-dtype float32 || fail
+        --out "$r" --state-dtype float32 --gdn fla || fail
   else
     echo "no fla $fla_version: fla rates skipped"; fail
   fi

@@ -206,3 +206,31 @@ def test_perturbed_reports_seed_range_and_control() -> None:
     assert out['range_over_seeds']['1'] == [-3.0, -0.4]
     assert out['top1_over_seeds'] == [1, 2]
     assert out['max_abs_change_recorded_before'] == pytest.approx(0.01)
+
+
+def fake_model(chunk_module: str) -> Any:
+    from types import SimpleNamespace
+
+    def chunk() -> None: ...
+
+    chunk.__module__ = chunk_module
+    attn = SimpleNamespace(
+        chunk_gated_delta_rule=chunk,
+        recurrent_gated_delta_rule=chunk,
+        causal_conv1d_fn=None,
+        causal_conv1d_update=chunk,
+        norm=SimpleNamespace(),
+    )
+    return SimpleNamespace(
+        model=SimpleNamespace(layers=[SimpleNamespace(), SimpleNamespace(linear_attn=attn)])
+    )
+
+
+def test_require_gdn_refuses_a_silent_fallback() -> None:
+    from experiments.bf16_paths.hf_paths import require_gdn
+
+    torch_model = fake_model('transformers.models.qwen3_5.modeling_qwen3_5')
+    assert require_gdn(torch_model, 'torch')['conv_prefill'] == 'torch.nn.Conv1d'
+    with pytest.raises(SystemExit, match='requested the fla GDN kernels'):
+        require_gdn(torch_model, 'fla')
+    assert require_gdn(fake_model('fla.ops.gated_delta_rule.chunk'), 'fla')

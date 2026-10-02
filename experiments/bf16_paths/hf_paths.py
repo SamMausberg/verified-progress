@@ -93,6 +93,16 @@ def keep_state_in_fp32() -> None:
     layer_cls.lazy_initialization = lazy_initialization
 
 
+def require_gdn(model: Any, gdn: str) -> dict[str, str]:
+    """The model's GDN kernels, refusing a run whose kernels are not the requested ones (an
+    `fla` that fails to import makes transformers fall back to torch silently)."""
+    kernels = gdn_kernels(model)
+    active = 'fla' if kernels['chunk'].startswith('fla.') else 'torch'
+    if active != gdn:
+        raise SystemExit(f'requested the {gdn} GDN kernels, but the model uses {kernels}')
+    return kernels
+
+
 def gdn_kernels(model: Any) -> dict[str, str]:
     """Which implementation each GDN entry point resolved to (the first GDN layer's)."""
     for layer in model.model.layers:
@@ -154,7 +164,9 @@ def read_target(model: Any, target: dict[str, Any], device: str) -> dict[str, An
     }
 
 
-def run(targets: Path, out: Path, dtype: str, device: str, state_dtype: str) -> int:
+def run(
+    targets: Path, out: Path, dtype: str, device: str, state_dtype: str, gdn: str = 'torch'
+) -> int:
     import torch
     import transformers
     from transformers import AutoModelForCausalLM
@@ -176,6 +188,7 @@ def run(targets: Path, out: Path, dtype: str, device: str, state_dtype: str) -> 
         raise SystemExit(f'{len(missing)} weights missing from the model: {missing[:5]}')
     model = model.to(device)
     model.eval()
+    require_gdn(model, gdn)
     found = [json.loads(line) for line in targets.read_text().splitlines() if line]
     if not found:
         raise SystemExit(f'no targets in {targets}')
@@ -237,10 +250,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--dtype', choices=('bfloat16', 'float32'), default='bfloat16')
     parser.add_argument('--device', choices=('cuda', 'cpu'), default='cuda')
     parser.add_argument('--state-dtype', choices=('model', 'float32'), default='model')
+    parser.add_argument(
+        '--gdn', choices=('torch', 'fla'), default='torch', help='GDN kernels the run must use'
+    )
     args = parser.parse_args(argv)
     if args.out.exists():
         raise SystemExit(f'{args.out} exists')
-    return run(args.targets, args.out, args.dtype, args.device, args.state_dtype)
+    return run(args.targets, args.out, args.dtype, args.device, args.state_dtype, args.gdn)
 
 
 if __name__ == '__main__':
