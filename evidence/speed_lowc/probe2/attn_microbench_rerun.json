@@ -1,0 +1,307 @@
+{
+ "command": "experiments/speed_lowc/attn_microbench.py --batch 1 8 --ctx 256 512 1024 --out /home/ubuntu/vp-data/speed-lowc/probe2-20261002T183524Z/attn_microbench_rerun.json",
+ "repo_commit": "e690b3a9a2c9801b761023d6c0bf486dceb1dd8d",
+ "gpu": "NVIDIA GH200 480GB",
+ "torch": "2.13.0+cu130",
+ "numerics": {
+  "target": {
+   "triton_max_abs_vs_fp32": 0.000909656286239624,
+   "splitkv_max_abs_vs_fp32": 0.000909656286239624,
+   "fa4_error": "ValueError('Expected size in shape to be strictly positive, but got 0')",
+   "splitkv_bitwise_equal_triton": false
+  },
+  "drafter": {
+   "triton_max_abs_vs_fp32": 0.0010244548320770264,
+   "fa4_max_abs_vs_fp32": 0.0010738670825958252
+  }
+ },
+ "rows": [
+  {
+   "shape": "target",
+   "ctx": 256,
+   "batch": 1,
+   "arm": "triton",
+   "layers": 8,
+   "median_us_per_forward": 214.8303985595703,
+   "p10_us": 214.74080085754395,
+   "p90_us": 215.03520011901855
+  },
+  {
+   "shape": "target",
+   "ctx": 256,
+   "batch": 1,
+   "arm": "splitkv",
+   "layers": 8,
+   "median_us_per_forward": 332.58479833602905,
+   "p10_us": 332.5295925140381,
+   "p90_us": 332.70881175994873
+  },
+  {
+   "shape": "target",
+   "ctx": 256,
+   "batch": 8,
+   "arm": "triton",
+   "layers": 8,
+   "median_us_per_forward": 253.57840061187744,
+   "p10_us": 252.99201011657715,
+   "p90_us": 254.19039726257324
+  },
+  {
+   "shape": "target",
+   "ctx": 256,
+   "batch": 8,
+   "arm": "splitkv",
+   "layers": 8,
+   "median_us_per_forward": 480.3135871887207,
+   "p10_us": 480.0271987915039,
+   "p90_us": 481.03041648864746
+  },
+  {
+   "shape": "target",
+   "ctx": 512,
+   "batch": 1,
+   "arm": "triton",
+   "layers": 8,
+   "median_us_per_forward": 369.6087956428528,
+   "p10_us": 369.4511890411377,
+   "p90_us": 369.7648048400879
+  },
+  {
+   "shape": "target",
+   "ctx": 512,
+   "batch": 1,
+   "arm": "splitkv",
+   "layers": 8,
+   "median_us_per_forward": 363.6039972305298,
+   "p10_us": 363.4176015853882,
+   "p90_us": 363.9695882797241
+  },
+  {
+   "shape": "target",
+   "ctx": 512,
+   "batch": 8,
+   "arm": "triton",
+   "layers": 8,
+   "median_us_per_forward": 435.8695983886719,
+   "p10_us": 435.25280952453613,
+   "p90_us": 436.25922203063965
+  },
+  {
+   "shape": "target",
+   "ctx": 512,
+   "batch": 8,
+   "arm": "splitkv",
+   "layers": 8,
+   "median_us_per_forward": 632.7591896057129,
+   "p10_us": 631.987190246582,
+   "p90_us": 633.3087921142578
+  },
+  {
+   "shape": "target",
+   "ctx": 1024,
+   "batch": 1,
+   "arm": "triton",
+   "layers": 8,
+   "median_us_per_forward": 735.4408025741577,
+   "p10_us": 735.0512027740479,
+   "p90_us": 735.862398147583
+  },
+  {
+   "shape": "target",
+   "ctx": 1024,
+   "batch": 1,
+   "arm": "splitkv",
+   "layers": 8,
+   "median_us_per_forward": 455.57360649108887,
+   "p10_us": 455.3631782531738,
+   "p90_us": 455.7648181915283
+  },
+  {
+   "shape": "target",
+   "ctx": 1024,
+   "batch": 8,
+   "arm": "triton",
+   "layers": 8,
+   "median_us_per_forward": 805.1136016845703,
+   "p10_us": 804.6784400939941,
+   "p90_us": 805.5088043212891
+  },
+  {
+   "shape": "target",
+   "ctx": 1024,
+   "batch": 8,
+   "arm": "splitkv",
+   "layers": 8,
+   "median_us_per_forward": 781.1408042907715,
+   "p10_us": 780.460786819458,
+   "p90_us": 783.1103801727295
+  },
+  {
+   "shape": "drafter",
+   "ctx": 256,
+   "batch": 1,
+   "arm": "triton",
+   "layers": 6,
+   "median_us_per_forward": 109.45599675178528,
+   "p10_us": 109.21920537948608,
+   "p90_us": 109.56799983978271
+  },
+  {
+   "shape": "drafter",
+   "ctx": 256,
+   "batch": 1,
+   "arm": "fa4",
+   "layers": 6,
+   "median_us_per_forward": 58.27760100364685,
+   "p10_us": 58.25440287590027,
+   "p90_us": 58.40799808502197
+  },
+  {
+   "shape": "drafter",
+   "ctx": 256,
+   "batch": 8,
+   "arm": "triton",
+   "layers": 6,
+   "median_us_per_forward": 235.32720804214478,
+   "p10_us": 235.19361019134521,
+   "p90_us": 235.6287956237793
+  },
+  {
+   "shape": "drafter",
+   "ctx": 256,
+   "batch": 8,
+   "arm": "fa4",
+   "layers": 6,
+   "median_us_per_forward": 107.7351987361908,
+   "p10_us": 107.45279788970947,
+   "p90_us": 108.05599689483643
+  },
+  {
+   "shape": "drafter",
+   "ctx": 512,
+   "batch": 1,
+   "arm": "triton",
+   "layers": 6,
+   "median_us_per_forward": 188.34879994392395,
+   "p10_us": 188.1327986717224,
+   "p90_us": 188.85120153427124
+  },
+  {
+   "shape": "drafter",
+   "ctx": 512,
+   "batch": 1,
+   "arm": "fa4",
+   "layers": 6,
+   "median_us_per_forward": 68.03120076656342,
+   "p10_us": 67.99039840698242,
+   "p90_us": 68.10879707336426
+  },
+  {
+   "shape": "drafter",
+   "ctx": 512,
+   "batch": 8,
+   "arm": "triton",
+   "layers": 6,
+   "median_us_per_forward": 406.75439834594727,
+   "p10_us": 406.4591884613037,
+   "p90_us": 407.7712059020996
+  },
+  {
+   "shape": "drafter",
+   "ctx": 512,
+   "batch": 8,
+   "arm": "fa4",
+   "layers": 6,
+   "median_us_per_forward": 119.85039710998535,
+   "p10_us": 119.61280107498169,
+   "p90_us": 120.32959461212158
+  },
+  {
+   "shape": "drafter",
+   "ctx": 1024,
+   "batch": 1,
+   "arm": "triton",
+   "layers": 6,
+   "median_us_per_forward": 346.8168020248413,
+   "p10_us": 345.73919773101807,
+   "p90_us": 347.7344036102295
+  },
+  {
+   "shape": "drafter",
+   "ctx": 1024,
+   "batch": 1,
+   "arm": "fa4",
+   "layers": 6,
+   "median_us_per_forward": 72.32960164546967,
+   "p10_us": 72.2271978855133,
+   "p90_us": 72.40800261497498
+  },
+  {
+   "shape": "drafter",
+   "ctx": 1024,
+   "batch": 8,
+   "arm": "triton",
+   "layers": 6,
+   "median_us_per_forward": 750.9768009185791,
+   "p10_us": 750.1823902130127,
+   "p90_us": 752.1647930145264
+  },
+  {
+   "shape": "drafter",
+   "ctx": 1024,
+   "batch": 8,
+   "arm": "fa4",
+   "layers": 6,
+   "median_us_per_forward": 149.99279975891113,
+   "p10_us": 149.58879947662354,
+   "p90_us": 150.273597240448
+  }
+ ],
+ "errors": [
+  {
+   "shape": "target",
+   "ctx": 256,
+   "batch": 1,
+   "arm": "fa4",
+   "error": "ValueError('Expected size in shape to be strictly positive, but got 0')"
+  },
+  {
+   "shape": "target",
+   "ctx": 256,
+   "batch": 8,
+   "arm": "fa4",
+   "error": "ValueError('Expected size in shape to be strictly positive, but got 0')"
+  },
+  {
+   "shape": "target",
+   "ctx": 512,
+   "batch": 1,
+   "arm": "fa4",
+   "error": "ValueError('Expected size in shape to be strictly positive, but got 0')"
+  },
+  {
+   "shape": "target",
+   "ctx": 512,
+   "batch": 8,
+   "arm": "fa4",
+   "error": "ValueError('Expected size in shape to be strictly positive, but got 0')"
+  },
+  {
+   "shape": "target",
+   "ctx": 1024,
+   "batch": 1,
+   "arm": "fa4",
+   "error": "ValueError('Expected size in shape to be strictly positive, but got 0')"
+  },
+  {
+   "shape": "target",
+   "ctx": 1024,
+   "batch": 8,
+   "arm": "fa4",
+   "error": "ValueError('Expected size in shape to be strictly positive, but got 0')"
+  }
+ ],
+ "kill_rule": "kill the target half if the best alternative saves < 200 us per 8-layer target forward at B = 1, ctx 512",
+ "target_saving_b1_ctx512_us": 6.004798412322998,
+ "killed_target": true
+}

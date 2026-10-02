@@ -1,0 +1,137 @@
+From 7f0eac55fd3848342baa2a6528770f2b955ec20a Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Fri, 2 Oct 2026 19:16:59 +0000
+Subject: [PATCH 2/3] Test FA4 paged KV on SM90 with tile_n below the loader's
+ 128 threads
+
+Head dim 256 (tile 128 x 80) against an FP32 reference over a shuffled
+page table: page size 1, causal and not; page size 16, causal. Head dim
+128 (page size 1, causal) as the unchanged control. Skipped unless SM90.
+---
+ .../test_flash_attention_4_paged_sm90.py      | 114 ++++++++++++++++++
+ 1 file changed, 114 insertions(+)
+ create mode 100644 test/registered/kernels/ops/attention/test_flash_attention_4_paged_sm90.py
+
+diff --git a/test/registered/kernels/ops/attention/test_flash_attention_4_paged_sm90.py b/test/registered/kernels/ops/attention/test_flash_attention_4_paged_sm90.py
+new file mode 100644
+index 0000000000..469ebad8b2
+--- /dev/null
++++ b/test/registered/kernels/ops/attention/test_flash_attention_4_paged_sm90.py
+@@ -0,0 +1,114 @@
++# SPDX-License-Identifier: Apache-2.0
++"""FA4 on SM90: paged KV through the cp.async loader with tile_n below 128.
++
++The SM90 forward tile for head dim 256 is 128 x 80, and the non-TMA paged loader
++runs with one 128-thread warp group, so a floor division gave it zero page-table
++entries per thread and the kernel failed to compile. Upstream flash-attention
++ceil-divides (Dao-AILab/flash-attention#2745).
++"""
++
++import unittest
++
++import torch
++
++from sglang.test.ci.ci_register import register_cuda_ci
++from sglang.test.test_utils import CustomTestCase
++
++register_cuda_ci(est_time=60, stage="base-b-kernel-unit", runner_config="1-gpu-large")
++
++requires_sm90 = unittest.skipUnless(
++    torch.cuda.is_available() and torch.cuda.get_device_capability() == (9, 0),
++    "requires SM90 (Hopper)",
++)
++
++
++def _reference(q, k, v, cu_q, seqlens_k, causal, scale):
++    """FP32 attention per sequence; q rows are the last rows of each sequence."""
++    outs = []
++    group = q.shape[1] // k[0].shape[1]
++    for i, kv_len in enumerate(seqlens_k.tolist()):
++        qi = q[cu_q[i] : cu_q[i + 1]].float()
++        ki = k[i][:kv_len].float().repeat_interleave(group, dim=1)
++        vi = v[i][:kv_len].float().repeat_interleave(group, dim=1)
++        s = torch.einsum("qhd,khd->hqk", qi, ki) * scale
++        if causal:
++            rows = (
++                torch.arange(qi.shape[0], device=q.device)[:, None]
++                + kv_len
++                - qi.shape[0]
++            )
++            cols = torch.arange(kv_len, device=q.device)[None, :]
++            s = s.masked_fill(cols > rows, float("-inf"))
++        outs.append(torch.einsum("hqk,khd->qhd", s.softmax(-1), vi))
++    return torch.cat(outs)
++
++
++@requires_sm90
++class TestFlashAttention4PagedSM90(CustomTestCase):
++    def _run(self, head_dim, page_size, causal, seqlens_k, q_per_seq=16):
++        from sglang.kernels.ops.attention.flash_attention_v4 import (
++            flash_attn_with_kvcache,
++        )
++
++        torch.manual_seed(0)
++        dev, dtype = "cuda", torch.bfloat16
++        num_heads, num_kv_heads = 16, 4
++        batch = len(seqlens_k)
++        pages_per_seq = max(-(-n // page_size) for n in seqlens_k)
++        num_pages = batch * pages_per_seq + 3
++        k_pages = torch.randn(
++            num_pages, page_size, num_kv_heads, head_dim, device=dev, dtype=dtype
++        )
++        v_pages = torch.randn_like(k_pages)
++        # A shuffled page table, so a loader that ignores it reads the wrong pages.
++        page_table = (
++            torch.randperm(num_pages, device=dev)[: batch * pages_per_seq]
++            .view(batch, pages_per_seq)
++            .to(torch.int32)
++        )
++        seqused_k = torch.tensor(seqlens_k, device=dev, dtype=torch.int32)
++        cu_q = torch.arange(
++            0, batch * q_per_seq + 1, q_per_seq, device=dev, dtype=torch.int32
++        )
++        q = torch.randn(batch * q_per_seq, num_heads, head_dim, device=dev, dtype=dtype)
++        scale = head_dim**-0.5
++
++        out = flash_attn_with_kvcache(
++            q=q,
++            k_cache=k_pages,
++            v_cache=v_pages,
++            page_table=page_table,
++            cache_seqlens=seqused_k,
++            cu_seqlens_q=cu_q,
++            max_seqlen_q=q_per_seq,
++            softmax_scale=scale,
++            causal=causal,
++            num_splits=0,
++        )
++        k_seq = [
++            k_pages[page_table[i]].reshape(-1, num_kv_heads, head_dim)
++            for i in range(batch)
++        ]
++        v_seq = [
++            v_pages[page_table[i]].reshape(-1, num_kv_heads, head_dim)
++            for i in range(batch)
++        ]
++        ref = _reference(q, k_seq, v_seq, cu_q.tolist(), seqused_k, causal, scale)
++        torch.testing.assert_close(out.float(), ref, atol=2e-2, rtol=2e-2)
++
++    def test_head_dim_256_page_size_1(self):
++        # tile_n = 80: one partial wave of 80 rows for 128 loader threads.
++        for causal in (True, False):
++            with self.subTest(causal=causal):
++                self._run(256, 1, causal, [528, 97])
++
++    def test_head_dim_256_page_size_16(self):
++        self._run(256, 16, True, [257, 1000])
++
++    def test_head_dim_128_page_size_1(self):
++        # tile_n = 128 = the loader's thread count: unchanged by the fix.
++        self._run(128, 1, True, [528, 97])
++
++
++if __name__ == "__main__":
++    unittest.main(verbosity=3)
+-- 
+2.34.1
+

@@ -1,0 +1,48 @@
+probe3 start 2026-10-02T19:42:52+00:00 repo e690b3a9a2c9801b761023d6c0bf486dceb1dd8d engine 1a52b76c4baa659ddea0f03eb69c81aa30ca7886 engine_dirty=0
+sglang from /home/ubuntu/sglang-wt/speed-lowc/python/sglang/__init__.py
+target  ctx=  256 B=8 triton      253.2 us/forward
+target  ctx=  256 B=8 splitkv     432.9 us/forward
+target  ctx=  256 B=8 fa4         203.6 us/forward
+target  ctx=  512 B=1 triton      369.0 us/forward
+target  ctx=  512 B=1 splitkv     362.5 us/forward
+target  ctx=  512 B=1 fa4         135.7 us/forward
+target  ctx=  512 B=2 triton      398.5 us/forward
+target  ctx=  512 B=2 splitkv     392.1 us/forward
+target  ctx=  512 B=2 fa4         158.6 us/forward
+target  ctx=  512 B=4 triton      432.0 us/forward
+target  ctx=  512 B=4 splitkv     422.3 us/forward
+target  ctx=  512 B=4 fa4         203.8 us/forward
+target  ctx=  512 B=8 triton      434.3 us/forward
+target  ctx=  512 B=8 splitkv     587.2 us/forward
+target  ctx=  512 B=8 fa4         299.3 us/forward
+target  ctx= 1024 B=1 triton      748.5 us/forward
+target  ctx= 1024 B=1 splitkv     466.6 us/forward
+target  ctx= 1024 B=1 fa4         148.9 us/forward
+target  ctx= 1024 B=2 triton      800.3 us/forward
+target  ctx= 1024 B=2 splitkv     492.0 us/forward
+target  ctx= 1024 B=2 fa4         184.0 us/forward
+target  ctx= 1024 B=4 triton      793.2 us/forward
+target  ctx= 1024 B=4 splitkv     541.9 us/forward
+target  ctx= 1024 B=4 fa4         298.8 us/forward
+target  ctx= 1024 B=8 triton      805.0 us/forward
+target  ctx= 1024 B=8 splitkv     787.5 us/forward
+target  ctx= 1024 B=8 fa4         463.9 us/forward
+target  ctx= 2048 B=1 triton     1538.1 us/forward
+target  ctx= 2048 B=1 splitkv     662.4 us/forward
+target  ctx= 2048 B=1 fa4         185.0 us/forward
+target  ctx= 2048 B=2 triton     1531.6 us/forward
+target  ctx= 2048 B=2 splitkv     674.6 us/forward
+target  ctx= 2048 B=2 fa4         277.1 us/forward
+target  ctx= 2048 B=4 triton     1515.3 us/forward
+target  ctx= 2048 B=4 splitkv     888.8 us/forward
+target  ctx= 2048 B=4 fa4         465.7 us/forward
+target  ctx= 2048 B=8 triton     1532.3 us/forward
+target  ctx= 2048 B=8 splitkv    1031.6 us/forward
+target  ctx= 2048 B=8 fa4         750.5 us/forward
+saving at B=1 ctx=512: 233.33359360694885 killed_target: False
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+3 passed, 33 warnings, 2 subtests passed in 14.59s
+sys:1: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
+stock ok  None 4.598802395209581
+fa4_both ok  5/6 4.598802395209581
+probe3 end 2026-10-02T19:46:19+00:00 failed: none
