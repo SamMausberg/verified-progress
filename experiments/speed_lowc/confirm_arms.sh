@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# Arms of the speed-lowc confirmation (DRAFT, not yet declared): every exact lever that
+# Arms of the speed-lowc confirmation (declared in evidence/speed_lowc/confirm/README.md): every exact lever that
 # survived its probe, on the low-concurrency envelope, measured as base, each lever alone
 # and all together in the same sessions. Sourced by hold_confirm_equality.sh and
 # hold_confirm_session.sh.
@@ -22,7 +22,7 @@
 # one session; reported as a measured near-null), split-KV verify and a fused GDN chain
 # (killed in evidence/speed_lowc/).
 #
-# CONFIRM_LEVERS   levers that survived their probes (A, B, and C if probe 4 passes)
+# CONFIRM_LEVERS   levers that survived their probes; declared: ABC (FULL is ABC on L, AC on H)
 # CONFIRM_ENGINE   the confirm engine worktree (~/sglang-wt/speed-lowc-confirm)
 # CONFIRM_TREE     its declared tree hash; every hold refuses another
 # CONFIRM_GATE     gate.json written by the equality hold (confirm_gate.py); sessions refuse

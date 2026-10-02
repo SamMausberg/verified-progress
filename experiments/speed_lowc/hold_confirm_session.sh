@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One timed session of the speed-lowc confirmation (DRAFT). Per group, every arm is
+# One timed session of the speed-lowc confirmation (declared in evidence/speed_lowc/confirm/README.md). Per group, every arm is
 # launched once through bench.sweep (confirm split, 512 output tokens), in the order
 #
 #   S0  FULL  <each lever alone>  FULL  S0
@@ -8,7 +8,7 @@
 # group L (c = 1, 2, 4) runs first in odd sessions and group H (c = 8, 16, 32) first in
 # even ones. Session ratio of an arm X at c: mean(X) / mean(S0's two launches).
 #
-#   CONFIRM_LEVERS=AB scripts/gpu_lock.sh -x experiments/speed_lowc/hold_confirm_session.sh <k>
+#   CONFIRM_LEVERS=ABC scripts/gpu_lock.sh -x experiments/speed_lowc/hold_confirm_session.sh <k>
 set -uo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo" || exit 1
