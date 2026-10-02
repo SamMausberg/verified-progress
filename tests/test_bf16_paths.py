@@ -239,3 +239,60 @@ def test_require_gdn_refuses_a_silent_fallback() -> None:
     with pytest.raises(SystemExit, match='requested the fla GDN kernels'):
         require_gdn(torch_model, 'fla')
     assert require_gdn(fake_model('fla.ops.gated_delta_rule.chunk'), 'fla')
+
+
+def server(tmp_path: Path, dispatcher: str, attention: str, graphs_off: bool) -> Path:
+    directory = tmp_path / 'servers' / 'v'
+    directory.mkdir(parents=True)
+    (directory / 'server.log').write_text(
+        f'[t] GDN kernel dispatcher: {dispatcher} packed_decode=True\n'
+    )
+    (directory / 'server_info.json').write_text(
+        json.dumps({'attention_backend': attention, 'disable_cuda_graph': graphs_off})
+    )
+    return directory
+
+
+def test_check_active_refuses_a_swap_the_server_did_not_make(tmp_path: Path) -> None:
+    from experiments.bf16_paths.sglang_variants import check_active
+
+    triton_prefill = 'decode=TritonGDNKernel, extend=TritonGDNKernel, verify=TritonGDNKernel'
+    ok = server(tmp_path / 'ok', triton_prefill, 'flashinfer', False)
+    assert check_active('prefill_triton', ok)
+    default_gdn = 'decode=TritonGDNKernel, extend=FlashInferGDNKernel, verify=TritonGDNKernel'
+    ignored = server(tmp_path / 'ignored', default_gdn, 'flashinfer', False)
+    with pytest.raises(SystemExit, match='prefill_triton'):
+        check_active('prefill_triton', ignored)
+    graphs_on = server(tmp_path / 'graphs', default_gdn, 'flashinfer', False)
+    with pytest.raises(SystemExit, match='no_cuda_graph'):
+        check_active('no_cuda_graph', graphs_on)
+
+
+def test_rates_outputs_are_never_replaced(tmp_path: Path) -> None:
+    target = tmp_path / 'prompts.jsonl'
+    rates.write_jsonl(target, [{'prompt': 'a'}])
+    with pytest.raises(SystemExit, match='exists'):
+        rates.write_jsonl(target, [{'prompt': 'b'}])
+    assert rates.read_jsonl(target) == [{'prompt': 'a'}]
+
+
+def test_rates_summary_refuses_partial_traces(tmp_path: Path) -> None:
+    output = [5, 6]
+    good = [[-0.1, 7], [-3.0, 8]]
+    row = {
+        'prompt': 'a',
+        'prompt_ids': [1],
+        'output_ids': output,
+        'decode': [good],
+        'prefill': [good] * 2,
+    }
+    write_gz(tmp_path / 'sglang.jsonl.gz', [row])
+    for name in rates.HF_RUNS:
+        write_gz(
+            tmp_path / f'{name}.jsonl.gz',
+            [{'prompt': 'a', 'decode': [good] * 2, 'prefill': [good] * 2}],
+        )
+    fp = {'top': [[-0.05, 7]], 'lp': {'7': -0.05, '8': -2.6}}
+    write_gz(tmp_path / 'fp32.jsonl.gz', [{'prompt': 'a', 'positions': [fp, fp]}])
+    with pytest.raises(SystemExit, match='does not cover all 2 positions'):
+        rates.summary(tmp_path)

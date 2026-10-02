@@ -33,18 +33,20 @@ module compares the paths on positions nobody selected:
   the count, when FP32's top token falls outside the path's top-20 somewhere); the worst
   positions.
 
-Readings (set before the run; `decide`): events are positions where FP32's logprob of a
-path's top-1 falls more than 2 nats short of FP32's top, pooled over decode and prefill (a
-position missed on both paths counted once, and the exact test paired by position; both
-corrections were made after the runs and change neither verdict).
-The comparator is the transformers configuration with more events among the two with an
-FP32 state (torch GDN, fla GDN); after the runs the rule was applied to each of the two (see
-`decide`). SGLang-specific: SGLang at least 5 events, at least 3 times the comparator's, and a
-one-sided exact binomial p below 0.05 for SGLang's share of the discordant positions (missed
-by one of the two only) under equal rates; then SGLang's BF16 arithmetic is less accurate than either
-transformers implementation at this model, and 579ae7ce/439 is an instance of that. Not
-specific: at least 10 events in the two counts and SGLang at most 1.5 times the
-comparator. Anything else is inconclusive.
+Readings (set before the run): events are positions where FP32's logprob of a path's top-1
+falls more than 2 nats short of FP32's top, pooled over decode and prefill. The comparator is
+the transformers configuration with more events among the two with an FP32 state (torch GDN,
+fla GDN). SGLang-specific: SGLang at least 5 events, at least 3 times the comparator's, and a
+one-sided exact binomial p below 0.05 for SGLang's share under equal rates; then SGLang's BF16
+arithmetic is less accurate than either transformers implementation at this model, and
+579ae7ce/439 is an instance of that. Not specific: at least 10 events in the two counts and
+SGLang at most 1.5 times the comparator. Anything else is inconclusive.
+
+Refined after the runs (review of #222; neither verdict changes, `decide`): a position missed
+on both of a source's paths counts once; the exact test is paired by position (SGLang-only
+against comparator-only positions); and the rule is applied against each FP32-state
+transformers run, SGLang-specific needing it against both and not specific needing SGLang to
+be comparable to at least one.
 """
 
 from __future__ import annotations
@@ -90,6 +92,10 @@ def sources(out: Path) -> dict[str, dict[str, dict[str, Any]]]:
 
 
 def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
+    """Write through a temporary file; never replace an existing output (move it aside to
+    redo a step)."""
+    if path.exists():
+        raise SystemExit(f'{path} exists')
     tmp = path.with_suffix(path.suffix + '.tmp')
     with gzip.open(tmp, 'wt') if path.suffix == '.gz' else tmp.open('w') as handle:
         for row in rows:
@@ -138,6 +144,11 @@ def tops(entries: Any) -> list[list[float | int]]:
 
 
 def sglang(out: Path, url: str) -> int:
+    from experiments.bf16_paths.sglang_variants import check_active, server_dir
+
+    if (out / 'sglang.jsonl.gz').exists():
+        raise SystemExit(f'{out / "sglang.jsonl.gz"} exists')
+    check_active('default', server_dir(out, 'default'))
     rows = []
     for item in read_jsonl(out / 'prompts.jsonl'):
         prompt = item['prompt_ids']
@@ -218,13 +229,14 @@ def load_model(dtype: Any, device: str, state_dtype: str) -> Any:
 def hf(out: Path, state_dtype: str, gdn: str) -> int:
     import torch
 
-    from experiments.bf16_paths.hf_paths import require_gdn
+    from experiments.bf16_paths.hf_paths import recurrent_state_dtypes, require_gdn
 
     target = out / f'hf_bf16_{"fla_" if gdn == "fla" else ""}{state_dtype}state.jsonl.gz'
     if target.exists():
         raise SystemExit(f'{target} exists')
     model = load_model(torch.bfloat16, 'cuda', state_dtype)
     print('GDN kernels', require_gdn(model, gdn), flush=True)
+    expected_state = [str(torch.float32 if state_dtype == 'float32' else torch.bfloat16)]
     rows = []
     for item in read_jsonl(out / 'sglang.jsonl.gz'):
         prompt, output = item['prompt_ids'], item['output_ids']
@@ -242,6 +254,9 @@ def hf(out: Path, state_dtype: str, gdn: str) -> int:
                     use_cache=True,
                 )
                 decode.append(top_entries(step.logits[0, -1]))
+        state = recurrent_state_dtypes(step.past_key_values)
+        if state != expected_state:
+            raise SystemExit(f'cached recurrent state is {state}, not {expected_state}')
         rows.append({'prompt': item['prompt'], 'decode': decode, 'prefill': prefill})
         print(item['prompt'], 'hf done', flush=True)
     write_jsonl(target, rows)
@@ -251,6 +266,8 @@ def hf(out: Path, state_dtype: str, gdn: str) -> int:
 def fp32(out: Path, threads: int) -> int:
     import torch
 
+    if (out / 'fp32.jsonl.gz').exists():
+        raise SystemExit(f'{out / "fp32.jsonl.gz"} exists')
     torch.set_num_threads(threads)
     model = load_model(torch.float32, 'cpu', 'model')
     paths = sources(out)
@@ -361,9 +378,20 @@ def summary(out: Path) -> dict[str, Any]:
             for item in sg:
                 output = item['output_ids']
                 eot = next((i for i, t in enumerate(output) if t in EOT), len(output))
-                for p, entries in enumerate(by_prompt[item['prompt']][kind]):
+                trace = by_prompt[item['prompt']][kind]
+                if len(trace) != len(output) or len(ref[item['prompt']]) != len(output):
+                    raise SystemExit(
+                        f'{path} or fp32 does not cover all {len(output)} positions of '
+                        f'{item["prompt"]}'
+                    )
+                for p, entries in enumerate(trace):
                     fp = ref[item['prompt']][p]
                     top1 = int(entries[0][1])
+                    if str(top1) not in fp['lp']:
+                        raise SystemExit(
+                            f"fp32.jsonl.gz has no logprob for {path}'s top-1 at "
+                            f'{item["prompt"]}/{p}: it predates that source; rerun fp32'
+                        )
                     regret = fp['top'][0][0] - fp['lp'][str(top1)]
                     region = regions[p > eot]
                     disagree[region] += top1 != fp['top'][0][1]
@@ -459,6 +487,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == 'hf':
         return hf(args.out, args.state_dtype, args.gdn)
     if args.command == 'fp32':
+        if args.threads < 1:
+            raise SystemExit('--threads must be positive')
         return fp32(args.out, args.threads)
     result = summary(args.out)
     args.json.parent.mkdir(parents=True, exist_ok=True)

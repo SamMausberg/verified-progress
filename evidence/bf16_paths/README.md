@@ -15,7 +15,8 @@ Status: measured. Correctness only; nothing here is timed.
 ## Result
 
 Neither error is shown to be specific to SGLang, so neither supports an SGLang issue. The
-readings (each set before its run, in the scripts' docstrings) give three findings.
+readings were set before each run in the scripts' docstrings (qualifications added after
+review are marked as such there); they give three findings.
 
 1. **`a4db11ff`/333 is ill-conditioned in BF16; any implementation can miss it.** transformers in
    BF16 misses FP32 there by as much as SGLang does: its torch GDN prefill of the whole output puts
@@ -100,8 +101,10 @@ At `a4db11ff` position 333, token 18299's logprob (FP32's top, at -0.45; 5500 is
 
 The unpatched pin reproduces the benchmark engine's readings to every printed digit, with or
 without CUDA graphs, so the observation stands on upstream code and the graphs play no part. The
-SGLang variants each change one kernel family; the GDN dispatcher line of each server log
-confirms the swap (`positions.json`, `meta`). The `beta_fp32` variant carries the one-line
+SGLang variants each change one kernel family. Each server's GDN dispatcher line and its
+resolved attention backend and CUDA-graph setting show that the swap took effect
+(`positions.json`, `meta`; the server records); `sglang_variants.read` now refuses a variant
+whose swap is not active, a check added after the runs that all six pass. The `beta_fp32` variant carries the one-line
 changes of the open upstream PRs #38977 and #40362 (issue #38975: the packed GDN decode kernel
 and the gating kernel round sigmoid(beta) through BF16).
 

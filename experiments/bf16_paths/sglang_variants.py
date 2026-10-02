@@ -27,9 +27,12 @@ variants that each swap one kernel family the two paths use:
   kernel and in the gating kernel that feeds prefill, where the pin rounds it through BF16
   (upstream issue #38975).
 
-`read` runs `paths.stock_target` on every target (one request at a time, the cache flushed
-before each: three prefills and one decode from TRACE positions before the target) and
-writes `<variant>.json` with the server's resolved kernel choices.
+`read` first checks that the server resolved the variant's kernels (`check_active`: the GDN
+dispatcher line, the attention backend, CUDA graphs; added after the runs, which all
+passed it), then runs `paths.stock_target` on every target (one request at a time, the
+cache flushed before each: three prefills and one decode from TRACE positions before the
+target) and writes `<variant>.json` with the server's resolved kernel choices; it refuses
+an existing `<variant>.json`.
 
 Readings (set before the run): `default` within 0.1 nats of the benchmark engine's stock
 reading (`paths.py stock`) means the observation stands on the unpatched pin. A variant
@@ -80,6 +83,21 @@ VARIANTS: dict[str, dict[str, ArgValue]] = {
 ENGINES: dict[str, tuple[Path, str]] = {
     'beta_fp32': (Path.home() / 'sglang-wt' / 'upstream-bf16', BETA_FP32_HEAD),
 }
+# What each variant must resolve to: the GDN dispatcher's decode and extend kernels (server
+# log), the attention backend and whether CUDA graphs are off (server_info.json).
+GDN_TRITON_DECODE_FLASHINFER_PREFILL = 'decode=TritonGDNKernel, extend=FlashInferGDNKernel'
+ACTIVE: dict[str, tuple[str, str, bool]] = {
+    'default': (GDN_TRITON_DECODE_FLASHINFER_PREFILL, 'flashinfer', False),
+    'prefill_triton': ('decode=TritonGDNKernel, extend=TritonGDNKernel', 'flashinfer', False),
+    'decode_flashinfer': (
+        'decode=FlashInferGDNKernel, extend=FlashInferGDNKernel',
+        'flashinfer',
+        False,
+    ),
+    'no_cuda_graph': (GDN_TRITON_DECODE_FLASHINFER_PREFILL, 'flashinfer', True),
+    'attn_triton': (GDN_TRITON_DECODE_FLASHINFER_PREFILL, 'triton', False),
+    'beta_fp32': (GDN_TRITON_DECODE_FLASHINFER_PREFILL, 'flashinfer', False),
+}
 _DISPATCHER = re.compile(r'GDN kernel dispatcher: (.*)$', re.MULTILINE)
 _GDN_LINES = re.compile(r'^.*(?:GDN|Linear attention kernel backend).*$', re.MULTILINE)
 
@@ -112,11 +130,35 @@ def start(out: Path, variant: str) -> int:
     return 0
 
 
+def check_active(variant: str, directory: Path) -> list[str]:
+    """Refuse a server whose resolved kernels are not the variant's (a flag the engine
+    ignores or overrides would otherwise read as the swap); returns the dispatcher lines."""
+    log = (directory / 'server.log').read_text(errors='replace')
+    info = json.loads((directory / 'server_info.json').read_text())
+    gdn, attention, graphs_off = ACTIVE[variant]
+    lines = sorted(set(_DISPATCHER.findall(log)))
+    found = (
+        len(lines) == 1 and lines[0].startswith(gdn),
+        info.get('attention_backend') == attention,
+        bool(info.get('disable_cuda_graph')) == graphs_off,
+    )
+    if not all(found):
+        raise SystemExit(
+            f'{variant}: expected GDN {gdn!r}, attention {attention}, CUDA graphs off '
+            f'{graphs_off}; the server resolved {lines}, {info.get("attention_backend")}, '
+            f'{info.get("disable_cuda_graph")}'
+        )
+    return lines
+
+
 def read(out: Path, variant: str, targets: Path) -> int:
+    if (out / f'{variant}.json').exists():
+        raise SystemExit(f'{out / f"{variant}.json"} exists')
     found = [json.loads(line) for line in targets.read_text().splitlines() if line]
     if not found:
         raise SystemExit(f'no targets in {targets}')
     directory = server_dir(out, variant)
+    check_active(variant, directory)
     log = (directory / 'server.log').read_text(errors='replace')
     launch = json.loads((directory / 'launch.json').read_text())
     results = [stock_target(f'http://127.0.0.1:{PORT}', t) for t in found]

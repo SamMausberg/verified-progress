@@ -61,9 +61,9 @@ def perturb_hook(generator: Any) -> Any:
     return hook
 
 
-def perturb_gdn_inputs(rule: Any, generator: Any) -> Any:
+def perturb_gdn_inputs(rule: Any, generator: Any, calls: list[int]) -> Any:
     """Wrap a GDN layer's `chunk_gated_delta_rule` so its query, key, value and beta are
-    multiplied by (1 + u) elementwise before the recurrence."""
+    multiplied by (1 + u) elementwise before the recurrence; counts its calls in `calls`."""
     import torch
 
     def jitter(x: Any) -> Any:
@@ -71,24 +71,32 @@ def perturb_gdn_inputs(rule: Any, generator: Any) -> Any:
         return (x.float() * (1 + (2 * noise - 1) * EPS)).to(x.dtype)
 
     def wrapped(query: Any, key: Any, value: Any, *args: Any, **kwargs: Any) -> Any:
+        calls[0] += 1
         kwargs['beta'] = jitter(kwargs['beta'])
         return rule(jitter(query), jitter(key), jitter(value), *args, **kwargs)
 
     return wrapped
 
 
-def install(model: Any, site: str, generator: Any) -> list[Any]:
-    """Install the perturbation; returns the callables that undo it."""
+def install(model: Any, site: str, generator: Any, calls: list[int]) -> list[Any]:
+    """Install the perturbation; returns the callables that undo it. `calls` counts the
+    perturbed calls, so a forward that bypasses the perturbation can be refused."""
     undo: list[Any] = []
     for layer in model.model.layers:
         if site == 'residual':
-            undo.append(layer.register_forward_hook(perturb_hook(generator)).remove)
+            hook = perturb_hook(generator)
+
+            def counted(*args: Any, hook: Any = hook) -> Any:
+                calls[0] += 1
+                return hook(*args)
+
+            undo.append(layer.register_forward_hook(counted).remove)
             continue
         attn = getattr(layer, 'linear_attn', None)
         if attn is None:
             continue
         original = attn.chunk_gated_delta_rule
-        attn.chunk_gated_delta_rule = perturb_gdn_inputs(original, generator)
+        attn.chunk_gated_delta_rule = perturb_gdn_inputs(original, generator, calls)
         undo.append(
             lambda attn=attn, original=original: setattr(attn, 'chunk_gated_delta_rule', original)
         )
@@ -134,14 +142,19 @@ def run(
         runs: dict[str, Any] = {}
         for seed in [None, *range(seeds)]:
             undo = []
+            calls = [0]
             if seed is not None:
-                undo = install(model, site, torch.Generator().manual_seed(seed))
+                undo = install(model, site, torch.Generator().manual_seed(seed), calls)
             try:
                 with torch.no_grad():
                     logits = model(input_ids=ids, use_cache=False).logits[0]
             finally:
                 for step in undo:
                     step()
+            if seed is not None and calls[0] != len(undo):
+                raise SystemExit(
+                    f'{target["id"]} seed {seed}: {calls[0]} perturbed calls, expected {len(undo)}'
+                )
             runs['none' if seed is None else f'seed_{seed}'] = {
                 str(p): entry(logits[n + p - 1], output[p], track) for p in range(first, pos + 1)
             }

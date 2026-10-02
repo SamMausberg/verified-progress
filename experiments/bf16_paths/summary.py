@@ -9,7 +9,7 @@ and SGLang variant (`<variant>.json`) present in `--out`. For each target, path 
 it gives, at the target: the top-1, the target's tracked tokens' logprobs, the largest
 absolute difference from FP32's one forward on those tokens, and FP32's own top logprob
 minus FP32's logprob of the path's top-1 (how much worse, by FP32, the token the path puts
-on top is: 0 when the path's top-1 is FP32's). Before the target it gives the largest
+on top is: 0 when the path's top-1 is FP32's, null when FP32 did not track that token). Before the target it gives the largest
 absolute difference from FP32 on the recorded token's logprob over the traced positions.
 It also condenses `perturb.py`'s runs (`perturb.json`, `perturb_gdn.json`): per target, the
 tracked tokens' range over the seeds and the control change before the target. Every
