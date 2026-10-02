@@ -1,0 +1,115 @@
+From 4eba651f81e76492c00b42a56dcf4339fb659c30 Mon Sep 17 00:00:00 2001
+From: Sam Mausberg <samuelmausberg@gmail.com>
+Date: Fri, 2 Oct 2026 19:04:41 +0000
+Subject: [PATCH] [FA4] Ceil-divide paged-KV page entries per loader thread
+ (backport flash-attention#2745)
+
+The cp.async paged-KV loader gives each thread n_block_size // num_threads
+page-table entries. On SM90 the head_dim 256 forward tile has 80 KV rows and
+the loader runs 128 threads, so the count was 0 and the kernel failed to
+compile whenever page_size != 80 (SGLang's default page size is 1).
+Dao-AILab/flash-attention#2745 ceil-divides; this takes its paged_kv.py hunk.
+
+Adds an SM90 regression test at head_dim 256 with page sizes 1 and 16.
+---
+ .../ops/attention/flash_attn/cute/paged_kv.py |  3 +-
+ .../ops/attention/test_flash_attention_4.py   | 63 ++++++++++++++++++-
+ 2 files changed, 64 insertions(+), 2 deletions(-)
+
+diff --git a/python/sglang/kernels/ops/attention/flash_attn/cute/paged_kv.py b/python/sglang/kernels/ops/attention/flash_attn/cute/paged_kv.py
+index 9b24a4268b..0536e91693 100644
+--- a/python/sglang/kernels/ops/attention/flash_attn/cute/paged_kv.py
++++ b/python/sglang/kernels/ops/attention/flash_attn/cute/paged_kv.py
+@@ -93,7 +93,8 @@ class PagedKVManager(ParamsBase):
+             atom_async_copy, thr_layout, val_layout
+         )
+         gmem_thr_copy_KV = gmem_tiled_copy_KV.get_slice(thread_idx)
+-        page_entry_per_thread = n_block_size // num_threads
++        # Include the final partially populated wave of rows.
++        page_entry_per_thread = (n_block_size + num_threads - 1) // num_threads
+ 
+         if const_expr(mSFK_paged is not None or mSFV_paged is not None):
+             atom_async_copy_sf = cute.make_copy_atom(
+diff --git a/test/registered/kernels/ops/attention/test_flash_attention_4.py b/test/registered/kernels/ops/attention/test_flash_attention_4.py
+index 69132bba3f..2b7098cd31 100644
+--- a/test/registered/kernels/ops/attention/test_flash_attention_4.py
++++ b/test/registered/kernels/ops/attention/test_flash_attention_4.py
+@@ -15,7 +15,7 @@ from sglang.kernels.ops.attention.flash_attention import (
+     flash_attn_varlen_func,
+     flash_attn_with_kvcache,
+ )
+-from sglang.srt.utils import is_sm100_or_sm110_supported
++from sglang.srt.utils import is_sm90_supported, is_sm100_or_sm110_supported
+ from sglang.test.ci.ci_register import register_cuda_ci
+ 
+ register_cuda_ci(est_time=120, stage="base-b-kernel-unit", runner_config="1-gpu-large")
+@@ -1795,5 +1795,66 @@ def test_flash_attn_hd256_noncontiguous_inputs(strided_input):
+     assert torch.equal(lse, lse_dense)
+ 
+ 
++@pytest.mark.skipif(
++    not is_sm90_supported(),
++    reason="Covers the SM90 head_dim 256 tile (128 x 80).",
++)
++@pytest.mark.parametrize("page_size", [1, 16])
++def test_flash_attn_paged_non_tma_partial_loader_tile_sm90(page_size):
++    """The SM90 head_dim 256 tile has 80 KV rows, fewer than the 128 threads of
++    the cp.async paged-KV loader; a page size other than 80 must still work."""
++    device = "cuda"
++    dtype = torch.bfloat16
++    batch_size, seqlen_q, seqlen_k = 3, 16, 600
++    nheads, nheads_k, d = 16, 4, 256
++    torch.random.manual_seed(0)
++
++    q = torch.randn(batch_size, seqlen_q, nheads, d, device=device, dtype=dtype)
++    k_cache, v_cache, page_table, k_cache_paged, v_cache_paged, _ = (
++        _generate_block_kvcache(
++            seqlen_k, page_size, batch_size, nheads_k, d, d, device, dtype, dtype
++        )
++    )
++    # Lengths that end inside a KV tile, so the last tile is partially loaded.
++    cache_seqlens = torch.tensor([seqlen_k, 97, 333], dtype=torch.int32, device=device)
++    cu_seqlens_q = (
++        torch.arange(batch_size + 1, dtype=torch.int32, device=device) * seqlen_q
++    )
++
++    out = flash_attn_with_kvcache(
++        q=rearrange(q, "b s h d -> (b s) h d"),
++        k_cache=k_cache_paged,
++        v_cache=v_cache_paged,
++        page_table=page_table,
++        cache_seqlens=cache_seqlens,
++        cu_seqlens_q=cu_seqlens_q,
++        max_seqlen_q=seqlen_q,
++        causal=True,
++        ver=4,
++    )
++    out = rearrange(out, "(b s) h d -> b s h d", b=batch_size)
++
++    key_padding_mask = rearrange(
++        torch.arange(seqlen_k, device=device), "s -> 1 s"
++    ) < rearrange(cache_seqlens, "b -> b 1")
++    out_ref, _ = attention_ref(q, k_cache, v_cache, None, key_padding_mask, causal=True)
++    out_pt, _ = attention_ref(
++        q,
++        k_cache,
++        v_cache,
++        None,
++        key_padding_mask,
++        causal=True,
++        upcast=False,
++        reorder_ops=True,
++    )
++    assert (out - out_ref).abs().max().item() <= 2 * (
++        out_pt - out_ref
++    ).abs().max().item() + 1e-5
++    assert (out - out_ref).abs().mean().item() <= 1.5 * (
++        out_pt - out_ref
++    ).abs().mean().item()
++
++
+ if __name__ == "__main__":
+     sys.exit(pytest.main([__file__, "-v", "-s"]))
+-- 
+2.34.1
+
