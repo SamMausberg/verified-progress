@@ -559,15 +559,18 @@ and both control pairs.
   ratio is -0.865, not above 0 (point estimates -0.386 and -0.602).
 - **Secondary.** The one-sided Fisher exact test on the pooled primary table gives
   p = 0.92.
-- **What this does and does not say.** Under the declared rule a result that fails (a) or
-  (b) is inconclusive, not evidence of no effect, and the declared statistics are
-  one-sided lower bounds, which say nothing about how large an effect the data exclude.
-  What the data show directly is that the exploratory pattern did not recur: on fresh
-  prompts the first cycle's divergence rate per fragile position (4.9%) is below the
-  later cycles' (7.5%), against 17.8% (13/73) for the same two configurations in the
-  pinned matrix. That fits the exploratory pattern having been a small-sample fluctuation
-  picked out after looking at the data, though the declared test does not establish it.
-  The handoff check that was to follow a supported result (comparing the GDN state
+- **What this does and does not say.** The declared test is inconclusive, and under its
+  rule that is not evidence of no effect. Descriptively, the data are inconsistent with a
+  pooled primary odds ratio above 1.28 (one-sided 95%, post hoc), which is below the
+  exploratory 2.36 ("Power" in the declaration). The bound is the 95th percentile of the
+  same 10,000 prompt-resampling bootstrap replicates, percentile method, added by the
+  amendment of 2026-10-02 (`experiments/state_safety/README.md`) after the result was
+  seen (`descriptive_upper_95`). The same bound for the primary minus the control log odds
+  ratio is 1.26. On the fresh prompts the first cycle's divergence rate per fragile
+  position (4.9%) is below the later cycles' (7.5%), against 17.8% (13/73) for the same
+  two configurations in the pinned matrix. That fits the exploratory pattern having been
+  a small-sample fluctuation picked out after looking at the data, though neither the
+  declared test nor the post-hoc bound establishes it. The handoff check that was to follow a supported result (comparing the GDN state
   handed from the prefill to the first verify with the state handed to the first plain
   decode step) is not run.
 - **Power.** The declaration expected about 219 first-cycle and 12,200 later fragile
@@ -608,10 +611,12 @@ python first_cycle.py --runs ~/vp-data/state/runs_fresh \
     --out ../../evidence/state_safety/first_cycle_fresh.json
 ```
 
-The script was last changed at `a493cbf` (2026-10-01 13:50 UTC), before either hold;
-the run used it unchanged from `origin/main` at `fc47cf6`, where it and the
-`compare.py` functions it imports (`load_run`, `spec_cycles_consistent`) are as they
-were then.
+The declared result was first computed with the script as it stood at `a493cbf`
+(2026-10-01 13:50 UTC, before either hold), run unchanged from `origin/main` at
+`fc47cf6`, where it and the `compare.py` functions it imports (`load_run`,
+`spec_cycles_consistent`) are as they were then. The committed file was then regenerated
+with the amended script, which adds `descriptive_upper_95`; with that key removed it is
+byte-identical to the first output.
 
 ## History dependence through radix-cache insertion
 

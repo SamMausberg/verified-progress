@@ -55,5 +55,11 @@
  "a_holds": false,
  "b_holds": false,
  "secondary_fisher_one_sided_p": 0.9228,
- "decision": "inconclusive"
+ "decision": "inconclusive",
+ "descriptive_upper_95": {
+  "note": "post hoc (amendment of 2026-10-02), not part of the declared decision",
+  "log_odds_primary": 0.2392,
+  "odds_ratio_primary": 1.271,
+  "log_odds_difference": 1.2536
+ }
 }
