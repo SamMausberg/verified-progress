@@ -85,7 +85,8 @@ def compare(a: dict[str, list[int]], b: dict[str, list[int]]) -> dict[str, int]:
 def load_points(root: Path) -> dict[tuple[str, int], dict[str, Any]]:
     points: dict[tuple[str, int], dict[str, Any]] = {}
     for label_dir in sorted(p for p in root.iterdir() if p.is_dir()):
-        runs = sorted(label_dir.glob('2026*/r0'))
+        # bench.sweep names each run YYYYMMDD-HHMMSS.
+        runs = sorted(label_dir.glob('[0-9]*-[0-9]*/r0'))
         if not runs:
             continue
         if len(runs) != 1:

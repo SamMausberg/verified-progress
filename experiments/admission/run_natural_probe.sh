@@ -25,7 +25,9 @@ python -m bench.sweep --sglang-worktree "$engine" --arm plain-tuned --label natu
   --out "$out/gen" --workload bench/workloads/mixed-v2/confirm.jsonl --no-ignore-eos --osl 2048 \
   --concurrency 128 --min-requests 1152 --waves 1 --port 30233 > "$out/gen.log" 2>&1 ||
   { echo "natural-length run failed"; tail -5 "$out/gen.log"; exit 1; }
-runs=("$out"/gen/natural-gen/2026*)
+# bench.sweep names each run YYYYMMDD-HHMMSS.
+runs=("$out"/gen/natural-gen/[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9])
+[ -e "${runs[-1]}" ] || { echo "no natural-length run in $out/gen/natural-gen" >&2; exit 1; }
 python -m bench.natural_workload "${runs[-1]}" --workload bench/workloads/mixed-v2/confirm.jsonl \
   --cap 2048 --out "$out/natural2048" || exit 1
 echo "lengths frozen $(date -u +%H:%M:%S)"

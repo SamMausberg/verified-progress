@@ -184,8 +184,12 @@ python experiments/admission/summarize_probe.py ~/vp-data/speed_highc/natural-20
 python experiments/admission/analyze_prefill_trace.py \
   ~/vp-data/speed_highc/prefill-20261002T175303Z/stock/prefill.nsys-rep \
   --out ~/vp-data/speed_highc/prefill-20261002T175303Z/stock/trace_summary.json
+experiments/admission/collect_records.sh ~/vp-data/speed_highc evidence/admission
 ```
 
-`prefill_requests.json` condenses the two servers' `client.json`, `prefill_trace.json` is
-`trace_summary.json` (per-request GPU windows and their medians) and `gdn_prefill_bench.json` is
-copied from the hold's output; `launches.csv` is built from each run's `server/launch.json`.
+`collect_records.sh` (jq only) writes the other four files: `launches.csv` from each server's
+`server/launch.json` and its run's `sweep.json`; `prefill_requests.json`, which condenses the
+two prefill-probe servers' `client.json`; `prefill_trace.json`, the per-request GPU windows and
+their medians from `trace_summary.json`; and `gdn_prefill_bench.json`, copied from the hold's
+output. Run on the raw data it reproduces the committed files byte for byte (checked with
+`cmp` on 2026-10-02).
