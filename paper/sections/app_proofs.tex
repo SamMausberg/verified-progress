@@ -9,7 +9,7 @@
 This appendix collects what the main text's contract and certified head rest on. It lists the numerical assumptions in full (Appendix~\ref{app:assumptions}), states the general form of the copy's error bound (Appendix~\ref{app:envelope}) and the refinement ladder (Appendix~\ref{app:ladder}), and proves them with the results of Sections~\ref{sec:headcontracts} and~\ref{sec:selfevidence} whose proofs are not in the main text and the secondary results they need: the constants of the two error models, the integer pass, and the computed norms and outward rounding that turn a real error bound into an interval of computed values. It then bounds and measures how many vocabulary entries a decision re-scores (Appendix~\ref{app:candidates}), says how the GPU kernel is checked (Appendix~\ref{app:kernel-checks}), and separates what is machine-checked from what is tested and what is proved only on paper (Appendix~\ref{app:checked}).
 
 \subsection{Numerical assumptions in full}\label{app:assumptions}
-Table~\ref{tab:assumptions-full} lists every rounding, accumulation, tie-breaking and error-model assumption with its status and the results that depend on it; Table~\ref{tab:assumptions} summarizes it in the main text.
+Table~\ref{tab:assumptions-full} lists every rounding, accumulation, tie-breaking and error-model assumption with its status and the results that depend on it; Table~\ref{tab:assumptions} summarizes it.
 
 \begin{table}[htbp]
 \caption{Numerical assumptions and the results that depend on them. ``Code reading'': read in SGLang's source at the pinned commit \sourcepin{} (Appendix~\ref{app:pins}) with PyTorch 2.13; $D=2{,}560$.}\label{tab:assumptions-full}
@@ -43,11 +43,11 @@ Transport is in real arithmetic with one head for both passes; $\delta^\ast$ use
 Assumption & Status\\\midrule
 BF16 operands are normal or zero, so products are exact in FP32 (underflow is charged to $\eta$) & Exact for normal operands\\\addlinespace[2pt]
 The stock head rounds its FP32 accumulator to BF16 (nearest, ties to even); \code{torch.argmax} returns the first maximal index & Code\\\addlinespace[2pt]
-The stock kernel's error is at most $\gamma_{\rm stock}\sum_j|w_{ij}h_j|+\eta$ at every served shape, under the \modelcons{} or the \modelhopper; no split-$K$ partial sums in BF16 & Assumed; consistent with every replayed position and with the observed error of the stock GEMM's FP32-output variant, a separate kernel (Section~\ref{sec:limits}) \ev{kernel-error}\\\addlinespace[2pt]
+The stock kernel's error is at most $\gamma_{\rm stock}\sum_j|w_{ij}h_j|+\eta$ at every served shape, under the \modelcons{} or the \modelhopper; no split-$K$ partial sums in BF16 & Assumed; consistent with every replayed position and the FP32-output variant (Section~\ref{sec:headcontracts}) \ev{kernel-error}\\\addlinespace[2pt]
 The int8 pass's own accumulation error is at most $\gamma_{\rm copy}=\gcons$ times $\sum_j|\bar w_{ij}h_j|$, and the kernel computes the modelled arithmetic & Assumed; checked per compiled variant at start-up and by runtime probes, not proved (Section~\ref{sec:kernel-design}) \ev{kernel-impl,kernel-tma}\\\addlinespace[2pt]
 Agreement is checked at the same batch shape and configuration & Required (Section~\ref{sec:same-shape})\\\addlinespace[2pt]
 Per-position fallback only: a position's stock logits do not depend on the rest of the batch or on which entries are present & Measured at 20 batch sizes; entry subsets re-checked at start-up \ev{kernel-invariance}\\\addlinespace[2pt]
-Seeded sampling (Section~\ref{sec:decisions}): noise is a function of (seed, position, token); no top-$k$ or top-$p$; the deterministic mode's head kernel is covered by the \modelcons{} only & Code; matched on replayed positions \ev{kernel-seeded}\\\addlinespace[2pt]
+Seeded sampling (Section~\ref{sec:decisions}): noise is a function of (seed, token position in the sequence, token); no top-$k$ or top-$p$; the deterministic mode's head kernel is covered by the \modelcons{} only & Code; matched on replayed positions \ev{kernel-seeded}\\\addlinespace[2pt]
 The offline replay evaluates real logits in FP64; transport is analysed in real arithmetic & How the replay computes\\
 \bottomrule
 \end{tabularx}
