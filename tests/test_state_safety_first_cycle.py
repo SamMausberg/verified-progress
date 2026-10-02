@@ -1,7 +1,9 @@
 """The declared first-cycle analysis on synthetic runs (CPU only)."""
 
 import hashlib
+import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -53,34 +55,62 @@ def test_log_odds_adds_half_to_every_cell():
     assert abs(float(log_odds(t)) - np.log(0.5 * 100.5 / (10.5 * 0.5))) < 1e-12
 
 
+def _decision_runs(first_cycle_diverges_in_primary):
+    out = {r: {} for r in RUNS}
+    for k in range(200):
+        p = f'p{k}'
+        out['plain/c1'][p] = rec([1] * 10, FRAGILE)
+        for cfg in ('mtp_s5', 'mtp_tree'):
+            # Primary pairs diverge in the first cycle for half the prompts and
+            # otherwise late; control pairs diverge late for a fifth of them.
+            ids = [1] * 10
+            if first_cycle_diverges_in_primary and k % 2 == 0:
+                ids[2] = 2
+            elif k % 5 == 0:
+                ids[8] = 2
+            out[f'{cfg}/c1'][p] = rec(ids, FRAGILE, chunks=[1, 3, 3, 3])
+            c32 = list(out[f'{cfg}/c1'][p]['output_ids'])
+            if k % 5 == 1:
+                c32[8] = 3
+            out[f'{cfg}/c32'][p] = rec(c32, FRAGILE, chunks=[1, 3, 3, 3])
+    return out
+
+
 def test_decision_supported_only_when_both_bounds_hold():
-    prompts = [f'p{i}' for i in range(200)]
-
-    def runs(first_cycle_diverges_in_primary):
-        out = {r: {} for r in RUNS}
-        for k, p in enumerate(prompts):
-            plain = rec([1] * 10, FRAGILE)
-            out['plain/c1'][p] = plain
-            for cfg in ('mtp_s5', 'mtp_tree'):
-                # Primary pairs diverge in the first cycle for half the prompts and
-                # otherwise late; control pairs diverge late for a fifth of them.
-                ids = [1] * 10
-                if first_cycle_diverges_in_primary and k % 2 == 0:
-                    ids[2] = 2
-                elif k % 5 == 0:
-                    ids[8] = 2
-                out[f'{cfg}/c1'][p] = rec(ids, FRAGILE, chunks=[1, 3, 3, 3])
-                c32 = list(out[f'{cfg}/c1'][p]['output_ids'])
-                if k % 5 == 1:
-                    c32[8] = 3
-                out[f'{cfg}/c32'][p] = rec(c32, FRAGILE, chunks=[1, 3, 3, 3])
-        return out
-
-    res = analyse(runs(True), fisher=False)
+    res = analyse(_decision_runs(True), fisher=False)
     assert res['prompts_included'] == 200
     assert res['a_holds'] and res['b_holds'] and res['decision'] == 'supported'
-    res = analyse(runs(False), fisher=False)
+    res = analyse(_decision_runs(False), fisher=False)
     assert not res['a_holds'] and res['decision'] == 'inconclusive'
+
+
+# The analysis as it stood when the declared runs were made (README, "Amendment of
+# 2026-10-02"): the amendment may only add descriptive_upper_95.
+DECLARED_ANALYSIS = 'a493cbf87e18db0478550297d58ed5f7a8ac5912'
+
+
+def test_amendment_leaves_the_declared_outputs_byte_identical(tmp_path):
+    repo = Path(__file__).resolve().parents[1]
+    blob = f'{DECLARED_ANALYSIS}:experiments/state_safety/first_cycle.py'
+    src = subprocess.run(
+        ['git', '-C', str(repo), 'show', blob], capture_output=True, check=True
+    ).stdout
+    path = tmp_path / 'first_cycle_declared.py'
+    path.write_bytes(src)
+    spec = importlib.util.spec_from_file_location('first_cycle_declared', path)
+    assert spec is not None and spec.loader is not None
+    declared = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(declared)
+    for first in (True, False):
+        runs = _decision_runs(first)
+        new = analyse(runs, fisher=False)
+        upper = new.pop('descriptive_upper_95')
+        old = declared.analyse(runs, fisher=False)
+        assert json.dumps(new, indent=1) == json.dumps(old, indent=1)
+        # One-sided upper bounds from the same replicates: above the lower bounds.
+        assert upper['log_odds_primary'] > new['a_lower_bound_log_odds_primary']
+        assert upper['log_odds_difference'] > new['b_lower_bound_log_odds_difference']
+        assert upper['odds_ratio_primary'] >= np.exp(upper['log_odds_primary']) - 1e-3
 
 
 def _write_declared(tmp_path, ids):

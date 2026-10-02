@@ -21,7 +21,9 @@ the primary minus the pooled control log odds ratio is above 0. One prompt
 resample per replicate is shared by all four pairs (10,000 replicates,
 numpy.random.default_rng(0)). Secondary: a one-sided Fisher exact test on the
 pooled primary table. Supported only if (a) and (b) both hold; otherwise
-inconclusive. The result is void, and no results are written, unless all five
+inconclusive. The amendment of 2026-10-02 (README) adds, post hoc and outside the
+decision, the 95th percentiles of the same replicates as descriptive upper bounds
+(descriptive_upper_95). The result is void, and no results are written, unless all five
 runs exist and are the declared runs: the declared configurations and
 concurrencies with the radix cache and overlap scheduler on, the pinned pools,
 256 tokens with top-5 logprobs at every output token, exactly the 960 frozen
@@ -382,6 +384,10 @@ def analyse(runs: dict[str, dict[str, dict[str, Any]]], fisher: bool = True) -> 
     lower_p = float(np.percentile(boot_p, 5))
     lower_d = float(np.percentile(boot_p - boot_c, 5))
     a_holds, b_holds = lower_p > 0, lower_d > 0
+    # Amendment of 2026-10-02 (post hoc, descriptive): one-sided 95% upper bounds from the
+    # same replicates. Nothing declared reads them.
+    upper_p = float(np.percentile(boot_p, 95))
+    upper_d = float(np.percentile(boot_p - boot_c, 95))
 
     def table(t: np.ndarray) -> dict[str, int]:
         s = t.sum(0).astype(int)
@@ -422,6 +428,13 @@ def analyse(runs: dict[str, dict[str, dict[str, Any]]], fisher: bool = True) -> 
         'b_holds': bool(b_holds),
         'secondary_fisher_one_sided_p': None if fisher_p is None else round(fisher_p, 4),
         'decision': 'supported' if a_holds and b_holds else 'inconclusive',
+        # Upper bounds rounded up, so the displayed value is never below the computed one.
+        'descriptive_upper_95': {
+            'note': 'post hoc (amendment of 2026-10-02), not part of the declared decision',
+            'log_odds_primary': math.ceil(upper_p * 1e4) / 1e4,
+            'odds_ratio_primary': math.ceil(math.exp(upper_p) * 1e3) / 1e3,
+            'log_odds_difference': math.ceil(upper_d * 1e4) / 1e4,
+        },
     }
 
 
