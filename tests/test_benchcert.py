@@ -579,8 +579,9 @@ def test_control_waves_compares_and_exports_contexts(tmp_path: Path) -> None:
             )
     assert control_waves.compare_variants(tmp_path) == 0
     summary = json.loads((tmp_path / 'compare.json').read_text())
-    assert summary['declared'] is False and summary['identical'] == 1
-    assert summary['diverged'] == 1
+    pair = summary['pairs']['cert_vs_stock']
+    assert summary['declared'] is False and pair['identical'] == 1 and pair['diverged'] == 1
+    assert pair['divergences'] == [{'prompt': 'b', 'position': 2, 'tokens': [6, 7]}]
     contexts = [json.loads(line) for line in (tmp_path / 'contexts.jsonl').open()]
     assert contexts == [
         {'id': analyze.context_id([8], [3, 5], (6, 7)), 'input_ids': [8, 3, 5], 'tokens': [6, 7]}
@@ -602,3 +603,15 @@ def test_control_waves_takes_the_first_64_prompts_in_workload_order(
     items = control_waves.prompts(tmp_path)
     assert [key for key, _ in items] == [prompt_hash(t) for t in texts[:64]]
     assert all(ids == [11, 12] for _, ids in items)
+
+
+def test_control_waves_cert0_never_certifies(tmp_path: Path) -> None:
+    from experiments.benchcert import control_waves
+
+    env = control_waves.variant_env('dflash16', 'cert0', tmp_path / 's.json')
+    assert env['SGLANG_CERTIFIED_HEAD_MAX_ROWS'] == '0'
+    assert env['SGLANG_CERTIFIED_HEAD_VERIFY'] == '1' and env['SGLANG_CERTIFIED_HEAD_DRAFT'] == '1'
+    timed = control_waves.variant_env('dflash16', 'cert', tmp_path / 's.json')
+    assert timed['SGLANG_CERTIFIED_HEAD_MAX_ROWS'] == '64'
+    assert control_waves.variant_env('dflash16', 'stock', tmp_path / 's.json') == {}
+    assert control_waves.overrides('dflash16')['max-total-tokens'] == 30000

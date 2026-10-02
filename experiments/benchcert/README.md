@@ -341,6 +341,20 @@ head gives identical tokens under identical batch evolution, the claim check mod
 also makes; it does not show the cause of every timed divergence. If any differ,
 their first divergences are re-scored into the same classes.
 
+A second control (added 2026-10-02 after h4, approved by main) concerns DFlash block
+16 at c = 8, a gated-off point, where the timed certified and stock arms diverged on
+the same three prompts at the same positions in all three sessions while each arm
+reproduced itself. In the same waves (prompts recorded by session 1's stock block-16
+run at c = 8, 30,000 KV tokens), three arms: stock, certified as timed, and certified
+with `SGLANG_CERTIFIED_HEAD_MAX_ROWS=0`, so the head never runs and only the stock head
+and draft sampler inside the conditional nodes remain. Reading rule (main's, set before
+the run): the `MAX_ROWS=0` arm differing from stock points to the gated-off path inside
+the conditional nodes, an integration exactness bug; it equal to stock while the
+certified arm differs points to the head's certified ramp-down, which check mode should
+then have caught at that shape; all three equal points to closed-loop timing in the
+timed runs. Until it runs, token identity is claimed only at c = 1 and at the
+check-mode batches.
+
 ## Hold commit
 
 Every hold runs from a clean checkout at the commit recorded here; `run_session.py`
