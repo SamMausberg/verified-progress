@@ -32,12 +32,13 @@ two models are reported separately:
 - `hopper-wgmma`: a Hopper tensor-core model with 16-term blocks, 25 fractional
   bits and truncation, the form Khattak and Mikaitis (ACM TACO 2026) published from
   measurements through the warp-level BF16 `mma` (SASS `HMMA`), plus an FP32
-  split-K allowance (1.19e-4). The stock head kernels issue the warpgroup `wgmma`
-  (SASS `HGMMA`) instead; on this GPU a probe with crafted inputs finds the same
-  16-term blocks, 25 fractional bits and truncation for `wgmma` and for all 14 head
-  kernels (`evidence/profiles/wgmma_precision.json`,
-  `evidence/profiles/head_tensor_instructions.json`). The model rests on these
-  measurements, not on vendor documentation.
+  split-K allowance (1.19e-4). The two head kernels whose SASS was inspected
+  (M = 1 and 32) issue the warpgroup `wgmma` (SASS `HGMMA`) instead
+  (`evidence/profiles/head_tensor_instructions.json`). On this GPU a probe with
+  crafted inputs finds the same 16-term blocks, 25 fractional bits and truncation
+  for Triton's `wgmma` and in the numerical behaviour of all 14 head kernels, whose
+  instruction was not read beyond those two (`evidence/profiles/wgmma_precision.json`).
+  The model rests on these measurements, not on vendor documentation.
 
 The approximate pass needs a model too. The W8A16 and BF16 passes accumulate on
 tensor cores (Triton `tl.dot`), and their own envelope uses the conservative

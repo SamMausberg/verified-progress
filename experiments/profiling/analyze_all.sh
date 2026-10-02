@@ -121,9 +121,13 @@ fi
 
 # Which tensor-core instruction the stock head GEMM kernels issue: the executed SASS in
 # the head ncu reports, and whether cuBLAS's libraries expose the nvjet kernels to cuobjdump.
-head_ncu=("$VP_DATA"/ncu/head_gemm_m*.ncu-rep)
+head_ncu=("$VP_DATA/ncu/head_gemm_m1.ncu-rep" "$VP_DATA/ncu/head_gemm_m32.ncu-rep")
 libdir="$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')/nvidia/cu13/lib"
-if [ "${#head_ncu[@]}" -gt 0 ]; then
+if [ -e "${head_ncu[0]}" ] || [ -e "${head_ncu[1]}" ]; then
+  # Both reports or neither: one alone would overwrite the evidence with half of it.
+  for rep in "${head_ncu[@]}"; do
+    [ -e "$rep" ] || { echo "missing $rep (run_ncu.sh interrupted?)" >&2; exit 1; }
+  done
   run tensor_instructions.py --ncu "${head_ncu[@]}" \
     --search-libs "$libdir/libcublasLt.so.13" "$libdir/libcublas.so.13" \
     --out "$EV/head_tensor_instructions.json" > /dev/null
