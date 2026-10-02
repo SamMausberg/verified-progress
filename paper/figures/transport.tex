@@ -36,8 +36,9 @@
 % for q > 0.52, the per-entry one below 0.0083 for q < 0.4, int4's above 0.12, DFlash-4B's drift
 % above 0.85 and MTP-4B's above 0.8 for q > 0.15). The arrow joins the median threshold (int8,
 % per entry) to the drafter's median drift. Drifts use the arm styles: DFlash diamonds, MTP
-% triangles, as in Figure fig:frontier.
-\pgfplotsset{drift panel/.style={panel stacked,width=7.1cm,xmin=1e-3,xmax=10,
+% triangles, as in Figure fig:frontier. The x axis starts at 4e-4, not 1e-3, so that the
+% per-128-weights label fits in two lines left of its curve.
+\pgfplotsset{drift panel/.style={panel stacked,width=7.1cm,xmin=4e-4,xmax=10,
   ymin=0,ymax=1,ytick={0,0.5,1},yticklabels={0,0.5,1},grid=major,xminorticks=false}}
 \begin{semilogxaxis}[drift panel,name=b,at={(7.85cm,0.25cm)},anchor=south west,xticklabels={},
   title={\paneltitle{b}{DFlash-4B: measured drift, derived thresholds}}]
@@ -48,7 +49,7 @@
 \draw[{Stealth[length=1.5mm]}-{Stealth[length=1.5mm]},leader] (axis cs:\figDstar,0.5) -- (axis cs:\figRho,0.5);
 % below the arrow, between the int4 thresholds and the drift curve
 \node[annot,anchor=north,align=center] at (axis cs:0.42,0.45) {medians\\$\vpnum{0}{\figRho/\figDstar}\times$};
-\node[annot,anchor=north east,align=right] at (axis cs:0.0045,0.97) {$\delta^\ast_i$: int8,\\per 128\\weights};
+\node[annot,anchor=north east,align=right] at (axis cs:0.0055,0.85) {$\delta^\ast_i$: int8,\\per 128 weights};
 \node[annot,anchor=west,align=left] at (axis cs:0.0098,0.25) {$\delta^\ast_i$: int8,\\per entry};
 \node[annot,anchor=east,align=right] at (axis cs:0.10,0.8) {$\delta^\ast_i$: int4,\\per entry};
 \node[annot,anchor=west] at (axis cs:1.1,0.3) {$\rho$, DFlash-4B};
