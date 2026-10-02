@@ -640,6 +640,10 @@ class Rig:
             'env_top_in': z(n, MAX_ROWS, dtype=torch.bool),
             'env_excl_max': z(n, MAX_ROWS, dtype=torch.float32),
             'env_best_rlo': z(n, MAX_ROWS, dtype=torch.float32),
+            # Stock logits of the stock argmax and of the head's id (certified replays),
+            # to class a mismatch by size: exact tie, one BF16 ulp, or more.
+            'z_ref': z(n, r, dtype=torch.float32),
+            'z_head': z(n, r, dtype=torch.float32),
         }
 
     def argmax_stock(self, h: Any) -> Any:
@@ -718,7 +722,10 @@ class Rig:
         log['rhi'][s, :r].copy_(head._rhi[:r, :CANDS])
         if step.gate:
             full = self.torch.matmul(self.v_in[:m], self.weight.T)  # the stock logits
-            log['ref'][s, :m].copy_(full.argmax(-1))
+            ref = full.argmax(-1)
+            log['ref'][s, :m].copy_(ref)
+            log['z_ref'][s, :m].copy_(full.gather(1, ref[:, None])[:, 0].float())
+            log['z_head'][s, :m].copy_(full.gather(1, head._ids[:m, None])[:, 0].float())
             self.audit(s, full, r)
         else:
             log['ref'][s, :m].copy_(self.argmax_stock(self.v_in[:m]))
@@ -770,6 +777,9 @@ class Rig:
                     problems.append(
                         self.record('verify_committed', start + s, entry, host, s, int(row))
                     )
+                    zr, zh = float(host['z_ref'][s, row]), float(host['z_head'][s, row])
+                    size = 'tie' if zr == zh else 'one_ulp' if zr - zh <= bf16_ulp(zr) else 'larger'
+                    totals['mismatch_by_size'][size] += 1
                 self.check_envelope(start + s, entry, host, s, totals, problems)
                 pad_bad = np.nonzero(host['ids'][s, rows:m] != host['ref'][s, rows:m])[0]
                 for row in pad_bad:
@@ -818,7 +828,8 @@ class Rig:
         for name, bad in (
             ('envelope_candidate', host['env_outside'][s, rows_c] > 0),
             ('envelope_top_not_candidate', ~host['env_top_in'][s, rows_c]),
-            ('envelope_excluded', excl >= best),
+            ('envelope_excluded', excl > best),
+            ('envelope_excluded_tie', excl == best),
         ):
             totals[name] += int(bad.sum())
             for row in rows_c[bad]:
@@ -871,6 +882,8 @@ class Rig:
             status=int(host['status'][s, row]),
             count=n,
             pool_row=int(entry['slots'][row]),
+            z_ref=float(host['z_ref'][s, row]),
+            z_head=float(host['z_head'][s, row]),
             row_class=CLASS_NAMES[int(entry['classes'][row])] if row < step.rows else 'padding',
         )
         if row < MAX_ROWS:
@@ -940,6 +953,8 @@ def stress(out: Path, replay: Path, seconds: float, seed: int, n_real: int, n_ti
         'envelope_candidate': 0,
         'envelope_top_not_candidate': 0,
         'envelope_excluded': 0,
+        'envelope_excluded_tie': 0,
+        'mismatch_by_size': {'tie': 0, 'one_ulp': 0, 'larger': 0},
         'draft_rows': 0,
         'extend_rows': 0,
         'gate_toggles': 0,

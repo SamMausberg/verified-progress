@@ -481,6 +481,16 @@ slot and output length), set before the run:
 1. Gate mismatch: the gate the device read differs from the host's intended gate.
 2. Certificate fault: gate on, status 0 (certified without a fallback), and an id other
    than the stock argmax. The envelope was violated; this is the most serious case.
+   Split on 2026-10-02 (main's ruling, committed before h7b's ring was read), by the
+   ring's refined values against `z_ref`, the stock logits of 579ae7ce's batch-1 hidden
+   state at this position (the stress hold's `return_hidden_states` pull):
+   - 2a, a head fault: 1756's refined value is about `z_ref(1756)` while the three
+     near-tied tokens are about 3.8 nats higher, so the head chose a token its own input
+     ranks far below the top;
+   - 2b, a different served state that the head decided correctly: 1756's refined value
+     is 3.8 nats or more above `z_ref(1756)`.
+   Reading 3 is split the same way. In draws without the event, the refined values of
+   the near-tied tokens against `z_ref` give the served drift at this row.
 3. Fallback fault: gate on, status exactly AMBIGUOUS, the column fallback ran, and the id
    is wrong. Sub-cases: whether 1756 was in the candidate list, and whether the winner
    had the largest bound. The dense merge (other nonzero status) is read the same way.
@@ -558,7 +568,18 @@ reach the winner's lower bound. (The bounds enclose the reference's BF16 logit, 
 the stock GEMM returns at this shape, not the exact real logit.) 579ae7ce's position-439
 row also enters as 128 near-tie variants of itself. The host logs each mismatch or audit
 failure with the row's state and an eager re-run of the same batch. Gate-off replays compare the graph's stock argmax with the eager one; the draft
-paths are checked the same way. The hold starts with the plain server (port 30091,
+paths are checked the same way.
+
+Reading, set before the run. A mismatch is classed by the stock gap between the stock
+argmax and the committed token at the same batch: an exact tie, one BF16 ulp, or more;
+an excluded token exactly equal to the winner's lower bound is counted apart from one
+above it. Tie or one-ulp mismatches only would be a defect of the bitwise contract in
+tie or rounding handling, not the 1756 mechanism. Only a mismatch with a stock gap of
+several ulps or more, or an envelope breach by more than an ulp, bears on 579ae7ce's
+position 439. A run without either clears the head and its fallbacks under graph replay
+for these inputs only: 579ae7ce's rows are batch-1 hidden states from a plain server, so
+if the served hidden state at that position is what differed, the stress test never saw
+the input that produced the event. The hold starts with the plain server (port 30091,
 started under the start-up lock), which also re-scores each gross context from the h6s
 report at batch 1 with the top 5. A run with no mismatch rules out a fault of the head
 and its fallbacks under graph replay for these inputs and sizes. It does not rule out

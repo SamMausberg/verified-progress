@@ -125,7 +125,13 @@ def find_target(
             pred = predict[index, ROWS_PER_REQUEST * i : ROWS_PER_REQUEST * (i + 1)]
             for o in offsets:
                 pos = st['pos'][o]
-                if st['ok'][o] and pos <= POSITION < pos + ROWS_PER_REQUEST:
+                j439 = POSITION - pos
+                # The verify committed position 439 (its row is within the accepted rows,
+                # bonus included) after committing the reference's tokens before it.
+                committed = 0 <= j439 < min(acc, ROWS_PER_REQUEST) and all(
+                    int(pred[j]) == ref[pos + j] for j in range(j439)
+                )
+                if st['ok'][o] and committed:
                     found.append(
                         {
                             'index': index,
@@ -294,6 +300,14 @@ def launch_report(launch: str, out: Path, ref: list[int], prompt_len: int) -> di
     report['graph_check'] = [json.loads(p.read_text()) for p in checks]
     totals: dict[str, int] = {}
     examples: list[dict[str, Any]] = []
+    # The client's view of each point: 579ae7ce's token at 439 and whether its output
+    # matched the reference through position 438 (the draws that reached the context).
+    tokens, reached = {}, {}
+    for name, _, _, point in windows:
+        record = drain.target_record(point)
+        if record and 'output' in record and len(record['output']) > POSITION:
+            tokens[name] = record['output'][POSITION]
+            reached[name] = record['output'][:POSITION] == ref[:POSITION]
     for npz, jsonl in ring_files(ring):
         records = [json.loads(line) for line in jsonl.read_text().splitlines() if line.strip()]
         with np.load(npz) as z:
@@ -341,16 +355,26 @@ def launch_report(launch: str, out: Path, ref: list[int], prompt_len: int) -> di
                 else None,
                 'state': state,
             }
+            entry['client_token_439'] = tokens.get(entry['point'] or '')
+            entry['predict_matches_client'] = (
+                entry['predict'][row - ROWS_PER_REQUEST * i] == entry['client_token_439']
+            )
             entry['readings'] = readings(gate, entry['host_gate'], entry['valid'], row, state)
             report['target_steps'].append(entry)
     report['consistency'] = totals
     report['consistency_examples'] = examples
-    tokens = {}
-    for name, _, _, point in windows:
-        record = drain.target_record(point)
-        if record and 'output' in record and len(record['output']) > POSITION:
-            tokens[name] = record['output'][POSITION]
     report['token_at_439_by_point'] = tokens
+    hits = {name: 0 for name in tokens}
+    for entry in report['target_steps']:
+        if entry['point'] in hits and entry['predict_matches_client']:
+            hits[entry['point']] += 1
+    # Exactly one located step per draw that reached the context, none otherwise.
+    report['locator'] = {
+        name: {'reached_prefix': reached[name], 'hits': hits[name]} for name in tokens
+    }
+    report['locator_ok'] = all(
+        (v['hits'] == 1) == v['reached_prefix'] and v['hits'] <= 1 for v in report['locator'].values()
+    ) and all(e['predict_matches_client'] for e in report['target_steps'])
     report['events'] = sorted(name for name, tok in tokens.items() if tok == WRONG)
     report['pass_ms_c64'] = pass_times(launch_dir)
     return report
