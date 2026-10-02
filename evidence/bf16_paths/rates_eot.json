@@ -222,8 +222,29 @@
    }
   }
  },
+ "positions_missed_above_2_nats": {
+  "sglang": [
+   [
+    "6af1e245439490c5",
+    247
+   ]
+  ],
+  "hf_bf16_float32state": [
+   [
+    "6af1e245439490c5",
+    247
+   ]
+  ],
+  "hf_bf16_fla_float32state": [
+   [
+    "6af1e245439490c5",
+    247
+   ]
+  ]
+ },
  "decision": {
   "threshold_nats": 2.0,
+  "counted": "positions missed on either path, each position once",
   "sglang_events": 1,
   "transformers_events": {
    "hf_bf16_float32state": 1,

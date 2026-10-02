@@ -286,8 +286,15 @@
    }
   }
  },
+ "positions_missed_above_2_nats": {
+  "sglang": [],
+  "hf_bf16_float32state": [],
+  "hf_bf16_modelstate": [],
+  "hf_bf16_fla_float32state": []
+ },
  "decision": {
   "threshold_nats": 2.0,
+  "counted": "positions missed on either path, each position once",
   "sglang_events": 0,
   "transformers_events": {
    "hf_bf16_float32state": 0,

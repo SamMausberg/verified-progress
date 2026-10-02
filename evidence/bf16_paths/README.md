@@ -20,10 +20,10 @@ readings (each set before its run, in the scripts' docstrings) give three findin
 1. **`a4db11ff`/333 is ill-conditioned in BF16; any implementation can miss it.** transformers in
    BF16 misses FP32 there by as much as SGLang does: its torch GDN prefill of the whole output puts
    18299 at -17.16, and its decode with an FP32 cached state at -15.63, where FP32 has -0.45 and
-   SGLang's prefills -13.4 to -15.3. FP32 itself flips its top-1 between 18299 and 5500 under noise
-   of the size of one BF16 rounding.
+   SGLang's prefills -13.4 to -15.3. FP32 itself, under relative noise within the BF16 rounding
+   bound, flips its top-1 between 18299 and 5500 and puts 18299 as low as -11.65.
 2. **At `579ae7ce`/439 only SGLang misses, and no single kernel carries the miss.** There FP32
-   under the same noise keeps 1756 within 0.15 nats of -9.79, and transformers in BF16 (four
+   under the same noise keeps 1756 within 0.52 nats of -9.79, and transformers in BF16 (four
    configurations, four paths each) keeps FP32's top-1 68189 on top and 1756 between -10.11 and
    -7.60. SGLang's decode puts 1756 on top at -0.32, and swapping one kernel family at a time moves
    it between -8.9 and -0.32 on one path or another. One BF16 rounding of beta (the lines of the
@@ -39,8 +39,10 @@ readings (each set before its run, in the scripts' docstrings) give three findin
    SGLang misses FP32's top by more than 0.5 nats at 3 positions against 2 and 1 for the two
    transformers configurations. The only miss above 2 nats, 3.2 nats at `6af1e245` position 247
    after the end of text, is shared by the prefill paths of all three implementations. The rule
-   declared before the runs needed at least 5 SGLang misses above 2 nats and 3 times
-   transformers' count; both samples were inconclusive (0 against 0, then 1 against 1).
+   declared before the runs needed at least 5 positions where SGLang misses by more than 2 nats
+   and 3 times transformers' count; both samples were inconclusive (0 against 0, then 1 against
+   1). A position missed on both of a source's paths now counts once, a correction made after the
+   runs (Codex on #222) that changes neither count.
 
 So `579ae7ce`/439 is a real SGLang outlier at one position, after the model's end-of-text token,
 but the samples cannot tell whether such outliers are more frequent in SGLang than in transformers:
@@ -116,22 +118,24 @@ are near-certain (FP32 gives each a logprob of -0.103 or higher), so this agreem
 paths read the same text, not that their distributions agree where the model is uncertain.
 
 **How sensitive the positions are by themselves.** `perturb.py` repeats FP32's one forward with
-BF16-sized relative noise, (1 + u) with u uniform in [-2^-9, 2^-9], 2^-9 being the largest
+BF16-sized relative noise, (1 + u) with u uniform in [-2^-8, 2^-8], 2^-8 being the bound on the
 relative error of rounding to BF16: once on every decoder layer's output (the residual stream),
 once on the inputs of every GDN layer's recurrence (query, key, value and beta, the quantities
 both SGLang and transformers hold in BF16). Eight seeds each; ranges over the seeds at the target
-(`positions.json`, `perturbation`):
+(`positions.json`, `perturbation`). A first pair of runs drew u from [-2^-9, 2^-9], half the
+bound, and is superseded; it gave the same picture with smaller ranges.
 
 | FP32 forward | `579ae7ce`/439: 1756 | 68189 | top-1 | `a4db11ff`/333: 18299 | 5500 | top-1 |
 |---|---|---|---|---|---|---|
 | unperturbed | -9.79 | -0.87 | 68189 | -0.45 | -1.74 | 18299 |
-| noise on every layer's output | -9.94 to -9.64 | -1.00 to -0.78 | 68189 in all 8 | -4.52 to -0.22 | -3.34 to -0.03 | 18299 or 5500 |
-| noise on the GDN inputs | -9.86 to -9.76 | -0.90 to -0.83 | 68189 in all 8 | -0.99 to -0.23 | -2.98 to -0.79 | 18299 or 5500 |
+| noise on every layer's output | -10.04 to -9.27 | -1.21 to -0.71 | 68189 in all 8 | -11.65 to -0.22 | -3.78 to -0.01 | 5500 in 4 of 8 |
+| noise on the GDN inputs | -9.90 to -9.69 | -0.94 to -0.80 | 68189 in all 8 | -2.72 to -0.25 | -3.12 to -0.14 | 5500 in 4 of 8 |
 
 At the positions before each target the same noise changes the recorded token's logprob by at
-most 0.011 nats (the control). So `a4db11ff`/333 is ill-conditioned at BF16 rounding scale: noise
-of the size of one rounding flips FP32's own top-1. `579ae7ce`/439 is not: the same noise moves
-1756 by at most 0.15 nats, while SGLang's paths put it anywhere from -8.9 to -0.32.
+most 0.022 nats (the control). So `a4db11ff`/333 is ill-conditioned at BF16 rounding scale: noise
+within one rounding flips FP32's own top-1 and can push 18299 down by 11 nats. `579ae7ce`/439 is
+not: the same noise moves 1756 by at most 0.52 nats, while SGLang's paths put it anywhere from
+-8.9 to -0.32.
 
 **Selection-free error rates (`rates.json`, `rates_eot.json`).** The two positions were found
 because SGLang erred there, so they cannot compare how often implementations err. `rates.py`
@@ -197,6 +201,9 @@ scripts/gpu_lock.sh -s experiments/bf16_paths/hold.sh hf perturb
 scripts/gpu_lock.sh -s experiments/bf16_paths/hold.sh perturb_gdn rates
 # Hold 4 (repo 43efc79): the same rates on text written after the end of text.
 scripts/gpu_lock.sh -s experiments/bf16_paths/hold.sh rates_eot
+# Hold 5 (repo 94460d6): both perturbations again at the full rounding bound, 2^-8 (the runs of
+# holds 2 and 3 used 2^-9 and are superseded).
+scripts/gpu_lock.sh -s experiments/bf16_paths/hold.sh perturb perturb_gdn
 # Readouts (CPU), from the holds' outputs in ~/vp-data/upstream/bf16:
 python -m experiments.bf16_paths.summary --paths ~/vp-data/exactness/paths \
   --out ~/vp-data/upstream/bf16 --json evidence/bf16_paths/positions.json
@@ -238,7 +245,9 @@ stay in `~/vp-data/upstream/bf16/`.
   rounding, not whether #38977 or #40362 improves accuracy in general.
 - FP32 is transformers on the CPU; its two paths agree within 0.0024 nats at both targets
   (`../certified_head/served/reference_paths.json`). The perturbation runs are one forward each
-  with 8 seeds; they measure sensitivity to noise of rounding size, not to SGLang's particular
-  roundings.
+  with 8 seeds of uniform noise within the rounding bound; they measure sensitivity to noise of
+  rounding size, not to SGLang's particular roundings.
+- The rate decision treats missed positions as independent; positions of one prompt are not, but
+  with at most one missed position per source the question does not arise here.
 - Hold 1's transformers step crashed on a trace-range bug (fixed in `b6abd11`) and is void; its
   SGLang variants are valid.
