@@ -54,6 +54,11 @@ def cmd_gemm(args: argparse.Namespace) -> None:
             f'{args.probe}: stopped at its time budget ({d["meta"]["stopped_at_budget"]})'
         )
     rows = [dict(r) for r in d['rows']]
+    for r in rows:
+        # The run's fp8_tensor route timed scalar-scale cuBLASLt GEMMs on weights quantized per
+        # output channel (unit weight scale), so its error is not the per-tensor route's: drop it.
+        if r['route'] == 'fp8_tensor':
+            r['rel_err_vs_fp32'] = ''
     have = {(r['shape'], r['M']) for r in rows if r['route'] == 'bf16'}
     shapes = sorted({r['shape'] for r in rows})
     ms = sorted({r['M'] for r in rows})
@@ -100,6 +105,8 @@ def cmd_served(args: argparse.Namespace) -> None:
             src = d['launch']['sglang_source']
             if src.get('dirty_files'):
                 raise SystemExit(f'{f}: engine tree was dirty')
+            if d['launch']['repo'].get('dirty_files'):
+                raise SystemExit(f'{f}: harness repository was dirty')
             planned = set(d['concurrency'])
             got = {p['concurrency'] for p in d['points']}
             if planned != got:

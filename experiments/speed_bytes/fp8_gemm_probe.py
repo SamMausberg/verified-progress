@@ -127,7 +127,10 @@ def main():
         W = [torch.randn(N, K, device=dev, dtype=torch.bfloat16) * 0.02 for _ in range(copies)]
         Wq, Ws = zip(*[quant_rowwise_fp8(w) for w in W])
         Wi8, Wsi8 = zip(*[quant_rowwise_int8(w) for w in W])
-        ones = torch.ones((), device=dev, dtype=torch.float32)
+        # Per-tensor weights for the fp8_tensor route (the 2026-10-02 run reused the per-channel Wq
+        # with a unit scale there: same kernel path and timing, but not this route's error).
+        St = [(w.float().abs().amax() / FP8_MAX).clamp(min=1e-12) for w in W]
+        Wt = [(w.float() / s).clamp(-FP8_MAX, FP8_MAX).to(FP8) for w, s in zip(W, St)]
         marlin_layers = []
         if marlin_ok:
             try:
@@ -158,7 +161,7 @@ def main():
             routes = {
                 'bf16': lambda i: F.linear(x, W[i]),
                 'fp8_tensor': lambda i: torch._scaled_mm(
-                    xq_t, Wq[i].t(), scale_a=xs_scalar, scale_b=ones, out_dtype=torch.bfloat16
+                    xq_t, Wt[i].t(), scale_a=xs_scalar, scale_b=St[i], out_dtype=torch.bfloat16
                 ),
                 'fp8_rowwise': lambda i: torch._scaled_mm(
                     xq, Wq[i].t(), scale_a=xs, scale_b=Ws[i].view(1, -1), out_dtype=torch.bfloat16
@@ -187,8 +190,6 @@ def main():
                         deq = out.float() * xsi8 * Wsi8[0].view(1, -1)
                         rel = ((deq - ref).norm() / ref.norm()).item()
                     elif route != 'act_quant_fp8':
-                        if route == 'fp8_tensor':
-                            out = out.float() * Ws[0].view(1, -1)  # per-tensor B scale was 1
                         rel = ((out.float() - ref).norm() / ref.norm()).item()
                     nrep = max(3, math.ceil(400 / copies))
                     med, best = time_graph(fn, copies, args.rounds, nrep)
@@ -211,7 +212,7 @@ def main():
             bf = {r['route']: r['us_median'] for r in rows if r['shape'] == name and r['M'] == M}
             line = ' '.join(f'{k}={v:.1f}' for k, v in bf.items())
             print(f'{name} M={M}: {line}', flush=True)
-        W = Wq = Ws = Wi8 = Wsi8 = marlin_layers = None  # free before the next shape
+        W = Wq = Ws = Wt = St = Wi8 = Wsi8 = marlin_layers = None  # free before the next shape
         torch.cuda.empty_cache()
     meta['elapsed_s'] = round(time.time() - t_start, 1)
     with open(args.out, 'w') as f:
