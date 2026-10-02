@@ -683,6 +683,12 @@
   "dflash16": true,
   "dflash8": true
  },
+ "check_h1_partial": {
+  "plain": null,
+  "mtp": null,
+  "dflash16": null,
+  "dflash8": null
+ },
  "plan": {
   "plain": {
    "arm": "plain-tuned",
@@ -755,7 +761,7 @@
   "SGLANG_CERTIFIED_HEAD_MODEL": "conservative",
   "SGLANG_CERTIFIED_HEAD_MAX_ROWS": "64"
  },
- "analysis_commit": "ff97d8575853e6304305c79269cc695e0892f686",
+ "analysis_commit": "96dcbad6d650746aec15460f77433a0ed3881ed4",
  "holds": [
   {
    "hold": "h1",
@@ -793,6 +799,16 @@
    "end_utc": "2026-10-02T06:19:02Z",
    "failed_launches": 0,
    "repo_commit": "aa121d83de88431939a61bd163c1ce19e33c1e2c",
+   "engine_commit": "4fe92d0330c137c44a16fb2be1a12e1c1b3f13eb",
+   "engine_tree": "9cd14d901f532bb15ea1bc7d74155928969bc6c2",
+   "certified_head_digest": "cf54222773e0eed17cf33ab2c8cc95d5f527734ba5d421b9d85e73e57c335978"
+  },
+  {
+   "hold": "h5",
+   "start_utc": "2026-10-02T09:59:48Z",
+   "end_utc": "2026-10-02T10:12:00Z",
+   "failed_launches": 0,
+   "repo_commit": "71c05e308d84a95f118dc9835833e8f5e603350b",
    "engine_commit": "4fe92d0330c137c44a16fb2be1a12e1c1b3f13eb",
    "engine_tree": "9cd14d901f532bb15ea1bc7d74155928969bc6c2",
    "certified_head_digest": "cf54222773e0eed17cf33ab2c8cc95d5f527734ba5d421b9d85e73e57c335978"

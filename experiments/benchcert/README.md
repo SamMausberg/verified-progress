@@ -357,8 +357,8 @@ the run): the `MAX_ROWS=0` arm differing from stock points to the gated-off path
 the conditional nodes, an integration exactness bug; it equal to stock while the
 certified arm differs points to the head's certified ramp-down, which check mode should
 then have caught at that shape; all three equal points to closed-loop timing in the
-timed runs. Until it runs, token identity is claimed only at c = 1 and at the
-check-mode batches.
+timed runs. It ran in the shared hold after session 3; the evidence README gives the
+result.
 
 ## Settling hold (not declared; added 2026-10-02 after the PR, approved by main)
 

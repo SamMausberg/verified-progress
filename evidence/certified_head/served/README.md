@@ -27,11 +27,17 @@ So the served envelope rises only at c = 1 and falls at c = 2, 4, 8 and 128. (Bu
 plain decoding, `plain-tuned-replayssm`, may lead at c = 96-128 with one confirmation
 session; it was not tested here.)
 
-**Open: one wrong token in a certified MTP run.** At MTP c = 64 (session 1) the certified
-run committed one token 3.8 nats below the batch-1 top where the other runs agreed on a
-near-top token (Exactness, below). Until a settling hold (check launches with every
-counter written, MTP in fixed waves of 64, a logged replay of that prompt) reports, MTP
-exactness is claimed only at concurrency 1 and at the check-mode batches.
+**Open: a reproduced wrong token in certified MTP runs.** At MTP c = 64 the certified
+engine committed a token 3.8 nats below the batch-1 top where every stock run chose one
+of three near-tied tokens (Exactness, below). Closed-loop reruns of that point reproduced
+it: at the same context, 2 of 15 certified c = 64 runs (session 1 and one of 12 reruns)
+committed it and 0 of 15 stock runs did. The count alone does not separate the arms
+(one-sided Fisher p = 0.24); the weight is the error's size, which rounding cannot
+produce. The acceptance statistics show that the verify step itself chose the token, at
+the point's drain; whether the certified head or the stock head inside the certified
+graph decided it is not established, and no check-mode run reproduced it. The mechanism
+is under investigation. MTP exactness is claimed only at concurrency 1 and at the
+check-mode batches.
 
 **Declared verdicts (measured).** By the pre-registered rule (one primary point per
 family, Holm-adjusted across the four) H4 is supported under the declared rule: at
@@ -91,11 +97,13 @@ plain, block 16, block 8 (`ratios.csv`).
 | dflash8 | c = 4 | 0.9880 | 0.9774-0.9986 | 0.9664-1.0100 | 0.040 | loss | 1.024 |
 
 Family verdicts: plain, MTP and DFlash block 16 **improve**; DFlash block 8 **loses**.
-H4: **supported**. The exactness behind these verdicts rests on h1's check launches,
-whose counts are partial, and on concurrency-1 identity; the check rerun is pending, and
-the declared rule does not cover the wrong token at MTP c = 64 (next section), which is
-open. Block 8's loss
-rests on Holm's last step at the nominal 0.05; its Bonferroni interval includes 1.
+H4: **supported** (`summary.json`, regenerated after the check rerun). The exactness
+behind these verdicts rests on the complete check launches (`check2`: every certified
+call counted, 0 of 592,433 certified rows differ) and on concurrency-1 identity; block 8
+rests on check mode alone. Under the declared rule a large class is reported and
+investigated, not by itself a failure, so the wrong token at MTP c = 64 (Exactness)
+leaves these verdicts as computed; it is open. Block 8's loss rests on Holm's last step
+at the nominal 0.05; its Bonferroni interval includes 1.
 
 ## Every point
 
@@ -159,25 +167,32 @@ microbenchmark has slower still; it was not timed.
 
 ## Exactness
 
-**Same batch shape.** The untimed check launches (h1) ran each family's certified arm at
-its tuned flags and capacity with `SGLANG_CERTIFIED_HEAD_CHECK=1`, which also runs the
-stock head in every certified step and counts, on the device, rows whose token differs
-(`check.csv`, step `check`). Their counters were written every 25 glue calls with no
-final write before each point's snapshot (Codex on PR #190), so the counts below are
-partial: 0 differing rows among the 594,329 rows whose counters were flushed; up to 24
-calls per point were not counted. A rerun with every counter written is pending (step
-`check2`):
+**Same batch shape.** The untimed check launches ran each family's certified arm at its
+tuned flags and capacity with `SGLANG_CERTIFIED_HEAD_CHECK=1`, which also runs the stock
+head in every certified step and counts, on the device, rows whose token differs
+(`check.csv`). The settling hold reran them (step `check2`, hold h5) with the counters
+written on every glue call. At every point and path the device counters cover every
+certified replay the host gated (`uncounted_calls` 0), and 0 of 592,433 certified rows
+differ. At MTP c = 64 the certified verify reached 64 rows, which happens only in the
+point's drain, with 16 or fewer requests left:
 
-| Family | Path | Concurrency | Certified calls | Rows | Rows differing | Rows falling back | Calls with a fallback |
-|---|---|---|---|---|---|---|---|
-| plain | decode | 1, 8, 64 | 12,288 | 119,808 | 0 | 1.49% | 10.6% |
-| mtp | verify | 1, 4, 16, 64 | 4,408 | 57,828 | 0 | 2.06% | 19.3% |
-| mtp | draft | 1, 4, 16, 64 | 9,818 | 88,648 | 0 | 2.68% | 15.6% |
-| mtp | draft extend | 1, 4, 16, 64 | 4,908 | 44,323 | 0 | 1.95% | 12.7% |
-| dflash16 | verify | 1, 2, 4 | 3,425 | 90,432 | 0 | 4.12% | 56.2% |
-| dflash16 | draft projection | 1, 2, 4 | 3,425 | 84,780 | 0 | 3.50% | 50.0% |
-| dflash8 | verify | 1, 4, 8 | 3,256 | 57,872 | 0 | 2.96% | 34.5% |
-| dflash8 | draft projection | 1, 4, 8 | 3,256 | 50,638 | 0 | 1.71% | 21.3% |
+| Family | Path | Concurrency | Certified calls | Rows | Rows differing | Rows falling back | Calls with a fallback | Largest certified batch |
+|---|---|---|---|---|---|---|---|---|
+| plain | decode | 1, 8, 64 | 12,288 | 119,808 | 0 | 1.49% | 10.6% | 64 |
+| mtp | verify | 1, 4, 16, 64 | 4,404 | 57,800 | 0 | 2.06% | 19.4% | 64 |
+| mtp | draft | 1, 4, 16, 64 | 9,808 | 88,604 | 0 | 2.71% | 15.6% | 64 |
+| mtp | draft extend | 1, 4, 16, 64 | 4,904 | 44,302 | 0 | 1.91% | 12.4% | 64 |
+| dflash16 | verify | 1, 2, 4 | 3,400 | 89,664 | 0 | 4.09% | 55.7% | 64 |
+| dflash16 | draft projection | 1, 2, 4 | 3,400 | 84,060 | 0 | 3.52% | 50.0% | 60 |
+| dflash8 | verify | 1, 4, 8 | 3,263 | 57,704 | 0 | 2.95% | 34.3% | 64 |
+| dflash8 | draft projection | 1, 4, 8 | 3,263 | 50,491 | 0 | 1.70% | 20.7% | 56 |
+
+The first check launches (h1, step `check`) wrote their counters every 25 glue calls with
+no final write before each point's snapshot (Codex on PR #190). A point's unwritten tail
+fell into the next point's counts, because the counters are cumulative, so only the tail
+of each launch's last point was lost: up to 24 glue calls (several per decoding step or
+MTP cycle; glue calls, not head calls). Their 594,329 counted rows, also with no
+difference, stay in `check.csv` labelled partial.
 
 No row was refused. Check mode compares the certified head with the stock head computed
 outside the conditional node; it does not test the gated-off stock path inside it.
@@ -186,8 +201,8 @@ outside the conditional node; it does not test the gated-off stock path inside i
 every request's token ids were identical between the two arms in all three sessions:
 plain, MTP and block 16, 32 of 32 prompts each. Block 8 has no c = 1 point; its
 exactness rests on its check launch alone. By the declared rule exactness was established
-for all four families from these and h1's (partial) check counts: token identity at
-concurrency 1 and at the counted check-mode batches. The exploratory wave controls below
+for all four families from these and the complete check rerun: token identity at
+concurrency 1 and at the check-mode batches. The exploratory wave controls below
 add identity under fixed batch evolution for MTP at 8 requests and for block 16 at c = 8
 with the head gated off.
 
@@ -236,10 +251,22 @@ the batch-1 stock distribution, while the session-1 stock run and both arms of s
 and session 2's certified run, committed `_triangle` (68189), 0.19 nats below the top
 (session 2's stock run had diverged earlier); all later tokens agree. A wrong draft is
 rejected by greedy verification, so the certified run's verify step committed a token it
-should not have produced. The shape is one the exactness tests did not cover: MTP at
-c = 64, where the 256-row verify batches are gated off except as the batch drains, and
-the draft and draft-extend paths are certified at 64 rows. The cause is not established:
-it is reported as an unexplained wrong-token event in a certified MTP run at c = 64, and
+should not have produced. This shape was tested only in check mode. The check rerun ran
+MTP at c = 64 on all three certified paths, every call counted (verify 78 calls and 2,364
+rows, up to 64 certified rows in the drain; draft 1,156 and 60,886; draft extend 578 and
+30,443), with no differing row. In h1's first check run c = 64 was MTP's last point, so
+its uncounted tail was the end of that drain. Check mode runs the stock head in every
+certified step, so it is not the timed graph, and it tests only the head's decision. The
+event itself came in the timed
+point's final drain: `579ae7ce` was the 570th of the point's 576 requests and started
+2.2 s before the point ended, and in the second the token was produced the server's
+running batch fell from 49 to 26 to 10 requests. At 16 requests or fewer the MTP verify
+batch is at most 64 rows and runs certified, so the certified verify head may have been
+active at the event, besides the draft and draft-extend paths, which run certified at
+64 rows throughout the point. The settling hold's waves of 64 (below) did not reproduce
+it, and they do not recreate the drain; closed-loop reruns of the timed point did (Drain
+reruns, below). The cause is not established: it is reported as a reproduced wrong-token
+failure of the certified engine in MTP c = 64 drains, mechanism under investigation, and
 MTP exactness is claimed only at concurrency 1 and at the check-mode batches. The first
 scoring run read the tokens' logprobs from the wrong response key, so every margin was
 NaN and every context classed large; it was discarded and the declared re-score rerun
@@ -269,6 +296,72 @@ block-16 divergence at c = 8 therefore points to closed-loop timing: the certifi
 different step times change how its batches evolve, reproducibly, and near-ties then
 resolve differently. These controls test 64 prompts at one shape per family; they do not
 cover every batch the timed runs formed.
+
+**Settling hold, MTP waves of 64 (exploratory, not declared).** The same construction at
+the timed pools (128 running requests, 128 mamba slots, 1,000,000 KV tokens, on an
+exclusive GPU): the c = 64 point's 512 measured prompts, in workload order, as 8 waves of
+64, stock, certified as timed, and the wave holding `579ae7ce` once more in check mode
+with every target verify replay logged (`control_waves_mtp64.json`).
+
+| Arms compared | Prompts | Identical outputs |
+|---|---|---|
+| certified vs stock | 512 | 512 (262,144 tokens) |
+| certified, check mode with the log, vs stock | 64 | 64 |
+| certified, check mode with the log, vs certified | 64 | 64 |
+
+In all three runs `579ae7ce` reaches the same 439-token prefix as session 1's certified
+run and commits 68189 at position 439. The log shows how: at that step all 64 requests
+were running, so the verify batch had 256 rows and ran the stock head (gate off); its
+input held the last committed token at position 437 and the drafts 44798, 68189 and 7
+(from the certified draft head), and the stock argmax accepted all three. For this
+request, at every logged step the token the verify read at each position equals the one
+the client received. A
+synchronized wave starts its requests together and keeps them all running until the
+first finishes, near the wave's end, so `579ae7ce` reached position 439 with 64 requests
+running, not with the 16 or fewer of the timed event: the waves do not test the event's
+conditions.
+
+**Drain reruns (exploratory, not declared).** Holds h6a and h6b reran session 1's c = 64
+point closed loop, at its flags, pools and prompt order (`experiments/benchcert/README.md`,
+"Drain reruns", which gives the reading rule set before the runs): h6a alternated
+certified and stock launches, each a fresh server replaying session 1's ladder
+(c = 1-32, then 64) and then 5 more c = 64 points, 12 per arm; h6b ran check mode at
+c = 64 six times with counters every 2,000 glue calls, and twice more with counters on
+every call and every verify replay logged. `drain_579ae7ce.csv` lists, for every MTP
+c = 64 point of sessions 1-3 and of these holds, `579ae7ce`'s token at position 439, where
+its output first differs from session 1's certified run, and the request's verify count
+and accepted-draft histogram.
+
+| Runs reaching position 439 with session 1's prefix | Committed 1756 | Committed 68189, 8078 or 5715 |
+|---|---|---|
+| timed certified (sessions 1-3 and h6a) | 2 of 14 (session 1, h6a `cert1` repeat 1) | 12 |
+| stock (sessions 1-3 and h6a) | 0 of 11 | 11 |
+| check mode (h6b) | 0 of 6 | 6 |
+
+Over every c = 64 point the count is 2 of 15 certified against 0 of 15 stock (one-sided
+Fisher p = 0.24). The context is a three-way near tie at batch 1 (8078 at -1.684, 5715 at
+about -1.81, 68189 at -1.872), and stock runs move among those three from run to run;
+1756 sits at -5.50. Both certified events came in the point's final drain: in h6a's the
+server's running batch fell from 22 to 8 to 2 requests in the second the token was
+produced (session 1: 49, 26, 10), where the verify batch drops to 64 rows or fewer and
+the certified verify head can run. The full output of h6a's event equals session 1's.
+In both events the request's accepted-draft histogram moved one verify cycle from three
+accepted drafts to one: the verify rejected the draft 68189 at position 439 and committed
+its own prediction, 1756, so the token was the verify step's decision, not a substitution
+after it. No other request in a 300 ms window around h6a's event emitted 1756 or any of
+the three near-tied tokens.
+
+The check-mode reruns did not reproduce it, and their counters found no differing row
+(certcheck: verify 612 certified calls and 17,636 rows, draft 1.10M rows, draft extend
+550K rows, to the last counter write; the logged run: per point, verify 102 calls and
+3,176 rows, draft 181,936 rows, draft extend 90,968 rows, every call counted). The logged
+run reached the event's state twice: at `579ae7ce`'s step for position 439 the batch had
+16 requests (64 rows), the certified verify head ran, its ids equalled the stock argmax
+(44798, 68189, 7, 17), and all three drafts were accepted. Its log of what each verify
+committed failed (a field this engine version names differently), so only the replay
+records exist for those runs. Teacher-forced scoring of every committed token (hold h6s)
+is pending: its first run stopped on its own positive control because of a scorer bug,
+now fixed. Scoring pending (scorer fix).
 
 ## Memory
 
@@ -345,7 +438,11 @@ Generated by `python -m experiments.benchcert.analyze report --runs ~/vp-data/be
 (CPU only), from the holds' raw outputs under `~/vp-data/benchcert/` (not committed). The
 holds ran `GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x experiments/benchcert/hold.sh hN`
 for N = 1-4 at the hold commit; the re-score and the wave control ran
-`GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -s experiments/benchcert/hold_shared.sh`.
+`GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -s experiments/benchcert/hold_shared.sh`; the
+settling hold (h5: `check2` and the waves of 64) ran
+`GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x experiments/benchcert/hold_settle.sh` and the
+drain reruns `GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x experiments/benchcert/hold_drain.sh
+h6a` (and `h6b`), each at its hold commit.
 
 | File | What |
 |---|---|
@@ -354,11 +451,13 @@ for N = 1-4 at the hold commit; the re-score and the wave control ran
 | `ratios.csv` | per family and concurrency: role, n, geometric-mean ratio with 95% (and, for primaries, Bonferroni) intervals, p, decision or reading, prediction, order diagnostic |
 | `summary.json` | verdicts, exactness status, Holm decisions, the plan, the analysis commit, each hold's commits and times |
 | `equality.csv` | token comparisons per family, concurrency and pair of runs: prompts, identical, first divergences, exposure, rate, classes |
-| `check.csv` | check launches' counters per family, concurrency and path. The committed copy predates the fix for the high-water gauge `max_certified_rows` (Codex on #190), so that column is invalid until the file is regenerated with the settling hold's evidence |
+| `check.csv` | check launches' counters per step (`check2` complete; h1's `check` partial), family, concurrency and path, with the host's certified gate count, `uncounted_calls` and the largest certified batch of each point (`max_certified_rows`, from the certified-rows histogram) |
 | `certified_stats.csv` | the timed certified launches' counters, cumulative to their last write (truncated by design) |
 | `launches.csv`, `capture_memory.csv` | per launch: pools, free memory, start-up time, commits; per graph family: capture memory and time |
 | `frontier.csv`, `frontier.png`, `ratios.png` | figure data and figures |
 | `launch_outliers.csv` | the post hoc slow-launch diagnostic |
 | `predictions.json` | the derived predictions, written before the runs (`analyze.py predict`) |
 | `classes.csv` | every re-scored first-divergence context: class, margin, BF16 spacing, both tokens and their batch-1 stock logprobs (from `experiments/benchcert/rescore.py`'s output, copied by `analyze.py report`) |
-| `control_waves_mtp.json`, `control_waves_dflash16.json` | the exploratory wave controls' comparisons, with their reading rules (`experiments/benchcert/control_waves.py`, run by `hold_shared.sh`) |
+| `control_waves_mtp.json`, `control_waves_dflash16.json` | the exploratory wave controls' comparisons, with their reading rules (`experiments/benchcert/control_waves.py`, run by `hold_shared.sh`; `compare.json` under `~/vp-data/benchcert/control/<family>/`, copied) |
+| `control_waves_mtp64.json` | the settling hold's waves of 64 (`hold_settle.sh`; `~/vp-data/benchcert/control/mtp64/compare.json`, copied) |
+| `drain_579ae7ce.csv` | `579ae7ce` in every MTP c = 64 point of sessions 1-3 and holds h6a and h6b: token at position 439, first difference from session 1's certified run, verify count, accepted-draft histogram (`python -m experiments.benchcert.drain target --out ~/vp-data/benchcert/drain --csv evidence/certified_head/served/drain_579ae7ce.csv`) |
