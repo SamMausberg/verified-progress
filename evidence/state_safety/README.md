@@ -875,9 +875,14 @@ common flags of the Setup section, one request in flight, 40 prompts per test (t
     plain decoding is batch-invariant, so its 40/40 says the aborts and slot reuse left
     no trace in its outputs. MTP is not batch-invariant, even with deterministic
     inference ("Configuration switches for plain decoding and MTP steps 3"), and
-    differences of this kind are what the batch shape alone gives. So for MTP the test
-    finds no large divergence and no non-argmax token, but it cannot separate a near-tie
-    effect of the aborts from the batch shape. It compares tokens, not logprobs.
+    differences of this kind are what the batch shape alone gives. In the radix-on arm
+    the request history differs as well: the references were served one after another
+    after one flush, and each probe after other probes and aborted requests, so the
+    radix history dependence ("History dependence" above) is a third possible cause. The
+    radix-off arms keep no radix tree. So for MTP the test finds no large divergence and
+    no non-argmax token, but it cannot separate a near-tie effect of the aborts from the
+    batch shape, nor, with the radix cache on, from the request history. It compares
+    tokens, not logprobs.
 - **Run-to-run repeats** (`repeat__*`). On one server (the common flags, at most 16
   running), 44 prompts were each served 5 times at batch 1 with the cache flushed
   before every request, 160 tokens each: 40 spread over the prompt set plus every
@@ -900,8 +905,9 @@ common flags of the Setup section, one request in flight, 40 prompts per test (t
   - Prompt positions. Drift at a position is the largest logprob difference over tokens
     in both top-5 lists with logprob above -4, as in `compare.py`. Mean drift before and
     after the first chunk boundary: 0.064 and 0.081 nats for chunk 256, 0.021 and 0.079
-    for chunk 200. The first four positions
-    after a boundary have mean drift 0.05 to 0.08 nats, like the rest of their chunk.
+    for chunk 200. Over the first four positions after each boundary (offsets 0 to 3,
+    chunks 1 and later only; `prompt_drift_by_offset_after_boundary`), the mean drift per
+    offset is 0.072 to 0.091 nats for chunk 256 and 0.062 to 0.095 for chunk 200.
   - A few prompt positions drift far more than anything seen in decoding. After the
     first boundary the 99th percentile is 0.56 (chunk 256) and 0.58 nats (chunk 200),
     but the maximum is 3.53 and 5.22 nats (`prompt_drift_by_chunk`); before it, 1.60 and
