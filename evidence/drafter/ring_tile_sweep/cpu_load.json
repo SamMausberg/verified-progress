@@ -1,0 +1,22 @@
+{
+  "command": [
+    "python",
+    "/home/ubuntu/vp-wt/drafter-run3/experiments/drafter/gdn_ring_tile_sweep.py",
+    "--out",
+    "/home/ubuntu/vp-data/drafter/ring-tile-sweep/sweep.json"
+  ],
+  "exit_code": 0,
+  "interval_s": 1.0,
+  "samples": 99,
+  "foreign_cores_mean": 0.155,
+  "foreign_cores_max": 0.87,
+  "contended": false,
+  "contention_threshold_cores": 2.0,
+  "top_foreign_mean_cores": {
+    "claude --dangerously-skip-permissions": 0.05,
+    "/home/ubuntu/.cursor-server/bin/linux-arm64/e44a49c17e334d442e58bbde931d791200f014a0/node --dns-result-order=ipv4first -": 0.03
+  },
+  "own_peak_cores": {
+    "python /home/ubuntu/vp-wt/drafter-run3/experiments/drafter/g": 5.23
+  }
+}
