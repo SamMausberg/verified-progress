@@ -17,6 +17,10 @@ ENGINE_WORKTREE = Path.home() / 'sglang-wt/benchcert'
 ENGINE_BASE = 'bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824'
 ENGINE_TREE = '9cd14d901f532bb15ea1bc7d74155928969bc6c2'
 PORT = 30081
+# Holds run only at the commit recorded in the README on this branch ("Hold commit:"),
+# so the code that ran is fixed before the first timed run.
+PIN_REF = 'benchcert/served'
+PIN_FILE = 'experiments/benchcert/README.md'
 SESSION_PREFIX = 'bc-'
 
 # Every certified launch: the per-position (column) fallback under the conservative

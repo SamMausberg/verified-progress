@@ -244,6 +244,12 @@ python -m experiments.benchcert.analyze replacement --runs ~/vp-data/benchcert
 | `figures.py` | frontier and ratio figures from the CSVs |
 | `rescore.py`, `hold_rescore.sh` | the untimed re-score of first divergences (shared lane) |
 
+## Hold commit
+
+Every hold runs from a clean checkout at the commit recorded here; `run_session.py`
+reads this line from the branch and refuses any other head. The line is added after
+the CPU checks of the code, before h1 starts.
+
 ## Amendments
 
 None.

@@ -34,6 +34,7 @@ from experiments.benchcert import plan
 LAUNCH_TIMEOUT = {'plain': 900, 'mtp': 780, 'dflash16': 480, 'dflash8': 480}
 CHECK_TIMEOUT = 600
 _RUN_DIR = re.compile(r'^run directory: (.+)$', re.MULTILINE)
+_PIN_LINE = re.compile(r'^Hold commit: `([0-9a-f]{40})`', re.MULTILINE)
 
 
 def git(path: Path, *args: str) -> str:
@@ -55,6 +56,13 @@ def provenance(src: Path) -> dict[str, Any]:
     dirty = git(plan.REPO, 'status', '--porcelain', '--untracked-files=all')
     if dirty:
         raise SystemExit(f'repository {plan.REPO} is not clean:\n{dirty}')
+    head = git(plan.REPO, 'rev-parse', 'HEAD')
+    readme = git(plan.REPO, 'show', f'{plan.PIN_REF}:{plan.PIN_FILE}')
+    pins = _PIN_LINE.findall(readme)
+    if pins != [head]:
+        raise SystemExit(
+            f'checkout at {head}, but {plan.PIN_REF}:{plan.PIN_FILE} records hold commit(s) {pins}'
+        )
     engine_dirty = git(plan.ENGINE_WORKTREE, 'status', '--porcelain', '--untracked-files=no')
     tree = git(plan.ENGINE_WORKTREE, 'rev-parse', 'HEAD^{tree}')
     if engine_dirty or tree != plan.ENGINE_TREE:
@@ -64,7 +72,8 @@ def provenance(src: Path) -> dict[str, Any]:
         )
     return {
         'repo': str(plan.REPO),
-        'repo_commit': git(plan.REPO, 'rev-parse', 'HEAD'),
+        'repo_commit': head,
+        'pin_ref': plan.PIN_REF,
         'engine_worktree': str(plan.ENGINE_WORKTREE),
         'engine_commit': git(plan.ENGINE_WORKTREE, 'rev-parse', 'HEAD'),
         'engine_tree': tree,
