@@ -444,16 +444,34 @@ def tokens_compare(out: Path, reference: Path) -> dict[str, Any]:
         for path, c in row['paths'].items():
             entry = by_size.setdefault(path, {}).setdefault(
                 str(row['size']),
-                {'certified_steps': 0, 'stock_graph_steps': 0, 'rows': 0, 'max_rows': 0},
+                {
+                    'certified_steps': 0,
+                    'calls': 0,
+                    'stock_graph_steps': 0,
+                    'rows': 0,
+                    'max_rows': 0,
+                },
             )
             entry['certified_steps'] += c['certified_steps']
+            entry['calls'] += c['calls']
             entry['stock_graph_steps'] += c['stock_graph_steps']
             entry['rows'] += c['rows']
             entry['max_rows'] = max(entry['max_rows'], c['max_rows'])
+    # Device coverage: every host-gated certified step must have its device calls
+    # (calls_per_step per path), as check_counters requires of the check launches.
+    per_step = plan.FAMILIES[CONTROLS['mtptokens'].family].calls_per_step
+    for path, sizes in by_size.items():
+        for entry in sizes.values():
+            entry['uncounted_calls'] = (
+                entry['certified_steps'] * per_step.get(path, 1) - entry['calls']
+            )
+    uncounted = sum(e['uncounted_calls'] for sizes in by_size.values() for e in sizes.values())
     verify_steps = sum(v['certified_steps'] for v in by_size.get('verify', {}).values())
     baseline = all(r['identical'] == r['prompts'] for r in within.values())
     identical = all(r['identical'] == r['prompts'] for r in against.values())
-    if verify_steps == 0:
+    if uncounted != 0:
+        reading = 'incomplete: host-gated certified steps without device calls'
+    elif verify_steps == 0:
         reading = 'the certified verify did not run in the waves'
     elif identical:
         reading = "the certified verify decided the waves' verifies and matched stock"
@@ -469,6 +487,7 @@ def tokens_compare(out: Path, reference: Path) -> dict[str, Any]:
         'baseline_identical': baseline,
         'waves_counters_by_size': by_size,
         'waves_certified_verify_steps': verify_steps,
+        'waves_uncounted_calls': uncounted,
         'reading': reading,
     }
 

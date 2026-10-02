@@ -236,3 +236,50 @@ def test_stats_delta_counts_only_the_steps_between_snapshots() -> None:
         'max_rows': 16,
     }
     assert control_waves.stats_delta({}, {}) == {}
+
+
+def test_tokens_compare_requires_device_calls_for_every_gated_step(tmp_path: Path) -> None:
+    out, ref = tmp_path / 'tokens', tmp_path / 'seeded'
+    records = [
+        {'wave': w, 'prompt': 'p', 'rep': r, 'output_ids': [1, 2, 3]}
+        for w in range(2)
+        for r in range(2)
+    ]
+    for path in (
+        out / 'stocktokens' / 'outputs.jsonl',
+        out / 'certtokens' / 'outputs.jsonl',
+        ref / 'stock' / 'outputs.jsonl',
+    ):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(''.join(json.dumps(x) + '\n' for x in records))
+
+    def counters(verify_calls: int) -> None:
+        def entry(calls: int) -> dict[str, int]:
+            return {
+                'calls': calls,
+                'rows': 8,
+                'certified_steps': 2,
+                'stock_graph_steps': 0,
+                'max_rows': 4,
+            }
+
+        rows = [
+            {
+                'wave': 0,
+                'size': 1,
+                'rep': 0,
+                'paths': {'verify': entry(verify_calls), 'draft': entry(4)},
+            },
+        ]
+        (out / 'certtokens' / 'counters.jsonl').write_text(
+            ''.join(json.dumps(x) + '\n' for x in rows)
+        )
+
+    counters(2)
+    result = control_waves.tokens_compare(out, ref)
+    assert result['waves_uncounted_calls'] == 0
+    assert result['reading'] == "the certified verify decided the waves' verifies and matched stock"
+    counters(1)
+    result = control_waves.tokens_compare(out, ref)
+    assert result['waves_counters_by_size']['verify']['1']['uncounted_calls'] == 1
+    assert result['reading'].startswith('incomplete')
