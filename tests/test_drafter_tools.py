@@ -525,3 +525,94 @@ def test_strict_checks_require_full_logprob_coverage(tmp_path: Path) -> None:
                 with pytest.raises(SystemExit) as exc:
                     module.main()
                 assert exc.value.code not in (None, 0), (name, argv[0])
+
+
+def _fold_timing_tree(root: Path, *, extra_arg: bool = False, swap: bool = False) -> None:
+    """Four bench.sweep runs of block 16 at c = 1 in the declared order."""
+    labels = ['stock-r1', 'fold-r1', 'fold-r2', 'stock-r2']
+    if swap:
+        labels[0], labels[1] = labels[1], labels[0]
+    for i, suffix in enumerate(labels):
+        arm = suffix.split('-')[0]
+        run = root / 'b16' / f'b16-{suffix}' / '20261002-000000'
+        (run / 'server').mkdir(parents=True)
+        (run / 'r0' / 'c001').mkdir(parents=True)
+        sweep = {
+            'label': f'b16-{suffix}',
+            'arm': {'name': 'dflash-tuned-b16'},
+            'concurrency': [1],
+            'session': 's',
+            'workload': {'sha256': 'w'},
+            'osl': 512,
+        }
+        (run / 'sweep.json').write_text(json.dumps(sweep))
+        launch = {
+            'env_overrides': {'SGLANG_GDN_REPLAYSSM_FOLD': '1'} if arm == 'fold' else {},
+            'sglang_worktree': '/e',
+            'sglang_source': {'head': 'e1', 'dirty_files': [], 'module_file': '/e/sglang.py'},
+            'repo': {'head': 'r1', 'dirty_files': []},
+            'checks': [{'name': 'capacity', 'ok': True}],
+            'gpu_before_start': {'compute_apps': []},
+            'gpu_after_stop': {'compute_apps': []},
+            'start_time_unix': 100.0 * i,
+            'stop_time_unix': 100.0 * i + 50,
+        }
+        (run / 'server' / 'launch.json').write_text(json.dumps(launch))
+        args = {
+            'enable_linear_replayssm_spec': arm == 'fold',
+            'mamba_ssm_dtype': 'float32' if arm == 'fold' else None,
+            'page_size': 2 if extra_arg and suffix == 'fold-r2' else 1,
+        }
+        (run / 'server' / 'server.log').write_text(f'[t] server_args={args!r}\n')
+        info = {
+            'max_mamba_cache_size': 64,
+            'internal_states': [{'effective_max_running_requests_per_dp': 64}],
+        }
+        (run / 'server' / 'server_info.json').write_text(json.dumps(info))
+        y = 1000.0 if arm == 'fold' else 900.0
+        span_ns = int(2 * 512 / y * 1e9)
+        rows = [
+            'request_id,prompt_id,ok,osl,start_ns,latency_ms',
+            'a,p1,True,512,0,1.0',
+            f'b,p2,True,512,1000000,{(span_ns - 1_000_000) / 1e6}',
+        ]
+        (run / 'r0' / 'c001' / 'requests.csv').write_text('\n'.join(rows) + '\n')
+        point = {
+            'concurrency': 1,
+            'requests': 2,
+            'completed': 2,
+            'failed': 0,
+            'osl_mismatch': 0,
+            'aiperf_exit_code': 0,
+            'y': 2 * 512 / (span_ns / 1e9),
+            'x_e2e': 1.0,
+            'foreign_cpu_during_mean': 0.5,
+            'foreign_cpu_during_max': 1.0,
+        }
+        (run / 'r0' / 'c001' / 'point.json').write_text(json.dumps(point))
+
+
+def test_fold_timing_check_passes_the_declared_protocol_only(tmp_path: Path) -> None:
+    import pytest
+
+    check = load('fold_timing_check')
+    for name, kwargs, passes in (
+        ('ok', {}, True),
+        ('extra-arg', {'extra_arg': True}, False),
+        ('swapped', {'swap': True}, False),
+    ):
+        root = tmp_path / name
+        _fold_timing_tree(root, **kwargs)
+        out = tmp_path / f'{name}.json'
+        sys.argv = ['fold_timing_check.py', str(root), '--blocks', '16']
+        sys.argv += ['--concurrency', '1', '--out', str(out)]
+        if passes:
+            check.main()
+            entry = json.loads(out.read_text())['comparison'][0]
+            assert abs(entry['ratio'] - 1000 / 900) < 1e-9
+            assert len(entry['abba_pairs']) == 2
+        else:
+            with pytest.raises(SystemExit) as exc:
+                check.main()
+            assert exc.value.code == 1, name
+            assert not out.exists(), name
