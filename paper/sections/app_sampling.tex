@@ -16,7 +16,7 @@ For $T>0$ and a fixed noise vector $g\in\R^V$, \Srace{} returns $\min\{i:z_i/T+g
 For a fixed noise vector $g$ and $T>0$, the ladder with $f_i(x)=x/T+g_i$ returns the token of a dense race with the same $g$ and tie rule. If the $g_i$ are i.i.d.\ standard Gumbel and independent of $z$, that token has law $\softmax(z/T)$.
 \end{theorem}
 \begin{proof}
-Each $f_i$ is nondecreasing, so Theorem~\ref{thm:ladder} returns $\min\argmax_i(z_i/T+g_i)$, which is \Srace. The law is the Gumbel-max identity~\cite{gumbel1954,papandreou2011}; ties have probability zero.
+Each $f_i$ is nondecreasing, so Theorem~\ref{thm:ladder} returns $\min\argmax_i(z_i/T+g_i)$, which is \Srace. The law is the Gumbel-max identity~\cite{papandreou2011,astar}; ties have probability zero.
 \end{proof}
 Bounding the perturbed scores so that most of them need not be computed is the principle of A$^\ast$ Sampling and of lazy Gumbel sampling~\cite{astar,mussmann2017}; a keyed field adds pathwise equality with the dense race.
 

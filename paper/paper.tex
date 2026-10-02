@@ -53,9 +53,9 @@
 \input{sections/related}
 \input{sections/discussion}
 
-% The notes of the reference entries come from the literature review's citation audit;
-% the preamble says once what they record.
-\renewcommand{\bibpreamble}{\small Each entry's note records when the source was read for this paper, or that only its bibliographic record was checked; the literature review behind them is committed \ev{litreview}.\par\medskip}
+% The entries carry bibliographic data only; how each was checked is recorded in the committed
+% citation audit (sources/citation_audit.md), which the preamble points to once.
+\renewcommand{\bibpreamble}{\small How each reference was checked is recorded in the committed citation audit \ev{litreview}.\par\medskip}
 {\raggedright
 \bibliography{references}
 \bibliographystyle{mlsys2025}

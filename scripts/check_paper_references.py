@@ -22,7 +22,14 @@ printed with its failures:
    ``\\evref`` and ``\\devref``, so that an ID such as E21 never means two things;
 9. every pointer of the paper into the notes, ``\\notessec{label}{number}``, names a label the
    notes define, and, if the notes have been built (``paper/research_notes.aux``), the number
-   the notes print for it.
+   the notes print for it;
+10. every entry in ``paper/references.bib`` has a row in the table of cited entries of
+    ``sources/citation_audit.md``, which records how the entry and its citing sentences were
+    checked;
+11. no ``note`` of an entry in ``paper/references.bib`` carries an audit remark (how the source
+    was verified or licensed, or when it was read for the audit), because those remarks belong
+    in the audit, not in the printed reference list; an access date for an unversioned web page
+    is bibliographic data and stays in the entry.
 
 A document's sources are its root file and every file it reaches through ``\\input``.
 
@@ -200,6 +207,52 @@ def prefix_failures(files: dict[str, list[str]]) -> list[str]:
     return failures
 
 
+AUDIT = ROOT / 'sources' / 'citation_audit.md'
+AUDIT_TABLE = '## Entries the paper and the notes cite'
+AUDIT_ROW = re.compile(r'(?m)^\| `([^`]+)` \|')
+AUDIT_REMARK = re.compile(r'(?i)\b(read|verified|licen[cs]ed?|checked)\b|arxiv comment')
+NOTE_FIELD = re.compile(r'(?i)(?<![\w-])note\s*=\s*')
+
+
+def note_value(entry: str) -> str | None:
+    """The value of an entry's ``note`` field in either BibTeX form, ``{...}`` or ``"..."``.
+
+    Braces nest in both forms; a quoted value ends at the first ``"`` outside braces. The field
+    may be the entry's last, with or without a trailing comma.
+    """
+    field = NOTE_FIELD.search(entry)
+    if field is None or field.end() >= len(entry) or entry[field.end()] not in '{"':
+        return None
+    start = field.end()
+    opener = entry[start]
+    depth = 0
+    for i in range(start, len(entry)):
+        char = entry[i]
+        if char == '{':
+            depth += 1
+        elif char == '}':
+            depth -= 1
+            if opener == '{' and depth == 0:
+                return entry[start + 1 : i]
+        elif char == '"' and opener == '"' and i > start and depth == 0:
+            return entry[start + 1 : i]
+    return None
+
+
+def audit_failures(paper_bib: dict[str, str]) -> tuple[list[str], list[str]]:
+    """(keys without a row in the audit's table of cited entries, keys whose note is an audit remark)."""
+    text = AUDIT.read_text() if AUDIT.is_file() else ''
+    start = text.find(AUDIT_TABLE)
+    table = text[start : text.find('\n## ', start + 1)] if start >= 0 else ''
+    rows = set(AUDIT_ROW.findall(table))
+    remarks = [
+        key
+        for key, entry in paper_bib.items()
+        if (note := note_value(entry)) is not None and AUDIT_REMARK.search(note)
+    ]
+    return sorted(set(paper_bib) - rows), sorted(remarks)
+
+
 NOTESSEC = re.compile(r'\\notessec\{([^}]*)\}\{([^}]*)\}')
 NEWLABEL = re.compile(r'\\newlabel\{([^}]*)\}\{\{([^}]*)\}')
 
@@ -282,6 +335,9 @@ def main() -> int:
     failures['register ID prefixes (paper none, notes distinct)'] = prefix_failures(files)
     aux_note = '' if (PAPER / 'research_notes.aux').is_file() else ' (labels only; notes not built)'
     failures[f'pointers into the notes{aux_note}'] = notessec_failures(files)
+    unaudited, remarks = audit_failures(paper_bib)
+    failures['entries without a row in sources/citation_audit.md'] = unaudited
+    failures['printed notes that carry an audit remark'] = remarks
 
     counts = ', '.join(
         f'{doc}: {len(cited[doc])} cited keys, {len(registers[doc][0])} entries, '
