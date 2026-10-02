@@ -109,12 +109,18 @@ the GDN checkpointing kept is served from the cache.
   during speculative decode. Prefixes ending at and just past each checkpoint
   are served warm, restoring the checkpointed state, and cold; also for
   checkpoints taken in a cycle that finished the request.
-- `abort`: requests are aborted mid-stream while the batch and the GDN pool
-  (exactly four slots) are full, so the next request reuses the freed slot
-  while the aborted request's last verify may still be in flight. Probe
-  outputs are compared with the same probes served alone.
+- `abort`: requests are aborted mid-stream on a server whose batch and GDN
+  pool hold four requests, so that the next request can reuse a freed slot
+  while the aborted request's last verify may still be in flight. The lanes
+  are not synchronized and slot assignments are not recorded, so that reuse is
+  the design's intent, not a measured condition. Probe outputs are compared
+  with the same probes served alone.
 - `prefill`: prompt logprobs at every position of the 40 longest prompts,
-  compared across `--chunked-prefill-size` settings by `compare_prefill.py`.
+  compared across `--chunked-prefill-size` settings by `compare_prefill.py`,
+  which assigns each position to the chunk and offset of the token whose
+  forward produced its distribution (token i - 1 for position i). Its alignment
+  check of the 40 largest drifts is exploratory: it was added after those
+  drifts were seen.
 
 ## Commands
 
@@ -156,9 +162,8 @@ the repository commit. An untapped c1 pass with the same pools on the same engin
 (`run_matrix.py`, into `~/vp-data/state/runs_cap16`) is the reference for the
 tap-neutrality check. The script refuses to start unless `~/sglang-wt/state` is a
 clean checkout of the tap tree (`9341fb82`) and the repository checkout is clean.
-The summary, `cachecheck_v4_plain_c1_vs_c32.json`, will be
-committed to `evidence/state_safety` once the hold has run; until then the check is
-pending.
+The hold ran on 2026-10-01 from `be00c17`; its summary is committed as
+`evidence/state_safety/cachecheck_v4_plain_c1_vs_c32.json`.
 
 `tap_signature.py` (light,
 run by `analyze_all.sh`) finds where the v1 and v3 tapped sessions of the same

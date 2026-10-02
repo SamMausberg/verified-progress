@@ -181,6 +181,42 @@
  },
  {
   "evidence": "noise_floor_pinned.json",
+  "comparison": "repeat session, mtp_s3 c1",
+  "server_a": "runs_pinned/mtp_s3/c1",
+  "server_b": "runs_pinned/mtp_s3__rep/c1",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "repeat session, mtp_s3 c32",
+  "server_a": "runs_pinned/mtp_s3/c32",
+  "server_b": "runs_pinned/mtp_s3__rep/c32",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
   "comparison": "concurrency 1 vs 32 (cap 8), plain",
   "server_a": "runs_pinned/plain/c1",
   "server_b": "runs_pinned/plain/c32",
@@ -307,9 +343,45 @@
  },
  {
   "evidence": "noise_floor_pinned.json",
+  "comparison": "radix off c1, plain",
+  "server_a": "runs_pinned/plain/c1",
+  "server_b": "runs_pinned/plain_noradix/c1",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
   "comparison": "radix off c1, mtp_s3",
   "server_a": "runs_pinned/mtp_s3/c1",
   "server_b": "runs_pinned/mtp_s3_noradix/c1",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "radix off c32, plain",
+  "server_a": "runs_pinned/plain/c32",
+  "server_b": "runs_pinned/plain_noradix/c32",
   "same_server": false,
   "pools_a": {
    "max_total_tokens": 49152,
@@ -343,6 +415,24 @@
  },
  {
   "evidence": "noise_floor_pinned.json",
+  "comparison": "radix off, plain c1 vs c32",
+  "server_a": "runs_pinned/plain_noradix/c1",
+  "server_b": "runs_pinned/plain_noradix/c32",
+  "same_server": true,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
   "comparison": "radix off, mtp_s3 c1 vs c32",
   "server_a": "runs_pinned/mtp_s3_noradix/c1",
   "server_b": "runs_pinned/mtp_s3_noradix/c32",
@@ -361,9 +451,81 @@
  },
  {
   "evidence": "noise_floor_pinned.json",
+  "comparison": "radix off, spec vs plain c1, mtp_s3",
+  "server_a": "runs_pinned/plain_noradix/c1",
+  "server_b": "runs_pinned/mtp_s3_noradix/c1",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "radix off, spec vs plain c32, mtp_s3",
+  "server_a": "runs_pinned/plain_noradix/c32",
+  "server_b": "runs_pinned/mtp_s3_noradix/c32",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "overlap off c1, plain",
+  "server_a": "runs_pinned/plain/c1",
+  "server_b": "runs_pinned/plain_nooverlap/c1",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
   "comparison": "overlap off c1, mtp_s3",
   "server_a": "runs_pinned/mtp_s3/c1",
   "server_b": "runs_pinned/mtp_s3_nooverlap/c1",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "overlap off vs radix off c1, plain",
+  "server_a": "runs_pinned/plain_noradix/c1",
+  "server_b": "runs_pinned/plain_nooverlap/c1",
   "same_server": false,
   "pools_a": {
    "max_total_tokens": 49152,
@@ -397,10 +559,46 @@
  },
  {
   "evidence": "noise_floor_pinned.json",
+  "comparison": "overlap off, plain c1 vs c32",
+  "server_a": "runs_pinned/plain_nooverlap/c1",
+  "server_b": "runs_pinned/plain_nooverlap/c32",
+  "same_server": true,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
   "comparison": "overlap off, mtp_s3 c1 vs c32",
   "server_a": "runs_pinned/mtp_s3_nooverlap/c1",
   "server_b": "runs_pinned/mtp_s3_nooverlap/c32",
   "same_server": true,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "overlap off, spec vs plain c1, mtp_s3",
+  "server_a": "runs_pinned/plain_nooverlap/c1",
+  "server_b": "runs_pinned/mtp_s3_nooverlap/c1",
+  "same_server": false,
   "pools_a": {
    "max_total_tokens": 49152,
    "max_running_requests": 8,
@@ -613,9 +811,99 @@
  },
  {
   "evidence": "noise_floor_pinned.json",
+  "comparison": "deterministic, plain c1 vs c32",
+  "server_a": "runs_pinned/plain_det/c1",
+  "server_b": "runs_pinned/plain_det/c32",
+  "same_server": true,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
   "comparison": "deterministic, mtp_s3 c1 vs c32",
   "server_a": "runs_pinned/mtp_s3_det/c1",
   "server_b": "runs_pinned/mtp_s3_det/c32",
+  "same_server": true,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "deterministic, plain vs mtp_s3 c1",
+  "server_a": "runs_pinned/plain_det/c1",
+  "server_b": "runs_pinned/mtp_s3_det/c1",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "deterministic, plain vs mtp_s3 c32",
+  "server_a": "runs_pinned/plain_det/c32",
+  "server_b": "runs_pinned/mtp_s3_det/c32",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "deterministic on vs off, plain c1",
+  "server_a": "runs_pinned/plain/c1",
+  "server_b": "runs_pinned/plain_det/c1",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "fp32 head, plain c1 vs c32",
+  "server_a": "runs_pinned/plain_fp32head/c1",
+  "server_b": "runs_pinned/plain_fp32head/c32",
   "same_server": true,
   "pools_a": {
    "max_total_tokens": 49152,
@@ -648,6 +936,42 @@
   "pools_identical": true
  },
  {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "fp32 head, plain vs mtp_s3 c1",
+  "server_a": "runs_pinned/plain_fp32head/c1",
+  "server_b": "runs_pinned/mtp_s3_fp32head/c1",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
+  "evidence": "noise_floor_pinned.json",
+  "comparison": "fp32 head, plain vs mtp_s3 c32",
+  "server_a": "runs_pinned/plain_fp32head/c32",
+  "server_b": "runs_pinned/mtp_s3_fp32head/c32",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_b": {
+   "max_total_tokens": 49152,
+   "max_running_requests": 8,
+   "max_mamba_cache_size": 40
+  },
+  "pools_identical": true
+ },
+ {
   "evidence": "cachecheck_v4_plain_c1_radix_vs_noradix.json",
   "comparison": "v4_plain_c1 vs v4_plain_noradix_c1",
   "server_a": "tap/v4_plain_c1",
@@ -664,6 +988,24 @@
    "max_mamba_cache_size": 16
   },
   "pools_identical": false
+ },
+ {
+  "evidence": "cachecheck_v4_plain_c1_vs_c32.json",
+  "comparison": "v4b_plain_c1 vs v4b_plain_c32",
+  "server_a": "tap/v4b_plain_c1",
+  "server_b": "tap/v4b_plain_c32",
+  "same_server": false,
+  "pools_a": {
+   "max_total_tokens": 98304,
+   "max_running_requests": 16,
+   "max_mamba_cache_size": 80
+  },
+  "pools_b": {
+   "max_total_tokens": 98304,
+   "max_running_requests": 16,
+   "max_mamba_cache_size": 80
+  },
+  "pools_identical": true
  },
  {
   "evidence": "cachecheck_v4_plain_c1_vs_mtp_s3_c1.json",
