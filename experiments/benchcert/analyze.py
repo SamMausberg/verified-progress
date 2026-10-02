@@ -494,6 +494,7 @@ def report(
             row = {
                 'session': step,
                 'family': fam,
+                'arm': family.arm,
                 'variant': variant,
                 'label': info['label'],
                 'run': info['run'],
