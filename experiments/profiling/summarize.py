@@ -25,6 +25,7 @@ GROUPS: list[tuple[str, list[str]]] = [
     ('Draft logits copy + top-1 + eager draft argmax', [
         'draft_logits_cast', 'spec_draft_topk', 'draft_argmax_eager']),
     ('MTP layer or DFlash draft model (non-head)', ['mtp_layer', 'draft_model']),
+    ('DFlash drafter KV from verified target features (eager)', ['draft_context_kv']),
     ('GDN in_proj GEMMs (qkvz + ba)', ['gdn_in_proj_gemm']),
     ('GDN out_proj GEMM', ['gdn_out_proj_gemm']),
     ('GDN conv (fused proj/conv update)', ['gdn_conv']),
@@ -75,7 +76,7 @@ COARSE: list[tuple[str, list[str]]] = [
     ('head', ['lm_head_gemm', 'logits_cast', 'sampling_argmax']),
     ('draft_head', ['draft_lm_head_gemm', 'draft_logits_cast', 'spec_draft_topk',
                     'draft_argmax_eager']),
-    ('draft_model', ['mtp_layer', 'draft_model']),
+    ('draft_model', ['mtp_layer', 'draft_model', 'draft_context_kv']),
     ('weight_gemms', ['gdn_in_proj_gemm', 'gdn_out_proj_gemm', 'attn_qkv_gemm',
                       'attn_o_proj_gemm', 'mlp_gate_up_gemm', 'mlp_down_gemm', 'other_gemm']),
     ('gdn_state', ['gdn_conv', 'gdn_recurrent', 'gdn_gated_norm', 'gdn_state_track',

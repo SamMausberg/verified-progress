@@ -30,6 +30,14 @@ if [ ! -d "$PLAIN_CITED" ]; then
 fi
 if [ "$PLAIN_CITED" -ef "$PLAIN_RERUN" ]; then PLAIN_RERUN=""; fi
 
+# The DFlash runs feed dflash_cycle.py, which needs every window their commands
+# planned: a run directory that lacks some (an interrupted hold) stops the analysis
+# here instead of yielding partial evidence. Absent runs are skipped.
+for run_dir in "$VP_DATA"/dflash-tuned-b16_{nsys,none} "$VP_DATA"/dflash-tuned_{nsys,none}; do
+  [ -e "$run_dir" ] || continue
+  run check_run.py "$run_dir" || { echo "incomplete DFlash run $run_dir" >&2; exit 1; }
+done
+
 # Attribution per configuration.
 for arm_kind in plain:plain mtp:spec dflash-tuned-b16:dflash dflash-tuned:dflash; do
   arm="${arm_kind%%:*}" kind="${arm_kind##*:}"
@@ -137,6 +145,13 @@ fi
 if have "$EV/microbench_rerun/microbench_clocks.csv"; then
   run clock_summary.py "$EV/microbench_rerun/microbench_clocks.csv" \
     --out "$EV/microbench_rerun/microbench_clocks.json" > /dev/null
+fi
+
+# The DFlash cycle by phase, traced and untraced. dflash_cycle.py refuses partial
+# windows files and missing attributions; it runs once any DFlash attribution exists.
+if compgen -G "$EV/attribution/dflash-tuned*_bs*.json" > /dev/null; then
+  run dflash_cycle.py --evidence "$EV" --out "$EV/dflash_cycle.json" \
+    --csv "$EV/dflash_cycle.csv" > /dev/null
 fi
 
 run summarize.py --evidence "$EV" > /dev/null
