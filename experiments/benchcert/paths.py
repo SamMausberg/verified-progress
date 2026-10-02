@@ -59,8 +59,8 @@ MODEL, REVISION = 'Qwen/Qwen3.5-4B', '851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a'
 
 def prefill_ends(position: int, output_len: int) -> list[int]:
     """The prefill lengths (in output tokens) that h8 read for 579ae7ce: the target, 62
-    more, and the whole output less its last token (absolute 514, 576 and 587)."""
-    return sorted({position, min(position + 62, output_len - 1), output_len - 1})
+    more, and the whole output (absolute 514, 576 and 587 for 579ae7ce)."""
+    return sorted({position, min(position + 62, output_len), output_len})
 
 
 def targets(out: Path, runs: Path) -> list[dict[str, Any]]:
