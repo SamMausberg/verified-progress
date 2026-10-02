@@ -26,11 +26,15 @@ profile_arms.sh), pairs each unprofiled label with its host-trace label
   environment, start time, Nsight version) and every counted window's values.
 
     python experiments/hostgap/summarize.py ~/vp-data/hostgap/prof1 --out evidence/hostgap/cycle_profiles.json
+
+--labels limits the summary to the labels matching a shell pattern, for a tag
+directory that two holds share (e.g. --labels 'dflash-*').
 """
 
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
 import statistics
 import subprocess
@@ -186,11 +190,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('tag_dir', type=Path)
     parser.add_argument('--out', type=Path, default=None)
+    parser.add_argument(
+        '--labels', default='*', help='shell pattern for the labels to summarize (default: all)'
+    )
     args = parser.parse_args()
     labels = {
         d.name: summarize_label(d)
         for d in sorted(args.tag_dir.expanduser().iterdir())
-        if (d / 'windows.jsonl').exists()
+        if (d / 'windows.jsonl').exists() and fnmatch.fnmatchcase(d.name, args.labels)
     }
     derived: dict[str, Any] = {}
     for name, summary in labels.items():
