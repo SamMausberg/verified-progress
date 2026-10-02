@@ -202,8 +202,14 @@ at most 64 rows, and divides the cycle time by the cycle time minus the saving;
 the y ratio dilutes that by the time before the first token. It assumes plain
 decoding's fallback rates on every path (MTP and DFlash rows fall back more often,
 1.7-4.0% against 1.4% in `engine_v2.json`), ignores the stock sampler's argmax that
-a certified step skips, and charges nothing for gated-off calls. The table follows
-the first run of the script.
+a certified step skips, and charges nothing for gated-off calls.
+
+| Family | Predicted y ratio by concurrency (saving per cycle, of the cycle) |
+|---|---|
+| plain | 1.035 (c=1, 121 of 3,482 us), 1.031 (4), 1.030 (8), 1.029 (16), 1.016 (32), 1.005 (64), 1.000 (128) |
+| mtp | 1.086 (c=1, 478 of 5,787 us), 1.077 (2), 1.071 (4), 1.057 (8), 1.041 (16), 1.017 (32), 1.004 (64) |
+| dflash16 | 1.045 (c=1, 247 of 5,294 us), 1.026 (2), 1.009 (4), 1.000 (8) |
+| dflash8 | 1.024 (c=4, 171 of 6,949 us), 1.008 (8), 1.000 (16), 1.000 (32) |
 
 ## Mechanism
 
