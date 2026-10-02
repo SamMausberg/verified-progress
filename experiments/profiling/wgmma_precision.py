@@ -52,6 +52,7 @@ import math
 import re
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import torch
 import triton
@@ -256,7 +257,7 @@ def main() -> None:
 
     batch = cases(args.k) + ROUND_CASES
     values, info = run_triton(args.k, batch)
-    rows = [
+    rows: list[dict[str, Any]] = [
         {'test': t, 'param': p, 'result': v} for (t, p, _, _), v in zip(batch, values, strict=True)
     ]
     rnd = {r['test']: r['result'] for r in rows if r['test'].startswith('round_')}
@@ -271,10 +272,10 @@ def main() -> None:
         if c[0].startswith('align') and not exactly_bf16(c[2][1]):
             raise ValueError('align term not BF16')
     result['cublas'] = {}
-    # One M per head kernel family named in evidence/certified_head/README.md.
-    for m in (1, 16, 24, 32, 48, 64, 96, 128, 192, 224, 256):
+    # One M for each of the 14 head kernels named in evidence/certified_head/README.md.
+    for m in (1, 16, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 224, 256):
         vals, names = run_cublas(m, cub_batch)
-        crow = [
+        crow: list[dict[str, Any]] = [
             {'test': t, 'param': p, 'result': v}
             for (t, p, _, _), v in zip(cub_batch, vals, strict=True)
         ]
