@@ -108,29 +108,43 @@ def write_gz(path: Path, rows: list[dict[str, Any]]) -> None:
             handle.write(json.dumps(row) + '\n')
 
 
+def write_rates(
+    directory: Path,
+    sglang_row: dict[str, Any],
+    hf_row: dict[str, Any] | None,
+    fp32_row: dict[str, Any] | None,
+    text: str | None = None,
+) -> None:
+    """A rates directory for one prompt: the manifest, SGLang's row, every transformers run
+    and FP32, the last two stamped with the hash of SGLang's text (or `text`)."""
+    manifest = {'prompt': sglang_row['prompt'], 'prompt_ids': sglang_row['prompt_ids']}
+    (directory / 'prompts.jsonl').write_text(json.dumps(manifest) + '\n')
+    write_gz(directory / 'sglang.jsonl.gz', [sglang_row])
+    sha = text or rates.text_sha(sglang_row['prompt_ids'], sglang_row['output_ids'])
+    if hf_row is not None:
+        for name in rates.HF_RUNS:
+            write_gz(directory / f'{name}.jsonl.gz', [{**hf_row, 'text_sha256': sha}])
+    if fp32_row is not None:
+        write_gz(directory / 'fp32.jsonl.gz', [{**fp32_row, 'text_sha256': sha}])
+
+
 def test_rates_summary_counts_regret_by_region(tmp_path: Path) -> None:
     output = [5, rates.EOT[0], 6]
     good = [[-0.1, 7], [-3.0, 8]]
     bad = [[-0.1, 8], [-3.0, 7]]
-    write_gz(
-        tmp_path / 'sglang.jsonl.gz',
-        [
-            {
-                'prompt': 'a',
-                'prompt_ids': [1],
-                'output_ids': output,
-                'decode': [good, good, bad],
-                'prefill': [good] * 3,
-            }
-        ],
-    )
-    for name in rates.HF_RUNS:
-        write_gz(
-            tmp_path / f'{name}.jsonl.gz',
-            [{'prompt': 'a', 'decode': [good] * 3, 'prefill': [good] * 3}],
-        )
     fp = {'top': [[-0.05, 7]], 'lp': {'7': -0.05, '8': -2.6}}
-    write_gz(tmp_path / 'fp32.jsonl.gz', [{'prompt': 'a', 'positions': [fp, fp, fp]}])
+    write_rates(
+        tmp_path,
+        {
+            'prompt': 'a',
+            'prompt_ids': [1],
+            'output_ids': output,
+            'decode': [good, good, bad],
+            'prefill': [good] * 3,
+        },
+        {'prompt': 'a', 'decode': [good] * 3, 'prefill': [good] * 3},
+        {'prompt': 'a', 'positions': [fp, fp, fp]},
+    )
     result = rates.summary(tmp_path)
     assert result['positions'] == {'before_eot': 2, 'after_eot': 1}
     decode = result['counts']['sglang/decode']
@@ -151,25 +165,19 @@ def test_rates_summary_counts_a_position_missed_on_both_paths_once(tmp_path: Pat
     good = [[-0.1, 7], [-3.0, 8]]
     bad = [[-0.1, 8], [-3.0, 7]]
     bad_without_7 = [[-0.1, 8], [-3.0, 9]]  # FP32's top token is not among the returned ones
-    write_gz(
-        tmp_path / 'sglang.jsonl.gz',
-        [
-            {
-                'prompt': 'a',
-                'prompt_ids': [1],
-                'output_ids': output,
-                'decode': [good, bad],
-                'prefill': [good, bad_without_7],
-            }
-        ],
-    )
-    for name in rates.HF_RUNS:
-        write_gz(
-            tmp_path / f'{name}.jsonl.gz',
-            [{'prompt': 'a', 'decode': [good] * 2, 'prefill': [good] * 2}],
-        )
     fp = {'top': [[-0.05, 7]], 'lp': {'7': -0.05, '8': -2.6, '9': -4.0}}
-    write_gz(tmp_path / 'fp32.jsonl.gz', [{'prompt': 'a', 'positions': [fp, fp]}])
+    write_rates(
+        tmp_path,
+        {
+            'prompt': 'a',
+            'prompt_ids': [1],
+            'output_ids': output,
+            'decode': [good, bad],
+            'prefill': [good, bad_without_7],
+        },
+        {'prompt': 'a', 'decode': [good] * 2, 'prefill': [good] * 2},
+        {'prompt': 'a', 'positions': [fp, fp]},
+    )
     result = rates.summary(tmp_path)
     assert result['counts']['sglang/decode']['regret_above']['before_eot']['2.0'] == 1
     assert result['counts']['sglang/prefill']['regret_above']['before_eot']['2.0'] == 1
@@ -180,7 +188,8 @@ def test_rates_summary_counts_a_position_missed_on_both_paths_once(tmp_path: Pat
 
 
 def test_rates_summary_requires_every_source(tmp_path: Path) -> None:
-    write_gz(tmp_path / 'sglang.jsonl.gz', [{'prompt': 'a'}])
+    row = {'prompt': 'a', 'prompt_ids': [1], 'output_ids': [5], 'decode': [], 'prefill': []}
+    write_rates(tmp_path, row, None, None)
     with pytest.raises(SystemExit, match='missing'):
         rates.summary(tmp_path)
 
@@ -277,47 +286,73 @@ def test_rates_outputs_are_never_replaced(tmp_path: Path) -> None:
 
 
 def test_rates_summary_refuses_partial_traces(tmp_path: Path) -> None:
-    output = [5, 6]
     good = [[-0.1, 7], [-3.0, 8]]
-    row = {
-        'prompt': 'a',
-        'prompt_ids': [1],
-        'output_ids': output,
-        'decode': [good],
-        'prefill': [good] * 2,
-    }
-    write_gz(tmp_path / 'sglang.jsonl.gz', [row])
-    for name in rates.HF_RUNS:
-        write_gz(
-            tmp_path / f'{name}.jsonl.gz',
-            [{'prompt': 'a', 'decode': [good] * 2, 'prefill': [good] * 2}],
-        )
     fp = {'top': [[-0.05, 7]], 'lp': {'7': -0.05, '8': -2.6}}
-    write_gz(tmp_path / 'fp32.jsonl.gz', [{'prompt': 'a', 'positions': [fp, fp]}])
+    write_rates(
+        tmp_path,
+        {
+            'prompt': 'a',
+            'prompt_ids': [1],
+            'output_ids': [5, 6],
+            'decode': [good],
+            'prefill': [good] * 2,
+        },
+        {'prompt': 'a', 'decode': [good] * 2, 'prefill': [good] * 2},
+        {'prompt': 'a', 'positions': [fp, fp]},
+    )
     with pytest.raises(SystemExit, match='does not cover all 2 positions'):
         rates.summary(tmp_path)
 
 
 def test_rates_refuses_traces_of_other_text(tmp_path: Path) -> None:
-    output = [5, 6]
     good = [[-0.1, 7], [-3.0, 8]]
-    write_gz(
-        tmp_path / 'sglang.jsonl.gz',
-        [
-            {
-                'prompt': 'a',
-                'prompt_ids': [1],
-                'output_ids': output,
-                'decode': [good] * 2,
-                'prefill': [good] * 2,
-            }
-        ],
-    )
+    row = {
+        'prompt': 'a',
+        'prompt_ids': [1],
+        'output_ids': [5, 6],
+        'decode': [good] * 2,
+        'prefill': [good] * 2,
+    }
     stale = rates.text_sha([1], [5, 9])
+    write_rates(
+        tmp_path, row, {'prompt': 'a', 'decode': [good] * 2, 'prefill': [good] * 2}, None, stale
+    )
+    with pytest.raises(SystemExit, match='computed on other text'):
+        rates.sources(tmp_path)
+
+
+def test_rates_refuses_unhashed_traces_unless_accepted(tmp_path: Path) -> None:
+    good = [[-0.1, 7], [-3.0, 8]]
+    row = {
+        'prompt': 'a',
+        'prompt_ids': [1],
+        'output_ids': [5, 6],
+        'decode': [good] * 2,
+        'prefill': [good] * 2,
+    }
+    write_rates(tmp_path, row, None, None)
     for name in rates.HF_RUNS:
         write_gz(
             tmp_path / f'{name}.jsonl.gz',
-            [{'prompt': 'a', 'text_sha256': stale, 'decode': [good] * 2, 'prefill': [good] * 2}],
+            [{'prompt': 'a', 'decode': [good] * 2, 'prefill': [good] * 2}],
         )
-    with pytest.raises(SystemExit, match='computed on other text'):
+    with pytest.raises(SystemExit, match='no text hash'):
+        rates.sources(tmp_path)
+    unhashed: list[str] = []
+    rates.sources(tmp_path, accept_unhashed=True, unhashed=unhashed)
+    assert unhashed == [f'{name}/a' for name in rates.HF_RUNS]
+
+
+def test_rates_refuses_sglang_text_of_another_manifest(tmp_path: Path) -> None:
+    good = [[-0.1, 7], [-3.0, 8]]
+    row = {
+        'prompt': 'a',
+        'prompt_ids': [1],
+        'output_ids': [5, 6],
+        'decode': [good] * 2,
+        'prefill': [good] * 2,
+    }
+    write_rates(tmp_path, row, {'prompt': 'a', 'decode': [good] * 2, 'prefill': [good] * 2}, None)
+    (tmp_path / 'prompts.jsonl').write_text(json.dumps({'prompt': 'b', 'prompt_ids': [2]}) + '\n')
+    with pytest.raises(SystemExit, match='current prompts'):
         rates.sources(tmp_path)

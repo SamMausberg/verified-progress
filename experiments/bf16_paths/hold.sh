@@ -164,25 +164,28 @@ for site in perturb perturb_gdn; do
   fi
   finish "$site"
 done
+# set_aside DIR FILE...: move the FILEs that exist into DIR/superseded-<UTC>/ (their inputs are
+# being regenerated, so they no longer describe them).
+set_aside() {
+  local dir=$1 aside file found=()
+  shift
+  for file in "$@"; do [ -e "$file" ] && found+=("$file"); done
+  [ "${#found[@]}" -gt 0 ] || return 0
+  aside="$dir/superseded-$(date -u +%Y%m%dT%H%M%SZ)"
+  mkdir -p "$aside" && mv "${found[@]}" "$aside/" && echo "moved ${found[*]} to $aside"
+}
 # run_rates DIR STATES PROMPT-ARGS...: rates.py's steps into DIR; transformers with its torch GDN
 # for each cached-state dtype in STATES, then with fla and an FP32 state; FP32 last.
 run_rates() {
   local r=$1 states=$2
   shift 2
+  # A new manifest invalidates SGLang's text and every trace on it; a new SGLang text, the traces.
   if missing "$r/prompts.jsonl"; then
+    set_aside "$r" "$r"/sglang.jsonl.gz "$r"/hf_bf16_*.jsonl.gz "$r"/fp32.jsonl.gz || { fail; return 0; }
     python -m experiments.bf16_paths.rates prompts --out "$r" "$@" || { fail; return 0; }
   fi
   if missing "$r/sglang.jsonl.gz"; then
-    # A new SGLang text invalidates every trace computed on the old one: move them aside.
-    local stale aside
-    stale=$(ls "$r"/hf_bf16_*.jsonl.gz "$r"/fp32.jsonl.gz 2>/dev/null || true)
-    if [ -n "$stale" ]; then
-      aside="$r/superseded-$(date -u +%Y%m%dT%H%M%SZ)"
-      mkdir -p "$aside"
-      # shellcheck disable=SC2086 # file names without spaces, one per word
-      mv $stale "$aside/" || { fail; return 0; }
-      echo "moved traces of the old SGLang text to $aside"
-    fi
+    set_aside "$r" "$r"/hf_bf16_*.jsonl.gz "$r"/fp32.jsonl.gz || { fail; return 0; }
     if GPU_STARTUP_MIN_FREE_GB=${GPU_STARTUP_MIN_FREE_GB:-48} GPU_STARTUP_TRIES=${GPU_STARTUP_TRIES:-10} \
       scripts/gpu_startup_lock.sh \
       python -m experiments.bf16_paths.sglang_variants start --variant default --out "$r"; then

@@ -79,20 +79,36 @@ def text_sha(prompt_ids: list[int], output_ids: list[int]) -> str:
     return hashlib.sha256(json.dumps([prompt_ids, output_ids]).encode()).hexdigest()
 
 
-def check_text(name: str, row: dict[str, Any], sglang_row: dict[str, Any]) -> None:
-    """Refuse a transformers or FP32 row computed on other text than SGLang's current output
-    (rows written before the hash was recorded carry none and are not checked)."""
+def check_text(
+    name: str, row: dict[str, Any], sglang_row: dict[str, Any], accept_unhashed: bool
+) -> bool:
+    """Refuse a transformers or FP32 row computed on other text than SGLang's current output.
+    A row without a hash (written before the hash was recorded) is refused unless
+    `accept_unhashed`; returns whether it was such a row."""
     recorded = row.get('text_sha256')
-    if recorded is not None and recorded != text_sha(
-        sglang_row['prompt_ids'], sglang_row['output_ids']
-    ):
+    if recorded is None:
+        if not accept_unhashed:
+            raise SystemExit(
+                f'{name}: {row["prompt"]} carries no text hash (pass --accept-unhashed only for '
+                'directories produced once, in order)'
+            )
+        return True
+    if recorded != text_sha(sglang_row['prompt_ids'], sglang_row['output_ids']):
         raise SystemExit(f'{name}: {row["prompt"]} was computed on other text than sglang.jsonl.gz')
+    return False
 
 
-def sources(out: Path) -> dict[str, dict[str, dict[str, Any]]]:
+def sources(
+    out: Path, accept_unhashed: bool = False, unhashed: list[str] | None = None
+) -> dict[str, dict[str, dict[str, Any]]]:
     """Every BF16 source by prompt: SGLang's paths and the transformers runs (the two
-    comparators required, the BF16-state run when present), each row bound to SGLang's text."""
+    comparators required, the BF16-state run when present), each row bound to SGLang's text,
+    and SGLang's rows bound to the prompt manifest. Unhashed rows accepted are listed in
+    `unhashed`."""
     found = {'sglang': read_jsonl(out / 'sglang.jsonl.gz')}
+    manifest = [(r['prompt'], r['prompt_ids']) for r in read_jsonl(out / 'prompts.jsonl')]
+    if [(r['prompt'], r['prompt_ids']) for r in found['sglang']] != manifest:
+        raise SystemExit('sglang.jsonl.gz was not decoded from the current prompts.jsonl')
     for name in HF_RUNS:
         file = out / f'{name}.jsonl.gz'
         if not file.exists():
@@ -104,8 +120,11 @@ def sources(out: Path) -> dict[str, dict[str, dict[str, Any]]]:
     for name, rows in found.items():
         if [r['prompt'] for r in rows] != prompts:
             raise SystemExit(f'{name}: prompts differ from sglang.jsonl.gz')
+        if name == 'sglang':
+            continue
         for row, sglang_row in zip(rows, found['sglang'], strict=True):
-            check_text(name, row, sglang_row)
+            if check_text(name, row, sglang_row, accept_unhashed) and unhashed is not None:
+                unhashed.append(f'{name}/{row["prompt"]}')
     return {name: {r['prompt']: r for r in rows} for name, rows in found.items()}
 
 
@@ -381,13 +400,17 @@ def decide(event_positions: dict[str, set[tuple[str, int]]]) -> dict[str, Any]:
     }
 
 
-def summary(out: Path) -> dict[str, Any]:
-    by_source = sources(out)
+def summary(out: Path, accept_unhashed: bool = False) -> dict[str, Any]:
+    unhashed: list[str] = []
+    by_source = sources(out, accept_unhashed, unhashed)
     sg = list(by_source['sglang'].values())
     fp32_rows = read_jsonl(out / 'fp32.jsonl.gz')
     for row in fp32_rows:
-        if row['prompt'] in by_source['sglang']:
-            check_text('fp32', row, by_source['sglang'][row['prompt']])
+        sglang_row = by_source['sglang'].get(row['prompt'])
+        if sglang_row is None:
+            raise SystemExit(f'fp32.jsonl.gz has {row["prompt"]}, which sglang.jsonl.gz lacks')
+        if check_text('fp32', row, sglang_row, accept_unhashed):
+            unhashed.append(f'fp32/{row["prompt"]}')
     ref = {r['prompt']: r['positions'] for r in fp32_rows}
     if sorted(ref) != sorted(by_source['sglang']):
         raise SystemExit('fp32.jsonl.gz does not cover the same prompts')
@@ -476,6 +499,7 @@ def summary(out: Path) -> dict[str, Any]:
             name: sorted([prompt, position] for prompt, position in found)
             for name, found in event_positions.items()
         },
+        'unhashed_rows_accepted': sorted(unhashed),
         'decision': decide(event_positions),
         'worst': worst,
     }
@@ -509,6 +533,12 @@ def main(argv: list[str] | None = None) -> int:
     m = sub.add_parser('summary')
     m.add_argument('--out', type=Path, required=True)
     m.add_argument('--json', type=Path, required=True)
+    m.add_argument(
+        '--accept-unhashed',
+        action='store_true',
+        help='accept transformers and FP32 rows without a text hash (written before it was '
+        'recorded); only for directories produced once, in order',
+    )
     args = parser.parse_args(argv)
     args.out.mkdir(parents=True, exist_ok=True)
     if args.command == 'prompts':
@@ -525,7 +555,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.threads < 1:
             raise SystemExit('--threads must be positive')
         return fp32(args.out, args.threads)
-    result = summary(args.out)
+    result = summary(args.out, args.accept_unhashed)
     args.json.parent.mkdir(parents=True, exist_ok=True)
     args.json.write_text(json.dumps(result, indent=1) + '\n')
     for path, c in result['counts'].items():
