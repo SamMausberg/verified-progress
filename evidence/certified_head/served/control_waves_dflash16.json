@@ -1,0 +1,40 @@
+{
+ "declared": false,
+ "family": "dflash16",
+ "reading_rule": "64/64 identical: the certified head gives identical tokens under identical batch evolution (the claim check mode makes), not the cause of every timed divergence; any difference: its first divergence is re-scored into the same classes; cert0 (MAX_ROWS=0) differing from stock points to the gated-off path inside the conditional nodes; cert0 equal to stock while cert differs points to the certified ramp-down; all equal points to closed-loop timing in the timed runs",
+ "pairs": {
+  "cert_vs_stock": {
+   "prompts": 64,
+   "identical": 64,
+   "diverged": 0,
+   "length_mismatch": 0,
+   "exposure_tokens": 32768,
+   "first_divergence_median": null,
+   "positions": [],
+   "divergences": []
+  },
+  "cert0_vs_stock": {
+   "prompts": 64,
+   "identical": 64,
+   "diverged": 0,
+   "length_mismatch": 0,
+   "exposure_tokens": 32768,
+   "first_divergence_median": null,
+   "positions": [],
+   "divergences": []
+  },
+  "cert0_vs_cert": {
+   "prompts": 64,
+   "identical": 64,
+   "diverged": 0,
+   "length_mismatch": 0,
+   "exposure_tokens": 32768,
+   "first_divergence_median": null,
+   "positions": [],
+   "divergences": []
+  }
+ },
+ "waves": 8,
+ "wave_size": 8,
+ "osl": 512
+}

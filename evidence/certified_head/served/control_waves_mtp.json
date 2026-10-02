@@ -1,0 +1,20 @@
+{
+ "declared": false,
+ "family": "mtp",
+ "reading_rule": "64/64 identical: the certified head gives identical tokens under identical batch evolution (the claim check mode makes), not the cause of every timed divergence; any difference: its first divergence is re-scored into the same classes",
+ "pairs": {
+  "cert_vs_stock": {
+   "prompts": 64,
+   "identical": 64,
+   "diverged": 0,
+   "length_mismatch": 0,
+   "exposure_tokens": 32768,
+   "first_divergence_median": null,
+   "positions": [],
+   "divergences": []
+  }
+ },
+ "waves": 8,
+ "wave_size": 8,
+ "osl": 512
+}

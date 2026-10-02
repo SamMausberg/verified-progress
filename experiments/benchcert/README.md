@@ -3,7 +3,7 @@
 Hypothesis H4: the certified LM head improves the served latency-throughput frontier
 of the tuned arms without changing their outputs. Everything below was fixed on
 2026-10-02, before any timed run of this campaign; later changes are dated
-amendments at the end. Results go to `evidence/certified_head/served/`.
+amendments at the end. Results: `evidence/certified_head/served/README.md`.
 
 ## What is compared
 
