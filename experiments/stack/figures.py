@@ -390,6 +390,7 @@ def plot_frontier(rows: list[dict[str, str]], full: str, path: Path) -> None:
             fontsize=8,
             color=MUTED,
         )
+    ax.margins(x=0.08)  # room for the c labels at both ends
     ax.set_xlabel('per-user rate x (output tokens/s per request, end to end)')
     ax.set_ylabel('throughput y (output tokens/s on the GPU)')
     ax.set_title(
@@ -588,7 +589,7 @@ def plot_gap(gap: list[dict[str, str]], blocks: list[dict[str, str]], path: Path
     bx.set_xlabel('verify width (tokens per block)')
     bx.set_ylabel('tokens committed per cycle')
     bx.set_title(
-        '(b) Tokens per cycle for 5x: repair Stage A cycles, Triton verify, c = 1\n(derived; open marker: interpolated width)',
+        '(b) Tokens per cycle for 5x (derived)\nrepair Stage A cycles, Triton verify, c = 1; open: interpolated',
         fontsize=9,
     )
     bx.grid(True, color='#d9dde1', linewidth=0.6)

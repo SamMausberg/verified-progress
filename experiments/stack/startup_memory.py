@@ -4,7 +4,8 @@ One row per server launch of the campaign's sessions (and of the equality hold's
 certified-head runs, which ran with smaller pools): free memory when the target loads, the
 GDN state slots and their intermediate (per-position) state cache, the KV pool, free memory
 after the pools, each CUDA graph capture's memory and the memory left after the last
-capture, and, for a server that died, the allocation that failed. SGLang sizes its pools
+capture, and, for a server that died, the allocation that failed and the call chain of the
+exception (the function of each traceback frame). SGLang sizes its pools
 before it captures the graphs, so memory a capture needs beyond the stock amount comes out
 of what the pools left.
 
@@ -49,6 +50,10 @@ def parse(log: str) -> dict[str, Any]:
     row['free_after_captures_gb'] = captures[-1] if captures else ''
     row['certified_head'] = 'Certified LM head on verify' in log
     row['scheduler_exception'] = 'Scheduler hit an exception' in log
+    # The call chain of the scheduler's exception (function names of its traceback frames).
+    tb = log.split('Scheduler hit an exception', 1)[1] if row['scheduler_exception'] else ''
+    tb = tb.split('Error:', 1)[0]
+    row['exception_frames'] = ' > '.join(re.findall(r'File "[^"]+", line \d+, in (\w+)', tb))
     return row
 
 

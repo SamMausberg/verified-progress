@@ -201,6 +201,10 @@ LOG = """\
 [2026-10-02 00:40:07] Capture target verify CUDA graph end. elapsed=6.90 s, mem usage=6.13 GB, avail mem=4.72 GB.
 [2026-10-02 00:40:09] Capture draft verify CUDA graph end. elapsed=1.96 s, mem usage=2.17 GB, avail mem=2.56 GB.
 [2026-10-02 00:40:09] Scheduler hit an exception: Traceback (most recent call last):
+  File "/x/scheduler.py", line 6082, in run_scheduler_process
+    scheduler = Scheduler(server_args, port_args)
+  File "/x/dflash_worker_v2.py", line 795, in prewarm_sampling
+    self._measure_sampling_peak(
 torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 970.00 MiB. GPU 0 has a total capacity of 94.50 GiB of which 676.81 MiB is free. Including
 """
 
@@ -213,8 +217,10 @@ def test_startup_memory_reads_pools_captures_and_the_failed_allocation():
     assert row['verify_graph_gb'] == '6.13' and row['free_after_captures_gb'] == '2.56'
     assert row['oom_alloc_mib'] == '970.00' and row['oom_free_mib'] == '676.81'
     assert row['certified_head'] and row['scheduler_exception']
+    assert row['exception_frames'] == 'run_scheduler_process > prewarm_sampling'
     clean = startup.parse(LOG.split('[2026-10-02 00:40:09] Scheduler')[0])
     assert clean['oom_alloc_mib'] == '' and not clean['scheduler_exception']
+    assert clean['exception_frames'] == ''
 
 
 def test_startup_memory_assigns_runs_to_their_session(tmp_path):

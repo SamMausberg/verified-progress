@@ -455,13 +455,14 @@ interpolated in time to its own launch instead changes no arm's mean ratio by mo
 ### H: not timed alone, a memory cost at full capacity
 
 H alone never served a request. In each session its server ran out of GPU memory during
-start-up, in DFlash's sampling prewarm: a 970 MiB softmax found 551-677 MiB free
-(`startup_memory.csv`, read from each server's log). SGLang sizes its memory pools before
-it captures the CUDA graphs. The certified head's int8 copy (0.64 GB) is allocated before
-the sizing and is accounted for: H's KV pool holds about 296,000 tokens against S0's
-308,000. What the sizing does not see is the head's work buffers inside the 27
-target-verify graphs: their capture took 6.13-6.25 GB against 2.91 GB for S0, about
-3.2 GB more. With the stock verify, which keeps a 48.75 GB intermediate GDN state cache
+start-up, in DFlash's sampling prewarm (`prewarm_sampling`): a 970 MiB softmax found
+551-677 MiB free (`startup_memory.csv`, read from each server's log, with the failing call
+chain). SGLang sizes its memory pools before it captures the CUDA graphs. The certified
+head's int8 copy of the LM head (248,320 x 2,560 bytes, 0.64 GB) is allocated before the
+sizing and is accounted for: H's KV pool holds about 296,000 tokens against S0's 308,000.
+What the sizing does not see is the head's work buffers inside the target-verify graphs
+(batch sizes up to 64 requests of 16 tokens): their capture took 6.13-6.25 GB against
+2.91 GB for S0, about 3.2 GB more. With the stock verify, which keeps a 48.75 GB intermediate GDN state cache
 for its 64 slots, 2.43-2.56 GB remained after all captures (S0: 5.81 GB), too little for
 the prewarm. F removes that cache, so FGH started with 13.4-13.6 GB free after its
 captures. Every server in the sessions started with 93.77-93.78 GB free, so H's failure
