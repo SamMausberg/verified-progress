@@ -1,0 +1,136 @@
+{
+ "verdict": "throughput rejected; output probe found no difference (this does not establish end-to-end exactness; bit-exactness is shown at kernel level)",
+ "throughput_decision": "rejected",
+ "output_probe": {
+  "outcome": "no difference",
+  "exact_first_difference": {
+   "generate": null,
+   "score": null
+  },
+  "control_first_difference": {
+   "generate": null,
+   "score": null
+  }
+ },
+ "provenance": {
+  "run_id": "20261002T084035Z",
+  "repo": "/home/ubuntu/vp-wt/moonshot-p4b",
+  "repo_head": "14c6dd1bde756b0cb01a9aaf3825d5ee16a80192",
+  "engine": "/home/ubuntu/sglang-wt/moonshot",
+  "engine_head": "c29a91692b2f05365c186601c6c61a8e0eb5fc93"
+ },
+ "pairs": [
+  {
+   "pair": "r1",
+   "dense_pools": {
+    "max_running_requests": 129,
+    "max_total_num_tokens": 655360,
+    "max_mamba_cache_size": 132
+   },
+   "dense_server_tps": 11888.522676680434,
+   "dense_windows_at_128": 24,
+   "dense_windows_excluded": 1,
+   "dense_bench_full_batch_tps": 8019.965698175559,
+   "dense_client_y": 7011.622229460871,
+   "exact_pools": {
+    "max_running_requests": 129,
+    "max_total_num_tokens": 655360,
+    "max_mamba_cache_size": 132
+   },
+   "exact_server_tps": 11933.965090373833,
+   "exact_windows_at_128": 24,
+   "exact_windows_excluded": 1,
+   "exact_bench_full_batch_tps": 8033.881108988078,
+   "exact_client_y": 7021.4068845086495,
+   "server_ratio": 1.0038223768359829,
+   "client_ratio": 1.0013954909046108
+  },
+  {
+   "pair": "r2",
+   "dense_pools": {
+    "max_running_requests": 129,
+    "max_total_num_tokens": 655360,
+    "max_mamba_cache_size": 132
+   },
+   "dense_server_tps": 11874.193371769088,
+   "dense_windows_at_128": 24,
+   "dense_windows_excluded": 1,
+   "dense_bench_full_batch_tps": 8010.421312441718,
+   "dense_client_y": 7003.310897296747,
+   "exact_pools": {
+    "max_running_requests": 129,
+    "max_total_num_tokens": 655360,
+    "max_mamba_cache_size": 132
+   },
+   "exact_server_tps": 11924.59848811688,
+   "exact_windows_at_128": 24,
+   "exact_windows_excluded": 1,
+   "exact_bench_full_batch_tps": 8033.842927953245,
+   "exact_client_y": 7014.829074647043,
+   "server_ratio": 1.0042449297202478,
+   "client_ratio": 1.0016446759995679
+  },
+  {
+   "pair": "r3",
+   "dense_pools": {
+    "max_running_requests": 129,
+    "max_total_num_tokens": 655360,
+    "max_mamba_cache_size": 132
+   },
+   "dense_server_tps": 11902.808045311844,
+   "dense_windows_at_128": 24,
+   "dense_windows_excluded": 1,
+   "dense_bench_full_batch_tps": 8017.77242477531,
+   "dense_client_y": 7009.998023372237,
+   "exact_pools": {
+    "max_running_requests": 129,
+    "max_total_num_tokens": 655360,
+    "max_mamba_cache_size": 132
+   },
+   "exact_server_tps": 11939.733995308698,
+   "exact_windows_at_128": 24,
+   "exact_windows_excluded": 1,
+   "exact_bench_full_batch_tps": 8032.203449743809,
+   "exact_client_y": 7018.859126123524,
+   "server_ratio": 1.0031022889604102,
+   "client_ratio": 1.0012640663694545
+  },
+  {
+   "pair": "r4",
+   "dense_pools": {
+    "max_running_requests": 129,
+    "max_total_num_tokens": 655360,
+    "max_mamba_cache_size": 132
+   },
+   "dense_server_tps": 11862.88412645628,
+   "dense_windows_at_128": 24,
+   "dense_windows_excluded": 1,
+   "dense_bench_full_batch_tps": 8013.285772827952,
+   "dense_client_y": 7005.355635430292,
+   "exact_pools": {
+    "max_running_requests": 129,
+    "max_total_num_tokens": 655360,
+    "max_mamba_cache_size": 132
+   },
+   "exact_server_tps": 11928.287274771043,
+   "exact_windows_at_128": 24,
+   "exact_windows_excluded": 1,
+   "exact_bench_full_batch_tps": 8028.892388216903,
+   "exact_client_y": 7014.169828614241,
+   "server_ratio": 1.0055132586323507,
+   "client_ratio": 1.0012582078116592
+  }
+ ],
+ "primary_metric": "server decode rate, windows at exactly 128 running in the measured phase",
+ "server_ratio_mean_ci95": [
+  1.0041703313764354,
+  1.0025620313967398,
+  1.0057812113748665
+ ],
+ "client_y_ratio_mean_ci95": [
+  1.0013905980247328,
+  1.0011028889712243,
+  1.0016783897635482
+ ],
+ "threshold": 1.1
+}
