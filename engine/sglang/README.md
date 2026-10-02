@@ -243,7 +243,7 @@ the DFlash draft block, and, on the tuned MTP arm, in-engine validation and toke
 greedy outputs (`evidence/hostgap/README.md`, hold 4). On DFlash block 8 with FlashInfer draft
 attention it also gave greedy outputs identical to stock with pinned pools (hold 5). With FA4
 draft attention, as in bench's `dflash-tuned`, the drafter's plan does not go through any
-patched path, so the series changes nothing there. To apply:
+patched path, so the series changes nothing there (code reading). To apply:
 
 ```sh
 scripts/sglang_worktree.sh hostgap
