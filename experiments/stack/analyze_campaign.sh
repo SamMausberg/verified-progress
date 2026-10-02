@@ -12,8 +12,9 @@
 #   2. analyze.py, the declared statistics and decision (composition.json, .csv);
 #   3. provenance.py, the checks amendment 1 moved to analysis time (provenance.json);
 #   4. startup_memory.py, each server's start-up memory from its log (startup_memory.csv);
-#   5. figures.py, the figure tables and figures (frontier, ratios, gap, last lever).
-# Steps 1-4 run with the repository venv; step 5 needs matplotlib (SGLang venv). Any
+#   5. phases.py on the equality hold's phase diagnostic (B0 and FG at c = 1 and 8);
+#   6. figures.py, the figure tables and figures (frontier, ratios, gap, last lever).
+# Steps 1-5 run with the repository venv; step 5 needs matplotlib (SGLang venv). Any
 # failing step stops the script with its exit status.
 set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -52,6 +53,9 @@ run "$repo_py" experiments/stack/startup_memory.py --runs-root "$runs" \
   --session-logs "$HOME"/vp-data/stack/session_s*.log \
   --equality "$eq_run" \
   --out "$out/startup_memory.csv"
+for arm in B0 FG; do
+  run "$repo_py" experiments/stack/phases.py "$eq_run/phases_$arm.jsonl" --out "$out/phases_$arm.json"
+done
 run "$sgl_py" experiments/stack/figures.py --points "$out/points.csv" \
   --composition "$out/composition.json" --expected evidence/stack/expected.json \
   --ceiling evidence/stack/ceiling.json --frame evidence/frontier/frame.json --out-dir "$out"
