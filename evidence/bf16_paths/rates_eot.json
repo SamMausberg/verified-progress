@@ -55,6 +55,8 @@
     "after_eot": 14
    },
    "fp32_top1_logprob_abs_diff": {
+    "complete": true,
+    "outside_top20": 0,
     "positions": 9216,
     "mean": 0.00388,
     "p99": 0.04637,
@@ -87,6 +89,8 @@
     "after_eot": 23
    },
    "fp32_top1_logprob_abs_diff": {
+    "complete": true,
+    "outside_top20": 0,
     "positions": 9216,
     "mean": 0.00447,
     "p99": 0.04781,
@@ -119,6 +123,8 @@
     "after_eot": 14
    },
    "fp32_top1_logprob_abs_diff": {
+    "complete": true,
+    "outside_top20": 0,
     "positions": 9216,
     "mean": 0.00438,
     "p99": 0.05272,
@@ -151,6 +157,8 @@
     "after_eot": 16
    },
    "fp32_top1_logprob_abs_diff": {
+    "complete": true,
+    "outside_top20": 0,
     "positions": 9216,
     "mean": 0.00486,
     "p99": 0.0497,
@@ -183,6 +191,8 @@
     "after_eot": 14
    },
    "fp32_top1_logprob_abs_diff": {
+    "complete": true,
+    "outside_top20": 0,
     "positions": 9216,
     "mean": 0.00415,
     "p99": 0.05329,
@@ -215,6 +225,8 @@
     "after_eot": 18
    },
    "fp32_top1_logprob_abs_diff": {
+    "complete": true,
+    "outside_top20": 0,
     "positions": 9216,
     "mean": 0.00468,
     "p99": 0.04998,
