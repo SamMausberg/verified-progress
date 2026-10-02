@@ -117,11 +117,14 @@ def engine_gate(bs: int, eligible: bool = True, max_rows: int = MAX_ROWS) -> boo
 def drain_steps(
     records: Iterable[dict[str, Any]], tail_from: int = 60, lead: int = 64
 ) -> list[Step]:
-    """The first c = 64 point's verify sequence from a ``certlog`` replay log: ``lead``
+    """The c = 64 point's verify sequence from a ``certlog`` replay log (its longest point,
+    not the warmup burst that also reaches the size): ``lead``
     steady steps before the drain, then the drain from the last step with at least
     ``tail_from`` requests to the end of the point. The gate is the one the log recorded,
     checked against ``engine_gate``."""
-    replays = [r for r in records if r.get('kind') == 'replay' and r.get('path') == 'verify']
+    # Every replay record is a target verify; 'path' names the certified path and is
+    # None when the gate was off, so it does not select verify replays.
+    replays = [r for r in records if r.get('kind') == 'replay']
     points: list[list[dict[str, Any]]] = []
     for r in replays:
         if points and points[-1] and r['t'] - points[-1][-1]['t'] > 0.5:
@@ -132,7 +135,7 @@ def drain_steps(
     full = [p for p in points if max(r['batch_size'] for r in p) >= tail_from]
     if not full:
         raise ValueError('no point reaches the drain size')
-    point = full[0]
+    point = max(full, key=len)  # the measured point, not the short warmup burst
     start = max(i for i, r in enumerate(point) if r['batch_size'] >= tail_from)
     steps = []
     for r in point[max(0, start - lead) :]:
@@ -344,6 +347,69 @@ def fetch(out: Path, contexts: Path | None) -> int:
 
 
 # -- GPU ---------------------------------------------------------------------------------
+
+
+def segment_pool(snapshot: dict[str, Any], ptr: int) -> list[int] | None:
+    """The memory pool (segment_pool_id) owning device address ``ptr``; (0, 0) is the
+    general caching allocator, a graph's private pool has another id."""
+    for seg in snapshot['segments']:
+        if seg['address'] <= ptr < seg['address'] + seg['total_size']:
+            return list(seg['segment_pool_id'])
+    return None
+
+
+def probe_minimal() -> dict[str, Any]:
+    """Where an allocation on the capture stream after a conditional node lands, and
+    whether an eager tensor allocated after capture can share its memory.
+
+    A graph is captured into a private pool: a temporary allocated before an if-node, a
+    small allocation inside the node, then a temporary of size S allocated after the node
+    and freed before the capture ends. Before the capture a block of size S is freed into
+    the general allocator, so a post-node allocation that the general allocator serves
+    takes it. After the capture an eager tensor of size S is allocated and zeroed, the
+    graph is replayed (it writes 3s into its post-node temporary), and the eager tensor is
+    checked."""
+    import torch
+    from torch._higher_order_ops.cudagraph_conditional_nodes import _if_body
+
+    dev = torch.device('cuda')
+    size = 37 * 1024 * 1024 + 4096
+    pred = torch.ones((), dtype=torch.bool, device=dev)
+    primer = torch.empty(size, dtype=torch.uint8, device=dev)
+    primer_ptr = primer.data_ptr()
+    del primer
+    torch.cuda.synchronize()
+    pool = torch.cuda.graph_pool_handle()
+    stream = torch.cuda.Stream()
+    g = torch.cuda.CUDAGraph()
+    ptrs: dict[str, int] = {}
+    with torch.cuda.graph(g, pool=pool, stream=stream):
+        before = torch.empty(size, dtype=torch.uint8, device=dev)
+        before.fill_(1)
+        ptrs['before_node'] = before.data_ptr()
+        with _if_body(pred):
+            inside = torch.empty(4096, dtype=torch.uint8, device=dev)
+            inside.fill_(2)
+            ptrs['inside_node'] = inside.data_ptr()
+        after = torch.empty(size, dtype=torch.uint8, device=dev)
+        after.fill_(3)
+        ptrs['after_node'] = after.data_ptr()
+        del before, inside, after
+    torch.cuda.synchronize()
+    snap = torch.cuda.memory._snapshot()
+    result: dict[str, Any] = {
+        'graph_pool': list(pool),
+        'pools': {k: segment_pool(snap, v) for k, v in ptrs.items()},
+        'after_node_took_freed_general_block': ptrs['after_node'] == primer_ptr,
+    }
+    eager = torch.zeros(size, dtype=torch.uint8, device=dev)
+    result['eager_shares_after_node_memory'] = eager.data_ptr() == ptrs['after_node']
+    g.replay()
+    torch.cuda.synchronize()
+    result['eager_overwritten_by_replay'] = bool((eager != 0).any())
+    del eager, g
+    torch.cuda.synchronize()
+    return result
 
 
 class Rig:
@@ -649,6 +715,30 @@ class Rig:
     def argmax_stock(self, h: Any) -> Any:
         return self.torch.matmul(h, self.weight.T).argmax(-1)
 
+    def alloc_sentinels(self, which: range | None = None) -> None:
+        """Long-lived eager tensors allocated after capture (the engine allocates per-batch
+        and per-request state after its graphs are captured), filled with a pattern whose
+        sum is kept: a graph replay that writes a temporary into their memory changes it."""
+        torch = self.torch
+        sizes = [4 << 10, 64 << 10, 1 << 20, 4 << 20, 16 << 20, 64 << 20]
+        if which is None:
+            self.sentinels: list[tuple[Any, Any]] = [None] * (6 * len(sizes))  # type: ignore[list-item]
+            which = range(len(self.sentinels))
+        for i in which:
+            n = sizes[i % len(sizes)] // 4
+            t = torch.randint(-(2**30), 2**30, (n,), dtype=torch.int32, device=self.dev)
+            self.sentinels[i] = (t, t.to(torch.int64).sum())
+
+    def check_sentinels(self) -> list[dict[str, Any]]:
+        """Sentinels whose sum changed (one host read of all sums)."""
+        torch = self.torch
+        now = torch.stack([t.to(torch.int64).sum() for t, _ in self.sentinels])
+        ref = torch.stack([s for _, s in self.sentinels])
+        bad = (now != ref).nonzero().flatten().tolist()
+        return [
+            {'kind': 'sentinel', 'index': i, 'bytes': self.sentinels[i][0].numel() * 4} for i in bad
+        ]
+
     def audit(self, s: int, full: Any, r: int) -> None:
         """Envelope containment against the stock logits of the same batch (device ops).
 
@@ -921,6 +1011,17 @@ class Rig:
         return out
 
 
+def sentinels(rig: Rig, totals: dict[str, Any]) -> list[dict[str, Any]]:
+    """Check the long-lived sentinels after a chunk, then reallocate half of them (eager
+    state is allocated and freed between batches in the engine too)."""
+    found = rig.check_sentinels()
+    totals['sentinel_checks'] += len(rig.sentinels)
+    totals['sentinel_corrupt'] += len(found)
+    half = totals['sentinel_checks'] // len(rig.sentinels) % 2
+    rig.alloc_sentinels(range(half, len(rig.sentinels), 2))
+    return found
+
+
 def stress(out: Path, replay: Path, seconds: float, seed: int, n_real: int, n_ties: int) -> int:
     import torch
 
@@ -928,6 +1029,12 @@ def stress(out: Path, replay: Path, seconds: float, seed: int, n_real: int, n_ti
     records = [json.loads(line) for line in replay.read_text().splitlines() if line.strip()]
     drain = drain_steps(records)
     synthetic = synthetic_steps()
+    try:
+        minimal = probe_minimal()
+    except Exception as exc:  # recorded; the stress run goes on
+        minimal = {'error': repr(exc)}
+    (out / 'probe_minimal.json').write_text(json.dumps(minimal, indent=1) + '\n')
+    print(f'probe_minimal: {json.dumps(minimal)}', flush=True)
     rig = Rig(out, seed)
     context_bits = out / 'context_hidden_bits.npy'
     pools = rig.build_pools(context_bits if context_bits.exists() else None, n_real, n_ties)
@@ -935,6 +1042,7 @@ def stress(out: Path, replay: Path, seconds: float, seed: int, n_real: int, n_ti
         raise SystemExit('no column-fallback rows in the pool')
     rig.capture()
     rig.alloc_log()
+    rig.alloc_sentinels()
     totals: dict[str, Any] = {
         'steps': 0,
         'by_mode': {},
@@ -959,6 +1067,8 @@ def stress(out: Path, replay: Path, seconds: float, seed: int, n_real: int, n_ti
         'extend_rows': 0,
         'gate_toggles': 0,
         'iterations': 0,
+        'sentinel_checks': 0,
+        'sentinel_corrupt': 0,
     }
     mismatches = out / 'mismatches.jsonl'
     mismatches.write_text('')
@@ -978,7 +1088,7 @@ def stress(out: Path, replay: Path, seconds: float, seed: int, n_real: int, n_ti
                 previous = step
                 chunk.append(rig.run_step(len(chunk), step, pools))
                 if len(chunk) == CHUNK:
-                    found = rig.check_chunk(chunk, totals, done)
+                    found = rig.check_chunk(chunk, totals, done) + sentinels(rig, totals)
                     done += len(chunk)
                     chunk = []
                     problems_total += len(found)
@@ -986,7 +1096,7 @@ def stress(out: Path, replay: Path, seconds: float, seed: int, n_real: int, n_ti
                         for p in found:
                             handle.write(json.dumps(p) + '\n')
             if chunk:
-                found = rig.check_chunk(chunk, totals, done)
+                found = rig.check_chunk(chunk, totals, done) + sentinels(rig, totals)
                 done += len(chunk)
                 problems_total += len(found)
                 with mismatches.open('a') as handle:

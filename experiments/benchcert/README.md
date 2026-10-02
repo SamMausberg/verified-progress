@@ -604,25 +604,30 @@ verify head runs at position 439.
 - The servers run `mtp-tuned-triton` at the timed pools (exclusive for memory, no timing
   reported; the arm runs with the radix cache off), stock or in the timed certified
   environment. The cache is flushed before every wave, as the timed points flush it.
-- 150 waves are drawn once from a fixed seed and served by both arms in four blocks: stock,
-  certified, certified with the device ring (so an event can be read at once), stock.
-  Each block is a fresh server serving half of the waves; a 1.5 s pause after each wave
-  lets the ring write.
+- 100 waves are drawn once from a fixed seed and served by three arms in six blocks: stock,
+  cert0, certified, certified with the device ring (so an event can be read at once),
+  cert0, stock. cert0 is the certified environment with `MAX_ROWS=0`: the certified graphs
+  and conditional nodes, with the head never running; h7 saw the event twice in 12 cert0
+  draws. Each block is a fresh server serving half of the waves; a 1.5 s pause after each
+  wave lets the ring write.
 - Estimate: about 4 s per wave plus the pause and the flush, and 1-1.5 min per server
-  start: about 35 min in all.
+  start: about 38 min in all.
 
 Reading rule, set before the run (main's, with the red team's counts), over the waves
-whose output reaches position 439 with session 1's prefix:
+whose output reaches position 439 with session 1's prefix; cert0 and certified are each
+compared with stock:
 
 - any 1756 in the stock arm: the stock engine can produce it there (fragile numerics at a
   near tie);
-- 5 or more events, all or nearly all certified, with a one-sided conditional binomial
-  p < 0.05 against an equal split: a bug of the certified engine at this context;
+- 5 or more events in a certified-graph arm, with a one-sided conditional binomial
+  p < 0.05 against an equal split with stock: a fault of that configuration at this
+  context (for cert0, of the certified integration without the head's decision);
 - anything else: inconclusive, reported as counts.
 
-Power: at the timed drains' rate (2 events in 14 certified draws that reached the context)
-the certified arm would expect about 17 events, enough to reach the bug threshold; at a
-per-draw rate of 3-5% it would expect about 4-7, so a null is likely and decides little.
+Power: at the timed drains' rate (2 events in 14 draws that reached the context) an arm
+would expect about 11 events in 100 waves; at a per-draw rate of 3-5% it would expect 3-4,
+so a null is likely and decides little. The first submission (four blocks, 150 waves,
+without cert0) was stopped after its first block to add cert0.
 
 ## Hold commit
 

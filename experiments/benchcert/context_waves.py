@@ -21,17 +21,22 @@ before 579ae7ce; the other waves exclude it, and the two strata are reported apa
 Servers run `mtp-tuned-triton` at the timed pools (128 running requests, 128 mamba slots,
 1,000,000 KV tokens; the arm runs with the radix cache off), stock or in the timed runs'
 certified environment, and the cache is flushed before every wave, as the timed points
-flush it. The waves are drawn once from a fixed seed; the arms serve them in four blocks,
-stock, certified, certified with the device ring (replay_hook/benchcert_ring.py), stock,
-each block a fresh server serving half of the waves, so both arms serve the same waves.
+flush it. The waves are drawn once from a fixed seed and served by three arms in six blocks: stock,
+cert0 (the certified graphs and conditional nodes with MAX_ROWS=0, so the head never
+runs), certified, certified with the device ring (replay_hook/benchcert_ring.py), cert0,
+stock; each block is a fresh server serving half of the waves, so every arm serves the
+same waves.
 
 Reading rule (set before the run; main's, with the red team's counts), over the waves
-whose 579ae7ce output reaches position 439 with session 1's prefix: any 1756 in the stock
-arm means the token is shared with the stock engine (fragile numerics at a near tie); 5
-or more events, all or nearly all certified, with a one-sided conditional binomial
-p < 0.05 for an equal split, mean a bug of the certified engine at this context; anything
-else is inconclusive and reported as counts. Power: at a per-draw rate of 3-5%, 150 waves
-per arm expect about 4-7 events, so a null is likely and decides little.
+whose 579ae7ce output reaches position 439 with session 1's prefix. Each of cert0 and
+cert is compared with stock: any 1756 in the stock arm means the token is shared with the
+stock engine (fragile numerics at a near tie); 5 or more events in a certified-graph arm,
+with a one-sided conditional binomial p < 0.05 against an equal split with stock, mean a
+fault of that configuration at this context (in cert0, of the certified integration
+without the head's decision); anything else is inconclusive and reported as counts.
+Power: at the timed drains' rate (2 events in 14 draws that reached the context) an arm
+would expect about 11 events in 100 waves; at 3-5% per draw, 3-4, so a null is likely
+and decides little.
 """
 
 from __future__ import annotations
@@ -52,7 +57,7 @@ from experiments.benchcert.rescore import stop as stop_server
 
 PORT = 30083
 SEED = 20261002
-WAVES = 150  # per arm
+WAVES = 100  # per arm
 SIZES = (8, 16)  # wave size range, inclusive
 STAGGER_S = 2.0
 OSL = 512
@@ -60,7 +65,14 @@ TARGET, POSITION, WRONG = '579ae7ce', 439, 1756
 PARTNER = 'session_000527'  # emits 1756 legitimately; finished just before the event
 PARTNER_LEAD_S = (0.5, 1.5)
 PAUSE_S = 1.5  # after each wave: the ring writes after a second without a verify
-BLOCKS = (('stock', 0), ('cert', 0), ('certring', 1), ('stock', 1))  # (variant, half)
+# (variant, half of the waves); arms: stock, cert0 (the certified graphs with MAX_ROWS=0:
+# the head never runs), cert (one half plain, one half with the device ring).
+BLOCKS = (('stock', 0), ('cert0', 0), ('cert', 0), ('certring', 1), ('cert0', 1), ('stock', 1))
+ARMS = {
+    'stock': (('stock', 0), ('stock', 1)),
+    'cert0': (('cert0', 0), ('cert0', 1)),
+    'cert': (('cert', 0), ('certring', 1)),
+}
 HOOK_DIR = Path(__file__).resolve().parent / 'replay_hook'
 
 
@@ -187,9 +199,8 @@ def start(block: Path, variant: str) -> int:
     from bench.server import Server
     from experiments.benchcert import plan
 
-    env = control_waves.variant_env(
-        'mtp64', 'stock' if variant == 'stock' else 'cert', block / 'certified_stats.json'
-    )
+    base = {'stock': 'stock', 'cert0': 'cert0'}.get(variant, 'cert')
+    env = control_waves.variant_env('mtp64', base, block / 'certified_stats.json')
     if variant == 'certring':
         env['PYTHONPATH'] = str(HOOK_DIR)
         env['BENCHCERT_RING'] = str(block / 'ring')
@@ -225,7 +236,7 @@ def compare(out: Path, runs: Path) -> int:
     ref = record['output']
     rule = (__doc__ or '').split('Reading rule')[1].strip()
     summary: dict[str, Any] = {'declared': False, 'reading_rule': rule}
-    for arm, blocks in (('stock', (('stock', 0), ('stock', 1))), ('cert', (('cert', 0), ('certring', 1)))):
+    for arm, blocks in ARMS.items():
         strata: dict[str, dict[str, int]] = {'with_partner': {}, 'without_partner': {}}
         for variant, half in blocks:
             path = block_dir(out, variant, half) / 'waves.jsonl'
@@ -255,7 +266,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest='command', required=True)
     for name in ('start', 'waves', 'stop'):
         p = sub.add_parser(name)
-        p.add_argument('--variant', choices=('stock', 'cert', 'certring'), required=True)
+        p.add_argument('--variant', choices=('stock', 'cert', 'cert0', 'certring'), required=True)
         p.add_argument('--out', type=Path, required=True)
         p.add_argument('--runs', type=Path, default=Path.home() / 'vp-data/benchcert')
         p.add_argument('--block', type=int, choices=(0, 1), required=True)
