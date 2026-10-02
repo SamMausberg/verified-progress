@@ -495,6 +495,65 @@ def score(out: Path, runs: Path, url: str, workers: int) -> int:
     return 0
 
 
+def target_record(point_dir: Path) -> dict[str, Any] | None:
+    """The target prompt's output ids and per-request speculative statistics in one point."""
+    raw = point_dir / 'aiperf/profile_export_raw.jsonl.gz'
+    with gzip.open(raw, 'rt') as handle:
+        for line in handle:
+            record = json.loads(line)
+            if record.get('metadata', {}).get('benchmark_phase') != 'profiling':
+                continue
+            messages = record.get('payload', {}).get('messages') or [{}]
+            if not prompt_hash(messages[-1].get('content', '')).startswith(TARGET[0]):
+                continue
+            found: dict[str, Any] = {}
+            for response in record.get('responses', []):
+                for packet in response.get('packets', []):
+                    value = packet.get('value')
+                    if isinstance(value, str) and value.startswith('{') and 'sglext' in value:
+                        ext = json.loads(value).get('sglext') or {}
+                        if ext.get('output_ids'):
+                            found['output'] = list(ext['output_ids'][0])
+                        if ext.get('spec_tokens_details'):
+                            found['spec'] = ext['spec_tokens_details']
+            return found
+    return None
+
+
+def target_rows(out: Path, runs: Path) -> list[dict[str, Any]]:
+    """579ae7ce in every MTP c = 64 point: the token at position 439, where its output first
+    differs from session 1's certified run, and the request's verify statistics."""
+    prompt, position, _ = TARGET
+    points = [(n, p) for n, p in point_dirs(out, runs) if p.name == f'c{TOP:03d}']
+    points = [(n, p) for n, p in points if n.startswith((HOLD, *plan.DECISION_SESSIONS))]
+    points = [(n, p) for n, p in points if FAMILY.arm in n or n.startswith(HOLD)]
+    records = {name: target_record(point) for name, point in points}
+    reference = records[f's1/{FAMILY.cert_label}/c064']
+    assert reference is not None
+    ref = reference['output']
+    rows = []
+    for name, record in records.items():
+        if record is None or 'output' not in record:
+            continue
+        output, spec = record['output'], record.get('spec') or {}
+        first = next((i for i, (a, b) in enumerate(zip(output, ref, strict=False)) if a != b), None)
+        rows.append(
+            {
+                'point': name,
+                'prompt': prompt,
+                'token_at_439': output[position],
+                'first_difference_from_s1_certified': first,
+                'same_prefix_through_438': first is None or first >= position,
+                'verify_count': spec.get('spec_verify_ct'),
+                'correct_drafts': spec.get('spec_num_correct_drafts'),
+                'correct_drafts_histogram': ' '.join(
+                    str(v) for v in spec.get('spec_correct_drafts_histogram') or []
+                ),
+            }
+        )
+    return rows
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if argv[:1] == ['sweep']:
@@ -508,6 +567,10 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument('--dry-run', action='store_true', help='print the command only')
     for name in ('start', 'stop'):
         sub.add_parser(name).add_argument('--out', type=Path, required=True)
+    t = sub.add_parser('target', help='write the 579ae7ce table (CSV) for every MTP c = 64 point')
+    t.add_argument('--out', type=Path, required=True, help='the drain output directory')
+    t.add_argument('--runs', type=Path, default=Path.home() / 'vp-data/benchcert')
+    t.add_argument('--csv', type=Path, required=True)
     s = sub.add_parser('score')
     s.add_argument('--out', type=Path, required=True)
     s.add_argument('--runs', type=Path, default=Path.home() / 'vp-data/benchcert')
@@ -524,6 +587,11 @@ def main(argv: list[str] | None = None) -> int:
         return start(args.out)
     if args.command == 'stop':
         return stop_server(args.out)
+    if args.command == 'target':
+        from experiments.benchcert.analyze import write_csv
+
+        write_csv(target_rows(args.out, args.runs), args.csv)
+        return 0
     return score(args.out, args.runs, args.url, args.workers)
 
 
