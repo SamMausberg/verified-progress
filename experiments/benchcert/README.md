@@ -585,6 +585,45 @@ report at batch 1 with the top 5. A run with no mismatch rules out a fault of th
 and its fallbacks under graph replay for these inputs and sizes. It does not rule out
 one that needs the engine's own surrounding graph or the scheduler.
 
+## Context waves (not declared; approved by main 2026-10-02, after the stress test)
+
+    GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x experiments/benchcert/hold_context_waves.sh
+
+Can 579ae7ce's context alone, served in small batches, produce 1756 at position 439?
+`context_waves.py` serves it in waves of B requests, with B drawn from 8 to 16. Each wave
+pairs 579ae7ce with B - 1 neighbours drawn from the other 511 measured prompts of the
+c = 64 point. Every request sends the chat-templated prompt ids that session 1's stock run
+recorded (its sglext `input_ids`) as its own `/generate` call (512 greedy tokens,
+`ignore_eos`), started after a random delay of up to 2 s. The batch never exceeds 16
+requests, so every verify has at most 64 rows, and in the certified arm the certified
+verify head runs at position 439.
+
+- Every other wave also holds `session_000527`, which emits 1756 legitimately and finished
+  about 0.85 s before 579ae7ce's position 439 in the drain, started 0.5-1.5 s before
+  579ae7ce; the other waves exclude it, and the two strata are reported apart.
+- The servers run `mtp-tuned-triton` at the timed pools (exclusive for memory, no timing
+  reported; the arm runs with the radix cache off), stock or in the timed certified
+  environment. The cache is flushed before every wave, as the timed points flush it.
+- 150 waves are drawn once from a fixed seed and served by both arms in four blocks: stock,
+  certified, certified with the device ring (so an event can be read at once), stock.
+  Each block is a fresh server serving half of the waves; a 1.5 s pause after each wave
+  lets the ring write.
+- Estimate: about 4 s per wave plus the pause and the flush, and 1-1.5 min per server
+  start: about 35 min in all.
+
+Reading rule, set before the run (main's, with the red team's counts), over the waves
+whose output reaches position 439 with session 1's prefix:
+
+- any 1756 in the stock arm: the stock engine can produce it there (fragile numerics at a
+  near tie);
+- 5 or more events, all or nearly all certified, with a one-sided conditional binomial
+  p < 0.05 against an equal split: a bug of the certified engine at this context;
+- anything else: inconclusive, reported as counts.
+
+Power: at the timed drains' rate (2 events in 14 certified draws that reached the context)
+the certified arm would expect about 17 events, enough to reach the bug threshold; at a
+per-draw rate of 3-5% it would expect about 4-7, so a null is likely and decides little.
+
 ## Hold commit
 
 Every hold runs from a clean checkout at the commit recorded here; `run_session.py`

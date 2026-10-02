@@ -589,14 +589,95 @@ def write_csv(rows: list[dict[str, Any]], path: Path, fields: Iterable[str] | No
             writer.writerow(row)
 
 
+EOT_ID = 248044  # <|endoftext|> (config.json eos_token_id; checked against 579ae7ce's output)
+
+
+def eot_split(out: Path, runs: Path, eot: int = EOT_ID) -> list[dict[str, Any]]:
+    """Near and gross events before and after each request's first <|endoftext|>, per
+    group, family and variant. Both gross contexts follow an end of turn that the
+    ignore_eos runs decode past (the model then regenerates a prompt)."""
+    acc: dict[tuple[Any, ...], dict[str, int]] = {}
+    for name, point in point_dirs(out, runs):
+        path = score_file(out, name)
+        if not path.exists():
+            continue
+        records = read_jsonl(path)
+        items = timeline(point)
+        if len(items) != len(records):
+            continue
+        d = describe(name)
+        key = (d['group'], d['family'], d['variant'])
+        bucket = acc.setdefault(key, {})
+        for item, rec in zip(items, records, strict=True):
+            if 'error' in rec:
+                continue
+            output = item.get('output') or []
+            first = output.index(eot) if eot in output else len(output)
+            bucket['positions_before'] = bucket.get('positions_before', 0) + min(first, 512)
+            bucket['positions_after'] = bucket.get('positions_after', 0) + max(0, 512 - first)
+            for entry in rec.get('disagree', []):
+                value = gap(entry)
+                kind = gap_class(value)
+                if kind in ('near', 'gross'):
+                    side = 'before' if entry['position'] < first else 'after'
+                    bucket[f'{kind}_{side}'] = bucket.get(f'{kind}_{side}', 0) + 1
+    return [
+        {'group': k[0], 'family': k[1], 'variant': k[2], **v} for k, v in sorted(acc.items(), key=str)
+    ]
+
+
+def companions(out: Path, runs: Path) -> list[dict[str, Any]]:
+    """The requests in flight (client view) when 579ae7ce's position-439 token arrived, in
+    every MTP c = 64 point whose output reached that position with session 1's prefix."""
+    from experiments.benchcert.drain import target_record
+
+    names = [(n, p) for n, p in point_dirs(out, runs) if n.endswith(f'c{TOP:03d}')]
+    names = [(n, p) for n, p in names if describe(n)['family'] == 'mtp']
+    control = next(p for n, p in names if n.startswith('s1/') and describe(n)['variant'] == 'cert')
+    ref = (target_record(control) or {}).get('output') or []
+    rows = []
+    for name, point in names:
+        items = timeline(point)
+        target = next(
+            (i for i in items if i['phase'] == 'profiling' and i['prompt'].startswith(TARGET[0])), None
+        )
+        if target is None or 'output' not in target or target['output'][:TARGET[1]] != ref[:TARGET[1]]:
+            continue
+        t = arrival(target, TARGET[1])
+        if t is None:
+            continue
+        flying = sorted(
+            f'{i["phase"]}:{i["prompt"]}'
+            for i in items
+            if i is not target and i.get('start') is not None and i.get('end') is not None
+            and i['start'] <= t <= i['end']
+        )
+        rows.append(
+            {
+                'point': name,
+                **describe(name),
+                'token_at_439': target['output'][TARGET[1]],
+                'in_flight_others': flying,
+            }
+        )
+    events = [set(r['in_flight_others']) for r in rows if r['token_at_439'] == TARGET[2]]
+    for r in rows:
+        mine = set(r['in_flight_others'])
+        r['overlap_with_events'] = [len(mine & e) for e in events]
+        r['same_set_as_an_event'] = any(mine == e for e in events)
+    return rows
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     sub = parser.add_subparsers(dest='command', required=True)
-    for command in ('summarize', 'report'):
+    for command in ('summarize', 'report', 'context'):
         p = sub.add_parser(command)
         p.add_argument('--out', type=Path, required=True, help='the drain output directory')
         p.add_argument('--runs', type=Path, default=Path.home() / 'vp-data/benchcert')
     sub.choices['summarize'].add_argument('--csv', type=Path, required=True)
+    sub.choices['context'].add_argument('--json', type=Path, required=True)
+    sub.choices['context'].add_argument('--eot', type=int, default=EOT_ID)
     r = sub.choices['report']
     r.add_argument('--json', type=Path, required=True)
     r.add_argument('--events', type=Path, help='also write the gross events as CSV')
@@ -605,6 +686,17 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == 'summarize':
         write_csv(summarize(args.out, args.runs), args.csv)
+        return 0
+    if args.command == 'context':
+        result = {
+            'eot_id': args.eot,
+            'eot_split': eot_split(args.out, args.runs, args.eot),
+            'companions_at_439': companions(args.out, args.runs),
+        }
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(json.dumps(result, indent=1) + '\n')
+        for row in result['companions_at_439']:
+            print(row['point'], row['token_at_439'], len(row['in_flight_others']), row['overlap_with_events'])
         return 0
     result = report(args.out, args.runs, args.contexts, args.rescored)
     args.json.parent.mkdir(parents=True, exist_ok=True)

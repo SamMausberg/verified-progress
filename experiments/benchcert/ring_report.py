@@ -395,7 +395,32 @@ def pass_times(launch_dir: Path) -> list[dict[str, Any]]:
     return out
 
 
-def report(out: Path, runs: Path) -> dict[str, Any]:
+def z_ref(hidden_bits: Path, tokens: tuple[int, ...]) -> dict[int, float]:
+    """FP64 logits of ``tokens`` for 579ae7ce's batch-1 hidden state at position 439 (the
+    stress hold's return_hidden_states pull; BF16 bits, one row per output position).
+    Needs torch and the model files (the SGLang environment)."""
+    from experiments.head_geometry.replay_data import load_head
+
+    bits = np.load(hidden_bits)[POSITION]
+    h = (bits.astype(np.uint32) << 16).view(np.float32).astype(np.float64)
+    w = load_head('qwen3.5-4b')
+    rows = w[list(tokens)].float().numpy().astype(np.float64)
+    return {t: float(rows[i] @ h) for i, t in enumerate(tokens)}
+
+
+def drift(state: dict[str, Any] | None, ref: dict[int, float]) -> dict[str, Any] | None:
+    """The refined bounds of the near-tied tokens and 1756 minus their batch-1 logits."""
+    if state is None:
+        return None
+    out = {}
+    for t, z in ref.items():
+        if t in state['cand']:
+            j = state['cand'].index(t)
+            out[str(t)] = [round(state['rlo'][j] - z, 4), round(state['rhi'][j] - z, 4)]
+    return out
+
+
+def report(out: Path, runs: Path, hidden_bits: Path | None = None) -> dict[str, Any]:
     ref = reference_output(runs)
     s1 = next(p for n, p in drain.point_dirs(out, runs) if n.startswith('s1/'))
     prompt_len = len(
@@ -409,6 +434,12 @@ def report(out: Path, runs: Path) -> dict[str, Any]:
     for name, launch in drain.LAUNCHES.items():
         if launch.variant == 'certring' and (out / name / 'ring').exists():
             launches[name] = launch_report(name, out, ref, prompt_len)
+    zr = None
+    if hidden_bits is not None and hidden_bits.exists():
+        zr = z_ref(hidden_bits, (*NEAR_TIE, WRONG))
+        for entry in launches.values():
+            for step in entry['target_steps']:
+                step['drift_vs_batch1'] = drift(step['state'], zr)
     timing = {}
     for name, launch in drain.LAUNCHES.items():
         if launch.hold in ('h6a', 'h7a', 'h7b') and (out / name).exists():
@@ -418,7 +449,12 @@ def report(out: Path, runs: Path) -> dict[str, Any]:
                 'c64': pass_times(out / name),
                 'graph_check': [json.loads(c.read_text())['problems'] for c in checks],
             }
-    return {'prompt_len': prompt_len, 'launches': launches, 'pass_ms_c64': timing}
+    return {
+        'prompt_len': prompt_len,
+        'z_ref_batch1': None if zr is None else {str(k): v for k, v in zr.items()},
+        'launches': launches,
+        'pass_ms_c64': timing,
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -427,8 +463,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--runs', type=Path, default=Path.home() / 'vp-data/benchcert')
     parser.add_argument('--json', type=Path, required=True)
     parser.add_argument('--csv', type=Path, help="579ae7ce's position-439 rows as CSV")
+    parser.add_argument(
+        '--hidden', type=Path, help="579ae7ce's batch-1 hidden states (fallback_stress fetch)"
+    )
     args = parser.parse_args(argv)
-    result = report(args.out, args.runs)
+    result = report(args.out, args.runs, args.hidden)
     args.json.parent.mkdir(parents=True, exist_ok=True)
     args.json.write_text(json.dumps(result, indent=1) + '\n')
     rows = []

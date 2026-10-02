@@ -106,3 +106,32 @@ def test_gate_off_steps_are_not_read_and_gate_mismatch_is_counted() -> None:
     t = rr.consistency(a, records)['totals']
     assert t['certified_steps'] == 1 and t['gate_differs_from_host'] == 1
     assert t['valid_differs_from_rows'] == 1 and t['id_not_in_cand'] == 1
+
+
+def test_context_waves_are_fixed_small_and_split_between_blocks() -> None:
+    from experiments.benchcert import context_waves as cw
+
+    keys = [f'{i:016x}' for i in range(511)] + [cw.TARGET + '0' * 8]
+    partner = 7
+    waves = cw.plan_waves(keys, partner)
+    assert waves == cw.plan_waves(keys, partner) and len(waves) == cw.WAVES
+    target = len(keys) - 1
+    for wave in waves:
+        assert cw.SIZES[0] <= wave['size'] <= cw.SIZES[1] == 16
+        assert wave['members'][0] == target and len(set(wave['members'])) == wave['size']
+        assert all(0 <= d <= cw.STAGGER_S for d in wave['delays'])
+        if wave['partner']:
+            assert wave['members'][1] == partner
+            lead = wave['delays'][0] - wave['delays'][1]
+            assert cw.PARTNER_LEAD_S[0] - 1e-3 <= lead <= cw.PARTNER_LEAD_S[1] + 1e-3
+        else:
+            assert partner not in wave['members']
+    assert sum(w['partner'] for w in waves) == cw.WAVES // 2
+    halves = cw.block_waves(waves, 0) + cw.block_waves(waves, 1)
+    assert halves == waves
+    ref = list(range(600))
+    assert cw.classify(None, ref) == 'incomplete'
+    assert cw.classify(ref[:400], ref) == 'incomplete'
+    assert cw.classify([*ref[:439], cw.WRONG, *ref[440:512]], ref) == 'wrong'
+    assert cw.classify([*ref[:439], 68189], ref) == '68189'
+    assert cw.classify([7, *ref[1:512]], ref) == 'other_prefix'
