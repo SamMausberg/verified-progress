@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'experiments' / 'state_safety'))
 
-from compare_prefill import drift_buckets
+from compare_prefill import alignment_check, drift_buckets
 
 SAME = [[-0.5, 1], [-1.0, 2]]
 MOVED = [[-1.5, 1], [-1.0, 2]]  # token 1 one nat lower: drift 1.0
@@ -33,3 +33,25 @@ def test_a_prompt_inside_the_first_chunk_adds_no_offset_bucket():
     by_offset, by_chunk = drift_buckets(a, b, 256)
     assert by_offset == {}
     assert by_chunk == {'chunk 0': [1.0, 0.0]}
+
+
+def _lists(n):
+    # Token 1's logprob changes with the position; tokens 2-5 do not.
+    rows = [[[-0.5 * i, 1], [-2.0, 2], [-3.0, 3], [-3.5, 4], [-3.9, 5]] for i in range(1, n)]
+    return [None, *rows]
+
+
+def test_alignment_check_matches_a_shifted_list_but_not_a_changed_one():
+    n = 10
+    a = {'p': {'input_top_logprobs': _lists(n)}}
+    shifted = _lists(n)
+    shifted[5] = shifted[2]  # position 5 reports position 2's list
+    changed = _lists(n)
+    changed[5] = [[-2.5, 1], [-0.5, 2], [-3.0, 3], [-3.5, 4], [-3.9, 5]]  # token 2 moved
+    res = alignment_check(a, {'p': {'input_top_logprobs': shifted}}, top=1)
+    assert res['cases'][0]['position'] == 5 and res['cases'][0]['shifts'] == [-3]
+    assert res['matched_at_another_shift'] == 1
+    res = alignment_check(a, {'p': {'input_top_logprobs': changed}}, top=1)
+    assert res['cases'][0]['position'] == 5 and res['cases'][0]['shifts'] == []
+    assert res['cases'][0]['shared_at_shift_0'] == 5
+    assert res['matched_at_another_shift'] == 0
