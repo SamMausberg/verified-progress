@@ -73,18 +73,12 @@
 % Evidence status. A committed result cites its entry in the evidence register
 % (appendix, \label{ev:<key>}): \ev{key} or \ev{key1,key2} prints a small tag, [E3] or [E3,E7], in
 % script size so that it reads lighter than the text (a superscript would look like an exponent
-% after a number). A result that is designed but not committed carries the pending marker
-% \pend{key}, a small [D4] that links to the pending list (\label{dev:<key>}); the words beside it
-% say that the result is not yet measured. The prose beside
-% it says what the result will decide, and no number stands in for it.
+% after a number). Work that was not done is stated as such in the text, without a marker.
 \newcommand{\evref}[1]{\hyperref[ev:#1]{E\ref*{ev:#1}}}
 \newcommand{\evloop}[1]{\evsep\evref{#1}\def\evsep{,}}
 \DeclareRobustCommand{\ev}[1]{{\scriptsize\def\evsep{}[\forcsvlist{\evloop}{#1}]}}
-\newcommand{\devref}[1]{\hyperref[dev:#1]{D\ref*{dev:#1}}}
-\newcommand{\devloop}[1]{\devsep\devref{#1}\def\devsep{,}}
-\DeclareRobustCommand{\pend}[1]{{\scriptsize\def\devsep{}[\forcsvlist{\devloop}{#1}]}}
-% A figure that reads a committed data file: draw it if the file exists, otherwise a
-% pending box naming the file, so the source builds before the evidence merges.
+% A figure that reads a committed data file: draw it if the file exists, otherwise a box naming
+% the missing file, so that a build without the evidence directory says what is absent.
 \newcommand{\pendingfigure}[2]{%
   \begin{center}\setlength{\fboxsep}{6pt}%
   \fbox{\parbox{.92\linewidth}{\centering\small Pending figure. #1\par\smallskip
