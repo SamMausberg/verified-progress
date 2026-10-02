@@ -1,0 +1,447 @@
+"""CPU tests of the served certified-head benchmark's plan and analysis."""
+
+from __future__ import annotations
+
+import csv
+import gzip
+import json
+import math
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from bench.results import prompt_hash
+from bench.sweep import request_body
+from experiments.benchcert import analyze, plan
+
+CERT_LINE = (
+    '[t] Certified LM head on {paths} (fallback columns, stock error model conservative, '
+    'check {check}).\n'
+)
+
+
+def test_request_body_asks_for_token_ids_only_when_told() -> None:
+    assert 'return_output_ids_in_sglext' not in request_body(True, True)
+    body = request_body(True, True, token_ids=True)
+    assert body['return_output_ids_in_sglext'] is True
+    assert body['return_input_ids_in_sglext'] is True
+
+
+def test_sweep_commands_differ_only_in_certified_variables(tmp_path: Path) -> None:
+    for family in plan.FAMILIES.values():
+        stock, no_stats = plan.sweep_command(family, 'stock', 's1', tmp_path)
+        cert, stats = plan.sweep_command(family, 'cert', 's1', tmp_path)
+        assert no_stats is None and stats is not None
+        assert not any('SGLANG_CERTIFIED_HEAD' in token for token in stock)
+
+        def strip(command: list[str]) -> list[str]:
+            out, skip = [], False
+            for token in command:
+                if skip:
+                    skip = False
+                    continue
+                if token in ('--env', '--snapshot-file', '--label'):
+                    skip = True
+                    continue
+                out.append(token)
+            return out
+
+        assert strip(stock) == strip(cert)
+        env = [cert[i + 1] for i, t in enumerate(cert) if t == '--env']
+        for flag in family.flags:
+            assert f'SGLANG_CERTIFIED_HEAD_{flag}=1' in env
+        assert 'SGLANG_CERTIFIED_HEAD_FALLBACK=columns' in env
+        assert 'SGLANG_CERTIFIED_HEAD_MAX_ROWS=64' in env
+        assert not any(e.startswith('SGLANG_CERTIFIED_HEAD_CHECK') for e in env)
+        check, _ = plan.sweep_command(family, 'check', 'check', tmp_path)
+        assert '--env' in check and 'SGLANG_CERTIFIED_HEAD_CHECK=1' in check
+
+
+def test_dflash_pairs_pin_the_kv_pool_on_both_arms(tmp_path: Path) -> None:
+    for name in ('dflash16', 'dflash8'):
+        family = plan.FAMILIES[name]
+        for variant in ('stock', 'cert'):
+            command, _ = plan.sweep_command(family, variant, 's1', tmp_path)
+            assert 'max-total-tokens=60000' in command
+
+
+def test_every_session_runs_each_pair_back_to_back() -> None:
+    for parts in plan.SESSIONS.values():
+        for launches in parts.values():
+            assert len(launches) == 4
+            for first, second in (launches[0:2], launches[2:4]):
+                assert first[0] == second[0] and {first[1], second[1]} == {'stock', 'cert'}
+    assert plan.SESSIONS['s2']['A'] == plan.SESSIONS['s1']['A'][::-1]
+    held = [step for steps in plan.HOLDS.values() for step in steps]
+    assert sorted(held, key=str) == sorted(
+        [('check', None), *[(s, p) for s in plan.DECISION_SESSIONS for p in 'AB']], key=str
+    )
+
+
+def test_ratio_summary_and_decision() -> None:
+    gain = analyze.ratio_summary([1.03, 1.035, 1.032])
+    assert gain['n'] == 3 and gain['low'] > 1 and analyze.decide(gain) == 'gain'
+    assert math.isclose(gain['mean'], (1.03 * 1.035 * 1.032) ** (1 / 3))
+    assert analyze.decide(analyze.ratio_summary([0.97, 0.98, 0.975])) == 'loss'
+    assert analyze.decide(analyze.ratio_summary([0.99, 1.01, 1.0])) == 'null'
+    assert analyze.decide(analyze.ratio_summary([1.05, 1.05])) == 'incomplete'
+    assert analyze.ratio_summary([])['n'] == 0
+
+
+def test_h4_verdict() -> None:
+    gain, null = [{'family': 'a', 'decision': 'gain'}], [{'family': 'a', 'decision': 'null'}]
+    assert analyze.h4_verdict({'a': 'improves', 'b': 'incomplete'}, gain) == 'supported'
+    assert analyze.h4_verdict({'a': 'loses', 'b': 'incomplete'}, null) == 'incomplete'
+    assert analyze.h4_verdict({'a': 'no detectable change'}, null) == 'refuted'
+    assert analyze.h4_verdict({'a': 'mixed'}, gain) == 'mixed'
+    assert analyze.h4_verdict({'a': 'fails exactness'}, gain) == 'refuted'
+
+
+def test_family_verdict() -> None:
+    assert analyze.family_verdict(['gain', 'null'], True) == 'improves'
+    assert analyze.family_verdict(['gain', 'loss'], True) == 'mixed'
+    assert analyze.family_verdict(['null', 'loss'], None) == 'loses'
+    assert analyze.family_verdict(['null'], True) == 'no detectable change'
+    assert analyze.family_verdict(['gain'], False) == 'fails exactness'
+    assert analyze.family_verdict(['gain', 'incomplete'], True) == 'incomplete'
+
+
+def test_compare_counts_first_divergences() -> None:
+    a = {'p': [1, 2, 3, 4], 'q': [5, 6, 7, 8]}
+    b = {'p': [1, 2, 9, 4], 'q': [5, 6, 7, 8]}
+    result = analyze.compare(a, b)
+    assert result['diverged'] == 1 and result['identical'] == 1
+    assert result['exposure_tokens'] == 3 + 4 and result['positions'] == [2]
+    with pytest.raises(ValueError):
+        analyze.compare(a, {'p': [1]})
+
+
+def _raw_record(text: str, ids: list[int] | None, phase: str = 'profiling') -> dict[str, Any]:
+    chunks: list[dict[str, Any]] = [{'choices': [{'delta': {'content': 'x'}}]}]
+    if ids is not None:
+        chunks.append({'choices': [], 'sglext': {'output_ids': [ids], 'input_ids': [11, 12]}})
+    return {
+        'metadata': {'benchmark_phase': phase},
+        'payload': {'messages': [{'role': 'user', 'content': text}]},
+        'responses': [
+            {'perf_ns': i, 'packets': [{'name': 'data', 'value': json.dumps(chunk)}]}
+            for i, chunk in enumerate(chunks)
+        ],
+    }
+
+
+def _write_raw(point_dir: Path, records: list[dict[str, Any]]) -> None:
+    (point_dir / 'aiperf').mkdir(parents=True, exist_ok=True)
+    with gzip.open(point_dir / 'aiperf/profile_export_raw.jsonl.gz', 'wt') as handle:
+        for record in records:
+            handle.write(json.dumps(record) + '\n')
+
+
+def test_output_ids_reads_the_sglext_chunk(tmp_path: Path) -> None:
+    _write_raw(tmp_path, [_raw_record('a', [1, 2]), _raw_record('w', [9], phase='warmup')])
+    assert analyze.output_ids(tmp_path) == {prompt_hash('a'): [1, 2]}
+    _write_raw(tmp_path, [_raw_record('a', None)])
+    with pytest.raises(ValueError, match='no output ids'):
+        analyze.output_ids(tmp_path)
+
+
+def test_parse_server_log() -> None:
+    text = (
+        CERT_LINE.format(paths='verify, draft, draft_extend, dflash_draft', check='False')
+        + '[t] Mamba Cache is allocated. max_mamba_cache_size: 64, conv_state size: 0.07GB\n'
+        + '[t] Capture target verify CUDA graph end. elapsed=6.90 s, mem usage=6.13 GB, '
+        'avail mem=4.72 GB.\n'
+        + '[t] max_total_num_tokens=80000, chunked_prefill_size=8192, max_prefill_tokens=16384,'
+        ' max_running_requests=64, context_len=262144, available_gpu_mem=5.10 GB\n'
+    )
+    parsed = analyze.parse_server_log(text)
+    assert parsed['cert_paths'] == ('verify', 'draft', 'draft_extend', 'dflash_draft')
+    assert parsed['captures']['target verify']['mem_gb'] == 6.13
+    assert parsed['mamba_slots'] == 64 and parsed['max_total_num_tokens'] == 80000
+    assert parsed['available_gpu_mem_gb'] == 5.10 and not parsed['oom']
+    assert analyze.parse_server_log('torch.OutOfMemoryError: CUDA out of memory')['oom']
+
+
+def test_point_problems_flag_retractions_and_a_short_batch() -> None:
+    point = {
+        'concurrency': 8,
+        'x_e2e': 1.0,
+        'y': 1.0,
+        'foreign_cpu_during_mean': 0.5,
+        'server_log': {'kv_retractions': 0, 'max_running_logged': 8},
+    }
+    assert analyze.point_problems(point, 64) == ''
+    point['server_log'] = {'kv_retractions': 2, 'max_running_logged': 5}
+    reason = analyze.point_problems(point, 64)
+    assert 'retractions' in reason and 'peaked at 5' in reason
+    point['server_log'] = {'kv_retractions': 0, 'max_running_logged': 8}
+    point['foreign_cpu_during_mean'] = 2.5
+    assert 'host_contention' in analyze.point_problems(point, 64)
+
+
+def test_predict_from_head_table_and_frontier(tmp_path: Path) -> None:
+    head = tmp_path / 'head.csv'
+    rows = [
+        (1, 400.0, 250.0),
+        (2, 400.0, 250.0),
+        (4, 400.0, 250.0),
+        (8, 400.0, 250.0),
+        (16, 400.0, 250.0),
+        (32, 400.0, 300.0),
+        (64, 400.0, 350.0),
+        (128, 500.0, 700.0),
+        (256, 800.0, 1400.0),
+    ]
+    with head.open('w', newline='') as handle:
+        writer = csv.writer(handle)
+        writer.writerow(['M', 'stock_us', 'columns_expected_us'])
+        writer.writerows(rows)
+    frontier = tmp_path / 'frontier.csv'
+    with frontier.open('w', newline='') as handle:
+        writer = csv.writer(handle)
+        writer.writerow(
+            ['label', 'concurrency', 'x_decode_mean', 'x_e2e_mean', 'accept_length_mean']
+        )
+        writer.writerow(['plain-tuned', 1, 250.0, 240.0, ''])
+        writer.writerow(['plain-tuned', 128, 100.0, 95.0, ''])
+    result = analyze.predict(head, frontier)
+    one = next(p for p in result['points'] if p['concurrency'] == 1)
+    assert math.isclose(one['cycle_us'], 4000.0)
+    assert math.isclose(one['saving_us'], 150.0)
+    assert math.isclose(one['decode_ratio'], 4000 / 3850)
+    full = next(p for p in result['points'] if p['concurrency'] == 128)
+    assert full['saving_us'] == 0 and full['decode_ratio'] == 1.0
+
+
+def _launch(
+    runs: Path,
+    step: str,
+    family: plan.Family,
+    variant: str,
+    y: float,
+    ids: dict[int, dict[str, list[int]]],
+    pool: int = 1000000,
+) -> dict[str, Any]:
+    name = plan.label(family, variant)
+    run_dir = runs / step / name / f'2026-{step}-{variant}'
+    (run_dir / 'server').mkdir(parents=True)
+    log = '[t] Mamba Cache is allocated. max_mamba_cache_size: 128\n'
+    if variant != 'stock':
+        log += CERT_LINE.format(paths=', '.join(family.paths), check=str(variant == 'check'))
+    log += (
+        f'[t] Capture target decode CUDA graph end. elapsed=1.0 s, mem usage='
+        f'{2.0 if variant == "stock" else 4.5} GB, avail mem=30.0 GB.\n'
+    )
+    log += (
+        f'[t] max_total_num_tokens={pool}, chunked_prefill_size=8192, max_prefill_tokens=1,'
+        ' max_running_requests=128, context_len=1, available_gpu_mem=30.0 GB\n'
+    )
+    (run_dir / 'server/server.log').write_text(log)
+    levels = family.check_concurrency if variant == 'check' else family.concurrency
+    points = []
+    for c in levels:
+        points.append(
+            {
+                'concurrency': c,
+                'x_e2e': y / c,
+                'x_decode': y / c,
+                'y': y * c,
+                'failed': 0,
+                'aiperf_exit_code': 0,
+                'osl_mismatch': 0,
+                'cache_flushed': True,
+                'prompts_as_expected': True,
+                'foreign_cpu_during_mean': 0.3,
+                'server_log': {'kv_retractions': 0, 'max_running_logged': c},
+            }
+        )
+        point_dir = run_dir / 'r0' / f'c{c:03d}'
+        _write_raw(point_dir, [_raw_record(text, tokens) for text, tokens in ids[c].items()])
+    stats = None
+    if variant != 'stock':
+        stats = runs / step / 'stats' / f'{name}.json'
+        stats.parent.mkdir(parents=True, exist_ok=True)
+        counters = {
+            p: {
+                'calls': 10,
+                'rows': 40,
+                'fallback_rows': 1,
+                'fallback_calls': 1,
+                'mismatch_rows': 0,
+                'host_steps': {'certified': 10, 'stock_graph': 2},
+            }
+            for p in family.rows_per_request
+        }
+        stats.write_text(json.dumps({'paths': counters}))
+        for c in levels:
+            point_dir = run_dir / 'r0' / f'c{c:03d}'
+            for when, scale in (('before', 0), ('after', 1)):
+                snap = point_dir / f'snapshot_{when}' / stats.name
+                snap.parent.mkdir(parents=True)
+                snap.write_text(
+                    json.dumps(
+                        {
+                            'paths': {
+                                p: {'calls': 10 * scale, 'rows': 40 * scale, 'mismatch_rows': 0}
+                                for p in family.rows_per_request
+                            }
+                        }
+                    )
+                )
+    manifest = {
+        'points': points,
+        'checks': [],
+        'launch': {
+            'final_limits': {'max_total_num_tokens': pool, 'max_running_requests': 128},
+            'sglang_source': {'head': 'enginehead', 'dirty_files': []},
+        },
+    }
+    (run_dir / 'sweep.json').write_text(json.dumps(manifest))
+    return {
+        'step': step,
+        'family': family.name,
+        'variant': variant,
+        'label': name,
+        'run_dir': str(run_dir),
+        'exit_code': 0,
+        'stats_file': str(stats) if stats else None,
+    }
+
+
+def test_report_end_to_end_on_synthetic_runs(tmp_path: Path) -> None:
+    family = plan.FAMILIES['plain']
+    same = {c: {f'p{i}': [1, 2, 3, 4] for i in range(4)} for c in family.concurrency}
+    other = {
+        c: {f'p{i}': [1, 2, 3, 4] if i else [1, 9, 3, 4] for i in range(4)}
+        for c in family.concurrency
+    }
+    holds = []
+    for k, step in enumerate(plan.DECISION_SESSIONS):
+        launches = [
+            _launch(tmp_path, step, family, 'stock', 100.0 + k, same),
+            # The certified arm diverges on one prompt at c > 1 only.
+            _launch(
+                tmp_path,
+                step,
+                family,
+                'cert',
+                103.0 + k,
+                {c: same[c] if c == 1 else other[c] for c in family.concurrency},
+            ),
+        ]
+        holds.append(
+            {
+                'hold': f'h{k}',
+                'launches': launches,
+                'provenance': {'engine_commit': 'enginehead', 'repo_commit': 'r'},
+            }
+        )
+    holds.append(
+        {
+            'hold': 'hc',
+            'provenance': {'engine_commit': 'enginehead'},
+            'launches': [_launch(tmp_path, 'check', family, 'check', 50.0, same)],
+        }
+    )
+    (tmp_path / 'holds').mkdir()
+    for record in holds:
+        (tmp_path / 'holds' / f'{record["hold"]}.json').write_text(json.dumps(record))
+    out = tmp_path / 'evidence'
+    summary = analyze.report(tmp_path, out, None, plot=False)
+    plain = [r for r in summary['decisions'] if r['family'] == 'plain']
+    assert all(r['n'] == 3 and r['decision'] == 'gain' for r in plain)
+    assert summary['verdicts']['plain'] == 'improves'
+    assert summary['verdicts']['mtp'] == 'incomplete'
+    assert summary['h4'] == 'supported'
+    exact = summary['exactness']['families']['plain']
+    assert exact['c1_identical'] is True and exact['c1_pairs'] == 3
+    assert exact['cert_vs_stock_c_gt_1']['diverged'] == 3 * (len(family.concurrency) - 1)
+    assert exact['stock_vs_stock_c_gt_1']['diverged'] == 0
+    assert summary['check']['plain'] is True
+    classes = exact['cert_vs_stock_c_gt_1']['classes']
+    assert classes['unscored'] == exact['cert_vs_stock_c_gt_1']['diverged']
+    for name in (
+        'points.csv',
+        'pairs.csv',
+        'ratios.csv',
+        'equality.csv',
+        'check.csv',
+        'certified_stats.csv',
+        'launches.csv',
+        'capture_memory.csv',
+        'frontier.csv',
+    ):
+        assert (out / name).exists()
+
+    # A pool mismatch voids that session's pairs.
+    bad = tmp_path / 'bad'
+    (bad / 'holds').mkdir(parents=True)
+    for k, step in enumerate(plan.DECISION_SESSIONS):
+        launches = [
+            _launch(bad, step, family, 'stock', 100.0, same),
+            _launch(
+                bad, step, family, 'cert', 103.0, same, pool=900000 if step == 's2' else 1000000
+            ),
+        ]
+        (bad / 'holds' / f'h{k}.json').write_text(
+            json.dumps(
+                {
+                    'hold': f'h{k}',
+                    'launches': launches,
+                    'provenance': {'engine_commit': 'enginehead'},
+                }
+            )
+        )
+    summary = analyze.report(bad, bad / 'evidence', None, plot=False)
+    plain = [r for r in summary['decisions'] if r['family'] == 'plain']
+    assert all(r['n'] == 2 and r['decision'] == 'incomplete' for r in plain)
+
+
+def test_two_successful_launches_of_one_arm_are_an_error() -> None:
+    entry = {'step': 's1', 'family': 'plain', 'variant': 'stock', 'exit_code': 0}
+    with pytest.raises(SystemExit):
+        analyze.index_launches([entry, dict(entry)])
+    failed = {**entry, 'exit_code': 1}
+    assert analyze.index_launches([failed, entry])[('s1', 'plain', 'stock')]['exit_code'] == 0
+
+
+def test_classify_margin_uses_compare_classes() -> None:
+    assert analyze.classify_margin(0.0, 0.0625) == 'tie'
+    assert analyze.classify_margin(0.0625, 0.0625) == 'one_ulp'
+    assert analyze.classify_margin(0.25, 0.0625) == 'near'
+    assert analyze.classify_margin(0.75, 0.0625) == 'large'
+    assert analyze.classify_margin(math.nan, None) == 'large'
+    assert analyze.context_id([1], [2], (5, 3)) == analyze.context_id([1], [2], (3, 5))
+    assert analyze.context_id([1], [2], (5, 3)) != analyze.context_id([1, 2], [], (5, 3))
+
+
+def test_rescore_reads_both_token_logprobs(monkeypatch: pytest.MonkeyPatch) -> None:
+    from experiments.benchcert import rescore
+
+    meta = {
+        'output_top_logprobs': [[[-0.5, 7, 'a'], [-0.5625, 9, 'b'], [-3.0, 4, 'c']]],
+        'output_token_ids_logprob': [[[-0.5, 7, 'a'], [-0.5625, 9, 'b']]],
+    }
+
+    class Response:
+        def __enter__(self) -> Response:
+            return self
+
+        def __exit__(self, *exc: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps({'meta_info': meta}).encode()
+
+    sent: list[dict[str, Any]] = []
+
+    def fake_urlopen(request: Any, timeout: float) -> Response:
+        sent.append(json.loads(request.data))
+        return Response()
+
+    monkeypatch.setattr(rescore.urllib.request, 'urlopen', fake_urlopen)
+    result = rescore.score_one('http://x', {'id': 'k', 'input_ids': [1, 2], 'tokens': [7, 9]})
+    assert sent[0]['token_ids_logprob'] == [7, 9] and sent[0]['input_ids'] == [1, 2]
+    assert math.isclose(result['margin'], 0.0625) and result['ulp'] == 0.0625
+    assert result['class'] == 'one_ulp' and result['stock_top1'] == 7

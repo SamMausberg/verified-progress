@@ -1,0 +1,528 @@
+{
+ "inputs": {
+  "head": "/home/ubuntu/vp-wt/benchcert/evidence/certified_head/head_path_time.csv",
+  "frontier": "/home/ubuntu/vp-wt/benchcert/evidence/bench/confirm/frontier.csv"
+ },
+ "model": "per call: saving = stock_us(M) - columns_expected_us(M) for M <= MAX_ROWS, 0 above; cycle time T = accept_length / x_decode (1 / x_decode for plain); decode ratio = T / (T - sum of savings); y ratio = 1 / (f + (1 - f) / decode ratio) with f = 1 - x_e2e / x_decode, the time share before the first token",
+ "points": [
+  {
+   "family": "plain",
+   "arm": "plain-tuned",
+   "concurrency": 1,
+   "head_calls": [
+    {
+     "path": "decode",
+     "rows": 1,
+     "certified": true
+    }
+   ],
+   "cycle_us": 3482.1839282586534,
+   "saving_us": 121.22490000000002,
+   "decode_ratio": 1.036068544418647,
+   "prefill_share": 0.016951271362763087,
+   "y_ratio": 1.0354354712151561
+  },
+  {
+   "family": "plain",
+   "arm": "plain-tuned",
+   "concurrency": 4,
+   "head_calls": [
+    {
+     "path": "decode",
+     "rows": 4,
+     "certified": true
+    }
+   ],
+   "cycle_us": 3679.181279148314,
+   "saving_us": 113.86039999999997,
+   "decode_ratio": 1.0319355266635073,
+   "prefill_share": 0.03027929400926266,
+   "y_ratio": 1.0309386242705076
+  },
+  {
+   "family": "plain",
+   "arm": "plain-tuned",
+   "concurrency": 8,
+   "head_calls": [
+    {
+     "path": "decode",
+     "rows": 8,
+     "certified": true
+    }
+   ],
+   "cycle_us": 3873.931424440711,
+   "saving_us": 117.9921,
+   "decode_ratio": 1.0314148046088498,
+   "prefill_share": 0.029537564931933047,
+   "y_ratio": 1.0304586247073781
+  },
+  {
+   "family": "plain",
+   "arm": "plain-tuned",
+   "concurrency": 16,
+   "head_calls": [
+    {
+     "path": "decode",
+     "rows": 16,
+     "certified": true
+    }
+   ],
+   "cycle_us": 4258.2800125704425,
+   "saving_us": 123.64600000000002,
+   "decode_ratio": 1.0299049443370516,
+   "prefill_share": 0.0286105317484584,
+   "y_ratio": 1.0290245147085428
+  },
+  {
+   "family": "plain",
+   "arm": "plain-tuned",
+   "concurrency": 32,
+   "head_calls": [
+    {
+     "path": "decode",
+     "rows": 32,
+     "certified": true
+    }
+   ],
+   "cycle_us": 4935.378620038526,
+   "saving_us": 79.84269999999998,
+   "decode_ratio": 1.0164436431559478,
+   "prefill_share": 0.037897291809689815,
+   "y_ratio": 1.0158106209154405
+  },
+  {
+   "family": "plain",
+   "arm": "plain-tuned",
+   "concurrency": 64,
+   "head_calls": [
+    {
+     "path": "decode",
+     "rows": 64,
+     "certified": true
+    }
+   ],
+   "cycle_us": 6238.824705246727,
+   "saving_us": 31.14100000000002,
+   "decode_ratio": 1.005016524919541,
+   "prefill_share": 0.03413136219746382,
+   "y_ratio": 1.0048444746155798
+  },
+  {
+   "family": "plain",
+   "arm": "plain-tuned",
+   "concurrency": 128,
+   "head_calls": [
+    {
+     "path": "decode",
+     "rows": 128,
+     "certified": false
+    }
+   ],
+   "cycle_us": 8900.352542964227,
+   "saving_us": 0,
+   "decode_ratio": 1.0,
+   "prefill_share": 0.032757747534379766,
+   "y_ratio": 1.0
+  },
+  {
+   "family": "mtp",
+   "arm": "mtp-tuned-triton",
+   "concurrency": 1,
+   "head_calls": [
+    {
+     "path": "draft",
+     "rows": 1,
+     "certified": true
+    },
+    {
+     "path": "draft",
+     "rows": 1,
+     "certified": true
+    },
+    {
+     "path": "draft_extend",
+     "rows": 1,
+     "certified": true
+    },
+    {
+     "path": "verify",
+     "rows": 4,
+     "certified": true
+    }
+   ],
+   "cycle_us": 5787.390394168066,
+   "saving_us": 477.53510000000006,
+   "decode_ratio": 1.0899337314379334,
+   "prefill_share": 0.04123830902206671,
+   "y_ratio": 1.0859064140223733
+  },
+  {
+   "family": "mtp",
+   "arm": "mtp-tuned-triton",
+   "concurrency": 2,
+   "head_calls": [
+    {
+     "path": "draft",
+     "rows": 2,
+     "certified": true
+    },
+    {
+     "path": "draft",
+     "rows": 2,
+     "certified": true
+    },
+    {
+     "path": "draft_extend",
+     "rows": 2,
+     "certified": true
+    },
+    {
+     "path": "verify",
+     "rows": 8,
+     "certified": true
+    }
+   ],
+   "cycle_us": 6140.323923624195,
+   "saving_us": 461.1612,
+   "decode_ratio": 1.081202321969339,
+   "prefill_share": 0.04429372890695149,
+   "y_ratio": 1.07732744058035
+  },
+  {
+   "family": "mtp",
+   "arm": "mtp-tuned-triton",
+   "concurrency": 4,
+   "head_calls": [
+    {
+     "path": "draft",
+     "rows": 4,
+     "certified": true
+    },
+    {
+     "path": "draft",
+     "rows": 4,
+     "certified": true
+    },
+    {
+     "path": "draft_extend",
+     "rows": 4,
+     "certified": true
+    },
+    {
+     "path": "verify",
+     "rows": 16,
+     "certified": true
+    }
+   ],
+   "cycle_us": 6740.574735750112,
+   "saving_us": 465.2271999999999,
+   "decode_ratio": 1.074135686884215,
+   "prefill_share": 0.04305699293265475,
+   "y_ratio": 1.0707178914034963
+  },
+  {
+   "family": "mtp",
+   "arm": "mtp-tuned-triton",
+   "concurrency": 8,
+   "head_calls": [
+    {
+     "path": "draft",
+     "rows": 8,
+     "certified": true
+    },
+    {
+     "path": "draft",
+     "rows": 8,
+     "certified": true
+    },
+    {
+     "path": "draft_extend",
+     "rows": 8,
+     "certified": true
+    },
+    {
+     "path": "verify",
+     "rows": 32,
+     "certified": true
+    }
+   ],
+   "cycle_us": 7712.772958151022,
+   "saving_us": 433.81899999999996,
+   "decode_ratio": 1.0595990855958373,
+   "prefill_share": 0.04304274632010563,
+   "y_ratio": 1.0568878424180377
+  },
+  {
+   "family": "mtp",
+   "arm": "mtp-tuned-triton",
+   "concurrency": 16,
+   "head_calls": [
+    {
+     "path": "draft",
+     "rows": 16,
+     "certified": true
+    },
+    {
+     "path": "draft",
+     "rows": 16,
+     "certified": true
+    },
+    {
+     "path": "draft_extend",
+     "rows": 16,
+     "certified": true
+    },
+    {
+     "path": "verify",
+     "rows": 64,
+     "certified": true
+    }
+   ],
+   "cycle_us": 9960.729351474605,
+   "saving_us": 402.07900000000006,
+   "decode_ratio": 1.042064411314927,
+   "prefill_share": 0.035503058387679864,
+   "y_ratio": 1.040510497069822
+  },
+  {
+   "family": "mtp",
+   "arm": "mtp-tuned-triton",
+   "concurrency": 32,
+   "head_calls": [
+    {
+     "path": "draft",
+     "rows": 32,
+     "certified": true
+    },
+    {
+     "path": "draft",
+     "rows": 32,
+     "certified": true
+    },
+    {
+     "path": "draft_extend",
+     "rows": 32,
+     "certified": true
+    },
+    {
+     "path": "verify",
+     "rows": 128,
+     "certified": false
+    }
+   ],
+   "cycle_us": 14004.061655570058,
+   "saving_us": 239.52809999999994,
+   "decode_ratio": 1.0174018319642273,
+   "prefill_share": 0.03180210037255515,
+   "y_ratio": 1.0168390981511848
+  },
+  {
+   "family": "mtp",
+   "arm": "mtp-tuned-triton",
+   "concurrency": 64,
+   "head_calls": [
+    {
+     "path": "draft",
+     "rows": 64,
+     "certified": true
+    },
+    {
+     "path": "draft",
+     "rows": 64,
+     "certified": true
+    },
+    {
+     "path": "draft_extend",
+     "rows": 64,
+     "certified": true
+    },
+    {
+     "path": "verify",
+     "rows": 256,
+     "certified": false
+    }
+   ],
+   "cycle_us": 21504.560423717237,
+   "saving_us": 93.42300000000006,
+   "decode_ratio": 1.0043632899154864,
+   "prefill_share": 0.026781890799246977,
+   "y_ratio": 1.0042459365933778
+  },
+  {
+   "family": "dflash16",
+   "arm": "dflash-tuned-b16",
+   "concurrency": 1,
+   "head_calls": [
+    {
+     "path": "dflash_draft",
+     "rows": 15,
+     "certified": true
+    },
+    {
+     "path": "verify",
+     "rows": 16,
+     "certified": true
+    }
+   ],
+   "cycle_us": 5294.322069897162,
+   "saving_us": 246.5852625,
+   "decode_ratio": 1.0488506576132581,
+   "prefill_share": 0.08347872101927967,
+   "y_ratio": 1.0445908262326227
+  },
+  {
+   "family": "dflash16",
+   "arm": "dflash-tuned-b16",
+   "concurrency": 2,
+   "head_calls": [
+    {
+     "path": "dflash_draft",
+     "rows": 30,
+     "certified": true
+    },
+    {
+     "path": "verify",
+     "rows": 32,
+     "certified": true
+    }
+   ],
+   "cycle_us": 5949.460934611319,
+   "saving_us": 165.16081249999996,
+   "decode_ratio": 1.0285532923626575,
+   "prefill_share": 0.08408807643502203,
+   "y_ratio": 1.0260896598821887
+  },
+  {
+   "family": "dflash16",
+   "arm": "dflash-tuned-b16",
+   "concurrency": 4,
+   "head_calls": [
+    {
+     "path": "dflash_draft",
+     "rows": 60,
+     "certified": true
+    },
+    {
+     "path": "verify",
+     "rows": 64,
+     "certified": true
+    }
+   ],
+   "cycle_us": 7403.631610301602,
+   "saving_us": 68.36971250000005,
+   "decode_ratio": 1.0093206914016921,
+   "prefill_share": 0.07101388317741664,
+   "y_ratio": 1.0086530654603947
+  },
+  {
+   "family": "dflash16",
+   "arm": "dflash-tuned-b16",
+   "concurrency": 8,
+   "head_calls": [
+    {
+     "path": "dflash_draft",
+     "rows": 120,
+     "certified": false
+    },
+    {
+     "path": "verify",
+     "rows": 128,
+     "certified": false
+    }
+   ],
+   "cycle_us": 10184.687994573818,
+   "saving_us": 0,
+   "decode_ratio": 1.0,
+   "prefill_share": 0.06391289141985079,
+   "y_ratio": 1.0
+  },
+  {
+   "family": "dflash8",
+   "arm": "dflash-tuned",
+   "concurrency": 4,
+   "head_calls": [
+    {
+     "path": "dflash_draft",
+     "rows": 28,
+     "certified": true
+    },
+    {
+     "path": "verify",
+     "rows": 32,
+     "certified": true
+    }
+   ],
+   "cycle_us": 6948.908515808448,
+   "saving_us": 170.63622499999997,
+   "decode_ratio": 1.0251739997567504,
+   "prefill_share": 0.05662196678140785,
+   "y_ratio": 1.0237147952769023
+  },
+  {
+   "family": "dflash8",
+   "arm": "dflash-tuned",
+   "concurrency": 8,
+   "head_calls": [
+    {
+     "path": "dflash_draft",
+     "rows": 56,
+     "certified": true
+    },
+    {
+     "path": "verify",
+     "rows": 64,
+     "certified": true
+    }
+   ],
+   "cycle_us": 8639.436264227767,
+   "saving_us": 74.457425,
+   "decode_ratio": 1.0086932409755625,
+   "prefill_share": 0.05137364388428156,
+   "y_ratio": 1.0082429561766844
+  },
+  {
+   "family": "dflash8",
+   "arm": "dflash-tuned",
+   "concurrency": 16,
+   "head_calls": [
+    {
+     "path": "dflash_draft",
+     "rows": 112,
+     "certified": false
+    },
+    {
+     "path": "verify",
+     "rows": 128,
+     "certified": false
+    }
+   ],
+   "cycle_us": 12087.289032949564,
+   "saving_us": 0,
+   "decode_ratio": 1.0,
+   "prefill_share": 0.04244790385675856,
+   "y_ratio": 1.0
+  },
+  {
+   "family": "dflash8",
+   "arm": "dflash-tuned",
+   "concurrency": 32,
+   "head_calls": [
+    {
+     "path": "dflash_draft",
+     "rows": 224,
+     "certified": false
+    },
+    {
+     "path": "verify",
+     "rows": 256,
+     "certified": false
+    }
+   ],
+   "cycle_us": 19189.92115353722,
+   "saving_us": 0,
+   "decode_ratio": 1.0,
+   "prefill_share": 0.03374665928884035,
+   "y_ratio": 1.0
+  }
+ ]
+}
