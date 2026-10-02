@@ -30,7 +30,17 @@ Modes:
   scheduler steps.
 
 Every window's client summary, the server log and the exact commands are
-written to ``--out-dir``.
+written to ``--out-dir``. One directory holds one server session: the script
+refuses a directory that already holds a ``windows.jsonl``, so an interrupted
+run is never extended by a second server.
+
+``--check-complete`` launches nothing. It compares the command recorded in
+``run_meta.json`` with these arguments and with the server command and environment
+they resolve to now, and ``windows.jsonl`` with the records a complete run of these
+arguments appends (under nsys, also each collected window's report). It exits 0
+when everything matches, 10 when the directory holds an incomplete or different
+run, and 11 when it holds no records. ``run_all.sh`` uses it to decide whether a
+run can be skipped.
 """
 
 from __future__ import annotations
@@ -45,6 +55,8 @@ import subprocess
 import sys
 import time
 import urllib.request
+from collections import Counter
+from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
 
@@ -78,6 +90,129 @@ REPO = HERE.parent.parent
 LOG_LINE = re.compile(r'^\[(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\] Decode batch.*?#running-req: (\d+)')
 ACCEPT = re.compile(r'accept len: ([\d.]+)')
 GEN_TPUT = re.compile(r'gen throughput \(token/s\): ([\d.]+)')
+# Exit codes of --check-complete.
+COMPLETE, INCOMPLETE, ABSENT = 0, 10, 11
+# Window records one run appends per concurrency, by window kind (main's loop).
+WINDOWS_PER_C = {'none': {'none': 1}, 'nsys': {'none': 1, 'nsys': 1}, 'sglang': {'sglang': 1}}
+
+
+def expected_windows(
+    mode: str, concurrency: Iterable[int], repeats: int
+) -> Counter[tuple[int, str]]:
+    """Window records a complete run appends, by (concurrency, window kind)."""
+    out: Counter[tuple[int, str]] = Counter()
+    for c in concurrency:
+        for kind, n in WINDOWS_PER_C[mode].items():
+            out[(c, kind)] += n * (repeats if mode == 'none' else 1)
+    return out
+
+
+def window_problems(
+    rows: list[dict], arm: str, mode: str, concurrency: Iterable[int], repeats: int
+) -> list[str]:
+    """How the window records differ from those of a complete run; empty when they match.
+
+    A record of another arm or mode, a missing or surplus window, and a window whose
+    client reported errors all count.
+    """
+    problems = []
+    # Keys as recorded, so a record without a concurrency or kind still counts.
+    seen: Counter[tuple[object, object]] = Counter()
+    for i, r in enumerate(rows, 1):
+        if (r.get('arm'), r.get('mode')) != (arm, mode):
+            problems.append(f'record {i} is arm {r.get("arm")} mode {r.get("mode")}')
+        if r.get('errors'):
+            problems.append(f'record {i} (c={r.get("concurrency")}) reported errors')
+        seen[(r.get('concurrency'), r.get('window_kind'))] += 1
+    want: Counter[tuple[object, object]] = Counter(expected_windows(mode, concurrency, repeats))
+    for c, kind in sorted(set(want) | set(seen), key=str):
+        if seen[(c, kind)] != want[(c, kind)]:
+            problems.append(f'c={c} {kind}: {seen[(c, kind)]} of {want[(c, kind)]} windows')
+    return problems
+
+
+def read_windows(path: Path) -> tuple[list[dict], list[str]]:
+    """Records of a windows.jsonl file, and its lines that are not JSON (a cut-off write)."""
+    rows, bad = [], []
+    for i, line in enumerate(path.read_text().splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            rows.append(json.loads(line))
+        except json.JSONDecodeError:
+            bad.append(f'line {i} of {path.name} is not JSON')
+    return rows, bad
+
+
+def build_server(args: argparse.Namespace) -> tuple[list[str], dict[str, str]]:
+    """The server command (without a profiler prefix) and environment of a run."""
+    if args.arm in BENCH_ARMS:
+        server, arm_env = bench_server(args.arm, args.port, args.concurrency)
+    else:
+        server = [sys.executable, '-m', 'sglang.launch_server', *BASE_FLAGS]
+        server += ['--port', str(args.port), *ARMS[args.arm]]
+        arm_env = {}
+    return server + shlex.split(args.extra_server_args), arm_env
+
+
+# Arguments that do not change what a run records.
+NOT_COMPARED = ('out_dir', 'check_complete')
+
+
+def command_problems(args: argparse.Namespace) -> list[str]:
+    """How the run that ``args`` describe differs from the one recorded in run_meta.json.
+
+    Every run_profiles.py argument except those in NOT_COMPARED, and the resolved server
+    command and environment (which also follow bench/arms.toml), must match.
+    """
+    path = args.out_dir / 'run_meta.json'
+    if not path.exists():
+        return [f'no {path.name} to compare the command with']
+    meta = json.loads(path.read_text())
+    try:
+        recorded = build_parser().parse_args(meta['argv'][1:])
+    except SystemExit:
+        return [f'the command in {path.name} does not parse']
+    problems = [
+        f'--{key.replace("_", "-")}: recorded {getattr(recorded, key, None)!r}, now {value!r}'
+        for key, value in vars(args).items()
+        if key not in NOT_COMPARED and getattr(recorded, key, None) != value
+    ]
+    server, arm_env = build_server(args)
+    if shlex.split(meta.get('server_command', ''))[-len(server) :] != server:
+        problems.append('the server command differs from the recorded one')
+    if meta.get('env', {}) != arm_env:
+        problems.append('the server environment differs from the recorded one')
+    return problems
+
+
+def run_status(args: argparse.Namespace, compare_command: bool = True) -> tuple[int, list[str]]:
+    """COMPLETE, INCOMPLETE or ABSENT for the run that ``args`` describe, with the reasons.
+
+    With ``compare_command`` the recorded command must also match ``args``
+    (``command_problems``), so a run made with other options is not complete.
+    """
+    path = args.out_dir / 'windows.jsonl'
+    if not path.exists():
+        return ABSENT, [f'no {path}']
+    rows, problems = read_windows(path)
+    if not rows and not problems:
+        return ABSENT, [f'{path} has no records']
+    if compare_command:
+        problems += command_problems(args)
+    problems += window_problems(rows, args.arm, args.mode, args.concurrency, args.repeats)
+    if args.mode == 'nsys':
+        for c in sorted(set(args.concurrency)):
+            report = args.out_dir / f'{args.arm}_bs{c}.nsys-rep'
+            if not report.exists():
+                problems.append(f'c={c}: no report {report.name}')
+    return (INCOMPLETE if problems else COMPLETE), problems
+
+
+def print_status(out_dir: Path, status: int, problems: list[str]) -> int:
+    word = {COMPLETE: 'complete', INCOMPLETE: 'incomplete', ABSENT: 'absent'}[status]
+    print(f'{out_dir}: {word}' + ''.join(f'\n  {p}' for p in problems), flush=True)
+    return status
 
 
 def bench_server(name: str, port: int, concurrency: list[int]) -> tuple[list[str], dict[str, str]]:
@@ -222,7 +357,7 @@ def drive(args: argparse.Namespace, concurrency: int, profiler: str, output: str
     return row
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('--arm', choices=sorted([*ARMS, *BENCH_ARMS]), required=True)
     parser.add_argument('--mode', choices=('none', 'nsys', 'sglang'), required=True)
@@ -251,18 +386,31 @@ def main() -> None:
         action='store_true',
         help='sample the scheduler with py-spy (sudo) during collected windows (diagnostic)',
     )
-    args = parser.parse_args()
+    parser.add_argument(
+        '--check-complete',
+        action='store_true',
+        help=f'launch nothing; exit {COMPLETE} if --out-dir holds this run (same recorded '
+        f'command, every window record), {INCOMPLETE} if it holds an incomplete or different '
+        f'run, {ABSENT} if none',
+    )
+    return parser
 
+
+def main() -> None:
+    args = build_parser().parse_args()
+    if args.repeats < 1:
+        raise SystemExit('--repeats must be at least 1')
     args.out_dir = args.out_dir.expanduser().resolve()
+    if args.check_complete:
+        sys.exit(print_status(args.out_dir, *run_status(args)))
+    if (args.out_dir / 'windows.jsonl').exists():
+        raise SystemExit(
+            f'{args.out_dir} already holds windows.jsonl from an earlier server session; '
+            'move the directory aside (run_all.sh does) so one file records one session'
+        )
     args.out_dir.mkdir(parents=True, exist_ok=True)
     args.session = f'vp_{args.arm}_{os.getpid()}'
-    if args.arm in BENCH_ARMS:
-        server, arm_env = bench_server(args.arm, args.port, args.concurrency)
-    else:
-        server = [sys.executable, '-m', 'sglang.launch_server', *BASE_FLAGS]
-        server += ['--port', str(args.port), *ARMS[args.arm]]
-        arm_env = {}
-    server += shlex.split(args.extra_server_args)
+    server, arm_env = build_server(args)
     # A non-zero flush interval lets CUPTI allocate more buffers instead of
     # dropping records once its 50 default buffers fill (seen in MTP windows).
     nsys_trace = [

@@ -28,6 +28,9 @@ and so on. The LM head is the last GEMM of a target or draft-extend replay and,
 in a draft replay, each GEMM followed by the draft top-1 kernels.
 ``splitKreduce_kernel`` inherits its GEMM's label. Unmatched in-graph kernels
 land in ``other_in_graph``; unmatched eager kernels in ``runtime_eager_small``.
+For DFlash, the eager GEMMs and norm, RoPE and KV-write kernels project the
+verified target features into the drafter's KV cache (``draft_context_kv``,
+``DFLASH_EAGER``).
 
     python experiments/profiling/attribute.py ~/vp-data/profile/plain_nsys/plain_bs8.nsys-rep \
         --kind plain --out-prefix evidence/profiles/attribution/plain_bs8
@@ -62,7 +65,8 @@ RULES: list[tuple[str, str]] = [
     ('gdn_recurrent', r'fused_recurrent|delta_rule|gated_delta|sigmoid_gating|replayssm'),
     ('gdn_gated_norm', r'_layer_norm_fwd'),
     ('gdn_state_track', r'track_mamba'),
-    ('full_attention', r'BatchDecode|BatchPrefill|MergeStates|merge_state'),
+    # FlashInfer's kernels, and SGLang's Triton extend/decode attention (_fwd_kernel*).
+    ('full_attention', r'BatchDecode|BatchPrefill|MergeStates|merge_state|^_fwd_kernel'),
     ('attn_output_gate', r'sigmoid_mul'),
     ('kv_cache_store', r'store_kvcache|set_kv|kv_buffer'),
     ('mlp_activation', r'act_and_mul|silu|gelu'),
@@ -78,6 +82,7 @@ ORDER = [
     'draft_argmax_eager',
     'mtp_layer',
     'draft_model',
+    'draft_context_kv',
     'gdn_in_proj_gemm',
     'gdn_out_proj_gemm',
     'gdn_conv',
@@ -125,6 +130,18 @@ def name_category(name: str) -> str:
 
 # Non-head work inside draft graphs goes to one category per drafter.
 DRAFT_LAYER = {'draft': 'mtp_layer', 'draft_extend': 'mtp_layer', 'dflash_draft': 'draft_model'}
+# DFlash runs the whole target forward inside the verify graph, so these eager kernels
+# belong to the drafter: after each verify, the verified target features are projected
+# into the drafter's KV cache (GEMMs, RMSNorm, fused norm + RoPE, prefix-valid KV writes;
+# DFlashWorkerV2._append_target_hidden_to_draft_kv_by_loc), and before each draft the
+# block's input embedding is looked up.
+DFLASH_EAGER = {
+    'gemm': 'draft_context_kv',
+    'norm': 'draft_context_kv',
+    'attn_qk_norm_rope_gate': 'draft_context_kv',
+    'kv_cache_store': 'draft_context_kv',
+    'embedding': 'draft_model',
+}
 
 
 def label_gemms(names: list[str], cats: list[str], role: str) -> list[str]:
@@ -153,7 +170,8 @@ def label_gemms(names: list[str], cats: list[str], role: str) -> list[str]:
         return False
 
     def followed_by_argmax(i: int) -> bool:
-        # DFlash's draft head is torch.matmul then torch.argmax per 256-row chunk.
+        # DFlash's draft head is torch.matmul then torch.argmax (_DflashDraftSampler,
+        # folded into the draft graph: one GEMM over the block's draft rows).
         for j in range(i + 1, len(names)):
             if cats[j] != 'gemm':
                 return names[j] == 'reduce_kernel'
@@ -262,7 +280,9 @@ def label_all(
     seen: set[int] = set()
     for idx in k.index[~ing]:
         cat = k.at[idx, 'cat']
-        if cat == 'gemm':
+        if spec == 'dflash' and cat in DFLASH_EAGER:
+            k.at[idx, 'cat'] = DFLASH_EAGER[cat]
+        elif cat == 'gemm':
             k.at[idx, 'cat'] = 'other_gemm'
         elif cat == 'unmatched':
             j = int(np.searchsorted(ends, k.at[idx, 'start'])) - 1
@@ -329,8 +349,16 @@ def attribute(trace: Trace, kind: str) -> dict:
         & (rt['start'] >= steps[0][0])
         & (rt['start'] < steps[-1][1])
     ]
-    eager = k[(k['role'] == 'eager') & k['corr'].isin(launch_calls['corr'])]
-    eager_records_ratio = len(eager) / max(len(launch_calls), 1)
+    # A stream runs in launch order, so a launch issued before the last recorded kernel
+    # of the main stream ran before collection stopped: without a record, CUPTI dropped
+    # it. A later launch without a record ran after collection ended (the host can lead
+    # the GPU by a whole cycle, as in DFlash with Triton attention) and is not counted.
+    main_stream = k['stream'].mode().iloc[0]
+    last_main = k.loc[k['stream'] == main_stream, 'corr'].max()
+    recorded = launch_calls['corr'].isin(k['corr'])
+    counted = launch_calls[recorded | (launch_calls['corr'] < last_main)]
+    eager = k[(k['role'] == 'eager') & k['corr'].isin(counted['corr'])]
+    eager_records_ratio = len(eager) / max(len(counted), 1)
 
     rows = []
     kernel_us: dict[tuple[str, str], float] = defaultdict(float)
@@ -453,6 +481,7 @@ def attribute(trace: Trace, kind: str) -> dict:
         'host_sync_calls': host_syncs,
         'eager_launch_calls_per_step': len(launch_calls) / n,
         'eager_kernel_records_per_launch_call': eager_records_ratio,
+        'eager_launch_calls_after_collection': len(launch_calls) - len(counted),
         'graph_roles': {str(g): r for g, r in roles.items()},
         'head_pct_target_chain': shares['target'],
         'head_pct_draft_chain': shares['draft'],

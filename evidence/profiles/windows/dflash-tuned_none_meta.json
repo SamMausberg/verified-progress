@@ -1,0 +1,25 @@
+{
+  "argv": [
+    "/home/ubuntu/vp-wt/profile-hold/experiments/profiling/run_profiles.py",
+    "--arm",
+    "dflash-tuned",
+    "--mode",
+    "none",
+    "--concurrency",
+    "1",
+    "4",
+    "16",
+    "64",
+    "--repeats",
+    "3",
+    "--out-dir",
+    "/home/ubuntu/vp-data/profile/dflash-tuned_none"
+  ],
+  "env": {},
+  "server_command": "/home/ubuntu/sglang/.venv/bin/python -m sglang.launch_server --model-path Qwen/Qwen3.5-4B --revision 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a --host 127.0.0.1 --port 30020 --attention-backend flashinfer --mm-attention-backend triton_attn --max-running-requests 128 --max-mamba-cache-size 128 --mem-fraction-static 0.85 --max-total-tokens 1000000 --enable-metrics --random-seed 0 --stream-interval 4 --speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash --speculative-draft-model-revision 9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf --speculative-dflash-block-size 8 --speculative-draft-attention-backend fa4 --disable-radix-cache",
+  "started": "2026-10-02T07:55:53",
+  "sglang_sha": "bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824",
+  "repo_sha": "5bc91db2455a0d399b35f65bf34cbb9e9ba5d2af",
+  "nsys_version": "NVIDIA Nsight Systems version 2025.3.2.474-253236389321v0",
+  "gpu": "NVIDIA GH200 480GB, 570.195.03, 1980 MHz, 2619 MHz"
+}

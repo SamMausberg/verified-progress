@@ -11,8 +11,15 @@
   "host_lead_us_median_by_graph": {
    "target": 2946.432
   },
+  "host_sync_calls": {
+   "cudaEventSynchronize": {
+    "calls_per_step": 1.0,
+    "host_blocked_us_per_step": 2028.8085873417722
+   }
+  },
   "eager_launch_calls_per_step": 20.0,
-  "eager_kernel_records_per_launch_call": 0.999493670886076,
+  "eager_kernel_records_per_launch_call": 1.0,
+  "eager_launch_calls_after_collection": 4,
   "graph_roles": {
    "5783": "target"
   },

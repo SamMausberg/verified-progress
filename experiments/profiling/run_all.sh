@@ -21,14 +21,27 @@ else
 fi
 RUN=(python "$REPO/experiments/profiling/run_profiles.py")
 
-# Profile runs are skipped when their output directory already holds window
-# records, so a queued hold can be resubmitted without repeating finished work.
-# Set VP_RERUN=1 (or delete the directory) to repeat a run.
+# A profile run is skipped only when its output directory records the same command
+# (arguments, server command, environment) and holds every window record that run
+# appends (run_profiles.py --check-complete exits 0; 10 means an incomplete or
+# different run, 11 no run), so a resubmitted hold repeats exactly the unfinished
+# or changed runs. Such a run is moved aside to <dir>.set-aside-<UTC time>,
+# never extended: run_profiles.py refuses a directory that already holds windows.
+# VP_RERUN=1 repeats every run, moving the earlier ones aside the same way.
 prof() {
-  local out="${*: -1}"
-  if [ -s "$out/windows.jsonl" ] && [ "${VP_RERUN:-0}" != 1 ]; then
-    echo "skip: $out already has windows.jsonl"
-    return 0
+  local out="${*: -1}" rc=0 aside
+  if [ "${VP_RERUN:-0}" != 1 ]; then
+    "${RUN[@]}" "$@" --check-complete || rc=$?
+    case "$rc" in
+      0) echo "skip: $out holds every expected window"; return 0 ;;
+      10 | 11) ;;
+      *) echo "prof: could not check $out (exit $rc)" >&2; exit "$rc" ;;
+    esac
+  fi
+  if [ -e "$out/windows.jsonl" ]; then
+    aside="$out.set-aside-$(date -u +%Y%m%dT%H%M%SZ)"
+    mv -T "$out" "$aside"  # -T: fail rather than move into an existing directory
+    echo "moved the earlier run in $out to $aside"
   fi
   "${LOCK[@]}" "${RUN[@]}" "$@"
 }
