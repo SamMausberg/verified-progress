@@ -19,6 +19,7 @@ import argparse
 import hashlib
 import json
 import struct
+import subprocess
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -116,7 +117,23 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('--out', type=Path, required=True)
     args = parser.parse_args(argv)
-    result: dict[str, Any] = {}
+    repo_dir = Path(__file__).resolve().parents[2]
+    result: dict[str, Any] = {
+        'repo_commit': subprocess.run(
+            ['git', '-C', str(repo_dir), 'rev-parse', 'HEAD'],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip(),
+        'repo_dirty': bool(
+            subprocess.run(
+                ['git', '-C', str(repo_dir), 'status', '--porcelain', '--untracked-files=no'],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+        ),
+    }
     for key, (repo, revision) in CHECKPOINTS.items():
         root = snapshot(repo, revision)
         entry: dict[str, Any] = {'repo': repo, 'revision': revision, **weight_bytes(root)}
