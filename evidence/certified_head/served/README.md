@@ -41,10 +41,12 @@ lowers DFlash block 8's by 1.2%. Plain's and MTP's gains are real and declared, 
 exact at concurrency 1 and the check-mode batches, but neither arm leads the envelope at
 c <= 32. The gains are confined
 to small batches and fall well short of the prediction (MTP 1.046 against 1.086 at c = 1;
-block 16 1.012 against 1.045 at c = 1 and 0.970 against 1.009 at c = 4). Wherever the
-head serves 32-64-row MTP or DFlash batches it loses up to 3.3%; where every certified
-path is gated off the captured certified graph still costs 0.6-1.2%; and the certified
-graphs take 3.8-25.7 GB more memory at capture.
+block 16 1.012 against 1.045 at c = 1 and 0.970 against 1.009 at c = 4). DFlash loses at
+every tested point where its certified batches reach 28-64 rows (block 16 at c = 2 and 4,
+block 8 at c = 4 and 8, by 1.0-3.0%); MTP gains through c = 8 (32-row verify batches),
+shows no detectable change at c = 16 and 32, and loses 3.3% at c = 64 (64-row draft
+batches). Where every certified path is gated off the captured certified graph still
+costs 0.6-1.2%, and the certified graphs take 3.8-25.7 GB more memory at capture.
 
 ## Setup
 
@@ -130,13 +132,14 @@ by chance.
 three sessions; `frontier.csv`); `ratios.png` draws the ratios with their intervals,
 the predictions and the gated-off range (`ratios.csv`).
 
-**Where the head loses.** The certified head is ahead only while its batches are small.
-Plain decoding gains about 2% up to c = 16 (16-row batches) and 1.1% at c = 32, then
-nothing at 64. MTP gains 3.0-4.6% up to c = 4 (verify batches of up to 16 rows, draft
-batches of 4) and loses 3.3% at c = 64, where every certified call is a 64-row draft
-batch. Both DFlash arms lose as soon as their certified batches pass about 16 rows:
-block 16 at c = 2 (32-row verify, 30-row draft projection) and c = 4 (64 and 60 rows),
-block 8 at c = 4 and 8 (32 and 64 verify rows).
+**Where the head loses.** From the measured points only: plain decoding gains about 2% up
+to c = 16 (16-row batches) and 1.1% at c = 32, then nothing at 64. MTP gains 3.0-4.6% up
+to c = 4 and 1.7% at c = 8 (32-row verify batches, 8-row draft batches), shows no
+detectable change at c = 16 and 32, and loses 3.3% at c = 64, where the certified calls
+are 64-row draft batches. Both DFlash arms lose at every tested point where the head is
+active above c = 1: block 16 at c = 2 (32-row verify, 30-row draft projection) and c = 4
+(64 and 60 rows), block 8 at c = 4 (32 and 28) and c = 8 (64 and 56). At c = 1 block 16
+(16 and 15 rows) gains 1.2%.
 
 **Gate overhead.** Above 64 rows the engine replays the same CUDA graph with the
 certified head's flag off: the stock head runs inside a conditional node, and the
@@ -357,4 +360,5 @@ for N = 1-4 at the hold commit; the re-score and the wave control ran
 | `frontier.csv`, `frontier.png`, `ratios.png` | figure data and figures |
 | `launch_outliers.csv` | the post hoc slow-launch diagnostic |
 | `predictions.json` | the derived predictions, written before the runs (`analyze.py predict`) |
+| `classes.csv` | every re-scored first-divergence context: class, margin, BF16 spacing, both tokens and their batch-1 stock logprobs (from `experiments/benchcert/rescore.py`'s output, copied by `analyze.py report`) |
 | `control_waves_mtp.json`, `control_waves_dflash16.json` | the exploratory wave controls' comparisons, with their reading rules (`experiments/benchcert/control_waves.py`, run by `hold_shared.sh`) |

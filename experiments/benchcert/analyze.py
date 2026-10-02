@@ -610,6 +610,24 @@ def _utc(stamp: float | None) -> str | None:
     return datetime.fromtimestamp(stamp, tz=UTC).strftime('%Y-%m-%dT%H:%M:%SZ')
 
 
+def class_rows(path: Path) -> list[dict[str, Any]]:
+    """One row per re-scored context (the committed copy of rescore.py's output)."""
+    if not path.exists():
+        return []
+    rows = []
+    for record in iter_jsonl(path):
+        first, second = record['tokens']
+        lp_first, lp_second = record['logprobs']
+        rows.append({
+            'context': record['id'], 'class': record['class'], 'margin_nats': record['margin'],
+            'ulp': record['ulp'], 'token_a': first, 'token_b': second,
+            'logprob_a': lp_first, 'logprob_b': lp_second,
+            'stock_top1': record.get('stock_top1'),
+            'prompt_and_prefix_tokens': record.get('prompt_and_prefix_tokens'),
+        })
+    return rows
+
+
 def load_classes(path: Path) -> dict[str, str]:
     """Context id -> class from rescore.py's output (empty before the re-score)."""
     if not path.exists():
@@ -853,6 +871,7 @@ def report(
     write_csv(launch_rows, out / 'launches.csv')
     write_csv(capture_rows, out / 'capture_memory.csv')
     write_csv(frontier_rows(point_rows), out / 'frontier.csv')
+    write_csv(class_rows(runs / 'rescore' / 'classes.jsonl'), out / 'classes.csv')
     slow_rows, slow_launches = slow_launch_diagnostic(point_rows)
     write_csv(slow_rows, out / 'launch_outliers.csv')
     summary['post_hoc_launch_outliers'] = outlier_effects(slow_launches, pair_rows, ratio_rows)
