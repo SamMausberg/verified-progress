@@ -11,6 +11,8 @@ OUT=$HOME/vp-data/speed-bytes/kill2b_$(date -u +%Y%m%dT%H%M%SZ)
 mkdir -p "$OUT"
 exec >"$OUT/hold.log" 2>&1
 unset PYTHONPATH
+# Only the switches each launch passes explicitly may reach a server.
+unset "${!SGLANG_FP8_@}"
 export SGLANG_WORKTREE=$ENGINE
 # shellcheck source=/dev/null
 source "$REPO/scripts/sglang_env.sh"

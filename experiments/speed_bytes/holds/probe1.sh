@@ -11,6 +11,8 @@ PORT=30221
 mkdir -p "$OUT"
 exec >"$OUT/hold.log" 2>&1
 unset PYTHONPATH
+# Only the switches each launch passes explicitly may reach a server.
+unset "${!SGLANG_FP8_@}"
 export SGLANG_WORKTREE=$ENGINE
 # shellcheck source=/dev/null
 source "$REPO/scripts/sglang_env.sh"
@@ -29,6 +31,9 @@ export GPU_STARTUP_MIN_FREE_GB=50
 start_server() {  # label, then env assignments
   local label=$1; shift
   echo "== start $label $(date -Is)"
+  if curl -sf "http://127.0.0.1:$PORT/health" >/dev/null; then
+    echo "port $PORT already serves: refusing to start $label"; return 1
+  fi
   # shellcheck disable=SC2016 # the inner bash expands its own $(...) and $_
   "$REPO/scripts/gpu_startup_lock.sh" env "$@" bash -c '
     setsid python -m sglang.launch_server --model-path Qwen/Qwen3.5-4B \
@@ -37,7 +42,9 @@ start_server() {  # label, then env assignments
       --max-running-requests 48 --mem-fraction-static 0.25 --max-total-tokens 150000 \
       --max-mamba-cache-size 64 --disable-radix-cache --random-seed 0 --stream-interval 4 \
       >"'"$OUT/server_$label.log"'" 2>&1 &
+    pid=$!
     for _ in $(seq 300); do
+      kill -0 "$pid" 2>/dev/null || exit 1  # the server this call started must still be alive
       curl -sf http://127.0.0.1:'"$PORT"'/health >/dev/null && exit 0
       sleep 2
     done

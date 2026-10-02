@@ -136,6 +136,13 @@ def cmd_served(args: argparse.Namespace) -> None:
             got = {p['concurrency'] for p in d['points']}
             if planned != got:
                 raise SystemExit(f'{f}: points {sorted(got)} != planned {sorted(planned)}')
+            # The server's own log must show the FP8 switches exactly when the arm sets them.
+            log = (f.parent / 'server' / 'server.log').read_text(errors='replace')
+            wants = {k for k, v in d['arm'].get('env', {}).items() if v}
+            if ('SGLANG_FP8_DENSE' in wants) != ('FP8 dense (' in log) or (
+                'SGLANG_FP8_DRAFT_HEAD' in wants
+            ) != ('draft head in FP8' in log):
+                raise SystemExit(f'{f}: server log does not match the FP8 switches {sorted(wants)}')
             for p in d['points']:
                 if p['failed'] or p['osl_mismatch'] or p['completed'] != p['requests']:
                     raise SystemExit(f'{f}: c={p["concurrency"]} has failed or short requests')
@@ -220,6 +227,10 @@ def cmd_probe(args: argparse.Namespace) -> None:
     def load(name: str) -> dict:
         return json.loads((d / f'{name}.json').read_text())
 
+    for label in ('bf16', 'fp8tok', 'fp8ten'):
+        log = (d / f'server_{label}.log').read_text(errors='replace')
+        if ('FP8 dense (' in log) != (label != 'bf16'):
+            raise SystemExit(f'{d}: server_{label}.log does not match its FP8 setting')
     ref = load('bf16.gen48')
     out: dict = {'reference': 'bf16.gen48', 'logit_probe_compare': {}, 'decode_path': {}}
     for cand in ['bf16.gen1', 'bf16.score', 'fp8tok.gen48', 'fp8tok.gen1', 'fp8tok.score',
