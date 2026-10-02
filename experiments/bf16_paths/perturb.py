@@ -10,9 +10,11 @@ own: one forward over the prompt and output[:position] (the `fp32_full` path of
 `paths.py fp32`), repeated with every decoder layer's output multiplied elementwise by
 (1 + u), u drawn uniformly from [-2^-8, 2^-8] with a fixed seed per run. 2^-8 bounds the
 relative error of rounding to BF16 (round to nearest, 8 significand bits; values just above
-a power of two come close to it), so each run perturbs the residual stream at least as much
-as storing it in BF16 after every layer would, at every position of the prefix
-(`--site residual`). The first runs used 2^-9, half that bound (superseded). Projections average such elementwise
+a power of two come close to it), so each run perturbs the residual stream by relative errors
+of the same order as storing it in BF16 after every layer, at every position of the prefix
+(`--site residual`). It is not an upper or lower bound on any particular rounding: each draw
+is uniform within the bound, while a real rounding error is fixed by the value rounded. The
+first runs used 2^-9, half that bound (superseded). Projections average such elementwise
 noise down, so it understates the effect of rounding a quantity the GDN recurrence uses
 directly; `--site gdn` instead multiplies the GDN core's inputs (query, key, value and beta,
 all BF16 in SGLang and in transformers' BF16 model) by (1 + u) in every GDN layer. The
