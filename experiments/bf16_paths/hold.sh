@@ -22,9 +22,10 @@
 #   of text (where both events lie) is sampled; transformers with an FP32 state only.
 # Targets: ~/vp-data/exactness/paths/targets.jsonl (paths.py `targets`), copied once and hashed.
 # Output: ~/vp-data/upstream/bf16 (BF16_PATHS_OUT); log in logs/hold-<UTC>.log. A step that
-# finishes without a failure writes done/<step>, and a step with that marker is refused. A
-# rerun after a failure keeps every output that exists and produces only the missing ones
-# (no file is overwritten); move an output aside to redo it.
+# finishes without a failure writes done/<step>; a rerun skips completed steps (and is refused
+# when every requested step is complete), and within an incomplete step keeps every output that
+# exists and produces only the missing ones (no file is overwritten); move an output aside to
+# redo it.
 set -euo pipefail
 steps=" ${*:-all} "
 for step in $steps; do
@@ -44,14 +45,19 @@ unset SGLANG_WORKTREE PYTHONPATH
 source "$repo/scripts/sglang_env.sh"
 python -c 'import sglang, torch, transformers' || { echo "not the SGLang environment: $(command -v python)"; exit 1; }
 [ -z "$(git status --porcelain --untracked-files=all)" ] || { echo "checkout not clean"; exit 65; }
+# Completed steps are skipped; the hold is refused only when every requested step is complete.
+todo=" "
+skipped=""
 for step in hf sglang perturb perturb_gdn rates rates_eot; do
-  if want "$step" && [ -e "$out/done/$step" ]; then
-    echo "$out/done/$step exists: $step already complete"; exit 65
-  fi
+  want "$step" || continue
+  if [ -e "$out/done/$step" ]; then skipped+="$step "; else todo+="$step "; fi
 done
+[ "$todo" != " " ] || { echo "every requested step is complete (markers in $out/done)"; exit 65; }
+want() { [[ $todo == *" $1 "* ]]; }
 mkdir -p "$out/logs" "$out/done"
 exec >"$out/logs/hold-$(date -u +%Y%m%dT%H%M%SZ).log" 2>&1
 echo "bf16 paths hold (${steps# }) start $(date -Is) repo $(git rev-parse HEAD) sglang $(git -C "$HOME/sglang" rev-parse HEAD)"
+echo "steps to run:${todo% }; already complete: ${skipped:-none}"
 if [ -e "$out/targets.jsonl" ]; then
   cmp "$targets_src" "$out/targets.jsonl" || { echo "targets changed since the first hold"; exit 65; }
 else
