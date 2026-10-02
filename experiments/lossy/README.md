@@ -21,6 +21,8 @@ one. Every hold runs every arm, exact or lossy, on that one engine worktree.
 | `plan.py` | The declared holds: arms and concurrencies per session, matched pairs, levers, quality holds, decision band, pins |
 | `run_hold.py` | Runs one timed session or quality hold from `plan.py`; every launch inside `scripts/gpu_startup_lock.sh` with its own timeout, a manifest written after each launch |
 | `analyze.py` | The declared analysis: session-paired ratios, envelope ratios and their decisions, GSM8K and probe comparisons against the budget |
+| `figures.py` | Frontier with and without each lever; quality against speed |
+| `checkpoint_check.py` | CPU only: weight bytes per decode step from the safetensors headers, tokenizer file hashes, end-of-sequence ids as SGLang resolves them |
 
 ## Load test L0 (untimed)
 
@@ -49,8 +51,9 @@ Nothing in L0 is timed. Its output is `~/vp-data/lossy/load_test/<UTC>/load_test
 
 ## Pre-registration of the timed and quality holds
 
-Declared before any timed hold of this study. Nothing below depends on the load test's
-outcome except one rule: an arm that fails its L0 launch checks is listed in
+Declared at `a5d605f` before any timed hold of this study, and revised twice before any timed
+hold (see "Revisions" at the end; each is a separate commit). Nothing below depends on the load
+test's outcome except one rule: an arm that fails its L0 launch checks is listed in
 `plan.DROPPED_ARMS` with the failure, and is not timed.
 
 ### Questions
@@ -58,7 +61,9 @@ outcome except one rule: an arm that fails its L0 launch checks is listed in
 1. How much faster is the INT4 target with its INT4 DFlash drafter than the best tuned exact
    arm at each concurrency, and what does it cost in quality?
 2. How much does an FP16 GDN state add over the best exact arm at c = 64-256 with capacity
-   256, and what does it cost in quality?
+   256, and what does it cost in quality? The decision band below (all three sessions beyond
+   +-2%) suits INT4's expected large gains; an FP16 gain of a few percent may come out as "no
+   detectable change" by design, and is then reported as its measured ratios.
 
 ### Arms and matched baselines
 
@@ -77,14 +82,18 @@ load-time check that every `fc` parameter was loaded, so the exact arms execute 
 The exact arms are bench's tuned arms (`evidence/bench/README.md`, confirm/): the best arm by
 mean y is `dflash-tuned-b16` at c <= 4, `dflash-tuned` at c = 8-32 and `plain-tuned` from
 c = 48, with buffered plain decoding (`plain-tuned-replayssm`) ahead of it at c = 96-128 in its
-one session. `plain-cap256` and `replayssm-cap256` are those two arms with capacity 256 (radix
-cache off, one GDN slot per request), so that c = 256 runs at all; at c = 64 and 128 their y
-is reported beside bench's confirmed `plain-tuned` means as a check, not a decision.
+one session. `plain-cap256` and `replayssm-cap256` are `plain-tuned` and
+`plain-tuned-replayssm` with capacity 256 (radix cache off, one GDN slot per request), so that
+c = 256 runs at all. `plain-tuned` itself (capacity 128) runs at c = 64 and 128 in every
+session and competes in the exact envelope there, so a cost of the larger capacity cannot
+inflate a ratio at those points.
 
 ### Sessions
 
 Three exclusive holds, `lossy-s1` to `lossy-s3`, each launching every arm afresh in the order
-of `plan.SESSION_LAUNCHES` (`lossy-s2` reverses it), about 28 minutes each with a 44-minute cap.
+of `plan.SESSION_LAUNCHES` (`lossy-s2` reverses it), about 34 minutes each with a 44-minute
+cap. The arms at both ends of the list (`int4-plain-cap256` and `plain-cap256`) carry no
+headline point, so a hold that runs out of time loses a non-headline launch in either order.
 The workload and request settings are bench's confirmation sweep: `mixed-v2/confirm.jsonl`,
 512 output tokens with `ignore_eos`, greedy, thinking on, `max(64, 8c)` measured requests after
 one warmup wave, `--stream-interval 4`, foreign CPU sampled at 1 Hz. At c = 256 the 2,048
@@ -101,7 +110,10 @@ so a repeated prompt is computed afresh.
   with the range over the three sessions.
 - Envelope ratio per lever and concurrency: the lever's best arm over the best exact arm, each
   chosen by its mean y over the three sessions, paired within each session. This is the "Y
-  times" of the result.
+  times" of the result. Choosing by the maximum mean favours an arm that was lucky in these
+  sessions, slightly inflating the lossy side and deflating the exact side; the runner-up's
+  ratio on each side is reported beside every envelope ratio. For FP16 state only arms with
+  their own GSM8K run compete (both FP16 arms have one, holds `q2` and `q3`).
 - Decision for every ratio: faster if all three sessions exceed 1.02, slower if all three are
   below 0.98, otherwise no detectable change. The 2% band is the largest session-to-session
   coefficient of variation of y in bench's confirmation (1.9%).
@@ -109,22 +121,24 @@ so a repeated prompt is computed afresh.
   sessions; an invalid point is reported with its reason and stays undecided.
 - Headline points: x at c = 1 and y at c = 8 and 32 for INT4; y at c = 128 and 256 for
   FP16 state. Every other point is reported in the tables.
+- Accept length and y per accepted token for every speculative arm, since a different target
+  and drafter change acceptance.
 - Memory, from the server logs of the same launches (not timed): weight memory of target and
   drafter, KV tokens and GDN state memory at the same `--mem-fraction-static`.
-- Slow-launch check (pre-run revision, 2026-10-02 03:30 UTC, before any timed hold). The
-  machine has an intermittent launch-level slow state (TTFT p50 about 4 ms higher at every
-  concurrency and decode 2-6% slower, invisible to the foreign-CPU and clock checks; seen by
-  the red team in two other workstreams' holds). For every launch (arm and session) and each of
-  its concurrencies, `analyze.launch_flags` compares TTFT p50 and the time per forward pass
-  (ITL p50 times the mean accept length; ITL p50 for plain decoding) with the median of the
-  same arm's sessions at that concurrency. A launch is flagged when, at a majority of its
-  concurrencies, TTFT p50 is more than 3 ms above that median and the time per pass more than
-  2% above it. Both conditions are required because TTFT alone varies by up to 5-9 ms between
-  bench's valid confirmation sessions at c >= 32. A flagged launch is reported, and stays in the
-  primary analysis; every decision is also computed without the flagged launches (each ratio
-  then needs at least two sessions), and both verdicts are shown. Where they differ, the text
-  gives both and calls neither the true result. With three sessions the median cannot expose a
-  slow state that hit two of an arm's three launches; that limit is stated with the results.
+- Slow-launch check. The machine has an intermittent launch-level slow state (TTFT p50 about
+  4 ms higher at every concurrency and decode 2-6% slower, invisible to the foreign-CPU and
+  clock checks; seen by the red team in two other workstreams' holds). For every launch (arm
+  and session) and each of its concurrencies, `analyze.launch_flags` compares TTFT p50 and the
+  time per forward pass (ITL p50 times the mean accept length; ITL p50 for plain decoding) with
+  the median of the same arm's sessions at that concurrency. A launch is flagged when, at a
+  majority of its concurrencies, TTFT p50 is more than 3 ms above that median and the time per
+  pass more than 2% above it. Both conditions are required because TTFT alone varies by up to
+  5-9 ms between bench's valid confirmation sessions at c >= 32. A flagged launch is reported
+  and stays in the primary analysis; every decision is also computed without the flagged
+  launches (each ratio then needs at least two sessions), and both verdicts are shown. Where
+  they differ, the text gives both and calls neither the true result. With three sessions the
+  median cannot expose a slow state that hit two of an arm's three launches; that limit is
+  stated with the results.
 
 ### Quality
 
@@ -135,49 +149,92 @@ most 0.01 nats on `logit_probe.py`'s fixed 48-prompt, 256-token set; each next t
 reference's own run-to-run noise.
 
 - GSM8K (`bench.quality`, 1,319 problems, temperature 0.6, top-p 0.95, top-k 20, seed 0,
-  16,384-token limit, 128 threads): `int4-dflash-b8` in hold `q1` (the INT4 target with its
-  drafter, measured as the combination it is served as) and `plain-cap256-fp16` in hold `q2`.
-  The references are bench's two committed `plain-tuned` runs
+  16,384-token limit, 128 threads), one exclusive hold each: `int4-dflash-b8` in `q1` (the INT4
+  target with its drafter, measured as the combination it is served as), `plain-cap256-fp16`
+  in `q2` and `replayssm-cap256-fp16` in `q3` (the replay path flushes and replays the state,
+  so its FP16 error is not the plain path's, and long thinking-mode outputs are the only test
+  of accumulation here: the probe uses 256 tokens and the timed runs 512).
+- References: bench's two committed `plain-tuned` runs
   (`evidence/bench/quality/plain-tuned-a-seed0` and `-b-seed0`), made on 2026-10-01 on the
   pinned engine `bd66ce343e` with the same harness (`bench/quality.py` unchanged since) and the
   same settings. This study's engine adds only `patches/lossy/0001`, which touches quantized
-  DFlash drafters and nothing a plain BF16 server runs. The two references differ from each
-  other by +0.30 points, which is the reference's run-to-run noise. Each comparison is paired
-  by problem: the same 1,319 problems, scored per problem in both runs (`bench.quality
-  compare`), with the McNemar test on the problems only one run solved. Reported per reference: the accuracy difference, the exact McNemar p-value and a 95%
-  Wald interval of the paired difference. The GSM8K part of the budget is met when the
-  difference is at least -1.0 point against both references. With about 150 discordant
-  problems per pair the interval is about +-1.8 points, and a loss below about 2.5 points would
-  not reach p < 0.05 with 80% probability (`evidence/bench/README.md`, quality/): GSM8K here
-  can rule out large losses, not a loss of 1.0 point, and the text says so wherever a GSM8K
-  difference is quoted.
-- Logit probe: score mode (the reference's greedy tokens fed back, so every position has the
-  same context) gives the agreement and KL against the reference run `plain-ref-1` from L0.
-  The reference's own values are `plain-ref-1` scored against itself (prefill against decode
-  path) and `plain-ref-2` (a second launch) against `plain-ref-1`. Score mode runs the GDN
-  layers in the chunked prefill kernel, which keeps its state in the configured dtype only at
-  chunk ends, so for the FP16 state it underestimates the decode-path effect; generate mode
-  (greedy continuations, first divergence and KL on the shared prefix) is reported beside it
-  for every probed arm as the decode-path measurement. Probed arms: `int4-plain-cap256` and
-  `int4-dflash-b8` in `q1`, `plain-cap256-fp16` and `replayssm-cap256-fp16` in `q2`.
-- A lever is within budget only if all three criteria hold. Otherwise the result is stated as
-  the trade it is: the GSM8K difference with its interval and the probe values, next to the
-  speedup at each concurrency.
+  DFlash drafters and nothing a plain BF16 server runs. Each comparison is paired by problem:
+  the same 1,319 problems, scored per problem in both runs (`bench.quality compare`), with the
+  McNemar test on the problems only one run solved. Reported per reference: the accuracy
+  difference, the exact McNemar p-value and a 95% Wald interval of the paired difference.
+- How much this check resolves. The two references differ by +0.30 points, but bench's exact
+  arms, compared with the same references, span -1.36 to +1.06 points (`mtp-stockverify`
+  -1.06 and -1.36, `mtp-tuned` -0.45 and -0.76, `dflash-tuned` -0.30 and -0.61,
+  `plain-tuned-replayssm` +1.06 and +0.76; `evidence/bench/quality/comparisons.json`), and the
+  95% interval of one paired difference is about +-1.8 points. A stock, exact arm would
+  already miss a -1.0-point rule against one reference. So the GSM8K part of the budget
+  (difference at least -1.0 point against both references) is applied as declared, but it
+  cannot separate a 1-point loss from noise; it can rule out losses of roughly 2.5 points or
+  more. Every lossy difference is reported beside the exact arms' spread, and the text says
+  this wherever a GSM8K difference is quoted.
+- The INT4 drafted arm is also compared with `dflash-tuned-seed0` (stock DFlash, same
+  speculative sampling and block size), reported only. One GSM8K arm covers the INT4 lever
+  because DFlash sampling keeps the target's distribution, which `dflash-tuned`'s -0.30 and
+  -0.61 against plain decoding support; the INT4 arms share one target.
+- Versions: the references used torch 2.13.0, triton 3.7.1, flashinfer 0.6.18, transformers
+  5.12.1 and sgl-eval 0.1.2 (no package in the venv is newer than the reference runs; checked
+  on 2026-10-02 at 03:35 UTC). `run_hold.py` records the versions in every hold and refuses a
+  quality hold whose versions differ; a fresh stock reference run would then come first.
+- EOS: GSM8K stops at end of sequence, so `checkpoint_check.py` records the end-of-sequence ids
+  SGLang derives from each checkpoint and each tokenizer's eos and pad ids. Neither checkpoint
+  has a `generation_config.json`; the INT4 `config.json` sets a top-level `eos_token_id`
+  (248046) that the BF16 one does not, and both tokenizers name `<|im_end|>` as eos. Any
+  difference in the resolved stop set is reported with the GSM8K result.
+- Logit probe, against the reference run `plain-ref-1` from L0, in two modes:
+  - score mode (the reference's greedy tokens fed back, so every position has the same
+    context): top-1 agreement and mean top-20 KL. It runs the GDN layers in the chunked prefill
+    kernel, which keeps the state in the configured dtype only at chunk ends, so it cannot see
+    the decode-path error of an FP16 state;
+  - decode path (generate mode, greedy continuations): positions before a sequence's first
+    divergence have the reference's context, so the comparison is teacher-forced up to there.
+    Agreement is shared positions over shared positions plus diverged sequences (the first
+    divergence is the one disagreeing position with an identical context), and the KL is the
+    mean over the shared positions. The count stops at each first divergence, which favours a
+    candidate whose divergences come early; divergences per 1,000 shared tokens are reported
+    beside it.
+  The same thresholds (agreement at least 0.98, KL at most 0.01 nats) apply in both modes, and
+  a probed arm meets the probe part of the budget only if both modes do. The reference's own
+  values: `plain-ref-1` scored against itself (prefill against decode path), `plain-ref-2` (a
+  second launch) in score mode against `plain-ref-1`, and `plain-ref-2`'s generate run against
+  `plain-ref-1` (decode-path noise). Probed arms: `int4-plain-cap256` and `int4-dflash-b8` in
+  `q1`, `plain-cap256-fp16` in `q2`, `replayssm-cap256-fp16` in `q3`.
+- A lever's arm is within budget only if all three criteria hold. Otherwise the result is
+  stated as the trade it is: the GSM8K difference with its interval and the exact arms'
+  spread, and the probe values, next to the speedup at each concurrency.
 
 ### GPU plan
 
 | Hold | Kind | Expected | Content |
 |---|---|---|---|
 | L0 | exclusive, untimed | ~20 min | load test (above) |
-| lossy-s1, -s2, -s3 | exclusive, timed | ~28 min each | every arm, one launch each |
+| lossy-s1, -s2, -s3 | exclusive, timed | ~34 min each | every arm, one launch each |
 | q1 | exclusive, untimed | ~22 min | GSM8K `int4-dflash-b8`, probes |
-| q2 | exclusive, untimed | ~20 min | GSM8K `plain-cap256-fp16`, probes |
+| q2 | exclusive, untimed | ~20 min | GSM8K `plain-cap256-fp16`, probe |
+| q3 | exclusive, untimed | ~20 min | GSM8K `replayssm-cap256-fp16`, probe |
 
-About 2.5 hours in all, priority lane, one ticket at a time, port 30101. The GSM8K runs are
+About 2.9 hours in all, priority lane, one ticket at a time, port 30101. The GSM8K runs are
 exclusive because 128 concurrent thinking-mode requests need more KV cache than a shared
 server's 0.25 memory fraction leaves.
 
 ```sh
 scripts/gpu_lock.sh -x experiments/lossy/hold.sh session lossy-s1   # then lossy-s2, lossy-s3
-scripts/gpu_lock.sh -x experiments/lossy/hold.sh quality q1         # then q2
+scripts/gpu_lock.sh -x experiments/lossy/hold.sh quality q1         # then q2, q3
 ```
+
+### Revisions (all before any timed hold)
+
+- `a4321f4` (2026-10-02 03:20 UTC): the GSM8K references' engine and the per-problem pairing
+  stated.
+- `4654446` (03:30 UTC): the slow-launch check and the with/without-flagged verdicts.
+- Revision 2 (03:45 UTC), after the red team's design review: the decode-path probe criterion
+  for every probed arm (was: generate mode reported without a threshold); GSM8K on
+  `replayssm-cap256-fp16` (hold `q3`) and only GSM8K-measured arms in the FP16 envelope;
+  `plain-tuned` in every session at c = 64 and 128 as an exact arm; non-headline arms at both
+  ends of the session order; the GSM8K yardstick (exact arms' spread), the comparison with
+  stock DFlash, the version check, the EOS check, runner-up ratios, accept lengths and the
+  FP16 band caveat.

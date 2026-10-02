@@ -6,8 +6,9 @@ frontier.png: output tokens/s per user (x) against tokens/s per GPU (y), session
 means, for every arm, with three envelopes: exact arms only, exact arms plus the
 INT4 arms, exact arms plus the FP16-state arms (the frontier without and with
 each lever). quality_speed.png: each lever's GSM8K difference against the
-reference (with its 95% interval, both references) against its envelope speedup
-at the declared headline points, with the -1.0-point budget line.
+reference (with its 95% interval, one point per reference) against the ratio of
+its session-mean y (x at c = 1) to the best exact arm's at the declared headline
+points, with the -1.0-point budget line.
 """
 
 from __future__ import annotations
@@ -134,12 +135,8 @@ def quality_speed(decisions: dict[str, Any], path: Path) -> None:
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
 
-    gsm8k_arm = {lever: str(spec['gsm8k']) for lever, spec in zip(
-        ('int4', 'fp16-state'), plan.QUALITY_HOLDS.values(), strict=True
-    )}  # fmt: skip
-    by_arm = {Path(g['run']).parent.name.removesuffix(f'-seed{plan.GSM8K_SEED}'): g
-              for g in decisions['gsm8k']}  # fmt: skip
-    envelope_at = {(e['lever'], e['concurrency']): e for e in decisions['envelope']}
+    means = {(m['arm'], m['concurrency']): m for m in decisions['means']}
+    best_exact = {e['concurrency']: e['best_exact'] for e in decisions['envelope']}
     fig, ax = plt.subplots(figsize=(7.0, 4.2), dpi=150)
     fig.patch.set_facecolor(SURFACE)
     style(ax)
@@ -147,16 +144,15 @@ def quality_speed(decisions: dict[str, Any], path: Path) -> None:
     ax.annotate('budget: -1.0 point', (1.0, -1.0), textcoords='offset points', xytext=(4, 4),
                 fontsize=7, color=MUTED)  # fmt: skip
     ax.axhline(0.0, color=GRID, linewidth=1, zorder=1)
-    for lever, points in HEADLINE.items():
-        g = by_arm.get(gsm8k_arm[lever])
-        if g is None:
-            continue
-        for offset, ref in zip((-0.15, 0.15), g['vs'], strict=False):
-            for c, metric in points:
-                e = envelope_at.get((lever, c))
-                if e is None:
+    seen: set[str] = set()
+    for g in decisions['gsm8k']:
+        lever = lever_of(g['arm'])
+        for offset, ref in zip((-0.12, 0.12), g['vs'], strict=False):
+            for c, metric in HEADLINE.get(lever, ()):
+                arm, base = means.get((g['arm'], c)), best_exact.get(c)
+                if arm is None or base is None:
                     continue
-                speedup = e[metric]['mean']
+                speedup = arm[f'{metric}_mean'] / means[(base, c)][f'{metric}_mean']
                 low, high = ref['delta_ci95_pt']
                 ax.errorbar(
                     speedup,
@@ -170,16 +166,18 @@ def quality_speed(decisions: dict[str, Any], path: Path) -> None:
                     zorder=3,
                 )
                 ax.annotate(
-                    f'c={c} ({metric})',
+                    f'{g["arm"]} c={c} ({metric})',
                     (speedup, ref['delta_pt'] + offset),
                     textcoords='offset points',
                     xytext=(5, -10),
-                    fontsize=7,
+                    fontsize=6,
                     color=MUTED,
                 )
-        ax.plot([], [], marker='s', linestyle='none', color=LEVER_COLOUR[lever],
-                label=LEVER_NAME[lever])  # fmt: skip
-    ax.set_xlabel('speedup over the best exact arm (session-paired mean; x at c=1, y elsewhere)')
+        if lever not in seen:
+            seen.add(lever)
+            ax.plot([], [], marker='s', linestyle='none', color=LEVER_COLOUR[lever],
+                    label=LEVER_NAME[lever])  # fmt: skip
+    ax.set_xlabel('ratio of session means over the best exact arm (x at c=1, y elsewhere)')
     ax.set_ylabel('GSM8K accuracy difference (points, 95% interval)')
     ax.set_title('Quality for speed: each lever against the declared budget', fontsize=10,
                  color='#0b0b0b')  # fmt: skip

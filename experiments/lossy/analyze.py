@@ -1,7 +1,7 @@
 """Declared analysis of the lossy-lever study (experiments/lossy/README.md).
 
     python -m experiments.lossy.analyze --points <dir>/points.csv \
-        --quality <q1 GSM8K run dir> <q2 GSM8K run dir> \
+        --quality <GSM8K run dir> [...] --references <plain-tuned-a> <plain-tuned-b> \
         --probes <probe dir> [...] --probe-noise <load test dir> --out evidence/lossy
 
 Speed: from bench.pareto's points.csv over the three session runs (only points it
@@ -13,13 +13,18 @@ ratio is "faster" when every session's value exceeds 1 + plan.BAND, "slower"
 when every one is below 1 - plan.BAND, otherwise "no detectable change". A point
 needs plan.MIN_SESSIONS valid sessions to be ranked or decided.
 
-Quality: each lever's GSM8K run against the two committed reference runs
+Quality: each GSM8K run against the two committed reference runs
 (bench.quality.compare: accuracy difference, exact McNemar test, and a 95%
-interval for the paired difference), and the logit probe's score-mode top-1
-agreement and mean top-20 KL against the reference, beside the reference's own
-run-to-run values. The budget is met when the GSM8K difference is at least
--1.0 point against both references, the agreement at least 0.98 and the KL at
-most 0.01 nats.
+interval for the paired difference), beside bench's exact arms against the same
+references (the check's spread) and, for the INT4 drafted arm, stock DFlash; and
+the logit probe's top-1 agreement and mean top-20 KL against the reference in
+score mode (teacher-forced prefill) and on the decode path (generate mode,
+teacher-forced up to each sequence's first divergence), beside the reference's
+own run-to-run values. The budget is met when the GSM8K difference is at least
+-1.0 point against both references and, in both probe modes, the agreement is
+at least 0.98 and the KL at most 0.01 nats. For the levers in
+plan.GSM8K_REQUIRED_FOR_HEADLINE only arms with their own GSM8K run enter the
+envelope.
 
 Every output is written only after all inputs pass their checks.
 """
@@ -65,6 +70,7 @@ def load_points(path: Path) -> dict[tuple[str, int], dict[str, dict[str, float]]
                 # Time per forward pass: ITL is per output token, a verify pass emits
                 # accept_length tokens on average (1 for plain decoding).
                 'pass_ms': float(row['itl_p50_ms']) * accept,
+                'accept': accept,
             }
     return table
 
@@ -167,7 +173,14 @@ def without(
 def speed(
     table: dict[tuple[str, int], dict[str, dict[str, float]]],
     min_sessions: int = plan.MIN_SESSIONS,
+    gsm8k_arms: frozenset[str] | None = None,
 ) -> dict[str, Any]:
+    """Means, matched pairs and envelope ratios.
+
+    For the levers in plan.GSM8K_REQUIRED_FOR_HEADLINE only arms in `gsm8k_arms`
+    (arms with their own GSM8K run) compete in the envelope; None means the quality
+    runs are not in yet, and those envelope rows are marked provisional.
+    """
     arms_at: dict[int, list[str]] = defaultdict(list)
     for launch in plan.SESSION_LAUNCHES:
         if launch.arm in plan.DROPPED_ARMS:
@@ -183,6 +196,7 @@ def speed(
             'y_mean': mean_y(entry),
             'y_sd': statistics.stdev([v['y'] for v in entry.values()]) if len(entry) > 1 else 0.0,
             'x_mean': statistics.fmean(v['x'] for v in entry.values()),
+            'accept_mean': statistics.fmean(v['accept'] for v in entry.values()),
             'exact': arm in plan.EXACT_ARMS,
         }
         for (arm, c), entry in sorted(table.items(), key=lambda item: (item[0][0], item[0][1]))
@@ -204,24 +218,40 @@ def speed(
                 )
     envelope = []
     for lever, lever_arms in plan.LEVERS.items():
+        gated = lever in plan.GSM8K_REQUIRED_FOR_HEADLINE
         for c in concurrencies():
             exact = [a for a in arms_at[c] if a in plan.EXACT_ARMS]
             lossy = [a for a in arms_at[c] if a in lever_arms]
+            if gated and gsm8k_arms is not None:
+                lossy = [a for a in lossy if a in gsm8k_arms]
             if not exact or not lossy:
                 continue
-            best_exact = max(exact, key=lambda a: mean_y(table[(a, c)]))
-            best_lossy = max(lossy, key=lambda a: mean_y(table[(a, c)]))
+            ranked_exact = sorted(exact, key=lambda a: mean_y(table[(a, c)]), reverse=True)
+            ranked_lossy = sorted(lossy, key=lambda a: mean_y(table[(a, c)]), reverse=True)
+            best_exact, best_lossy = ranked_exact[0], ranked_lossy[0]
             num, den = table[(best_lossy, c)], table[(best_exact, c)]
-            envelope.append(
-                {
-                    'lever': lever,
-                    'concurrency': c,
-                    'best_lossy': best_lossy,
-                    'best_exact': best_exact,
-                    'y': ratio_record(num, den, 'y', min_sessions),
-                    'x': ratio_record(num, den, 'x', min_sessions),
-                }
-            )
+            record: dict[str, Any] = {
+                'lever': lever,
+                'concurrency': c,
+                'best_lossy': best_lossy,
+                'best_exact': best_exact,
+                'provisional': gated and gsm8k_arms is None,
+                'y': ratio_record(num, den, 'y', min_sessions),
+                'x': ratio_record(num, den, 'x', min_sessions),
+            }
+            # The pick by maximum mean y favours a lucky arm slightly; the runner-up of
+            # each side shows how much the choice matters.
+            if len(ranked_lossy) > 1:
+                record['runner_up_lossy'] = ranked_lossy[1]
+                record['runner_up_lossy_y'] = ratio_record(
+                    table[(ranked_lossy[1], c)], den, 'y', min_sessions
+                )
+            if len(ranked_exact) > 1:
+                record['runner_up_exact'] = ranked_exact[1]
+                record['vs_runner_up_exact_y'] = ratio_record(
+                    num, table[(ranked_exact[1], c)], 'y', min_sessions
+                )
+            envelope.append(record)
     return {'means': means, 'pairs': pairs, 'envelope': envelope}
 
 
@@ -235,38 +265,89 @@ def paired_interval(only_ref: int, only_test: int, n: int) -> tuple[float, float
     return (d - half, d + half)
 
 
-def gsm8k(run: Path, references: list[Path]) -> dict[str, Any]:
+def paired(ref: Path, run: Path) -> dict[str, Any]:
     from bench.quality import compare
 
-    out = {'run': str(run), 'vs': []}
-    for ref in references:
-        result = compare(ref, run)
-        low, high = paired_interval(
-            result['correct_only_a'], result['correct_only_b'], result['problems']
-        )
-        result['delta_pt'] = 100 * result['accuracy_delta_b_minus_a']
-        result['delta_ci95_pt'] = [100 * low, 100 * high]
-        out['vs'].append(result)
+    result = compare(ref, run)
+    low, high = paired_interval(
+        result['correct_only_a'], result['correct_only_b'], result['problems']
+    )
+    result['delta_pt'] = 100 * result['accuracy_delta_b_minus_a']
+    result['delta_ci95_pt'] = [100 * low, 100 * high]
+    return result
+
+
+def gsm8k_arm(run: Path) -> str:
+    """Arm of a bench.quality run directory (<out>/<arm>-seed<seed>/<time>)."""
+    return run.parent.name.removesuffix(f'-seed{plan.GSM8K_SEED}')
+
+
+def gsm8k(run: Path, references: list[Path], bench_quality: Path) -> dict[str, Any]:
+    out: dict[str, Any] = {'run': str(run), 'arm': gsm8k_arm(run)}
+    out['vs'] = [paired(ref, run) for ref in references]
     out['within_budget'] = all(r['delta_pt'] >= GSM8K_BUDGET_PT for r in out['vs'])
+    if out['arm'].startswith('int4-dflash'):
+        # Same speculative sampling and block size, BF16 target and drafter (reported only).
+        out['vs_stock_dflash'] = paired(bench_quality / plan.GSM8K_INT4_DFLASH_REFERENCE, run)
     return out
+
+
+def gsm8k_exact_spread(references: list[Path], bench_quality: Path) -> list[dict[str, Any]]:
+    """bench's exact arms against the same references: the spread of this check."""
+    rows = []
+    for name in plan.GSM8K_EXACT_ARMS:
+        for ref in references:
+            result = paired(ref, bench_quality / name)
+            rows.append(
+                {
+                    'arm': name,
+                    'reference': ref.name,
+                    'delta_pt': result['delta_pt'],
+                    'mcnemar_exact_p': result['mcnemar_exact_p'],
+                }
+            )
+    return rows
 
 
 def probe(summary_path: Path) -> dict[str, Any]:
     summary = json.loads(summary_path.read_text())
     score = summary['score']
     generate = summary['generate']
+    decode_agreement = decode_path_agreement(generate)
+    score_ok = score['argmax_agreement'] >= AGREEMENT_MIN and score['kl_mean'] <= KL_MAX
+    decode_ok = decode_agreement >= AGREEMENT_MIN and generate['kl_mean'] <= KL_MAX
     return {
         'arm': summary['arm'],
         'file': str(summary_path),
         'score_agreement': score['argmax_agreement'],
         'score_kl_mean': score['kl_mean'],
         'score_positions': score['positions'],
+        'decode_agreement': decode_agreement,
+        'decode_kl_mean_shared_prefix': generate['kl_mean'],
+        'decode_positions': generate['positions'],
         'generate_first_divergence_median': generate.get('first_divergence_median'),
         'generate_divergences_per_1k': generate.get('divergences_per_1k_shared_tokens'),
-        'generate_kl_mean_shared_prefix': generate.get('kl_mean'),
-        'within_budget': score['argmax_agreement'] >= AGREEMENT_MIN
-        and score['kl_mean'] <= KL_MAX,
+        'score_within_budget': score_ok,
+        'decode_within_budget': decode_ok,
+        'within_budget': score_ok and decode_ok,
     }
+
+
+def decode_path_agreement(generate: dict[str, Any]) -> float:
+    """Top-1 agreement on the decode path, teacher-forced up to the first divergence.
+
+    Every position before a sequence's first divergence has the reference's context
+    and agrees (greedy decoding); the first divergence is the one disagreeing
+    position with an identical context; later positions have other contexts and
+    are not counted. So agreement = shared / (shared + diverged sequences). The
+    count stops at each sequence's first divergence, which favours a candidate
+    whose divergences come early.
+    """
+    shared = int(generate['positions'])
+    diverged = int(generate['sequences']) - int(generate['sequences_identical'])
+    if shared + diverged == 0:
+        raise ValueError('generate comparison has no positions')
+    return shared / (shared + diverged)
 
 
 def probe_noise(load_test: Path) -> dict[str, Any]:
@@ -292,6 +373,8 @@ def probe_noise(load_test: Path) -> dict[str, Any]:
             )
             if key in result
         }
+        if result['mode'] == 'generate':
+            out[name]['decode_agreement'] = decode_path_agreement(result)
     return out
 
 
@@ -300,6 +383,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--points', type=Path, required=True)
     parser.add_argument('--quality', type=Path, nargs='*', default=[])
     parser.add_argument('--references', type=Path, nargs='+', required=True)
+    parser.add_argument(
+        '--bench-quality',
+        type=Path,
+        default=plan.REPO / 'evidence/bench/quality',
+        help="bench's committed GSM8K runs (stock DFlash and the exact arms)",
+    )
     parser.add_argument('--probes', type=Path, nargs='*', default=[])
     parser.add_argument('--probe-noise', type=Path, default=None)
     parser.add_argument('--out', type=Path, required=True)
@@ -313,16 +402,24 @@ def main(argv: list[str] | None = None) -> int:
     missing = check_plan(table)
     if missing and not args.allow_missing:
         raise SystemExit('declared points without enough valid sessions:\n  ' + '\n  '.join(missing))
+    gsm8k_arms = frozenset(gsm8k_arm(run) for run in args.quality) if args.quality else None
     flags = launch_flags(table)
     flagged = {(r['arm'], r['session']) for r in flags.values() if r['flagged']}
-    result: dict[str, Any] = {'missing_points': missing, 'band': plan.BAND, **speed(table)}
+    result: dict[str, Any] = {
+        'missing_points': missing,
+        'band': plan.BAND,
+        **speed(table, gsm8k_arms=gsm8k_arms),
+    }
     result['launch_flags'] = flags
     result['flagged_launches'] = sorted(f'{arm}@{session}' for arm, session in flagged)
     # Shown beside the primary verdict whenever a launch is flagged.
     result['without_flagged'] = (
-        speed(without(table, flagged), MIN_SESSIONS_WITHOUT_FLAGGED) if flagged else None
+        speed(without(table, flagged), MIN_SESSIONS_WITHOUT_FLAGGED, gsm8k_arms)
+        if flagged
+        else None
     )
-    result['gsm8k'] = [gsm8k(run, args.references) for run in args.quality]
+    result['gsm8k'] = [gsm8k(run, args.references, args.bench_quality) for run in args.quality]
+    result['gsm8k_exact_spread'] = gsm8k_exact_spread(args.references, args.bench_quality)
     result['probes'] = [probe(path / 'probe_summary.json') for path in args.probes]
     if args.probe_noise is not None:
         result['probe_noise'] = probe_noise(args.probe_noise)

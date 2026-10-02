@@ -140,3 +140,29 @@ def test_slow_launch_flag(tmp_path: Path) -> None:
         p for p in result['pairs'] if p['test'] == 'plain-cap256-fp16' and p['concurrency'] == 64
     )
     assert pair['y']['sessions'] == ['lossy-s1', 'lossy-s3']
+
+
+def test_fp16_envelope_needs_gsm8k(tmp_path: Path) -> None:
+    scale = {'replayssm-cap256-fp16': 1.5, 'plain-cap256-fp16': 1.2}
+    table = analyze.load_points(write_points(tmp_path / 'p.csv', full_rows(scale)))
+    env = {
+        e['concurrency']: e
+        for e in analyze.speed(table, gsm8k_arms=frozenset({'plain-cap256-fp16'}))['envelope']
+        if e['lever'] == 'fp16-state'
+    }
+    assert env[256]['best_lossy'] == 'plain-cap256-fp16'
+    assert not env[256]['provisional']
+    provisional = [
+        e for e in analyze.speed(table)['envelope'] if e['lever'] == 'fp16-state'
+    ]
+    assert all(e['provisional'] and e['best_lossy'] == 'replayssm-cap256-fp16' for e in provisional)
+    # INT4 is not gated: its envelope keeps every INT4 arm.
+    int4 = analyze.speed(table, gsm8k_arms=frozenset({'int4-dflash-b8'}))['envelope']
+    assert any(e['best_lossy'] == 'int4-dflash-b16' for e in int4 if e['lever'] == 'int4')
+
+
+def test_decode_path_agreement() -> None:
+    generate = {'positions': 980, 'sequences': 48, 'sequences_identical': 28}
+    assert analyze.decode_path_agreement(generate) == pytest.approx(980 / 1000)
+    with pytest.raises(ValueError):
+        analyze.decode_path_agreement({'positions': 0, 'sequences': 0, 'sequences_identical': 0})

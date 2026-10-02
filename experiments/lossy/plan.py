@@ -27,22 +27,31 @@ class Launch:
 
 
 # One timed session = one exclusive hold; lossy-s2 runs the list in reverse order.
+# The two arms at the ends carry no headline point, so a hold that runs out of time
+# loses a non-headline launch in either order (pre-run revision 2, 2026-10-02).
 SESSION_LAUNCHES: tuple[Launch, ...] = (
+    Launch('int4-plain-cap256', (64, 128, 256)),
     Launch('dflash-tuned-b16', (1, 2, 4)),
     Launch('int4-dflash-b16', (1, 2, 4, 8, 16, 32)),
     Launch('dflash-tuned', (8, 16, 32)),
     Launch('int4-dflash-b8', (8, 16, 32, 64, 128)),
-    Launch('plain-cap256', (64, 128, 256)),
-    Launch('int4-plain-cap256', (64, 128, 256)),
-    Launch('plain-cap256-fp16', (64, 128, 256)),
+    Launch('plain-tuned', (64, 128)),
     Launch('replayssm-cap256', (64, 128, 256)),
+    Launch('plain-cap256-fp16', (64, 128, 256)),
     Launch('replayssm-cap256-fp16', (64, 128, 256)),
+    Launch('plain-cap256', (64, 128, 256)),
 )
 
 # Arms that failed their load test (L0) launch checks; they are not timed.
 DROPPED_ARMS: tuple[str, ...] = ()
 
-EXACT_ARMS = ('dflash-tuned-b16', 'dflash-tuned', 'plain-cap256', 'replayssm-cap256')
+EXACT_ARMS = (
+    'dflash-tuned-b16',
+    'dflash-tuned',
+    'plain-tuned',
+    'plain-cap256',
+    'replayssm-cap256',
+)
 
 # Matched pairs: identical flags apart from the lever (model weights or state dtype).
 PAIRS: tuple[tuple[str, str], ...] = (
@@ -65,19 +74,37 @@ BAND = 0.02
 # A point enters the envelope and the decisions only with this many valid sessions.
 MIN_SESSIONS = 3
 
-# Quality holds: GSM8K on one arm per lever, then the logit probe on the listed arms.
+# Quality holds: GSM8K on one arm each, then the logit probe on the listed arms.
 QUALITY_HOLDS: dict[str, dict[str, object]] = {
     'q1': {'gsm8k': 'int4-dflash-b8', 'probes': ('int4-plain-cap256', 'int4-dflash-b8')},
-    'q2': {
-        'gsm8k': 'plain-cap256-fp16',
-        'probes': ('plain-cap256-fp16', 'replayssm-cap256-fp16'),
-    },
+    'q2': {'gsm8k': 'plain-cap256-fp16', 'probes': ('plain-cap256-fp16',)},
+    'q3': {'gsm8k': 'replayssm-cap256-fp16', 'probes': ('replayssm-cap256-fp16',)},
 }
+# Levers whose headline and envelope count only arms with their own GSM8K run.
+GSM8K_REQUIRED_FOR_HEADLINE = ('fp16-state',)
 GSM8K_SEED = 0
 GSM8K_THREADS = 128
 # The reference GSM8K runs (two launches of plain-tuned, same harness and settings),
 # committed in evidence/bench/quality/.
 GSM8K_REFERENCES = ('plain-tuned-a-seed0', 'plain-tuned-b-seed0')
+# Reported beside them, not deciding: the INT4 drafted arm against stock DFlash with the
+# same sampling and block size, and bench's exact arms against the references (the
+# spread an exact configuration shows on this check).
+GSM8K_INT4_DFLASH_REFERENCE = 'dflash-tuned-seed0'
+GSM8K_EXACT_ARMS = (
+    'mtp-tuned-seed0',
+    'mtp-stockverify-seed0',
+    'dflash-tuned-seed0',
+    'plain-tuned-replayssm-seed0',
+)
+# Package versions the reference runs used (their dist-info files predate the runs).
+REFERENCE_VERSIONS = {
+    'torch': '2.13.0',
+    'triton': '3.7.1',
+    'flashinfer-python': '0.6.18',
+    'transformers': '5.12.1',
+    'sgl-eval': '0.1.2',
+}
 
 # Reference of the logit probe: plain-ref-1's generate run from the load test (stock
 # plain-cap256, greedy, 48 prompts x 256 tokens, top-20), pinned by SHA-256 once L0 ran.

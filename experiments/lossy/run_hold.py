@@ -63,7 +63,20 @@ def provenance() -> dict[str, Any]:
         'engine_worktree': str(plan.ENGINE_WORKTREE),
         'engine_commit': engine_head,
         'python': sys.executable,
+        'versions': package_versions(),
     }
+
+
+def package_versions() -> dict[str, str]:
+    from importlib.metadata import PackageNotFoundError, version
+
+    found = {}
+    for name in plan.REFERENCE_VERSIONS:
+        try:
+            found[name] = version(name)
+        except PackageNotFoundError:
+            found[name] = 'missing'
+    return found
 
 
 def sha256(path: Path) -> str:
@@ -323,6 +336,11 @@ def main(argv: list[str] | None = None) -> int:
     else:
         if plan.REFERENCE_PROBE is None:
             raise SystemExit('plan.REFERENCE_PROBE is not pinned yet')
+        # The GSM8K references were made with these versions; a quality run on other
+        # versions needs a fresh reference run first (README, pre-run revision 2).
+        versions = package_versions()
+        if versions != plan.REFERENCE_VERSIONS:
+            raise SystemExit(f'package versions {versions} differ from the references')
         launches = quality_launches(args.name, out)
     if args.dry_run:
         for label, command, timeout in launches:
