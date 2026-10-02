@@ -212,24 +212,24 @@ Re-scoring candidates with IEEE FP32 accumulation on CUDA cores leaves no positi
 
 \begin{table}[htbp]
 \tablefont\centering
-\caption{Candidates and the gap condition on replayed speculative captures, with plain decoding for comparison: the int8 copy with one scale per entry (FP8 where named) under the elementwise minimum of the rigorous per-entry error bounds and the \modelcons{} for the copy. ``Candidates'': mean, and the 99th percentile where recorded. ``Left to stock'': share of positions the gap condition (Theorem~\ref{thm:stock}) leaves to the stock kernel; ``Steps'': share of the capture's steps with at least one such position; each under the \modelhopper{} and under the \modelcons{} of the stock kernel. Measured~\ev{selfevidence-csv,selfevidence-dflash,selfevidence-mtp,rstock}.}\label{tab:spec-positions}
+\caption{Candidates and the gap condition on replayed speculative captures, with plain decoding for comparison: the int8 copy with one scale per entry (FP8 where named) under the elementwise minimum of the rigorous per-entry error bounds and the \modelcons{} for the copy. ``Candidates'': mean and 99th percentile. ``Left to stock'': share of positions the gap condition (Theorem~\ref{thm:stock}) leaves to the stock kernel; ``Steps'': share of the capture's steps with at least one such position; each under the \modelhopper{} and under the \modelcons{} of the stock kernel. Measured~\ev{selfevidence-csv,selfevidence-dflash,selfevidence-mtp,rstock}.}\label{tab:spec-positions}
 \vskip 0.05in
 \setlength{\tabcolsep}{3.5pt}
 \begin{tabular}{@{}l>{\raggedright\arraybackslash}p{3.6cm}rrrrrrr@{}}\toprule
 & & & \multicolumn{2}{c}{Candidates} & \multicolumn{2}{c}{Left to stock} & \multicolumn{2}{c}{Steps}\\\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(l){8-9}
 Capture & Positions & Count & mean & p99 & Hopper & conservative & Hopper & conservative\\\midrule
-Plain decoding & held-out & 6,005 & 1.54 & & 2.18\% & 3.03\% & 16.0\% & 21.6\%\\\addlinespace
-DFlash-4B, block 16 & all verification & 4,000 & & & 5.7\% & 8.6\% & 78\% & 84\%\\
-& verification, needed by the verifier & 1,162 & 1.57 & & & & &\\
-& verification, after the first rejection & & 4.0 & & & & &\\
-& all verification, FP8 copy & 4,000 & 28.9 & & & & &\\
-& draft head, reached & 1,138 of 4,020 & 1.28 & & & & &\\
-& draft head, not reached & & 3.36 & & & & &\\\addlinespace
-MTP-4B, four steps & all verification & 4,010 & & & 2.84\% & 4.04\% & 37.5\% & 48\%\\
+Plain decoding & held-out & 6,005 & 1.54 & 7 & 2.18\% & 3.03\% & 16.0\% & 21.6\%\\\addlinespace
+DFlash-4B, block 16 & all verification & 4,000 & & & 5.68\% & 8.60\% & 78.2\% & 84.2\%\\
+& verification, needed by the verifier & 1,162 & 1.57 & 8 & & & &\\
+& verification, after the first rejection & 2,838 & 4.03 & 20 & & & &\\
+& all verification, FP8 copy & 4,000 & 28.91 & 240 & & & &\\
+& draft head, reached & 1,138 of 4,020 & 1.28 & 4 & & & &\\
+& draft head, not reached & 2,882 of 4,020 & 3.36 & 11 & & & &\\\addlinespace
+MTP-4B, four steps & all verification & 4,010 & & & 2.84\% & 4.04\% & 37.5\% & 48.0\%\\
 & verification, needed by the verifier & 2,901 & 1.51 & 7 & & & &\\
-& verification, after the first rejection & & 2.44 & & & & &\\
-& draft head, reached & & 2.44 & 15 & & & &\\
-& all draft positions & 4,024 & & & 4.20\% & 6.44\% & &\\\bottomrule
+& verification, after the first rejection & 1,109 & 2.44 & 11 & & & &\\
+& draft head, reached & 2,997 of 4,024 & 2.44 & 15 & & & &\\
+& all draft positions & 4,024 & & & 4.20\% & 6.44\% & 44.0\% & 60.0\%\\\bottomrule
 \end{tabular}
 \end{table}
 
