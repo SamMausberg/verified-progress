@@ -65,6 +65,8 @@ def overrides(family: str) -> dict[str, ArgValue]:
         'max-running-requests': WAVE_SIZE,
         'max-mamba-cache-size': WAVE_SIZE,
     }
+
+
 WORKLOAD = plan.REPO / 'bench/workloads/mixed-v2/confirm.jsonl'
 
 
@@ -182,7 +184,7 @@ def compare_variants(out: Path, family: str = 'mtp') -> int:
         rule += (
             '; cert0 (MAX_ROWS=0) differing from stock points to the gated-off path inside the'
             ' conditional nodes; cert0 equal to stock while cert differs points to the'
-            " certified ramp-down; all equal points to closed-loop timing in the timed runs"
+            ' certified ramp-down; all equal points to closed-loop timing in the timed runs'
         )
     summary = {
         'declared': False,

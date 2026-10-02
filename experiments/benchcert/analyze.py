@@ -563,14 +563,23 @@ def hold_records(runs: Path) -> list[dict[str, Any]]:
     for path in sorted((runs / 'holds').glob('*.json')):
         record = json.loads(path.read_text())
         prov = record.get('provenance') or {}
-        out.append({
-            'hold': record.get('hold'),
-            'start_utc': _utc(record.get('start_unix')),
-            'end_utc': _utc(record.get('end_unix')),
-            'failed_launches': record.get('failed_launches'),
-            **{key: prov.get(key) for key in ('repo_commit', 'engine_commit', 'engine_tree',
-                                               'certified_head_digest')},
-        })
+        out.append(
+            {
+                'hold': record.get('hold'),
+                'start_utc': _utc(record.get('start_unix')),
+                'end_utc': _utc(record.get('end_unix')),
+                'failed_launches': record.get('failed_launches'),
+                **{
+                    key: prov.get(key)
+                    for key in (
+                        'repo_commit',
+                        'engine_commit',
+                        'engine_tree',
+                        'certified_head_digest',
+                    )
+                },
+            }
+        )
     return out
 
 
