@@ -9,7 +9,7 @@
 \section{What the Engine Computes and What a Certificate Must Match}\label{sec:contract}\label{sec:semantics}
 
 \subsection{What the Engine Computes}\label{sec:stock}
-The head is a matrix $W\in\BF^{V\times D}$ of $V=248{,}320$ vocabulary entries of width $D=2{,}560$, where $\BF$ denotes the BF16 numbers; row $w_i$ belongs to entry $i$. We call one head input, with the token decided from it, a \emph{position}. A decode step or a verification pass sends $M$ positions through the head in one call, and $M$ is the \emph{batch shape}. SGLang computes the head as \code{torch.matmul} of the BF16 head inputs with $W^\top$: a cuBLAS kernel, chosen by the batch shape, sums each logit's $D$ products in an FP32 \emph{accumulator} and rounds the result to BF16. The logits are widened exactly to FP32, and greedy decoding and greedy verification take \code{torch.argmax}, which returns the smallest index among equal maxima. We call this unmodified computation the \emph{stock head}, and its GEMM the \emph{stock kernel}.
+The head is a matrix $W\in\BF^{V\times D}$ of $V=248{,}320$ vocabulary entries of width $D=2{,}560$, where $\BF$ denotes the BF16 numbers; row $w_i$ belongs to entry $i$. We call one head input, with the token decided from it, a \emph{position}. A decode step or a verification pass sends $M$ positions through the head in one call, and $M$ is the \emph{batch shape}. SGLang computes the head as \code{torch.matmul} of the BF16 head inputs with $W^\top$: a cuBLAS kernel, chosen by the batch shape, sums each logit's $D$ products in an FP32 \emph{accumulator} and rounds the result to BF16. The logits are widened exactly to FP32, and greedy decoding and verification take \code{torch.argmax}, which returns the smallest index among equal maxima. We call this unmodified computation the \emph{stock head}, and its GEMM the \emph{stock kernel}.
 
 \subsection{References for One Decision}\label{sec:headcontracts}
 The three references below differ in where rounding enters. Let $h\in\BF^D$ be a position's head input and $z_i=\langle w_i,h\rangle$ the \emph{real logit} of entry $i$, computed in exact arithmetic over the stored operands. The stock kernel forms an FP32 accumulator $\hat y_i$ and outputs $L_i=\rnb(\hat y_i)$, where $\rnb$ rounds to the nearest BF16 value (ties to even); $\ulpb(x)$ denotes the BF16 spacing at $|x|$.
@@ -31,7 +31,6 @@ then \Rstock{} returns $a$.
 \begin{proof}
 $\hat y_a-\hat y_b>\ulpb(\max(|z_a|,|z_b|)+\max(G_a,G_b))\ge\ulpb(\max(|\hat y_a|,|\hat y_b|))$, since $\ulpb$ is nondecreasing in the magnitude; Lemma~\ref{lem:bf16gap} gives $L_a>L_b$.
 \end{proof}
-The certified head decides with the sharper Proposition~\ref{prop:stockinterval} below and uses this theorem's margin only to screen.
 
 \paragraph{The stock kernel's error} Theorem~\ref{thm:stock} needs a bound $G_i$ on how far the stock kernel's FP32 accumulator can lie from the real logit; for a closed-source kernel it can only be assumed. We write it as $G_i=\gamma_{\rm stock}\sum_j|w_{ij}h_j|+\eta$, where the floor $\eta=2^{-113}$ covers underflow in products and partial sums. For an entry that is never recomputed, Cauchy--Schwarz bounds $\sum_j|w_{ij}h_j|$ by $\norm{w_i}_2\norm h_2$, from row norms stored offline.
 
