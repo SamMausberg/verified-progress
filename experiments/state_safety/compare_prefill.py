@@ -7,9 +7,12 @@ prefilled in chunk k from the GDN state and KV that chunk k-1 left behind, so a
 faulty state handoff would raise the drift from chunk 1 onwards and at the
 first positions after each boundary. Drift at a position is the largest
 |lp_A - lp_B| over tokens in both top-k lists with logprob above -4 (as in
-compare.py). The offset buckets hold only positions after a boundary (k >= 1):
-the first chunk's positions follow no boundary and are counted under chunk 0
-only. Generated tokens are compared as in compare.py.
+compare.py). The top-k list at prompt position i is the distribution for token i,
+computed in the forward of token i - 1 (position 0 has none), so each position is
+assigned to the chunk and offset of that producing token: chunk (i - 1) // C, offset
+(i - 1) % C. The offset buckets hold only positions produced after a boundary
+(chunks 1 and later); positions produced in the first chunk follow no boundary and
+are counted under chunk 0 only. Generated tokens are compared as in compare.py.
 
 The alignment check asks whether the largest drifts are an artefact of how input
 logprobs are returned: if B's top-k list at position i were A's list for another
@@ -50,7 +53,8 @@ def _bucket(offset: int) -> str:
 def drift_buckets(
     ra: dict[str, dict[str, Any]], rb: dict[str, dict[str, Any]], chunk: int
 ) -> tuple[dict[str, list[float]], dict[str, list[float]]]:
-    """Per-position prompt drift by offset after a chunk boundary, and by chunk."""
+    """Per-position prompt drift by offset after a chunk boundary, and by chunk, both
+    taken from the token whose forward produced the position's distribution."""
     by_offset: dict[str, list[float]] = {}
     by_chunk: dict[str, list[float]] = {}
     for pid in sorted(ra.keys() & rb.keys()):
@@ -60,9 +64,11 @@ def drift_buckets(
             if not ta[i] or not tb[i]:
                 continue
             dr = position_drift(ta[i], tb[i])
-            if i >= chunk:
-                by_offset.setdefault(_bucket(i % chunk), []).append(dr)
-            by_chunk.setdefault('chunk 0' if i < chunk else 'chunk 1+', []).append(dr)
+            # Position i's distribution comes from the forward of token i - 1.
+            producer = i - 1
+            if producer >= chunk:
+                by_offset.setdefault(_bucket(producer % chunk), []).append(dr)
+            by_chunk.setdefault('chunk 0' if producer < chunk else 'chunk 1+', []).append(dr)
     return by_offset, by_chunk
 
 
@@ -138,7 +144,8 @@ def main() -> None:
         'a': args.a,
         'b': args.b,
         'chunk': args.chunk,
-        # Positions after a boundary only (chunks 1 and later), by offset in their chunk.
+        # Positions produced after a boundary only (chunks 1 and later), by the producing
+        # token's offset in its chunk.
         'prompt_drift_by_offset_after_boundary': {
             k: stats(v) for k, v in sorted(by_offset.items())
         },
