@@ -318,6 +318,20 @@ SGLANG_WORKTREE=~/sglang-wt/lossy source scripts/sglang_env.sh
 |---|---|---|
 | 0001 | `DFlashDraftModel` builds its context projection `fc` as a `ReplicatedLinear` with the draft's quantization config whenever one is set, and refuses to load a checkpoint that leaves any `fc` parameter unset. Without it, a compressed-tensors drafter stores `fc` as `weight_packed`/`weight_scale`, which match no parameter of the plain `nn.Linear`; the loader skips them silently and `fc.weight` keeps uninitialised memory. | unquantized drafters (no quantization config) build and load `fc` exactly as before |
 
+## upstream (`patches/upstream/0001-0002`, base: upstream SGLang `f6fcda8827`)
+
+These two patches are for upstream SGLang, not for the paper's engine. Each is one commit on upstream
+`main` at `f6fcda8827` (2026-10-02). Both also apply to the pin with `git am`.
+
+```sh
+git -C <SGLang checkout at f6fcda8827> am "$PWD"/engine/sglang/patches/upstream/<patch>.patch
+```
+
+| Patch | What it changes | Upstream |
+|---|---|---|
+| 0001 | FA4 (CuTe DSL) paged KV on SM90. `PagedKVManager.create` ceil-divides the page-table entries per loader thread (`flash_attn/cute/paged_kv.py`), as Dao-AILab/flash-attention#2745 does. With floor division, the head_dim 256 tile (128 x 80) gets 0 entries for the 128 loader threads, and FA4 fails to compile for Qwen3.5-4B's full-attention layers at SGLang's default page size of 1. The patch adds an SM90 head_dim 256 test to `test_flash_attention_4.py`. Checked at head_dim 256 (tile_n 80 and 64) and 192 (tile_n 112). At head_dim 160 and 224 it gets past the compile error but not to correct output, so those need a separate fix (see the comment); other head dims on SM90's cp.async paged path are not covered. | Not opened as a PR: the same ceil-divide (written there as `cute.ceil_div`) is in the open sgl-project/sglang#35757. The test is offered there in [a comment](https://github.com/sgl-project/sglang/pull/35757#issuecomment-5961366446) |
+| 0002 | sgl-kernel's CMake adds the sm_90a gencode for `common_ops` and `spatial_ops` whenever CUDA >= 12.4, not only when FA3 is built. FA3 is off by default on aarch64, so `common_ops` in the aarch64 wheel (inspected: `sglang-kernel` 0.4.8) has no sm_90a code. On GH200 its SM90 CUTLASS GEMMs (`fp8_scaled_mm`, `int8_scaled_mm`, the FP8 and W4A8 MoE GEMMs) print CUTLASS's "Arch conditional MMA" error and return without computing. Builds with FA3 on (the x86_64 default) get the same flags as before. | [sgl-project/sglang#42263](https://github.com/sgl-project/sglang/pull/42263): the same diff on a newer upstream `main` |
+
 ## speed-lowc (`patches/speed-lowc/0001-0003`, built by `experiments/speed_lowc/build_engines.sh`)
 
 ```sh
@@ -336,6 +350,25 @@ Tree hashes (stable across builds): fa4 `dcd97db178c101495148fb7a361203f975bcf71
 `5d6db54828d7fbdac62180810b68a87cee3b39ec`. The probe and confirmation holds check them. Probe 4 ran on
 the earlier confirm tree `9a01a622f6e7f7f816ce6255ba5de56d52e09dbc`, whose 0003 stopped at 4 sequences
 (`evidence/speed_lowc/README.md`, Provenance).
+
+## upstream-bf16 (`patches/upstream-bf16/0001`, branch `engine/upstream-bf16`, head `4608661757`)
+
+One diagnostic patch on `bd66ce343e` for `experiments/bf16_paths/` (variant `beta_fp32`): it keeps
+sigmoid(beta) in FP32 in the packed GDN decode kernel (`fused_recurrent.py`) and in the gating kernel
+whose output feeds GDN prefill (`fused_gdn_gating.py`), where the pin rounds it through BF16. The two
+lines are the changes of the open upstream PRs #38977 and #40362 (upstream issue #38975); the patch
+exists only to measure whether that rounding explains a BF16 decode/prefill disagreement, not as a
+proposed change.
+
+```sh
+scripts/sglang_worktree.sh upstream-bf16
+git -C ~/sglang-wt/upstream-bf16 am "$PWD"/engine/sglang/patches/upstream-bf16/0001-*.patch
+SGLANG_WORKTREE=~/sglang-wt/upstream-bf16 source scripts/sglang_env.sh
+```
+
+| Patch | What it changes | Default behaviour |
+|---|---|---|
+| 0001 | `beta_val = tl.sigmoid(b_val).to(tl.float32)` in the packed decode kernel; the gating kernel stores the FP32 sigmoid into its FP32 output buffer | numerics change only in beta's low mantissa bits (at most one BF16 rounding, about 0.4% relative) |
 
 ## speed-bytes (`patches/speed-bytes/0001-0005`, branches `engine/speed-bytes` and `engine/speed-bytes-l2`)
 
