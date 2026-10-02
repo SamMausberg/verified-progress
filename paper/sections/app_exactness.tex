@@ -90,7 +90,7 @@ In brief:
 
 \begin{figure}[htbp]
 \centering
-\input{figures/divergence}
+\input{figures/divergence}%
 \caption{Where equivalent stock configurations first produce different module outputs, by decoder layer; each number counts the prompts at its mark. Plain decoding and MTP speculation part at layer 0's GDN recurrence in every prompt, because decode and target verify use different recurrent kernels; plain decoding at concurrency 1 and 32 (batches of up to 16) part at batch-dependent kernels across the depth. The plotted runs' two tapped servers had different pools in each pair. Reruns of 40 prompts that also hash the caches find them identical on entry: for plain decoding against MTP, every cache entering the differing recurrence; for the concurrency pair, with identical fixed pools, every cache entering every forward up to the first differing module output (gated norm 30, layer 3's attention 5, batched-prefill down-projection 5, against 29, 6 and 5 plotted). Measured with a bit-exact tap~\ev{state-mech,state-cache}.}
 \label{fig:divergence}
 \end{figure}
