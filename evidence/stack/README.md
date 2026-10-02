@@ -353,12 +353,15 @@ admitted at each c (`analyze.py`, `admitted_sessions`).
 
 ## Results
 
-Everything in this section is measured unless it says derived. The declared analysis ran
-once, at 2026-10-02 02:16:21 UTC, after the last session had ended and after amendment 2
+Everything in this section is measured unless it says derived. The analysis behind these
+files ran at 2026-10-02 03:09:16 UTC, after the last session had ended and after amendment 2
 (committed 2026-10-01 22:00:09 UTC), with `experiments/stack/analyze_campaign.sh` at
-repository commit `8687b45` (`analysis_run.json`, command lines in
-`analysis_commands.txt`). Two earlier runs of the same script, on s1-s2 only, tested the
-code; no number here comes from them.
+repository commit `b011a9c` (`analysis_run.json`, command lines in
+`analysis_commands.txt`). The first run of the declared analysis, at 02:16:21 UTC (commit
+`8687b45`, before the start-up table gained its call-chain column and two figure labels
+were fixed), produced byte-identical statistics: every ratio, interval, decision and
+diagnostic table is the same. Two earlier runs, on s1-s2 only, tested the code; no number
+here comes from them.
 
 ### What ran
 
@@ -601,8 +604,8 @@ FP16 state) need the declared quality budget and have not been measured on DFlas
 ## Files
 
 The analysis files are copies, unchanged, of the declared analysis's directory
-(`~/vp-data/stack/analysis/20261002T021621Z/`, outside git), written by one command at
-repository commit `8687b45`:
+(`~/vp-data/stack/analysis/20261002T030916Z/`, outside git), written by one command at
+repository commit `b011a9c`:
 
 ```sh
 experiments/stack/analyze_campaign.sh     # fresh ~/vp-data/stack/analysis/<UTC>/, command lines, HEAD

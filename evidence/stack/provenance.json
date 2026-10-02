@@ -1,8 +1,8 @@
 {
  "equality_run": "20261001T212416Z",
  "hold_start": "2026-10-01T21:24:16+00:00",
- "checked_at": "2026-10-02T02:16:23+00:00",
- "analysis_commit": "8687b45ff2f1b7dbb36f0a7f1889a529bdc3c6d3",
+ "checked_at": "2026-10-02T03:09:18+00:00",
+ "analysis_commit": "b011a9c3ce6edb99f83edc2a5aa77e1854394765",
  "package": {
   "checkout": "~/vp-wt/stack-cert",
   "head": "01502cc5bf3ac5dec338fe8e86bedcf63be95d8d",
