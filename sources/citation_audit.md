@@ -31,9 +31,9 @@ the first table below.
 
 A verdict of "verified" means that the entry's bibliographic data agree with the primary record
 and that every citing sentence is supported by the quoted passage. Where an entry or a sentence
-was corrected, the verdict says what changed. Main-text corrections S1 to S6 are applied in the
-prose editor's pull requests; the corrections in the appendices and the notes are applied in the
-same change as this file. Numbers reported by other authors were not reproduced.
+was corrected, the verdict says what changed. Main-text corrections S2 and S3 are applied in the
+same change as this file, and S1, S4, S5 and S6 in the prose editor's pull requests; the
+corrections in the appendices and the notes are applied in the same change as this file. Numbers reported by other authors were not reproduced.
 
 ## Entries the paper and the notes cite
 
@@ -175,7 +175,7 @@ same change as this file. Numbers reported by other authors were not reproduced.
 
 ## Corrections to citing text (2 October 2026)
 
-Main text (applied by the prose editor):
+Main text (S2 and S3 applied with this file; S1, S4, S5 and S6 by the prose editor):
 - S1 contract.tex, "The stock kernel's error": Khattak and Mikaitis's BF16 model was measured on
   the warp-level `mma` path (WMMA, HMMA.16816 in SASS; `wgmma` was tested only for FP8); the
   sentence now says so, and that whether either model bounds the stock kernel is an open
