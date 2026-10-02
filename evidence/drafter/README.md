@@ -565,7 +565,8 @@ As written, then, 0005 removes the fold's loss at c ≤ 4 and costs it about 4% 
 block 16 (fold y 3.7% below #133's fold; fold/stock 1.018 against 1.061). It is untimed at c ≥ 16.
 For serving at c ≥ 8, use the fold with patches 0001-0004 only. A rule that keeps the narrow
 tiles for the ring-writing verify only below a measured batch threshold would likely keep both
-gains. That rule has not been built or measured.
+gains. That rule has not been built or measured. The kernel sweep below puts the threshold at
+two sequences.
 
     FOLD_TIMING_CONCURRENCY="1 2 4 8" scripts/gpu_lock.sh -x \
         experiments/drafter/run_fold_timing.sh ~/vp-data/drafter/fold-timing-0005
@@ -609,3 +610,154 @@ other grid of blocks or batches:
 A sweep whose bitwise gate fails writes its report to `sweep.failed.json`, not `sweep.json`.
 
     scripts/gpu_lock.sh -x experiments/drafter/run_ring_tile_sweep.sh ~/vp-data/drafter/ring-tile-sweep
+
+Added with the result below; the rule above is unchanged. The declared configuration in full is
+the script's defaults at d9d2e02, the commit that ran: the grid above, tiles 4, 8, 16 and 32,
+24 layers per CUDA graph, 50 replays per measurement and 4 repeats. At d9d2e02 the script
+withheld the threshold only from other grids; it now withholds it (`n_star` null, with
+`differences` naming each parameter) from a run that differs in any of these, or whose rows
+miss or repeat a point of the grid (`ring_tile_rule.py`).
+
+## Ring-writing verify tiles by batch: result
+
+`ring_tile_sweep/` (`run_ring_tile_sweep.sh`, one exclusive hold, 2026-10-02 14:48-14:50 UTC;
+repository at d9d2e02, engine `engine/drafter` 9292abd874 = bd66ce343e + 0001-0005).
+
+| File | What | Kind | Command |
+|---|---|---|---|
+| `sweep.json` | GPU time per layer by block, batch, path (ring-writing verify, stock verify) and value tile: the median, range and value of each of the four repeats; the bitwise gate per tile; the tile the engine selects for the stock verify; the fastest tile and tile 4 / tile 32 per point; the declared threshold | measured (the threshold applies the declared rule) | the hold (below) |
+| `provenance.txt` | Repository and engine commits with their counts of modified files; start and end times | measured | written by the hold |
+| `cpu_load.json` | Foreign CPU load during the sweep, sampled every second | measured | written by the hold (`bench.hostload record`) |
+| `cycle_estimate.json` | The sweep checked against the declared configuration and threshold; its kernel table; per block and client concurrency, the change in the fold's verify cycle and throughput by tile, set against the two served sessions | derived | `ring_tile_cycle_estimate.py` (below) |
+
+**Validity.**
+- The run used the declared configuration: blocks 16 and 8, the 13 declared batches, tiles 4, 8,
+  16 and 32, 24 layers, 50 replays per measurement and 4 repeats (`sweep.json`: the grid in
+  `rows`, `shape.layers`, `iters`, `repeats`), with exactly one row per tile and one stock row
+  at each of the 26 points. `ring_tile_cycle_estimate.py` checks this and applies the declared
+  rule to the rows again; it reproduces the recorded threshold.
+- Every tile's verify output and ring contents were bitwise equal to tile 32's at every block
+  and batch (`bitwise_failures` empty), on random inputs for one layer.
+- From code reading (`sweep.json` does not record warps): forcing a tile keeps the selection's
+  warp count, which `_select_recurrent_launch_config` sets to 1 for both tiles at 9292abd874,
+  so tile 32 is the ring-writing verify's launch under patches 0001-0004 and tile 4 its launch
+  under 0005. The engine selected tile 4 for the stock verify at every point (`stock_tile`).
+- Repository and engine had no modified files. Foreign CPU load averaged 0.155 cores (largest
+  one-second sample 0.87). The GPU held 5 MiB when the sweep started.
+- Repeats agree closely: the median repeat range is 0.6% of its median, the largest 6.5% (the
+  stock verify at block 16, batch 1).
+
+Median GPU time per layer over the four repeats, in microseconds, block 16:
+
+| N | tile 32 | tile 16 | tile 8 | tile 4 | stock (tile 4) | tile 4 / tile 32 | fastest |
+|---|---|---|---|---|---|---|---|
+| 1 | 29.0 | 20.6 | 20.2 | 15.7 | 16.7 | 0.54 | 4 |
+| 2 | 29.8 | 21.6 | 22.7 | 20.0 | 29.5 | 0.67 | 4 |
+| 3 | 31.5 | 26.6 | 25.6 | 34.5 | 37.1 | 1.09 | 8 |
+| 4 | 32.8 | 27.7 | 45.2 | 35.4 | 43.8 | 1.08 | 16 |
+| 5 | 42.6 | 41.8 | 46.2 | 45.1 | 63.7 | 1.06 | 16 |
+| 6 | 43.2 | 42.6 | 47.4 | 48.7 | 75.3 | 1.13 | 16 |
+| 8 | 44.8 | 44.6 | 58.8 | 62.9 | 85.7 | 1.40 | 16 |
+| 12 | 83.8 | 70.4 | 75.2 | 90.9 | 127.8 | 1.08 | 16 |
+| 16 | 89.8 | 83.7 | 100.2 | 117.7 | 170.6 | 1.31 | 16 |
+| 24 | 135.4 | 121.7 | 140.1 | 171.4 | 258.4 | 1.27 | 16 |
+| 32 | 179.1 | 158.2 | 182.1 | 225.1 | 346.9 | 1.26 | 16 |
+| 48 | 262.5 | 231.7 | 263.4 | 331.9 | 518.4 | 1.26 | 16 |
+| 64 | 342.5 | 300.8 | 347.6 | 439.1 | 694.8 | 1.28 | 16 |
+
+Block 8:
+
+| N | tile 32 | tile 16 | tile 8 | tile 4 | stock (tile 4) | tile 4 / tile 32 | fastest |
+|---|---|---|---|---|---|---|---|
+| 1 | 15.4 | 11.2 | 11.0 | 8.8 | 8.8 | 0.57 | 4 |
+| 2 | 16.3 | 12.1 | 12.7 | 11.3 | 12.2 | 0.70 | 4 |
+| 3 | 17.3 | 14.9 | 14.4 | 18.8 | 20.8 | 1.09 | 8 |
+| 4 | 18.3 | 15.6 | 24.4 | 19.5 | 24.5 | 1.07 | 16 |
+| 5 | 23.7 | 23.3 | 25.2 | 24.5 | 34.4 | 1.03 | 16 |
+| 6 | 24.2 | 23.8 | 26.1 | 26.5 | 39.9 | 1.10 | 16 |
+| 8 | 25.3 | 25.3 | 32.3 | 33.7 | 47.3 | 1.33 | 32 |
+| 12 | 46.2 | 39.0 | 40.5 | 48.0 | 69.7 | 1.04 | 16 |
+| 16 | 49.7 | 46.5 | 52.8 | 62.0 | 93.4 | 1.25 | 16 |
+| 24 | 75.4 | 67.4 | 74.4 | 90.6 | 141.4 | 1.20 | 16 |
+| 32 | 99.1 | 86.7 | 96.4 | 118.2 | 188.3 | 1.19 | 16 |
+| 48 | 144.1 | 124.8 | 138.3 | 173.1 | 281.6 | 1.20 | 16 |
+| 64 | 188.9 | 160.2 | 181.4 | 228.8 | 371.9 | 1.21 | 16 |
+
+**The declared reading gives N\* = 2.** Tile 4 wins at N = 1 and 2 on both blocks, where it takes
+0.54-0.70 of tile 32's time in every repeat, and loses from N = 3 (1.09 on both blocks). It
+stays slower at every larger batch, by 3-40%, and by at least 19% from N = 16. So N\*_16 =
+N\*_8 = 2. Under rule 5, N\* is neither 0 nor 8 or more, so the kernel timing agrees with the
+served A/B, and the declared reading allows a restricted patch: tile 4 for the ring-writing
+verify at N ≤ 2, tile 32 above. That patch has not been built. Under rule 6 it needs the kernel
+parity check and a served session before any served claim.
+
+### What the kernel times imply for patch 0005 (derived)
+
+`cycle_estimate.json` turns the kernel times into served terms. At client concurrency c the
+fold verifies about c sequences per cycle, so tile 4 in place of tile 32 changes each verify
+cycle's GPU time by 24 layers times the per-layer difference at N = c. #133's fold runs (tile
+32) give the wall time per cycle as W = c x tau / y, with tau the tokens per cycle per request
+and y the output tokens per second per GPU, so W includes the prefill and idle time spread
+over the cycles. If the tile changes nothing but the verify's GPU time, the fold's y with tile
+4 is y x W / (W + change). This assumes every cycle runs at batch c (ramps and tails of a
+closed-loop run are smaller) and that the time per layer measured here, on random inputs with
+24 verifies back to back in one CUDA graph, is the verify's time inside the model. The measured
+columns compare the patch-0005 session with #133 and are unpaired (the 0005 section above);
+stock does not depend on the ring tile, so its column is the drift between the two sessions.
+
+| block | c | change per cycle, tile 4 vs 32 (µs) | W, #133 fold (ms) | fold y, tile 4 / tile 32: predicted | fold y, 0005 session / #133: measured | stock y, 0005 session / #133 |
+|---|---|---|---|---|---|---|
+| 16 | 1 | -319 | 6.72 | 1.050 | 1.047 | 0.994 |
+| 16 | 2 | -235 | 7.64 | 1.032 | 1.025 | 0.995 |
+| 16 | 4 | +62 | 9.27 | 0.993 | 1.013 | 1.000 |
+| 16 | 8 | +435 | 12.34 | 0.966 | 0.963 | 1.004 |
+| 16 | 16 | +672 | 18.62 | 0.965 | not timed | |
+| 16 | 32 | +1,103 | 31.60 | 0.966 | not timed | |
+| 8 | 1 | -160 | 6.30 | 1.026 | 1.030 | 1.003 |
+| 8 | 2 | -118 | 6.82 | 1.018 | 1.013 | 1.006 |
+| 8 | 4 | +29 | 7.98 | 0.996 | 1.002 | 1.007 |
+| 8 | 8 | +201 | 9.84 | 0.980 | 0.979 | 1.003 |
+| 8 | 16 | +294 | 13.13 | 0.978 | not timed | |
+| 8 | 32 | +460 | 20.08 | 0.978 | not timed | |
+
+- **The kernel times are consistent with 0005's served effect at c = 1, 2 and 8.** On both
+  blocks the predicted change in the fold's y is within 0.7 points of the change measured
+  across the two sessions. Stock moved up to 0.7% between those sessions, so the agreement is
+  as close as the comparison can show, not closer. The 0005 section attributed the fold's
+  shift to the patch across sessions seven hours apart; at these points the ring-writing
+  verify's kernel time agrees with that attribution in sign and size.
+- **Block 16 at c = 4 is the exception.** The kernel predicts a 0.7% loss (62 µs per cycle) and
+  the sessions measured a 1.3% gain, a gap of 2.0 points that would take about 0.18 ms per
+  cycle. Block 8 agrees within the drift (0.996 against 1.002). Neither the sweep nor the two
+  sessions explain the gap. If the gain is real, the restricted rule below would give it up
+  there; a session that runs both tile rules side by side would settle it.
+- **0005 as written would cost the fold at c = 16 and 32**, which it was never timed at: about
+  3.4-3.5% on block 16 and 2.2% on block 8 against 0001-0004. That would bring #133's fold/stock of
+  1.094 and 1.120 (block 16) to about 1.056 and 1.082. The advice above to use 0001-0004 at
+  c ≥ 8 stands, and the kernel times favour tile 32 from three sequences up; only the block-16
+  c = 4 measurement disagrees.
+- **The restricted rule (tile 4 for N ≤ 2) would keep both gains, by this estimate.** It
+  predicts the fold 5.0% and 3.2% above 0001-0004 at c = 1 and 2 on block 16 (2.6% and 1.8% on
+  block 8), which is fold/stock 1.016 and 1.014 against 0005's measured 1.020 and 1.011, and
+  0001-0004's measured figures at c ≥ 4 because it launches the same tile there. None of this is
+  measured.
+- **Tile 16 is faster still at most larger batches, and is outside the declared reading.** It is
+  the fastest tile at every N ≥ 4 except block 8 at N = 8; at N = 8 it is within 0.4% of tile
+  32 on both blocks, and from N = 12 it takes 6-16% less time than tile 32 on both blocks. By
+  the same estimate that is worth 0.6-1.6% of the fold's y at c = 16-32. It passed this sweep's
+  bitwise gate but has not been through the parity check or a served exactness check, so rule
+  4 leaves it out; a rule that used it would need its own declaration.
+- **The stock reference.** Stock's verify, which writes a state per block position, takes
+  about as long as the ring-writing verify at tile 4 for one sequence (16.7 against 15.7 µs on
+  block 16; 8.8 for both on block 8), and 1.9-2.0 times as long as the ring-writing verify at
+  tile 32 at N = 8 and from N = 16 (1.5 at N = 12, where tile 32 is slow). That is the verify
+  kernel's part of the fold's served gain at c ≥ 8; the phase split above measures the whole
+  cycle.
+
+    scripts/gpu_lock.sh -x experiments/drafter/run_ring_tile_sweep.sh ~/vp-data/drafter/ring-tile-sweep
+    # sweep.json, provenance.txt and cpu_load.json copied here unchanged
+    python experiments/drafter/ring_tile_cycle_estimate.py \
+        --sweep evidence/drafter/ring_tile_sweep/sweep.json \
+        --tile32-session evidence/drafter/fold_timing/summary.json \
+        --tile4-session evidence/drafter/fold_narrow_tiles/timing/summary.json \
+        --out evidence/drafter/ring_tile_sweep/cycle_estimate.json
