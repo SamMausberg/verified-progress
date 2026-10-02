@@ -17,7 +17,7 @@ This section measures the certified head on states recorded from the engine, the
 \begin{figure*}[t]
 \centering
 \input{figures/candidates}
-\caption{What the certified head costs. \textbf{(a)}~Held-out replay, \Rreal{} decision: share of positions that need at least $k$ candidates, for four copies of the head (greedy) and for the int8 copy with one scale per 128 weights in a seeded race at $T=1$ \ev{ccdf}. \textbf{(b)}~Share of head calls of $M$ positions that fall back to the stock head: lines if positions fell back independently at the held-out shares of Table~\ref{tab:fallback} (derived) \ev{rstock}; markers measured in the kernel replay \ev{kernel-path}. \textbf{(c)}~Time per call over the stock head's, head alone: measured with every position certified (median of 30 replays; p10--p90 within the markers below 256), and expected with each fallback under the \modelcons, from measured times and the rates of (b) \ev{kernel-path}; under the \modelhopper{} the expected times lie between these lines and the measured one. Shaded: above 16 positions the calls are consecutive replay positions, not engine batches.}
+\caption{What the certified head costs. \textbf{(a)}~Held-out replay, \Rreal{} decision: share of positions that need at least $k$ candidates, for four copies of the head (greedy) and for the int8 copy with one scale per 128 weights in a seeded race at $T=1$ \ev{ccdf}. \textbf{(b)}~Share of head calls of $M$ positions that fall back to the stock head: lines if positions fell back independently at the held-out shares of Table~\ref{tab:fallback} \ev{rstock}; markers from the kernel replay \ev{kernel-path}. \textbf{(c)}~Time per call over the stock head's, head alone: measured with every position certified (medians; p10--p90 within the markers below 256), and expected with each fallback under the \modelcons{} from measured times and the rates of (b) \ev{kernel-path}. Shaded: above 16 positions the calls are consecutive replay positions, not engine batches.}
 \label{fig:candidates}\label{fig:geometry-candidates}
 \end{figure*}
 
@@ -31,13 +31,6 @@ This section measures the certified head on states recorded from the engine, the
 \paragraph{Kernel replay, \Rstock{}} On the first 60,000 captured positions, the certified head recomputes about 1.8 entries per decision on average and one at the median, depending on the stock-kernel model through the margin $\delta_{\max}$ (Table~\ref{tab:fallback} in Appendix~\ref{app:candidates}) \ev{kernel-replay}.
 
 \paragraph{Held-out replay, \Rreal{}} This replay compares copies of the head on 6,005 held-out plain-decoding positions, drawn as whole decode steps, with the simpler \Rreal{} decision, whose screen needs no margin. No error bound was violated, and the exact winner was always a candidate \ev{selfevidence,selfevidence-csv}. Int8 with one scale per entry needs 1.55 candidates on average; FP8 needs about three times as many, and int4 leaves tens of thousands (Figure~\ref{fig:candidates}a; Table~\ref{tab:candidates}). Int8 is enough because the margins are wide: its intervals are about two logits wide, while the median gap between the two largest logits is 7.3 logits \ev{stats}, so a tighter bound would help little (Appendix~\ref{app:candidates}). On the verification positions of the speculative captures, evaluated offline with the gap condition only, the counts are about the same as in plain decoding (Appendix~\ref{app:candidates}) \ev{selfevidence-dflash,selfevidence-mtp}.
-
-\begin{figure*}[t]
-\centering
-\input{figures/transport}
-\caption{Why transport fails. \textbf{(a)}~Median DFlash-4B head inputs, to scale: norms over the 4,020 transport pairs, cosine over 20,000 random drift pairs. Transport's bound beats the int8 copy's only if $h^d$ lies in the dot at the tip of $h^t$, of radius $\delta^\ast\norm{h^t}_2$ for the median $\delta^\ast$ (Proposition~\ref{thm:crossover}). \textbf{(b, c)}~Cumulative distributions of the measured drift $\rho$ over 40,000 aligned held-out pairs of DFlash-4B (b) and MTP-4B (c), against the thresholds $\delta^\ast_i$ derived from the weights for every vocabulary entry (64-entry tiles of contiguous token indices); the arrows join the median threshold for int8 with one scale per entry to each drafter's median drift (107 and 112 times apart) \ev{head-constants,rho,transport,rho-mtp,stats-dflash}.}
-\label{fig:rho}\label{fig:transport}
-\end{figure*}
 
 \subsection{Fallback and Agreement}\label{sec:rstock-share}
 \paragraph{Kernel replay, \Rstock{}, interval condition} The certified head leaves 0.28\% of positions to the stock head under the \modelhopper{} and 1.46\% under the \modelcons, and with that fallback every token equals the engine's \ev{kernel-replay}. The held-out replay gives nearly the same shares, 0.35\% and 1.40\%; under the gap condition, which needs a margin of more than one BF16 spacing, its share never falls below about 2\% (Table~\ref{tab:fallback}). This agreement is consistent with each model, not a proof of any: even an IEEE FP32 summation tree, with a $\gamma_{\rm stock}$ about 360 times smaller than the conservative one, certifies every held-out position and gets every token right \ev{rstock}. The observed error of the stock GEMM's FP32-output variant (Section~\ref{sec:headcontracts}) is the more direct test.
@@ -55,36 +48,45 @@ where the left side adds the int8 pass, the selection of candidates, their recom
 
 In the microbenchmark (the head alone at $M=1$ to 256, CUDA graphs, warm L2 cache; medians of 30 graph replays) a fully certified batch at $M=1$ takes 239.6~\textmu s, against 370.5~\textmu s for the stock head. Adding each fallback's measured cost at its measured rate gives an expected time of about 0.7 of the stock head's up to 16 positions, with the per-position fallback under the \modelcons{} (Figure~\ref{fig:candidates}c) \ev{kernel-rowwise,kernel-path}. Under the \modelhopper{}, with its lower fallback rates, both expected times lie between these and the all-certified time at every measured $M$ \ev{kernel-path}. From 128 positions every mode is slower, because the int8 pass alone is slower than the stock head there; with the whole-batch fallback, 77\% of calls also pay for the stock head. The pass is not bound by memory bandwidth: at one position its directed-rounding epilogue keeps the streaming multiprocessors 79\% busy while it draws 62--63\% of DRAM bandwidth, so its time grows with $M$ faster than the stock GEMM's \ev{kernel-micro}. At one position the expected time under the \modelcons{} is 0.66--0.67 of the stock head's with either fallback \ev{kernel-path}, so with the head at 10.3\% of a plain decode step at batch 1, the step would shorten by at most about 3.4--3.5\% (derived; the effect on served decoding is not yet measured \pend{bench-cert}).
 
-\begin{figure}[t]
-\centering
-\input{figures/frontier}
-\caption{Stock serving frontier (baseline; no certified head): four of nine tuned arms, client concurrency 1 (lower right) to 128 (64 for 16-token DFlash blocks). Points average three or four sessions (hollow: one); one standard deviation, below 2\% of each mean, hides behind the markers \ev{bench-frontier}. Grey: envelope of all nine arms' points with three or more sessions.}
-\label{fig:frontier}
-\end{figure}
-
 \begin{table}[!b]
-\caption{Engine changes against the tuned stock arm each modifies (group rows), flags otherwise identical; one session each. Ratio: throughput $y$ with over without the change; brackets: range over the session's run pairs. Outputs: greedy outputs against stock, same configuration; exactness is not established where not compared.}\label{tab:levers}
+\caption{Engine changes against the tuned stock arm each modifies (group rows), flags otherwise identical; one session each. Ratio: throughput $y$ with over without the change; range: over the session's run pairs. Outputs: greedy outputs against stock, same configuration; exactness is not established where not compared.}\label{tab:levers}
 \vskip 0.05in
-\centering\scriptsize\setlength{\tabcolsep}{2pt}
-\begin{tabular*}{\columnwidth}{@{}l@{\extracolsep{\fill}}rll@{}}
+% 8 pt: at 9 pt an unwrapped row needs about 295 pt against the 235 pt column, so the change and
+% outputs columns wrap and the range over run pairs has its own column.
+\centering\figsmall\setlength{\tabcolsep}{2pt}
+\begin{tabular*}{\columnwidth}{@{}>{\raggedright\arraybackslash}p{2.1cm}@{\extracolsep{\fill}}rrr>{\raggedright\arraybackslash}p{2.0cm}@{}}
 \toprule
-Change & $c$ & Ratio (pairs) & Outputs\\\midrule
-\multicolumn{4}{@{}l}{\emph{MTP, three steps, FlashInfer attention} \ev{hostgap,backbone}}\\
-Host-gap patches & 1--8 & 1.094--1.096 (1.090--1.101) & token-identical$^a$\\
-Backbone GEMM routing & 1 & 0.991 (0.989--0.993) & not compared\\\addlinespace[2pt]
-\multicolumn{4}{@{}l}{\emph{Plain decoding} \ev{backbone,bench-frontier,bench-equality}}\\
-Backbone GEMM routing & 1 & 1.035 (1.034--1.035) & exact up to rounding\\
-Replayed GDN decoding & 128 & 1.081 (one pair) & exact up to rounding\\\addlinespace[2pt]
-\multicolumn{4}{@{}l}{\emph{DFlash, 16-token blocks} \ev{drafter-fold}}\\
-Fold verify & 1 & 0.968 (0.966--0.970) & bitwise$^b$\\
-& 8 & 1.061 (1.053--1.070) & \\
-& 32 & 1.120 (1.106--1.134) & \\
+Change & $c$ & Ratio & \begin{tabular}[b]{@{}r@{}}Range\\over pairs\end{tabular} & Outputs\\\midrule
+\multicolumn{5}{@{}l}{\emph{MTP, three steps, FlashInfer attention} \ev{hostgap,backbone}}\\
+Host-gap patches & 1--8 & 1.094--1.096 & 1.090--1.101 & token-identical$^a$\\
+Backbone GEMM routing & 1 & 0.991 & 0.989--0.993 & not compared\\\addlinespace[2pt]
+\multicolumn{5}{@{}l}{\emph{Plain decoding} \ev{backbone,bench-frontier,bench-equality}}\\
+Backbone GEMM routing & 1 & 1.035 & 1.034--1.035 & exact up to rounding\\
+Replayed GDN decoding & 128 & 1.081 & one pair & exact up to rounding\\\addlinespace[2pt]
+\multicolumn{5}{@{}l}{\emph{DFlash, 16-token blocks} \ev{drafter-fold}}\\
+Fold verify & 1 & 0.968 & 0.966--0.970 & bitwise$^b$\\
+& 8 & 1.061 & 1.053--1.070 & \\
+& 32 & 1.120 & 1.106--1.134 & \\
 \bottomrule
-\multicolumn{4}{@{}p{\columnwidth}@{}}{$^a$Tokens, verify-step counts and draft histograms on 192 of 192 requests; log-probabilities not compared. $^b$Identical tokens and top-five log-probabilities, with matched pools and fixed batch composition, in a separate check.}
+\multicolumn{5}{@{}p{\columnwidth}@{}}{$^a$Tokens, verify-step counts and draft histograms on 192 of 192 requests; log-probabilities not compared. $^b$Identical tokens and top-five log-probabilities, with matched pools and fixed batch composition, in a separate check.}
 \end{tabular*}
 \end{table}
 
 \subsection{Served Decoding}\label{sec:served}
 \paragraph{The stock baseline} Each serving configuration, or \emph{arm}, runs with CUDA graphs and the overlap scheduler (checked at launch) and without the prefix cache, which the workload does not reuse. It is launched once per session at full capacity and swept over client concurrency $c$, the requests a closed-loop client keeps in flight, on 1,152 held-out public prompts (chat, code, mathematics) with 512-token outputs \ev{workload}. Figure~\ref{fig:frontier} plots the per-request output rate $x$, including the time to first token, against throughput $y$ (Appendix~\ref{app:serving}). Over three sessions speculation serves more than plain decoding up to $c=32$ and less from 48, for every drafter \ev{bench-frontier}; at $c=1$, DFlash-4B with 16-token blocks, a public drafter that we tuned and validated, gives 3.06 times plain decoding's throughput, both with Triton attention. Every arm is stock or exact up to rounding against a matched stock reference \ev{bench-equality}, and on GSM8K the four arms tested (two MTP, DFlash block 8, replayed plain decoding) are within the noise of plain decoding, excluding losses above about 3.3 points (derived), not smaller ones \ev{bench-quality}.
+
+\begin{figure}[t]
+\centering
+\input{figures/frontier}
+\caption{Stock serving frontier (measured; baseline, no certified head): four of nine tuned arms, client concurrency 1 (lower right) to 128 (64 for 16-token DFlash blocks). Points average three or four sessions (hollow: one); one standard deviation, below 2\% of each mean, hides behind the markers \ev{bench-frontier}. Grey: envelope of all nine arms' points with three or more sessions.}
+\label{fig:frontier}
+\end{figure}
+
+\begin{figure*}[t]
+\centering
+\input{figures/transport}
+\caption{Why transport fails. \textbf{(a)}~Median DFlash-4B head inputs, to scale: norms over the 4,020 transport pairs, cosine over 20,000 random drift pairs. Transport's bound beats the int8 copy's only if $h^d$ lies in the dot at the tip of $h^t$, of radius $\delta^\ast\norm{h^t}_2$ for the median $\delta^\ast$ (Proposition~\ref{thm:crossover}). \textbf{(b, c)}~Cumulative distributions of the measured drift $\rho$ over 40,000 aligned held-out pairs of DFlash-4B (b) and MTP-4B (c), against the thresholds $\delta^\ast_i$ derived from the weights for every vocabulary entry (64-entry tiles of contiguous token indices); the arrows join the median threshold for int8 with one scale per entry to each drafter's median drift (107 and 112 times apart) \ev{head-constants,rho,transport,rho-mtp,stats-dflash}.}
+\label{fig:rho}\label{fig:transport}
+\end{figure*}
 
 \paragraph{Engine changes} At low concurrency the largest gain in Table~\ref{tab:levers} comes from host work, not a kernel: making FlashInfer's attention planning, the host work that leaves the MTP cycle idle (Figure~\ref{fig:breakdown}), cheaper and free of blocking GPU reads raises MTP's throughput by 9.4--9.6\% at $c=1$--8 \ev{hostgap}. Stock MTP with Triton attention, which plans nothing on the host, stays faster there (532 against about 500 tokens/s at $c=1$, derived) \ev{bench-frontier}; the patches do not move the MTP frontier. Faster backbone GEMM kernels gain 3.4--3.5\% for plain decoding at $c=1$ and 0.991 times for MTP, whose outputs were not compared \ev{backbone}. Removing per-request state traffic pays as the batch grows: verifying DFlash blocks without per-position state snapshots (SGLang's fold-every-commit protocol) costs 3.2\% at $c=1$ and gains 6.1\% at $c=8$ \ev{drafter-fold}. The certified head on DFlash verification and the composed changes are not yet timed \pend{bench-cert,stack-composition}.

@@ -1,16 +1,19 @@
 % Figure fig:frontier (Section 4.5): the confirmed serving frontier. Its width is the line width up
-% to 10.5 cm and its height 0.48 of that. Reads
+% to 10.5 cm and its height 0.54 of that (tall enough that the legend clears every curve). Reads
 % evidence/bench/confirm/frontier.csv (per arm and client concurrency: means over sessions
 % of x = output tokens per second per request, end to end, and y = output tokens per second
 % on the GPU; n = valid sessions) and evidence/bench/confirm/envelope-all.dat (the Pareto
 % envelope over the points with at least three valid sessions, grey band). Points with fewer
 % than three sessions are hollow; they do not rank on the frontier (evidence/bench/README.md).
-% Colours follow style.tex: plain decoding, the stock baseline, in ink; the drafter arms in
-% purple, told apart by marker and dash pattern and named in the legend (MTP in the lighter purple
-% of Figure fig:rho). Each curve runs from c = 1 (lower right) to c = 128 (upper left); the plain
-% curve's ends are labelled. Error bars are one standard
-% deviation over sessions (x_e2e_std, y_std); every one is below 2% of its mean and hidden by
-% its marker, which the caption says. No arm uses the certified head.
+% Styles follow style.tex: plain decoding (arm plain) ink with circles; DFlash (arm dflash) purple
+% with diamonds, 8-token blocks solid and 16-token blocks dashed; MTP (arm mtp) purple, dash-dot,
+% with triangles, filled where three or more sessions are valid and hollow (mark hollow) where only
+% one is, which the caption says. Each curve runs from c = 1 (lower right) to c = 128 (upper
+% left); the plain curve's ends are labelled, clear of its line (c = 128 above its point: ymax 25,000
+% leaves room for the label). Error bars are one standard
+% deviation over sessions (x_e2e_std, y_std); every one is below 2% of its mean and hidden by its
+% marker, which the caption says. No arm uses the certified head. The figure has one panel, so it
+% has no title inside it; the caption names it and its status.
 % Keep only points with at least #1 sessions, or with fewer than #1.
 \pgfplotsset{
   only if n at least/.style={x filter/.append code={%
@@ -18,40 +21,38 @@
   only if n below/.style={x filter/.append code={%
     \ifnum\thisrow{n}<#1\relax\else\def\pgfmathresult{inf}\fi}}}
 \pgfmathsetmacro{\frontierw}{min(\linewidth,10.5cm)}
-\pgfmathsetmacro{\frontierh}{0.48*\frontierw}
+\pgfmathsetmacro{\frontierh}{0.54*\frontierw}
 \begin{tikzpicture}
 \begin{axis}[xmode=log,ymode=log,width=\frontierw pt,height=\frontierh pt,
-  xmin=80,xmax=1150,ymin=220,ymax=18000,grid=major,
+  xmin=80,xmax=1150,ymin=220,ymax=25000,grid=major,
   xlabel={Per-request rate $x$ (output tokens/s)},
   ylabel={Throughput $y$ (output tokens/s)},
-  title={Stock serving frontier (measured; no certified head)},
   xtick={100,200,500,1000},xticklabels={100,200,500,1000},
   ytick={300,1000,3000,10000},yticklabels={300,1k,3k,10k},
-  every axis plot/.append style={mark size=1.8pt},
-  % the legend fills the empty lower-left corner (no point lies below y = 280 left of x = 280)
-  legend style={at={(0.015,0.03)},anchor=south west,font=\figsmall,row sep=0pt},
-  legend image code/.code={\draw[mark repeat=2,mark phase=2,#1] plot coordinates {(0cm,0cm) (0.3cm,0cm) (0.6cm,0cm)};},
+  % the legend fills the empty lower-left corner: no point lies left of x = 250 below y = 2,000,
+  % and the 16-token DFlash squares nearest it sit above y = 5,000
+  legend style={at={(0.015,0.03)},anchor=south west},
+  short legend,
   % one standard deviation over sessions; keep last in a plot's options (it changes key path)
   sd bars/.style={error bars/.cd,x dir=both,x explicit,y dir=both,y explicit,error bar style={thin}}]
 \addplot[line width=4pt,ccontext!25,forget plot,no markers]
   table[x=x,y=y]{../evidence/bench/confirm/envelope-all.dat};
-\addplot[cstock,thick,mark=*,discard if not={label}{plain-tuned},sd bars]
+\addplot[arm plain,discard if not={label}{plain-tuned},sd bars]
   table[x=x_e2e_mean,y=y_mean,x error=x_e2e_std,y error=y_std,col sep=comma]{../evidence/bench/confirm/frontier.csv};
   \addlegendentry{plain decoding}
-\addplot[cdraft,very thick,mark=diamond*,mark size=2.2pt,discard if not={label}{dflash-tuned},sd bars]
+\addplot[arm dflash,discard if not={label}{dflash-tuned},sd bars]
   table[x=x_e2e_mean,y=y_mean,x error=x_e2e_std,y error=y_std,col sep=comma]{../evidence/bench/confirm/frontier.csv};
   \addlegendentry{DFlash, block 8}
-\addplot[cdraft,thick,dashed,mark=square*,mark size=1.6pt,mark options={solid},discard if not={label}{dflash-tuned-b16},sd bars]
+\addplot[arm dflash16,discard if not={label}{dflash-tuned-b16},sd bars]
   table[x=x_e2e_mean,y=y_mean,x error=x_e2e_std,y error=y_std,col sep=comma]{../evidence/bench/confirm/frontier.csv};
   \addlegendentry{DFlash, block 16}
-% MTP: the lighter purple line of Figure fig:rho, dash-dot; triangles filled in full purple where
-% three or more sessions are valid, open (white-filled, heavy outline) where only one is
-\addplot[cdraft!60,thick,dashdotted,mark=triangle*,mark size=2.3pt,mark options={solid,fill=cdraft,draw=cdraft},discard if not={label}{mtp-tuned},sd bars]
+\addplot[arm mtp,discard if not={label}{mtp-tuned},sd bars]
   table[x=x_e2e_mean,y=y_mean,x error=x_e2e_std,y error=y_std,col sep=comma]{../evidence/bench/confirm/frontier.csv};
   \addlegendentry{MTP, 3 steps}
-\addplot[only marks,mark=triangle*,mark size=2.3pt,mark options={solid,fill=white,draw=cdraft,line width=0.9pt},forget plot,discard if not={label}{mtp-tuned},only if n below=3]
+% the one-session MTP points drawn again over their filled marks, hollow; the caption names them
+\addplot[only marks,cdraft,mark triangle,mark hollow,forget plot,discard if not={label}{mtp-tuned},only if n below=3]
   table[x=x_e2e_mean,y=y_mean,col sep=comma]{../evidence/bench/confirm/frontier.csv};
-\node[annot,text=black,anchor=west] at (axis cs:300,282) {$c{=}1$};
-\node[annot,text=black,anchor=west] at (axis cs:112,15500) {$c{=}128$};
+\node[annot,anchor=west] at (axis cs:300,282) {$c{=}1$};
+\node[annot,anchor=south] at (axis cs:108.7,14600) {$c{=}128$};
 \end{axis}
 \end{tikzpicture}

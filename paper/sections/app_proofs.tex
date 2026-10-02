@@ -14,21 +14,23 @@ Table~\ref{tab:assumptions-full} lists every rounding, accumulation, tie-breakin
 \begin{table}[htbp]
 \caption{Numerical assumptions and the results that depend on them. ``Code reading'': read in SGLang's source at the pinned commit \sourcepin{} (Appendix~\ref{app:pins}) with PyTorch 2.13; $D=2{,}560$.}\label{tab:assumptions-full}
 \vskip 0.05in
-\centering\scriptsize\renewcommand{\arraystretch}{1.08}
+% At 9 pt this table is taller than a page (by 41 pt with 2 pt between rows), so it is set at 8 pt,
+% the one appendix table below \tablefont; 7 pt would be needed only if 8 pt did not fit.
+\centering\figsmall\setlength{\tabcolsep}{4pt}
 \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{7.9cm}Y>{\raggedright\arraybackslash}p{3.3cm}@{}}
 \toprule
 Assumption & Status & Results that depend on it\\\midrule
-Head weights and inputs are BF16 and are normal or zero. Every product $w_{ij}h_j$, and every product of an int8 code with a BF16 input, is exact in FP32 unless it underflows; underflow and flush to zero of products and partial sums cost less than $2^{-126}$ each and are charged to the absolute floor $\eta$. & Exact in the normal range; normal operands assumed. & Thms.~\ref{thm:stock}, \ref{thm:envelope}, \ref{thm:envelope-general}; Prop.~\ref{prop:stockinterval}\\\addlinespace[3pt]
-The stock head rounds its FP32 accumulator to BF16 (nearest, ties to even) and widens it exactly; \code{torch.argmax} returns the smallest maximal index in greedy decoding and verification. & Code reading. & Def.~\ref{def:contracts}; Lem.~\ref{lem:bf16gap}; Prop.~\ref{prop:stockinterval}\\\addlinespace[3pt]
-Stock accumulation error $|\hat y_i-z_i|\le\gamma_{\rm stock}\sum_j|w_{ij}h_j|+\eta$ at every served shape: $\gamma_{\rm stock}=\gcons$ (\modelcons: $2D$ roundings at $2^{-23}$, any order, which covers multi-term adders that keep at least 23 fractional bits per block of 8 to 32 terms) or $\gamma_{\rm stock}=\ghop$ (\modelhopper: Khattak and Mikaitis's model of Hopper's BF16 tensor cores, measured on the warp-level \code{mma} path, plus FP32 split-$K$); $\eta=2^{-113}$; no split-$K$ partials stored in BF16; crafted-input probes of the stock kernels match the \modelhopper{} (Appendix~\ref{app:accumulation}) \ev{profile-wgmma}. The replay omitted $\eta$, which can change a decision only if an endpoint lies within $2^{-112}$ of a BF16 rounding boundary or a gap within $2^{-112}$ of its threshold. & Assumed; consistent with all replayed positions and with the FP32-output kernel's observed error, 58 times inside the \modelhopper{} \ev{kernel-error}; implemented floor $2^{-100}$ \ev{kernel-impl}. & Certification against \Rstock; Table~\ref{tab:rstock}\\\addlinespace[3pt]
-A position's stock BF16 logits do not depend on the other positions of the batch or on which vocabulary entries are present. & Measured on this build at 20 batch sizes; the part about which entries are present is re-checked at start-up, at the deployed batch sizes \ev{kernel-invariance}. & Per-position fallback only\\\addlinespace[3pt]
-Comparisons are made at the same batch shape and serving configuration. & Required (Section~\ref{sec:same-shape}). & Every agreement claim\\\addlinespace[3pt]
-The low-precision pass accumulates in FP32 on tensor cores within $\gamma_{\rm copy}=\gcons$, the \modelcons{} whichever model is assumed for the stock kernel, which holds if its adders keep at least 23 fractional bits per block of 8 to 32 terms, or exactly in int32 for int8 codes times int8 activation codes. & Model assumed; integer pass exact. & Thms.~\ref{thm:envelope}, \ref{thm:envelope-general}; Table~\ref{tab:candidates}\\\addlinespace[3pt]
-The low-precision kernel computes the modelled arithmetic: the scaled products of codes and inputs, accumulated in FP32 within $\gamma_{\rm copy}$ or exactly in int32, and the error-bound epilogue as analysed. & Required, not proved; checked per compiled variant at start-up and by runtime probes \ev{kernel-impl}. Int8 TMA tiles with a 64-byte box gave wrong products under Triton 3.7.1 and are refused \ev{kernel-tma}. & Tokens certified by a kernel, not by the replay; its runtime\\\addlinespace[3pt]
-Re-scoring sums the exact BF16 products of each candidate in FP64 on CUDA cores under IEEE rounding, with error at most $\gamma_D(2^{-53})\sum_j|w_{ij}h_j|<3\times10^{-13}\sum_j|w_{ij}h_j|$, which widens its accumulator enclosure. & Implemented and tested \ev{kernel-impl}. & Decision by Prop.~\ref{prop:stockinterval}\\\addlinespace[3pt]
-Norms of $h$ are rounded up ($\ell_1$ reduction depth at most $2^{13}$); interval endpoints are rounded outward; offline constants are exact and stored rounded up. & Proved (Appendix~\ref{app:proofs}). & Every computed enclosure\\\addlinespace[3pt]
-Untruncated seeded noise is a function of (seed, absolute position, token) through a 32-bit hash, evaluated in FP64 after an FP32 softmax and logarithm; statements in law idealize it as i.i.d.\ continuous Gumbel. The seeded sampler exists only in deterministic-inference mode, whose head is SGLang's batch-invariant \code{mm}, here DeepGEMM's deterministic BF16 GEMM (one FP32 accumulator, no split-$K$, round-to-nearest output): the \modelcons{} covers it; the \modelhopper{} is unchecked for it. Undecided sampled positions run the stock sampler. & Code reading; the chain's rounding bounded by CUDA's documented \code{expf} and \code{logf} accuracy; matched on 60,000 replayed positions \ev{kernel-seeded}. & Thms.~\ref{thm:race}, \ref{thm:fixednoise}; sampling contract\\\addlinespace[3pt]
-Replay: real logits are evaluated in FP64 from the stored operands (error below $D\,2^{-52}\sum_j|w_{ij}h_j|$); draft logits are exact, ignoring the BF16 rounding a served draft pass adds, which favours transport. & Replay convention. & Tables~\ref{tab:candidates}--\ref{tab:transport}; Figs.~\ref{fig:candidates}, \ref{fig:rho}\\\addlinespace[3pt]
+Head weights and inputs are BF16 and are normal or zero. Every product $w_{ij}h_j$, and every product of an int8 code with a BF16 input, is exact in FP32 unless it underflows; underflow and flush to zero of products and partial sums cost less than $2^{-126}$ each and are charged to the absolute floor $\eta$. & Exact in the normal range; normal operands assumed. & Thms.~\ref{thm:stock}, \ref{thm:envelope}, \ref{thm:envelope-general}; Prop.~\ref{prop:stockinterval}\\\addlinespace[2pt]
+The stock head rounds its FP32 accumulator to BF16 (nearest, ties to even) and widens it exactly; \code{torch.argmax} returns the smallest maximal index in greedy decoding and verification. & Code reading. & Def.~\ref{def:contracts}; Lem.~\ref{lem:bf16gap}; Prop.~\ref{prop:stockinterval}\\\addlinespace[2pt]
+Stock accumulation error $|\hat y_i-z_i|\le\gamma_{\rm stock}\sum_j|w_{ij}h_j|+\eta$ at every served shape: $\gamma_{\rm stock}=\gcons$ (\modelcons: $2D$ roundings at $2^{-23}$, any order, which covers multi-term adders that keep at least 23 fractional bits per block of 8 to 32 terms) or $\gamma_{\rm stock}=\ghop$ (\modelhopper: Khattak and Mikaitis's model of Hopper's BF16 tensor cores, measured on the warp-level \code{mma} path, plus FP32 split-$K$); $\eta=2^{-113}$; no split-$K$ partials stored in BF16; crafted-input probes of the stock kernels match the \modelhopper{} (Appendix~\ref{app:accumulation}) \ev{profile-wgmma}. The replay omitted $\eta$, which can change a decision only if an endpoint lies within $2^{-112}$ of a BF16 rounding boundary or a gap within $2^{-112}$ of its threshold. & Assumed; consistent with all replayed positions and with the FP32-output kernel's observed error, 58 times inside the \modelhopper{} \ev{kernel-error}; implemented floor $2^{-100}$ \ev{kernel-impl}. & Certification against \Rstock; Table~\ref{tab:rstock}\\\addlinespace[2pt]
+A position's stock BF16 logits do not depend on the other positions of the batch or on which vocabulary entries are present. & Measured on this build at 20 batch sizes; the part about which entries are present is re-checked at start-up, at the deployed batch sizes \ev{kernel-invariance}. & Per-position fallback only\\\addlinespace[2pt]
+Comparisons are made at the same batch shape and serving configuration. & Required (Section~\ref{sec:same-shape}). & Every agreement claim\\\addlinespace[2pt]
+The low-precision pass accumulates in FP32 on tensor cores within $\gamma_{\rm copy}=\gcons$, the \modelcons{} whichever model is assumed for the stock kernel, which holds if its adders keep at least 23 fractional bits per block of 8 to 32 terms, or exactly in int32 for int8 codes times int8 activation codes. & Model assumed; integer pass exact. & Thms.~\ref{thm:envelope}, \ref{thm:envelope-general}; Table~\ref{tab:candidates}\\\addlinespace[2pt]
+The low-precision kernel computes the modelled arithmetic: the scaled products of codes and inputs, accumulated in FP32 within $\gamma_{\rm copy}$ or exactly in int32, and the error-bound epilogue as analysed. & Required, not proved; checked per compiled variant at start-up and by runtime probes \ev{kernel-impl}. Int8 TMA tiles with a 64-byte box gave wrong products under Triton 3.7.1 and are refused \ev{kernel-tma}. & Tokens certified by a kernel, not by the replay; its runtime\\\addlinespace[2pt]
+Re-scoring sums the exact BF16 products of each candidate in FP64 on CUDA cores under IEEE rounding, with error at most $\gamma_D(2^{-53})\sum_j|w_{ij}h_j|<3\times10^{-13}\sum_j|w_{ij}h_j|$, which widens its accumulator enclosure. & Implemented and tested \ev{kernel-impl}. & Decision by Prop.~\ref{prop:stockinterval}\\\addlinespace[2pt]
+Norms of $h$ are rounded up ($\ell_1$ reduction depth at most $2^{13}$); interval endpoints are rounded outward; offline constants are exact and stored rounded up. & Proved (Appendix~\ref{app:proofs}). & Every computed enclosure\\\addlinespace[2pt]
+Untruncated seeded noise is a function of (seed, absolute position, token) through a 32-bit hash, evaluated in FP64 after an FP32 softmax and logarithm; statements in law idealize it as i.i.d.\ continuous Gumbel. The seeded sampler exists only in deterministic-inference mode, whose head is SGLang's batch-invariant \code{mm}, here DeepGEMM's deterministic BF16 GEMM (one FP32 accumulator, no split-$K$, round-to-nearest output): the \modelcons{} covers it; the \modelhopper{} is unchecked for it. Undecided sampled positions run the stock sampler. & Code reading; the chain's rounding bounded by CUDA's documented \code{expf} and \code{logf} accuracy; matched on 60,000 replayed positions \ev{kernel-seeded}. & Thms.~\ref{thm:race}, \ref{thm:fixednoise}; sampling contract\\\addlinespace[2pt]
+Replay: real logits are evaluated in FP64 from the stored operands (error below $D\,2^{-52}\sum_j|w_{ij}h_j|$); draft logits are exact, ignoring the BF16 rounding a served draft pass adds, which favours transport. & Replay convention. & Tables~\ref{tab:candidates}--\ref{tab:transport}; Figs.~\ref{fig:candidates}, \ref{fig:rho}\\\addlinespace[2pt]
 Transport is in real arithmetic with one head for both passes; $\delta^\ast$ uses Euclidean error bounds, 64-entry tiles of contiguous token indices and tile-mean centres. & Stated; other geometries in Table~\ref{tab:transport}. & Thm.~\ref{thm:transport}; Prop.~\ref{thm:crossover}; Fig.~\ref{fig:rho}\\
 \bottomrule
 \end{tabularx}
@@ -37,8 +39,8 @@ Transport is in real arithmetic with one head for both passes; $\delta^\ast$ use
 \begin{table}[htbp]
 \caption{Numerical assumptions, in short (in full: Table~\ref{tab:assumptions-full}). ``Code'': read from SGLang's and PyTorch's code at the versions of Section~\ref{sec:setup}.}\label{tab:assumptions}
 \vskip 0.05in
-\centering\scriptsize
-\begin{tabularx}{0.62\linewidth}{@{}Y>{\raggedright\arraybackslash}p{3.05cm}@{}}
+\centering\tablefont
+\begin{tabularx}{\linewidth}{@{}Y>{\raggedright\arraybackslash}p{6.4cm}@{}}
 \toprule
 Assumption & Status\\\midrule
 BF16 operands are normal or zero, so products are exact in FP32 (underflow is charged to $\eta$) & Exact for normal operands\\\addlinespace[2pt]
@@ -154,7 +156,7 @@ At $T=1$ and error bound $\beta$ (so $t\approx4\beta$), the bound on the expecte
 \begin{table}[htbp]
 \caption{Candidate tokens per greedy decision on 6,005 held-out plain-decode positions from 160 prompts; \modelcons{} for the copy's accumulation; Cauchy--Schwarz error bound per entry for int8 with one scale per entry, blockwise $\ell_2$ otherwise. ``Bytes'': the copy relative to the BF16 head; ``1 entry'': decided without re-scoring. Measured on replayed states \ev{selfevidence-csv}.}\label{tab:candidates}\label{tab:geometry-candidates}
 \vskip 0.05in
-\centering\scriptsize\setlength{\tabcolsep}{3.8pt}
+\centering\tablefont\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}lrrrrrr@{}}
 \toprule
 & & \multicolumn{3}{c}{Candidate tokens} & \multicolumn{2}{c}{Decided with}\\\cmidrule(lr){3-5}\cmidrule(l){6-7}
@@ -171,7 +173,7 @@ int4, 128 cols & 0.27 & 72,847 & 248,295 & 248,320 & 0\% & 0\%\\
 \begin{table}[htbp]
 \caption{Share of the 6,005 held-out positions, and of the capture's 750 decode steps (counting each step's held-out positions, 8.0 on average), that the contract leaves to the stock kernel, by rule and by the model assumed for the stock kernel's accumulation. The last two rows are sensitivity rows that do not model the stock tensor-core GEMM. Measured on replayed states \ev{rstock}.}\label{tab:rstock}
 \vskip 0.05in
-\centering\scriptsize\setlength{\tabcolsep}{4pt}
+\centering\tablefont\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}lrrrrr@{}}
 \toprule
 & & \multicolumn{2}{c}{Gap (Thm.~\ref{thm:stock})} & \multicolumn{2}{c}{Interval (Prop.~\ref{prop:stockinterval})}\\\cmidrule(lr){3-4}\cmidrule(l){5-6}
@@ -187,16 +189,16 @@ IEEE FP32 tree & $1.7\times10^{-6}$ & 1.95\% & 14.8\% & 0\% & 0\%\\
 \begin{table}[htbp]
 \caption{Recomputation and fallback by the model assumed for the stock kernel: mean candidates and the share of positions left to the stock head. Held-out replay columns: the gap and interval conditions, and the share of decode steps (8.0 held-out positions each) with a position the interval condition leaves. The last row is a sensitivity check, not a model of the stock kernel. By rule and step in full: Table~\ref{tab:rstock}.}\label{tab:fallback}
 \vskip 0.05in
-\centering\scriptsize\setlength{\tabcolsep}{3pt}
-\begin{tabular*}{0.7\linewidth}{@{}l@{\extracolsep{\fill}}rrrrr@{}}
+\centering\tablefont\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrrr@{}}
 \toprule
 & \multicolumn{2}{c}{Kernel replay \ev{kernel-replay}} & \multicolumn{3}{c}{Held-out replay \ev{rstock}}\\\cmidrule(lr){2-3}\cmidrule(l){4-6}
-Model ($\gamma_{\rm stock}$) & Cand. & Interval & Gap & Interval & Steps\\\midrule
+Model ($\gamma_{\rm stock}$) & Cand. & Interval & Gap & Interval & \begin{tabular}[b]{@{}r@{}}Steps with\\a fallback\end{tabular}\\\midrule
 Conservative ($\gcons$) & 1.84 & 1.46\% & 3.03\% & 1.40\% & 10.9\%\\
 Hopper ($\ghop$) & 1.78 & 0.28\% & 2.18\% & 0.35\% & 2.8\%\\
 IEEE FP32 tree ($1.7\times10^{-6}$) & -- & -- & 1.95\% & 0\% & 0\%\\
 \bottomrule
-\end{tabular*}
+\end{tabular}
 \end{table}
 
 
@@ -205,24 +207,25 @@ IEEE FP32 tree ($1.7\times10^{-6}$) & -- & -- & 1.95\% & 0\% & 0\%\\
 \paragraph{Verification and draft positions} Table~\ref{tab:spec-positions} gives the candidate sets and the gap condition's fallback on the two speculative captures, with plain decoding for comparison~\ev{selfevidence-csv,selfevidence-dflash,selfevidence-mtp,rstock}. The counts use the elementwise minimum of the rigorous per-entry error bounds of the int8 copy with one scale per entry, under the \modelcons{}; it is the only bound for which the replay records whether the verifier needs a position. The positions a greedy verifier needs behave as on plain decoding; for MTP-4B, 76.1\% of them are decided by one candidate. Verification positions after the first rejection are conditioned on a wrong prefix and have flatter distributions, so they need more candidates. Unlike DFlash's, the MTP draft head needs more candidates than the verifier, because its input keeps the target's scale and the error bound grows with $\norm h$. The gap condition is the only \Rstock{} rule evaluated on the speculative captures. On DFlash-4B it leaves at least one position to the stock kernel in most verify steps, so a whole-batch fallback would run in most verify passes unless the interval form does much better there, which is untested. On both captures no bound was violated and no winner was missed.
 
 \begin{table}[htbp]
-\small\centering
-\caption{Candidates and the gap condition on replayed speculative captures, with plain decoding for comparison: the int8 copy with one scale per entry (FP8 where named) under the elementwise minimum of the rigorous per-entry error bounds and the \modelcons{} for the copy. ``Candidates'': mean, and the 99th percentile where recorded. ``Left to stock'': share of positions the gap condition (Theorem~\ref{thm:stock}) leaves to the stock kernel; ``Steps'': share of the capture's steps with at least one such position; both under the \modelhopper{} / \modelcons{} of the stock kernel. Measured~\ev{selfevidence-csv,selfevidence-dflash,selfevidence-mtp,rstock}.}\label{tab:spec-positions}
+\tablefont\centering
+\caption{Candidates and the gap condition on replayed speculative captures, with plain decoding for comparison: the int8 copy with one scale per entry (FP8 where named) under the elementwise minimum of the rigorous per-entry error bounds and the \modelcons{} for the copy. ``Candidates'': mean, and the 99th percentile where recorded. ``Left to stock'': share of positions the gap condition (Theorem~\ref{thm:stock}) leaves to the stock kernel; ``Steps'': share of the capture's steps with at least one such position; each under the \modelhopper{} and under the \modelcons{} of the stock kernel. Measured~\ev{selfevidence-csv,selfevidence-dflash,selfevidence-mtp,rstock}.}\label{tab:spec-positions}
 \vskip 0.05in
-\begin{tabular}{@{}llrrrrr@{}}\toprule
-& & & \multicolumn{2}{c}{Candidates} & &\\\cmidrule(lr){4-5}
-Capture & Positions & Count & mean & p99 & Left to stock & Steps\\\midrule
-Plain decoding & held-out & 6,005 & 1.54 & & 2.18\% / 3.03\% & 16.0\% / 21.6\%\\\addlinespace
-DFlash-4B, block 16 & all verification & 4,000 & & & 5.7\% / 8.6\% & 78\% / 84\%\\
-& verification, needed by the verifier & 1,162 & 1.57 & & &\\
-& verification, after the first rejection & & 4.0 & & &\\
-& all verification, FP8 copy & 4,000 & 28.9 & & &\\
-& draft head, reached & 1,138 of 4,020 & 1.28 & & &\\
-& draft head, not reached & & 3.36 & & &\\\addlinespace
-MTP-4B, four steps & all verification & 4,010 & & & 2.84\% / 4.04\% & 37.5\% / 48\%\\
-& verification, needed by the verifier & 2,901 & 1.51 & 7 & &\\
-& verification, after the first rejection & & 2.44 & & &\\
-& draft head, reached & & 2.44 & 15 & &\\
-& all draft positions & 4,024 & & & 4.20\% / 6.44\% &\\\bottomrule
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{@{}l>{\raggedright\arraybackslash}p{3.6cm}rrrrrrr@{}}\toprule
+& & & \multicolumn{2}{c}{Candidates} & \multicolumn{2}{c}{Left to stock} & \multicolumn{2}{c}{Steps}\\\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(l){8-9}
+Capture & Positions & Count & mean & p99 & Hopper & conservative & Hopper & conservative\\\midrule
+Plain decoding & held-out & 6,005 & 1.54 & & 2.18\% & 3.03\% & 16.0\% & 21.6\%\\\addlinespace
+DFlash-4B, block 16 & all verification & 4,000 & & & 5.7\% & 8.6\% & 78\% & 84\%\\
+& verification, needed by the verifier & 1,162 & 1.57 & & & & &\\
+& verification, after the first rejection & & 4.0 & & & & &\\
+& all verification, FP8 copy & 4,000 & 28.9 & & & & &\\
+& draft head, reached & 1,138 of 4,020 & 1.28 & & & & &\\
+& draft head, not reached & & 3.36 & & & & &\\\addlinespace
+MTP-4B, four steps & all verification & 4,010 & & & 2.84\% & 4.04\% & 37.5\% & 48\%\\
+& verification, needed by the verifier & 2,901 & 1.51 & 7 & & & &\\
+& verification, after the first rejection & & 2.44 & & & & &\\
+& draft head, reached & & 2.44 & 15 & & & &\\
+& all draft positions & 4,024 & & & 4.20\% & 6.44\% & &\\\bottomrule
 \end{tabular}
 \end{table}
 
