@@ -75,7 +75,11 @@ def session_windows(logs: list[Path]) -> list[tuple[str, datetime, datetime]]:
     for i, (name, begin, stop) in enumerate(found):
         following = found[i + 1] if i + 1 < len(found) else None
         if stop is None:
-            stop = following[1] - timedelta(microseconds=1) if following else datetime.max.replace(tzinfo=UTC)
+            stop = (
+                following[1] - timedelta(microseconds=1)
+                if following
+                else datetime.max.replace(tzinfo=UTC)
+            )
         elif following and stop >= following[1]:
             raise SystemExit(f'session {name} ends at {stop}, after {following[0]} starts')
         windows.append((name, begin, stop))
