@@ -1,0 +1,13 @@
+{
+  "run_a": "evidence/bench/quality/plain-tuned-replayssm-seed0",
+  "run_b": "evidence/bench/quality/mtp-stockverify-seed0",
+  "problems": 1319,
+  "accuracy_a": 0.910538286580743,
+  "accuracy_b": 0.8893100833965125,
+  "accuracy_delta_b_minus_a": -0.021228203184230465,
+  "correct_only_a": 93,
+  "correct_only_b": 65,
+  "mcnemar_exact_p": 0.03138663605336957,
+  "same_predicted_answer": 0.7589082638362395,
+  "identical_generation": 0.0
+}

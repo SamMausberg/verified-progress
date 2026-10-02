@@ -23,10 +23,12 @@ shared across layers to bound memory).
 Before timing, each tile's verify output and ring contents for one layer are compared
 bitwise with tile 32's. A tile that changes the arithmetic fails the run, and the report
 is then written to <out stem>.failed.json instead of --out. The report also applies the
-threshold rule declared before the sweep ran (`declared_threshold`; evidence README,
-"Ring-writing verify tiles by batch: declared reading").
+threshold rule declared before the sweep ran (`ring_tile_rule.py`; evidence README,
+"Ring-writing verify tiles by batch: declared reading"), and only when the run used the
+declared configuration (the defaults below); any other run gets `n_star` null with the
+parameters that differ.
 
-Exclusive hold (timing), about 13 minutes:
+Exclusive hold (timing), about 2 minutes (the declared run took 1 min 41 s):
 
     scripts/gpu_lock.sh -x experiments/drafter/run_ring_tile_sweep.sh [OUT]
 """
@@ -37,16 +39,17 @@ import argparse
 import json
 import statistics
 import subprocess
+import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import torch
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from ring_tile_rule import DECLARED, report_config, threshold_for_config
+
 H, HV, K, V = 16, 32, 128, 128
-# The grid the threshold rule was declared on (evidence README); other grids get no threshold.
-DECLARED_BLOCKS = [16, 8]
-DECLARED_BATCHES = [1, 2, 3, 4, 5, 6, 8, 12, 16, 24, 32, 48, 64]
 
 
 def gpu_state() -> list[str]:
@@ -80,60 +83,6 @@ def graph_time_us(calls: Callable[[], None], layers: int, iters: int) -> float:
         times.append(start.elapsed_time(end) * 1e3 / layers)
     del graph
     return statistics.median(times)
-
-
-def declared_threshold(
-    rows: list[dict[str, Any]], blocks: list[int], batches: list[int]
-) -> dict[str, Any]:
-    """The batch threshold N* by the rule declared before the sweep ran (evidence README).
-
-    Tile 4 wins at (T, N) when it is faster than tile 32 in every repeat and the gap
-    between their medians exceeds the larger of the two tiles' repeat ranges. N*_T is
-    the largest grid batch such that tile 4 wins at it and at every smaller grid batch
-    (0 if it loses at the smallest), and N* is the smaller of N*_T over the blocks, since
-    the launch-config selection sees the batch but not the block length.
-    """
-    result: dict[str, Any] = {'wins': {}, 'n_star_by_block': {}}
-    for T in blocks:
-        star = 0
-        prefix = True
-        for n in batches:
-            by_bv = {
-                r['BV']: r for r in rows if r['T'] == T and r['N'] == n and r['path'] == 'ring'
-            }
-            narrow, wide = by_bv[4], by_bv[32]
-            spread = max(
-                narrow['us_per_layer_range'][1] - narrow['us_per_layer_range'][0],
-                wide['us_per_layer_range'][1] - wide['us_per_layer_range'][0],
-            )
-            every = all(
-                a < b
-                for a, b in zip(
-                    narrow['us_per_layer_by_repeat'], wide['us_per_layer_by_repeat'], strict=True
-                )
-            )
-            gap = wide['us_per_layer_median'] - narrow['us_per_layer_median']
-            wins = every and gap > spread
-            result['wins'][f'T{T}_N{n}'] = wins
-            prefix = prefix and wins
-            if prefix:
-                star = n
-        result['n_star_by_block'][f'T{T}'] = star
-    result['n_star'] = min(result['n_star_by_block'].values())
-    return result
-
-
-def threshold_for_grid(
-    rows: list[dict[str, Any]], blocks: list[int], batches: list[int]
-) -> dict[str, Any]:
-    """The declared threshold on the declared grid; on any other grid, none, with the reason."""
-    if sorted(blocks) == sorted(DECLARED_BLOCKS) and sorted(batches) == DECLARED_BATCHES:
-        return declared_threshold(rows, DECLARED_BLOCKS, DECLARED_BATCHES)
-    return {
-        'n_star': None,
-        'reason': f'grid differs from the declared one (blocks {DECLARED_BLOCKS}, '
-        f'batches {DECLARED_BATCHES}), so the declared rule does not apply',
-    }
 
 
 class Sweep:
@@ -266,23 +215,21 @@ class Sweep:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=(__doc__ or '').split('\n\n')[0])
-    parser.add_argument('--blocks', type=int, nargs='+', default=DECLARED_BLOCKS)
+    # The defaults are the declared configuration; any override withholds the threshold.
+    parser.add_argument('--blocks', type=int, nargs='+', default=DECLARED['blocks'])
+    parser.add_argument('--batches', type=int, nargs='+', default=DECLARED['batches'])
+    parser.add_argument('--tiles', type=int, nargs='+', default=DECLARED['tiles'])
     parser.add_argument(
-        '--batches',
-        type=int,
-        nargs='+',
-        default=DECLARED_BATCHES,
+        '--layers', type=int, default=DECLARED['layers'], help='GDN layers of Qwen3.5-4B'
     )
-    parser.add_argument('--tiles', type=int, nargs='+', default=[4, 8, 16, 32])
-    parser.add_argument('--layers', type=int, default=24, help='GDN layers of Qwen3.5-4B')
-    parser.add_argument('--iters', type=int, default=50)
-    parser.add_argument('--repeats', type=int, default=4)
+    parser.add_argument('--iters', type=int, default=DECLARED['iters'])
+    parser.add_argument('--repeats', type=int, default=DECLARED['repeats'])
     parser.add_argument('--out', type=Path, required=True)
     args = parser.parse_args()
     if not {4, 32} <= set(args.tiles) or any(t not in (4, 8, 16, 32) for t in args.tiles):
         parser.error(
             'tiles must be among 4, 8, 16, 32 and include 4 and 32 '
-            '(the declared threshold compares them)'
+            '(tile 32 is the bitwise reference; the threshold compares 4 with 32)'
         )
     if min(args.batches) < 1 or min(args.blocks) < 1 or args.layers < 1 or args.iters < 1:
         parser.error('batches, blocks, layers and iters must be positive')
@@ -322,8 +269,7 @@ def main() -> None:
                 'fastest_tile': min(by_bv, key=lambda bv: by_bv[bv]),
                 'bv4_over_bv32': by_bv[4] / by_bv[32] if 4 in by_bv else None,
             }
-    threshold = threshold_for_grid(rows, args.blocks, args.batches)
-    report = {
+    report: dict[str, Any] = {
         'shape': {'H': H, 'HV': HV, 'K': K, 'V': V, 'layers': args.layers},
         'iters': args.iters,
         'repeats': args.repeats,
@@ -333,9 +279,11 @@ def main() -> None:
         'bitwise_failures': [list(key) for key in broken],
         'stock_tile': {f'T{T}_N{n}': bv for (T, n), bv in sweep.stock_tile.items()},
         'fastest': fastest,
-        'threshold': threshold,
-        'rows': rows,
     }
+    # The rule reads the configuration from the report itself (the grid from its rows).
+    threshold = threshold_for_config(rows, report_config({**report, 'rows': rows}))
+    report['threshold'] = threshold
+    report['rows'] = rows
     # A failed sweep is written under its own name, so no later analysis reads it as a result.
     out = args.out.with_name(args.out.stem + '.failed.json') if broken else args.out
     out.parent.mkdir(parents=True, exist_ok=True)

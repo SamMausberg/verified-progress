@@ -1,0 +1,13 @@
+{
+  "run_a": "evidence/lossy/quality/plain-cap256-fp16-seed0/20261002-094130",
+  "run_b": "evidence/lossy/quality/replayssm-cap256-fp16-seed0/20261002-110013",
+  "problems": 1319,
+  "accuracy_a": 0.890068233510235,
+  "accuracy_b": 0.8893100833965125,
+  "accuracy_delta_b_minus_a": -0.0007581501137224889,
+  "correct_only_a": 87,
+  "correct_only_b": 86,
+  "mcnemar_exact_p": 1.0,
+  "same_predicted_answer": 0.7604245640636846,
+  "identical_generation": 0.0
+}

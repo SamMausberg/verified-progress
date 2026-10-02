@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Kernel timing of the exact fold's ring-writing GDN verify by value tile and batch
 # (gdn_ring_tile_sweep.py; the follow-up to patch drafter/0005, #167). No server. One
-# exclusive hold, about 13 minutes:
+# exclusive hold, about 2 minutes (the declared run took 1 min 41 s):
 #   scripts/gpu_lock.sh -x experiments/drafter/run_ring_tile_sweep.sh [OUT]
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

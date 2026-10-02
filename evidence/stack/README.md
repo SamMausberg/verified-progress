@@ -96,7 +96,7 @@ At c = 1-8 on tuned DFlash:
 | Hot-vocabulary draft head (D7) | derived about break-even (0.3 ms saved, ~7% fewer accepted tokens) | derived | exact (draft side) | no: derived net < 1% |
 | FA4 draft attention under Triton target (D8) | untested at block 16 | - | exact (draft side) | no |
 | Host-gap patches (D9) | no-op on these arms; MTP cycle -2.7% to -4.8% | held-batch windows | bitwise | applied, off |
-| Relaxed acceptance, INT4 target, FP16 state (D13-D15) | not measured on DFlash | - | lossy | lossy stack |
+| Relaxed acceptance, INT4 target, FP16 state (D13-D15) | INT4 target with its INT4 drafter on DFlash: no detectable change at c = 1, slower at c = 2-32 (`evidence/lossy/`); the other two not measured on DFlash | three sessions (INT4 only) | lossy | lossy stack |
 | Wider perfect blocks, P6 selector, P9 reuse (D16-D18) | oracles only | offline or forced | - | gap analysis |
 | P10, P3, one-step recycling (D19-D20) | rejected at c = 1 or refuted | derived or offline | - | no |
 
@@ -104,9 +104,10 @@ At c = 32-128 on tuned plain decoding (inventory only; the composition plan belo
 c = 1-8): buffered GDN decode (ReplaySSM) serves 1.08x plain's throughput at c = 128 and
 0.94x at c = 32 (one session against four, exact-up-to-rounding); rounding-preserving exact
 replay (P4) is bit-exact at kernel level with a derived 1.08x per step and no valid served
-run; FP16 state gives +24% at c = 128 in a single run but is lossy with quality pending;
-speculation trails plain from c = 48; the merged GDN in_proj is bitwise and derives to
-under 1%; FP8 weights and KV give nothing.
+run; FP16 state gives +24% at c = 128 in a single run but is lossy (the lossy track measured
+1.16-1.17x over the best exact arm at c = 64-256 and a GSM8K cost outside its declared band;
+`evidence/lossy/`); speculation trails plain from c = 48; the merged GDN in_proj is bitwise
+and derives to under 1%; FP8 weights and KV give nothing.
 
 ## Composed engine
 

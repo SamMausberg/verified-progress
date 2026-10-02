@@ -1,0 +1,46 @@
+{
+ "arm": "int4-plain-cap256",
+ "reference": "/home/ubuntu/vp-data/lossy/load_test/20261002T035539Z/plain-ref-1/probe_generate.json",
+ "reference_sha256": "5186472b7ae278bd4d7f9de1bd462e6126f03adb870cd0d98648cbaab0c968f7",
+ "generate": {
+  "reference": "plain-ref-1",
+  "candidate": "int4-plain-cap256",
+  "mode": "generate",
+  "positions": 1774,
+  "kl_mean": 0.009135057949343472,
+  "kl_p50": 4.293121563009212e-05,
+  "kl_p99": 0.15107296114113666,
+  "kl_max": 0.4636577484621628,
+  "identical": false,
+  "first_difference": {
+   "sequence": 0,
+   "position": 0,
+   "kind": "top-k"
+  },
+  "sequences": 48,
+  "sequences_identical": 0,
+  "first_divergence_median": 26.0,
+  "divergences_per_1k_shared_tokens": 27.057497181510712,
+  "top1_logprob_abs_delta_mean": 0.024536631179391245,
+  "emitted_non_argmax_rate": 0.004801432291666667,
+  "emitted_non_argmax_logprob_gap_mean": 0.0
+ },
+ "score": {
+  "reference": "plain-ref-1",
+  "candidate": "int4-plain-cap256",
+  "mode": "score",
+  "positions": 12240,
+  "kl_mean": 0.012432431883659443,
+  "kl_p50": 0.00013014034535602814,
+  "kl_p99": 0.16578893109507134,
+  "kl_max": 0.8004785570564446,
+  "identical": false,
+  "first_difference": {
+   "sequence": 0,
+   "position": 0,
+   "kind": "top-k"
+  },
+  "argmax_agreement": 0.9706699346405229,
+  "argmax_disagreements": 359
+ }
+}

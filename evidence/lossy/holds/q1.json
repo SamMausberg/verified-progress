@@ -1,0 +1,96 @@
+{
+ "hold": "q1",
+ "provenance": {
+  "repo_commit": "ec9173776f7621d8aaad3f158ed87f1ee21a9acc",
+  "engine_worktree": "/home/ubuntu/sglang-wt/lossy",
+  "engine_commit": "57560de6907090a34eb21774ba13dbe2a6b89b80",
+  "python": "/home/ubuntu/sglang/.venv/bin/python",
+  "versions": {
+   "torch": "2.13.0",
+   "triton": "3.7.1",
+   "flashinfer-python": "0.6.18",
+   "transformers": "5.12.1",
+   "sgl-eval": "0.1.2"
+  }
+ },
+ "planned": [
+  "gsm8k-int4-dflash-b8",
+  "probe-int4-plain-cap256",
+  "probe-int4-dflash-b8"
+ ],
+ "start_unix": 1790932311.342954,
+ "launches": [
+  {
+   "label": "gsm8k-int4-dflash-b8",
+   "command": [
+    "/home/ubuntu/vp-wt/lossy-hold/scripts/gpu_startup_lock.sh",
+    "/home/ubuntu/sglang/.venv/bin/python",
+    "-m",
+    "bench.quality",
+    "run",
+    "--arm",
+    "int4-dflash-b8",
+    "--label",
+    "int4-dflash-b8-seed0",
+    "--seed",
+    "0",
+    "--threads",
+    "128",
+    "--port",
+    "30101",
+    "--out",
+    "/home/ubuntu/vp-data/lossy/quality",
+    "--sglang-worktree",
+    "/home/ubuntu/sglang-wt/lossy"
+   ],
+   "log": "/home/ubuntu/vp-data/lossy/logs/q1/gsm8k-int4-dflash-b8.log",
+   "timeout_s": 1500,
+   "start_unix": 1790932311.3432682,
+   "end_unix": 1790933871.4740446,
+   "exit_code": 124,
+   "run_dir": null
+  },
+  {
+   "label": "probe-int4-plain-cap256",
+   "command": [
+    "/home/ubuntu/vp-wt/lossy-hold/scripts/gpu_startup_lock.sh",
+    "/home/ubuntu/sglang/.venv/bin/python",
+    "-m",
+    "experiments.lossy.run_hold",
+    "probe",
+    "--arm",
+    "int4-plain-cap256",
+    "--out",
+    "/home/ubuntu/vp-data/lossy/probes/int4-plain-cap256"
+   ],
+   "log": "/home/ubuntu/vp-data/lossy/logs/q1/probe-int4-plain-cap256.log",
+   "timeout_s": 600,
+   "start_unix": 1790933871.474645,
+   "end_unix": 1790933971.6074247,
+   "exit_code": 0,
+   "run_dir": null
+  },
+  {
+   "label": "probe-int4-dflash-b8",
+   "command": [
+    "/home/ubuntu/vp-wt/lossy-hold/scripts/gpu_startup_lock.sh",
+    "/home/ubuntu/sglang/.venv/bin/python",
+    "-m",
+    "experiments.lossy.run_hold",
+    "probe",
+    "--arm",
+    "int4-dflash-b8",
+    "--out",
+    "/home/ubuntu/vp-data/lossy/probes/int4-dflash-b8"
+   ],
+   "log": "/home/ubuntu/vp-data/lossy/logs/q1/probe-int4-dflash-b8.log",
+   "timeout_s": 600,
+   "start_unix": 1790933971.6080518,
+   "end_unix": 1790934078.6043983,
+   "exit_code": 0,
+   "run_dir": null
+  }
+ ],
+ "end_unix": 1790934078.6049352,
+ "failed_launches": 1
+}
