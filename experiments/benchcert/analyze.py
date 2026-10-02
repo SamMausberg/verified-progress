@@ -1049,8 +1049,13 @@ def slow_launch_diagnostic(
     for (fam, variant, c), by_session in sorted(groups.items()):
         for session, row in by_session.items():
             others = [r for s, r in by_session.items() if s != session]
-            entry: dict[str, Any] = {'family': fam, 'variant': variant, 'concurrency': c,
-                                     'session': session, 'others': len(others)}
+            entry: dict[str, Any] = {
+                'family': fam,
+                'variant': variant,
+                'concurrency': c,
+                'session': session,
+                'others': len(others),
+            }
             slow = False
             for key, label in (('ttft_p50_ms', 'ttft'), ('server_ms_per_pass', 'pass')):
                 mine = row.get(key)
@@ -1066,8 +1071,9 @@ def slow_launch_diagnostic(
             rows.append(entry)
             if others:
                 flags[(session, fam, variant)].append(slow)
-    flagged = [key for key, marks in flags.items()
-               if marks and sum(marks) >= OUTLIER_SHARE * len(marks)]
+    flagged = [
+        key for key, marks in flags.items() if marks and sum(marks) >= OUTLIER_SHARE * len(marks)
+    ]
     for row in rows:
         row['launch_flagged'] = (row['session'], row['family'], row['variant']) in flagged
     return rows, sorted(flagged)
@@ -1083,21 +1089,27 @@ def outlier_effects(
     out = []
     for session, fam, variant in flagged:
         primary = plan.FAMILIES[fam].primary
-        kept = [pr['y_ratio'] for pr in pair_rows
-                if pr['family'] == fam and pr['concurrency'] == primary and pr['counted']
-                and pr['session'] != session]
-        declared = next(r for r in ratio_rows
-                        if r['family'] == fam and r['concurrency'] == primary)
+        kept = [
+            pr['y_ratio']
+            for pr in pair_rows
+            if pr['family'] == fam
+            and pr['concurrency'] == primary
+            and pr['counted']
+            and pr['session'] != session
+        ]
+        declared = next(r for r in ratio_rows if r['family'] == fam and r['concurrency'] == primary)
         without = ratio_summary(kept)
-        out.append({
-            'launch': f'{session}/{fam}/{variant}',
-            'primary_concurrency': primary,
-            'declared_ratio': declared['y_ratio'],
-            'declared_decision': declared['decision'],
-            'without_ratio': without['mean'],
-            'without_interval': [without['low'], without['high']],
-            'without_n': without['n'],
-        })
+        out.append(
+            {
+                'launch': f'{session}/{fam}/{variant}',
+                'primary_concurrency': primary,
+                'declared_ratio': declared['y_ratio'],
+                'declared_decision': declared['decision'],
+                'without_ratio': without['mean'],
+                'without_interval': [without['low'], without['high']],
+                'without_n': without['n'],
+            }
+        )
     return out
 
 

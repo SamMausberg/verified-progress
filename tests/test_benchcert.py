@@ -542,11 +542,22 @@ def test_slow_launch_diagnostic_flags_a_uniformly_slow_launch() -> None:
     rows = []
     for session, ttft in (('s1', 50.0), ('s2', 50.5), ('s3', 54.5)):
         for c in (1, 4, 8, 16):
-            rows.append({'family': 'plain', 'variant': 'stock', 'concurrency': c,
-                         'session': session, 'ttft_p50_ms': ttft + c,
-                         'server_ms_per_pass': 4.0})
+            rows.append(
+                {
+                    'family': 'plain',
+                    'variant': 'stock',
+                    'concurrency': c,
+                    'session': session,
+                    'ttft_p50_ms': ttft + c,
+                    'server_ms_per_pass': 4.0,
+                }
+            )
     table, flagged = analyze.slow_launch_diagnostic(rows)
     assert flagged == [('s3', 'plain', 'stock')]
     assert all(r['launch_flagged'] == (r['session'] == 's3') for r in table)
-    assert analyze.server_ms_per_pass({'server_log': {'logged_gen_tps_full_batch': 2000.0,
-                                                      'max_running_logged': 8}}) == 4.0
+    assert (
+        analyze.server_ms_per_pass(
+            {'server_log': {'logged_gen_tps_full_batch': 2000.0, 'max_running_logged': 8}}
+        )
+        == 4.0
+    )
