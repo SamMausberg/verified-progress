@@ -79,32 +79,64 @@ def test_every_session_runs_each_pair_back_to_back() -> None:
     )
 
 
-def test_ratio_summary_and_decision() -> None:
+def test_ratio_summary_and_interval_reading() -> None:
     gain = analyze.ratio_summary([1.03, 1.035, 1.032])
-    assert gain['n'] == 3 and gain['low'] > 1 and analyze.decide(gain) == 'gain'
+    assert gain['n'] == 3 and gain['low'] > 1 and analyze.interval_reading(gain) == 'above 1'
     assert math.isclose(gain['mean'], (1.03 * 1.035 * 1.032) ** (1 / 3))
-    assert analyze.decide(analyze.ratio_summary([0.97, 0.98, 0.975])) == 'loss'
-    assert analyze.decide(analyze.ratio_summary([0.99, 1.01, 1.0])) == 'null'
-    assert analyze.decide(analyze.ratio_summary([1.05, 1.05])) == 'incomplete'
+    assert analyze.interval_reading(analyze.ratio_summary([0.97, 0.98, 0.975])) == 'below 1'
+    assert analyze.interval_reading(analyze.ratio_summary([0.99, 1.01, 1.0])) == 'includes 1'
+    assert analyze.interval_reading(analyze.ratio_summary([1.05, 1.05])) == 'incomplete'
     assert analyze.ratio_summary([])['n'] == 0
 
 
+def test_t_test_p_matches_the_interval() -> None:
+    # The two-sided p crosses 0.05 exactly where the 95% interval crosses 1.
+    for ratios in ([1.01, 1.02, 1.03], [1.0, 1.02, 1.04], [0.99, 1.0, 1.04]):
+        summary = analyze.ratio_summary(ratios)
+        t = math.log(summary['mean']) / (summary['sd_log'] / math.sqrt(3))
+        p = analyze.t_test_p(summary)
+        assert (p < 0.05) == (summary['low'] > 1.0)
+        assert math.isclose(p, 1 - abs(t) / math.sqrt(t * t + 2))
+    assert analyze.t_test_p(analyze.ratio_summary([1.02, 1.02])) == 1.0
+
+
+def test_holm_over_the_primary_points() -> None:
+    strong = analyze.ratio_summary([1.08, 1.081, 1.079])
+    loss = analyze.ratio_summary([0.95, 0.951, 0.949])
+    none = analyze.ratio_summary([0.99, 1.01, 1.0])
+    # Significant alone (p < 0.05) but not at Holm's third step (0.05 / 2).
+    weak = analyze.ratio_summary([1.010, 1.022, 1.016])
+    assert 0.025 < analyze.t_test_p(weak) < 0.05
+    decisions = analyze.holm({'a': strong, 'b': weak, 'c': none, 'd': loss})
+    assert decisions == {'a': 'gain', 'b': 'null', 'c': 'null', 'd': 'loss'}
+    short = analyze.ratio_summary([1.08, 1.08])
+    assert analyze.holm({'a': short, 'b': strong}) == {'a': 'incomplete', 'b': 'gain'}
+
+
+def test_exactness_needs_positive_evidence() -> None:
+    assert analyze.exactness_status(True, True, True) == 'established'
+    assert analyze.exactness_status(None, False, True) == 'established'  # no c=1 point
+    assert analyze.exactness_status(None, True, True) == 'incomplete'
+    assert analyze.exactness_status(True, True, None) == 'incomplete'
+    assert analyze.exactness_status(False, True, None) == 'fails'
+    assert analyze.exactness_status(True, True, False) == 'fails'
+
+
 def test_h4_verdict() -> None:
-    gain, null = [{'family': 'a', 'decision': 'gain'}], [{'family': 'a', 'decision': 'null'}]
-    assert analyze.h4_verdict({'a': 'improves', 'b': 'incomplete'}, gain) == 'supported'
-    assert analyze.h4_verdict({'a': 'loses', 'b': 'incomplete'}, null) == 'incomplete'
-    assert analyze.h4_verdict({'a': 'no detectable change'}, null) == 'refuted'
-    assert analyze.h4_verdict({'a': 'mixed'}, gain) == 'mixed'
-    assert analyze.h4_verdict({'a': 'fails exactness'}, gain) == 'refuted'
+    assert analyze.h4_verdict({'a': 'improves', 'b': 'incomplete'}) == 'supported'
+    assert analyze.h4_verdict({'a': 'loses', 'b': 'incomplete'}) == 'incomplete'
+    assert analyze.h4_verdict({'a': 'gain, exactness incomplete'}) == 'incomplete'
+    assert analyze.h4_verdict({'a': 'no detectable change', 'b': 'loses'}) == 'refuted'
+    assert analyze.h4_verdict({'a': 'fails exactness', 'b': 'no detectable change'}) == 'refuted'
 
 
 def test_family_verdict() -> None:
-    assert analyze.family_verdict(['gain', 'null'], True) == 'improves'
-    assert analyze.family_verdict(['gain', 'loss'], True) == 'mixed'
-    assert analyze.family_verdict(['null', 'loss'], None) == 'loses'
-    assert analyze.family_verdict(['null'], True) == 'no detectable change'
-    assert analyze.family_verdict(['gain'], False) == 'fails exactness'
-    assert analyze.family_verdict(['gain', 'incomplete'], True) == 'incomplete'
+    assert analyze.family_verdict('gain', 'established') == 'improves'
+    assert analyze.family_verdict('gain', 'incomplete') == 'gain, exactness incomplete'
+    assert analyze.family_verdict('gain', 'fails') == 'fails exactness'
+    assert analyze.family_verdict('loss', 'established') == 'loses'
+    assert analyze.family_verdict('null', 'incomplete') == 'no detectable change'
+    assert analyze.family_verdict('incomplete', 'established') == 'incomplete'
 
 
 def test_compare_counts_first_divergences() -> None:
@@ -178,6 +210,10 @@ def test_point_problems_flag_retractions_and_a_short_batch() -> None:
     point['server_log'] = {'kv_retractions': 0, 'max_running_logged': 8}
     point['foreign_cpu_during_mean'] = 2.5
     assert 'host_contention' in analyze.point_problems(point, 64)
+    point['foreign_cpu_during_mean'] = None
+    point['server_log'] = {'kv_retractions': 0}
+    reason = analyze.point_problems(point, 64)
+    assert 'no foreign-load record' in reason and 'no running-batch record' in reason
 
 
 def test_predict_from_head_table_and_frontier(tmp_path: Path) -> None:
@@ -222,6 +258,7 @@ def _launch(
     y: float,
     ids: dict[int, dict[str, list[int]]],
     pool: int = 1000000,
+    foreign: dict[int, float] | None = None,
 ) -> dict[str, Any]:
     name = plan.label(family, variant)
     run_dir = runs / step / name / f'2026-{step}-{variant}'
@@ -248,11 +285,12 @@ def _launch(
                 'x_decode': y / c,
                 'y': y * c,
                 'failed': 0,
+                'completed': len(ids[c]),
                 'aiperf_exit_code': 0,
                 'osl_mismatch': 0,
                 'cache_flushed': True,
                 'prompts_as_expected': True,
-                'foreign_cpu_during_mean': 0.3,
+                'foreign_cpu_during_mean': (foreign or {}).get(c, 0.3),
                 'server_log': {'kv_retractions': 0, 'max_running_logged': c},
             }
         )
@@ -349,8 +387,12 @@ def test_report_end_to_end_on_synthetic_runs(tmp_path: Path) -> None:
         (tmp_path / 'holds' / f'{record["hold"]}.json').write_text(json.dumps(record))
     out = tmp_path / 'evidence'
     summary = analyze.report(tmp_path, out, None, plot=False)
-    plain = [r for r in summary['decisions'] if r['family'] == 'plain']
-    assert all(r['n'] == 3 and r['decision'] == 'gain' for r in plain)
+    plain = {r['concurrency']: r for r in summary['decisions'] if r['family'] == 'plain'}
+    assert plain[1]['role'] == 'primary' and plain[1]['decision'] == 'gain'
+    assert plain[128]['role'] == 'gate overhead' and plain[128]['decision'] == ''
+    assert plain[8]['role'] == 'descriptive' and plain[8]['interval_reading'] == 'above 1'
+    assert all(r['n'] == 3 for r in plain.values())
+    assert summary['exactness_status']['plain'] == 'established'
     assert summary['verdicts']['plain'] == 'improves'
     assert summary['verdicts']['mtp'] == 'incomplete'
     assert summary['h4'] == 'supported'
@@ -394,8 +436,29 @@ def test_report_end_to_end_on_synthetic_runs(tmp_path: Path) -> None:
             )
         )
     summary = analyze.report(bad, bad / 'evidence', None, plot=False)
-    plain = [r for r in summary['decisions'] if r['family'] == 'plain']
-    assert all(r['n'] == 2 and r['decision'] == 'incomplete' for r in plain)
+    plain = {r['concurrency']: r for r in summary['decisions'] if r['family'] == 'plain'}
+    assert all(r['n'] == 2 for r in plain.values()) and plain[1]['decision'] == 'incomplete'
+    # No check launch: a gain cannot become 'improves'.
+    assert summary['exactness_status']['plain'] == 'incomplete'
+
+    # A timing-invalid concurrency-1 pair is still compared token by token.
+    noisy = tmp_path / 'noisy'
+    (noisy / 'holds').mkdir(parents=True)
+    differs = {c: other[c] for c in family.concurrency}
+    for k, step in enumerate(plan.DECISION_SESSIONS):
+        cert_ids = differs if step == 's1' else same
+        launches = [
+            _launch(noisy, step, family, 'stock', 100.0, same),
+            _launch(noisy, step, family, 'cert', 103.0, cert_ids, foreign={1: 3.0}),
+        ]
+        (noisy / 'holds' / f'h{k}.json').write_text(
+            json.dumps({'hold': f'h{k}', 'launches': launches,
+                        'provenance': {'engine_commit': 'enginehead'}})
+        )
+    summary = analyze.report(noisy, noisy / 'evidence', None, plot=False)
+    assert summary['exactness']['families']['plain']['c1_identical'] is False
+    assert summary['verdicts']['plain'] == 'fails exactness'
+    assert summary['h4'] == 'refuted' or summary['h4'] == 'incomplete'
 
 
 def test_two_successful_launches_of_one_arm_are_an_error() -> None:

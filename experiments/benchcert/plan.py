@@ -84,6 +84,14 @@ class Family:
     # steps + 1 and draft 1; DFlash verify block and draft projection block - 1.
     rows_per_request: dict[str, int] = field(default_factory=dict)
     max_concurrency: int = 128
+    # The one concurrency whose paired ratio enters the family verdict and H4
+    # (Holm-adjusted across the four families); every other point is descriptive.
+    primary: int = 1
+
+    def gated_off(self, c: int) -> bool:
+        """Every certified path's batch exceeds MAX_ROWS at concurrency c."""
+        limit = int(CERT_ENV['SGLANG_CERTIFIED_HEAD_MAX_ROWS'])
+        return min(self.rows_per_request.values()) * c > limit
 
     @property
     def stock_label(self) -> str:
@@ -130,8 +138,8 @@ FAMILIES = {
         # draft projection add about 6.2 GB (block 16: 1,408 + 1,320 rows) and 9.9 GB
         # (block 8: 2,304 + 2,016 rows). 60,000 tokens frees 13.2 GB and 10.6 GB
         # against the stock arms' own pools (308K and 258K tokens at 53.4 KB per token,
-        # target and draft) and is 2.4 times what the largest point here holds (32
-        # requests of at most about 750 tokens). Check launches add the stock head to
+        # target and draft) and is 2.5 times what the largest point here holds (block 8
+        # at c = 32: at most 23.6K tokens). Check launches add the stock head to
         # every certified graph, so they pin 40,000.
         Family(
             name='dflash16',
@@ -152,6 +160,7 @@ FAMILIES = {
             paths=('verify', *DRAFT_PATHS),
             concurrency=(4, 8, 16, 32),
             check_concurrency=(1, 4, 8),
+            primary=4,
             sets=('max-total-tokens=60000',),
             check_sets=('max-total-tokens=40000',),
             rows_per_request={'verify': 8, 'dflash_draft': 7},

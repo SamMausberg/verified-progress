@@ -39,6 +39,8 @@ from experiments.benchcert import plan
 # Two-sided 95% Student t quantiles by degrees of freedom.
 T95 = {1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365, 8: 2.306}
 DECISION_N = 3
+# t(1 - 0.05 / 8, 2): two-sided 95% across the four primary points (displayed intervals).
+T_BONFERRONI4 = 8.860
 NEAR_NATS = 0.5  # experiments/state_safety/compare.py
 CLASSES = ('tie', 'one_ulp', 'near', 'large')
 
@@ -208,6 +210,9 @@ def load_launch(entry: dict[str, Any]) -> dict[str, Any]:
     info['memory_usage'] = launch.get('memory_usage') or {}
     info['ready_after_s'] = launch.get('ready_after_s')
     info['sglang_source'] = launch.get('sglang_source') or {}
+    info['graph_sizes'] = {
+        key: value.get('sizes') for key, value in (launch.get('graph_captures') or {}).items()
+    }
     info['repo_state'] = launch.get('repo') or {}
     info['checks_failed'] = [
         c['name'] for c in manifest.get('checks', []) if c.get('required') and not c.get('ok')
@@ -222,16 +227,14 @@ def _mib(text: str) -> float | None:
     return float(match.group(1)) if match else None
 
 
-def launch_problems(info: dict[str, Any], family: plan.Family, variant: str) -> list[str]:
-    """Why a launch cannot stand for its arm (empty when it can)."""
-    problems = list(info.get('problems', []))
-    if info.get('exit_code') != 0:
-        problems.append(f'exit {info.get("exit_code")}')
+def config_problems(info: dict[str, Any], family: plan.Family, variant: str) -> list[str]:
+    """Ways a launch did not run its declared configuration (head, engine, levels).
+
+    A launch with any of these cannot stand for its arm in a token comparison either:
+    a certified launch without the head would trivially match the stock arm.
+    """
+    problems = []
     server = info['server']
-    if server['oom']:
-        problems.append('out of memory')
-    if info.get('checks_failed'):
-        problems.append(f'launch checks failed: {", ".join(info["checks_failed"])}')
     if variant == 'stock' and server['cert_paths'] is not None:
         problems.append('stock launch ran the certified head')
     if variant in ('cert', 'check'):
@@ -250,9 +253,7 @@ def launch_problems(info: dict[str, Any], family: plan.Family, variant: str) -> 
     prov = info.get('provenance') or {}
     if source:
         if source.get('head') != prov.get('engine_commit') or source.get('dirty_files'):
-            problems.append(
-                f'engine {source.get("head")} (hold declared {prov.get("engine_commit")})'
-            )
+            problems.append(f'engine {source.get("head")} (hold declared {prov.get("engine_commit")})')
     elif info.get('manifest'):
         problems.append('no engine record')
     if info.get('points'):
@@ -263,15 +264,41 @@ def launch_problems(info: dict[str, Any], family: plan.Family, variant: str) -> 
     return problems
 
 
+def launch_problems(info: dict[str, Any], family: plan.Family, variant: str) -> list[str]:
+    """Why a launch cannot stand for its arm in a timed comparison (empty when it can)."""
+    problems = list(info.get('problems', []))
+    if info.get('exit_code') != 0:
+        problems.append(f'exit {info.get("exit_code")}')
+    if info['server']['oom']:
+        problems.append('out of memory')
+    if info.get('checks_failed'):
+        problems.append(f'launch checks failed: {", ".join(info["checks_failed"])}')
+    return problems + config_problems(info, family, variant)
+
+
+def outputs_complete(point: dict[str, Any]) -> bool:
+    """Every measured request finished with the requested length (timing aside)."""
+    return (
+        point.get('failed') == 0
+        and not point.get('osl_mismatch')
+        and point.get('aiperf_exit_code') == 0
+        and int(point.get('completed') or 0) > 0
+    )
+
+
 def point_problems(point: dict[str, Any], capacity: int) -> str:
-    """bench.pareto's validity rule plus the pool checks of this campaign."""
+    """bench.pareto's validity rule plus the pool and record checks of this campaign."""
     reasons = [invalid_reason(point)] if invalid_reason(point) else []
+    if point.get('foreign_cpu_during_mean') is None:
+        reasons.append('no foreign-load record')
     log = point.get('server_log') or {}
     if log.get('kv_retractions'):
         reasons.append(f'{log["kv_retractions"]} KV retractions')
     c = int(point['concurrency'])
     top = log.get('max_running_logged')
-    if top is not None and top < min(c, capacity):
+    if top is None:
+        reasons.append('no running-batch record')
+    elif top < min(c, capacity):
         reasons.append(f'running requests peaked at {top} (c = {c})')
     return '; '.join(reasons)
 
@@ -317,30 +344,88 @@ def ratio_summary(ratios: list[float]) -> dict[str, Any]:
     }
 
 
-def decide(summary: dict[str, Any]) -> str:
-    """gain / loss / null from the interval; incomplete below three pairs."""
+def _adjusted(summary: dict[str, Any], t: float, side: int) -> float:
+    """One end of a t interval with quantile `t` (NaN below three pairs)."""
+    if summary['n'] != DECISION_N:
+        return math.nan
+    half = t * summary['sd_log'] / math.sqrt(DECISION_N)
+    return math.exp(math.log(summary['mean']) + side * half)
+
+
+def t_test_p(summary: dict[str, Any]) -> float:
+    """Two-sided p of mean log ratio = 0 for three pairs (Student t, 2 degrees of freedom).
+
+    With 2 degrees of freedom the t distribution has the closed form
+    P(|T| > t) = 1 - t / sqrt(t^2 + 2).
+    """
+    if summary['n'] != DECISION_N:
+        return 1.0
+    mean = math.log(summary['mean'])
+    if summary['sd_log'] == 0:
+        return 0.0 if mean != 0 else 1.0
+    t = abs(mean) / (summary['sd_log'] / math.sqrt(DECISION_N))
+    return 1.0 - t / math.sqrt(t * t + 2.0)
+
+
+def holm(primaries: dict[str, dict[str, Any]], alpha: float = 0.05) -> dict[str, str]:
+    """gain / loss / null per family from Holm's procedure over the declared primaries.
+
+    The family size is the number of declared primaries whether or not each is
+    complete; an incomplete primary counts as not rejected and reads `incomplete`.
+    """
+    m = len(primaries)
+    order = sorted(primaries, key=lambda fam: t_test_p(primaries[fam]))
+    decisions = {fam: 'incomplete' if primaries[fam]['n'] < DECISION_N else 'null'
+                 for fam in primaries}
+    for rank, fam in enumerate(order):
+        if primaries[fam]['n'] < DECISION_N or t_test_p(primaries[fam]) > alpha / (m - rank):
+            break
+        decisions[fam] = 'gain' if primaries[fam]['mean'] > 1.0 else 'loss'
+    return decisions
+
+
+def interval_reading(summary: dict[str, Any]) -> str:
+    """Where a descriptive point's 95% interval lies (not a decision)."""
     if summary['n'] < DECISION_N:
         return 'incomplete'
     if summary['low'] > 1.0:
-        return 'gain'
+        return 'above 1'
     if summary['high'] < 1.0:
-        return 'loss'
-    return 'null'
+        return 'below 1'
+    return 'includes 1'
 
 
-def family_verdict(decisions: list[str], exact: bool | None) -> str:
-    if exact is False:
+def exactness_status(c1: bool | None, c1_required: bool, check: bool | None) -> str:
+    """`fails` on positive evidence of a difference, `established` on positive
+    evidence of equality (check mode, and concurrency-1 identity where the family has
+    that point), `incomplete` otherwise."""
+    if c1 is False or check is False:
+        return 'fails'
+    if check is True and (c1 is True or not c1_required):
+        return 'established'
+    return 'incomplete'
+
+
+def family_verdict(primary: str, exact: str) -> str:
+    if exact == 'fails':
         return 'fails exactness'
-    if not decisions or 'incomplete' in decisions:
+    if primary == 'incomplete':
         return 'incomplete'
-    gains, losses = decisions.count('gain'), decisions.count('loss')
-    if gains and losses:
-        return 'mixed'
-    if gains:
-        return 'improves'
-    if losses:
+    if primary == 'gain':
+        return 'improves' if exact == 'established' else 'gain, exactness incomplete'
+    if primary == 'loss':
         return 'loses'
     return 'no detectable change'
+
+
+def h4_verdict(verdicts: dict[str, str]) -> str:
+    """Supported if a family improves (gain at its primary point, exactness
+    established); incomplete while a family's verdict is pending; refuted otherwise."""
+    if any(v == 'improves' for v in verdicts.values()):
+        return 'supported'
+    if any(v in ('incomplete', 'gain, exactness incomplete') for v in verdicts.values()):
+        return 'incomplete'
+    return 'refuted'
 
 
 # ---------------------------------------------------------------------------
@@ -500,6 +585,11 @@ def report(
                 'run': info['run'],
                 'concurrency': int(point['concurrency']),
                 'invalid_reason': '; '.join(filter(None, [reason, *info['problems']])),
+                # Token comparisons need complete outputs from a correctly configured
+                # launch, not a valid timing.
+                'outputs_complete': outputs_complete(point)
+                and not config_problems(info, family, variant)
+                and bool(info.get('run_dir')),
                 'x_e2e': point.get('x_e2e'),
                 'x_decode': point.get('x_decode'),
                 'y': point.get('y'),
@@ -541,6 +631,8 @@ def report(
                     cert_info = launches[(step, fam, 'cert')]
                     if pools(stock_info) != pools(cert_info):
                         problems.append(f'pools differ {pools(stock_info)} {pools(cert_info)}')
+                    if stock_info.get('graph_sizes') != cert_info.get('graph_sizes'):
+                        problems.append('captured graph sizes differ')
                 # Sessions are in order s1, s2, s3, s4: the first three valid pairs count,
                 # so s4 counts only where s1-s3 left fewer than three.
                 counted = not problems and len(ys) < DECISION_N
@@ -554,23 +646,55 @@ def report(
                     'x_cert': c_row['x_e2e'] if c_row else None,
                     'y_ratio': None,
                     'x_ratio': None,
+                    'accept_stock': s_row['accept_length'] if s_row else None,
+                    'accept_cert': c_row['accept_length'] if c_row else None,
+                    'accept_ratio': None,
+                    'cycle_rate_ratio': None,
+                    'foreign_cpu_stock': s_row['foreign_cpu_mean'] if s_row else None,
+                    'foreign_cpu_cert': c_row['foreign_cpu_mean'] if c_row else None,
                     'counted': counted,
                     'invalid_reason': '; '.join(problems),
                 }
                 if s_row and c_row and not problems:
                     pair['y_ratio'] = float(c_row['y']) / float(s_row['y'])
                     pair['x_ratio'] = float(c_row['x_e2e']) / float(s_row['x_e2e'])
+                    if s_row['accept_length'] and c_row['accept_length']:
+                        # y = cycles/s x tokens per cycle: split a head effect (cycle
+                        # rate) from acceptance drift.
+                        pair['accept_ratio'] = float(c_row['accept_length']) / float(
+                            s_row['accept_length']
+                        )
+                        pair['cycle_rate_ratio'] = pair['y_ratio'] / pair['accept_ratio']
                 pair_rows.append(pair)
                 if counted:
                     ys.append(pair['y_ratio'])
                     xs.append(pair['x_ratio'])
                     used.append(step)
             y_sum, x_sum = ratio_summary(ys), ratio_summary(xs)
+            by_session = {
+                pr['session']: pr['y_ratio']
+                for pr in pair_rows
+                if pr['family'] == fam and pr['concurrency'] == c and pr['counted']
+            }
+            order = None
+            if all(k in by_session for k in plan.DECISION_SESSIONS):
+                # Session 2 runs each pair in the other order: its log ratio against the
+                # mean of sessions 1 and 3 shows a position effect.
+                order = math.log(by_session['s2']) - 0.5 * (
+                    math.log(by_session['s1']) + math.log(by_session['s3'])
+                )
+            if c == family.primary:
+                role = 'primary'
+            elif family.gated_off(c):
+                role = 'gate overhead'
+            else:
+                role = 'descriptive'
             ratio_rows.append(
                 {
                     'family': fam,
                     'arm': family.arm,
                     'concurrency': c,
+                    'role': role,
                     'n': y_sum['n'],
                     'sessions': ' '.join(used),
                     'y_ratio': y_sum['mean'],
@@ -579,9 +703,21 @@ def report(
                     'x_ratio': x_sum['mean'],
                     'x_low': x_sum['low'],
                     'x_high': x_sum['high'],
-                    'decision': decide(y_sum),
+                    'p_value': t_test_p(y_sum),
+                    'y_low_bonferroni4': _adjusted(y_sum, T_BONFERRONI4, -1),
+                    'y_high_bonferroni4': _adjusted(y_sum, T_BONFERRONI4, 1),
+                    'interval_reading': interval_reading(y_sum),
+                    'decision': '',
+                    'order_effect_log': order,
+                    '_summary': y_sum,
                 }
             )
+    primaries = {r['family']: r['_summary'] for r in ratio_rows if r['role'] == 'primary'}
+    holm_decisions = holm(primaries)
+    for row in ratio_rows:
+        if row['role'] == 'primary':
+            row['decision'] = holm_decisions[row['family']]
+        del row['_summary']
 
     pred = {}
     if predictions and predictions.exists():
@@ -607,17 +743,20 @@ def report(
     # Certified head counters in the timed launches; launch and capture records.
     stats_rows, launch_rows, capture_rows = launch_records(launches)
 
-    verdicts = {}
-    for fam in plan.FAMILIES:
-        decisions = [r['decision'] for r in ratio_rows if r['family'] == fam]
-        exact = exactness['families'].get(fam, {}).get('c1_identical')
-        if check_verdict.get(fam) is False:
-            exact = False
-        verdicts[fam] = family_verdict(decisions, exact)
+    verdicts, exact_status = {}, {}
+    for fam, family in plan.FAMILIES.items():
+        exact_status[fam] = exactness_status(
+            exactness['families'].get(fam, {}).get('c1_identical'),
+            1 in family.concurrency,
+            check_verdict.get(fam),
+        )
+        verdicts[fam] = family_verdict(holm_decisions[fam], exact_status[fam])
     summary = {
         'sessions': sessions,
-        'h4': h4_verdict(verdicts, ratio_rows),
+        'h4': h4_verdict(verdicts),
         'verdicts': verdicts,
+        'exactness_status': exact_status,
+        'primary': {fam: f.primary for fam, f in plan.FAMILIES.items()},
         'decisions': ratio_rows,
         'exactness': exactness,
         'check': check_verdict,
@@ -646,22 +785,6 @@ def report(
     return summary
 
 
-def h4_verdict(verdicts: dict[str, str], ratio_rows: list[dict[str, Any]]) -> str:
-    """Supported if a family improves (exactness holding), refuted if no family that
-    keeps exactness shows a gain anywhere, mixed otherwise; incomplete while a family is."""
-    if any(v == 'improves' for v in verdicts.values()):
-        return 'supported'
-    if any(v == 'incomplete' for v in verdicts.values()):
-        return 'incomplete'
-    exact_gain = any(
-        r['decision'] == 'gain' and verdicts.get(r['family']) != 'fails exactness'
-        for r in ratio_rows
-    )
-    if not exact_gain:
-        return 'refuted'
-    return 'mixed'
-
-
 def token_comparisons(
     launches: dict[tuple[str, str, str], dict[str, Any]],
     by_key: dict[tuple[str, str, str, int], dict[str, Any]],
@@ -682,7 +805,7 @@ def token_comparisons(
     def ids(step: str, fam: str, variant: str, c: int) -> dict[str, dict[str, list[int]]] | None:
         key = (step, fam, variant, c)
         row = by_key.get(key)
-        if row is None or row['invalid_reason']:
+        if row is None or not row['outputs_complete']:
             return None
         if key not in cache:
             run_dir = Path(launches[(step, fam, variant)]['run_dir'])
@@ -779,7 +902,13 @@ def token_comparisons(
 def check_counters(
     launches: dict[tuple[str, str, str], dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], dict[str, bool | None]]:
-    """Per point and path: certified calls, rows, fallbacks and differing rows."""
+    """Per point and path: certified calls, rows, fallbacks and differing rows.
+
+    The verdict per family is False on positive evidence (a differing row, or a
+    declared path never certified by a launch that completed), True when a complete
+    launch certified every declared path with no differing row, and None (exactness
+    incomplete) when the launch is missing, failed or left no counters.
+    """
     rows: list[dict[str, Any]] = []
     verdict: dict[str, bool | None] = {}
     for fam, family in plan.FAMILIES.items():
@@ -787,7 +916,8 @@ def check_counters(
         if info is None:
             verdict[fam] = None
             continue
-        ok = not info['problems']
+        complete = not info['problems']
+        mismatch = 0
         name = Path(info['stats_file']).name if info.get('stats_file') else ''
         seen_paths: set[str] = set()
         for point in info['points']:
@@ -795,19 +925,20 @@ def check_counters(
             point_dir = Path(info['run_dir']) / 'r0' / f'c{c:03d}'
             after = _snapshot(point_dir, 'after', name)
             if after is None:
-                ok = False
+                complete = False
                 continue
             delta = stats_delta(after, _snapshot(point_dir, 'before', name))
             for path, counters in delta.items():
                 if counters.get('calls', 0) > 0:
                     seen_paths.add(path)
-                if counters.get('mismatch_rows', 0) != 0:
-                    ok = False
+                mismatch += counters.get('mismatch_rows', 0)
                 rows.append({'family': fam, 'concurrency': c, 'path': path, **counters})
-        expected = {p for p in family.rows_per_request}
-        if not expected <= seen_paths:
-            ok = False
-        verdict[fam] = ok
+        if mismatch > 0:
+            verdict[fam] = False
+        elif not complete or not info['points']:
+            verdict[fam] = None
+        else:
+            verdict[fam] = set(family.rows_per_request) <= seen_paths
     return rows, verdict
 
 

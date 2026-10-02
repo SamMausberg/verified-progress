@@ -77,8 +77,9 @@ prewarm. That is 3.22 GB over 1,408 certified rows, 2.29 MB per row (derived). A
 that rate verify plus draft projection add about 6.2 GB for block 16 and 9.9 GB for
 block 8 (derived). `--max-total-tokens 60000` on both arms frees about 13.2 and
 10.6 GB against the pools the stock arms size for themselves (308K and 258K tokens
-at 53.4 KB per token, target plus draft) and holds 2.4 times the largest point's
-need (32 requests of at most about 750 tokens). The pin must not bind: a point with
+at 53.4 KB per token, target plus draft) and holds 2.5 times the largest point's
+need (block 8 at c = 32: the 32 longest of the first 256 prompts, at most 369
+prompt tokens each, plus 512 output tokens and a block each, 23.6K tokens). The pin must not bind: a point with
 a KV retraction, or whose logged running batch never reaches its concurrency, is
 invalid.
 
@@ -106,7 +107,9 @@ session 1. Each launch is one `bench.sweep` run: server start inside
 scheduler on, capacity reached, backend and speculative settings), a server warmup,
 then every concurrency in ascending order on the confirmation split with 512 greedy
 output tokens (`ignore_eos`, thinking on), `max(32, 8c)` measured requests after a
-warmup wave, the prefix cache flushed before each point, the foreign CPU load
+warmup wave (32 rather than the confirmation's 64 at c <= 4, which keeps h3 and
+h4 under the 44-minute limit; 64 would add about 6 minutes per session), the prefix
+cache flushed before each point, the foreign CPU load
 sampled during it (a quiet-host wait of at most 120 s), and every request's prompt
 and output token ids returned (`return_input_ids_in_sglext`,
 `return_output_ids_in_sglext`; neither reads logits). Certified
@@ -131,37 +134,79 @@ certified graph.
   levels other than the plan's.
 - A point: `bench.pareto`'s rule (failed requests, aiperf errors, wrong output
   lengths, an unflushed cache, unexpected prompts, mean foreign load above 2
-  cores), a KV retraction, or a logged running batch below the concurrency.
-- A pair: either point or launch invalid, or different pools.
+  cores), a KV retraction, a logged running batch below the concurrency, or no
+  record of the foreign load or the running batch.
+- A pair: either point or launch invalid, different pools, or different captured
+  graph sizes.
 
 ## Decision rule
 
-The primary measure is the paired throughput ratio r = y(certified) / y(stock) of
-the two launches of one session at one concurrency (y = output tokens/s on the
-GPU); the per-user rate ratio (x) is reported beside it. For each family and
-concurrency, the first three valid sessions in the order s1, s2, s3 (then s4)
-count. With three, the summary is the geometric mean of r with a 95% t interval on
-the log scale (2 degrees of freedom):
+(Revised 2026-10-02 01:50 UTC, before any timed run, after a red-team review: one
+primary point per family with a Holm adjustment replaced verdicts over all 22
+points, and the exactness verdict now needs positive evidence.)
 
-- **gain** if the interval lies above 1, **loss** if it lies below 1, **null**
-  otherwise; **incomplete** with fewer than three valid pairs.
-- Family verdict: **improves** (at least one gain, no loss), **mixed** (gains and
-  losses), **loses** (losses, no gain), **no detectable change** (all null),
-  **fails exactness** (below), **incomplete**.
-- H4 is supported if at least one family improves with exactness holding, refuted
-  if no family that keeps exactness shows a gain anywhere, and mixed otherwise. Where the confirmation
-  frontier's best arm is one of these arms (block 16 at c = 1-4, block 8 at
-  c = 8-32, plain from c = 48; here c = 64 and 128), the family's ratio is the
-  change to the served envelope; elsewhere the certified arm would have to overtake
-  another family to move it.
+The measure is the paired throughput ratio r = y(certified) / y(stock) of the two
+launches of one session at one concurrency (y = output tokens/s on the GPU); the
+per-user rate ratio (x), the accept-length ratio and the cycle-rate ratio (r over
+the accept-length ratio, which separates a head effect from acceptance drift) are
+reported beside it. For each family and concurrency, the first three valid
+sessions in the order s1, s2, s3 (then s4) count, summarised by the geometric mean
+of r with a 95% t interval on the log scale (2 degrees of freedom).
 
-There are 26 family-concurrency points; with no effect anywhere, about 1.3 would
-fall outside their 95% intervals by chance. A verdict that rests on one isolated
-gain or loss is reported as such.
+- **Primary points**, one per family: plain c = 1, MTP c = 1, block 16 c = 1,
+  block 8 c = 4 (each family's largest predicted effect). Their two-sided t-test p
+  values (mean log ratio = 0) go through Holm's procedure across the four at
+  0.05: a rejected point is a **gain** or **loss** by its sign, the others
+  **null**, and a primary with fewer than three valid pairs **incomplete** (it
+  still counts in the family of four). The displayed intervals at these points are
+  Bonferroni-adjusted (t = 8.86).
+- **Family verdict**, from the primary point and exactness (next section):
+  **improves** (gain, exactness established), **gain, exactness incomplete**,
+  **loses**, **no detectable change**, **fails exactness**, **incomplete**.
+- **H4** is supported if at least one family improves, incomplete while any family
+  is incomplete or has a gain without established exactness, and refuted
+  otherwise.
+- **Every other point is descriptive**: its 95% interval is reported (above 1,
+  below 1, includes 1) and enters no verdict. With 18 such points and no effect
+  anywhere, about one would fall outside its interval by chance.
+- **Gate overhead**: where every certified path is gated off (plain c = 128, block
+  16 c = 8, block 8 c = 16 and 32) the ratio measures what the gated graph costs
+  when the head does not run, reported with its own interval. The ramp-down at the
+  end of each point (fewer than 64 rows) is still certified, so these points are
+  not pure overhead.
+- **Envelope**: where the confirmation frontier's best arm is one of these arms
+  (block 16 at c = 1-4, block 8 at c = 8-32, plain from c = 48; here c = 64 and
+  128), the family's ratio is the change to the served envelope. Caveats: buffered
+  plain decoding (`plain-tuned-replayssm`, n = 1) is 4.9% and 8.0% above
+  `plain-tuned` at c = 96 and 128, and at MTP c = 64 `mtp-tuned` is 3.0% above
+  `mtp-tuned-triton`; neither is tested here.
+
+**Power (derived** from the confirmation's session-to-session SD of log y, with
+the pair SD taken as sqrt(2) times it). The smallest detectable ratio at the
+primary points under the Bonferroni-4 quantile is about 1.010 (plain c = 1), 1.006
+(MTP) and 1.008 (block 16), against predicted 1.035, 1.086 and 1.045. Block 8 is
+weak everywhere: power at its predicted effect is about 0.5 at c = 4 and 0.2 at
+c = 8, and c = 16 and 32 are gated off, so its pairs mainly measure gate overhead.
+They stay in the plan because block 8 is the envelope arm at c = 8-32 and its
+c = 8 pair is the only served measurement of the certified head there. A null at
+a low-power point is not evidence of no effect.
+
+**Order.** Each family runs stock first in sessions 1 and 3 and certified first in
+session 2, so a position effect d biases the mean by d/3 outside the interval. The
+analysis reports, per point, session 2's log ratio against the mean of sessions 1
+and 3, and the foreign CPU load of each arm.
 
 Replacement: session s4 runs only if s1-s3 leave a family with fewer than three
 valid pairs at some concurrency (`analyze.py replacement`), and only for that
 family's pairs, in session 1's order.
+
+**Start-up failure.** A launch that runs out of memory or fails at start-up is
+void for its family in that session and is reported as a memory result (as the
+stack workstream's certified block-16 launch was); the pins do not change.
+
+**After h1 starts** nothing in this file changes (families, levels, `MAX_ROWS`,
+request counts, pins, validity or decision rules), except a dated fix for a crash
+in the analysis or the holds, shown with its outputs before and after.
 
 ## Exactness
 
@@ -188,9 +233,18 @@ family's pairs, in session 1's order.
    large (`experiments/state_safety/compare.py`'s classes, applied to one margin;
    `rescore.py`, `hold_rescore.sh`).
 
-A family fails exactness if 1 or 2 fails. A rate ratio above the floor (lower
-bound above 1) or any large class is reported and investigated, not by itself a
-failure.
+Tokens are compared whenever both launches ran their declared configuration and
+every request finished with its full length, whatever the point's timing validity
+(a point voided for foreign CPU load is still compared). Exactness is
+**established** for a family when its check launch shows zero differing rows with
+every declared path certified, and every session with complete concurrency-1
+outputs on both arms has identical tokens (block 8 has no concurrency-1 point and
+rests on its check launch). It **fails** on positive evidence only: a differing
+row in check mode, a concurrency-1 token difference, or a declared path never
+certified by a check launch that completed. A missing or failed check launch, or
+no comparable concurrency-1 outputs, leaves it **incomplete**. A rate ratio above
+the floor (lower bound above 1) or any large class is reported and investigated,
+not by itself a failure.
 
 ## Predictions (derived)
 
@@ -216,7 +270,12 @@ a certified step skips, and charges nothing for gated-off calls.
 Reported with the result: each certified launch's counters (certified and
 gated-off steps per path, rows, fallback rows and calls, refused rows), each check
 launch's counters per point and path, the capture memory of every launch, and the
-prediction against the measurement. If budget remains after session 3 (about 15
+prediction against the measurement. The timed launches' counters are truncated:
+they are cumulative to the last write (every 20,000 glue calls, none at exit), so
+a short launch records little or nothing (block 8 makes about 18,000 calls in
+all); the per-concurrency mechanism comes from the check launches, whose counters
+are written every 25 calls. The captured graph sizes of the two arms of a pair are
+compared as well as their pools. If budget remains after session 3 (about 15
 minutes of the 2.5 hours), one exploratory hold may time a pair at the engine
 default `MAX_ROWS=256` at the gated-off concurrencies or take one Nsight Systems
 profile of a plain decoding step with and without the head; either is labelled
