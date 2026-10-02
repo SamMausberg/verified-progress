@@ -34,6 +34,26 @@ Transport is in real arithmetic with one head for both passes; $\delta^\ast$ use
 \end{tabularx}
 \end{table}
 
+\begin{table}[htbp]
+\caption{Numerical assumptions, in short (in full: Table~\ref{tab:assumptions-full}). ``Code'': read from SGLang's and PyTorch's code at the versions of Section~\ref{sec:setup}.}\label{tab:assumptions}
+\vskip 0.05in
+\centering\scriptsize
+\begin{tabularx}{0.62\linewidth}{@{}Y>{\raggedright\arraybackslash}p{3.05cm}@{}}
+\toprule
+Assumption & Status\\\midrule
+BF16 operands are normal or zero, so products are exact in FP32 (underflow is charged to $\eta$) & Exact for normal operands\\\addlinespace[2pt]
+The stock head rounds its FP32 accumulator to BF16 (nearest, ties to even); \code{torch.argmax} returns the first maximal index & Code\\\addlinespace[2pt]
+The stock kernel's error is at most $\gamma_{\rm stock}\sum_j|w_{ij}h_j|+\eta$ at every served shape, under the \modelcons{} or the \modelhopper; no split-$K$ partial sums in BF16 & Assumed; consistent with every replayed position and with the observed error of the stock GEMM's FP32-output variant, a separate kernel (Section~\ref{sec:limits}) \ev{kernel-error}\\\addlinespace[2pt]
+The int8 pass's own accumulation error is at most $\gamma_{\rm copy}=\gcons$ times $\sum_j|\bar w_{ij}h_j|$, and the kernel computes the modelled arithmetic & Assumed; checked per compiled variant at start-up and by runtime probes, not proved (Section~\ref{sec:kernel-design}) \ev{kernel-impl,kernel-tma}\\\addlinespace[2pt]
+Agreement is checked at the same batch shape and configuration & Required (Section~\ref{sec:same-shape})\\\addlinespace[2pt]
+Per-position fallback only: a position's stock logits do not depend on the rest of the batch or on which entries are present & Measured at 20 batch sizes; entry subsets re-checked at start-up \ev{kernel-invariance}\\\addlinespace[2pt]
+Seeded sampling (Section~\ref{sec:decisions}): noise is a function of (seed, position, token); no top-$k$ or top-$p$; the deterministic mode's head kernel is covered by the \modelcons{} only & Code; matched on replayed positions \ev{kernel-seeded}\\\addlinespace[2pt]
+The offline replay evaluates real logits in FP64; transport is analysed in real arithmetic & How the replay computes\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+
 \subsection{The BF16 separation lemma}\label{app:bf16gap}
 \begin{proof}[Proof of Lemma~\ref{lem:bf16gap}]
 Rounding is nondecreasing, so if $\rnb(y_a)\le\rnb(y_b)$ while $y_a>y_b$, both values round to the same $v$ and lie in its preimage. When $|v|$ is not a power of two, the preimage has length $\ulpb(v)$ and both values lie in the binade of $v$. When $|v|=2^e$ the preimage is $[v-\ulpb(v)/4,\,v+\ulpb(v)/2]$ for $v>0$ (symmetrically for $v<0$): two values on one side of $v$ are within half the spacing of their binade, and two values on both sides are within $\tfrac34\ulpb(v)\le\ulpb(y_a)$. At $v=0$ the preimage has the subnormal spacing. In every case $y_a-y_b\le\ulpb(\max(|y_a|,|y_b|))$, contradicting the hypothesis.
@@ -160,6 +180,22 @@ IEEE FP32 tree & $1.7\times10^{-6}$ & 1.95\% & 14.8\% & 0\% & 0\%\\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{table}[htbp]
+\caption{Recomputation and fallback by the model assumed for the stock kernel: mean candidates and the share of positions left to the stock head. Held-out replay columns: the gap and interval rules, and the share of decode steps (8.0 held-out positions each) with a position the interval rule leaves. The last row is a sensitivity check, not a model of the stock kernel. By rule and step in full: Table~\ref{tab:rstock}.}\label{tab:fallback}
+\vskip 0.05in
+\centering\scriptsize\setlength{\tabcolsep}{3pt}
+\begin{tabular*}{0.7\linewidth}{@{}l@{\extracolsep{\fill}}rrrrr@{}}
+\toprule
+& \multicolumn{2}{c}{Kernel replay \ev{kernel-replay}} & \multicolumn{3}{c}{Held-out replay \ev{rstock}}\\\cmidrule(lr){2-3}\cmidrule(l){4-6}
+Model ($\gamma_{\rm stock}$) & Cand. & Interval & Gap & Interval & Steps\\\midrule
+Conservative ($\gcons$) & 1.84 & 1.46\% & 3.03\% & 1.40\% & 10.9\%\\
+Hopper ($\ghop$) & 1.78 & 0.28\% & 2.18\% & 0.35\% & 2.8\%\\
+IEEE FP32 tree ($1.7\times10^{-6}$) & -- & -- & 1.95\% & 0\% & 0\%\\
+\bottomrule
+\end{tabular*}
+\end{table}
+
 
 \paragraph{Other copies on plain decoding} The same replay covers heads the main text summarizes in a sentence~\ev{selfevidence}. Int4 alone is useless as a certificate: with 32-column groups a decision needs 20,751 candidate tokens on average (p99 230,238, maximum 248,192) and 0.02\% of positions are decided by one entry, and with 128-column groups the median set is 13,991 entries. A two-plane cascade, an int4 plane for every entry and an int4 residual plane only for entries the first cannot exclude, reads 0.32 of the BF16 head's bytes for one position and 0.41--0.42 over capture steps with 5 to 16 held-out positions, at the price of an irregular second gather. Seeded races at $T=1$ and 0.7 behave like greedy selection, with a mean of 1.33 candidates and a p99 of 5 for the 128-column copy~\ev{selfevidence-csv}. Re-scoring candidates with IEEE FP32 accumulation on CUDA cores leaves no position undecided; with the tensor-core error model applied to the re-scoring as well, 2.1\% of positions still overlap and need FP64. Re-scoring also reads little: on capture steps with 5 to 16 held-out positions the 128-group candidates cover 9.5--12.5 distinct vocabulary entries on average~\ev{selfevidence}, so the gather of their BF16 rows reads tens of kilobytes beside a 636~MB int8 pass (derived). Tightening the error bound helps little: 16 to 64 exact outlier columns or a 64-dimensional PCA rotation of $h$ lower the mean count by 3--7\% for 1--7\% more pass bytes, and centring $W$ raises it by 10\%~\ev{selfevidence-csv,stats}. Centring fails because the mean entry points along the bulk of the vocabulary (median cosine 0.39) but not along the entries that compete for the argmax (median cosine $-0.11$ over each position's top eight), so it lowers the median error norm over all entries by 14\% and raises it by 20\% on the entries that matter~\ev{stats}. For comparison, an int8 copy of the Qwen3-8B head with one scale per entry agrees with the BF16 argmax on 97.56\% of positions~\cite{archead}, so an exact re-score must catch the rest.
 
