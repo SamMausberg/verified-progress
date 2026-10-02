@@ -1,5 +1,5 @@
 {
- "repo_commit": "f850e97b923bb7cefcb192cac5f3a9ad35567ca5",
+ "repo_commit": "02b921b69889377488ba3f7147721d70ebe36a3f",
  "gpu": "NVIDIA GH200 480GB",
  "torch": "2.13.0+cu130",
  "cuda": "13.0",
@@ -16,6 +16,7 @@
   },
   "summary": {
    "fractional_bits_kept": 25,
+   "alignment_dropped_bits": "truncation toward zero",
    "negative_terms_truncated": "toward zero",
    "align_neg_largest_exact": 25,
    "accumulator_in_aligned_sum": true,
@@ -23,7 +24,6 @@
    "first_k_outside_block_of_k0": 16,
    "block_before_tiny_survives_at_j": [],
    "rounding_to_fp32": "toward-zero",
-   "round_above_tie_result_minus_1": 0.0,
    "round_acc_tie_odd_result_minus_1": 1.1920928955078125e-07
   },
   "rows": [
@@ -625,6 +625,56 @@
    {
     "test": "acc_fused",
     "param": 40,
+    "result": 0.0
+   },
+   {
+    "test": "align_round_pos",
+    "param": 0.25,
+    "result": 0.0
+   },
+   {
+    "test": "align_round_neg",
+    "param": 0.25,
+    "result": 0.0
+   },
+   {
+    "test": "align_round_pos",
+    "param": 0.5,
+    "result": 0.0
+   },
+   {
+    "test": "align_round_neg",
+    "param": 0.5,
+    "result": 0.0
+   },
+   {
+    "test": "align_round_pos",
+    "param": 0.625,
+    "result": 0.0
+   },
+   {
+    "test": "align_round_neg",
+    "param": 0.625,
+    "result": 0.0
+   },
+   {
+    "test": "align_round_pos",
+    "param": 0.75,
+    "result": 0.0
+   },
+   {
+    "test": "align_round_neg",
+    "param": 0.75,
+    "result": 0.0
+   },
+   {
+    "test": "align_round_pos",
+    "param": 0.875,
+    "result": 0.0
+   },
+   {
+    "test": "align_round_neg",
+    "param": 0.875,
     "result": 0.0
    },
    {
@@ -1263,9 +1313,14 @@
     "result": -1.0000001192092896
    },
    {
-    "test": "round_above_tie",
+    "test": "round_above_half",
     "param": 0,
     "result": 1.0
+   },
+   {
+    "test": "round_above_half_neg",
+    "param": 0,
+    "result": -1.0
    },
    {
     "test": "round_acc_tie_odd",
@@ -1282,12 +1337,14 @@
    ],
    "summary": {
     "fractional_bits_kept": 25,
+    "alignment_dropped_bits": "truncation toward zero",
     "negative_terms_truncated": "toward zero",
     "align_neg_largest_exact": 25,
     "accumulator_in_aligned_sum": null,
     "acc_fused_largest_exact": 0,
     "first_k_outside_block_of_k0": 16,
     "block_before_tiny_survives_at_j": [],
+    "epilogue_fp32_to_bf16": "nearest-even",
     "rounding_to_fp32": "toward-zero"
    },
    "rows": [
@@ -1689,6 +1746,56 @@
     {
      "test": "align_neg",
      "param": 40,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.875,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.875,
      "result": 0.0
     },
     {
@@ -2960,6 +3067,36 @@
      "test": "bf16tie_below_neg",
      "param": 0,
      "result": -1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_pos",
+     "param": 0,
+     "result": 1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_neg",
+     "param": 0,
+     "result": -1.0078125
+    },
+    {
+     "test": "epilogue_tie_odd",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_even",
+     "param": 0,
+     "result": 1.0
+    },
+    {
+     "test": "epilogue_above_tie",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_odd_neg",
+     "param": 0,
+     "result": -1.015625
     }
    ]
   },
@@ -2969,12 +3106,14 @@
    ],
    "summary": {
     "fractional_bits_kept": 25,
+    "alignment_dropped_bits": "truncation toward zero",
     "negative_terms_truncated": "toward zero",
     "align_neg_largest_exact": 25,
     "accumulator_in_aligned_sum": null,
     "acc_fused_largest_exact": 0,
     "first_k_outside_block_of_k0": 16,
     "block_before_tiny_survives_at_j": [],
+    "epilogue_fp32_to_bf16": "nearest-even",
     "rounding_to_fp32": "toward-zero"
    },
    "rows": [
@@ -3376,6 +3515,56 @@
     {
      "test": "align_neg",
      "param": 40,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.875,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.875,
      "result": 0.0
     },
     {
@@ -4647,6 +4836,36 @@
      "test": "bf16tie_below_neg",
      "param": 0,
      "result": -1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_pos",
+     "param": 0,
+     "result": 1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_neg",
+     "param": 0,
+     "result": -1.0078125
+    },
+    {
+     "test": "epilogue_tie_odd",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_even",
+     "param": 0,
+     "result": 1.0
+    },
+    {
+     "test": "epilogue_above_tie",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_odd_neg",
+     "param": 0,
+     "result": -1.015625
     }
    ]
   },
@@ -4656,12 +4875,14 @@
    ],
    "summary": {
     "fractional_bits_kept": 25,
+    "alignment_dropped_bits": "truncation toward zero",
     "negative_terms_truncated": "toward zero",
     "align_neg_largest_exact": 25,
     "accumulator_in_aligned_sum": null,
     "acc_fused_largest_exact": 0,
     "first_k_outside_block_of_k0": 16,
     "block_before_tiny_survives_at_j": [],
+    "epilogue_fp32_to_bf16": "nearest-even",
     "rounding_to_fp32": "toward-zero"
    },
    "rows": [
@@ -5063,6 +5284,56 @@
     {
      "test": "align_neg",
      "param": 40,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.875,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.875,
      "result": 0.0
     },
     {
@@ -6334,6 +6605,36 @@
      "test": "bf16tie_below_neg",
      "param": 0,
      "result": -1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_pos",
+     "param": 0,
+     "result": 1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_neg",
+     "param": 0,
+     "result": -1.0078125
+    },
+    {
+     "test": "epilogue_tie_odd",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_even",
+     "param": 0,
+     "result": 1.0
+    },
+    {
+     "test": "epilogue_above_tie",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_odd_neg",
+     "param": 0,
+     "result": -1.015625
     }
    ]
   },
@@ -6343,12 +6644,14 @@
    ],
    "summary": {
     "fractional_bits_kept": 25,
+    "alignment_dropped_bits": "truncation toward zero",
     "negative_terms_truncated": "toward zero",
     "align_neg_largest_exact": 25,
     "accumulator_in_aligned_sum": null,
     "acc_fused_largest_exact": 0,
     "first_k_outside_block_of_k0": 16,
     "block_before_tiny_survives_at_j": [],
+    "epilogue_fp32_to_bf16": "nearest-even",
     "rounding_to_fp32": "toward-zero"
    },
    "rows": [
@@ -6750,6 +7053,56 @@
     {
      "test": "align_neg",
      "param": 40,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.875,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.875,
      "result": 0.0
     },
     {
@@ -8021,6 +8374,36 @@
      "test": "bf16tie_below_neg",
      "param": 0,
      "result": -1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_pos",
+     "param": 0,
+     "result": 1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_neg",
+     "param": 0,
+     "result": -1.0078125
+    },
+    {
+     "test": "epilogue_tie_odd",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_even",
+     "param": 0,
+     "result": 1.0
+    },
+    {
+     "test": "epilogue_above_tie",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_odd_neg",
+     "param": 0,
+     "result": -1.015625
     }
    ]
   },
@@ -8030,12 +8413,14 @@
    ],
    "summary": {
     "fractional_bits_kept": 25,
+    "alignment_dropped_bits": "truncation toward zero",
     "negative_terms_truncated": "toward zero",
     "align_neg_largest_exact": 25,
     "accumulator_in_aligned_sum": null,
     "acc_fused_largest_exact": 0,
     "first_k_outside_block_of_k0": 16,
     "block_before_tiny_survives_at_j": [],
+    "epilogue_fp32_to_bf16": "nearest-even",
     "rounding_to_fp32": "toward-zero"
    },
    "rows": [
@@ -8437,6 +8822,56 @@
     {
      "test": "align_neg",
      "param": 40,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.875,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.875,
      "result": 0.0
     },
     {
@@ -9708,6 +10143,36 @@
      "test": "bf16tie_below_neg",
      "param": 0,
      "result": -1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_pos",
+     "param": 0,
+     "result": 1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_neg",
+     "param": 0,
+     "result": -1.0078125
+    },
+    {
+     "test": "epilogue_tie_odd",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_even",
+     "param": 0,
+     "result": 1.0
+    },
+    {
+     "test": "epilogue_above_tie",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_odd_neg",
+     "param": 0,
+     "result": -1.015625
     }
    ]
   },
@@ -9717,12 +10182,14 @@
    ],
    "summary": {
     "fractional_bits_kept": 25,
+    "alignment_dropped_bits": "truncation toward zero",
     "negative_terms_truncated": "toward zero",
     "align_neg_largest_exact": 25,
     "accumulator_in_aligned_sum": null,
     "acc_fused_largest_exact": 0,
     "first_k_outside_block_of_k0": 16,
     "block_before_tiny_survives_at_j": [],
+    "epilogue_fp32_to_bf16": "nearest-even",
     "rounding_to_fp32": "toward-zero"
    },
    "rows": [
@@ -10124,6 +10591,56 @@
     {
      "test": "align_neg",
      "param": 40,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.875,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.875,
      "result": 0.0
     },
     {
@@ -11395,6 +11912,36 @@
      "test": "bf16tie_below_neg",
      "param": 0,
      "result": -1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_pos",
+     "param": 0,
+     "result": 1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_neg",
+     "param": 0,
+     "result": -1.0078125
+    },
+    {
+     "test": "epilogue_tie_odd",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_even",
+     "param": 0,
+     "result": 1.0
+    },
+    {
+     "test": "epilogue_above_tie",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_odd_neg",
+     "param": 0,
+     "result": -1.015625
     }
    ]
   },
@@ -11404,12 +11951,14 @@
    ],
    "summary": {
     "fractional_bits_kept": 25,
+    "alignment_dropped_bits": "truncation toward zero",
     "negative_terms_truncated": "toward zero",
     "align_neg_largest_exact": 25,
     "accumulator_in_aligned_sum": null,
     "acc_fused_largest_exact": 0,
     "first_k_outside_block_of_k0": 16,
     "block_before_tiny_survives_at_j": [],
+    "epilogue_fp32_to_bf16": "nearest-even",
     "rounding_to_fp32": "toward-zero"
    },
    "rows": [
@@ -11811,6 +12360,56 @@
     {
      "test": "align_neg",
      "param": 40,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.875,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.875,
      "result": 0.0
     },
     {
@@ -13082,6 +13681,36 @@
      "test": "bf16tie_below_neg",
      "param": 0,
      "result": -1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_pos",
+     "param": 0,
+     "result": 1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_neg",
+     "param": 0,
+     "result": -1.0078125
+    },
+    {
+     "test": "epilogue_tie_odd",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_even",
+     "param": 0,
+     "result": 1.0
+    },
+    {
+     "test": "epilogue_above_tie",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_odd_neg",
+     "param": 0,
+     "result": -1.015625
     }
    ]
   },
@@ -13091,12 +13720,14 @@
    ],
    "summary": {
     "fractional_bits_kept": 25,
+    "alignment_dropped_bits": "truncation toward zero",
     "negative_terms_truncated": "toward zero",
     "align_neg_largest_exact": 25,
     "accumulator_in_aligned_sum": null,
     "acc_fused_largest_exact": 0,
     "first_k_outside_block_of_k0": 16,
     "block_before_tiny_survives_at_j": [],
+    "epilogue_fp32_to_bf16": "nearest-even",
     "rounding_to_fp32": "toward-zero"
    },
    "rows": [
@@ -13498,6 +14129,56 @@
     {
      "test": "align_neg",
      "param": 40,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.875,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.875,
      "result": 0.0
     },
     {
@@ -14769,6 +15450,36 @@
      "test": "bf16tie_below_neg",
      "param": 0,
      "result": -1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_pos",
+     "param": 0,
+     "result": 1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_neg",
+     "param": 0,
+     "result": -1.0078125
+    },
+    {
+     "test": "epilogue_tie_odd",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_even",
+     "param": 0,
+     "result": 1.0
+    },
+    {
+     "test": "epilogue_above_tie",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_odd_neg",
+     "param": 0,
+     "result": -1.015625
     }
    ]
   },
@@ -14778,12 +15489,14 @@
    ],
    "summary": {
     "fractional_bits_kept": 25,
+    "alignment_dropped_bits": "truncation toward zero",
     "negative_terms_truncated": "toward zero",
     "align_neg_largest_exact": 25,
     "accumulator_in_aligned_sum": null,
     "acc_fused_largest_exact": 0,
     "first_k_outside_block_of_k0": 16,
     "block_before_tiny_survives_at_j": [],
+    "epilogue_fp32_to_bf16": "nearest-even",
     "rounding_to_fp32": "toward-zero"
    },
    "rows": [
@@ -15185,6 +15898,56 @@
     {
      "test": "align_neg",
      "param": 40,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.875,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.875,
      "result": 0.0
     },
     {
@@ -16456,6 +17219,36 @@
      "test": "bf16tie_below_neg",
      "param": 0,
      "result": -1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_pos",
+     "param": 0,
+     "result": 1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_neg",
+     "param": 0,
+     "result": -1.0078125
+    },
+    {
+     "test": "epilogue_tie_odd",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_even",
+     "param": 0,
+     "result": 1.0
+    },
+    {
+     "test": "epilogue_above_tie",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_odd_neg",
+     "param": 0,
+     "result": -1.015625
     }
    ]
   },
@@ -16465,12 +17258,14 @@
    ],
    "summary": {
     "fractional_bits_kept": 25,
+    "alignment_dropped_bits": "truncation toward zero",
     "negative_terms_truncated": "toward zero",
     "align_neg_largest_exact": 25,
     "accumulator_in_aligned_sum": null,
     "acc_fused_largest_exact": 0,
     "first_k_outside_block_of_k0": 16,
     "block_before_tiny_survives_at_j": [],
+    "epilogue_fp32_to_bf16": "nearest-even",
     "rounding_to_fp32": "toward-zero"
    },
    "rows": [
@@ -16872,6 +17667,56 @@
     {
      "test": "align_neg",
      "param": 40,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.875,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.875,
      "result": 0.0
     },
     {
@@ -18143,6 +18988,36 @@
      "test": "bf16tie_below_neg",
      "param": 0,
      "result": -1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_pos",
+     "param": 0,
+     "result": 1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_neg",
+     "param": 0,
+     "result": -1.0078125
+    },
+    {
+     "test": "epilogue_tie_odd",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_even",
+     "param": 0,
+     "result": 1.0
+    },
+    {
+     "test": "epilogue_above_tie",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_odd_neg",
+     "param": 0,
+     "result": -1.015625
     }
    ]
   },
@@ -18152,12 +19027,14 @@
    ],
    "summary": {
     "fractional_bits_kept": 25,
+    "alignment_dropped_bits": "truncation toward zero",
     "negative_terms_truncated": "toward zero",
     "align_neg_largest_exact": 25,
     "accumulator_in_aligned_sum": null,
     "acc_fused_largest_exact": 0,
     "first_k_outside_block_of_k0": 16,
     "block_before_tiny_survives_at_j": [],
+    "epilogue_fp32_to_bf16": "nearest-even",
     "rounding_to_fp32": "toward-zero"
    },
    "rows": [
@@ -18559,6 +19436,56 @@
     {
      "test": "align_neg",
      "param": 40,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.875,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.875,
      "result": 0.0
     },
     {
@@ -19830,6 +20757,36 @@
      "test": "bf16tie_below_neg",
      "param": 0,
      "result": -1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_pos",
+     "param": 0,
+     "result": 1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_neg",
+     "param": 0,
+     "result": -1.0078125
+    },
+    {
+     "test": "epilogue_tie_odd",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_even",
+     "param": 0,
+     "result": 1.0
+    },
+    {
+     "test": "epilogue_above_tie",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_odd_neg",
+     "param": 0,
+     "result": -1.015625
     }
    ]
   },
@@ -19839,12 +20796,14 @@
    ],
    "summary": {
     "fractional_bits_kept": 25,
+    "alignment_dropped_bits": "truncation toward zero",
     "negative_terms_truncated": "toward zero",
     "align_neg_largest_exact": 25,
     "accumulator_in_aligned_sum": null,
     "acc_fused_largest_exact": 0,
     "first_k_outside_block_of_k0": 16,
     "block_before_tiny_survives_at_j": [],
+    "epilogue_fp32_to_bf16": "nearest-even",
     "rounding_to_fp32": "toward-zero"
    },
    "rows": [
@@ -20246,6 +21205,56 @@
     {
      "test": "align_neg",
      "param": 40,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.875,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.875,
      "result": 0.0
     },
     {
@@ -21517,6 +22526,36 @@
      "test": "bf16tie_below_neg",
      "param": 0,
      "result": -1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_pos",
+     "param": 0,
+     "result": 1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_neg",
+     "param": 0,
+     "result": -1.0078125
+    },
+    {
+     "test": "epilogue_tie_odd",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_even",
+     "param": 0,
+     "result": 1.0
+    },
+    {
+     "test": "epilogue_above_tie",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_odd_neg",
+     "param": 0,
+     "result": -1.015625
     }
    ]
   },
@@ -21526,12 +22565,14 @@
    ],
    "summary": {
     "fractional_bits_kept": 25,
+    "alignment_dropped_bits": "truncation toward zero",
     "negative_terms_truncated": "toward zero",
     "align_neg_largest_exact": 25,
     "accumulator_in_aligned_sum": null,
     "acc_fused_largest_exact": 0,
     "first_k_outside_block_of_k0": 16,
     "block_before_tiny_survives_at_j": [],
+    "epilogue_fp32_to_bf16": "nearest-even",
     "rounding_to_fp32": "toward-zero"
    },
    "rows": [
@@ -21933,6 +22974,56 @@
     {
      "test": "align_neg",
      "param": 40,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.875,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.875,
      "result": 0.0
     },
     {
@@ -23204,6 +24295,36 @@
      "test": "bf16tie_below_neg",
      "param": 0,
      "result": -1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_pos",
+     "param": 0,
+     "result": 1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_neg",
+     "param": 0,
+     "result": -1.0078125
+    },
+    {
+     "test": "epilogue_tie_odd",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_even",
+     "param": 0,
+     "result": 1.0
+    },
+    {
+     "test": "epilogue_above_tie",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_odd_neg",
+     "param": 0,
+     "result": -1.015625
     }
    ]
   },
@@ -23213,12 +24334,14 @@
    ],
    "summary": {
     "fractional_bits_kept": 25,
+    "alignment_dropped_bits": "truncation toward zero",
     "negative_terms_truncated": "toward zero",
     "align_neg_largest_exact": 25,
     "accumulator_in_aligned_sum": null,
     "acc_fused_largest_exact": 0,
     "first_k_outside_block_of_k0": 16,
     "block_before_tiny_survives_at_j": [],
+    "epilogue_fp32_to_bf16": "nearest-even",
     "rounding_to_fp32": "toward-zero"
    },
    "rows": [
@@ -23620,6 +24743,56 @@
     {
      "test": "align_neg",
      "param": 40,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.25,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.5,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.625,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.75,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_pos",
+     "param": 0.875,
+     "result": 0.0
+    },
+    {
+     "test": "align_round_neg",
+     "param": 0.875,
      "result": 0.0
     },
     {
@@ -24891,6 +26064,36 @@
      "test": "bf16tie_below_neg",
      "param": 0,
      "result": -1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_pos",
+     "param": 0,
+     "result": 1.0078125
+    },
+    {
+     "test": "bf16tie_quarter_neg",
+     "param": 0,
+     "result": -1.0078125
+    },
+    {
+     "test": "epilogue_tie_odd",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_even",
+     "param": 0,
+     "result": 1.0
+    },
+    {
+     "test": "epilogue_above_tie",
+     "param": 0,
+     "result": 1.015625
+    },
+    {
+     "test": "epilogue_tie_odd_neg",
+     "param": 0,
+     "result": -1.015625
     }
    ]
   }

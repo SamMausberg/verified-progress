@@ -421,17 +421,20 @@ The probe runs on two paths:
 | Test (products in k order; C = accumulator) | Result if ... | Observed, Triton and all 14 head kernels |
 |---|---|---|
 | {1, 2^-e, -1}, e = 1-40 | 2^-e when e <= F, else 0 | 2^-e up to e = 25, 0 from 26: **F = 25** |
-| {1, -2^-e, -1}, e = 1-40 | beyond F: 0 if dropped bits are truncated toward zero, -2^-F if toward minus infinity | -2^-e up to 25, then 0: **toward zero** |
+| {1, -2^-e, -1}, e = 1-40 | beyond F: 0, unless dropped bits round toward minus infinity (then -2^-F) | -2^-e up to 25, then 0: **not toward minus infinity** |
+| {1, +/-v, -1}, v = 0.25, 0.5, 0.625, 0.75, 0.875 of the last kept quantum 2^-25 | all 0 if dropped bits are truncated toward zero; +/-2^-25 for v > 0.5 if they round to nearest | all 0: **dropped bits truncated toward zero** |
 | C = 1, {2^-e, -1} (Triton only; the cuBLAS call has no accumulator input) | 2^-e up to e = F if C is one of the aligned addends | 2^-e up to 25: **accumulator inside the aligned sum** |
 | {1 at k = 0, -1 at 1, 2^-60 at j} | 0 while j shares the pair's block, 2^-60 once it is in a later block | 0 for j <= 15, 2^-60 from j = 16: **blocks of 16** |
 | {2^-60 at 0, 1 at j, -1 at j + 1} | 2^-60 if block sums are added afterwards; 0 if the running FP32 accumulator joins the next block's aligned sum | 0 at every j: **running accumulator joins the next block** |
-| {1, 2^-23, 2^-24}, {1, 2^-24}, {-1, -2^-23, -2^-24} (Triton) | 1 + 2^-22, 1, -1 - 2^-22 if round to nearest even; 1 + 2^-23, 1, -1 - 2^-23 if toward zero; other modes differ in at least one | 1 + 2^-23, 1, -1 - 2^-23: **truncated to FP32 (toward zero)** |
-| {1, 2^-7, 2^-8, -2^-24} and its negative (cuBLAS) | the FP32 sum lands on, or one step below, a BF16 tie; toward zero moves both BF16 logits down one step | both down: **toward zero** |
+| {1, 2^-23, 2^-24}, {1, 2^-24}, {-1, -2^-23, -2^-24}, {1, 2^-24, 2^-25}, {-1, -2^-24, -2^-25} (Triton; two ties and two sums 0.75 of an FP32 step above a representable value) | nearest-even: 1 + 2^-22, 1, -1 - 2^-22, 1 + 2^-23, -1 - 2^-23; toward zero: 1 + 2^-23, 1, -1 - 2^-23, 1, -1; nearest-away, nearest with ties toward zero, up and down each differ in at least one | 1 + 2^-23, 1, -1 - 2^-23, 1, -1: **sum truncated to FP32 (toward zero)** |
+| {1, 2^-7, 2^-8}, {1, 2^-8}, {1, 2^-7, 2^-8, 2^-23} and the first one's negative (cuBLAS; exact in FP32, so the FP32-to-BF16 epilogue alone decides) | nearest-even: 1 + 2^-6, 1, 1 + 2^-6, -1 - 2^-6; the five other modes differ in at least one | as nearest-even: **epilogue rounds to nearest even** |
+| {1, 2^-7, 2^-8, -2^-24}, {1, 2^-7, 2^-8, -2^-25} and their negatives (cuBLAS; an FP32 tie and a quarter step below a BF16 tie) | with that epilogue, toward zero puts all four BF16 logits one step down and round to nearest puts the quarter-step ones up | all four down: **sum truncated to FP32 (toward zero)** |
 
-There are 249 Triton rows and 334 rows at each cuBLAS row count. Every row gives the
+There are 260 Triton rows and 350 rows at each cuBLAS row count. Every row gives the
 same answer at every row count, so the measured behaviour matches the paper's Hopper
 model (k = 16, F = 25, truncation) and satisfies the conservative model, which needs
-FP32's 24 bits. Scope: this is a measurement on crafted inputs of one GH200 with driver
+FP32's 24 bits. On the cuBLAS path the accumulator's rounding is read through the
+BF16 epilogue, whose round-to-nearest-even behaviour the control rows establish. Scope: this is a measurement on crafted inputs of one GH200 with driver
 570.195.03, CUDA 13.0 and PyTorch 2.13's cuBLAS, not a vendor contract and not a proof
 for all inputs. Its operands are powers of two and short sums of them, with one operand
 of every product equal to 1. Products of two full 8-bit significands, subnormal
@@ -560,7 +563,7 @@ python experiments/profiling/attribute.py ~/vp-data/profile/mtp_nsys/mtp_bs8.nsy
 | `kernel_bandwidth.csv` | achieved bandwidth of the head GEMM and the GDN kernels by batch and source (microbenchmark, GDN bench, serving traces, ncu), with the ncu regime | `kernel_bandwidth.py` | measured; regime by rule |
 | `microbench_rerun/` | 2026-10-01 rerun of `run_microbench.sh` with the clock log: `hbm_bandwidth.json`, `head_microbench.json`, `microbench_clocks.csv` (nvidia-smi, 100 ms), `microbench_clocks.json` | `MICROBENCH_EVIDENCE=evidence/profiles/microbench_rerun experiments/profiling/run_all.sh microbench` (`clock_summary.py`) | measured; reproduction check |
 | `head_tensor_instructions.json` | HGMMA- and HMMA-path tensor operations and executed SASS of the head GEMM at M = 1 and 32 (from the ncu reports); `cuobjdump -symbols` search of cuBLAS's libraries for the nvjet kernels | `tensor_instructions.py` (`analyze_all.sh`) | measured |
-| `wgmma_precision.json` | BF16 accumulation probe: every test row and result, the kernel each cuBLAS row count ran, and the derived F, truncation direction, block size, accumulator handling and rounding to FP32, for Triton's `wgmma` and the 14 head kernels | `run_all.sh wgmma` (`wgmma_precision.py`) | measured |
+| `wgmma_precision.json` | BF16 accumulation probe: every test row and result, the kernel each cuBLAS row count ran, and the derived F, handling of dropped bits, block size, accumulator handling, rounding to FP32 and (cuBLAS) the BF16 epilogue's rounding, for Triton's `wgmma` and the 14 head kernels | `run_all.sh wgmma` (`wgmma_precision.py`) | measured |
 | `attribution/plain_rerun/plain_bs<B>.json`, `plain_rerun_check.csv` | attribution of the 2026-10-01 plain traces and its comparison with the cited ones | `attribute.py`, `compare_attribution.py` | measured; reproduction check |
 
 The `gdn`, `ncu` and `microbench` steps ran in one exclusive hold that ended on
