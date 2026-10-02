@@ -35,6 +35,7 @@ Buffered GDN verify (engine patches 0002 and 0003):
 | File | What it does |
 |---|---|
 | `gdn_verify_parity.py`, `run_gdn_parity.sh` | Kernel-level parity at the Qwen3.5-4B GDN shape on random inputs: the fold verify and committed state, and the circular verify, against the stock recurrent verify, bitwise |
+| `gdn_ring_tile_sweep.py`, `run_ring_tile_sweep.sh` | GPU time per layer of the fold's ring-writing verify at forced value tiles 4, 8, 16 and 32 for batches 1-64 and blocks 16 and 8 (24 layers per CUDA graph, repeated), with the stock per-position-state verify as reference and each tile's output checked bitwise against tile 32's; exclusive hold |
 | `run_replay_check.sh`, `run_replay_check_mtp.sh` | Served exactness of the circular and fold arms against stock DFlash (block 16) and stock MTP s3 on panel-v2 at concurrency 1 and 8, with a stock-repeat control |
 | `summarize_replay_check.py` | One table from those runs: bitwise-identical sequences, first-divergence classes, tokens per cycle, foreign CPU load and the resolved pools of each arm |
 | `run_fold_localize.sh`, `fold_localize.py` | Fold against stock with identical pinned pools: traced runs at concurrency 1 located cycle by cycle, and deterministic batched waves (DFlash waves of 4, MTP waves of 8) with a stock repeat |
