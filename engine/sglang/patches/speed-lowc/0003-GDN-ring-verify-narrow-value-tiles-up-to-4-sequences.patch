@@ -1,0 +1,77 @@
+From 487fc5cfc7830b7638f491e2eed0157a01b96fc6 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Fri, 2 Oct 2026 17:39:49 +0000
+Subject: [PATCH 3/3] GDN ring verify: narrow value tiles up to 4 sequences on
+ SM90
+
+Drafter 0005 gave the ReplaySSM ring-writing verify (the fold's verify)
+BV=4 tiles for up to 64 sequences: faster than BV=32 at 1-4 sequences on
+DFlash block 16 and slower at 8. Use BV=4 only up to 4 sequences, so one
+engine serves both regimes. Output and fold are bitwise equal at both
+tile widths on SM90 (drafter's kernel check).
+---
+ .../fla/fused_sigmoid_gating_recurrent.py     | 27 ++++++++++++++++++-
+ 1 file changed, 26 insertions(+), 1 deletion(-)
+
+diff --git a/python/sglang/kernels/ops/attention/fla/fused_sigmoid_gating_recurrent.py b/python/sglang/kernels/ops/attention/fla/fused_sigmoid_gating_recurrent.py
+index 1fdfe7df1c..e19489bb3b 100644
+--- a/python/sglang/kernels/ops/attention/fla/fused_sigmoid_gating_recurrent.py
++++ b/python/sglang/kernels/ops/attention/fla/fused_sigmoid_gating_recurrent.py
+@@ -10,6 +10,8 @@ from sglang.srt.utils import is_gfx95_supported, is_hip, is_sm90_supported
+ _is_hip = is_hip()
+ _is_gfx95 = is_gfx95_supported()
+ _is_sm90 = is_sm90_supported()
++# Largest sequence count for which the ring-writing verify uses BV=4 (see below).
++RING_VERIFY_NARROW_MAX_N = 4
+ 
+ 
+ def _select_recurrent_launch_config(
+@@ -20,6 +22,7 @@ def _select_recurrent_launch_config(
+     v: int,
+     is_kda: bool,
+     target_verify: bool = False,
++    ring_verify: bool = False,
+ ) -> tuple[int, int]:
+     """Select the value tile and warp count for recurrent GDN."""
+     if (
+@@ -46,6 +49,21 @@ def _select_recurrent_launch_config(
+         # with narrow tiles but not bit-identical to BV=32. Only the dense
+         # intermediate-state verify sets target_verify; cache_ring keeps BV=32.
+         return 4, 1
++    if (
++        ring_verify
++        and not _is_hip
++        and not is_kda
++        and 0 < n <= RING_VERIFY_NARROW_MAX_N
++        and k == 128
++        and v == 128
++        and _is_sm90
++    ):
++        # The ReplaySSM ring-writing verify (cache_ring) has no per-position state
++        # writes, so at a handful of sequences BV=32 leaves most SMs idle; BV=4
++        # fills them. On GH200 (DFlash, Qwen3.5-4B) BV=4 was faster up to 4
++        # sequences and slower from 8. Output and fold are bitwise equal at BV=4
++        # and BV=32 on SM90.
++        return 4, 1
+     return min(triton.next_power_of_2(v), 32), 1
+ 
+ 
+@@ -444,7 +462,14 @@ def fused_sigmoid_gating_delta_rule_update(
+     HV = v.shape[2]
+     N = B if cu_seqlens is None else len(cu_seqlens) - 1
+     BV, num_warps = _select_recurrent_launch_config(
+-        N, H, HV, K, V, is_kda, target_verify=intermediate_states_buffer is not None
++        N,
++        H,
++        HV,
++        K,
++        V,
++        is_kda,
++        target_verify=intermediate_states_buffer is not None,
++        ring_verify=cache_ring,
+     )
+     BK = triton.next_power_of_2(K)
+     NK, NV = triton.cdiv(K, BK), triton.cdiv(V, BV)
+-- 
+2.34.1
+

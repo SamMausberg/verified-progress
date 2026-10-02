@@ -6,7 +6,11 @@
 #   scripts/gpu_lock.sh -x experiments/speed_lowc/hold_probe3.sh
 set -uo pipefail
 cd "$(dirname "$0")/../.." || exit 1
+# The engine: experiments/speed_lowc/build_engines.sh fa4 (pin + speed-lowc 0001-0002).
 export SGLANG_WORKTREE=${ENGINE:-$HOME/sglang-wt/speed-lowc}
+FA4_TREE=dcd97db178c101495148fb7a361203f975bcf711
+[ "$(git -C "$SGLANG_WORKTREE" rev-parse 'HEAD^{tree}')" = "$FA4_TREE" ] ||
+  { echo "engine tree is not $FA4_TREE"; exit 1; }
 # shellcheck disable=SC1091
 source scripts/sglang_env.sh
 OUT=~/vp-data/speed-lowc/probe3-$(date -u +%Y%m%dT%H%M%SZ)

@@ -315,3 +315,20 @@ SGLANG_WORKTREE=~/sglang-wt/lossy source scripts/sglang_env.sh
 | Patch | What it changes | Default behaviour |
 |---|---|---|
 | 0001 | `DFlashDraftModel` builds its context projection `fc` as a `ReplicatedLinear` with the draft's quantization config whenever one is set, and refuses to load a checkpoint that leaves any `fc` parameter unset. Without it, a compressed-tensors drafter stores `fc` as `weight_packed`/`weight_scale`, which match no parameter of the plain `nn.Linear`; the loader skips them silently and `fc.weight` keeps uninitialised memory. | unquantized drafters (no quantization config) build and load `fc` exactly as before |
+
+## speed-lowc (`patches/speed-lowc/0001-0003`, built by `experiments/speed_lowc/build_engines.sh`)
+
+```sh
+experiments/speed_lowc/build_engines.sh fa4       # ~/sglang-wt/speed-lowc: pin + 0001-0002
+experiments/speed_lowc/build_engines.sh confirm   # ~/sglang-wt/speed-lowc-confirm: pin + drafter 0001-0004 + 0001 + 0003
+SGLANG_WORKTREE=~/sglang-wt/speed-lowc-confirm source scripts/sglang_env.sh
+```
+
+| Patch | What it changes | Default behaviour |
+|---|---|---|
+| 0001 | Backport of Dao-AILab/flash-attention#2745's paged-KV loader fix to SGLang's vendored FA4: `page_entry_per_thread` is ceil-divided. On sm_90 the head-dim-256 forward tile is 128 x 80, so the floor gave 80 // 128 = 0 entries and FA4 failed to compile for any head-dim-256 model with a paged KV cache whose page size is not the tile's (`evidence/speed_lowc/README.md`). | FA4 runs where it failed to compile; no change elsewhere (tiles whose n is a multiple of 128 compute the same count) |
+| 0002 | SM90 regression test for 0001 (`test/registered/kernels/ops/attention/test_flash_attention_4_paged_sm90.py`): head dim 256 at page sizes 1 and 16, causal and not, against an FP32 reference over a shuffled page table; head dim 128 as a control. | test only |
+| 0003 | The recurrent GDN kernel's ring-writing verify (`cache_ring`, the fold's verify from drafter 0003) uses value tiles of 4 for at most 4 sequences on sm_90, and 32 above. Drafter 0005 used 4 for up to 64 sequences, which made the fold faster at c = 1-4 and slower at c = 8 on DFlash; the cutoff keeps the first and drops the second. The two tilings are bitwise equal on sm_90 (drafter 0005's kernel check). | changes only the ring-writing verify, which runs only with drafter 0003's fold |
+
+Tree hashes (stable across builds): fa4 `dcd97db178c101495148fb7a361203f975bcf711`, confirm
+`9a01a622f6e7f7f816ce6255ba5de56d52e09dbc`. The probe and confirmation holds check them.

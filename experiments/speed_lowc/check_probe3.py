@@ -9,10 +9,13 @@ such directory (or --dir) and checks:
 * regression_test.log: pytest reports passes and no failures or errors;
 * smoke/smoke.json: every configuration started and produced every requested token.
 
+With --microbench-only only the first check runs, on the attn_microbench.json in --dir
+(probe 4 uses this on its own run of the microbenchmark on the confirm engine).
+
 Exit 0: passed. Exit 1: probe 3 ran and failed a check (the served A/B is skipped).
 Exit 2: probe 3's outputs are missing or unreadable (an error, not a verdict).
 
-    python experiments/speed_lowc/check_probe3.py [--dir <probe3 dir>]
+    python experiments/speed_lowc/check_probe3.py [--dir <probe3 dir>] [--microbench-only]
 """
 
 from __future__ import annotations
@@ -30,15 +33,18 @@ ROOT = Path.home() / 'vp-data/speed-lowc'
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     ap.add_argument('--dir', type=Path, default=None)
+    ap.add_argument('--microbench-only', action='store_true')
     args = ap.parse_args()
+    if args.microbench_only and args.dir is None:
+        ap.error('--microbench-only needs --dir')
     run = args.dir or max(ROOT.glob('probe3-*'), default=None)
     if run is None:
         print(f'no probe3-* directory under {ROOT}')
         sys.exit(2)
     try:
         attn = json.loads((run / 'attn_microbench.json').read_text())
-        test_log = (run / 'regression_test.log').read_text()
-        smoke = json.loads((run / 'smoke/smoke.json').read_text())
+        test_log = '' if args.microbench_only else (run / 'regression_test.log').read_text()
+        smoke = [] if args.microbench_only else json.loads((run / 'smoke/smoke.json').read_text())
     except (OSError, json.JSONDecodeError) as exc:
         print(f'{run}: unreadable or missing output: {exc!r}')
         sys.exit(2)
@@ -55,6 +61,12 @@ def main() -> None:
     fa4_errors = [e for e in attn.get('errors', []) if e.get('arm') == 'fa4']
     if fa4_errors:
         failures.append(f'{len(fa4_errors)} FA4 timing rows failed, first: {fa4_errors[0]}')
+    if args.microbench_only:
+        print(
+            f'{run} (microbenchmark): '
+            + ('passed' if not failures else 'FAILED: ' + '; '.join(failures))
+        )
+        sys.exit(0 if not failures else 1)
     summary = re.findall(r'(\d+) (passed|failed|error|errors)', test_log)
     counts = {k: int(n) for n, k in summary}
     if (

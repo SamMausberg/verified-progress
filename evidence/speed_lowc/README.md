@@ -12,7 +12,9 @@ microbenchmarks at the served shapes, a server smoke, and a short served A/B. La
 
 Setup: GH200 (132 SMs), torch 2.13.0+cu130, Triton 3.7.1, nvidia-cutlass-dsl 4.6.2, SGLang at the
 pin `bd66ce343e` (stock `~/sglang`), `Qwen/Qwen3.5-4B@851bf6e8` with
-`z-lab/Qwen3.5-4B-DFlash@9a1996cc`. Scripts: `experiments/speed_lowc/`.
+`z-lab/Qwen3.5-4B-DFlash@9a1996cc`. Scripts: `experiments/speed_lowc/`. Probes 1 and 2 ran stock SGLang;
+probes 3 and 4 run the trees `experiments/speed_lowc/build_engines.sh` builds from
+`engine/sglang/patches/` (section speed-lowc of `engine/sglang/README.md`), and check their tree hashes.
 
 **Provenance.** Probes 1 and 2 ran on 2026-10-02 from this repository at `e690b3a` with the
 `experiments/speed_lowc/` scripts present but not yet committed (the hold logs record `dirty=1`);
@@ -67,7 +69,8 @@ SGLang's vendored copy computes `page_entry_per_thread = n_block_size // num_thr
 on 2026-10-02), so the CuTe DSL refuses the zero-sized register tensor and the kernel never
 compiles. Head dim 128 (tile_n 128) gives 1, which is why FA4 drafter attention works. Upstream
 flash-attention ceil-divides since Dao-AILab/flash-attention#2745 (2026-08-07); its regression test
-covers SM100/SM110 only. The served smoke (`probe1/fa4_smoke.json`, measured) shows the same failure:
+covers SM100/SM110 only. An open SGLang PR, sgl-project/sglang#35757 (2026-08-20, not merged on
+2026-10-02), proposes the same fix. The served smoke (`probe1/fa4_smoke.json`, measured) shows the same failure:
 `dflash-tuned-b16` with `--attention-backend fa4` exits during prefill CUDA-graph capture with that
 error, while FA4 drafter attention serves. The backport is tested in probe 3 (pending).
 

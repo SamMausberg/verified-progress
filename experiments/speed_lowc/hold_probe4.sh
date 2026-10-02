@@ -3,7 +3,8 @@
 #  1. the attention microbenchmark on the confirm engine (~/sglang-wt/speed-lowc-confirm: the pin
 #     plus the FA4 paged-KV backport and switched-off levers; Triton, split-KV and head-dim-128
 #     FA4 paths are the pin's) and the GDN chain benchmark on the stock tree;
-#  2. only if probe 3's outputs pass check_probe3.py (FA4 target numerics, regression test, smoke):
+#  2. only if probe 3's outputs pass check_probe3.py (FA4 target numerics, regression test, smoke)
+#     and FA4's numerics pass again on the confirm engine (step 1's microbenchmark):
 #     a served A/B of FA4 target attention (lever C) on the confirm engine,
 #       L: dflash-tuned-b16 with FA4 draft (B) against FA4 target + draft (BC), c = 1, 4: B BC B
 #       H: dflash-tuned (FlashInfer target, FA4 draft) against FA4 target (C), c = 8, 32: B0 C B0
@@ -15,6 +16,21 @@ unset SGLANG_WORKTREE PYTHONPATH
 # shellcheck disable=SC1091
 source scripts/sglang_env.sh
 ENGINE=$HOME/sglang-wt/speed-lowc-confirm
+FA4_ENGINE=$HOME/sglang-wt/speed-lowc
+# Trees from experiments/speed_lowc/build_engines.sh (confirm and fa4).
+CONFIRM_TREE=9a01a622f6e7f7f816ce6255ba5de56d52e09dbc
+FA4_TREE=dcd97db178c101495148fb7a361203f975bcf711
+PAGED_KV=python/sglang/kernels/ops/attention/flash_attn/cute/paged_kv.py
+[ "$(git -C "$ENGINE" rev-parse 'HEAD^{tree}')" = "$CONFIRM_TREE" ] ||
+  { echo "confirm engine tree is not $CONFIRM_TREE"; exit 1; }
+[ -z "$(git -C "$ENGINE" status --porcelain --untracked-files=no)" ] ||
+  { echo "confirm engine has uncommitted changes"; exit 1; }
+# Probe 3 validated FA4 on the fa4 tree; the served A/B runs the confirm tree. Require the
+# same FA4 loader in both, and check FA4's numerics again on the confirm tree below.
+[ "$(git -C "$FA4_ENGINE" rev-parse 'HEAD^{tree}')" = "$FA4_TREE" ] ||
+  { echo "fa4 engine tree is not $FA4_TREE"; exit 1; }
+[ "$(git -C "$ENGINE" rev-parse "HEAD:$PAGED_KV")" = "$(git -C "$FA4_ENGINE" rev-parse "HEAD:$PAGED_KV")" ] ||
+  { echo "paged_kv.py differs between the fa4 and confirm engines"; exit 1; }
 OUT=~/vp-data/speed-lowc/probe4-$(date -u +%Y%m%dT%H%M%SZ)
 mkdir -p "$OUT"
 cleanup() { pkill -TERM -f 'sglang.launch_server.*--port 30216' 2>/dev/null || true; }
@@ -49,6 +65,11 @@ timeout --foreground 180 python experiments/speed_lowc/gdn_chain_bench.py \
 # 0 passed, 1 failed a check (served A/B skipped), 2 outputs missing (an error).
 python experiments/speed_lowc/check_probe3.py | tee "$OUT/probe3_check.txt"
 p3=${PIPESTATUS[0]}
+if (( p3 == 0 )); then
+  # The confirm engine's own FA4 numerics (its microbenchmark above).
+  python experiments/speed_lowc/check_probe3.py --dir "$OUT" --microbench-only | tee -a "$OUT/probe3_check.txt"
+  p3=${PIPESTATUS[0]}
+fi
 if (( p3 != 0 )); then
   (( p3 == 1 )) || failed+=(probe3_outputs_missing)
   echo "probe4 end $(date -Is) failed: ${failed[*]:-none} (served A/B skipped: probe 3 check exit $p3)"
