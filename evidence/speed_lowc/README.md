@@ -19,9 +19,11 @@ probes 3 and 4 run the trees `experiments/speed_lowc/build_engines.sh` builds fr
 **Provenance.** Probes 1 and 2 ran on 2026-10-02 from this repository at `e690b3a` with the
 `experiments/speed_lowc/` scripts present but not yet committed (the hold logs record `dirty=1`);
 the committed scripts are the ones that ran, with ruff's formatting and two shellcheck fixes in the
-hold scripts (`cd ... || exit 1`, direct exit-status checks); no logic changed. The two microbenchmarks are rerun from
-the committed tree in probe 4 (pending); until then their JSON files here are the first runs. The
-served probe used only committed harness code (`bench.sweep` at `e690b3a`) and stock SGLang.
+hold scripts (`cd ... || exit 1`, direct exit-status checks); no logic changed. Probe 4 ran from the
+committed tree (`09b6dc4`) and repeated both microbenchmarks there (`probe4/`): every Triton and FA4
+row is within 6.7% of probe 1's and every GDN-chain excess within 3 us, so no decision changes (the
+split-KV rows move by up to 13%, all still far from the 200 us rule). Probe 2's served A/B used only
+committed harness code (`bench.sweep` at `e690b3a`) and stock SGLang.
 
 ## Results
 
@@ -133,6 +135,28 @@ part of the confirmation). The gain is larger than the microbenchmark alone sugg
 contexts (about 0.1-0.3 ms per cycle, derived, against 0.2-0.4 ms served); the per-cycle ratio (x over accepted tokens) is
 1.034-1.040.
 
+### FA4 target attention, served (`probe4/points.csv`, measured)
+
+One exclusive hold from repository `09b6dc4` on the confirm engine (`build_engines.sh confirm`: pin +
+drafter 0001-0004 + speed-lowc 0001 and 0003, every switch off; tree `9a01a622`, clean), after the hold
+had checked that engine's tree, that its `paged_kv.py` is the blob probe 3 validated, and FA4's numerics
+again on it (`probe4/probe3_check.txt`). Bench confirm split, 512 output tokens, 64 or 256 measured
+requests per point, foreign CPU at most 0.41 cores per point. Arms differ only in attention flags.
+
+| Group, c | Base (two launches) | Test (one launch) | x ratio | y ratio | base spread x / y | accept base / test | per cycle |
+|---|---|---|---|---|---|---|---|
+| `dflash-tuned-b16`, c = 1 | FA4 draft: 1,011.6, 1,010.2 | + FA4 target: 1,050.4 | 1.039 | 1.044 | 0.15% / 0.09% | 5.650 / 5.725 | 1.025 |
+| same, c = 4 | 735.8, 732.9 | 765.2 | 1.042 | 1.040 | 0.40% / 0.36% | 5.709 / 5.745 | 1.035 |
+| `dflash-tuned`, c = 8 | stock flags: 516.0, 515.1 | FA4 target: 553.5 | 1.074 | 1.079 | 0.17% / 0.17% | 4.731 / 4.788 | 1.061 |
+| same, c = 32 | 236.1, 237.5 | 243.0 | 1.026 | 1.026 | 0.58% / 1.24% | 4.733 / 4.749 | 1.023 |
+
+x columns are x_e2e in tok/s/user; ratios are the test over the mean of the two base launches;
+"per cycle" divides x by accepted tokens per cycle, since FA4 changes the target's rounding and with
+it the token trajectories and acceptance. Every ratio is above 2% and outside the base launches'
+spread. On `dflash-tuned` FA4 replaces FlashInfer target attention, whose verify planning runs on the
+host every cycle; the larger gain at c = 8 than at 32 fits removing a fixed per-cycle cost, but this
+probe does not separate the kernel from the host share. One session: a probe, not a confirmation.
+
 ## Files
 
 | File | Content | Command |
@@ -143,4 +167,5 @@ contexts (about 0.1-0.3 ms per cycle, derived, against 0.2-0.4 ms served); the p
 | `probe1/hold.log`, `probe2/hold.log` | hold logs | - |
 | `probe2/attn_microbench_rerun.json` | microbenchmark rerun, B = 1, 8 | `scripts/gpu_lock.sh -x experiments/speed_lowc/hold_probe2.sh` |
 | `probe3/attn_microbench.json`, `probe3/regression_test.log`, `probe3/fa4_smoke.json`, `probe3/hold.log` | FA4 with the backport: numerics and timing, regression test, server smoke | `scripts/gpu_lock.sh -x experiments/speed_lowc/hold_probe3.sh` after `experiments/speed_lowc/build_engines.sh fa4` |
+| `probe4/points.csv`, `probe4/launches.csv`, `probe4/attn_microbench.json`, `probe4/gdn_chain_bench.json`, `probe4/probe3_check.txt`, `probe4/hold.log` | served A/B of FA4 target attention on the confirm engine; microbenchmark reruns from the committed tree | `experiments/speed_lowc/build_engines.sh confirm`, then `scripts/gpu_lock.sh -x experiments/speed_lowc/hold_probe4.sh`; points: `python -m bench.pareto ~/vp-data/speed-lowc/probe4-20261002T204410Z/lowc-p4-*/* --out evidence/speed_lowc/probe4 --points-only --status probe` |
 | `probe2/points.csv`, `probe2/launches.csv` | served points and launches (commands, pools, commits) | `python -m bench.pareto ~/vp-data/speed-lowc/probe2-20261002T183524Z/lowc-*/* --out evidence/speed_lowc/probe2 --points-only --status probe` |
