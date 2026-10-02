@@ -475,7 +475,10 @@ experiments/profiling/analyze_all.sh
 ```
 
 `run_all.sh` names each step's exact `run_profiles.py` command; `analyze_all.sh` names
-the analysis command behind each evidence file. One configuration by hand:
+the analysis command behind each evidence file. The committed plain evidence comes from
+the traces kept in `~/vp-data/profile/plain_nsys_v0/` (`PLAIN_CITED` overrides the
+path); on a fresh `$VP_DATA`, where `run_all.sh plain` writes only `plain_nsys/`,
+`analyze_all.sh` takes the plain evidence from that run and skips the rerun comparison. One configuration by hand:
 
 ```sh
 source scripts/sglang_env.sh

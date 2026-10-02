@@ -19,8 +19,16 @@ have() { [ -e "$1" ] || { echo "skip: $1 missing"; return 1; }; }
 
 # The plain traces behind the committed plain evidence (2026-09-30 18:28) are kept in
 # plain_nsys_v0/; plain_nsys/ now holds the 2026-10-01 rerun with the committed driver,
-# which is attributed separately below and compared with them.
-PLAIN_CITED="$VP_DATA/plain_nsys_v0"
+# which is attributed separately below and compared with them. On a fresh $VP_DATA,
+# where `run_all.sh plain` writes only plain_nsys/, that run is the plain evidence and
+# there is no rerun to compare. PLAIN_CITED overrides the cited directory.
+PLAIN_CITED="${PLAIN_CITED:-$VP_DATA/plain_nsys_v0}"
+PLAIN_RERUN="$VP_DATA/plain_nsys"
+if [ ! -d "$PLAIN_CITED" ]; then
+  echo "no $PLAIN_CITED: the plain evidence comes from $PLAIN_RERUN"
+  PLAIN_CITED="$PLAIN_RERUN"
+fi
+if [ "$PLAIN_CITED" -ef "$PLAIN_RERUN" ]; then PLAIN_RERUN=""; fi
 
 # Attribution per configuration.
 for arm_kind in plain:plain mtp:spec dflash-tuned-b16:dflash dflash-tuned:dflash; do
@@ -35,22 +43,26 @@ for arm_kind in plain:plain mtp:spec dflash-tuned-b16:dflash dflash-tuned:dflash
 done
 
 # Plain rerun: attribution and comparison with the cited traces.
-mkdir -p "$EV/attribution/plain_rerun"
-for rep in "$VP_DATA"/plain_nsys/plain_bs*.nsys-rep; do
-  have "$rep" || continue
-  b="$(basename "$rep" .nsys-rep)"
-  run attribute.py "$rep" --kind plain --out-prefix "$EV/attribution/plain_rerun/$b" | head -1
-  rm -f "$EV/attribution/plain_rerun/${b}_categories.csv"
-done
-if have "$EV/attribution/plain_rerun/plain_bs1.json"; then
-  run compare_attribution.py --base "$EV/attribution" --test "$EV/attribution/plain_rerun" \
-    --arm plain --batch 1 8 32 128 --out "$EV/plain_rerun_check.csv"
+plain_entry=plain_nsys:plain_nsys
+if [ -n "$PLAIN_RERUN" ]; then
+  plain_entry=plain_nsys:plain_nsys_rerun
+  mkdir -p "$EV/attribution/plain_rerun"
+  for rep in "$PLAIN_RERUN"/plain_bs*.nsys-rep; do
+    have "$rep" || continue
+    b="$(basename "$rep" .nsys-rep)"
+    run attribute.py "$rep" --kind plain --out-prefix "$EV/attribution/plain_rerun/$b" | head -1
+    rm -f "$EV/attribution/plain_rerun/${b}_categories.csv"
+  done
+  if have "$EV/attribution/plain_rerun/plain_bs1.json"; then
+    run compare_attribution.py --base "$EV/attribution" --test "$EV/attribution/plain_rerun" \
+      --arm plain --batch 1 8 32 128 --out "$EV/plain_rerun_check.csv"
+  fi
 fi
 
 # Client windows, server commands and startup logs. The cited plain windows
-# (windows/plain_nsys*) were copied before the rerun replaced the raw directory;
-# the rerun's are collected as plain_nsys_rerun.
-for entry in plain_nsys:plain_nsys_rerun mtp_nsys plain_none mtp_none plain_sglang \
+# (windows/plain_nsys*) were copied before the rerun replaced the raw directory, so
+# with a rerun present plain_nsys/ is collected as plain_nsys_rerun.
+for entry in "$plain_entry" mtp_nsys plain_none mtp_none plain_sglang \
   mtp_sglang plain_nsys_graphtrace mtp_nsys_graphtrace plain_eager_nsys mtp_eager_nsys \
   mtp_nsys_hosttrace plain_nsys_hosttrace dflash-tuned-b16_nsys dflash-tuned-b16_none \
   dflash-tuned_nsys dflash-tuned_none; do
