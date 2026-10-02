@@ -2,6 +2,8 @@
 
     python -m experiments.lossy.figures evidence/lossy/decisions.json --out evidence/lossy
 
+gemm_w4a16.png (with --gemm): the exploratory GEMM microbenchmark's time per forward
+pass of the quantized projections against rows, BF16 and W4A16, target and drafter.
 frontier.png: output tokens/s per user (x) against tokens/s per GPU (y), session
 means, for every arm, with three envelopes: exact arms only, exact arms plus the
 INT4 arms, exact arms plus the FP16-state arms (the frontier without and with
@@ -73,19 +75,28 @@ def frontier(decisions: dict[str, Any], path: Path) -> None:
     fig.patch.set_facecolor(SURFACE)
     style(ax)
     exact = [m for m in means if m['exact']]
-    for lever, line in (('exact', ':'), ('int4', '-'), ('fp16-state', '--')):
-        pool = exact + [m for m in means if lever_of(m['arm']) == lever and lever != 'exact']
-        front = envelope(pool)
-        label = (
-            'envelope, exact arms' if lever == 'exact' else f'envelope, exact + {LEVER_NAME[lever]}'
-        )
+    # The exact envelope is drawn wide and light underneath, so a lever's envelope shows
+    # where it leaves it and where it coincides.
+    front = envelope(exact)
+    ax.plot(
+        [p['x_mean'] for p in front],
+        [p['y_mean'] for p in front],
+        color=INK,
+        linewidth=6,
+        alpha=0.22,
+        solid_capstyle='round',
+        label='envelope, exact arms',
+        zorder=1,
+    )
+    for lever, line in (('int4', '-'), ('fp16-state', '--')):
+        front = envelope(exact + [m for m in means if lever_of(m['arm']) == lever])
         ax.plot(
             [p['x_mean'] for p in front],
             [p['y_mean'] for p in front],
             color=LEVER_COLOUR[lever],
-            linewidth=2,
+            linewidth=1.6,
             linestyle=line,
-            label=label,
+            label=f'envelope, exact + {LEVER_NAME[lever]}',
             zorder=2,
         )
     for m in means:
@@ -185,16 +196,67 @@ def quality_speed(decisions: dict[str, Any], path: Path) -> None:
     plt.close(fig)
 
 
+def gemm(result: dict[str, Any], path: Path) -> None:
+    """Quantized-projection GEMM time per forward pass against rows, BF16 and W4A16."""
+    import matplotlib
+
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 2, figsize=(9.0, 3.8), dpi=150)
+    fig.patch.set_facecolor(SURFACE)
+    for ax, model, title in (
+        (axes[0], 'target', 'target (Qwen3.5-4B backbone projections)'),
+        (axes[1], 'drafter', 'DFlash drafter (BF16 z-lab vs INT4 nota)'),
+    ):
+        style(ax)
+        rows = sorted(
+            (t for t in result['per_forward_totals'] if t['model'] == model), key=lambda t: t['m']
+        )
+        ms = [t['m'] for t in rows]
+        for side, colour, label in (
+            ('bf16', MUTED, 'BF16 (cuBLAS)'),
+            ('w4a16', LEVER_COLOUR['int4'], 'W4A16 (Marlin)'),
+        ):
+            ax.plot(
+                ms,
+                [t[f'{side}_us'] / 1000 for t in rows],
+                marker='o',
+                markersize=4,
+                linewidth=2,
+                color=colour,
+                label=label,
+            )
+        ax.set_xscale('log', base=2)
+        ax.set_xticks(ms, [str(m) for m in ms])
+        ax.set_xlabel('rows per GEMM (M)')
+        ax.set_ylabel('ms per forward pass')
+        ax.set_title(title, fontsize=9, color='#0b0b0b')
+        ax.set_ylim(bottom=0)
+    axes[0].legend(frameon=False, fontsize=8)
+    fig.suptitle(
+        'Quantized projections only, CUDA graphs, cold L2 (exploratory microbenchmark)',
+        fontsize=10,
+        color='#0b0b0b',
+    )
+    fig.tight_layout()
+    fig.savefig(path)
+    plt.close(fig)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('decisions', type=Path)
     parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument('--gemm', type=Path, default=None, help='gemm_w4a16_bench output')
     args = parser.parse_args(argv)
     decisions = json.loads(args.decisions.read_text())
     args.out.mkdir(parents=True, exist_ok=True)
     frontier(decisions, args.out / 'frontier.png')
     if decisions.get('gsm8k'):
         quality_speed(decisions, args.out / 'quality_speed.png')
+    if args.gemm is not None:
+        gemm(json.loads(args.gemm.read_text()), args.out / 'gemm_w4a16.png')
     return 0
 
 
