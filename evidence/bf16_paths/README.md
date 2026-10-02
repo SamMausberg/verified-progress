@@ -30,10 +30,10 @@ readings (each set before its run, in the scripts' docstrings) give three findin
    one path or another. One BF16 rounding of beta (the lines of the open upstream PRs #38977 and
    #40362) moves the decode to -4.97 and the prefills by up to 5.6 nats without bringing any path
    to FP32, and at `a4db11ff`/333 it restores the prefills (18299 at -0.29 to -0.33) while sending
-   the decode from -0.28 to -7.26. SGLang's arithmetic at this position is therefore far more
-   sensitive than FP32's or transformers', but that rests on one position chosen because SGLang
-   erred there.
-3. **On positions nobody selected, SGLang is as accurate as transformers.** Over 15,360 positions
+   the decode from -0.28 to -7.26. Under the changes tested, SGLang's result at this position is
+   far more sensitive than FP32's or transformers', but that rests on one position chosen because
+   SGLang erred there.
+3. **On positions nobody selected, SGLang's typical accuracy matches transformers'.** Over 15,360 positions
    per path (12 workload prompts decoded for 512 tokens, then 12 prompts decoded for 768 tokens so
    that 5,426 positions lie after the end of text), SGLang's mean logprob error on FP32's top token
    (0.0039-0.0054 nats per path and sample) lies within transformers' range (0.0042-0.0057), and
@@ -52,7 +52,7 @@ but the samples cannot tell whether such outliers are more frequent in SGLang th
 with one miss above 2 nats per path in 15,360 positions, a several-fold difference in that rate
 would go undetected. What they do show is that SGLang's typical BF16 accuracy on this model
 matches transformers', and that large misses after the end of text occur in every BF16
-implementation.
+implementation tested.
 
 ## The two positions in detail
 

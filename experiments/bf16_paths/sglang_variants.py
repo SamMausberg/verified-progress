@@ -39,6 +39,12 @@ that brings a wrong path within 1 nat of FP32 on the target's tracked tokens, wh
 Triton GDN decode at 579ae7ce/439; `no_cuda_graph`: graph capture or replay;
 `attn_triton`: FlashInfer attention; `beta_fp32`: the BF16 rounding of beta). A variant
 that leaves both errors in place clears its family at these positions.
+
+Qualified after the run (review of #222): the swaps are not isolating interventions. Each
+replacement is BF16 arithmetic too and several families may contribute, so a swap that
+leaves an error in place does not clear its family, and one that removes an error on one path
+while creating another does not name it. What the variants can show is whether any single
+change restores every path.
 """
 
 from __future__ import annotations

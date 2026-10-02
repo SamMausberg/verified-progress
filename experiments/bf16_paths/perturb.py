@@ -27,9 +27,12 @@ spread of several nats (1756 at 579ae7ce/439 or 18299 at a4db11ff/333 moving by 
 2 nats between seeds) means the positions are ill-conditioned at BF16 rounding scale, so a
 BF16 path missing FP32 there by a comparable amount says nothing specific about its
 kernels; a spread well under 1 nat means they are not, and a 9-14 nat miss needs an
-explanation beyond rounding. The positions before the target are the control. Random draws
-can show sensitivity but do not bound it: a small spread over eight draws is evidence of good
-conditioning in the sampled directions, not a worst case over every in-bound rounding pattern.
+explanation beyond rounding. The positions before the target are the control.
+
+Qualified after the run (review of #222): random draws can show sensitivity but do not bound
+it. A spread well under 1 nat says only that no sensitivity was seen in the sampled
+directions; an unsampled pattern of in-bound rounding errors could still move the position,
+so such a spread supports, and does not establish, that the position is well-conditioned.
 """
 
 from __future__ import annotations
