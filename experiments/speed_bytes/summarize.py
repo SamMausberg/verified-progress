@@ -26,6 +26,7 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+SGLANG_PIN = 'bd66ce343e'
 # Backbone linears per decode step (24 GDN layers, 8 attention layers, 32 MLPs); the head and
 # the GDN in_proj_ba (kept BF16) are not counted.
 STEP_COUNTS = {
@@ -49,6 +50,11 @@ def write_csv(rows: list[dict], out: Path) -> None:
 
 def cmd_gemm(args: argparse.Namespace) -> None:
     d = json.loads(Path(args.probe).read_text())
+    src = d['meta'].get('sglang_source')  # recorded by runs after 2026-10-02's
+    if src and (src['dirty_files'] or not src['head'].startswith(SGLANG_PIN)):
+        raise SystemExit(
+            f'{args.probe}: SGLang {src["head"][:10]} dirty={src["dirty_files"]}, pin {SGLANG_PIN}'
+        )
     if d['meta'].get('stopped_at_budget'):
         raise SystemExit(
             f'{args.probe}: stopped at its time budget ({d["meta"]["stopped_at_budget"]})'

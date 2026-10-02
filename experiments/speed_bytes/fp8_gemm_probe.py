@@ -22,6 +22,7 @@ import math
 import statistics
 import sys
 import time
+from pathlib import Path
 
 import torch
 import torch.nn.functional as F
@@ -48,6 +49,24 @@ def quant_rowwise_fp8(w):
 def quant_rowwise_int8(w):
     s = w.float().abs().amax(dim=1, keepdim=True).clamp(min=1e-12) / 127.0
     return (w.float() / s).round().clamp(-127, 127).to(torch.int8), s
+
+
+def sglang_source():
+    """The SGLang checkout the kernels were imported from: path, HEAD and tracked edits."""
+    import subprocess
+
+    import sglang
+
+    root = Path(sglang.__file__).resolve().parents[2]
+
+    def git(*a):
+        return subprocess.run(['git', '-C', str(root), *a], capture_output=True, text=True).stdout
+
+    return {
+        'path': str(root),
+        'head': git('rev-parse', 'HEAD').strip(),
+        'dirty_files': git('status', '--porcelain', '--untracked-files=no').splitlines(),
+    }
 
 
 def time_graph(fn, copies, rounds, reps):
@@ -118,6 +137,7 @@ def main():
         'cuda': torch.version.cuda,
         'device': torch.cuda.get_device_name(),
         'arch_list': torch.cuda.get_arch_list(),
+        'sglang_source': sglang_source(),
         'route_errors': {},
     }
     for name in shapes:
