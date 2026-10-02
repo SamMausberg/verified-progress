@@ -318,3 +318,24 @@ reason go in a new commit before the runs.
   `tests/test_state_safety_first_cycle.py` tests it on synthetic runs, and
   `analyze_all.sh` runs it once all five runs exist. Missing runs, unpinned pools or
   other generation settings make the result void, and then no results are written.
+
+### Amendment of 2026-10-02: descriptive upper bounds (post hoc)
+
+Written on 2026-10-02 after the result above was computed and seen, and approved by the
+integrator before this change was run. It adds description; it changes nothing that was
+declared.
+
+- **Why.** The declared statistics are one-sided lower bounds. For a result that is not
+  supported they say nothing about how large an excess the data are inconsistent with,
+  and the exploratory odds ratio (2.36, "Power" above) is the effect a reader would ask
+  about.
+- **What.** `first_cycle.py` also writes the 95th percentiles of the same 10,000
+  bootstrap replicates (the same `default_rng(0)` draws, percentile method) for the
+  pooled primary log odds ratio L_p and for L_p - L_c, under `descriptive_upper_95`,
+  with the primary bound also as an odds ratio. These are one-sided 95% upper bounds.
+- **What does not change.** The declared lower bounds, criteria (a) and (b), the Fisher
+  test and the decision are computed exactly as before and do not read the new values.
+  `tests/test_state_safety_first_cycle.py` checks that, with the new key removed, the
+  output is byte-identical to that of the declaration-era script (`a493cbf`).
+- **Reporting.** The upper bounds are labelled post hoc and descriptive wherever they are
+  reported, and the declared verdict is stated first.
