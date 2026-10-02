@@ -41,6 +41,7 @@
   }
  },
  "uncounted_calls_zero": true,
+ "passes_identical": true,
  "against_stock": {
   "certstats_vs_stock/rep0": {
    "prompts": 109,
