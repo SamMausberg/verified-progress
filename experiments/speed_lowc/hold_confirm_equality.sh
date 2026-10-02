@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Output equality for the speed-lowc confirmation (DRAFT), before any timed session.
+# Output equality for the speed-lowc confirmation (declared in evidence/speed_lowc/confirm/README.md), before any timed session.
 # State's runner (experiments/state_safety/run_matrix.py) serves the 320 state prompts at
 # c = 1, 256 greedy tokens, top-5 logprobs, radix cache off, running limit 4, SGLang's own
 # pools (--no-pin; one request at a time, so pool sizes cannot change batch composition),
@@ -7,7 +7,7 @@
 # compare.py classifies every first divergence against S0 of the same group (bench's
 # rule: tie, one_ulp or near = rounding-level; large or not_argmax = not exact).
 #
-#   CONFIRM_LEVERS=AB scripts/gpu_lock.sh -x experiments/speed_lowc/hold_confirm_equality.sh
+#   CONFIRM_LEVERS=ABC scripts/gpu_lock.sh -x experiments/speed_lowc/hold_confirm_equality.sh
 set -uo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo" || exit 1
