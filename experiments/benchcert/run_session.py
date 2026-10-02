@@ -51,18 +51,23 @@ def package_digest(src: Path) -> str:
     return digest.hexdigest()
 
 
+def pin_problem(readme: str, head: str) -> str:
+    """Why `head` is not the one hold commit the README records (empty if it is)."""
+    pins = _PIN_LINE.findall(readme)
+    if pins != [head]:
+        return f'checkout at {head}, but {plan.PIN_REF}:{plan.PIN_FILE} records {pins}'
+    return ''
+
+
 def provenance(src: Path) -> dict[str, Any]:
     """Repository and engine identity; raises if either is not as declared."""
     dirty = git(plan.REPO, 'status', '--porcelain', '--untracked-files=all')
     if dirty:
         raise SystemExit(f'repository {plan.REPO} is not clean:\n{dirty}')
     head = git(plan.REPO, 'rev-parse', 'HEAD')
-    readme = git(plan.REPO, 'show', f'{plan.PIN_REF}:{plan.PIN_FILE}')
-    pins = _PIN_LINE.findall(readme)
-    if pins != [head]:
-        raise SystemExit(
-            f'checkout at {head}, but {plan.PIN_REF}:{plan.PIN_FILE} records hold commit(s) {pins}'
-        )
+    problem = pin_problem(git(plan.REPO, 'show', f'{plan.PIN_REF}:{plan.PIN_FILE}'), head)
+    if problem:
+        raise SystemExit(problem)
     engine_dirty = git(plan.ENGINE_WORKTREE, 'status', '--porcelain', '--untracked-files=no')
     tree = git(plan.ENGINE_WORKTREE, 'rev-parse', 'HEAD^{tree}')
     if engine_dirty or tree != plan.ENGINE_TREE:

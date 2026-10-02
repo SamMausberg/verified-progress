@@ -445,3 +445,13 @@ def test_rescore_reads_both_token_logprobs(monkeypatch: pytest.MonkeyPatch) -> N
     assert sent[0]['token_ids_logprob'] == [7, 9] and sent[0]['input_ids'] == [1, 2]
     assert math.isclose(result['margin'], 0.0625) and result['ulp'] == 0.0625
     assert result['class'] == 'one_ulp' and result['stock_top1'] == 7
+
+
+def test_holds_run_only_at_the_recorded_commit() -> None:
+    from experiments.benchcert.run_session import pin_problem
+
+    head = 'a' * 40
+    assert pin_problem(f'x\nHold commit: `{head}`\n', head) == ''
+    assert pin_problem(f'Hold commit: `{"b" * 40}`\n', head)
+    assert pin_problem('Hold commit: to be recorded\n', head)
+    assert pin_problem(f'Hold commit: `{head}`\nHold commit: `{head}`\n', head)
