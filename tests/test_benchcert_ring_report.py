@@ -10,7 +10,7 @@ from experiments.benchcert import ring_report as rr
 
 
 def test_target_row_is_tracked_on_the_device_from_the_first_verify() -> None:
-    ref = list(range(1000, 1512))
+    ref = list(range(1000, 1600))  # longer than the 513 positions the 128 verifies cover
     steps = 128  # each verify accepts all three drafts and the bonus: 4 positions
     records, predict, accept = [], np.zeros((steps, 256), np.int32), np.zeros((steps, 128), np.int32)
     for k in range(steps):
