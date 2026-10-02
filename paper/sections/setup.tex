@@ -58,12 +58,12 @@ In the microbenchmark (the head alone at $M=1$ to 256, CUDA graphs, warm L2 cach
 \begin{figure}[t]
 \centering
 \input{figures/frontier}
-\caption{Stock serving frontier (baseline; no certified head): four of nine tuned arms, client concurrency 1 (lower right) to 128 (64 for 16-token DFlash blocks). Points average three or four sessions (hollow: one); one standard deviation, below 2\% of each mean, hides behind the markers \ev{bench-frontier}. Grey: envelope over all nine arms' points with three or more sessions.}
+\caption{Stock serving frontier (baseline; no certified head): four of nine tuned arms, client concurrency 1 (lower right) to 128 (64 for 16-token DFlash blocks). Points average three or four sessions (hollow: one); one standard deviation, below 2\% of each mean, hides behind the markers \ev{bench-frontier}. Grey: envelope of all nine arms' points with three or more sessions.}
 \label{fig:frontier}
 \end{figure}
 
 \begin{table}[!b]
-\caption{Engine changes against the tuned stock arm each modifies (group rows), flags otherwise identical, on the workload of Figure~\ref{fig:frontier}; one session each. Ratio: throughput $y$ with over without the change; brackets: range over the session's run pairs. Outputs: greedy outputs against stock, same configuration; where not compared, exactness is not established.}\label{tab:levers}
+\caption{Engine changes against the tuned stock arm each modifies (group rows), flags otherwise identical; one session each. Ratio: throughput $y$ with over without the change; brackets: range over the session's run pairs. Outputs: greedy outputs against stock, same configuration; exactness is not established where not compared.}\label{tab:levers}
 \vskip 0.05in
 \centering\scriptsize\setlength{\tabcolsep}{2pt}
 \begin{tabular*}{\columnwidth}{@{}l@{\extracolsep{\fill}}rll@{}}
