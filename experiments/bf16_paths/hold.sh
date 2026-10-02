@@ -45,6 +45,14 @@ unset SGLANG_WORKTREE PYTHONPATH
 source "$repo/scripts/sglang_env.sh"
 python -c 'import sglang, torch, transformers' || { echo "not the SGLang environment: $(command -v python)"; exit 1; }
 [ -z "$(git status --porcelain --untracked-files=all)" ] || { echo "checkout not clean"; exit 65; }
+# The shared input first: every step and the readouts need it, so it is restored (and checked
+# against the source) even when every requested step turns out to be complete.
+mkdir -p "$out"
+if [ -e "$out/targets.jsonl" ]; then
+  cmp "$targets_src" "$out/targets.jsonl" || { echo "targets changed since the first hold"; exit 65; }
+else
+  cp "$targets_src" "$out/targets.jsonl"
+fi
 # outputs STEP: the files a complete STEP leaves in $out.
 outputs() {
   case "$1" in
@@ -80,11 +88,6 @@ mkdir -p "$out/logs" "$out/done"
 exec >"$out/logs/hold-$(date -u +%Y%m%dT%H%M%SZ).log" 2>&1
 echo "bf16 paths hold (${steps# }) start $(date -Is) repo $(git rev-parse HEAD) sglang $(git -C "$HOME/sglang" rev-parse HEAD)"
 echo "steps to run:${todo% }; already complete: ${skipped:-none}"
-if [ -e "$out/targets.jsonl" ]; then
-  cmp "$targets_src" "$out/targets.jsonl" || { echo "targets changed since the first hold"; exit 65; }
-else
-  cp "$targets_src" "$out/targets.jsonl"
-fi
 sha256sum "$out/targets.jsonl"
 # shellcheck disable=SC2329 # invoked by the EXIT trap
 kill_servers() {
