@@ -10,6 +10,9 @@
 \setlength{\@fptop}{0pt}
 \setlength{\@fpsep}{\floatsep}
 \setlength{\@fpbot}{0pt plus 1fil}
+% A page of floats alone must be at least three quarters full; a smaller float goes to the top of a
+% page with text below it instead of leaving half a page empty.
+\renewcommand{\floatpagefraction}{0.75}
 \makeatother
 \usetikzlibrary{shapes.geometric}
 % The style sets \flushbottom with a rigid \parskip, so a paragraph that cannot be split at the

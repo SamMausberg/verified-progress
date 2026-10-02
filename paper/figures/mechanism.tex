@@ -4,12 +4,15 @@
 % decide; (c) fall back for a position left open. Schematic: the values below are illustrative,
 % chosen to show each case, and are not data. Colours follow style.tex: blue the certified head,
 % vermilion an open decision, ink (tinted) what the stock head computes, grey dropped entries.
-% Notes are \figsmall (8 pt); axis labels and titles \footnotesize (9 pt).
-\begin{tikzpicture}[x=1cm,y=0.8cm,font=\footnotesize]
+% Notes are \figsmall (8 pt); axis labels and titles \figlabel (9 pt). Every panel is a schematic,
+% so the caption says so once and the panel titles carry no status (style.tex); each axis
+% label is set along its axis, as in the plots.
+\begin{tikzpicture}[x=1cm,y=0.8cm,font=\figlabel]
 % ---------------- (a) approximate and bound ----------------
 \begin{scope}
-\node[panel title,anchor=north] at (2.3,4.35) {\paneltitle{a}{Approximate and bound (schematic)}};
-\draw[-{Stealth[length=1.5mm]},ink!70] (0,0) -- (0,3.55) node[above,inner sep=1pt,text=black]{score};
+\node[panel title,anchor=north] at (1.93,4.35) {\paneltitle{a}{Approximate and bound}};
+\draw[-{Stealth[length=1.5mm]},ink!70] (0,0) -- (0,3.55);
+\node[rotate=90,anchor=south,inner sep=2pt] at (0,2.9) {score};
 \draw[ink!70] (0,0) -- (3.85,0);
 % entries: x, lo, hi, kept (1) or dropped (0); the threshold is 2.10 = 2.55 - delta_max
 \foreach \x/\lo/\hi/\k in {0.28/0.95/1.45/0, 0.62/0.35/0.85/0, 0.96/1.15/1.62/0, 1.30/2.55/3.05/1,
@@ -38,8 +41,9 @@
 \draw[flow] (4.05,1.55) -- node[note,above=1pt]{candidates} (5.12,1.55);
 % ---------------- (b) recompute and round ----------------
 \begin{scope}[xshift=5.35cm]
-\node[panel title,anchor=north] at (2.25,4.35) {\paneltitle{b}{Recompute and round (schematic)}};
-\draw[-{Stealth[length=1.5mm]},ink!70] (0,0) -- (0,3.55) node[left,inner sep=2pt,text=black]{score};
+\node[panel title,anchor=north] at (2.15,4.35) {\paneltitle{b}{Recompute and round}};
+\draw[-{Stealth[length=1.5mm]},ink!70] (0,0) -- (0,3.55);
+\node[rotate=90,anchor=south,inner sep=2pt] at (0,2.9) {score};
 \draw[ink!70] (0,0) -- (4.3,0);
 % BF16 rounding boundaries, one spacing apart
 \foreach \y in {0.95,1.95,2.95} {\draw[ink!30] (0,\y) -- (4.3,\y);}
@@ -72,7 +76,7 @@
 % One head call of M = 8 positions. Fill: blue, certified; vermilion, open; ink tint, rerun by the
 % stock head.
 \begin{scope}[xshift=10.75cm]
-\node[panel title,anchor=north] at (2.45,4.35) {\paneltitle{c}{Fall back (schematic)}};
+\node[panel title,anchor=north] at (2.45,4.35) {\paneltitle{c}{Fall back}};
 % \vpstrip{y}{state}: state 0 after (b), cell 6 open; 1 whole-batch fallback, every cell rerun;
 % 2 per-position fallback, cell 6 rerun
 \newcommand{\vpstrip}[2]{%
@@ -90,13 +94,13 @@
 \node[note,anchor=west,align=left] at (2.5,1.57) {stock head reruns all\\$M$ positions, same shape};
 \node[note,anchor=south west] at (0,0.32) {per-position fallback};
 \vpstrip{-0.15}{2}
-\node[note,anchor=west,align=left] at (2.5,0.07) {stock head reruns only\\the open position's\\candidates; needs its\\logits independent of\\the rest of the batch};
+\node[note,anchor=west,align=left] at (2.5,0.07) {stock head reruns only\\the open position's\\candidates; needs logits\\independent of the batch};
 % the two fallbacks for the open position: alternatives, each named above its strip
 \draw[flow] (-0.04,3.07) -- (-0.32,3.07) -- (-0.32,1.57) -- (-0.04,1.57);
 \draw[flow] (-0.32,1.57) -- (-0.32,0.07) -- (-0.04,0.07);
 % colour key
 \foreach \c/\t/\x in {ccert!22/certified/0, cfallback!45/open/1.7, ink!30/rerun by stock head/2.85} {
-  \filldraw[fill=\c,draw=ink!45] (\x,-1.45) rectangle ++(0.22,0.3);
-  \node[note,anchor=west,text height=1.6ex,text depth=0.4ex] at (\x+0.25,-1.3) {\t};}
+  \filldraw[fill=\c,draw=ink!45] (\x,-1.35) rectangle ++(0.22,0.3);
+  \node[note,anchor=west,text height=1.6ex,text depth=0.4ex] at (\x+0.25,-1.2) {\t};}
 \end{scope}
 \end{tikzpicture}

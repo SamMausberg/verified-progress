@@ -28,44 +28,50 @@
 \vplookup{\rhomtptable}{q}{0.5}{rho_all}{\figRhoMtp}
 \def\rhodflash{../evidence/head_geometry/rho_dflash4b_quantiles.csv}
 \def\rhomtp{../evidence/head_geometry/rho_mtp4b_quantiles.csv}
-\begin{tikzpicture}[font=\footnotesize]
+\begin{tikzpicture}[font=\figlabel]
 % ---------------- (b) DFlash-4B and (c) MTP-4B: measured drift against the thresholds -------
-% Two short panels, one drafter each, on a shared x axis; both show the same derived thresholds
-% (lines without markers), labelled in (b). The arrow joins the median threshold (int8, per
-% entry) to the drafter's median drift.
-\pgfplotsset{drift panel/.style={scale only axis,width=7.1cm,height=1.3cm,xmin=1e-3,xmax=10,
+% Two stacked panels (style panel stacked, 1.75 cm), one drafter each, on a shared x axis; both
+% show the same derived thresholds (lines without markers), labelled in (b) in regions that no
+% curve enters (checked against the quantile files: the per-128-weights threshold is above 0.0061
+% for q > 0.52, the per-entry one below 0.0083 for q < 0.4, int4's above 0.12, DFlash-4B's drift
+% above 0.85 and MTP-4B's above 0.8 for q > 0.15). The arrow joins the median threshold (int8,
+% per entry) to the drafter's median drift. Drifts use the arm styles: DFlash diamonds, MTP
+% triangles, as in Figure fig:frontier. The x axis starts at 4e-4, not 1e-3, so that the
+% per-128-weights label fits in two lines left of its curve.
+\pgfplotsset{drift panel/.style={panel stacked,width=7.1cm,xmin=4e-4,xmax=10,
   ymin=0,ymax=1,ytick={0,0.5,1},yticklabels={0,0.5,1},grid=major,xminorticks=false}}
-\begin{semilogxaxis}[drift panel,name=b,at={(7.85cm,0.35cm)},anchor=south west,xticklabels={},
+\begin{semilogxaxis}[drift panel,name=b,at={(7.85cm,0.25cm)},anchor=south west,xticklabels={},
   title={\paneltitle{b}{DFlash-4B: measured drift, derived thresholds}}]
 \addplot[copy int8 g128,derived] table[x=threshold_int8_g128,y=q,col sep=comma]{\rhodflash};
 \addplot[copy int8 row,derived] table[x=threshold_int8_row,y=q,col sep=comma]{\rhodflash};
 \addplot[copy int4,derived] table[x=threshold_int4_row,y=q,col sep=comma]{\rhodflash};
-\addplot[drafter dflash,mark=*,mark size=1.6pt,mark repeat=50,mark phase=25] table[x=rho_all,y=q,col sep=comma]{\rhodflash};
-\draw[{Stealth[length=1.5mm]}-{Stealth[length=1.5mm]},ink!70] (axis cs:\figDstar,0.5) -- (axis cs:\figRho,0.5);
+\addplot[arm dflash,mark repeat=50,mark phase=25] table[x=rho_all,y=q,col sep=comma]{\rhodflash};
+\draw[{Stealth[length=1.5mm]}-{Stealth[length=1.5mm]},leader] (axis cs:\figDstar,0.5) -- (axis cs:\figRho,0.5);
 % below the arrow, between the int4 thresholds and the drift curve
-\node[annot,anchor=north,align=center] at (axis cs:0.37,0.47) {medians\\$\vpnum{0}{\figRho/\figDstar}\times$};
-\node[annot,anchor=east,align=right] at (axis cs:0.0048,0.5) {$\delta^\ast_i$: int8,\\per 128\\weights};
-\node[annot,anchor=west] at (axis cs:0.0098,0.2) {$\delta^\ast_i$: int8, per entry};
-\node[annot,anchor=east,align=right] at (axis cs:0.15,0.8) {$\delta^\ast_i$: int4,\\per entry};
+\node[annot,anchor=north,align=center] at (axis cs:0.42,0.45) {medians\\$\vpnum{0}{\figRho/\figDstar}\times$};
+\node[annot,anchor=north east,align=right] at (axis cs:0.0055,0.85) {$\delta^\ast_i$: int8,\\per 128 weights};
+\node[annot,anchor=west,align=left] at (axis cs:0.0098,0.25) {$\delta^\ast_i$: int8,\\per entry};
+\node[annot,anchor=east,align=right] at (axis cs:0.10,0.8) {$\delta^\ast_i$: int4,\\per entry};
 \node[annot,anchor=west] at (axis cs:1.1,0.3) {$\rho$, DFlash-4B};
 \end{semilogxaxis}
-\begin{semilogxaxis}[drift panel,name=c,at={(7.85cm,-1.65cm)},anchor=south west,
-  xlabel={Drift ratio $\rho$ of a pair, or threshold $\delta^\ast_i$ of an entry},
+\begin{semilogxaxis}[drift panel,name=c,at={(7.85cm,-2.1cm)},anchor=south west,
+  xlabel={Drift $\rho$ of a pair, or threshold $\delta^\ast_i$ of an entry},
   title={\paneltitle{c}{MTP-4B: measured drift, same thresholds}}]
 \addplot[copy int8 g128,derived] table[x=threshold_int8_g128,y=q,col sep=comma]{\rhodflash};
 \addplot[copy int8 row,derived] table[x=threshold_int8_row,y=q,col sep=comma]{\rhodflash};
 \addplot[copy int4,derived] table[x=threshold_int4_row,y=q,col sep=comma]{\rhodflash};
-\addplot[cdraft,very thick,mark=triangle*,mark size=2pt,mark repeat=50,mark phase=25,mark options={solid}] table[x=rho_all,y=q,col sep=comma]{\rhomtp};
-\draw[{Stealth[length=1.5mm]}-{Stealth[length=1.5mm]},ink!70] (axis cs:\figDstar,0.5) -- (axis cs:\figRhoMtp,0.5);
-\node[annot,anchor=north,align=center] at (axis cs:0.34,0.47) {medians\\$\vpnum{0}{\figRhoMtp/\figDstar}\times$};
-\node[annot,anchor=west] at (axis cs:0.0011,0.8) {$\delta^\ast_i$ as in (b)};
+\addplot[arm mtp,mark repeat=50,mark phase=25] table[x=rho_all,y=q,col sep=comma]{\rhomtp};
+\draw[{Stealth[length=1.5mm]}-{Stealth[length=1.5mm]},leader] (axis cs:\figDstar,0.5) -- (axis cs:\figRhoMtp,0.5);
+\node[annot,anchor=north,align=center] at (axis cs:0.38,0.45) {medians\\$\vpnum{0}{\figRhoMtp/\figDstar}\times$};
+\node[annot,anchor=west] at (axis cs:0.02,0.85) {$\delta^\ast_i$ as in (b)};
 \node[annot,anchor=west] at (axis cs:1.1,0.3) {$\rho$, MTP-4B};
 \end{semilogxaxis}
 % one y label for both panels
 \node[rotate=90,anchor=south] at (7.23cm,0) {Cumulative share};
 % ---------------- (a) median DFlash-4B head inputs, to scale ----------------
-% The drawing spans y from about -41 units (the callout text) to 62 (the line through h^d);
-% it is shifted down 17 units so that its top stays below the shared title line.
+% The drawing spans y from about -44 units (the callout text) to 62 (the line through h^d);
+% it is shifted down 17 units so that its top stays below the shared title line. Labels keep 2 pt
+% from the vectors: cos inside the angle, h^t's label left of the callout, which hangs under T.
 \begin{scope}[x=0.0295cm,y=0.0295cm,shift={(0,-17)}]
 \coordinate (O) at (0,0);
 \coordinate (T) at (\figHt,0);
@@ -81,20 +87,20 @@
 \node[note,anchor=south west,align=left] at ($(T)!.4!(F)+(2,2)$) {closest rescaling of $h^d$:\\$\rho=\vpnum{2}{\figSin}$};
 % vectors
 \draw[flow,very thick,shorten >=2.2pt] (O) -- (T);
-\node[below,inner sep=2pt] at (80,-2) {$h^t$, $\norm{h^t}_2=\vpnum{0}{\figHt}$};
+\node[below,inner sep=2pt] at (70,-2) {$h^t$, $\norm{h^t}_2=\vpnum{0}{\figHt}$};
 \draw[flow,very thick,cdraft] (O) -- (D);
 \node[anchor=south east,align=right,inner sep=1pt] at ($(D)+(-1,1)$) {$h^d$, $\norm{h^d}_2=\vpnum{1}{\figHd}$};
 % Delta: its symbol beside the dashed line near h^d's tip, its length under h^t's label
 \draw[thick,cdraft,dashed,shorten >=2.2pt] (D) -- (T);
 \node[note,inner sep=1pt] at (42,31) {$\Delta$};
-\node[note,anchor=north,inner sep=1pt] at (52,-15) {$\norm\Delta_2=\vpnum{2}{\figDrel}\,\norm{h^t}_2$};
+\node[note,anchor=north,inner sep=1pt] at (45,-17) {$\norm\Delta_2=\vpnum{2}{\figDrel}\,\norm{h^t}_2$};
 \draw[ink!60] ($(O)+(13,0)$) arc[start angle=0,end angle={acos(\figCos)},radius=13];
-\node[note,anchor=west] at (14,5) {$\cos=\vpnum{2}{\figCos}$};
+\node[note,anchor=west] at (16,9) {$\cos=\vpnum{2}{\figCos}$};
 % the ball inside which transport would beat int8: radius delta* ||h^t||, to scale
 \fill[ccert] (T) circle[radius={\figDstar*\figHt}];
 \draw[ccert,thin] (T) circle[radius=2.6pt];
-\draw[ccert,thin] (T) -- (148,-14);
-\node[note,text=black,anchor=north,align=center] at (146,-14) {transport wins only\\inside this dot, of radius\\$\vpnum{4}{\figDstar}\,\norm{h^t}_2$};
+\draw[ccert,thin] (T) -- (159,-14);
+\node[note,text=black,anchor=north,align=center] at (159,-15) {transport wins only\\inside this dot, of radius\\$\vpnum{4}{\figDstar}\,\norm{h^t}_2$};
 \end{scope}
 % (a)'s title on (b)'s title line
 \node[panel title,anchor=north] at (amid |- b.outer north) {\paneltitle{a}{Median DFlash-4B head inputs, to scale}};

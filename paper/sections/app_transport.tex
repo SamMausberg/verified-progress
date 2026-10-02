@@ -62,7 +62,7 @@ On both drafters the drift is close to the size of $h$ in either norm: $\norm\De
 Table~\ref{tab:headconstants} gives the constants of the tied head from which the thresholds of Section~\ref{sec:crossover} are derived. They use no hidden states, so they decide nothing about certification rates on their own. Two further facts follow from them. The static tile screen is weak on this head, because the radius of a 64-entry tile exceeds the norm of an entry's weight row (median $r_c/\norm{w_i}_2=1.14$), so $\langle\mu_c,h\rangle+r_c\norm h_2$ is wider than the plain per-entry bound $\norm{w_i}_2\norm h_2$, and tiles in token order are barely tighter than random ones; a public experiment on a Qwen3.8 head with the same vocabulary also found that centroid-radius bounds prune almost nothing~\cite{e142}. Bounding an inner product under a bounded displacement of the query, which is what transport does, is known from sequential screening rules for the lasso~\cite{dppscreening} and from cached retrieval with drifting queries~\cite{frieder2024}. And a scalar $\ell_\infty$ radius paired with $\norm\Delta_1$ is about four times looser than the Euclidean pairing for a spread-out $\Delta$ (derived from the same constants, $r^\infty_c\approx1.30\norm{w_i}_\infty$ and $\norm\Delta_1\approx0.8\sqrt D\norm\Delta_2$).
 
 \begin{table}[htbp]
-\small\centering
+\tablefont\centering
 \caption{Weight-only constants of the Qwen3.5-4B head, computed in float64 on the CPU; quantiles over all 248,320 vocabulary entries. $\delta^\ast_i=\norm{e_i}_2/r_c(i)$ is the drift below which transport's Euclidean error bound for entry $i$ is narrower than that of the named low-precision copy (``per entry'': one scale per entry), with 64-entry tiles of contiguous token indices and $\mu_c$ the tile mean; the last row is the analogous threshold for the $\ell_\infty$/$\ell_1$ pairing, $s_i\norm h_1/2$ against $r^\infty_c\norm\Delta_1$. Error-bound widths are compared, not certification rates or runtime. Derived~\ev{head-constants}.}
 \label{tab:headconstants}
 \vskip 0.05in
@@ -102,7 +102,7 @@ The main text explains the size of the drift by the draft input's fixed norm and
 Table~\ref{tab:rho-groups-mtp} breaks down the drift of the MTP layer. It is wider than DFlash's and reaches lower, with a median of 0.954 and a smallest drift of 0.385 against 0.917 and 0.823, because the MTP head input is not held at a fixed norm (medians 176 for the draft and 160 for the target)~\ev{transport-mtp}. It also depends more on the draft: the median rises from 0.86 at step 1 to 1.00 at step 4, rejected drafts lie lower than accepted ones (0.89 against 0.99), and code and mathematics (both 1.02) lie above chat and multilingual prompts (0.92). The other metrics agree~\ev{rho-mtp}. In the head's metric the median is 0.83, and 0.88 after removing each position's mean logit; in $W$'s leading 64 right singular directions it is 0.86, and those directions carry 23\% of $\Delta$'s norm; the median $\ell_1$ ratio is 0.99; and the median largest logit drift is 10.7~\ev{transport-mtp}. None of this changes the verdict. Transport's error bound is narrower than int8's only on the 0.08\% of entries in the tiles of unused tokens, the realized per-tile transport error is a median 81 times int8's, and certified $\ell_2$ transport and the static screen each skip 0.08\% of entries. Even oracle radii skip 99.97\% (median; p10 98.6\%), where the int8 copy decides with about one candidate~\ev{rho-mtp}.
 
 \begin{table}[htbp]
-\small\centering
+\tablefont\centering
 \caption{Drift $\rho=\norm{h^t-h^d}_2/\norm{h^t}_2$ of DFlash-4B pairs by outcome, domain, block position and context length (tokens before the verified position), on 40,000 held-out pairs. The smallest drift over all pairs is 0.823. Measured~\ev{rho}.}
 \label{tab:rho-groups}
 \vskip 0.05in
@@ -133,7 +133,7 @@ Context $\ge$1,024 & 267 & 0.877 & 0.930 & 0.966\\\bottomrule
 \end{table}
 
 \begin{table}[htbp]
-\small\centering
+\tablefont\centering
 \caption{Drift $\rho$ of MTP-4B pairs by outcome, domain, draft step and context length, on 40,000 held-out pairs from 160 prompts. Measured~\ev{rho-mtp}.}
 \label{tab:rho-groups-mtp}
 \vskip 0.05in
@@ -164,7 +164,7 @@ Table~\ref{tab:transport-full} gives, per tiling, the best certified family, whi
 \begin{table}[htbp]
 \caption{Transport on held-out draft pairs with the best certified bound family per tiling (the elementwise minimum of all certified radii). ``Skipped'': mean share of the vocabulary a greedy verifier skips, by transport (T), by the static screen with the same geometry (S) and by oracle radii (O), the realized per-tile deviations that no certified geometry can undercut. ``Width'': median partition width $\log(Z^+/Z^-)$ in nats; $P_?$: mean probability, over proposals $x\sim q$ at $T=1$, that the acceptance test stays undecided. Measured \ev{transport,transport-mtp}.}\label{tab:transport-full}
 \vskip 0.05in
-\centering\footnotesize\setlength{\tabcolsep}{3.6pt}
+\centering\tablefont\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}lrrrrr@{}}
 \toprule
 & \multicolumn{3}{c}{Skipped (greedy)} & \multicolumn{2}{c}{Sampled}\\\cmidrule(lr){2-4}\cmidrule(l){5-6}
@@ -192,8 +192,8 @@ $k$-means 1,024 & 0.02\% & 0.02\% & 86.8\% & 162 & 1.000\\
 \begin{table}[htbp]
 \caption{Transport on the held-out transport pairs (DFlash-4B: 4,020 from 110 prompts; MTP-4B: 16,016 from 160), over every bound family and tiling tested (tiles of 64 to 1,024 entries). Single values are the best case; ranges span the tilings (by tiling: Table~\ref{tab:transport-full}). ``Skipped'': mean share of the vocabulary a greedy verifier skips; ``read by a real verify batch'': the share in tiles that at least one position of the batch still needs; $P_?$: mean probability, over proposals at $T=1$, that the sampled acceptance test stays undecided. Measured \ev{transport,transport-mtp}.}\label{tab:transport}
 \vskip 0.05in
-\centering\footnotesize
-\begin{tabular*}{0.62\linewidth}{@{}l@{\extracolsep{\fill}}rr@{}}
+\centering\tablefont
+\begin{tabular}{@{}lrr@{}}
 \toprule
 & DFlash-4B & MTP-4B\\\midrule
 Skipped: certified transport & 0.59\% & 0.64\%\\
@@ -202,12 +202,12 @@ Skipped: oracle radii & 68.4--89.3\% & 86.8--98.5\%\\
 Read by a real verify batch & $\ge$99.48\% & $\ge$99.44\%\\
 Sampled test undecided, $P_?$ & $\ge$0.964 & $\ge$0.998\\
 \bottomrule
-\end{tabular*}
+\end{tabular}
 \end{table}
 
 
 \begin{table}[htbp]
-\small\centering
+\tablefont\centering
 \caption{Transport by bound family on $k$-means tiles of 64 entries: mean share of the vocabulary skipped for greedy verification (tile level), and the median width of the partition interval in nats at $T=1$, for transport and for the static screen at the target state with the same geometry. Oracle radii are the realized per-tile deviations, a ceiling that no certified geometry reaches. Measured~\ev{transport,transport-mtp}.}
 \label{tab:transport-families}
 \vskip 0.05in
@@ -243,7 +243,7 @@ about 87.3\% at $f=1/16$ and $B=32$, so a per-position skip of 93.75\% can coexi
 How far would a drafter have to move before transport became useful? The replay answers with a model, not a drafter: it replaces $h^d$ by $h^t-s\Delta$, which scales $\rho$, the logit drift and every radius term by $s$, and re-evaluates the best certified family on $k$-means 256-entry tiles. Table~\ref{tab:transport-scaling} gives the result. On DFlash-4B, greedy transport skips half the vocabulary on average only at a tenth of the measured drift, and the sampled acceptance test decides a third of proposals only at a hundredth. The MTP layer needs a somewhat smaller reduction for greedy transport (80\% skipped on average at $s=0.1$, against 49\%) and the same for sampled acceptance.
 
 \begin{table}[htbp]
-\small\centering
+\tablefont\centering
 \caption{Drift-scaling extrapolation, a model and not a measured drafter: the draft input is replaced by $h^t-s\Delta$ and the best certified family on $k$-means 256-entry tiles is re-evaluated. Shares skipped are for greedy verification; the partition width is a median in nats and $\E_qP_?$ a mean, both at $T=1$. Derived from measured pairs~\ev{transport,transport-mtp}.}
 \label{tab:transport-scaling}
 \vskip 0.05in
