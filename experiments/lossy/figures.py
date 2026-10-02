@@ -7,10 +7,12 @@ pass of the quantized projections against rows, BF16 and W4A16, target and draft
 frontier.png: output tokens/s per user (x) against tokens/s per GPU (y), session
 means, for every arm, with three envelopes: exact arms only, exact arms plus the
 INT4 arms, exact arms plus the FP16-state arms (the frontier without and with
-each lever). quality_speed.png: each lever's GSM8K difference against the
-reference (with its 95% interval, one point per reference) against the ratio of
-its session-mean y (x at c = 1) to the best exact arm's at the declared headline
-points, with the -1.0-point budget line.
+each lever). quality_speed.png: each GSM8K-measured arm's difference against the
+two references (95% interval, one point per reference) against the ratio of its
+session-mean y (x at c = 1) to the best exact arm's at its lever's headline
+points, with the -1.0-point budget line and the exact arms' spread; with
+--partial-gsm8k, also the full-split bounds of the INT4 run that stopped early
+(not declared).
 """
 
 from __future__ import annotations
@@ -138,7 +140,17 @@ def frontier(decisions: dict[str, Any], path: Path) -> None:
     plt.close(fig)
 
 
-def quality_speed(decisions: dict[str, Any], path: Path) -> None:
+def quality_speed(
+    decisions: dict[str, Any], path: Path, partial: dict[str, Any] | None = None
+) -> None:
+    """GSM8K difference against speed ratio at each lever's headline points.
+
+    One point per reference run at its true value (filled: first reference, open:
+    second), dodged sideways by a fixed amount so both stay visible; the band is the
+    spread of bench's exact arms against the same references. `partial`
+    (gsm8k_partial.py's output, not declared) adds the full-split bounds of an arm
+    whose run stopped early, as bars without a point estimate.
+    """
     import matplotlib
 
     matplotlib.use('Agg')
@@ -146,51 +158,87 @@ def quality_speed(decisions: dict[str, Any], path: Path) -> None:
 
     means = {(m['arm'], m['concurrency']): m for m in decisions['means']}
     best_exact = {e['concurrency']: e['best_exact'] for e in decisions['envelope']}
-    fig, ax = plt.subplots(figsize=(7.0, 4.2), dpi=150)
+
+    def speedup(arm: str, c: int, metric: str) -> float | None:
+        m, base = means.get((arm, c)), best_exact.get(c)
+        if m is None or base is None:
+            return None
+        return float(m[f'{metric}_mean'] / means[(base, c)][f'{metric}_mean'])
+
+    fig, ax = plt.subplots(figsize=(7.5, 4.4), dpi=150)
     fig.patch.set_facecolor(SURFACE)
     style(ax)
+    spread = [r['delta_pt'] for r in decisions.get('gsm8k_exact_spread', [])]
+    if spread:
+        ax.axhspan(min(spread), max(spread), color=GRID, alpha=0.7, zorder=0,
+                   label="exact arms' spread (bench, same references)")  # fmt: skip
     ax.axhline(-1.0, color=INK, linewidth=1, linestyle=':', zorder=1)
-    ax.annotate('budget: -1.0 point', (1.0, -1.0), textcoords='offset points', xytext=(4, 4),
-                fontsize=7, color=MUTED)  # fmt: skip
-    ax.axhline(0.0, color=GRID, linewidth=1, zorder=1)
-    seen: set[str] = set()
+    ax.annotate('declared budget: -1.0 point', (0.2, -1.0), xycoords=('axes fraction', 'data'),
+                textcoords='offset points', xytext=(0, 3), fontsize=7, color=MUTED)  # fmt: skip
+    ax.axhline(0.0, color=MUTED, linewidth=0.6, zorder=1)
+    dodge = 0.0015
+    # Labels above the whiskers at some concurrencies and below at others, so that
+    # neighbouring points (c = 8 and 32, c = 128 and 256) do not share a label slot.
+    above = {1, 8, 128}
+
+    def label_c(x: float, low: float, high: float, c: int) -> None:
+        ax.annotate(f'c={c}', (x, high if c in above else low), textcoords='offset points',
+                    xytext=(0, 3 if c in above else -9), ha='center', fontsize=6,
+                    color=MUTED)  # fmt: skip
+
     for g in decisions['gsm8k']:
         lever = lever_of(g['arm'])
-        for offset, ref in zip((-0.12, 0.12), g['vs'], strict=False):
-            for c, metric in HEADLINE.get(lever, ()):
-                arm, base = means.get((g['arm'], c)), best_exact.get(c)
-                if arm is None or base is None:
-                    continue
-                speedup = arm[f'{metric}_mean'] / means[(base, c)][f'{metric}_mean']
+        marker = 'D' if 'replayssm' in g['arm'] else 's'
+        for c, metric in HEADLINE.get(lever, ()):
+            ratio = speedup(g['arm'], c, metric)
+            if ratio is None:
+                continue
+            for k, ref in enumerate(g['vs']):
                 low, high = ref['delta_ci95_pt']
                 ax.errorbar(
-                    speedup,
-                    ref['delta_pt'] + offset,
+                    ratio + (k - 0.5) * dodge,
+                    ref['delta_pt'],
                     yerr=[[ref['delta_pt'] - low], [high - ref['delta_pt']]],
-                    marker='s',
+                    marker=marker,
                     markersize=5,
                     color=LEVER_COLOUR[lever],
+                    markerfacecolor=LEVER_COLOUR[lever] if k == 0 else SURFACE,
                     capsize=2,
-                    linewidth=1.5,
+                    linewidth=1.2,
                     zorder=3,
                 )
-                ax.annotate(
-                    f'{g["arm"]} c={c} ({metric})',
-                    (speedup, ref['delta_pt'] + offset),
-                    textcoords='offset points',
-                    xytext=(5, -10),
-                    fontsize=6,
-                    color=MUTED,
-                )
-        if lever not in seen:
-            seen.add(lever)
-            ax.plot([], [], marker='s', linestyle='none', color=LEVER_COLOUR[lever],
-                    label=LEVER_NAME[lever])  # fmt: skip
+            lows, highs = zip(*(r['delta_ci95_pt'] for r in g['vs']), strict=True)
+            label_c(ratio, min(lows), max(highs), c)
+        ax.plot([], [], marker=marker, linestyle='none', color=LEVER_COLOUR[lever],
+                label=f'{g["arm"]} ({LEVER_NAME[lever]}): 95% interval')  # fmt: skip
+    if partial is not None:
+        arm = 'int4-dflash-b8'
+        lever = lever_of(arm)
+        refs = [partial['vs'][name] for name in plan.GSM8K_REFERENCES]
+        for c, metric in HEADLINE[lever]:
+            # The x headline at c = 1 belongs to the b16 arm; GSM8K ran on b8, which
+            # shares its target and drafter weights.
+            ratio = speedup('int4-dflash-b16' if c == 1 else arm, c, metric)
+            if ratio is None:
+                continue
+            for k, ref in enumerate(refs):
+                low, high = ref['full_split_delta_bounds_pt']
+                ax.plot([ratio + (k - 0.5) * 2 * dodge] * 2, [low, high], linewidth=3,
+                        color=LEVER_COLOUR[lever], alpha=0.9 if k == 0 else 0.45,
+                        solid_capstyle='butt', zorder=3)  # fmt: skip
+            lows, highs = zip(*(r['full_split_delta_bounds_pt'] for r in refs), strict=True)
+            label_c(ratio, min(lows), max(highs), c)
+        ax.plot([], [], linewidth=3, color=LEVER_COLOUR[lever],
+                label=f'{arm} ({LEVER_NAME[lever]}): bounds, run stopped at '
+                f'{partial["finished"]}/{partial["task_problems"]} (not declared)')  # fmt: skip
+    ax.margins(y=0.08)
     ax.set_xlabel('ratio of session means over the best exact arm (x at c=1, y elsewhere)')
-    ax.set_ylabel('GSM8K accuracy difference (points, 95% interval)')
-    ax.set_title('Quality for speed: each lever against the declared budget', fontsize=10,
-                 color='#0b0b0b')  # fmt: skip
-    ax.legend(frameon=False, fontsize=8)
+    ax.set_ylabel('GSM8K accuracy difference (points)')
+    ax.set_title('Quality for speed at the headline points (references: plain-tuned a, b)',
+                 fontsize=10, color='#0b0b0b')  # fmt: skip
+    ax.legend(frameon=False, fontsize=7, loc='lower center',
+              title='dark or filled: reference a; light or open: reference b',
+              title_fontsize=7)  # fmt: skip
     fig.tight_layout()
     fig.savefig(path)
     plt.close(fig)
@@ -249,12 +297,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('decisions', type=Path)
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--gemm', type=Path, default=None, help='gemm_w4a16_bench output')
+    parser.add_argument(
+        '--partial-gsm8k', type=Path, default=None, help='gsm8k_partial output (not declared)'
+    )
     args = parser.parse_args(argv)
     decisions = json.loads(args.decisions.read_text())
     args.out.mkdir(parents=True, exist_ok=True)
     frontier(decisions, args.out / 'frontier.png')
     if decisions.get('gsm8k'):
-        quality_speed(decisions, args.out / 'quality_speed.png')
+        partial = json.loads(args.partial_gsm8k.read_text()) if args.partial_gsm8k else None
+        quality_speed(decisions, args.out / 'quality_speed.png', partial)
     if args.gemm is not None:
         gemm(json.loads(args.gemm.read_text()), args.out / 'gemm_w4a16.png')
     return 0
