@@ -1,0 +1,139 @@
+{
+ "repo_commit": "023e54e1a0eb08e4e9ee4ee949d06dbadc096f41",
+ "repo_dirty": false,
+ "bf16_target": {
+  "repo": "Qwen/Qwen3.5-4B",
+  "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+  "tensors": 738,
+  "bytes_by_group": {
+   "embedding (tied head)": 1271398400,
+   "mtp": 241199104,
+   "other weights": 7140111872,
+   "vision": 667028480
+  },
+  "total_bytes": 9319737856,
+  "decode_step_bytes": 8411510272,
+  "tokenizer_sha256": {
+   "tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+   "tokenizer_config.json": "316230d6a809701f4db5ea8f8fc862bc3a6f3229c937c174e674ff3ca0a64ac8",
+   "vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003",
+   "merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+   "chat_template.jinja": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715"
+  },
+  "eos": {
+   "model_override_args": "{}",
+   "sglang_hf_eos_token_id": [
+    248044
+   ],
+   "tokenizer_eos": [
+    "<|im_end|>",
+    248046
+   ],
+   "tokenizer_pad": [
+    "<|endoftext|>",
+    248044
+   ],
+   "additional_stop_token_ids": [],
+   "stop_set": [
+    248044,
+    248046
+   ],
+   "generation_config_present": false
+  }
+ },
+ "int4_target": {
+  "repo": "nota-ai/Qwen3.5-4B-QAD-W4A16",
+  "revision": "a67b0fedb2b39cb057da6114e656b76b52d321b4",
+  "tensors": 1138,
+  "bytes_by_group": {
+   "embedding (tied head)": 1271398400,
+   "group scales": 222822400,
+   "mtp": 241199104,
+   "other weights": 9787392,
+   "packed int4 weights": 1782579200,
+   "shape records": 3200,
+   "vision": 667028480
+  },
+  "total_bytes": 4194818176,
+  "decode_step_bytes": 3286590592,
+  "tokenizer_sha256": {
+   "tokenizer.json": "87a7830d63fcf43bf241c3c5242e96e62dd3fdc29224ca26fed8ea333db72de4",
+   "tokenizer_config.json": "a4f52c2103a685c3d9f3022b3954246fbab865abd709ac69d8b8a98f79580564",
+   "vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003",
+   "merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+   "chat_template.jinja": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715"
+  },
+  "eos": {
+   "model_override_args": "{}",
+   "sglang_hf_eos_token_id": [
+    248046
+   ],
+   "tokenizer_eos": [
+    "<|im_end|>",
+    248046
+   ],
+   "tokenizer_pad": [
+    "<|endoftext|>",
+    248044
+   ],
+   "additional_stop_token_ids": [],
+   "stop_set": [
+    248046
+   ],
+   "generation_config_present": false
+  },
+  "eos_with_arm_override": {
+   "model_override_args": "{\"eos_token_id\": 248044}",
+   "sglang_hf_eos_token_id": [
+    248044
+   ],
+   "tokenizer_eos": [
+    "<|im_end|>",
+    248046
+   ],
+   "tokenizer_pad": [
+    "<|endoftext|>",
+    248044
+   ],
+   "additional_stop_token_ids": [],
+   "stop_set": [
+    248044,
+    248046
+   ],
+   "generation_config_present": false
+  }
+ },
+ "bf16_drafter": {
+  "repo": "z-lab/Qwen3.5-4B-DFlash",
+  "revision": "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
+  "tensors": 69,
+  "bytes_by_group": {
+   "other weights": 1268851712
+  },
+  "total_bytes": 1268851712,
+  "decode_step_bytes": 1268851712
+ },
+ "int4_drafter": {
+  "repo": "nota-ai/Qwen3.5-4B-DFlash-GPTQ-W4A16",
+  "revision": "c5fb290e47e30c81d06e48b0495ec06f2560dd4e",
+  "tensors": 130,
+  "bytes_by_group": {
+   "group scales": 8396800,
+   "other weights": 64000,
+   "packed int4 weights": 268697600,
+   "shape records": 576
+  },
+  "total_bytes": 277158976,
+  "decode_step_bytes": 277158976
+ },
+ "stop_sets_equal_without_override": false,
+ "stop_sets_equal_with_override": true,
+ "decode_step_ratio_bf16_over_int4": 2.559342283908053,
+ "tokenizer_files_identical": {
+  "tokenizer.json": false,
+  "tokenizer_config.json": false,
+  "vocab.json": true,
+  "merges.txt": true,
+  "chat_template.jinja": true
+ }
+}

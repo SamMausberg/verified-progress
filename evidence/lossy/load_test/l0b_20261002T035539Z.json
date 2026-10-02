@@ -1,0 +1,1090 @@
+{
+ "repo": {
+  "path": "/home/ubuntu/vp-wt/lossy-hold",
+  "head": "5f149d25ffad444f3d1dd1a8c9fab3013728ede5",
+  "branch": "HEAD",
+  "dirty_files": []
+ },
+ "engine": {
+  "path": "/home/ubuntu/sglang-wt/lossy",
+  "head": "57560de6907090a34eb21774ba13dbe2a6b89b80",
+  "branch": "engine/lossy",
+  "dirty_files": []
+ },
+ "engine_worktree": "/home/ubuntu/sglang-wt/lossy",
+ "steps": [
+  {
+   "step": "int4-dflash-b8",
+   "arm": "int4-dflash-b8",
+   "start_unix": 1790913343.4208286,
+   "checks": [
+    {
+     "name": "cuda_graph_decode",
+     "ok": true,
+     "required": true,
+     "detail": "captured: target prefill (breakable), target verify (full), draft verify (full)"
+    },
+    {
+     "name": "cuda_graph_prefill",
+     "ok": true,
+     "required": true,
+     "detail": "captured"
+    },
+    {
+     "name": "cuda_graph_covers_capacity",
+     "ok": true,
+     "required": true,
+     "detail": "target verify graph batch sizes up to 128; server capacity 128"
+    },
+    {
+     "name": "overlap_scheduler",
+     "ok": true,
+     "required": true,
+     "detail": "scheduler disable_overlap_schedule=False"
+    },
+    {
+     "name": "capacity",
+     "ok": true,
+     "required": true,
+     "detail": "effective max_running_requests=128, target 128"
+    },
+    {
+     "name": "attention_backend",
+     "ok": true,
+     "required": true,
+     "detail": "scheduler attention_backend=flashinfer, requested flashinfer"
+    },
+    {
+     "name": "speculative_config",
+     "ok": true,
+     "required": true,
+     "detail": "resolved: speculative_algorithm=DFLASH, speculative_num_steps=1, speculative_eagle_topk=1, speculative_num_draft_tokens=8"
+    }
+   ],
+   "launch_ok": true,
+   "final_limits": {
+    "max_total_num_tokens": 394434,
+    "chunked_prefill_size": 8192,
+    "max_prefill_tokens": 16384,
+    "max_running_requests": 128,
+    "context_len": 262144
+   },
+   "sglang_source": {
+    "module_file": "/home/ubuntu/sglang-wt/lossy/python/sglang/__init__.py",
+    "path": "/home/ubuntu/sglang-wt/lossy",
+    "head": "57560de6907090a34eb21774ba13dbe2a6b89b80",
+    "branch": "engine/lossy",
+    "dirty_files": []
+   },
+   "tokenizer": {
+    "prompts": 16,
+    "mismatches": [],
+    "ok": true
+   },
+   "smoke": {
+    "requests": [
+     {
+      "id": "oasst1-7cf046b4-d31b-461b-ab59-224423f56a50",
+      "completion_tokens": 256,
+      "spec_verify_ct": 79,
+      "seconds": 3.69,
+      "text_head": "Here's a thinking process that leads to the suggested response:\n\n1.  **Analyze the Request:**\n    *   **Topic:** Contributing to Open Assistant (OA).\n    *   **Questions:** \"Where\" (platforms, repositories) and \"How\" (steps, types of contri"
+     },
+     {
+      "id": "humaneval-99",
+      "completion_tokens": 256,
+      "spec_verify_ct": 72,
+      "seconds": 3.63,
+      "text_head": "The function needs to:\n1. Take a string value representing a number\n2. Convert it to a float\n3. Round it to the nearest integer\n4. Handle the special case where the number is equidistant from two integers (round away from zero)\n\nLet me thin"
+     },
+     {
+      "id": "gsm8k-train-3476",
+      "completion_tokens": 256,
+      "spec_verify_ct": 46,
+      "seconds": 3.42,
+      "text_head": "Here's a thinking process that leads to the solution:\n\n1.  **Analyze the Request:**\n    *   **Given:** Hannah has three brothers.\n    *   **Given:** Her brothers are all 8 years old.\n    *   **Condition:** Hannah is twice as old as the sum "
+     },
+     {
+      "id": "oasst1-8a720e0c-915c-4566-856a-ba1286c4e2ff",
+      "completion_tokens": 256,
+      "spec_verify_ct": 80,
+      "seconds": 3.69,
+      "text_head": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   **Topic:** Second Law of Thermodynamics.\n    *   **Target Audience:** 6-year-old kid.\n    *   **Goal:** Make it very intuitive and easy to understand.\n    *   **Requirement:** Provide "
+     },
+     {
+      "id": "mbpp-315",
+      "completion_tokens": 256,
+      "spec_verify_ct": 57,
+      "seconds": 3.51,
+      "text_head": "Let me analyze the requirements:\n\n1. Find the first maximum length of even word\n2. Return the word itself if found, otherwise return \"-1\"\n3. The function should handle multiple test cases\n\nLooking at the test cases:\n- \"python language\" -> \""
+     },
+     {
+      "id": "gsm8k-train-3674",
+      "completion_tokens": 256,
+      "spec_verify_ct": 43,
+      "seconds": 3.39,
+      "text_head": "Here's my thought process for solving this problem:\n\n1.  **Analyze the Request:**\n    *   **Context:** A UFO convention.\n    *   **Total attendees:** 120.\n    *   **Relationship:** There are 4 more male attendees than female attendees.\n    "
+     },
+     {
+      "id": "oasst1-2b43223b-fd85-4068-b3a1-3559a46886c5",
+      "completion_tokens": 256,
+      "spec_verify_ct": 87,
+      "seconds": 3.73,
+      "text_head": "Here's a thinking process that leads to the suggested guide on making a tabletop from multiple boards:\n\n1.  **Understand the Goal:** The user wants to know how to construct a tabletop using multiple pieces of wood (boards). This is a common"
+     },
+     {
+      "id": "mbpp-246",
+      "completion_tokens": 256,
+      "spec_verify_ct": 73,
+      "seconds": 3.64,
+      "text_head": "The Babylonian method (also known as Heron's method) for computing square roots is an iterative algorithm that converges to the square root of a number.\n\nThe formula is:\nx_{n+1} = (x_n + S / x_n) / 2\n\nWhere:\n- S is the number we want to fin"
+     }
+    ],
+    "all_full_length": true,
+    "accept_length": 3.813780260707635
+   },
+   "log_facts": {
+    "weights": [
+     {
+      "type": "Qwen3_5ForConditionalGeneration",
+      "quant": "compressed-tensors",
+      "avail_gb": 89.88,
+      "usage_gb": 3.9
+     },
+     {
+      "type": "DFlashDraftModel",
+      "quant": "compressed-tensors",
+      "avail_gb": 89.43,
+      "usage_gb": 0.41
+     }
+    ],
+    "ssm_state_gb": [
+     6.05
+    ],
+    "log_lines": [
+     "[2026-10-02 03:55:56] server_args={'model_path': 'nota-ai/Qwen3.5-4B-QAD-W4A16', 'tokenizer_path': 'nota-ai/Qwen3.5-4B-QAD-W4A16', 'tokenizer_mode': 'auto', 'tokenizer_backend': 'huggingface', 'tokenizer_worker_num': 1, 'detokenizer_worker_num': 1, 'skip_tokenizer_init': False, 'load_format': 'auto'",
+     "[2026-10-02 03:56:13] Acceleration for non-quantized schemes is not supported by Compressed Tensors. Falling back to UnquantizedLinearMethod",
+     "[2026-10-02 03:56:14] Load weight end. elapsed=1.48 s, type=Qwen3_5ForConditionalGeneration, quant=compressed-tensors, avail mem=89.88 GB, mem usage=3.90 GB.",
+     "[2026-10-02 03:56:23] Load weight end. elapsed=0.12 s, type=DFlashDraftModel, quant=compressed-tensors, avail mem=89.43 GB, mem usage=0.41 GB.",
+     "[2026-10-02 03:56:23] DFLASH block size mismatch: using speculative_num_draft_tokens=8 but draft config block_size=16.",
+     "[2026-10-02 03:56:23] Initialized DFLASH draft runner. attention_backend=fa4, model=DFlashDraftModel, block_size=8, draft_window_size=None, compact_cache=False",
+     "[2026-10-02 03:56:23] DFLASH draft runner ready. mask_token=<|MASK|>, mask_token_id=248070, mask_token_id_override=248070, noise_embed_scale=1.0",
+     "[2026-10-02 03:56:23] DFLASH fused KV materialization disabled: quantized qkv_proj is not supported for this path (quant_method=CompressedTensorsLinearMethod): layer=0",
+     "[2026-10-02 03:56:27] Mamba Cache is allocated. max_mamba_cache_size: 128, conv_state size: 0.14GB, ssm_state size: 6.05GB intermediate_ssm_state_cache size: 48.38GB intermediate_conv_window_cache size: 0.47GB",
+     "[2026-10-02 03:56:28] KV Cache is allocated. dtype: torch.bfloat16, #tokens: 394434, K size: 6.02 GB, V size: 6.02 GB",
+     "[2026-10-02 03:56:29] KV Cache is allocated. dtype: torch.bfloat16, #tokens: 394434, K size: 3.76 GB, V size: 3.76 GB",
+     "[2026-10-02 03:56:29] Linear attention kernel backend: decode=triton, prefill=flashinfer, verify=triton",
+     "[2026-10-02 03:56:29] GDN kernel dispatcher: decode=TritonGDNKernel, extend=FlashInferGDNKernel, verify=TritonGDNKernel packed_decode=True",
+     "[2026-10-02 03:56:55] DFLASH draft greedy head folded into the draft cuda graph (tp=1).",
+     "[2026-10-02 03:56:57] DFLASH sampling pre-warm: borrowing=False bs=128 peak=3133551104 B headroom=4150669824 B",
+     "[2026-10-02 03:56:57] max_total_num_tokens=394434, chunked_prefill_size=8192, max_prefill_tokens=16384, max_running_requests=128, context_len=262144, available_gpu_mem=4.62 GB"
+    ]
+   },
+   "end_unix": 1790913435.980941,
+   "ok": true,
+   "port_cleared": true
+  },
+  {
+   "step": "int4-plain-cap256",
+   "arm": "int4-plain-cap256",
+   "start_unix": 1790913435.9846027,
+   "checks": [
+    {
+     "name": "cuda_graph_decode",
+     "ok": true,
+     "required": true,
+     "detail": "captured: target prefill (breakable), target decode (full)"
+    },
+    {
+     "name": "cuda_graph_prefill",
+     "ok": true,
+     "required": true,
+     "detail": "captured"
+    },
+    {
+     "name": "cuda_graph_covers_capacity",
+     "ok": true,
+     "required": true,
+     "detail": "target decode graph batch sizes up to 256; server capacity 256"
+    },
+    {
+     "name": "overlap_scheduler",
+     "ok": true,
+     "required": true,
+     "detail": "scheduler disable_overlap_schedule=False"
+    },
+    {
+     "name": "capacity",
+     "ok": true,
+     "required": true,
+     "detail": "effective max_running_requests=256, target 256"
+    },
+    {
+     "name": "attention_backend",
+     "ok": true,
+     "required": true,
+     "detail": "scheduler attention_backend=flashinfer, requested flashinfer"
+    },
+    {
+     "name": "speculative_config",
+     "ok": true,
+     "required": true,
+     "detail": "resolved speculative_algorithm=None"
+    }
+   ],
+   "launch_ok": true,
+   "final_limits": {
+    "max_total_num_tokens": 1000000,
+    "chunked_prefill_size": 8192,
+    "max_prefill_tokens": 16384,
+    "max_running_requests": 256,
+    "context_len": 262144
+   },
+   "sglang_source": {
+    "module_file": "/home/ubuntu/sglang-wt/lossy/python/sglang/__init__.py",
+    "path": "/home/ubuntu/sglang-wt/lossy",
+    "head": "57560de6907090a34eb21774ba13dbe2a6b89b80",
+    "branch": "engine/lossy",
+    "dirty_files": []
+   },
+   "tokenizer": {
+    "prompts": 16,
+    "mismatches": [],
+    "ok": true
+   },
+   "smoke": {
+    "requests": [
+     {
+      "id": "oasst1-7cf046b4-d31b-461b-ab59-224423f56a50",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.54,
+      "text_head": "Here's a thinking process that leads to the suggested response:\n\n1.  **Analyze the Request:**\n    *   **Topic:** Contributing to Open Assistant (OA).\n    *   **Questions:** \"Where\" (platforms, repositories) and \"How\" (steps, types of contri"
+     },
+     {
+      "id": "humaneval-99",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.54,
+      "text_head": "The function needs to:\n1. Take a string value representing a number\n2. Convert it to a float\n3. Round it to the nearest integer\n4. Handle the special case where the number is equidistant from two integers (round away from zero)\n\nLet me thin"
+     },
+     {
+      "id": "gsm8k-train-3476",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.54,
+      "text_head": "Here's a thinking process that leads to the solution:\n\n1.  **Analyze the Request:**\n    *   **Given:** Hannah has three brothers.\n    *   **Given:** Her brothers are all 8 years old.\n    *   **Condition:** Hannah is twice as old as the sum "
+     },
+     {
+      "id": "oasst1-8a720e0c-915c-4566-856a-ba1286c4e2ff",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.54,
+      "text_head": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   **Topic:** Second Law of Thermodynamics.\n    *   **Target Audience:** 6-year-old kid.\n    *   **Goal:** Make it very intuitive and easy to understand.\n    *   **Requirement:** Provide "
+     },
+     {
+      "id": "mbpp-315",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.54,
+      "text_head": "Let me analyze the requirements:\n\n1. Find the first maximum length of even word\n2. Return the word itself if found, otherwise return \"-1\"\n3. The function should handle multiple test cases\n\nLooking at the test cases:\n- \"python language\" -> \""
+     },
+     {
+      "id": "gsm8k-train-3674",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.54,
+      "text_head": "Here's my thought process for solving this problem:\n\n1.  **Analyze the Request:**\n    *   **Context:** A UFO convention.\n    *   **Total attendees:** 120.\n    *   **Relationship:** There are 4 more male attendees than female attendees.\n    "
+     },
+     {
+      "id": "oasst1-2b43223b-fd85-4068-b3a1-3559a46886c5",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.53,
+      "text_head": "Here's a thinking process that leads to the suggested guide on making a tabletop from multiple boards:\n\n1.  **Understand the Goal:** The user wants to know how to construct a tabletop using multiple pieces of wood (boards). This is a common"
+     },
+     {
+      "id": "mbpp-246",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.53,
+      "text_head": "The Babylonian method (also known as Heron's method) for computing square roots is an iterative algorithm that converges to the square root of a number.\n\nThe formula is:\nx_{n+1} = (x_n + S / x_n) / 2\n\nWhere:\n- S is the number we want to fin"
+     }
+    ],
+    "all_full_length": true,
+    "accept_length": null
+   },
+   "log_facts": {
+    "weights": [
+     {
+      "type": "Qwen3_5ForConditionalGeneration",
+      "quant": "compressed-tensors",
+      "avail_gb": 89.88,
+      "usage_gb": 3.9
+     }
+    ],
+    "ssm_state_gb": [
+     12.05
+    ],
+    "log_lines": [
+     "[2026-10-02 03:57:28] server_args={'model_path': 'nota-ai/Qwen3.5-4B-QAD-W4A16', 'tokenizer_path': 'nota-ai/Qwen3.5-4B-QAD-W4A16', 'tokenizer_mode': 'auto', 'tokenizer_backend': 'huggingface', 'tokenizer_worker_num': 1, 'detokenizer_worker_num': 1, 'skip_tokenizer_init': False, 'load_format': 'auto'",
+     "[2026-10-02 03:57:45] Acceleration for non-quantized schemes is not supported by Compressed Tensors. Falling back to UnquantizedLinearMethod",
+     "[2026-10-02 03:57:46] Load weight end. elapsed=1.50 s, type=Qwen3_5ForConditionalGeneration, quant=compressed-tensors, avail mem=89.88 GB, mem usage=3.90 GB.",
+     "[2026-10-02 03:57:56] Mamba Cache is allocated. max_mamba_cache_size: 256, conv_state size: 0.28GB, ssm_state size: 12.05GB",
+     "[2026-10-02 03:57:58] KV Cache is allocated. dtype: torch.bfloat16, #tokens: 1000000, K size: 15.26 GB, V size: 15.26 GB",
+     "[2026-10-02 03:57:58] Linear attention kernel backend: decode=triton, prefill=flashinfer, verify=triton",
+     "[2026-10-02 03:57:58] GDN kernel dispatcher: decode=TritonGDNKernel, extend=FlashInferGDNKernel, verify=TritonGDNKernel packed_decode=True",
+     "[2026-10-02 03:58:24] max_total_num_tokens=1000000, chunked_prefill_size=8192, max_prefill_tokens=16384, max_running_requests=256, context_len=262144, available_gpu_mem=43.72 GB"
+    ]
+   },
+   "end_unix": 1790913521.6231751,
+   "ok": true,
+   "port_cleared": true
+  },
+  {
+   "step": "plain-cap256-fp16",
+   "arm": "plain-cap256-fp16",
+   "start_unix": 1790913521.6269512,
+   "checks": [
+    {
+     "name": "cuda_graph_decode",
+     "ok": true,
+     "required": true,
+     "detail": "captured: target prefill (breakable), target decode (full)"
+    },
+    {
+     "name": "cuda_graph_prefill",
+     "ok": true,
+     "required": true,
+     "detail": "captured"
+    },
+    {
+     "name": "cuda_graph_covers_capacity",
+     "ok": true,
+     "required": true,
+     "detail": "target decode graph batch sizes up to 256; server capacity 256"
+    },
+    {
+     "name": "overlap_scheduler",
+     "ok": true,
+     "required": true,
+     "detail": "scheduler disable_overlap_schedule=False"
+    },
+    {
+     "name": "capacity",
+     "ok": true,
+     "required": true,
+     "detail": "effective max_running_requests=256, target 256"
+    },
+    {
+     "name": "attention_backend",
+     "ok": true,
+     "required": true,
+     "detail": "scheduler attention_backend=flashinfer, requested flashinfer"
+    },
+    {
+     "name": "speculative_config",
+     "ok": true,
+     "required": true,
+     "detail": "resolved speculative_algorithm=None"
+    }
+   ],
+   "launch_ok": true,
+   "final_limits": {
+    "max_total_num_tokens": 1000000,
+    "chunked_prefill_size": 8192,
+    "max_prefill_tokens": 16384,
+    "max_running_requests": 256,
+    "context_len": 262144
+   },
+   "sglang_source": {
+    "module_file": "/home/ubuntu/sglang-wt/lossy/python/sglang/__init__.py",
+    "path": "/home/ubuntu/sglang-wt/lossy",
+    "head": "57560de6907090a34eb21774ba13dbe2a6b89b80",
+    "branch": "engine/lossy",
+    "dirty_files": []
+   },
+   "tokenizer": {
+    "prompts": 16,
+    "mismatches": [],
+    "ok": true
+   },
+   "smoke": {
+    "requests": [
+     {
+      "id": "oasst1-7cf046b4-d31b-461b-ab59-224423f56a50",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 1.01,
+      "text_head": "Here's a thinking process that leads to the suggested guide for contributing to Open Assistant:\n\n1.  **Understand the User's Goal:** The user wants to know *where* and *how* to start contributing to Open Assistant (OA). This implies they ar"
+     },
+     {
+      "id": "humaneval-99",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 1.01,
+      "text_head": "Let me understand the requirements:\n\n1. Take a string representing a number\n2. Return the closest integer to it\n3. If equidistant from two integers, round away from zero\n\nExamples:\n- \"10\" \u2192 10\n- \"15.3\" \u2192 15\n- \"14.5\" \u2192 15 (away from zero, so"
+     },
+     {
+      "id": "gsm8k-train-3476",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 1.01,
+      "text_head": "Here's a thinking process that leads to the solution:\n\n1.  **Analyze the Request:**\n    *   **Subject:** Hannah and her brothers.\n    *   **Given Information:**\n        *   Hannah has 3 brothers.\n        *   All brothers are 8 years old.\n  "
+     },
+     {
+      "id": "oasst1-8a720e0c-915c-4566-856a-ba1286c4e2ff",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 1.01,
+      "text_head": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   **Topic:** Second Law of Thermodynamics.\n    *   **Target Audience:** 6-year-old kid.\n    *   **Goal:** Make it very intuitive and easy to understand.\n    *   **Requirement:** Provide "
+     },
+     {
+      "id": "mbpp-315",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 1.01,
+      "text_head": "Let me analyze the requirements:\n\n1. Find the first word with maximum length among even-length words\n2. Return that word as a string\n3. If no even-length word exists, return \"-1\"\n\nLet me trace through the test cases:\n\n1. \"python language\"\n "
+     },
+     {
+      "id": "gsm8k-train-3674",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 1.01,
+      "text_head": "Here's my thought process for solving this problem:\n\n1.  **Analyze the Request:**\n    *   **Context:** A UFO convention.\n    *   **Total attendees:** 120.\n    *   **Relationship:** There are 4 more male attendees than female attendees.\n    "
+     },
+     {
+      "id": "oasst1-2b43223b-fd85-4068-b3a1-3559a46886c5",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 1.01,
+      "text_head": "Here's a thinking process that leads to the suggested guide on making a tabletop from multiple boards:\n\n1.  **Understand the Goal:** The user wants to know how to construct a tabletop using multiple pieces of wood (boards). This is a common"
+     },
+     {
+      "id": "mbpp-246",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 1.01,
+      "text_head": "The Babylonian method (also known as Heron's method) is an iterative algorithm for computing square roots. The formula is:\n\nx_{n+1} = (x_n + S/x_n) / 2\n\nwhere S is the number we want to find the square root of, and x_n is our current approx"
+     }
+    ],
+    "all_full_length": true,
+    "accept_length": null
+   },
+   "log_facts": {
+    "weights": [],
+    "ssm_state_gb": [
+     6.02
+    ],
+    "log_lines": [
+     "[2026-10-02 03:58:54] server_args={'model_path': 'Qwen/Qwen3.5-4B', 'tokenizer_path': 'Qwen/Qwen3.5-4B', 'tokenizer_mode': 'auto', 'tokenizer_backend': 'huggingface', 'tokenizer_worker_num': 1, 'detokenizer_worker_num': 1, 'skip_tokenizer_init': False, 'load_format': 'auto', 'model_loader_extra_conf",
+     "[2026-10-02 03:59:07] Mamba Cache is allocated. max_mamba_cache_size: 256, conv_state size: 0.28GB, ssm_state size: 6.02GB",
+     "[2026-10-02 03:59:09] KV Cache is allocated. dtype: torch.bfloat16, #tokens: 1000000, K size: 15.26 GB, V size: 15.26 GB",
+     "[2026-10-02 03:59:09] Linear attention kernel backend: decode=triton, prefill=triton, verify=triton",
+     "[2026-10-02 03:59:09] GDN kernel dispatcher: decode=TritonGDNKernel, extend=TritonGDNKernel, verify=TritonGDNKernel packed_decode=True",
+     "[2026-10-02 03:59:24] max_total_num_tokens=1000000, chunked_prefill_size=8192, max_prefill_tokens=16384, max_running_requests=256, context_len=262144, available_gpu_mem=45.07 GB"
+    ]
+   },
+   "end_unix": 1790913578.7065945,
+   "ok": true,
+   "port_cleared": true
+  },
+  {
+   "step": "replayssm-cap256-fp16",
+   "arm": "replayssm-cap256-fp16",
+   "start_unix": 1790913578.710656,
+   "checks": [
+    {
+     "name": "cuda_graph_decode",
+     "ok": true,
+     "required": true,
+     "detail": "captured: target prefill (breakable), target decode (full)"
+    },
+    {
+     "name": "cuda_graph_prefill",
+     "ok": true,
+     "required": true,
+     "detail": "captured"
+    },
+    {
+     "name": "cuda_graph_covers_capacity",
+     "ok": true,
+     "required": true,
+     "detail": "target decode graph batch sizes up to 256; server capacity 256"
+    },
+    {
+     "name": "overlap_scheduler",
+     "ok": true,
+     "required": true,
+     "detail": "scheduler disable_overlap_schedule=False"
+    },
+    {
+     "name": "capacity",
+     "ok": true,
+     "required": true,
+     "detail": "effective max_running_requests=256, target 256"
+    },
+    {
+     "name": "attention_backend",
+     "ok": true,
+     "required": true,
+     "detail": "scheduler attention_backend=flashinfer, requested flashinfer"
+    },
+    {
+     "name": "speculative_config",
+     "ok": true,
+     "required": true,
+     "detail": "resolved speculative_algorithm=None"
+    }
+   ],
+   "launch_ok": true,
+   "final_limits": {
+    "max_total_num_tokens": 1000000,
+    "chunked_prefill_size": 8192,
+    "max_prefill_tokens": 16384,
+    "max_running_requests": 256,
+    "context_len": 262144
+   },
+   "sglang_source": {
+    "module_file": "/home/ubuntu/sglang-wt/lossy/python/sglang/__init__.py",
+    "path": "/home/ubuntu/sglang-wt/lossy",
+    "head": "57560de6907090a34eb21774ba13dbe2a6b89b80",
+    "branch": "engine/lossy",
+    "dirty_files": []
+   },
+   "tokenizer": {
+    "prompts": 16,
+    "mismatches": [],
+    "ok": true
+   },
+   "smoke": {
+    "requests": [
+     {
+      "id": "oasst1-7cf046b4-d31b-461b-ab59-224423f56a50",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 1.14,
+      "text_head": "Here's a thinking process that leads to the suggested guide for contributing to Open Assistant:\n\n1.  **Understand the User's Goal:** The user wants to know *where* and *how* to start contributing to Open Assistant (OA). This implies they ar"
+     },
+     {
+      "id": "humaneval-99",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 1.14,
+      "text_head": "Let me understand the requirements:\n\n1. Take a string representing a number\n2. Return the closest integer to it\n3. If equidistant from two integers, round away from zero\n\nExamples:\n- \"10\" \u2192 10\n- \"15.3\" \u2192 15\n- \"14.5\" \u2192 15 (away from zero, so"
+     },
+     {
+      "id": "gsm8k-train-3476",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 1.14,
+      "text_head": "Here's a thinking process that leads to the solution:\n\n1.  **Analyze the Request:**\n    *   **Subject:** Hannah and her brothers.\n    *   **Given Information:**\n        *   Hannah has 3 brothers.\n        *   All brothers are 8 years old.\n  "
+     },
+     {
+      "id": "oasst1-8a720e0c-915c-4566-856a-ba1286c4e2ff",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 1.14,
+      "text_head": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   **Topic:** Second Law of Thermodynamics.\n    *   **Target Audience:** 6-year-old kid.\n    *   **Goal:** Make it very intuitive and easy to understand.\n    *   **Requirement:** Provide "
+     },
+     {
+      "id": "mbpp-315",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 1.14,
+      "text_head": "Let me analyze the requirements:\n\n1. Find the first maximum length of even word\n2. Return the word itself if found, otherwise return \"-1\"\n3. The function should work with space-separated words\n\nLooking at the test cases:\n- \"python language\""
+     },
+     {
+      "id": "gsm8k-train-3674",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 1.14,
+      "text_head": "Here's my thought process for solving this problem:\n\n1.  **Analyze the Request:**\n    *   **Context:** A UFO convention.\n    *   **Total attendees:** 120.\n    *   **Relationship:** There are 4 more male attendees than female attendees.\n    "
+     },
+     {
+      "id": "oasst1-2b43223b-fd85-4068-b3a1-3559a46886c5",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 1.14,
+      "text_head": "Here's a thinking process that leads to the suggested guide on making a tabletop from multiple boards:\n\n1.  **Understand the Goal:** The user wants to know how to construct a tabletop using multiple pieces of wood (boards). This is a common"
+     },
+     {
+      "id": "mbpp-246",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 1.14,
+      "text_head": "The Babylonian method (also known as Heron's method) is an iterative algorithm for computing square roots. The formula is:\n\nx_{n+1} = (x_n + S/x_n) / 2\n\nwhere S is the number we want to find the square root of, and x_n is our current approx"
+     }
+    ],
+    "all_full_length": true,
+    "accept_length": null
+   },
+   "log_facts": {
+    "weights": [],
+    "ssm_state_gb": [
+     6.02
+    ],
+    "log_lines": [
+     "[2026-10-02 03:59:51] server_args={'model_path': 'Qwen/Qwen3.5-4B', 'tokenizer_path': 'Qwen/Qwen3.5-4B', 'tokenizer_mode': 'auto', 'tokenizer_backend': 'huggingface', 'tokenizer_worker_num': 1, 'detokenizer_worker_num': 1, 'skip_tokenizer_init': False, 'load_format': 'auto', 'model_loader_extra_conf",
+     "[2026-10-02 04:00:04] Mamba Cache is allocated. max_mamba_cache_size: 256, conv_state size: 0.28GB, ssm_state size: 6.02GB",
+     "[2026-10-02 04:00:07] KV Cache is allocated. dtype: torch.bfloat16, #tokens: 1000000, K size: 15.26 GB, V size: 15.26 GB",
+     "[2026-10-02 04:00:07] Linear attention kernel backend: decode=triton, prefill=triton, verify=triton",
+     "[2026-10-02 04:00:07] GDN kernel dispatcher: decode=TritonGDNKernel, extend=TritonGDNKernel, verify=TritonGDNKernel packed_decode=True",
+     "[2026-10-02 04:00:22] max_total_num_tokens=1000000, chunked_prefill_size=8192, max_prefill_tokens=16384, max_running_requests=256, context_len=262144, available_gpu_mem=43.93 GB"
+    ]
+   },
+   "end_unix": 1790913635.9440606,
+   "ok": true,
+   "port_cleared": true
+  },
+  {
+   "step": "replayssm-cap256",
+   "arm": "replayssm-cap256",
+   "start_unix": 1790913635.9480362,
+   "checks": [
+    {
+     "name": "cuda_graph_decode",
+     "ok": true,
+     "required": true,
+     "detail": "captured: target prefill (breakable), target decode (full)"
+    },
+    {
+     "name": "cuda_graph_prefill",
+     "ok": true,
+     "required": true,
+     "detail": "captured"
+    },
+    {
+     "name": "cuda_graph_covers_capacity",
+     "ok": true,
+     "required": true,
+     "detail": "target decode graph batch sizes up to 256; server capacity 256"
+    },
+    {
+     "name": "overlap_scheduler",
+     "ok": true,
+     "required": true,
+     "detail": "scheduler disable_overlap_schedule=False"
+    },
+    {
+     "name": "capacity",
+     "ok": true,
+     "required": true,
+     "detail": "effective max_running_requests=256, target 256"
+    },
+    {
+     "name": "attention_backend",
+     "ok": true,
+     "required": true,
+     "detail": "scheduler attention_backend=flashinfer, requested flashinfer"
+    },
+    {
+     "name": "speculative_config",
+     "ok": true,
+     "required": true,
+     "detail": "resolved speculative_algorithm=None"
+    }
+   ],
+   "launch_ok": true,
+   "final_limits": {
+    "max_total_num_tokens": 1000000,
+    "chunked_prefill_size": 8192,
+    "max_prefill_tokens": 16384,
+    "max_running_requests": 256,
+    "context_len": 262144
+   },
+   "sglang_source": {
+    "module_file": "/home/ubuntu/sglang-wt/lossy/python/sglang/__init__.py",
+    "path": "/home/ubuntu/sglang-wt/lossy",
+    "head": "57560de6907090a34eb21774ba13dbe2a6b89b80",
+    "branch": "engine/lossy",
+    "dirty_files": []
+   },
+   "tokenizer": {
+    "prompts": 16,
+    "mismatches": [],
+    "ok": true
+   },
+   "smoke": {
+    "requests": [
+     {
+      "id": "oasst1-7cf046b4-d31b-461b-ab59-224423f56a50",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.77,
+      "text_head": "Here's a thinking process that leads to the suggested guide for contributing to Open Assistant:\n\n1.  **Understand the User's Goal:** The user wants to know *where* and *how* to start contributing to Open Assistant (OA). This implies they ar"
+     },
+     {
+      "id": "humaneval-99",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.77,
+      "text_head": "Let me understand the requirements:\n\n1. Take a string representing a number\n2. Return the closest integer to it\n3. If equidistant from two integers, round away from zero\n\nExamples:\n- \"10\" \u2192 10\n- \"15.3\" \u2192 15\n- \"14.5\" \u2192 15 (away from zero, so"
+     },
+     {
+      "id": "gsm8k-train-3476",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.77,
+      "text_head": "Here's a thinking process that leads to the solution:\n\n1.  **Analyze the Request:**\n    *   **Subject:** Hannah and her brothers.\n    *   **Given Information:**\n        *   Hannah has 3 brothers.\n        *   All brothers are 8 years old.\n  "
+     },
+     {
+      "id": "oasst1-8a720e0c-915c-4566-856a-ba1286c4e2ff",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.77,
+      "text_head": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   **Topic:** Second Law of Thermodynamics.\n    *   **Target Audience:** 6-year-old kid.\n    *   **Goal:** Make it very intuitive and easy to understand.\n    *   **Requirement:** Provide "
+     },
+     {
+      "id": "mbpp-315",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.77,
+      "text_head": "Let me analyze the requirements:\n\n1. Find the first word with maximum length among even-length words\n2. Return the word itself if found, otherwise return \"-1\"\n3. The function should handle multiple test cases\n\nLet me trace through the examp"
+     },
+     {
+      "id": "gsm8k-train-3674",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.77,
+      "text_head": "Here's my thought process for solving this problem:\n\n1.  **Analyze the Request:**\n    *   **Context:** A UFO convention.\n    *   **Total attendees:** 120.\n    *   **Relationship:** There are 4 more male attendees than female attendees.\n    "
+     },
+     {
+      "id": "oasst1-2b43223b-fd85-4068-b3a1-3559a46886c5",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.77,
+      "text_head": "Here's a thinking process that leads to the suggested guide on making a tabletop from multiple boards:\n\n1.  **Understand the Goal:** The user wants to know how to construct a tabletop using multiple pieces of wood (boards). This is a common"
+     },
+     {
+      "id": "mbpp-246",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.77,
+      "text_head": "The Babylonian method (also known as Heron's method) is an iterative algorithm for computing square roots. The formula is:\n\nx_{n+1} = (x_n + S/x_n) / 2\n\nwhere S is the number we want to find the square root of, and x_n is our current approx"
+     }
+    ],
+    "all_full_length": true,
+    "accept_length": null
+   },
+   "log_facts": {
+    "weights": [],
+    "ssm_state_gb": [
+     12.05
+    ],
+    "log_lines": [
+     "[2026-10-02 04:00:48] server_args={'model_path': 'Qwen/Qwen3.5-4B', 'tokenizer_path': 'Qwen/Qwen3.5-4B', 'tokenizer_mode': 'auto', 'tokenizer_backend': 'huggingface', 'tokenizer_worker_num': 1, 'detokenizer_worker_num': 1, 'skip_tokenizer_init': False, 'load_format': 'auto', 'model_loader_extra_conf",
+     "[2026-10-02 04:01:02] Mamba Cache is allocated. max_mamba_cache_size: 256, conv_state size: 0.28GB, ssm_state size: 12.05GB",
+     "[2026-10-02 04:01:04] KV Cache is allocated. dtype: torch.bfloat16, #tokens: 1000000, K size: 15.26 GB, V size: 15.26 GB",
+     "[2026-10-02 04:01:05] Linear attention kernel backend: decode=triton, prefill=flashinfer, verify=triton",
+     "[2026-10-02 04:01:05] GDN kernel dispatcher: decode=TritonGDNKernel, extend=FlashInferGDNKernel, verify=TritonGDNKernel packed_decode=True",
+     "[2026-10-02 04:01:27] max_total_num_tokens=1000000, chunked_prefill_size=8192, max_prefill_tokens=16384, max_running_requests=256, context_len=262144, available_gpu_mem=36.70 GB"
+    ]
+   },
+   "end_unix": 1790913704.583831,
+   "ok": true,
+   "port_cleared": true
+  },
+  {
+   "step": "plain-ref-1",
+   "arm": "plain-cap256",
+   "start_unix": 1790913704.587927,
+   "checks": [
+    {
+     "name": "cuda_graph_decode",
+     "ok": true,
+     "required": true,
+     "detail": "captured: target prefill (breakable), target decode (full)"
+    },
+    {
+     "name": "cuda_graph_prefill",
+     "ok": true,
+     "required": true,
+     "detail": "captured"
+    },
+    {
+     "name": "cuda_graph_covers_capacity",
+     "ok": true,
+     "required": true,
+     "detail": "target decode graph batch sizes up to 256; server capacity 256"
+    },
+    {
+     "name": "overlap_scheduler",
+     "ok": true,
+     "required": true,
+     "detail": "scheduler disable_overlap_schedule=False"
+    },
+    {
+     "name": "capacity",
+     "ok": true,
+     "required": true,
+     "detail": "effective max_running_requests=256, target 256"
+    },
+    {
+     "name": "attention_backend",
+     "ok": true,
+     "required": true,
+     "detail": "scheduler attention_backend=flashinfer, requested flashinfer"
+    },
+    {
+     "name": "speculative_config",
+     "ok": true,
+     "required": true,
+     "detail": "resolved speculative_algorithm=None"
+    }
+   ],
+   "launch_ok": true,
+   "final_limits": {
+    "max_total_num_tokens": 1000000,
+    "chunked_prefill_size": 8192,
+    "max_prefill_tokens": 16384,
+    "max_running_requests": 256,
+    "context_len": 262144
+   },
+   "sglang_source": {
+    "module_file": "/home/ubuntu/sglang-wt/lossy/python/sglang/__init__.py",
+    "path": "/home/ubuntu/sglang-wt/lossy",
+    "head": "57560de6907090a34eb21774ba13dbe2a6b89b80",
+    "branch": "engine/lossy",
+    "dirty_files": []
+   },
+   "tokenizer": {
+    "prompts": 16,
+    "mismatches": [],
+    "ok": true
+   },
+   "smoke": {
+    "requests": [
+     {
+      "id": "oasst1-7cf046b4-d31b-461b-ab59-224423f56a50",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.62,
+      "text_head": "Here's a thinking process that leads to the suggested guide for contributing to Open Assistant:\n\n1.  **Understand the User's Goal:** The user wants to know *where* and *how* to start contributing to Open Assistant (OA). This implies they ar"
+     },
+     {
+      "id": "humaneval-99",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.62,
+      "text_head": "Let me understand the requirements:\n\n1. Take a string representing a number\n2. Return the closest integer to it\n3. If equidistant from two integers, round away from zero\n\nExamples:\n- \"10\" \u2192 10\n- \"15.3\" \u2192 15\n- \"14.5\" \u2192 15 (away from zero, so"
+     },
+     {
+      "id": "gsm8k-train-3476",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.62,
+      "text_head": "Here's a thinking process that leads to the solution:\n\n1.  **Analyze the Request:**\n    *   **Subject:** Hannah and her brothers.\n    *   **Given Information:**\n        *   Hannah has 3 brothers.\n        *   All brothers are 8 years old.\n  "
+     },
+     {
+      "id": "oasst1-8a720e0c-915c-4566-856a-ba1286c4e2ff",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.61,
+      "text_head": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   **Topic:** Second Law of Thermodynamics.\n    *   **Target Audience:** 6-year-old kid.\n    *   **Goal:** Make it very intuitive and easy to understand.\n    *   **Requirement:** Provide "
+     },
+     {
+      "id": "mbpp-315",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.61,
+      "text_head": "Let me analyze the requirements:\n\n1. Find the first word with maximum length among even-length words\n2. Return the word itself if found, otherwise return \"-1\"\n3. The function should handle multiple test cases\n\nLet me trace through the examp"
+     },
+     {
+      "id": "gsm8k-train-3674",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.61,
+      "text_head": "Here's my thought process for solving this problem:\n\n1.  **Analyze the Request:**\n    *   **Context:** A UFO convention.\n    *   **Total attendees:** 120.\n    *   **Relationship:** There are 4 more male attendees than female attendees.\n    "
+     },
+     {
+      "id": "oasst1-2b43223b-fd85-4068-b3a1-3559a46886c5",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.61,
+      "text_head": "Here's a thinking process that leads to the suggested guide on making a tabletop from multiple boards:\n\n1.  **Understand the Goal:** The user wants to know how to construct a tabletop using multiple pieces of wood (boards). This is a common"
+     },
+     {
+      "id": "mbpp-246",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.61,
+      "text_head": "The Babylonian method (also known as Heron's method) is an iterative algorithm for computing square roots. The formula is:\n\nx_{n+1} = (x_n + S/x_n) / 2\n\nwhere S is the number we want to find the square root of, and x_n is our current approx"
+     }
+    ],
+    "all_full_length": true,
+    "accept_length": null
+   },
+   "probe_generate": "/home/ubuntu/vp-data/lossy/load_test/20261002T035539Z/plain-ref-1/probe_generate.json",
+   "probe_score": "/home/ubuntu/vp-data/lossy/load_test/20261002T035539Z/plain-ref-1/probe_score.json",
+   "log_facts": {
+    "weights": [],
+    "ssm_state_gb": [
+     12.05
+    ],
+    "log_lines": [
+     "[2026-10-02 04:01:57] server_args={'model_path': 'Qwen/Qwen3.5-4B', 'tokenizer_path': 'Qwen/Qwen3.5-4B', 'tokenizer_mode': 'auto', 'tokenizer_backend': 'huggingface', 'tokenizer_worker_num': 1, 'detokenizer_worker_num': 1, 'skip_tokenizer_init': False, 'load_format': 'auto', 'model_loader_extra_conf",
+     "[2026-10-02 04:02:11] Mamba Cache is allocated. max_mamba_cache_size: 256, conv_state size: 0.28GB, ssm_state size: 12.05GB",
+     "[2026-10-02 04:02:13] KV Cache is allocated. dtype: torch.bfloat16, #tokens: 1000000, K size: 15.26 GB, V size: 15.26 GB",
+     "[2026-10-02 04:02:13] Linear attention kernel backend: decode=triton, prefill=flashinfer, verify=triton",
+     "[2026-10-02 04:02:13] GDN kernel dispatcher: decode=TritonGDNKernel, extend=FlashInferGDNKernel, verify=TritonGDNKernel packed_decode=True",
+     "[2026-10-02 04:02:35] max_total_num_tokens=1000000, chunked_prefill_size=8192, max_prefill_tokens=16384, max_running_requests=256, context_len=262144, available_gpu_mem=38.98 GB"
+    ]
+   },
+   "end_unix": 1790913787.6568854,
+   "ok": true,
+   "port_cleared": true
+  },
+  {
+   "step": "plain-ref-2",
+   "arm": "plain-cap256",
+   "start_unix": 1790913787.6610553,
+   "checks": [
+    {
+     "name": "cuda_graph_decode",
+     "ok": true,
+     "required": true,
+     "detail": "captured: target prefill (breakable), target decode (full)"
+    },
+    {
+     "name": "cuda_graph_prefill",
+     "ok": true,
+     "required": true,
+     "detail": "captured"
+    },
+    {
+     "name": "cuda_graph_covers_capacity",
+     "ok": true,
+     "required": true,
+     "detail": "target decode graph batch sizes up to 256; server capacity 256"
+    },
+    {
+     "name": "overlap_scheduler",
+     "ok": true,
+     "required": true,
+     "detail": "scheduler disable_overlap_schedule=False"
+    },
+    {
+     "name": "capacity",
+     "ok": true,
+     "required": true,
+     "detail": "effective max_running_requests=256, target 256"
+    },
+    {
+     "name": "attention_backend",
+     "ok": true,
+     "required": true,
+     "detail": "scheduler attention_backend=flashinfer, requested flashinfer"
+    },
+    {
+     "name": "speculative_config",
+     "ok": true,
+     "required": true,
+     "detail": "resolved speculative_algorithm=None"
+    }
+   ],
+   "launch_ok": true,
+   "final_limits": {
+    "max_total_num_tokens": 1000000,
+    "chunked_prefill_size": 8192,
+    "max_prefill_tokens": 16384,
+    "max_running_requests": 256,
+    "context_len": 262144
+   },
+   "sglang_source": {
+    "module_file": "/home/ubuntu/sglang-wt/lossy/python/sglang/__init__.py",
+    "path": "/home/ubuntu/sglang-wt/lossy",
+    "head": "57560de6907090a34eb21774ba13dbe2a6b89b80",
+    "branch": "engine/lossy",
+    "dirty_files": []
+   },
+   "tokenizer": {
+    "prompts": 16,
+    "mismatches": [],
+    "ok": true
+   },
+   "smoke": {
+    "requests": [
+     {
+      "id": "oasst1-7cf046b4-d31b-461b-ab59-224423f56a50",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.65,
+      "text_head": "Here's a thinking process that leads to the suggested guide for contributing to Open Assistant:\n\n1.  **Understand the User's Goal:** The user wants to know *where* and *how* to start contributing to Open Assistant (OA). This implies they ar"
+     },
+     {
+      "id": "humaneval-99",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.65,
+      "text_head": "Let me understand the requirements:\n\n1. Take a string representing a number\n2. Return the closest integer to it\n3. If equidistant from two integers, round away from zero\n\nExamples:\n- \"10\" \u2192 10\n- \"15.3\" \u2192 15\n- \"14.5\" \u2192 15 (away from zero, so"
+     },
+     {
+      "id": "gsm8k-train-3476",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.64,
+      "text_head": "Here's a thinking process that leads to the solution:\n\n1.  **Analyze the Request:**\n    *   **Subject:** Hannah and her brothers.\n    *   **Given Information:**\n        *   Hannah has 3 brothers.\n        *   All brothers are 8 years old.\n  "
+     },
+     {
+      "id": "oasst1-8a720e0c-915c-4566-856a-ba1286c4e2ff",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.65,
+      "text_head": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   **Topic:** Second Law of Thermodynamics.\n    *   **Target Audience:** 6-year-old kid.\n    *   **Goal:** Make it very intuitive and easy to understand.\n    *   **Requirement:** Provide "
+     },
+     {
+      "id": "mbpp-315",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.64,
+      "text_head": "Let me analyze the requirements:\n\n1. Find the first word with maximum length among even-length words\n2. Return the word itself if found, otherwise return \"-1\"\n3. The function should handle multiple test cases\n\nLet me trace through the examp"
+     },
+     {
+      "id": "gsm8k-train-3674",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.64,
+      "text_head": "Here's my thought process for solving this problem:\n\n1.  **Analyze the Request:**\n    *   **Context:** A UFO convention.\n    *   **Total attendees:** 120.\n    *   **Relationship:** There are 4 more male attendees than female attendees.\n    "
+     },
+     {
+      "id": "oasst1-2b43223b-fd85-4068-b3a1-3559a46886c5",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.64,
+      "text_head": "Here's a thinking process that leads to the suggested guide on making a tabletop from multiple boards:\n\n1.  **Understand the Goal:** The user wants to know how to construct a tabletop using multiple pieces of wood (boards). This is a common"
+     },
+     {
+      "id": "mbpp-246",
+      "completion_tokens": 256,
+      "spec_verify_ct": null,
+      "seconds": 3.64,
+      "text_head": "The Babylonian method (also known as Heron's method) is an iterative algorithm for computing square roots. The formula is:\n\nx_{n+1} = (x_n + S/x_n) / 2\n\nwhere S is the number we want to find the square root of, and x_n is our current approx"
+     }
+    ],
+    "all_full_length": true,
+    "accept_length": null
+   },
+   "probe_generate": "/home/ubuntu/vp-data/lossy/load_test/20261002T035539Z/plain-ref-2/probe_generate.json",
+   "probe_score": "/home/ubuntu/vp-data/lossy/load_test/20261002T035539Z/plain-ref-2/probe_score.json",
+   "log_facts": {
+    "weights": [],
+    "ssm_state_gb": [
+     12.05
+    ],
+    "log_lines": [
+     "[2026-10-02 04:03:20] server_args={'model_path': 'Qwen/Qwen3.5-4B', 'tokenizer_path': 'Qwen/Qwen3.5-4B', 'tokenizer_mode': 'auto', 'tokenizer_backend': 'huggingface', 'tokenizer_worker_num': 1, 'detokenizer_worker_num': 1, 'skip_tokenizer_init': False, 'load_format': 'auto', 'model_loader_extra_conf",
+     "[2026-10-02 04:03:34] Mamba Cache is allocated. max_mamba_cache_size: 256, conv_state size: 0.28GB, ssm_state size: 12.05GB",
+     "[2026-10-02 04:03:36] KV Cache is allocated. dtype: torch.bfloat16, #tokens: 1000000, K size: 15.26 GB, V size: 15.26 GB",
+     "[2026-10-02 04:03:36] Linear attention kernel backend: decode=triton, prefill=flashinfer, verify=triton",
+     "[2026-10-02 04:03:36] GDN kernel dispatcher: decode=TritonGDNKernel, extend=FlashInferGDNKernel, verify=TritonGDNKernel packed_decode=True",
+     "[2026-10-02 04:03:59] max_total_num_tokens=1000000, chunked_prefill_size=8192, max_prefill_tokens=16384, max_running_requests=256, context_len=262144, available_gpu_mem=38.98 GB"
+    ]
+   },
+   "end_unix": 1790913870.9728122,
+   "ok": true,
+   "port_cleared": true
+  }
+ ],
+ "failed": []
+}
