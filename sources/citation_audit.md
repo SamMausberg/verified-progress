@@ -400,7 +400,7 @@ consequences (D-cut), and missing prior art rather than bad citations.
 
 ### Text corrections needed in `paper/paper.tex`
 
-The paper agent owns `paper.tex`. Line numbers refer to `origin/main` at `34f5283`.
+Line numbers refer to `origin/main` at `34f5283`.
 
 1. **Sampled-depth counterexample is prior art** (abstract l. 78; Sec. 5.6
    l. 368-379; failure table in Sec. 12.6, l. 727). DSpark (key `dspark`, Sec. 3.2.2 and
