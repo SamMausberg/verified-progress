@@ -123,10 +123,14 @@ reference's own run-to-run noise.
 - GSM8K (`bench.quality`, 1,319 problems, temperature 0.6, top-p 0.95, top-k 20, seed 0,
   16,384-token limit, 128 threads): `int4-dflash-b8` in hold `q1` (the INT4 target with its
   drafter, measured as the combination it is served as) and `plain-cap256-fp16` in hold `q2`.
-  The references are bench's two `plain-tuned` runs (`evidence/bench/quality/plain-tuned-a-seed0`
-  and `-b-seed0`), made with the same harness (`bench/quality.py` unchanged since) and the same
-  settings; they differ from each other by +0.30 points, which is the reference's run-to-run
-  noise. Reported per reference: the accuracy difference, the exact McNemar p-value and a 95%
+  The references are bench's two committed `plain-tuned` runs
+  (`evidence/bench/quality/plain-tuned-a-seed0` and `-b-seed0`), made on 2026-10-01 on the
+  pinned engine `bd66ce343e` with the same harness (`bench/quality.py` unchanged since) and the
+  same settings. This study's engine adds only `patches/lossy/0001`, which touches quantized
+  DFlash drafters and nothing a plain BF16 server runs. The two references differ from each
+  other by +0.30 points, which is the reference's run-to-run noise. Each comparison is paired
+  by problem: the same 1,319 problems, scored per problem in both runs (`bench.quality
+  compare`), with the McNemar test on the problems only one run solved. Reported per reference: the accuracy difference, the exact McNemar p-value and a 95%
   Wald interval of the paired difference. The GSM8K part of the budget is met when the
   difference is at least -1.0 point against both references. With about 150 discordant
   problems per pair the interval is about +-1.8 points, and a loss below about 2.5 points would
