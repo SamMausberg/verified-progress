@@ -17,6 +17,7 @@ source "$REPO/scripts/sglang_env.sh"
 cd "$REPO"
 echo "start $(date -Is) repo $(git rev-parse HEAD) engine $(git -C "$ENGINE" rev-parse HEAD)"
 [ "$(git -C "$ENGINE" rev-parse --short=10 HEAD)" = "$ENGINE_COMMIT" ] || { echo "engine not at $ENGINE_COMMIT"; exit 1; }
+[ -z "$(git -C "$ENGINE" status --porcelain --untracked-files=no)" ] || { echo "engine dirty"; exit 1; }
 # shellcheck disable=SC2329 # invoked by the EXIT trap and between servers
 kill_servers() {
   pkill -TERM -f -- 'sglang.launch_server.* --port 30221( |$)' || true

@@ -49,7 +49,17 @@ def write_csv(rows: list[dict], out: Path) -> None:
 
 def cmd_gemm(args: argparse.Namespace) -> None:
     d = json.loads(Path(args.probe).read_text())
+    if d['meta'].get('stopped_at_budget'):
+        raise SystemExit(
+            f'{args.probe}: stopped at its time budget ({d["meta"]["stopped_at_budget"]})'
+        )
     rows = [dict(r) for r in d['rows']]
+    have = {(r['shape'], r['M']) for r in rows if r['route'] == 'bf16'}
+    shapes = sorted({r['shape'] for r in rows})
+    ms = sorted({r['M'] for r in rows})
+    missing = [(s, m) for s in shapes for m in ms if (s, m) not in have]
+    if missing:
+        raise SystemExit(f'{args.probe}: no BF16 timing for {missing}')
     t = {(r['shape'], r['M'], r['route']): r['us_median'] for r in rows}
     routes = sorted({r['route'] for r in rows} - {'act_quant_fp8', 'int8_mm'})
     for m in sorted({r['M'] for r in rows}):
