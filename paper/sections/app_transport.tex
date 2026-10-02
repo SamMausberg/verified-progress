@@ -190,7 +190,7 @@ $k$-means 1,024 & 0.02\% & 0.02\% & 86.8\% & 162 & 1.000\\
 \end{table}
 
 \begin{table}[htbp]
-\caption{Transport on the held-out transport pairs (DFlash-4B: 4,020 from 110 prompts; MTP-4B: 16,016 from 160), over every bound family and tiling tested (tiles of 64 to 1,024 entries). Single values are the best case; ranges span the tilings (by tiling: Table~\ref{tab:transport-full}). ``Skipped'': mean share of the vocabulary a greedy verifier skips; ``read by a real verify batch'': the share in tiles that at least one position of the batch still needs; $P_?$: mean probability, over proposals at $T=1$, that the sampled acceptance test stays undecided. Measured \ev{transport,transport-mtp}.}\label{tab:transport}
+\caption{Transport on the pairs from whole held-out capture steps (DFlash-4B: 4,020 from 110 prompts; MTP-4B: 16,016 from 160), over every bound family and tiling tested (tiles of 64 to 1,024 entries). Single values are the best case; ranges span the tilings (by tiling: Table~\ref{tab:transport-full}). ``Skipped'': mean share of the vocabulary a greedy verifier skips; ``read by a real verify batch'': the share in tiles that at least one position of the batch still needs; $P_?$: mean probability, over proposals at $T=1$, that the sampled acceptance test stays undecided. Measured \ev{transport,transport-mtp}.}\label{tab:transport}
 \vskip 0.05in
 \centering\tablefont
 \begin{tabular}{@{}lrr@{}}
