@@ -232,8 +232,10 @@ switch give the same token ids and top-5 logprobs at concurrency 1, and `--bf16-
 gemv` and the routing table (lever v1) are exact up to rounding; and paired serving of lever v1
 against tuned plain decoding (3.4% faster at concurrency 1, 1.0% at 128). Against MTP
 with FlashInfer attention (`mtp-tuned`) it gains nothing (0.9% slower at concurrency 1 in both
-pairs, one beyond the session's spread; untested against `mtp-tuned-triton` at c = 1-32), and
-an nsys trace of plain decoding shows each route dispatching as tabled.
+pairs, one beyond the session's spread). Against `mtp-tuned-triton` it gives 1.0006x and
+1.0007x at c = 1 and no claim at 8 and 32; the streamed greedy text differs from the
+switches-off engine's on 7 of 64 prompts at c = 1, so its exactness class under MTP is not
+established. An nsys trace of plain decoding shows each route dispatching as tabled.
 
 ## hostgap (`patches/hostgap/0001-0005`, branch `engine/hostgap`)
 
