@@ -390,6 +390,7 @@ reads this line from the branch and refuses any other head. The line is added af
 the CPU checks of the code, before h1 starts.
 
 Hold commit: `aa121d83de88431939a61bd163c1ce19e33c1e2c`
+Hold commit (h5): `71c05e308d84a95f118dc9835833e8f5e603350b`
 
 ## Amendments
 
