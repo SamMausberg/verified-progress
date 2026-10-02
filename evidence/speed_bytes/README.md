@@ -21,26 +21,31 @@ one GH200, greedy decoding, bench's harness and arms (`bench/arms.toml`) at repo
   FP8 GEMM included, is the stub that prints "Arch conditional MMA instruction used without
   targeting sm90a". In sgl-kernel's CMake file at the pin (`python/sglang/kernels/aot/CMakeLists.txt`)
   the only `compute_90a` gencode for these libraries is inside the FA3 block, and FA3 defaults to
-  off on aarch64; the `SGL_KERNEL_ENABLE_SM90A` option is declared and never read. SGLang's online
-  FP8 picks per-channel weight scales and that GEMM because `cutlass_fp8_supported()` returns True
-  on any sm90.
+  off on aarch64; the `SGL_KERNEL_ENABLE_SM90A` option is declared and never read. The stub
+  prints that message and returns without computing; the server keeps running
+  (`evidence/moonshot/README.md` saw the message repeat in a loop). SGLang's online FP8 picks per-channel weight scales and that GEMM because
+  `cutlass_fp8_supported()` returns True on sm90 with CUDA 12.0 or later; a tuned Triton config
+  would take some shapes instead, but the pin ships tuned configs only for the L40S, so on this
+  GH200 every converted layer reaches the CUTLASS GEMM unless `USE_TRITON_W8A8_FP8_KERNEL` is set.
 - **The GEMMs are fast through cuBLASLt** (measured, `gemm_probe.csv`). With one scale per
   tensor, `torch._scaled_mm` runs cuBLASLt FP8 kernels: the backbone GEMMs of one decode step take
   1,474 us at M = 1 against 2,478 us in BF16 (0.59x) and 0.59-0.66x up to M = 256; the head
   0.51x (180 against 353 us at M = 1). torch's per-row `_scaled_mm` (its own kernel on sm90) runs
-  without the abort but takes 0.89-1.03x of BF16, SGLang's Triton W8A8 kernel 0.80-1.10x and
+  (it is not the stub) but takes 0.89-1.03x of BF16, SGLang's Triton W8A8 kernel 0.80-1.10x and
   Marlin W8A16 0.84x at M = 1 rising to 2.2x at M = 256.
 - **Served, the saving almost vanishes** (measured, `served.csv`, killed by its own rule). FP8
   W8A8 on the target (128 layers, 7.13 to 3.57 GB) with per-row activation scales makes
   `plain-tuned` 1.035x at c = 1, 1.014x at c = 8 and 1.013x at c = 64 in x (kill1; kill3 repeats
-  it: 1.036, 1.021, 1.015). The kill rule fixed before the run (at least 5% in decode rate on
-  `dflash-tuned-b16` at c = 1 and on `plain-tuned` at c = 64) fails at c = 64.
+  it: 1.036, 1.021, 1.015). Against a kill rule of at least 5% in decode rate on
+  `dflash-tuned-b16` at c = 1 and on `plain-tuned` at c = 64, it fails at c = 64.
 - **Where it goes** (measured, `step_budget.csv`, Nsight trace of plain decoding at c = 1). The FP8
   GEMMs save 931 us per step in the served graph (backbone 2,334 to 1,403 us, 0.60x, as the
   microbenchmark said). Two small kernels per layer take it back: the row-scale multiply (128 x
   3.79 us = 485 us) and the activation quantization (128 x 1.97 us = 252 us), plus 106 us of
-  extra launch gaps and 37 us of lost programmatic-dependent-launch overlap. Net: 109 us shorter,
-  the served 1.036x.
+  extra launch gaps and 37 us of lost programmatic-dependent-launch overlap: 880 us of the 931.
+  The rest of the step gives back 58 us (other kernels 202 to 153 us, norms 225 to 214 us, the
+  remaining classes +2 us), so the traced step is 109 us shorter (3,535 to 3,426 us, 1.032x),
+  close to the served 1.036x in x.
 - **Ceiling** (measured, kill3, timing only, outputs invalid). With the quantization and
   row-scale kernels removed (the GEMMs read a fixed random FP8 input), `plain-tuned` runs 1.368x
   at c = 1, 1.322x at c = 8 and 1.186x at c = 64. That is the bound on fusing the quantization into
@@ -60,7 +65,8 @@ one GH200, greedy decoding, bench's harness and arms (`bench/arms.toml`) at repo
   `dflash-tuned-b16` by 2% per cycle at c = 1 (no change at c = 4), for the same reason as above at
   smaller GEMMs. The FP8 draft head alone (one GEMM, 1.27 to 0.64 GB, one quantization kernel and
   no row scale) gives 1.024x and 1.033x per cycle at c = 1 and 4 on block 16 and nothing on block 8
-  at c = 8 (0.998). Only the drafts change, so verified outputs keep the arm's class.
+  at c = 8 (0.998). Only the drafts change and the target still verifies every token; the arm's
+  exactness class with the FP8 draft head was not checked (no equality run).
 
 ## Files
 
@@ -91,9 +97,10 @@ flags. At these request counts a ratio within about 1-2% of 1 is not a detected 
 | kill3 | plain-tuned | FP8 target, per-row | 1 / 8 / 64 | 1.036 / 1.021 / 1.016 | 1.036 / 1.021 / 1.015 | |
 | kill3 | plain-tuned | FP8 oracle (timing only, outputs invalid) | 1 / 8 / 64 | 1.367 / 1.322 / 1.185 | 1.368 / 1.322 / 1.186 | |
 
-On block 16 the FP8 target's x gain is mostly acceptance: accept length moved from 5.32 to 5.52
-(c = 1) and 5.33 to 5.55 (c = 4) because a lossy target changes the token trajectories of these
-16 prompts; per cycle it is 1.02x and 1.04x. The oracle's GEMM inputs are random, so its outputs
+On block 16 a lossy target changes the token trajectories of these 16 prompts, and with them the
+accept length: 5.32 to 5.52 (1.037) at c = 1 and 5.33 to 5.55 (1.041) at c = 4. Per cycle the
+FP8 target is 1.021x and 1.044x, so at c = 1 most of its x gain is acceptance, and at c = 4
+acceptance and cycle time contribute about equally. The oracle's GEMM inputs are random, so its outputs
 are meaningless; its time is a bound because GEMM and decode-kernel times do not depend on the
 values (an assumption, not tested beyond this run).
 

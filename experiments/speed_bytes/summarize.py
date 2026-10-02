@@ -21,6 +21,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
@@ -28,6 +29,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 SGLANG_PIN = 'bd66ce343e'
 REQUIRED_ROUTES = ('bf16', 'fp8_tensor', 'fp8_rowwise', 'fp8_triton', 'fp8_marlin', 'act_quant_fp8')
+# The grid fp8_gemm_probe.py runs by default (its SHAPES and --ms; holds/fp8_probe.sh passes neither).
+GEMM_SHAPES = (
+    'gdn_in_qkvz',
+    'out_or_o_proj',
+    'attn_qkv',
+    'mlp_gate_up',
+    'mlp_down',
+    'lm_head',
+    'dflash_qkv',
+    'dflash_fc',
+)
+GEMM_MS = (1, 2, 4, 8, 16, 32, 64, 128, 256)
 # Backbone linears per decode step (24 GDN layers, 8 attention layers, 32 MLPs); the head and
 # the GDN in_proj_ba (kept BF16) are not counted.
 STEP_COUNTS = {
@@ -69,6 +82,10 @@ def cmd_gemm(args: argparse.Namespace) -> None:
     have = {(r['shape'], r['M'], r['route']) for r in rows}
     shapes = sorted({r['shape'] for r in rows})
     ms = sorted({r['M'] for r in rows})
+    if shapes != sorted(GEMM_SHAPES) or ms != list(GEMM_MS):
+        raise SystemExit(
+            f'{args.probe}: shapes {shapes} and M {ms}, planned {GEMM_SHAPES} {GEMM_MS}'
+        )
     # Every route must cover every shape and M; torch._int_mm needs M > 16, so int8_mm is required
     # only there.
     missing = [
@@ -103,26 +120,60 @@ def cmd_gemm(args: argparse.Namespace) -> None:
     write_csv(rows, Path(args.out))
 
 
-# The sweeps each committed hold launches (holds/kill1.sh, kill2b.sh, kill3.sh) and the client
-# concurrencies of each; a hold missing a sweep or a point, or holding another, is refused.
+# The sweeps each committed hold launches (holds/kill1.sh, kill2b.sh, kill3.sh): per label, the
+# bench arm, the client concurrencies and the exact switches passed to the server. A hold missing
+# a sweep or a point, holding another, or launched with other switches is refused.
 PLAIN = (1, 8, 64)
 B16 = (1, 4)
-PLANNED: dict[str, dict[str, tuple[int, ...]]] = {
+TARGET = {'SGLANG_FP8_DENSE': 'target'}
+HEAD = {'SGLANG_FP8_DRAFT_HEAD': '1'}
+Planned = tuple[str, tuple[int, ...], dict[str, str]]
+PLANNED: dict[str, dict[str, Planned]] = {
     'kill1': {
-        'sb-plain-bf16': PLAIN,
-        'sb-plain-fp8': PLAIN,
-        'sb-b16-bf16': B16,
-        'sb-b16-fp8target': B16,
-        'sb-b16-fp8draft': B16,
+        'sb-plain-bf16': ('plain-tuned', PLAIN, {}),
+        'sb-plain-fp8': ('plain-tuned', PLAIN, TARGET),
+        'sb-b16-bf16': ('dflash-tuned-b16', B16, {}),
+        'sb-b16-fp8target': ('dflash-tuned-b16', B16, TARGET),
+        'sb-b16-fp8draft': ('dflash-tuned-b16', B16, {'SGLANG_FP8_DENSE': 'draft'}),
     },
     'kill2b': {
-        'sb2-b16-bf16': B16,
-        'sb2-b16-fp8head': B16,
-        'sb2-b8-bf16': (8,),
-        'sb2-b8-fp8head': (8,),
+        'sb2-b16-bf16': ('dflash-tuned-b16', B16, {}),
+        'sb2-b16-fp8head': ('dflash-tuned-b16', B16, HEAD),
+        'sb2-b8-bf16': ('dflash-tuned', (8,), {}),
+        'sb2-b8-fp8head': ('dflash-tuned', (8,), HEAD),
     },
-    'kill3': {'sb3-plain-bf16': PLAIN, 'sb3-plain-fp8oracle': PLAIN, 'sb3-plain-fp8tok': PLAIN},
+    'kill3': {
+        'sb3-plain-bf16': ('plain-tuned', PLAIN, {}),
+        'sb3-plain-fp8oracle': ('plain-tuned', PLAIN, {**TARGET, 'SGLANG_FP8_DENSE_ACT': 'oracle'}),
+        'sb3-plain-fp8tok': ('plain-tuned', PLAIN, {**TARGET, 'SGLANG_FP8_DENSE_ACT': 'token'}),
+    },
 }
+
+
+# The engine commit each hold ran (engine/sglang/README.md: patches 0001; 0001-0002; 0001 + 0003).
+HOLD_ENGINES = {
+    'kill1': '98aa8c9821',
+    'kill2b': '1490d9a891',
+    'kill3': '1bc2fc4719',
+    'probe1': '98aa8c9821',
+}
+
+
+def check_hold_engine(hold: Path) -> None:
+    """The hold log's first line records the engine head; it must be the one the hold was run on."""
+    name = hold.name.split('_')[0]
+    m = re.match(r'start \S+ repo \w+ engine (\w+)', (hold / 'hold.log').read_text())
+    if not m or name not in HOLD_ENGINES or not m.group(1).startswith(HOLD_ENGINES[name]):
+        raise SystemExit(f'{hold}: engine {m and m.group(1)}, expected {HOLD_ENGINES.get(name)}')
+
+
+def check_fp8_log(log: str, env: dict[str, str]) -> bool:
+    """The server log shows exactly the FP8 conversions the switches ask for, with their mode."""
+    mode = env.get('SGLANG_FP8_DENSE')
+    act = env.get('SGLANG_FP8_DENSE_ACT') or 'token'
+    dense_ok = (f'FP8 dense ({mode}, act={act},' in log) if mode else ('FP8 dense (' not in log)
+    head_ok = ('draft head in FP8' in log) == bool(env.get('SGLANG_FP8_DRAFT_HEAD'))
+    return dense_ok and head_ok
 
 
 def env_label(arm: dict) -> str:
@@ -131,11 +182,14 @@ def env_label(arm: dict) -> str:
 
 
 def cmd_served(args: argparse.Namespace) -> None:
+    from bench.pareto import invalid_reason
+
     pts = []
     for hold in args.holds:
         hold = Path(hold)
         sweeps = sorted(hold.glob('*/*/sweep.json'))
         name = hold.name.split('_')[0]
+        check_hold_engine(hold)
         labels = [f.parent.parent.name for f in sweeps]
         if name not in PLANNED or sorted(labels) != sorted(PLANNED[name]):
             raise SystemExit(
@@ -146,25 +200,31 @@ def cmd_served(args: argparse.Namespace) -> None:
             src = d['launch']['sglang_source']
             if src.get('dirty_files'):
                 raise SystemExit(f'{f}: engine tree was dirty')
+            if not src['head'].startswith(HOLD_ENGINES[name]):
+                raise SystemExit(f'{f}: engine {src["head"][:10]}, expected {HOLD_ENGINES[name]}')
             if d['launch']['repo'].get('dirty_files'):
                 raise SystemExit(f'{f}: harness repository was dirty')
-            planned = set(PLANNED[name][f.parent.parent.name])
+            arm, conc, switches = PLANNED[name][f.parent.parent.name]
+            planned = set(conc)
             got = {p['concurrency'] for p in d['points']}
             if planned != got or planned != set(d['concurrency']):
                 raise SystemExit(
                     f'{f}: points {sorted(got)}, sweep {sorted(d["concurrency"])}, '
                     f'planned {sorted(planned)}'
                 )
-            # The server's own log must show the FP8 switches exactly when the arm sets them.
+            env = {k: v for k, v in d['arm'].get('env', {}).items() if v}
+            if d['arm']['name'] != arm or env != switches:
+                raise SystemExit(f'{f}: arm {d["arm"]["name"]} {env}, planned {arm} {switches}')
+            # The server's own log must show those switches' conversions, with their mode.
             log = (f.parent / 'server' / 'server.log').read_text(errors='replace')
-            wants = {k for k, v in d['arm'].get('env', {}).items() if v}
-            if ('SGLANG_FP8_DENSE' in wants) != ('FP8 dense (' in log) or (
-                'SGLANG_FP8_DRAFT_HEAD' in wants
-            ) != ('draft head in FP8' in log):
-                raise SystemExit(f'{f}: server log does not match the FP8 switches {sorted(wants)}')
+            if not check_fp8_log(log, env):
+                raise SystemExit(f'{f}: server log does not match the FP8 switches {env}')
             for p in d['points']:
-                if p['failed'] or p['osl_mismatch'] or p['completed'] != p['requests']:
-                    raise SystemExit(f'{f}: c={p["concurrency"]} has failed or short requests')
+                # bench's own validity rule (failed or short requests, aiperf errors, warm cache,
+                # other prompts, host contention), plus every request completed.
+                reason = invalid_reason(p)
+                if reason or p['completed'] != p['requests']:
+                    raise SystemExit(f'{f}: c={p["concurrency"]} invalid: {reason or "short"}')
                 acc = (p.get('spec') or {}).get('accept_length')
                 pts.append(
                     {
@@ -207,16 +267,27 @@ def cmd_served(args: argparse.Namespace) -> None:
     write_csv(pts, Path(args.out))
 
 
+# The trace variants of holds/kill2b.sh and the switches each runs with.
+TRACE_SWITCHES = {'bf16': {}, 'fp8': TARGET}
+
+
 def cmd_steps(args: argparse.Namespace) -> None:
     from step_budget import budget
 
     rows = []
+    seen: list[tuple[str, int]] = []
     for rep in args.reports:
         rep = Path(rep)
-        b = budget(rep)
+        check_hold_engine(rep.parent.parent)  # <hold>/trace_<variant>/<report>
         m = re.search(r'trace_(\w+)/plain_bs(\d+)', str(rep))
-        if not m:
-            raise SystemExit(f'{rep}: expected .../trace_<variant>/plain_bs<B>.nsys-rep')
+        if not m or m.group(1) not in TRACE_SWITCHES:
+            raise SystemExit(f'{rep}: expected .../trace_{{bf16,fp8}}/plain_bs<B>.nsys-rep')
+        # The traced server's log (beside the report) must show the variant's conversion.
+        log = (rep.parent / 'server.log').read_text(errors='replace')
+        if not check_fp8_log(log, TRACE_SWITCHES[m.group(1)]):
+            raise SystemExit(f'{rep}: server.log does not match variant {m.group(1)}')
+        seen.append((m.group(1), int(m.group(2))))
+        b = budget(rep)
         for r in b['classes']:
             rows.append(
                 {
@@ -228,6 +299,10 @@ def cmd_steps(args: argparse.Namespace) -> None:
                     **{k: round(v, 2) if isinstance(v, float) else v for k, v in r.items()},
                 }
             )
+    # holds/kill2b.sh traces each variant at c = 1 and 64 (run_profiles.py --concurrency 1 64).
+    planned = sorted((v, bs) for v in TRACE_SWITCHES for bs in (1, 64))
+    if sorted(seen) != planned:
+        raise SystemExit(f'reports {sorted(seen)} != planned {planned}')
     write_csv(rows, Path(args.out))
 
 
@@ -237,23 +312,55 @@ UNIT = re.compile(
 )
 
 
+# holds/probe1.sh: each server's label and switches; per server it runs generate with 48 requests
+# in flight (<label>.gen48, run label <label>-c48), one at a time (.gen1, -c1) and score mode on
+# the BF16 generate run's tokens (.score, -score, 48 in flight).
+PROBE1_SWITCHES: dict[str, dict[str, str]] = {
+    'bf16': {},
+    'fp8tok': {**TARGET, 'SGLANG_FP8_DENSE_ACT': 'token'},
+    'fp8ten': {**TARGET, 'SGLANG_FP8_DENSE_ACT': 'tensor'},
+}
+PROBE_KINDS = {
+    'gen48': ('generate', 48, 'c48'),
+    'gen1': ('generate', 1, 'c1'),
+    'score': ('score', 48, 'score'),
+}
+
+
+def check_probe_run(run: dict, name: str, ref: dict) -> None:
+    """A probe file is the run its name says: mode, concurrency, label, prompts and settings."""
+    label, kind = name.split('.')
+    mode, conc, suffix = PROBE_KINDS[kind]
+    if (run['mode'], run['concurrency'], run['label']) != (mode, conc, f'{label}-{suffix}'):
+        raise SystemExit(f'{name}: recorded {run["mode"]}, c={run["concurrency"]}, {run["label"]}')
+    for key in ('prompt_ids', 'workload_sha256', 'thinking', 'max_new_tokens', 'topk'):
+        if run[key] != ref[key]:
+            raise SystemExit(f'{name}: {key} differs from the reference')
+    # Score mode is teacher-forced on the reference's tokens.
+    if mode == 'score' and [s['tokens'] for s in run['sequences']] != [
+        s['tokens'] for s in ref['sequences']
+    ]:
+        raise SystemExit(f'{name}: not scored on the reference tokens')
+
+
 def cmd_probe(args: argparse.Namespace) -> None:
     from experiments.lossy.analyze import decode_path
     from experiments.moonshot.logit_probe import compare_runs
 
     d = Path(args.probe_dir)
+    check_hold_engine(d)
+    for label, switches in PROBE1_SWITCHES.items():
+        log = (d / f'server_{label}.log').read_text(errors='replace')
+        if not check_fp8_log(log, switches):
+            raise SystemExit(f'{d}: server_{label}.log does not match its FP8 setting')
+    ref = json.loads((d / 'bf16.gen48.json').read_text())
 
     def load(name: str) -> dict:
-        return json.loads((d / f'{name}.json').read_text())
+        run = json.loads((d / f'{name}.json').read_text())
+        check_probe_run(run, name, ref)
+        return run
 
-    expected = {'bf16': None, 'fp8tok': 'act=token', 'fp8ten': 'act=tensor'}
-    for label, act in expected.items():
-        log = (d / f'server_{label}.log').read_text(errors='replace')
-        if ('FP8 dense (' in log) != (act is not None) or (
-            act and f'FP8 dense (target, {act}' not in log
-        ):
-            raise SystemExit(f'{d}: server_{label}.log does not match its FP8 setting')
-    ref = load('bf16.gen48')
+    load('bf16.gen48')
     out: dict = {'reference': 'bf16.gen48', 'logit_probe_compare': {}, 'decode_path': {}}
     for cand in ['bf16.gen1', 'bf16.score', 'fp8tok.gen48', 'fp8tok.gen1', 'fp8tok.score',
                  'fp8ten.gen48', 'fp8ten.gen1', 'fp8ten.score']:  # fmt: skip
@@ -263,7 +370,8 @@ def cmd_probe(args: argparse.Namespace) -> None:
     for a, b in [('fp8tok.gen48', 'fp8tok.gen1'), ('fp8ten.gen48', 'fp8ten.gen1')]:
         out['logit_probe_compare'][f'{a} vs {b}'] = compare_runs(load(a), load(b))
         out['decode_path'][f'{a} vs {b}'] = decode_path(load(a), load(b))
-    unit = [
+    check_hold_engine(Path(args.unit_log).parent)  # kill1, the hold that ran the unit check
+    unit: list[dict[str, Any]] = [
         {
             'act': m.group(1),
             'M': int(m.group(2)),
@@ -274,8 +382,16 @@ def cmd_probe(args: argparse.Namespace) -> None:
         }
         for m in UNIT.finditer(Path(args.unit_log).read_text())
     ]
-    if len(unit) != 6:
-        raise SystemExit(f'expected 6 unit-check lines, found {len(unit)}')
+    # fp8_dense_unit.py: both activation modes at M = 1, 16 and 64; with per-row scales a row's
+    # result must not depend on the rest of the batch (the README's claim).
+    combos = sorted((u['act'], u['M']) for u in unit)
+    if combos != sorted((a, m) for a in ('token', 'tensor') for m in (1, 16, 64)):
+        raise SystemExit(f'unit-check lines {combos}')
+    if not all(u['row1_alone_equals_in_batch'] for u in unit if u['act'] == 'token' and u['M'] > 1):
+        raise SystemExit('unit check: a per-row-scale row depends on its batch')
+    text = Path(args.unit_log).read_text()
+    if not all(f'act={a} graph replay equal eager: True' in text for a in ('token', 'tensor')):
+        raise SystemExit('unit check: CUDA-graph replay differs from eager')
     out['unit_check'] = unit
     Path(args.out).write_text(json.dumps(out, indent=1, default=float) + '\n')
     print(f'wrote {args.out}')

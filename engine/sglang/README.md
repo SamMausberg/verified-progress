@@ -340,7 +340,8 @@ the earlier confirm tree `9a01a622f6e7f7f816ce6255ba5de56d52e09dbc`, whose 0003 
 ## speed-bytes (`patches/speed-bytes/0001-0005`, branches `engine/speed-bytes` and `engine/speed-bytes-l2`)
 
 Online FP8 for the dense linear layers, through cuBLASLt rather than sgl-kernel's CUTLASS FP8
-GEMM (the aarch64 sgl-kernel 0.4.7 wheel carries no sm_90a code, so that GEMM aborts on GH200;
+GEMM (the aarch64 sgl-kernel 0.4.7 wheel's `common_ops` carries no sm_90a code, so on GH200 that GEMM is
+CUTLASS's stub, which prints an abort message and computes nothing;
 `evidence/speed_bytes/README.md`). Every switch is off unless its environment variable is set.
 
 ```sh

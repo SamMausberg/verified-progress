@@ -11,11 +11,10 @@ OUT=$HOME/vp-data/speed-bytes/probe1_$(date -u +%Y%m%dT%H%M%SZ)
 PORT=30221
 mkdir -p "$OUT"
 exec >"$OUT/hold.log" 2>&1
-# sglang_env.sh's defaults (the main checkout's virtualenv, the CUDA 13 toolkit and compat libraries),
-# never ones a calling shell names.
-unset PYTHONPATH SGLANG_DIR CUDA_HOME_13 CUDA_COMPAT_DIR
-# Only the switches each launch passes explicitly may reach a server.
-unset "${!SGLANG_FP8_@}"
+# Only what this script sets reaches SGLang: no inherited SGLANG_* variable (the FP8 switches, an
+# SGLANG_DIR naming another virtualenv), PYTHONPATH or CUDA toolkit override; sglang_env.sh then uses
+# its defaults (the main checkout's virtualenv, the CUDA 13 toolkit and compat libraries).
+unset PYTHONPATH CUDA_HOME_13 CUDA_COMPAT_DIR "${!SGLANG_@}"
 export SGLANG_WORKTREE=$ENGINE
 # shellcheck source=/dev/null
 source "$REPO/scripts/sglang_env.sh"
@@ -41,6 +40,7 @@ kill_servers() {
   done
 }
 trap kill_servers EXIT
+FAILS=0
 # A server already answering on the port belongs to someone else: refuse the whole probe.
 if curl -sf "http://127.0.0.1:$PORT/health" >/dev/null; then
   echo "port $PORT already serves: refusing to run"; exit 1
@@ -83,9 +83,9 @@ for spec in "bf16:SGLANG_FP8_DENSE=" "fp8tok:SGLANG_FP8_DENSE=target SGLANG_FP8_
   label=${spec%%:*}
   read -r -a envs <<<"${spec#*:}"
   if start_server "$label" "${envs[@]}"; then
-    probe "$label" || echo "!! probe $label failed"
+    probe "$label" || { echo "!! probe $label failed"; FAILS=$((FAILS + 1)); }
   else
-    echo "!! server $label failed to start"
+    echo "!! server $label failed to start"; FAILS=$((FAILS + 1))
   fi
   grep -E "FP8 dense|max_total_num_tokens|Load weight end" "$OUT/server_$label.log" | head -5 || true
   kill_servers
@@ -95,6 +95,8 @@ for pair in "bf16.gen48 bf16.gen1" "bf16.gen48 fp8tok.gen48" "fp8tok.gen48 fp8to
             "bf16.gen48 fp8tok.score" "bf16.gen48 fp8ten.score"; do
   read -r a b <<<"$pair"
   echo "== compare $a $b"
-  python experiments/moonshot/logit_probe.py compare "$OUT/$a.json" "$OUT/$b.json" || echo "!! compare failed"
+  # For the log only (summarize.py probe builds the evidence); compare exits 3 when two runs differ.
+  python experiments/moonshot/logit_probe.py compare "$OUT/$a.json" "$OUT/$b.json" || echo "(compare exit $?)"
 done
-echo "end $(date -Is)"
+echo "end $(date -Is), failed steps: $FAILS"
+[ "$FAILS" = 0 ]

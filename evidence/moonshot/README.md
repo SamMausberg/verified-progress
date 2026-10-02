@@ -123,7 +123,7 @@ bench `plain` arm (radix on, max-running 128, mamba cache 640 slots, mem 0.85) p
   Triton W8A8 route runs but shows no consistent gain (0.96-1.06x across c = 1-128, single
   runs). **Negative result** until a cuBLASLt rowwise route is wired.
   (2026-10-02: `evidence/speed_bytes/` gives the cause, no sm_90a code in the aarch64 sgl-kernel
-  wheel, and measures the cuBLASLt per-tensor route served.)
+  wheel's `common_ops`, and measures the cuBLASLt per-tensor route served.)
 - FP8 KV does nothing at ~334-token contexts; it matters only for long contexts.
 - ReplaySSM and NGRAM arms failed to launch in this pass (radix strategy and bench's
   draft-graph check, both fixed in the harness); rerun pending.

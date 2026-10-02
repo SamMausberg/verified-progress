@@ -17,10 +17,17 @@ The holds ran on 2026-10-02 from copies of these scripts in a scratch directory,
 commit. The committed hold scripts differ from those copies in how they locate the repository
 and the helper scripts, and in guards added after review that do not change what a run measures:
 they refuse a repository with tracked edits and an engine whose tree is not the recorded one,
-clear inherited `SGLANG_FP8_*` switches and any override of the virtualenv or CUDA toolkit that
-`scripts/sglang_env.sh` would honour, `fp8_probe.sh` creates its output directory and checks
-the SGLang checkout, and `probe1.sh` refuses a port that already serves and stops only the
-servers it started. `fp8_gemm_probe.py` differs by formatting, a lint directive and
+clear every inherited `SGLANG_*` variable and any override of the virtualenv or CUDA toolkit that
+`scripts/sglang_env.sh` would honour, exit non-zero when any sweep, trace or probe step failed,
+`fp8_probe.sh` creates its output directory and checks the SGLang checkout, and `probe1.sh`
+refuses a port that already serves and stops only the servers it started. `fp8_dense_unit.py`
+now fails on the properties it prints (per-row rows independent of the batch, CUDA-graph replay
+equal to eager, relative error under 0.06); the run printed them all passing.
+`summarize.py` checks every input against what its hold launched: per sweep the arm, the
+concurrencies and the exact switches, per server log the FP8 conversion and mode those switches
+imply, per hold the engine commit, per probe file its mode, concurrency, label, prompts and
+(score mode) the reference tokens, and bench's own point-validity rule.
+`fp8_gemm_probe.py` differs by formatting, a lint directive and
 fixes made after review: its `fp8_tensor` route now quantizes the weights per tensor, where the
 run reused the per-channel weights with a unit scale (the same scalar-scale cuBLASLt kernel and
 timing, but not that route's error, so `summarize.py` omits the error for it), and it records the

@@ -12,11 +12,10 @@ ENGINE_TREE=e95d72d554f3b70f280e466de8adc21a2f5598c2
 OUT=$HOME/vp-data/speed-bytes/kill1_$(date -u +%Y%m%dT%H%M%SZ)
 mkdir -p "$OUT"
 exec >"$OUT/hold.log" 2>&1
-# sglang_env.sh's defaults (the main checkout's virtualenv, the CUDA 13 toolkit and compat libraries),
-# never ones a calling shell names.
-unset PYTHONPATH SGLANG_DIR CUDA_HOME_13 CUDA_COMPAT_DIR
-# Only the switches each launch passes explicitly may reach a server.
-unset "${!SGLANG_FP8_@}"
+# Only what this script sets reaches SGLang: no inherited SGLANG_* variable (the FP8 switches, an
+# SGLANG_DIR naming another virtualenv), PYTHONPATH or CUDA toolkit override; sglang_env.sh then uses
+# its defaults (the main checkout's virtualenv, the CUDA 13 toolkit and compat libraries).
+unset PYTHONPATH CUDA_HOME_13 CUDA_COMPAT_DIR "${!SGLANG_@}"
 export SGLANG_WORKTREE=$ENGINE
 # shellcheck source=/dev/null
 source "$REPO/scripts/sglang_env.sh"
@@ -32,6 +31,7 @@ kill_servers() {
   pkill -KILL -f -- 'sglang.launch_server.* --port 30220( |$)' || true
 }
 trap kill_servers EXIT
+FAILS=0
 echo "== unit check"
 timeout --foreground 180 python "$SP/fp8_dense_unit.py"
 run() {  # label arm concurrency... -- extra args
@@ -42,11 +42,12 @@ run() {  # label arm concurrency... -- extra args
   echo "== $label $(date -Is)"
   timeout --foreground 600 python -m bench.sweep --arm "$arm" --label "$label" --session sb-kill1 \
     --sglang-worktree "$ENGINE" --port 30220 --out "$OUT" --concurrency "${conc[@]}" \
-    --min-requests 16 --waves 4 "$@" || echo "!! $label failed: $?"
+    --min-requests 16 --waves 4 "$@" || { echo "!! $label failed: $?"; FAILS=$((FAILS + 1)); }
 }
 run sb-plain-bf16 plain-tuned 1 8 64
 run sb-plain-fp8 plain-tuned 1 8 64 -- --env SGLANG_FP8_DENSE=target
 run sb-b16-bf16 dflash-tuned-b16 1 4
 run sb-b16-fp8target dflash-tuned-b16 1 4 -- --env SGLANG_FP8_DENSE=target
 run sb-b16-fp8draft dflash-tuned-b16 1 4 -- --env SGLANG_FP8_DENSE=draft
-echo "end $(date -Is)"
+echo "end $(date -Is), failed steps: $FAILS"
+[ "$FAILS" = 0 ]

@@ -8,6 +8,7 @@ from sglang.srt.layers.quantization import fp8_dense_online as m
 from sglang.srt.layers.quantization.unquant import UnquantizedLinearMethod
 
 torch.manual_seed(0)
+failures = []
 
 
 class Lin(torch.nn.Module):
@@ -47,6 +48,10 @@ for act in ('token', 'tensor'):
             f'act={act} M={M} dtype={y.dtype} rel_err row0 {rel[0]:.4f} others {others:.4f} '
             f'row1 alone==in-batch {same} maxdiff {d:.3g}'
         )
+        if rel.max().item() > 0.06:  # e4m3 rounding gives about 0.04 on these inputs
+            failures.append(f'act={act} M={M}: relative error {rel.max().item():.4f}')
+        if act == 'token' and M > 1 and not same:
+            failures.append(f'act=token M={M}: row 1 depends on the batch')
     # graph capture
     x = torch.randn(16, 2560, device='cuda', dtype=torch.bfloat16)
     s = torch.cuda.Stream()
@@ -59,7 +64,10 @@ for act in ('token', 'tensor'):
         yg = root.a.quant_method.apply(root.a, x)
     g.replay()
     torch.cuda.synchronize()
-    print(
-        f'act={act} graph replay equal eager: {torch.equal(yg, root.a.quant_method.apply(root.a, x))}'
-    )
+    graph_equal = torch.equal(yg, root.a.quant_method.apply(root.a, x))
+    print(f'act={act} graph replay equal eager: {graph_equal}')
+    if not graph_equal:
+        failures.append(f'act={act}: CUDA-graph replay differs from eager')
+if failures:
+    raise SystemExit('FAILED: ' + '; '.join(failures))
 print('OK')

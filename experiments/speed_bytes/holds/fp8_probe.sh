@@ -4,12 +4,13 @@ set -euo pipefail
 SP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO="$(cd "$SP/../.." && pwd)"
 [ -z "$(git -C "$REPO" status --porcelain --untracked-files=no)" ] || { echo "repository $REPO has tracked edits"; exit 1; }
-# The probe imports SGLang's kernels from the main checkout; require the pinned, clean tree.
-# Always the pinned main checkout and its virtualenv, whatever the calling shell exports.
+# No inherited SGLANG_* variable, PYTHONPATH or CUDA toolkit override reaches the probe.
+unset PYTHONPATH CUDA_HOME_13 CUDA_COMPAT_DIR "${!SGLANG_@}"
+# The probe imports SGLang's kernels from the main checkout (and its virtualenv); require the
+# pinned, clean tree.
 SGLANG_DIR=$HOME/sglang
 [ "$(git -C "$SGLANG_DIR" rev-parse --short=10 HEAD)" = bd66ce343e ] || { echo "$SGLANG_DIR is not at bd66ce343e"; exit 1; }
 [ -z "$(git -C "$SGLANG_DIR" status --porcelain --untracked-files=no)" ] || { echo "$SGLANG_DIR is dirty"; exit 1; }
-unset SGLANG_WORKTREE PYTHONPATH CUDA_HOME_13 CUDA_COMPAT_DIR
 # shellcheck source=/dev/null
 source "$REPO/scripts/sglang_env.sh"
 mkdir -p "$HOME/vp-data/speed-bytes"
