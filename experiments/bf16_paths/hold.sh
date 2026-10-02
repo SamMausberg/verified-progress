@@ -22,10 +22,10 @@
 #   of text (where both events lie) is sampled; transformers with an FP32 state only.
 # Targets: ~/vp-data/exactness/paths/targets.jsonl (paths.py `targets`), copied once and hashed.
 # Output: ~/vp-data/upstream/bf16 (BF16_PATHS_OUT); log in logs/hold-<UTC>.log. A step that
-# finishes without a failure writes done/<step>; a rerun skips completed steps (and is refused
-# when every requested step is complete), and within an incomplete step keeps every output that
-# exists and produces only the missing ones (no file is overwritten); move an output aside to
-# redo it.
+# finishes without a failure writes done/<step>; a rerun skips completed steps (a marker counts
+# only while all of the step's outputs exist) and is refused when every requested step is
+# complete, and within an incomplete step keeps every output that exists and produces only the
+# missing ones (no file is overwritten); move an output aside to redo it.
 set -euo pipefail
 steps=" ${*:-all} "
 for step in $steps; do
@@ -45,12 +45,34 @@ unset SGLANG_WORKTREE PYTHONPATH
 source "$repo/scripts/sglang_env.sh"
 python -c 'import sglang, torch, transformers' || { echo "not the SGLang environment: $(command -v python)"; exit 1; }
 [ -z "$(git status --porcelain --untracked-files=all)" ] || { echo "checkout not clean"; exit 65; }
+# outputs STEP: the files a complete STEP leaves in $out.
+outputs() {
+  case "$1" in
+    hf) echo hf_bf16_torch.json hf_bf16_torch_fp32state.json hf_bf16_fla.json hf_bf16_fla_fp32state.json ;;
+    sglang) echo default.json prefill_triton.json decode_flashinfer.json no_cuda_graph.json attn_triton.json \
+      beta_fp32.json ;;
+    perturb | perturb_gdn) echo "$1.json" ;;
+    rates) echo rates/prompts.jsonl rates/sglang.jsonl.gz rates/hf_bf16_float32state.jsonl.gz \
+      rates/hf_bf16_modelstate.jsonl.gz rates/hf_bf16_fla_float32state.jsonl.gz rates/fp32.jsonl.gz ;;
+    rates_eot) echo rates_eot/prompts.jsonl rates_eot/sglang.jsonl.gz rates_eot/hf_bf16_float32state.jsonl.gz \
+      rates_eot/hf_bf16_fla_float32state.jsonl.gz rates_eot/fp32.jsonl.gz ;;
+  esac
+}
+# complete STEP: its done marker exists and so does every output (a marker whose outputs were
+# moved aside is stale and is removed, so the step runs again).
+complete() {
+  [ -e "$out/done/$1" ] || return 1
+  local file
+  for file in $(outputs "$1"); do
+    [ -e "$out/$file" ] || { echo "stale marker $out/done/$1: $file missing"; rm -f "$out/done/$1"; return 1; }
+  done
+}
 # Completed steps are skipped; the hold is refused only when every requested step is complete.
 todo=" "
 skipped=""
 for step in hf sglang perturb perturb_gdn rates rates_eot; do
   want "$step" || continue
-  if [ -e "$out/done/$step" ]; then skipped+="$step "; else todo+="$step "; fi
+  if complete "$step"; then skipped+="$step "; else todo+="$step "; fi
 done
 [ "$todo" != " " ] || { echo "every requested step is complete (markers in $out/done)"; exit 65; }
 want() { [[ $todo == *" $1 "* ]]; }
