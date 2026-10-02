@@ -35,7 +35,7 @@
 \term{main}{Guards, $P_?$}{Interval tests that decide the standard acceptance rule from enclosures of the numerator and the partition function; $P_?$ is the probability that neither fires (Theorem~\ref{thm:guards}).}
 \term{app}{Head chain}{The stock head GEMM, the FP32 copy of its logits and the argmax or top-1 that follows it (Appendix~\ref{app:profile}).}
 \term{main}{Integer pass}{A certified pass that quantizes the head input as well and accumulates exactly in int32 (Theorem~\ref{thm:integer}).}
-\term{main}{Keyed noise field}{Gumbel noise $G_{t,i}$ that is a pure function of (seed, absolute position $t$, token $i$), as in the engine's seeded sampler.}
+\term{main}{Keyed noise field}{Gumbel noise $G_{t,i}$ that is a pure function of (seed, token position $t$ in the sequence, token $i$), as in the engine's seeded sampler.}
 \term{main}{Oracle radii}{The realized per-tile deviations used as transport radii; a ceiling that no certified geometry reaches (Appendix~\ref{app:transport-families}).}
 \term{app}{Partition interval $\log(Z^+/Z^-)$}{The width, in nats, of an enclosure of the partition function; it decides how often the acceptance guards fire (Appendix~\ref{app:transport-sampled}).}
 \term{app}{Point-mass proposal}{A deterministic draft token, SGLang's default for sampled verification; its residual is a race over the untried tokens (Appendix~\ref{app:residual}).}
