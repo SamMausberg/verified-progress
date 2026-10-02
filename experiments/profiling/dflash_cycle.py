@@ -15,7 +15,9 @@ Nothing is written unless every window the two runs' recorded commands planned i
 present (``run_profiles.window_problems``), every window held its batch at C with no
 request finishing inside it, and every planned concurrency has an attribution of its
 own report with complete eager kernel records. A partial windows file therefore
-stops the analysis instead of yielding a partial table.
+stops the analysis instead of yielding a partial table. The traced and untraced runs
+of an arm must also share the repository and SGLang commits, the GPU, the server
+command and its environment (``pair_problems``), since the derived terms combine them.
 
 Phases (``PHASES``) group the attribution's categories, which for DFlash are tied
 to the graph or eager section a kernel runs in, so the phases and the two idle
@@ -55,6 +57,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import shlex
 import statistics
 import sys
 from pathlib import Path
@@ -112,6 +115,25 @@ def load_run(evidence: Path, name: str, mode: str, problems: list[str]) -> tuple
     return {'args': args, 'meta': meta}, rows
 
 
+def pair_problems(traced: dict, untraced: dict) -> list[str]:
+    """Why a traced and an untraced run cannot be combined: the derived terms subtract one
+    from the other, so both must come from the same code, engine, GPU and server command."""
+    problems = []
+    for key in ('repo_sha', 'sglang_sha'):
+        if not traced.get(key) or traced.get(key) != untraced.get(key):
+            problems.append(
+                f'{key} differs ({traced.get(key)} traced, {untraced.get(key)} untraced)'
+            )
+    if traced.get('gpu') != untraced.get('gpu'):
+        problems.append('the runs were made on different GPUs or clocks')
+    server = shlex.split(untraced.get('server_command', ''))
+    if not server or shlex.split(traced.get('server_command', ''))[-len(server) :] != server:
+        problems.append('the traced server command is not the untraced one under nsys')
+    if traced.get('env', {}) != untraced.get('env', {}):
+        problems.append('the server environments differ')
+    return problems
+
+
 def window_stats(rows: list[dict]) -> dict:
     ms = [r['ms_per_cycle_est'] for r in rows]
     tps = [r['output_tokens_per_s'] for r in rows]
@@ -157,6 +179,7 @@ def load_inputs(evidence: Path) -> dict[str, dict]:
         cs = traced_run['args'].concurrency
         if sorted(cs) != sorted(untraced_run['args'].concurrency):
             problems.append(f'{arm}: traced and untraced runs planned different concurrencies')
+        problems += [f'{arm}: {p}' for p in pair_problems(traced_run['meta'], untraced_run['meta'])]
         attrs = {}
         for c in cs:
             path = evidence / 'attribution' / f'{arm}_bs{c}.json'

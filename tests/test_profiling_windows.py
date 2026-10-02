@@ -330,6 +330,8 @@ def test_dflash_cycle_splits_the_cycle_and_derives_the_untraced_terms(tmp_path: 
         ('batch_not_held', 'c=1: running batch [1, 2], not 1'),
         ('unknown_category', 'category mystery belongs to no phase'),
         ('cut_off_line', 'is not JSON'),
+        ('other_engine', 'dflash-tuned: sglang_sha differs (t traced, s untraced)'),
+        ('other_server', 'the traced server command is not the untraced one under nsys'),
     ],
 )
 def test_dflash_cycle_refuses_partial_or_invalid_inputs(
@@ -352,6 +354,15 @@ def test_dflash_cycle_refuses_partial_or_invalid_inputs(
         attr = json.loads(path.read_text())
         attr['categories'].append({'category': 'mystery', 'us_per_step': 1.0})
         path.write_text(json.dumps(attr))
+    elif damage in ('other_engine', 'other_server'):
+        # Codex on #192: a resumed hold may pair runs from different revisions or flags.
+        path = win / 'dflash-tuned_nsys_meta.json'
+        meta = json.loads(path.read_text())
+        if damage == 'other_engine':
+            meta['sglang_sha'] = 't'
+        else:
+            meta['server_command'] = 'nsys launch other-server'
+        path.write_text(json.dumps(meta))
     else:
         with (win / 'dflash-tuned-b16_none.jsonl').open('a') as fh:
             fh.write('{"arm": "dflash-tuned-b16", "concurr')
