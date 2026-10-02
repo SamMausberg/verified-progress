@@ -376,12 +376,18 @@ capture's batch shape, i.e. no counterexample to any of these error models for c
 these 6,005 rows. That is consistent with the models, not a proof that the stock kernel
 stays within the smallest one. Under R-stock the fallback reruns the stock head at the
 served batch shape. Resolving undecided rows one at a time returns the stock decision only
-if the stock head GEMM is bitwise batch-invariant row by row. On this build it is, at 20
-batch sizes from 1 to 256 and for the gathered-candidate shape of the column fallback
-(`evidence/certified_head/stock_invariance.json`); that is a measured property of this
-build, which the certified head's start-up self-test re-checks on the deployed shapes, and
-without it R-stock requires the rerun at the same batch shape. The cost of either fallback
-mode is not measured here; `evidence/certified_head/micro_head.json` times both.
+if the stock head GEMM is bitwise batch-invariant row by row. On this build it is: at 20
+batch sizes from 1 to 256, every row's logits equal its logits at batch 1
+(`evidence/certified_head/stock_invariance.json`, `rows_equal_to_m1_*`). That is a measured
+property of this build, not a guarantee, and without it R-stock requires the rerun at the
+same batch shape. The certified head's column fallback needs a different property: it reruns
+the stock GEMM at the same batch shape over the gathered candidate rows, so it relies on
+column-subset invariance (the gathered rows' logits equal the same columns of the full
+stock head). The same file measures that at the 20 sizes (`column_subset_equal`), and the
+head's start-up self-test (`column_invariance_self_test` in `src/certified_head/head.py`)
+re-checks it at the deployed batch sizes; the self-test does not check row invariance. The
+cost of either fallback mode is not measured here; `evidence/certified_head/micro_head.json`
+times both.
 
 ## P1: certified decoder tail (plain decoding only) - negative result
 
