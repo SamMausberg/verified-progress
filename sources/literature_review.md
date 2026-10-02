@@ -924,7 +924,7 @@ than a few requests (Section 8).
 
 For Qwen3.5-4B no quality curve exists; one would have to be measured. DFlash's
 per-position acceptance on Qwen3.5-4B is about 0.78-0.88 (DFlash 2 blog, Fig. 5,
-per the scout). A lossy rule mainly raises it at concurrency 1-8, where speculation
+per the first-pass search). A lossy rule mainly raises it at concurrency 1-8, where speculation
 is bandwidth-bound.
 
 ### 12.3 Datastore and retrieval drafting (lossless; gains depend on the workload)
@@ -987,7 +987,7 @@ These help agentic, code and summarization traffic, and little on open chat.
   experiment:** half the state bytes and half the per-request memory. Whether
   SGLang's sm_90 GDN kernels accept an FP16 state was not checked.
 - No paper offloads the live recurrent state to Grace memory. GH200 offload work
-  (BOOST, SuperInfer, DAK, per the scout) moves weights or KV instead.
+  (BOOST, SuperInfer, DAK, per the first-pass search) moves weights or KV instead.
 
 ### 12.6 2:4 sparsity with FP8 on Hopper
 
@@ -996,7 +996,7 @@ These help agentic, code and summarization traffic, and little on open chat.
   raises LLaMA-7B WikiText perplexity from 5.68 to 11.00 and 11.53 respectively.
 - **MaskLLM** (NeurIPS 2024) [`maskllm`]: learned 2:4 masks reach 6.72 perplexity
   (dense 5.12) at about 1,280 A100-hours.
-- Red Hat's Sparse-Llama-3.1-8B-2of4 (FP8, H100, vLLM, Dec 2024 blog; per the scout)
+- Red Hat's Sparse-Llama-3.1-8B-2of4 (FP8, H100, vLLM, Dec 2024 blog; per the first-pass search)
   reports 1.7x single-stream latency over dense BF16. Only up to about 30 % of that
   comes from sparsity, and it needed 13B tokens of distillation.
 - **SlideSparse** [`slidesparse`]: cuSPARSELt is often slower than dense at M < 256, and
@@ -1026,7 +1026,7 @@ They are judgement, not measurement.
    - The Nota INT4 target plus matched drafter, whose checkpoints are local and
      whose quality cost is measured.
 
-The combination is plausibly several-fold at concurrency 1 (the scout estimates
+The combination is plausibly several-fold at concurrency 1 (the first-pass search estimated
 8-10x for all three; that is an estimate, not a measurement) and much less at 32+.
 
 ## 13. Coverage, and what could not be verified
@@ -1076,7 +1076,7 @@ The combination is plausibly several-fold at concurrency 1 (the scout estimates
   - the Red Hat 2:4 blog numbers and the SGLang NGRAM PR benchmarks;
   - the SlideSparse and SpenseGPT figures;
   - the DFlash per-position acceptance of 0.78-0.88;
-  - the scout's 8-10x combined estimate, which is an estimate, not a measurement.
+  - the first-pass search's 8-10x combined estimate, which is an estimate, not a measurement.
 
   No code release was found for LeapQuant, DAMP, SketchSSM, Bole, TreeWY or DFlow.
   Whether SGLang's GDN kernels accept a float16 state on sm_90 was not checked.

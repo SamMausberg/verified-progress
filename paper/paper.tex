@@ -56,6 +56,9 @@
 % The entries carry bibliographic data only; how each was checked is recorded in the committed
 % citation audit (sources/citation_audit.md), which the preamble points to once.
 \renewcommand{\bibpreamble}{\small How each reference was checked is recorded in the committed citation audit \ev{litreview}.\par\medskip}
+% The references start on the page after the main text, so their heading never sits alone at
+% the foot of the main text's last column.
+\clearpage
 {\raggedright
 \bibliography{references}
 \bibliographystyle{mlsys2025}

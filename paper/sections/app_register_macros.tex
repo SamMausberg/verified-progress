@@ -1,10 +1,8 @@
 % Macros of the evidence register, shared by the paper (sections/app_register.tex) and the research
 % notes (notes/register.tex); owner: appendix editor. \ev{key} (macros.tex) links to the entries these
-% macros label. The pending-list macros (\devitem, \devref) stay defined but no entry uses them. \regprefix is empty in the paper and N- in the notes, so an ID
-% such as E21 or D7 never means two things (scripts/check_paper_references.py enforces it).
+% macros label. \regprefix is empty in the paper and N- in the notes, so an ID such as E21 never
+% means two things (scripts/check_paper_references.py enforces it).
 \providecommand{\regprefix}{}
 \newcounter{evitem}
 \newcommand{\evgroup}[1]{\multicolumn{2}{@{}l}{\emph{#1}}\\*[1pt]}
 \newcommand{\evitem}[4]{\refstepcounter{evitem}\label{ev:#1}\regprefix E\theevitem & #2\par\vspace{1pt}{\footnotesize#3\ifblank{#4}{}{; produced by #4}.\par}\vspace{2pt}\\}
-\newcounter{devitem}
-\newcommand{\devitem}[3]{\refstepcounter{devitem}\label{dev:#1}\regprefix D\thedevitem & #2\ifblank{#3}{}{ {\footnotesize(#3)}}\\}

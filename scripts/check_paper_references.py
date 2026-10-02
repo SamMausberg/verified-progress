@@ -2,7 +2,7 @@
 """Check the paper's and the research notes' bibliography and evidence registers.
 
 The paper (``paper/paper.tex``) and the research notes (``paper/notes/research_notes.tex``) share
-``paper/references.bib``; each has its own evidence register and pending list. The checks, each
+``paper/references.bib``; each has its own evidence register. The checks, each
 printed with its failures:
 
 1. every key either document cites has an entry in ``paper/references.bib``;
@@ -12,14 +12,15 @@ printed with its failures:
    ``sources/source_manifest.json``;
 4. every path a register lists (``\\evitem``) exists at a git revision, ``origin/main`` by
    default, because the documents may cite only merged evidence;
-5. in each document, every ``\\ev`` key has an ``\\evitem`` and every ``\\pend`` key a
-   ``\\devitem`` in that document's register;
-6. in each document, every ``\\evitem`` and ``\\devitem`` of its register is cited there, so an
-   entry that only the notes need does not stay in the paper's register;
+5. in each document, every ``\\ev`` key has an ``\\evitem`` in that document's register, and no
+   ``\\pend`` marker is left (the pending markers and their list were retired once every
+   result was either committed or stated as not done);
+6. in each document, every ``\\evitem`` of its register is cited there, so an entry that only
+   the notes need does not stay in the paper's register;
 7. an entry in both registers lists the same files and producer in both.
 8. the two documents print their register IDs with different prefixes (empty in the paper,
-   ``N-`` in the notes), through ``\\regprefix`` in the register macros and in the notes'
-   ``\\evref`` and ``\\devref``, so that an ID such as E21 never means two things;
+   ``N-`` in the notes), through ``\\regprefix`` in the register macro and in the notes'
+   ``\\evref``, so that an ID such as E21 never means two things;
 9. every pointer of the paper into the notes, ``\\notessec{label}{number}``, names a label the
    notes define, and, if the notes have been built (``paper/research_notes.aux``), the number
    the notes print for it;
@@ -130,15 +131,14 @@ def brace_args(text: str, start: int, count: int) -> list[str]:
     return args
 
 
-def register_entries(register: str) -> tuple[dict[str, tuple[str, str]], set[str]]:
-    """(\\evitem key -> (files, producer), set of \\devitem keys) of a register file."""
+def register_entries(register: str) -> dict[str, tuple[str, str]]:
+    """\\evitem key -> (files, producer) of a register file."""
     text = strip_comments((PAPER / register).read_text())
     evitems: dict[str, tuple[str, str]] = {}
     for match in re.finditer(r'(?m)^\\evitem(?=\{)', text):
         key, _, files, producer = brace_args(text, match.end(), 4)
         evitems[key] = (files, producer)
-    devitems = {brace_args(text, m.end(), 1)[0] for m in re.finditer(r'(?m)^\\devitem(?=\{)', text)}
-    return evitems, devitems
+    return evitems
 
 
 def register_paths(evitems: dict[str, tuple[str, str]]) -> list[tuple[str, str]]:
@@ -182,10 +182,9 @@ def prefix_failures(files: dict[str, list[str]]) -> list[str]:
     """Each document's register-ID prefix, which must differ between the documents."""
     failures: list[str] = []
     macros = strip_comments((PAPER / REGISTER_MACROS).read_text())
-    for macro in ('evitem', 'devitem'):
-        body = macros[macros.find(f'\\newcommand{{\\{macro}}}') :].split('\n', 1)[0]
-        if '\\regprefix' not in body:
-            failures.append(f'{REGISTER_MACROS}: \\{macro} does not print \\regprefix')
+    body = macros[macros.find('\\newcommand{\\evitem}') :].split('\n', 1)[0]
+    if '\\regprefix' not in body:
+        failures.append(f'{REGISTER_MACROS}: \\evitem does not print \\regprefix')
     prefixes: dict[str, str] = {}
     for doc, names in files.items():
         defined = [
@@ -196,10 +195,9 @@ def prefix_failures(files: dict[str, list[str]]) -> list[str]:
         ]
         prefixes[doc] = defined[-1] if defined else ''
     root = strip_comments((PAPER / DOCUMENTS['notes'][0]).read_text())
-    for macro in ('evref', 'devref'):
-        found = re.search(r'\\renewcommand\{\\' + macro + r'\}.*', root)
-        if not found or '\\regprefix' not in found.group(0):
-            failures.append(f'notes: \\{macro} is not redefined to print \\regprefix')
+    found = re.search(r'\\renewcommand\{\\evref\}.*', root)
+    if not found or '\\regprefix' not in found.group(0):
+        failures.append('notes: \\evref is not redefined to print \\regprefix')
     if prefixes['paper'] or not prefixes['notes'] or prefixes['paper'] == prefixes['notes']:
         failures.append(
             f'register prefixes paper {prefixes["paper"]!r}, notes {prefixes["notes"]!r}'
@@ -315,19 +313,18 @@ def main() -> int:
     orphans: list[str] = []
     n_paths = 0
     for doc, (_, register) in DOCUMENTS.items():
-        evitems, devitems = registers[doc]
+        evitems = registers[doc]
         listed = register_paths(evitems)
         n_paths += len(listed)
         missing_paths += [f'{doc} {key}: {path}' for key, path in listed if path not in existing]
         used = markers(files[doc], register)
         unregistered += [f'{doc}: \\ev{{{k}}}' for k in sorted(used['ev'] - set(evitems))]
-        unregistered += [f'{doc}: \\pend{{{k}}}' for k in sorted(used['pend'] - devitems)]
+        unregistered += [f'{doc}: \\pend{{{k}}}' for k in sorted(used['pend'])]
         orphans += [f'{doc}: evitem {k}' for k in sorted(set(evitems) - used['ev'])]
-        orphans += [f'{doc}: devitem {k}' for k in sorted(devitems - used['pend'])]
     failures[f'register paths missing at {args.rev}'] = missing_paths
-    failures['markers without a register entry'] = unregistered
+    failures['markers without a register entry (\\pend is retired)'] = unregistered
     failures['register entries their document does not cite'] = orphans
-    paper_ev, notes_ev = registers['paper'][0], registers['notes'][0]
+    paper_ev, notes_ev = registers['paper'], registers['notes']
     failures['entries whose files or producer differ between the registers'] = sorted(
         key for key in set(paper_ev) & set(notes_ev) if paper_ev[key] != notes_ev[key]
     )
@@ -340,9 +337,7 @@ def main() -> int:
     failures['printed notes that carry an audit remark'] = remarks
 
     counts = ', '.join(
-        f'{doc}: {len(cited[doc])} cited keys, {len(registers[doc][0])} entries, '
-        f'{len(registers[doc][1])} pending'
-        for doc in DOCUMENTS
+        f'{doc}: {len(cited[doc])} cited keys, {len(registers[doc])} entries' for doc in DOCUMENTS
     )
     print(f'{counts}; {len(paper_bib)} bib entries, {n_paths} register paths')
     for check, items in failures.items():
