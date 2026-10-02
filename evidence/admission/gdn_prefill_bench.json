@@ -1,0 +1,91 @@
+{
+  "layer": 0,
+  "gdn_layers": 24,
+  "device": "NVIDIA GH200 480GB",
+  "points": [
+    {
+      "tokens": 94,
+      "requests": 1,
+      "triton_chunked_eager_us": 455.3920030593872,
+      "triton_chunked_queued_us": 46.38560116291046,
+      "flashinfer_eager_us": 450.111985206604,
+      "flashinfer_queued_us": 58.99680256843567,
+      "recurrent_bv32_eager_us": 378.36799025535583,
+      "recurrent_bv32_queued_us": 315.94879627227783,
+      "recurrent_bv4_eager_us": 116.35199934244156,
+      "recurrent_bv4_queued_us": 62.2655987739563
+    },
+    {
+      "tokens": 94,
+      "requests": 2,
+      "triton_chunked_eager_us": 408.4480106830597,
+      "triton_chunked_queued_us": 49.641600251197815,
+      "flashinfer_eager_us": 440.47999382019043,
+      "flashinfer_queued_us": 71.2768018245697,
+      "recurrent_bv32_eager_us": 376.9280016422272,
+      "recurrent_bv32_queued_us": 316.0367965698242,
+      "recurrent_bv4_eager_us": 143.16800236701965,
+      "recurrent_bv4_queued_us": 88.48959803581238
+    },
+    {
+      "tokens": 94,
+      "requests": 8,
+      "triton_chunked_eager_us": 417.5040125846863,
+      "triton_chunked_queued_us": 100.90559720993042,
+      "flashinfer_eager_us": 454.0799856185913,
+      "flashinfer_queued_us": 69.21759843826294,
+      "recurrent_bv32_eager_us": 410.43201088905334,
+      "recurrent_bv32_queued_us": 392.7072048187256,
+      "recurrent_bv4_eager_us": 374.6879994869232,
+      "recurrent_bv4_queued_us": 312.6447916030884
+    },
+    {
+      "tokens": 32,
+      "requests": 1,
+      "triton_chunked_eager_us": 421.4720129966736,
+      "triton_chunked_queued_us": 36.59519851207733,
+      "flashinfer_eager_us": 436.7679953575134,
+      "flashinfer_queued_us": 55.29279708862305,
+      "recurrent_bv32_eager_us": 164.0319973230362,
+      "recurrent_bv32_queued_us": 108.9359998703003,
+      "recurrent_bv4_eager_us": 76.22399926185608,
+      "recurrent_bv4_queued_us": 22.542400658130646
+    },
+    {
+      "tokens": 256,
+      "requests": 1,
+      "triton_chunked_eager_us": 409.92000699043274,
+      "triton_chunked_queued_us": 51.93279981613159,
+      "flashinfer_eager_us": 434.81600284576416,
+      "flashinfer_queued_us": 66.18559956550598,
+      "recurrent_bv32_eager_us": 919.0080165863037,
+      "recurrent_bv32_queued_us": 855.1615715026855,
+      "recurrent_bv4_eager_us": 215.13600647449493,
+      "recurrent_bv4_queued_us": 165.2351975440979
+    },
+    {
+      "tokens": 512,
+      "requests": 1,
+      "triton_chunked_eager_us": 403.9359986782074,
+      "triton_chunked_queued_us": 68.66880059242249,
+      "flashinfer_eager_us": 438.87999653816223,
+      "flashinfer_queued_us": 81.70719742774963,
+      "recurrent_bv32_eager_us": 1783.7120294570923,
+      "recurrent_bv32_queued_us": 1707.9856872558594,
+      "recurrent_bv4_eager_us": 374.783992767334,
+      "recurrent_bv4_queued_us": 328.28640937805176
+    },
+    {
+      "tokens": 1024,
+      "requests": 1,
+      "triton_chunked_eager_us": 415.5519902706146,
+      "triton_chunked_queued_us": 106.00800514221191,
+      "flashinfer_eager_us": 443.4559941291809,
+      "flashinfer_queued_us": 104.89599704742432,
+      "recurrent_bv32_eager_us": 3488.5759353637695,
+      "recurrent_bv32_queued_us": 3412.948989868164,
+      "recurrent_bv4_eager_us": 687.6159906387329,
+      "recurrent_bv4_queued_us": 645.2432155609131
+    }
+  ]
+}
