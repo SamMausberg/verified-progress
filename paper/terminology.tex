@@ -8,17 +8,17 @@
 \term{main}{Real logit $z_i$}{$\langle w_i,h\rangle$ in exact arithmetic over the stored BF16 operands.}
 \term{main}{Accumulator $\hat y_i$}{The FP32 sum a kernel forms for a logit before rounding it to BF16.}
 \term{main}{Stock head}{SGLang's head at the pinned commit: a cuBLAS BF16 GEMM with FP32 accumulation and BF16 output, then \code{torch.argmax} (first maximal index).}
-\term{main}{\Rreal, \Rbf, \Rstock, \Srace}{The four references for one decision (Definitions~\ref{def:contracts} and~\ref{def:srace}).}
-\term{main}{Error model $\gamma$, $G_i$}{An assumed bound $G_i=\gamma\sum_j|w_{ij}h_j|+\eta$ on the stock kernel's accumulation error, with $\gamma$ from the \modelcons{} or the \modelhopper{} (Section~\ref{sec:headcontracts}, Table~\ref{tab:assumptions}).}
+\term{main}{\Rreal, \Rbf, \Rstock}{The three references for one greedy decision (Definition~\ref{def:contracts}).}
+\term{main}{Error model $\gamma_{\rm stock}$, $G_i$}{An assumed bound $G_i=\gamma_{\rm stock}\sum_j|w_{ij}h_j|+\eta$ on the stock kernel's accumulation error, with $\gamma_{\rm stock}$ from the \modelcons{} or the \modelhopper{} (Section~\ref{sec:headcontracts}, Table~\ref{tab:assumptions}).}
 \term{main}{Error bound $\beta_i$}{A proved bound on the error of the int8 copy's score for entry $i$ (Theorem~\ref{thm:envelope}).}
-\term{main}{Enclosure, interval $[lo_i,hi_i]$}{An interval that contains the value it encloses, given the stated assumptions, computed with outward rounding.}
+\term{main}{Interval $[lo_i,hi_i]$}{An interval that contains the value it bounds, given the stated assumptions, computed with outward rounding; the appendices call it an enclosure.}
 \term{main}{Candidate}{A vocabulary entry the screen cannot exclude; it is recomputed from its BF16 row.}
 \term{main}{Certified position}{A position whose \Rstock{} token the intervals fix for every accumulator value the error model admits.}
-\term{main}{Fallback}{The stock head at the same batch shape, for a position the intervals cannot decide: on the whole batch, or per position over its gathered candidates, the per-position fallback (called the column fallback in the evidence files).}
+\term{main}{Fallback}{The stock head at the same batch shape, for a position the intervals cannot decide: on the whole batch, or per position over its gathered candidates, the per-position fallback. The evidence files call the per-position fallback the column fallback.}
 \term{main}{Capture, replay}{Head inputs recorded bit for bit from the running engine; their offline re-evaluation (Section~\ref{sec:transport-capture}).}
 \term{main}{Held-out}{From prompts that no choice of head, bound or threshold was fitted on.}
 \term{main}{Transport; tile summary}{Bounds carried from a drafter's per-tile summaries to the target's head input; the largest score and the sum of exponentiated scores of a tile of vocabulary entries at the drafter's head input.}
-\term{main}{$\rho$; $\delta^\ast_i$}{Drift ratio $\norm{h^t-h^d}_2/\norm{h^t}_2$ of a draft pair; the $\rho$ below which transport's bound beats the int8 copy's on entry $i$.}
+\term{main}{$\rho$; $\delta^\ast_i$}{Drift $\norm{h^t-h^d}_2/\norm{h^t}_2$ of a draft pair; the $\rho$ below which transport's bound beats the int8 copy's on entry $i$.}
 % ---------------------------------------------------------------------------
 % Scope app (owner: appendix editor): terms used only in the appendices, in alphabetical
 % order; printed by the glossary (Appendix app:glossary).
@@ -41,5 +41,6 @@
 \term{app}{Point-mass proposal}{A deterministic draft token, SGLang's default for sampled verification; its residual is a race over the untried tokens (Appendix~\ref{app:residual}).}
 \term{main}{Residual race}{An exact sample from the residual law $(p-q)_+$ by a certified race under a fixed priority field (Theorem~\ref{thm:residualrace}).}
 \term{main}{Static screen}{Tile bounds $\langle\mu_c,h\rangle+r_c\norm h$ evaluated at the target state without any draft (Proposition~\ref{prop:static}).}
+\term{app}{\Srace}{The reference for one seeded decision: the winner of the race with a fixed noise vector (Definition~\ref{def:srace}).}
 \term{app}{Tuning and confirmation splits}{Disjoint prompt sets of the serving workload: configurations are chosen on the first and reported on the second (Appendix~\ref{app:serving}).}
 \term{main}{Verify pass, draft step, cycle}{The target's forward pass over a drafted block; one drafter forward; a draft, its verification and the state commit (Appendix~\ref{app:profile}).}
