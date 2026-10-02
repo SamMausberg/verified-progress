@@ -495,6 +495,69 @@ certified draws, 24 ring-logged draws have roughly a 5-10% chance of showing non
 is reported as "not reproduced in 24 ring-logged draws", with the event left open; the
 ring's copies may perturb the timing, as check mode does.
 
+## Readouts of the drain reruns (CPU)
+
+    python -m experiments.benchcert.score_report summarize --out ~/vp-data/benchcert/drain --csv POINTS.csv
+    python -m experiments.benchcert.score_report report --out ~/vp-data/benchcert/drain \
+        --json REPORT.json --events EVENTS.csv --contexts CONTEXTS.jsonl
+    python -m experiments.benchcert.ring_report --out ~/vp-data/benchcert/drain --json RING.json --csv ROWS.csv
+
+`score_report.py` reads h6s's per-point score files. `summarize` gives each point's near
+and gross counts over all and measured requests. `report` gives the certified-against-stock
+rate ratios with an exact conditional (binomial) interval, the positive control, 579ae7ce's
+disagreements after position 439 in every point that committed 1756, and every gross
+event with its client-side time, the requests in flight and the co-batched requests'
+disagreements whose tokens streamed within 300 ms. It writes the gross contexts for a
+batch-1 top-5 re-score.
+
+`ring_report.py` applies the five readings above to 579ae7ce's position-439 row in each
+`certring` launch. It also checks every certified row that has a complete candidate list.
+The stock argmax lies inside its refined interval, so an id outside the list, or one whose
+upper bound is below another candidate's lower bound, is wrong whatever the stock
+rounding. And each request's predicted ids on its accepted rows must equal the head's ids.
+
+## Fallback stress test (not declared; added 2026-10-02 after h6a)
+
+    GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -s experiments/benchcert/hold_stress.sh
+
+`fallback_stress.py` tests the certified verify head without the scheduler: can it, as
+captured and replayed, return a token other than the stock head's for one row of a batch?
+It builds the heads as the engine does (`EngineHeads` from the BF16 head: verify plus the
+draft and draft-extend siblings, column fallback, conservative model). It captures every
+verify graph up to 64 requests (256 rows) in one memory pool, the way the glue records
+them: the certified head under the device gate, the stock `torch.matmul` into a float
+logits buffer under its negation, and the fallbacks as conditional nodes. The draft
+graphs (two certified steps each) and the draft-extend graphs share that pool. Then it
+replays, back to back with no host read between replays:
+
+- the c = 64 point's real verify sequence from h6b's `certlog` log (64 steady steps,
+  then the drain from 60 requests down to 1: gate off down to 18 requests, on from 16),
+  padded to the captured sizes;
+- 64, 48, 32, 16, 8 and 64 rows, each with the gate on and then off.
+
+Each verify batch mixes several kinds of rows:
+
+- real verify hidden states (`experiments/head_geometry` captures);
+- near ties made from them, where two to four top tokens are moved to within 0.75 BF16
+  ulp of each other along `w_a - w_b`, kept if the head routes them to the column
+  fallback;
+- rows the dense merge serves;
+- in half the batches, 579ae7ce's own four verify rows (positions 438-441) at a random
+  request slot. These are hidden states from a plain server's `return_hidden_states`
+  over the prompt and session 1's stock output, which has 68189 at position 439.
+
+After each replay, device copies record the gate and `valid` the graph read and the
+fallback flags. For each row they record the committed id (as `attach_ids` clones it),
+the status, the candidates and their refined bounds, and the stock argmax of the same
+batch at the same shape, computed eagerly. Every 256 replays the host compares them
+bitwise. It logs each mismatch with the row's state and an eager re-run of the same
+batch. Gate-off replays compare the graph's stock argmax with the eager one; the draft
+paths are checked the same way. The hold starts with the plain server (port 30091,
+started under the start-up lock), which also re-scores each gross context from the h6s
+report at batch 1 with the top 5. A run with no mismatch rules out a fault of the head
+and its fallbacks under graph replay for these inputs and sizes. It does not rule out
+one that needs the engine's own surrounding graph or the scheduler.
+
 ## Hold commit
 
 Every hold runs from a clean checkout at the commit recorded here; `run_session.py`
