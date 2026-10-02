@@ -2,8 +2,8 @@
 % Definitions: proved. Contract witnesses: register entry contracts. Divergence mechanisms,
 % noise floor, tap controls: state-mech, state-noise, state-tap, state-pinned, state-pools.
 % Cache-level checks (plain vs MTP, the two history pairs, prefix cache on vs off, one
-% prompt's same-server repeats): state-cache. Cache-level check of the concurrency pair and
-% the remaining pairs: pending (state-mech). Detail moved to the research notes: the pools of
+% prompt's same-server repeats, the concurrency pair with fixed pools): state-cache. The
+% remaining runs: pending (state-mech). Detail moved to the research notes: the pools of
 % the tapped servers, the five tap-changed prompts, MTP's configuration switches, H5.
 % Figure fig:divergence reads evidence/state_safety/first_difference_by_module.csv.
 \appneedspace{10\baselineskip}
@@ -82,7 +82,7 @@ In brief: neither the tie rule nor the head GEMM caused a divergence~\ev{state-m
 \begin{figure}[htbp]
 \centering
 \input{figures/divergence}
-\caption{Where equivalent stock configurations first produce different module outputs, by decoder layer. Plain decoding and MTP speculation part at layer 0's GDN recurrence in every prompt, because decode and target verify use different recurrent kernels. Plain decoding at concurrency 1 and 32 (batches of up to 16) part at batch-dependent kernels spread over the depth: the gated RMSNorm of GDN layers (the number above each mark gives the count), layer 3's attention, or layer 0's MLP in a batched prefill. For plain decoding against MTP, a rerun of 40 prompts that also hashes the caches finds every cache entering the differing recurrence identical; for the concurrency pair these are first differing module outputs only, and whether the caches entering them agree is pending. Each pair's two tapped servers had different pools. Measured with a bit-exact tap~\ev{state-mech,state-cache}.}
+\caption{Where equivalent stock configurations first produce different module outputs, by decoder layer. Plain decoding and MTP speculation part at layer 0's GDN recurrence in every prompt, because decode and target verify use different recurrent kernels. Plain decoding at concurrency 1 and 32 (batches of up to 16) part at batch-dependent kernels spread over the depth: the gated RMSNorm of GDN layers (the number above each mark gives the count), layer 3's attention, or layer 0's MLP in a batched prefill. The plotted runs' two tapped servers had different pools in each pair. Reruns of 40 prompts that also hash the caches find them identical on entry: for plain decoding against MTP, every cache entering the differing recurrence; for the concurrency pair, with identical fixed pools, every cache entering every forward up to the first differing module output (gated norm 30, layer 3's attention 5, batched-prefill down-projection 5, against 29, 6 and 5 plotted). Measured with a bit-exact tap~\ev{state-mech,state-cache}.}
 \label{fig:divergence}
 \end{figure}
 
