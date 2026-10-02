@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -47,6 +48,8 @@ def main() -> None:
     fa4, triton = target.get('fa4_max_abs_vs_fp32'), target.get('triton_max_abs_vs_fp32')
     if fa4 is None or triton is None:
         failures.append(f'FA4 target numerics missing: {target}')
+    elif not (math.isfinite(fa4) and math.isfinite(triton)):
+        failures.append(f'non-finite error vs FP32: FA4 {fa4}, Triton {triton}')
     elif fa4 > 2 * triton:
         failures.append(f'FA4 target max |err| {fa4:.3g} > 2 x Triton {triton:.3g}')
     fa4_errors = [e for e in attn.get('errors', []) if e.get('arm') == 'fa4']
