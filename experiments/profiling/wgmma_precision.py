@@ -26,8 +26,12 @@ Tests (terms are the nonzero products of a row, in k order; C is the accumulator
 * ``align_pos``: {1, 2^-e, -1}, C = 0. The exact sum 2^-e survives only if the adder
   keeps at least e fractional bits below the leading bit of 1, so F is the largest
   e that survives.
-* ``align_neg``: {1, -2^-e, -1}. Beyond F the result is 0 if the dropped bits are
-  truncated toward zero and -2^-F if they are truncated toward minus infinity.
+* ``align_neg``: {1, -2^-e, -1}. Beyond F the result is 0 unless the dropped bits are
+  rounded toward minus infinity (then -2^-F). Powers of two alone cannot tell
+  truncation from rounding to nearest (2^-(F+1) is a tie), hence:
+* ``align_round_*``: {1, +/-v, -1} with v = 0.25, 0.5, 0.625, 0.75 and 0.875 of the
+  last kept quantum 2^-25. Truncation toward zero drops every v; rounding to nearest
+  keeps one quantum for v > 0.5.
 * ``acc_fused``: C = 1, {2^-e, -1}: whether the accumulator joins the products'
   aligned sum (then the pattern matches ``align_pos``).
 * ``block_after``: {1 at 0, -1 at 1, 2^-60 at j}: 0 while j shares the block of the
@@ -36,10 +40,17 @@ Tests (terms are the nonzero products of a row, in k order; C is the accumulator
 * ``block_before``: {2^-60 at 0, 1 at j, -1 at j + 1}: whether the running FP32
   accumulator joins the next block's aligned sum (then 2^-60 is lost even across a
   block boundary).
-* ``round_*`` (triton): sums that need rounding to FP32, which tell round to
-  nearest even, to nearest away, toward zero, up and down apart.
-* ``bf16tie_*`` (cublas): sums of 1 + 2^-7 + 2^-8 -/+ 2^-24, an FP32 tie next to a
-  BF16 tie, so that rounding toward zero or down moves the BF16 logit by one step.
+* ``round_*`` (triton): sums that need rounding to FP32, two of them ties and two of
+  them 0.75 of an FP32 step above a representable value (all their bits within
+  F), which tell nearest-even, nearest-away, nearest with ties toward zero,
+  toward zero, up and down apart.
+* ``bf16tie_*`` (cublas): 1 + 2^-7 + 2^-8 -/+ 2^-24 (an FP32 tie) and -/+ 2^-25 (a
+  quarter step), next to a BF16 tie, so that the FP32 rounding decides whether the
+  BF16 logit lands one step up or down. This reading assumes the epilogue rounds
+  FP32 to BF16 to nearest even, which the next rows check.
+* ``epilogue_*`` (cublas): sums that are exact in FP32 at a BF16 tie (odd and even
+  lower neighbour, both signs) and one FP32 step above it, so that the epilogue
+  alone decides the BF16 logit.
 
 The probe makes no timing claim; it runs in a few seconds and uses under 3 GB.
 """
@@ -74,7 +85,7 @@ def dot_kernel(a_ptr, b_ptr, c_ptr, d_ptr, K: tl.constexpr, N: tl.constexpr):
     tl.store(d_ptr + rm[:, None] * N + rn[None, :], acc)
 
 
-Case = tuple[str, int, dict[int, float], float]  # (test, parameter, {k: term}, accumulator)
+Case = tuple[str, float, dict[int, float], float]  # (test, parameter, {k: term}, accumulator)
 
 
 def cases(k: int) -> list[Case]:
@@ -83,6 +94,14 @@ def cases(k: int) -> list[Case]:
         out.append(('align_pos', e, {0: 1.0, 1: 2.0**-e, 2: -1.0}, 0.0))
         out.append(('align_neg', e, {0: 1.0, 1: -(2.0**-e), 2: -1.0}, 0.0))
         out.append(('acc_fused', e, {0: 2.0**-e, 1: -1.0}, 1.0))
+    # Dropped fractions of the last kept quantum (2^-25 if F = 25): 0.25, 0.5 (a tie),
+    # 0.625, 0.75 and 0.875 of it, positive and negative. Truncation toward zero
+    # drops all of them; rounding to nearest keeps a quantum for the last three.
+    for num, den in ((1, 27), (1, 26), (5, 28), (3, 27), (7, 28)):
+        v = num * 2.0**-den
+        frac = round(v / 2.0**-25, 3)
+        out.append(('align_round_pos', frac, {0: 1.0, 1: v, 2: -1.0}, 0.0))
+        out.append(('align_round_neg', frac, {0: 1.0, 1: -v, 2: -1.0}, 0.0))
     for j in range(2, k):
         out.append(('block_after', j, {0: 1.0, 1: -1.0, j: 2.0**-TINY}, 0.0))
     for j in range(1, k - 1):
@@ -94,14 +113,44 @@ ROUND_CASES: list[Case] = [
     ('round_tie_odd', 0, {0: 1.0, 1: 2.0**-23, 2: 2.0**-24}, 0.0),
     ('round_tie_even', 0, {0: 1.0, 1: 2.0**-24}, 0.0),
     ('round_tie_odd_neg', 0, {0: -1.0, 1: -(2.0**-23), 2: -(2.0**-24)}, 0.0),
-    ('round_above_tie', 0, {0: 1.0, 1: 2.0**-24, 2: 2.0**-30}, 0.0),
+    ('round_above_half', 0, {0: 1.0, 1: 2.0**-24, 2: 2.0**-25}, 0.0),
+    ('round_above_half_neg', 0, {0: -1.0, 1: -(2.0**-24), 2: -(2.0**-25)}, 0.0),
     ('round_acc_tie_odd', 0, {0: 2.0**-24}, 1.0 + 2.0**-23),
 ]
 BF16_TIE = 1.0 + 2.0**-7 + 2.0**-8
 BF16_CASES: list[Case] = [
     ('bf16tie_below_pos', 0, {0: 1.0, 1: 2.0**-7, 2: 2.0**-8, 3: -(2.0**-24)}, 0.0),
     ('bf16tie_below_neg', 0, {0: -1.0, 1: -(2.0**-7), 2: -(2.0**-8), 3: 2.0**-24}, 0.0),
+    ('bf16tie_quarter_pos', 0, {0: 1.0, 1: 2.0**-7, 2: 2.0**-8, 3: -(2.0**-25)}, 0.0),
+    ('bf16tie_quarter_neg', 0, {0: -1.0, 1: -(2.0**-7), 2: -(2.0**-8), 3: 2.0**-25}, 0.0),
+    # Controls for the FP32-to-BF16 epilogue: FP32 sums that are exact, so the epilogue
+    # alone decides the BF16 logit.
+    ('epilogue_tie_odd', 0, {0: 1.0, 1: 2.0**-7, 2: 2.0**-8}, 0.0),
+    ('epilogue_tie_even', 0, {0: 1.0, 1: 2.0**-8}, 0.0),
+    ('epilogue_above_tie', 0, {0: 1.0, 1: 2.0**-7, 2: 2.0**-8, 3: 2.0**-23}, 0.0),
+    ('epilogue_tie_odd_neg', 0, {0: -1.0, 1: -(2.0**-7), 2: -(2.0**-8)}, 0.0),
 ]
+
+
+def epilogue_mode(res: dict[str, float]) -> str:
+    """FP32-to-BF16 rounding of the logits, from sums that are exact in FP32."""
+    up, down = 1.0 + 2.0**-6, 1.0 + 2.0**-7
+    signature = (
+        res['epilogue_tie_odd'],
+        res['epilogue_tie_even'],
+        res['epilogue_above_tie'],
+        -res['epilogue_tie_odd_neg'],
+    )
+    modes = {
+        'nearest-even': (up, 1.0, up, up),
+        'nearest-away': (up, down, up, up),
+        'nearest, ties toward zero': (down, 1.0, up, down),
+        'toward-zero': (down, 1.0, down, down),
+        'up': (up, down, up, down),
+        'down': (down, 1.0, down, up),
+    }
+    found = [name for name, sig in modes.items() if sig == signature]
+    return found[0] if found else f'unclassified {signature}'
 
 
 def exactly_bf16(x: float) -> bool:
@@ -182,21 +231,47 @@ def first_true(rows: list[dict], test: str, value: float) -> int | None:
 
 
 def rounding_mode(res: dict[str, float]) -> str:
+    """Rounding of the aligned sum to FP32, from two ties and two non-tie sums."""
     u = 2.0**-23
     signature = (
         res['round_tie_odd'] - 1.0,
         res['round_tie_even'] - 1.0,
         res['round_tie_odd_neg'] + 1.0,
+        res['round_above_half'] - 1.0,
+        res['round_above_half_neg'] + 1.0,
     )
     modes = {
-        'nearest-even': (2 * u, 0.0, -2 * u),
-        'nearest-away': (2 * u, u, -2 * u),
-        'toward-zero': (u, 0.0, -u),
-        'up': (2 * u, u, -u),
-        'down': (u, 0.0, -2 * u),
+        'nearest-even': (2 * u, 0.0, -2 * u, u, -u),
+        'nearest-away': (2 * u, u, -2 * u, u, -u),
+        'nearest, ties toward zero': (u, 0.0, -u, u, -u),
+        'toward-zero': (u, 0.0, -u, 0.0, 0.0),
+        'up': (2 * u, u, -u, u, 0.0),
+        'down': (u, 0.0, -2 * u, 0.0, -u),
     }
     found = [name for name, sig in modes.items() if sig == signature]
     return found[0] if found else f'unclassified {signature}'
+
+
+def alignment_rounding(rows: list[dict], f_bits: int) -> str:
+    """How dropped bits are handled, from fractions 0.25-0.875 of the last kept quantum."""
+    if f_bits != 25:
+        return f'not tested (the probe fractions assume F = 25, measured F = {f_bits})'
+    q = 2.0**-f_bits
+    got = {
+        (r['test'], r['param']): r['result']
+        for r in rows
+        if r['test'] in ('align_round_pos', 'align_round_neg')
+    }
+    if not got:
+        return 'not tested'
+    pos = {frac: v for (t, frac), v in got.items() if t == 'align_round_pos'}
+    neg = {frac: v for (t, frac), v in got.items() if t == 'align_round_neg'}
+    if all(v == 0.0 for v in got.values()):
+        return 'truncation toward zero'
+    above = [f for f in pos if f > 0.5]
+    if all(pos[f] == q for f in above) and all(neg[f] == -q for f in above):
+        return 'round to nearest'
+    return f'unclassified pos={sorted(pos.items())} neg={sorted(neg.items())}'
 
 
 def summarize(rows: list[dict]) -> dict:
@@ -211,6 +286,7 @@ def summarize(rows: list[dict]) -> dict:
         neg_trunc = f'other: {neg[:4]}'
     return {
         'fractional_bits_kept': f_pos,
+        'alignment_dropped_bits': alignment_rounding(rows, f_pos),
         'negative_terms_truncated': neg_trunc,
         'align_neg_largest_exact': max(
             (
@@ -263,7 +339,6 @@ def main() -> None:
     rnd = {r['test']: r['result'] for r in rows if r['test'].startswith('round_')}
     tri = summarize(rows)
     tri['rounding_to_fp32'] = rounding_mode(rnd)
-    tri['round_above_tie_result_minus_1'] = rnd['round_above_tie'] - 1.0
     tri['round_acc_tie_odd_result_minus_1'] = rnd['round_acc_tie_odd'] - 1.0
     result['triton'] = {'k': args.k, 'instructions': info, 'summary': tri, 'rows': rows}
 
@@ -279,18 +354,31 @@ def main() -> None:
             {'test': t, 'param': p, 'result': v}
             for (t, p, _, _), v in zip(cub_batch, vals, strict=True)
         ]
-        tie = {r['test']: r['result'] for r in crow if r['test'].startswith('bf16tie')}
+        tie = {
+            r['test']: r['result'] for r in crow if r['test'].startswith(('bf16tie', 'epilogue'))
+        }
         up, down = 1.0 + 2.0**-6, 1.0 + 2.0**-7
-        sig = (tie['bf16tie_below_pos'], -tie['bf16tie_below_neg'])
+        sig = (
+            tie['bf16tie_below_pos'],
+            -tie['bf16tie_below_neg'],
+            tie['bf16tie_quarter_pos'],
+            -tie['bf16tie_quarter_neg'],
+        )
         modes = {
-            'nearest (even or away)': (up, up),
-            'toward-zero': (down, down),
-            'up': (up, down),
-            'down': (down, up),
+            'nearest (even or away)': (up, up, up, up),
+            'nearest, ties toward zero': (down, down, up, up),
+            'toward-zero': (down, down, down, down),
+            'up': (up, down, up, down),
+            'down': (down, up, down, up),
         }
         cs = summarize(crow)
-        cs['rounding_to_fp32'] = next(
-            (k for k, s in modes.items() if s == sig), f'unclassified {sig}'
+        cs['epilogue_fp32_to_bf16'] = epilogue_mode(tie)
+        # The bf16tie rows read the accumulator's rounding through the epilogue, and
+        # their signatures assume a round-to-nearest-even epilogue.
+        cs['rounding_to_fp32'] = (
+            next((k for k, s in modes.items() if s == sig), f'unclassified {sig}')
+            if cs['epilogue_fp32_to_bf16'] == 'nearest-even'
+            else 'undetermined: the epilogue does not round to nearest even'
         )
         result['cublas'][f'm{m}'] = {'kernels': names, 'summary': cs, 'rows': crow}
 
