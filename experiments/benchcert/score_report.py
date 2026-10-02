@@ -624,6 +624,70 @@ def serial_contexts(out: Path, runs: Path) -> list[dict[str, Any]]:
 
 NEAR_TIE_TOKEN = 68189  # session 1's stock token at 579ae7ce's position 439
 
+# -- planted donor (h8) ------------------------------------------------------------
+
+H8_LAUNCHES = ('plant1', 'cert0c', 'plant2', 'cert0d', 'plant3', 'order1')
+CHECK_ID, OPEN_ID = 1716, 1148  # ' check' and '((' around the donor's function-name suffix
+
+
+def donor_suffixes(ids: list[int]) -> list[int]:
+    """The suffix tokens in ' check' + suffix + '((' (session_000527's asserts)."""
+    return [ids[i + 1] for i in range(len(ids) - 2) if ids[i] == CHECK_ID and ids[i + 2] == OPEN_ID]
+
+
+def donor_rows(out: Path, runs: Path, planted: int | None) -> list[dict[str, Any]]:
+    """Per h8 c = 64 draw: 579ae7ce's token at 439 and whether it reached 439 with session
+    1's prefix, the planted token anywhere in its output, and the donor (the request whose
+    prompt holds the three ' check<suffix>((' asserts): its suffix, its 1756 and planted
+    emissions, and the time from its last chunk to 579ae7ce's chunk carrying position 439
+    (client clock, ms; negative when the donor was still running)."""
+    prompt, position, wrong = TARGET
+    points = point_dirs(out, runs)
+    reference = next(
+        i
+        for i in timeline(points[0][1])
+        if i['phase'] == 'profiling' and i['prompt'].startswith(prompt)
+    )['output']
+    rows = []
+    for name, point in points:
+        parts = name.split('/')
+        if len(parts) != 4 or parts[1] not in H8_LAUNCHES or parts[3] != f'c{TOP:03d}':
+            continue
+        items = [i for i in timeline(point) if i['phase'] == 'profiling']
+        target = next(i for i in items if i['prompt'].startswith(prompt))
+        output = target.get('output') or []
+        t439 = arrival(target, position)
+        row: dict[str, Any] = {
+            'point': name,
+            'launch': parts[1],
+            'repeat': parts[2],
+            'reached': len(output) > position and output[:position] == reference[:position],
+            'token_at_439': output[position] if len(output) > position else None,
+            'planted_in_target': [
+                i for i, t in enumerate(output) if planted is not None and t == planted
+            ],
+            'donors': [],
+        }
+        for item in items:
+            if item is target or len(donor_suffixes(item.get('input') or [])) < 3:
+                continue
+            done = item.get('output') or []
+            row['donors'].append(
+                {
+                    'conversation': item['cid'],
+                    'suffix_tokens': sorted(set(donor_suffixes(item['input']))),
+                    'emitted_1756_at': [i for i, t in enumerate(done) if t == wrong],
+                    'emitted_planted_at': [
+                        i for i, t in enumerate(done) if planted is not None and t == planted
+                    ],
+                    'end_to_439_ms': None
+                    if t439 is None or item.get('end') is None
+                    else round((t439 - item['end']) / 1e6),
+                }
+            )
+        rows.append(row)
+    return rows
+
 
 def serial_readout(contexts: Path, rescored: Path) -> dict[str, Any]:
     """Each h6s event's gap again from the serial re-score: the top-1 logprob minus the
@@ -807,6 +871,10 @@ def main(argv: list[str] | None = None) -> int:
     sc.add_argument('--out', type=Path, required=True, help='the drain output directory')
     sc.add_argument('--runs', type=Path, default=Path.home() / 'vp-data/benchcert')
     sc.add_argument('--contexts', type=Path, required=True)
+    dn = sub.add_parser('donor', help="the planted-donor hold's draws (h8)")
+    dn.add_argument('--out', type=Path, required=True, help='the drain output directory')
+    dn.add_argument('--runs', type=Path, default=Path.home() / 'vp-data/benchcert')
+    dn.add_argument('--json', type=Path, required=True)
     sr = sub.add_parser('serial-readout', help='h6s classes against the serial re-score')
     sr.add_argument('--contexts', type=Path, required=True)
     sr.add_argument('--rescored', type=Path, required=True)
@@ -817,6 +885,29 @@ def main(argv: list[str] | None = None) -> int:
         args.contexts.parent.mkdir(parents=True, exist_ok=True)
         args.contexts.write_text(''.join(json.dumps(c) + '\n' for c in lines))
         print(f'{len(lines)} contexts, {sum(len(c["events"]) for c in lines)} events')
+        return 0
+    if args.command == 'donor':
+        chosen = args.out / 'workloads' / 'planted_token.json'
+        planted = int(json.loads(chosen.read_text())['token']) if chosen.exists() else None
+        rows = donor_rows(args.out, args.runs, planted)
+        by_launch: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            entry = by_launch.setdefault(
+                row['launch'], {'draws': 0, 'reached': 0, 'tokens_at_439': {}}
+            )
+            entry['draws'] += 1
+            if row['reached']:
+                entry['reached'] += 1
+                key = str(row['token_at_439'])
+                entry['tokens_at_439'][key] = entry['tokens_at_439'].get(key, 0) + 1
+        donor_out: dict[str, Any] = {
+            'planted_token': planted,
+            'by_launch': by_launch,
+            'draws': rows,
+        }
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(json.dumps(donor_out, indent=1) + '\n')
+        print(json.dumps(by_launch))
         return 0
     if args.command == 'serial-readout':
         result = serial_readout(args.contexts, args.rescored)

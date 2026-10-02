@@ -292,6 +292,71 @@ def fp32(out: Path, device: str = 'cpu', threads: int = 8) -> int:
     return 0
 
 
+def summary(out: Path) -> dict[str, Any]:
+    """The compact readout: per target and path, the tracked tokens' logprobs and the top-1
+    at the target, and the recorded token's logprob at every traced position before it."""
+    tracks = {
+        t['id']: t['track']
+        for t in (
+            json.loads(line) for line in (out / 'targets.jsonl').read_text().splitlines() if line
+        )
+    }
+    stock_rows = json.loads((out / 'stock.json').read_text())
+    fp = json.loads((out / 'fp32.json').read_text())
+    fp_rows = {r['id']: r for r in fp['results']}
+    rows = []
+    for row in stock_rows:
+        pos = row['position']
+        paths = {**row['paths'], **fp_rows[row['id']]['paths']}
+        first = min(int(p) for p in next(iter(paths.values())))
+        at = {}
+        for name, trace in paths.items():
+            entry = trace.get(str(pos))
+            if entry is None:
+                continue
+            at[name] = {
+                'top1': entry['top1'],
+                'top1_logprob': round(entry['top1_logprob'], 4),
+                'tracked': {
+                    k: round(v, 4)
+                    for k, v in entry['tracked'].items()
+                    if int(k) in tracks[row['id']]
+                },
+            }
+        before = {
+            name: [
+                None
+                if trace.get(str(p), {}).get('token_logprob') is None
+                else round(trace[str(p)]['token_logprob'], 4)
+                for p in range(first, pos)
+            ]
+            for name, trace in paths.items()
+        }
+        spread = max(
+            (max(v) - min(v) for v in zip(*before.values(), strict=True) if None not in v),
+            default=None,
+        )
+        fp32 = [at[n]['tracked'] for n in at if n.startswith('fp32')]
+        fp32_gap = max(abs(fp32[0][k] - fp32[1][k]) for k in fp32[0]) if len(fp32) == 2 else None
+        rows.append(
+            {
+                'id': row['id'],
+                'points': row['points'],
+                'position': pos,
+                'decode_left_text_at': row['decode_left_text_at'],
+                'fp32_top1_follows_text': fp_rows[row['id']].get('top1_follows_text'),
+                'at_target': at,
+                'fp32_paths_max_abs_diff_at_target': None
+                if fp32_gap is None
+                else round(fp32_gap, 4),
+                'trace_from': first,
+                'recorded_token_logprob_before_target': before,
+                'max_spread_before_target': None if spread is None else round(spread, 4),
+            }
+        )
+    return {'fp32': fp['meta'], 'targets': rows}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     sub = parser.add_subparsers(dest='command', required=True)
@@ -306,7 +371,16 @@ def main(argv: list[str] | None = None) -> int:
     f.add_argument('--out', type=Path, required=True)
     f.add_argument('--device', default='cpu')
     f.add_argument('--threads', type=int, default=8)
+    m = sub.add_parser('summary', help='compact readout of stock.json and fp32.json (CPU)')
+    m.add_argument('--out', type=Path, required=True)
+    m.add_argument('--json', type=Path, required=True)
     args = parser.parse_args(argv)
+    if args.command == 'summary':
+        result = summary(args.out)
+        args.json.write_text(json.dumps(result, indent=1) + '\n')
+        for row in result['targets']:
+            print(row['id'], json.dumps({k: v['tracked'] for k, v in row['at_target'].items()}))
+        return 0
     args.out.mkdir(parents=True, exist_ok=True)
     if args.command == 'targets':
         found = targets(args.drain, args.runs)

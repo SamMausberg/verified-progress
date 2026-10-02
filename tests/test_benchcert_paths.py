@@ -105,3 +105,69 @@ def test_seeded_logprobs_keep_the_span_by_output_position() -> None:
     assert sorted(map(int, kept)) == list(range(400, 451))
     assert kept['439']['top5'] == [[-0.1 * 39, 139]]
     assert kept['439']['tracked'] == {'1756': -1.0, '9471': -2.0}
+
+
+def test_summary_reports_each_path_at_the_target_and_the_spread_before(tmp_path: Path) -> None:
+    def entry(token: int, lp: float, tracked: dict[str, float]) -> dict[str, object]:
+        return {
+            'top1': token,
+            'top1_logprob': lp,
+            'tracked': tracked,
+            'token': token,
+            'token_logprob': lp,
+        }
+
+    target = {'id': 't', 'track': [1756, 68189], 'points': ['p'], 'position': 2}
+    (tmp_path / 'targets.jsonl').write_text(json.dumps(target) + '\n')
+    stock = [
+        {
+            'id': 't',
+            'points': ['p'],
+            'position': 2,
+            'decode_left_text_at': None,
+            'paths': {
+                'prefill_9': {
+                    '1': entry(5, -0.10, {}),
+                    '2': entry(68189, -1.3, {'1756': -8.1, '68189': -1.3, '7': -2.0}),
+                },
+                'decode_from_1': {
+                    '1': entry(5, -0.12, {}),
+                    '2': entry(1756, -0.3, {'1756': -0.3, '68189': -5.3}),
+                },
+            },
+        }
+    ]
+    (tmp_path / 'stock.json').write_text(json.dumps(stock))
+    fp32 = {
+        'meta': {'dtype': 'float32'},
+        'results': [
+            {
+                'id': 't',
+                'position': 2,
+                'top1_follows_text': [1, 1],
+                'paths': {
+                    'fp32_full': {
+                        '1': entry(5, -0.11, {}),
+                        '2': entry(68189, -0.9, {'1756': -9.8, '68189': -0.9}),
+                    },
+                    'fp32_recurrent_from_1': {
+                        '1': entry(5, -0.11, {}),
+                        '2': entry(68189, -0.9, {'1756': -9.8005, '68189': -0.9}),
+                    },
+                },
+            }
+        ],
+    }
+    (tmp_path / 'fp32.json').write_text(json.dumps(fp32))
+    result = paths.summary(tmp_path)
+    row = result['targets'][0]
+    assert row['at_target']['prefill_9']['tracked'] == {'1756': -8.1, '68189': -1.3}
+    assert row['at_target']['decode_from_1']['top1'] == 1756
+    assert row['fp32_paths_max_abs_diff_at_target'] == 0.0005
+    assert row['max_spread_before_target'] == 0.02
+    assert row['recorded_token_logprob_before_target']['fp32_full'] == [-0.11]
+
+
+def test_donor_suffixes_find_the_check_asserts() -> None:
+    ids = [9, 1716, 1756, 1148, 3, 1716, 9471, 1148, 1716, 4]
+    assert score_report.donor_suffixes(ids) == [1756, 9471]

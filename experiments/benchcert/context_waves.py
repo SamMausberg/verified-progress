@@ -226,6 +226,13 @@ def classify(output: list[int] | None, ref: list[int]) -> str:
     return 'wrong' if output[POSITION] == WRONG else str(output[POSITION])
 
 
+def first_difference(output: list[int] | None, ref: list[int]) -> int | None:
+    """The first output position before POSITION where the wave left session 1's text."""
+    if output is None:
+        return None
+    return next((i for i in range(min(len(output), POSITION)) if output[i] != ref[i]), None)
+
+
 def compare(out: Path, runs: Path) -> int:
     """Per arm: waves reaching the context, and the token each committed at 439."""
     from experiments.benchcert.drain import point_dirs, target_record
@@ -238,6 +245,7 @@ def compare(out: Path, runs: Path) -> int:
     summary: dict[str, Any] = {'declared': False, 'reading_rule': rule}
     for arm, blocks in ARMS.items():
         strata: dict[str, dict[str, int]] = {'with_partner': {}, 'without_partner': {}}
+        left: dict[str, dict[str, int]] = {'with_partner': {}, 'without_partner': {}}
         for variant, half in blocks:
             path = block_dir(out, variant, half) / 'waves.jsonl'
             if not path.exists():
@@ -246,6 +254,10 @@ def compare(out: Path, runs: Path) -> int:
                 counts = strata['with_partner' if wave.get('partner') else 'without_partner']
                 key = classify(wave.get('target_output'), ref)
                 counts[key] = counts.get(key, 0) + 1
+                where = first_difference(wave.get('target_output'), ref)
+                if where is not None:
+                    side = left['with_partner' if wave.get('partner') else 'without_partner']
+                    side[str(where)] = side.get(str(where), 0) + 1
         summary[arm] = {
             name: {
                 'tokens_at_439': counts,
@@ -253,6 +265,7 @@ def compare(out: Path, runs: Path) -> int:
                     v for k, v in counts.items() if k not in ('incomplete', 'other_prefix')
                 ),
                 'wrong': counts.get('wrong', 0),
+                'left_session_1_text_at': left[name],
             }
             for name, counts in strata.items()
         }
