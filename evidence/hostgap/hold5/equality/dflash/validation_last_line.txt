@@ -1,0 +1,1 @@
+[2026-10-02 13:11:33] hostgap validation: 8192 verify plans and 0 draft kv_indptr sets matched the stock path; plan guard waited 0 of 12284 times

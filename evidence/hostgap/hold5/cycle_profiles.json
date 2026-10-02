@@ -1,0 +1,2655 @@
+{
+  "generated_by": {
+    "repo_head": "6b237c060cb3ca2f5e75b00c8e0ee640a57e2c21",
+    "argv": [
+      "experiments/hostgap/summarize.py",
+      "/home/ubuntu/vp-data/hostgap/prof4",
+      "--labels",
+      "dflash-*",
+      "--out",
+      "evidence/hostgap/hold5/cycle_profiles.json"
+    ]
+  },
+  "tag_dir": "/home/ubuntu/vp-data/hostgap/prof4",
+  "labels": {
+    "dflash-host": {
+      "label": "dflash-host",
+      "provenance": {
+        "started": "2026-10-02T13:22:08",
+        "repo_head": "8f9a765836be5c371d300239c5582facc2d118a7",
+        "repo_dirty_files": [],
+        "sglang_head": "bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824",
+        "sglang_branch": "verified-progress",
+        "sglang_dirty_files": [],
+        "env_overrides": {},
+        "launch_command": [
+          "nsys",
+          "launch",
+          "--session-new=hostgap_2981132",
+          "--trace=cuda,nvtx",
+          "--cuda-graph-trace=graph",
+          "--cuda-flush-interval=250",
+          "--python-functions-trace=/home/ubuntu/vp-wt/hostgap/experiments/hostgap/host_functions.json",
+          "/home/ubuntu/sglang/.venv/bin/python",
+          "-m",
+          "sglang.launch_server",
+          "--model-path",
+          "Qwen/Qwen3.5-4B",
+          "--revision",
+          "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "30100",
+          "--attention-backend",
+          "flashinfer",
+          "--mm-attention-backend",
+          "triton_attn",
+          "--max-running-requests",
+          "128",
+          "--max-mamba-cache-size",
+          "128",
+          "--mem-fraction-static",
+          "0.85",
+          "--max-total-tokens",
+          "1000000",
+          "--enable-metrics",
+          "--random-seed",
+          "0",
+          "--stream-interval",
+          "4",
+          "--speculative-algorithm",
+          "DFLASH",
+          "--speculative-draft-model-path",
+          "z-lab/Qwen3.5-4B-DFlash",
+          "--speculative-draft-model-revision",
+          "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
+          "--speculative-dflash-block-size",
+          "8",
+          "--disable-radix-cache"
+        ],
+        "mode": "nsys",
+        "host_trace": true,
+        "graph_trace": "graph",
+        "nsys_version": "NVIDIA Nsight Systems version 2025.3.2.474-253236389321v0"
+      },
+      "by_concurrency": {
+        "1": {
+          "counter_windows": {
+            "cycle_ms": {
+              "mean": 7.095393745616151,
+              "std": 0.0,
+              "n": 1
+            },
+            "tokens_per_s_per_user": {
+              "mean": 752.9893865363814,
+              "std": 0.0,
+              "n": 1
+            },
+            "tokens_per_s": {
+              "mean": 752.9893865363814,
+              "std": 0.0,
+              "n": 1
+            },
+            "tokens_per_request_per_cycle": {
+              "mean": 5.342756183745583,
+              "std": 0.0,
+              "n": 1
+            },
+            "foreign_cores_mean": 0.155,
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 7.095393745616151,
+                "tokens_per_request_per_cycle": 5.342756183745583,
+                "foreign_cores_mean": 0.155
+              }
+            ]
+          },
+          "excluded_windows": [],
+          "trace": {
+            "report": "/home/ubuntu/vp-data/hostgap/prof4/dflash-host/c1.nsys-rep",
+            "window_ms": 2041.377295,
+            "gpu_busy_ms": 1315.021494,
+            "gpu_idle_ms": 726.355801,
+            "idle_fraction": 0.35581653757935033,
+            "graph_launch_counts": {
+              "('graph', 5846)": 267,
+              "('graph', 5951)": 267
+            },
+            "cycles_from_graphs": 267,
+            "eager_kernel_records": false,
+            "cycles_from_run_batch": 262,
+            "cycles": 262,
+            "gpu_busy_ms_per_cycle": 5.019166007633587,
+            "gpu_idle_ms_per_cycle": 2.7723503854961833,
+            "cycle_ms": 7.791516393129771,
+            "idle_gaps": {
+              "count_per_cycle": 17.248091603053435,
+              "over_100us_per_cycle": 6.026717557251908,
+              "ms_per_cycle_in_gaps_over_100us": 2.195960038167939
+            },
+            "kernel_ms_per_cycle_by_class": {},
+            "graph_ms_per_cycle": {
+              "5846": {
+                "executions_per_cycle": 1.019,
+                "mean_ms": 3.9177,
+                "ms_per_cycle": 3.9924
+              },
+              "5951": {
+                "executions_per_cycle": 1.019,
+                "mean_ms": 0.982,
+                "ms_per_cycle": 1.0008
+              }
+            },
+            "idle_ms_per_cycle_by_innermost": {
+              "FlashInferIndicesUpdaterPrefill.call_begin_forward": 1.1114,
+              "DecodeCudaGraphRunner.load_batch": 0.3335,
+              "DFlashWorkerV2.forward_batch_generation": 0.297,
+              "FlashInferAttnBackend.init_forward_metadata_out_graph": 0.1885,
+              "DecodeCudaGraphRunner.execute": 0.1499,
+              "Scheduler.run_batch": 0.1367,
+              "FutureMap.resolve_seq_lens_cpu": 0.1303,
+              "fast_prefill_plan": 0.1243,
+              "MambaAttnBackendBase.init_forward_metadata_out_graph": 0.105,
+              "FutureMap._resolve_spec_extras": 0.0626,
+              "ModelRunner.forward": 0.0432,
+              "<no traced function>": 0.0392,
+              "cub::DeviceScan::InclusiveScan": 0.0342,
+              "HybridLinearAttnBackend.init_forward_metadata_out_graph": 0.0095,
+              "TpModelWorker.forward_batch_generation": 0.0057,
+              "DFlashVerifyInput.prepare_for_verify": 0.0013
+            },
+            "idle_ms_per_cycle_by_chain": {
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward": 1.0755,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation": 0.2959,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch": 0.2519,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph": 0.1846,
+              "Scheduler.run_batch": 0.1367,
+              "Scheduler.run_batch > FutureMap.resolve_seq_lens_cpu": 0.1303,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashVerifyInput.prepare_for_verify > DecodeCudaGraphRunner.load_batch > HybridLinearAttnBackend.init_forward_metadata_out_graph > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward > fast_prefill_plan": 0.1239,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashVerifyInput.prepare_for_verify > DecodeCudaGraphRunner.load_batch > HybridLinearAttnBackend.init_forward_metadata_out_graph > MambaAttnBackendBase.init_forward_metadata_out_graph": 0.1047,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > TpModelWorker.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute": 0.0914,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > TpModelWorker.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch": 0.073,
+              "Scheduler.run_batch > FutureMap._resolve_spec_extras": 0.0624,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute": 0.058,
+              "<no traced function>": 0.0392,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward > cub::DeviceScan::InclusiveScan": 0.0341,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashVerifyInput.prepare_for_verify > DecodeCudaGraphRunner.load_batch > HybridLinearAttnBackend.init_forward_metadata_out_graph > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward": 0.0318,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward": 0.0237,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > TpModelWorker.forward_batch_generation > ModelRunner.forward": 0.0193,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashVerifyInput.prepare_for_verify > DecodeCudaGraphRunner.load_batch > HybridLinearAttnBackend.init_forward_metadata_out_graph": 0.0094,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashVerifyInput.prepare_for_verify > DecodeCudaGraphRunner.load_batch": 0.0074,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > TpModelWorker.forward_batch_generation": 0.0057
+            },
+            "host_functions": {
+              "Scheduler.run_batch": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 7.0738,
+                "exposed_ms_per_cycle": 2.724,
+                "exposed_fraction": 0.385
+              },
+              "DFlashWorkerV2.forward_batch_generation": {
+                "calls_per_cycle": 1.004,
+                "inclusive_ms_per_cycle": 4.7299,
+                "exposed_ms_per_cycle": 2.4035,
+                "exposed_fraction": 0.508
+              },
+              "DecodeCudaGraphRunner.load_batch": {
+                "calls_per_cycle": 3.008,
+                "inclusive_ms_per_cycle": 2.4754,
+                "exposed_ms_per_cycle": 1.9064,
+                "exposed_fraction": 0.77
+              },
+              "ModelRunner.forward": {
+                "calls_per_cycle": 2.004,
+                "inclusive_ms_per_cycle": 1.9335,
+                "exposed_ms_per_cycle": 1.8183,
+                "exposed_fraction": 0.94
+              },
+              "DecodeCudaGraphRunner.execute": {
+                "calls_per_cycle": 2.004,
+                "inclusive_ms_per_cycle": 1.8661,
+                "exposed_ms_per_cycle": 1.7752,
+                "exposed_fraction": 0.951
+              },
+              "FutureMap.resolve_seq_lens_cpu": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 1.8155,
+                "exposed_ms_per_cycle": 0.1303,
+                "exposed_fraction": 0.072
+              },
+              "FlashInferAttnBackend.init_forward_metadata_out_graph": {
+                "calls_per_cycle": 2.008,
+                "inclusive_ms_per_cycle": 1.783,
+                "exposed_ms_per_cycle": 1.4585,
+                "exposed_fraction": 0.818
+              },
+              "FlashInferIndicesUpdaterPrefill.call_begin_forward": {
+                "calls_per_cycle": 3.011,
+                "inclusive_ms_per_cycle": 1.5735,
+                "exposed_ms_per_cycle": 1.2699,
+                "exposed_fraction": 0.807
+              },
+              "DFlashVerifyInput.prepare_for_verify": {
+                "calls_per_cycle": 1.004,
+                "inclusive_ms_per_cycle": 1.0566,
+                "exposed_ms_per_cycle": 0.2825,
+                "exposed_fraction": 0.267
+              },
+              "DFlashWorkerV2._append_target_hidden_to_draft_kv_by_loc": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.6773,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "HybridLinearAttnBackend.init_forward_metadata_out_graph": {
+                "calls_per_cycle": 1.004,
+                "inclusive_ms_per_cycle": 0.59,
+                "exposed_ms_per_cycle": 0.2738,
+                "exposed_fraction": 0.464
+              },
+              "Scheduler.get_next_batch_to_run": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.2854,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "TpModelWorker.forward_batch_generation": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.2511,
+                "exposed_ms_per_cycle": 0.19,
+                "exposed_fraction": 0.757
+              },
+              "DFlashWorkerV2._update_target_mamba_state_after_verify": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.2448,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "DFlashWorkerV2._accept_block": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.157,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "Scheduler.process_batch_result": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.148,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "fast_prefill_plan": {
+                "calls_per_cycle": 1.004,
+                "inclusive_ms_per_cycle": 0.1265,
+                "exposed_ms_per_cycle": 0.1243,
+                "exposed_fraction": 0.983
+              },
+              "SchedulerBatchResultProcessor.process_batch_result_decode": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.1161,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "MambaAttnBackendBase.init_forward_metadata_out_graph": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.105,
+                "exposed_ms_per_cycle": 0.105,
+                "exposed_fraction": 1.0
+              },
+              "FutureMap.publish": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0803,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "FutureMap._resolve_spec_extras": {
+                "calls_per_cycle": 1.004,
+                "inclusive_ms_per_cycle": 0.0627,
+                "exposed_ms_per_cycle": 0.0626,
+                "exposed_fraction": 0.999
+              },
+              "Scheduler.ingest_requests": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0573,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "FutureMap.stash": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0544,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "cub::DeviceScan::InclusiveScan": {
+                "calls_per_cycle": 3.011,
+                "inclusive_ms_per_cycle": 0.0515,
+                "exposed_ms_per_cycle": 0.0342,
+                "exposed_fraction": 0.663
+              },
+              "Scheduler._apply_war_barrier": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0152,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "Scheduler.launch_batch_sample_if_needed": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0019,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              }
+            },
+            "host_sync_sites": {
+              "cudaStreamSynchronize @ Scheduler.run_batch > FutureMap.resolve_seq_lens_cpu": {
+                "per_cycle": 1.0,
+                "ms_per_cycle": 1.6442
+              },
+              "D2H copy @ DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward": {
+                "per_cycle": 6.023,
+                "ms_per_cycle": 0.0976
+              },
+              "cudaStreamSynchronize @ <no traced function>": {
+                "per_cycle": 0.08,
+                "ms_per_cycle": 0.0198
+              },
+              "D2H copy @ Scheduler.run_batch": {
+                "per_cycle": 1.992,
+                "ms_per_cycle": 0.0189
+              },
+              "cudaStreamSynchronize @ DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward": {
+                "per_cycle": 6.023,
+                "ms_per_cycle": 0.014
+              },
+              "D2H copy @ Scheduler.run_batch > FutureMap.resolve_seq_lens_cpu": {
+                "per_cycle": 1.0,
+                "ms_per_cycle": 0.0102
+              },
+              "cudaEventSynchronize @ Scheduler.process_batch_result > SchedulerBatchResultProcessor.process_batch_result_decode": {
+                "per_cycle": 1.0,
+                "ms_per_cycle": 0.0055
+              },
+              "D2H copy @ <no traced function>": {
+                "per_cycle": 0.107,
+                "ms_per_cycle": 0.0014
+              },
+              "cudaEventSynchronize @ <no traced function>": {
+                "per_cycle": 0.011,
+                "ms_per_cycle": 0.0001
+              }
+            },
+            "runtime_api_ms_per_cycle_during_idle": {
+              "cudaMemcpyAsync_v3020": 0.2504,
+              "cudaLaunchKernel_v7000": 0.1195,
+              "cudaStreamSynchronize_v3020": 0.1053,
+              "cudaGraphLaunch_v10000": 0.0932,
+              "cuLaunchKernelEx": 0.0384,
+              "cudaStreamIsCapturing_v10000": 0.0081,
+              "cudaEventRecordWithFlags_v11010": 0.0056,
+              "cudaEventQuery_v3020": 0.0052,
+              "cuKernelGetName": 0.0028,
+              "cudaEventCreateWithFlags_v3020": 0.0022,
+              "cudaStreamWaitEvent_v3020": 0.0017,
+              "cudaEventRecord_v3020": 0.0011
+            }
+          }
+        },
+        "8": {
+          "counter_windows": {
+            "cycle_ms": {
+              "mean": 9.295764212934214,
+              "std": 0.0,
+              "n": 1
+            },
+            "tokens_per_s_per_user": {
+              "mean": 456.45042821242475,
+              "std": 0.0,
+              "n": 1
+            },
+            "tokens_per_s": {
+              "mean": 3651.603425699398,
+              "std": 0.0,
+              "n": 1
+            },
+            "tokens_per_request_per_cycle": {
+              "mean": 4.243055555555555,
+              "std": 0.0,
+              "n": 1
+            },
+            "foreign_cores_mean": 0.155,
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 9.295764212934214,
+                "tokens_per_request_per_cycle": 4.243055555555555,
+                "foreign_cores_mean": 0.155
+              }
+            ]
+          },
+          "excluded_windows": [],
+          "trace": {
+            "report": "/home/ubuntu/vp-data/hostgap/prof4/dflash-host/c8.nsys-rep",
+            "window_ms": 2037.062272,
+            "gpu_busy_ms": 1416.104224,
+            "gpu_idle_ms": 620.958048,
+            "idle_fraction": 0.3048301745779915,
+            "graph_launch_counts": {
+              "('graph', 5825)": 212,
+              "('graph', 5930)": 211
+            },
+            "cycles_from_graphs": 212,
+            "eager_kernel_records": false,
+            "cycles_from_run_batch": 209,
+            "cycles": 209,
+            "gpu_busy_ms_per_cycle": 6.775618296650718,
+            "gpu_idle_ms_per_cycle": 2.971091138755981,
+            "cycle_ms": 9.746709435406698,
+            "idle_gaps": {
+              "count_per_cycle": 17.19138755980861,
+              "over_100us_per_cycle": 6.4688995215311005,
+              "ms_per_cycle_in_gaps_over_100us": 2.4137887846889954
+            },
+            "kernel_ms_per_cycle_by_class": {},
+            "graph_ms_per_cycle": {
+              "5825": {
+                "executions_per_cycle": 1.014,
+                "mean_ms": 5.4891,
+                "ms_per_cycle": 5.5679
+              },
+              "5930": {
+                "executions_per_cycle": 1.01,
+                "mean_ms": 1.1722,
+                "ms_per_cycle": 1.1834
+              }
+            },
+            "idle_ms_per_cycle_by_innermost": {
+              "FlashInferIndicesUpdaterPrefill.call_begin_forward": 1.1917,
+              "FutureMap.resolve_seq_lens_cpu": 0.3641,
+              "DecodeCudaGraphRunner.load_batch": 0.34,
+              "DFlashWorkerV2.forward_batch_generation": 0.316,
+              "FlashInferAttnBackend.init_forward_metadata_out_graph": 0.186,
+              "DecodeCudaGraphRunner.execute": 0.1482,
+              "Scheduler.run_batch": 0.1395,
+              "MambaAttnBackendBase.init_forward_metadata_out_graph": 0.0846,
+              "FutureMap._resolve_spec_extras": 0.0648,
+              "ModelRunner.forward": 0.0432,
+              "<no traced function>": 0.0401,
+              "cub::DeviceScan::InclusiveScan": 0.033,
+              "HybridLinearAttnBackend.init_forward_metadata_out_graph": 0.008,
+              "TpModelWorker.forward_batch_generation": 0.0061,
+              "fast_prefill_plan": 0.0043,
+              "DFlashVerifyInput.prepare_for_verify": 0.0014
+            },
+            "idle_ms_per_cycle_by_chain": {
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward": 1.1882,
+              "Scheduler.run_batch > FutureMap.resolve_seq_lens_cpu": 0.3641,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation": 0.316,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch": 0.2588,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph": 0.1847,
+              "Scheduler.run_batch": 0.1395,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > TpModelWorker.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute": 0.0886,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashVerifyInput.prepare_for_verify > DecodeCudaGraphRunner.load_batch > HybridLinearAttnBackend.init_forward_metadata_out_graph > MambaAttnBackendBase.init_forward_metadata_out_graph": 0.0842,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > TpModelWorker.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch": 0.0735,
+              "Scheduler.run_batch > FutureMap._resolve_spec_extras": 0.0648,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute": 0.0592,
+              "<no traced function>": 0.0401,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward > cub::DeviceScan::InclusiveScan": 0.033,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward": 0.0242,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > TpModelWorker.forward_batch_generation > ModelRunner.forward": 0.019,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashVerifyInput.prepare_for_verify > DecodeCudaGraphRunner.load_batch > HybridLinearAttnBackend.init_forward_metadata_out_graph": 0.0079,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashVerifyInput.prepare_for_verify > DecodeCudaGraphRunner.load_batch": 0.0074,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > TpModelWorker.forward_batch_generation": 0.0061,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashVerifyInput.prepare_for_verify > DecodeCudaGraphRunner.load_batch > HybridLinearAttnBackend.init_forward_metadata_out_graph > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward > fast_prefill_plan": 0.0043,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashVerifyInput.prepare_for_verify > DecodeCudaGraphRunner.load_batch > HybridLinearAttnBackend.init_forward_metadata_out_graph > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward": 0.0034
+            },
+            "host_functions": {
+              "Scheduler.run_batch": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 8.8234,
+                "exposed_ms_per_cycle": 2.9295,
+                "exposed_fraction": 0.332
+              },
+              "DFlashWorkerV2.forward_batch_generation": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 4.8705,
+                "exposed_ms_per_cycle": 2.3611,
+                "exposed_fraction": 0.485
+              },
+              "FutureMap.resolve_seq_lens_cpu": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 3.3997,
+                "exposed_ms_per_cycle": 0.3641,
+                "exposed_fraction": 0.107
+              },
+              "DecodeCudaGraphRunner.load_batch": {
+                "calls_per_cycle": 2.995,
+                "inclusive_ms_per_cycle": 2.5913,
+                "exposed_ms_per_cycle": 1.847,
+                "exposed_fraction": 0.713
+              },
+              "ModelRunner.forward": {
+                "calls_per_cycle": 2.0,
+                "inclusive_ms_per_cycle": 2.0448,
+                "exposed_ms_per_cycle": 1.9299,
+                "exposed_fraction": 0.944
+              },
+              "DecodeCudaGraphRunner.execute": {
+                "calls_per_cycle": 2.0,
+                "inclusive_ms_per_cycle": 1.9772,
+                "exposed_ms_per_cycle": 1.8867,
+                "exposed_fraction": 0.954
+              },
+              "FlashInferAttnBackend.init_forward_metadata_out_graph": {
+                "calls_per_cycle": 2.0,
+                "inclusive_ms_per_cycle": 1.8922,
+                "exposed_ms_per_cycle": 1.4149,
+                "exposed_fraction": 0.748
+              },
+              "FlashInferIndicesUpdaterPrefill.call_begin_forward": {
+                "calls_per_cycle": 3.0,
+                "inclusive_ms_per_cycle": 1.6828,
+                "exposed_ms_per_cycle": 1.2289,
+                "exposed_fraction": 0.73
+              },
+              "DFlashVerifyInput.prepare_for_verify": {
+                "calls_per_cycle": 0.995,
+                "inclusive_ms_per_cycle": 1.0599,
+                "exposed_ms_per_cycle": 0.1099,
+                "exposed_fraction": 0.104
+              },
+              "DFlashWorkerV2._append_target_hidden_to_draft_kv_by_loc": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.6812,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "HybridLinearAttnBackend.init_forward_metadata_out_graph": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.5928,
+                "exposed_ms_per_cycle": 0.1017,
+                "exposed_fraction": 0.172
+              },
+              "Scheduler.get_next_batch_to_run": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.3918,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "TpModelWorker.forward_batch_generation": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.2493,
+                "exposed_ms_per_cycle": 0.188,
+                "exposed_fraction": 0.754
+              },
+              "Scheduler.process_batch_result": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.2483,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "DFlashWorkerV2._update_target_mamba_state_after_verify": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.2464,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "SchedulerBatchResultProcessor.process_batch_result_decode": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.2127,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "DFlashWorkerV2._accept_block": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.1591,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "fast_prefill_plan": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.1286,
+                "exposed_ms_per_cycle": 0.0043,
+                "exposed_fraction": 0.033
+              },
+              "MambaAttnBackendBase.init_forward_metadata_out_graph": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.1046,
+                "exposed_ms_per_cycle": 0.0846,
+                "exposed_fraction": 0.809
+              },
+              "FutureMap.publish": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0781,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "FutureMap._resolve_spec_extras": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0649,
+                "exposed_ms_per_cycle": 0.0648,
+                "exposed_fraction": 0.999
+              },
+              "Scheduler.ingest_requests": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0575,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "FutureMap.stash": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.053,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "cub::DeviceScan::InclusiveScan": {
+                "calls_per_cycle": 3.0,
+                "inclusive_ms_per_cycle": 0.0501,
+                "exposed_ms_per_cycle": 0.033,
+                "exposed_fraction": 0.659
+              },
+              "Scheduler._apply_war_barrier": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0157,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "Scheduler.launch_batch_sample_if_needed": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0019,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              }
+            },
+            "host_sync_sites": {
+              "cudaStreamSynchronize @ Scheduler.run_batch > FutureMap.resolve_seq_lens_cpu": {
+                "per_cycle": 1.0,
+                "ms_per_cycle": 3.2241
+              },
+              "D2H copy @ DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward": {
+                "per_cycle": 6.0,
+                "ms_per_cycle": 0.0994
+              },
+              "cudaStreamSynchronize @ <no traced function>": {
+                "per_cycle": 0.081,
+                "ms_per_cycle": 0.031
+              },
+              "D2H copy @ Scheduler.run_batch": {
+                "per_cycle": 1.99,
+                "ms_per_cycle": 0.0187
+              },
+              "cudaStreamSynchronize @ DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward": {
+                "per_cycle": 5.995,
+                "ms_per_cycle": 0.0148
+              },
+              "D2H copy @ Scheduler.run_batch > FutureMap.resolve_seq_lens_cpu": {
+                "per_cycle": 1.0,
+                "ms_per_cycle": 0.0104
+              },
+              "cudaEventSynchronize @ Scheduler.process_batch_result > SchedulerBatchResultProcessor.process_batch_result_decode": {
+                "per_cycle": 1.0,
+                "ms_per_cycle": 0.0055
+              },
+              "D2H copy @ <no traced function>": {
+                "per_cycle": 0.11,
+                "ms_per_cycle": 0.0015
+              },
+              "cudaEventSynchronize @ <no traced function>": {
+                "per_cycle": 0.01,
+                "ms_per_cycle": 0.0
+              }
+            },
+            "runtime_api_ms_per_cycle_during_idle": {
+              "cudaStreamSynchronize_v3020": 0.3399,
+              "cudaMemcpyAsync_v3020": 0.2229,
+              "cudaLaunchKernel_v7000": 0.1219,
+              "cudaGraphLaunch_v10000": 0.0909,
+              "cuLaunchKernelEx": 0.0371,
+              "cudaStreamIsCapturing_v10000": 0.0082,
+              "cudaEventRecordWithFlags_v11010": 0.0055,
+              "cudaEventQuery_v3020": 0.005,
+              "cuKernelGetName": 0.0028,
+              "cudaEventCreateWithFlags_v3020": 0.0019,
+              "cudaStreamWaitEvent_v3020": 0.0017,
+              "cudaEventRecord_v3020": 0.0012
+            }
+          }
+        },
+        "32": {
+          "counter_windows": {
+            "cycle_ms": {
+              "mean": 16.193780249816502,
+              "std": 0.0,
+              "n": 1
+            },
+            "tokens_per_s_per_user": {
+              "mean": 298.48925206290124,
+              "std": 0.0,
+              "n": 1
+            },
+            "tokens_per_s": {
+              "mean": 9551.65606601284,
+              "std": 0.0,
+              "n": 1
+            },
+            "tokens_per_request_per_cycle": {
+              "mean": 4.83366935483871,
+              "std": 0.0,
+              "n": 1
+            },
+            "foreign_cores_mean": 0.205,
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 16.193780249816502,
+                "tokens_per_request_per_cycle": 4.83366935483871,
+                "foreign_cores_mean": 0.205
+              }
+            ]
+          },
+          "excluded_windows": [],
+          "trace": {
+            "report": "/home/ubuntu/vp-data/hostgap/prof4/dflash-host/c32.nsys-rep",
+            "window_ms": 2039.955648,
+            "gpu_busy_ms": 1587.25536,
+            "gpu_idle_ms": 452.700288,
+            "idle_fraction": 0.22191673061315498,
+            "graph_launch_counts": {
+              "('graph', 5789)": 125,
+              "('graph', 5894)": 124
+            },
+            "cycles_from_graphs": 125,
+            "eager_kernel_records": false,
+            "cycles_from_run_batch": 123,
+            "cycles": 123,
+            "gpu_busy_ms_per_cycle": 12.904515121951219,
+            "gpu_idle_ms_per_cycle": 3.6804901463414637,
+            "cycle_ms": 16.585005268292683,
+            "idle_gaps": {
+              "count_per_cycle": 17.11382113821138,
+              "over_100us_per_cycle": 8.178861788617887,
+              "ms_per_cycle_in_gaps_over_100us": 3.3455653983739837
+            },
+            "kernel_ms_per_cycle_by_class": {},
+            "graph_ms_per_cycle": {
+              "5789": {
+                "executions_per_cycle": 1.016,
+                "mean_ms": 11.0047,
+                "ms_per_cycle": 11.1837
+              },
+              "5894": {
+                "executions_per_cycle": 1.008,
+                "mean_ms": 1.6854,
+                "ms_per_cycle": 1.6991
+              }
+            },
+            "idle_ms_per_cycle_by_innermost": {
+              "FlashInferIndicesUpdaterPrefill.call_begin_forward": 1.3311,
+              "FutureMap.resolve_seq_lens_cpu": 1.1529,
+              "DFlashWorkerV2.forward_batch_generation": 0.3129,
+              "DecodeCudaGraphRunner.load_batch": 0.2572,
+              "FlashInferAttnBackend.init_forward_metadata_out_graph": 0.1868,
+              "Scheduler.run_batch": 0.1449,
+              "FutureMap._resolve_spec_extras": 0.0628,
+              "<no traced function>": 0.0594,
+              "DecodeCudaGraphRunner.execute": 0.0575,
+              "cub::DeviceScan::InclusiveScan": 0.0336,
+              "DFlashWorkerV2._accept_block": 0.0304,
+              "DFlashWorkerV2._update_target_mamba_state_after_verify": 0.0264,
+              "ModelRunner.forward": 0.0244,
+              "TpModelWorker.forward_batch_generation": 0.0001
+            },
+            "idle_ms_per_cycle_by_chain": {
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward": 1.3311,
+              "Scheduler.run_batch > FutureMap.resolve_seq_lens_cpu": 1.1529,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation": 0.3129,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch": 0.2572,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph": 0.1868,
+              "Scheduler.run_batch": 0.1449,
+              "Scheduler.run_batch > FutureMap._resolve_spec_extras": 0.0628,
+              "<no traced function>": 0.0594,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute": 0.0575,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward > cub::DeviceScan::InclusiveScan": 0.0336,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashWorkerV2._accept_block": 0.0298,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashWorkerV2._update_target_mamba_state_after_verify": 0.0264,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward": 0.0244,
+              "DFlashWorkerV2._accept_block": 0.0005,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > TpModelWorker.forward_batch_generation": 0.0001,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > TpModelWorker.forward_batch_generation > ModelRunner.forward": 0.0
+            },
+            "host_functions": {
+              "Scheduler.run_batch": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 15.0353,
+                "exposed_ms_per_cycle": 3.6206,
+                "exposed_fraction": 0.241
+              },
+              "FutureMap.resolve_seq_lens_cpu": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 9.46,
+                "exposed_ms_per_cycle": 1.1529,
+                "exposed_fraction": 0.122
+              },
+              "DFlashWorkerV2.forward_batch_generation": {
+                "calls_per_cycle": 0.992,
+                "inclusive_ms_per_cycle": 5.019,
+                "exposed_ms_per_cycle": 2.26,
+                "exposed_fraction": 0.45
+              },
+              "DecodeCudaGraphRunner.load_batch": {
+                "calls_per_cycle": 2.992,
+                "inclusive_ms_per_cycle": 2.7451,
+                "exposed_ms_per_cycle": 1.8087,
+                "exposed_fraction": 0.659
+              },
+              "ModelRunner.forward": {
+                "calls_per_cycle": 1.992,
+                "inclusive_ms_per_cycle": 2.1836,
+                "exposed_ms_per_cycle": 1.8907,
+                "exposed_fraction": 0.866
+              },
+              "DecodeCudaGraphRunner.execute": {
+                "calls_per_cycle": 1.992,
+                "inclusive_ms_per_cycle": 2.1152,
+                "exposed_ms_per_cycle": 1.8662,
+                "exposed_fraction": 0.882
+              },
+              "FlashInferAttnBackend.init_forward_metadata_out_graph": {
+                "calls_per_cycle": 1.992,
+                "inclusive_ms_per_cycle": 2.0444,
+                "exposed_ms_per_cycle": 1.5515,
+                "exposed_fraction": 0.759
+              },
+              "FlashInferIndicesUpdaterPrefill.call_begin_forward": {
+                "calls_per_cycle": 2.984,
+                "inclusive_ms_per_cycle": 1.8332,
+                "exposed_ms_per_cycle": 1.3647,
+                "exposed_fraction": 0.744
+              },
+              "DFlashVerifyInput.prepare_for_verify": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 1.0762,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "Scheduler.get_next_batch_to_run": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.7282,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "DFlashWorkerV2._append_target_hidden_to_draft_kv_by_loc": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.6848,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "HybridLinearAttnBackend.init_forward_metadata_out_graph": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.6005,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "Scheduler.process_batch_result": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.403,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "SchedulerBatchResultProcessor.process_batch_result_decode": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.3618,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "TpModelWorker.forward_batch_generation": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.2462,
+                "exposed_ms_per_cycle": 0.0001,
+                "exposed_fraction": 0.001
+              },
+              "DFlashWorkerV2._update_target_mamba_state_after_verify": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.2461,
+                "exposed_ms_per_cycle": 0.0264,
+                "exposed_fraction": 0.107
+              },
+              "DFlashWorkerV2._accept_block": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.1602,
+                "exposed_ms_per_cycle": 0.0304,
+                "exposed_fraction": 0.189
+              },
+              "fast_prefill_plan": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.1342,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "MambaAttnBackendBase.init_forward_metadata_out_graph": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.1064,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "FutureMap.publish": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0773,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "FutureMap._resolve_spec_extras": {
+                "calls_per_cycle": 0.992,
+                "inclusive_ms_per_cycle": 0.0657,
+                "exposed_ms_per_cycle": 0.0628,
+                "exposed_fraction": 0.955
+              },
+              "Scheduler.ingest_requests": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0587,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "FutureMap.stash": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0539,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "cub::DeviceScan::InclusiveScan": {
+                "calls_per_cycle": 2.984,
+                "inclusive_ms_per_cycle": 0.0507,
+                "exposed_ms_per_cycle": 0.0336,
+                "exposed_fraction": 0.662
+              },
+              "Scheduler._apply_war_barrier": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0155,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "Scheduler.launch_batch_sample_if_needed": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.002,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              }
+            },
+            "host_sync_sites": {
+              "cudaStreamSynchronize @ Scheduler.run_batch > FutureMap.resolve_seq_lens_cpu": {
+                "per_cycle": 0.992,
+                "ms_per_cycle": 9.2166
+              },
+              "D2H copy @ DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward": {
+                "per_cycle": 5.951,
+                "ms_per_cycle": 0.1001
+              },
+              "cudaStreamSynchronize @ <no traced function>": {
+                "per_cycle": 0.106,
+                "ms_per_cycle": 0.0747
+              },
+              "D2H copy @ Scheduler.run_batch": {
+                "per_cycle": 1.967,
+                "ms_per_cycle": 0.0181
+              },
+              "cudaStreamSynchronize @ DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward": {
+                "per_cycle": 5.951,
+                "ms_per_cycle": 0.0148
+              },
+              "D2H copy @ Scheduler.run_batch > FutureMap.resolve_seq_lens_cpu": {
+                "per_cycle": 0.992,
+                "ms_per_cycle": 0.0099
+              },
+              "cudaEventSynchronize @ Scheduler.process_batch_result > SchedulerBatchResultProcessor.process_batch_result_decode": {
+                "per_cycle": 1.0,
+                "ms_per_cycle": 0.0054
+              },
+              "D2H copy @ <no traced function>": {
+                "per_cycle": 0.138,
+                "ms_per_cycle": 0.0022
+              },
+              "cudaEventSynchronize @ <no traced function>": {
+                "per_cycle": 0.008,
+                "ms_per_cycle": 0.0
+              }
+            },
+            "runtime_api_ms_per_cycle_during_idle": {
+              "cudaStreamSynchronize_v3020": 1.1332,
+              "cudaMemcpyAsync_v3020": 0.1926,
+              "cudaLaunchKernel_v7000": 0.1277,
+              "cuLaunchKernelEx": 0.0326,
+              "cudaGraphLaunch_v10000": 0.0304,
+              "cudaStreamIsCapturing_v10000": 0.0082,
+              "cudaEventRecordWithFlags_v11010": 0.0061,
+              "cudaEventQuery_v3020": 0.005,
+              "cuKernelGetName": 0.0028,
+              "cudaEventCreateWithFlags_v3020": 0.0025,
+              "cudaStreamWaitEvent_v3020": 0.0019,
+              "cudaGetDevice_v3020": 0.0015
+            }
+          }
+        }
+      }
+    },
+    "dflash-none": {
+      "label": "dflash-none",
+      "provenance": {
+        "started": "2026-10-02T13:17:14",
+        "repo_head": "8f9a765836be5c371d300239c5582facc2d118a7",
+        "repo_dirty_files": [],
+        "sglang_head": "bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824",
+        "sglang_branch": "verified-progress",
+        "sglang_dirty_files": [],
+        "env_overrides": {},
+        "launch_command": [
+          "/home/ubuntu/sglang/.venv/bin/python",
+          "-m",
+          "sglang.launch_server",
+          "--model-path",
+          "Qwen/Qwen3.5-4B",
+          "--revision",
+          "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "30100",
+          "--attention-backend",
+          "flashinfer",
+          "--mm-attention-backend",
+          "triton_attn",
+          "--max-running-requests",
+          "128",
+          "--max-mamba-cache-size",
+          "128",
+          "--mem-fraction-static",
+          "0.85",
+          "--max-total-tokens",
+          "1000000",
+          "--enable-metrics",
+          "--random-seed",
+          "0",
+          "--stream-interval",
+          "4",
+          "--speculative-algorithm",
+          "DFLASH",
+          "--speculative-draft-model-path",
+          "z-lab/Qwen3.5-4B-DFlash",
+          "--speculative-draft-model-revision",
+          "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
+          "--speculative-dflash-block-size",
+          "8",
+          "--disable-radix-cache"
+        ],
+        "mode": "none",
+        "host_trace": false,
+        "graph_trace": "graph",
+        "nsys_version": "NVIDIA Nsight Systems version 2025.3.2.474-253236389321v0"
+      },
+      "by_concurrency": {
+        "1": {
+          "counter_windows": {
+            "cycle_ms": {
+              "mean": 6.59904574734049,
+              "std": 0.01274088076400034,
+              "n": 3
+            },
+            "tokens_per_s_per_user": {
+              "mean": 604.8261326940075,
+              "std": 158.01860801325046,
+              "n": 3
+            },
+            "tokens_per_s": {
+              "mean": 604.8261326940075,
+              "std": 158.01860801325046,
+              "n": 3
+            },
+            "tokens_per_request_per_cycle": {
+              "mean": 3.989933851020995,
+              "std": 1.0339299421369474,
+              "n": 3
+            },
+            "foreign_cores_mean": 0.525,
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 6.584347439376393,
+                "tokens_per_request_per_cycle": 5.180327868852459,
+                "foreign_cores_mean": 0.525
+              },
+              {
+                "repeat": 1,
+                "cycle_ms": 6.605847315816056,
+                "tokens_per_request_per_cycle": 3.473684210526316,
+                "foreign_cores_mean": 0.12
+              },
+              {
+                "repeat": 2,
+                "cycle_ms": 6.60694248682902,
+                "tokens_per_request_per_cycle": 3.3157894736842106,
+                "foreign_cores_mean": 0.105
+              }
+            ]
+          },
+          "excluded_windows": []
+        },
+        "8": {
+          "counter_windows": {
+            "cycle_ms": {
+              "mean": 8.718927496995322,
+              "std": 0.022060654346692198,
+              "n": 3
+            },
+            "tokens_per_s_per_user": {
+              "mean": 531.307472550439,
+              "std": 34.313707718614914,
+              "n": 3
+            },
+            "tokens_per_s": {
+              "mean": 4250.459780403512,
+              "std": 274.5096617489193,
+              "n": 3
+            },
+            "tokens_per_request_per_cycle": {
+              "mean": 4.632912980739068,
+              "std": 0.3100225040265636,
+              "n": 3
+            },
+            "foreign_cores_mean": 0.185,
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 8.693454060673279,
+                "tokens_per_request_per_cycle": 4.29004329004329,
+                "foreign_cores_mean": 0.185
+              },
+              {
+                "repeat": 1,
+                "cycle_ms": 8.731686613021377,
+                "tokens_per_request_per_cycle": 4.715217391304348,
+                "foreign_cores_mean": 0.07
+              },
+              {
+                "repeat": 2,
+                "cycle_ms": 8.731641817291308,
+                "tokens_per_request_per_cycle": 4.893478260869565,
+                "foreign_cores_mean": 0.1
+              }
+            ]
+          },
+          "excluded_windows": []
+        },
+        "32": {
+          "counter_windows": {
+            "cycle_ms": {
+              "mean": 15.693988343703799,
+              "std": 0.003490516789443574,
+              "n": 3
+            },
+            "tokens_per_s_per_user": {
+              "mean": 299.9662960568449,
+              "std": 14.136365378090751,
+              "n": 3
+            },
+            "tokens_per_s": {
+              "mean": 9598.921473819037,
+              "std": 452.36369209890404,
+              "n": 3
+            },
+            "tokens_per_request_per_cycle": {
+              "mean": 4.707682291666667,
+              "std": 0.22232691629844267,
+              "n": 3
+            },
+            "foreign_cores_mean": 0.245,
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 15.697929218731588,
+                "tokens_per_request_per_cycle": 4.869140625,
+                "foreign_cores_mean": 0.145
+              },
+              {
+                "repeat": 1,
+                "cycle_ms": 15.691285898356,
+                "tokens_per_request_per_cycle": 4.7998046875,
+                "foreign_cores_mean": 0.115
+              },
+              {
+                "repeat": 2,
+                "cycle_ms": 15.692749914023807,
+                "tokens_per_request_per_cycle": 4.4541015625,
+                "foreign_cores_mean": 0.245
+              }
+            ]
+          },
+          "excluded_windows": []
+        }
+      }
+    },
+    "dflash-patched-host": {
+      "label": "dflash-patched-host",
+      "provenance": {
+        "started": "2026-10-02T13:20:19",
+        "repo_head": "8f9a765836be5c371d300239c5582facc2d118a7",
+        "repo_dirty_files": [],
+        "sglang_head": "6b1d3448872b47ba774aeb6ec077c6aec94c05a2",
+        "sglang_branch": "engine/hostgap",
+        "sglang_dirty_files": [],
+        "env_overrides": {
+          "SGLANG_HOSTGAP_VERIFY_PLAN": "1",
+          "SGLANG_HOSTGAP_DRAFT_INDPTR": "1",
+          "SGLANG_HOSTGAP_DFLASH_DRAFT_PLAN": "1"
+        },
+        "launch_command": [
+          "nsys",
+          "launch",
+          "--session-new=hostgap_2977533",
+          "--trace=cuda,nvtx",
+          "--cuda-graph-trace=graph",
+          "--cuda-flush-interval=250",
+          "--python-functions-trace=/home/ubuntu/vp-wt/hostgap/experiments/hostgap/host_functions.json",
+          "/home/ubuntu/sglang/.venv/bin/python",
+          "-m",
+          "sglang.launch_server",
+          "--model-path",
+          "Qwen/Qwen3.5-4B",
+          "--revision",
+          "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "30100",
+          "--attention-backend",
+          "flashinfer",
+          "--mm-attention-backend",
+          "triton_attn",
+          "--max-running-requests",
+          "128",
+          "--max-mamba-cache-size",
+          "128",
+          "--mem-fraction-static",
+          "0.85",
+          "--max-total-tokens",
+          "1000000",
+          "--enable-metrics",
+          "--random-seed",
+          "0",
+          "--stream-interval",
+          "4",
+          "--speculative-algorithm",
+          "DFLASH",
+          "--speculative-draft-model-path",
+          "z-lab/Qwen3.5-4B-DFlash",
+          "--speculative-draft-model-revision",
+          "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
+          "--speculative-dflash-block-size",
+          "8",
+          "--disable-radix-cache"
+        ],
+        "mode": "nsys",
+        "host_trace": true,
+        "graph_trace": "graph",
+        "nsys_version": "NVIDIA Nsight Systems version 2025.3.2.474-253236389321v0"
+      },
+      "by_concurrency": {
+        "1": {
+          "counter_windows": {
+            "cycle_ms": {
+              "mean": 7.021633286694215,
+              "std": 0.0,
+              "n": 1
+            },
+            "tokens_per_s_per_user": {
+              "mean": 752.9178854628382,
+              "std": 0.0,
+              "n": 1
+            },
+            "tokens_per_s": {
+              "mean": 752.9178854628382,
+              "std": 0.0,
+              "n": 1
+            },
+            "tokens_per_request_per_cycle": {
+              "mean": 5.286713286713287,
+              "std": 0.0,
+              "n": 1
+            },
+            "foreign_cores_mean": 0.195,
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 7.021633286694215,
+                "tokens_per_request_per_cycle": 5.286713286713287,
+                "foreign_cores_mean": 0.195
+              }
+            ]
+          },
+          "excluded_windows": [],
+          "trace": {
+            "report": "/home/ubuntu/vp-data/hostgap/prof4/dflash-patched-host/c1.nsys-rep",
+            "window_ms": 2040.285488,
+            "gpu_busy_ms": 1358.88692,
+            "gpu_idle_ms": 681.398568,
+            "idle_fraction": 0.3339721681145438,
+            "graph_launch_counts": {
+              "('graph', 5951)": 267,
+              "('graph', 5846)": 267
+            },
+            "cycles_from_graphs": 267,
+            "eager_kernel_records": true,
+            "cycles_from_run_batch": 263,
+            "cycles": 263,
+            "gpu_busy_ms_per_cycle": 5.166870418250951,
+            "gpu_idle_ms_per_cycle": 2.5908690798479084,
+            "cycle_ms": 7.75773949809886,
+            "idle_gaps": {
+              "count_per_cycle": 80.40684410646388,
+              "over_100us_per_cycle": 7.258555133079848,
+              "ms_per_cycle_in_gaps_over_100us": 1.1567555931558935
+            },
+            "kernel_ms_per_cycle_by_class": {
+              "gemm": 0.062,
+              "copy_index": 0.0513,
+              "gdn_state": 0.0338,
+              "other": 0.0162,
+              "sampling": 0.0097,
+              "attention": 0.0072,
+              "norm_act": 0.005
+            },
+            "graph_ms_per_cycle": {
+              "5846": {
+                "executions_per_cycle": 1.015,
+                "mean_ms": 3.9178,
+                "ms_per_cycle": 3.9774
+              },
+              "5951": {
+                "executions_per_cycle": 1.015,
+                "mean_ms": 0.982,
+                "ms_per_cycle": 0.997
+              }
+            },
+            "idle_ms_per_cycle_by_innermost": {
+              "FlashInferIndicesUpdaterPrefill.call_begin_forward": 1.0115,
+              "DecodeCudaGraphRunner.load_batch": 0.3289,
+              "DFlashWorkerV2.forward_batch_generation": 0.2973,
+              "FlashInferAttnBackend.init_forward_metadata_out_graph": 0.2272,
+              "DecodeCudaGraphRunner.execute": 0.1475,
+              "Scheduler.run_batch": 0.1247,
+              "fast_prefill_plan": 0.1227,
+              "MambaAttnBackendBase.init_forward_metadata_out_graph": 0.1079,
+              "FutureMap._resolve_spec_extras": 0.0647,
+              "ModelRunner.forward": 0.0418,
+              "<no traced function>": 0.0381,
+              "cub::DeviceScan::InclusiveScan": 0.0362,
+              "FutureMap.resolve_seq_lens_cpu": 0.0258,
+              "HybridLinearAttnBackend.init_forward_metadata_out_graph": 0.0093,
+              "TpModelWorker.forward_batch_generation": 0.0059,
+              "DFlashVerifyInput.prepare_for_verify": 0.0012
+            },
+            "idle_ms_per_cycle_by_chain": {
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward": 0.9329,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation": 0.2973,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch": 0.248,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph": 0.2234,
+              "Scheduler.run_batch": 0.1247,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashVerifyInput.prepare_for_verify > DecodeCudaGraphRunner.load_batch > HybridLinearAttnBackend.init_forward_metadata_out_graph > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward > fast_prefill_plan": 0.1227,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashVerifyInput.prepare_for_verify > DecodeCudaGraphRunner.load_batch > HybridLinearAttnBackend.init_forward_metadata_out_graph > MambaAttnBackendBase.init_forward_metadata_out_graph": 0.1075,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > TpModelWorker.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute": 0.0905,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashVerifyInput.prepare_for_verify > DecodeCudaGraphRunner.load_batch > HybridLinearAttnBackend.init_forward_metadata_out_graph > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward": 0.0786,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > TpModelWorker.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch": 0.0738,
+              "Scheduler.run_batch > FutureMap._resolve_spec_extras": 0.0647,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute": 0.0567,
+              "<no traced function>": 0.0381,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward > cub::DeviceScan::InclusiveScan": 0.0362,
+              "Scheduler.run_batch > FutureMap.resolve_seq_lens_cpu": 0.0258,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward": 0.0226,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > TpModelWorker.forward_batch_generation > ModelRunner.forward": 0.0192,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashVerifyInput.prepare_for_verify > DecodeCudaGraphRunner.load_batch > HybridLinearAttnBackend.init_forward_metadata_out_graph": 0.0093,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashVerifyInput.prepare_for_verify > DecodeCudaGraphRunner.load_batch": 0.0069,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > TpModelWorker.forward_batch_generation": 0.0059
+            },
+            "host_functions": {
+              "Scheduler.run_batch": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 7.065,
+                "exposed_ms_per_cycle": 2.5517,
+                "exposed_fraction": 0.361
+              },
+              "DFlashWorkerV2.forward_batch_generation": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 4.738,
+                "exposed_ms_per_cycle": 2.3364,
+                "exposed_fraction": 0.493
+              },
+              "DecodeCudaGraphRunner.load_batch": {
+                "calls_per_cycle": 2.996,
+                "inclusive_ms_per_cycle": 2.4361,
+                "exposed_ms_per_cycle": 1.8433,
+                "exposed_fraction": 0.757
+              },
+              "ModelRunner.forward": {
+                "calls_per_cycle": 2.0,
+                "inclusive_ms_per_cycle": 1.8403,
+                "exposed_ms_per_cycle": 1.7039,
+                "exposed_fraction": 0.926
+              },
+              "FutureMap.resolve_seq_lens_cpu": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 1.7794,
+                "exposed_ms_per_cycle": 0.0258,
+                "exposed_fraction": 0.015
+              },
+              "DecodeCudaGraphRunner.execute": {
+                "calls_per_cycle": 2.0,
+                "inclusive_ms_per_cycle": 1.7738,
+                "exposed_ms_per_cycle": 1.6621,
+                "exposed_fraction": 0.937
+              },
+              "FlashInferAttnBackend.init_forward_metadata_out_graph": {
+                "calls_per_cycle": 1.996,
+                "inclusive_ms_per_cycle": 1.7391,
+                "exposed_ms_per_cycle": 1.3975,
+                "exposed_fraction": 0.804
+              },
+              "FlashInferIndicesUpdaterPrefill.call_begin_forward": {
+                "calls_per_cycle": 2.992,
+                "inclusive_ms_per_cycle": 1.4842,
+                "exposed_ms_per_cycle": 1.1703,
+                "exposed_fraction": 0.789
+              },
+              "DFlashVerifyInput.prepare_for_verify": {
+                "calls_per_cycle": 0.996,
+                "inclusive_ms_per_cycle": 1.1134,
+                "exposed_ms_per_cycle": 0.33,
+                "exposed_fraction": 0.296
+              },
+              "DFlashWorkerV2._append_target_hidden_to_draft_kv_by_loc": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.7001,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "HybridLinearAttnBackend.init_forward_metadata_out_graph": {
+                "calls_per_cycle": 0.996,
+                "inclusive_ms_per_cycle": 0.6409,
+                "exposed_ms_per_cycle": 0.3219,
+                "exposed_fraction": 0.502
+              },
+              "Scheduler.get_next_batch_to_run": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.284,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "DFlashWorkerV2._update_target_mamba_state_after_verify": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.2543,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "TpModelWorker.forward_batch_generation": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.2536,
+                "exposed_ms_per_cycle": 0.19,
+                "exposed_fraction": 0.749
+              },
+              "DFlashWorkerV2._accept_block": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.1649,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "Scheduler.process_batch_result": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.1465,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "fast_prefill_plan": {
+                "calls_per_cycle": 0.996,
+                "inclusive_ms_per_cycle": 0.1265,
+                "exposed_ms_per_cycle": 0.1227,
+                "exposed_fraction": 0.97
+              },
+              "SchedulerBatchResultProcessor.process_batch_result_decode": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.1139,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "MambaAttnBackendBase.init_forward_metadata_out_graph": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.1098,
+                "exposed_ms_per_cycle": 0.1079,
+                "exposed_fraction": 0.982
+              },
+              "FutureMap.publish": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0804,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "FutureMap._resolve_spec_extras": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0666,
+                "exposed_ms_per_cycle": 0.0647,
+                "exposed_fraction": 0.971
+              },
+              "FutureMap.stash": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0591,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "Scheduler.ingest_requests": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0572,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "cub::DeviceScan::InclusiveScan": {
+                "calls_per_cycle": 2.992,
+                "inclusive_ms_per_cycle": 0.0566,
+                "exposed_ms_per_cycle": 0.0362,
+                "exposed_fraction": 0.639
+              },
+              "Scheduler._apply_war_barrier": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0149,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "Scheduler.launch_batch_sample_if_needed": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.002,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              }
+            },
+            "host_sync_sites": {
+              "cudaStreamSynchronize @ Scheduler.run_batch > FutureMap.resolve_seq_lens_cpu": {
+                "per_cycle": 1.0,
+                "ms_per_cycle": 1.6051
+              },
+              "D2H copy @ Scheduler.run_batch": {
+                "per_cycle": 1.992,
+                "ms_per_cycle": 0.0181
+              },
+              "cudaStreamSynchronize @ <no traced function>": {
+                "per_cycle": 0.008,
+                "ms_per_cycle": 0.0121
+              },
+              "D2H copy @ Scheduler.run_batch > FutureMap.resolve_seq_lens_cpu": {
+                "per_cycle": 1.0,
+                "ms_per_cycle": 0.0099
+              },
+              "cudaEventSynchronize @ Scheduler.process_batch_result > SchedulerBatchResultProcessor.process_batch_result_decode": {
+                "per_cycle": 1.0,
+                "ms_per_cycle": 0.0052
+              },
+              "D2H copy @ <no traced function>": {
+                "per_cycle": 0.03,
+                "ms_per_cycle": 0.0003
+              },
+              "cudaEventSynchronize @ <no traced function>": {
+                "per_cycle": 0.008,
+                "ms_per_cycle": 0.0
+              }
+            },
+            "runtime_api_ms_per_cycle_during_idle": {
+              "cudaMemcpyAsync_v3020": 0.1763,
+              "cudaLaunchKernel_v7000": 0.1553,
+              "cudaGraphLaunch_v10000": 0.0925,
+              "cuLaunchKernelEx": 0.0534,
+              "cudaStreamSynchronize_v3020": 0.0229,
+              "cudaEventQuery_v3020": 0.0177,
+              "cudaEventRecordWithFlags_v11010": 0.0126,
+              "cudaStreamIsCapturing_v10000": 0.006,
+              "cuKernelGetName": 0.0028,
+              "cudaEventCreateWithFlags_v3020": 0.002,
+              "cudaStreamWaitEvent_v3020": 0.0017,
+              "cudaEventRecord_v3020": 0.0011
+            }
+          }
+        },
+        "8": {
+          "counter_windows": {
+            "cycle_ms": {
+              "mean": 9.127582181827165,
+              "std": 0.0,
+              "n": 1
+            },
+            "tokens_per_s_per_user": {
+              "mean": 472.095547676385,
+              "std": 0.0,
+              "n": 1
+            },
+            "tokens_per_s": {
+              "mean": 3776.76438141108,
+              "std": 0.0,
+              "n": 1
+            },
+            "tokens_per_request_per_cycle": {
+              "mean": 4.3090909090909095,
+              "std": 0.0,
+              "n": 1
+            },
+            "foreign_cores_mean": 0.145,
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 9.127582181827165,
+                "tokens_per_request_per_cycle": 4.3090909090909095,
+                "foreign_cores_mean": 0.145
+              }
+            ]
+          },
+          "excluded_windows": [],
+          "trace": {
+            "report": "/home/ubuntu/vp-data/hostgap/prof4/dflash-patched-host/c8.nsys-rep",
+            "window_ms": 2032.792692,
+            "gpu_busy_ms": 1517.390068,
+            "gpu_idle_ms": 515.402624,
+            "idle_fraction": 0.2535441149647738,
+            "graph_launch_counts": {
+              "('graph', 5930)": 214,
+              "('graph', 5825)": 214
+            },
+            "cycles_from_graphs": 214,
+            "eager_kernel_records": true,
+            "cycles_from_run_batch": 211,
+            "cycles": 211,
+            "gpu_busy_ms_per_cycle": 7.191422123222749,
+            "gpu_idle_ms_per_cycle": 2.4426664644549763,
+            "cycle_ms": 9.634088587677725,
+            "idle_gaps": {
+              "count_per_cycle": 80.75829383886256,
+              "over_100us_per_cycle": 7.137440758293839,
+              "ms_per_cycle_in_gaps_over_100us": 1.152333431279621
+            },
+            "kernel_ms_per_cycle_by_class": {
+              "gdn_state": 0.2475,
+              "gemm": 0.062,
+              "copy_index": 0.048,
+              "sampling": 0.0335,
+              "other": 0.0192,
+              "norm_act": 0.0071,
+              "attention": 0.007
+            },
+            "graph_ms_per_cycle": {
+              "5825": {
+                "executions_per_cycle": 1.014,
+                "mean_ms": 5.4904,
+                "ms_per_cycle": 5.5685
+              },
+              "5930": {
+                "executions_per_cycle": 1.014,
+                "mean_ms": 1.1734,
+                "ms_per_cycle": 1.1901
+              }
+            },
+            "idle_ms_per_cycle_by_innermost": {
+              "FlashInferIndicesUpdaterPrefill.call_begin_forward": 0.9658,
+              "DecodeCudaGraphRunner.load_batch": 0.3327,
+              "DFlashWorkerV2.forward_batch_generation": 0.3204,
+              "FlashInferAttnBackend.init_forward_metadata_out_graph": 0.2323,
+              "DecodeCudaGraphRunner.execute": 0.1533,
+              "Scheduler.run_batch": 0.116,
+              "MambaAttnBackendBase.init_forward_metadata_out_graph": 0.1018,
+              "FutureMap._resolve_spec_extras": 0.0655,
+              "ModelRunner.forward": 0.0432,
+              "cub::DeviceScan::InclusiveScan": 0.0363,
+              "<no traced function>": 0.0259,
+              "FutureMap.resolve_seq_lens_cpu": 0.0246,
+              "HybridLinearAttnBackend.init_forward_metadata_out_graph": 0.0089,
+              "fast_prefill_plan": 0.0088,
+              "TpModelWorker.forward_batch_generation": 0.0059,
+              "DFlashVerifyInput.prepare_for_verify": 0.0013
+            },
+            "idle_ms_per_cycle_by_chain": {
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward": 0.9424,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation": 0.3188,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch": 0.2513,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph": 0.2285,
+              "Scheduler.run_batch": 0.116,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashVerifyInput.prepare_for_verify > DecodeCudaGraphRunner.load_batch > HybridLinearAttnBackend.init_forward_metadata_out_graph > MambaAttnBackendBase.init_forward_metadata_out_graph": 0.1013,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > TpModelWorker.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute": 0.0922,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > TpModelWorker.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch": 0.0727,
+              "Scheduler.run_batch > FutureMap._resolve_spec_extras": 0.0652,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute": 0.0604,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward > cub::DeviceScan::InclusiveScan": 0.0362,
+              "<no traced function>": 0.0259,
+              "Scheduler.run_batch > FutureMap.resolve_seq_lens_cpu": 0.0246,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward": 0.0235,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > TpModelWorker.forward_batch_generation > ModelRunner.forward": 0.0194,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashVerifyInput.prepare_for_verify > DecodeCudaGraphRunner.load_batch > HybridLinearAttnBackend.init_forward_metadata_out_graph > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward": 0.0189,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashVerifyInput.prepare_for_verify > DecodeCudaGraphRunner.load_batch > HybridLinearAttnBackend.init_forward_metadata_out_graph": 0.0088,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashVerifyInput.prepare_for_verify > DecodeCudaGraphRunner.load_batch > HybridLinearAttnBackend.init_forward_metadata_out_graph > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward > fast_prefill_plan": 0.0088,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashVerifyInput.prepare_for_verify > DecodeCudaGraphRunner.load_batch": 0.007,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > TpModelWorker.forward_batch_generation": 0.0059
+            },
+            "host_functions": {
+              "Scheduler.run_batch": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 8.7223,
+                "exposed_ms_per_cycle": 2.4061,
+                "exposed_fraction": 0.276
+              },
+              "DFlashWorkerV2.forward_batch_generation": {
+                "calls_per_cycle": 1.005,
+                "inclusive_ms_per_cycle": 4.8047,
+                "exposed_ms_per_cycle": 2.2106,
+                "exposed_fraction": 0.46
+              },
+              "FutureMap.resolve_seq_lens_cpu": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 3.3937,
+                "exposed_ms_per_cycle": 0.0246,
+                "exposed_fraction": 0.007
+              },
+              "DecodeCudaGraphRunner.load_batch": {
+                "calls_per_cycle": 3.005,
+                "inclusive_ms_per_cycle": 2.4687,
+                "exposed_ms_per_cycle": 1.6865,
+                "exposed_fraction": 0.683
+              },
+              "ModelRunner.forward": {
+                "calls_per_cycle": 2.005,
+                "inclusive_ms_per_cycle": 1.8591,
+                "exposed_ms_per_cycle": 1.7347,
+                "exposed_fraction": 0.933
+              },
+              "DecodeCudaGraphRunner.execute": {
+                "calls_per_cycle": 2.005,
+                "inclusive_ms_per_cycle": 1.7922,
+                "exposed_ms_per_cycle": 1.6915,
+                "exposed_fraction": 0.944
+              },
+              "FlashInferAttnBackend.init_forward_metadata_out_graph": {
+                "calls_per_cycle": 2.005,
+                "inclusive_ms_per_cycle": 1.7653,
+                "exposed_ms_per_cycle": 1.2432,
+                "exposed_fraction": 0.704
+              },
+              "FlashInferIndicesUpdaterPrefill.call_begin_forward": {
+                "calls_per_cycle": 3.009,
+                "inclusive_ms_per_cycle": 1.505,
+                "exposed_ms_per_cycle": 1.0109,
+                "exposed_fraction": 0.672
+              },
+              "DFlashVerifyInput.prepare_for_verify": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 1.1267,
+                "exposed_ms_per_cycle": 0.1496,
+                "exposed_fraction": 0.133
+              },
+              "DFlashWorkerV2._append_target_hidden_to_draft_kv_by_loc": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.7007,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "HybridLinearAttnBackend.init_forward_metadata_out_graph": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.649,
+                "exposed_ms_per_cycle": 0.1412,
+                "exposed_fraction": 0.218
+              },
+              "Scheduler.get_next_batch_to_run": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.3777,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "DFlashWorkerV2._update_target_mamba_state_after_verify": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.2524,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "TpModelWorker.forward_batch_generation": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.2488,
+                "exposed_ms_per_cycle": 0.1912,
+                "exposed_fraction": 0.768
+              },
+              "Scheduler.process_batch_result": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.2487,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "SchedulerBatchResultProcessor.process_batch_result_decode": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.213,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "DFlashWorkerV2._accept_block": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.1679,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "fast_prefill_plan": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.1296,
+                "exposed_ms_per_cycle": 0.0088,
+                "exposed_fraction": 0.068
+              },
+              "MambaAttnBackendBase.init_forward_metadata_out_graph": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.1112,
+                "exposed_ms_per_cycle": 0.1018,
+                "exposed_fraction": 0.915
+              },
+              "FutureMap.publish": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0758,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "FutureMap._resolve_spec_extras": {
+                "calls_per_cycle": 1.005,
+                "inclusive_ms_per_cycle": 0.0675,
+                "exposed_ms_per_cycle": 0.0655,
+                "exposed_fraction": 0.971
+              },
+              "cub::DeviceScan::InclusiveScan": {
+                "calls_per_cycle": 3.009,
+                "inclusive_ms_per_cycle": 0.0573,
+                "exposed_ms_per_cycle": 0.0363,
+                "exposed_fraction": 0.634
+              },
+              "Scheduler.ingest_requests": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0568,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "FutureMap.stash": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0559,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "Scheduler._apply_war_barrier": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0149,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "Scheduler.launch_batch_sample_if_needed": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0018,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              }
+            },
+            "host_sync_sites": {
+              "cudaStreamSynchronize @ Scheduler.run_batch > FutureMap.resolve_seq_lens_cpu": {
+                "per_cycle": 1.0,
+                "ms_per_cycle": 3.2181
+              },
+              "cudaStreamSynchronize @ <no traced function>": {
+                "per_cycle": 0.014,
+                "ms_per_cycle": 0.0468
+              },
+              "D2H copy @ Scheduler.run_batch": {
+                "per_cycle": 1.991,
+                "ms_per_cycle": 0.0177
+              },
+              "D2H copy @ Scheduler.run_batch > FutureMap.resolve_seq_lens_cpu": {
+                "per_cycle": 1.0,
+                "ms_per_cycle": 0.0099
+              },
+              "cudaEventSynchronize @ Scheduler.process_batch_result > SchedulerBatchResultProcessor.process_batch_result_decode": {
+                "per_cycle": 1.0,
+                "ms_per_cycle": 0.0055
+              },
+              "D2H copy @ <no traced function>": {
+                "per_cycle": 0.043,
+                "ms_per_cycle": 0.0004
+              },
+              "cudaEventSynchronize @ <no traced function>": {
+                "per_cycle": 0.009,
+                "ms_per_cycle": 0.0
+              }
+            },
+            "runtime_api_ms_per_cycle_during_idle": {
+              "cudaLaunchKernel_v7000": 0.1542,
+              "cudaMemcpyAsync_v3020": 0.1401,
+              "cudaGraphLaunch_v10000": 0.0927,
+              "cuLaunchKernelEx": 0.054,
+              "cudaStreamSynchronize_v3020": 0.0247,
+              "cudaEventQuery_v3020": 0.0153,
+              "cudaEventRecordWithFlags_v11010": 0.0104,
+              "cudaStreamIsCapturing_v10000": 0.0055,
+              "cuKernelGetName": 0.003,
+              "cudaEventCreateWithFlags_v3020": 0.0017,
+              "cudaStreamWaitEvent_v3020": 0.0016,
+              "cudaEventRecord_v3020": 0.0013
+            }
+          }
+        },
+        "32": {
+          "counter_windows": {
+            "cycle_ms": {
+              "mean": 15.811941409520218,
+              "std": 0.0,
+              "n": 1
+            },
+            "tokens_per_s_per_user": {
+              "mean": 299.03642659882496,
+              "std": 0.0,
+              "n": 1
+            },
+            "tokens_per_s": {
+              "mean": 9569.165651162399,
+              "std": 0.0,
+              "n": 1
+            },
+            "tokens_per_request_per_cycle": {
+              "mean": 4.728346456692913,
+              "std": 0.0,
+              "n": 1
+            },
+            "foreign_cores_mean": 0.175,
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 15.811941409520218,
+                "tokens_per_request_per_cycle": 4.728346456692913,
+                "foreign_cores_mean": 0.175
+              }
+            ]
+          },
+          "excluded_windows": [],
+          "trace": {
+            "report": "/home/ubuntu/vp-data/hostgap/prof4/dflash-patched-host/c32.nsys-rep",
+            "window_ms": 2036.532021,
+            "gpu_busy_ms": 1773.21761,
+            "gpu_idle_ms": 263.314411,
+            "idle_fraction": 0.12929549267322815,
+            "graph_launch_counts": {
+              "('graph', 5894)": 127,
+              "('graph', 5789)": 127
+            },
+            "cycles_from_graphs": 127,
+            "eager_kernel_records": true,
+            "cycles_from_run_batch": 125,
+            "cycles": 125,
+            "gpu_busy_ms_per_cycle": 14.18574088,
+            "gpu_idle_ms_per_cycle": 2.106515288,
+            "cycle_ms": 16.292256167999998,
+            "idle_gaps": {
+              "count_per_cycle": 80.52,
+              "over_100us_per_cycle": 6.032,
+              "ms_per_cycle_in_gaps_over_100us": 1.0370785679999999
+            },
+            "kernel_ms_per_cycle_by_class": {
+              "gdn_state": 0.9776,
+              "sampling": 0.1091,
+              "gemm": 0.0742,
+              "copy_index": 0.0455,
+              "other": 0.0306,
+              "norm_act": 0.0151,
+              "attention": 0.0065
+            },
+            "graph_ms_per_cycle": {
+              "5789": {
+                "executions_per_cycle": 1.016,
+                "mean_ms": 11.0219,
+                "ms_per_cycle": 11.1982
+              },
+              "5894": {
+                "executions_per_cycle": 1.016,
+                "mean_ms": 1.6893,
+                "ms_per_cycle": 1.7163
+              }
+            },
+            "idle_ms_per_cycle_by_innermost": {
+              "FlashInferIndicesUpdaterPrefill.call_begin_forward": 0.9469,
+              "DFlashWorkerV2.forward_batch_generation": 0.3133,
+              "DecodeCudaGraphRunner.load_batch": 0.2531,
+              "FlashInferAttnBackend.init_forward_metadata_out_graph": 0.2314,
+              "Scheduler.run_batch": 0.097,
+              "DecodeCudaGraphRunner.execute": 0.0666,
+              "FutureMap._resolve_spec_extras": 0.0519,
+              "cub::DeviceScan::InclusiveScan": 0.0374,
+              "DFlashWorkerV2._accept_block": 0.0278,
+              "<no traced function>": 0.0277,
+              "FutureMap.resolve_seq_lens_cpu": 0.0232,
+              "ModelRunner.forward": 0.023,
+              "DFlashWorkerV2._update_target_mamba_state_after_verify": 0.007,
+              "TpModelWorker.forward_batch_generation": 0.0002
+            },
+            "idle_ms_per_cycle_by_chain": {
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward": 0.9393,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation": 0.3109,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch": 0.251,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph": 0.2294,
+              "Scheduler.run_batch": 0.097,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute": 0.0658,
+              "Scheduler.run_batch > FutureMap._resolve_spec_extras": 0.0513,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward > cub::DeviceScan::InclusiveScan": 0.0371,
+              "<no traced function>": 0.0277,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashWorkerV2._accept_block": 0.0275,
+              "Scheduler.run_batch > FutureMap.resolve_seq_lens_cpu": 0.0232,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > ModelRunner.forward": 0.0225,
+              "DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph > FlashInferIndicesUpdaterPrefill.call_begin_forward": 0.0076,
+              "Scheduler.run_batch > DFlashWorkerV2.forward_batch_generation > DFlashWorkerV2._update_target_mamba_state_after_verify": 0.007,
+              "DFlashWorkerV2.forward_batch_generation": 0.0025,
+              "DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch": 0.0021,
+              "DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute > DecodeCudaGraphRunner.load_batch > FlashInferAttnBackend.init_forward_metadata_out_graph": 0.002,
+              "FutureMap._resolve_spec_extras": 0.0006,
+              "DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > DecodeCudaGraphRunner.execute": 0.0005,
+              "DFlashWorkerV2.forward_batch_generation > DFlashWorkerV2._accept_block": 0.0003
+            },
+            "host_functions": {
+              "Scheduler.run_batch": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 14.8019,
+                "exposed_ms_per_cycle": 2.0628,
+                "exposed_fraction": 0.139
+              },
+              "FutureMap.resolve_seq_lens_cpu": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 9.4678,
+                "exposed_ms_per_cycle": 0.0232,
+                "exposed_fraction": 0.002
+              },
+              "DFlashWorkerV2.forward_batch_generation": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 4.819,
+                "exposed_ms_per_cycle": 1.9067,
+                "exposed_fraction": 0.396
+              },
+              "DecodeCudaGraphRunner.load_batch": {
+                "calls_per_cycle": 3.0,
+                "inclusive_ms_per_cycle": 2.4789,
+                "exposed_ms_per_cycle": 1.4688,
+                "exposed_fraction": 0.593
+              },
+              "ModelRunner.forward": {
+                "calls_per_cycle": 2.0,
+                "inclusive_ms_per_cycle": 1.8631,
+                "exposed_ms_per_cycle": 1.5583,
+                "exposed_fraction": 0.836
+              },
+              "DecodeCudaGraphRunner.execute": {
+                "calls_per_cycle": 2.0,
+                "inclusive_ms_per_cycle": 1.7963,
+                "exposed_ms_per_cycle": 1.5354,
+                "exposed_fraction": 0.855
+              },
+              "FlashInferAttnBackend.init_forward_metadata_out_graph": {
+                "calls_per_cycle": 2.0,
+                "inclusive_ms_per_cycle": 1.7773,
+                "exposed_ms_per_cycle": 1.2157,
+                "exposed_fraction": 0.684
+              },
+              "FlashInferIndicesUpdaterPrefill.call_begin_forward": {
+                "calls_per_cycle": 3.0,
+                "inclusive_ms_per_cycle": 1.5167,
+                "exposed_ms_per_cycle": 0.9843,
+                "exposed_fraction": 0.649
+              },
+              "DFlashVerifyInput.prepare_for_verify": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 1.1339,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "DFlashWorkerV2._append_target_hidden_to_draft_kv_by_loc": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.7006,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "Scheduler.get_next_batch_to_run": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.6687,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "HybridLinearAttnBackend.init_forward_metadata_out_graph": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.655,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "Scheduler.process_batch_result": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.4018,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "SchedulerBatchResultProcessor.process_batch_result_decode": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.3621,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "DFlashWorkerV2._update_target_mamba_state_after_verify": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.2583,
+                "exposed_ms_per_cycle": 0.007,
+                "exposed_fraction": 0.027
+              },
+              "TpModelWorker.forward_batch_generation": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.2479,
+                "exposed_ms_per_cycle": 0.0007,
+                "exposed_fraction": 0.003
+              },
+              "DFlashWorkerV2._accept_block": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.1665,
+                "exposed_ms_per_cycle": 0.0278,
+                "exposed_fraction": 0.167
+              },
+              "fast_prefill_plan": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.1316,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "MambaAttnBackendBase.init_forward_metadata_out_graph": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.1084,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "FutureMap.publish": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0761,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "FutureMap._resolve_spec_extras": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0684,
+                "exposed_ms_per_cycle": 0.0519,
+                "exposed_fraction": 0.758
+              },
+              "Scheduler.ingest_requests": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0584,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "FutureMap.stash": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0581,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "cub::DeviceScan::InclusiveScan": {
+                "calls_per_cycle": 3.0,
+                "inclusive_ms_per_cycle": 0.0567,
+                "exposed_ms_per_cycle": 0.0374,
+                "exposed_fraction": 0.659
+              },
+              "Scheduler._apply_war_barrier": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0144,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              },
+              "Scheduler.launch_batch_sample_if_needed": {
+                "calls_per_cycle": 1.0,
+                "inclusive_ms_per_cycle": 0.0021,
+                "exposed_ms_per_cycle": 0.0,
+                "exposed_fraction": 0.0
+              }
+            },
+            "host_sync_sites": {
+              "cudaStreamSynchronize @ Scheduler.run_batch > FutureMap.resolve_seq_lens_cpu": {
+                "per_cycle": 1.0,
+                "ms_per_cycle": 9.2915
+              },
+              "cudaStreamSynchronize @ <no traced function>": {
+                "per_cycle": 0.008,
+                "ms_per_cycle": 0.0725
+              },
+              "D2H copy @ Scheduler.run_batch": {
+                "per_cycle": 1.968,
+                "ms_per_cycle": 0.0177
+              },
+              "D2H copy @ Scheduler.run_batch > FutureMap.resolve_seq_lens_cpu": {
+                "per_cycle": 0.992,
+                "ms_per_cycle": 0.0098
+              },
+              "cudaEventSynchronize @ Scheduler.process_batch_result > SchedulerBatchResultProcessor.process_batch_result_decode": {
+                "per_cycle": 1.0,
+                "ms_per_cycle": 0.0053
+              },
+              "D2H copy @ <no traced function>": {
+                "per_cycle": 0.04,
+                "ms_per_cycle": 0.0004
+              },
+              "cudaEventSynchronize @ <no traced function>": {
+                "per_cycle": 0.008,
+                "ms_per_cycle": 0.0
+              }
+            },
+            "runtime_api_ms_per_cycle_during_idle": {
+              "cudaLaunchKernel_v7000": 0.1581,
+              "cudaMemcpyAsync_v3020": 0.1007,
+              "cuLaunchKernelEx": 0.0424,
+              "cudaGraphLaunch_v10000": 0.0325,
+              "cudaStreamSynchronize_v3020": 0.0228,
+              "cudaEventQuery_v3020": 0.0154,
+              "cudaEventRecordWithFlags_v11010": 0.0086,
+              "cudaStreamIsCapturing_v10000": 0.0045,
+              "cuKernelGetName": 0.0029,
+              "cudaEventRecord_v3020": 0.0014,
+              "cudaMemsetAsync_v3020": 0.0011,
+              "cudaGetDevice_v3020": 0.0007
+            }
+          }
+        }
+      }
+    },
+    "dflash-patched-none": {
+      "label": "dflash-patched-none",
+      "provenance": {
+        "started": "2026-10-02T13:14:25",
+        "repo_head": "8f9a765836be5c371d300239c5582facc2d118a7",
+        "repo_dirty_files": [],
+        "sglang_head": "6b1d3448872b47ba774aeb6ec077c6aec94c05a2",
+        "sglang_branch": "engine/hostgap",
+        "sglang_dirty_files": [],
+        "env_overrides": {
+          "SGLANG_HOSTGAP_VERIFY_PLAN": "1",
+          "SGLANG_HOSTGAP_DRAFT_INDPTR": "1",
+          "SGLANG_HOSTGAP_DFLASH_DRAFT_PLAN": "1"
+        },
+        "launch_command": [
+          "/home/ubuntu/sglang/.venv/bin/python",
+          "-m",
+          "sglang.launch_server",
+          "--model-path",
+          "Qwen/Qwen3.5-4B",
+          "--revision",
+          "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "30100",
+          "--attention-backend",
+          "flashinfer",
+          "--mm-attention-backend",
+          "triton_attn",
+          "--max-running-requests",
+          "128",
+          "--max-mamba-cache-size",
+          "128",
+          "--mem-fraction-static",
+          "0.85",
+          "--max-total-tokens",
+          "1000000",
+          "--enable-metrics",
+          "--random-seed",
+          "0",
+          "--stream-interval",
+          "4",
+          "--speculative-algorithm",
+          "DFLASH",
+          "--speculative-draft-model-path",
+          "z-lab/Qwen3.5-4B-DFlash",
+          "--speculative-draft-model-revision",
+          "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
+          "--speculative-dflash-block-size",
+          "8",
+          "--disable-radix-cache"
+        ],
+        "mode": "none",
+        "host_trace": false,
+        "graph_trace": "graph",
+        "nsys_version": "NVIDIA Nsight Systems version 2025.3.2.474-253236389321v0"
+      },
+      "by_concurrency": {
+        "1": {
+          "counter_windows": {
+            "cycle_ms": {
+              "mean": 6.542398466844411,
+              "std": 0.0013657138578085674,
+              "n": 3
+            },
+            "tokens_per_s_per_user": {
+              "mean": 608.7571083473052,
+              "std": 154.3891110972013,
+              "n": 3
+            },
+            "tokens_per_s": {
+              "mean": 608.7571083473052,
+              "std": 154.3891110972013,
+              "n": 3
+            },
+            "tokens_per_request_per_cycle": {
+              "mean": 3.982627578718784,
+              "std": 1.0093586068496883,
+              "n": 3
+            },
+            "foreign_cores_mean": 0.23,
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 6.541179048833331,
+                "tokens_per_request_per_cycle": 5.14657980456026,
+                "foreign_cores_mean": 0.19
+              },
+              {
+                "repeat": 1,
+                "cycle_ms": 6.543874166108037,
+                "tokens_per_request_per_cycle": 3.452768729641694,
+                "foreign_cores_mean": 0.16
+              },
+              {
+                "repeat": 2,
+                "cycle_ms": 6.542142185591865,
+                "tokens_per_request_per_cycle": 3.3485342019543975,
+                "foreign_cores_mean": 0.23
+              }
+            ]
+          },
+          "excluded_windows": []
+        },
+        "8": {
+          "counter_windows": {
+            "cycle_ms": {
+              "mean": 8.571850276208645,
+              "std": 0.021776363866626545,
+              "n": 3
+            },
+            "tokens_per_s_per_user": {
+              "mean": 539.2460643257685,
+              "std": 34.1290598074387,
+              "n": 3
+            },
+            "tokens_per_s": {
+              "mean": 4313.968514606148,
+              "std": 273.0324784595096,
+              "n": 3
+            },
+            "tokens_per_request_per_cycle": {
+              "mean": 4.622831423895254,
+              "std": 0.30385170097411857,
+              "n": 3
+            },
+            "foreign_cores_mean": 0.17,
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 8.546705102235912,
+                "tokens_per_request_per_cycle": 4.272340425531915,
+                "foreign_cores_mean": 0.17
+              },
+              {
+                "repeat": 1,
+                "cycle_ms": 8.584436743483385,
+                "tokens_per_request_per_cycle": 4.784188034188034,
+                "foreign_cores_mean": 0.09
+              },
+              {
+                "repeat": 2,
+                "cycle_ms": 8.584408982906641,
+                "tokens_per_request_per_cycle": 4.811965811965812,
+                "foreign_cores_mean": 0.065
+              }
+            ]
+          },
+          "excluded_windows": []
+        },
+        "32": {
+          "counter_windows": {
+            "cycle_ms": {
+              "mean": 15.491110647689696,
+              "std": 0.0656165548850281,
+              "n": 3
+            },
+            "tokens_per_s_per_user": {
+              "mean": 304.5374542372787,
+              "std": 15.40639937436914,
+              "n": 3
+            },
+            "tokens_per_s": {
+              "mean": 9745.19853559292,
+              "std": 493.0047799798125,
+              "n": 3
+            },
+            "tokens_per_request_per_cycle": {
+              "mean": 4.717615782150666,
+              "std": 0.23869448672085658,
+              "n": 3
+            },
+            "foreign_cores_mean": 0.095,
+            "contended": false,
+            "windows": [
+              {
+                "repeat": 0,
+                "cycle_ms": 15.566849612491927,
+                "tokens_per_request_per_cycle": 4.74515503875969,
+                "foreign_cores_mean": 0.02
+              },
+              {
+                "repeat": 1,
+                "cycle_ms": 15.451441392248784,
+                "tokens_per_request_per_cycle": 4.941346153846154,
+                "foreign_cores_mean": 0.055
+              },
+              {
+                "repeat": 2,
+                "cycle_ms": 15.455040938328379,
+                "tokens_per_request_per_cycle": 4.466346153846154,
+                "foreign_cores_mean": 0.095
+              }
+            ]
+          },
+          "excluded_windows": [],
+          "pyspy": {
+            "samples": 1413,
+            "share": {
+              "verify plan (hostgap fast_verify_plan)": 0.0113,
+              "verify metadata (init_forward_metadata_out_graph)": 0.0658,
+              "resolve_seq_lens_cpu (waits for the previous verify)": 0.7325,
+              "process_batch_result": 0.0163,
+              "get_next_batch_to_run": 0.0382,
+              "DFlash forward_batch_generation": 0.184
+            }
+          }
+        }
+      }
+    }
+  },
+  "derived_idle": {
+    "dflash": {
+      "1": {
+        "unprofiled_cycle_ms": 6.59904574734049,
+        "gpu_busy_source": "dflash-patched-host (assumed equal: same graphs and kernels); dflash-host has no eager kernel records",
+        "traced_gpu_busy_ms_per_cycle": 5.166870418250951,
+        "derived_unprofiled_idle_ms_per_cycle": 1.4321753290895396,
+        "derived_unprofiled_idle_fraction": 0.21702764065042687,
+        "tokens_per_s_per_user": {
+          "mean": 604.8261326940075,
+          "std": 158.01860801325046,
+          "n": 3
+        },
+        "tokens_per_request_per_cycle": {
+          "mean": 3.989933851020995,
+          "std": 1.0339299421369474,
+          "n": 3
+        },
+        "foreign_cores_mean": 0.525
+      },
+      "8": {
+        "unprofiled_cycle_ms": 8.718927496995322,
+        "gpu_busy_source": "dflash-patched-host (assumed equal: same graphs and kernels); dflash-host has no eager kernel records",
+        "traced_gpu_busy_ms_per_cycle": 7.191422123222749,
+        "derived_unprofiled_idle_ms_per_cycle": 1.5275053737725734,
+        "derived_unprofiled_idle_fraction": 0.17519418234627773,
+        "tokens_per_s_per_user": {
+          "mean": 531.307472550439,
+          "std": 34.313707718614914,
+          "n": 3
+        },
+        "tokens_per_request_per_cycle": {
+          "mean": 4.632912980739068,
+          "std": 0.3100225040265636,
+          "n": 3
+        },
+        "foreign_cores_mean": 0.185
+      },
+      "32": {
+        "unprofiled_cycle_ms": 15.693988343703799,
+        "gpu_busy_source": "dflash-patched-host (assumed equal: same graphs and kernels); dflash-host has no eager kernel records",
+        "traced_gpu_busy_ms_per_cycle": 14.18574088,
+        "derived_unprofiled_idle_ms_per_cycle": 1.508247463703798,
+        "derived_unprofiled_idle_fraction": 0.09610351624282205,
+        "tokens_per_s_per_user": {
+          "mean": 299.9662960568449,
+          "std": 14.136365378090751,
+          "n": 3
+        },
+        "tokens_per_request_per_cycle": {
+          "mean": 4.707682291666667,
+          "std": 0.22232691629844267,
+          "n": 3
+        },
+        "foreign_cores_mean": 0.245
+      }
+    },
+    "dflash-patched": {
+      "1": {
+        "unprofiled_cycle_ms": 6.542398466844411,
+        "gpu_busy_source": "dflash-patched-host",
+        "traced_gpu_busy_ms_per_cycle": 5.166870418250951,
+        "derived_unprofiled_idle_ms_per_cycle": 1.37552804859346,
+        "derived_unprofiled_idle_fraction": 0.21024828364771203,
+        "profiled_cycle_ms": 7.75773949809886,
+        "profiled_idle_ms_per_cycle": 2.5908690798479084,
+        "profiled_idle_fraction": 0.3339721681145438,
+        "tokens_per_s_per_user": {
+          "mean": 608.7571083473052,
+          "std": 154.3891110972013,
+          "n": 3
+        },
+        "tokens_per_request_per_cycle": {
+          "mean": 3.982627578718784,
+          "std": 1.0093586068496883,
+          "n": 3
+        },
+        "foreign_cores_mean": 0.23
+      },
+      "8": {
+        "unprofiled_cycle_ms": 8.571850276208645,
+        "gpu_busy_source": "dflash-patched-host",
+        "traced_gpu_busy_ms_per_cycle": 7.191422123222749,
+        "derived_unprofiled_idle_ms_per_cycle": 1.3804281529858962,
+        "derived_unprofiled_idle_fraction": 0.16104202809249996,
+        "profiled_cycle_ms": 9.634088587677725,
+        "profiled_idle_ms_per_cycle": 2.4426664644549763,
+        "profiled_idle_fraction": 0.2535441149647738,
+        "tokens_per_s_per_user": {
+          "mean": 539.2460643257685,
+          "std": 34.1290598074387,
+          "n": 3
+        },
+        "tokens_per_request_per_cycle": {
+          "mean": 4.622831423895254,
+          "std": 0.30385170097411857,
+          "n": 3
+        },
+        "foreign_cores_mean": 0.17
+      },
+      "32": {
+        "unprofiled_cycle_ms": 15.491110647689696,
+        "gpu_busy_source": "dflash-patched-host",
+        "traced_gpu_busy_ms_per_cycle": 14.18574088,
+        "derived_unprofiled_idle_ms_per_cycle": 1.3053697676896956,
+        "derived_unprofiled_idle_fraction": 0.08426573132019911,
+        "profiled_cycle_ms": 16.292256167999998,
+        "profiled_idle_ms_per_cycle": 2.106515288,
+        "profiled_idle_fraction": 0.12929549267322815,
+        "tokens_per_s_per_user": {
+          "mean": 304.5374542372787,
+          "std": 15.40639937436914,
+          "n": 3
+        },
+        "tokens_per_request_per_cycle": {
+          "mean": 4.717615782150666,
+          "std": 0.23869448672085658,
+          "n": 3
+        },
+        "foreign_cores_mean": 0.095
+      }
+    }
+  },
+  "before_after": {
+    "dflash": {
+      "started": {
+        "stock": "2026-10-02T13:17:14",
+        "patched": "2026-10-02T13:14:25"
+      },
+      "by_concurrency": {
+        "1": {
+          "stock_cycle_ms": {
+            "mean": 6.59904574734049,
+            "std": 0.01274088076400034,
+            "n": 3
+          },
+          "patched_cycle_ms": {
+            "mean": 6.542398466844411,
+            "std": 0.0013657138578085674,
+            "n": 3
+          },
+          "cycle_change_ms": -0.05664728049607959,
+          "cycle_change_fraction": -0.008584162417560031,
+          "removed_share_of_stock_idle": 0.03955331400108066
+        },
+        "8": {
+          "stock_cycle_ms": {
+            "mean": 8.718927496995322,
+            "std": 0.022060654346692198,
+            "n": 3
+          },
+          "patched_cycle_ms": {
+            "mean": 8.571850276208645,
+            "std": 0.021776363866626545,
+            "n": 3
+          },
+          "cycle_change_ms": -0.1470772207866773,
+          "cycle_change_fraction": -0.01686872850328924,
+          "removed_share_of_stock_idle": 0.09628589418538783
+        },
+        "32": {
+          "stock_cycle_ms": {
+            "mean": 15.693988343703799,
+            "std": 0.003490516789443574,
+            "n": 3
+          },
+          "patched_cycle_ms": {
+            "mean": 15.491110647689696,
+            "std": 0.0656165548850281,
+            "n": 3
+          },
+          "cycle_change_ms": -0.20287769601410233,
+          "cycle_change_fraction": -0.012927096132035418,
+          "removed_share_of_stock_idle": 0.13451220764256835
+        }
+      }
+    }
+  }
+}

@@ -240,8 +240,10 @@ an nsys trace of plain decoding shows each route dispatching as tabled.
 The series applies in order to `bd66ce343e` on its own. The whole series (engine
 `6b1d344887`) passed the GPU tests and the GPU plan check, which covers the EAGLE verify and
 the DFlash draft block, and, on the tuned MTP arm, in-engine validation and token-identical
-greedy outputs (`evidence/hostgap/README.md`, hold 4). For DFlash, serving equality has run
-only on 0001-0003, with an unpinned KV pool; the full-series DFlash check is pending:
+greedy outputs (`evidence/hostgap/README.md`, hold 4). On DFlash block 8 with FlashInfer draft
+attention it also gave greedy outputs identical to stock with pinned pools (hold 5). With FA4
+draft attention, as in bench's `dflash-tuned`, the drafter's plan does not go through any
+patched path, so the series changes nothing there. To apply:
 
 ```sh
 scripts/sglang_worktree.sh hostgap

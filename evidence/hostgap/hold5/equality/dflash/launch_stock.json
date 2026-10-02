@@ -1,0 +1,134 @@
+{
+  "command": [
+    "/home/ubuntu/sglang/.venv/bin/python",
+    "-m",
+    "sglang.launch_server",
+    "--model-path",
+    "Qwen/Qwen3.5-4B",
+    "--revision",
+    "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "30102",
+    "--attention-backend",
+    "flashinfer",
+    "--mm-attention-backend",
+    "triton_attn",
+    "--max-running-requests",
+    "128",
+    "--max-mamba-cache-size",
+    "128",
+    "--mem-fraction-static",
+    "0.85",
+    "--max-total-tokens",
+    "240000",
+    "--enable-metrics",
+    "--random-seed",
+    "0",
+    "--stream-interval",
+    "4",
+    "--speculative-algorithm",
+    "DFLASH",
+    "--speculative-draft-model-path",
+    "z-lab/Qwen3.5-4B-DFlash",
+    "--speculative-draft-model-revision",
+    "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
+    "--speculative-dflash-block-size",
+    "8",
+    "--disable-radix-cache"
+  ],
+  "env_overrides": {},
+  "sglang_source": {
+    "module_file": "/home/ubuntu/sglang/python/sglang/__init__.py",
+    "path": "/home/ubuntu/sglang",
+    "head": "bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824",
+    "branch": "verified-progress",
+    "dirty_files": []
+  },
+  "repo": {
+    "path": "/home/ubuntu/vp-wt/hostgap",
+    "head": "8f9a765836be5c371d300239c5582facc2d118a7",
+    "branch": "hostgap/dflash-results",
+    "dirty_files": []
+  },
+  "checks": [
+    {
+      "name": "cuda_graph_decode",
+      "ok": true,
+      "required": true,
+      "detail": "captured: target prefill (breakable), target verify (full), draft verify (full)"
+    },
+    {
+      "name": "cuda_graph_prefill",
+      "ok": true,
+      "required": true,
+      "detail": "captured"
+    },
+    {
+      "name": "cuda_graph_covers_capacity",
+      "ok": true,
+      "required": true,
+      "detail": "target verify graph batch sizes up to 128; server capacity 128"
+    },
+    {
+      "name": "overlap_scheduler",
+      "ok": true,
+      "required": true,
+      "detail": "scheduler disable_overlap_schedule=False"
+    },
+    {
+      "name": "capacity",
+      "ok": true,
+      "required": true,
+      "detail": "effective max_running_requests=128, target 128"
+    },
+    {
+      "name": "attention_backend",
+      "ok": true,
+      "required": true,
+      "detail": "scheduler attention_backend=flashinfer, requested flashinfer"
+    },
+    {
+      "name": "speculative_config",
+      "ok": true,
+      "required": true,
+      "detail": "resolved: speculative_algorithm=DFLASH, speculative_num_steps=1, speculative_eagle_topk=1, speculative_num_draft_tokens=8"
+    }
+  ],
+  "free_gib_at_start": 94.4990234375,
+  "final_limits": {
+    "max_total_num_tokens": 240000,
+    "chunked_prefill_size": 8192,
+    "max_prefill_tokens": 16384,
+    "max_running_requests": 128,
+    "context_len": 262144
+  },
+  "memory_usage": {
+    "weight": 8.621,
+    "kvcache": 7.324,
+    "startup_available": 3.337,
+    "token_capacity": 240000,
+    "token_capacity_swa": null,
+    "graph": {
+      "prefill": 3.852,
+      "decode": 0.0,
+      "target_verify": 1.806,
+      "draft_prefill": 0.0,
+      "draft_decode": 2.308,
+      "draft_extend": 0.0
+    }
+  },
+  "prompts": 64,
+  "workload": "/home/ubuntu/vp-wt/hostgap/bench/workloads/mixed-v2/tune.jsonl",
+  "pools": {
+    "mamba_cache_slots": [
+      128
+    ],
+    "kv_cache_tokens": [
+      240000,
+      240000
+    ],
+    "max_running_reqs_seen": 32
+  }
+}
