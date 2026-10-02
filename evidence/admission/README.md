@@ -128,9 +128,37 @@ did not change and the rate is what two launches give, and 0.97 at c = 128. Prob
 against MTP: 2.51 at c = 64 and 1.70 at c = 96; plain with PD against plain: 0.02 at both.
 Probe 3: MTP 1.42 and 1.17, plain 0.57 and 1.95. Every rate is below the batch-shape floor of
 stock plain decoding at c = 1 against c = 32 with the radix cache on, 3.42 per 1,000
-(`evidence/bench/equality/report.json`). These are screens: the delay changes only which
-requests share a batch, but the exactness class needs the logprob classification
-(`experiments/admission/run_admission_logprob.sh`), which is not in this directory yet.
+(`evidence/bench/equality/report.json`). These are screens; the class comes from the logprob
+run below.
+
+## Exactness class of the prefill delayer (`logprob_*`)
+
+An untimed run classifies MTP with PD against MTP without it with top-5 logprobs
+(`run_admission_logprob.sh`, repository `7b35508`, stock SGLang `bd66ce34`). The arms are
+`mtp-tuned`'s flags without the delay, launched twice (the launch-to-launch control), and with
+PD. Pools are pinned identically: 128 running, 120,000 KV tokens, 128 GDN slots, radix cache
+off, all as resolved by each server (`logprob_runs.csv`). There are 960 fresh prompts, 256 new
+tokens with natural stopping, and passes at c = 64 and 128. The delay fired: 221 prefill
+batches over both passes against 884 and 875 without it.
+
+`classify_logprob.sh` compares the delayed run with both undelayed launches at each concurrency
+and classifies each comparison with `bench.divergence`'s rule (`logprob_classes.json`;
+`logprob_report.json` and `logprob_pairs.csv` per pair). All four are exact-up-to-rounding:
+every first divergence is a tie, one ulp or near, with no large or not-argmax event and no
+length mismatch.
+
+| Comparison | First divergences per 1,000 tokens | tie / one_ulp / near / large | Launch-to-launch control |
+|---|---|---|---|
+| PD vs launch 1, c = 128 | 1.22 | 207 / 14 / 2 / 0 | 1.43 |
+| PD vs launch 2, c = 128 | 1.30 | 222 / 12 / 2 / 0 | 1.43 |
+| PD vs launch 1, c = 64 | 2.66 | 382 / 36 / 3 / 0 | 1.29 |
+| PD vs launch 2, c = 64 | 2.69 | 404 / 21 / 3 / 0 | 1.29 |
+
+At c = 64 the delayed run diverges twice as often as two undelayed launches do. That fits the
+mechanism: two undelayed launches admit requests at nearly the same moments, while PD changes
+which requests share each batch. The extra divergences are all rounding-level. The hold itself
+classified two of these comparisons with an earlier version of the arms list; the table is
+`classify_logprob.sh` rerun on the same runs, which adds the other two.
 
 ## The cost of one small prefill (`prefill_requests.json`, `prefill_trace.json`, `gdn_prefill_bench.json`)
 
@@ -160,9 +188,9 @@ PD's 65 prefill batches in probe 3 at c = 128 would save about 3% (derived).
 ## Not shown here
 
 One session per probe; probes 1 and 2 ran four and six waves, against eight in the
-confirmation design, which weights the synchronized first wave more. Exactness classes, a
-three-session confirmation, concurrencies below 64 and the low-concurrency effect of PD are in
-the confirmation hold plan (`experiments/admission/README.md`).
+confirmation design, which weights the synchronized first wave more. A three-session
+confirmation, concurrencies below 64 and the low-concurrency effect of PD are in the
+confirmation hold plan (`experiments/admission/README.md`).
 
 ## Commands
 
@@ -184,12 +212,20 @@ python experiments/admission/summarize_probe.py ~/vp-data/speed_highc/natural-20
 python experiments/admission/analyze_prefill_trace.py \
   ~/vp-data/speed_highc/prefill-20261002T175303Z/stock/prefill.nsys-rep \
   --out ~/vp-data/speed_highc/prefill-20261002T175303Z/stock/trace_summary.json
+# Exactness (GPU hold, untimed; then CPU):
+GPU_STARTUP_MIN_FREE_GB=88 scripts/gpu_lock.sh -x experiments/admission/run_admission_logprob.sh
+experiments/admission/classify_logprob.sh ~/vp-data/speed_highc/logprob
+cp ~/vp-data/speed_highc/logprob/report.json evidence/admission/logprob_report.json
+cp ~/vp-data/speed_highc/logprob/classes.json evidence/admission/logprob_classes.json
+cp ~/vp-data/speed_highc/logprob/table.csv evidence/admission/logprob_pairs.csv
+cp ~/vp-data/speed_highc/logprob/summary.json evidence/admission/logprob_summary.json
 experiments/admission/collect_records.sh ~/vp-data/speed_highc evidence/admission
 ```
 
-`collect_records.sh` (jq only) writes the other four files: `launches.csv` from each server's
+`collect_records.sh` (jq only) writes the record files: `launches.csv` from each server's
 `server/launch.json` and its run's `sweep.json`; `prefill_requests.json`, which condenses the
 two prefill-probe servers' `client.json`; `prefill_trace.json`, the per-request GPU windows and
-their medians from `trace_summary.json`; and `gdn_prefill_bench.json`, copied from the hold's
-output. Run on the raw data it reproduces the committed files byte for byte (checked with
-`cmp` on 2026-10-02).
+their medians from `trace_summary.json`; `gdn_prefill_bench.json`, copied from the hold's
+output; and `logprob_runs.csv`, each logprob server's resolved pools, prefill batches and
+commits (from its `server.log` and `c128.meta.json`). Run on the raw data it reproduces the
+committed files byte for byte (checked with `cmp` on 2026-10-02).

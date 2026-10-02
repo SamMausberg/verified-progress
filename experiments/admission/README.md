@@ -22,7 +22,8 @@ arrivals are batched, the speculative cycle runs close to its held-batch time.
 | `run_natural_probe.sh` | Probe 3: natural output lengths (plain-tuned's own greedy lengths, capped at 2,048, frozen outside the repository), the best configurations with and without the delayer at c = 64 and 128 |
 | `run_prefill_probe.sh` | Cost of one small prefill: client timings of single requests with one output token (stock and FlashInfer GDN prefill), an nsys trace, and `gdn_prefill_bench.py` |
 | `prefill_probe.py`, `analyze_prefill_trace.py`, `gdn_prefill_bench.py` | Helpers of the prefill probe |
-| `run_admission_logprob.sh` | Exactness: greedy outputs with top-5 logprobs, MTP with and without the delayer and a repeat without it, pinned pools, c = 64 and 128, classified with `bench.divergence` |
+| `run_admission_logprob.sh` | Exactness: greedy outputs with top-5 logprobs, MTP with and without the delayer and a repeat without it, pinned pools, c = 64 and 128 |
+| `classify_logprob.sh` | Classifies every delayed-vs-undelayed comparison of that run with `bench.divergence` (CPU) |
 | `run_admission_confirm.sh` | Confirmation: three sessions, one per hold |
 | `summarize_probe.py` | CSV of every point of a probe or session directory, with ratios and token identity |
 | `collect_records.sh` | Launch records and the prefill probe's condensed client, trace and kernel files for `evidence/admission/` (jq only) |

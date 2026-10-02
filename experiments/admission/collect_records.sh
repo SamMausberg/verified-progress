@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Build evidence/admission/launches.csv and evidence/admission/prefill_requests.json from the
-# raw runs (CPU only, jq):
+# Build the record files of evidence/admission/ from the raw runs (CPU only, jq):
 #   experiments/admission/collect_records.sh [DATA] [OUT]
 # DATA defaults to ~/vp-data/speed_highc, OUT to evidence/admission. launches.csv has one row
 # per server of probes 1-3 (bench's server/launch.json and the run's sweep.json);
-# prefill_requests.json condenses the two prefill-probe servers' client.json.
+# prefill_requests.json condenses the two prefill-probe servers' client.json; logprob_runs.csv
+# lists the logprob servers' resolved pools, prefill batches and commits.
 set -euo pipefail
 data="${1:-$HOME/vp-data/speed_highc}"
 out="${2:-evidence/admission}"
@@ -47,7 +47,16 @@ jq '{gap_ms_between_windows: 20, windows: .windows, first_30_median: .first_30_m
   "$prefill/stock/trace_summary.json" > "$tmp/prefill_trace.json"
 cp "$prefill/gdn_prefill_bench.json" "$tmp/gdn_prefill_bench.json"
 
+{
+  echo "run,prefill_batches,max_total_num_tokens,max_mamba_cache_size,max_running_requests,sglang_sha,repo_sha"
+  for run in "$data"/logprob/runs/*; do
+    log="$run/server.log"
+    echo "$(basename "$run"),$(grep -c 'Prefill batch' "$log"),$(grep -o 'max_total_num_tokens=[0-9]*' "$log" | tail -1 | cut -d= -f2),$(grep -o 'max_mamba_cache_size: [0-9]*' "$log" | tail -1 | cut -d' ' -f2),$(grep -o 'max_running_requests=[0-9]*' "$log" | tail -1 | cut -d= -f2),$(jq -r .sglang_sha "$run/c128.meta.json"),$(jq -r .repo_sha "$run/c128.meta.json")"
+  done
+} > "$tmp/logprob_runs.csv"
+
 mkdir -p "$out"
-for file in launches.csv prefill_requests.json prefill_trace.json gdn_prefill_bench.json; do
+for file in launches.csv prefill_requests.json prefill_trace.json gdn_prefill_bench.json \
+  logprob_runs.csv; do
   mv "$tmp/$file" "$out/$file"
 done

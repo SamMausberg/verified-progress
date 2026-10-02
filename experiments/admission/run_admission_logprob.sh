@@ -6,8 +6,8 @@
 # all three (running 128, KV 120,000
 # tokens, 128 GDN slots; run_matrix restarts a server until it resolves exactly these).
 # 960 fresh prompts, 256 new tokens, natural stopping, so completions desynchronize and
-# the delay fires. Classified with experiments/state_safety/compare.py and
-# bench.divergence (event classes tie / one_ulp / near / large).
+# the delay fires. classify_logprob.sh then classifies every delayed-vs-undelayed comparison
+# with experiments/state_safety/compare.py and bench.divergence (tie / one_ulp / near / large).
 # Correctness only, untimed, about 12 minutes:
 #   GPU_STARTUP_MIN_FREE_GB=88 scripts/gpu_lock.sh -x experiments/admission/run_admission_logprob.sh
 # Exclusive only for GPU memory (128 FP32 GDN slots at --mem-fraction-static 0.25 need
@@ -32,26 +32,5 @@ for tag in adm_n0 adm_n0b adm_pd; do
     --prompts "$prompts" --configs mtp_s3_replayssm --tag "$tag" --allow-mixed-pins \
     "--extra-flags=$flags" || { echo "run $tag failed"; status=1; }
 done
-cat > "$out/pairs.json" <<'PAIRS'
-[
-  ["mtp n0 vs n0 repeat c128", "mtp_s3_replayssm__adm_n0/c128", "mtp_s3_replayssm__adm_n0b/c128"],
-  ["mtp pd vs n0 c128", "mtp_s3_replayssm__adm_n0/c128", "mtp_s3_replayssm__adm_pd/c128"],
-  ["mtp pd vs n0 repeat c128", "mtp_s3_replayssm__adm_n0b/c128", "mtp_s3_replayssm__adm_pd/c128"],
-  ["mtp n0 vs n0 repeat c64", "mtp_s3_replayssm__adm_n0/c64", "mtp_s3_replayssm__adm_n0b/c64"],
-  ["mtp pd vs n0 c64", "mtp_s3_replayssm__adm_n0/c64", "mtp_s3_replayssm__adm_pd/c64"]
-]
-PAIRS
-cat > "$out/arms.json" <<'ARMS'
-[
-  ["mtp-tuned + prefill delayer, c128", "mtp pd vs n0 c128", "mtp pd vs n0 repeat c128"],
-  ["mtp-tuned + prefill delayer, c64", "mtp pd vs n0 c64", "mtp n0 vs n0 repeat c64"]
-]
-ARMS
-rm -f "$out/summary.json" "$out/report.json" "$out/classes.json" "$out/divergences.csv"
-python experiments/state_safety/compare.py --runs "$runs" --pairs "$out/pairs.json" \
-  --out-json "$out/summary.json" --out-csv "$out/divergences.csv" \
-  --out-table "$out/table.csv" > "$out/compare.log" 2>&1 || status=1
-python -m bench.divergence "$out/summary.json" --floor "mtp n0 vs n0 repeat c128" \
-  --out "$out/report.json" --arms "$out/arms.json" --classes-out "$out/classes.json" \
-  --expect-prompts "$(grep -c . "$prompts")" || status=1
+"$here/classify_logprob.sh" "$out" || status=1
 exit "$status"
