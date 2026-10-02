@@ -172,7 +172,11 @@ Raw outputs stay in `~/vp-data/state/` (`runs_pinned/`, `runs/`, `targeted/`); e
 run has a `.meta.json` with the flags, the pool pin, the resolved server settings
 and pool sizes, and the repository and SGLang commits.
 
-## Declared follow-up: the first verify cycle after prefill (not yet run)
+## Declared follow-up: the first verify cycle after prefill
+
+Run on 2026-10-01 and 2026-10-02 as declared below; the result (inconclusive) and its
+validity checks are in `evidence/state_safety/README.md`, "The first verify cycle after
+prefill: the declared test". The declaration below is unchanged.
 
 In the pinned matrix, the first verify cycle after prefill had a higher divergence
 rate per fragile position than later cycles for MTP steps 5 and the tree (7/40 and
