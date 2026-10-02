@@ -4,13 +4,17 @@
 #
 #   scripts/gpu_lock.sh -x experiments/profiling/run_microbench.sh
 #
-# Writes evidence/profiles/{hbm_bandwidth,head_microbench}.json and
-# $VP_DATA/head_microbench.nsys-rep (raw trace, outside git).
+# Writes hbm_bandwidth.json, head_microbench.json, microbench_clocks.json and the
+# clock log microbench_clocks.csv into $MICROBENCH_EVIDENCE (default
+# evidence/profiles, which holds the cited copies; the 2026-10-01 rerun used
+# MICROBENCH_EVIDENCE=evidence/profiles/microbench_rerun), and the raw trace
+# $VP_DATA/head_microbench.nsys-rep (outside git).
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 VP_DATA="${VP_DATA:-$HOME/vp-data/profile}"
-EVIDENCE="$REPO/evidence/profiles"
+EVIDENCE="${MICROBENCH_EVIDENCE:-$REPO/evidence/profiles}"
+case "$EVIDENCE" in /*) ;; *) EVIDENCE="$REPO/$EVIDENCE" ;; esac
 mkdir -p "$VP_DATA" "$EVIDENCE"
 # shellcheck source=/dev/null
 source "$REPO/scripts/sglang_env.sh"
@@ -26,7 +30,8 @@ python experiments/profiling/head_microbench.py \
   --hbm-json "$EVIDENCE/hbm_bandwidth.json" \
   --out "$EVIDENCE/head_microbench.json"
 kill $SMI
-python experiments/profiling/clock_summary.py "$VP_DATA/microbench_clocks.csv" \
+cp "$VP_DATA/microbench_clocks.csv" "$EVIDENCE/microbench_clocks.csv"
+python experiments/profiling/clock_summary.py "$EVIDENCE/microbench_clocks.csv" \
   --out "$EVIDENCE/microbench_clocks.json"
 
 # Kernel names and CUPTI durations; timings under the tracer are not reported.

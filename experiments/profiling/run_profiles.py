@@ -13,6 +13,10 @@ Arms (server flags on top of the production baseline in ``BASE_FLAGS``):
   4 draft tokens).
 * ``plain-eager`` / ``mtp-eager``: diagnostic arms with ``--disable-cuda-graph``
   and layer-wise NVTX markers, for kernel attribution only.
+* ``dflash-tuned-b16`` / ``dflash-tuned``: the serving benchmark's two tuned
+  DFlash arms, resolved from ``bench/arms.toml`` (its defaults included), so
+  the profile runs exactly the server flags behind the frontier. They do not
+  use ``BASE_FLAGS``.
 
 Modes:
 
@@ -60,41 +64,48 @@ MTP_FLAGS = [
     "--speculative-num-draft-tokens", "4",
 ]  # fmt: skip
 EAGER_FLAGS = ['--disable-cuda-graph', '--enable-layerwise-nvtx-marker']
-# DFlash-4B draft (flags from the drafter workstream). One server covers
-# B = 1-64: block 16 keeps 16 FP32 GDN states per request, so the radix cache
-# is off and the state pool is sized for 64 requests.
-DFLASH_FLAGS = [
-    "--speculative-algorithm", "DFLASH",
-    "--speculative-draft-model-path", "z-lab/Qwen3.5-4B-DFlash",
-    "--speculative-draft-model-revision", "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf",
-    "--linear-attn-prefill-backend", "flashinfer",
-    "--linear-attn-decode-backend", "flashinfer",
-    "--disable-radix-cache",
-    "--max-running-requests", "64",
-    "--max-mamba-cache-size", "64",
-]  # fmt: skip
 ARMS = {
     'plain': [],
     'mtp': MTP_FLAGS,
     'plain-eager': EAGER_FLAGS,
     'mtp-eager': MTP_FLAGS + EAGER_FLAGS,
-    'dflash16': [*DFLASH_FLAGS, '--speculative-dflash-block-size', '16'],
-    'dflash8': [*DFLASH_FLAGS, '--speculative-dflash-block-size', '8'],
 }
-ARM_ENV = {
-    'dflash16': {'SGLANG_ENABLE_OVERLAP_PLAN_STREAM': '1'},
-    'dflash8': {'SGLANG_ENABLE_OVERLAP_PLAN_STREAM': '1'},
-}
+# Arms taken whole from bench/arms.toml: block 16 with Triton attention (the
+# low-concurrency arm, capacity 64) and block 8 with FA4 draft attention (capacity 128).
+BENCH_ARMS = ('dflash-tuned-b16', 'dflash-tuned')
 HERE = Path(__file__).resolve().parent
+REPO = HERE.parent.parent
 LOG_LINE = re.compile(r'^\[(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\] Decode batch.*?#running-req: (\d+)')
 ACCEPT = re.compile(r'accept len: ([\d.]+)')
 GEN_TPUT = re.compile(r'gen throughput \(token/s\): ([\d.]+)')
 
 
-def max_tokens_for(concurrency: int) -> int:
+def bench_server(name: str, port: int, concurrency: list[int]) -> tuple[list[str], dict[str, str]]:
+    """Server command and environment of a bench arm, refusing a concurrency above its capacity."""
+    sys.path.insert(0, str(REPO))
+    from bench.arms import resolve_arm, server_command
+
+    arm = resolve_arm(name)
+    if max(concurrency) > arm.max_concurrency:
+        raise SystemExit(f'{name} admits at most {arm.max_concurrency} requests')
+    return server_command(arm, sys.executable, '127.0.0.1', port), dict(arm.env)
+
+
+def max_tokens_for(concurrency: int, pool_tokens: int) -> int:
     # Keep C * max_new_tokens well inside the KV pool so admission control
-    # (which reserves for future tokens) admits all C requests at once.
-    return min(16384, 524288 // concurrency)
+    # (which reserves for future tokens) admits all C requests at once. The
+    # plain and MTP pools (1.17-1.30M tokens) give the old fixed budget of 524,288;
+    # DFlash's pool is about a quarter of that.
+    budget = min(524288, int(0.45 * pool_tokens))
+    return min(16384, budget // concurrency)
+
+
+def kv_pool_tokens(log: Path) -> int:
+    """The KV pool size the server resolved (``max_total_num_tokens`` in its log)."""
+    found = re.findall(r'max_total_num_tokens=(\d+)', log.read_text(errors='replace'))
+    if not found:
+        raise RuntimeError(f'no max_total_num_tokens in {log}')
+    return int(found[-1])
 
 
 def sglang_dir() -> Path:
@@ -181,7 +192,7 @@ def drive(args: argparse.Namespace, concurrency: int, profiler: str, output: str
         sys.executable, str(HERE / "drive_decode.py"),
         "--port", str(args.port),
         "--concurrency", str(concurrency),
-        "--max-tokens", str(max_tokens_for(concurrency)),
+        "--max-tokens", str(max_tokens_for(concurrency, args.pool_tokens)),
         "--window", str(window),
         "--profiler", profiler,
         "--nsys-session", args.session,
@@ -213,7 +224,7 @@ def drive(args: argparse.Namespace, concurrency: int, profiler: str, output: str
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
-    parser.add_argument('--arm', choices=sorted(ARMS), required=True)
+    parser.add_argument('--arm', choices=sorted([*ARMS, *BENCH_ARMS]), required=True)
     parser.add_argument('--mode', choices=('none', 'nsys', 'sglang'), required=True)
     parser.add_argument('--concurrency', type=int, nargs='+', required=True)
     parser.add_argument('--out-dir', type=Path, required=True)
@@ -245,8 +256,13 @@ def main() -> None:
     args.out_dir = args.out_dir.expanduser().resolve()
     args.out_dir.mkdir(parents=True, exist_ok=True)
     args.session = f'vp_{args.arm}_{os.getpid()}'
-    server = [sys.executable, '-m', 'sglang.launch_server', *BASE_FLAGS, '--port', str(args.port)]
-    server += ARMS[args.arm] + shlex.split(args.extra_server_args)
+    if args.arm in BENCH_ARMS:
+        server, arm_env = bench_server(args.arm, args.port, args.concurrency)
+    else:
+        server = [sys.executable, '-m', 'sglang.launch_server', *BASE_FLAGS]
+        server += ['--port', str(args.port), *ARMS[args.arm]]
+        arm_env = {}
+    server += shlex.split(args.extra_server_args)
     # A non-zero flush interval lets CUPTI allocate more buffers instead of
     # dropping records once its 50 default buffers fill (seen in MTP windows).
     nsys_trace = [
@@ -271,7 +287,7 @@ def main() -> None:
     cmd = prefix + server
     meta = {
         'argv': sys.argv,
-        'env': ARM_ENV.get(args.arm, {}),
+        'env': arm_env,
         'server_command': shlex.join(cmd),
         'started': datetime.now().isoformat(timespec='seconds'),
         'sglang_sha': subprocess.run(
@@ -297,13 +313,14 @@ def main() -> None:
 
     log = args.out_dir / 'server.log'
     with log.open('w') as fh:
-        env = {**os.environ, **ARM_ENV.get(args.arm, {})}
+        env = {**os.environ, **arm_env}
         proc = subprocess.Popen(
             cmd, stdout=fh, stderr=subprocess.STDOUT, start_new_session=True, env=env
         )
     try:
         wait_ready(args.port, proc, log, timeout=900)
         args.scheduler_pid = scheduler_pid(proc.pid)
+        args.pool_tokens = kv_pool_tokens(log)
         for c in args.concurrency:
             if args.mode == 'none':
                 for _ in range(args.repeats):

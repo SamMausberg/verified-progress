@@ -1,0 +1,37 @@
+{
+ "sm_clock_mhz": {
+  "min": 540.0,
+  "median": 1980.0,
+  "max": 1980.0,
+  "n": 380
+ },
+ "mem_clock_mhz": {
+  "min": 2619.0,
+  "median": 2619.0,
+  "max": 2619.0,
+  "n": 380
+ },
+ "power_w": {
+  "min": 150.65,
+  "median": 569.755,
+  "max": 691.48,
+  "n": 380
+ },
+ "temperature_c": {
+  "min": 38.0,
+  "median": 49.0,
+  "max": 60.0,
+  "n": 380
+ },
+ "min_power_filter_w": 150.0,
+ "load_power_w": 400.0,
+ "throttled": {
+  "n": 124,
+  "n_under_load": 353,
+  "first": "2026/10/01 11:25:29.491",
+  "last": "2026/10/01 11:25:43.107",
+  "sm_clock_mhz_min": 1305.0,
+  "power_w_min": 458.3,
+  "power_w_max": 691.48
+ }
+}

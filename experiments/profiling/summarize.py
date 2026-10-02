@@ -4,8 +4,10 @@
 
 Reads ``attribution/*.json`` (attribute.py), ``windows/*.jsonl`` (client windows
 copied from run_profiles.py output), ``head_microbench.json`` and
-``hbm_bandwidth.json``, and writes ``tables.md``. Every number in the README's
-tables comes from this file.
+``hbm_bandwidth.json``, and writes ``tables.md``, the figure data ``step_share.csv``
+and ``breakdown.csv`` (plain decoding and MTP) and, once DFlash attributions exist,
+``dflash_breakdown.csv`` (same columns). Every number in the README's tables comes
+from this file.
 """
 
 from __future__ import annotations
@@ -45,6 +47,8 @@ GROUPS: list[tuple[str, list[str]]] = [
     ('GPU idle inside graph replays', ['idle_in_graph']),
     ('GPU idle outside graphs (host, launch)', ['idle_outside_graph']),
 ]  # fmt: skip
+# The bench's tuned DFlash arms (run_profiles.py BENCH_ARMS).
+DFLASH_ARMS = ('dflash-tuned-b16', 'dflash-tuned')
 CONFIGS = [
     ('plain', 1),
     ('plain', 8),
@@ -53,7 +57,7 @@ CONFIGS = [
     ('mtp', 1),
     ('mtp', 8),
     ('mtp', 32),
-    *[(arm, b) for arm in ('dflash16', 'dflash8') for b in (1, 4, 16, 64)],
+    *[(arm, b) for arm in DFLASH_ARMS for b in (1, 4, 16, 64)],
 ]
 
 
@@ -85,9 +89,9 @@ COARSE: list[tuple[str, list[str]]] = [
 ]  # fmt: skip
 
 
-def breakdown_csv(attr: dict[tuple[str, int], dict]) -> str:
+def breakdown_csv(attr: dict[tuple[str, int], dict], arms: tuple[str, ...]) -> str:
     rows = ['config,x,' + ','.join(name for name, _ in COARSE)]
-    for x, k in enumerate(k for k in CONFIGS if k in attr):
+    for x, k in enumerate(k for k in CONFIGS if k in attr and k[0] in arms):
         by = {r['category']: r['pct_of_step'] for r in attr[k]['categories']}
         vals = [sum(by.get(c, 0.0) for c in cats) for _, cats in COARSE]
         rows.append(f'{k[0]}-{k[1]},{x},' + ','.join(f'{v:.2f}' for v in vals))
@@ -171,6 +175,9 @@ def runs_table(evidence: Path) -> str:
                 kind = 'SGLang /start_profile (CUDA_PROFILER) under nsys'
             else:
                 continue
+            if p.stem.endswith('_rerun'):
+                # Reproduction runs (windows/<run>_rerun.jsonl) get their own rows.
+                kind += ', rerun'
             rows.setdefault((r['arm'], r['concurrency'], kind), []).append(r)
     lines = [
         '| Arm | B | Condition | windows | output tok/s (mean, sd) | tok/s/user | ms per step or cycle | accept len |',
@@ -233,7 +240,11 @@ def main() -> None:
         '## Head microbenchmark (CUDA graphs, BF16 weight 248320 x 2560)',
         microbench_table(args.evidence),
     ]
-    (args.evidence / 'breakdown.csv').write_text(breakdown_csv(attr))
+    # breakdown.csv feeds the paper's Figure 1, which plots every row, so it keeps
+    # plain decoding and MTP only; the DFlash rows, same columns, go to their own file.
+    (args.evidence / 'breakdown.csv').write_text(breakdown_csv(attr, ('plain', 'mtp')))
+    if any(k[0] in DFLASH_ARMS for k in attr):
+        (args.evidence / 'dflash_breakdown.csv').write_text(breakdown_csv(attr, DFLASH_ARMS))
     (args.evidence / 'step_share.csv').write_text(step_share_csv(attr))
     out = args.evidence / 'tables.md'
     out.write_text('\n\n'.join(parts) + '\n')
