@@ -22,10 +22,10 @@ readings (each set before its run, in the scripts' docstrings) give three findin
    18299 at -17.16, and its decode with an FP32 cached state at -15.63, where FP32 has -0.45 and
    SGLang's prefills -13.4 to -15.3. FP32 itself, under relative noise within the BF16 rounding
    bound, flips its top-1 between 18299 and 5500 and puts 18299 as low as -11.65.
-2. **At `579ae7ce`/439 only SGLang misses, and no single kernel carries the miss.** There FP32
-   under the same noise keeps 1756 within 0.52 nats of -9.79, and transformers in BF16 (four
-   configurations, four paths each) keeps FP32's top-1 68189 on top and 1756 between -10.11 and
-   -7.60. SGLang's decode puts 1756 on top at -0.32, and swapping one kernel family at a time moves
+2. **At `579ae7ce`/439 only SGLang misses, and no single kernel carries the miss.** There, in 16
+   random draws of the same noise, FP32 kept 1756 within 0.52 nats of -9.79 (a probe of
+   sensitivity, not a bound), and transformers in BF16 (four configurations, four paths each)
+   keeps FP32's top-1 68189 on top and 1756 between -10.11 and -7.60. SGLang's decode puts 1756 on top at -0.32, and swapping one kernel family at a time moves
    it between -8.9 and -0.32 on one path or another. One BF16 rounding of beta (the lines of the
    open upstream PRs #38977 and #40362) moves the decode to -4.97 and the prefills by up to 5.6
    nats without bringing any path to FP32, and at `a4db11ff`/333 it fixes the prefills (18299 at
@@ -133,9 +133,13 @@ bound, and is superseded; it gave the same picture with smaller ranges.
 
 At the positions before each target the same noise changes the recorded token's logprob by at
 most 0.022 nats (the control). So `a4db11ff`/333 is ill-conditioned at BF16 rounding scale: noise
-within one rounding flips FP32's own top-1 and can push 18299 down by 11 nats. `579ae7ce`/439 is
-not: the same noise moves 1756 by at most 0.52 nats, while SGLang's paths put it anywhere from
--8.9 to -0.32.
+within one rounding flips FP32's own top-1 and can push 18299 down by 11 nats. `579ae7ce`/439
+showed no such sensitivity: in all 16 draws 1756 moved by at most 0.52 nats, while SGLang's paths
+put it anywhere from -8.9 to -0.32. A random probe can show that a position is sensitive but
+cannot bound how stable it is, since eight draws per site do not cover every correlated pattern
+of in-bound rounding errors; it supports, and does not prove, that `579ae7ce`/439 is
+well-conditioned at this scale. The transformers runs, which apply real BF16 roundings in four
+configurations, point the same way.
 
 **Selection-free error rates (`rates.json`, `rates_eot.json`).** The two positions were found
 because SGLang erred there, so they cannot compare how often implementations err. `rates.py`
@@ -251,8 +255,9 @@ stay in `~/vp-data/upstream/bf16/`.
   rounding, not whether #38977 or #40362 improves accuracy in general.
 - FP32 is transformers on the CPU; its two paths agree within 0.0024 nats at both targets
   (`../certified_head/served/reference_paths.json`). The perturbation runs are one forward each
-  with 8 seeds of uniform noise within the rounding bound; they measure sensitivity to noise of
-  rounding size, not to SGLang's particular roundings.
+  with 8 seeds of uniform noise within the rounding bound per site; they can show sensitivity to
+  noise of rounding size but do not bound it over every in-bound rounding pattern, and they do not
+  reproduce SGLang's particular roundings.
 - The rate decision treats missed positions as independent; positions of one prompt are not, but
   with at most one missed position per source the question does not arise here.
 - Hold 1's transformers step crashed on a trace-range bug (fixed in `b6abd11`) and is void; its
