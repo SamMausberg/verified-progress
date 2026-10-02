@@ -315,3 +315,22 @@ SGLANG_WORKTREE=~/sglang-wt/lossy source scripts/sglang_env.sh
 | Patch | What it changes | Default behaviour |
 |---|---|---|
 | 0001 | `DFlashDraftModel` builds its context projection `fc` as a `ReplicatedLinear` with the draft's quantization config whenever one is set, and refuses to load a checkpoint that leaves any `fc` parameter unset. Without it, a compressed-tensors drafter stores `fc` as `weight_packed`/`weight_scale`, which match no parameter of the plain `nn.Linear`; the loader skips them silently and `fc.weight` keeps uninitialised memory. | unquantized drafters (no quantization config) build and load `fc` exactly as before |
+
+## upstream-bf16 (`patches/upstream-bf16/0001`, branch `engine/upstream-bf16`, head `4608661757`)
+
+One diagnostic patch on `bd66ce343e` for `experiments/bf16_paths/` (variant `beta_fp32`): it keeps
+sigmoid(beta) in FP32 in the packed GDN decode kernel (`fused_recurrent.py`) and in the gating kernel
+whose output feeds GDN prefill (`fused_gdn_gating.py`), where the pin rounds it through BF16. The two
+lines are the changes of the open upstream PRs #38977 and #40362 (upstream issue #38975); the patch
+exists only to measure whether that rounding explains a BF16 decode/prefill disagreement, not as a
+proposed change.
+
+```sh
+scripts/sglang_worktree.sh upstream-bf16
+git -C ~/sglang-wt/upstream-bf16 am "$PWD"/engine/sglang/patches/upstream-bf16/0001-*.patch
+SGLANG_WORKTREE=~/sglang-wt/upstream-bf16 source scripts/sglang_env.sh
+```
+
+| Patch | What it changes | Default behaviour |
+|---|---|---|
+| 0001 | `beta_val = tl.sigmoid(b_val).to(tl.float32)` in the packed decode kernel; the gating kernel stores the FP32 sigmoid into its FP32 output buffer | numerics change only in beta's low mantissa bits (at most one BF16 rounding, about 0.4% relative) |

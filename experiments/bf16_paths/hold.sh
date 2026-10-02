@@ -7,9 +7,10 @@
 #    then with flash-linear-attention's (installed with --no-deps into $out/pydeps, used only
 #    through PYTHONPATH here), each with the cached recurrent state in the model dtype and
 #    in FP32: four runs, about 10 GB each.
-# 2. Unpatched SGLang at the pin (~/sglang), one server at a time on port 30240 inside the
-#    start-up memory gate, under the kernel variants of sglang_variants.py: the targets
-#    along three prefills and one decode each.
+# 2. SGLang at the pin (~/sglang, unpatched), one server at a time on port 30240 inside the
+#    start-up memory gate, under the kernel variants of sglang_variants.py (the last,
+#    beta_fp32, on ~/sglang-wt/upstream-bf16: the pin plus the beta-in-FP32 patch): the
+#    targets along three prefills and one decode each.
 # Targets: ~/vp-data/exactness/paths/targets.jsonl (paths.py `targets`), copied and hashed.
 # Output: ~/vp-data/upstream/bf16 (BF16_PATHS_OUT); log in logs/hold-<UTC>.log.
 set -euo pipefail
@@ -63,7 +64,7 @@ else
 fi
 
 # 2. Unpatched SGLang under kernel variants.
-for variant in default prefill_triton decode_flashinfer no_cuda_graph attn_triton; do
+for variant in default prefill_triton decode_flashinfer no_cuda_graph attn_triton beta_fp32; do
   echo "variant $variant start $(date -Is)"
   if GPU_STARTUP_MIN_FREE_GB=${GPU_STARTUP_MIN_FREE_GB:-48} GPU_STARTUP_TRIES=${GPU_STARTUP_TRIES:-10} \
     scripts/gpu_startup_lock.sh \

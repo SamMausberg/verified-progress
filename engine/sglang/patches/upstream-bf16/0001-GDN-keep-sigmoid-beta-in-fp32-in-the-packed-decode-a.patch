@@ -1,0 +1,43 @@
+From 4608661757c5c3891f0a40d8980fd99fd0547abd Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Fri, 2 Oct 2026 17:44:06 +0000
+Subject: [PATCH] GDN: keep sigmoid(beta) in fp32 in the packed decode and
+ gating kernels (diagnostic)
+
+The one-line changes of open upstream PRs #38977 (packed decode) and #40362
+(gating store), applied together to the pin to test whether the beta bf16
+round-trip explains the decode/prefill disagreement at two Qwen3.5-4B rows.
+---
+ python/sglang/kernels/ops/attention/fla/fused_gdn_gating.py | 2 +-
+ python/sglang/kernels/ops/attention/fla/fused_recurrent.py  | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/python/sglang/kernels/ops/attention/fla/fused_gdn_gating.py b/python/sglang/kernels/ops/attention/fla/fused_gdn_gating.py
+index 16cdf8f7b8..a9e2243d82 100644
+--- a/python/sglang/kernels/ops/attention/fla/fused_gdn_gating.py
++++ b/python/sglang/kernels/ops/attention/fla/fused_gdn_gating.py
+@@ -38,7 +38,7 @@ def fused_gdn_gating_kernel(
+     blk_g = -tl.exp(blk_A_log.to(tl.float32)) * softplus_x
+     tl.store(g + off, blk_g.to(g.dtype.element_ty), mask=mask)
+     blk_beta_output = tl.sigmoid(blk_b.to(tl.float32))
+-    tl.store(beta_output + off, blk_beta_output.to(b.dtype.element_ty), mask=mask)
++    tl.store(beta_output + off, blk_beta_output, mask=mask)
+ 
+ 
+ def fused_gdn_gating(
+diff --git a/python/sglang/kernels/ops/attention/fla/fused_recurrent.py b/python/sglang/kernels/ops/attention/fla/fused_recurrent.py
+index 1a59ad0643..74f610f1bd 100644
+--- a/python/sglang/kernels/ops/attention/fla/fused_recurrent.py
++++ b/python/sglang/kernels/ops/attention/fla/fused_recurrent.py
+@@ -252,7 +252,7 @@ def fused_recurrent_gated_delta_rule_packed_decode_kernel(
+     x = a_val + dt_bias_val
+     softplus_x = tl.where(x <= SOFTPLUS_THRESHOLD, tl.log(1.0 + tl.exp(x)), x)
+     g_val = -tl.exp(A_log_val) * softplus_x
+-    beta_val = tl.sigmoid(b_val).to(b.dtype.element_ty).to(tl.float32)
++    beta_val = tl.sigmoid(b_val).to(tl.float32)
+ 
+     b_h *= exp(g_val)
+     b_v -= tl.sum(b_h * b_k[None, :], 1)
+-- 
+2.34.1
+

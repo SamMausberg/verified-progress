@@ -20,6 +20,12 @@ variants that each swap one kernel family the two paths use:
 - `no_cuda_graph`: `--disable-cuda-graph`, eager decode and prefill.
 - `attn_triton`: `--attention-backend triton`, Triton attention for the full-attention
   layers.
+- `beta_fp32`: the default flags on the pin plus
+  `engine/sglang/patches/upstream-bf16/0001-*.patch` (engine worktree
+  `~/sglang-wt/upstream-bf16` at `BETA_FP32_HEAD`): the one-line changes of the open
+  upstream PRs #38977 and #40362, which keep sigmoid(beta) in FP32 in the packed GDN decode
+  kernel and in the gating kernel that feeds prefill, where the pin rounds it through BF16
+  (upstream issue #38975).
 
 `read` runs `paths.stock_target` on every target (one request at a time, the cache flushed
 before each: three prefills and one decode from TRACE positions before the target) and
@@ -31,8 +37,8 @@ that brings a wrong path within 1 nat of FP32 on the target's tracked tokens, wh
 `default` misses by several nats, names the kernel family that carries that error
 (`prefill_triton`: FlashInfer's GDN prefill at a4db11ff/333; `decode_flashinfer`: the
 Triton GDN decode at 579ae7ce/439; `no_cuda_graph`: graph capture or replay;
-`attn_triton`: FlashInfer attention). A variant that leaves both errors in place clears its
-family at these positions.
+`attn_triton`: FlashInfer attention; `beta_fp32`: the BF16 rounding of beta). A variant
+that leaves both errors in place clears its family at these positions.
 """
 
 from __future__ import annotations
@@ -55,12 +61,18 @@ from experiments.benchcert.rescore import OVERRIDES
 
 PORT = 30240
 PIN = 'bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824'
+BETA_FP32_HEAD = '4608661757c5c3891f0a40d8980fd99fd0547abd'
 VARIANTS: dict[str, dict[str, ArgValue]] = {
     'default': {},
     'prefill_triton': {'linear-attn-prefill-backend': 'triton'},
     'decode_flashinfer': {'linear-attn-decode-backend': 'flashinfer'},
     'no_cuda_graph': {'disable-cuda-graph': True},
     'attn_triton': {'attention-backend': 'triton'},
+    'beta_fp32': {},
+}
+# Variants that run a patched engine worktree instead of ~/sglang: (worktree, its head).
+ENGINES: dict[str, tuple[Path, str]] = {
+    'beta_fp32': (Path.home() / 'sglang-wt' / 'upstream-bf16', BETA_FP32_HEAD),
 }
 _DISPATCHER = re.compile(r'GDN kernel dispatcher: (.*)$', re.MULTILINE)
 _GDN_LINES = re.compile(r'^.*(?:GDN|Linear attention kernel backend).*$', re.MULTILINE)
@@ -71,18 +83,19 @@ def server_dir(out: Path, variant: str) -> Path:
 
 
 def start(out: Path, variant: str) -> int:
-    """Start the variant on the unpatched pin, check its source, record its pid."""
+    """Start the variant, check its SGLang source, record its pid."""
     arm = resolve_arm('plain-tuned', {**OVERRIDES, **VARIANTS[variant]})
     arm = type(arm)(**{**arm.to_json(), 'max_concurrency': 32})
     directory = server_dir(out, variant)
-    # The venv's editable install is ~/sglang; no SGLANG_WORKTREE, so no patched engine.
+    # Without a worktree the server imports the venv's editable install, ~/sglang at PIN.
     os.environ.pop('SGLANG_WORKTREE', None)
-    server = Server(arm, directory, PORT, sglang_worktree=None, strict=False)
+    worktree, head = ENGINES.get(variant, (None, PIN))
+    server = Server(arm, directory, PORT, sglang_worktree=worktree, strict=False)
     server.start()
     try:
         source = server.launch_record['sglang_source']
-        if source.get('head') != PIN or source.get('dirty_files'):
-            raise SystemExit(f'SGLang source is not the clean pin: {source}')
+        if source.get('head') != head or source.get('dirty_files'):
+            raise SystemExit(f'SGLang source is not the clean {head}: {source}')
         server.wait_ready()
         server.record_and_verify()
     except BaseException:
