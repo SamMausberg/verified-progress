@@ -312,6 +312,8 @@ Every hold runs from a clean checkout at the commit recorded here; `run_session.
 reads this line from the branch and refuses any other head. The line is added after
 the CPU checks of the code, before h1 starts.
 
+Hold commit: `aa121d83de88431939a61bd163c1ce19e33c1e2c`
+
 ## Amendments
 
 None.
