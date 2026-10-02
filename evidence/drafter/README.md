@@ -615,8 +615,8 @@ Added with the result below; the rule above is unchanged. The declared configura
 the script's defaults at d9d2e02, the commit that ran: the grid above, tiles 4, 8, 16 and 32,
 24 layers per CUDA graph, 50 replays per measurement and 4 repeats. At d9d2e02 the script
 withheld the threshold only from other grids; it now withholds it (`n_star` null, with
-`differences` naming each parameter) from a run that differs in any of these
-(`ring_tile_rule.py`).
+`differences` naming each parameter) from a run that differs in any of these, or whose rows
+miss or repeat a point of the grid (`ring_tile_rule.py`).
 
 ## Ring-writing verify tiles by batch: result
 
@@ -633,13 +633,15 @@ repository at d9d2e02, engine `engine/drafter` 9292abd874 = bd66ce343e + 0001-00
 **Validity.**
 - The run used the declared configuration: blocks 16 and 8, the 13 declared batches, tiles 4, 8,
   16 and 32, 24 layers, 50 replays per measurement and 4 repeats (`sweep.json`: the grid in
-  `rows`, `shape.layers`, `iters`, `repeats`). `ring_tile_cycle_estimate.py` checks this and
-  applies the declared rule to the rows again; it reproduces the recorded threshold.
+  `rows`, `shape.layers`, `iters`, `repeats`), with exactly one row per tile and one stock row
+  at each of the 26 points. `ring_tile_cycle_estimate.py` checks this and applies the declared
+  rule to the rows again; it reproduces the recorded threshold.
 - Every tile's verify output and ring contents were bitwise equal to tile 32's at every block
   and batch (`bitwise_failures` empty), on random inputs for one layer.
-- Forcing a tile keeps the selection's warp count, which is 1 for both tiles at the pin, so
-  tile 32 is the ring-writing verify's launch under patches 0001-0004 and tile 4 its launch
-  under 0005. The engine selected tile 4 for the stock verify at every point.
+- From code reading (`sweep.json` does not record warps): forcing a tile keeps the selection's
+  warp count, which `_select_recurrent_launch_config` sets to 1 for both tiles at 9292abd874,
+  so tile 32 is the ring-writing verify's launch under patches 0001-0004 and tile 4 its launch
+  under 0005. The engine selected tile 4 for the stock verify at every point (`stock_tile`).
 - Repository and engine had no modified files. Foreign CPU load averaged 0.155 cores (largest
   one-second sample 0.87). The GPU held 5 MiB when the sweep started.
 - Repeats agree closely: the median repeat range is 0.6% of its median, the largest 6.5% (the
@@ -718,11 +720,12 @@ stock does not depend on the ring tile, so its column is the drift between the t
 | 8 | 16 | +294 | 13.13 | 0.978 | not timed | |
 | 8 | 32 | +460 | 20.08 | 0.978 | not timed | |
 
-- **The kernel times account for 0005's served effect at c = 1, 2 and 8.** On both blocks the
-  predicted change in the fold's y is within 0.7 points of the change measured across the two
-  sessions, and stock moved at most 0.7% between them. The 0005 section had to attribute the
-  fold's shift to the patch across sessions seven hours apart; at these points the
-  ring-writing verify's kernel time explains it.
+- **The kernel times are consistent with 0005's served effect at c = 1, 2 and 8.** On both
+  blocks the predicted change in the fold's y is within 0.7 points of the change measured
+  across the two sessions. Stock moved up to 0.7% between those sessions, so the agreement is
+  as close as the comparison can show, not closer. The 0005 section attributed the fold's
+  shift to the patch across sessions seven hours apart; at these points the ring-writing
+  verify's kernel time agrees with that attribution in sign and size.
 - **Block 16 at c = 4 is the exception.** The kernel predicts a 0.7% loss (62 µs per cycle) and
   the sessions measured a 1.3% gain, a gap of 2.0 points that would take about 0.18 ms per
   cycle. Block 8 agrees within the drift (0.996 against 1.002). Neither the sweep nor the two
