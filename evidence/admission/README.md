@@ -113,8 +113,11 @@ Best against best: MTP with PD gives 1.48 times the best non-speculative arm's y
 1.40 times at c = 128 (plain with PD in both cases; x 1.52 and 1.42 times), at a TTFT p99 of
 0.49 and 0.73 s against 0.26 and 0.44 s. With natural lengths plain decoding also benefits from
 PD (+4.2% and +8.4%), and MTP without any delay already leads plain decoding (1.38 and 1.29
-times): on this workload, in this session, the fixed-length panel's "speculation trails from
-c = 48" does not hold even with stock settings.
+times). So the confirmed frontier's "speculation trails plain decoding from c = 48" is specific
+to the fixed 512-token closed loop, whose equal lengths keep plain decoding's admissions in
+synchronized waves. This rests on one session and one length distribution (`plain-tuned`'s own
+greedy lengths on the confirmation split, capped at 2,048 tokens); the declared sensitivity
+campaign of `bench/README.md` has not run.
 
 ## Token identity
 
