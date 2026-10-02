@@ -54,9 +54,12 @@ Rows the certificate cannot decide are completed by the stock kernel itself:
 `fallback_mode='batch'` (default) reruns `torch.matmul` on the whole batch at
 the same shape and takes its argmax, and needs no model. `fallback_mode='columns'`
 completes a row that is undecided only by a near tie among a complete candidate
-list with one stock `matmul` over its gathered candidate rows; it is enabled
-only by `enable_column_fallback(batch_sizes)`, which checks that exact GEMM shape
-bitwise at start-up. Inside a CUDA graph each fallback is a conditional node.
+list of at most 64 entries (`COLS_CAP` in `head.py`; status exactly `ambiguous`)
+with one stock `matmul` over its gathered candidate rows; any other undecided
+row, including a near tie with a longer list, takes the whole-batch fallback.
+It is enabled only by `enable_column_fallback(batch_sizes)`, which checks that
+exact GEMM shape bitwise at start-up. Inside a CUDA graph each fallback is a
+conditional node.
 
 `gumbel_sample` extends the contract to SGLang's seeded sampler without top-k,
 top-p or min-p: `logits.div_(T)` in FP32, FP32 `softmax` and `log`, then

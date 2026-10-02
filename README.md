@@ -25,11 +25,14 @@ system overheads and the latency-throughput frontiers.
 Read `paper/paper.pdf`, typeset in the MLSys two-column format: a 10-page main
 text on the exactness contract, the certified head and transport, then the
 references and the appendices. The paper cites committed evidence as [E*n*] and
-marks work whose result is not yet committed as [pending D*n*]; the evidence
-register in the appendices lists every cited file with the program that
-produced it. `TASKS.md` tracks the work and its status, `RUNBOOK.md` gives the
-commands and the rules for admissible runs, and `SETUP.md` describes the
-machine.
+marks work whose result is not yet committed as [D*n*]; the evidence register in
+the appendices lists every cited file with the program that produced it. The
+companion `paper/research_notes.pdf` (source in `paper/notes/`) holds the
+research notes behind the paper: the status of the questions and proposals, the
+serving stack and protocol, drafting and repair, the stock engine under
+speculation and further analysis, with its own evidence register. `TASKS.md`
+tracks the work and its status, `RUNBOOK.md` gives the commands and the rules
+for admissible runs, and `SETUP.md` describes the machine.
 
 ## Main results
 
@@ -118,11 +121,15 @@ Secondary investigations and supporting material:
   2-16 rows and a packed GDN input projection from 64 rows serves tuned plain
   decoding 3.4% faster at concurrency 1 and 1.0% at 128 (two pairs, one
   session), with greedy outputs exact up to rounding against stock; at
-  concurrency 8 it gains 0.4%, a tenth of the microbenchmark prediction, for a
-  reason not yet traced. The packed projection alone gives the same tokens
-  and top-5 logprobs as stock on 320 prompts at concurrency 1. Folding the
-  norm and SiLU into the GEMM, as implemented, is a measured loss. Serving
-  against tuned MTP is pending (`evidence/backbone/`).
+  concurrency 8 it gains 0.4%, a tenth of the microbenchmark prediction. An
+  nsys trace shows the routes dispatch as tabled but keep only 37-52% of their
+  isolated GPU gain in the served step. On MTP with FlashInfer attention
+  (`mtp-tuned`) the table gains nothing (0.9% slower at concurrency 1 in both
+  pairs, only one of them beyond the session's spread); it is untested against
+  `mtp-tuned-triton` at concurrency 1-32. The packed projection alone gives the same tokens and
+  top-5 logprobs as stock on 320 prompts at concurrency 1. Folding the norm
+  and SiLU into the GEMM, as implemented, is a measured loss
+  (`evidence/backbone/`).
 - **Exact witnesses.** `tests/test_state_structure.py` and
   `tests/test_contracts.py` check in exact arithmetic why the recurrent state
   resists exact compression, why computation cannot be shared across unrelated
@@ -143,13 +150,16 @@ python -m pip install -r requirements-dev.txt   # NumPy plus pytest and the lint
 python -m pytest tests/                          # every CPU test; GPU tests skip without CUDA
 bash scripts/check_lean.sh                       # needs Lean 4.19.0 (~/.elan)
 cd paper && latexmk -pdf -interaction=nonstopmode -halt-on-error paper.tex
+latexmk -pdf -interaction=nonstopmode -halt-on-error notes/research_notes.tex
 ```
 
-The paper builds with pdfLaTeX and BibTeX, no shell escape. The MLSys style file
-carries no licence, so it is not committed: `paper/latexmkrc` fetches the
-official author kit and checks its SHA-256 before each build, which needs
-network access the first time (`paper/template/README.md`). Plots that read
-committed data files under `evidence/` regenerate on each build.
+The paper builds with pdfLaTeX and BibTeX, no shell escape. The research notes
+build from `paper/` after the paper, because they cite its labels through
+xr-hyper and read `paper.aux`. The MLSys style file carries no licence, so it is
+not committed: `paper/latexmkrc` fetches the official author kit and checks its
+SHA-256 before each build, which needs network access the first time
+(`paper/template/README.md`). Plots that read committed data files under
+`evidence/` regenerate on each build.
 
 `RUNBOOK.md` has the commands that regenerate each evidence file (some rewrite
 committed files, so it says which to run on a copy), the GPU procedures and the
@@ -162,6 +172,7 @@ and SGLang at the pinned commit with the patch series under
 | Path | What it holds |
 |---|---|
 | `paper/` | The manuscript: `paper.tex`, one file per section in `sections/`, shared macros and terminology, figures, bibliography and the built `paper.pdf` |
+| `paper/notes/` | The research notes: `research_notes.tex` and one file per section, built from `paper/` to `paper/research_notes.pdf` |
 | `src/` | Exact CPU references: `precision_reference.py` for the certified head, and the earlier revision's `decision_reference.py`, `race_reference.py`, `v1_reference.py` and `v2_reference.py` |
 | `tests/` | pytest tests for the references and witnesses, the serving harness, the scripts and the experiments' analysis code; GPU tests skip without CUDA |
 | `formal/` | Lean sources and `STATUS.md` (what is and is not formalized) |

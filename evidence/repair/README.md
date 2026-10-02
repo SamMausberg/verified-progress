@@ -1,8 +1,9 @@
-# Long-window repair oracles (P2, P3)
+# Repair oracles (P2, P3, P9, P12)
 
 Evidence for the repair workstream's kill tests of Sam's proposals P2 (long-window exact
-repair of a DFlash window, 2026-09-30) and P3 (target-anchored residual decoding,
-2026-09-30). Setting throughout: Qwen/Qwen3.5-4B
+repair of a DFlash window, 2026-09-30), P3 (target-anchored residual decoding, 2026-09-30),
+P9 (reusing a cached window once after a rejection, 2026-10-01) and P12 (compiling the final
+classifier backward through the last FFN, 2026-10-01). Setting throughout: Qwen/Qwen3.5-4B
 at `851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a`, drafter z-lab/Qwen3.5-4B-DFlash at
 `9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf`, SGLang `bd66ce343e` plus the repair patches on
 branch `engine/repair` (`engine/sglang/patches/repair/`): patch 0001 (engine commit
@@ -204,8 +205,8 @@ B = 64 and 256, where `audit_saving_needed_for_target_us` is 0.)
   (5.18x end to end, `S_b_ceiling_stateless_audit_e2e`; 2.33 ms needed).
 - With the Triton kernel (pending exactness classification), P2 therefore turns on drafting: a
   5x gain needs blocks of 64 or more tokens accepted almost entirely, and the repair mechanisms
-  tested here do not produce them (one-step recycling below; exact Jacobi about one token per
-  pass, Stage B). P3 stays refuted by Stage B.
+  tested here do not produce them (one-step recycling and exact Jacobi sweeps in the engine
+  below, about one token per exact pass; Stage B). P3 stays refuted by Stage B.
 
 ### P9 support oracle: reuse a cached DFlash window once after a rejection (c = 1)
 
@@ -582,6 +583,137 @@ previous draft's tail gives 1.11, and choosing the best of the three with hindsi
 after a wrong draft token matches the continuation 14% of the time once that token is
 corrected, against 84% for DFlash's first drafted token. Recycling the target's suffix does
 not improve on fresh DFlash drafting.
+
+### P2 Arm B in the engine: exact Jacobi sweeps from real DFlash windows (B = 16, 32)
+
+`jacobi_probe_progress.csv`, `jacobi_probe_summary.json` (measured). Session `runs/jacobi_probes.sh`
+under the exclusive lock on 2026-10-01, 21:53-22:05 UTC (exclusive for memory; nothing here is
+timed), repository commit `17bbeac` (on main) and engine build `5d8e00e3e1`, both clean, as each
+run's `run.json` records (`jacobi_probe_provenance.json`, written and checked by
+`write_provenance.py`, copies those records with the input and trace hashes). The probe follows the stock DFlash trajectory and, on
+every block, runs four extra exact target passes from the same committed prefix of each kind: recycle
+sweeps (the Jacobi map: the next candidate takes the target's predictions from the previous pass,
+shifted by one) and keep sweeps (only the first mismatching draft token is replaced by the
+target's token). The plain DFlash pass is then rerun and committed, so the trajectory stays stock
+DFlash. Inputs: every second decode checkpoint of the drafter workstream's shared panel
+(`checkpoints_probe_half.jsonl`, 67 requests, SHA-256
+`5bb26409670cf3be159812c6003d3329781f04e5f7d575cfd50a51f4038b18b7`, raw data outside git), 384
+new tokens each, greedy, one request at a time, FlashInfer GDN kernels. Each rerun from a prefix
+restores the batch's conv and SSM states; rerunning the original draft reproduced the first
+pass's argmax in all 4,085 (B = 16) and 3,968 (B = 32) cycles (`replay_mismatch_cycles` 0).
+
+Accepted drafts after r exact sweeps, with committed tokens per exact target pass, (a_r + 1) / (r + 1):
+
+| B | sweeps r | recycle: accepted | per pass | keep: accepted | per pass | blocks fully accepted (keep) |
+|---|---|---|---|---|---|---|
+| 16 | 0 (DFlash) | 5.49 | 6.49 | 5.49 | 6.49 | 14.7% |
+| 16 | 1 | 6.72 | 3.86 | 7.08 | 4.04 | 18.6% |
+| 16 | 2 | 7.66 | 2.89 | 8.16 | 3.05 | 21.6% |
+| 16 | 3 | 8.53 | 2.38 | 9.08 | 2.52 | 24.7% |
+| 16 | 4 | 9.37 | 2.07 | 9.93 | 2.19 | 27.9% |
+| 32 | 0 (DFlash) | 5.69 | 6.69 | 5.69 | 6.69 | 0.05% |
+| 32 | 1 | 7.18 | 4.09 | 7.59 | 4.30 | 0.2% |
+| 32 | 2 | 8.33 | 3.11 | 8.94 | 3.31 | 0.4% |
+| 32 | 3 | 9.41 | 2.60 | 10.12 | 2.78 | 0.7% |
+| 32 | 4 | 10.48 | 2.30 | 11.25 | 2.45 | 1.1% |
+
+Each exact sweep adds 0.84-1.58 accepted tokens at B = 16 and 1.07-1.90 at B = 32, less with
+every sweep, which is what the Hugging Face replay of Stage B found (about one token per exact
+pass). The mechanism shows in the target's own predictions: after one corrected token, the
+prediction right after it changes in 87% of the cases (86% at B = 32), the next one in 49%, about
+a quarter four positions on and about a seventh eight positions on (`one_correction` in the
+JSON), so a correction invalidates many of the downstream guesses that a sweep would have to
+confirm. Even P3's ceiling, which charges the sweeps nothing and pays
+only an anchor and an audit pass, commits 5.18 (recycle) or 5.46 (keep) tokens per pass after
+four sweeps at B = 16, below DFlash's 6.49, and 5.74 or 6.13 at B = 32 against 6.69
+(`committed_per_pass_p3_ceiling` in the CSV). Derived, from Stage A's FlashInfer timings at
+c = 1: a sweep is one verify pass (4.78 ms at B = 16), while fresh DFlash commits about 0.87 tokens
+per ms (this panel's 6.49 tokens per Stage A's 7.46 ms cycle); the best sweep (the first keep sweep, +1.58) adds 0.33
+tokens per ms of its own cost, so every sweep lowers throughput.
+
+- **P2 verdict: long-window exact repair is rejected as a route to 5x.** Repair from a DFlash
+  window converges at about one token per exact target pass and leaves 72% of B = 16 blocks and
+  99% of B = 32 blocks short of full acceptance after four sweeps, while Stage A needs blocks of
+  64 or more tokens accepted almost entirely (per-position acceptance about 0.9985 at B = 64 with
+  the Triton verify kernel, `evidence/drafter/drafting_requirement.json`). What remains of P2 is
+  a drafting problem, not a repair one.
+
+```sh
+scripts/gpu_lock.sh -x experiments/repair/runs/jacobi_probes.sh   # raw traces in ~/vp-data/repair/runs/probe1
+python experiments/repair/analyze_jacobi.py ~/vp-data/repair/runs/probe1/probe_b16 \
+    ~/vp-data/repair/runs/probe1/probe_b32 --out-dir ~/vp-data/repair/analysis/jacobi
+cp ~/vp-data/repair/analysis/jacobi/jacobi_summary.json evidence/repair/jacobi_probe_summary.json
+cp ~/vp-data/repair/analysis/jacobi/jacobi_progress.csv evidence/repair/jacobi_probe_progress.csv
+python experiments/repair/write_provenance.py --result evidence/repair/jacobi_probe_summary.json \
+    evidence/repair/jacobi_probe_progress.csv --raw ~/vp-data/repair/analysis/jacobi/jacobi_summary.json \
+    ~/vp-data/repair/analysis/jacobi/jacobi_progress.csv \
+    --run-dir ~/vp-data/repair/runs/probe1/probe_b16 ~/vp-data/repair/runs/probe1/probe_b32 \
+    --worktree ~/vp-wt/repair --scripts experiments/repair/serve_probe.py experiments/repair/runs/jacobi_probes.sh \
+    --inputs ~/vp-data/repair/panel/checkpoints_probe_half.jsonl --out evidence/repair/jacobi_probe_provenance.json
+```
+
+The analysis ran from main at `204c4cd`, whose `analyze_jacobi.py` is the same blob as at the
+run's commit `17bbeac`. The provenance file also checks that both runs' recorded `repo_sha` is
+the run worktree's HEAD and that their engine worktree was clean.
+
+### P12 static screen on the compiled last-FFN dictionary
+
+`p12_static_screen.json` (measured; `p12_static_screen.py`). Sam's proposal P12 (2026-10-01)
+compiles the tied head backward through the last decoder layer's FFN, so the greedy winner is an
+argmax of t_v^T q over a dictionary t_v = [Gamma w_v; D^T Gamma w_v] with the query q = [x; a],
+and asks whether a centre-plus-radius tile bound, mu_C^T q + R_C ||q||, can skip tiles of that
+dictionary. The script measures the most favourable version of the screen: the winner's exact
+score is taken as known, so its skip rate bounds from above what any screen with this bound can
+skip.
+
+Setup: the Hugging Face Qwen3.5-4B target at the pinned revision (BF16 weights, FP32 arithmetic for
+the dictionary and the scores) on 1,000 queries, 25 positions from each of 40 outputs of the
+drafter workstream's block-16 panel (`drafter_b16_outputs.jsonl`, SHA-256
+`679240063371673782ca0fe6b7eeeb241c36bef2f183030bda3dcd9dceaffec4`, raw data outside git); 64-row
+tiles in token-id order, and the same tiles after sorting the rows by a random projection (a cheap
+clustering control, not k-means). Run under the shared lock on 2026-10-01, finishing at 18:51 UTC,
+at repository commit `a05df1d` (`p12_static_screen.provenance.json`, written and checked by
+`write_provenance.py`): a local branch, never pushed, recovered from the run worktree's reflog
+(HEAD there from 10:04 UTC on, worktree clean, both scripts last modified at 08:28 UTC), since the
+JSON itself records no commit. Its
+`p12_static_screen.py` (SHA-256 `7ca21067...`) and `runs/p12_screen.sh` (`c32c4c10...`) are
+byte-identical to the files at `694c0bc`, the commit on main that added them, which is the revision
+to rerun; the provenance file gives the full hashes.
+
+| quantity | value |
+|---|---|
+| dictionary | 248,320 rows x 11,776 coefficients, 4.6 times the head's 2,560 |
+| compiled argmax equals the model's argmax | 99.7% of queries |
+| median margin between the top two scores, over \|\|q\|\| | 0.125 |
+| rows in skippable tiles, token-id order | 0.077% (192 rows), the same for every query |
+| rows in skippable tiles, random-projection order | 0.052% (128 rows), the same for every query |
+
+- **Verdict: the tile screen does not prune the compiled dictionary.** Even knowing the winner's
+  score, it skips the same two or three tiles for every query, 0.05-0.08% of the rows. That is
+  the share the static l2 screen skips on the head alone with contiguous 64-row tiles (0.08%,
+  which `evidence/head_geometry/README.md` traces to unused-token tiles; k-means tiles reach 0.64%
+  there), while every remaining row costs 4.6 times a head row. The compiled form reproduces the
+  model's argmax at 99.7% of the queries, so the obstruction is the bound: a tile is skipped only
+  when its radius times ||q|| is below the winner's lead over the tile centre, and the winner's lead
+  over the runner-up is a median 0.125 ||q||. Tighter tilings (k-means, smaller tiles) and per-row
+  bounds were not tested on the dictionary.
+
+```sh
+scripts/gpu_lock.sh -s experiments/repair/runs/p12_screen.sh   # writes ~/vp-data/repair/p12/p12_static_screen.json
+cp ~/vp-data/repair/p12/p12_static_screen.json evidence/repair/p12_static_screen.json
+python experiments/repair/write_provenance.py --result evidence/repair/p12_static_screen.json \
+    --raw ~/vp-data/repair/p12/p12_static_screen.json --worktree ~/vp-wt/repair-p9 \
+    --scripts experiments/repair/p12_static_screen.py experiments/repair/runs/p12_screen.sh \
+    --same-at 694c0bc --inputs ~/vp-data/repair/panel/drafter_b16_outputs.jsonl \
+    --out evidence/repair/p12_static_screen.provenance.json
+```
+
+`write_provenance.py` writes the provenance file only if its checks pass: the committed result
+equals the raw output, the run worktree is clean with HEAD unchanged since before the run, the
+scripts were last modified before it, and their blobs are the same at `694c0bc`. Rerunning it
+needs the run worktree and the raw output, which stay outside git; if they are removed, the
+commit, the reflog time and the modification times cannot be rechecked, while the scripts'
+hashes and blobs can still be checked against `694c0bc`.
 
 ## One-step recycling on the shared DFlash trace
 

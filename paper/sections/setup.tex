@@ -1,12 +1,85 @@
-% Section 3: evaluation setup.
-% Claims and status: pins from SETUP.md and the evidence READMEs; capture method and
-% alignment from committed head-geometry evidence. No served run is reported.
-\section{Evaluation Setup}\label{sec:setup}
-\paragraph{System} One NVIDIA GH200 (96~GB HBM3, compute capability 9.0, 64-core Grace CPU) with PyTorch 2.13 for CUDA 13.0, Triton 3.7.1 and FlashInfer 0.6.18; SGLang~\cite{sglangpaper} at commit \sourcepin{} with the FlashInfer attention backend. The target is Qwen3.5-4B at revision \modelpin~\cite{qwencard}: 32 layers, 24 of them Gated DeltaNet linear attention~\cite{gdn} and 8 full attention, one native MTP layer, and the tied head of Section~\ref{sec:stock}. The drafters are the MTP layer (four draft steps, top-$k$ 1) and the public DFlash block drafter for this target, \code{z-lab/Qwen3.5-4B-DFlash} at revision \code{9a1996cc}~\cite{dflashpaper,dflash4bcard}, which drafts blocks of 16 tokens and projects them through the target's head.
+% Section 4: measurements of the certified head on the engine's states (setup and the
+% fixed-configuration rule, recomputation, fallback and agreement, the engine check, head-only
+% runtime). The file keeps its old name so that the editorial tools that list the main-text
+% files keep working.
+% Claims and status: pins from SETUP.md and the evidence READMEs; capture method and alignment
+% from committed head-geometry evidence; stock divergences from committed state-safety
+% evidence; held-out replay, kernel replay, engine check, head-only microbenchmark and
+% primitive costs from committed evidence. No served run of the certified head is reported
+% (pending bench-cert). Figure 4 (Section 5's) is placed in this file so that it floats onto the
+% page where Section 5 begins.
+\section{Measurements on the Engine's States}\label{sec:measure}
+This section measures the certified head on states recorded from the running engine. Its numbers come from the five sources of Table~\ref{tab:sources}; numbers labelled baseline are the stock head's.
 
-\subsection{Capture and Replay}\label{sec:transport-capture}
-A capture-only engine patch stores the head input as BF16 bit patterns and joins it, within the same step, with the tokens the engine chose; under speculation it also stores the draft head inputs, the proposals and the accepted lengths, and pairs each drafted token with the target head input that verifies it (labelled accepted, rejected or unreached). The hooks run in Python between forwards, so the capture servers run without CUDA graphs or the overlap scheduler, with at most 16 running requests (plain decoding), 8 (MTP) or 5 (DFlash). The prompts are 320 public prompts in four domains (MT-Bench, No Robots, HumanEval, MBPP, GSM8K, MATH-500, m-ArenaHard and MGSM, 40 each), a third in thinking mode, decoded greedily for 384 tokens and split by prompt into analysis and held-out halves before any fitting; every result is on held-out prompts.
+\begin{figure*}[t]
+\centering
+\input{figures/candidates}
+\caption{What the certified head costs. \textbf{(a)}~Held-out replay, \Rreal{} decision: share of positions that need at least $k$ candidates, for four copies of the head (greedy) and for the int8 copy with one scale per 128 weights (20 scales for each entry's 2,560 weights) in a seeded race at $T=1$ \ev{ccdf}. \textbf{(b)}~Share of head calls of $M$ positions that fall back to the stock head: lines if positions fell back independently at the held-out shares of Table~\ref{tab:fallback} (derived) \ev{rstock}; markers measured in the kernel replay \ev{kernel-path}. \textbf{(c)}~Time per call over the stock head's, head alone: measured with every position certified (median of 30 replays; p10--p90 whiskers hidden by the markers below 256), and expected with each fallback under the \modelcons, from measured times and the rates of (b) \ev{kernel-path}; under the \modelhopper{} the expected times lie between these lines and the measured one. Shaded: above 16 positions the calls are consecutive replay positions, not engine batches.}
+\label{fig:candidates}\label{fig:geometry-candidates}
+\end{figure*}
 
-\paragraph{The capture is what the head read} In plain decoding the FP64 argmax of the captured head input equals the engine's token at 99.51\% of 105,269 positions, and all 519 disagreements lie within one BF16 spacing of the FP64 winner \ev{alignment}.
+\subsection{Setup}\label{sec:setup}\label{sec:transport-capture}
+\paragraph{System} One NVIDIA GH200 with SGLang~\cite{sglangpaper} at commit \sourcepin{}, PyTorch 2.13 for CUDA 13.0 and the FlashInfer attention backend (Appendix~\ref{app:pins} lists every version). The target is Qwen3.5-4B at revision \modelpin~\cite{qwencard}. The drafters are MTP-4B, the model's native MTP layer (top-$k$ 1; four draft steps in the captures, three in the profile of Figure~\ref{fig:breakdown}), and DFlash-4B, the public block drafter for this target~\cite{dflashpaper,dflash4bcard}, which drafts blocks of 16 tokens and projects them through the target's head.
 
-\paragraph{What is compared with what} Candidate counts are for the \Rreal{} decision on 6,005 held-out plain-decode rows from 160 prompts and 750 decode steps (8.0 held-out rows per step), with real logits in FP64; fallback shares apply the \Rstock{} rules to the same rows, and agreement compares each certified token with the engine's token at the capture's batch shape. Drift uses 40,000 held-out pairs of each drafter, and transport certification 4,020 DFlash-4B pairs from 110 prompts and 16,016 MTP-4B pairs.
+\paragraph{Capture} A capture-only engine patch records each position's head input as BF16 bit patterns, with the token the engine chose; under speculation it also records the drafter's head inputs and pairs each drafted token with the target head input that verifies it. The capture servers ran without CUDA graphs or the overlap scheduler, with at most 16 running requests in plain decoding (Appendix~\ref{app:transport-capture}). The 320 \emph{capture prompts} come from eight public datasets in four domains and were decoded greedily for 384 tokens. They were split by prompt into an analysis half, on which data-dependent choices were made (such as which columns of $h$ to compute exactly, or a rotation of $h$), and a held-out half. The deployed copy and its bound depend on the weights alone, so the kernel replay need not be held out, and it is not: its positions come from both halves. In plain decoding the FP64 argmax of the captured head input equals the engine's token at 99.51\% of positions, and every disagreement lies within one BF16 spacing of the FP64 winner \ev{alignment}.
+
+\begin{table}[!b]
+\caption{Where the numbers come from, and which decision rule each applies. A replay re-evaluates recorded head inputs offline; the held-out replay draws whole decode steps at random from the held-out half until it has at least 6,000 positions (6,005 in 750 steps).}\label{tab:sources}
+\vskip 0.05in
+\centering\scriptsize
+\begin{tabularx}{\columnwidth}{@{}>{\raggedright\arraybackslash}p{1.45cm}Y>{\raggedright\arraybackslash}p{1.75cm}>{\raggedright\arraybackslash}p{1.15cm}@{}}
+\toprule
+Source & What & Decision rule & Size\\\midrule
+Held-out replay & FP64 replay of held-out plain-decoding positions & \Rreal{} to compare copies; gap and interval rules & 6,005 positions\\\addlinespace[2pt]
+Kernel replay & the GPU kernel on the first captured positions, both halves, at their batch shapes & interval rule; seeded race & 60,000 positions\\\addlinespace[2pt]
+Engine check & the kernel inside SGLang, \modelcons & interval rule; seeded verification & 64 prompts\\\addlinespace[2pt]
+Microbench\-mark & the head alone, CUDA graphs, warm L2 cache & time only & $M=1$ to 256\\\addlinespace[2pt]
+Speculative captures & aligned draft and target head inputs; verification positions & \Rreal{}, gap rule; drift & 40,000 pairs per drafter\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\paragraph{A fixed configuration}\label{sec:same-shape} Bit-equality is a useful test only within one configuration, because the stock engine's own output varies across configurations. On one server that runs at most 16 requests at a time (the rest wait in its queue), plain greedy decoding with the client keeping 1 or 32 requests in flight differs within 256 tokens in 52\% of 320 \emph{divergence prompts}, a separate test set (Appendix~\ref{app:divergence}) \ev{state-noise}. A bit-exact trace places the first differences in kernels upstream of the head whose results depend on the batch or the memory pools, and never in the head GEMM or the tie rule \ev{state-mech}. Every comparison here therefore holds the serving configuration fixed, and a speculative configuration is compared with stock speculative verification, not with plain decoding. The head's own batch-shape rule is separate: cuBLAS may choose its kernel by $M$, so the contract fixes $M$ too.
+
+\subsection{How Many Entries Are Recomputed}\label{sec:geometry-selfevidence}\label{sec:candidates}
+\paragraph{Kernel replay, \Rstock{} rule} The certified head recomputes about 1.8 entries per decision on average, and one at the median (Table~\ref{tab:fallback}) \ev{kernel-replay}. The count depends on the stock-kernel model through the margin $\delta_{\max}$; the copy's own bound always uses the conservative constant.
+
+\paragraph{Held-out replay, \Rreal{} rule} This replay compares copies of the head on the simpler \Rreal{} decision, whose screen needs no margin; no error bound was violated and the exact winner was always a candidate \ev{selfevidence,selfevidence-csv}. Int8 with one scale per entry reads half the BF16 head's bytes and needs 1.55 candidates on average. FP8 needs about three times as many, and int4 leaves tens of thousands (Figure~\ref{fig:candidates}a; Table~\ref{tab:candidates}). Int8 suffices because of the margins, not because its bound is tight (Section~\ref{sec:envelope}). Its intervals are about two logits wide, while the median gap between the two largest logits is 7.3 logits \ev{stats}, so tightening the bound helps little (Appendix~\ref{app:candidates}). On the verification positions of the speculative captures, the counts are about the same as in plain decoding (Appendix~\ref{app:candidates}) \ev{selfevidence-dflash,selfevidence-mtp}; there only the gap condition of Theorem~\ref{thm:stock} has been evaluated offline.
+
+\begin{figure*}[t]
+\centering
+\input{figures/transport}
+\caption{Why transport fails. \textbf{(a)}~Median DFlash-4B head inputs, to scale: norms over the 4,020 transport pairs, cosine over 20,000 drift pairs drawn at random. Transport's bound beats the int8 copy's only if $h^d$ lies in the dot at the tip of $h^t$, of radius $\delta^\ast\norm{h^t}_2$ for the median $\delta^\ast$ (Proposition~\ref{thm:crossover}); the closest rescaling of $h^d$ (dotted, to the marked point) leaves $\rho=0.91$. \textbf{(b, c)}~Cumulative distributions of the measured drift $\rho$ over 40,000 aligned held-out pairs of DFlash-4B (b) and MTP-4B (c), against the same thresholds $\delta^\ast_i$ derived from the weights for each of the 248,320 vocabulary entries (64-entry tiles of contiguous token indices); the arrows join the median threshold for int8 with one scale per entry to each drafter's median drift (107 and 112 times apart) \ev{head-constants,rho,transport,rho-mtp,stats-dflash}.}
+\label{fig:rho}\label{fig:transport}
+\end{figure*}
+
+\subsection{Fallback and Agreement}\label{sec:rstock-share}
+\begin{table}[!b]
+\caption{Recomputation and fallback by the model assumed for the stock kernel: mean candidates and the share of positions left to the stock head. Held-out replay columns: the gap and interval rules, and the share of decode steps (8.0 held-out positions each) with a position the interval rule leaves. The last row is a sensitivity check, not a model of the stock kernel. In full: Table~\ref{tab:rstock}.}\label{tab:fallback}
+\vskip 0.05in
+\centering\scriptsize\setlength{\tabcolsep}{3pt}
+\begin{tabular*}{\columnwidth}{@{}l@{\extracolsep{\fill}}rrrrr@{}}
+\toprule
+& \multicolumn{2}{c}{Kernel replay \ev{kernel-replay}} & \multicolumn{3}{c}{Held-out replay \ev{rstock}}\\\cmidrule(lr){2-3}\cmidrule(l){4-6}
+Model ($\gamma_{\rm stock}$) & Cand. & Interval & Gap & Interval & Steps\\\midrule
+Conservative ($\gcons$) & 1.84 & 1.46\% & 3.03\% & 1.40\% & 10.9\%\\
+Hopper ($\ghop$) & 1.78 & 0.28\% & 2.18\% & 0.35\% & 2.8\%\\
+IEEE FP32 tree ($1.7\times10^{-6}$) & -- & -- & 1.95\% & 0\% & 0\%\\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+\paragraph{Kernel replay, \Rstock{} interval rule} The certified head leaves 0.28\% of positions to the stock head under the \modelhopper{} and 1.46\% under the \modelcons. With that fallback, every token equals the engine's \ev{kernel-replay}. The held-out replay gives nearly the same shares (Table~\ref{tab:fallback}). Under the gap rule its fallback share never falls below about 2\%, because that rule demands a margin of more than one BF16 spacing. This agreement cannot tell the models apart: even an IEEE FP32 summation tree, with a $\gamma_{\rm stock}$ about 360 times smaller than the conservative one, certifies every held-out position and gets every token right \ev{rstock}. It is consistent with each model, not a proof of any; the stock FP32-output kernel's largest observed error, 1/58 of the \modelhopper's bound, is the more direct test (Section~\ref{sec:limits}).
+
+Fallback grows with the batch, because one undecided position sends the whole batch to the stock head. If positions fell back independently with probability $p$, a call of $M$ positions would contain an undecided one with probability $1-(1-p)^M$, which matches the measured share of decode steps with a fallback (Table~\ref{tab:fallback}). At $M=128$ the held-out rates predict 36\% and 84\% of calls (Hopper, conservative). On calls of 128 consecutive positions the kernel replay measures 27\% and 77\% (Figure~\ref{fig:candidates}b) \ev{kernel-path}. Independence at the kernel replay's own rates would give 30\% and 85\% (derived) \ev{kernel-replay}, so the measured shares are consistent with undecided positions clustering in fewer calls than independence predicts. A whole-batch fallback would therefore run the stock head for most large batches, so at serving batch sizes the certified head depends on the per-position fallback.
+
+\paragraph{Engine check, \Rstock{} interval rule}\label{sec:engine} The engine check ran the kernel inside SGLang, untimed and under the \modelcons, on plain decoding, greedy verification and the drafters' projections. In the concurrent runs (up to 16 requests for plain decoding, 8 for speculation), every certified position was compared with the stock head at the same batch shape, and none of 196,734 differed \ev{kernel-engine}. Separate runs with one request at a time compared whole outputs: the certified and stock servers were identical on all 64 prompts for plain decoding and for MTP-4B; DFlash-4B's outputs were not compared end to end. Every path used the whole-batch fallback except one plain-decoding run, which used the per-position fallback. In plain decoding, 1.38\% of positions fell back, close to the kernel replay's 1.46\%. In MTP-4B verification, 1.74\% did. DFlash-4B verification sends up to 128 positions per call, and although only 3.99\% of its positions were left open, the whole-batch fallback ran in 90\% of its verify head calls. We infer that the per-position fallback, which reruns only an open position's candidates, would have to carry the result there; the engine check exercised it only in plain decoding.
+
+\subsection{Head-Only Runtime}\label{sec:kernel-runtime}
+The certified head pays off only if
+\begin{equation}
+T_{\rm pass}+T_{\rm select}+T_{\rm rescore}+P_{\rm fb}(M)\,T_{\rm fallback}(M)<T_{\rm head}(M),\label{eq:headgate}
+\end{equation}
+where the left side adds the int8 pass, the selection of candidates, their recomputation and the fallback's time weighted by the share $P_{\rm fb}(M)$ of calls that fall back, and $T_{\rm head}$ is the stock head itself: its GEMM, the FP32 copy and the argmax. As a baseline, the stock GEMM at $M=1$ runs at 95\% of the measured read bandwidth \ev{profile-head,profile-bw}, so a pass reading half the bytes needs at least about 170~\textmu s (derived).
+
+In the microbenchmark a fully certified batch at $M=1$ takes 239.6~\textmu s, against 370.5~\textmu s for the stock head. Adding each fallback's measured cost at its measured rate gives an expected time of about 0.7 of the stock head's up to 16 positions, with the per-position fallback under the \modelcons{} (Figure~\ref{fig:candidates}c) \ev{kernel-rowwise,kernel-path}. From 128 positions every mode is slower, because the int8 pass alone is slower than the stock head there; with the whole-batch fallback, 77\% of calls also pay for the stock head. The pass is not bound by memory bandwidth: at one position its directed-rounding epilogue keeps the streaming multiprocessors 79\% busy while it draws 62--63\% of DRAM bandwidth, so its time grows with $M$ faster than the stock GEMM's \ev{kernel-micro}. At one position the expected time under the \modelcons{} is 0.66--0.67 of the stock head's with either fallback \ev{kernel-path}. Since the head takes 10.3\% of a plain decode step at batch 1, that would shorten the step by at most about 3.4--3.5\% (derived, not measured). The effect on served decoding is not yet measured \pend{bench-cert}.

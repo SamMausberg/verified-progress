@@ -1,0 +1,22 @@
+{
+ "kind": "measured (HF target, BF16 weights in FP32 arithmetic); optimistic screen: winner score known",
+ "queries": 1000,
+ "dictionary_rows": 248320,
+ "dictionary_cols": 11776,
+ "dictionary_vs_head_coefficients": 4.6,
+ "compiled_argmax_matches_model_argmax": 0.996999979019165,
+ "winner_margin_over_qnorm_median": 0.125209242105484,
+ "tile_rows": 64,
+ "screens": {
+  "contiguous_token_ids": {
+   "skipped_row_share_mean": 0.0007731958758085966,
+   "skipped_row_share_median": 0.0007731958758085966,
+   "skipped_row_share_max": 0.0007731958758085966
+  },
+  "sorted_by_random_projection": {
+   "skipped_row_share_mean": 0.0005154639366082847,
+   "skipped_row_share_median": 0.0005154639366082847,
+   "skipped_row_share_max": 0.0005154639366082847
+  }
+ }
+}
