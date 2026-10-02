@@ -22,13 +22,27 @@ echo "start $(date -Is) repo $(git rev-parse HEAD) engine $(git -C "$ENGINE" rev
 [ -z "$(git status --porcelain --untracked-files=no)" ] || { echo "repository $REPO has tracked edits"; exit 1; }
 [ "$(git -C "$ENGINE" rev-parse "HEAD^{tree}")" = "$ENGINE_TREE" ] || { echo "engine tree is not $ENGINE_TREE"; exit 1; }
 [ -z "$(git -C "$ENGINE" status --porcelain --untracked-files=no)" ] || { echo "engine dirty"; exit 1; }
+# Stops only the servers this hold started: each one leads its own process group (setsid), whose
+# id start_server records in $OUT/server_<label>.pid.
 # shellcheck disable=SC2329 # invoked by the EXIT trap and between servers
 kill_servers() {
-  pkill -TERM -f -- 'sglang.launch_server.* --port 30221( |$)' || true
+  local f
+  for f in "$OUT"/server_*.pid; do
+    [ -e "$f" ] || continue
+    kill -TERM -- "-$(cat "$f")" 2>/dev/null || true
+  done
   sleep 5
-  pkill -KILL -f -- 'sglang.launch_server.* --port 30221( |$)' || true
+  for f in "$OUT"/server_*.pid; do
+    [ -e "$f" ] || continue
+    kill -KILL -- "-$(cat "$f")" 2>/dev/null || true
+    rm -f "$f"
+  done
 }
 trap kill_servers EXIT
+# A server already answering on the port belongs to someone else: refuse the whole probe.
+if curl -sf "http://127.0.0.1:$PORT/health" >/dev/null; then
+  echo "port $PORT already serves: refusing to run"; exit 1
+fi
 export GPU_STARTUP_MIN_FREE_GB=50
 start_server() {  # label, then env assignments
   local label=$1; shift
@@ -45,6 +59,7 @@ start_server() {  # label, then env assignments
       --max-mamba-cache-size 64 --disable-radix-cache --random-seed 0 --stream-interval 4 \
       >"'"$OUT/server_$label.log"'" 2>&1 &
     pid=$!
+    echo "$pid" >"'"$OUT/server_$label.pid"'"
     for _ in $(seq 300); do
       kill -0 "$pid" 2>/dev/null || exit 1  # the server this call started must still be alive
       curl -sf http://127.0.0.1:'"$PORT"'/health >/dev/null && exit 0

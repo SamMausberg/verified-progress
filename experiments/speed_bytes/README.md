@@ -14,11 +14,17 @@ engine side is `engine/sglang/patches/speed-bytes/` (switches `SGLANG_FP8_DENSE*
 | `holds/` | The GPU holds: `fp8_probe.sh` (microbenchmark), `kill1.sh`, `kill2b.sh` and `kill3.sh` (exclusive served kill tests on the bench harness), `probe1.sh` (shared logit probe) |
 
 The holds ran on 2026-10-02 from copies of these scripts in a scratch directory, before this
-commit. The committed hold scripts differ from those copies only in how they locate the
-repository and the helper scripts (and `fp8_probe.sh` creates its output directory); `fp8_gemm_probe.py` differs by formatting, a lint directive and
-one fix made after review: its `fp8_tensor` route now quantizes the weights per tensor, where the
+commit. The committed hold scripts differ from those copies in how they locate the repository
+and the helper scripts, and in guards added after review that do not change what a run measures:
+they refuse a repository with tracked edits and an engine whose tree is not the recorded one,
+clear inherited `SGLANG_FP8_*` switches, `fp8_probe.sh` creates its output directory and checks
+the SGLang checkout, and `probe1.sh` refuses a port that already serves and stops only the
+servers it started. `fp8_gemm_probe.py` differs by formatting, a lint directive and
+fixes made after review: its `fp8_tensor` route now quantizes the weights per tensor, where the
 run reused the per-channel weights with a unit scale (the same scalar-scale cuBLASLt kernel and
-timing, but not that route's error, so `summarize.py` omits the error for it); `step_budget.py` is a cleaned version of the analysis that was run, and the committed
+timing, but not that route's error, so `summarize.py` omits the error for it), and it records the
+SGLang checkout and stops every shape once its time budget runs out (the run finished well inside
+it); `step_budget.py` is a cleaned version of the analysis that was run, and the committed
 evidence was regenerated with it. `kill3.sh` also ran a first cuBLASLt outer-vector-scale
 microbenchmark after its sweeps; that attempt was invalid (see `evidence/speed_bytes/README.md`)
 and is left out of the committed script.
