@@ -173,6 +173,16 @@ run_rates() {
     python -m experiments.bf16_paths.rates prompts --out "$r" "$@" || { fail; return 0; }
   fi
   if missing "$r/sglang.jsonl.gz"; then
+    # A new SGLang text invalidates every trace computed on the old one: move them aside.
+    local stale aside
+    stale=$(ls "$r"/hf_bf16_*.jsonl.gz "$r"/fp32.jsonl.gz 2>/dev/null || true)
+    if [ -n "$stale" ]; then
+      aside="$r/superseded-$(date -u +%Y%m%dT%H%M%SZ)"
+      mkdir -p "$aside"
+      # shellcheck disable=SC2086 # file names without spaces, one per word
+      mv $stale "$aside/" || { fail; return 0; }
+      echo "moved traces of the old SGLang text to $aside"
+    fi
     if GPU_STARTUP_MIN_FREE_GB=${GPU_STARTUP_MIN_FREE_GB:-48} GPU_STARTUP_TRIES=${GPU_STARTUP_TRIES:-10} \
       scripts/gpu_startup_lock.sh \
       python -m experiments.bf16_paths.sglang_variants start --variant default --out "$r"; then

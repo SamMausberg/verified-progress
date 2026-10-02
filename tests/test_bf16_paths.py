@@ -296,3 +296,28 @@ def test_rates_summary_refuses_partial_traces(tmp_path: Path) -> None:
     write_gz(tmp_path / 'fp32.jsonl.gz', [{'prompt': 'a', 'positions': [fp, fp]}])
     with pytest.raises(SystemExit, match='does not cover all 2 positions'):
         rates.summary(tmp_path)
+
+
+def test_rates_refuses_traces_of_other_text(tmp_path: Path) -> None:
+    output = [5, 6]
+    good = [[-0.1, 7], [-3.0, 8]]
+    write_gz(
+        tmp_path / 'sglang.jsonl.gz',
+        [
+            {
+                'prompt': 'a',
+                'prompt_ids': [1],
+                'output_ids': output,
+                'decode': [good] * 2,
+                'prefill': [good] * 2,
+            }
+        ],
+    )
+    stale = rates.text_sha([1], [5, 9])
+    for name in rates.HF_RUNS:
+        write_gz(
+            tmp_path / f'{name}.jsonl.gz',
+            [{'prompt': 'a', 'text_sha256': stale, 'decode': [good] * 2, 'prefill': [good] * 2}],
+        )
+    with pytest.raises(SystemExit, match='computed on other text'):
+        rates.sources(tmp_path)

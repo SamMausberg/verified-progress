@@ -53,6 +53,7 @@ from __future__ import annotations
 
 import argparse
 import gzip
+import hashlib
 import json
 import math
 import sys
@@ -73,9 +74,24 @@ HF_RUNS = ('hf_bf16_float32state', 'hf_bf16_modelstate', 'hf_bf16_fla_float32sta
 COMPARATORS = ('hf_bf16_float32state', 'hf_bf16_fla_float32state')
 
 
+def text_sha(prompt_ids: list[int], output_ids: list[int]) -> str:
+    """The text a row was computed on, so that a row of another file can be bound to it."""
+    return hashlib.sha256(json.dumps([prompt_ids, output_ids]).encode()).hexdigest()
+
+
+def check_text(name: str, row: dict[str, Any], sglang_row: dict[str, Any]) -> None:
+    """Refuse a transformers or FP32 row computed on other text than SGLang's current output
+    (rows written before the hash was recorded carry none and are not checked)."""
+    recorded = row.get('text_sha256')
+    if recorded is not None and recorded != text_sha(
+        sglang_row['prompt_ids'], sglang_row['output_ids']
+    ):
+        raise SystemExit(f'{name}: {row["prompt"]} was computed on other text than sglang.jsonl.gz')
+
+
 def sources(out: Path) -> dict[str, dict[str, dict[str, Any]]]:
     """Every BF16 source by prompt: SGLang's paths and the transformers runs (the two
-    comparators required, the BF16-state run when present)."""
+    comparators required, the BF16-state run when present), each row bound to SGLang's text."""
     found = {'sglang': read_jsonl(out / 'sglang.jsonl.gz')}
     for name in HF_RUNS:
         file = out / f'{name}.jsonl.gz'
@@ -88,6 +104,8 @@ def sources(out: Path) -> dict[str, dict[str, dict[str, Any]]]:
     for name, rows in found.items():
         if [r['prompt'] for r in rows] != prompts:
             raise SystemExit(f'{name}: prompts differ from sglang.jsonl.gz')
+        for row, sglang_row in zip(rows, found['sglang'], strict=True):
+            check_text(name, row, sglang_row)
     return {name: {r['prompt']: r for r in rows} for name, rows in found.items()}
 
 
@@ -257,7 +275,14 @@ def hf(out: Path, state_dtype: str, gdn: str) -> int:
         state = recurrent_state_dtypes(step.past_key_values)
         if state != expected_state:
             raise SystemExit(f'cached recurrent state is {state}, not {expected_state}')
-        rows.append({'prompt': item['prompt'], 'decode': decode, 'prefill': prefill})
+        rows.append(
+            {
+                'prompt': item['prompt'],
+                'text_sha256': text_sha(prompt, output),
+                'decode': decode,
+                'prefill': prefill,
+            }
+        )
         print(item['prompt'], 'hf done', flush=True)
     write_jsonl(target, rows)
     return 0
@@ -299,7 +324,13 @@ def fp32(out: Path, threads: int) -> int:
                     'lp': {str(t): float(lp[p, t]) for t in sorted(seen)},
                 }
             )
-        rows.append({'prompt': item['prompt'], 'positions': positions})
+        rows.append(
+            {
+                'prompt': item['prompt'],
+                'text_sha256': text_sha(prompt, output),
+                'positions': positions,
+            }
+        )
         print(item['prompt'], 'fp32 done', flush=True)
     write_jsonl(out / 'fp32.jsonl.gz', rows)
     return 0
@@ -353,7 +384,11 @@ def decide(event_positions: dict[str, set[tuple[str, int]]]) -> dict[str, Any]:
 def summary(out: Path) -> dict[str, Any]:
     by_source = sources(out)
     sg = list(by_source['sglang'].values())
-    ref = {r['prompt']: r['positions'] for r in read_jsonl(out / 'fp32.jsonl.gz')}
+    fp32_rows = read_jsonl(out / 'fp32.jsonl.gz')
+    for row in fp32_rows:
+        if row['prompt'] in by_source['sglang']:
+            check_text('fp32', row, by_source['sglang'][row['prompt']])
+    ref = {r['prompt']: r['positions'] for r in fp32_rows}
     if sorted(ref) != sorted(by_source['sglang']):
         raise SystemExit('fp32.jsonl.gz does not cover the same prompts')
     regions = ('before_eot', 'after_eot')
