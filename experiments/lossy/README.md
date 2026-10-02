@@ -53,8 +53,8 @@ Nothing in L0 is timed. Its output is `~/vp-data/lossy/load_test/<UTC>/load_test
 
 ## Pre-registration of the timed and quality holds
 
-Declared at `a5d605f` before any timed hold of this study, and revised twice before any timed
-hold (see "Revisions" at the end; each is a separate commit). Nothing below depends on the load
+Declared at `a5d605f` before any timed hold of this study, and revised in five commits before any
+timed hold (see "Revisions" at the end; each is a separate commit). Nothing below depends on the load
 test's outcome except one rule: an arm that fails its L0 launch checks is listed in
 `plan.DROPPED_ARMS` with the failure, and is not timed.
 

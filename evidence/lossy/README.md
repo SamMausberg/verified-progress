@@ -237,9 +237,11 @@ bench's six exact GSM8K runs, both FP16 runs come out about 2.1 points lower (-2
 nominal: none would survive a correction for the several comparisons made here, and one run per
 arm cannot say how much of that gap is the reference's draw and how much the FP16 state. Post hoc
 (derived from the committed accuracies): the two FP16 runs (89.01%, 88.93%) sit level with the
-lowest of the six exact runs (88.93-91.05%) and below the other five; their mean is 0.95 points
-below the exact runs' mean, against an exact run-to-run standard deviation of 0.72 points (pooled
-two-sample t 1.76 with 6 degrees of freedom, p 0.13). The two FP16 runs differ from each other by
+lowest of the six exact runs and below the other five. The six exact runs are `mtp-stockverify`
+88.93%, `mtp-tuned` 89.54%, `dflash-tuned` 89.69%, `plain-tuned-a` 89.99%, `plain-tuned-b`
+90.30% and `plain-tuned-replayssm` 91.05% (each run's `quality.json` in `evidence/bench/quality/`).
+The FP16 runs' mean is 0.95 points below the exact runs' mean, against an exact run-to-run
+standard deviation of 0.72 points (pooled two-sample t 1.76 with 6 degrees of freedom, p 0.13). The two FP16 runs differ from each other by
 -0.08 points (p 1.0).
 
 ```sh

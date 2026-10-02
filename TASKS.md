@@ -36,7 +36,7 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 | lit | Literature review, novelty assessment, citation audit | `done` (PR #6, #25) |
 | bench | Baseline server arms, aiperf Pareto harness, quality baseline, spec tuning | `done` (PR #17, #42, #46, #57, #66, #70, #131); not run: two more buffered-plain sessions, the sensitivity workload, capacity and frontend repeats |
 | benchcert | Served before-and-after test of the certified head (H4) | `active`: pre-registered; first hold done, h2-h4 running |
-| lossy | Lossy track: INT4 QAD target and INT4 DFlash drafter with FP16 GDN state, under the lossy-stack quality budget | `review` (PR #209): FP16 state faster at c >= 64 (1.16-1.17x), passes the probe, misses the GSM8K rule by about 1 point; INT4 outside its band (probe) and no faster |
+| lossy | Lossy track: INT4 QAD target and INT4 DFlash drafter with FP16 GDN state, under the lossy-stack quality budget | `review` (PR #209): FP16 state faster at c >= 64 (1.16-1.17x), passes the probe, misses the GSM8K rule by about 1 point; INT4 outside its band (probe) and slower at c >= 2 (at c = 1, y 1.046, faster; x within the band) |
 | profile | nsys/ncu profiles and critical-path attribution | `active` (PR #13, #54 merged; open PR #173: Nsight Compute bandwidth regimes, GDN kernel bench); DFlash attribution hold queued |
 | geometry | Real-head replay: transport versus self-evidence bounds | `done` (PR #16, #35, #47, #62, #77) |
 | precision | Hopper accumulation constant rounded up, replays rerun | `done` (PR #139) |
