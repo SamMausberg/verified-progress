@@ -26,8 +26,10 @@ import json
 import math
 import re
 import statistics
+import subprocess
 from collections import defaultdict
 from collections.abc import Iterable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -548,6 +550,36 @@ def _snapshot(point_dir: Path, when: str, name: str) -> dict[str, Any] | None:
     return json.loads(path.read_text()) if path.exists() else None
 
 
+def _git_head(path: Path) -> str | None:
+    result = subprocess.run(
+        ['git', '-C', str(path), 'rev-parse', 'HEAD'], capture_output=True, text=True, check=False
+    )
+    return result.stdout.strip() or None
+
+
+def hold_records(runs: Path) -> list[dict[str, Any]]:
+    """Each hold's provenance and time span (UTC), from its manifest."""
+    out = []
+    for path in sorted((runs / 'holds').glob('*.json')):
+        record = json.loads(path.read_text())
+        prov = record.get('provenance') or {}
+        out.append({
+            'hold': record.get('hold'),
+            'start_utc': _utc(record.get('start_unix')),
+            'end_utc': _utc(record.get('end_unix')),
+            'failed_launches': record.get('failed_launches'),
+            **{key: prov.get(key) for key in ('repo_commit', 'engine_commit', 'engine_tree',
+                                               'certified_head_digest')},
+        })
+    return out
+
+
+def _utc(stamp: float | None) -> str | None:
+    if stamp is None:
+        return None
+    return datetime.fromtimestamp(stamp, tz=UTC).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+
 def load_classes(path: Path) -> dict[str, str]:
     """Context id -> class from rescore.py's output (empty before the re-score)."""
     if not path.exists():
@@ -775,6 +807,8 @@ def report(
             for name, f in plan.FAMILIES.items()
         },
         'certified_env': plan.CERT_ENV,
+        'analysis_commit': _git_head(plan.REPO),
+        'holds': hold_records(runs),
     }
     out.mkdir(parents=True, exist_ok=True)
     write_csv(point_rows, out / 'points.csv')

@@ -175,6 +175,10 @@ def ratios(csv_path: Path, png: Path) -> None:
             capsize=3,
             label='measured y ratio, 95% interval',
         )
+        for r, m in zip(pts, mean, strict=True):
+            if r.get('role') == 'primary':
+                ax.annotate(f'primary: {r["decision"]}', (int(r['concurrency']), m),
+                            textcoords='offset points', xytext=(8, 6), fontsize=8, color=INK)
         predicted = [_num(r.get('predicted_y_ratio', '')) for r in pts]
         if any(math.isfinite(p) for p in predicted):
             ax.plot(
