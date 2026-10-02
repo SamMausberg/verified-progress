@@ -6,6 +6,7 @@ saved report.
 
 from __future__ import annotations
 
+from collections import Counter
 from typing import Any
 
 # The configuration the threshold rule was declared on. A run that differs in any of these
@@ -53,6 +54,36 @@ def config_differences(config: dict[str, Any]) -> list[str]:
     return differences
 
 
+def grid_problems(rows: list[dict[str, Any]]) -> list[str]:
+    """Points of the measured grid that are missing or repeated: every (block, batch) pair the
+    rows name must have exactly one ring row per tile the rows name and exactly one stock row.
+    The global sets in `report_config` cannot show a tile missing at a single point."""
+    count = Counter((r['T'], r['N'], r['path'], r['BV']) for r in rows)
+    blocks = sorted({key[0] for key in count})
+    batches = sorted({key[1] for key in count})
+    tiles = sorted({key[3] for key in count if key[2] == 'ring'})
+    problems = [
+        f'grid: {n} rows for T{T} N{N} {path} tile {bv}'
+        for (T, N, path, bv), n in sorted(count.items())
+        if n > 1
+    ]
+    for T in blocks:
+        for N in batches:
+            missing = [bv for bv in tiles if (T, N, 'ring', bv) not in count]
+            if missing:
+                problems.append(f'grid: no ring row at T{T} N{N} for tiles {missing}')
+            stock = sum(1 for key in count if key[:3] == (T, N, 'stock'))
+            if stock != 1:
+                problems.append(f'grid: {stock} stock tiles at T{T} N{N} (expected 1)')
+    return problems
+
+
+def run_differences(rows: list[dict[str, Any]], config: dict[str, Any]) -> list[str]:
+    """Everything that keeps a run from the declared reading: the declared parameters it does
+    not match, and any missing or repeated point of its grid."""
+    return config_differences(config) + grid_problems(rows)
+
+
 def declared_threshold(
     rows: list[dict[str, Any]], blocks: list[int], batches: list[int]
 ) -> dict[str, Any]:
@@ -95,9 +126,9 @@ def declared_threshold(
 
 
 def threshold_for_config(rows: list[dict[str, Any]], config: dict[str, Any]) -> dict[str, Any]:
-    """The declared threshold if the run used the declared configuration; otherwise none,
-    with every parameter that differs."""
-    differences = config_differences(config)
+    """The declared threshold if the run used the declared configuration on a complete grid;
+    otherwise none, with every difference."""
+    differences = run_differences(rows, config)
     if differences:
         return {
             'n_star': None,

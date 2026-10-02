@@ -618,17 +618,17 @@ def test_fold_timing_check_passes_the_declared_protocol_only(tmp_path: Path) -> 
             assert not out.exists(), name
 
 
-def _ring_row(T: int, n: int, bv: int, times: list[float]) -> dict[str, object]:
+def _ring_row(T: int, n: int, bv: int, times: list[float], path: str = 'ring') -> dict[str, object]:
     ordered = sorted(times)
     return {
         'T': T,
         'N': n,
-        'path': 'ring',
+        'path': path,
         'BV': bv,
         'us_per_layer_median': (ordered[1] + ordered[2]) / 2,
         'us_per_layer_range': [ordered[0], ordered[-1]],
         'us_per_layer_by_repeat': times,
-        'bitwise_vs_bv32': True,
+        'bitwise_vs_bv32': True if path == 'ring' else None,
     }
 
 
@@ -682,13 +682,14 @@ def test_ring_tile_threshold_only_on_the_declared_configuration() -> None:
 
 def _ring_report(rule: ModuleType) -> dict[str, object]:
     """A declared-configuration sweep report: tile 4 takes 5 us at N <= 2 and 15 us above,
-    tile 16 takes 8 us everywhere, the other tiles 10 us."""
+    tile 16 takes 8 us everywhere, the other tiles 10 us; stock takes 20 us."""
     rows = []
     for T in rule.DECLARED['blocks']:
         for n in rule.DECLARED['batches']:
             for bv in rule.DECLARED['tiles']:
                 t = {4: 5.0 if n <= 2 else 15.0, 16: 8.0}.get(bv, 10.0)
                 rows.append(_ring_row(T, n, bv, [t] * 4))
+            rows.append(_ring_row(T, n, 4, [20.0] * 4, path='stock'))
     report: dict[str, object] = {
         'shape': {'layers': 24},
         'iters': 50,
@@ -709,6 +710,27 @@ def test_ring_tile_report_config_reads_the_rows() -> None:
     assert isinstance(rows, list)
     rows[0] = {**rows[0], 'us_per_layer_by_repeat': [5.0] * 3}
     assert rule.config_differences(rule.report_config(report)) == ['repeats: [3, 4] (declared 4)']
+
+
+def test_ring_tile_grid_must_be_complete() -> None:
+    rule = load('ring_tile_rule')
+    estimate = load('ring_tile_cycle_estimate')
+    report = _ring_report(rule)
+    rows = report['rows']
+    assert isinstance(rows, list) and rule.grid_problems(rows) == []
+    # Tile 16 missing at one point leaves the global tile set intact, so only the per-point
+    # check sees it; a repeated stock row likewise.
+    gap = [r for r in rows if (r['T'], r['N'], r['path'], r['BV']) != (16, 1, 'ring', 16)]
+    stock = next(r for r in rows if r['path'] == 'stock')
+    for changed, problem in (
+        (gap, 'grid: no ring row at T16 N1 for tiles [16]'),
+        ([*rows, stock], 'grid: 2 rows for T16 N1 stock tile 4'),
+    ):
+        broken = {**report, 'rows': changed}
+        assert rule.config_differences(rule.report_config(broken)) == []
+        assert problem in rule.grid_problems(changed)
+        assert rule.threshold_for_config(changed, rule.report_config(broken))['n_star'] is None
+        assert any(problem in p for p in estimate.check_sweep(broken))
 
 
 def test_ring_tile_cycle_estimate(tmp_path: Path) -> None:

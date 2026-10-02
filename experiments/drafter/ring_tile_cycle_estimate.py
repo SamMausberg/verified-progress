@@ -20,9 +20,9 @@ concurrency, the measured ratio of the two sessions' fold y is given beside the 
 with stock's ratio as the drift between the sessions (stock does not depend on the ring tile).
 Both ratios compare two sessions and are unpaired.
 
-Before anything else the sweep report is checked: the declared configuration
-(`ring_tile_rule.py`), no bitwise failure, and the recorded threshold equal to the declared
-rule applied again to its rows. Any failure exits 1 and writes nothing.
+Before anything else the sweep report is checked: the declared configuration on a complete
+grid (`ring_tile_rule.py`), no bitwise failure, and the recorded threshold equal to the
+declared rule applied again to its rows. Any failure exits 1 and writes nothing.
 
     python experiments/drafter/ring_tile_cycle_estimate.py \
         --sweep evidence/drafter/ring_tile_sweep/sweep.json \
@@ -42,7 +42,7 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from ring_tile_rule import config_differences, report_config, threshold_for_config
+from ring_tile_rule import report_config, run_differences, threshold_for_config
 
 
 def generator() -> dict[str, Any]:
@@ -59,7 +59,9 @@ def generator() -> dict[str, Any]:
 
 def check_sweep(report: dict[str, Any]) -> list[str]:
     """Reasons the sweep report cannot be read under the declared rule (empty if it can)."""
-    problems = [f'configuration {d}' for d in config_differences(report_config(report))]
+    problems = [
+        f'configuration {d}' for d in run_differences(report['rows'], report_config(report))
+    ]
     if report['bitwise_failures']:
         problems.append(f'bitwise failures {report["bitwise_failures"]}')
     if any(r['bitwise_vs_bv32'] is not True for r in report['rows'] if r['path'] == 'ring'):
