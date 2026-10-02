@@ -17,7 +17,7 @@ Every committed result the paper cites is listed below with the claims it suppor
 Source & What & Decision rule & Size\\\midrule
 Held-out replay & FP64 replay of held-out plain-decoding positions & \Rreal{} to compare copies; gap and interval rules & 6,005 positions\\\addlinespace[2pt]
 Kernel replay & the GPU kernel on the first captured positions, both halves, at their batch shapes & interval rule; seeded race & 60,000 positions\\\addlinespace[2pt]
-Engine check & the kernel inside SGLang, \modelcons & interval rule; seeded verification & 64 prompts\\\addlinespace[2pt]
+Engine check & the kernel inside SGLang, \modelcons & interval rule; fixed-noise verification & 64 prompts\\\addlinespace[2pt]
 Microbench\-mark & the head alone, CUDA graphs, warm L2 cache & time only & $M=1$ to 256\\\addlinespace[2pt]
 Speculative captures & aligned draft and target head inputs; verification positions & \Rreal{}, gap rule; drift & 40,000 pairs per drafter\\\addlinespace[2pt]
 Served sweeps & the serving engine at full capacity, swept over client concurrency & time; output equality & 1, 3 or 4 sessions\\
