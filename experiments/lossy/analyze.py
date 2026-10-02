@@ -353,7 +353,9 @@ def probe(summary_path: Path) -> dict[str, Any]:
     score = summary['score']
     generate = summary['generate']
     reference = json.loads(Path(summary['reference']).read_text())
-    decode = decode_path(reference, json.loads((summary_path.parent / 'probe_generate.json').read_text()))
+    decode = decode_path(
+        reference, json.loads((summary_path.parent / 'probe_generate.json').read_text())
+    )
     decode_agreement = decode['agreement']
     score_ok = score['argmax_agreement'] >= AGREEMENT_MIN and score['kl_mean'] <= KL_MAX
     decode_ok = decode_agreement >= AGREEMENT_MIN and decode['kl_mean'] <= KL_MAX
@@ -381,7 +383,7 @@ def probe_noise(load_test: Path) -> dict[str, Any]:
     from experiments.moonshot.logit_probe import compare_runs
 
     ref1 = json.loads((load_test / 'plain-ref-1/probe_generate.json').read_text())
-    out = {}
+    out: dict[str, dict[str, Any]] = {}
     for name, rel in (
         ('ref1_score_vs_ref1', 'plain-ref-1/probe_score.json'),
         ('ref2_score_vs_ref1', 'plain-ref-2/probe_score.json'),
@@ -400,9 +402,7 @@ def probe_noise(load_test: Path) -> dict[str, Any]:
             if key in result
         }
         if result['mode'] == 'generate':
-            out[name]['decode_path'] = decode_path(
-                ref1, json.loads((load_test / rel).read_text())
-            )
+            out[name]['decode_path'] = decode_path(ref1, json.loads((load_test / rel).read_text()))
     return out
 
 
@@ -429,7 +429,9 @@ def main(argv: list[str] | None = None) -> int:
     table = load_points(args.points)
     missing = check_plan(table)
     if missing and not args.allow_missing:
-        raise SystemExit('declared points without enough valid sessions:\n  ' + '\n  '.join(missing))
+        raise SystemExit(
+            'declared points without enough valid sessions:\n  ' + '\n  '.join(missing)
+        )
     measured_arms = {gsm8k_arm(run) for run in args.quality}
     gsm8k_arms = {
         lever: frozenset(measured_arms & set(arms))
@@ -458,7 +460,7 @@ def main(argv: list[str] | None = None) -> int:
         result['probe_noise'] = probe_noise(args.probe_noise)
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / 'decisions.json').write_text(json.dumps(result, indent=1, default=str) + '\n')
-    rows = [
+    rows: list[list[object]] = [
         ['kind', 'test', 'baseline', 'concurrency', 'metric', 'mean', 'min', 'max', 'n', 'decision']
     ]
     entries = []
@@ -469,7 +471,13 @@ def main(argv: list[str] | None = None) -> int:
             (f'{prefix}pair', p['test'], p['baseline'], p['concurrency'], p) for p in part['pairs']
         ]
         entries += [
-            (f'{prefix}envelope-{e["lever"]}', e['best_lossy'], e['best_exact'], e['concurrency'], e)
+            (
+                f'{prefix}envelope-{e["lever"]}',
+                e['best_lossy'],
+                e['best_exact'],
+                e['concurrency'],
+                e,
+            )
             for e in part['envelope']
         ]
     for kind, test, base, c, record in entries:

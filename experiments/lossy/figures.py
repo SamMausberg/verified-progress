@@ -77,9 +77,7 @@ def frontier(decisions: dict[str, Any], path: Path) -> None:
         pool = exact + [m for m in means if lever_of(m['arm']) == lever and lever != 'exact']
         front = envelope(pool)
         label = (
-            'envelope, exact arms'
-            if lever == 'exact'
-            else f'envelope, exact + {LEVER_NAME[lever]}'
+            'envelope, exact arms' if lever == 'exact' else f'envelope, exact + {LEVER_NAME[lever]}'
         )
         ax.plot(
             [p['x_mean'] for p in front],

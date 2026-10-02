@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One GPU hold of the lossy-lever study (experiments/lossy/README.md):
 #
-#   scripts/gpu_lock.sh -x experiments/lossy/hold.sh load
+#   scripts/gpu_lock.sh -x experiments/lossy/hold.sh load [step ...]
 #   scripts/gpu_lock.sh -x experiments/lossy/hold.sh session lossy-s1   (s2, s3)
 #   scripts/gpu_lock.sh -x experiments/lossy/hold.sh quality q1         (q2)
 #
@@ -13,7 +13,7 @@
 set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo"
-[ "$#" -ge 1 ] || { echo "usage: $0 load | session <lossy-sN> | quality <qN>" >&2; exit 64; }
+[ "$#" -ge 1 ] || { echo "usage: $0 load [step ...] | session <lossy-sN> | quality <qN>" >&2; exit 64; }
 hold=$1
 name=${2:-}
 out=${LOSSY_OUT:-$HOME/vp-data/lossy}
@@ -25,7 +25,9 @@ export SGLANG_WORKTREE=$ENGINE_WORKTREE
 source "$repo/scripts/sglang_env.sh"
 python -c 'import sglang, torch' || { echo "not the SGLang environment: $(command -v python)"; exit 1; }
 mkdir -p "$out/logs"
-exec >"$out/logs/$hold${name:+-$name}-$(date -u +%Y%m%dT%H%M%SZ).log" 2>&1
+label=$hold
+[ "$hold" = load ] || label=$hold${name:+-$name}
+exec >"$out/logs/$label-$(date -u +%Y%m%dT%H%M%SZ).log" 2>&1
 echo "hold $hold start $(date -Is) repo $(git rev-parse HEAD)"
 if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
   echo "repository $repo is not clean"; exit 1
@@ -48,8 +50,12 @@ trap kill_servers EXIT
 status=0
 case $hold in
   load)
+    # Optional step names after "load" rerun a subset of load_test.STEPS.
+    shift
+    steps=()
+    [ "$#" -gt 0 ] && steps=(--steps "$@")
     timeout --foreground 2640 scripts/gpu_startup_lock.sh \
-      python -m experiments.lossy.load_test --out "$out/load_test" || status=$?
+      python -m experiments.lossy.load_test --out "$out/load_test" "${steps[@]}" || status=$?
     ;;
   session | quality)
     [ -n "$name" ] || { echo "$hold needs a name"; exit 64; }

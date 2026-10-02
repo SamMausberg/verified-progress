@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import math
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -16,7 +17,7 @@ FIELDS = [
 ]  # fmt: skip
 
 
-def write_points(path: Path, rows: list[dict[str, object]]) -> Path:
+def write_points(path: Path, rows: list[dict[str, Any]]) -> Path:
     with path.open('w', newline='') as handle:
         writer = csv.DictWriter(handle, fieldnames=FIELDS)
         writer.writeheader()
@@ -28,10 +29,10 @@ def write_points(path: Path, rows: list[dict[str, object]]) -> Path:
     return path
 
 
-def full_rows(scale: dict[str, float] | None = None) -> list[dict[str, object]]:
+def full_rows(scale: dict[str, float] | None = None) -> list[dict[str, Any]]:
     """Every declared point in every session; y = 1000 * scale[arm], x = y / c."""
     scale = scale or {}
-    rows: list[dict[str, object]] = []
+    rows: list[dict[str, Any]] = []
     for launch in plan.SESSION_LAUNCHES:
         for c in launch.concurrency:
             for i, session in enumerate(plan.SESSIONS):
@@ -147,14 +148,14 @@ def test_fp16_envelope_needs_gsm8k(tmp_path: Path) -> None:
     table = analyze.load_points(write_points(tmp_path / 'p.csv', full_rows(scale)))
     env = {
         e['concurrency']: e
-        for e in analyze.speed(table, gsm8k_arms={'fp16-state': frozenset({'plain-cap256-fp16'})})['envelope']
+        for e in analyze.speed(table, gsm8k_arms={'fp16-state': frozenset({'plain-cap256-fp16'})})[
+            'envelope'
+        ]
         if e['lever'] == 'fp16-state'
     }
     assert env[256]['best_lossy'] == 'plain-cap256-fp16'
     assert not env[256]['provisional']
-    provisional = [
-        e for e in analyze.speed(table)['envelope'] if e['lever'] == 'fp16-state'
-    ]
+    provisional = [e for e in analyze.speed(table)['envelope'] if e['lever'] == 'fp16-state']
     assert all(e['provisional'] and e['best_lossy'] == 'replayssm-cap256-fp16' for e in provisional)
     # INT4 is not gated: its envelope keeps every INT4 arm.
     int4 = analyze.speed(table, gsm8k_arms={'int4': frozenset({'int4-dflash-b8'})})['envelope']
@@ -165,12 +166,12 @@ def test_fp16_envelope_needs_gsm8k(tmp_path: Path) -> None:
 
 
 def test_decode_path_includes_divergence_position() -> None:
-    def seq(tokens: list[int], first: float) -> dict[str, object]:
+    def seq(tokens: list[int], first: float) -> dict[str, Any]:
         return {'tokens': tokens, 'top': [[[first, t], [-3.0, 99]] for t in tokens]}
 
-    ref = {'mode': 'generate', 'prompt_ids': ['a', 'b'],
+    ref: dict[str, Any] = {'mode': 'generate', 'prompt_ids': ['a', 'b'],
            'sequences': [seq([1, 2, 3, 4], -0.1), seq([5, 6, 7, 8], -0.1)]}  # fmt: skip
-    cand = {'mode': 'generate', 'prompt_ids': ['a', 'b'],
+    cand: dict[str, Any] = {'mode': 'generate', 'prompt_ids': ['a', 'b'],
             'sequences': [seq([1, 2, 9, 9], -0.1), seq([5, 6, 7, 8], -0.1)]}  # fmt: skip
     # At the divergence the candidate puts the reference's token outside its top-2.
     cand['sequences'][0]['top'][2] = [[-0.1, 9], [-2.0, 98]]

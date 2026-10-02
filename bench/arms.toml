@@ -232,6 +232,11 @@ max_concurrency = 64
 exactness = "lossy"
 lossy = "INT4 weight-only target (quantization-aware distilled) and INT4 drafter"
 [arms.int4-dflash-b16.args]
+# The INT4 config.json sets a top-level eos_token_id (248046) that the BF16 one lacks, so
+# SGLang would stop the INT4 target on <|im_end|> only and the BF16 target also on
+# <|endoftext|> (248044); this makes both stop sets {248044, 248046}
+# (evidence/lossy/checkpoint_check.json). Timed runs use ignore_eos and are unaffected.
+json-model-override-args = '{"eos_token_id": 248044}'
 speculative-algorithm = "DFLASH"
 speculative-draft-model-path = "nota-ai/Qwen3.5-4B-DFlash-GPTQ-W4A16"
 speculative-draft-model-revision = "c5fb290e47e30c81d06e48b0495ec06f2560dd4e"
@@ -249,6 +254,11 @@ revision = "a67b0fedb2b39cb057da6114e656b76b52d321b4"
 exactness = "lossy"
 lossy = "INT4 weight-only target (quantization-aware distilled) and INT4 drafter"
 [arms.int4-dflash-b8.args]
+# The INT4 config.json sets a top-level eos_token_id (248046) that the BF16 one lacks, so
+# SGLang would stop the INT4 target on <|im_end|> only and the BF16 target also on
+# <|endoftext|> (248044); this makes both stop sets {248044, 248046}
+# (evidence/lossy/checkpoint_check.json). Timed runs use ignore_eos and are unaffected.
+json-model-override-args = '{"eos_token_id": 248044}'
 speculative-algorithm = "DFLASH"
 speculative-draft-model-path = "nota-ai/Qwen3.5-4B-DFlash-GPTQ-W4A16"
 speculative-draft-model-revision = "c5fb290e47e30c81d06e48b0495ec06f2560dd4e"
@@ -285,6 +295,11 @@ max_concurrency = 256
 exactness = "lossy"
 lossy = "INT4 weight-only target (quantization-aware distilled)"
 [arms.int4-plain-cap256.args]
+# The INT4 config.json sets a top-level eos_token_id (248046) that the BF16 one lacks, so
+# SGLang would stop the INT4 target on <|im_end|> only and the BF16 target also on
+# <|endoftext|> (248044); this makes both stop sets {248044, 248046}
+# (evidence/lossy/checkpoint_check.json). Timed runs use ignore_eos and are unaffected.
+json-model-override-args = '{"eos_token_id": 248044}'
 disable-radix-cache = true
 max-running-requests = 256
 max-mamba-cache-size = 256

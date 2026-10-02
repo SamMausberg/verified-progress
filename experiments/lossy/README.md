@@ -184,11 +184,16 @@ reference's own run-to-run noise.
   5.12.1 and sgl-eval 0.1.2 (no package in the venv is newer than the reference runs; checked
   on 2026-10-02 at 03:35 UTC). `run_hold.py` records the versions in every hold and refuses a
   quality hold whose versions differ; a fresh stock reference run would then come first.
-- EOS: GSM8K stops at end of sequence, so `checkpoint_check.py` records the end-of-sequence ids
-  SGLang derives from each checkpoint and each tokenizer's eos and pad ids. Neither checkpoint
-  has a `generation_config.json`; the INT4 `config.json` sets a top-level `eos_token_id`
-  (248046) that the BF16 one does not, and both tokenizers name `<|im_end|>` as eos. Any
-  difference in the resolved stop set is reported with the GSM8K result.
+- EOS: GSM8K stops at end of sequence, and SGLang ends a request on its model config's
+  `eos_token_id` set or the tokenizer's eos id. `checkpoint_check.py` resolves both on the
+  local files (CPU only, 2026-10-02 03:36 UTC): the BF16 checkpoint stops on {248044
+  `<|endoftext|>`, 248046 `<|im_end|>`}, the INT4 checkpoint, whose `config.json` sets a
+  top-level `eos_token_id` of 248046, only on {248046}. Neither has a
+  `generation_config.json`. The INT4 arms therefore pass
+  `--json-model-override-args '{"eos_token_id": 248044}'`, which gives them the BF16 stop set;
+  `checkpoint_check.py` records the stop set with and without that override. The timed runs
+  are unaffected either way: with `ignore_eos` SGLang checks no stop token, and bench requires
+  exact output lengths.
 - Logit probe, against the reference run `plain-ref-1` from L0, in two modes:
   - score mode (the reference's greedy tokens fed back, so every position has the same
     context): top-1 agreement and mean top-20 KL. It runs the GDN layers in the chunked prefill
@@ -233,16 +238,24 @@ scripts/gpu_lock.sh -x experiments/lossy/hold.sh quality q1         # then q2, q
 
 ### Revisions (all before any timed hold)
 
-- `a4321f4` (2026-10-02 03:20 UTC): the GSM8K references' engine and the per-problem pairing
-  stated.
-- `4654446` (03:30 UTC): the slow-launch check and the with/without-flagged verdicts.
-- Revision 2 (03:45 UTC), after the red team's design review: the decode-path probe criterion
-  for every probed arm (was: generate mode reported without a threshold); GSM8K on
+Times are the commits' own (UTC, 2026-10-02); the times written in the subjects of `a4321f4`,
+`4654446`, `a8ae713` and `1f89c2c` were mistyped, and the commit times below are the record.
+
+- `a5d605f` (03:12): the pre-registration.
+- `a4321f4` (03:13): the GSM8K references' engine and the per-problem pairing stated.
+- `4654446` (03:15): the slow-launch check and the with/without-flagged verdicts.
+- `a8ae713` (03:22), after the red team's design review: the decode-path probe criterion for
+  every probed arm (was: generate mode reported without a threshold); GSM8K on
   `replayssm-cap256-fp16` (hold `q3`) and only GSM8K-measured arms in the FP16 envelope;
   `plain-tuned` in every session at c = 64 and 128 as an exact arm; non-headline arms at both
   ends of the session order; the GSM8K yardstick (exact arms' spread), the comparison with
   stock DFlash, the version check, the EOS check, runner-up ratios, accept lengths and the
   FP16 band caveat.
-- Revision 3 (03:55 UTC), after the red team's re-check (no blocking findings): the decode-path
-  KL includes each first-divergence position; the GSM8K gate of the envelope is per lever; the
+- `1f89c2c` (03:25), after the red team's re-check (no blocking findings): the decode-path KL
+  includes each first-divergence position; the GSM8K gate of the envelope is per lever; the
   drift exposure of the `int4-plain-cap256` / `plain-cap256` pair is stated.
+- Revision 4 (the commit after `1f89c2c`, after L0's first part, 03:31-03:35, and before any
+  timed hold): the EOS override on the INT4 arms (above). L0's first run stopped after its
+  Nsight step because nsys exited while the server it launched kept the port; `load_test.py`
+  now kills that server's process group and clears the port after every step, and the seven
+  steps that did not run are rerun as L0b (`hold.sh load <steps>`).

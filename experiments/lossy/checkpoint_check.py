@@ -33,6 +33,7 @@ CHECKPOINTS = {
         'c5fb290e47e30c81d06e48b0495ec06f2560dd4e',
     ),
 }
+INT4_EOS_OVERRIDE = '{"eos_token_id": 248044}'
 TOKENIZER_FILES = ('tokenizer.json', 'tokenizer_config.json', 'vocab.json', 'merges.txt',
                    'chat_template.jinja')  # fmt: skip
 
@@ -88,17 +89,25 @@ def weight_bytes(root: Path) -> dict[str, Any]:
     }
 
 
-def eos_ids(repo: str, revision: str) -> dict[str, Any]:
+def eos_ids(repo: str, revision: str, override: str = '{}') -> dict[str, Any]:
+    """The token ids that end a request in SGLang (Req._check_token_based_finish):
+    ModelConfig.hf_eos_token_id, the tokenizer's eos id and its additional stop ids."""
+    from sglang.srt.configs.model_config import ModelConfig
+    from sglang.srt.utils.hf_transformers import attach_additional_stop_token_ids
     from transformers import AutoTokenizer
 
-    from sglang.srt.configs.model_config import ModelConfig
-
-    config = ModelConfig(repo, revision=revision)
+    config = ModelConfig(repo, revision=revision, model_override_args=override)
     tok = AutoTokenizer.from_pretrained(repo, revision=revision)
+    attach_additional_stop_token_ids(tok)
+    hf_eos = set(config.hf_eos_token_id or [])
+    stop = hf_eos | {tok.eos_token_id} | set(tok.additional_stop_token_ids or [])
     return {
-        'sglang_hf_eos_token_id': sorted(config.hf_eos_token_id or []),
+        'model_override_args': override,
+        'sglang_hf_eos_token_id': sorted(hf_eos),
         'tokenizer_eos': [tok.eos_token, tok.eos_token_id],
         'tokenizer_pad': [tok.pad_token, tok.pad_token_id],
+        'additional_stop_token_ids': sorted(tok.additional_stop_token_ids or []),
+        'stop_set': sorted(stop),
         'generation_config_present': (snapshot(repo, revision) / 'generation_config.json').exists(),
     }
 
@@ -119,6 +128,18 @@ def main(argv: list[str] | None = None) -> int:
             }
             entry['eos'] = eos_ids(repo, revision)
         result[key] = entry
+    # The override the INT4 arms in bench/arms.toml pass (json-model-override-args).
+    int4_repo, int4_revision = CHECKPOINTS['int4_target']
+    result['int4_target']['eos_with_arm_override'] = eos_ids(
+        int4_repo, int4_revision, INT4_EOS_OVERRIDE
+    )
+    result['stop_sets_equal_without_override'] = (
+        result['bf16_target']['eos']['stop_set'] == result['int4_target']['eos']['stop_set']
+    )
+    result['stop_sets_equal_with_override'] = (
+        result['bf16_target']['eos']['stop_set']
+        == result['int4_target']['eos_with_arm_override']['stop_set']
+    )
     bf16 = result['bf16_target']['decode_step_bytes']
     int4 = result['int4_target']['decode_step_bytes']
     result['decode_step_ratio_bf16_over_int4'] = bf16 / int4
@@ -129,8 +150,13 @@ def main(argv: list[str] | None = None) -> int:
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=1) + '\n')
-    print(json.dumps({k: result[k] for k in ('decode_step_ratio_bf16_over_int4',
-                                             'tokenizer_files_identical')}, indent=1))  # fmt: skip
+    keys = (
+        'decode_step_ratio_bf16_over_int4',
+        'tokenizer_files_identical',
+        'stop_sets_equal_without_override',
+        'stop_sets_equal_with_override',
+    )
+    print(json.dumps({k: result[k] for k in keys}, indent=1))
     return 0
 
 

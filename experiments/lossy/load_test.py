@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import contextlib
 import csv
 import json
 import os
@@ -45,7 +46,15 @@ from pathlib import Path
 from typing import Any
 
 from bench.arms import Arm, resolve_arm, server_command
-from bench.server import Server, git_state, gpu_snapshot, host_id, http_post, sglang_source
+from bench.server import (
+    Server,
+    git_state,
+    gpu_snapshot,
+    host_id,
+    http_post,
+    port_free,
+    sglang_source,
+)
 from experiments.moonshot.logit_probe import chat_ids, select_prompts
 
 REPO = Path(__file__).resolve().parents[2]
@@ -218,6 +227,31 @@ class NsysServer(Server):
             start_new_session=True,
         )
 
+    def stop(self) -> None:
+        """nsys may exit (stop-shutdown) while the server it launched keeps running in
+        the same process group, so the group is killed whether or not nsys is alive."""
+        if self.proc is not None:
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(self.proc.pid, signal.SIGTERM)
+            time.sleep(5)
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(self.proc.pid, signal.SIGKILL)
+        super().stop()
+
+
+def clear_port() -> bool:
+    """Stop any server left on this test's port and wait until the port is free."""
+    pattern = f'sglang.launch_server.* --port {PORT}( |$)'
+    for sig in ('TERM', 'KILL'):
+        if port_free('127.0.0.1', PORT):
+            return True
+        subprocess.run(['pkill', f'-{sig}', '-f', '--', pattern], check=False)
+        for _ in range(30):
+            time.sleep(1)
+            if port_free('127.0.0.1', PORT):
+                return True
+    return port_free('127.0.0.1', PORT)
+
 
 def kernel_table(report: Path, out_dir: Path) -> dict[str, Any]:
     """`nsys stats` GPU kernel summary; the top kernels and the GEMM families."""
@@ -303,9 +337,7 @@ def run_step(step: Step, root: Path, worktree: Path, tok: Any) -> dict[str, Any]
             record['final_limits'] = server.launch_record.get('final_limits')
             record['sglang_source'] = server.launch_record.get('sglang_source')
             prompts = select_prompts(WORKLOAD, 6)
-            record['tokenizer'] = check_tokenizer(
-                server.base_url, tok, prompts[:TOKENIZER_PROMPTS]
-            )
+            record['tokenizer'] = check_tokenizer(server.base_url, tok, prompts[:TOKENIZER_PROMPTS])
             record['smoke'] = smoke(server.base_url, tok, prompts[:SMOKE_PROMPTS])
             if step.probe_generate:
                 gen = out / 'probe_generate.json'
@@ -319,7 +351,7 @@ def run_step(step: Step, root: Path, worktree: Path, tok: Any) -> dict[str, Any]
             if step.nsys:
                 record['nsys'] = profile_kernels(server, out, tok, prompts)
             record['log_facts'] = log_facts(server.log_text())
-    except Exception as exc:  # noqa: BLE001 - a failed step is a result
+    except Exception as exc:
         record['error'] = f'{type(exc).__name__}: {exc}'
         record['traceback'] = traceback.format_exc()[-3000:]
         if server.log_path.exists():
@@ -341,10 +373,9 @@ def profile_kernels(
             'input_ids': chat_ids(tok, row['text'], True),
             'sampling_params': {'temperature': 0.0, 'max_new_tokens': 2048, 'ignore_eos': True},
         }
-        try:
+        # nsys shuts the server down mid-request
+        with contextlib.suppress(Exception):
             http_post(f'{server.base_url}/generate', body, timeout=600)
-        except Exception:  # noqa: BLE001 - nsys shuts the server down mid-request
-            pass
 
     pool = concurrent.futures.ThreadPoolExecutor(max_workers=4)
     for row in prompts[:4]:
@@ -358,7 +389,11 @@ def profile_kernels(
         os.killpg(os.getpgid(server.proc.pid), signal.SIGINT)
         server.proc.wait(timeout=120)
     pool.shutdown(wait=False, cancel_futures=True)
-    return {'start_profile': started.strip(), 'steps': NSYS_STEPS, **kernel_table(server.report, out)}
+    return {
+        'start_profile': started.strip(),
+        'steps': NSYS_STEPS,
+        **kernel_table(server.report, out),
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -388,6 +423,8 @@ def main(argv: list[str] | None = None) -> int:
     for name in names:
         print(f'=== {name}', flush=True)
         record = run_step(known[name], root, worktree, tok)
+        # A server that outlived its step would make every later step fail on the port.
+        record['port_cleared'] = clear_port()
         summary['steps'].append(record)
         path.write_text(json.dumps(summary, indent=1, default=str) + '\n')
         status = 'ok' if record['ok'] else f'FAILED {record.get("error", "launch checks")}'
@@ -397,6 +434,9 @@ def main(argv: list[str] | None = None) -> int:
             f'tokenizer {(record.get("tokenizer") or {}).get("ok")}',
             flush=True,
         )
+        if not record['port_cleared']:
+            print(f'    port {PORT} still in use after {name}; stopping', flush=True)
+            break
     failed = [s['step'] for s in summary['steps'] if not s['ok']]
     summary['failed'] = failed
     path.write_text(json.dumps(summary, indent=1, default=str) + '\n')

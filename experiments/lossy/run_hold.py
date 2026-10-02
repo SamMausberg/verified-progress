@@ -245,11 +245,13 @@ def _alive(pid: int) -> bool:
 
 
 def session_launches(session: str, out: Path) -> list[tuple[str, list[str], float]]:
-    launches = []
+    launches: list[tuple[str, list[str], float]] = []
     for launch in plan.session_order(session):
         if launch.arm in plan.DROPPED_ARMS:
             continue
-        launches.append((launch.arm, sweep_command(launch, session, out), plan.LAUNCH_TIMEOUT))
+        launches.append(
+            (launch.arm, sweep_command(launch, session, out), float(plan.LAUNCH_TIMEOUT))
+        )
     return launches
 
 
@@ -258,7 +260,9 @@ def quality_launches(hold: str, out: Path) -> list[tuple[str, list[str], float]]
     gsm8k = str(spec['gsm8k'])
     probes = [str(arm) for arm in spec['probes']]  # type: ignore[attr-defined]
     launches = [(f'gsm8k-{gsm8k}', gsm8k_command(gsm8k, out), float(plan.GSM8K_TIMEOUT))]
-    launches += [(f'probe-{arm}', probe_command(arm, out), float(plan.PROBE_TIMEOUT)) for arm in probes]
+    launches += [
+        (f'probe-{arm}', probe_command(arm, out), float(plan.PROBE_TIMEOUT)) for arm in probes
+    ]
     return launches
 
 
@@ -325,8 +329,8 @@ def main(argv: list[str] | None = None) -> int:
     probe = sub.add_parser('probe')
     probe.add_argument('--arm', required=True)
     probe.add_argument('--out', type=Path, required=True)
-    for command in (session, quality):
-        command.add_argument('--dry-run', action='store_true', help='print the launches only')
+    for subparser in (session, quality):
+        subparser.add_argument('--dry-run', action='store_true', help='print the launches only')
     args = parser.parse_args(argv)
     if args.command == 'probe':
         return run_probe(args.arm, args.out.expanduser())
