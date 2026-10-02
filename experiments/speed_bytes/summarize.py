@@ -150,21 +150,34 @@ PLANNED: dict[str, dict[str, Planned]] = {
 }
 
 
-# The engine commit each hold ran (engine/sglang/README.md: patches 0001; 0001-0002; 0001 + 0003).
+# The engine each hold ran, as the commit of the recorded run and its tree (the tree is what a
+# rebuild from engine/sglang/README.md reproduces; the hold scripts' ENGINE_TREE guards check it).
 HOLD_ENGINES = {
-    'kill1': '98aa8c9821',
-    'kill2b': '1490d9a891',
-    'kill3': '1bc2fc4719',
-    'probe1': '98aa8c9821',
+    'kill1': ('98aa8c9821', 'e95d72d554f3b70f280e466de8adc21a2f5598c2'),
+    'kill2b': ('1490d9a891', '30a865322c98e93b37c7303e391540276350ef2f'),
+    'kill3': ('1bc2fc4719', '1c2b81de6367850630de8ee1d4fffbda999bea38'),
+    'probe1': ('98aa8c9821', 'e95d72d554f3b70f280e466de8adc21a2f5598c2'),
 }
 
 
-def check_hold_engine(hold: Path) -> None:
-    """The hold log's first line records the engine head; it must be the one the hold was run on."""
+def check_hold_engine(hold: Path) -> str:
+    """The engine commit a hold's log records, checked against the hold's recorded engine.
+
+    The hold scripts log the engine's tree next to its commit; a log with a tree must show the
+    recorded tree (a rebuilt engine has another commit id but the same tree). The recorded runs
+    predate the tree in the log, so for them the commit itself must match.
+    """
     name = hold.name.split('_')[0]
-    m = re.match(r'start \S+ repo \w+ engine (\w+)', (hold / 'hold.log').read_text())
-    if not m or name not in HOLD_ENGINES or not m.group(1).startswith(HOLD_ENGINES[name]):
-        raise SystemExit(f'{hold}: engine {m and m.group(1)}, expected {HOLD_ENGINES.get(name)}')
+    head = (hold / 'hold.log').read_text().split('\n', 1)[0]
+    m = re.match(r'start \S+ repo \w+ engine (\w+)(?: tree (\w+))?', head)
+    if not m or name not in HOLD_ENGINES:
+        raise SystemExit(f'{hold}: no engine in the hold log, or an unknown hold')
+    commit, tree = HOLD_ENGINES[name]
+    if (m.group(2) != tree) if m.group(2) else not m.group(1).startswith(commit):
+        raise SystemExit(
+            f'{hold}: engine {m.group(1)} tree {m.group(2)}, expected {commit} / {tree}'
+        )
+    return m.group(1)
 
 
 def check_fp8_log(log: str, env: dict[str, str]) -> bool:
@@ -189,7 +202,7 @@ def cmd_served(args: argparse.Namespace) -> None:
         hold = Path(hold)
         sweeps = sorted(hold.glob('*/*/sweep.json'))
         name = hold.name.split('_')[0]
-        check_hold_engine(hold)
+        engine = check_hold_engine(hold)
         labels = [f.parent.parent.name for f in sweeps]
         if name not in PLANNED or sorted(labels) != sorted(PLANNED[name]):
             raise SystemExit(
@@ -200,8 +213,9 @@ def cmd_served(args: argparse.Namespace) -> None:
             src = d['launch']['sglang_source']
             if src.get('dirty_files'):
                 raise SystemExit(f'{f}: engine tree was dirty')
-            if not src['head'].startswith(HOLD_ENGINES[name]):
-                raise SystemExit(f'{f}: engine {src["head"][:10]}, expected {HOLD_ENGINES[name]}')
+            # Every sweep of a hold ran the engine its log records.
+            if src['head'] != engine:
+                raise SystemExit(f'{f}: engine {src["head"][:10]}, hold log {engine[:10]}')
             if d['launch']['repo'].get('dirty_files'):
                 raise SystemExit(f'{f}: harness repository was dirty')
             arm, conc, switches = PLANNED[name][f.parent.parent.name]
