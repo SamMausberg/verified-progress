@@ -11,9 +11,10 @@ profile_arms.sh), pairs each unprofiled label with its host-trace label
 * derived: unprofiled idle per cycle = unprofiled cycle time minus the traced
   GPU busy time per cycle (kernel durations are not inflated by the profiler,
   host time is), and its share of the cycle. A stock label without its own
-  usable trace in the directory (none, or one that lost its eager kernel
-  records) borrows the GPU busy time of its patched trace (the patches launch
-  the same graphs and kernels on the same data); the row names its source;
+  usable trace in the directory (no host-trace label, or, per concurrency, a
+  trace that lost its eager kernel records) borrows the GPU busy time of its
+  patched trace (the patches launch the same graphs and kernels on the same
+  data); the row names its source;
 * derived, before/after: the unprofiled cycle-time change of each patched
   label against its stock label, the share of the stock idle it removed, and
   when each server started (which one ran first);
@@ -206,30 +207,33 @@ def main() -> int:
         if not name.endswith('-none'):
             continue
         base = name[: -len('-none')]
-        traced = labels.get(f'{base}-host')
-        busy_source = f'{base}-host'
-        lost = traced is not None and any(
-            (entry.get('trace') or {}).get('eager_kernel_records') is False
-            for entry in traced['by_concurrency'].values()
-        )
-        if lost:
-            if base.endswith('-patched'):
-                print(f'{base}-host has no eager kernel records: no derived idle', file=sys.stderr)
-                continue
-            traced = None
-        own_trace = traced is not None
-        if traced is None and not base.endswith('-patched'):
-            # Stock without a usable trace here: the patched trace's GPU busy time.
-            traced = labels.get(f'{base}-patched-host')
-            busy_source = f'{base}-patched-host (assumed equal: same graphs and kernels)'
-            if lost:
-                busy_source += f'; {base}-host has no eager kernel records'
-        if traced is None:
+        own = labels.get(f'{base}-host')
+        # A stock label borrows its patched trace's GPU busy time where it has no
+        # trace of its own here, or where its trace lost the eager kernel records
+        # (decided per concurrency).
+        patched = None if base.endswith('-patched') else labels.get(f'{base}-patched-host')
+        if own is None and patched is None:
             continue
         rows = {}
         for c, entry in summary['by_concurrency'].items():
-            trace = traced['by_concurrency'].get(c, {}).get('trace')
             cycle = (entry['counter_windows'].get('cycle_ms') or {}).get('mean')
+            own_t = own['by_concurrency'].get(c, {}).get('trace') if own else None
+            lost = own_t is not None and own_t.get('eager_kernel_records') is False
+            own_trace = own_t is not None and not lost
+            trace = own_t if own_trace else None
+            busy_source = f'{base}-host'
+            if trace is None and patched is not None and (own is None or lost):
+                trace = patched['by_concurrency'].get(c, {}).get('trace')
+                if trace is not None and trace.get('eager_kernel_records') is False:
+                    trace = None
+                busy_source = f'{base}-patched-host (assumed equal: same graphs and kernels)'
+                if lost:
+                    busy_source += f'; {base}-host has no eager kernel records at c = {c}'
+            if lost and trace is None:
+                print(
+                    f'{base}-host c={c} has no eager kernel records: no derived idle',
+                    file=sys.stderr,
+                )
             if trace is None or cycle is None or 'gpu_busy_ms_per_cycle' not in trace:
                 continue
             idle = cycle - trace['gpu_busy_ms_per_cycle']
