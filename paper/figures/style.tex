@@ -101,6 +101,9 @@
 % printed in a plot 7 pt (\scriptsize, style annot), the smallest size used. Text is black; the
 % coloured line or mark beside a label carries the identity. Labels and titles in sentence case.
 % Figures are drawn at their final size: never scale a figure.
+% Every figure file ends with a %, and so does every line that \inputs one: a space after the
+% picture lets a full-width figure overflow its line, which pushes the caption's link anchor onto
+% a line of its own and leaves a blank line (about 12 pt) between the figure and its caption.
 % Tables use \tablefont (9 pt) in both documents, never smaller than 7 pt, natural width when they fit.
 % \vpnum{digits}{expression} and \vppct{digits}{expression} print a computed value.
 \newcommand{\figlabel}{\fontsize{9}{10}\selectfont}

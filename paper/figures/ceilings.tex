@@ -22,4 +22,4 @@
 \addplot[only marks,mark=*,cstock,discard if not={config}{plain}] table[x expr=\thisrow{concurrency}/1.12,y=y_tok_s_gpu,col sep=comma]{../evidence/moonshot/lever_sweeps_quick.csv};\addlegendentry{plain, served (single run)}
 \addplot[only marks,mark=square*,mark size=1.5pt,cstock,discard if not={config}{plain+fp16_state}] table[x expr=\thisrow{concurrency}*1.12,y=y_tok_s_gpu,col sep=comma]{../evidence/moonshot/lever_sweeps_quick.csv};\addlegendentry{FP16 state, served (single run)}
 \end{axis}
-\end{tikzpicture}}{Derived throughput ceilings per lever stack against batch size, with measured served throughput.}
+\end{tikzpicture}}{Derived throughput ceilings per lever stack against batch size, with measured served throughput.}%

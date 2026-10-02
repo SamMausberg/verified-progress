@@ -22,4 +22,4 @@
 \addplot[semithick,ccontext,densely dotted,mark=o,mark options={solid,fill=white},mark size=1.4pt,discard if not={domain}{math500},discard if not={block_size}{16}] table[x=position,y=survival,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};
 \end{groupplot}
 \node[anchor=north] at ($(group c1r1.south)!.5!(group c2r1.south)+(0,-1.0cm)$) {\pgfplotslegendfromname{acclegend}};
-\end{tikzpicture}}{Conditional acceptance and survival by block position, block size 16, per domain.}
+\end{tikzpicture}}{Conditional acceptance and survival by block position, block size 16, per domain.}%
