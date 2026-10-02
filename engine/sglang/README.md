@@ -318,6 +318,25 @@ SGLANG_WORKTREE=~/sglang-wt/lossy source scripts/sglang_env.sh
 |---|---|---|
 | 0001 | `DFlashDraftModel` builds its context projection `fc` as a `ReplicatedLinear` with the draft's quantization config whenever one is set, and refuses to load a checkpoint that leaves any `fc` parameter unset. Without it, a compressed-tensors drafter stores `fc` as `weight_packed`/`weight_scale`, which match no parameter of the plain `nn.Linear`; the loader skips them silently and `fc.weight` keeps uninitialised memory. | unquantized drafters (no quantization config) build and load `fc` exactly as before |
 
+## speed-lowc (`patches/speed-lowc/0001-0003`, built by `experiments/speed_lowc/build_engines.sh`)
+
+```sh
+experiments/speed_lowc/build_engines.sh fa4       # ~/sglang-wt/speed-lowc: pin + 0001-0002
+experiments/speed_lowc/build_engines.sh confirm   # ~/sglang-wt/speed-lowc-confirm: pin + drafter 0001-0004 + 0001 + 0003
+SGLANG_WORKTREE=~/sglang-wt/speed-lowc-confirm source scripts/sglang_env.sh
+```
+
+| Patch | What it changes | Default behaviour |
+|---|---|---|
+| 0001 | Backport of Dao-AILab/flash-attention#2745's paged-KV loader fix to SGLang's vendored FA4: `page_entry_per_thread` is ceil-divided. On sm_90 the head-dim-256 forward tile is 128 x 80, so the floor gave 80 // 128 = 0 entries and FA4 failed to compile for any head-dim-256 model with a paged KV cache whose page size is not the tile's (`evidence/speed_lowc/README.md`). | tiles with n below 128 now compile; tiles whose n is a multiple of 128 compute the same count; the 192 x 144 tile (head dim 65-96, non-causal) gets two entries per thread instead of one, a shape these probes did not test |
+| 0002 | SM90 regression test for 0001 (`test/registered/kernels/ops/attention/test_flash_attention_4_paged_sm90.py`): head dim 256 against an FP32 reference over a shuffled page table: page size 1, causal and not; page size 16, causal. Head dim 128 (page size 1, causal) as a control. | test only |
+| 0003 | The recurrent GDN kernel's ring-writing verify (`cache_ring`, the fold's verify from drafter 0003) uses value tiles of 4 for at most 2 sequences on sm_90, and 32 above. Drafter 0005 used 4 for up to 64 sequences. The cutoff is the threshold that the drafter's pre-registered kernel sweep gives (N\* = 2, `evidence/drafter/README.md`, "Ring-writing verify tiles by batch"): on DFlash blocks 16 and 8, tile 4 took 0.54-0.70 of tile 32's time at 1 and 2 sequences and 1.03-1.40 of it at every batch from 3 to 64. These probes do not measure its served effect. The two tilings are bitwise equal on sm_90 (the sweep's bitwise gate). | changes only the ring-writing verify, which runs only with drafter 0003's fold |
+
+Tree hashes (stable across builds): fa4 `dcd97db178c101495148fb7a361203f975bcf711`, confirm
+`5d6db54828d7fbdac62180810b68a87cee3b39ec`. The probe and confirmation holds check them. Probe 4 ran on
+the earlier confirm tree `9a01a622f6e7f7f816ce6255ba5de56d52e09dbc`, whose 0003 stopped at 4 sequences
+(`evidence/speed_lowc/README.md`, Provenance).
+
 ## upstream-bf16 (`patches/upstream-bf16/0001`, branch `engine/upstream-bf16`, head `4608661757`)
 
 One diagnostic patch on `bd66ce343e` for `experiments/bf16_paths/` (variant `beta_fp32`): it keeps
