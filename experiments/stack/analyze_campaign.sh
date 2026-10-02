@@ -16,8 +16,10 @@
 #   3. provenance.py, the checks amendment 1 moved to analysis time (provenance.json);
 #   4. startup_memory.py, each server's start-up memory from its log (startup_memory.csv);
 #   5. phases.py on the equality hold's phase diagnostic (B0 and FG at c = 1 and 8);
-#   6. figures.py, the figure tables and figures (frontier, ratios, gap, last lever).
-# Steps 1-5 run with the repository venv; step 6 needs matplotlib (SGLang venv). Any
+#   6. diagnostics.py, post hoc checks of drift, launch position and acceptance (drift.csv,
+#      position.csv, accept.csv; not declared);
+#   7. figures.py, the figure tables and figures (frontier, ratios, gap, last lever).
+# Steps 1-6 run with the repository venv; step 7 needs matplotlib (SGLang venv). Any
 # failing step stops the script with its exit status, except step 3, whose failure is
 # recorded and returned at the end.
 set -euo pipefail
@@ -74,6 +76,8 @@ run "$repo_py" experiments/stack/startup_memory.py --runs-root "$runs" \
 for arm in B0 FG; do
   run "$repo_py" experiments/stack/phases.py "$eq_run/phases_$arm.jsonl" --out "$out/phases_$arm.json"
 done
+run "$repo_py" experiments/stack/diagnostics.py --points "$out/points.csv" \
+  --composition "$out/composition.json" --out-dir "$out"
 run "$sgl_py" experiments/stack/figures.py --points "$out/points.csv" \
   --composition "$out/composition.json" --expected evidence/stack/expected.json \
   --ceiling evidence/stack/ceiling.json --frame evidence/frontier/frame.json \

@@ -356,3 +356,38 @@ def test_figures_command_line_writes_every_table(tmp_path, monkeypatch):
         'gap_by_block.csv',
         'last_lever.csv',
     }
+
+
+diagnostics = _load('diagnostics')
+
+
+def _launch(session: str, run: str, arm: str, x: float, accept: float = 5.7) -> dict[str, str]:
+    return {**_row(session, 1, arm, x, x), 'run': run, 'accept_length': str(accept)}
+
+
+def test_diagnostics_drift_interpolation_and_accept():
+    points = [
+        _launch('stack-s1', '20261002-000000', 'S0', 100.0, 5.70),
+        _launch('stack-s1', '20261002-000300', 'FG', 110.0, 5.74),
+        _launch('stack-s1', '20261002-000600', 'F', 104.0, 5.70),
+        _launch('stack-s1', '20261002-000900', 'FG', 112.0, 5.74),
+        _launch('stack-s1', '20261002-001200', 'S0', 104.0, 5.70),
+    ]
+    comp = {
+        'full': 'FG',
+        'sessions_admitted': {'1': ['stack-s1']},
+        'arms': {'FG': {'1': {'x_e2e': {'ratio': 1.08}}}},
+    }
+    valid = diagnostics.cells(points, comp)
+    drift = {r['arm']: r for r in diagnostics.drift_rows(valid, 'FG')}
+    assert drift['S0']['x_e2e_last_over_first'] == 1.04
+    assert drift['FG']['x_e2e_last_over_first'] == round(112 / 110, 5)
+    pos = {r['arm']: r for r in diagnostics.position_rows(valid, 'FG')}
+    # F ran halfway: S0 interpolates to 102, the same as mean(S0)
+    assert pos['F']['x_e2e_declared'] == pos['F']['x_e2e_time_interpolated'] == round(104 / 102, 5)
+    assert pos['F']['minutes_after_first_S0'] == '6.0'
+    assert pos['FG']['x_e2e_time_interpolated'] == round(111 / 102, 5)
+    acc = {r['arm']: r for r in diagnostics.accept_rows(valid, comp)}
+    assert acc['FG']['accept_over_S0'] == round(5.74 / 5.70, 5)
+    assert acc['FG']['x_ratio_over_accept_ratio'] == round(1.08 / (5.74 / 5.70), 5)
+    assert acc['G']['n'] == 0 and acc['G']['accept_length_mean'] == ''
