@@ -21,7 +21,10 @@
 #   output ends its text before position 400, decoded for 768 tokens, so the text after the end
 #   of text (where both events lie) is sampled; transformers with an FP32 state only.
 # Targets: ~/vp-data/exactness/paths/targets.jsonl (paths.py `targets`), copied once and hashed.
-# Output: ~/vp-data/upstream/bf16 (BF16_PATHS_OUT); log in logs/hold-<UTC>.log.
+# Output: ~/vp-data/upstream/bf16 (BF16_PATHS_OUT); log in logs/hold-<UTC>.log. A step that
+# finishes without a failure writes done/<step>, and a step with that marker is refused. A
+# rerun after a failure keeps every output that exists and produces only the missing ones
+# (no file is overwritten); move an output aside to redo it.
 set -euo pipefail
 steps=" ${*:-all} "
 for step in $steps; do
@@ -41,13 +44,12 @@ unset SGLANG_WORKTREE PYTHONPATH
 source "$repo/scripts/sglang_env.sh"
 python -c 'import sglang, torch, transformers' || { echo "not the SGLang environment: $(command -v python)"; exit 1; }
 [ -z "$(git status --porcelain --untracked-files=all)" ] || { echo "checkout not clean"; exit 65; }
-for done_file in hf:hf_bf16_torch.json sglang:default.json perturb:perturb.json \
-  perturb_gdn:perturb_gdn.json rates:rates/prompts.jsonl rates_eot:rates_eot/prompts.jsonl; do
-  if want "${done_file%%:*}" && [ -e "$out/${done_file#*:}" ]; then
-    echo "$out/${done_file#*:} exists: ${done_file%%:*} already run"; exit 65
+for step in hf sglang perturb perturb_gdn rates rates_eot; do
+  if want "$step" && [ -e "$out/done/$step" ]; then
+    echo "$out/done/$step exists: $step already complete"; exit 65
   fi
 done
-mkdir -p "$out/logs"
+mkdir -p "$out/logs" "$out/done"
 exec >"$out/logs/hold-$(date -u +%Y%m%dT%H%M%SZ).log" 2>&1
 echo "bf16 paths hold (${steps# }) start $(date -Is) repo $(git rev-parse HEAD) sglang $(git -C "$HOME/sglang" rev-parse HEAD)"
 if [ -e "$out/targets.jsonl" ]; then
@@ -67,89 +69,113 @@ kill_servers() {
 }
 trap kill_servers EXIT
 status=0
+failed=0
+# missing FILE: true when FILE still has to be produced; an existing one is kept.
+missing() { [ ! -e "$1" ] || { echo "kept $1"; false; }; }
+fail() { failed=1; status=1; }
+# finish STEP: mark STEP complete if nothing in it failed, then reset for the next step.
+finish() {
+  if [ "$failed" = 0 ]; then date -Is >"$out/done/$1"; else echo "step $1 incomplete"; fi
+  failed=0
+}
 
 if want hf; then
   for state in model float32; do
     suffix=$([ "$state" = model ] && echo "" || echo "_fp32state")
-    timeout --foreground 600 python -m experiments.bf16_paths.hf_paths --targets "$out/targets.jsonl" \
-      --out "$out/hf_bf16_torch$suffix.json" --dtype bfloat16 --device cuda --state-dtype "$state" || status=1
+    ! missing "$out/hf_bf16_torch$suffix.json" ||
+      timeout --foreground 600 python -m experiments.bf16_paths.hf_paths --targets "$out/targets.jsonl" \
+        --out "$out/hf_bf16_torch$suffix.json" --dtype bfloat16 --device cuda --state-dtype "$state" || fail
   done
   deps="$out/pydeps"
   if [ ! -d "$deps/fla" ]; then
     timeout --foreground 300 uv pip install --python "$(command -v python)" --target "$deps" --no-deps \
       "flash-linear-attention==$fla_version" "fla-core==$fla_version" || echo "fla install failed"
   fi
-  ls "$deps"
+  ls "$deps" || true
   if [ -d "$deps/fla_core-$fla_version.dist-info" ]; then
     for state in model float32; do
       suffix=$([ "$state" = model ] && echo "" || echo "_fp32state")
-      PYTHONPATH="$deps" timeout --foreground 600 python -m experiments.bf16_paths.hf_paths \
-        --targets "$out/targets.jsonl" --out "$out/hf_bf16_fla$suffix.json" --dtype bfloat16 --device cuda \
-        --state-dtype "$state" || status=1
+      ! missing "$out/hf_bf16_fla$suffix.json" ||
+        PYTHONPATH="$deps" timeout --foreground 600 python -m experiments.bf16_paths.hf_paths \
+          --targets "$out/targets.jsonl" --out "$out/hf_bf16_fla$suffix.json" --dtype bfloat16 \
+          --device cuda --state-dtype "$state" || fail
     done
   else
-    echo "no fla $fla_version: kernel-path runs skipped"; status=1
+    echo "no fla $fla_version: kernel-path runs skipped"; fail
   fi
+  finish hf
 fi
 
 if want sglang; then
   for variant in default prefill_triton decode_flashinfer no_cuda_graph attn_triton beta_fp32; do
+    missing "$out/$variant.json" || continue
     echo "variant $variant start $(date -Is)"
     if GPU_STARTUP_MIN_FREE_GB=${GPU_STARTUP_MIN_FREE_GB:-48} GPU_STARTUP_TRIES=${GPU_STARTUP_TRIES:-10} \
       scripts/gpu_startup_lock.sh \
       python -m experiments.bf16_paths.sglang_variants start --variant "$variant" --out "$out"; then
       timeout --foreground 300 python -m experiments.bf16_paths.sglang_variants read --variant "$variant" \
-        --out "$out" --targets "$out/targets.jsonl" || status=1
+        --out "$out" --targets "$out/targets.jsonl" || fail
     else
-      echo "variant $variant failed to start"; status=1
+      echo "variant $variant failed to start"; fail
     fi
     python -m experiments.bf16_paths.sglang_variants stop --out "$out"
     echo "variant $variant end $(date -Is)"
   done
+  finish sglang
 fi
-if want perturb; then
-  timeout --foreground 900 taskset -c 32-39 python -m experiments.bf16_paths.perturb \
-    --targets "$out/targets.jsonl" --out "$out/perturb.json" --seeds 8 --threads 8 \
-    --fp32 "$HOME/vp-data/exactness/paths/fp32.json" || status=1
-fi
-if want perturb_gdn; then
-  timeout --foreground 900 taskset -c 32-39 python -m experiments.bf16_paths.perturb --site gdn \
-    --targets "$out/targets.jsonl" --out "$out/perturb_gdn.json" --seeds 8 --threads 8 \
-    --fp32 "$HOME/vp-data/exactness/paths/fp32.json" || status=1
-fi
+for site in perturb perturb_gdn; do
+  want "$site" || continue
+  if missing "$out/$site.json"; then
+    timeout --foreground 900 taskset -c 32-39 python -m experiments.bf16_paths.perturb \
+      --site "$([ "$site" = perturb ] && echo residual || echo gdn)" \
+      --targets "$out/targets.jsonl" --out "$out/$site.json" --seeds 8 --threads 8 \
+      --fp32 "$HOME/vp-data/exactness/paths/fp32.json" || fail
+  fi
+  finish "$site"
+done
 # run_rates DIR STATES PROMPT-ARGS...: rates.py's steps into DIR; transformers with its torch GDN
 # for each cached-state dtype in STATES, then with fla and an FP32 state; FP32 last.
 run_rates() {
   local r=$1 states=$2
   shift 2
-  python -m experiments.bf16_paths.rates prompts --out "$r" "$@"
-  if GPU_STARTUP_MIN_FREE_GB=${GPU_STARTUP_MIN_FREE_GB:-48} GPU_STARTUP_TRIES=${GPU_STARTUP_TRIES:-10} \
-    scripts/gpu_startup_lock.sh \
-    python -m experiments.bf16_paths.sglang_variants start --variant default --out "$r"; then
-    timeout --foreground 600 python -m experiments.bf16_paths.rates sglang --out "$r" \
-      --url http://127.0.0.1:30240 || status=1
-  else
-    echo "rates server failed to start"; status=1
+  if missing "$r/prompts.jsonl"; then
+    python -m experiments.bf16_paths.rates prompts --out "$r" "$@" || { fail; return 0; }
   fi
-  python -m experiments.bf16_paths.sglang_variants stop --out "$r"
-  [ -e "$r/sglang.jsonl.gz" ] || return 0
+  if missing "$r/sglang.jsonl.gz"; then
+    if GPU_STARTUP_MIN_FREE_GB=${GPU_STARTUP_MIN_FREE_GB:-48} GPU_STARTUP_TRIES=${GPU_STARTUP_TRIES:-10} \
+      scripts/gpu_startup_lock.sh \
+      python -m experiments.bf16_paths.sglang_variants start --variant default --out "$r"; then
+      timeout --foreground 600 python -m experiments.bf16_paths.rates sglang --out "$r" \
+        --url http://127.0.0.1:30240 || fail
+    else
+      echo "rates server failed to start"; fail
+    fi
+    python -m experiments.bf16_paths.sglang_variants stop --out "$r"
+  fi
+  [ -e "$r/sglang.jsonl.gz" ] || { fail; return 0; }
   for state in $states; do
-    timeout --foreground 1200 python -m experiments.bf16_paths.rates hf --out "$r" --state-dtype "$state" || status=1
+    ! missing "$r/hf_bf16_${state}state.jsonl.gz" ||
+      timeout --foreground 1200 python -m experiments.bf16_paths.rates hf --out "$r" --state-dtype "$state" || fail
   done
   if [ -d "$out/pydeps/fla_core-$fla_version.dist-info" ]; then
-    PYTHONPATH="$out/pydeps" timeout --foreground 1200 python -m experiments.bf16_paths.rates hf --out "$r" \
-      --state-dtype float32 || status=1
+    ! missing "$r/hf_bf16_fla_float32state.jsonl.gz" ||
+      PYTHONPATH="$out/pydeps" timeout --foreground 1200 python -m experiments.bf16_paths.rates hf \
+        --out "$r" --state-dtype float32 || fail
   else
-    echo "no fla $fla_version: fla rates skipped"; status=1
+    echo "no fla $fla_version: fla rates skipped"; fail
   fi
-  timeout --foreground 1200 taskset -c 32-39 python -m experiments.bf16_paths.rates fp32 --out "$r" \
-    --threads 8 || status=1
+  if [ "$failed" = 0 ] && missing "$r/fp32.jsonl.gz"; then
+    timeout --foreground 1200 taskset -c 32-39 python -m experiments.bf16_paths.rates fp32 --out "$r" \
+      --threads 8 || fail
+  fi
 }
 if want rates; then
   run_rates "$out/rates" "float32 model" --count 12
+  finish rates
 fi
 if want rates_eot; then
   run_rates "$out/rates_eot" "float32" --count 12 --output-len 768 --eot-before 400
+  finish rates_eot
 fi
 echo "bf16 paths hold (${steps# }) end $(date -Is) exit $status"
 nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader || true

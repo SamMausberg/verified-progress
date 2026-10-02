@@ -215,8 +215,8 @@ scripts/gpu_lock.sh -s experiments/bf16_paths/hold.sh perturb_gdn rates
 # Hold 4 (repo 43efc79): the same rates on text written after the end of text.
 scripts/gpu_lock.sh -s experiments/bf16_paths/hold.sh rates_eot
 # Hold 5 (repo 94460d6): both perturbations again at the full rounding bound, 2^-8. The runs of
-# holds 2 and 3 used 2^-9 and are superseded; hold.sh refuses to overwrite an output, so they
-# were moved aside first:
+# holds 2 and 3 used 2^-9 and are superseded; hold.sh keeps an existing output rather than
+# overwrite it, so they were moved aside first:
 mkdir -p ~/vp-data/upstream/bf16/superseded_eps2m9
 mv ~/vp-data/upstream/bf16/perturb.json ~/vp-data/upstream/bf16/perturb_gdn.json \
   ~/vp-data/upstream/bf16/superseded_eps2m9/
