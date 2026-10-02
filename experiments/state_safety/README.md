@@ -117,6 +117,8 @@ the GDN checkpointing kept is served from the cache.
   with the same probes served alone.
 - `prefill`: prompt logprobs at every position of the 40 longest prompts,
   compared across `--chunked-prefill-size` settings by `compare_prefill.py`.
+  Its alignment check of the 40 largest drifts is exploratory: it was added
+  after those drifts were seen.
 
 ## Commands
 

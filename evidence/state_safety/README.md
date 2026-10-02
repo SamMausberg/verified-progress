@@ -1008,11 +1008,12 @@ common flags of the Setup section, one request in flight, 40 prompts per test (t
     33,853 compared positions exceed 1 nat (`over_1_nat`), 13 and 1 of them in the first
     chunk, where the maximum is 1.60 and 1.66 nats. Drifts above 1 nat therefore occur
     before any boundary too, where no state passes from one chunk to the next.
-  - The check for an alignment artefact finds none (`alignment_check`). The chunked
-    top-5 list matches the unchunked list at another position within 16 (at least 4
-    shared tokens, every shared logprob within 0.1 nats) for none of the 40 largest
-    drifts in either run, while 29 (chunk 256) and 24 (chunk 200) of the 40 share at
-    least 4 of their top-5 tokens with the unchunked list at the same position.
+  - An exploratory check, added after these drifts were seen, finds no alignment
+    artefact (`alignment_check`). The chunked top-5 list matches the unchunked list at
+    another position within 16 (at least 4 shared tokens, every shared logprob within
+    0.1 nats) for none of the 40 largest drifts in either run, while 29 (chunk 256) and
+    24 (chunk 200) of the 40 share at least 4 of their top-5 tokens with the unchunked
+    list at the same position.
   - What makes these positions so sensitive to the prefill's chunking is not known.
     They are not read as a state error: the generated tokens, which start from the
     state after the whole prompt, differ only at ties or one BF16 step, and the
