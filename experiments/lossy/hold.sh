@@ -3,7 +3,8 @@
 #
 #   scripts/gpu_lock.sh -x experiments/lossy/hold.sh load [step ...]
 #   scripts/gpu_lock.sh -x experiments/lossy/hold.sh session lossy-s1   (s2, s3)
-#   scripts/gpu_lock.sh -x experiments/lossy/hold.sh quality q1         (q2)
+#   scripts/gpu_lock.sh -x experiments/lossy/hold.sh quality q1         (q2, q3)
+#   scripts/gpu_lock.sh -x experiments/lossy/hold.sh gemm               (exploratory)
 #
 # Runs from this checkout, which must be clean, against the declared engine
 # worktree (ENGINE_WORKTREE at ENGINE_COMMIT, clean). Servers use port 30101 and
@@ -13,7 +14,7 @@
 set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo"
-[ "$#" -ge 1 ] || { echo "usage: $0 load [step ...] | session <lossy-sN> | quality <qN>" >&2; exit 64; }
+[ "$#" -ge 1 ] || { echo "usage: $0 load [step ...] | session <lossy-sN> | quality <qN> | gemm" >&2; exit 64; }
 hold=$1
 name=${2:-}
 out=${LOSSY_OUT:-$HOME/vp-data/lossy}
@@ -61,6 +62,12 @@ case $hold in
     [ -n "$name" ] || { echo "$hold needs a name"; exit 64; }
     timeout --foreground 2640 python -m experiments.lossy.run_hold "$hold" "$name" \
       --out "$out" || status=$?
+    ;;
+  gemm)
+    # Exploratory W4A16 vs BF16 GEMM microbenchmark (no server).
+    mkdir -p "$out/gemm"
+    timeout --foreground 900 python -m experiments.lossy.gemm_w4a16_bench \
+      --out "$out/gemm/gemm_w4a16_$(date -u +%Y%m%dT%H%M%SZ).json" || status=$?
     ;;
   *) echo "unknown hold $hold"; exit 64 ;;
 esac

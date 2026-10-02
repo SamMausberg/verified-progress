@@ -22,6 +22,7 @@ one. Every hold runs every arm, exact or lossy, on that one engine worktree.
 | `run_hold.py` | Runs one timed session or quality hold from `plan.py`; every launch inside `scripts/gpu_startup_lock.sh` with its own timeout, a manifest written after each launch |
 | `analyze.py` | The declared analysis: session-paired ratios, envelope ratios and their decisions, GSM8K and probe comparisons against the budget |
 | `figures.py` | Frontier with and without each lever; quality against speed |
+| `gemm_w4a16_bench.py` | Exploratory, not declared (approved after s1): W4A16 Marlin against BF16 GEMMs at the target's and drafters' layer shapes, M = 1-256, CUDA graphs, cold L2, achieved bandwidth |
 | `checkpoint_check.py` | CPU only: weight bytes per decode step from the safetensors headers, tokenizer file hashes, end-of-sequence ids as SGLang resolves them |
 
 ## Load test L0 (untimed)
