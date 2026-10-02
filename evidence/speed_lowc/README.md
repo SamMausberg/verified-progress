@@ -72,7 +72,28 @@ flash-attention ceil-divides since Dao-AILab/flash-attention#2745 (2026-08-07); 
 covers SM100/SM110 only. An open SGLang PR, sgl-project/sglang#35757 (2026-08-20, not merged on
 2026-10-02), proposes the same fix. The served smoke (`probe1/fa4_smoke.json`, measured) shows the same failure:
 `dflash-tuned-b16` with `--attention-backend fa4` exits during prefill CUDA-graph capture with that
-error, while FA4 drafter attention serves. The backport is tested in probe 3 (pending).
+error, while FA4 drafter attention serves.
+
+**With the backport (probe 3, `probe3/`, measured).** On the tree `build_engines.sh fa4` builds
+(pin + `engine/sglang/patches/speed-lowc/0001-0002`, tree `dcd97db1`, clean), FA4 target attention
+compiles and runs at every shape. Its largest difference from the FP32 reference (B = 2, context 700)
+is 9.10e-4, the same as Triton's. Over 8 target layers, microseconds per forward:
+
+| B | ctx 256: Triton / FA4 | 512 | 1,024 | 2,048 |
+|---|---|---|---|---|
+| 1 | 214 / 101 | 369 / 136 | 748 / 149 | 1,538 / 185 |
+| 2 | 219 / 138 | 398 / 159 | 800 / 184 | 1,532 / 277 |
+| 4 | 248 / 182 | 432 / 204 | 793 / 299 | 1,515 / 466 |
+| 8 | 253 / 204 | 434 / 299 | 805 / 464 | 1,532 / 750 |
+
+At B = 1 and context 512 FA4 saves 233 us per target forward, above the declared 200 us. The SM90
+regression test (patch 0002) passes: 3 tests and 2 subtests (`probe3/regression_test.log`). The server
+smoke (`probe3/fa4_smoke.json`) starts `dflash-tuned-b16` with FA4 for target and drafter with every
+required launch check passing (CUDA graphs for prefill and decode, overlap, capacity, backend), and
+server_info reports FA4 for both. It decodes 6 x 128 tokens with the same tokens per verify as stock
+(4.599), and 5 of the 6 outputs are token-identical to stock. Probe 3 ran the hold script then in the
+working tree (`hold_probe3.sh` without the tree and clean checks added later). Its engine was that
+same tree (`dcd97db1`) with no local changes: the hold log records `engine_dirty=0`.
 
 ### GDN verify chain (`probe1/gdn_chain_bench.json`, measured)
 
@@ -121,4 +142,5 @@ contexts (about 0.1-0.3 ms per cycle, derived, against 0.2-0.4 ms served); the p
 | `probe1/fa4_smoke.json` | server smoke: stock, FA4 draft, FA4 target + draft on `dflash-tuned-b16`; tokens, verify counts, failure traceback | same hold (`fa4_smoke.py`) |
 | `probe1/hold.log`, `probe2/hold.log` | hold logs | - |
 | `probe2/attn_microbench_rerun.json` | microbenchmark rerun, B = 1, 8 | `scripts/gpu_lock.sh -x experiments/speed_lowc/hold_probe2.sh` |
+| `probe3/attn_microbench.json`, `probe3/regression_test.log`, `probe3/fa4_smoke.json`, `probe3/hold.log` | FA4 with the backport: numerics and timing, regression test, server smoke | `scripts/gpu_lock.sh -x experiments/speed_lowc/hold_probe3.sh` after `experiments/speed_lowc/build_engines.sh fa4` |
 | `probe2/points.csv`, `probe2/launches.csv` | served points and launches (commands, pools, commits) | `python -m bench.pareto ~/vp-data/speed-lowc/probe2-20261002T183524Z/lowc-*/* --out evidence/speed_lowc/probe2 --points-only --status probe` |
