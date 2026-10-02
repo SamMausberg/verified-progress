@@ -1,0 +1,123 @@
+"""Decide from probe 3's own outputs whether FA4 target attention passed.
+
+Probe 3 (hold_probe3.sh) writes ~/vp-data/speed-lowc/probe3-<UTC>/ with the attention
+microbenchmark, the SM90 regression test log and the server smoke. This reads the newest
+such directory (or --dir) and checks:
+
+* attn_microbench.json: the FA4 target arm ran (no error) and its largest difference from
+  the FP32 reference is at most twice the Triton kernel's, no FA4 timing row failed, and FA4
+  meets the declared kill rule: it saves at least 200 us per 8-layer target forward against
+  Triton at B = 1, context 512 (both rows must exist);
+* regression_test.log: pytest reports passes and no failures or errors;
+* smoke/smoke.json: every configuration started and produced every requested token.
+
+With --microbench-only only the first check runs, on the attn_microbench.json in --dir
+(probe 4 uses this on its own run of the microbenchmark on the confirm engine).
+
+Exit 0: passed. Exit 1: probe 3 ran and failed a check (the served A/B is skipped).
+Exit 2: probe 3's outputs are missing or unreadable (an error, not a verdict).
+
+    python experiments/speed_lowc/check_probe3.py [--dir <probe3 dir>] [--microbench-only]
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path.home() / 'vp-data/speed-lowc'
+# The declared target kill rule (attn_microbench.py's kill_rule): microseconds per 8-layer
+# target forward that FA4 must save against Triton at B = 1, context 512.
+KILL_SAVING_US = 200.0
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
+    ap.add_argument('--dir', type=Path, default=None)
+    ap.add_argument('--microbench-only', action='store_true')
+    args = ap.parse_args()
+    if args.microbench_only and args.dir is None:
+        ap.error('--microbench-only needs --dir')
+    run = args.dir or max(ROOT.glob('probe3-*'), default=None)
+    if run is None:
+        print(f'no probe3-* directory under {ROOT}')
+        sys.exit(2)
+    try:
+        attn = json.loads((run / 'attn_microbench.json').read_text())
+        test_log = '' if args.microbench_only else (run / 'regression_test.log').read_text()
+        smoke = [] if args.microbench_only else json.loads((run / 'smoke/smoke.json').read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f'{run}: unreadable or missing output: {exc!r}')
+        sys.exit(2)
+
+    failures = []
+    target = attn.get('numerics', {}).get('target', {})
+    fa4, triton = target.get('fa4_max_abs_vs_fp32'), target.get('triton_max_abs_vs_fp32')
+    if fa4 is None or triton is None:
+        failures.append(f'FA4 target numerics missing: {target}')
+    elif not (math.isfinite(fa4) and math.isfinite(triton)):
+        failures.append(f'non-finite error vs FP32: FA4 {fa4}, Triton {triton}')
+    elif fa4 > 2 * triton:
+        failures.append(f'FA4 target max |err| {fa4:.3g} > 2 x Triton {triton:.3g}')
+    fa4_errors = [e for e in attn.get('errors', []) if e.get('arm') == 'fa4']
+    if fa4_errors:
+        failures.append(f'{len(fa4_errors)} FA4 timing rows failed, first: {fa4_errors[0]}')
+    median = {
+        (r.get('shape'), r.get('batch'), r.get('ctx'), r.get('arm')): r.get('median_us_per_forward')
+        for r in attn.get('rows', [])
+    }
+    t_triton = median.get(('target', 1, 512, 'triton'))
+    t_fa4 = median.get(('target', 1, 512, 'fa4'))
+    if t_triton is None or t_fa4 is None:
+        failures.append('target timing rows at B = 1, context 512 missing (Triton or FA4)')
+    elif not t_triton - t_fa4 >= KILL_SAVING_US:
+        failures.append(
+            f'FA4 saves {t_triton - t_fa4:.1f} us per target forward at B = 1, context 512, '
+            f'below the declared {KILL_SAVING_US:.0f} us'
+        )
+    if args.microbench_only:
+        print(
+            f'{run} (microbenchmark): '
+            + ('passed' if not failures else 'FAILED: ' + '; '.join(failures))
+        )
+        sys.exit(0 if not failures else 1)
+    summary = re.findall(r'(\d+) (passed|failed|error|errors)', test_log)
+    counts = {k: int(n) for n, k in summary}
+    if (
+        not counts.get('passed')
+        or counts.get('failed')
+        or counts.get('error')
+        or counts.get('errors')
+    ):
+        failures.append(f'regression test: {counts or "no pytest summary"}')
+    bad = [r.get('config') for r in smoke if not r.get('ok')]
+    if not smoke or bad:
+        failures.append(f'smoke failed: {bad or "empty"}')
+    # fa4_smoke.py launches with strict=False: a server can decode while a required launch
+    # check (CUDA graphs, overlap, capacity, backend) failed, so check them here.
+    for r in smoke:
+        checks = r.get('checks') or []
+        failed_required = [c['name'] for c in checks if c.get('required') and not c.get('ok')]
+        if r.get('ok') and (not checks or failed_required):
+            failures.append(
+                f'{r.get("config")}: launch checks failed {failed_required or "missing"}'
+            )
+    both = next((r for r in smoke if r.get('config') == 'fa4_both'), None)
+    if both is None:
+        failures.append('smoke has no fa4_both configuration')
+    elif (both.get('attention_backend'), both.get('draft_attention_backend')) != ('fa4', 'fa4'):
+        failures.append(
+            'fa4_both resolved backends '
+            f'{both.get("attention_backend")} / {both.get("draft_attention_backend")}, not fa4 / fa4'
+        )
+
+    print(f'{run}: ' + ('passed' if not failures else 'FAILED: ' + '; '.join(failures)))
+    sys.exit(0 if not failures else 1)
+
+
+if __name__ == '__main__':
+    main()

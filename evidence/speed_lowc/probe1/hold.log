@@ -1,0 +1,82 @@
+probe1 start 2026-10-02T17:29:36+00:00 repo e690b3a9a2c9801b761023d6c0bf486dceb1dd8d dirty=1
+target  ctx=  512 B=8 triton      434.7 us/forward
+target  ctx=  512 B=8 splitkv     648.3 us/forward
+target ctx=512 B=8 fa4: FAILED ValueError('Expected size in shape to be strictly positive, but got 0')
+target  ctx= 1024 B=1 triton      764.5 us/forward
+target  ctx= 1024 B=1 splitkv     472.9 us/forward
+target ctx=1024 B=1 fa4: FAILED ValueError('Expected size in shape to be strictly positive, but got 0')
+target  ctx= 1024 B=2 triton      800.4 us/forward
+target  ctx= 1024 B=2 splitkv     493.1 us/forward
+target ctx=1024 B=2 fa4: FAILED ValueError('Expected size in shape to be strictly positive, but got 0')
+target  ctx= 1024 B=4 triton      794.2 us/forward
+target  ctx= 1024 B=4 splitkv     528.2 us/forward
+target ctx=1024 B=4 fa4: FAILED ValueError('Expected size in shape to be strictly positive, but got 0')
+target  ctx= 1024 B=8 triton      805.4 us/forward
+target  ctx= 1024 B=8 splitkv     776.1 us/forward
+target ctx=1024 B=8 fa4: FAILED ValueError('Expected size in shape to be strictly positive, but got 0')
+target  ctx= 2048 B=1 triton     1538.4 us/forward
+target  ctx= 2048 B=1 splitkv     661.9 us/forward
+target ctx=2048 B=1 fa4: FAILED ValueError('Expected size in shape to be strictly positive, but got 0')
+target  ctx= 2048 B=2 triton     1526.4 us/forward
+target  ctx= 2048 B=2 splitkv     677.4 us/forward
+target ctx=2048 B=2 fa4: FAILED ValueError('Expected size in shape to be strictly positive, but got 0')
+target  ctx= 2048 B=4 triton     1514.7 us/forward
+target  ctx= 2048 B=4 splitkv     881.9 us/forward
+target ctx=2048 B=4 fa4: FAILED ValueError('Expected size in shape to be strictly positive, but got 0')
+target  ctx= 2048 B=8 triton     1530.5 us/forward
+target  ctx= 2048 B=8 splitkv    1021.0 us/forward
+target ctx=2048 B=8 fa4: FAILED ValueError('Expected size in shape to be strictly positive, but got 0')
+drafter ctx=  256 B=1 triton      109.3 us/forward
+drafter ctx=  256 B=1 fa4          58.1 us/forward
+drafter ctx=  256 B=2 triton      109.8 us/forward
+drafter ctx=  256 B=2 fa4          68.9 us/forward
+drafter ctx=  256 B=4 triton      111.3 us/forward
+drafter ctx=  256 B=4 fa4          83.2 us/forward
+drafter ctx=  256 B=8 triton      235.8 us/forward
+drafter ctx=  256 B=8 fa4         107.8 us/forward
+drafter ctx=  512 B=1 triton      188.2 us/forward
+drafter ctx=  512 B=1 fa4          66.8 us/forward
+drafter ctx=  512 B=2 triton      187.8 us/forward
+drafter ctx=  512 B=2 fa4          74.0 us/forward
+drafter ctx=  512 B=4 triton      228.8 us/forward
+drafter ctx=  512 B=4 fa4          96.8 us/forward
+drafter ctx=  512 B=8 triton      408.0 us/forward
+drafter ctx=  512 B=8 fa4         115.7 us/forward
+drafter ctx= 1024 B=1 triton      351.5 us/forward
+drafter ctx= 1024 B=1 fa4          72.5 us/forward
+drafter ctx= 1024 B=2 triton      408.6 us/forward
+drafter ctx= 1024 B=2 fa4          91.8 us/forward
+drafter ctx= 1024 B=4 triton      417.9 us/forward
+drafter ctx= 1024 B=4 fa4         109.9 us/forward
+drafter ctx= 1024 B=8 triton      751.0 us/forward
+drafter ctx= 1024 B=8 fa4         150.3 us/forward
+drafter ctx= 2048 B=1 triton      786.0 us/forward
+drafter ctx= 2048 B=1 fa4          92.4 us/forward
+drafter ctx= 2048 B=2 triton      797.6 us/forward
+drafter ctx= 2048 B=2 fa4         107.3 us/forward
+drafter ctx= 2048 B=4 triton      793.1 us/forward
+drafter ctx= 2048 B=4 fa4         141.4 us/forward
+drafter ctx= 2048 B=8 triton     1511.5 us/forward
+drafter ctx= 2048 B=8 fa4         211.9 us/forward
+saving at B=1 ctx=512: 7.595193386077881 killed_target: True
+B=1 recurrent    537.3 us per 24-layer forward
+B=1 conv         148.1 us per 24-layer forward
+B=1 norm          33.6 us per 24-layer forward
+B=1 chain        801.2 us per 24-layer forward
+B=2 recurrent    699.8 us per 24-layer forward
+B=2 conv         233.8 us per 24-layer forward
+B=2 norm          37.9 us per 24-layer forward
+B=2 chain        991.2 us per 24-layer forward
+B=4 recurrent   1079.6 us per 24-layer forward
+B=4 conv         259.6 us per 24-layer forward
+B=4 norm          51.2 us per 24-layer forward
+B=4 chain       1365.1 us per 24-layer forward
+B=8 recurrent   2103.3 us per 24-layer forward
+B=8 conv         289.5 us per 24-layer forward
+B=8 norm          74.3 us per 24-layer forward
+B=8 chain       2469.7 us per 24-layer forward
+{"1": {"chain_minus_recurrent_us": 263.93282413482666}, "2": {"chain_minus_recurrent_us": 291.4144277572632}, "4": {"chain_minus_recurrent_us": 285.4959964752197}, "8": {"chain_minus_recurrent_us": 366.30964279174805}} killed: False
+stock ok  None 4.598802395209581
+fa4_draft ok  5/6 4.388571428571429
+fa4_both FAILED ServerError('server exited with code -9:\n    return scf_gen.scf_execute_dynamic(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File "/home/ubuntu/sglang/.venv/lib/python3.12/site-packages/nvidia_cutlass_dsl/dsl_packages/cutlass/cutlass_dsl/cutlass_ast_decorators.py", line 207, in scf_execute_dynamic\ None None
+probe1 end 2026-10-02T17:33:27+00:00 failed: smoke
