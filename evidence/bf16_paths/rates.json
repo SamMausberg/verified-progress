@@ -301,7 +301,9 @@
    "hf_bf16_fla_float32state": 0
   },
   "comparator": "hf_bf16_float32state",
-  "binomial_p_one_sided": 1.0,
+  "sglang_only": 0,
+  "comparator_only": 0,
+  "paired_exact_p_one_sided": 1.0,
   "verdict": "inconclusive"
  },
  "worst": {
