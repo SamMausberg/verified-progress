@@ -997,17 +997,18 @@ common flags of the Setup section, one request in flight, 40 prompts per test (t
     over the generated tokens before the divergence is at most 0.95 nats (chunk 256) and
     0.51 (chunk 200).
   - Prompt positions. Drift at a position is the largest logprob difference over tokens
-    in both top-5 lists with logprob above -4, as in `compare.py`. Mean drift before and
-    after the first chunk boundary: 0.064 and 0.081 nats for chunk 256, 0.021 and 0.079
-    for chunk 200. Over the first four positions after each boundary (offsets 0 to 3,
-    chunks 1 and later only; `prompt_drift_by_offset_after_boundary`), the mean drift per
-    offset is 0.072 to 0.091 nats for chunk 256 and 0.062 to 0.095 for chunk 200.
+    in both top-5 lists with logprob above -4, as in `compare.py`. The top-5 list at
+    prompt position i is the distribution for token i, computed in the forward of token
+    i - 1, so each position is assigned to the chunk of that token. Mean drift before
+    and after the first chunk boundary: 0.064 and 0.081 nats for chunk 256, 0.021
+    and 0.079 for chunk 200 (`prompt_drift_by_chunk`).
   - A few prompt positions drift far more than anything seen in decoding. After the
-    first boundary the 99th percentile is 0.56 (chunk 256) and 0.58 nats (chunk 200),
-    but the maximum is 3.53 and 5.22 nats (`prompt_drift_by_chunk`). 94 and 90 of the
-    33,853 compared positions exceed 1 nat (`over_1_nat`), 13 and 1 of them in the first
-    chunk, where the maximum is 1.60 and 1.66 nats. Drifts above 1 nat therefore occur
-    before any boundary too, where no state passes from one chunk to the next.
+    first boundary the 99th percentile is 0.56 (chunk 256) and 0.58 nats (chunk
+    200), but the maximum is 3.53 and 5.22 nats. 94 and 90 of the 33,853
+    compared positions exceed 1 nat (`over_1_nat`), 13 and 1 of them produced
+    in the first chunk, where the maximum is 1.60 and 1.66 nats. Drifts above 1 nat
+    therefore occur before any boundary too, where no state passes from one chunk to the
+    next.
   - An exploratory check, added after these drifts were seen, finds no alignment
     artefact (`alignment_check`). The chunked top-5 list matches the unchunked list at
     another position within 16 (at least 4 shared tokens, every shared logprob within
@@ -1015,10 +1016,11 @@ common flags of the Setup section, one request in flight, 40 prompts per test (t
     24 (chunk 200) of the 40 share at least 4 of their top-5 tokens with the unchunked
     list at the same position.
   - What makes these positions so sensitive to the prefill's chunking is not known.
-    They are not read as a state error: the generated tokens, which start from the
-    state after the whole prompt, differ only at ties or one BF16 step, and the
-    positions right after a boundary do not stand out from the later offsets of their
-    chunk (mean drift 0.077 to 0.082 nats for chunk 256 and 0.077 to 0.080 for chunk 200
-    at offsets 4 and later). That is an observation, not a test.
+    They are not read as a state error: the generated tokens, which start from the state
+    after the whole prompt, differ only at ties or one BF16 step, and drifts above 1 nat
+    occur in the first chunk too. Per offset of the producing token after a boundary
+    (`prompt_drift_by_offset_after_boundary`), the mean drift is 0.072 to 0.093 nats at offsets 0
+    to 3 and 0.077 to 0.082 at offsets 4 and later for chunk 256, and 0.062 to 0.095 and 0.077 to 0.080 for chunk
+    200. That is an observation, not a test.
 
 Per-rejection-position drift is under "Matrix with pinned pools" above.
