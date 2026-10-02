@@ -119,6 +119,16 @@ if have "$EV/ncu_key_kernels.json" && have "$EV/gdn_kernel_bench.json"; then
   run kernel_bandwidth.py --evidence "$EV" --out "$EV/kernel_bandwidth.csv"
 fi
 
+# Which tensor-core instruction the stock head GEMM kernels issue: the executed SASS in
+# the head ncu reports, and whether cuBLAS's libraries expose the nvjet kernels to cuobjdump.
+head_ncu=("$VP_DATA"/ncu/head_gemm_m*.ncu-rep)
+libdir="$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')/nvidia/cu13/lib"
+if [ "${#head_ncu[@]}" -gt 0 ]; then
+  run tensor_instructions.py --ncu "${head_ncu[@]}" \
+    --search-libs "$libdir/libcublasLt.so.13" "$libdir/libcublas.so.13" \
+    --out "$EV/head_tensor_instructions.json" > /dev/null
+fi
+
 # Clock and power log of the microbenchmark rerun (committed with it).
 if have "$EV/microbench_rerun/microbench_clocks.csv"; then
   run clock_summary.py "$EV/microbench_rerun/microbench_clocks.csv" \

@@ -9,7 +9,7 @@
 #
 #   scripts/gpu_lock.sh -x env VP_LOCKED=1 experiments/profiling/run_all.sh step...
 #
-# Steps: microbench plain mtp baseline startprofile graphtrace eager host dflash gdn ncu
+# Steps: microbench plain mtp baseline startprofile graphtrace eager host dflash gdn ncu wgmma
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -80,6 +80,8 @@ step() {
     gdn) "${LOCK[@]}" python experiments/profiling/gdn_kernel_bench.py \
       --out evidence/profiles/gdn_kernel_bench.json ;;
     ncu) "${LOCK[@]}" experiments/profiling/run_ncu.sh ;;
+    wgmma) "${LOCK[@]}" python experiments/profiling/wgmma_precision.py \
+      --out evidence/profiles/wgmma_precision.json ;;
     *) echo "unknown step $1" >&2; exit 64 ;;
   esac
 }
