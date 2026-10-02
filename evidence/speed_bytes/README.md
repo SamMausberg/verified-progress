@@ -66,7 +66,7 @@ one GH200, greedy decoding, bench's harness and arms (`bench/arms.toml`) at repo
 
 | File | What it holds | Produced by |
 |---|---|---|
-| `gemm_probe.csv` | Per weight shape (N x K), row count M and route: median and minimum microseconds per GEMM under CUDA-graph replay with the weights cycled out of L2, relative error against an FP32 product (random N(0, 0.02) weights), and rows `backbone_step_sum` with the summed time of one decode step's backbone GEMMs (24 GDN input projections, 32 output projections, 8 attention QKV, 32 gate-up, 32 down) | `summarize.py gemm` on `~/vp-data/speed-bytes/fp8_gemm_probe_20261002T170014Z.json` from `holds/fp8_probe.sh` (exclusive, 54 s, 17:00 UTC) |
+| `gemm_probe.csv` | Per weight shape (N x K), row count M and route: median and minimum microseconds per GEMM under CUDA-graph replay with the weights cycled out of L2, relative error against an FP32 product (random N(0, 0.02) weights; left empty for `fp8_tensor`, whose run used per-channel weights with a unit scale, so the error was not that route's), and rows `backbone_step_sum` with the summed time of one decode step's backbone GEMMs (24 GDN input projections, 32 output projections, 8 attention QKV, 32 gate-up, 32 down) | `summarize.py gemm` on `~/vp-data/speed-bytes/fp8_gemm_probe_20261002T170014Z.json` from `holds/fp8_probe.sh` (exclusive, 54 s, 17:00 UTC) |
 | `served.csv` | Every served point of the kill tests: hold, label, arm, FP8 switches, engine commit, concurrency, y, x (end to end and decode), TTFT p50, accept length and milliseconds per verify cycle (speculative arms), foreign CPU, and ratios to the same hold's BF16 point of the same arm | `summarize.py served` on the bench sweeps of `holds/kill1.sh` (17:34-17:45 UTC), `holds/kill2b.sh` (18:00-18:11) and `holds/kill3.sh` (19:25-19:33) |
 | `step_budget.csv` | Per decode step of plain decoding (plain-tuned flags) at c = 1 and 64, BF16 and FP8 per-row: kernels, busy time, launch gap before and PDL overlap by kernel class | `summarize.py steps` on the Nsight reports of `holds/kill2b.sh` (`run_profiles.py --arm plain --mode nsys`) |
 | `probe1.json` | Logit probe (48 prompts x 256 tokens, top-20) of BF16, FP8 per-row and FP8 per-tensor servers: `logit_probe.compare_runs` and the lossy track's decode-path rule against the BF16 generate run with all 48 prompts in one batch, the same prompts one at a time, the score-mode runs; and the GPU unit check of the switch (`unit_check`) | `summarize.py probe` on `holds/probe1.sh` (shared, 17:45-17:52 UTC; shared-lane caps: memory fraction 0.25, 150k KV tokens, 48 running) and the unit-check lines of kill1's log |
@@ -125,7 +125,8 @@ scripts/gpu_lock.sh -x experiments/speed_bytes/holds/kill1.sh
 scripts/gpu_lock.sh -s experiments/speed_bytes/holds/probe1.sh
 scripts/gpu_lock.sh -x experiments/speed_bytes/holds/kill2b.sh
 scripts/gpu_lock.sh -x experiments/speed_bytes/holds/kill3.sh
-# evidence (CPU), at repository commit 5811250
+# evidence (CPU): probe1.json and step_budget.csv at repository commit 5811250; gemm_probe.csv and
+# served.csv at c740981 (served.csv identical to its 5811250 version)
 D=~/vp-data/speed-bytes
 python experiments/speed_bytes/summarize.py gemm $D/fp8_gemm_probe_20261002T170014Z.json --out evidence/speed_bytes/gemm_probe.csv
 python experiments/speed_bytes/summarize.py served $D/kill1_20261002T173359Z $D/kill2b_20261002T180019Z $D/kill3_20261002T192532Z --out evidence/speed_bytes/served.csv
