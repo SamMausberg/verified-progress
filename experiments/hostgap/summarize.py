@@ -11,9 +11,10 @@ profile_arms.sh), pairs each unprofiled label with its host-trace label
 * derived: unprofiled idle per cycle = unprofiled cycle time minus the traced
   GPU busy time per cycle (kernel durations are not inflated by the profiler,
   host time is), and its share of the cycle. A stock label without its own
-  trace in the directory borrows the GPU busy time of its patched trace (the
-  patches launch the same graphs and kernels on the same data); the row names
-  its source;
+  usable trace in the directory (no host-trace label, or, per concurrency, a
+  trace that lost its eager kernel records) borrows the GPU busy time of its
+  patched trace (the patches launch the same graphs and kernels on the same
+  data); the row names its source;
 * derived, before/after: the unprofiled cycle-time change of each patched
   label against its stock label, the share of the stock idle it removed, and
   when each server started (which one ran first);
@@ -26,11 +27,15 @@ profile_arms.sh), pairs each unprofiled label with its host-trace label
   environment, start time, Nsight version) and every counted window's values.
 
     python experiments/hostgap/summarize.py ~/vp-data/hostgap/prof1 --out evidence/hostgap/cycle_profiles.json
+
+--labels limits the summary to the labels matching a shell pattern, for a tag
+directory that two holds share (e.g. --labels 'dflash-*').
 """
 
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
 import statistics
 import subprocess
@@ -186,30 +191,49 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('tag_dir', type=Path)
     parser.add_argument('--out', type=Path, default=None)
+    parser.add_argument(
+        '--labels', default='*', help='shell pattern for the labels to summarize (default: all)'
+    )
     args = parser.parse_args()
     labels = {
         d.name: summarize_label(d)
         for d in sorted(args.tag_dir.expanduser().iterdir())
-        if (d / 'windows.jsonl').exists()
+        if (d / 'windows.jsonl').exists() and fnmatch.fnmatchcase(d.name, args.labels)
     }
+    if not labels:
+        parser.error(f'no label in {args.tag_dir} matches {args.labels!r}')
     derived: dict[str, Any] = {}
     for name, summary in labels.items():
         if not name.endswith('-none'):
             continue
         base = name[: -len('-none')]
-        traced = labels.get(f'{base}-host')
-        busy_source = f'{base}-host'
-        own_trace = traced is not None
-        if traced is None and not base.endswith('-patched'):
-            # Stock without its own trace here: the patched trace's GPU busy time.
-            traced = labels.get(f'{base}-patched-host')
-            busy_source = f'{base}-patched-host (assumed equal: same graphs and kernels)'
-        if traced is None:
+        own = labels.get(f'{base}-host')
+        # Per concurrency, a stock label borrows its patched trace's GPU busy time
+        # where it has no usable trace of its own (no host-trace label, no trace at
+        # that concurrency, or one that lost the eager kernel records).
+        patched = None if base.endswith('-patched') else labels.get(f'{base}-patched-host')
+        if own is None and patched is None:
             continue
         rows = {}
         for c, entry in summary['by_concurrency'].items():
-            trace = traced['by_concurrency'].get(c, {}).get('trace')
             cycle = (entry['counter_windows'].get('cycle_ms') or {}).get('mean')
+            own_t = own['by_concurrency'].get(c, {}).get('trace') if own else None
+            lost = own_t is not None and own_t.get('eager_kernel_records') is False
+            own_trace = own_t is not None and not lost and 'gpu_busy_ms_per_cycle' in own_t
+            trace = own_t if own_trace else None
+            busy_source = f'{base}-host'
+            if trace is None and patched is not None:
+                trace = patched['by_concurrency'].get(c, {}).get('trace')
+                if trace is not None and trace.get('eager_kernel_records') is False:
+                    trace = None
+                busy_source = f'{base}-patched-host (assumed equal: same graphs and kernels)'
+                if lost:
+                    busy_source += f'; {base}-host has no eager kernel records at c = {c}'
+                elif own is not None:
+                    busy_source += f'; {base}-host has no usable trace at c = {c}'
+            if trace is None and own is not None:
+                why = 'has no eager kernel records' if lost else 'has no usable trace'
+                print(f'{base}-host c={c} {why}: no derived idle', file=sys.stderr)
             if trace is None or cycle is None or 'gpu_busy_ms_per_cycle' not in trace:
                 continue
             idle = cycle - trace['gpu_busy_ms_per_cycle']

@@ -1,0 +1,111 @@
+=== hold start 2026-10-02T13:05:11Z repo 8f9a765836be5c371d300239c5582facc2d118a7 sglang-hostgap 6b1d3448872b47ba774aeb6ec077c6aec94c05a2
+=== 13:05:11 dflash stock
+stock c=1: 64 requests, 22263 tokens
+stock c=8: 64 requests, 22258 tokens
+stock c=32: 64 requests, 22258 tokens
+=== 13:07:13 dflash hostgap
+hostgap c=1: 64 requests, 22263 tokens
+hostgap c=8: 64 requests, 22258 tokens
+hostgap c=32: 64 requests, 22258 tokens
+=== 13:09:15 dflash hostgap-validate
+hostgap-validate c=1: 64 requests, 22263 tokens
+hostgap-validate c=8: 64 requests, 22258 tokens
+hostgap-validate c=32: 64 requests, 22258 tokens
+=== 13:12:22 dflash stock-repeat
+stock-repeat c=1: 64 requests, 22263 tokens
+stock-repeat c=8: 64 requests, 22258 tokens
+stock-repeat c=32: 64 requests, 22258 tokens
+=== dflash equality ok=1 (554 s): [2026-10-02 13:11:33] hostgap validation: 8192 verify plans and 0 draft kv_indptr sets matched the stock path; plan guard waited 0 of 12284 times
+=== 13:14:25 dflash-patched-none: --arm dflash --set disable-radix-cache=true --set max-mamba-cache-size=128 --set max-total-tokens=1000000 --no-strict --sglang-worktree /home/ubuntu/sglang-wt/hostgap --env SGLANG_HOSTGAP_VERIFY_PLAN=1 --env SGLANG_HOSTGAP_DRAFT_INDPTR=1 --env SGLANG_HOSTGAP_DFLASH_DRAFT_PLAN=1 --mode none --pyspy --concurrency 1 8 32
+dflash-patched-none c=1 unprofiled: cycle 6.541 ms, 786.8 tok/s/user, 5.15 tok/req/cycle, foreign 0.19 cores
+dflash-patched-none c=1 unprofiled: cycle 6.544 ms, 527.6 tok/s/user, 3.45 tok/req/cycle, foreign 0.16 cores
+dflash-patched-none c=1 unprofiled: cycle 6.542 ms, 511.8 tok/s/user, 3.35 tok/req/cycle, foreign 0.23 cores
+dflash-patched-none c=8 unprofiled: cycle 8.547 ms, 499.9 tok/s/user, 4.27 tok/req/cycle, foreign 0.17 cores
+dflash-patched-none c=8 unprofiled: cycle 8.584 ms, 557.3 tok/s/user, 4.78 tok/req/cycle, foreign 0.09 cores
+dflash-patched-none c=8 unprofiled: cycle 8.584 ms, 560.5 tok/s/user, 4.81 tok/req/cycle, foreign 0.065 cores
+dflash-patched-none c=32 unprofiled: cycle 15.567 ms, 304.8 tok/s/user, 4.75 tok/req/cycle, foreign 0.02 cores
+dflash-patched-none c=32 unprofiled: cycle 15.451 ms, 319.8 tok/s/user, 4.94 tok/req/cycle, foreign 0.055 cores
+dflash-patched-none c=32 unprofiled: cycle 15.455 ms, 289.0 tok/s/user, 4.47 tok/req/cycle, foreign 0.095 cores
+=== 13:17:14 dflash-none: --arm dflash --set disable-radix-cache=true --set max-mamba-cache-size=128 --set max-total-tokens=1000000 --no-strict --mode none --pyspy --concurrency 1 8 32
+dflash-none c=1 unprofiled: cycle 6.584 ms, 786.8 tok/s/user, 5.18 tok/req/cycle, foreign 0.525 cores
+dflash-none c=1 unprofiled: cycle 6.606 ms, 525.8 tok/s/user, 3.47 tok/req/cycle, foreign 0.12 cores
+dflash-none c=1 unprofiled: cycle 6.607 ms, 501.9 tok/s/user, 3.32 tok/req/cycle, foreign 0.105 cores
+dflash-none c=8 unprofiled: cycle 8.693 ms, 493.5 tok/s/user, 4.29 tok/req/cycle, foreign 0.185 cores
+dflash-none c=8 unprofiled: cycle 8.732 ms, 540.0 tok/s/user, 4.72 tok/req/cycle, foreign 0.07 cores
+dflash-none c=8 unprofiled: cycle 8.732 ms, 560.4 tok/s/user, 4.89 tok/req/cycle, foreign 0.1 cores
+dflash-none c=32 unprofiled: cycle 15.698 ms, 310.2 tok/s/user, 4.87 tok/req/cycle, foreign 0.145 cores
+dflash-none c=32 unprofiled: cycle 15.691 ms, 305.9 tok/s/user, 4.80 tok/req/cycle, foreign 0.115 cores
+dflash-none c=32 unprofiled: cycle 15.693 ms, 283.8 tok/s/user, 4.45 tok/req/cycle, foreign 0.245 cores
+=== 13:20:19 dflash-patched-host: --arm dflash --set disable-radix-cache=true --set max-mamba-cache-size=128 --set max-total-tokens=1000000 --no-strict --sglang-worktree /home/ubuntu/sglang-wt/hostgap --env SGLANG_HOSTGAP_VERIFY_PLAN=1 --env SGLANG_HOSTGAP_DRAFT_INDPTR=1 --env SGLANG_HOSTGAP_DFLASH_DRAFT_PLAN=1 --mode nsys --host-trace --repeats 1 --concurrency 1 8 32
+dflash-patched-host c=1 uncollected: cycle 7.022 ms, 752.9 tok/s/user, 5.29 tok/req/cycle, foreign 0.195 cores
+dflash-patched-host c=8 uncollected: cycle 9.128 ms, 472.1 tok/s/user, 4.31 tok/req/cycle, foreign 0.145 cores
+dflash-patched-host c=32 uncollected: cycle 15.812 ms, 299.0 tok/s/user, 4.73 tok/req/cycle, foreign 0.175 cores
+=== 13:22:08 dflash-host: --arm dflash --set disable-radix-cache=true --set max-mamba-cache-size=128 --set max-total-tokens=1000000 --no-strict --mode nsys --host-trace --repeats 1 --concurrency 1 8 32
+dflash-host c=1 uncollected: cycle 7.095 ms, 753.0 tok/s/user, 5.34 tok/req/cycle, foreign 0.155 cores
+dflash-host c=8 uncollected: cycle 9.296 ms, 456.5 tok/s/user, 4.24 tok/req/cycle, foreign 0.155 cores
+dflash-host c=32 uncollected: cycle 16.194 ms, 298.5 tok/s/user, 4.83 tok/req/cycle, foreign 0.205 cores
+=== 13:23:57 A dflash-b8-stock
+run directory: /home/ubuntu/vp-data/hostgap/ab-prof4/dflash-b8-stock/20261002-132357
+[ok  ] cuda_graph_decode: captured: target prefill (breakable), target verify (full), draft verify (full)
+[ok  ] cuda_graph_prefill: captured
+[ok  ] cuda_graph_covers_capacity: target verify graph batch sizes up to 128; server capacity 128
+[ok  ] overlap_scheduler: scheduler disable_overlap_schedule=False
+[ok  ] capacity: effective max_running_requests=128, target 128
+[ok  ] attention_backend: scheduler attention_backend=flashinfer, requested flashinfer
+[ok  ] speculative_config: resolved: speculative_algorithm=DFLASH, speculative_num_steps=1, speculative_eagle_topk=1, speculative_num_draft_tokens=8
+r0 c=  1 ok=64/64 x=  721.3 tok/s/user y=   679.6 tok/s ttft_p50=   38.9 ms accept=4.747 osl_mismatch=0 foreign_cpu=0.86
+r0 c=  2 ok=64/64 x=  662.3 tok/s/user y=  1240.9 tok/s ttft_p50=   42.3 ms accept=4.784 osl_mismatch=0 foreign_cpu=0.52
+r0 c=  4 ok=64/64 x=  583.6 tok/s/user y=  2129.5 tok/s ttft_p50=   43.1 ms accept=4.782 osl_mismatch=0 foreign_cpu=0.75
+r0 c=  8 ok=64/64 x=  476.5 tok/s/user y=  3336.0 tok/s ttft_p50=   45.2 ms accept=4.715 osl_mismatch=0 foreign_cpu=0.38
+r0 c= 16 ok=128/128 x=  344.1 tok/s/user y=  4907.1 tok/s ttft_p50=   50.0 ms accept=4.677 osl_mismatch=0 foreign_cpu=0.55
+r0 c= 32 ok=256/256 x=  223.2 tok/s/user y=  6396.2 tok/s ttft_p50=   63.1 ms accept=4.712 osl_mismatch=0 foreign_cpu=0.45
+done: /home/ubuntu/vp-data/hostgap/ab-prof4/dflash-b8-stock/20261002-132357/sweep.json
+=== 13:28:25 B dflash-b8-hostgap
+run directory: /home/ubuntu/vp-data/hostgap/ab-prof4/dflash-b8-hostgap/20261002-132825
+[ok  ] cuda_graph_decode: captured: target prefill (breakable), target verify (full), draft verify (full)
+[ok  ] cuda_graph_prefill: captured
+[ok  ] cuda_graph_covers_capacity: target verify graph batch sizes up to 128; server capacity 128
+[ok  ] overlap_scheduler: scheduler disable_overlap_schedule=False
+[ok  ] capacity: effective max_running_requests=128, target 128
+[ok  ] attention_backend: scheduler attention_backend=flashinfer, requested flashinfer
+[ok  ] speculative_config: resolved: speculative_algorithm=DFLASH, speculative_num_steps=1, speculative_eagle_topk=1, speculative_num_draft_tokens=8
+r0 c=  1 ok=64/64 x=  724.4 tok/s/user y=   682.4 tok/s ttft_p50=   38.5 ms accept=4.747 osl_mismatch=0 foreign_cpu=0.74
+r0 c=  2 ok=64/64 x=  668.1 tok/s/user y=  1251.4 tok/s ttft_p50=   41.7 ms accept=4.784 osl_mismatch=0 foreign_cpu=0.4
+r0 c=  4 ok=64/64 x=  587.0 tok/s/user y=  2140.5 tok/s ttft_p50=   43.1 ms accept=4.782 osl_mismatch=0 foreign_cpu=0.45
+r0 c=  8 ok=64/64 x=  481.5 tok/s/user y=  3369.5 tok/s ttft_p50=   44.5 ms accept=4.715 osl_mismatch=0 foreign_cpu=1.09
+r0 c= 16 ok=128/128 x=  349.6 tok/s/user y=  4983.6 tok/s ttft_p50=   49.3 ms accept=4.677 osl_mismatch=0 foreign_cpu=0.33
+r0 c= 32 ok=256/256 x=  229.5 tok/s/user y=  6577.9 tok/s ttft_p50=   59.4 ms accept=4.724 osl_mismatch=0 foreign_cpu=0.84
+done: /home/ubuntu/vp-data/hostgap/ab-prof4/dflash-b8-hostgap/20261002-132825/sweep.json
+=== 13:32:51 B dflash-b8-hostgap
+run directory: /home/ubuntu/vp-data/hostgap/ab-prof4/dflash-b8-hostgap/20261002-133251
+[ok  ] cuda_graph_decode: captured: target prefill (breakable), target verify (full), draft verify (full)
+[ok  ] cuda_graph_prefill: captured
+[ok  ] cuda_graph_covers_capacity: target verify graph batch sizes up to 128; server capacity 128
+[ok  ] overlap_scheduler: scheduler disable_overlap_schedule=False
+[ok  ] capacity: effective max_running_requests=128, target 128
+[ok  ] attention_backend: scheduler attention_backend=flashinfer, requested flashinfer
+[ok  ] speculative_config: resolved: speculative_algorithm=DFLASH, speculative_num_steps=1, speculative_eagle_topk=1, speculative_num_draft_tokens=8
+r0 c=  1 ok=64/64 x=  730.8 tok/s/user y=   688.1 tok/s ttft_p50=   37.7 ms accept=4.747 osl_mismatch=0 foreign_cpu=0.87
+r0 c=  2 ok=64/64 x=  677.7 tok/s/user y=  1269.6 tok/s ttft_p50=   40.5 ms accept=4.784 osl_mismatch=0 foreign_cpu=0.35
+r0 c=  4 ok=64/64 x=  592.5 tok/s/user y=  2161.6 tok/s ttft_p50=   42.3 ms accept=4.782 osl_mismatch=0 foreign_cpu=0.43
+r0 c=  8 ok=64/64 x=  484.9 tok/s/user y=  3393.6 tok/s ttft_p50=   44.6 ms accept=4.715 osl_mismatch=0 foreign_cpu=0.63
+r0 c= 16 ok=128/128 x=  352.3 tok/s/user y=  5022.2 tok/s ttft_p50=   48.5 ms accept=4.677 osl_mismatch=0 foreign_cpu=0.41
+r0 c= 32 ok=256/256 x=  229.4 tok/s/user y=  6594.7 tok/s ttft_p50=   58.6 ms accept=4.750 osl_mismatch=0 foreign_cpu=0.6
+done: /home/ubuntu/vp-data/hostgap/ab-prof4/dflash-b8-hostgap/20261002-133251/sweep.json
+=== 13:37:15 A dflash-b8-stock
+run directory: /home/ubuntu/vp-data/hostgap/ab-prof4/dflash-b8-stock/20261002-133715
+[ok  ] cuda_graph_decode: captured: target prefill (breakable), target verify (full), draft verify (full)
+[ok  ] cuda_graph_prefill: captured
+[ok  ] cuda_graph_covers_capacity: target verify graph batch sizes up to 128; server capacity 128
+[ok  ] overlap_scheduler: scheduler disable_overlap_schedule=False
+[ok  ] capacity: effective max_running_requests=128, target 128
+[ok  ] attention_backend: scheduler attention_backend=flashinfer, requested flashinfer
+[ok  ] speculative_config: resolved: speculative_algorithm=DFLASH, speculative_num_steps=1, speculative_eagle_topk=1, speculative_num_draft_tokens=8
+r0 c=  1 ok=64/64 x=  719.0 tok/s/user y=   677.3 tok/s ttft_p50=   39.0 ms accept=4.747 osl_mismatch=0 foreign_cpu=0.95
+r0 c=  2 ok=64/64 x=  664.5 tok/s/user y=  1245.1 tok/s ttft_p50=   41.9 ms accept=4.784 osl_mismatch=0 foreign_cpu=0.44
+r0 c=  4 ok=64/64 x=  579.1 tok/s/user y=  2113.5 tok/s ttft_p50=   43.8 ms accept=4.782 osl_mismatch=0 foreign_cpu=0.31
+r0 c=  8 ok=64/64 x=  473.2 tok/s/user y=  3313.6 tok/s ttft_p50=   45.7 ms accept=4.715 osl_mismatch=0 foreign_cpu=0.86
+r0 c= 16 ok=128/128 x=  343.3 tok/s/user y=  4894.9 tok/s ttft_p50=   50.1 ms accept=4.677 osl_mismatch=0 foreign_cpu=0.29
+r0 c= 32 ok=256/256 x=  225.8 tok/s/user y=  6508.5 tok/s ttft_p50=   61.2 ms accept=4.748 osl_mismatch=0 foreign_cpu=0.52
+done: /home/ubuntu/vp-data/hostgap/ab-prof4/dflash-b8-stock/20261002-133715/sweep.json
+=== hold end 2026-10-02T13:41:43Z (2192 s)

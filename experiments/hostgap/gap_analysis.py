@@ -14,6 +14,10 @@ For one collected window (a `.nsys-rep`, exported to SQLite on first use):
   inclusive host time per cycle and the part of it that overlapped GPU idle
   ("exposed"). CUDA runtime calls open on that thread during idle are counted too.
 * Kernel time per cycle is grouped by a coarse name class (node-level traces).
+* A trace whose export has no kernel table (CUPTI recorded no kernel outside the
+  graphs) is analysed with graphs, copies and memsets only and flagged
+  `eager_kernel_records: false`: its busy time and idle attribution then miss the
+  eager kernels, while graph times and blocking host calls stay valid.
 
     python experiments/hostgap/gap_analysis.py <report.nsys-rep>... --out summary.json
 
@@ -114,12 +118,14 @@ def classify(name: str) -> str:
 
 def load_device(con: sqlite3.Connection) -> dict[str, Any]:
     have = tables(con)
-    kcols = columns(con, 'CUPTI_ACTIVITY_KIND_KERNEL')
-    graph_col = 'k.graphId' if 'graphId' in kcols else '(k.graphNodeId >> 32)'
-    kernels = con.execute(
-        f"""select k.start, k.end, {graph_col}, s.value
-            from CUPTI_ACTIVITY_KIND_KERNEL k join StringIds s on s.id = k.shortName"""
-    ).fetchall()
+    kernels = []
+    if 'CUPTI_ACTIVITY_KIND_KERNEL' in have:
+        kcols = columns(con, 'CUPTI_ACTIVITY_KIND_KERNEL')
+        graph_col = 'k.graphId' if 'graphId' in kcols else '(k.graphNodeId >> 32)'
+        kernels = con.execute(
+            f"""select k.start, k.end, {graph_col}, s.value
+                from CUPTI_ACTIVITY_KIND_KERNEL k join StringIds s on s.id = k.shortName"""
+        ).fetchall()
     intervals = [(r[0], r[1]) for r in kernels]
     for table in ('CUPTI_ACTIVITY_KIND_MEMCPY', 'CUPTI_ACTIVITY_KIND_MEMSET'):
         if table in have:
@@ -153,6 +159,7 @@ def load_device(con: sqlite3.Connection) -> dict[str, Any]:
     return {
         'intervals': np.array(intervals, dtype=np.int64).reshape(-1, 2),
         'kernels': kernels,
+        'eager_kernel_records': 'CUPTI_ACTIVITY_KIND_KERNEL' in have,
         'graph_launches': graph_launches,
         'graph_spans': graph_spans,
     }
@@ -352,6 +359,7 @@ def analyze(report: Path) -> dict[str, Any]:
         'idle_fraction': (window - busy) / window,
         'graph_launch_counts': launch_counts,
         'cycles_from_graphs': graph_cycles,
+        'eager_kernel_records': device['eager_kernel_records'],
     }
     cycles = graph_cycles
     if host is not None:

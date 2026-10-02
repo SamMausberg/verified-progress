@@ -51,22 +51,30 @@ not yet run).
   processes' CPU load peaked at 1.2-1.3 cores at c = 1, 2.2-3.1 cores at c = 8 and 9.6-10.1
   cores at c = 32 and 128 (`foreign_cpu_max`), so the comparisons at c >= 8 may be distorted
   by contention. The interleaved Triton reference sweep in hold 4 was skipped for time.
-- DFlash (block 8, FlashInfer draft attention): 0001-0003 shortened the cycle by 0.7-1.7% in
-  hold 2, which sequential runs cannot separate from launch-to-launch variation at B = 1 and 8
-  (the two holds' stock MTP cycles differ by 0.5-1.0%). Its interleaved A/B and pinned-KV
-  equality on the full series are queued (**pending**). Bench's `dflash-tuned` arm runs the
-  draft with FA4 and does not reach any of the patched paths.
+- DFlash, on bench's untuned `dflash` arm (block 8, FlashInfer draft attention), not on its
+  best-tuned `dflash-tuned` (FA4 draft attention): the full series raises the served per-user
+  rate by 1.0-2.2% at c = 1-32 (measured, hold 5: one session of stock, hostgap, hostgap,
+  stock; all twelve stock/hostgap pairs 1.004-1.028; `hold5/ab_dflash.json`). Greedy outputs
+  are identical to stock on 192/192 requests (tokens, verify-step counts and correct-draft
+  histograms) with the pools pinned and equal. The gain is small because the six blocking reads
+  the series removes there come after the host has already waited for the previous verify, so
+  they barely wait; the draft's planning still runs while the GPU idles. The patched arm stays
+  4-11% below `dflash-tuned` per user (derived across days), so the DFlash frontier does not
+  move. On `dflash-tuned` the series changes nothing (code reading). The one synchronization
+  per cycle the profile workstream found there matches, in count and size, the wait for the
+  previous verify's lengths that every plan needs; this suggests no removable read is left
+  there (inferred from this hold's traces, not traced on `dflash-tuned`).
 
 ## Setup
 
 | Item | Value |
 |---|---|
 | GPU | NVIDIA GH200 480GB (sm_90, 96 GB HBM3), driver 570.195.03 with CUDA 13.0 forward compatibility |
-| Engine | SGLang `bd66ce343e` (stock); engine/hostgap `02b0e36ec8` (patches 0001-0003) for holds 1-2; `6b1d344887` (0001-0005) for hold 4 |
+| Engine | SGLang `bd66ce343e` (stock); engine/hostgap `02b0e36ec8` (patches 0001-0003) for holds 1-2; `6b1d344887` (0001-0005) for holds 4 and 5 |
 | Libraries | torch 2.13.0+cu130, flashinfer 0.6.18, Nsight Systems 2025.3.2 |
 | Model | `Qwen/Qwen3.5-4B@851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a`; DFlash drafter `z-lab/Qwen3.5-4B-DFlash@9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf` |
 | MTP arm | bench `mtp` (NEXTN, 3 steps, top-k 1, 4 draft tokens) + `--enable-linear-replayssm-spec --disable-radix-cache --max-mamba-cache-size 128 --max-total-tokens 1000000`, bench defaults (FlashInfer attention, `--stream-interval 4`, capacity 128, static memory 0.85, CUDA graphs and the overlap scheduler on) |
-| DFlash arm | bench `dflash` (block 8) + `--disable-radix-cache --max-mamba-cache-size 128 --max-total-tokens 1000000` |
+| DFlash arm | bench `dflash` (block 8) + `--disable-radix-cache --max-mamba-cache-size 128 --max-total-tokens 1000000`; draft and target attention FlashInfer (the arm's default) |
 | Patch flags | `SGLANG_HOSTGAP_VERIFY_PLAN=1 SGLANG_HOSTGAP_DRAFT_INDPTR=1 SGLANG_HOSTGAP_DFLASH_DRAFT_PLAN=1` |
 
 The MTP arm resolves to the same server flags as bench's `mtp-tuned` arm on main. Bench's
@@ -172,6 +180,147 @@ Output throughput per GPU moves by the same ratios within 0.006. Accept length i
 c = 1-16 (3.244-3.279); at c = 32 it is 3.263 against 3.258, since arrival timing changes batch
 composition in served runs. With two runs per side the spread is not a distribution, but all
 twelve pairs fall between 1.067 and 1.101. Concurrencies above 32 were not swept.
+
+## DFlash block 8 with FlashInfer drafting, full series 0001-0005 (hold 5)
+
+Measured in one exclusive hold (2026-10-02 13:05-13:42 UTC; engine `6b1d344887` with patches
+0001-0005; files in `hold5/`). The repository was at `8f9a765`: `6f70a23` (main after #163) plus
+`experiments/hostgap/hold_upstream.sh`, which this hold does not run. Every script the hold ran is
+the same at `6f70a23`.
+
+**Which arm.** The DFlash arm of the Setup table: bench's `dflash` arm (block 8) with the radix
+cache off, 128 mamba slots and the KV cache capped at 1M tokens. Its drafter attends with
+FlashInfer, the arm's default (`speculative_draft_attention_backend` is `flashinfer` in every
+server's resolved arguments). This is not bench's best DFlash arm. `dflash-tuned` runs the same
+drafter with FA4 draft attention, and in bench's three confirmation sessions it served 814 / 519 /
+238 tokens/s per user at c = 1 / 8 / 32 (`evidence/bench/confirm/points.csv`): 6-13% more than
+this arm's stock runs here and 4-12% more than its patched runs at c = 1-32 (derived across
+days, with the same workload and flags apart from the draft backend). The patches therefore do
+not move the DFlash frontier, which bench's tuned DFlash arms set at these concurrencies.
+
+**Order and validity.** The hold ran, in this order (`hold5/hold_dflash.log`): greedy output
+equality for stock, hostgap, hostgap with validation and a stock repeat; held-batch profiles,
+patched server before stock (unprofiled windows, then host traces); and served sweeps in the
+order stock, hostgap, hostgap, stock. Hold 2 profiled stock first, so the held windows of the
+two holds form an A-B / B-A pair, except that hold 2's patched engine had only 0001-0003. No step
+printed a failure, every server passed bench's launch checks (CUDA graphs captured for the
+target verify and the draft, overlap scheduler on, capacity 128, FlashInfer attention, the
+resolved speculative configuration) from clean worktrees at the recorded commits, and the GPU
+was clean at the end. Other processes used at most 0.21 cores on average during each served
+point and 0.53 cores during each held window. Only one of the six py-spy recordings was kept
+(patched, B = 32, `pyspy` in `cycle_profiles.json`): the other five windows were invalidated
+because a request stream ended during them (raw `windows.jsonl`), so there is no py-spy
+comparison.
+
+**Exactness** (measured; `hold5/equality/dflash/`). Hold 2's prompts and concurrencies (64
+prompts at c = 1, 8 and 32, radix cache off), now with the pools pinned: every server had 240,000
+KV tokens (a binding `--max-total-tokens`), 128 mamba slots and a running limit of 128, and
+started with 94.5 GiB free (`launch_*.json`). Hostgap, hostgap with `SGLANG_HOSTGAP_VALIDATE=1`
+and the stock repeat each match the first stock run on 192/192 token sequences, verify-step
+counts and correct-draft histograms, with equal pools (`"all_equal": true` in all three compare
+files); accept length is 4.777 / 4.796 / 4.833 at c = 1 / 8 / 32 in all four runs. Log-probabilities
+were not compared. Validation matched at least 8,192 sync-free plans against the stock path (on
+DFlash, the draft forward's two wrapper plans; the draft `kv_indptr` count is 0 because DFlash has
+no multi-step draft), the pinned-buffer guard never waited (0 of 12,284 checks;
+`validation_last_line.txt`), and the validating server logged no assertion. The hold did not
+rerun the GPU plan check or `tests/test_hostgap_plan.py`; hold 4 ran both on this engine.
+
+**Held-batch cycle, untraced** (measured; `hold5/cycle_profiles.json`, `before_after.dflash` and
+`derived_idle`; mean of three 2 s windows, standard deviation in parentheses). The stock idle is
+the stock cycle minus the GPU busy time per cycle in this hold's patched host trace (the stock
+trace cannot give it; see below):
+
+| B | Stock cycle (ms) | 0001-0005 cycle (ms) | Change | Hold 2 (0001-0003, stock first) | Stock idle, derived | Idle removed | Share of the idle |
+|---|---|---|---|---|---|---|---|
+| 1 | 6.599 (0.013) | 6.542 (0.001) | -0.9% | -1.0% | 1.43 ms (22%) | 0.06 | 4% |
+| 8 | 8.719 (0.022) | 8.572 (0.022) | -1.7% | -0.7% | 1.53 (18%) | 0.15 | 10% |
+| 32 | 15.694 (0.004) | 15.491 (0.066) | -1.3% | -1.7% | 1.51 (10%) | 0.20 | 13% |
+
+Each change is three to seven times the larger window standard deviation, and both holds show a
+shorter cycle at every B in either order. But their stock cycles differ by -0.4% to +1.6% (hold
+2: 6.548, 8.584 and 15.758 ms), as much as the change, so these sequential windows do not size
+the gain on their own; the interleaved sweeps below do. Hold 2's estimate of the stock idle
+(1.36-1.46 ms) is 0.05-0.15 ms lower, within the stock cycle's variation between the holds.
+
+**Where the idle is** (measured, host traces; labels `dflash-host` and `dflash-patched-host`;
+traced, so they locate the idle rather than size it). The stock traces exported without any
+kernel record outside the CUDA graphs (no kernel table in any of the three; graph executions,
+copies and runtime calls are present), so their GPU busy time and idle attribution are
+incomplete (`eager_kernel_records: false`) and only their graph times and blocking calls are
+used. The graphs agree between the two traces: the target verify graph takes 3.918 / 5.489 /
+11.005 ms per execution in stock against 3.918 / 5.490 / 11.022 ms patched at B = 1 / 8 / 32, and
+the draft graph 0.982 / 1.172 / 1.685 against 0.982 / 1.173 / 1.689 ms (`graph_ms_per_cycle`), within
+0.23% per execution. Per cycle the two graphs' totals differ by at most 0.38% (0.03 ms), because
+the executions per cycle differ slightly between the windows. That supports using the patched
+trace's busy time for stock; the eager kernels (0.19-1.26 ms per patched cycle) could not be
+compared.
+
+- Stock: under the draft forward's `call_begin_forward`, the drafter's two-wrapper `plan()`
+  makes 6.0 device-to-host copies and 6.0 `cudaStreamSynchronize` calls per cycle
+  (`host_sync_sites`). The synchronizations take about 2.5 µs each. The host reaches them after
+  it has waited in `resolve_seq_lens_cpu` for the previous verify's lengths (1.64 / 3.22 / 9.22 ms
+  per traced cycle), so the stream has already drained and the reads have little to wait for.
+- 0001-0005: no copy or synchronization remains under the draft plan; the only blocking wait per
+  cycle is `resolve_seq_lens_cpu`'s, which every plan needs. The draft forward's planning
+  (`DFlashWorkerV2.forward_batch_generation > ModelRunner.forward > ... > call_begin_forward`) is
+  still the largest site of GPU idle, 0.93 / 0.94 / 0.94 ms per traced cycle
+  (`idle_ms_per_cycle_by_chain`), followed by the worker's own code in `forward_batch_generation`
+  (0.30-0.32 ms) and the draft's `DecodeCudaGraphRunner.load_batch` (0.25 ms). The target verify's
+  sync-free `fast_prefill_plan` overlaps GPU idle for 0.12 ms per cycle at B = 1 and almost none
+  at B >= 8.
+
+So on DFlash the host plans the draft only after it learns the previous verify's lengths, and it
+does so while the GPU idles, blocking or not; removing the reads saves little more than their
+own cost, which matches the 0.06-0.20 ms per cycle above. On MTP the same kind of read held back
+verify planning that could otherwise run under the draft graph, which is why the series gains
+far more there (interpretation of the traces, not a measured decomposition).
+
+**Served A/B** (measured, one session; `hold5/ab_dflash.json` from `ab_summary.py`). bench.sweep
+with one server per sweep, in the order stock, hostgap, hostgap, stock, at c = 1-32, with
+identical flags except the patched worktree and its environment flags. All 24 points are valid.
+Per-user output rate (end to end, TTFT included), mean of the two runs per side:
+
+| c | Stock (tok/s per user) | 0001-0005 | Ratio of means | Pair ratios (adjacent runs) | ITL p50, ms | TTFT p50, ms |
+|---|---|---|---|---|---|---|
+| 1 | 720.2 | 727.6 | 1.010 | 1.004, 1.016 | 1.227 / 1.215 | 39.0 / 38.1 |
+| 2 | 663.4 | 672.9 | 1.014 | 1.009, 1.020 | 1.354 / 1.336 | 42.1 / 41.1 |
+| 4 | 581.4 | 589.8 | 1.014 | 1.006, 1.023 | 1.529 / 1.504 | 43.4 / 42.7 |
+| 8 | 474.9 | 483.2 | 1.017 | 1.010, 1.025 | 1.912 / 1.887 | 45.4 / 44.5 |
+| 16 | 343.7 | 351.0 | 1.021 | 1.016, 1.026 | 2.708 / 2.648 | 50.1 / 48.9 |
+| 32 | 224.5 | 229.4 | 1.022 | 1.028, 1.016 | 4.219 / 4.159 | 62.1 / 59.0 |
+
+Output throughput per GPU moves by the same ratios within 0.001, and the server's time per decode
+pass falls by 1.0-2.0%. Accept length is identical at c = 1-16 (4.677-4.784); at c = 32 it is 4.737
+against 4.730, since arrival timing changes batch composition in served runs. With two runs per
+side the spread is not a distribution, but all twelve pairs lie above 1 (1.004-1.028). At c = 1-16
+the second pair is the larger one, mainly because the second hostgap run was faster than the
+first; the stock, hostgap, hostgap, stock order cancels such a drift in the means if it is
+linear. Concurrencies above 32 were not swept.
+
+**What this leaves for `dflash-tuned`.** The series cannot help bench's tuned block-8 arm. By
+reading the code: 0001 and 0002 change EAGLE/NEXTN paths, which DFlash does not run; SGLang
+already gives DFlash's target verify a sync-free plan (`fast_prefill_plan`); 0003 changes only the
+plan of the drafter's FlashInfer wrappers; and 0004-0005 change only the code of 0001-0003. With
+FA4 draft attention the draft forward's metadata goes through SGLang's FlashAttention backend,
+which the series does not touch, so on `dflash-tuned` it changes nothing (not run). The upstream
+port (sgl-project/sglang#42195) leaves the DFlash draft plan out altogether.
+
+The profile workstream found a host gap on `dflash-tuned` all the same: one
+`cudaStreamSynchronize` per cycle (1.71 ms at c = 1, traced) and one `cudaEventSynchronize` (5 µs),
+with the call site not traced, and an untraced gap of at most about 0.66 ms per cycle at c = 1
+and 0.97 ms at c = 4 (11% and 14% of the cycle; derived overestimates;
+`evidence/profiles/README.md`, "Host gap on the tuned arms", and `attribution/dflash-tuned_bs*.json`,
+`host_sync_calls`). The patched trace here has the same pair per cycle: one
+`cudaStreamSynchronize` in `resolve_seq_lens_cpu` (1.61 ms per traced cycle at B = 1, growing with B
+as on `dflash-tuned`) and one `cudaEventSynchronize` of 5 µs in `process_batch_result_decode`, plus
+an untraced synchronization in about 1% of cycles. Each blocking read in the stock draft plan
+appears in the trace as a copy plus a `cudaStreamSynchronize`, so a read of that kind on
+`dflash-tuned` would have raised its count above one. This suggests (not traced on
+`dflash-tuned`) that the tuned arm has no removable blocking read left: its synchronization is
+the wait for the previous verify's lengths, and its gap is host work between those lengths
+arriving and the draft launch, as for the idle that remains here and on MTP. A port to the tuned
+arm would have to make that host path cheaper or start it earlier; removing synchronizations
+would not reach it. The 0.66 ms bound is what such work could recover at most at c = 1.
 
 ## How much of the cycle is idle (hold 2, patches 0001-0003)
 
@@ -327,8 +476,8 @@ pin it and it varied by up to 155 tokens between launches, including stock again
 The DFlash compare files therefore say `"all_equal": false` at the top level: that flag
 includes `pools_equal`, while every per-concurrency output comparison in them is equal. The
 runs used at most 32 running requests and about 35K tokens, so no request was ever limited by
-the pool; a rerun on the full series with a binding cap (240K) is queued (`hold_dflash.sh`,
-**pending**). No comparison found an output difference, so there was
+the pool. Hold 5 reran the comparison on the full series with a binding cap (240K tokens) and
+equal pools (above). No comparison found an output difference, so there was
 nothing to classify with the state workstream's divergence classes.
 
 ## Effect (hold 2, patches 0001-0003)
@@ -352,9 +501,9 @@ These pairs are sequential, not interleaved: in each arm one stock server ran al
 windows, then one patched server, in the same hold. The window standard deviations measure
 the spread within one server, not between launches. The MTP changes are at least four times
 the larger window standard deviation at every B. The DFlash changes at B = 1 and 8 (0.06 ms)
-are one to five window standard deviations, which a launch-to-launch shift could produce, so
-the DFlash gain is unconfirmed until the interleaved sweeps report. Hold 4 later ran the MTP
-pair in the opposite order (Full series, above).
+are one to five window standard deviations, which a launch-to-launch shift could produce. Hold
+4 later ran the MTP pair in the opposite order, and hold 5 the DFlash pair, whose interleaved
+sweeps put the full series' DFlash gain at 1.0-2.2% per user (both above).
 
 The patches launch the same graphs and kernels on the same data (above), so the GPU work per
 cycle is unchanged and the cycle-time reduction is GPU idle removed (derived): 0.19 / 0.24 /
@@ -398,8 +547,8 @@ at B = 128). It predates the patches: stock shows five synchronizations there fo
 copies. It comes from FlashInfer's `_compute_page_mask_indptr`, and 0004 removes it (Full
 series, above).
 
-**Serving A/B.** The interleaved MTP sweeps ran on the full series in hold 4 (Full series,
-above). The DFlash sweeps are queued (`hold_dflash.sh`, **pending**).
+**Serving A/B.** The interleaved sweeps ran on the full series: MTP in hold 4 and DFlash in
+hold 5 (both above).
 
 ## Reproduction
 
@@ -413,6 +562,7 @@ the patch series.
 | `plan_equivalence.json`, `equality/` | hold 2 (repository `3bf8479`, engine `02b0e36ec8`, 13:07-13:45 UTC): `experiments/hostgap/hold_equality_profiles.sh`; then `python experiments/hostgap/equality.py compare <stock> <variant> --out ...` (repository `fa43fe6`) |
 | `cycle_profiles.json` | the profiling steps of the same hold 2; then `python experiments/hostgap/summarize.py ~/vp-data/hostgap/prof2 --out evidence/hostgap/cycle_profiles.json`. The file records the repository commit that summarized it (`generated_by`) and, per label, the commits, launch command, flag environment and start time of the run (`provenance`), and every counted window (`counter_windows.windows`) |
 | `hold4/` | hold 4 (repository `02a9803`, engine `6b1d344887`, 2026-10-01 19:49-20:28 UTC): `scripts/gpu_lock.sh -x experiments/hostgap/hold_mtp.sh` (`TAG=prof4`). That run exported `OUT`, so its A/B sweeps landed in `~/vp-data/hostgap/equality_x/` instead of a directory of their own (fixed since: sweeps go to `~/vp-data/hostgap/ab-<TAG>/`, and a profile step refuses a label that already holds windows). Then, at repository `c57f9e5`: `python experiments/hostgap/summarize.py ~/vp-data/hostgap/prof4 --out evidence/hostgap/hold4/cycle_profiles.json` and `python experiments/hostgap/ab_summary.py --runs ~/vp-data/hostgap/equality_x --a-label mtp-rspec-stock --b-label mtp-rspec-hostgap --out evidence/hostgap/hold4/ab_mtp.json`. `plan_equivalence.json` and `pytest_hostgap_plan.log` are the hold's own outputs; `equality/mtp/compare_stock_vs_*.json` were written by the hold with `equality.py compare` against hold 2's stock run, `launch_*.json` are the hold's launch summaries, and `validation_last_line.txt` is the last `hostgap validation:` line of the validating server's log |
+| `hold5/` | hold 5 (repository `8f9a765`, engine `6b1d344887`, 2026-10-02 13:05-13:42 UTC): `scripts/gpu_lock.sh -x experiments/hostgap/hold_dflash.sh` (`TAG=prof4`: the DFlash labels share hold 4's profile directory; sweeps in `~/vp-data/hostgap/ab-prof4/`, equality runs in `~/vp-data/hostgap/equality_kvpin/`). `hold_dflash.log` is the hold's log from its `=== hold start` line on. `equality/dflash/compare_stock_vs_*.json` were written by the hold with `equality.py compare`; `launch_*.json` are the four servers' `launch_summary.json`; `validation_last_line.txt` is the last `hostgap validation:` line of the validating server's log. Then, at repository `edd525b` (which `cycle_profiles.json` records as `generated_by`): `python experiments/hostgap/summarize.py ~/vp-data/hostgap/prof4 --labels 'dflash-*' --out evidence/hostgap/hold5/cycle_profiles.json` and `python experiments/hostgap/ab_summary.py --runs ~/vp-data/hostgap/ab-prof4 --a-label dflash-b8-stock --b-label dflash-b8-hostgap --out evidence/hostgap/hold5/ab_dflash.json` |
 
 ## Limits
 
@@ -421,12 +571,17 @@ the patch series.
   timing comes from untraced windows, and every idle magnitude quoted above is the derived
   untraced estimate.
 - The held-batch before/after timings are sequential within each hold, one server each (stock
-  first in hold 2, patched first in hold 4); the served A/B in hold 4 is interleaved.
+  first in hold 2, patched first in holds 4 and 5); the served A/Bs in holds 4 and 5 are
+  interleaved, one session each.
 - Hold 1's stock host traces and hold 2's patched traces come from different window drivers
-  and are not compared with each other; hold 4 traced both with the same driver.
-- The full series' served gain is measured at c = 1-32 on the tuned MTP arm only. c > 32, the
-  DFlash arms and the Triton reference were not swept on it; the DFlash hold is queued.
+  and are not compared with each other; hold 4 traced both with the same driver. Hold 5's stock
+  DFlash traces lost their eager kernel records, so only their graph times and blocking calls
+  are used.
+- The full series' served gain is measured at c = 1-32 on the tuned MTP arm and on the untuned
+  DFlash block-8 arm with FlashInfer drafting, one session each. c > 32, bench's tuned DFlash
+  arms (on which the series changes nothing, by code reading) and the Triton reference were not
+  swept.
 - Equality covers greedy decoding at concurrency 1, 8 and 32 on 64 prompts per concurrency,
-  the two arms above and top-k 1 chains; trees, sampling, the radix cache, NVFP4 KV and the
+  the two arms above (DFlash with pinned pools only in hold 5) and top-k 1 chains; trees, sampling, the radix cache, NVFP4 KV and the
   plan-stream option are not covered (SGLang's plan stream fails at the first verify on
   Qwen3.5 MTP at this commit, `evidence/moonshot/README.md`).
