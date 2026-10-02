@@ -28,6 +28,7 @@ from typing import Any
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
 from bench.arms import parse_overrides, resolve_arm, server_command
+from bench.server import port_free
 
 CONFIRM = REPO / 'bench/workloads/mixed-v2/confirm.jsonl'
 WARMUP = REPO / 'bench/workloads/mixed-v2/warmup.jsonl'
@@ -121,6 +122,10 @@ def main() -> None:
     parser.add_argument('--nsys', action='store_true')
     parser.add_argument('--requests', type=int, default=30)
     args = parser.parse_args()
+    if not port_free('127.0.0.1', args.port):
+        # A server already on this port would answer the health check and every request,
+        # and the record would attribute its numbers to this arm (bench.server does the same).
+        raise SystemExit(f'port {args.port} is already in use; stop that server first')
     out = args.out.expanduser() / args.label
     if out.exists():
         raise SystemExit(f'{out} exists; move it aside')
