@@ -21,10 +21,11 @@ else
 fi
 RUN=(python "$REPO/experiments/profiling/run_profiles.py")
 
-# A profile run is skipped only when its output directory holds every window record
-# the same run would append (run_profiles.py --check-complete exits 0; 10 means an
-# incomplete or different run, 11 no run), so a resubmitted hold repeats exactly
-# the unfinished runs. Such a run is moved aside to <dir>.set-aside-<UTC time>,
+# A profile run is skipped only when its output directory records the same command
+# (arguments, server command, environment) and holds every window record that run
+# appends (run_profiles.py --check-complete exits 0; 10 means an incomplete or
+# different run, 11 no run), so a resubmitted hold repeats exactly the unfinished
+# or changed runs. Such a run is moved aside to <dir>.set-aside-<UTC time>,
 # never extended: run_profiles.py refuses a directory that already holds windows.
 # VP_RERUN=1 repeats every run, moving the earlier ones aside the same way.
 prof() {

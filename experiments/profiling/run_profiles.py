@@ -34,11 +34,13 @@ written to ``--out-dir``. One directory holds one server session: the script
 refuses a directory that already holds a ``windows.jsonl``, so an interrupted
 run is never extended by a second server.
 
-``--check-complete`` launches nothing. It compares ``windows.jsonl`` with the
-records a complete run of the same arguments appends (and, under nsys, checks
-each collected window's report) and exits 0 when they match, 10 when the
-directory holds an incomplete or different run, and 11 when it holds no
-records. ``run_all.sh`` uses it to decide whether a run can be skipped.
+``--check-complete`` launches nothing. It compares the command recorded in
+``run_meta.json`` with these arguments and with the server command and environment
+they resolve to now, and ``windows.jsonl`` with the records a complete run of these
+arguments appends (under nsys, also each collected window's report). It exits 0
+when everything matches, 10 when the directory holds an incomplete or different
+run, and 11 when it holds no records. ``run_all.sh`` uses it to decide whether a
+run can be skipped.
 """
 
 from __future__ import annotations
@@ -142,14 +144,62 @@ def read_windows(path: Path) -> tuple[list[dict], list[str]]:
     return rows, bad
 
 
-def run_status(args: argparse.Namespace) -> tuple[int, list[str]]:
-    """COMPLETE, INCOMPLETE or ABSENT for the run that ``args`` describe, with the reasons."""
+def build_server(args: argparse.Namespace) -> tuple[list[str], dict[str, str]]:
+    """The server command (without a profiler prefix) and environment of a run."""
+    if args.arm in BENCH_ARMS:
+        server, arm_env = bench_server(args.arm, args.port, args.concurrency)
+    else:
+        server = [sys.executable, '-m', 'sglang.launch_server', *BASE_FLAGS]
+        server += ['--port', str(args.port), *ARMS[args.arm]]
+        arm_env = {}
+    return server + shlex.split(args.extra_server_args), arm_env
+
+
+# Arguments that do not change what a run records.
+NOT_COMPARED = ('out_dir', 'check_complete')
+
+
+def command_problems(args: argparse.Namespace) -> list[str]:
+    """How the run that ``args`` describe differs from the one recorded in run_meta.json.
+
+    Every run_profiles.py argument except those in NOT_COMPARED, and the resolved server
+    command and environment (which also follow bench/arms.toml), must match.
+    """
+    path = args.out_dir / 'run_meta.json'
+    if not path.exists():
+        return [f'no {path.name} to compare the command with']
+    meta = json.loads(path.read_text())
+    try:
+        recorded = build_parser().parse_args(meta['argv'][1:])
+    except SystemExit:
+        return [f'the command in {path.name} does not parse']
+    problems = [
+        f'--{key.replace("_", "-")}: recorded {getattr(recorded, key, None)!r}, now {value!r}'
+        for key, value in vars(args).items()
+        if key not in NOT_COMPARED and getattr(recorded, key, None) != value
+    ]
+    server, arm_env = build_server(args)
+    if shlex.split(meta.get('server_command', ''))[-len(server) :] != server:
+        problems.append('the server command differs from the recorded one')
+    if meta.get('env', {}) != arm_env:
+        problems.append('the server environment differs from the recorded one')
+    return problems
+
+
+def run_status(args: argparse.Namespace, compare_command: bool = True) -> tuple[int, list[str]]:
+    """COMPLETE, INCOMPLETE or ABSENT for the run that ``args`` describe, with the reasons.
+
+    With ``compare_command`` the recorded command must also match ``args``
+    (``command_problems``), so a run made with other options is not complete.
+    """
     path = args.out_dir / 'windows.jsonl'
     if not path.exists():
         return ABSENT, [f'no {path}']
     rows, problems = read_windows(path)
     if not rows and not problems:
         return ABSENT, [f'{path} has no records']
+    if compare_command:
+        problems += command_problems(args)
     problems += window_problems(rows, args.arm, args.mode, args.concurrency, args.repeats)
     if args.mode == 'nsys':
         for c in sorted(set(args.concurrency)):
@@ -339,8 +389,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         '--check-complete',
         action='store_true',
-        help=f'launch nothing; exit {COMPLETE} if --out-dir holds every window record of '
-        f'this run, {INCOMPLETE} if it holds an incomplete or different run, {ABSENT} if none',
+        help=f'launch nothing; exit {COMPLETE} if --out-dir holds this run (same recorded '
+        f'command, every window record), {INCOMPLETE} if it holds an incomplete or different '
+        f'run, {ABSENT} if none',
     )
     return parser
 
@@ -359,13 +410,7 @@ def main() -> None:
         )
     args.out_dir.mkdir(parents=True, exist_ok=True)
     args.session = f'vp_{args.arm}_{os.getpid()}'
-    if args.arm in BENCH_ARMS:
-        server, arm_env = bench_server(args.arm, args.port, args.concurrency)
-    else:
-        server = [sys.executable, '-m', 'sglang.launch_server', *BASE_FLAGS]
-        server += ['--port', str(args.port), *ARMS[args.arm]]
-        arm_env = {}
-    server += shlex.split(args.extra_server_args)
+    server, arm_env = build_server(args)
     # A non-zero flush interval lets CUPTI allocate more buffers instead of
     # dropping records once its 50 default buffers fill (seen in MTP windows).
     nsys_trace = [

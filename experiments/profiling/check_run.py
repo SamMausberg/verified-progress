@@ -4,9 +4,10 @@
 
 ``run_profiles.py`` writes its command line to ``run_meta.json`` when it starts; this
 script parses that command and checks ``windows.jsonl`` (and, under nsys, the reports)
-against it, as ``run_profiles.py --check-complete`` does, but for a directory
-possibly moved since. Exit status: 0 complete, 10 incomplete or different, 11 no
-records or no ``run_meta.json``.
+against it, for a directory possibly moved since. Unlike ``run_profiles.py
+--check-complete`` it does not compare the command with the one the current code and
+``bench/arms.toml`` would run: the question is whether the recorded run finished. Exit
+status: 0 complete, 10 incomplete, 11 no records or no ``run_meta.json``.
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ def main() -> None:
         sys.exit(print_status(run_dir, ABSENT, ['no run_meta.json']))
     args = recorded_args(json.loads(meta.read_text()))
     args.out_dir = run_dir
-    sys.exit(print_status(run_dir, *run_status(args)))
+    sys.exit(print_status(run_dir, *run_status(args, compare_command=False)))
 
 
 if __name__ == '__main__':

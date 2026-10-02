@@ -8,6 +8,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -41,14 +42,20 @@ def rows_for(arm: str, mode: str, concurrency: list[int], repeats: int = 1) -> l
     return rows
 
 
-def write_run(out: Path, arm: str, mode: str, rows: list[dict], reports: list[int]) -> None:
+def write_run(
+    out: Path, arm: str, mode: str, rows: list[dict], reports: list[int], repeats: int = 1
+) -> None:
+    """A run directory as run_profiles.py leaves it, recording the command it was run with."""
     out.mkdir(parents=True, exist_ok=True)
     (out / 'windows.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in rows))
-    # Recorded where the run was made, before the directory moved (check_run.py ignores it).
+    # Recorded where the run was made, before the directory moved (never compared).
     argv = [str(PROFILING / 'run_profiles.py'), '--arm', arm, '--mode', mode]
-    argv += ['--out-dir', f'/elsewhere/{out.name}', '--concurrency']
+    argv += ['--out-dir', f'/elsewhere/{out.name}', '--repeats', str(repeats), '--concurrency']
     argv += [str(c) for c in sorted({r['concurrency'] for r in rows})]
-    (out / 'run_meta.json').write_text(json.dumps({'argv': argv}))
+    server, env = rp.build_server(rp.build_parser().parse_args(argv[1:]))
+    prefix = ['nsys', 'launch', '--session-new=vp_test'] if mode == 'nsys' else []
+    meta = {'argv': argv, 'server_command': shlex.join(prefix + server), 'env': env}
+    (out / 'run_meta.json').write_text(json.dumps(meta))
     for c in reports:
         (out / f'{arm}_bs{c}.nsys-rep').write_text('report')
 
@@ -106,6 +113,34 @@ def test_check_complete_exit_codes(tmp_path: Path) -> None:
     run = check(out, *args)
     assert run.returncode == rp.INCOMPLETE, run.stderr
     assert 'is not JSON' in run.stdout
+
+
+def test_check_complete_compares_the_recorded_command(tmp_path: Path) -> None:
+    # Codex on #192: a run made with other options must not count as this run.
+    args = ('--arm', 'dflash-tuned', '--mode', 'none', '--repeats', '3', '--concurrency', '1', '4')
+    out = tmp_path / 'run'
+    rows = rows_for('dflash-tuned', 'none', [1, 4], repeats=3)
+    write_run(out, 'dflash-tuned', 'none', rows, [], repeats=3)
+    assert check(out, *args).returncode == rp.COMPLETE
+    run = check(out, *args, '--plain-window', '10')
+    assert run.returncode == rp.INCOMPLETE
+    assert '--plain-window: recorded 5.0, now 10.0' in run.stdout
+    run = check(out, *args, '--extra-server-args=--cuda-graph-max-bs 8')
+    assert run.returncode == rp.INCOMPLETE
+    assert 'the server command differs from the recorded one' in run.stdout
+    # The recorded server command no longer resolves from the arm (bench/arms.toml changed).
+    meta = json.loads((out / 'run_meta.json').read_text())
+    meta['server_command'] = meta['server_command'].replace(
+        '--speculative-dflash-block-size 8', '--speculative-dflash-block-size 4'
+    )
+    (out / 'run_meta.json').write_text(json.dumps(meta))
+    run = check(out, *args)
+    assert run.returncode == rp.INCOMPLETE
+    assert 'the server command differs from the recorded one' in run.stdout
+    (out / 'run_meta.json').unlink()
+    run = check(out, *args)
+    assert run.returncode == rp.INCOMPLETE
+    assert 'no run_meta.json' in run.stdout
 
 
 def test_check_run_reads_the_recorded_command(tmp_path: Path) -> None:
@@ -170,9 +205,9 @@ def test_run_all_dflash_repeats_only_unfinished_runs(tmp_path: Path) -> None:
     b16_nsys = data / 'dflash-tuned-b16_nsys'
     write_run(b16_nsys, 'dflash-tuned-b16', 'nsys', rows_for('dflash-tuned-b16', 'nsys', c), c)
     partial = rows_for('dflash-tuned-b16', 'none', c, repeats=3)[:1]
-    write_run(data / 'dflash-tuned-b16_none', 'dflash-tuned-b16', 'none', partial, [])
+    write_run(data / 'dflash-tuned-b16_none', 'dflash-tuned-b16', 'none', partial, [], 3)
     full_none = rows_for('dflash-tuned', 'none', c, repeats=3)
-    write_run(data / 'dflash-tuned_none', 'dflash-tuned', 'none', full_none, [])
+    write_run(data / 'dflash-tuned_none', 'dflash-tuned', 'none', full_none, [], 3)
     script = PROFILING / 'run_all.sh'
     run = subprocess.run(
         ['bash', str(script), 'dflash'], env=env, capture_output=True, text=True, timeout=120
