@@ -55,7 +55,7 @@ once per second; `foreign_cpu_mean` and `foreign_cpu_max` in `points.csv`). A po
 whose mean exceeds 2 cores is invalid (`host_contention`), as is one with failed
 requests, wrong output lengths, an unflushed cache or unexpected prompts. Of 186
 points, 4 are invalid, all `plain-tuned` in confirm-supp: c=2, 8, 16 and 32 at 3.8,
-2.4, 2.1 and 2.6 foreign cores (an unlocked Triton build and other agents' test runs
+2.4, 2.1 and 2.6 foreign cores (an unlocked Triton build and other test runs
 during the hold). They stay in `points.csv` with their reason and out of every mean and
 pair, so `mtp-stockverify` at those concurrencies, `mtp-tuned` at c=2, 8, 16 and
 `plain-tuned-replayssm` at c=32 have no paired baseline in that session. The valid

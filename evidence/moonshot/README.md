@@ -639,12 +639,12 @@ to the measured noise floor); "lossy" changes them and needs the quality budget 
 | 9 | Certified int8 head | latency | exact | head is 15% of plain bytes, 39% of verify bytes under the INT4 target | none | kernel workstream | integrate workstream |
 | - | FP8 W8A8 (Triton), FP8 KV, BF16 state, 2:4 sparsity | - | lossy | measured no gain (FP8 W8A8, FP8 KV); BF16 dominated by FP16; 2:4 unsupported in SGLang | - | - | dropped |
 
-Deserving dedicated agents next: (a) a host-gap removal agent for the speculative cycle
+Deserving dedicated work next: (a) host-gap removal for the speculative cycle
 (sync-free verify planning; the profile workstream has the call sites), because it
 multiplies every drafter at c = 1-4; (b) the c >= 256 streaming front end, because
 client throughput above c = 256 is not yet measured cleanly (see 1.3) and every throughput
 lever above c = 128 depends on it.
-The integrator assigned (b) to bench and kept (a) with moonshot.
+(b) went to the bench workstream and (a) stayed with moonshot.
 
 ### Quality budget for the lossy stack (fixed before measuring)
 

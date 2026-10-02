@@ -28,7 +28,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-# Idle-host background (IDE server, agent CLIs, kernel threads) measures 0.3-0.6
+# Idle-host background (IDE server, interactive CLI sessions, kernel threads) measures 0.3-0.6
 # cores here. A run needs its four single-threaded loops (scheduler, tokenizer
 # manager, detokenizer, client timing manager) to keep a core each and the memory
 # system to itself; 2 cores admits the background and rejects any real job. It is

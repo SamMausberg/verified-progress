@@ -652,7 +652,7 @@ untraced cycle (derived; 1.08-1.15x).
   host-side times are, which is why the MTP idle share is given both profiled and
   derived. The host-function NVTX ranges and py-spy add their own overhead; use their
   split, not their absolute times.
-- **Host load.** Other agents' CPU jobs share this machine. Every window since the MTP
+- **Host load.** Other CPU jobs share this machine. Every window since the MTP
   rerun records the mean number of busy cores outside our server and client
   (`cpu_cores_busy_foreign` in `windows/*.jsonl`); all MTP and diagnostic windows here
   ran with 0.3-1.4 foreign cores, below the team's 2-core limit for host-gap claims. The
