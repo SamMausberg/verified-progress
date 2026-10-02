@@ -198,17 +198,24 @@ def bench_projection(
             group = ckpt.group_size()
             raw = []
             for p in prefixes:
-                packed = torch.cat([ckpt.tensor(f'{p}{m}.weight_packed') for m in projection.modules])
-                scales = torch.cat([ckpt.tensor(f'{p}{m}.weight_scale') for m in projection.modules])
+                packed = torch.cat(
+                    [ckpt.tensor(f'{p}{m}.weight_packed') for m in projection.modules]
+                )
+                scales = torch.cat(
+                    [ckpt.tensor(f'{p}{m}.weight_scale') for m in projection.modules]
+                )
                 raw.append((packed.contiguous(), scales.contiguous()))
             n, k = raw[0][0].shape[0], raw[0][0].shape[1] * 8
             nbytes = n * k // 2 + n * (k // group) * 2
             copies = cold_copies(nbytes, len(raw))
             # Every copy is a separately repacked module, so no weight is read twice per replay.
-            ops = [w4a16_module(packed, scales, group) for _ in range(copies) for packed, scales in raw]
+            ops = [
+                w4a16_module(packed, scales, group) for _ in range(copies) for packed, scales in raw
+            ]
 
             def make(x: torch.Tensor, ops: list[Any] = ops) -> Callable[[], object]:
                 return lambda: [scheme.apply_weights(module, x, None) for scheme, module in ops]
+
         for m in M_VALUES:
             x = torch.randn(m, k, device='cuda', dtype=torch.bfloat16)
             replay_us = time_graph(capture(make(x)), inner, repeats)
