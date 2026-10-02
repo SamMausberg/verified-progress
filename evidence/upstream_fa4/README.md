@@ -71,17 +71,17 @@ the paged TMA load (page size equal to tile_n), on `main` and on `ceil` (0.0022-
 failure is specific to the cp.async paged loader.
 
 **tile_n 144: wrong output on every tree (found here, cause not located).** Head_dim 96 and 80
-without causal masking use a 192 x 144 tile, and every form of the line, including `main`'s floor,
-gives 1 entry per thread. With the cp.async paged loader the output is finite but wrong on all four
-trees: at head_dim 96 and page size 1 the largest error is 0.35 (`main`), 0.98 (`ceil`), 0.96
-(`ceil_div`) and 0.60 (`max_one`), against 0.0106 for the BF16 reference; at page size 16 it is
-0.52 and 0.32 (`main`, `ceil`; reference 0.0136); at head_dim 80, 0.95 and 1.94 (reference 0.0076).
-The same head_dim 96 case is correct with a contiguous cache and with the paged TMA load (page size
-144), and head_dim 96 causal and head_dim 64 non-causal (both tile_n 128) are correct (these four on
-`main` and `ceil`). The `varlen`
-harness gives the same picture on SGLang's copy and on flash-attention `main`: wrong at head_dim 96
-with 300, 145 and 100 keys (0.26-0.51 over all calls; BF16 0.0010-0.0019) and at head_dim 80 (up to 1.48), correct
-with exactly 144 keys (0.0013), and correct without a page table in every one of these cases.
+without causal masking use a 192 x 144 tile: `main`'s floor and `max_one` give 1 entry per thread,
+`ceil` and `ceil_div` give 2, and all four compile. With the cp.async paged loader the output is
+finite but wrong on all four trees: at head_dim 96 and page size 1 the largest error is 0.35
+(`main`), 0.98 (`ceil`), 0.96 (`ceil_div`) and 0.60 (`max_one`), against 0.0106 for the BF16
+reference; at page size 16 it is 0.52 and 0.32 (`main`, `ceil`; reference 0.0136); at head_dim 80,
+0.95 and 1.94 (reference 0.0076). The same head_dim 96 case is correct with a contiguous cache and
+with the paged TMA load (page size 144), and head_dim 96 causal and head_dim 64 non-causal (both
+tile_n 128) are correct (these four on `main` and `ceil`). The `varlen` harness gives the same
+picture on SGLang's copy and on flash-attention `main`: wrong at head_dim 96 with 300, 145 and 100
+keys (0.26-0.51 over all calls; BF16 0.0010-0.0019) and at head_dim 80 (up to 1.48), correct with
+exactly 144 keys (0.0013), and correct without a page table in every one of these cases.
 
 **Which cp.async cases fail.** For BF16, the loader's 128 threads cover
 `rows_per_pass = 128 // (gcd(head_dim, head_dim_v, 64) // 8)` KV rows per copy (`paged_kv.py`). Of
