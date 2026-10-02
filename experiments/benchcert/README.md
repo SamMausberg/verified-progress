@@ -233,7 +233,11 @@ in the analysis or the holds, shown with its outputs before and after.
    concurrency 1 with the common prefix and top-5 logprobs, and classes it by the
    stock margin between the two tokens: tie, one ulp, near (at most 0.5 nats) or
    large (`experiments/state_safety/compare.py`'s classes, applied to one margin;
-   `rescore.py`, run by `hold_shared.sh`).
+   `rescore.py`, run by `hold_shared.sh`). The first scoring run (2026-10-02 07:38) read the
+   tokens' logprobs from the wrong response key, so every margin was NaN and every
+   context classed large; it is discarded (kept as `classes.keybug.jsonl` with the raw
+   runs) and the declared re-score was rerun after the fix (`hold_shared.sh rescore`).
+   The wave controls compare token ids and are unaffected.
 
 Tokens are compared whenever both launches ran their declared configuration and
 every request finished with its full length, whatever the point's timing validity

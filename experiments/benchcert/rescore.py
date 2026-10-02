@@ -105,12 +105,20 @@ def score_one(url: str, context: dict[str, Any]) -> dict[str, Any]:
     )
     with urllib.request.urlopen(request, timeout=300) as response:
         meta = json.loads(response.read())['meta_info']
-    top = (meta.get('output_top_logprobs') or [[]])[0]
+    top = (meta.get('output_top_logprobs') or [None])[0] or []
+    # SGLang returns the requested tokens' logprobs under the plural key, one list per
+    # output position of [logprob, token id, text].
     chosen = {
         int(entry[1]): float(entry[0])
-        for entry in (meta.get('output_token_ids_logprob') or [[]])[0]
+        for entry in (meta.get('output_token_ids_logprobs') or [None])[0] or []
+        if entry[0] is not None
     }
-    lp_first, lp_second = chosen.get(first, math.nan), chosen.get(second, math.nan)
+    if first not in chosen or second not in chosen:
+        raise ValueError(
+            f'context {context["id"]}: no logprob for token(s) '
+            f'{sorted({first, second} - set(chosen))} in the server response'
+        )
+    lp_first, lp_second = chosen[first], chosen[second]
     margin = abs(lp_first - lp_second)
     ulp = infer_ulp(top)
     return {
@@ -121,6 +129,7 @@ def score_one(url: str, context: dict[str, Any]) -> dict[str, Any]:
         'ulp': ulp,
         'class': classify_margin(margin, ulp),
         'stock_top1': int(top[0][1]) if top else None,
+        'top5': [[float(entry[0]), int(entry[1])] for entry in top],
         'prompt_and_prefix_tokens': len(context['input_ids']),
     }
 

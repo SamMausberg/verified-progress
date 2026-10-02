@@ -502,7 +502,7 @@ def test_rescore_reads_both_token_logprobs(monkeypatch: pytest.MonkeyPatch) -> N
 
     meta = {
         'output_top_logprobs': [[[-0.5, 7, 'a'], [-0.5625, 9, 'b'], [-3.0, 4, 'c']]],
-        'output_token_ids_logprob': [[[-0.5, 7, 'a'], [-0.5625, 9, 'b']]],
+        'output_token_ids_logprobs': [[[-0.5, 7, 'a'], [-0.5625, 9, 'b']]],
     }
 
     class Response:
@@ -526,6 +526,10 @@ def test_rescore_reads_both_token_logprobs(monkeypatch: pytest.MonkeyPatch) -> N
     assert sent[0]['token_ids_logprob'] == [7, 9] and sent[0]['input_ids'] == [1, 2]
     assert math.isclose(result['margin'], 0.0625) and result['ulp'] == 0.0625
     assert result['class'] == 'one_ulp' and result['stock_top1'] == 7
+    # A response without the requested tokens' logprobs fails loudly, never 'large'.
+    del meta['output_token_ids_logprobs']
+    with pytest.raises(ValueError, match='no logprob'):
+        rescore.score_one('http://x', {'id': 'k', 'input_ids': [1, 2], 'tokens': [7, 9]})
 
 
 def test_holds_run_only_at_the_recorded_commit() -> None:

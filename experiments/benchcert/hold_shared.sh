@@ -2,7 +2,9 @@
 # The untimed shared hold after session 3 (README, "Exactness" item 4 and "Exploratory
 # control"):
 #
-#   GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -s experiments/benchcert/hold_shared.sh
+#   GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -s experiments/benchcert/hold_shared.sh [rescore]
+#
+# With `rescore`, only step 1 runs (the re-run after the first scoring's key bug).
 #
 # 1. Declared: export every first-divergence context of the timed runs, start a small
 #    stock plain-decoding server (port 30082, --mem-fraction-static 0.25, 200,000-token
@@ -24,18 +26,22 @@ source "$repo/scripts/sglang_env.sh"
 python -c 'import sglang, torch' || { echo "not the SGLang environment: $(command -v python)"; exit 1; }
 [ -z "$(git status --porcelain --untracked-files=all)" ] || { echo "checkout not clean"; exit 65; }
 echo "shared hold start $(date -Is) repo $(git rev-parse HEAD)"
-for done_file in "$rescore/classes.jsonl" "$control/mtp/compare.json"; do
+mode=${1:-all}
+case $mode in
+  all) done_files=("$rescore/classes.jsonl" "$control/mtp/compare.json") ;;
+  rescore) done_files=("$rescore/classes.jsonl") ;;
+  *) echo "usage: $0 [rescore]"; exit 64 ;;
+esac
+for done_file in "${done_files[@]}"; do
   [ ! -e "$done_file" ] || { echo "$done_file exists: already run"; exit 65; }
 done
 mkdir -p "$rescore" "$control"
 stop_servers() {
   python -m experiments.benchcert.rescore stop --out "$rescore" || true
   python -m experiments.benchcert.rescore stop --out "$control/rescore" || true
-  for v in stock cert cert0; do
-    for fam in mtp dflash16; do
-      python -m experiments.benchcert.control_waves stop --family "$fam" --variant "$v" \
-        --out "$control/$fam" || true
-    done
+  for entry in mtp:stock mtp:cert dflash16:stock dflash16:cert dflash16:cert0; do
+    python -m experiments.benchcert.control_waves stop --family "${entry%%:*}" \
+      --variant "${entry#*:}" --out "$control/${entry%%:*}" || true
   done
 }
 trap stop_servers EXIT
@@ -49,6 +55,10 @@ timeout --foreground 1500 python -m experiments.benchcert.rescore score \
   --contexts "$rescore/contexts.jsonl" --out "$rescore/classes.jsonl"
 python -m experiments.benchcert.rescore stop --out "$rescore"
 echo "re-score done $(date -Is): $(wc -l < "$rescore/classes.jsonl") contexts"
+if [ "$mode" = rescore ]; then
+  echo "shared hold end $(date -Is)"
+  exit 0
+fi
 
 # 2. Exploratory controls (not declared).
 for plan_entry in "mtp:stock cert" "dflash16:stock cert cert0"; do
