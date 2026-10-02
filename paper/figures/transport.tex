@@ -30,7 +30,7 @@
 \def\rhomtp{../evidence/head_geometry/rho_mtp4b_quantiles.csv}
 \begin{tikzpicture}[font=\figlabel]
 % ---------------- (b) DFlash-4B and (c) MTP-4B: measured drift against the thresholds -------
-% Two stacked panels (style panel stacked, 1.9 cm), one drafter each, on a shared x axis; both
+% Two stacked panels (style panel stacked, 1.75 cm), one drafter each, on a shared x axis; both
 % show the same derived thresholds (lines without markers), labelled in (b) in regions that no
 % curve enters (checked against the quantile files: the per-128-weights threshold is above 0.0061
 % for q > 0.52, the per-entry one below 0.0083 for q < 0.4, int4's above 0.12, DFlash-4B's drift
@@ -54,7 +54,7 @@
 \node[annot,anchor=east,align=right] at (axis cs:0.10,0.8) {$\delta^\ast_i$: int4,\\per entry};
 \node[annot,anchor=west] at (axis cs:1.1,0.3) {$\rho$, DFlash-4B};
 \end{semilogxaxis}
-\begin{semilogxaxis}[drift panel,name=c,at={(7.85cm,-2.25cm)},anchor=south west,
+\begin{semilogxaxis}[drift panel,name=c,at={(7.85cm,-2.1cm)},anchor=south west,
   xlabel={Drift $\rho$ of a pair, or threshold $\delta^\ast_i$ of an entry},
   title={\paneltitle{c}{MTP-4B: measured drift, same thresholds}}]
 \addplot[copy int8 g128,derived] table[x=threshold_int8_g128,y=q,col sep=comma]{\rhodflash};
