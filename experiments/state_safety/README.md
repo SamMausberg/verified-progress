@@ -109,10 +109,12 @@ the GDN checkpointing kept is served from the cache.
   during speculative decode. Prefixes ending at and just past each checkpoint
   are served warm, restoring the checkpointed state, and cold; also for
   checkpoints taken in a cycle that finished the request.
-- `abort`: requests are aborted mid-stream while the batch and the GDN pool
-  (exactly four slots) are full, so the next request reuses the freed slot
-  while the aborted request's last verify may still be in flight. Probe
-  outputs are compared with the same probes served alone.
+- `abort`: requests are aborted mid-stream on a server whose batch and GDN
+  pool hold four requests, so that the next request can reuse a freed slot
+  while the aborted request's last verify may still be in flight. The lanes
+  are not synchronized and slot assignments are not recorded, so that reuse is
+  the design's intent, not a measured condition. Probe outputs are compared
+  with the same probes served alone.
 - `prefill`: prompt logprobs at every position of the 40 longest prompts,
   compared across `--chunked-prefill-size` settings by `compare_prefill.py`.
 

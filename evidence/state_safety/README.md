@@ -947,23 +947,27 @@ common flags of the Setup section, one request in flight, 40 prompts per test (t
     no speculative state, shows them too (9 of 68 cases, against 21 of 153 for MTP
     steps 3 and 8 of 89 for the tree). None points to a wrong restored state.
 
-- **Aborts with GDN slot reuse** (`abort__*`, groups `abort_repeat` of
-  `run_targeted.sh`). The batch cap is 4 and the GDN pool is full: 4 slots with the
-  radix cache off (one per request), or 20 with it on (five per request under the
-  overlap scheduler). Each of 4 lanes starts a thinking-mode request with up to 1,024
-  tokens, aborts it mid-stream (after a seeded random target of 1 to 60 tokens; 3 to 62
-  were streamed), and then serves the next of 40 probe prompts (the first 40
-  non-thinking prompts, 160 tokens), which takes the freed slot while the other lanes
-  keep running. Each probe is compared, in tokens,
-  with the same probe served alone on the same server before the aborts.
+- **Aborts on a small GDN pool** (`abort__*`, group `abort_repeat` of
+  `run_targeted.sh`). The batch cap is 4 and the GDN pool holds exactly 4 requests: 4
+  slots with the radix cache off (one per request), or 20 with it on (five per request
+  under the overlap scheduler). Each of 4 lanes starts a thinking-mode request with up
+  to 1,024 tokens, aborts it mid-stream (after a seeded random target of 1 to 60 tokens;
+  3 to 62 were streamed), and then serves the next of 40 probe prompts (the first 40
+  non-thinking prompts, 160 tokens), which can take a freed slot while the other lanes
+  keep running. Each probe is compared, in tokens, with the same probe served alone on
+  the same server before the aborts. The test records neither which GDN slot a probe
+  took nor how full the pool was when it was admitted, and its lanes are not
+  synchronized, so it does not show that a probe reused the slot of a request that had
+  just been aborted.
   - Plain decoding with deterministic inference (radix off): 40/40 probes
     token-identical.
   - MTP steps 3, radix off: 28/40 token-identical; the other 12 diverge at exact ties.
   - MTP steps 3, radix on (`extra_buffer`): 28/40; 11 exact ties and 1 within one BF16
     step.
   - The probes ran in batches of up to 4 and their references alone. Deterministic
-    plain decoding is batch-invariant, so its 40/40 says the aborts and slot reuse left
-    no trace in its outputs. MTP is not batch-invariant, even with deterministic
+    plain decoding is batch-invariant, so its 40/40 says that the concurrent aborts, and
+    whatever slots the probes ran on, left no trace in their outputs; it is not a
+    verified test of slot reuse. MTP is not batch-invariant, even with deterministic
     inference ("Configuration switches for plain decoding and MTP steps 3"), and
     differences of this kind are what the batch shape alone gives. In the radix-on arm
     the request history differs as well: the references were served one after another
