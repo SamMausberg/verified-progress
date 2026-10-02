@@ -147,7 +147,7 @@ def test_fp16_envelope_needs_gsm8k(tmp_path: Path) -> None:
     table = analyze.load_points(write_points(tmp_path / 'p.csv', full_rows(scale)))
     env = {
         e['concurrency']: e
-        for e in analyze.speed(table, gsm8k_arms=frozenset({'plain-cap256-fp16'}))['envelope']
+        for e in analyze.speed(table, gsm8k_arms={'fp16-state': frozenset({'plain-cap256-fp16'})})['envelope']
         if e['lever'] == 'fp16-state'
     }
     assert env[256]['best_lossy'] == 'plain-cap256-fp16'
@@ -157,12 +157,25 @@ def test_fp16_envelope_needs_gsm8k(tmp_path: Path) -> None:
     ]
     assert all(e['provisional'] and e['best_lossy'] == 'replayssm-cap256-fp16' for e in provisional)
     # INT4 is not gated: its envelope keeps every INT4 arm.
-    int4 = analyze.speed(table, gsm8k_arms=frozenset({'int4-dflash-b8'}))['envelope']
+    int4 = analyze.speed(table, gsm8k_arms={'int4': frozenset({'int4-dflash-b8'})})['envelope']
     assert any(e['best_lossy'] == 'int4-dflash-b16' for e in int4 if e['lever'] == 'int4')
+    # Only INT4's GSM8K run is in: the FP16 rows stay, marked provisional.
+    fp16 = [e for e in int4 if e['lever'] == 'fp16-state']
+    assert fp16 and all(e['provisional'] for e in fp16)
 
 
-def test_decode_path_agreement() -> None:
-    generate = {'positions': 980, 'sequences': 48, 'sequences_identical': 28}
-    assert analyze.decode_path_agreement(generate) == pytest.approx(980 / 1000)
-    with pytest.raises(ValueError):
-        analyze.decode_path_agreement({'positions': 0, 'sequences': 0, 'sequences_identical': 0})
+def test_decode_path_includes_divergence_position() -> None:
+    def seq(tokens: list[int], first: float) -> dict[str, object]:
+        return {'tokens': tokens, 'top': [[[first, t], [-3.0, 99]] for t in tokens]}
+
+    ref = {'mode': 'generate', 'prompt_ids': ['a', 'b'],
+           'sequences': [seq([1, 2, 3, 4], -0.1), seq([5, 6, 7, 8], -0.1)]}  # fmt: skip
+    cand = {'mode': 'generate', 'prompt_ids': ['a', 'b'],
+            'sequences': [seq([1, 2, 9, 9], -0.1), seq([5, 6, 7, 8], -0.1)]}  # fmt: skip
+    # At the divergence the candidate puts the reference's token outside its top-2.
+    cand['sequences'][0]['top'][2] = [[-0.1, 9], [-2.0, 98]]
+    stats = analyze.decode_path(ref, cand)
+    assert stats['positions'] == 2 + 1 + 4
+    assert stats['agreement'] == pytest.approx(6 / 7)
+    assert stats['diverged_sequences'] == 1
+    assert stats['kl_mean'] > 0  # only the divergence position contributes

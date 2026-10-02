@@ -173,13 +173,14 @@ def without(
 def speed(
     table: dict[tuple[str, int], dict[str, dict[str, float]]],
     min_sessions: int = plan.MIN_SESSIONS,
-    gsm8k_arms: frozenset[str] | None = None,
+    gsm8k_arms: dict[str, frozenset[str]] | None = None,
 ) -> dict[str, Any]:
     """Means, matched pairs and envelope ratios.
 
-    For the levers in plan.GSM8K_REQUIRED_FOR_HEADLINE only arms in `gsm8k_arms`
-    (arms with their own GSM8K run) compete in the envelope; None means the quality
-    runs are not in yet, and those envelope rows are marked provisional.
+    For the levers in plan.GSM8K_REQUIRED_FOR_HEADLINE only that lever's arms in
+    `gsm8k_arms[lever]` (arms with their own GSM8K run) compete in the envelope; a
+    lever without an entry has no GSM8K run yet, and its envelope rows are computed
+    over all its arms and marked provisional.
     """
     arms_at: dict[int, list[str]] = defaultdict(list)
     for launch in plan.SESSION_LAUNCHES:
@@ -222,8 +223,9 @@ def speed(
         for c in concurrencies():
             exact = [a for a in arms_at[c] if a in plan.EXACT_ARMS]
             lossy = [a for a in arms_at[c] if a in lever_arms]
-            if gated and gsm8k_arms is not None:
-                lossy = [a for a in lossy if a in gsm8k_arms]
+            measured = (gsm8k_arms or {}).get(lever)
+            if gated and measured is not None:
+                lossy = [a for a in lossy if a in measured]
             if not exact or not lossy:
                 continue
             ranked_exact = sorted(exact, key=lambda a: mean_y(table[(a, c)]), reverse=True)
@@ -235,7 +237,7 @@ def speed(
                 'concurrency': c,
                 'best_lossy': best_lossy,
                 'best_exact': best_exact,
-                'provisional': gated and gsm8k_arms is None,
+                'provisional': gated and measured is None,
                 'y': ratio_record(num, den, 'y', min_sessions),
                 'x': ratio_record(num, den, 'x', min_sessions),
             }
@@ -309,13 +311,52 @@ def gsm8k_exact_spread(references: list[Path], bench_quality: Path) -> list[dict
     return rows
 
 
+def decode_path(ref: dict[str, Any], cand: dict[str, Any]) -> dict[str, Any]:
+    """Decode-path statistics of a generate run against the reference's generate run.
+
+    Positions 0..d of each sequence, where d is its first divergence (the last
+    position whose context is still the reference's), or all n positions if the
+    sequence never diverges. Agreement counts the d agreeing positions and the one
+    disagreeing position per diverged sequence; the KL is the mean of top-20
+    KL(ref || cand) over the same positions, so the divergence position, where the
+    two distributions differ most, is included (logit_probe.compare_runs stops
+    before it).
+    """
+    from experiments.moonshot.logit_probe import kl_topk
+
+    if ref['prompt_ids'] != cand['prompt_ids'] or cand['mode'] != 'generate':
+        raise ValueError('not a generate run on the reference prompts')
+    shared = diverged = 0
+    kls: list[float] = []
+    for r, c in zip(ref['sequences'], cand['sequences'], strict=True):
+        n = min(len(r['tokens']), len(c['tokens']))
+        div = next((j for j in range(n) if r['tokens'][j] != c['tokens'][j]), n)
+        shared += div
+        diverged += div < n
+        for j in range(div + 1 if div < n else n):
+            kl = kl_topk(r['top'][j], c['top'][j])
+            if not math.isnan(kl):
+                kls.append(kl)
+    if shared + diverged == 0 or not kls:
+        raise ValueError('generate comparison has no positions')
+    return {
+        'agreement': shared / (shared + diverged),
+        'kl_mean': statistics.fmean(kls),
+        'positions': shared + diverged,
+        'diverged_sequences': diverged,
+        'divergences_per_1k_shared_tokens': 1000 * diverged / max(1, shared),
+    }
+
+
 def probe(summary_path: Path) -> dict[str, Any]:
     summary = json.loads(summary_path.read_text())
     score = summary['score']
     generate = summary['generate']
-    decode_agreement = decode_path_agreement(generate)
+    reference = json.loads(Path(summary['reference']).read_text())
+    decode = decode_path(reference, json.loads((summary_path.parent / 'probe_generate.json').read_text()))
+    decode_agreement = decode['agreement']
     score_ok = score['argmax_agreement'] >= AGREEMENT_MIN and score['kl_mean'] <= KL_MAX
-    decode_ok = decode_agreement >= AGREEMENT_MIN and generate['kl_mean'] <= KL_MAX
+    decode_ok = decode_agreement >= AGREEMENT_MIN and decode['kl_mean'] <= KL_MAX
     return {
         'arm': summary['arm'],
         'file': str(summary_path),
@@ -323,31 +364,16 @@ def probe(summary_path: Path) -> dict[str, Any]:
         'score_kl_mean': score['kl_mean'],
         'score_positions': score['positions'],
         'decode_agreement': decode_agreement,
-        'decode_kl_mean_shared_prefix': generate['kl_mean'],
-        'decode_positions': generate['positions'],
+        'decode_kl_mean': decode['kl_mean'],
+        'decode_positions': decode['positions'],
+        'decode_divergences_per_1k_shared_tokens': decode['divergences_per_1k_shared_tokens'],
+        'generate_kl_mean_before_divergence': generate['kl_mean'],
         'generate_first_divergence_median': generate.get('first_divergence_median'),
         'generate_divergences_per_1k': generate.get('divergences_per_1k_shared_tokens'),
         'score_within_budget': score_ok,
         'decode_within_budget': decode_ok,
         'within_budget': score_ok and decode_ok,
     }
-
-
-def decode_path_agreement(generate: dict[str, Any]) -> float:
-    """Top-1 agreement on the decode path, teacher-forced up to the first divergence.
-
-    Every position before a sequence's first divergence has the reference's context
-    and agrees (greedy decoding); the first divergence is the one disagreeing
-    position with an identical context; later positions have other contexts and
-    are not counted. So agreement = shared / (shared + diverged sequences). The
-    count stops at each sequence's first divergence, which favours a candidate
-    whose divergences come early.
-    """
-    shared = int(generate['positions'])
-    diverged = int(generate['sequences']) - int(generate['sequences_identical'])
-    if shared + diverged == 0:
-        raise ValueError('generate comparison has no positions')
-    return shared / (shared + diverged)
 
 
 def probe_noise(load_test: Path) -> dict[str, Any]:
@@ -374,7 +400,9 @@ def probe_noise(load_test: Path) -> dict[str, Any]:
             if key in result
         }
         if result['mode'] == 'generate':
-            out[name]['decode_agreement'] = decode_path_agreement(result)
+            out[name]['decode_path'] = decode_path(
+                ref1, json.loads((load_test / rel).read_text())
+            )
     return out
 
 
@@ -402,7 +430,12 @@ def main(argv: list[str] | None = None) -> int:
     missing = check_plan(table)
     if missing and not args.allow_missing:
         raise SystemExit('declared points without enough valid sessions:\n  ' + '\n  '.join(missing))
-    gsm8k_arms = frozenset(gsm8k_arm(run) for run in args.quality) if args.quality else None
+    measured_arms = {gsm8k_arm(run) for run in args.quality}
+    gsm8k_arms = {
+        lever: frozenset(measured_arms & set(arms))
+        for lever, arms in plan.LEVERS.items()
+        if measured_arms & set(arms)
+    }
     flags = launch_flags(table)
     flagged = {(r['arm'], r['session']) for r in flags.values() if r['flagged']}
     result: dict[str, Any] = {

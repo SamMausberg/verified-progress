@@ -94,6 +94,9 @@ Three exclusive holds, `lossy-s1` to `lossy-s3`, each launching every arm afresh
 of `plan.SESSION_LAUNCHES` (`lossy-s2` reverses it), about 34 minutes each with a 44-minute
 cap. The arms at both ends of the list (`int4-plain-cap256` and `plain-cap256`) carry no
 headline point, so a hold that runs out of time loses a non-headline launch in either order.
+That pair is therefore about half an hour apart within each session, so its matched ratio
+carries any drift within a hold, balanced only two to one by the reversed session; it is not
+a headline pair.
 The workload and request settings are bench's confirmation sweep: `mixed-v2/confirm.jsonl`,
 512 output tokens with `ignore_eos`, greedy, thinking on, `max(64, 8c)` measured requests after
 one warmup wave, `--stream-interval 4`, foreign CPU sampled at 1 Hz. At c = 256 the 2,048
@@ -113,7 +116,8 @@ so a repeated prompt is computed afresh.
   times" of the result. Choosing by the maximum mean favours an arm that was lucky in these
   sessions, slightly inflating the lossy side and deflating the exact side; the runner-up's
   ratio on each side is reported beside every envelope ratio. For FP16 state only arms with
-  their own GSM8K run compete (both FP16 arms have one, holds `q2` and `q3`).
+  their own GSM8K run compete (both FP16 arms have one, holds `q2` and `q3`); until a lever's
+  GSM8K runs exist its envelope rows are computed over all its arms and marked provisional.
 - Decision for every ratio: faster if all three sessions exceed 1.02, slower if all three are
   below 0.98, otherwise no detectable change. The 2% band is the largest session-to-session
   coefficient of variation of y in bench's confirmation (1.9%).
@@ -194,9 +198,10 @@ reference's own run-to-run noise.
     divergence have the reference's context, so the comparison is teacher-forced up to there.
     Agreement is shared positions over shared positions plus diverged sequences (the first
     divergence is the one disagreeing position with an identical context), and the KL is the
-    mean over the shared positions. The count stops at each first divergence, which favours a
-    candidate whose divergences come early; divergences per 1,000 shared tokens are reported
-    beside it.
+    mean over the same positions, the divergence position included (`analyze.decode_path`;
+    `logit_probe.py`'s own generate summary stops before it and would bias the KL low). The
+    count stops at each first divergence, which favours a candidate whose divergences come
+    early; divergences per 1,000 shared tokens are reported beside it.
   The same thresholds (agreement at least 0.98, KL at most 0.01 nats) apply in both modes, and
   a probed arm meets the probe part of the budget only if both modes do. The reference's own
   values: `plain-ref-1` scored against itself (prefill against decode path), `plain-ref-2` (a
@@ -238,3 +243,6 @@ scripts/gpu_lock.sh -x experiments/lossy/hold.sh quality q1         # then q2, q
   ends of the session order; the GSM8K yardstick (exact arms' spread), the comparison with
   stock DFlash, the version check, the EOS check, runner-up ratios, accept lengths and the
   FP16 band caveat.
+- Revision 3 (03:55 UTC), after the red team's re-check (no blocking findings): the decode-path
+  KL includes each first-divergence position; the GSM8K gate of the envelope is per lever; the
+  drift exposure of the `int4-plain-cap256` / `plain-cap256` pair is stated.
