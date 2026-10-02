@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # BF16 references at the two gross positions (shared lane, untimed; evidence/bf16_paths/README.md):
 #
-#   scripts/gpu_lock.sh -s experiments/bf16_paths/hold.sh [all|hf|sglang]
+#   scripts/gpu_lock.sh -s experiments/bf16_paths/hold.sh [all|hf|sglang|perturb ...]
 #
 # hf: transformers' Qwen3.5 in BF16 on the GPU (hf_paths.py), with its torch GDN kernels and
 #   then with flash-linear-attention 0.5.2's (installed with --no-deps into $out/pydeps and
@@ -11,11 +11,16 @@
 #   the start-up memory gate, under the kernel variants of sglang_variants.py (the last,
 #   beta_fp32, on ~/sglang-wt/upstream-bf16: the pin plus the beta-in-FP32 patch): the
 #   targets along three prefills and one decode each.
+# perturb: FP32 on the CPU (8 cores) with BF16-sized relative noise after every decoder layer
+#   (perturb.py, 8 seeds), the positions' own sensitivity to rounding.
 # Targets: ~/vp-data/exactness/paths/targets.jsonl (paths.py `targets`), copied once and hashed.
 # Output: ~/vp-data/upstream/bf16 (BF16_PATHS_OUT); log in logs/hold-<UTC>.log.
 set -euo pipefail
-step=${1:-all}
-case "$step" in all | hf | sglang) ;; *) echo "usage: $0 [all|hf|sglang]"; exit 64 ;; esac
+steps=" ${*:-all} "
+for step in $steps; do
+  case "$step" in all | hf | sglang | perturb) ;; *) echo "usage: $0 [all|hf|sglang|perturb ...]"; exit 64 ;; esac
+done
+want() { [[ $steps == *" all "* || $steps == *" $1 "* ]]; }
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo"
 out=${BF16_PATHS_OUT:-$HOME/vp-data/upstream/bf16}
@@ -26,15 +31,14 @@ unset SGLANG_WORKTREE PYTHONPATH
 source "$repo/scripts/sglang_env.sh"
 python -c 'import sglang, torch, transformers' || { echo "not the SGLang environment: $(command -v python)"; exit 1; }
 [ -z "$(git status --porcelain --untracked-files=all)" ] || { echo "checkout not clean"; exit 65; }
-if [ "$step" != sglang ] && [ -e "$out/hf_bf16_torch.json" ]; then
-  echo "$out/hf_bf16_torch.json exists: hf already run"; exit 65
-fi
-if [ "$step" != hf ] && [ -e "$out/default.json" ]; then
-  echo "$out/default.json exists: sglang already run"; exit 65
-fi
+for done_file in hf:hf_bf16_torch.json sglang:default.json perturb:perturb.json; do
+  if want "${done_file%%:*}" && [ -e "$out/${done_file#*:}" ]; then
+    echo "$out/${done_file#*:} exists: ${done_file%%:*} already run"; exit 65
+  fi
+done
 mkdir -p "$out/logs"
 exec >"$out/logs/hold-$(date -u +%Y%m%dT%H%M%SZ).log" 2>&1
-echo "bf16 paths hold ($step) start $(date -Is) repo $(git rev-parse HEAD) sglang $(git -C "$HOME/sglang" rev-parse HEAD)"
+echo "bf16 paths hold (${steps# }) start $(date -Is) repo $(git rev-parse HEAD) sglang $(git -C "$HOME/sglang" rev-parse HEAD)"
 if [ -e "$out/targets.jsonl" ]; then
   cmp "$targets_src" "$out/targets.jsonl" || { echo "targets changed since the first hold"; exit 65; }
 else
@@ -51,7 +55,7 @@ kill_servers() {
 trap kill_servers EXIT
 status=0
 
-if [ "$step" != sglang ]; then
+if want hf; then
   for state in model float32; do
     suffix=$([ "$state" = model ] && echo "" || echo "_fp32state")
     timeout --foreground 600 python -m experiments.bf16_paths.hf_paths --targets "$out/targets.jsonl" \
@@ -75,7 +79,7 @@ if [ "$step" != sglang ]; then
   fi
 fi
 
-if [ "$step" != hf ]; then
+if want sglang; then
   for variant in default prefill_triton decode_flashinfer no_cuda_graph attn_triton beta_fp32; do
     echo "variant $variant start $(date -Is)"
     if GPU_STARTUP_MIN_FREE_GB=${GPU_STARTUP_MIN_FREE_GB:-48} GPU_STARTUP_TRIES=${GPU_STARTUP_TRIES:-10} \
@@ -90,6 +94,11 @@ if [ "$step" != hf ]; then
     echo "variant $variant end $(date -Is)"
   done
 fi
-echo "bf16 paths hold ($step) end $(date -Is) exit $status"
+if want perturb; then
+  timeout --foreground 900 taskset -c 32-39 python -m experiments.bf16_paths.perturb \
+    --targets "$out/targets.jsonl" --out "$out/perturb.json" --seeds 8 --threads 8 \
+    --fp32 "$HOME/vp-data/exactness/paths/fp32.json" || status=1
+fi
+echo "bf16 paths hold (${steps# }) end $(date -Is) exit $status"
 nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader || true
 exit "$status"
