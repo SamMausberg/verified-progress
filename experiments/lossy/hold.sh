@@ -9,8 +9,15 @@
 # Runs from this checkout, which must be clean, against the declared engine
 # worktree (ENGINE_WORKTREE at ENGINE_COMMIT, clean). Servers use port 30101 and
 # start inside scripts/gpu_startup_lock.sh (run_hold.py wraps each launch). Output under ~/vp-data/lossy
-# (LOSSY_OUT); the hold's log goes to <out>/logs/<hold>-<UTC>.log. The whole hold
-# stops after 44 minutes.
+# (LOSSY_OUT); the hold's log goes to <out>/logs/<hold>-<UTC>.log.
+#
+# Time limits: a session or quality hold stops itself at plan.HOLD_BUDGET (44 minutes):
+# run_hold.py ends the running launch with its whole process tree and writes the manifest.
+# The outer `timeout` is a backstop two minutes later, so it cannot cut that cleanup short.
+# The load test and the GEMM benchmark stop at their outer timeout. `--foreground` signals
+# only the direct child, but no process outlives the hold: scripts/gpu_job.sh is a child
+# subreaper and, before it releases the lock, terminates every process the hold started,
+# orphans and servers in their own session included.
 set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo"
@@ -60,7 +67,8 @@ case $hold in
     ;;
   session | quality)
     [ -n "$name" ] || { echo "$hold needs a name"; exit 64; }
-    timeout --foreground 2640 python -m experiments.lossy.run_hold "$hold" "$name" \
+    # run_hold enforces plan.HOLD_BUDGET (2640 s) itself; this is the backstop (+120 s).
+    timeout --foreground 2760 python -m experiments.lossy.run_hold "$hold" "$name" \
       --out "$out" || status=$?
     ;;
   gemm)
