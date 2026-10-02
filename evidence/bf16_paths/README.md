@@ -99,6 +99,17 @@ confirms the swap (`positions.json`, `meta`). The `beta_fp32` variant carries th
 changes of the open upstream PRs #38977 and #40362 (issue #38975: the packed GDN decode kernel
 and the gating kernel round sigmoid(beta) through BF16).
 
+In the terms of the pre-set readings (largest difference from FP32 on the tracked tokens,
+`positions.json`): no variant brings `579ae7ce`'s decode within 1 nat of FP32 (the closest,
+Triton GDN prefill, is 2.75 off). At `a4db11ff` the Triton GDN prefill brings one of the three
+prefills within 1 nat (0.31; the others 1.18 and 1.34) and `beta_fp32` brings them to 1.06-1.72,
+but both then break the decode path (4.60 and 6.81 off), so no kernel family carries either
+error. For transformers, the reading called the error SGLang-specific only if every
+transformers run stayed within 1 nat of FP32 at both positions; at `a4db11ff` they miss by up to
+16.7 nats (not specific), and at `579ae7ce` two of sixteen readings exceed 1 nat (1.15 on 5715,
+the torch 576-token prefill; 3.08 on 5715 and 2.19 on 1756, the fla decode with a BF16 state),
+which the reading reports as a partial BF16 sensitivity rather than an SGLang fault.
+
 On the 39 positions before each target every path gives the recorded token's logprob within 0.05
 nats of FP32 (at most 0.047, SGLang's 576-token prefill at `579ae7ce` position 437). Those tokens
 are near-certain (FP32 gives each a logprob of -0.103 or higher), so this agreement shows that the
