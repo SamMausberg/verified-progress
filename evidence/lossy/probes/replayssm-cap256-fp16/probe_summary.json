@@ -1,0 +1,46 @@
+{
+ "arm": "replayssm-cap256-fp16",
+ "reference": "/home/ubuntu/vp-data/lossy/load_test/20261002T035539Z/plain-ref-1/probe_generate.json",
+ "reference_sha256": "5186472b7ae278bd4d7f9de1bd462e6126f03adb870cd0d98648cbaab0c968f7",
+ "generate": {
+  "reference": "plain-ref-1",
+  "candidate": "replayssm-cap256-fp16",
+  "mode": "generate",
+  "positions": 8940,
+  "kl_mean": 0.00022375064626863747,
+  "kl_p50": 2.802674095018718e-07,
+  "kl_p99": 0.002611883047213819,
+  "kl_max": 0.011214137657602213,
+  "identical": false,
+  "first_difference": {
+   "sequence": 0,
+   "position": 0,
+   "kind": "top-k"
+  },
+  "sequences": 48,
+  "sequences_identical": 25,
+  "first_divergence_median": 256.0,
+  "divergences_per_1k_shared_tokens": 2.5727069351230427,
+  "top1_logprob_abs_delta_mean": 0.004274258780385185,
+  "emitted_non_argmax_rate": 0.004313151041666667,
+  "emitted_non_argmax_logprob_gap_mean": 0.0
+ },
+ "score": {
+  "reference": "plain-ref-1",
+  "candidate": "replayssm-cap256-fp16",
+  "mode": "score",
+  "positions": 12240,
+  "kl_mean": 0.0002699270348467925,
+  "kl_p50": 5.042687346123476e-07,
+  "kl_p99": 0.0030338535513251127,
+  "kl_max": 0.010489088106969201,
+  "identical": false,
+  "first_difference": {
+   "sequence": 0,
+   "position": 0,
+   "kind": "top-k"
+  },
+  "argmax_agreement": 0.9937091503267974,
+  "argmax_disagreements": 77
+ }
+}

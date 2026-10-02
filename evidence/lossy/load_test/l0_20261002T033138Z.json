@@ -1,0 +1,537 @@
+{
+ "repo": {
+  "path": "/home/ubuntu/vp-wt/lossy-hold",
+  "head": "51808ce369c8c49a456115168fba19828523a10f",
+  "branch": "HEAD",
+  "dirty_files": []
+ },
+ "engine": {
+  "path": "/home/ubuntu/sglang-wt/lossy",
+  "head": "57560de6907090a34eb21774ba13dbe2a6b89b80",
+  "branch": "engine/lossy",
+  "dirty_files": []
+ },
+ "engine_worktree": "/home/ubuntu/sglang-wt/lossy",
+ "steps": [
+  {
+   "step": "int4-dflash-b16",
+   "arm": "int4-dflash-b16",
+   "start_unix": 1790911902.5125334,
+   "checks": [
+    {
+     "name": "cuda_graph_decode",
+     "ok": true,
+     "required": true,
+     "detail": "captured: target prefill (breakable), target verify (full), draft verify (full)"
+    },
+    {
+     "name": "cuda_graph_prefill",
+     "ok": true,
+     "required": true,
+     "detail": "captured"
+    },
+    {
+     "name": "cuda_graph_covers_capacity",
+     "ok": true,
+     "required": true,
+     "detail": "target verify graph batch sizes up to 64; server capacity 64"
+    },
+    {
+     "name": "overlap_scheduler",
+     "ok": true,
+     "required": true,
+     "detail": "scheduler disable_overlap_schedule=False"
+    },
+    {
+     "name": "capacity",
+     "ok": true,
+     "required": true,
+     "detail": "effective max_running_requests=64, target 64"
+    },
+    {
+     "name": "attention_backend",
+     "ok": true,
+     "required": true,
+     "detail": "scheduler attention_backend=triton, requested triton"
+    },
+    {
+     "name": "speculative_config",
+     "ok": true,
+     "required": true,
+     "detail": "resolved: speculative_algorithm=DFLASH, speculative_num_steps=1, speculative_eagle_topk=1, speculative_num_draft_tokens=16"
+    }
+   ],
+   "launch_ok": true,
+   "final_limits": {
+    "max_total_num_tokens": 448601,
+    "chunked_prefill_size": 8192,
+    "max_prefill_tokens": 16384,
+    "max_running_requests": 64,
+    "context_len": 262144
+   },
+   "sglang_source": {
+    "module_file": "/home/ubuntu/sglang-wt/lossy/python/sglang/__init__.py",
+    "path": "/home/ubuntu/sglang-wt/lossy",
+    "head": "57560de6907090a34eb21774ba13dbe2a6b89b80",
+    "branch": "engine/lossy",
+    "dirty_files": []
+   },
+   "tokenizer": {
+    "prompts": 16,
+    "mismatches": [],
+    "ok": true
+   },
+   "smoke": {
+    "requests": [
+     {
+      "id": "oasst1-7cf046b4-d31b-461b-ab59-224423f56a50",
+      "completion_tokens": 256,
+      "spec_verify_ct": 69,
+      "seconds": 3.81,
+      "text_head": "Here's a thinking process that leads to the suggested response:\n\n1.  **Analyze the Request:**\n    *   **Topic:** Contributing to Open Assistant (OA).\n    *   **Questions:** \"Where\" (platforms, repositories) and \"How\" (steps, types of contri"
+     },
+     {
+      "id": "humaneval-99",
+      "completion_tokens": 256,
+      "spec_verify_ct": 59,
+      "seconds": 3.73,
+      "text_head": "The function needs to:\n1. Take a string value representing a number\n2. Convert it to a float\n3. Round it to the nearest integer\n4. Handle the special case where the number is equidistant from two integers (round away from zero)\n\nLet me thin"
+     },
+     {
+      "id": "gsm8k-train-3476",
+      "completion_tokens": 256,
+      "spec_verify_ct": 35,
+      "seconds": 3.41,
+      "text_head": "Here's a thinking process that leads to the solution:\n\n1.  **Analyze the Request:**\n    *   **Given:** Hannah has three brothers.\n    *   **Given:** Her brothers are all 8 years old.\n    *   **Condition:** Hannah is twice as old as the sum "
+     },
+     {
+      "id": "oasst1-8a720e0c-915c-4566-856a-ba1286c4e2ff",
+      "completion_tokens": 256,
+      "spec_verify_ct": 76,
+      "seconds": 3.86,
+      "text_head": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   **Topic:** Second Law of Thermodynamics.\n    *   **Target Audience:** 6-year-old kid.\n    *   **Goal:** Make it very intuitive and easy to understand.\n    *   **Requirement:** Provide "
+     },
+     {
+      "id": "mbpp-315",
+      "completion_tokens": 256,
+      "spec_verify_ct": 50,
+      "seconds": 3.62,
+      "text_head": "Let me analyze the requirements:\n\n1. Find the first maximum length of even word\n2. Return the word itself if found, otherwise return \"-1\"\n3. The function should handle multiple test cases\n\nLooking at the test cases:\n- \"python language\" -> \""
+     },
+     {
+      "id": "gsm8k-train-3674",
+      "completion_tokens": 256,
+      "spec_verify_ct": 31,
+      "seconds": 3.35,
+      "text_head": "Here's my thought process for solving this problem:\n\n1.  **Analyze the Request:**\n    *   **Context:** A UFO convention.\n    *   **Total attendees:** 120.\n    *   **Relationship:** There are 4 more male attendees than female attendees.\n    "
+     },
+     {
+      "id": "oasst1-2b43223b-fd85-4068-b3a1-3559a46886c5",
+      "completion_tokens": 256,
+      "spec_verify_ct": 80,
+      "seconds": 3.88,
+      "text_head": "Here's a thinking process that leads to the suggested guide on making a tabletop from multiple boards:\n\n1.  **Understand the Goal:** The user wants to know how to construct a tabletop using multiple pieces of wood (boards). This is a common"
+     },
+     {
+      "id": "mbpp-246",
+      "completion_tokens": 256,
+      "spec_verify_ct": 57,
+      "seconds": 3.7,
+      "text_head": "The Babylonian method (also known as Heron's method) for computing square roots is an iterative algorithm that converges to the square root of a number.\n\nThe formula is:\nx_{n+1} = (x_n + S / x_n) / 2\n\nWhere:\n- S is the number we want to fin"
+     }
+    ],
+    "all_full_length": true,
+    "accept_length": 4.481400437636761
+   },
+   "log_facts": {
+    "weights": [
+     {
+      "type": "Qwen3_5ForConditionalGeneration",
+      "quant": "compressed-tensors",
+      "avail_gb": 89.88,
+      "usage_gb": 3.9
+     },
+     {
+      "type": "DFlashDraftModel",
+      "quant": "compressed-tensors",
+      "avail_gb": 89.43,
+      "usage_gb": 0.41
+     }
+    ],
+    "ssm_state_gb": [
+     3.05
+    ],
+    "log_lines": [
+     "[2026-10-02 03:31:56] server_args={'model_path': 'nota-ai/Qwen3.5-4B-QAD-W4A16', 'tokenizer_path': 'nota-ai/Qwen3.5-4B-QAD-W4A16', 'tokenizer_mode': 'auto', 'tokenizer_backend': 'huggingface', 'tokenizer_worker_num': 1, 'detokenizer_worker_num': 1, 'skip_tokenizer_init': False, 'load_format': 'auto'",
+     "[2026-10-02 03:32:13] Acceleration for non-quantized schemes is not supported by Compressed Tensors. Falling back to UnquantizedLinearMethod",
+     "[2026-10-02 03:32:14] Load weight end. elapsed=1.51 s, type=Qwen3_5ForConditionalGeneration, quant=compressed-tensors, avail mem=89.88 GB, mem usage=3.90 GB.",
+     "[2026-10-02 03:32:22] Load weight end. elapsed=0.12 s, type=DFlashDraftModel, quant=compressed-tensors, avail mem=89.43 GB, mem usage=0.41 GB.",
+     "[2026-10-02 03:32:23] Initialized DFLASH draft runner. attention_backend=triton, model=DFlashDraftModel, block_size=16, draft_window_size=None, compact_cache=False",
+     "[2026-10-02 03:32:23] DFLASH draft runner ready. mask_token=<|MASK|>, mask_token_id=248070, mask_token_id_override=248070, noise_embed_scale=1.0",
+     "[2026-10-02 03:32:23] DFLASH fused KV materialization disabled: quantized qkv_proj is not supported for this path (quant_method=CompressedTensorsLinearMethod): layer=0",
+     "[2026-10-02 03:32:27] Mamba Cache is allocated. max_mamba_cache_size: 64, conv_state size: 0.07GB, ssm_state size: 3.05GB intermediate_ssm_state_cache size: 48.75GB intermediate_conv_window_cache size: 0.43GB",
+     "[2026-10-02 03:32:28] KV Cache is allocated. dtype: torch.bfloat16, #tokens: 448601, K size: 6.85 GB, V size: 6.85 GB",
+     "[2026-10-02 03:32:29] KV Cache is allocated. dtype: torch.bfloat16, #tokens: 448601, K size: 4.28 GB, V size: 4.28 GB",
+     "[2026-10-02 03:32:29] Linear attention kernel backend: decode=triton, prefill=flashinfer, verify=triton",
+     "[2026-10-02 03:32:29] GDN kernel dispatcher: decode=TritonGDNKernel, extend=FlashInferGDNKernel, verify=TritonGDNKernel packed_decode=True",
+     "[2026-10-02 03:32:55] DFLASH draft greedy head folded into the draft cuda graph (tp=1).",
+     "[2026-10-02 03:32:57] DFLASH sampling pre-warm: borrowing=False bs=64 peak=3133551104 B headroom=4150669824 B",
+     "[2026-10-02 03:32:57] max_total_num_tokens=448601, chunked_prefill_size=8192, max_prefill_tokens=16384, max_running_requests=64, context_len=262144, available_gpu_mem=2.39 GB"
+    ]
+   },
+   "end_unix": 1790912000.623002,
+   "ok": true
+  },
+  {
+   "step": "int4-dflash-b16-nsys",
+   "arm": "int4-dflash-b16",
+   "start_unix": 1790912000.6264935,
+   "checks": [
+    {
+     "name": "cuda_graph_decode",
+     "ok": true,
+     "required": true,
+     "detail": "captured: target prefill (breakable), target verify (full), draft verify (full)"
+    },
+    {
+     "name": "cuda_graph_prefill",
+     "ok": true,
+     "required": true,
+     "detail": "captured"
+    },
+    {
+     "name": "cuda_graph_covers_capacity",
+     "ok": true,
+     "required": true,
+     "detail": "target verify graph batch sizes up to 64; server capacity 64"
+    },
+    {
+     "name": "overlap_scheduler",
+     "ok": true,
+     "required": true,
+     "detail": "scheduler disable_overlap_schedule=False"
+    },
+    {
+     "name": "capacity",
+     "ok": true,
+     "required": true,
+     "detail": "effective max_running_requests=64, target 64"
+    },
+    {
+     "name": "attention_backend",
+     "ok": true,
+     "required": true,
+     "detail": "scheduler attention_backend=triton, requested triton"
+    },
+    {
+     "name": "speculative_config",
+     "ok": true,
+     "required": true,
+     "detail": "resolved: speculative_algorithm=DFLASH, speculative_num_steps=1, speculative_eagle_topk=1, speculative_num_draft_tokens=16"
+    }
+   ],
+   "launch_ok": true,
+   "final_limits": {
+    "max_total_num_tokens": 448452,
+    "chunked_prefill_size": 8192,
+    "max_prefill_tokens": 16384,
+    "max_running_requests": 64,
+    "context_len": 262144
+   },
+   "sglang_source": {
+    "module_file": "/home/ubuntu/sglang-wt/lossy/python/sglang/__init__.py",
+    "path": "/home/ubuntu/sglang-wt/lossy",
+    "head": "57560de6907090a34eb21774ba13dbe2a6b89b80",
+    "branch": "engine/lossy",
+    "dirty_files": []
+   },
+   "tokenizer": {
+    "prompts": 16,
+    "mismatches": [],
+    "ok": true
+   },
+   "smoke": {
+    "requests": [
+     {
+      "id": "oasst1-7cf046b4-d31b-461b-ab59-224423f56a50",
+      "completion_tokens": 256,
+      "spec_verify_ct": 69,
+      "seconds": 3.75,
+      "text_head": "Here's a thinking process that leads to the suggested response:\n\n1.  **Analyze the Request:**\n    *   **Topic:** Contributing to Open Assistant (OA).\n    *   **Questions:** \"Where\" (platforms, repositories) and \"How\" (steps, types of contri"
+     },
+     {
+      "id": "humaneval-99",
+      "completion_tokens": 256,
+      "spec_verify_ct": 59,
+      "seconds": 3.67,
+      "text_head": "The function needs to:\n1. Take a string value representing a number\n2. Convert it to a float\n3. Round it to the nearest integer\n4. Handle the special case where the number is equidistant from two integers (round away from zero)\n\nLet me thin"
+     },
+     {
+      "id": "gsm8k-train-3476",
+      "completion_tokens": 256,
+      "spec_verify_ct": 35,
+      "seconds": 3.35,
+      "text_head": "Here's a thinking process that leads to the solution:\n\n1.  **Analyze the Request:**\n    *   **Given:** Hannah has three brothers.\n    *   **Given:** Her brothers are all 8 years old.\n    *   **Condition:** Hannah is twice as old as the sum "
+     },
+     {
+      "id": "oasst1-8a720e0c-915c-4566-856a-ba1286c4e2ff",
+      "completion_tokens": 256,
+      "spec_verify_ct": 76,
+      "seconds": 3.8,
+      "text_head": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   **Topic:** Second Law of Thermodynamics.\n    *   **Target Audience:** 6-year-old kid.\n    *   **Goal:** Make it very intuitive and easy to understand.\n    *   **Requirement:** Provide "
+     },
+     {
+      "id": "mbpp-315",
+      "completion_tokens": 256,
+      "spec_verify_ct": 50,
+      "seconds": 3.56,
+      "text_head": "Let me analyze the requirements:\n\n1. Find the first maximum length of even word\n2. Return the word itself if found, otherwise return \"-1\"\n3. The function should handle multiple test cases\n\nLooking at the test cases:\n- \"python language\" -> \""
+     },
+     {
+      "id": "gsm8k-train-3674",
+      "completion_tokens": 256,
+      "spec_verify_ct": 31,
+      "seconds": 3.29,
+      "text_head": "Here's my thought process for solving this problem:\n\n1.  **Analyze the Request:**\n    *   **Context:** A UFO convention.\n    *   **Total attendees:** 120.\n    *   **Relationship:** There are 4 more male attendees than female attendees.\n    "
+     },
+     {
+      "id": "oasst1-2b43223b-fd85-4068-b3a1-3559a46886c5",
+      "completion_tokens": 256,
+      "spec_verify_ct": 80,
+      "seconds": 3.82,
+      "text_head": "Here's a thinking process that leads to the suggested guide on making a tabletop from multiple boards:\n\n1.  **Understand the Goal:** The user wants to know how to construct a tabletop using multiple pieces of wood (boards). This is a common"
+     },
+     {
+      "id": "mbpp-246",
+      "completion_tokens": 256,
+      "spec_verify_ct": 57,
+      "seconds": 3.64,
+      "text_head": "The Babylonian method (also known as Heron's method) for computing square roots is an iterative algorithm that converges to the square root of a number.\n\nThe formula is:\nx_{n+1} = (x_n + S / x_n) / 2\n\nWhere:\n- S is the number we want to fin"
+     }
+    ],
+    "all_full_length": true,
+    "accept_length": 4.481400437636761
+   },
+   "nsys": {
+    "start_profile": "Start profiling.",
+    "steps": 20,
+    "csv": "/home/ubuntu/vp-data/lossy/load_test/20261002T033138Z/int4-dflash-b16-nsys/kernels_cuda_gpu_kern_sum.csv",
+    "kernels": 45,
+    "top": [
+     {
+      "name": "_fwd_kernel",
+      "share": 0.3081020788832717
+     },
+     {
+      "name": "void sglang::device::marlin::Marlin<__nv_bfloat16, (long)1125899907892224, (int)256, (int)1, (int)8, (int)8, (bool)0, (int)4, (int)2, (bool)0>(const int4 *, con",
+      "share": 0.2582034940938309
+     },
+     {
+      "name": "nvjet_sm90_tst_512x16_64x3_2x1_v_bz_TNT",
+      "share": 0.0927545642989031
+     },
+     {
+      "name": "fused_sigmoid_gating_delta_rule_update_kernel",
+      "share": 0.09219886274305451
+     },
+     {
+      "name": "_layer_norm_fwd_1pass_kernel",
+      "share": 0.05023811119628232
+     },
+     {
+      "name": "_causal_conv1d_update_kernel",
+      "share": 0.04526288127621881
+     },
+     {
+      "name": "void sglang::device::marlin::Marlin<__nv_bfloat16, (long)1125899907892224, (int)256, (int)1, (int)8, (int)8, (bool)0, (int)4, (int)8, (bool)0>(const int4 *, con",
+      "share": 0.04321164273406278
+     },
+     {
+      "name": "nvjet_sm90_tst_64x8_64x16_1x2_h_bz_TNT",
+      "share": 0.029615070538234405
+     },
+     {
+      "name": "kernel_cutlass_kernel_flashinfernormkernelsfused_add_rmsnormFusedAddRMSNormKernel_object_at__tensorptrbf16gmemalign128oi64256025601_tensorptrbf16gmemalign128oi6",
+      "share": 0.02830414650828336
+     },
+     {
+      "name": "void at::native::elementwise_kernel<(int)128, (int)4, void at::native::gpu_kernel_impl_nocast<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase &)::[la",
+      "share": 0.007825354125376166
+     },
+     {
+      "name": "fused_qkvzba_split_reshape_cat_contiguous_kernel",
+      "share": 0.007307999340065596
+     },
+     {
+      "name": "void sglang::act_and_mul_kernel<__nv_bfloat16, (sglang::ActivationKind)0, (bool)1, (bool)0, (bool)0, (bool)0>(sglang::ActivationParams)",
+      "share": 0.006842696301978832
+     },
+     {
+      "name": "_fused_mamba_state_scatter_with_mask_kernel",
+      "share": 0.0037913954568306266
+     },
+     {
+      "name": "_fused_qk_rmsnorm_rope_gate_kernel",
+      "share": 0.0030889555758063813
+     },
+     {
+      "name": "void sglang::store_kvcache_kernel<(long)2048, (long)2048, (unsigned int)128, (bool)1, long>(sglang::StoreKVCacheParams)",
+      "share": 0.0022685455320880232
+     },
+     {
+      "name": "void at::native::<unnamed>::indexSelectSmallIndex<c10::BFloat16, long, unsigned int, (int)2, (int)2, (int)-2>(at::cuda::detail::TensorInfo<T1, T3>, at::cuda::de",
+      "share": 0.001909667879260669
+     },
+     {
+      "name": "void at::native::reduce_kernel<(int)512, (int)1, at::native::ReduceOp<c10::BFloat16, at::native::ArgMaxOps<float>, unsigned int, long, (int)4, (int)4>>(T3)",
+      "share": 0.001741198208325567
+     },
+     {
+      "name": "void at::native::reduce_kernel<(int)512, (int)1, at::native::ReduceOp<float, at::native::ArgMaxOps<float>, unsigned int, long, (int)4, (int)4>>(T3)",
+      "share": 0.0017074628810990048
+     },
+     {
+      "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIteratorBase &)::[lambda() (instance 3)]::operator ()() const::[lambd",
+      "share": 0.0015872161012300931
+     },
+     {
+      "name": "_fused_sigmoid_mul_kernel",
+      "share": 0.0013285096040938802
+     },
+     {
+      "name": "_table_qk_norm_rope_kernel",
+      "share": 0.001260831984443047
+     },
+     {
+      "name": "kernel_cutlass_kernel_flashinfernormkernelsrmsnormRMSNormKernel_object_at__tensorptrbf16gmemalign128oi64256025601_tensorptrbf16gmemalign16o25601_tensorptrbf16gm",
+      "share": 0.0010017115569114163
+     },
+     {
+      "name": "_fused_conv_window_scatter_multi_kernel",
+      "share": 0.0010002628005274534
+     },
+     {
+      "name": "set_kv_buffer_prefix_valid_tiled",
+      "share": 0.0009013334360225656
+     },
+     {
+      "name": "void sglang::fused_rope_kernel<(bool)1, (long)128, (bool)1, __nv_bfloat16, __nv_bfloat16, long, (unsigned int)16>(sglang::FusedRopeParams)",
+      "share": 0.0008539384057472114
+     }
+    ],
+    "share_marlin": 0.3014151368278937,
+    "share_dense_gemm": 0.1223696348371375
+   },
+   "log_facts": {
+    "weights": [
+     {
+      "type": "Qwen3_5ForConditionalGeneration",
+      "quant": "compressed-tensors",
+      "avail_gb": 89.87,
+      "usage_gb": 3.9
+     },
+     {
+      "type": "DFlashDraftModel",
+      "quant": "compressed-tensors",
+      "avail_gb": 89.43,
+      "usage_gb": 0.41
+     }
+    ],
+    "ssm_state_gb": [
+     3.05
+    ],
+    "log_lines": [
+     "[2026-10-02 03:33:33] server_args={'model_path': 'nota-ai/Qwen3.5-4B-QAD-W4A16', 'tokenizer_path': 'nota-ai/Qwen3.5-4B-QAD-W4A16', 'tokenizer_mode': 'auto', 'tokenizer_backend': 'huggingface', 'tokenizer_worker_num': 1, 'detokenizer_worker_num': 1, 'skip_tokenizer_init': False, 'load_format': 'auto'",
+     "[2026-10-02 03:33:51] Acceleration for non-quantized schemes is not supported by Compressed Tensors. Falling back to UnquantizedLinearMethod",
+     "[2026-10-02 03:33:52] Load weight end. elapsed=1.49 s, type=Qwen3_5ForConditionalGeneration, quant=compressed-tensors, avail mem=89.87 GB, mem usage=3.90 GB.",
+     "[2026-10-02 03:34:00] Load weight end. elapsed=0.12 s, type=DFlashDraftModel, quant=compressed-tensors, avail mem=89.43 GB, mem usage=0.41 GB.",
+     "[2026-10-02 03:34:00] Initialized DFLASH draft runner. attention_backend=triton, model=DFlashDraftModel, block_size=16, draft_window_size=None, compact_cache=False",
+     "[2026-10-02 03:34:00] DFLASH draft runner ready. mask_token=<|MASK|>, mask_token_id=248070, mask_token_id_override=248070, noise_embed_scale=1.0",
+     "[2026-10-02 03:34:00] DFLASH fused KV materialization disabled: quantized qkv_proj is not supported for this path (quant_method=CompressedTensorsLinearMethod): layer=0",
+     "[2026-10-02 03:34:05] Mamba Cache is allocated. max_mamba_cache_size: 64, conv_state size: 0.07GB, ssm_state size: 3.05GB intermediate_ssm_state_cache size: 48.75GB intermediate_conv_window_cache size: 0.43GB",
+     "[2026-10-02 03:34:06] KV Cache is allocated. dtype: torch.bfloat16, #tokens: 448452, K size: 6.84 GB, V size: 6.84 GB",
+     "[2026-10-02 03:34:07] KV Cache is allocated. dtype: torch.bfloat16, #tokens: 448452, K size: 4.28 GB, V size: 4.28 GB",
+     "[2026-10-02 03:34:07] Linear attention kernel backend: decode=triton, prefill=flashinfer, verify=triton",
+     "[2026-10-02 03:34:07] GDN kernel dispatcher: decode=TritonGDNKernel, extend=FlashInferGDNKernel, verify=TritonGDNKernel packed_decode=True",
+     "[2026-10-02 03:34:33] DFLASH draft greedy head folded into the draft cuda graph (tp=1).",
+     "[2026-10-02 03:34:36] DFLASH sampling pre-warm: borrowing=False bs=64 peak=3133551104 B headroom=4150669824 B",
+     "[2026-10-02 03:34:36] max_total_num_tokens=448452, chunked_prefill_size=8192, max_prefill_tokens=16384, max_running_requests=64, context_len=262144, available_gpu_mem=2.43 GB"
+    ]
+   },
+   "end_unix": 1790912093.9403148,
+   "ok": true
+  },
+  {
+   "step": "int4-dflash-b8",
+   "arm": "int4-dflash-b8",
+   "start_unix": 1790912093.9440598,
+   "error": "ServerError: port 30101 on 127.0.0.1 is already in use",
+   "traceback": "Traceback (most recent call last):\n  File \"/home/ubuntu/vp-wt/lossy-hold/experiments/lossy/load_test.py\", line 297, in run_step\n    with server:\n         ^^^^^^\n  File \"/home/ubuntu/vp-wt/lossy-hold/bench/server.py\", line 663, in __enter__\n    self.start()\n  File \"/home/ubuntu/vp-wt/lossy-hold/bench/server.py\", line 520, in start\n    raise ServerError(f'port {self.port} on {self.host} is already in use')\nbench.server.ServerError: port 30101 on 127.0.0.1 is already in use\n",
+   "end_unix": 1790912093.9447775,
+   "ok": false
+  },
+  {
+   "step": "int4-plain-cap256",
+   "arm": "int4-plain-cap256",
+   "start_unix": 1790912093.948315,
+   "error": "ServerError: port 30101 on 127.0.0.1 is already in use",
+   "traceback": "Traceback (most recent call last):\n  File \"/home/ubuntu/vp-wt/lossy-hold/experiments/lossy/load_test.py\", line 297, in run_step\n    with server:\n         ^^^^^^\n  File \"/home/ubuntu/vp-wt/lossy-hold/bench/server.py\", line 663, in __enter__\n    self.start()\n  File \"/home/ubuntu/vp-wt/lossy-hold/bench/server.py\", line 520, in start\n    raise ServerError(f'port {self.port} on {self.host} is already in use')\nbench.server.ServerError: port 30101 on 127.0.0.1 is already in use\n",
+   "end_unix": 1790912093.948657,
+   "ok": false
+  },
+  {
+   "step": "plain-cap256-fp16",
+   "arm": "plain-cap256-fp16",
+   "start_unix": 1790912093.9521546,
+   "error": "ServerError: port 30101 on 127.0.0.1 is already in use",
+   "traceback": "Traceback (most recent call last):\n  File \"/home/ubuntu/vp-wt/lossy-hold/experiments/lossy/load_test.py\", line 297, in run_step\n    with server:\n         ^^^^^^\n  File \"/home/ubuntu/vp-wt/lossy-hold/bench/server.py\", line 663, in __enter__\n    self.start()\n  File \"/home/ubuntu/vp-wt/lossy-hold/bench/server.py\", line 520, in start\n    raise ServerError(f'port {self.port} on {self.host} is already in use')\nbench.server.ServerError: port 30101 on 127.0.0.1 is already in use\n",
+   "end_unix": 1790912093.9524522,
+   "ok": false
+  },
+  {
+   "step": "replayssm-cap256-fp16",
+   "arm": "replayssm-cap256-fp16",
+   "start_unix": 1790912093.955936,
+   "error": "ServerError: port 30101 on 127.0.0.1 is already in use",
+   "traceback": "Traceback (most recent call last):\n  File \"/home/ubuntu/vp-wt/lossy-hold/experiments/lossy/load_test.py\", line 297, in run_step\n    with server:\n         ^^^^^^\n  File \"/home/ubuntu/vp-wt/lossy-hold/bench/server.py\", line 663, in __enter__\n    self.start()\n  File \"/home/ubuntu/vp-wt/lossy-hold/bench/server.py\", line 520, in start\n    raise ServerError(f'port {self.port} on {self.host} is already in use')\nbench.server.ServerError: port 30101 on 127.0.0.1 is already in use\n",
+   "end_unix": 1790912093.9562352,
+   "ok": false
+  },
+  {
+   "step": "replayssm-cap256",
+   "arm": "replayssm-cap256",
+   "start_unix": 1790912093.9597013,
+   "error": "ServerError: port 30101 on 127.0.0.1 is already in use",
+   "traceback": "Traceback (most recent call last):\n  File \"/home/ubuntu/vp-wt/lossy-hold/experiments/lossy/load_test.py\", line 297, in run_step\n    with server:\n         ^^^^^^\n  File \"/home/ubuntu/vp-wt/lossy-hold/bench/server.py\", line 663, in __enter__\n    self.start()\n  File \"/home/ubuntu/vp-wt/lossy-hold/bench/server.py\", line 520, in start\n    raise ServerError(f'port {self.port} on {self.host} is already in use')\nbench.server.ServerError: port 30101 on 127.0.0.1 is already in use\n",
+   "end_unix": 1790912093.9600208,
+   "ok": false
+  },
+  {
+   "step": "plain-ref-1",
+   "arm": "plain-cap256",
+   "start_unix": 1790912093.9634852,
+   "error": "ServerError: port 30101 on 127.0.0.1 is already in use",
+   "traceback": "Traceback (most recent call last):\n  File \"/home/ubuntu/vp-wt/lossy-hold/experiments/lossy/load_test.py\", line 297, in run_step\n    with server:\n         ^^^^^^\n  File \"/home/ubuntu/vp-wt/lossy-hold/bench/server.py\", line 663, in __enter__\n    self.start()\n  File \"/home/ubuntu/vp-wt/lossy-hold/bench/server.py\", line 520, in start\n    raise ServerError(f'port {self.port} on {self.host} is already in use')\nbench.server.ServerError: port 30101 on 127.0.0.1 is already in use\n",
+   "end_unix": 1790912093.9637845,
+   "ok": false
+  },
+  {
+   "step": "plain-ref-2",
+   "arm": "plain-cap256",
+   "start_unix": 1790912093.9672816,
+   "error": "ServerError: port 30101 on 127.0.0.1 is already in use",
+   "traceback": "Traceback (most recent call last):\n  File \"/home/ubuntu/vp-wt/lossy-hold/experiments/lossy/load_test.py\", line 297, in run_step\n    with server:\n         ^^^^^^\n  File \"/home/ubuntu/vp-wt/lossy-hold/bench/server.py\", line 663, in __enter__\n    self.start()\n  File \"/home/ubuntu/vp-wt/lossy-hold/bench/server.py\", line 520, in start\n    raise ServerError(f'port {self.port} on {self.host} is already in use')\nbench.server.ServerError: port 30101 on 127.0.0.1 is already in use\n",
+   "end_unix": 1790912093.9675891,
+   "ok": false
+  }
+ ],
+ "failed": [
+  "int4-dflash-b8",
+  "int4-plain-cap256",
+  "plain-cap256-fp16",
+  "replayssm-cap256-fp16",
+  "replayssm-cap256",
+  "plain-ref-1",
+  "plain-ref-2"
+ ]
+}

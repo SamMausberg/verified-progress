@@ -1,0 +1,13 @@
+{
+  "run_a": "evidence/bench/quality/plain-tuned-replayssm-seed0",
+  "run_b": "evidence/lossy/quality/plain-cap256-fp16-seed0/20261002-094130",
+  "problems": 1319,
+  "accuracy_a": 0.910538286580743,
+  "accuracy_b": 0.890068233510235,
+  "accuracy_delta_b_minus_a": -0.020470053070507976,
+  "correct_only_a": 101,
+  "correct_only_b": 74,
+  "mcnemar_exact_p": 0.04905527867125778,
+  "same_predicted_answer": 0.7573919636087946,
+  "identical_generation": 0.0
+}

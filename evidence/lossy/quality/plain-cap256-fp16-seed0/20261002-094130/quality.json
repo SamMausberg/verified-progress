@@ -1,0 +1,193 @@
+{
+  "label": "plain-cap256-fp16-seed0",
+  "arm": {
+    "name": "plain-cap256-fp16",
+    "description": "plain-cap256 with the GDN recurrent state stored in FP16 (checkpoint: FP32).",
+    "model": "Qwen/Qwen3.5-4B",
+    "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+    "args": {
+      "attention-backend": "flashinfer",
+      "mm-attention-backend": "triton_attn",
+      "max-running-requests": 256,
+      "max-mamba-cache-size": 256,
+      "mem-fraction-static": 0.85,
+      "max-total-tokens": 1000000,
+      "enable-metrics": true,
+      "random-seed": 0,
+      "stream-interval": 4,
+      "disable-radix-cache": true,
+      "mamba-ssm-dtype": "float16"
+    },
+    "env": {},
+    "max_concurrency": 256,
+    "lossy": "FP16 GDN recurrent state",
+    "exactness": "lossy",
+    "exactness_note": "",
+    "require_full_graph_coverage": true
+  },
+  "launch_checks": [
+    {
+      "name": "cuda_graph_decode",
+      "ok": true,
+      "required": true,
+      "detail": "captured: target prefill (breakable), target decode (full)"
+    },
+    {
+      "name": "cuda_graph_prefill",
+      "ok": true,
+      "required": true,
+      "detail": "captured"
+    },
+    {
+      "name": "cuda_graph_covers_capacity",
+      "ok": true,
+      "required": true,
+      "detail": "target decode graph batch sizes up to 256; server capacity 256"
+    },
+    {
+      "name": "overlap_scheduler",
+      "ok": true,
+      "required": true,
+      "detail": "scheduler disable_overlap_schedule=False"
+    },
+    {
+      "name": "capacity",
+      "ok": true,
+      "required": true,
+      "detail": "effective max_running_requests=256, target 256"
+    },
+    {
+      "name": "attention_backend",
+      "ok": true,
+      "required": true,
+      "detail": "scheduler attention_backend=flashinfer, requested flashinfer"
+    },
+    {
+      "name": "speculative_config",
+      "ok": true,
+      "required": true,
+      "detail": "resolved speculative_algorithm=None"
+    }
+  ],
+  "server_version": "0.5.21.dev861+gbd66ce343",
+  "sglang_source": {
+    "module_file": "/home/ubuntu/sglang-wt/lossy/python/sglang/__init__.py",
+    "path": "/home/ubuntu/sglang-wt/lossy",
+    "head": "57560de6907090a34eb21774ba13dbe2a6b89b80",
+    "branch": "engine/lossy",
+    "dirty_files": []
+  },
+  "repo": {
+    "path": "/home/ubuntu/vp-wt/lossy-hold",
+    "head": "ec9173776f7621d8aaad3f158ed87f1ee21a9acc",
+    "branch": "HEAD",
+    "dirty_files": []
+  },
+  "task_file": "/home/ubuntu/vp-wt/lossy-hold/bench/quality/gsm8k_test.jsonl",
+  "task_sha256": "01680346c8530cfc7edaf42642adc5367750de72e24ba6b2420b8a1073a8a704",
+  "task_problems": 1319,
+  "generation": {
+    "temperature": 0.6,
+    "top_p": 0.95,
+    "extra_body": {
+      "top_k": 20
+    },
+    "max_tokens": 16384,
+    "chat_template_kwargs": {
+      "enable_thinking": true
+    },
+    "prompt": "sgl-eval gsm8k default (NeMo-Skills generic/math, zero-shot)",
+    "seed": 0,
+    "threads": 128
+  },
+  "sgl_eval_command": [
+    "/home/ubuntu/sglang/.venv/bin/python",
+    "-m",
+    "bench.quality",
+    "sgl-eval",
+    "--extra-body",
+    "{\"top_k\": 20}",
+    "run",
+    "gsm8k",
+    "--base-url",
+    "http://127.0.0.1:30101/v1",
+    "--model",
+    "Qwen/Qwen3.5-4B",
+    "--from-dataset",
+    "/home/ubuntu/vp-wt/lossy-hold/bench/quality/gsm8k_test.jsonl",
+    "--temperature",
+    "0.6",
+    "--top-p",
+    "0.95",
+    "--max-tokens",
+    "16384",
+    "--chat-template-kwarg",
+    "enable_thinking=true",
+    "--num-threads",
+    "128",
+    "--seed",
+    "0",
+    "--out-dir",
+    "/home/ubuntu/vp-data/lossy/quality/plain-cap256-fp16-seed0/20261002-094130/sgl_eval"
+  ],
+  "sgl_eval_exit_code": 0,
+  "wall_s": 958.0891888141632,
+  "host_load": {
+    "interval_s": 1.0,
+    "samples": 929,
+    "foreign_cores_mean": 0.842,
+    "foreign_cores_max": 4.78,
+    "contended": false,
+    "contention_threshold_cores": 2.0,
+    "top_foreign_mean_cores": {
+      "claude --dangerously-skip-permissions": 0.16,
+      "pdflatex -interaction=nonstopmode -halt-on-error -recorder paper.tex": 0.15,
+      "/home/ubuntu/.cursor-server/bin/linux-arm64/e44a49c17e334d442e58bbde931d791200f014a0/node --dns-result-order=ipv4first -": 0.05,
+      "pdftoppm -r 150 -f 1 -l 50 -png paper.pdf /tmp/claude-1000/-home-ubuntu-verified-progress/35e4cf50-ebde-47f2-9891-a5b369": 0.04,
+      "pdflatex -interaction=nonstopmode -halt-on-error -recorder notes/research_notes.tex": 0.03
+    },
+    "own_peak_cores": {
+      "/home/ubuntu/sglang/.venv/bin/python -m bench.quality sgl-ev": 5.12,
+      "sglang::scheduler": 1.03,
+      "/home/ubuntu/sglang/.venv/bin/python -m sglang.launch_server": 0.1
+    }
+  },
+  "server_counters": {
+    "generation_tokens": 8202158.0,
+    "prompt_tokens": 124279.0,
+    "spec_verify_calls": 0,
+    "decode_graph_passes": 73980.0,
+    "decode_eager_passes": 0,
+    "prefill_graph_passes": 1157.0,
+    "prefill_eager_passes": 0.0,
+    "num_requests": 1319.0,
+    "retracted_requests": 0,
+    "decode_graph_fraction": 1.0
+  },
+  "avg_spec_accept_length_since_start": null,
+  "gpu": [
+    "NVIDIA GH200 480GB",
+    "570.195.03",
+    "97871 MiB",
+    "4 MiB",
+    "345 MHz",
+    "2619 MHz",
+    "1980 MHz",
+    "2619 MHz",
+    "900.00 W",
+    "39",
+    "Enabled"
+  ],
+  "problems": 1319,
+  "correct": 1174,
+  "accuracy": 0.890068233510235,
+  "accuracy_wilson95": [
+    0.8720406263642846,
+    0.9058302842572137
+  ],
+  "no_answer": 101,
+  "truncated": 243,
+  "completion_tokens_mean": 6218.467020470053,
+  "completion_tokens_p50": 4026,
+  "completion_tokens_max": 16384
+}

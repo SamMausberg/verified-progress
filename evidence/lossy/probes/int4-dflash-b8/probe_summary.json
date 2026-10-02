@@ -1,0 +1,46 @@
+{
+ "arm": "int4-dflash-b8",
+ "reference": "/home/ubuntu/vp-data/lossy/load_test/20261002T035539Z/plain-ref-1/probe_generate.json",
+ "reference_sha256": "5186472b7ae278bd4d7f9de1bd462e6126f03adb870cd0d98648cbaab0c968f7",
+ "generate": {
+  "reference": "plain-ref-1",
+  "candidate": "int4-dflash-b8",
+  "mode": "generate",
+  "positions": 1874,
+  "kl_mean": 0.00907072148962805,
+  "kl_p50": 4.000467911844816e-05,
+  "kl_p99": 0.14353739984027217,
+  "kl_max": 0.46488593349166696,
+  "identical": false,
+  "first_difference": {
+   "sequence": 0,
+   "position": 0,
+   "kind": "top-k"
+  },
+  "sequences": 48,
+  "sequences_identical": 0,
+  "first_divergence_median": 27.0,
+  "divergences_per_1k_shared_tokens": 25.6136606189968,
+  "top1_logprob_abs_delta_mean": 0.02458972298058794,
+  "emitted_non_argmax_rate": 0.004150390625,
+  "emitted_non_argmax_logprob_gap_mean": 0.0
+ },
+ "score": {
+  "reference": "plain-ref-1",
+  "candidate": "int4-dflash-b8",
+  "mode": "score",
+  "positions": 12240,
+  "kl_mean": 0.01249704759814444,
+  "kl_p50": 0.00013189456986419757,
+  "kl_p99": 0.16463316666038155,
+  "kl_max": 0.7501006602219894,
+  "identical": false,
+  "first_difference": {
+   "sequence": 0,
+   "position": 0,
+   "kind": "top-k"
+  },
+  "argmax_agreement": 0.9694444444444444,
+  "argmax_disagreements": 374
+ }
+}

@@ -1,0 +1,75 @@
+{
+ "hold": "q2",
+ "provenance": {
+  "repo_commit": "ec9173776f7621d8aaad3f158ed87f1ee21a9acc",
+  "engine_worktree": "/home/ubuntu/sglang-wt/lossy",
+  "engine_commit": "57560de6907090a34eb21774ba13dbe2a6b89b80",
+  "python": "/home/ubuntu/sglang/.venv/bin/python",
+  "versions": {
+   "torch": "2.13.0",
+   "triton": "3.7.1",
+   "flashinfer-python": "0.6.18",
+   "transformers": "5.12.1",
+   "sgl-eval": "0.1.2"
+  }
+ },
+ "planned": [
+  "gsm8k-plain-cap256-fp16",
+  "probe-plain-cap256-fp16"
+ ],
+ "start_unix": 1790934090.933997,
+ "launches": [
+  {
+   "label": "gsm8k-plain-cap256-fp16",
+   "command": [
+    "/home/ubuntu/vp-wt/lossy-hold/scripts/gpu_startup_lock.sh",
+    "/home/ubuntu/sglang/.venv/bin/python",
+    "-m",
+    "bench.quality",
+    "run",
+    "--arm",
+    "plain-cap256-fp16",
+    "--label",
+    "plain-cap256-fp16-seed0",
+    "--seed",
+    "0",
+    "--threads",
+    "128",
+    "--port",
+    "30101",
+    "--out",
+    "/home/ubuntu/vp-data/lossy/quality",
+    "--sglang-worktree",
+    "/home/ubuntu/sglang-wt/lossy"
+   ],
+   "log": "/home/ubuntu/vp-data/lossy/logs/q2/gsm8k-plain-cap256-fp16.log",
+   "timeout_s": 1500,
+   "start_unix": 1790934090.9343333,
+   "end_unix": 1790935104.8063705,
+   "exit_code": 0,
+   "run_dir": null
+  },
+  {
+   "label": "probe-plain-cap256-fp16",
+   "command": [
+    "/home/ubuntu/vp-wt/lossy-hold/scripts/gpu_startup_lock.sh",
+    "/home/ubuntu/sglang/.venv/bin/python",
+    "-m",
+    "experiments.lossy.run_hold",
+    "probe",
+    "--arm",
+    "plain-cap256-fp16",
+    "--out",
+    "/home/ubuntu/vp-data/lossy/probes/plain-cap256-fp16"
+   ],
+   "log": "/home/ubuntu/vp-data/lossy/logs/q2/probe-plain-cap256-fp16.log",
+   "timeout_s": 600,
+   "start_unix": 1790935104.8069475,
+   "end_unix": 1790935175.739957,
+   "exit_code": 0,
+   "run_dir": null
+  }
+ ],
+ "end_unix": 1790935175.7404752,
+ "failed_launches": 0
+}

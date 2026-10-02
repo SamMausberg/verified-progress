@@ -1,0 +1,101 @@
+From 57560de6907090a34eb21774ba13dbe2a6b89b80 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Fri, 2 Oct 2026 02:59:00 +0000
+Subject: [PATCH] dflash: load a quantized context projection (fc) instead of
+ leaving it uninitialised
+
+A compressed-tensors DFlash checkpoint (nota-ai/Qwen3.5-4B-DFlash-GPTQ-W4A16)
+stores fc as weight_packed/weight_scale/weight_shape. The non-Nemotron path
+built fc as a plain nn.Linear, so those tensors matched no parameter, were
+skipped, and fc.weight stayed torch.empty. Build fc as a ReplicatedLinear with
+the draft's quant_config whenever one is set, and refuse to load when any fc
+parameter is missing.
+---
+ python/sglang/srt/models/dflash.py | 29 +++++++++++++++++++++++------
+ 1 file changed, 23 insertions(+), 6 deletions(-)
+
+diff --git a/python/sglang/srt/models/dflash.py b/python/sglang/srt/models/dflash.py
+index f3205f3de4..1c44dae02f 100644
+--- a/python/sglang/srt/models/dflash.py
++++ b/python/sglang/srt/models/dflash.py
+@@ -692,7 +692,11 @@ class DFlashDraftModel(nn.Module):
+         num_context_features = len(target_layer_ids)
+ 
+         self.num_context_features = int(num_context_features)
+-        if self.is_nemotron_35_draft:
++        # A quantized checkpoint (e.g. compressed-tensors W4A16) stores the
++        # projection packed (fc.weight_packed, fc.weight_scale); a plain
++        # nn.Linear has no such parameters and would be left uninitialised.
++        self.fc_is_linear_method = self.is_nemotron_35_draft or quant_config is not None
++        if self.fc_is_linear_method:
+             fc_prefix = f"{prefix}.fc" if prefix else "fc"
+             self.fc = ReplicatedLinear(
+                 self.num_context_features * hidden_size,
+@@ -763,7 +767,7 @@ class DFlashDraftModel(nn.Module):
+     def project_target_hidden(self, target_hidden: torch.Tensor) -> torch.Tensor:
+         """Project concatenated target-layer hidden states into draft hidden_size."""
+         expected = int(
+-            self.fc.input_size if self.is_nemotron_35_draft else self.fc.in_features
++            self.fc.input_size if self.fc_is_linear_method else self.fc.in_features
+         )
+         if target_hidden.ndim != 2 or int(target_hidden.shape[-1]) != expected:
+             raise ValueError(
+@@ -775,7 +779,7 @@ class DFlashDraftModel(nn.Module):
+                 "the draft checkpoint/config expects."
+             )
+         projected = self.fc(target_hidden)
+-        if self.is_nemotron_35_draft:
++        if self.fc_is_linear_method:
+             projected = projected[0]
+         return self.hidden_norm(projected)
+ 
+@@ -881,7 +885,7 @@ class DFlashDraftModel(nn.Module):
+                     continue
+                 param = params_dict[resolved_name]
+                 if resolved_name.endswith("fc.weight"):
+-                    if self.is_nemotron_35_draft:
++                    if self.fc_is_linear_method:
+                         expected_shape = (
+                             int(self.config.hidden_size),
+                             int(self.num_context_features * self.config.hidden_size),
+@@ -919,6 +923,19 @@ class DFlashDraftModel(nn.Module):
+                 weight_loader(param, loaded_weight)
+                 loaded_params.add(resolved_name)
+ 
++        # Fail loudly rather than serve an uninitialised context projection
++        # (a quantized fc whose packed tensors did not match any parameter).
++        missing_fc = sorted(
++            name
++            for name in params_dict
++            if name.startswith("fc.") and name not in loaded_params
++        )
++        if missing_fc:
++            raise ValueError(
++                "DFLASH checkpoint did not provide the context projection "
++                f"parameters {missing_fc}."
++            )
++
+         if self.projector_type == "domino":
+             required = {
+                 "prefix_gru.weight_ih_l0",
+@@ -1013,7 +1030,7 @@ class DFlashLagunaForCausalLM(DFlashDraftModel):
+ 
+     def project_target_hidden(self, target_hidden: torch.Tensor) -> torch.Tensor:
+         expected = int(
+-            self.fc.input_size if self.is_nemotron_35_draft else self.fc.in_features
++            self.fc.input_size if self.fc_is_linear_method else self.fc.in_features
+         )
+         if target_hidden.ndim != 2 or int(target_hidden.shape[-1]) != expected:
+             raise ValueError(
+@@ -1034,7 +1051,7 @@ class DFlashLagunaForCausalLM(DFlashDraftModel):
+             normed[:, i, :] = norm(slices[:, i, :])
+         fused = normed.reshape(target_hidden.shape[0], -1)
+         projected = self.fc(fused)
+-        if self.is_nemotron_35_draft:
++        if self.fc_is_linear_method:
+             projected = projected[0]
+         return self.hidden_norm(projected)
+ 
+-- 
+2.34.1
+
