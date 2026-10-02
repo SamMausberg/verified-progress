@@ -11,6 +11,10 @@ export SGLANG_WORKTREE=${ENGINE:-$HOME/sglang-wt/speed-lowc}
 FA4_TREE=dcd97db178c101495148fb7a361203f975bcf711
 [ "$(git -C "$SGLANG_WORKTREE" rev-parse 'HEAD^{tree}')" = "$FA4_TREE" ] ||
   { echo "engine tree is not $FA4_TREE"; exit 1; }
+# HEAD's tree says nothing about edits on top of it: require a clean worktree (tracked and
+# untracked files; ignored build products such as the copied .so files are allowed).
+[ -z "$(git -C "$SGLANG_WORKTREE" status --porcelain)" ] ||
+  { echo "engine worktree has local changes"; exit 1; }
 # shellcheck disable=SC1091
 source scripts/sglang_env.sh
 OUT=~/vp-data/speed-lowc/probe3-$(date -u +%Y%m%dT%H%M%SZ)

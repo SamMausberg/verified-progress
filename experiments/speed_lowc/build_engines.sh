@@ -29,7 +29,12 @@ case ${1:-} in
     ;;
 esac
 dest=$HOME/sglang-wt/$name
-[ ! -e "$dest" ] || { echo "$dest exists; remove it first (git -C ~/sglang worktree remove $dest)" >&2; exit 1; }
+sglang=${SGLANG_DIR:-$HOME/sglang}
+if [ -e "$dest" ] || git -C "$sglang" rev-parse --verify -q "refs/heads/engine/$name" > /dev/null; then
+  echo "$dest or branch engine/$name exists; to rebuild, remove both first:" >&2
+  echo "  git -C $sglang worktree remove $dest; git -C $sglang branch -D engine/$name" >&2
+  exit 1
+fi
 for p in "${patches[@]}"; do [ -f "$p" ] || { echo "missing patch $p" >&2; exit 1; }; done
 "$repo/scripts/sglang_worktree.sh" "$name" > /dev/null
 git -C "$dest" am -q "${patches[@]}"

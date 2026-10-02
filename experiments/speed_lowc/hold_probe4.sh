@@ -23,8 +23,11 @@ FA4_TREE=dcd97db178c101495148fb7a361203f975bcf711
 PAGED_KV=python/sglang/kernels/ops/attention/flash_attn/cute/paged_kv.py
 [ "$(git -C "$ENGINE" rev-parse 'HEAD^{tree}')" = "$CONFIRM_TREE" ] ||
   { echo "confirm engine tree is not $CONFIRM_TREE"; exit 1; }
-[ -z "$(git -C "$ENGINE" status --porcelain --untracked-files=no)" ] ||
-  { echo "confirm engine has uncommitted changes"; exit 1; }
+# Clean worktrees (tracked and untracked files) for both the served tree and the tree probe 3
+# validated; HEAD's tree alone does not cover local edits.
+for wt in "$ENGINE" "$FA4_ENGINE"; do
+  [ -z "$(git -C "$wt" status --porcelain)" ] || { echo "$wt has local changes"; exit 1; }
+done
 # Probe 3 validated FA4 on the fa4 tree; the served A/B runs the confirm tree. Require the
 # same FA4 loader in both, and check FA4's numerics again on the confirm tree below.
 [ "$(git -C "$FA4_ENGINE" rev-parse 'HEAD^{tree}')" = "$FA4_TREE" ] ||
