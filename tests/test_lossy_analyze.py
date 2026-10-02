@@ -10,7 +10,10 @@ import pytest
 
 from experiments.lossy import analyze, plan
 
-FIELDS = ['status', 'invalid_reason', 'label', 'session', 'concurrency', 'y', 'x_e2e']
+FIELDS = [
+    'status', 'invalid_reason', 'label', 'session', 'concurrency', 'y', 'x_e2e',
+    'ttft_p50_ms', 'itl_p50_ms', 'accept_length',
+]  # fmt: skip
 
 
 def write_points(path: Path, rows: list[dict[str, object]]) -> Path:
@@ -18,7 +21,10 @@ def write_points(path: Path, rows: list[dict[str, object]]) -> Path:
         writer = csv.DictWriter(handle, fieldnames=FIELDS)
         writer.writeheader()
         for row in rows:
-            writer.writerow({'status': '', 'invalid_reason': '', **row})
+            writer.writerow(
+                {'status': '', 'invalid_reason': '', 'ttft_p50_ms': 40.0, 'itl_p50_ms': 4.0,
+                 'accept_length': '', **row}
+            )  # fmt: skip
     return path
 
 
@@ -112,3 +118,25 @@ def test_plan_is_consistent() -> None:
     assert plan.session_order('lossy-s2') == tuple(reversed(plan.SESSION_LAUNCHES))
     with pytest.raises(ValueError):
         plan.session_order('lossy-s4')
+
+
+def test_slow_launch_flag(tmp_path: Path) -> None:
+    rows = full_rows()
+    for row in rows:
+        if row['label'] == 'plain-cap256' and row['session'] == 'lossy-s2':
+            row['ttft_p50_ms'] = 44.0  # +4 ms
+            row['itl_p50_ms'] = 4.2  # +5% per pass
+        if row['label'] == 'dflash-tuned' and row['session'] == 'lossy-s3':
+            row['ttft_p50_ms'] = 50.0  # TTFT alone does not flag
+    table = analyze.load_points(write_points(tmp_path / 'p.csv', rows))
+    flags = analyze.launch_flags(table)
+    assert flags['plain-cap256@lossy-s2']['flagged']
+    assert not flags['dflash-tuned@lossy-s3']['flagged']
+    assert sum(r['flagged'] for r in flags.values()) == 1
+    reduced = analyze.without(table, {('plain-cap256', 'lossy-s2')})
+    assert set(reduced[('plain-cap256', 64)]) == {'lossy-s1', 'lossy-s3'}
+    result = analyze.speed(reduced, analyze.MIN_SESSIONS_WITHOUT_FLAGGED)
+    pair = next(
+        p for p in result['pairs'] if p['test'] == 'plain-cap256-fp16' and p['concurrency'] == 64
+    )
+    assert pair['y']['sessions'] == ['lossy-s1', 'lossy-s3']

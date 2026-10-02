@@ -38,6 +38,11 @@ from typing import Any
 from experiments.lossy import plan
 
 GSM8K_BUDGET_PT = -1.0
+# Slow-launch check (pre-run revision of 2026-10-02): see launch_flags().
+SLOW_TTFT_MS = 3.0
+SLOW_PASS_FRACTION = 0.02
+# Sessions a ratio needs in the sensitivity analysis without flagged launches.
+MIN_SESSIONS_WITHOUT_FLAGGED = 2
 AGREEMENT_MIN = 0.98
 KL_MAX = 0.01
 
@@ -52,7 +57,15 @@ def load_points(path: Path) -> dict[tuple[str, int], dict[str, dict[str, float]]
             key = (row['label'], int(row['concurrency']))
             if row['session'] in table[key]:
                 raise ValueError(f'two valid points for {key} in {row["session"]}')
-            table[key][row['session']] = {'y': float(row['y']), 'x': float(row['x_e2e'])}
+            accept = float(row['accept_length']) if row.get('accept_length') else 1.0
+            table[key][row['session']] = {
+                'y': float(row['y']),
+                'x': float(row['x_e2e']),
+                'ttft_p50_ms': float(row['ttft_p50_ms']),
+                # Time per forward pass: ITL is per output token, a verify pass emits
+                # accept_length tokens on average (1 for plain decoding).
+                'pass_ms': float(row['itl_p50_ms']) * accept,
+            }
     return table
 
 
@@ -69,8 +82,8 @@ def check_plan(table: dict[tuple[str, int], dict[str, dict[str, float]]]) -> lis
     return missing
 
 
-def classify(values: list[float]) -> str:
-    if len(values) < plan.MIN_SESSIONS:
+def classify(values: list[float], min_sessions: int = plan.MIN_SESSIONS) -> str:
+    if len(values) < min_sessions:
         return 'not decided (fewer sessions)'
     if all(v > 1 + plan.BAND for v in values):
         return 'faster'
@@ -80,7 +93,10 @@ def classify(values: list[float]) -> str:
 
 
 def ratio_record(
-    num: dict[str, dict[str, float]], den: dict[str, dict[str, float]], metric: str
+    num: dict[str, dict[str, float]],
+    den: dict[str, dict[str, float]],
+    metric: str,
+    min_sessions: int = plan.MIN_SESSIONS,
 ) -> dict[str, Any]:
     sessions = sorted(set(num) & set(den))
     values = [num[s][metric] / den[s][metric] for s in sessions]
@@ -90,7 +106,7 @@ def ratio_record(
         'mean': statistics.fmean(values) if values else math.nan,
         'min': min(values) if values else math.nan,
         'max': max(values) if values else math.nan,
-        'decision': classify(values),
+        'decision': classify(values, min_sessions),
     }
 
 
@@ -102,13 +118,62 @@ def concurrencies() -> list[int]:
     return sorted({c for launch in plan.SESSION_LAUNCHES for c in launch.concurrency})
 
 
-def speed(table: dict[tuple[str, int], dict[str, dict[str, float]]]) -> dict[str, Any]:
+def launch_flags(
+    table: dict[tuple[str, int], dict[str, dict[str, float]]],
+) -> dict[str, dict[str, Any]]:
+    """The declared slow-launch check, per arm and session.
+
+    At each of the launch's concurrencies, compare its TTFT p50 and time per pass
+    with the median over the arm's sessions there. A launch is flagged when, at a
+    majority of its concurrencies, TTFT p50 exceeds that median by more than
+    SLOW_TTFT_MS and the time per pass exceeds it by more than SLOW_PASS_FRACTION.
+    """
+    per_launch: dict[str, dict[str, Any]] = {}
+    for (arm, c), entry in sorted(table.items()):
+        if len(entry) < 2:
+            continue
+        ttft_median = statistics.median(v['ttft_p50_ms'] for v in entry.values())
+        pass_median = statistics.median(v['pass_ms'] for v in entry.values())
+        for session, v in entry.items():
+            record = per_launch.setdefault(
+                f'{arm}@{session}', {'arm': arm, 'session': session, 'points': []}
+            )
+            d_ttft = v['ttft_p50_ms'] - ttft_median
+            d_pass = v['pass_ms'] / pass_median - 1
+            record['points'].append(
+                {
+                    'concurrency': c,
+                    'ttft_excess_ms': d_ttft,
+                    'pass_excess': d_pass,
+                    'slow': d_ttft > SLOW_TTFT_MS and d_pass > SLOW_PASS_FRACTION,
+                }
+            )
+    for record in per_launch.values():
+        slow = sum(point['slow'] for point in record['points'])
+        record['flagged'] = slow > len(record['points']) / 2
+    return per_launch
+
+
+def without(
+    table: dict[tuple[str, int], dict[str, dict[str, float]]], launches: set[tuple[str, str]]
+) -> dict[tuple[str, int], dict[str, dict[str, float]]]:
+    """The table without the given (arm, session) launches."""
+    return {
+        (arm, c): {s: v for s, v in entry.items() if (arm, s) not in launches}
+        for (arm, c), entry in table.items()
+    }
+
+
+def speed(
+    table: dict[tuple[str, int], dict[str, dict[str, float]]],
+    min_sessions: int = plan.MIN_SESSIONS,
+) -> dict[str, Any]:
     arms_at: dict[int, list[str]] = defaultdict(list)
     for launch in plan.SESSION_LAUNCHES:
         if launch.arm in plan.DROPPED_ARMS:
             continue
         for c in launch.concurrency:
-            if len(table.get((launch.arm, c), {})) >= plan.MIN_SESSIONS:
+            if len(table.get((launch.arm, c), {})) >= min_sessions:
                 arms_at[c].append(launch.arm)
     means = [
         {
@@ -121,6 +186,7 @@ def speed(table: dict[tuple[str, int], dict[str, dict[str, float]]]) -> dict[str
             'exact': arm in plan.EXACT_ARMS,
         }
         for (arm, c), entry in sorted(table.items(), key=lambda item: (item[0][0], item[0][1]))
+        if entry
     ]
     pairs = []
     for test, base in plan.PAIRS:
@@ -132,8 +198,8 @@ def speed(table: dict[tuple[str, int], dict[str, dict[str, float]]]) -> dict[str
                         'test': test,
                         'baseline': base,
                         'concurrency': c,
-                        'y': ratio_record(num, den, 'y'),
-                        'x': ratio_record(num, den, 'x'),
+                        'y': ratio_record(num, den, 'y', min_sessions),
+                        'x': ratio_record(num, den, 'x', min_sessions),
                     }
                 )
     envelope = []
@@ -152,8 +218,8 @@ def speed(table: dict[tuple[str, int], dict[str, dict[str, float]]]) -> dict[str
                     'concurrency': c,
                     'best_lossy': best_lossy,
                     'best_exact': best_exact,
-                    'y': ratio_record(num, den, 'y'),
-                    'x': ratio_record(num, den, 'x'),
+                    'y': ratio_record(num, den, 'y', min_sessions),
+                    'x': ratio_record(num, den, 'x', min_sessions),
                 }
             )
     return {'means': means, 'pairs': pairs, 'envelope': envelope}
@@ -247,7 +313,15 @@ def main(argv: list[str] | None = None) -> int:
     missing = check_plan(table)
     if missing and not args.allow_missing:
         raise SystemExit('declared points without enough valid sessions:\n  ' + '\n  '.join(missing))
+    flags = launch_flags(table)
+    flagged = {(r['arm'], r['session']) for r in flags.values() if r['flagged']}
     result: dict[str, Any] = {'missing_points': missing, 'band': plan.BAND, **speed(table)}
+    result['launch_flags'] = flags
+    result['flagged_launches'] = sorted(f'{arm}@{session}' for arm, session in flagged)
+    # Shown beside the primary verdict whenever a launch is flagged.
+    result['without_flagged'] = (
+        speed(without(table, flagged), MIN_SESSIONS_WITHOUT_FLAGGED) if flagged else None
+    )
     result['gsm8k'] = [gsm8k(run, args.references) for run in args.quality]
     result['probes'] = [probe(path / 'probe_summary.json') for path in args.probes]
     if args.probe_noise is not None:
@@ -257,12 +331,18 @@ def main(argv: list[str] | None = None) -> int:
     rows = [
         ['kind', 'test', 'baseline', 'concurrency', 'metric', 'mean', 'min', 'max', 'n', 'decision']
     ]
-    for kind, test, base, c, record in [
-        ('pair', p['test'], p['baseline'], p['concurrency'], p) for p in result['pairs']
-    ] + [
-        (f'envelope-{e["lever"]}', e['best_lossy'], e['best_exact'], e['concurrency'], e)
-        for e in result['envelope']
-    ]:
+    entries = []
+    for prefix, part in (('', result), ('without-flagged-', result['without_flagged'])):
+        if part is None:
+            continue
+        entries += [
+            (f'{prefix}pair', p['test'], p['baseline'], p['concurrency'], p) for p in part['pairs']
+        ]
+        entries += [
+            (f'{prefix}envelope-{e["lever"]}', e['best_lossy'], e['best_exact'], e['concurrency'], e)
+            for e in part['envelope']
+        ]
+    for kind, test, base, c, record in entries:
         for metric in ('y', 'x'):
             r = record[metric]
             rows.append(

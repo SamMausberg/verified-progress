@@ -111,6 +111,20 @@ so a repeated prompt is computed afresh.
   FP16 state. Every other point is reported in the tables.
 - Memory, from the server logs of the same launches (not timed): weight memory of target and
   drafter, KV tokens and GDN state memory at the same `--mem-fraction-static`.
+- Slow-launch check (pre-run revision, 2026-10-02 03:30 UTC, before any timed hold). The
+  machine has an intermittent launch-level slow state (TTFT p50 about 4 ms higher at every
+  concurrency and decode 2-6% slower, invisible to the foreign-CPU and clock checks; seen by
+  the red team in two other workstreams' holds). For every launch (arm and session) and each of
+  its concurrencies, `analyze.launch_flags` compares TTFT p50 and the time per forward pass
+  (ITL p50 times the mean accept length; ITL p50 for plain decoding) with the median of the
+  same arm's sessions at that concurrency. A launch is flagged when, at a majority of its
+  concurrencies, TTFT p50 is more than 3 ms above that median and the time per pass more than
+  2% above it. Both conditions are required because TTFT alone varies by up to 5-9 ms between
+  bench's valid confirmation sessions at c >= 32. A flagged launch is reported, and stays in the
+  primary analysis; every decision is also computed without the flagged launches (each ratio
+  then needs at least two sessions), and both verdicts are shown. Where they differ, the text
+  gives both and calls neither the true result. With three sessions the median cannot expose a
+  slow state that hit two of an arm's three launches; that limit is stated with the results.
 
 ### Quality
 
