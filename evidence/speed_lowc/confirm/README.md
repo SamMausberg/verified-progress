@@ -3,6 +3,12 @@
 Declared on 2026-10-02 in the commit that adds this file, before any of its holds ran. Any change after
 the equality hold starts is added below as a dated amendment with its reason.
 
+One change was made before any hold ran (2026-10-02, review of #220): patch 0003 now gives the fold's
+ring-writing verify narrow tiles up to 2 sequences instead of 4, the threshold that the drafter's
+pre-registered kernel sweep gives (`evidence/drafter/README.md`, "Ring-writing verify tiles by batch"),
+so the engine tree is `5d6db548` instead of `9a01a622`. The equality hold queued for the old tree was
+cancelled before it started.
+
 **Question.** On the confirmed frontier's best exact arms at client concurrency 1-32
 (`evidence/bench/README.md`), what do the three exact levers that passed their probes
 (`evidence/speed_lowc/README.md`) give together, and what does each give alone, measured in the same
@@ -11,7 +17,7 @@ sessions with identical flags apart from the lever?
 ## Engine
 
 `experiments/speed_lowc/build_engines.sh confirm`: the pin `bd66ce343e` plus `engine/sglang/patches/drafter/0001-0004`
-and `engine/sglang/patches/speed-lowc/0001` and `0003`; tree `9a01a622f6e7f7f816ce6255ba5de56d52e09dbc`, every
+and `engine/sglang/patches/speed-lowc/0001` and `0003`; tree `5d6db54828d7fbdac62180810b68a87cee3b39ec`, every
 switch off by default. Every hold checks the tree and refuses a worktree with local changes. Each server's
 `launch.json` records the SGLang commit it imported.
 
@@ -26,7 +32,7 @@ Levers:
 
 | Lever | Change | Groups | Probe evidence (one session each) |
 |---|---|---|---|
-| A | exact GDN fold: `--enable-linear-replayssm-spec`, `SGLANG_GDN_REPLAYSSM_FOLD=1` (drafter 0001-0004), with ring-verify tiles BV=4 up to 4 sequences (speed-lowc 0003) | L, H | fold with narrow tiles 1.020 / 1.012 / 1.018 at c = 1 / 2 / 4 on block 16; fold with wide tiles 1.061 / 1.058 at c = 8 on block 16 / 8 (`evidence/drafter/fold_narrow_tiles/timing/`, `evidence/drafter/fold_timing/`) |
+| A | exact GDN fold: `--enable-linear-replayssm-spec`, `SGLANG_GDN_REPLAYSSM_FOLD=1` (drafter 0001-0004), with ring-verify tiles BV=4 up to 2 sequences (speed-lowc 0003) | L, H | fold/stock y: with narrow tiles at every batch (drafter 0005) 1.020 / 1.012 at c = 1 / 2 on block 16; with wide tiles (0001-0004 alone) 1.005 at c = 4 on block 16 and 1.058 / 1.082 / 1.118 at c = 8 / 16 / 32 on block 8 (`evidence/drafter/fold_narrow_tiles/timing/`, `evidence/drafter/fold_timing/`). At c = 4 on block 16 the narrow tiles measured 1.018 against the wide tiles' 1.005, an unpaired comparison of two sessions; the kernel sweep has the narrow tiles slower at 3 and 4 sequences, and the cutoff follows its declared reading |
 | B | FA4 draft attention: `--speculative-draft-attention-backend fa4` | L (H already drafts with FA4) | x 1.029 / 1.027 / 1.039 / 1.043 at c = 1 / 2 / 4 / 8 (`evidence/speed_lowc/probe2/`) |
 | C | FA4 target attention: `--attention-backend fa4` (needs speed-lowc 0001) | L, H | x 1.039 / 1.042 at c = 1 / 4 over B on block 16; 1.074 / 1.026 at c = 8 / 32 on block 8 (`evidence/speed_lowc/probe4/`) |
 
