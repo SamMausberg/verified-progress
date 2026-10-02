@@ -607,7 +607,8 @@ def report(
             by_key[(step, fam, variant, row['concurrency'])] = row
 
     # Pairs and decisions.
-    pair_rows, ratio_rows = [], []
+    pair_rows: list[dict[str, Any]] = []
+    ratio_rows: list[dict[str, Any]] = []
     for fam, family in plan.FAMILIES.items():
         for c in family.concurrency:
             ys: list[float] = []
@@ -743,7 +744,8 @@ def report(
     # Certified head counters in the timed launches; launch and capture records.
     stats_rows, launch_rows, capture_rows = launch_records(launches)
 
-    verdicts, exact_status = {}, {}
+    verdicts: dict[str, str] = {}
+    exact_status: dict[str, str] = {}
     for fam, family in plan.FAMILIES.items():
         exact_status[fam] = exactness_status(
             exactness['families'].get(fam, {}).get('c1_identical'),
