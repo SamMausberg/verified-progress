@@ -1,0 +1,9 @@
+point,group,family,variant,concurrency,phase,prompt,position,token,top1,gap,control,ms_before_point_end,in_flight,co_batched_requests_in_window
+s1/mtp-tuned-triton+cert/c064,s1,mtp,cert,64,profiling,579ae7ce3d47d06c,439,1756,8078,3.8125,True,309.2,10,21
+h6/cert1/r1/c064,h6,mtp,cert,64,profiling,579ae7ce3d47d06c,439,1756,8078,3.8125,True,348.6,10,21
+s1/plain-tuned/c128,s1,plain,stock,128,profiling,a4db11ff3ac4ceb6,333,18299,5500,6.1875,False,11070.3,128,127
+s1/plain-tuned+cert/c128,s1,plain,cert,128,profiling,a4db11ff3ac4ceb6,333,18299,5500,6.1875,False,11141.4,128,127
+s2/plain-tuned/c128,s2,plain,stock,128,profiling,a4db11ff3ac4ceb6,333,18299,5500,6.1875,False,11080.8,128,127
+s2/plain-tuned+cert/c128,s2,plain,cert,128,profiling,a4db11ff3ac4ceb6,333,18299,5500,6.1875,False,11161.6,128,127
+s3/plain-tuned/c128,s3,plain,stock,128,profiling,a4db11ff3ac4ceb6,333,18299,5500,6.1875,False,11094.7,128,127
+s3/plain-tuned+cert/c128,s3,plain,cert,128,profiling,a4db11ff3ac4ceb6,333,18299,5500,6.1875,False,11114.9,128,127

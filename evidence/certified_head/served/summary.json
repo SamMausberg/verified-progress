@@ -761,7 +761,7 @@
   "SGLANG_CERTIFIED_HEAD_MODEL": "conservative",
   "SGLANG_CERTIFIED_HEAD_MAX_ROWS": "64"
  },
- "analysis_commit": "96dcbad6d650746aec15460f77433a0ed3881ed4",
+ "analysis_commit": "708c723f01e46f9351d2066268498a933d19c104",
  "holds": [
   {
    "hold": "h1",

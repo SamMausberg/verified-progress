@@ -1,0 +1,23 @@
+{
+ "graph_pool": [
+  0,
+  1
+ ],
+ "pools": {
+  "before_node": [
+   0,
+   1
+  ],
+  "inside_node": [
+   0,
+   1
+  ],
+  "after_node": [
+   0,
+   1
+  ]
+ },
+ "after_node_took_freed_general_block": false,
+ "eager_shares_after_node_memory": false,
+ "eager_overwritten_by_replay": false
+}
