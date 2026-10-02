@@ -629,7 +629,7 @@ would expect about 11 events in 100 waves; at a per-draw rate of 3-5% it would e
 so a null is likely and decides little. The first submission (four blocks, 150 waves,
 without cert0) was stopped after its first block to add cert0.
 
-## Planted donor (not declared; designed 2026-10-02 after h7, awaiting main's go)
+## Planted donor (not declared; designed 2026-10-02 after h7, approved by main with the red team's changes)
 
     GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x experiments/benchcert/hold_drain.sh h8
 
@@ -638,32 +638,49 @@ The wrong token 1756 (`_type`) is the suffix that one other request of the c = 6
 type"), puts in the same syntactic slot: its prompt asserts `check_type(...)` three times
 and its output repeats `def check_type(`. 579ae7ce went wrong at the function name of its
 own third regenerated assert (`perimeter_▢`). No other request of the point has that
-pattern. h8 tests whether 527's content causes the event.
+pattern. The only other request that emits 1756 in session 1's certified point is
+`session_000139` (its positions 392, 396 and 403), the next donor candidate if 527 is
+ruled out. h8 tests whether 527's content causes the event, in the closed loop where it
+occurred, on cert0 (the event fired in 2 of 12 cert0 draws without the head).
 
-- `plant1`-`plant4` run cert0, the arm where the event occurred twice in 12 draws without
-  the head, with the confirmation split changed in one place. 527's prompt reads
-  `check_kind` for `check_type`, so its token 1756 becomes 32061 (`_kind`). That token is
-  absent from the point's prompts and outputs, and 13.6 nats below the top at 579ae7ce's
-  position 439 (batch-1 stock logits from the stress hold's hidden state).
-- `order1` runs cert0 with 527's prompt moved behind 579ae7ce (to measured index 509), so
-  527 starts after it and is still running at position 439, instead of finishing about
-  0.85 s before.
-- Each launch replays session 1's ladder and then 5 more c = 64 points, as h7 did (graph
-  check against h6a's `cert1`). The 24 planted draws expect 3-4 events at cert0's 2/12.
-  Estimate: about 40 min (five launches of about 8 min).
+- Planted token. 527's three `check_type` become `check<s>` for one single-token
+  identifier suffix `s` from `drain.PLANT_CANDIDATES`, so its token 1756 becomes that
+  suffix's token T, in its prompt and in its copied outputs. Every candidate fits the slot
+  (`' check' + s + '(('` tokenizes as 1716, T, 1148) and is absent from every MTP c = 64
+  point's prompts and outputs. The hold's first step picks `s` by a fixed rule
+  (`fallback_stress refs`). On the scorer's own server (rescore.py's stock `plain-tuned`
+  server, as h6s used), it reads 579ae7ce's distribution at position 439 under four
+  batch-1 stock paths: prefills ending at absolute positions 514, 576 and 587 (the
+  scorer's shape), and decoding from position 400. It takes the candidate whose logprob
+  is closest to 1756's under every path, that is, with the smallest worst-case gap. A
+  boost that lifts 1756 would then lift T comparably. The same step settles how much the
+  stock references themselves differ at this position (the 439 verify starts at absolute
+  position 512, a 64-token GDN chunk boundary, which these prefills straddle).
+- Launches, interleaved: `plant1`, `cert0c`, `plant2`, `cert0d`, `plant3`, `order1`.
+  The planted ones use the changed split. `cert0c` and `cert0d` are unplanted cert0, the
+  concurrent positive control. `order1` moves 527's prompt behind 579ae7ce (to measured
+  index 509), so 527 starts after it and is still running at position 439, instead of
+  finishing about 0.85 s before. Each launch replays session 1's ladder and then 5 more
+  c = 64 points, as h7 did (graph check against h6a's `cert1`): 18 planted, 12 unplanted
+  and 6 ordered c = 64 draws. Estimate: about 50 min, timed like h7, plus 2-3 min for the
+  reference step.
 
-Reading rule, set before the run, over the planted draws whose 579ae7ce output reaches
-position 439 with session 1's prefix:
+Reading rule, set before the run, over the draws whose 579ae7ce output reaches position
+439 with session 1's prefix:
 
-- 32061 at position 439 in any draw: 527's content reaches 579ae7ce's row, a causal
+- T at position 439 in a planted draw: 527's content reaches 579ae7ce's row, a causal
   contamination (through a KV page, a GDN state slot or a buffer);
-- 1756 at position 439: the wrong token arises without its in-batch source, so not from
-  527's content;
-- neither: inconclusive, reported with the number of draws that reached the context.
+- 1756 at position 439 in a planted draw: the wrong token arises without its in-batch
+  source, so not from 527's content (session_000139 becomes the next candidate);
+- no event in the planted draws while the unplanted draws show 1756: evidence that 527's
+  content is needed;
+- no event in either: inconclusive, reported with the number of draws that reached the
+  context.
 
-`order1` is reported descriptively: an event with 527 still running at 439 would point to
-shared state between concurrent requests; with its slot not yet freed, the reuse of 527's
-freed KV pages or state slot is ruled out for that draw.
+Each draw also reports 527's finish-to-439 gap and whether planted 527 emitted 1756
+anywhere. `order1` is reported descriptively: an event with 527 still running at 439
+would point to shared state between concurrent requests and, for that draw, rule out the
+reuse of 527's freed KV pages or state slot.
 
 ## Hold commit
 

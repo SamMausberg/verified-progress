@@ -120,18 +120,33 @@ LAUNCHES = {
         Launch('certring4', 'certring', LADDER, 5, 'h7b'),
         # h8: cert0 (where the event occurred without the head) with session_000527's
         # function name changed (planted donor), and with 527 moved behind 579ae7ce (order).
+        # Unplanted cert0 launches interleaved as the concurrent positive control.
         Launch('plant1', 'cert0', LADDER, 5, 'h8', 'planted'),
+        Launch('cert0c', 'cert0', LADDER, 5, 'h8'),
         Launch('plant2', 'cert0', LADDER, 5, 'h8', 'planted'),
-        Launch('order1', 'cert0', LADDER, 5, 'h8', 'order'),
+        Launch('cert0d', 'cert0', LADDER, 5, 'h8'),
         Launch('plant3', 'cert0', LADDER, 5, 'h8', 'planted'),
-        Launch('plant4', 'cert0', LADDER, 5, 'h8', 'planted'),
+        Launch('order1', 'cert0', LADDER, 5, 'h8', 'order'),
     )
 }
 WORKLOAD = plan.REPO / 'bench/workloads/mixed-v2/confirm.jsonl'
 DONOR = 463  # session_000527's prompt (mbpp-222, check_type), measured index 463
 VICTIM = 505  # 579ae7ce (mbpp-176), measured index 505
-PLANT = ('check_type', 'check_kind')  # tokens [1716, 1756] -> [1716, 32061]
-PLANTED_TOKEN = 32061  # '_kind': absent from the point's prompts and outputs
+# The planted suffix replaces '_type' (1756) in the donor's 'check_type': one of these
+# single-token identifier suffixes (' check' + s + '((' tokenizes as [1716, t, 1148]), each
+# absent from every MTP c = 64 point's prompts and outputs; the hold's first step picks the
+# one whose batch-1 logprob at 579ae7ce's position 439 is closest to 1756's under every
+# stock reference path (fallback_stress refs) and writes it to workloads/planted_token.json.
+PLANT_CANDIDATES = {
+    '_dtype': 62691, '_label': 5916, '_kind': 32061, '_class': 4637, '_form': 7665,
+    '_cat': 20191, '_style': 14676, '_family': 25966, '_species': 71609, '_genre': 88177,
+    '_mode': 7075, '_format': 8685, '_types': 9471, '_typ': 40717, '_Type': 13335,
+    '_TYPE': 4051, '_category': 11508, '_shape': 13204, '_sign': 10847, '_tag': 9093,
+    '_ident': 37125, '_flag': 10614, '_status': 4620, '_level': 8016, '_rank': 19794,
+    '_group': 6090, '_variant': 44573, '_spec': 13201, '_struct': 14685, '_unit': 14402,
+    '_role': 19189, '_scheme': 51503, '_layout': 14051, '_series': 33857, '_model': 4885,
+    '_brand': 53013, '_grade': 48813, '_classes': 16341, '_cast': 5135,
+}  # fmt: skip
 ORDER_INDEX = 509  # the donor moved behind the victim (issued 573 against 569)
 # h7 launches must capture the same graphs as h6a's (sizes equal, capture memory within
 # GRAPH_MEM_TOL GB per graph family); otherwise the launch stops before its first point.
@@ -145,15 +160,21 @@ GRAPH_MISMATCH = 3
 
 def workload_file(kind: str, out: Path) -> Path:
     """The confirmation split, or a copy with session_000527's prompt changed (planted:
-    'check_type' becomes 'check_kind' in its three asserts) or moved behind 579ae7ce
-    (order), written under <out>/workloads (deterministic; the sweep records its sha256)."""
+    'check_type' becomes 'check' + the chosen suffix in its three asserts) or moved behind
+    579ae7ce (order), written under <out>/workloads (the sweep records its sha256)."""
     if not kind:
         return WORKLOAD
     rows = [json.loads(line) for line in WORKLOAD.read_text().splitlines() if line.strip()]
     if rows[DONOR]['id'] != 'mbpp-222' or rows[VICTIM]['id'] != 'mbpp-176':
         raise SystemExit('the confirmation split changed: donor or victim not at their indices')
     if kind == 'planted':
-        old, new = PLANT
+        chosen = out / 'workloads' / 'planted_token.json'
+        if not chosen.exists():
+            raise SystemExit(f'{chosen} missing: the hold picks the planted token first')
+        suffix = json.loads(chosen.read_text())['suffix']
+        if suffix not in PLANT_CANDIDATES:
+            raise SystemExit(f'planted suffix {suffix!r} is not a declared candidate')
+        old, new = 'check_type', 'check' + suffix
         if rows[DONOR]['text'].count(old) != 3:
             raise SystemExit(f'expected three {old!r} in the donor prompt')
         rows[DONOR] = {

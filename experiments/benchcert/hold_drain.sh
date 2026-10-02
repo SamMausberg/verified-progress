@@ -21,7 +21,7 @@ case "$hold" in
   h6b) launches="certcheck:540 certlog:360" ;;
   h7a) launches="certring1:660 stock3:630 cert0a:660 certring2:660" ;;
   h7b) launches="certring3:660 cert0b:660 stock4:630 certring4:660" ;;
-  h8) launches="plant1:660 plant2:660 order1:660 plant3:660 plant4:660" ;;
+  h8) launches="plant1:660 cert0c:660 plant2:660 cert0d:660 plant3:660 order1:660" ;;
   *) echo "unknown hold $hold" >&2; exit 64 ;;
 esac
 runs=${BENCHCERT_OUT:-$HOME/vp-data/benchcert}
@@ -36,12 +36,26 @@ exec >"$runs/logs/drain-$hold-$(date -u +%Y%m%dT%H%M%SZ).log" 2>&1
 echo "hold $hold start $(date -Is) repo $(git rev-parse HEAD)"
 # shellcheck disable=SC2329 # invoked by the EXIT trap
 kill_servers() {
-  pkill -TERM -f -- 'sglang.launch_server.* --port (30084)( |$)' || true
+  python -m experiments.benchcert.drain stop --out "$out/refs" || true
+  pkill -TERM -f -- 'sglang.launch_server.* --port (30084|30085)( |$)' || true
   sleep 5
-  pkill -KILL -f -- 'sglang.launch_server.* --port (30084)( |$)' || true
+  pkill -KILL -f -- 'sglang.launch_server.* --port (30084|30085)( |$)' || true
 }
 trap kill_servers EXIT
 status=0
+if [ "$hold" = h8 ]; then
+  # The CPU tests of the h8 code (committed while timed holds blocked them), then the stock
+  # reference paths at 579ae7ce's position 439 on the scorer's server, which also pick the
+  # planted suffix (README, "Planted donor") before any launch.
+  python -m pytest -q -p no:cacheprovider tests/test_benchcert_score_report.py \
+    tests/test_benchcert_fallback_stress.py || { echo "CPU tests failed: no GPU work"; exit 1; }
+  mkdir -p "$out/refs"
+  scripts/gpu_startup_lock.sh python -m experiments.benchcert.drain start --out "$out/refs"
+  timeout --foreground 300 python -m experiments.benchcert.fallback_stress refs --out "$out/refs" \
+    --url http://127.0.0.1:30085 --plant "$out/workloads/planted_token.json" || status=1
+  python -m experiments.benchcert.drain stop --out "$out/refs"
+  [ "$status" -eq 0 ] || { echo "reference step failed: no launches"; exit 1; }
+fi
 for item in $launches; do
   rc=0
   python -m experiments.benchcert.drain run --launch "${item%%:*}" --out "$out" \

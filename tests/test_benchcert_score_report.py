@@ -219,6 +219,10 @@ def test_planted_and_order_workloads_change_only_the_donor(tmp_path: Path) -> No
     from experiments.benchcert import drain
 
     base = [json.loads(line) for line in drain.WORKLOAD.read_text().splitlines()]
+    with pytest.raises(SystemExit, match='picks the planted token first'):
+        drain.workload_file('planted', tmp_path)
+    (tmp_path / 'workloads').mkdir(exist_ok=True)
+    (tmp_path / 'workloads' / 'planted_token.json').write_text(json.dumps({'suffix': '_kind'}))
     planted = [
         json.loads(line)
         for line in drain.workload_file('planted', tmp_path).read_text().splitlines()
@@ -239,3 +243,25 @@ def test_planted_and_order_workloads_change_only_the_donor(tmp_path: Path) -> No
     command, _ = drain.sweep_command(drain.LAUNCHES['plant1'], tmp_path)
     assert command[command.index('--workload') + 1].endswith('confirm-planted.jsonl')
     assert '--workload' not in drain.sweep_command(drain.LAUNCHES['cert0a'], tmp_path)[0]
+
+
+def test_planted_token_is_closest_to_1756_under_every_path() -> None:
+    from experiments.benchcert import drain
+    from experiments.benchcert.fallback_stress import choose_planted
+
+    cands = {'_a': 10, '_b': 11, '_c': 12, '_d': 9}
+    paths = {
+        'p1': {1756: -5.5, 10: -5.0, 11: -9.0, 12: -6.0, 9: -5.0},
+        'p2': {1756: -8.3, 10: -12.0, 11: -8.0, 12: -7.6, 9: -10.0},
+        'p3': {1756: -6.0},  # scored nothing else: skipped
+    }
+    best, scores = choose_planted(paths, cands)
+    assert best == '_c' and scores['_c'] == pytest.approx(0.7)
+    assert scores['_a'] == pytest.approx(3.7) and scores['_b'] == pytest.approx(3.5)
+    # A tie in the worst-case gap goes to the smaller token id.
+    tie = {'p': {1756: -6.0, 10: -5.0, 9: -7.0}}
+    assert choose_planted(tie, {'_a': 10, '_d': 9})[0] == '_d'
+    with pytest.raises(ValueError):
+        choose_planted({'p': {1756: -1.0}}, cands)
+    assert len(set(drain.PLANT_CANDIDATES.values())) == len(drain.PLANT_CANDIDATES)
+    assert 1756 not in drain.PLANT_CANDIDATES.values()

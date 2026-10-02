@@ -301,6 +301,111 @@ def context_rows(hidden_states: list[Any], prompt_len: int, output_len: int) -> 
     return np.asarray(flat[prompt_len - 1 : prompt_len - 1 + output_len], np.float32)
 
 
+REF_TOKENS = (1756, 8078, 5715, 68189)  # the wrong token and the three near-tied ones
+
+
+def choose_planted(
+    paths: dict[str, dict[int, float]], candidates: dict[str, int], wrong: int = 1756
+) -> tuple[str, dict[str, float]]:
+    """The candidate suffix whose logprob is closest to the wrong token's under every
+    reference path: the smallest worst-case distance (ties to the smaller token id). Paths
+    without both logprobs are skipped."""
+    scores: dict[str, float] = {}
+    for suffix, token in candidates.items():
+        gaps = [abs(lp[token] - lp[wrong]) for lp in paths.values() if token in lp and wrong in lp]
+        if gaps:
+            scores[suffix] = max(gaps)
+    if not scores:
+        raise ValueError('no reference path scored the candidates')
+    best = min(scores, key=lambda k: (scores[k], candidates[k]))
+    return best, scores
+
+
+def _logprobs(entries: Any) -> dict[int, float]:
+    """{token: logprob} from one position of SGLang's *_token_ids_logprobs."""
+    return {int(e[1]): float(e[0]) for e in entries or [] if e and e[0] is not None}
+
+
+def refs(out: Path, runs: Path, url: str, candidates: dict[str, int], plant: Path) -> int:
+    """579ae7ce's distribution at position 439 under four batch-1 stock paths on one
+    server: prefills ending at absolute position 514 (the context only), 576 and 587 (the
+    scorer's shape), and decoding from position 400; then the planted suffix
+    (choose_planted) written to ``plant``."""
+    from experiments.benchcert.drain import point_dirs, requests
+
+    point = next(p for n, p in point_dirs(runs / 'drain', runs) if n.startswith('s1/'))
+    item = next(
+        r for r in requests(point) if r['phase'] == 'profiling' and r['prompt'].startswith(TARGET[0])
+    )
+    prompt, output = item['input'], item['output']
+    pos, n = TARGET[1], len(prompt)
+    track = sorted({*REF_TOKENS, *candidates.values()})
+    common = {'return_logprob': True, 'top_logprobs_num': 5, 'token_ids_logprob': track}
+    result: dict[str, Any] = {'prompt_len': n, 'position': pos, 'paths': {}}
+    paths: dict[str, dict[int, float]] = {}
+    body: dict[str, Any] = {
+        'input_ids': prompt + output[:pos],
+        'sampling_params': {'max_new_tokens': 1, 'temperature': 0.0},
+        **common,
+    }
+    meta = post(f'{url}/generate', body)['meta_info']
+    paths['prefill_514'] = _logprobs((meta.get('output_token_ids_logprobs') or [None])[0])
+    result['paths']['prefill_514'] = {'top5': (meta.get('output_top_logprobs') or [None])[0]}
+    for end in (n + 501, n + len(output)):
+        body = {
+            'input_ids': (prompt + output)[:end],
+            'sampling_params': {'max_new_tokens': 0, 'temperature': 0.0},
+            'logprob_start_len': n + pos - 1,
+            **common,
+        }
+        meta = post(f'{url}/generate', body)['meta_info']
+        key = f'prefill_{end}'
+        # Entry 0 is position n + pos - 1 (SGLang leaves it empty); entry 1 is n + pos.
+        ids = meta.get('input_token_logprobs') or []
+        checked = len(ids) > 1 and ids[1] and int(ids[1][1]) == output[pos]
+        paths[key] = _logprobs((meta.get('input_token_ids_logprobs') or [None, None])[1])
+        result['paths'][key] = {
+            'top5': (meta.get('input_top_logprobs') or [None, None])[1],
+            'aligned': bool(checked),
+        }
+    start = 400
+    body = {
+        'input_ids': prompt + output[:start],
+        'sampling_params': {'max_new_tokens': pos - start + 1, 'temperature': 0.0},
+        **common,
+    }
+    response = post(f'{url}/generate', body)
+    meta = response['meta_info']
+    generated = list(response.get('output_ids') or [])
+    same = generated[: pos - start] == output[start:pos]
+    entries = meta.get('output_token_ids_logprobs') or []
+    if same and len(entries) > pos - start:
+        paths['decode_from_400'] = _logprobs(entries[pos - start])
+    result['paths']['decode_from_400'] = {
+        'same_prefix': same,
+        'top5': (meta.get('output_top_logprobs') or [None] * (pos - start + 1))[pos - start]
+        if len(meta.get('output_top_logprobs') or []) > pos - start
+        else None,
+    }
+    for key, lp in paths.items():
+        result['paths'][key]['ref_tokens'] = {str(t): lp.get(t) for t in REF_TOKENS}
+    suffix, scores = choose_planted(paths, candidates)
+    result['chosen'] = {
+        'suffix': suffix,
+        'token': candidates[suffix],
+        'worst_gap_to_1756': scores[suffix],
+        'per_path': {k: lp.get(candidates[suffix]) for k, lp in paths.items()},
+    }
+    result['scores'] = scores
+    out.mkdir(parents=True, exist_ok=True)
+    (out / 'refs.json').write_text(json.dumps(result, indent=1) + '\n')
+    plant.parent.mkdir(parents=True, exist_ok=True)
+    plant.write_text(json.dumps(result['chosen']) + '\n')
+    print(json.dumps({k: v.get('ref_tokens') for k, v in result['paths'].items()}))
+    print(json.dumps(result['chosen']))
+    return 0
+
+
 def fetch(out: Path, contexts: Path | None) -> int:
     """Hidden states of every output position of the context (one prefill), and the
     batch-1 top-5 re-score of the gross contexts (rescore.score_one) if given."""
@@ -1131,6 +1236,11 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument('--out', type=Path, required=True)
     for name in ('start', 'stop'):
         sub.add_parser(name).add_argument('--out', type=Path, required=True)
+    r = sub.add_parser('refs', help="579ae7ce's distribution at 439 under stock reference paths")
+    r.add_argument('--out', type=Path, required=True)
+    r.add_argument('--runs', type=Path, default=Path.home() / 'vp-data/benchcert')
+    r.add_argument('--url', required=True)
+    r.add_argument('--plant', type=Path, required=True, help='where to write the chosen suffix')
     f = sub.add_parser('fetch')
     f.add_argument('--out', type=Path, required=True)
     f.add_argument('--contexts', type=Path, help='gross contexts (score_report --contexts)')
@@ -1154,6 +1264,10 @@ def main(argv: list[str] | None = None) -> int:
         return stop(args.out)
     if args.command == 'fetch':
         return fetch(args.out, args.contexts)
+    if args.command == 'refs':
+        from experiments.benchcert.drain import PLANT_CANDIDATES
+
+        return refs(args.out, args.runs, args.url, PLANT_CANDIDATES, args.plant)
     return stress(args.out, args.replay, args.seconds, args.seed, args.real_rows, args.ties)
 
 
