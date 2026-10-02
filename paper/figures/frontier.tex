@@ -1,5 +1,6 @@
-% Figure fig:frontier: the confirmed serving frontier (Section 4.5). Its width is the line width up to 10.5 cm
-% and its height 0.42 of that, so it fits one column of the main text. Reads
+% Figure fig:frontier (Section 4.5): the confirmed serving frontier. Its width is the line width up
+% to 10.5 cm and its height about half of that, so it keeps its shape in one column of the paper or
+% across the one-column appendix. Reads
 % evidence/bench/confirm/frontier.csv (per arm and client concurrency: means over sessions
 % of x = output tokens per second per request, end to end, and y = output tokens per second
 % on the GPU; n = valid sessions) and evidence/bench/confirm/envelope-all.dat (the Pareto
@@ -18,7 +19,7 @@
   only if n below/.style={x filter/.append code={%
     \ifnum\thisrow{n}<#1\relax\else\def\pgfmathresult{inf}\fi}}}
 \pgfmathsetmacro{\frontierw}{min(\linewidth,10.5cm)}
-\pgfmathsetmacro{\frontierh}{0.42*\frontierw}
+\pgfmathsetmacro{\frontierh}{0.515*\frontierw}
 \begin{tikzpicture}
 \begin{axis}[xmode=log,ymode=log,width=\frontierw pt,height=\frontierh pt,
   xmin=80,xmax=1150,ymin=220,ymax=18000,grid=major,
