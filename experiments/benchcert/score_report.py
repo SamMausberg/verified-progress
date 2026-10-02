@@ -594,7 +594,11 @@ def serial_contexts(out: Path, runs: Path) -> list[dict[str, Any]]:
                     'token': int(entry['token']),
                     'h6s_gap': round(value, 4),
                 }
-                add(item['input'] + item['output'][:pos], [event['token'], int(entry['top1'])], event)
+                add(
+                    item['input'] + item['output'][:pos],
+                    [event['token'], int(entry['top1'])],
+                    event,
+                )
         found = describe(name)
         target = next(
             (i for i in items if i['phase'] == 'profiling' and i['prompt'].startswith(prompt)), None

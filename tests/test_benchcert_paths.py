@@ -46,14 +46,34 @@ def test_serial_readout_reclasses_each_event_by_the_serial_gap(tmp_path: Path) -
             'id': 't',
             'input_ids': [6],
             'tokens': [68189, 1756],
-            'events': [{'point': 'p1', 'kind': 'target', 'token': 68189, 'h6s_gap': 0.0, 'position': 439}],
+            'events': [
+                {'point': 'p1', 'kind': 'target', 'token': 68189, 'h6s_gap': 0.0, 'position': 439}
+            ],
         },
     ]
     contexts.write_text(''.join(json.dumps(x) + '\n' for x in lines))
     classes = [
-        {'id': 'a', 'tokens': [7, 9], 'logprobs': [-8.1, -1.3], 'top5': [[-1.3, 9]], 'stock_top1': 9},
-        {'id': 'b', 'tokens': [4, 5], 'logprobs': [-1.0, -1.2], 'top5': [[-1.0, 4]], 'stock_top1': 4},
-        {'id': 't', 'tokens': [68189, 1756], 'logprobs': [-1.3, -8.1], 'top5': [[-1.3, 68189]], 'stock_top1': 68189},
+        {
+            'id': 'a',
+            'tokens': [7, 9],
+            'logprobs': [-8.1, -1.3],
+            'top5': [[-1.3, 9]],
+            'stock_top1': 9,
+        },
+        {
+            'id': 'b',
+            'tokens': [4, 5],
+            'logprobs': [-1.0, -1.2],
+            'top5': [[-1.0, 4]],
+            'stock_top1': 4,
+        },
+        {
+            'id': 't',
+            'tokens': [68189, 1756],
+            'logprobs': [-1.3, -8.1],
+            'top5': [[-1.3, 68189]],
+            'stock_top1': 68189,
+        },
     ]
     rescored.write_text(''.join(json.dumps(x) + '\n' for x in classes))
     result = score_report.serial_readout(contexts, rescored)

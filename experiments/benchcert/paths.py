@@ -91,7 +91,9 @@ def targets(out: Path, runs: Path) -> list[dict[str, Any]]:
     points = point_dirs(drain_out, runs)
     s1_name, s1_point = points[0]
     item = next(
-        r for r in requests(s1_point) if r['phase'] == 'profiling' and r['prompt'].startswith(TARGET[0])
+        r
+        for r in requests(s1_point)
+        if r['phase'] == 'profiling' and r['prompt'].startswith(TARGET[0])
     )
     add(s1_name, item, TARGET[1], [item['output'][TARGET[1]], WRONG, *TRIO, PLANTED])
     for name, point in points:
@@ -178,7 +180,9 @@ def stock_target(url: str, target: dict[str, Any]) -> dict[str, Any]:
     response = post(f'{url}/generate', body)
     meta = response['meta_info']
     generated = list(response.get('output_ids') or [])
-    off_text = next((first + i for i, t in enumerate(generated[: pos - first]) if t != output[first + i]), None)
+    off_text = next(
+        (first + i for i, t in enumerate(generated[: pos - first]) if t != output[first + i]), None
+    )
     tops = meta.get('output_top_logprobs') or []
     ids = meta.get('output_token_ids_logprobs') or []
     trace = {
@@ -205,6 +209,24 @@ def stock(out: Path, url: str) -> int:
         summary = {k: (v.get(pos) or {}).get('tracked') for k, v in r['paths'].items()}
         print(r['id'], 'decode left text at', r['decode_left_text_at'], json.dumps(summary))
     return 0
+
+
+def fp32_entry(logits: Any, token: int, track: list[int]) -> dict[str, Any]:
+    """One position of the FP32 reference: top-5, the tracked tokens' and the recorded
+    token's logprobs (log-softmax in FP64 over the FP32 logits)."""
+    import torch
+
+    lp = torch.log_softmax(logits.double(), dim=-1)
+    top = torch.topk(lp, 5)
+    top5 = [[float(v), int(i)] for v, i in zip(top.values, top.indices, strict=True)]
+    return {
+        'top1': top5[0][1],
+        'top1_logprob': top5[0][0],
+        'top5': top5,
+        'tracked': {str(t): float(lp[t]) for t in track},
+        'token': token,
+        'token_logprob': float(lp[token]),
+    }
 
 
 def fp32(out: Path, device: str = 'cpu', threads: int = 8) -> int:
@@ -235,29 +257,21 @@ def fp32(out: Path, device: str = 'cpu', threads: int = 8) -> int:
         ids = torch.tensor([prompt + output[:pos]], device=device)
         track = sorted({*target['track'], *output[first : pos + 1]})
 
-        def entry(logits: Any, p: int) -> dict[str, Any]:
-            lp = torch.log_softmax(logits.double(), dim=-1)
-            top = torch.topk(lp, 5)
-            top5 = [[float(v), int(i)] for v, i in zip(top.values, top.indices, strict=True)]
-            return {
-                'top1': top5[0][1],
-                'top1_logprob': top5[0][0],
-                'top5': top5,
-                'tracked': {str(t): float(lp[t]) for t in track},
-                'token': output[p],
-                'token_logprob': float(lp[output[p]]),
-            }
-
         with torch.no_grad():
             logits = model(input_ids=ids).logits[0]
-            full = {str(p): entry(logits[n + p - 1], p) for p in range(first, pos + 1)}
+            full = {
+                str(p): fp32_entry(logits[n + p - 1], output[p], track)
+                for p in range(first, pos + 1)
+            }
             step = model(input_ids=ids[:, : n + first], use_cache=True)
             cache = step.past_key_values
-            recurrent = {str(first): entry(step.logits[0, -1], first)}
+            recurrent = {str(first): fp32_entry(step.logits[0, -1], output[first], track)}
             for p in range(first + 1, pos + 1):
-                step = model(input_ids=ids[:, n + p - 1 : n + p], past_key_values=cache, use_cache=True)
+                step = model(
+                    input_ids=ids[:, n + p - 1 : n + p], past_key_values=cache, use_cache=True
+                )
                 cache = step.past_key_values
-                recurrent[str(p)] = entry(step.logits[0, -1], p)
+                recurrent[str(p)] = fp32_entry(step.logits[0, -1], output[p], track)
         # A sanity check of the load: the full forward's top-1 should follow the recorded
         # text at most traced positions before the target.
         agree = sum(full[str(p)]['top1'] == output[p] for p in range(first, pos))
@@ -269,7 +283,10 @@ def fp32(out: Path, device: str = 'cpu', threads: int = 8) -> int:
                 'paths': {'fp32_full': full, f'fp32_recurrent_from_{first}': recurrent},
             }
         )
-        print(target['id'], json.dumps({k: v[str(pos)]['tracked'] for k, v in results[-1]['paths'].items()}))
+        print(
+            target['id'],
+            json.dumps({k: v[str(pos)]['tracked'] for k, v in results[-1]['paths'].items()}),
+        )
     meta = {'model': MODEL, 'revision': REVISION, 'dtype': 'float32', 'torch': torch.__version__}
     (out / 'fp32.json').write_text(json.dumps({'meta': meta, 'results': results}, indent=1) + '\n')
     return 0

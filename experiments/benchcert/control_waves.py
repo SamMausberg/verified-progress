@@ -128,7 +128,7 @@ def small_plan(keys: list[str], partner: int, seed: int = SMALL_SEED) -> list[di
     target = next(i for i, k in enumerate(keys) if k.startswith(SMALL_TARGET))
     others = [i for i in range(len(keys)) if i not in (target, partner)]
     rng = random.Random(seed)
-    waves = []
+    waves: list[dict[str, Any]] = []
     for size in SMALL_SIZES:
         for _ in range(1 if size == 1 else SMALL_SETS):
             members = [target, *rng.sample(others, size - 1)]
@@ -254,7 +254,9 @@ def generate_results(
         raise SystemExit(f'wave {wave}: {len(results)} results for {len(batch)} prompts')
     for result in results:
         if len(result['output_ids']) != OSL:
-            raise SystemExit(f'wave {wave}: {len(result["output_ids"])} output tokens, wanted {OSL}')
+            raise SystemExit(
+                f'wave {wave}: {len(result["output_ids"])} output tokens, wanted {OSL}'
+            )
     return results
 
 
@@ -291,7 +293,9 @@ def small_waves(out: Path, variant: str, runs: Path) -> int:
     planned = small_plan(keys, partner_index(runs, keys))
     s1 = point_dirs(runs / 'drain', runs)[0][1]  # session 1's certified MTP c = 64 point
     recorded = next(
-        r for r in requests(s1) if r['phase'] == 'profiling' and r['prompt'].startswith(SMALL_TARGET)
+        r
+        for r in requests(s1)
+        if r['phase'] == 'profiling' and r['prompt'].startswith(SMALL_TARGET)
     )
     seeded = recorded['input'] + recorded['output'][:SEED_AT]
     track = {'return_logprob': True, 'top_logprobs_num': 5, 'token_ids_logprob': list(SMALL_TRACK)}
@@ -365,7 +369,9 @@ def small_compare(out: Path) -> dict[str, Any]:
         return result
 
     def diverged(name: str) -> set[str]:
-        return {d['request'] for k, r in across.items() if k.startswith(name) for d in r['divergences']}
+        return {
+            d['request'] for k, r in across.items() if k.startswith(name) for d in r['divergences']
+        }
 
     within = {v: pair(reps[0], reps[1]) for v, reps in runs.items()}
     across: dict[str, dict[str, Any]] = {}
@@ -375,21 +381,23 @@ def small_compare(out: Path) -> dict[str, Any]:
             for rep in range(SMALL_REPS):
                 across[f'{right}_vs_{left}/rep{rep}'] = pair(runs[left][rep], runs[right][rep])
     baseline = all(r['identical'] == r['prompts'] for r in within.values()) and all(
-        r['identical'] == r['prompts'] for k, r in across.items() if k.startswith('stock2_vs_stock/')
+        r['identical'] == r['prompts']
+        for k, r in across.items()
+        if k.startswith('stock2_vs_stock/')
     )
     # A request on which an arm differs from both stock servers.
     arm_only = {
         arm: sorted(diverged(f'{arm}_vs_stock/') & diverged(f'stock2_vs_{arm}/'))
         for arm in ('cert0', 'cert')
     }
-    batch1 = {
-        v: [s for s in rows if s['size'] == 1] for v, rows in seeded.items()
-    }
+    batch1 = {v: [s for s in rows if s['size'] == 1] for v, rows in seeded.items()}
     stock1 = {s['token_at_439'] for s in batch1.get('stock', [])}
     if not baseline:
         reading_ii = 'baseline failed: stock is not deterministic here; arms read as rates only'
     elif any(arm_only.values()):
-        reading_ii = 'an arm differs from both stock servers: the certified graphs change the numerics'
+        reading_ii = (
+            'an arm differs from both stock servers: the certified graphs change the numerics'
+        )
     else:
         reading_ii = 'all identical: the certified graphs do not change the numerics here'
     return {
@@ -416,7 +424,18 @@ def compare_variants(out: Path, family: str = 'mtp') -> int:
     if family == 'mtpsmall':
         summary = small_compare(out)
         (out / 'compare.json').write_text(json.dumps(summary, indent=1) + '\n')
-        print(json.dumps({k: summary[k] for k in ('reading_i_stock_batch1_token_at_439', 'baseline_identical', 'reading_ii')}))
+        print(
+            json.dumps(
+                {
+                    k: summary[k]
+                    for k in (
+                        'reading_i_stock_batch1_token_at_439',
+                        'baseline_identical',
+                        'reading_ii',
+                    )
+                }
+            )
+        )
         for name, result in {**summary['within_server'], **summary['across_servers']}.items():
             print(name, {k: v for k, v in result.items() if k != 'divergences'})
         return 0
@@ -480,7 +499,9 @@ def main(argv: list[str] | None = None) -> int:
     for name in ('start', 'waves', 'stop'):
         p = sub.add_parser(name)
         p.add_argument('--family', choices=sorted(VARIANTS), required=True)
-        p.add_argument('--variant', choices=('stock', 'cert', 'cert0', 'certlog', 'stock2'), required=True)
+        p.add_argument(
+            '--variant', choices=('stock', 'cert', 'cert0', 'certlog', 'stock2'), required=True
+        )
         p.add_argument('--out', type=Path, required=True)
         p.add_argument('--runs', type=Path, default=Path.home() / 'vp-data/benchcert')
     c = sub.add_parser('compare')

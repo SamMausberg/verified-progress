@@ -700,7 +700,9 @@ def target_rows(out: Path, runs: Path) -> list[dict[str, Any]]:
     points = [
         (n, p) for n, p in points if n.startswith(('h6', 'h7', 'h8', 'h9', *plan.DECISION_SESSIONS))
     ]
-    points = [(n, p) for n, p in points if FAMILY.arm in n or n.startswith(('h6', 'h7', 'h8', 'h9'))]
+    points = [
+        (n, p) for n, p in points if FAMILY.arm in n or n.startswith(('h6', 'h7', 'h8', 'h9'))
+    ]
     records = {name: target_record(point) for name, point in points}
     reference = records[f's1/{FAMILY.cert_label}/c064']
     assert reference is not None
