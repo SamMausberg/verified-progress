@@ -26,8 +26,8 @@ cleanup() { pkill -TERM -f 'sglang.launch_server.*--port 30214' 2>/dev/null || t
 trap cleanup EXIT INT TERM
 [ "$(git -C "$CONFIRM_ENGINE" rev-parse 'HEAD^{tree}')" = "$CONFIRM_TREE" ] ||
   { echo "confirm engine tree is not the declared one"; exit 1; }
-[ -z "$(git -C "$CONFIRM_ENGINE" status --porcelain --untracked-files=no)" ] ||
-  { echo "confirm engine has uncommitted changes"; exit 1; }
+[ -z "$(git -C "$CONFIRM_ENGINE" status --porcelain)" ] ||
+  { echo "confirm engine has local changes"; exit 1; }
 gate_ok || { echo "refused: the equality gate did not pass for levers $CONFIRM_LEVERS"; exit 1; }
 groups=(L H)
 (( k % 2 == 0 )) && groups=(H L)
