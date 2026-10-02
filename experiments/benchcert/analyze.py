@@ -603,6 +603,7 @@ def report(
                 'y_steady': point.get('y_steady'),
                 'ttft_p50_ms': (point.get('ttft_ms') or {}).get('p50'),
                 'itl_p50_ms': (point.get('itl_ms') or {}).get('p50'),
+                'server_ms_per_pass': server_ms_per_pass(point),
                 'accept_length': (point.get('spec') or {}).get('accept_length'),
                 'max_running_logged': (point.get('server_log') or {}).get('max_running_logged'),
                 'kv_retractions': (point.get('server_log') or {}).get('kv_retractions'),
@@ -785,6 +786,9 @@ def report(
     write_csv(launch_rows, out / 'launches.csv')
     write_csv(capture_rows, out / 'capture_memory.csv')
     write_csv(frontier_rows(point_rows), out / 'frontier.csv')
+    slow_rows, slow_launches = slow_launch_diagnostic(point_rows)
+    write_csv(slow_rows, out / 'launch_outliers.csv')
+    summary['post_hoc_launch_outliers'] = outlier_effects(slow_launches, pair_rows, ratio_rows)
     (out / 'summary.json').write_text(json.dumps(summary, indent=1, default=str) + '\n')
     if plot:
         from experiments.benchcert import figures
@@ -1011,6 +1015,90 @@ def launch_records(
                     }
                 )
     return stats_rows, launch_rows, capture_rows
+
+
+def server_ms_per_pass(point: dict[str, Any]) -> float | None:
+    """Scheduler time per decode or verify pass at (nearly) full batch, from the log:
+    running requests x tokens per pass / logged generation rate."""
+    log = point.get('server_log') or {}
+    tps, running = log.get('logged_gen_tps_full_batch'), log.get('max_running_logged')
+    if not tps or not running:
+        return None
+    return 1000.0 * running * (log.get('logged_accept_len_mean') or 1.0) / tps
+
+
+# Post hoc, not declared (2026-10-02, after h1): the machine has shown launch-level slow
+# states (TTFT p50 about +4 ms at every concurrency, decode 2-6% slower, foreign load
+# and clocks normal). A launch is listed when, at three quarters or more of its levels,
+# its TTFT p50 is at least TTFT_MS above the median of the same arm's other sessions or
+# its time per pass is at least PASS_FRACTION above theirs. Reported, never excluded.
+OUTLIER_TTFT_MS = 3.0
+OUTLIER_PASS_FRACTION = 0.02
+OUTLIER_SHARE = 0.75
+
+
+def slow_launch_diagnostic(
+    point_rows: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[tuple[str, str, str]]]:
+    """Per point: TTFT p50 and time per pass against the same arm's other sessions."""
+    groups: dict[tuple[str, str, int], dict[str, dict[str, Any]]] = defaultdict(dict)
+    for row in point_rows:
+        groups[(row['family'], row['variant'], row['concurrency'])][row['session']] = row
+    rows: list[dict[str, Any]] = []
+    flags: dict[tuple[str, str, str], list[bool]] = defaultdict(list)
+    for (fam, variant, c), by_session in sorted(groups.items()):
+        for session, row in by_session.items():
+            others = [r for s, r in by_session.items() if s != session]
+            entry: dict[str, Any] = {'family': fam, 'variant': variant, 'concurrency': c,
+                                     'session': session, 'others': len(others)}
+            slow = False
+            for key, label in (('ttft_p50_ms', 'ttft'), ('server_ms_per_pass', 'pass')):
+                mine = row.get(key)
+                theirs = [float(r[key]) for r in others if r.get(key) is not None]
+                if mine is None or not theirs:
+                    entry[f'{label}_excess'] = None
+                    continue
+                ref = statistics.median(theirs)
+                excess = float(mine) - ref if label == 'ttft' else float(mine) / ref - 1.0
+                entry[f'{label}_excess'] = excess
+                limit = OUTLIER_TTFT_MS if label == 'ttft' else OUTLIER_PASS_FRACTION
+                slow = slow or excess >= limit
+            rows.append(entry)
+            if others:
+                flags[(session, fam, variant)].append(slow)
+    flagged = [key for key, marks in flags.items()
+               if marks and sum(marks) >= OUTLIER_SHARE * len(marks)]
+    for row in rows:
+        row['launch_flagged'] = (row['session'], row['family'], row['variant']) in flagged
+    return rows, sorted(flagged)
+
+
+def outlier_effects(
+    flagged: list[tuple[str, str, str]],
+    pair_rows: list[dict[str, Any]],
+    ratio_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """For each flagged launch, its family's primary ratio with and without that
+    session's pair (a sensitivity check; the declared decision is unchanged)."""
+    out = []
+    for session, fam, variant in flagged:
+        primary = plan.FAMILIES[fam].primary
+        kept = [pr['y_ratio'] for pr in pair_rows
+                if pr['family'] == fam and pr['concurrency'] == primary and pr['counted']
+                and pr['session'] != session]
+        declared = next(r for r in ratio_rows
+                        if r['family'] == fam and r['concurrency'] == primary)
+        without = ratio_summary(kept)
+        out.append({
+            'launch': f'{session}/{fam}/{variant}',
+            'primary_concurrency': primary,
+            'declared_ratio': declared['y_ratio'],
+            'declared_decision': declared['decision'],
+            'without_ratio': without['mean'],
+            'without_interval': [without['low'], without['high']],
+            'without_n': without['n'],
+        })
+    return out
 
 
 def frontier_rows(point_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:

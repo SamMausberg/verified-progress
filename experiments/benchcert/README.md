@@ -306,6 +306,19 @@ python -m experiments.benchcert.analyze replacement --runs ~/vp-data/benchcert
 | `figures.py` | frontier and ratio figures from the CSVs |
 | `rescore.py`, `hold_rescore.sh` | the untimed re-score of first divergences (shared lane) |
 
+## Post hoc diagnostic (not declared; added 2026-10-02 after h1)
+
+Other workstreams' holds showed an intermittent launch-level slow state on this
+machine: one launch with TTFT p50 about 4 ms higher at every concurrency and decode
+2-6% slower, with normal foreign load and clocks. `analyze.py` therefore lists, per
+point, each launch's TTFT p50 and scheduler time per pass (from the log: running
+requests times tokens per pass over the logged full-batch rate) against the median of
+the same arm's other sessions (`launch_outliers.csv`). A launch is flagged when, at
+three quarters or more of its levels, its TTFT p50 is at least 3 ms above or its time
+per pass at least 2% above. For each flagged launch the summary gives its family's
+primary ratio with and without that session's pair. This changes no decision and
+excludes nothing; it says whether a verdict depends on one launch.
+
 ## Hold commit
 
 Every hold runs from a clean checkout at the commit recorded here; `run_session.py`

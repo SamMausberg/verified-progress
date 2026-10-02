@@ -413,8 +413,10 @@ def test_report_end_to_end_on_synthetic_runs(tmp_path: Path) -> None:
         'launches.csv',
         'capture_memory.csv',
         'frontier.csv',
+        'launch_outliers.csv',
     ):
         assert (out / name).exists()
+    assert summary['post_hoc_launch_outliers'] == []
 
     # A pool mismatch voids that session's pairs.
     bad = tmp_path / 'bad'
@@ -534,3 +536,17 @@ def test_holds_run_only_at_the_recorded_commit() -> None:
     assert pin_problem(f'Hold commit: `{"b" * 40}`\n', head)
     assert pin_problem('Hold commit: to be recorded\n', head)
     assert pin_problem(f'Hold commit: `{head}`\nHold commit: `{head}`\n', head)
+
+
+def test_slow_launch_diagnostic_flags_a_uniformly_slow_launch() -> None:
+    rows = []
+    for session, ttft in (('s1', 50.0), ('s2', 50.5), ('s3', 54.5)):
+        for c in (1, 4, 8, 16):
+            rows.append({'family': 'plain', 'variant': 'stock', 'concurrency': c,
+                         'session': session, 'ttft_p50_ms': ttft + c,
+                         'server_ms_per_pass': 4.0})
+    table, flagged = analyze.slow_launch_diagnostic(rows)
+    assert flagged == [('s3', 'plain', 'stock')]
+    assert all(r['launch_flagged'] == (r['session'] == 's3') for r in table)
+    assert analyze.server_ms_per_pass({'server_log': {'logged_gen_tps_full_batch': 2000.0,
+                                                      'max_running_logged': 8}}) == 4.0
