@@ -432,8 +432,8 @@ The probe runs on two paths:
 
 There are 260 Triton rows and 350 rows at each cuBLAS row count. Every row gives the
 same answer at every row count, so the measured behaviour matches the paper's Hopper
-model (k = 16, F = 25, truncation) and satisfies the conservative model, which needs
-FP32's 24 bits. On the cuBLAS path the accumulator's rounding is read through the
+model (k = 16, F = 25, truncation) and lies within the conservative model, which covers
+adders that keep at least FP32's 23 fraction bits (F = 25 here). On the cuBLAS path the accumulator's rounding is read through the
 BF16 epilogue, whose round-to-nearest-even behaviour the control rows establish. Scope: this is a measurement on crafted inputs of one GH200 with driver
 570.195.03, CUDA 13.0 and PyTorch 2.13's cuBLAS, not a vendor contract and not a proof
 for all inputs. Its operands are powers of two and short sums of them, with one operand
