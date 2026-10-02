@@ -317,3 +317,27 @@ SGLANG_WORKTREE=~/sglang-wt/lossy source scripts/sglang_env.sh
 | Patch | What it changes | Default behaviour |
 |---|---|---|
 | 0001 | `DFlashDraftModel` builds its context projection `fc` as a `ReplicatedLinear` with the draft's quantization config whenever one is set, and refuses to load a checkpoint that leaves any `fc` parameter unset. Without it, a compressed-tensors drafter stores `fc` as `weight_packed`/`weight_scale`, which match no parameter of the plain `nn.Linear`; the loader skips them silently and `fc.weight` keeps uninitialised memory. | unquantized drafters (no quantization config) build and load `fc` exactly as before |
+
+## speed-bytes (`patches/speed-bytes/0001-0004`, branches `engine/speed-bytes` and `engine/speed-bytes-l2`)
+
+Online FP8 for the dense linear layers, through cuBLASLt rather than sgl-kernel's CUTLASS FP8
+GEMM (the aarch64 sgl-kernel 0.4.7 wheel carries no sm_90a code, so that GEMM aborts on GH200;
+`evidence/speed_bytes/README.md`). Every switch is off unless its environment variable is set.
+
+```sh
+scripts/sglang_worktree.sh speed-bytes
+git -C ~/sglang-wt/speed-bytes am "$PWD"/engine/sglang/patches/speed-bytes/*.patch
+SGLANG_WORKTREE=~/sglang-wt/speed-bytes source scripts/sglang_env.sh
+```
+
+| Patch | What it changes | Default behaviour |
+|---|---|---|
+| 0001 | `SGLANG_FP8_DENSE=target\|draft\|both`: after loading, every linear layer on SGLang's unquantized BF16 path in the target, the draft model or both is converted to `float8_e4m3fn` with one weight scale per tensor and runs `torch._scaled_mm` with scalar scales (cuBLASLt). `SGLANG_FP8_DENSE_ACT=token` (default) quantizes activations per row and multiplies the row scale into the BF16 output afterwards; `tensor` uses one dynamic scale per batch. `SGLANG_FP8_DENSE_SKIP` lists module-name substrings kept in BF16 (default `in_proj_ba,visual`). Hooked in `ModelRunner.load_model` | unset: nothing is converted |
+| 0002 | `SGLANG_FP8_DRAFT_HEAD=1`: DFlash's greedy draft projection reads an FP8 copy of the tied head (0.64 GB) through `torch._scaled_mm`; both scales are positive per row, so the argmax skips them. Only the drafts change | unset: the stock BF16 projection |
+| 0003 | `SGLANG_FP8_DENSE_ACT=oracle`: timing only, outputs invalid. The converted GEMMs read a fixed random FP8 input, so no quantization or row-scale kernel runs; it bounds what fusing those into the producing kernels could gain | not selected by default |
+| 0004 | Quality-only modes: `SGLANG_FP8_DENSE_WSCALE=channel` (one weight scale per output channel, row and channel scales applied to an FP32 GEMM output) and `SGLANG_FP8_DENSE_ACT=none` (weights rounded through FP8 and kept for the stock BF16 GEMM: the quality of a weight-only kernel) | not selected by default |
+
+Engines behind the evidence: `98aa8c9821` = 0001 (kill1, probe1), `1490d9a891` = 0001 + 0002
+(kill2b), `1bc2fc4719` = 0001 + 0003 (kill3; 0002 and 0003 touch different files),
+`776f8e5c79` = 0001 + 0003 + 0004. The tree after 0001 equals `98aa8c9821`'s and after
+0001-0002 equals `1490d9a891`'s.

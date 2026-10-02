@@ -1,0 +1,145 @@
+From 776f8e5c792c92410ce030bfe472672fcce4f3e3 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Fri, 2 Oct 2026 19:37:03 +0000
+Subject: [PATCH] FP8 dense: quality-only modes (per-channel weight scales;
+ weight-only round trip)
+
+SGLANG_FP8_DENSE_WSCALE=channel quantizes each output channel separately
+and applies row and channel scales to an FP32 GEMM output (slow; for the
+quality of an outer-vector epilogue). SGLANG_FP8_DENSE_ACT=none rounds the
+weights through FP8 and keeps the BF16 GEMM, the quality of a weight-only
+FP8 kernel.
+---
+ .../layers/quantization/fp8_dense_online.py   | 57 ++++++++++++++++---
+ 1 file changed, 50 insertions(+), 7 deletions(-)
+
+diff --git a/python/sglang/srt/layers/quantization/fp8_dense_online.py b/python/sglang/srt/layers/quantization/fp8_dense_online.py
+index 0404fc683f..f563219811 100644
+--- a/python/sglang/srt/layers/quantization/fp8_dense_online.py
++++ b/python/sglang/srt/layers/quantization/fp8_dense_online.py
+@@ -15,9 +15,17 @@ SGLANG_FP8_DENSE_ACT selects the activation scale:
+   tensor one scale for the whole batch (its maximum), passed to cuBLASLt. One kernel fewer per
+          layer, but each row's result depends on the other rows in the batch, padded CUDA-graph
+          rows included.
++  none   QUALITY ONLY: weights round-trip through FP8 (per tensor, or per channel with
++         WSCALE=channel) and stay BF16 for the stock BF16 GEMM, so activations are not
++         quantized. It measures the quality of a weight-only FP8 (W8A16) kernel; its speed is
++         the BF16 path's.
+   oracle TIMING ONLY, OUTPUTS INVALID: the GEMM reads a fixed random FP8 activation buffer, so no
+          quantization or row-scale kernel runs. It bounds what a fused design (quantization inside
+          the producing norm/activation kernel, scales in the GEMM epilogue) could gain.
++SGLANG_FP8_DENSE_WSCALE=channel quantizes each weight row (output channel) with its own scale and
++applies row and channel scales to an FP32 GEMM output before one rounding to BF16 (token activations
++only). It is slow (three extra elementwise kernels) and exists to measure the quality a per-channel
++epilogue (cuBLASLt outer-vector scaling) would give.
+ SGLANG_FP8_DENSE_SKIP is a comma-separated list of module-name substrings that stay BF16
+ (default: in_proj_ba,visual).
+ """
+@@ -34,7 +42,7 @@ logger = logging.getLogger(__name__)
+ FP8 = torch.float8_e4m3fn
+ FP8_MAX = float(torch.finfo(FP8).max)
+ _MODES = ("target", "draft", "both")
+-_ACTS = ("token", "tensor", "oracle")
++_ACTS = ("token", "tensor", "oracle", "none")
+ _ORACLE_ROWS = 32768
+ 
+ 
+@@ -54,8 +62,9 @@ def _per_tensor_quant(x: torch.Tensor):
+ class Fp8DenseOnlineLinearMethod:
+     """Replaces UnquantizedLinearMethod.apply on a converted layer."""
+ 
+-    def __init__(self, act: str):
++    def __init__(self, act: str, channel: bool = False):
+         self.act = act
++        self.channel = channel
+         self.oracle_inputs: dict = {}
+ 
+     def apply(self, layer, x: torch.Tensor, bias=None) -> torch.Tensor:
+@@ -72,6 +81,16 @@ class Fp8DenseOnlineLinearMethod:
+                 scale_b=layer.weight_scale_fp8,
+                 out_dtype=x.dtype,
+             )
++        elif self.channel:
++            q, xs = _per_token_quant(x2)
++            out = torch._scaled_mm(
++                q,
++                layer.weight_fp8_t,
++                scale_a=layer.fp8_one,
++                scale_b=layer.fp8_one,
++                out_dtype=torch.float32,
++            )
++            out = (out * xs * layer.weight_scale_fp8).to(x.dtype)
+         elif self.act == "token":
+             q, xs = _per_token_quant(x2)
+             out = torch._scaled_mm(
+@@ -112,7 +131,17 @@ def maybe_convert_dense_to_fp8(model: torch.nn.Module, is_draft_worker: bool) ->
+         for s in os.environ.get("SGLANG_FP8_DENSE_SKIP", "in_proj_ba,visual").split(",")
+         if s
+     ]
+-    method = Fp8DenseOnlineLinearMethod(act)
++    wscale = os.environ.get("SGLANG_FP8_DENSE_WSCALE", "tensor").strip()
++    if (
++        wscale not in ("tensor", "channel")
++        or wscale == "channel"
++        and act not in ("token", "none")
++    ):
++        raise ValueError(
++            f"SGLANG_FP8_DENSE_WSCALE={wscale!r} (channel needs act=token)"
++        )
++    channel = wscale == "channel"
++    method = Fp8DenseOnlineLinearMethod(act, channel)
+     converted, skipped, bytes_before, bytes_after = 0, [], 0, 0
+     for name, module in model.named_modules():
+         qm = getattr(module, "quant_method", None)
+@@ -126,13 +155,24 @@ def maybe_convert_dense_to_fp8(model: torch.nn.Module, is_draft_worker: bool) ->
+             skipped.append(name)
+             continue
+         with torch.no_grad():
+-            scale = (w.abs().amax().float() / FP8_MAX).clamp(min=1e-12)
+-            wq = (w.float() / scale).clamp(-FP8_MAX, FP8_MAX).to(FP8)
++            if channel:
++                scale = (w.abs().amax(dim=1).float() / FP8_MAX).clamp(min=1e-12)
++                wq = (w.float() / scale[:, None]).clamp(-FP8_MAX, FP8_MAX).to(FP8)
++            else:
++                scale = (w.abs().amax().float() / FP8_MAX).clamp(min=1e-12)
++                wq = (w.float() / scale).clamp(-FP8_MAX, FP8_MAX).to(FP8)
+         bytes_before += w.numel() * w.element_size()
+         bytes_after += wq.numel()
++        if act == "none":
++            # Weight-only emulation: dequantize in place, keep the stock BF16 method.
++            with torch.no_grad():
++                deq = wq.float() * (scale[:, None] if channel else scale)
++                w.copy_(deq.to(w.dtype))
++            converted += 1
++            continue
+         # Column-major [K, N] view, as torch._scaled_mm requires for its second operand.
+         module.weight_fp8_t = wq.t()
+-        module.weight_scale_fp8 = scale.reshape(())
++        module.weight_scale_fp8 = scale.reshape(1, -1) if channel else scale.reshape(())
+         module.fp8_one = torch.ones((), dtype=torch.float32, device=w.device)
+         # Free the BF16 weight; nothing on the converted path reads it.
+         module.weight = torch.nn.Parameter(
+@@ -145,16 +185,19 @@ def maybe_convert_dense_to_fp8(model: torch.nn.Module, is_draft_worker: bool) ->
+             )
+         converted += 1
+     torch.cuda.empty_cache()
++    if act == "none":
++        bytes_after = bytes_before
+     if act == "oracle":
+         logger.warning(
+             "FP8 dense ORACLE mode: GEMMs read a fixed random FP8 input; "
+             "outputs are INVALID (timing only)."
+         )
+     logger.info(
+-        "FP8 dense (%s, act=%s, %s): converted %d linear layers, %.2f GB -> %.2f GB; "
++        "FP8 dense (%s, act=%s, wscale=%s, %s): converted %d linear layers, %.2f GB -> %.2f GB; "
+         "kept BF16: %s",
+         mode,
+         act,
++        wscale,
+         "draft" if is_draft_worker else "target",
+         converted,
+         bytes_before / 1e9,
+-- 
+2.34.1
+
