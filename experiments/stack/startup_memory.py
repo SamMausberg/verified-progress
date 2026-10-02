@@ -19,7 +19,7 @@ from __future__ import annotations
 import argparse
 import csv
 import re
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -58,16 +58,31 @@ def parse(log: str) -> dict[str, Any]:
 
 
 def session_windows(logs: list[Path]) -> list[tuple[str, datetime, datetime]]:
-    """(session, start, end) from each hold_session.sh log; an unfinished one is open."""
-    windows = []
+    """(session, start, end) from each hold_session.sh log, in start order. A session
+    without an end line (an interrupted hold) ends just before the next session starts, or
+    stays open if no session follows; windows that overlap stop the script."""
+    found: list[tuple[str, datetime, datetime | None]] = []
     for path in logs:
         text = path.read_text()
         start = re.search(r'^session (s\d+) start (\S+)', text, re.M)
         if not start:
             continue
         end = re.search(r'^session s\d+ end (\S+)', text, re.M)
-        stop = datetime.fromisoformat(end.group(1)) if end else datetime.max.replace(tzinfo=None)
-        windows.append((start.group(1), datetime.fromisoformat(start.group(2)), stop))
+        stop = datetime.fromisoformat(end.group(1)) if end else None
+        found.append((start.group(1), datetime.fromisoformat(start.group(2)), stop))
+    found.sort(key=lambda w: w[1])
+    windows = []
+    for i, (name, begin, stop) in enumerate(found):
+        following = found[i + 1] if i + 1 < len(found) else None
+        if stop is None:
+            stop = (
+                following[1] - timedelta(microseconds=1)
+                if following
+                else datetime.max.replace(tzinfo=UTC)
+            )
+        elif following and stop >= following[1]:
+            raise SystemExit(f'session {name} ends at {stop}, after {following[0]} starts')
+        windows.append((name, begin, stop))
     return windows
 
 

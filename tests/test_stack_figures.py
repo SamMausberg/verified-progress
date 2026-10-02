@@ -405,3 +405,48 @@ def test_diagnostics_drift_interpolation_and_accept():
     assert acc['FG']['accept_over_S0'] == round(5.74 / 5.70, 5)
     assert acc['FG']['x_ratio_over_accept_ratio'] == round(1.08 / (5.74 / 5.70), 5)
     assert acc['G']['n'] == 0 and acc['G']['accept_length_mean'] == ''
+
+
+def test_accept_ratios_use_only_sessions_with_a_valid_s0():
+    points = [
+        _launch('stack-s1', '20261002-000000', 'S0', 100.0, 5.70),
+        _launch('stack-s1', '20261002-000300', 'F', 104.0, 5.74),
+        _launch('stack-s1', '20261002-000600', 'S0', 104.0, 5.70),
+        _launch('stack-s2', '20261002-010000', 'S0', 100.0, 5.60),
+        _launch('stack-s2', '20261002-010300', 'F', 104.0, 5.90),
+        {**_launch('stack-s2', '20261002-010600', 'S0', 104.0, 5.60), 'invalid_reason': 'x'},
+    ]
+    comp = {
+        'full': 'FG',
+        'sessions_admitted': {'1': ['stack-s1', 'stack-s2']},
+        'arms': {'F': {'1': {'x_e2e': {'ratio': 1.02}}}},
+    }
+    acc = {r['arm']: r for r in diagnostics.accept_rows(diagnostics.cells(points, comp), comp)}
+    # s2's S0 is void, so F's s2 cell (accept 5.90) stays out of both its mean and its ratio
+    assert acc['S0']['n'] == 1 and acc['F']['n'] == 1
+    assert acc['F']['accept_length_mean'] == 5.74
+    assert acc['F']['accept_over_S0'] == round(5.74 / 5.70, 5)
+
+
+def test_unfinished_session_window_ends_where_the_next_session_starts(tmp_path):
+    (tmp_path / 's1.log').write_text('session s1 start 2026-10-02T00:26:13+00:00 repo x\n')
+    (tmp_path / 's2.log').write_text(
+        'session s2 start 2026-10-02T00:53:17+00:00 repo x\n'
+        'session s2 end 2026-10-02T01:20:15+00:00 (26 min) failed=none\n'
+    )
+    windows = startup.session_windows([tmp_path / 's2.log', tmp_path / 's1.log'])
+    assert [w[0] for w in windows] == ['s1', 's2']
+    assert startup.session_of('20261002-004000', windows) == 'stack-s1'
+    assert startup.session_of('20261002-005317', windows) == 'stack-s2'
+    with pytest.raises(SystemExit):
+        startup.session_of('20261002-013000', windows)
+
+
+def test_overlapping_session_windows_are_refused(tmp_path):
+    (tmp_path / 's1.log').write_text(
+        'session s1 start 2026-10-02T00:26:13+00:00 repo x\n'
+        'session s1 end 2026-10-02T01:00:00+00:00 (34 min) failed=none\n'
+    )
+    (tmp_path / 's2.log').write_text('session s2 start 2026-10-02T00:53:17+00:00 repo x\n')
+    with pytest.raises(SystemExit):
+        startup.session_windows([tmp_path / 's1.log', tmp_path / 's2.log'])

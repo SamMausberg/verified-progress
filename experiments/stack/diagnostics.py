@@ -133,28 +133,33 @@ def position_rows(
 def accept_rows(
     valid: dict[tuple[str, int, str], list[dict[str, str]]], comp: dict[str, Any]
 ) -> list[dict[str, Any]]:
+    """Accept length per arm and concurrency over the sessions in which both the arm's
+    cell and S0's are valid (an invalid S0 launch voids every arm's ratio in that session,
+    as in analyze.py), and its ratio to S0's accept length over those same sessions."""
     full = comp['full']
     out = []
     for c in sorted(int(c) for c in comp['sessions_admitted']):
-        acc: dict[str, list[float]] = {}
+        per: dict[str, dict[str, float]] = {}
         for arm in arm_order(full):
-            vals = [
-                statistics.fmean(float(r['accept_length']) for r in launches)
+            per[arm] = {
+                s: statistics.fmean(float(r['accept_length']) for r in launches)
                 for (s, c2, a), launches in sorted(valid.items())
                 if c2 == c and a == arm
-            ]
-            acc[arm] = vals
-        s0 = statistics.fmean(acc['S0']) if acc['S0'] else math.nan
+            }
         for arm in arm_order(full):
-            mean = statistics.fmean(acc[arm]) if acc[arm] else math.nan
+            paired = sorted(set(per[arm]) & set(per['S0']))
+            acc = [per[arm][s] for s in paired]
+            base = [per['S0'][s] for s in paired]
+            mean = statistics.fmean(acc) if acc else math.nan
+            s0 = statistics.fmean(base) if base else math.nan
             row: dict[str, Any] = {
                 'arm': arm,
                 'c': c,
-                'n': len(acc[arm]),
-                'accept_length_mean': round(mean, 4) if acc[arm] else '',
-                'accept_min': round(min(acc[arm]), 4) if acc[arm] else '',
-                'accept_max': round(max(acc[arm]), 4) if acc[arm] else '',
-                'accept_over_S0': round(mean / s0, 5) if acc[arm] and acc['S0'] else '',
+                'n': len(acc),
+                'accept_length_mean': round(mean, 4) if acc else '',
+                'accept_min': round(min(acc), 4) if acc else '',
+                'accept_max': round(max(acc), 4) if acc else '',
+                'accept_over_S0': round(mean / s0, 5) if acc else '',
             }
             ratio = (
                 comp['arms'].get(arm, {}).get(str(c), {}).get('x_e2e', {}).get('ratio')
@@ -163,7 +168,7 @@ def accept_rows(
             )
             row['x_e2e_ratio'] = ratio if ratio is not None else ''
             row['x_ratio_over_accept_ratio'] = (
-                round(ratio / (mean / s0), 5) if ratio is not None and row['accept_over_S0'] else ''
+                round(ratio / (mean / s0), 5) if ratio is not None and acc else ''
             )
             out.append(row)
     return out
