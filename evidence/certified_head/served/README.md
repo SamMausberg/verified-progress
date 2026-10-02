@@ -354,11 +354,11 @@ for N = 1-4 at the hold commit; the re-score and the wave control ran
 | `ratios.csv` | per family and concurrency: role, n, geometric-mean ratio with 95% (and, for primaries, Bonferroni) intervals, p, decision or reading, prediction, order diagnostic |
 | `summary.json` | verdicts, exactness status, Holm decisions, the plan, the analysis commit, each hold's commits and times |
 | `equality.csv` | token comparisons per family, concurrency and pair of runs: prompts, identical, first divergences, exposure, rate, classes |
-| `check.csv` | check launches' counters per family, concurrency and path |
+| `check.csv` | check launches' counters per family, concurrency and path. The committed copy predates the fix for the high-water gauge `max_certified_rows` (Codex on #190), so that column is invalid until the file is regenerated with the settling hold's evidence |
 | `certified_stats.csv` | the timed certified launches' counters, cumulative to their last write (truncated by design) |
 | `launches.csv`, `capture_memory.csv` | per launch: pools, free memory, start-up time, commits; per graph family: capture memory and time |
 | `frontier.csv`, `frontier.png`, `ratios.png` | figure data and figures |
 | `launch_outliers.csv` | the post hoc slow-launch diagnostic |
 | `predictions.json` | the derived predictions, written before the runs (`analyze.py predict`) |
-| `classes.csv` | every re-scored first-divergence context: class, margin, BF16 spacing, both tokens and their batch-1 stock logprobs (from `experiments/benchcert/rescore.py`'s output, copied by `analyze.py report`) |
+| `classes.csv` (added with the settling hold's regeneration) | every re-scored first-divergence context: class, margin, BF16 spacing, both tokens and their batch-1 stock logprobs (from `experiments/benchcert/rescore.py`'s output, copied by `analyze.py report`) |
 | `control_waves_mtp.json`, `control_waves_dflash16.json` | the exploratory wave controls' comparisons, with their reading rules (`experiments/benchcert/control_waves.py`, run by `hold_shared.sh`) |
