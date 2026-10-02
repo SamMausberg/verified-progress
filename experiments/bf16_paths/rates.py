@@ -16,20 +16,26 @@ module compares the paths on positions nobody selected:
 - `sglang`: on a stock server, each prompt decoded greedily for 512 tokens at batch 1 with
   ignore_eos, as the benchmark did (the decode path, top-20 logprobs per step), then the
   prompt and that output prefilled in one request (the prefill path, top-20 per position);
-- `hf`: transformers' BF16 model (torch GDN kernels, eager attention) over the same text,
-  one forward (prefill path) and token by token through the cache (decode path);
+- `hf`: transformers' BF16 model (eager attention) over the same text, one forward
+  (prefill path) and token by token through the cache (decode path): with its torch GDN
+  implementation (FP32 inside the recurrence) and the cached state in FP32 or BF16, and
+  with flash-linear-attention's Triton kernels (run with `fla` on PYTHONPATH) and an FP32
+  state;
 - `fp32`: transformers in FP32 on the CPU, one forward over the same text: per position its
   top-20 and its logprob of every token in any path's top-20;
 - `summary`: per path, the positions where FP32's logprob of the path's top-1 falls short
   of FP32's top logprob by more than 0.5, 1, 2 and 5 nats, before and after the output's
   first end-of-text token, and the worst positions.
 
-Readings (set before the run): if SGLang's paths miss FP32 by more than 2 nats at clearly
-more positions than transformers' BF16 paths on the same text (a rate ratio of 3 or more,
-with at least 5 SGLang positions), SGLang's BF16 arithmetic is less accurate than an
-independent BF16 implementation at this model, and 579ae7ce/439 is an instance of that;
-comparable counts mean the two implementations err at similar rates at different
-positions, and the event is not specific to SGLang.
+Readings (set before the run; `decide`): events are positions where FP32's logprob of a
+path's top-1 falls more than 2 nats short of FP32's top, pooled over decode and prefill.
+The comparator is the transformers configuration with more events among the two with an
+FP32 state (torch GDN, fla GDN). SGLang-specific: SGLang at least 5 events, at least 3 times
+the comparator's, and a one-sided exact binomial p below 0.05 for SGLang's share of the two
+counts under equal rates; then SGLang's BF16 arithmetic is less accurate than either
+transformers implementation at this model, and 579ae7ce/439 is an instance of that. Not
+specific: at least 10 events in the two counts and SGLang at most 1.5 times the
+comparator. Anything else is inconclusive.
 """
 
 from __future__ import annotations
@@ -37,6 +43,7 @@ from __future__ import annotations
 import argparse
 import gzip
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Any
@@ -48,7 +55,9 @@ TOP = 20
 THRESHOLDS = (0.5, 1.0, 2.0, 5.0)
 EOT = (248044, 248046)  # <|endoftext|>, <|im_end|>
 POINT_GLOB = 's1/plain-tuned/2026*/r0/c128'
-HF_RUNS = ('hf_bf16_float32state', 'hf_bf16_modelstate')
+HF_RUNS = ('hf_bf16_float32state', 'hf_bf16_modelstate', 'hf_bf16_fla_float32state')
+# The comparators of the decision: both transformers GDN implementations, FP32 cached state.
+COMPARATORS = ('hf_bf16_float32state', 'hf_bf16_fla_float32state')
 
 
 def sources(out: Path) -> dict[str, dict[str, dict[str, Any]]]:
@@ -182,7 +191,12 @@ def load_model(dtype: Any, device: str, state_dtype: str) -> Any:
 def hf(out: Path, state_dtype: str) -> int:
     import torch
 
+    from experiments.bf16_paths.hf_paths import gdn_kernels
+
     model = load_model(torch.bfloat16, 'cuda', state_dtype)
+    kernels = gdn_kernels(model)
+    fla = kernels['chunk'].startswith('fla.')
+    print('GDN kernels', kernels, flush=True)
     rows = []
     for item in read_jsonl(out / 'sglang.jsonl.gz'):
         prompt, output = item['prompt_ids'], item['output_ids']
@@ -202,7 +216,7 @@ def hf(out: Path, state_dtype: str) -> int:
                 decode.append(top_entries(step.logits[0, -1]))
         rows.append({'prompt': item['prompt'], 'decode': decode, 'prefill': prefill})
         print(item['prompt'], 'hf done', flush=True)
-    write_jsonl(out / f'hf_bf16_{state_dtype}state.jsonl.gz', rows)
+    write_jsonl(out / f'hf_bf16_{"fla_" if fla else ""}{state_dtype}state.jsonl.gz', rows)
     return 0
 
 
@@ -244,6 +258,37 @@ def fp32(out: Path, threads: int) -> int:
         print(item['prompt'], 'fp32 done', flush=True)
     write_jsonl(out / 'fp32.jsonl.gz', rows)
     return 0
+
+
+def events_above(counts: dict[str, Any], path: str, threshold: float = 2.0) -> int:
+    return sum(region[str(threshold)] for region in counts[path]['regret_above'].values())
+
+
+def decide(counts: dict[str, Any]) -> dict[str, Any]:
+    """The rule declared before the run (module docstring, "Readings")."""
+    sglang_events = events_above(counts, 'sglang/decode') + events_above(counts, 'sglang/prefill')
+    by_comparator = {
+        name: events_above(counts, f'{name}/decode') + events_above(counts, f'{name}/prefill')
+        for name in COMPARATORS
+    }
+    comparator = max(by_comparator, key=lambda name: by_comparator[name])
+    hf_events = by_comparator[comparator]
+    total = sglang_events + hf_events
+    p_value = sum(math.comb(total, k) for k in range(sglang_events, total + 1)) / 2**total
+    if sglang_events >= 5 and sglang_events >= 3 * hf_events and p_value < 0.05:
+        verdict = 'sglang-specific'
+    elif total >= 10 and sglang_events <= 1.5 * hf_events:
+        verdict = 'not specific'
+    else:
+        verdict = 'inconclusive'
+    return {
+        'threshold_nats': 2.0,
+        'sglang_events': sglang_events,
+        'transformers_events': by_comparator,
+        'comparator': comparator,
+        'binomial_p_one_sided': round(p_value, 6),
+        'verdict': verdict,
+    }
 
 
 def summary(out: Path) -> dict[str, Any]:
@@ -298,6 +343,7 @@ def summary(out: Path) -> dict[str, Any]:
         'positions': totals,
         'thresholds_nats': list(THRESHOLDS),
         'counts': counts,
+        'decision': decide(counts),
         'worst': worst,
     }
 

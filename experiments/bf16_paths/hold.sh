@@ -15,7 +15,8 @@
 #   (perturb.py, 8 seeds), the positions' own sensitivity to rounding; perturb_gdn the same
 #   with the noise on the GDN core's inputs (query, key, value, beta).
 # rates: whole outputs of 12 workload prompts (rates.py): SGLang's default variant decodes
-#   and prefills them, transformers BF16 reads the same text (FP32 and BF16 cached state),
+#   and prefills them, transformers BF16 reads the same text (torch GDN with FP32 and BF16
+#   cached state, fla GDN with FP32 state),
 #   FP32 on the CPU scores every path's top-1.
 # Targets: ~/vp-data/exactness/paths/targets.jsonl (paths.py `targets`), copied once and hashed.
 # Output: ~/vp-data/upstream/bf16 (BF16_PATHS_OUT); log in logs/hold-<UTC>.log.
@@ -129,6 +130,12 @@ if want rates; then
     for state in float32 model; do
       timeout --foreground 900 python -m experiments.bf16_paths.rates hf --out "$r" --state-dtype "$state" || status=1
     done
+    if [ -d "$out/pydeps/fla_core-$fla_version.dist-info" ]; then
+      PYTHONPATH="$out/pydeps" timeout --foreground 900 python -m experiments.bf16_paths.rates hf --out "$r" \
+        --state-dtype float32 || status=1
+    else
+      echo "no fla $fla_version: fla rates skipped"; status=1
+    fi
     timeout --foreground 1200 taskset -c 32-39 python -m experiments.bf16_paths.rates fp32 --out "$r" \
       --threads 8 || status=1
   fi
