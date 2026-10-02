@@ -458,19 +458,34 @@ def tokens_compare(out: Path, reference: Path) -> dict[str, Any]:
             entry['rows'] += c['rows']
             entry['max_rows'] = max(entry['max_rows'], c['max_rows'])
     # Device coverage: every host-gated certified step must have its device calls
-    # (calls_per_step per path), as check_counters requires of the check launches.
+    # (calls_per_step per path), checked for each wave pass and path on its own, as
+    # check_counters requires of the check launches (a signed sum could cancel).
     per_step = plan.FAMILIES[CONTROLS['mtptokens'].family].calls_per_step
-    for path, sizes in by_size.items():
-        for entry in sizes.values():
-            entry['uncounted_calls'] = (
-                entry['certified_steps'] * per_step.get(path, 1) - entry['calls']
-            )
-    uncounted = sum(e['uncounted_calls'] for sizes in by_size.values() for e in sizes.values())
+    uncovered = []
+    for row in rows:
+        for path, c in row['paths'].items():
+            missing = c['certified_steps'] * per_step.get(path, 1) - c['calls']
+            entry = by_size[path][str(row['size'])]
+            entry['uncounted_calls'] = entry.get('uncounted_calls', 0) + abs(missing)
+            if missing != 0:
+                uncovered.append(
+                    {
+                        'wave': row['wave'],
+                        'rep': row['rep'],
+                        'path': path,
+                        'uncounted_calls': missing,
+                    }
+                )
     verify_steps = sum(v['certified_steps'] for v in by_size.get('verify', {}).values())
+    # Baselines: each server's two passes, and the token-only stock run against the logprob
+    # stock run (another server); without them the arms are not compared.
     baseline = all(r['identical'] == r['prompts'] for r in within.values())
+    stock_stable = all(r['identical'] == r['prompts'] for r in side.values())
     identical = all(r['identical'] == r['prompts'] for r in against.values())
-    if uncounted != 0:
+    if uncovered:
         reading = 'incomplete: host-gated certified steps without device calls'
+    elif not (baseline and stock_stable):
+        reading = 'baseline failed: stock is not deterministic here; no match or mismatch reading'
     elif verify_steps == 0:
         reading = 'the certified verify did not run in the waves'
     elif identical:
@@ -487,7 +502,8 @@ def tokens_compare(out: Path, reference: Path) -> dict[str, Any]:
         'baseline_identical': baseline,
         'waves_counters_by_size': by_size,
         'waves_certified_verify_steps': verify_steps,
-        'waves_uncounted_calls': uncounted,
+        'stock_runs_identical': stock_stable,
+        'waves_uncovered_entries': uncovered,
         'reading': reading,
     }
 

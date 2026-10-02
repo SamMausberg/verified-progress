@@ -253,7 +253,7 @@ def test_tokens_compare_requires_device_calls_for_every_gated_step(tmp_path: Pat
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(''.join(json.dumps(x) + '\n' for x in records))
 
-    def counters(verify_calls: int) -> None:
+    def counters(verify_calls: int, draft_calls: int = 4) -> None:
         def entry(calls: int) -> dict[str, int]:
             return {
                 'calls': calls,
@@ -268,7 +268,7 @@ def test_tokens_compare_requires_device_calls_for_every_gated_step(tmp_path: Pat
                 'wave': 0,
                 'size': 1,
                 'rep': 0,
-                'paths': {'verify': entry(verify_calls), 'draft': entry(4)},
+                'paths': {'verify': entry(verify_calls), 'draft': entry(draft_calls)},
             },
         ]
         (out / 'certtokens' / 'counters.jsonl').write_text(
@@ -277,9 +277,22 @@ def test_tokens_compare_requires_device_calls_for_every_gated_step(tmp_path: Pat
 
     counters(2)
     result = control_waves.tokens_compare(out, ref)
-    assert result['waves_uncounted_calls'] == 0
+    assert result['waves_uncovered_entries'] == []
     assert result['reading'] == "the certified verify decided the waves' verifies and matched stock"
     counters(1)
     result = control_waves.tokens_compare(out, ref)
     assert result['waves_counters_by_size']['verify']['1']['uncounted_calls'] == 1
     assert result['reading'].startswith('incomplete')
+    # A missing call on one path and an extra one on another must not cancel.
+    counters(1, draft_calls=5)
+    result = control_waves.tokens_compare(out, ref)
+    assert len(result['waves_uncovered_entries']) == 2
+    assert result['reading'].startswith('incomplete')
+    # An unstable baseline (a server's two passes differ) gives no match reading.
+    counters(2)
+    unstable = [dict(x, output_ids=[1, 2, 4]) if x['rep'] == 1 else x for x in records]
+    (out / 'stocktokens' / 'outputs.jsonl').write_text(
+        ''.join(json.dumps(x) + '\n' for x in unstable)
+    )
+    result = control_waves.tokens_compare(out, ref)
+    assert result['reading'].startswith('baseline failed')
