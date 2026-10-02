@@ -125,5 +125,8 @@ python experiments/upstream_fa4/summarize.py ~/vp-data/upstream/fa4-evidence/run
 cp ~/vp-data/upstream/fa4-evidence/run-20261002T223025Z/{cases.csv,summary.json} evidence/upstream_fa4/
 ```
 
+The checks that the flash-attention checkout has no local edits (and that `fa-pkg` points at it)
+were added after the run, in 9d1844f; the checkout the run used passed them when checked afterwards.
+
 The run directory keeps the raw records: one JSON line and the standard error per case, the
 regression test's pytest logs, `meta.json` and the hold's log. It stays outside git.
