@@ -32,7 +32,9 @@ module compares the paths on positions nobody selected:
   on FP32's top-1 token (mean, 99th percentile, maximum; secondary); the worst positions.
 
 Readings (set before the run; `decide`): events are positions where FP32's logprob of a
-path's top-1 falls more than 2 nats short of FP32's top, pooled over decode and prefill.
+path's top-1 falls more than 2 nats short of FP32's top, pooled over decode and prefill (a
+position missed on both paths counted once, a correction made after both runs; it changes
+neither verdict).
 The comparator is the transformers configuration with more events among the two with an
 FP32 state (torch GDN, fla GDN). SGLang-specific: SGLang at least 5 events, at least 3 times
 the comparator's, and a one-sided exact binomial p below 0.05 for SGLang's share of the two
@@ -58,6 +60,7 @@ OUTPUT_LEN = 512
 TOP = 20
 # The decision uses 2 nats; the finer thresholds and the logprob differences are secondary.
 THRESHOLDS = (0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0)
+DECISION_NATS = 2.0
 EOT = (248044, 248046)  # <|endoftext|>, <|im_end|>
 POINT_GLOB = 's1/plain-tuned/2026*/r0/c128'
 HF_RUNS = ('hf_bf16_float32state', 'hf_bf16_modelstate', 'hf_bf16_fla_float32state')
@@ -281,17 +284,13 @@ def fp32(out: Path, threads: int) -> int:
     return 0
 
 
-def events_above(counts: dict[str, Any], path: str, threshold: float = 2.0) -> int:
-    return sum(region[str(threshold)] for region in counts[path]['regret_above'].values())
-
-
-def decide(counts: dict[str, Any]) -> dict[str, Any]:
-    """The rule declared before the run (module docstring, "Readings")."""
-    sglang_events = events_above(counts, 'sglang/decode') + events_above(counts, 'sglang/prefill')
-    by_comparator = {
-        name: events_above(counts, f'{name}/decode') + events_above(counts, f'{name}/prefill')
-        for name in COMPARATORS
-    }
+def decide(event_positions: dict[str, int]) -> dict[str, Any]:
+    """The rule declared before the run (module docstring, "Readings"), on the number of
+    positions where a source's decode or prefill path (or both) misses by more than 2 nats.
+    A position missed on both paths counts once: the two paths share the prompt, the
+    position and most of the arithmetic, so they are not independent events."""
+    sglang_events = event_positions['sglang']
+    by_comparator = {name: event_positions[name] for name in COMPARATORS}
     comparator = max(by_comparator, key=lambda name: by_comparator[name])
     hf_events = by_comparator[comparator]
     total = sglang_events + hf_events
@@ -303,7 +302,8 @@ def decide(counts: dict[str, Any]) -> dict[str, Any]:
     else:
         verdict = 'inconclusive'
     return {
-        'threshold_nats': 2.0,
+        'threshold_nats': DECISION_NATS,
+        'counted': 'positions missed on either path, each position once',
         'sglang_events': sglang_events,
         'transformers_events': by_comparator,
         'comparator': comparator,
@@ -321,6 +321,7 @@ def summary(out: Path) -> dict[str, Any]:
     regions = ('before_eot', 'after_eot')
     counts: dict[str, Any] = {}
     worst: dict[str, list[dict[str, Any]]] = {}
+    event_positions: dict[str, set[tuple[str, int]]] = {}
     totals = dict.fromkeys(regions, 0)
     for item in sg:
         output = item['output_ids']
@@ -333,6 +334,7 @@ def summary(out: Path) -> dict[str, Any]:
             table = {r: dict.fromkeys(map(str, THRESHOLDS), 0) for r in regions}
             disagree = dict.fromkeys(regions, 0)
             differences: list[float] = []
+            missed = event_positions.setdefault(name, set())
             events = []
             for item in sg:
                 output = item['output_ids']
@@ -345,6 +347,8 @@ def summary(out: Path) -> dict[str, Any]:
                     disagree[region] += top1 != fp['top'][0][1]
                     for t in THRESHOLDS:
                         table[region][str(t)] += regret > t
+                    if regret > DECISION_NATS:
+                        missed.add((item['prompt'], p))
                     own = {int(e[1]): float(e[0]) for e in entries}
                     if fp['top'][0][1] in own:
                         differences.append(abs(own[fp['top'][0][1]] - fp['top'][0][0]))
@@ -378,7 +382,11 @@ def summary(out: Path) -> dict[str, Any]:
         'positions': totals,
         'thresholds_nats': list(THRESHOLDS),
         'counts': counts,
-        'decision': decide(counts),
+        'positions_missed_above_2_nats': {
+            name: sorted([prompt, position] for prompt, position in found)
+            for name, found in event_positions.items()
+        },
+        'decision': decide({name: len(found) for name, found in event_positions.items()}),
         'worst': worst,
     }
 

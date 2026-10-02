@@ -36,18 +36,8 @@ def test_readout_measures_against_fp32_and_scores_the_path_top1() -> None:
     assert r['positions_before'] == 1
 
 
-def counts_with(events: dict[str, int]) -> dict[str, Any]:
-    paths = ['sglang/decode', 'sglang/prefill']
-    paths += [f'{n}/{k}' for n in rates.HF_RUNS for k in ('decode', 'prefill')]
-    out = {}
-    for path in paths:
-        table = {
-            region: dict.fromkeys(map(str, rates.THRESHOLDS), 0)
-            for region in ('before_eot', 'after_eot')
-        }
-        table['after_eot']['2.0'] = events.get(path, 0)
-        out[path] = {'regret_above': table}
-    return out
+def events(sglang: int = 0, **runs: int) -> dict[str, int]:
+    return {'sglang': sglang, **dict.fromkeys(rates.COMPARATORS, 0), **runs}
 
 
 @pytest.mark.parametrize(
@@ -63,18 +53,15 @@ def counts_with(events: dict[str, int]) -> dict[str, Any]:
     ],
 )
 def test_decision_rule(sglang: int, hf: int, verdict: str) -> None:
-    counts = counts_with({'sglang/decode': sglang, 'hf_bf16_float32state/prefill': hf})
-    assert rates.decide(counts)['verdict'] == verdict
+    assert rates.decide(events(sglang, hf_bf16_float32state=hf))['verdict'] == verdict
 
 
 def test_decision_ignores_the_bf16_state_run() -> None:
-    counts = counts_with({'sglang/decode': 6, 'hf_bf16_modelstate/decode': 50})
-    assert rates.decide(counts)['verdict'] == 'sglang-specific'
+    assert rates.decide(events(6, hf_bf16_modelstate=50))['verdict'] == 'sglang-specific'
 
 
 def test_decision_compares_against_the_worse_transformers_run() -> None:
-    counts = counts_with({'sglang/decode': 9, 'hf_bf16_fla_float32state/prefill': 6})
-    decision = rates.decide(counts)
+    decision = rates.decide(events(9, hf_bf16_fla_float32state=6))
     assert decision['comparator'] == 'hf_bf16_fla_float32state'
     assert decision['verdict'] == 'not specific'
 
@@ -118,6 +105,36 @@ def test_rates_summary_counts_regret_by_region(tmp_path: Path) -> None:
     assert decode['fp32_top1_logprob_abs_diff']['max'] == pytest.approx(2.95)
     assert decode['top1_differs'] == {'before_eot': 0, 'after_eot': 1}
     assert result['worst']['sglang/decode'][0]['regret'] == pytest.approx(2.55)
+    assert result['decision']['sglang_events'] == 1
+    assert result['positions_missed_above_2_nats']['sglang'] == [['a', 2]]
+
+
+def test_rates_summary_counts_a_position_missed_on_both_paths_once(tmp_path: Path) -> None:
+    output = [5, 6]
+    good = [[-0.1, 7], [-3.0, 8]]
+    bad = [[-0.1, 8], [-3.0, 7]]
+    write_gz(
+        tmp_path / 'sglang.jsonl.gz',
+        [
+            {
+                'prompt': 'a',
+                'prompt_ids': [1],
+                'output_ids': output,
+                'decode': [good, bad],
+                'prefill': [good, bad],
+            }
+        ],
+    )
+    for name in rates.HF_RUNS:
+        write_gz(
+            tmp_path / f'{name}.jsonl.gz',
+            [{'prompt': 'a', 'decode': [good] * 2, 'prefill': [good] * 2}],
+        )
+    fp = {'top': [[-0.05, 7]], 'lp': {'7': -0.05, '8': -2.6}}
+    write_gz(tmp_path / 'fp32.jsonl.gz', [{'prompt': 'a', 'positions': [fp, fp]}])
+    result = rates.summary(tmp_path)
+    assert result['counts']['sglang/decode']['regret_above']['before_eot']['2.0'] == 1
+    assert result['counts']['sglang/prefill']['regret_above']['before_eot']['2.0'] == 1
     assert result['decision']['sglang_events'] == 1
 
 

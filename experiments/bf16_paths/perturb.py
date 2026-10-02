@@ -8,10 +8,11 @@ The transformers and SGLang readings show which BF16 implementations miss FP32 a
 script measures that sensitivity in FP32, where the arithmetic adds almost no error of its
 own: one forward over the prompt and output[:position] (the `fp32_full` path of
 `paths.py fp32`), repeated with every decoder layer's output multiplied elementwise by
-(1 + u), u drawn uniformly from [-2^-9, 2^-9] with a fixed seed per run. 2^-9 is the largest
-relative error of rounding to BF16 (round to nearest, 8 significand bits), so each run
-perturbs the residual stream about as much as storing it in BF16 after every layer would,
-at every position of the prefix (`--site residual`). Projections average such elementwise
+(1 + u), u drawn uniformly from [-2^-8, 2^-8] with a fixed seed per run. 2^-8 bounds the
+relative error of rounding to BF16 (round to nearest, 8 significand bits; values just above
+a power of two come close to it), so each run perturbs the residual stream at least as much
+as storing it in BF16 after every layer would, at every position of the prefix
+(`--site residual`). The first runs used 2^-9, half that bound (superseded). Projections average such elementwise
 noise down, so it understates the effect of rounding a quantity the GDN recurrence uses
 directly; `--site gdn` instead multiplies the GDN core's inputs (query, key, value and beta,
 all BF16 in SGLang and in transformers' BF16 model) by (1 + u) in every GDN layer. The
@@ -38,7 +39,7 @@ from typing import Any
 from experiments.benchcert.paths import MODEL, REVISION, TRACE
 from experiments.bf16_paths.hf_paths import entry
 
-EPS = 2.0**-9
+EPS = 2.0**-8  # the relative rounding-error bound of BF16 (8 significand bits)
 
 
 def perturb_hook(generator: Any) -> Any:
@@ -168,7 +169,7 @@ def run(
         'torch': torch.__version__,
         'site': site,
         'perturbation': {
-            'residual': 'each decoder layer output times (1 + u), u ~ U[-2^-9, 2^-9], per element',
+            'residual': 'each decoder layer output times (1 + u), u ~ U[-2^-8, 2^-8], per element',
             'gdn': 'each GDN layer core input (query, key, value, beta) times (1 + u), per element',
         }[site],
         'eps': EPS,
