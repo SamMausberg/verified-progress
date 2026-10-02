@@ -63,7 +63,7 @@ sessions 1 and 3 and certified first in session 2. Four exclusive holds on 2026-
 (times and commits in `summary.json`, `holds`): h1 (the untimed check launches, then
 session 1's DFlash pairs), h2 (session 1's plain and MTP pairs), h3 and h4 (sessions 2
 and 3). Every launch exited 0. Of 132 timed points none is invalid (foreign CPU mean
-0.13-0.56 cores, no KV retraction, every running batch reached its concurrency, no
+0.13-0.67 cores, no KV retraction, every running batch reached its concurrency, no
 failed request); both arms of every pair resolved the same pools and captured the same
 graph sizes, so the 60,000-token DFlash pin never bound.
 
