@@ -11,7 +11,7 @@ The speed at stake is modest. Qwen3.5-4B's head has 248,320 entries; in BF16 it 
 \begin{figure}[t]
 \centering
 \input{figures/breakdown}
-\caption{Where the GPU time of a stock decode step goes (measured under Nsight Systems; baseline, no certified head), with a fixed number $B$ of requests per decode step, so that a head call in plain decoding has $M=B$ positions \ev{profile-attr}. The target head comprises its GEMM, the FP32 copy of its logits and the argmax. Tracing inflates the MTP cycle's idle time (hatched) but barely changes kernel durations, so the heads' shares of an untraced cycle are larger than shown (Appendix~\ref{app:profile}).}
+\caption{Where the GPU time of a stock decode step goes (measured under Nsight Systems; baseline, no certified head), with a fixed number $B$ of requests per decode step, so that a head call in plain decoding has $M=B$ positions \ev{profile-attr}. The target head comprises its GEMM, the FP32 copy of its logits and the argmax. Tracing inflates the MTP cycle's idle time (hatched) but barely changes kernel durations, so the MTP heads' shares of an untraced cycle are larger than shown (Appendix~\ref{app:profile}). DFlash: the tuned arm with 16-token blocks, which is GPU-bound \ev{profile-dflash}.}
 \label{fig:breakdown}
 \end{figure}
 
