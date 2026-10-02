@@ -43,7 +43,9 @@ BF16 output (R-stock).
   Cauchy-Schwarz (or blockwise l2) envelope, compaction of rows with hi >= max lo, and BF16
   rescoring of those rows. Under R-stock on plain decode, the bucket-exact rule leaves 1.4%
   of positions to the stock kernel with the conservative accumulation model and 0.35% with
-  the tighter model (its justification pending the kernel workstream's evidence); the
+  the tighter model (assumed for the stock kernel: the largest error of the stock GEMM's
+  FP32-output variant over 2,048 real head inputs is 1/58 of its bound,
+  `evidence/certified_head/stock_invariance.json`); the
   `stock_gap` sufficient condition alone leaves 2-3%.
 
 ## Files
@@ -339,7 +341,7 @@ the stock kernel must decide, at:
 | gamma for the stock kernel's FP32 accumulation | Positions failing | Capture-run batches with at least one |
 |---|---|---|
 | 6.11e-4: conservative default, the largest fused-adder model of `src/precision_reference.py` | 3.03% | 21.6% |
-| 1.1922e-4: the Hopper `wgmma` model with a split-K allowance, its derived value rounded up (whether the stock kernel stays within it is pending the kernel workstream's evidence) | 2.18% | 16.0% |
+| 1.1922e-4: the Hopper `wgmma` model with a split-K allowance, its derived value rounded up (assumed for the stock kernel: the largest error of the stock GEMM's FP32-output variant over 2,048 real head inputs is 1/58 of this bound, `evidence/certified_head/stock_invariance.json`; the BF16-output kernel SGLang runs does not expose its accumulator) | 2.18% | 16.0% |
 | 1.67e-6: IEEE FP32 blocked tree, not justified for the stock tensor-core GEMM (shown for scale) | 1.95% | 14.8% |
 
 The floor near 2% belongs to this sufficient condition, not to R-stock itself: with G
@@ -353,7 +355,7 @@ outward to FP32 and then to BF16, and compare with the tie rule) certifies most 
 | gamma | gap rule: positions / batches needing the stock kernel | bucket-exact rule: positions / batches |
 |---|---|---|
 | 6.11e-4 (conservative default) | 3.03% / 21.6% | 1.40% / 10.9% |
-| 1.1922e-4 (Hopper model, pending its evidence) | 2.18% / 16.0% | 0.35% / 2.8% |
+| 1.1922e-4 (Hopper model; observed FP32-output error 1/58 of it) | 2.18% / 16.0% | 0.35% / 2.8% |
 | 1e-5 (not justified for the stock tensor-core GEMM) | 1.97% / 14.9% | 0.017% / 0.13% |
 | 1.67e-6 (IEEE FP32 tree; not justified for the stock tensor-core GEMM) | 1.95% / 14.8% | 0% / 0% |
 
@@ -374,10 +376,12 @@ capture's batch shape, i.e. no counterexample to any of these error models for c
 these 6,005 rows. That is consistent with the models, not a proof that the stock kernel
 stays within the smallest one. Under R-stock the fallback reruns the stock head at the
 served batch shape. Resolving undecided rows one at a time returns the stock decision only
-if the stock head GEMM is bitwise batch-invariant row by row; whether it is on this stack
-is pending the kernel workstream's evidence, and without that precondition R-stock
-requires the rerun at the same batch shape. The cost of either fallback mode is not
-measured here.
+if the stock head GEMM is bitwise batch-invariant row by row. On this build it is, at 20
+batch sizes from 1 to 256 and for the gathered-candidate shape of the column fallback
+(`evidence/certified_head/stock_invariance.json`); that is a measured property of this
+build, which the certified head's start-up self-test re-checks on the deployed shapes, and
+without it R-stock requires the rerun at the same batch shape. The cost of either fallback
+mode is not measured here; `evidence/certified_head/micro_head.json` times both.
 
 ## P1: certified decoder tail (plain decoding only) - negative result
 
