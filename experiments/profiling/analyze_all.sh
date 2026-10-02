@@ -43,9 +43,7 @@ for arm_kind in plain:plain mtp:spec dflash-tuned-b16:dflash dflash-tuned:dflash
 done
 
 # Plain rerun: attribution and comparison with the cited traces.
-plain_entry=plain_nsys:plain_nsys
 if [ -n "$PLAIN_RERUN" ]; then
-  plain_entry=plain_nsys:plain_nsys_rerun
   mkdir -p "$EV/attribution/plain_rerun"
   for rep in "$PLAIN_RERUN"/plain_bs*.nsys-rep; do
     have "$rep" || continue
@@ -59,16 +57,19 @@ if [ -n "$PLAIN_RERUN" ]; then
   fi
 fi
 
-# Client windows, server commands and startup logs. The cited plain windows
-# (windows/plain_nsys*) were copied before the rerun replaced the raw directory, so
-# with a rerun present plain_nsys/ is collected as plain_nsys_rerun.
-for entry in "$plain_entry" mtp_nsys plain_none mtp_none plain_sglang \
-  mtp_sglang plain_nsys_graphtrace mtp_nsys_graphtrace plain_eager_nsys mtp_eager_nsys \
-  mtp_nsys_hosttrace plain_nsys_hosttrace dflash-tuned-b16_nsys dflash-tuned-b16_none \
-  dflash-tuned_nsys dflash-tuned_none; do
-  rundir="${entry%%:*}" name="${entry##*:}"
-  have "$VP_DATA/$rundir/windows.jsonl" || continue
-  run collect_run.py "$VP_DATA/$rundir" --name "$name" --evidence "$EV/windows"
+# Client windows, server commands and startup logs (directory:name). The cited plain
+# run is collected as plain_nsys and, when present, the rerun as plain_nsys_rerun.
+collect=("$PLAIN_CITED:plain_nsys")
+if [ -n "$PLAIN_RERUN" ]; then collect+=("$PLAIN_RERUN:plain_nsys_rerun"); fi
+for rundir in mtp_nsys plain_none mtp_none plain_sglang mtp_sglang plain_nsys_graphtrace \
+  mtp_nsys_graphtrace plain_eager_nsys mtp_eager_nsys mtp_nsys_hosttrace plain_nsys_hosttrace \
+  dflash-tuned-b16_nsys dflash-tuned-b16_none dflash-tuned_nsys dflash-tuned_none; do
+  collect+=("$VP_DATA/$rundir:$rundir")
+done
+for entry in "${collect[@]}"; do
+  dir="${entry%:*}" name="${entry##*:}"
+  have "$dir/windows.jsonl" || continue
+  run collect_run.py "$dir" --name "$name" --evidence "$EV/windows"
 done
 
 # Derived bytes and label checks.
