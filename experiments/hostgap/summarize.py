@@ -199,6 +199,8 @@ def main() -> int:
         for d in sorted(args.tag_dir.expanduser().iterdir())
         if (d / 'windows.jsonl').exists() and fnmatch.fnmatchcase(d.name, args.labels)
     }
+    if not labels:
+        parser.error(f'no label in {args.tag_dir} matches {args.labels!r}')
     derived: dict[str, Any] = {}
     for name, summary in labels.items():
         if not name.endswith('-none'):
@@ -212,6 +214,7 @@ def main() -> int:
         )
         if lost:
             if base.endswith('-patched'):
+                print(f'{base}-host has no eager kernel records: no derived idle', file=sys.stderr)
                 continue
             traced = None
         own_trace = traced is not None
