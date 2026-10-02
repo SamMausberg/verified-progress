@@ -3,14 +3,16 @@
 bench.sweep keeps aiperf's raw export, the SSE stream of every request. With greedy
 decoding and ignore_eos, two servers that commit the same tokens stream the same text.
 This rebuilds each profiling-phase request's text from its chunks (the `reasoning_content`
-and `content` deltas, in arrival order), matches requests across two runs by prompt id
-(the point's requests.csv), and reports for each sweep point how many prompts streamed
-identical text and, for the others, where the first difference falls: its character
-offset and the output tokens streamed before the chunk that holds it (the smaller count
-of the two runs, from the chunks' cumulative usage).
+and `content` deltas in one buffer, in arrival order, noting each character's channel),
+matches requests across two runs by prompt id (the point's requests.csv), and reports for
+each sweep point how many prompts streamed identical text and, for the others, where the
+first difference falls: its character offset and the output tokens streamed before the
+chunk that holds it (the smaller count of the two runs, from the chunks' cumulative usage).
 
-This is streamed-text identity, not token-id or logprob identity: two token sequences
-that detokenize to the same text count as identical.
+A prompt is identical when both runs streamed the same characters in the same order, each
+on the same channel. This is streamed-text identity, not token-id or logprob identity: two
+token sequences that detokenize to the same text count as identical. Completion token
+counts do not enter it; prompts whose counts differ are reported separately.
 
 A run is LABEL=<sweep run dir>; a pair is TEST:BASELINE. A missing raw export, a request
 that failed or streamed no usage, a prompt repeated within a point, or two runs whose
@@ -36,18 +38,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+CHANNELS = {'reasoning_content': 'r', 'content': 'c'}
+
 
 @dataclass
 class Stream:
-    reasoning: str = ''
-    content: str = ''
-    # (characters of reasoning + content streamed so far, cumulative completion tokens)
+    text: str = ''  # every delta of both channels, in arrival order
+    channels: str = ''  # one letter per character of text: 'r' reasoning, 'c' content
+    # (characters streamed so far, cumulative completion tokens)
     marks: list[tuple[int, int]] = field(default_factory=list)
     completion_tokens: int | None = None
-
-    @property
-    def text(self) -> str:
-        return self.reasoning + self.content
 
 
 def read_stream(raw: dict[str, Any]) -> Stream:
@@ -60,13 +60,15 @@ def read_stream(raw: dict[str, Any]) -> Stream:
                 continue
             chunk = json.loads(value)
             for choice in chunk.get('choices') or []:
-                delta = choice.get('delta') or {}
-                s.reasoning += delta.get('reasoning_content') or ''
-                s.content += delta.get('content') or ''
+                # Within one delta, keep the order in which its fields were sent.
+                for key, piece in (choice.get('delta') or {}).items():
+                    if key in CHANNELS and piece:
+                        s.text += piece
+                        s.channels += CHANNELS[key] * len(piece)
             usage = chunk.get('usage')
             if usage:
                 s.completion_tokens = int(usage['completion_tokens'])
-                s.marks.append((len(s.reasoning) + len(s.content), s.completion_tokens))
+                s.marks.append((len(s.text), s.completion_tokens))
     return s
 
 
@@ -117,17 +119,21 @@ def load_run(run: Path) -> dict[str, dict[str, Stream]]:
     return {f'{p.parent.name}/{p.name}': load_point(p) for p in points}
 
 
+def _first_mismatch(x: str, y: str) -> int | None:
+    """First index where x and y differ (the shorter length for a strict prefix), or None."""
+    offset = next((i for i, (u, v) in enumerate(zip(x, y, strict=False)) if u != v), None)
+    if offset is None and len(x) != len(y):
+        offset = min(len(x), len(y))
+    return offset
+
+
 def first_divergence(a: Stream, b: Stream) -> tuple[int, int]:
     """Character offset of the first difference, and tokens streamed before its chunk."""
-    ta, tb = a.text, b.text
-    offset = next((i for i, (x, y) in enumerate(zip(ta, tb, strict=False)) if x != y), None)
+    offset = _first_mismatch(a.text, b.text)
+    if offset is None:  # same text, split differently between the channels
+        offset = _first_mismatch(a.channels, b.channels)
     if offset is None:
-        if ta != tb:  # one text is a prefix of the other
-            offset = min(len(ta), len(tb))
-        elif a.reasoning != b.reasoning:  # same text, split differently between the channels
-            offset = min(len(a.reasoning), len(b.reasoning))
-        else:  # same text, different completion token counts
-            offset = len(ta)
+        raise ValueError('the two streams are identical')
 
     def before(s: Stream) -> int:
         return max((tokens for chars, tokens in s.marks if chars <= offset), default=0)
@@ -139,14 +145,12 @@ def compare_point(a: dict[str, Stream], b: dict[str, Stream]) -> dict[str, Any]:
     if set(a) != set(b):
         raise ValueError(f'prompt sets differ: {len(set(a) ^ set(b))} ids in only one run')
     divergences: list[dict[str, Any]] = []
+    token_counts_differ: list[str] = []
     for pid in sorted(a):
         sa, sb = a[pid], b[pid]
-        same = (
-            sa.reasoning == sb.reasoning
-            and sa.content == sb.content
-            and sa.completion_tokens == sb.completion_tokens
-        )
-        if not same:
+        if sa.completion_tokens != sb.completion_tokens:
+            token_counts_differ.append(pid)
+        if sa.text != sb.text or sa.channels != sb.channels:
             offset, tokens = first_divergence(sa, sb)
             divergences.append({'prompt_id': pid, 'char_offset': offset, 'tokens_before': tokens})
     divergences.sort(key=lambda d: (d['tokens_before'], d['prompt_id']))
@@ -156,6 +160,7 @@ def compare_point(a: dict[str, Stream], b: dict[str, Stream]) -> dict[str, Any]:
         'identical': len(a) - len(divergences),
         'differing': len(divergences),
         'completion_tokens': sorted({s.completion_tokens for s in (*a.values(), *b.values())}),
+        'completion_tokens_differ': token_counts_differ,
         'tokens_before_min': min(tokens_before) if tokens_before else None,
         'tokens_before_median': statistics.median(tokens_before) if tokens_before else None,
         'first_divergences': divergences,
@@ -208,8 +213,10 @@ def main() -> None:
     out = {
         'command': ' '.join(sys.argv),
         'repo_commit': _repo_commit(),
-        'comparison': 'streamed text (reasoning_content then content deltas, in arrival order) '
-        'and completion token count per prompt; not token ids or logprobs',
+        'comparison': 'streamed text per prompt (reasoning_content and content deltas in one '
+        'buffer, in arrival order, each character on the same channel); not token ids or '
+        'logprobs; completion_tokens_differ lists prompts whose token counts differ, which '
+        'does not enter the identity',
         'tokens_before': 'output tokens streamed before the chunk that holds the first '
         'difference, the smaller count of the two runs; the first differing token is at '
         'or after this index',

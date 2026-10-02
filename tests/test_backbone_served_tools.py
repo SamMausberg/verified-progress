@@ -80,18 +80,27 @@ def test_bitwise_cli_fails_on_a_missing_run(tmp_path: Path) -> None:
     assert not (tmp_path / 'out.json').exists()
 
 
-def write_point(point: Path, texts: dict[str, list[str]], *, ok: bool = True) -> None:
-    """A sweep point with one profiling request per prompt; each chunk streams one token."""
+Chunk = str | tuple[str, str]
+
+
+def write_point(
+    point: Path, texts: dict[str, list[Chunk]], *, ok: bool = True, tokens_per_chunk: int = 1
+) -> None:
+    """A sweep point with one profiling request per prompt.
+
+    A chunk is a reasoning delta or a (delta field, text) pair; each streams tokens_per_chunk.
+    """
     (point / 'aiperf').mkdir(parents=True)
     rows: list[dict[str, str]] = []
     raws: list[dict[str, Any]] = []
     for i, (pid, chunks) in enumerate(texts.items()):
         rid = f'r{i}'
         rows.append({'request_id': rid, 'prompt_id': pid, 'ok': str(ok)})
+        deltas = [dict([c]) if isinstance(c, tuple) else {'reasoning_content': c} for c in chunks]
         packets = [
-            {'value': json.dumps({'choices': [{'delta': {'reasoning_content': c}}],
-                                  'usage': {'completion_tokens': n + 1}})}
-            for n, c in enumerate(chunks)
+            {'value': json.dumps({'choices': [{'delta': d}],
+                                  'usage': {'completion_tokens': (n + 1) * tokens_per_chunk}})}
+            for n, d in enumerate(deltas)
         ] + [{'value': '[DONE]'}]  # fmt: skip
         raws.append({'metadata': {'benchmark_phase': 'warmup', 'x_request_id': 'w'}})
         raws.append({'metadata': {'benchmark_phase': 'profiling', 'x_request_id': rid},
@@ -120,3 +129,26 @@ def test_stream_text_identity_refuses_different_prompts_and_failed_requests(tmp_
     write_point(tmp_path / 'c', {'p0': ['ab']}, ok=False)
     with pytest.raises(ValueError, match='failed'):
         load_point(tmp_path / 'c')
+
+
+def test_stream_text_identity_keeps_the_arrival_order_of_both_channels(tmp_path: Path) -> None:
+    # Reasoning 'a', content 'c', reasoning 'b' streams 'acb'; buffering the channels
+    # separately would rebuild both requests as 'abc' and call them identical.
+    r, c = 'reasoning_content', 'content'
+    write_point(tmp_path / 'a', {'p0': [(r, 'a'), (c, 'c'), (r, 'b')]})
+    write_point(tmp_path / 'b', {'p0': [(r, 'a'), (r, 'b'), (c, 'c')]})
+    s = compare_point(load_point(tmp_path / 'a'), load_point(tmp_path / 'b'))
+    assert s['first_divergences'] == [{'prompt_id': 'p0', 'char_offset': 1, 'tokens_before': 1}]
+    # Same characters in the same order, but the second one on another channel.
+    write_point(tmp_path / 'c', {'p0': [(r, 'a'), (c, 'b'), (c, 'c')]})
+    write_point(tmp_path / 'd', {'p0': [(r, 'a'), (r, 'b'), (c, 'c')]})
+    s = compare_point(load_point(tmp_path / 'c'), load_point(tmp_path / 'd'))
+    assert s['first_divergences'] == [{'prompt_id': 'p0', 'char_offset': 1, 'tokens_before': 1}]
+
+
+def test_stream_text_identity_reports_token_counts_outside_the_identity(tmp_path: Path) -> None:
+    write_point(tmp_path / 'a', {'p0': ['ab', 'cd']}, tokens_per_chunk=1)
+    write_point(tmp_path / 'b', {'p0': ['ab', 'cd']}, tokens_per_chunk=2)
+    s = compare_point(load_point(tmp_path / 'a'), load_point(tmp_path / 'b'))
+    assert (s['identical'], s['differing']) == (1, 0)
+    assert s['completion_tokens_differ'] == ['p0']
