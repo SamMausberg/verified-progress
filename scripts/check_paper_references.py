@@ -26,9 +26,10 @@ printed with its failures:
 10. every entry in ``paper/references.bib`` has a row in the table of cited entries of
     ``sources/citation_audit.md``, which records how the entry and its citing sentences were
     checked;
-11. no ``note`` of an entry in ``paper/references.bib`` carries an audit remark (when or how the
-    source was read, verified or licensed), because those remarks belong in the audit, not in
-    the printed reference list.
+11. no ``note`` of an entry in ``paper/references.bib`` carries an audit remark (how the source
+    was verified or licensed, or when it was read for the audit), because those remarks belong
+    in the audit, not in the printed reference list; an access date for an unversioned web page
+    is bibliographic data and stays in the entry.
 
 A document's sources are its root file and every file it reaches through ``\\input``.
 
