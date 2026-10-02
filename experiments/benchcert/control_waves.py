@@ -64,6 +64,19 @@ Reading rule (set before the run), over every request's tokens:
   (located by its first divergence). All identical: they do not, under identical batch
   evolution at the most sensitive row known, so differences between arms in the closed
   loop need a different batch evolution (timing) or a race.
+
+The seeded control's run wrote no counters (the timed environment writes them every 20,000
+glue calls), so it could not show that the certified head decided the cert arm's verifies;
+a silent fallback to the stock head would also match stock. `mtpstats` serves the same 10
+waves twice on the cert arm only (`certstats`: the timed certified environment with the
+counters written on every glue call) and compares the outputs with the seeded control's
+stock run.
+
+Counter rerun (set before it ran): certified verify rows above zero, with every request
+identical to stock on both passes, means the certified head decided and matched; zero
+certified verify rows means a silent fallback, reported as such; certified rows with any
+output differing from stock is a certified-head mismatch under identical batch evolution.
+Uncounted calls (host-gated certified steps without a device count) must be zero.
 """
 
 from __future__ import annotations
@@ -109,6 +122,8 @@ CONTROLS = {
     # Seeded MTP control (exclusive, untimed): stock, cert0, cert, stock again, at the
     # timed pools; waves of SMALL_SIZES (wave_size is the largest).
     'mtpsmall': Control('mtp', 64, 16, ('stock', 'cert0', 'cert', 'stock2'), None),
+    # Its cert arm again with the counters written on every glue call (exclusive, untimed).
+    'mtpstats': Control('mtp', 64, 16, ('certstats',), None),
 }
 VARIANTS = {name: control.variants for name, control in CONTROLS.items()}
 SMALL_SIZES = (1, 8, 12, 16)
@@ -178,6 +193,8 @@ def variant_env(name: str, variant: str, stats: Path) -> dict[str, str]:
     if variant in ('stock', 'stock2'):
         return {}
     env = plan.certified_env(plan.FAMILIES[CONTROLS[name].family], 'cert', plan.REPO / 'src', stats)
+    if variant == 'certstats':
+        env['SGLANG_CERTIFIED_HEAD_STATS_EVERY'] = '1'
     if variant == 'cert0':
         env['SGLANG_CERTIFIED_HEAD_MAX_ROWS'] = '0'
     if variant == 'certlog':
@@ -336,6 +353,67 @@ def small_waves(out: Path, variant: str, runs: Path) -> int:
     return 0
 
 
+def pair_outputs(a: dict[str, list[int]], b: dict[str, list[int]]) -> dict[str, Any]:
+    """analyze.compare of two runs keyed by wave and prompt, with its divergences listed."""
+    result = compare(a, b)
+    result['divergences'] = [
+        {'request': key, 'position': d, 'tokens': [ta, tb]}
+        for key, d, ta, tb in result.pop('events')
+    ]
+    del result['positions']
+    return result
+
+
+def outputs_by_rep(path: Path) -> dict[int, dict[str, list[int]]]:
+    """A small-control outputs file as {pass: {"wave:prompt": output ids}}."""
+    by_rep: dict[int, dict[str, list[int]]] = {}
+    for r in iter_jsonl(path):
+        by_rep.setdefault(r['rep'], {})[f'{r["wave"]}:{r["prompt"]}'] = r['output_ids']
+    return by_rep
+
+
+def stats_compare(out: Path, reference: Path) -> dict[str, Any]:
+    """The cert arm rerun with counters on every glue call: its counters per path and its
+    outputs against the seeded control's stock outputs, pass by pass."""
+    cert = outputs_by_rep(out / 'certstats' / 'outputs.jsonl')
+    stock = outputs_by_rep(reference / 'stock' / 'outputs.jsonl')
+    pairs = {
+        f'certstats_vs_stock/rep{rep}': pair_outputs(stock[rep], cert[rep])
+        for rep in range(SMALL_REPS)
+    }
+    stats = json.loads((out / 'certstats' / 'certified_stats.json').read_text())
+    family = plan.FAMILIES[CONTROLS['mtpstats'].family]
+    paths = {}
+    for path, c in stats['paths'].items():
+        host = (c.get('host_steps') or {}).get('certified', 0)
+        paths[path] = {
+            'calls': c.get('calls', 0),
+            'rows': c.get('rows', 0),
+            'fallback_rows': c.get('fallback_rows', 0),
+            'mismatch_rows': c.get('mismatch_rows', 0),
+            'max_certified_rows': c.get('max_certified_rows'),
+            'host_certified_steps': host,
+            'uncounted_calls': host * family.calls_per_step.get(path, 1) - c.get('calls', 0),
+        }
+    verify_rows = paths.get('verify', {}).get('rows', 0)
+    identical = all(r['identical'] == r['prompts'] for r in pairs.values())
+    if verify_rows == 0:
+        reading = 'no certified verify row: a silent fallback to the stock head'
+    elif identical:
+        reading = 'the certified head decided the verifies and matched stock'
+    else:
+        reading = 'the certified head decided the verifies and the outputs differ from stock'
+    return {
+        'declared': False,
+        'reading_rule': (__doc__ or '').split('Counter rerun (set before it ran):')[1].strip(),
+        'reference': str(reference),
+        'paths': paths,
+        'uncounted_calls_zero': all(p['uncounted_calls'] == 0 for p in paths.values()),
+        'against_stock': pairs,
+        'reading': reading,
+    }
+
+
 def small_compare(out: Path) -> dict[str, Any]:
     """The seeded control's comparisons: the two passes on each server, each pair of
     servers on every pass (keyed by wave and prompt), and 579ae7ce's token at 439 per wave."""
@@ -359,27 +437,20 @@ def small_compare(out: Path) -> dict[str, Any]:
                 )
         runs[variant] = by_rep
 
-    def pair(a: dict[str, list[int]], b: dict[str, list[int]]) -> dict[str, Any]:
-        result = compare(a, b)
-        result['divergences'] = [
-            {'request': key, 'position': d, 'tokens': [ta, tb]}
-            for key, d, ta, tb in result.pop('events')
-        ]
-        del result['positions']
-        return result
-
     def diverged(name: str) -> set[str]:
         return {
             d['request'] for k, r in across.items() if k.startswith(name) for d in r['divergences']
         }
 
-    within = {v: pair(reps[0], reps[1]) for v, reps in runs.items()}
+    within = {v: pair_outputs(reps[0], reps[1]) for v, reps in runs.items()}
     across: dict[str, dict[str, Any]] = {}
     names = list(VARIANTS['mtpsmall'])
     for i, left in enumerate(names):
         for right in names[i + 1 :]:
             for rep in range(SMALL_REPS):
-                across[f'{right}_vs_{left}/rep{rep}'] = pair(runs[left][rep], runs[right][rep])
+                across[f'{right}_vs_{left}/rep{rep}'] = pair_outputs(
+                    runs[left][rep], runs[right][rep]
+                )
     baseline = all(r['identical'] == r['prompts'] for r in within.values()) and all(
         r['identical'] == r['prompts']
         for k, r in across.items()
@@ -418,9 +489,14 @@ def small_compare(out: Path) -> dict[str, Any]:
     }
 
 
-def compare_variants(out: Path, family: str = 'mtp') -> int:
+def compare_variants(out: Path, family: str = 'mtp', reference: Path | None = None) -> int:
     """Every pair of the control's variants: identical outputs and first divergences
     (over the prompts both served: certlog serves one wave)."""
+    if family == 'mtpstats':
+        stats = stats_compare(out, reference or out.parent / 'seeded')
+        (out / 'compare.json').write_text(json.dumps(stats, indent=1) + '\n')
+        print(json.dumps({k: stats[k] for k in ('paths', 'uncounted_calls_zero', 'reading')}))
+        return 0
     if family == 'mtpsmall':
         summary = small_compare(out)
         (out / 'compare.json').write_text(json.dumps(summary, indent=1) + '\n')
@@ -500,23 +576,26 @@ def main(argv: list[str] | None = None) -> int:
         p = sub.add_parser(name)
         p.add_argument('--family', choices=sorted(VARIANTS), required=True)
         p.add_argument(
-            '--variant', choices=('stock', 'cert', 'cert0', 'certlog', 'stock2'), required=True
+            '--variant',
+            choices=('stock', 'cert', 'cert0', 'certlog', 'stock2', 'certstats'),
+            required=True,
         )
         p.add_argument('--out', type=Path, required=True)
         p.add_argument('--runs', type=Path, default=Path.home() / 'vp-data/benchcert')
     c = sub.add_parser('compare')
     c.add_argument('--family', choices=sorted(VARIANTS), required=True)
     c.add_argument('--out', type=Path, required=True)
+    c.add_argument('--reference', type=Path, help="mtpstats: the seeded control's output directory")
     args = parser.parse_args(argv)
     if args.command == 'compare':
-        return compare_variants(args.out, args.family)
+        return compare_variants(args.out, args.family, args.reference)
     if args.variant not in VARIANTS[args.family]:
         parser.error(f'{args.family} has variants {VARIANTS[args.family]}')
     (args.out / args.variant).mkdir(parents=True, exist_ok=True)
     if args.command == 'start':
         return start(args.out, args.family, args.variant)
     if args.command == 'waves':
-        if args.family == 'mtpsmall':
+        if args.family in ('mtpsmall', 'mtpstats'):
             return small_waves(args.out, args.variant, args.runs)
         return waves(args.out, args.family, args.variant, args.runs)
     return stop_server(args.out / args.variant)

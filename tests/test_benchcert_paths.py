@@ -171,3 +171,40 @@ def test_summary_reports_each_path_at_the_target_and_the_spread_before(tmp_path:
 def test_donor_suffixes_find_the_check_asserts() -> None:
     ids = [9, 1716, 1756, 1148, 3, 1716, 9471, 1148, 1716, 4]
     assert score_report.donor_suffixes(ids) == [1756, 9471]
+
+
+def test_stats_compare_reads_counters_and_compares_with_stock(tmp_path: Path) -> None:
+    out, ref = tmp_path / 'stats', tmp_path / 'seeded'
+    (out / 'certstats').mkdir(parents=True)
+    (ref / 'stock').mkdir(parents=True)
+    records = [
+        {'wave': w, 'prompt': 'p', 'rep': r, 'output_ids': [1, 2, 3]}
+        for w in range(2)
+        for r in range(2)
+    ]
+    for path in (out / 'certstats' / 'outputs.jsonl', ref / 'stock' / 'outputs.jsonl'):
+        path.write_text(''.join(json.dumps(x) + '\n' for x in records))
+    stats = {
+        'paths': {
+            'verify': {
+                'calls': 10,
+                'rows': 40,
+                'max_certified_rows': 16,
+                'host_steps': {'certified': 10},
+            },
+            'draft': {
+                'calls': 20,
+                'rows': 80,
+                'max_certified_rows': 16,
+                'host_steps': {'certified': 10},
+            },
+        }
+    }
+    (out / 'certstats' / 'certified_stats.json').write_text(json.dumps(stats))
+    result = control_waves.stats_compare(out, ref)
+    assert result['reading'] == 'the certified head decided the verifies and matched stock'
+    assert result['paths']['verify']['uncounted_calls'] == 0
+    assert all(r['identical'] == r['prompts'] == 2 for r in result['against_stock'].values())
+    stats['paths']['verify']['rows'] = 0
+    (out / 'certstats' / 'certified_stats.json').write_text(json.dumps(stats))
+    assert control_waves.stats_compare(out, ref)['reading'].startswith('no certified verify row')

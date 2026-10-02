@@ -779,6 +779,20 @@ Readings, set before the run, over every request's tokens:
   All identical means they do not, at the most sensitive row known, so differences between
   the arms in the closed loop need a different batch evolution (timing) or a race.
 
+Counter rerun (added 2026-10-02 after the run, approved by main):
+
+    GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x experiments/benchcert/hold_seeded_stats.sh
+
+The run wrote no counters (the timed environment writes them every 20,000 glue calls), so
+it cannot show that the certified head decided the cert arm's verifies; a silent fallback
+to the stock head would also match stock. `mtpstats` serves the same 10 waves twice on the
+cert arm only, with `SGLANG_CERTIFIED_HEAD_STATS_EVERY=1`, and compares its outputs with
+the stored stock run. Reading, set before it runs: certified verify rows above zero with
+every request identical to stock on both passes means the certified head decided and
+matched; zero certified verify rows means a silent fallback, reported as such; certified
+rows with an output that differs from stock is a certified-head mismatch under identical
+batch evolution. Uncounted calls must be zero.
+
 ## Hold commit
 
 Every hold runs from a clean checkout at the commit recorded here; `run_session.py`
