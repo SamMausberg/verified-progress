@@ -67,108 +67,141 @@
   "verify": {
    "1": {
     "certified_steps": 272,
+    "calls": 272,
     "stock_graph_steps": 0,
     "rows": 1088,
-    "max_rows": 4
+    "max_rows": 4,
+    "uncounted_calls": 0
    },
    "8": {
     "certified_steps": 1128,
+    "calls": 1128,
     "stock_graph_steps": 0,
     "rows": 30328,
-    "max_rows": 32
+    "max_rows": 32,
+    "uncounted_calls": 0
    },
    "12": {
     "certified_steps": 1166,
+    "calls": 1166,
     "stock_graph_steps": 0,
     "rows": 46504,
-    "max_rows": 48
+    "max_rows": 48,
+    "uncounted_calls": 0
    },
    "16": {
     "certified_steps": 1142,
+    "calls": 1142,
     "stock_graph_steps": 0,
     "rows": 59664,
-    "max_rows": 64
+    "max_rows": 64,
+    "uncounted_calls": 0
    }
   },
   "draft": {
    "1": {
     "certified_steps": 272,
+    "calls": 544,
     "stock_graph_steps": 0,
     "rows": 544,
-    "max_rows": 1
+    "max_rows": 1,
+    "uncounted_calls": 0
    },
    "8": {
     "certified_steps": 1128,
+    "calls": 2256,
     "stock_graph_steps": 0,
     "rows": 15164,
-    "max_rows": 8
+    "max_rows": 8,
+    "uncounted_calls": 0
    },
    "12": {
     "certified_steps": 1166,
+    "calls": 2332,
     "stock_graph_steps": 0,
     "rows": 23252,
-    "max_rows": 12
+    "max_rows": 12,
+    "uncounted_calls": 0
    },
    "16": {
     "certified_steps": 1142,
+    "calls": 2284,
     "stock_graph_steps": 0,
     "rows": 29832,
-    "max_rows": 16
+    "max_rows": 16,
+    "uncounted_calls": 0
    }
   },
   "draft_extend": {
    "1": {
     "certified_steps": 272,
+    "calls": 272,
     "stock_graph_steps": 0,
     "rows": 272,
-    "max_rows": 1
+    "max_rows": 1,
+    "uncounted_calls": 0
    },
    "8": {
     "certified_steps": 1128,
+    "calls": 1128,
     "stock_graph_steps": 0,
     "rows": 7582,
-    "max_rows": 8
+    "max_rows": 8,
+    "uncounted_calls": 0
    },
    "12": {
     "certified_steps": 1166,
+    "calls": 1166,
     "stock_graph_steps": 0,
     "rows": 11626,
-    "max_rows": 12
+    "max_rows": 12,
+    "uncounted_calls": 0
    },
    "16": {
     "certified_steps": 1142,
+    "calls": 1142,
     "stock_graph_steps": 0,
     "rows": 14916,
-    "max_rows": 16
+    "max_rows": 16,
+    "uncounted_calls": 0
    }
   },
   "dflash_draft": {
    "1": {
     "certified_steps": 0,
+    "calls": 0,
     "stock_graph_steps": 0,
     "rows": 0,
-    "max_rows": 0
+    "max_rows": 0,
+    "uncounted_calls": 0
    },
    "8": {
     "certified_steps": 0,
+    "calls": 0,
     "stock_graph_steps": 0,
     "rows": 0,
-    "max_rows": 0
+    "max_rows": 0,
+    "uncounted_calls": 0
    },
    "12": {
     "certified_steps": 0,
+    "calls": 0,
     "stock_graph_steps": 0,
     "rows": 0,
-    "max_rows": 0
+    "max_rows": 0,
+    "uncounted_calls": 0
    },
    "16": {
     "certified_steps": 0,
+    "calls": 0,
     "stock_graph_steps": 0,
     "rows": 0,
-    "max_rows": 0
+    "max_rows": 0,
+    "uncounted_calls": 0
    }
   }
  },
  "waves_certified_verify_steps": 3708,
+ "waves_uncounted_calls": 0,
  "reading": "the certified verify decided the waves' verifies and matched stock"
 }

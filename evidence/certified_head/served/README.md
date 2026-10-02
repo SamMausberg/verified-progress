@@ -693,7 +693,8 @@ logprobs unchanged. A token-only rerun then served the same waves twice without 
 stock and certified in turn, reading the counters before and after every wave
 (`control_seeded_tokens.json`). In the waves alone the certified verify ran 3,708 steps and
 137,584 rows (272, 1,128, 1,166 and 1,142 steps at sizes 1, 8, 12 and 16, at most 4, 32,
-48 and 64 rows) with no stock-head verify step, so every verify, 579ae7ce's at 439 among
+48 and 64 rows) with no stock-head verify step and a device call for every host-gated step
+(no uncounted call on any path in any of the 20 wave passes), so every verify, 579ae7ce's at 439 among
 them, was the certified head's decision; draft and draft-extend ran certified in the same
 steps. Every token of the 109 requests equals stock's on both passes, each server's passes
 are identical, and the token-only stock run equals the logprob stock run. By the pre-set
@@ -827,4 +828,4 @@ references `... -s experiments/benchcert/hold_paths.sh` at `12643a1`, the seeded
 | `context_waves_stopped_20261002T1255.json`, `context_waves_stopped_20261002T1346.json` | the two stopped context-wave runs (stock waves only): 579ae7ce's token at 439 by 527 stratum and where each wave left session 1's text (`python -m experiments.benchcert.context_waves compare --out ~/vp-data/benchcert/control/context_stopped_<time>`; `compare.json` there, copied) |
 | `control_seeded_mtp.json` | the seeded MTP control: the two passes on each server, every pair of servers on each pass, and 579ae7ce's token and logprobs at 439 per wave (`hold_seeded_waves.sh`; `~/vp-data/benchcert/control/seeded/compare.json`, copied) |
 | `control_seeded_stats.json` | the counter rerun of the seeded control's cert arm: counters per path over the server's life, warm-up included, and its outputs against the seeded stock run (`hold_seeded_stats.sh`; `python -m experiments.benchcert.control_waves compare --family mtpstats --out ~/vp-data/benchcert/control/seeded_stats --reference ~/vp-data/benchcert/control/seeded` at `5a7ee16`, copied) |
-| `control_seeded_tokens.json` | the token-only rerun of the seeded control: each server's two passes, certified against stock pass by pass, the stock run against the logprob stock run, and the certified head's counters over the waves only, per wave size (`hold_seeded_tokens.sh`; `~/vp-data/benchcert/control/seeded_tokens/compare.json`, copied) |
+| `control_seeded_tokens.json` | the token-only rerun of the seeded control: each server's two passes, certified against stock pass by pass, the stock run against the logprob stock run, and the certified head's counters over the waves only, per wave size, with device calls against host-gated steps (`hold_seeded_tokens.sh`; `python -m experiments.benchcert.control_waves compare --family mtptokens --out ~/vp-data/benchcert/control/seeded_tokens --reference ~/vp-data/benchcert/control/seeded` at `011aac2`, copied) |
