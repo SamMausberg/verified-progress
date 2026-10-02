@@ -3,6 +3,7 @@
 set -euo pipefail
 SP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO="$(cd "$SP/../.." && pwd)"
+[ -z "$(git -C "$REPO" status --porcelain --untracked-files=no)" ] || { echo "repository $REPO has tracked edits"; exit 1; }
 # The probe imports SGLang's kernels from the main checkout; require the pinned, clean tree.
 SGLANG_DIR=${SGLANG_DIR:-$HOME/sglang}
 [ "$(git -C "$SGLANG_DIR" rev-parse --short=10 HEAD)" = bd66ce343e ] || { echo "$SGLANG_DIR is not at bd66ce343e"; exit 1; }

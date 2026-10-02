@@ -27,6 +27,7 @@ sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 SGLANG_PIN = 'bd66ce343e'
+REQUIRED_ROUTES = ('bf16', 'fp8_tensor', 'fp8_rowwise', 'fp8_triton', 'fp8_marlin', 'act_quant_fp8')
 # Backbone linears per decode step (24 GDN layers, 8 attention layers, 32 MLPs); the head and
 # the GDN in_proj_ba (kept BF16) are not counted.
 STEP_COUNTS = {
@@ -65,12 +66,20 @@ def cmd_gemm(args: argparse.Namespace) -> None:
         # output channel (unit weight scale), so its error is not the per-tensor route's: drop it.
         if r['route'] == 'fp8_tensor':
             r['rel_err_vs_fp32'] = ''
-    have = {(r['shape'], r['M']) for r in rows if r['route'] == 'bf16'}
+    have = {(r['shape'], r['M'], r['route']) for r in rows}
     shapes = sorted({r['shape'] for r in rows})
     ms = sorted({r['M'] for r in rows})
-    missing = [(s, m) for s in shapes for m in ms if (s, m) not in have]
+    # Every route must cover every shape and M; torch._int_mm needs M > 16, so int8_mm is required
+    # only there.
+    missing = [
+        (s, m, route)
+        for s in shapes
+        for m in ms
+        for route in REQUIRED_ROUTES + (('int8_mm',) if m > 16 else ())
+        if (s, m, route) not in have
+    ]
     if missing:
-        raise SystemExit(f'{args.probe}: no BF16 timing for {missing}')
+        raise SystemExit(f'{args.probe}: no timing for {missing[:8]} ({len(missing)} missing)')
     t = {(r['shape'], r['M'], r['route']): r['us_median'] for r in rows}
     routes = sorted({r['route'] for r in rows} - {'act_quant_fp8', 'int8_mm'})
     for m in sorted({r['M'] for r in rows}):
