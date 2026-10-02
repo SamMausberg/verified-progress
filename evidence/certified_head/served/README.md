@@ -27,22 +27,27 @@ So the served envelope rises only at c = 1 and falls at c = 2, 4, 8 and 128. (Bu
 plain decoding, `plain-tuned-replayssm`, may lead at c = 96-128 with one confirmation
 session; it was not tested here.)
 
-**MTP at c = 64: one ill-conditioned position, and no observation that requires a
-certified-head error.** Session 1's certified MTP run at c = 64 committed token 1756 at
-prompt `579ae7ce`, output position 439, a single position in text the model wrote after its
-own end-of-text token. Stock runs there committed 68189, 8078 or 5715 (Exactness, below).
-The next-token distribution at that position is ill-conditioned. Every stock path agrees
-within 0.03 nats on each of the 39 preceding positions. At the position itself, an FP32
-forward puts 68189 on top (-0.87) and 1756 at -9.79, and the engine's BF16 paths disagree:
-batch-1 prefills put 1756 at -8.1 to -8.9, while batch-1 plain decoding from position 400
-puts it on top (-0.32), a token FP32 puts 8.9 nats below its top. At the plain c = 128 event
-(`a4db11ff`, position 333) the roles reverse: there the BF16 prefill misses FP32's top token
-by about 13-15 nats, and stock decoding commits it. Against FP32, closed-loop c = 64 runs
-commit a token at least 2 nats below the top at 439 in 4 of 19 stock MTP draws (5715) and
-in 8 of 34 uninstrumented draws of engines carrying the certified graphs (1756 four times,
-5715 four times). 1756 itself appears only in the latter (4 of 34 against 0 of 19; post hoc,
-one-sided Fisher p about 0.16), so the arms differ in which wrong token, not measurably in
-how often. No observation requires an error in the certified head:
+**MTP at c = 64: stock's BF16 decode path errs against FP32 at one position, and no
+observation requires a certified-head error.** Session 1's certified MTP run at c = 64
+committed token 1756 at prompt `579ae7ce`, output position 439, a single position in text
+the model wrote after its own end-of-text token. Stock runs there committed 68189, 8078 or
+5715 (Exactness, below). At that position an FP32 forward puts 68189 on top (-0.87) and
+1756 at -9.79, and FP32's two paths (one forward, and recurrent decode) agree within 0.0001
+nats and side with the stock BF16 prefills (1756 at -8.1 to -8.9), while stock batch-1
+plain decoding from position 400 puts 1756 on top (-0.32), a token FP32 puts 8.9 nats below
+its top. By the serial-references hold's pre-set reading, the stock decode path carries the
+error there: a stock-engine numerics fault, independent of the certified head (the reading
+named the GDN decode path; the layer that errs was not located). At the plain c = 128 event
+(`a4db11ff`, position 333) the reading's other branch applies: the BF16 prefill and scorer
+references miss FP32's top token by about 13-15 nats, and stock decoding commits it. As an
+interpretation, both are positions ill-conditioned in BF16: every path, BF16 and FP32,
+agrees within 0.05 nats on each of the 39 positions before them, and they part at the
+position alone. Against FP32, closed-loop c = 64 runs commit a token at least 2 nats below
+the top at 439 in 4 of 19 stock MTP draws (5715) and in 8 of 34 uninstrumented draws of
+engines carrying the certified graphs (1756 four times, 5715 four times), a grouping chosen
+after seeing the data. 1756 itself appears only in the latter (4 of 34 against 0 of 19;
+post hoc, one-sided Fisher p about 0.16), so the arms differ in which wrong token, not
+measurably in how often. No observation requires an error in the certified head:
 - `cert0` (`MAX_ROWS=0`, the head never decides) committed 1756;
 - the head matched the stock argmax on every check-mode row (592,433) and every
   stress-test row (967,680; batch-1 inputs in head-only graphs), and was consistent with
@@ -127,8 +132,9 @@ H4: **supported** (`summary.json`, regenerated after the check rerun). The exact
 behind these verdicts rests on the complete check launches (`check2`: every certified
 call counted, 0 of 592,433 certified rows differ) and on concurrency-1 identity; block 8
 rests on check mode alone. Under the declared rule a large class is reported and
-investigated, not by itself a failure, so the one large class, at MTP c = 64 (an
-ill-conditioned position where stock errs too; Exactness), leaves these verdicts as
+investigated, not by itself a failure, so the one large class, at MTP c = 64 (a
+position where stock's BF16 decode path errs against FP32 and stock MTP runs err too;
+Exactness), leaves these verdicts as
 computed. Block 8's loss rests on Holm's last step
 at the nominal 0.05; its Bonferroni interval includes 1.
 
@@ -290,8 +296,8 @@ c > 1, counting every pair's first divergences (`summary.json`, `equality.csv`):
 | dflash8 | 272 / 250 / 7 / 0 | 267 / 243 / 7 / 0 |
 
 These classes are only as good as their reference. A BF16 batch-1 teacher-forced
-reference can be wrong by 13 nats or more at an ill-conditioned position (Reference paths
-and FP32, below), so a class says how far apart the two tokens are under the stock prefill
+reference can be wrong by 13 nats or more at a position ill-conditioned in BF16 (Reference
+paths and FP32, below), so a class says how far apart the two tokens are under the stock prefill
 path, not under the model's exact arithmetic.
 
 The block-16 events are the three recurring c = 8 divergences, all at the rounding
@@ -317,13 +323,16 @@ batch is at most 64 rows and runs certified, so the certified verify head may ha
 active at the event, besides the draft and draft-extend paths, which run certified at
 64 rows throughout the point. The settling hold's waves of 64 (below) did not reproduce
 it, and they do not recreate the drain. One closed-loop rerun of the timed point committed
-the same token, which the teacher-forced scores count as a reproduction under the reruns'
-pre-set rule, and two ring-logged reruns of `cert0`, where the head never runs, did too
-(Drain reruns, below). What followed explains the position rather than a fault: the
-position is ill-conditioned, stock BF16 paths disagree there by up to 8 nats, stock MTP
-runs commit a token 4.7 nats below FP32's top there too, and the certified engine is
-identical to stock under identical batch evolution (Drain reruns: Reference paths and FP32,
-Seeded MTP control). MTP identity is claimed at concurrency 1, in check mode and under
+the same token, and two ring-logged reruns of `cert0`, where the head never runs, did too
+(Drain reruns, below). Under the reruns' pre-set rule, read with the serial reference that
+replaced the concurrent scorer, the outcome is that the event is not specific to the
+certified engine: at this position 3 of 12 certified h6a points are gross (1756 once, 5715
+twice) and so is 1 of 12 stock points (5715). The concurrent scorer's first reading, 1 of
+12 against 0 of 12 (a reproduction), is superseded. What followed locates the error in the
+stock engine rather than the head: stock's BF16 decode path errs against FP32 at this
+position (stock BF16 paths disagree there by up to 8.6 nats), stock MTP runs commit a token
+4.7 nats below FP32's top there too, and the certified engine is identical to stock under
+identical batch evolution (Drain reruns: Reference paths and FP32, Seeded MTP control). MTP identity is claimed at concurrency 1, in check mode and under
 identical batch evolution. The first
 scoring run read the tokens' logprobs from the wrong response key, so every margin was
 NaN and every context classed large; it was discarded and the declared re-score rerun
@@ -389,15 +398,23 @@ c = 64 point of sessions 1-3 and of these holds, `579ae7ce`'s token at position 
 its output first differs from session 1's certified run, and the request's verify count
 and accepted-draft histogram.
 
-The reading rule counts the reruns only; sessions 1-3 are the discovery data.
+The reading rule counts the reruns only; sessions 1-3 are the discovery data. The gross
+counts are given under the serial reference (`drain_serial_rescore.json`, one request at a
+time), which replaced the concurrent scorer; the concurrent counts are the superseded first
+reading.
 
-| c = 64 points of the reruns | Gross event (h6s) | Committed 1756 at position 439 | Reached position 439 with session 1's prefix |
-|---|---|---|---|
-| h6a certified | 1 of 12 | 1 (`cert1` repeat 1) | 11 |
-| h6a stock | 0 of 12 | 0 | 9 |
-| h6b check mode | 0 of 8 | 0 | 6 |
+| c = 64 points of the reruns | Gross event, serial reference | Gross event, concurrent (superseded) | Committed 1756 at position 439 | Reached position 439 with session 1's prefix |
+|---|---|---|---|---|
+| h6a certified | 3 of 12 (`cert1` repeats 1, 3 and 5) | 1 of 12 | 1 (`cert1` repeat 1) | 11 |
+| h6a stock | 1 of 12 (`stock2` repeat 2) | 0 of 12 | 0 | 9 |
+| h6b check mode | 0 of 8 | 0 of 8 | 0 | 6 |
 
-Among the points that reached the prefix, that is 1 of 11 certified against 0 of 9 stock.
+All four serial gross events are at 579ae7ce's position 439 (1756 at 6.81 nats, 5715 at
+2.19). Only contexts flagged near or gross concurrently, and position 439 in every point,
+were re-scored serially. By the rule ("a gross event in `stock` too means it is not specific
+to the certified engine") the outcome is: not specific to the certified engine. The
+concurrent first reading, 1 of 11 certified against 0 of 9 stock among the points that
+reached the prefix, read as a reproduction.
 Session 1's certified point, the discovery, committed 1756. Of the other five MTP c = 64
 points of sessions 1-3, four committed 68189 and one diverged earlier. Post hoc and
 descriptive only, against the stated rule: pooling session 1 with h6a gives 2 of 15
@@ -591,14 +608,22 @@ exactly). Logprobs at the target:
 | FP32, one forward | -9.79 | -0.87 | -1.89 | -5.62 | 68189 | -0.45 | -1.74 | 18299 |
 | FP32, recurrent from 39 before | -9.79 | -0.87 | -1.89 | -5.62 | 68189 | -0.45 | -1.74 | 18299 |
 
-FP32's two paths agree to 0.001 nats, and its top-1 follows the recorded text at all 39
-traced positions before each target. On each of those 39 positions every path, BF16 and
-FP32, gives the recorded token's logprob within about 0.03 nats; the paths part at the
-target alone. Taking as the measure FP32's top logprob minus FP32's logprob of the token a
-path puts on top, BF16 decode errs by 8.9 nats at 579ae7ce/439 and BF16 prefill by about
-13-15 at a4db11ff/333. Neither path is systematically wrong: these are single
-ill-conditioned positions, both after the request's first end of text, at an identifier
-the model copies into a regenerated prompt. The same 514-token prefill gave 1756 at -5.50
+FP32's two paths agree within 0.0001 nats at 579ae7ce/439 and 0.0024 at a4db11ff/333, and
+its top-1 follows the recorded text at all 39 traced positions before each target. On each
+of those 39 positions every path, BF16 and FP32, gives the recorded token's logprob within
+0.05 nats (at most 0.046, at 579ae7ce's position 437); the paths part at the target alone.
+Taking as the measure FP32's top logprob minus FP32's logprob of the token a path puts on
+top, BF16 decode errs by 8.9 nats at 579ae7ce/439 and BF16 prefill by about 13-15 at
+a4db11ff/333. In the terms of the hold's pre-set readings: at 579ae7ce/439 FP32's paths
+agree with each other and with the stock prefills, so the stock decode path carries the
+error, a stock-engine numerics fault independent of the certified head (the reading named
+the GDN decode path; the layer was not located); at a4db11ff/333 they side with the stock
+decode path, so the prefill and scorer references are the inaccurate ones and h6s's gross
+label there inverts. The reading reserved "ill-conditioned even in FP32" for FP32's paths
+disagreeing by more than 0.1 nats, which did not happen. Neither BF16 path is
+systematically wrong; as an interpretation, these are positions ill-conditioned in BF16,
+both after the request's first end of text, at an identifier the model copies into a
+regenerated prompt. The same 514-token prefill gave 1756 at -5.50
 when 16 requests shared the server (the concurrent re-score), so batching alone moves it
 by 2.6 nats. The planted token 9471 is never on top (-10.4 to -11.3 under the prefills,
 -3.57 under decode).
@@ -613,8 +638,9 @@ session 1's prefix:
 | certified graphs, instrumented (h6b check mode, h7 ring) | 23 | 1 | 2 | 0 | 2 of 26 |
 | h8 planted and reordered `cert0` | 10 | 6 | 1 | 0 | 1 of 17 |
 
-The rate of a token 2 or more nats below FP32's top is similar between stock and the
-certified-graph arms (4 of 19 against 8 of 34; 11 of 77 over all certified-graph draws).
+Post hoc (the measure and the grouping were chosen after seeing the data), the rate of a
+token 2 or more nats below FP32's top is similar between stock and the certified-graph arms
+(4 of 19 against 8 of 34; 11 of 77 over all certified-graph draws).
 Only 1756, the larger error, is confined to the certified-graph arms: 4 of 34 against 0 of
 19, one-sided Fisher p about 0.16, a grouping chosen after seeing the data.
 
