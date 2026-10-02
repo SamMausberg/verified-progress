@@ -9,11 +9,10 @@ commands are in [`experiments/backbone/`](../../experiments/backbone/).
 
 Status: the kernel, merge, norm and skeleton results are **microbenchmarks** (measured) or
 calculations from them (**derived**). [Served results](#served-results) add the exactness class
-of each engine switch (greedy outputs against stock plain decoding) and paired serving runs of
-the routing table against tuned plain decoding and against MTP with FlashInfer attention
-(`mtp-tuned`), and a trace of which GEMM kernels the served engine dispatches. The routing
-table's exactness class under MTP, and its effect on bench's low-concurrency MTP arm
-(`mtp-tuned-triton`, untested at c = 1-32), are **pending**.
+of each engine switch (greedy outputs against stock plain decoding), paired serving runs of the
+routing table against tuned plain decoding and against both of bench's MTP arms (FlashInfer
+attention, `mtp-tuned`; Triton attention, `mtp-tuned-triton`), and a trace of which GEMM kernels
+the served engine dispatches. The routing table's exactness class under MTP is **pending**.
 
 ## Setup
 
@@ -329,10 +328,69 @@ c = 1, 8, 32 and 128. Foreign CPU load averaged 0.19-0.36 cores per point (large
   (not traced).
 - **c = 128: no claim.** Both pairs are below 1 (0.996, 0.984), one beyond the 0.81% spread.
 - The exactness class of lever v1 on MTP was not measured; the frontier file marks it pending.
-- The routing table is untested against `mtp-tuned-triton`, bench's low-concurrency MTP arm
-  (faster at c = 1-32: 532 against 456 tokens/s at c = 1 in bench's confirmation). With Triton
-  target attention the kernels around the routed GEMMs, and with them PDL's overlap, differ, so
-  these runs say nothing about it.
+- These runs say nothing about `mtp-tuned-triton`, bench's low-concurrency MTP arm (faster at
+  c = 1-32: 532 against 456 tokens/s at c = 1 in bench's confirmation): with Triton target
+  attention the kernels around the routed GEMMs, and with them PDL's overlap, differ. Hold 4
+  measured that arm (next section).
+
+### Paired serving: lever v1 against MTP with Triton attention (`mtp-tuned-triton`, hold 4)
+
+The same design in one exclusive hold (2026-10-02, 12:36-12:50 UTC) on bench's low-concurrency MTP
+arm, `mtp-tuned-triton`: `mtp-tuned` with Triton attention in place of FlashInfer (native MTP,
+three-step chain, buffered GDN verify, radix cache off, 128 GDN slots, running limit 128). Both
+arms on the backbone engine, B with lever v1's four variables, order B A A B with the sessions
+recorded by the harness (pairs (B1, A1) and (A2, B2)), at c = 1, 8 and 32 with 64, 64 and 256
+measured requests. Every launch passed the harness's checks (Triton attention, full CUDA-graph
+coverage, overlap scheduler, running limit 128), every request at every point completed with all
+512 output tokens, and no point is invalid. Foreign CPU load averaged 0.12-1.17 cores per point
+(largest single sample 1.94, in A2 at c = 32), below the 2-core limit
+([`served/mtp_triton_v1/`](served/mtp_triton_v1/)).
+
+| c | A: tokens/s, two runs | B: tokens/s, two runs | B/A per pair | B/A mean | A1-A2 spread | Tokens per verify cycle, A and B |
+|---|---|---|---|---|---|---|
+| 1 | 533.2, 533.2 | 533.5, 533.6 | 1.0006, 1.0007 | 1.0006 | 0.01% | 3.2586, 3.2595 |
+| 8 | 3,008.9, 3,027.9 | 3,012.3, 3,027.0 | 1.0011, 0.9997 | 1.0004 | 0.63% | 3.2524, 3.2543 |
+| 32 | 6,733.8, 6,838.6 | 6,796.7, 6,751.9 | 1.0093, 0.9873 | 0.9983 | 1.54% | 3.2561-3.2632, 3.2543-3.2635 |
+
+Throughput is `y` in `points.csv`; the mean and the two per-pair ratios are `y_ratio_mean`,
+`y_ratio_min` and `y_ratio_max` in `pairs.csv`. The spread is the difference between A's two runs
+over their mean.
+
+- **c = 1: 0.06% faster in both pairs, too little to matter.** The sign holds in both pairs and
+  exceeds the 0.01% spread of A's runs, but bench's three stock confirmation sessions of this arm
+  differ by 0.15% (532.0-532.8 tokens/s, `evidence/bench/confirm/points.csv`), and on tuned plain
+  decoding the same table gives 3.4% at c = 1.
+- **c = 8 and 32: no claim.** The pairs straddle 1, and A's own two runs differ by 0.63% and 1.54%.
+- **Where the saving goes at c = 1 (derived).** The verify cycle, tokens per cycle over the
+  per-user decode rate (`accept_length / x_decode`), is 5.786 ms for A and 5.778 ms for B (means of
+  two runs; 5.5 and 11.0 us shorter per pair). At c = 1 the target verifies 4 rows per request,
+  where the table sends `in_proj_qkvz`, `out_proj`, `o_proj` and `gate_up` to the Triton kernel
+  with PDL (88 calls per verify; `down`, `qkv_proj` and `in_proj_ba` stay on cuBLAS). By the
+  method of the in-situ section below (cuBLAS's time minus the routed kernel's per call in
+  `gemm_microbench.json`, times the calls; it reproduces that section's 197 and 120 us), those
+  calls save 81 us per verify in isolation, and the served cycle keeps 7-14% of that. The draft
+  passes' routed GEMMs (the Hopper GEMV for each one-row draft step) would add to the prediction,
+  since the table routes a call only where the routed kernel is faster in isolation, so the
+  served share of the whole isolated gain is smaller still. Nothing here is traced.
+- **Time to first token is longer with the table under MTP.** B's median TTFT at c = 1 is 41.2 and
+  41.0 ms against A's 40.1 and 39.1 ms (1.1 and 2.0 ms longer per pair). Hold 3's `mtp-tuned`
+  pairs show 0.4 and 1.3 ms longer, while on tuned plain decoding B's is 0.9 and 1.4 ms shorter.
+  A request at c = 1 takes about 915 ms, so the longer TTFT costs B 0.1-0.2% per request and
+  absorbs most of its decode gain: the per-user decode rate (`x_decode`) rises 0.12% and 0.22%,
+  throughput 0.06%. The cause is not traced.
+- **Acceptance.** At c = 1 and 8 the tokens per verify cycle repeat to four decimals within each
+  arm (A: 3.2586 and 3.2524 in both sessions, the same values as all three of bench's stock
+  confirmation sessions; B: 3.2595 and 3.2543) and differ between the arms, by +0.03% and +0.06%:
+  the table changes the draft and verify passes' arithmetic, which moves acceptance at near ties.
+  At c = 32 acceptance also varies between runs of the same arm.
+- A's rates are within 0.2% of bench's stock confirmation of this arm at c = 1 and 0.7% at c = 8,
+  and up to 2.6% above it at c = 32 (6,666-6,727 tokens/s), so carrying the patches with every
+  switch off costs nothing visible here either.
+- **The exactness class of lever v1 under MTP was not measured for this arm either:** the hold
+  compared no outputs between the arms, and the frontier file marks B's class pending.
+- These are two pairs from one session. With hold 3, lever v1 gives no material serving gain under
+  MTP on either attention backend at c = 1-32; its served gains are on plain decoding (c = 1, 8
+  and 128).
 
 ### Which GEMM kernels the served engine runs (hold 3)
 
@@ -370,11 +428,11 @@ cores).
 
 ## Pending
 
-- The exactness class of lever v1 under MTP (greedy outputs against stock MTP).
-- Paired serving of lever v1 against `mtp-tuned-triton`, bench's low-concurrency MTP arm, at
-  c = 1, 8 and 32 (queued as hold 4).
-- Why the step at c = 16 keeps only a third of the GPU span's saving, and why `mtp-tuned` at
-  c = 1 is slower; neither is traced.
+- The exactness class of lever v1 under MTP (greedy outputs against stock MTP), on either MTP
+  arm.
+- Why the step at c = 16 keeps only a third of the GPU span's saving, why `mtp-tuned` at c = 1 is
+  slower, why the MTP verify cycle at c = 1 keeps 7-14% of its isolated GEMM saving, and
+  why the table lengthens time to first token under MTP; none of these is traced.
 
 ## Commands behind the served files
 
@@ -472,4 +530,27 @@ python experiments/backbone/insitu_gemm.py --report A1=$N/plain-A/plain_bs1.nsys
     --report B1=$N/plain-B/plain_bs1.nsys-rep --report A16=$N/plain-A/plain_bs16.nsys-rep \
     --report B16=$N/plain-B/plain_bs16.nsys-rep --pair B1:A1 --pair B16:A16 \
     --out evidence/backbone/served/insitu_gemm.json
+```
+
+Hold 4 (exclusive lock, repository commit 53e39a3, engine `59deb68e29`):
+
+```sh
+# Paired MTP serving with Triton attention: four sweeps in the order B A A B; runs 1-2 are session
+# abba-1, runs 3-4 abba-2. B sets the four lever variables (LEVER as above); A runs the same engine
+# without them.
+i=0
+for lab in B A A B; do
+  i=$((i + 1)); session=abba-$(((i + 1) / 2))
+  sw=(); [ $lab = B ] && sw=("${LEVER[@]}")
+  python -m bench.sweep --arm mtp-tuned-triton --label backbone-mtp-triton-v1-$lab --session $session \
+      --sglang-worktree ~/sglang-wt/backbone "${sw[@]}" --concurrency 1 8 32 --repeats 1 \
+      --port 30471 --out ~/vp-data/backbone/e2e/mtp-triton-v1
+done
+# Then, at repository commit 0821e6d:
+T=~/vp-data/backbone/e2e/mtp-triton-v1
+python -m bench.pareto $T/backbone-mtp-triton-v1-B/20261002-123648 $T/backbone-mtp-triton-v1-A/20261002-124002 \
+    $T/backbone-mtp-triton-v1-A/20261002-124317 $T/backbone-mtp-triton-v1-B/20261002-124631 --out <dir> \
+    --pair backbone-mtp-triton-v1-B:backbone-mtp-triton-v1-A --status paired --no-plot \
+    --class backbone-mtp-triton-v1-B=pending
+# served/mtp_triton_v1/ keeps points.csv, pairs.csv, launches.csv and frontier.csv from <dir>.
 ```
