@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Kernel timing of the exact fold's ring-writing GDN verify by value tile and batch
 # (gdn_ring_tile_sweep.py; the follow-up to patch drafter/0005, #167). No server. One
-# exclusive hold, about 10 minutes:
+# exclusive hold, about 13 minutes:
 #   scripts/gpu_lock.sh -x experiments/drafter/run_ring_tile_sweep.sh [OUT]
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,7 +10,7 @@ export SGLANG_WORKTREE="${SGLANG_WORKTREE:-$HOME/sglang-wt/drafter}"
 # shellcheck source=/dev/null
 source "$repo/scripts/sglang_env.sh"
 out="${1:-$HOME/vp-data/drafter/ring-tile-sweep}"
-if [ -e "$out/sweep.json" ]; then
+if [ -e "$out/sweep.json" ] || [ -e "$out/sweep.failed.json" ]; then
   echo "refusing to overwrite an earlier sweep in $out" >&2
   exit 2
 fi

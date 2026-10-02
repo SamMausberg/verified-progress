@@ -616,3 +616,47 @@ def test_fold_timing_check_passes_the_declared_protocol_only(tmp_path: Path) -> 
                 check.main()
             assert exc.value.code == 1, name
             assert not out.exists(), name
+
+
+def test_ring_tile_threshold_follows_the_declared_rule() -> None:
+    import pytest
+
+    pytest.importorskip('torch')  # the sweep module imports torch; runs in the SGLang venv
+    sweep = load('gdn_ring_tile_sweep')
+
+    def row(T: int, n: int, bv: int, times: list[float]) -> dict[str, object]:
+        ordered = sorted(times)
+        return {
+            'T': T,
+            'N': n,
+            'path': 'ring',
+            'BV': bv,
+            'us_per_layer_median': (ordered[1] + ordered[2]) / 2,
+            'us_per_layer_range': [ordered[0], ordered[-1]],
+            'us_per_layer_by_repeat': times,
+        }
+
+    wide = [10.0, 10.2, 10.1, 10.3]
+    rows = []
+    for T, narrow_by_n in (
+        # T16: wins at 1 and 2; at 4 it ties tile 32 in one repeat; at 8 it loses.
+        (
+            16,
+            {
+                1: [8.0, 8.1, 8.2, 8.1],
+                2: [9.0, 9.1, 9.0, 9.2],
+                4: [9.9, 10.0, 10.1, 9.95],
+                8: [12.0] * 4,
+            },
+        ),
+        # T8: wins at 1, 2 and 4, loses at 8, wins again at 16 (not a prefix, so ignored).
+        (8, {1: [7.0] * 4, 2: [7.5] * 4, 4: [8.0] * 4, 8: [11.0] * 4, 16: [5.0] * 4}),
+    ):
+        for n, narrow in narrow_by_n.items():
+            rows += [row(T, n, 4, narrow), row(T, n, 32, wide)]
+    # T16 has no N = 16 point; give it one that wins, which must not extend its prefix.
+    rows += [row(16, 16, 4, [5.0] * 4), row(16, 16, 32, wide)]
+    result = sweep.declared_threshold(rows, [16, 8], [1, 2, 4, 8, 16])
+    assert result['n_star_by_block'] == {'T16': 2, 'T8': 4}
+    assert result['n_star'] == 2
+    assert result['wins']['T16_N4'] is False and result['wins']['T8_N16'] is True
