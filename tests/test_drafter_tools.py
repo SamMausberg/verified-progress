@@ -618,24 +618,22 @@ def test_fold_timing_check_passes_the_declared_protocol_only(tmp_path: Path) -> 
             assert not out.exists(), name
 
 
+def _ring_row(T: int, n: int, bv: int, times: list[float]) -> dict[str, object]:
+    ordered = sorted(times)
+    return {
+        'T': T,
+        'N': n,
+        'path': 'ring',
+        'BV': bv,
+        'us_per_layer_median': (ordered[1] + ordered[2]) / 2,
+        'us_per_layer_range': [ordered[0], ordered[-1]],
+        'us_per_layer_by_repeat': times,
+        'bitwise_vs_bv32': True,
+    }
+
+
 def test_ring_tile_threshold_follows_the_declared_rule() -> None:
-    import pytest
-
-    pytest.importorskip('torch')  # the sweep module imports torch; runs in the SGLang venv
-    sweep = load('gdn_ring_tile_sweep')
-
-    def row(T: int, n: int, bv: int, times: list[float]) -> dict[str, object]:
-        ordered = sorted(times)
-        return {
-            'T': T,
-            'N': n,
-            'path': 'ring',
-            'BV': bv,
-            'us_per_layer_median': (ordered[1] + ordered[2]) / 2,
-            'us_per_layer_range': [ordered[0], ordered[-1]],
-            'us_per_layer_by_repeat': times,
-        }
-
+    rule = load('ring_tile_rule')
     wide = [10.0, 10.2, 10.1, 10.3]
     rows = []
     for T, narrow_by_n in (
@@ -653,20 +651,108 @@ def test_ring_tile_threshold_follows_the_declared_rule() -> None:
         (8, {1: [7.0] * 4, 2: [7.5] * 4, 4: [8.0] * 4, 8: [11.0] * 4, 16: [5.0] * 4}),
     ):
         for n, narrow in narrow_by_n.items():
-            rows += [row(T, n, 4, narrow), row(T, n, 32, wide)]
+            rows += [_ring_row(T, n, 4, narrow), _ring_row(T, n, 32, wide)]
     # T16 has no N = 16 point; give it one that wins, which must not extend its prefix.
-    rows += [row(16, 16, 4, [5.0] * 4), row(16, 16, 32, wide)]
-    result = sweep.declared_threshold(rows, [16, 8], [1, 2, 4, 8, 16])
+    rows += [_ring_row(16, 16, 4, [5.0] * 4), _ring_row(16, 16, 32, wide)]
+    result = rule.declared_threshold(rows, [16, 8], [1, 2, 4, 8, 16])
     assert result['n_star_by_block'] == {'T16': 2, 'T8': 4}
     assert result['n_star'] == 2
     assert result['wins']['T16_N4'] is False and result['wins']['T8_N16'] is True
 
 
-def test_ring_tile_threshold_only_on_the_declared_grid() -> None:
+def test_ring_tile_threshold_only_on_the_declared_configuration() -> None:
+    rule = load('ring_tile_rule')
+    assert rule.config_differences(dict(rule.DECLARED)) == []
+    # Order within the grid does not matter.
+    assert rule.config_differences({**rule.DECLARED, 'blocks': [8, 16]}) == []
+    for key, value in (
+        ('blocks', [16]),
+        ('batches', [2, 4, 8]),
+        ('tiles', [4, 32]),
+        ('layers', 12),
+        ('iters', 10),
+        ('repeats', 1),
+    ):
+        result = rule.threshold_for_config([], {**rule.DECLARED, key: value})
+        assert result['n_star'] is None, key
+        assert len(result['differences']) == 1 and result['differences'][0].startswith(key)
+    two = rule.threshold_for_config([], {**rule.DECLARED, 'repeats': 2, 'layers': 1})
+    assert [d.split(':')[0] for d in two['differences']] == ['layers', 'repeats']
+
+
+def _ring_report(rule: ModuleType) -> dict[str, object]:
+    """A declared-configuration sweep report: tile 4 takes 5 us at N <= 2 and 15 us above,
+    tile 16 takes 8 us everywhere, the other tiles 10 us."""
+    rows = []
+    for T in rule.DECLARED['blocks']:
+        for n in rule.DECLARED['batches']:
+            for bv in rule.DECLARED['tiles']:
+                t = {4: 5.0 if n <= 2 else 15.0, 16: 8.0}.get(bv, 10.0)
+                rows.append(_ring_row(T, n, bv, [t] * 4))
+    report: dict[str, object] = {
+        'shape': {'layers': 24},
+        'iters': 50,
+        'repeats': 4,
+        'bitwise_failures': [],
+        'rows': rows,
+    }
+    report['threshold'] = rule.threshold_for_config(rows, rule.report_config(report))
+    return report
+
+
+def test_ring_tile_report_config_reads_the_rows() -> None:
+    rule = load('ring_tile_rule')
+    report = _ring_report(rule)
+    assert rule.config_differences(rule.report_config(report)) == []
+    assert report['threshold']['n_star'] == 2  # type: ignore[index]
+    rows = report['rows']
+    assert isinstance(rows, list)
+    rows[0] = {**rows[0], 'us_per_layer_by_repeat': [5.0] * 3}
+    assert rule.config_differences(rule.report_config(report)) == ['repeats: [3, 4] (declared 4)']
+
+
+def test_ring_tile_cycle_estimate(tmp_path: Path) -> None:
     import pytest
 
-    pytest.importorskip('torch')
-    sweep = load('gdn_ring_tile_sweep')
-    for blocks, batches in (([16], sweep.DECLARED_BATCHES), ([16, 8], [2, 4, 8])):
-        result = sweep.threshold_for_grid([], blocks, batches)
-        assert result['n_star'] is None and 'declared' in result['reason']
+    rule = load('ring_tile_rule')
+    estimate = load('ring_tile_cycle_estimate')
+    report = _ring_report(rule)
+
+    def summary(fold_y: float, stock_y: float, concurrency: int) -> dict[str, object]:
+        arms = {
+            'fold': {'y': [fold_y, fold_y], 'accept_length': [5.0, 5.0]},
+            'stock': {'y': [stock_y, stock_y], 'accept_length': [5.0, 5.0]},
+        }
+        entry = {'group': 'b16', 'concurrency': concurrency, 'arms': arms, 'invalid_points': {}}
+        return {'comparison': [entry]}
+
+    # c = 2 at y = 1000 tok/s and 5 tokens per cycle: 10 ms per cycle. Tile 4 saves
+    # 24 x 5 us = 120 us per cycle, so the fold's y should rise by 10 / 9.88.
+    served = estimate.served_estimate(report, summary(1000.0, 950.0, 2), summary(1010.0, 951.0, 2))
+    (entry,) = served
+    assert entry['wall_us_per_cycle'] == pytest.approx(10_000.0)
+    assert entry['delta_us_per_cycle'][4] == pytest.approx(-120.0)
+    assert entry['delta_us_per_cycle'][16] == pytest.approx(-48.0)
+    assert entry['predicted_fold_y_ratio'][4] == pytest.approx(10_000 / 9_880)
+    assert entry['fold_over_stock_tile32'] == pytest.approx(1000 / 950)
+    assert entry['measured_fold_y_ratio_tile4'] == pytest.approx(1.01)
+    assert entry['measured_stock_y_ratio'] == pytest.approx(951 / 950)
+    assert estimate.check_sweep(report) == []
+    # A session point with an invalid run is refused rather than averaged over fewer runs.
+    broken = summary(1000.0, 950.0, 2)
+    broken['comparison'][0]['invalid_points'] = {'b16-fold-r2': 'osl mismatch'}  # type: ignore[index]
+    with pytest.raises(SystemExit):
+        estimate.served_estimate(report, broken, summary(1010.0, 951.0, 2))
+
+    # A report off the declared configuration, or with a threshold the rule does not
+    # reproduce, is refused before anything is written.
+    for change in ({'repeats': 1}, {'threshold': {'n_star': 4}}):
+        bad = tmp_path / 'bad.json'
+        bad.write_text(json.dumps({**report, **change}))
+        out = tmp_path / 'out.json'
+        sys.argv = ['ring_tile_cycle_estimate.py', '--sweep', str(bad), '--out', str(out)]
+        sys.argv += ['--tile32-session', str(bad), '--tile4-session', str(bad)]
+        with pytest.raises(SystemExit) as exc:
+            estimate.main()
+        assert 'declared rule' in str(exc.value.code)
+        assert not out.exists()
