@@ -13,14 +13,20 @@ For each block length T and batch N, the ring verify is called once per layer fo
 --layers layers (distinct FP32 states and rings per layer, as in the served model; the
 activations are shared), with the tile forced, and the calls are captured in one CUDA
 graph. The median replay time over --iters replays, divided by the layer count, is one
-measurement; the grid is repeated --repeats times, tiles interleaved within each (T, N),
-and the report gives the median and range over repeats. The stock per-position-state
-verify at the tile the engine selects is timed the same way as a reference (its
-per-position buffer is shared across layers to bound memory). Before timing, each tile's
-verify output and ring contents for one layer are compared bitwise with tile 32's: a tile
-that changes the arithmetic would fail the run.
+measurement. The grid is repeated --repeats times (default 4); within each (T, N) the
+tile order rotates with the repeat, so with four repeats every tile takes every position
+once, and the stock reference alternates between the first and the last slot. The report
+gives the median and range over repeats. The stock per-position-state verify at the tile
+the engine selects is timed the same way as a reference (its per-position buffer is
+shared across layers to bound memory).
 
-Exclusive hold (timing), about 10 minutes:
+Before timing, each tile's verify output and ring contents for one layer are compared
+bitwise with tile 32's. A tile that changes the arithmetic fails the run, and the report
+is then written to <out stem>.failed.json instead of --out. The report also applies the
+threshold rule declared before the sweep ran (`declared_threshold`; evidence README,
+"Ring-writing verify tiles by batch: declared reading").
+
+Exclusive hold (timing), about 13 minutes:
 
     scripts/gpu_lock.sh -x experiments/drafter/run_ring_tile_sweep.sh [OUT]
 """
@@ -38,6 +44,9 @@ from typing import Any
 import torch
 
 H, HV, K, V = 16, 32, 128, 128
+# The grid the threshold rule was declared on (evidence README); other grids get no threshold.
+DECLARED_BLOCKS = [16, 8]
+DECLARED_BATCHES = [1, 2, 3, 4, 5, 6, 8, 12, 16, 24, 32, 48, 64]
 
 
 def gpu_state() -> list[str]:
@@ -71,6 +80,60 @@ def graph_time_us(calls: Callable[[], None], layers: int, iters: int) -> float:
         times.append(start.elapsed_time(end) * 1e3 / layers)
     del graph
     return statistics.median(times)
+
+
+def declared_threshold(
+    rows: list[dict[str, Any]], blocks: list[int], batches: list[int]
+) -> dict[str, Any]:
+    """The batch threshold N* by the rule declared before the sweep ran (evidence README).
+
+    Tile 4 wins at (T, N) when it is faster than tile 32 in every repeat and the gap
+    between their medians exceeds the larger of the two tiles' repeat ranges. N*_T is
+    the largest grid batch such that tile 4 wins at it and at every smaller grid batch
+    (0 if it loses at the smallest), and N* is the smaller of N*_T over the blocks, since
+    the launch-config selection sees the batch but not the block length.
+    """
+    result: dict[str, Any] = {'wins': {}, 'n_star_by_block': {}}
+    for T in blocks:
+        star = 0
+        prefix = True
+        for n in batches:
+            by_bv = {
+                r['BV']: r for r in rows if r['T'] == T and r['N'] == n and r['path'] == 'ring'
+            }
+            narrow, wide = by_bv[4], by_bv[32]
+            spread = max(
+                narrow['us_per_layer_range'][1] - narrow['us_per_layer_range'][0],
+                wide['us_per_layer_range'][1] - wide['us_per_layer_range'][0],
+            )
+            every = all(
+                a < b
+                for a, b in zip(
+                    narrow['us_per_layer_by_repeat'], wide['us_per_layer_by_repeat'], strict=True
+                )
+            )
+            gap = wide['us_per_layer_median'] - narrow['us_per_layer_median']
+            wins = every and gap > spread
+            result['wins'][f'T{T}_N{n}'] = wins
+            prefix = prefix and wins
+            if prefix:
+                star = n
+        result['n_star_by_block'][f'T{T}'] = star
+    result['n_star'] = min(result['n_star_by_block'].values())
+    return result
+
+
+def threshold_for_grid(
+    rows: list[dict[str, Any]], blocks: list[int], batches: list[int]
+) -> dict[str, Any]:
+    """The declared threshold on the declared grid; on any other grid, none, with the reason."""
+    if sorted(blocks) == sorted(DECLARED_BLOCKS) and sorted(batches) == DECLARED_BATCHES:
+        return declared_threshold(rows, DECLARED_BLOCKS, DECLARED_BATCHES)
+    return {
+        'n_star': None,
+        'reason': f'grid differs from the declared one (blocks {DECLARED_BLOCKS}, '
+        f'batches {DECLARED_BATCHES}), so the declared rule does not apply',
+    }
 
 
 class Sweep:
@@ -155,10 +218,11 @@ class Sweep:
                     **common,
                 )
 
-        reference: list[torch.Tensor] = []
-        for bv in self.tiles:
-            self.forced = bv
-            if repeat == 0:
+        if repeat == 0:
+            # Bitwise gate before any timing: tile 32 first, as the reference.
+            reference: list[torch.Tensor] = []
+            for bv in self.tiles:
+                self.forced = bv
                 for buf in rings[0].values():
                     buf.zero_()
                 self.selected.clear()
@@ -170,13 +234,28 @@ class Sweep:
                 self.bitwise[(T, n, bv)] = all(
                     torch.equal(r, t) for r, t in zip(reference, outputs, strict=True)
                 )
+
+        def time_stock() -> None:
+            self.forced = None
+            self.selected.clear()
+            us = graph_time_us(stock_all, args.layers, args.iters)
+            self.stock_tile[(T, n)] = self.selected[0][0]
+            self.times.setdefault((T, n, 'stock', self.stock_tile[(T, n)]), []).append(us)
+
+        # The order within a point rotates with the repeat (with as many repeats as tiles,
+        # every tile takes every position once), and the stock reference alternates between
+        # the first and the last slot, so drift within a point does not favour one tile.
+        shift = repeat % len(self.tiles)
+        order = self.tiles[shift:] + self.tiles[:shift]
+        if repeat % 2:
+            time_stock()
+        for bv in order:
+            self.forced = bv
             us = graph_time_us(ring_all, args.layers, args.iters)
             self.times.setdefault((T, n, 'ring', bv), []).append(us)
+        if not repeat % 2:
+            time_stock()
         self.forced = None
-        self.selected.clear()
-        us = graph_time_us(stock_all, args.layers, args.iters)
-        self.stock_tile[(T, n)] = self.selected[0][0]
-        self.times.setdefault((T, n, 'stock', self.stock_tile[(T, n)]), []).append(us)
         line = ' '.join(
             f'{path}/{bv}={v[-1]:.1f}us'
             for (t, m, path, bv), v in self.times.items()
@@ -187,21 +266,24 @@ class Sweep:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=(__doc__ or '').split('\n\n')[0])
-    parser.add_argument('--blocks', type=int, nargs='+', default=[16, 8])
+    parser.add_argument('--blocks', type=int, nargs='+', default=DECLARED_BLOCKS)
     parser.add_argument(
         '--batches',
         type=int,
         nargs='+',
-        default=[1, 2, 3, 4, 5, 6, 8, 12, 16, 24, 32, 48, 64],
+        default=DECLARED_BATCHES,
     )
     parser.add_argument('--tiles', type=int, nargs='+', default=[4, 8, 16, 32])
     parser.add_argument('--layers', type=int, default=24, help='GDN layers of Qwen3.5-4B')
     parser.add_argument('--iters', type=int, default=50)
-    parser.add_argument('--repeats', type=int, default=3)
+    parser.add_argument('--repeats', type=int, default=4)
     parser.add_argument('--out', type=Path, required=True)
     args = parser.parse_args()
-    if 32 not in args.tiles or any(t not in (4, 8, 16, 32) for t in args.tiles):
-        parser.error('tiles must be among 4, 8, 16, 32 and include 32 (the reference)')
+    if not {4, 32} <= set(args.tiles) or any(t not in (4, 8, 16, 32) for t in args.tiles):
+        parser.error(
+            'tiles must be among 4, 8, 16, 32 and include 4 and 32 '
+            '(the declared threshold compares them)'
+        )
     if min(args.batches) < 1 or min(args.blocks) < 1 or args.layers < 1 or args.iters < 1:
         parser.error('batches, blocks, layers and iters must be positive')
     if args.repeats < 1:
@@ -240,6 +322,7 @@ def main() -> None:
                 'fastest_tile': min(by_bv, key=lambda bv: by_bv[bv]),
                 'bv4_over_bv32': by_bv[4] / by_bv[32] if 4 in by_bv else None,
             }
+    threshold = threshold_for_grid(rows, args.blocks, args.batches)
     report = {
         'shape': {'H': H, 'HV': HV, 'K': K, 'V': V, 'layers': args.layers},
         'iters': args.iters,
@@ -250,14 +333,18 @@ def main() -> None:
         'bitwise_failures': [list(key) for key in broken],
         'stock_tile': {f'T{T}_N{n}': bv for (T, n), bv in sweep.stock_tile.items()},
         'fastest': fastest,
+        'threshold': threshold,
         'rows': rows,
     }
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(report, indent=1) + '\n')
+    # A failed sweep is written under its own name, so no later analysis reads it as a result.
+    out = args.out.with_name(args.out.stem + '.failed.json') if broken else args.out
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(report, indent=1) + '\n')
     for key, entry in fastest.items():
         print(key, entry)
+    print('threshold', json.dumps(threshold))
     if broken:
-        raise SystemExit(f'tiles changed the arithmetic: {broken}')
+        raise SystemExit(f'tiles changed the arithmetic: {broken}; report in {out}')
 
 
 if __name__ == '__main__':

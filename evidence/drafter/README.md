@@ -527,8 +527,8 @@ confidence intervals.
 
 | block | c | stock y | fold y | fold/stock (range) | #133: fold/stock (range) | stock y / #133 | fold y / #133 |
 |---|---|---|---|---|---|---|---|
-| 16 | 1 | 871 | 888 | 1.020 (1.019-1.020) | 0.968 (0.966-0.970) | 0.994 | 1.047 |
-| 16 | 2 | 1,509 | 1,527 | 1.012 (1.008-1.015) | 0.983 (0.980-0.985) | 0.995 | 1.025 |
+| 16 | 1 | 870 | 887 | 1.020 (1.019-1.020) | 0.968 (0.966-0.970) | 0.994 | 1.047 |
+| 16 | 2 | 1,509 | 1,527 | 1.011 (1.008-1.015) | 0.983 (0.980-0.985) | 0.995 | 1.025 |
 | 16 | 4 | 2,441 | 2,484 | 1.018 (1.013-1.022) | 1.005 (1.000-1.010) | 1.000 | 1.013 |
 | 16 | 8 | 3,536 | 3,600 | 1.018 (1.017-1.019) | 1.061 (1.053-1.070) | 1.004 | 0.963 |
 | 8 | 1 | 765 | 775 | 1.012 (1.007-1.018) | 0.986 (0.981-0.990) | 1.003 | 1.030 |
@@ -536,7 +536,9 @@ confidence intervals.
 | 8 | 4 | 2,372 | 2,406 | 1.014 (1.009-1.020) | 1.020 (1.016-1.023) | 1.007 | 1.002 |
 | 8 | 8 | 3,647 | 3,764 | 1.032 (1.028-1.036) | 1.058 (1.050-1.066) | 1.003 | 0.979 |
 
-The first five columns are measured in this session. The #133 column is that session's
+The first five columns are measured in this session, rounded once from `check.json`'s unrounded
+means (`summary.json` rounds each run to one decimal first, so rounding its means again can move
+the last digit). The #133 column is that session's
 committed result (`fold_timing/summary.json`). The last two columns divide this session's mean y
 by #133's for the same arm. They compare two sessions and are derived and unpaired.
 
@@ -574,3 +576,36 @@ gains. That rule has not been built or measured.
         --reference evidence/drafter/fold_timing/summary.json \
         --launch-dir evidence/drafter/fold_narrow_tiles/timing/launch \
         --out evidence/drafter/fold_narrow_tiles/timing/check.json
+
+## Ring-writing verify tiles by batch: declared reading (pre-registered)
+
+Declared before `run_ring_tile_sweep.sh` ran (its exclusive ticket was still queued when this was
+committed), so that a restricted version of patch 0005 cannot be tuned on noise.
+`gdn_ring_tile_sweep.py` gives, for blocks T = 16 and 8 and batches N = 1, 2, 3, 4, 5, 6, 8, 12,
+16, 24, 32, 48 and 64, the GPU time per layer of the fold's ring-writing verify at value tiles
+4, 8, 16 and 32. There are four repeats, the tile order rotates between repeats, and every tile
+is checked bitwise against tile 32 first.
+The threshold is read as follows, on this grid only; the script applies the rule itself
+(`threshold` in `sweep.json`) and writes no threshold (`n_star` null, with the reason) for any
+other grid of blocks or batches:
+
+1. Tile 4 wins at (T, N) when it is faster than tile 32 in every repeat and the gap between the
+   two medians exceeds the larger of the two tiles' repeat ranges (maximum minus minimum).
+2. N*_T is the largest grid batch at which tile 4 wins and also wins at every smaller grid batch.
+   It is 0 if tile 4 loses at N = 1.
+3. N* is the smaller of N*_16 and N*_8, because the launch-config selection sees the batch but
+   not the block length.
+4. A restricted patch would give the ring-writing verify tile 4 for N ≤ N* and tile 32 above, on
+   sm_90 under the selection rule's existing conditions. Tiles 8 and 16 are reported (`fastest`)
+   but not used, because they have not been through the served exactness checks.
+5. If N* = 0, no restricted patch is built. If N* ≥ 8, the kernel timing contradicts the served
+   A/B above, where the narrow tiles cost the fold at c = 8, and no restricted patch is built
+   until the difference is explained.
+6. The sweep is a kernel microbenchmark on random inputs, so no served-throughput claim follows
+   from it. A restricted patch would still need the kernel parity check and a served session
+   (stock, the fold with 0001-0004, and the fold with the restricted rule, at c = 1-32 on both
+   tuned arms), which waits for main's go after the end-to-end campaigns.
+
+A sweep whose bitwise gate fails writes its report to `sweep.failed.json`, not `sweep.json`.
+
+    scripts/gpu_lock.sh -x experiments/drafter/run_ring_tile_sweep.sh ~/vp-data/drafter/ring-tile-sweep
