@@ -113,9 +113,12 @@ Secondary investigations and supporting material:
 - **Recurrent-state replay (P4).** Strict GDN state replay is bit-exact at the
   kernel level on synthetic activations and 1.22x faster than the stock kernel
   at batch 128, which derives to about 1.08x per decode step, below the
-  pre-registered 1.10x. The served A/B test has no valid run: both attempts were
-  void, and the record keeps them with the amendments declared before each rerun
-  (`evidence/moonshot/`).
+  pre-registered 1.10x. The served A/B test (P4b, four pairs at exactly 128
+  running requests) rejects the claim: exact replay decoded 1.0042x as fast as
+  dense decoding (95% interval 1.0026-1.0058), and the output probe found no
+  difference. About 6.5% of the kernel's saving reached the server. Three
+  earlier attempts were void; the record keeps them with the amendments declared
+  before each rerun (`evidence/moonshot/`).
 - **Backbone GEMMs.** A routing table that sends each projection to SGLang's
   Hopper GEMV at one row, a Triton kernel with programmatic dependent launch at
   2-16 rows and a packed GDN input projection from 64 rows serves tuned plain
