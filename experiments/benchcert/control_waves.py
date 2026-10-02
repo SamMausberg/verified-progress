@@ -552,9 +552,19 @@ def stats_compare(out: Path, reference: Path) -> dict[str, Any]:
         }
     verify_rows = paths.get('verify', {}).get('rows', 0)
     identical = all(r['identical'] == r['prompts'] for r in pairs.values())
+    # The reading needs every host-gated step counted on every path, and each run's two
+    # passes identical (the cert arm's, and the reference stock run's).
+    covered = all(p['uncounted_calls'] == 0 for p in paths.values())
+    stable = all(
+        pair_outputs(runs[0], runs[1])['identical'] == len(runs[0]) for runs in (cert, stock)
+    )
     # Counted over the server's life, warm-up included: the waves' own verifies are not
     # separable here (tokens_compare counts them wave by wave).
-    if verify_rows == 0:
+    if not covered:
+        reading = 'incomplete: host-gated certified steps without device calls'
+    elif not stable:
+        reading = 'baseline failed: a run differs between its two passes; no reading'
+    elif verify_rows == 0:
         reading = 'no certified verify row: a silent fallback to the stock head'
     elif identical:
         reading = (
@@ -567,7 +577,8 @@ def stats_compare(out: Path, reference: Path) -> dict[str, Any]:
         'reading_rule': (__doc__ or '').split('Counter rerun (set before it ran):')[1].strip(),
         'reference': str(reference),
         'paths': paths,
-        'uncounted_calls_zero': all(p['uncounted_calls'] == 0 for p in paths.values()),
+        'uncounted_calls_zero': covered,
+        'passes_identical': stable,
         'against_stock': pairs,
         'reading': reading,
     }

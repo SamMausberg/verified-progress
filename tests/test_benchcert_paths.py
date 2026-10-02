@@ -208,6 +208,16 @@ def test_stats_compare_reads_counters_and_compares_with_stock(tmp_path: Path) ->
     stats['paths']['verify']['rows'] = 0
     (out / 'certstats' / 'certified_stats.json').write_text(json.dumps(stats))
     assert control_waves.stats_compare(out, ref)['reading'].startswith('no certified verify row')
+    # Any uncounted call on any path withholds the reading.
+    stats['paths']['verify'].update(rows=40, calls=9)
+    (out / 'certstats' / 'certified_stats.json').write_text(json.dumps(stats))
+    assert control_waves.stats_compare(out, ref)['reading'].startswith('incomplete')
+    # So does a run whose two passes differ.
+    stats['paths']['verify']['calls'] = 10
+    (out / 'certstats' / 'certified_stats.json').write_text(json.dumps(stats))
+    unstable = [dict(x, output_ids=[9]) if x['rep'] == 1 else x for x in records]
+    (ref / 'stock' / 'outputs.jsonl').write_text(''.join(json.dumps(x) + '\n' for x in unstable))
+    assert control_waves.stats_compare(out, ref)['reading'].startswith('baseline failed')
 
 
 def test_stats_delta_counts_only_the_steps_between_snapshots() -> None:
