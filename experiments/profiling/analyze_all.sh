@@ -18,7 +18,7 @@ run() { python "$REPO/experiments/profiling/$1" "${@:2}"; }
 have() { [ -e "$1" ] || { echo "skip: $1 missing"; return 1; }; }
 
 # Attribution per configuration.
-for arm_kind in plain:plain mtp:spec dflash16:dflash dflash8:dflash; do
+for arm_kind in plain:plain mtp:spec dflash-tuned-b16:dflash dflash-tuned:dflash; do
   arm="${arm_kind%%:*}" kind="${arm_kind##*:}"
   for rep in "$VP_DATA/${arm}_nsys/${arm}"_bs*.nsys-rep; do
     have "$rep" || continue
@@ -30,7 +30,8 @@ done
 # Client windows, server commands and startup logs.
 for rundir in plain_nsys mtp_nsys plain_none mtp_none plain_sglang mtp_sglang \
   plain_nsys_graphtrace mtp_nsys_graphtrace plain_eager_nsys mtp_eager_nsys \
-  mtp_nsys_hosttrace plain_nsys_hosttrace dflash16_nsys dflash8_nsys; do
+  mtp_nsys_hosttrace plain_nsys_hosttrace dflash-tuned-b16_nsys dflash-tuned-b16_none \
+  dflash-tuned_nsys dflash-tuned_none; do
   have "$VP_DATA/$rundir/windows.jsonl" || continue
   run collect_run.py "$VP_DATA/$rundir" --name "$rundir" --evidence "$EV/windows"
 done

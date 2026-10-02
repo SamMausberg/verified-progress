@@ -69,10 +69,14 @@ step() {
       prof --arm plain --mode nsys --host-trace --py-spy --concurrency 1 \
         --out-dir "$VP_DATA/plain_nsys_hosttrace" ;;
     dflash)
-      prof --arm dflash16 --mode nsys --concurrency 1 4 16 64 \
-        --out-dir "$VP_DATA/dflash16_nsys"
-      prof --arm dflash8 --mode nsys --concurrency 1 4 16 64 \
-        --out-dir "$VP_DATA/dflash8_nsys" ;;
+      # The serving benchmark's two tuned DFlash arms (bench/arms.toml): traced
+      # windows for the attribution, then untraced windows for the cycle time.
+      for arm in dflash-tuned-b16 dflash-tuned; do
+        prof --arm "$arm" --mode nsys --concurrency 1 4 16 64 \
+          --out-dir "$VP_DATA/${arm}_nsys"
+        prof --arm "$arm" --mode none --concurrency 1 4 16 64 --repeats 3 \
+          --out-dir "$VP_DATA/${arm}_none"
+      done ;;
     gdn) "${LOCK[@]}" python experiments/profiling/gdn_kernel_bench.py \
       --out evidence/profiles/gdn_kernel_bench.json ;;
     ncu) "${LOCK[@]}" experiments/profiling/run_ncu.sh ;;
