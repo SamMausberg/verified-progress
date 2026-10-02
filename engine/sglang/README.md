@@ -297,3 +297,18 @@ SGLANG_WORKTREE=~/sglang-wt/stack source scripts/sglang_env.sh
 The composed tree is `628f650ea031b0fc8a68233ff10d8878eb22686d`. The kernel series (0001,
 0004-0006) and the drafter's 0001-0003 are on `main`; the kernel's later 0007-0010 and the
 drafter's 0004-0005 are not part of the composed engine.
+
+## lossy (`patches/lossy/0001`, branch `engine/lossy`, head `57560de690`)
+
+One patch on `bd66ce343e`, needed to serve the INT4 DFlash drafter
+(`nota-ai/Qwen3.5-4B-DFlash-GPTQ-W4A16`) used by the lossy-lever study (`experiments/lossy/`):
+
+```sh
+scripts/sglang_worktree.sh lossy
+git -C ~/sglang-wt/lossy am "$PWD"/engine/sglang/patches/lossy/0001-*.patch
+SGLANG_WORKTREE=~/sglang-wt/lossy source scripts/sglang_env.sh
+```
+
+| Patch | What it changes | Default behaviour |
+|---|---|---|
+| 0001 | `DFlashDraftModel` builds its context projection `fc` as a `ReplicatedLinear` with the draft's quantization config whenever one is set, and refuses to load a checkpoint that leaves any `fc` parameter unset. Without it, a compressed-tensors drafter stores `fc` as `weight_packed`/`weight_scale`, which match no parameter of the plain `nn.Linear`; the loader skips them silently and `fc.weight` keeps uninitialised memory. | unquantized drafters (no quantization config) build and load `fc` exactly as before |

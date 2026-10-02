@@ -215,3 +215,99 @@ speculative-draft-model-revision = "9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf"
 speculative-dflash-block-size = 4
 disable-radix-cache = true
 max-mamba-cache-size = 128
+
+# ---------------------------------------------------------------------------
+# Lossy arms (experiments/lossy/README.md). Each changes the model's arithmetic
+# by design and is reported only with its quality measurement. The INT4 DFlash
+# arms need the quantized-projection fix in engine/sglang/patches/lossy/ (run
+# with SGLANG_WORKTREE pointing at a tree that has it); the others run on the pin.
+# ---------------------------------------------------------------------------
+
+[arms.int4-dflash-b16]
+description = """INT4 QAD target (nota-ai, W4A16, group 32) with its INT4 DFlash drafter \
+(GPTQ W4A16, group 128), block 16, Triton attention; flags as dflash-tuned-b16."""
+model = "nota-ai/Qwen3.5-4B-QAD-W4A16"
+revision = "a67b0fedb2b39cb057da6114e656b76b52d321b4"
+max_concurrency = 64
+exactness = "lossy"
+lossy = "INT4 weight-only target (quantization-aware distilled) and INT4 drafter"
+[arms.int4-dflash-b16.args]
+speculative-algorithm = "DFLASH"
+speculative-draft-model-path = "nota-ai/Qwen3.5-4B-DFlash-GPTQ-W4A16"
+speculative-draft-model-revision = "c5fb290e47e30c81d06e48b0495ec06f2560dd4e"
+speculative-dflash-block-size = 16
+disable-radix-cache = true
+max-mamba-cache-size = 64
+max-running-requests = 64
+attention-backend = "triton"
+
+[arms.int4-dflash-b8]
+description = """INT4 QAD target with its INT4 DFlash drafter, block 8, FA4 draft \
+attention, FlashInfer target attention, capacity 128; flags as dflash-tuned."""
+model = "nota-ai/Qwen3.5-4B-QAD-W4A16"
+revision = "a67b0fedb2b39cb057da6114e656b76b52d321b4"
+exactness = "lossy"
+lossy = "INT4 weight-only target (quantization-aware distilled) and INT4 drafter"
+[arms.int4-dflash-b8.args]
+speculative-algorithm = "DFLASH"
+speculative-draft-model-path = "nota-ai/Qwen3.5-4B-DFlash-GPTQ-W4A16"
+speculative-draft-model-revision = "c5fb290e47e30c81d06e48b0495ec06f2560dd4e"
+speculative-dflash-block-size = 8
+speculative-draft-attention-backend = "fa4"
+disable-radix-cache = true
+max-mamba-cache-size = 128
+
+[arms.plain-cap256]
+description = "plain-tuned with capacity 256 (radix cache off, one GDN state slot per request)."
+max_concurrency = 256
+exactness = "stock"
+[arms.plain-cap256.args]
+disable-radix-cache = true
+max-running-requests = 256
+max-mamba-cache-size = 256
+
+[arms.replayssm-cap256]
+description = "plain-tuned-replayssm with capacity 256."
+max_concurrency = 256
+exactness = "exact-up-to-rounding"
+exactness_note = "flags of plain-tuned-replayssm (exact-up-to-rounding, equality report 2026-10-01) plus capacity flags only"
+[arms.replayssm-cap256.args]
+disable-radix-cache = true
+max-running-requests = 256
+max-mamba-cache-size = 256
+enable-linear-replayssm = true
+
+[arms.int4-plain-cap256]
+description = "INT4 QAD target, plain decoding, capacity 256; flags as plain-cap256."
+model = "nota-ai/Qwen3.5-4B-QAD-W4A16"
+revision = "a67b0fedb2b39cb057da6114e656b76b52d321b4"
+max_concurrency = 256
+exactness = "lossy"
+lossy = "INT4 weight-only target (quantization-aware distilled)"
+[arms.int4-plain-cap256.args]
+disable-radix-cache = true
+max-running-requests = 256
+max-mamba-cache-size = 256
+
+[arms.plain-cap256-fp16]
+description = "plain-cap256 with the GDN recurrent state stored in FP16 (checkpoint: FP32)."
+max_concurrency = 256
+exactness = "lossy"
+lossy = "FP16 GDN recurrent state"
+[arms.plain-cap256-fp16.args]
+disable-radix-cache = true
+max-running-requests = 256
+max-mamba-cache-size = 256
+mamba-ssm-dtype = "float16"
+
+[arms.replayssm-cap256-fp16]
+description = "replayssm-cap256 with the GDN recurrent state stored in FP16."
+max_concurrency = 256
+exactness = "lossy"
+lossy = "FP16 GDN recurrent state"
+[arms.replayssm-cap256-fp16.args]
+disable-radix-cache = true
+max-running-requests = 256
+max-mamba-cache-size = 256
+enable-linear-replayssm = true
+mamba-ssm-dtype = "float16"
