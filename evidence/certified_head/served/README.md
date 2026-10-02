@@ -752,13 +752,13 @@ plain decoding's fallback rates on every path. The check launches measured more 
 DFlash rows (verify 3-4% of rows), and because a call falls back when any of its rows
 does, the share of calls needing a fallback grows with the batch:
 
-| Path | Calls with a fallback, by concurrency (check launches) |
+| Path | Calls with a fallback, by concurrency (complete check launches, `check2`) |
 |---|---|
 | plain decode | 2% (c = 1), 14% (8), 61% (64) |
-| MTP verify | 8% (1), 26% (4), 59% (16), 67% (64; mostly gated off) |
+| MTP verify | 8% (1), 26% (4), 61% (16), 63% (64; mostly gated off) |
 | MTP draft | 2% (1), 10% (4), 32% (16), 76% (64) |
-| block 16 verify / draft projection | 42% / 37% (1), 64% / 58% (2), 83% / 75% (4) |
-| block 8 verify / draft projection | 20% / 12% (1), 55% / 35% (4), 70% / 45% (8) |
+| block 16 verify / draft projection | 42% / 37% (1), 64% / 58% (2), 82% / 76% (4) |
+| block 8 verify / draft projection | 20% / 12% (1), 54% / 31% (4), 71% / 45% (8) |
 
 Most of these are near ties completed by the per-position fallback; a few percent of
 calls had a row whose candidate list overflowed and took the whole-batch fallback
