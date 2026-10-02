@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # BF16 references at the two gross positions (shared lane, untimed; evidence/bf16_paths/README.md):
 #
-#   scripts/gpu_lock.sh -s experiments/bf16_paths/hold.sh [all|hf|sglang|perturb|perturb_gdn|rates ...]
+#   scripts/gpu_lock.sh -s experiments/bf16_paths/hold.sh [all|hf|sglang|perturb|perturb_gdn|rates|rates_eot ...]
 #
 # hf: transformers' Qwen3.5 in BF16 on the GPU (hf_paths.py), with its torch GDN kernels and
 #   then with flash-linear-attention 0.5.2's (installed with --no-deps into $out/pydeps and
@@ -17,15 +17,17 @@
 # rates: whole outputs of 12 workload prompts (rates.py): SGLang's default variant decodes
 #   and prefills them, transformers BF16 reads the same text (torch GDN with FP32 and BF16
 #   cached state, fla GDN with FP32 state),
-#   FP32 on the CPU scores every path's top-1.
+#   FP32 on the CPU scores every path's top-1. rates_eot: the same on 12 prompts whose recorded
+#   output ends its text before position 400, decoded for 768 tokens, so the text after the end
+#   of text (where both events lie) is sampled; transformers with an FP32 state only.
 # Targets: ~/vp-data/exactness/paths/targets.jsonl (paths.py `targets`), copied once and hashed.
 # Output: ~/vp-data/upstream/bf16 (BF16_PATHS_OUT); log in logs/hold-<UTC>.log.
 set -euo pipefail
 steps=" ${*:-all} "
 for step in $steps; do
   case "$step" in
-    all | hf | sglang | perturb | perturb_gdn | rates) ;;
-    *) echo "usage: $0 [all|hf|sglang|perturb|perturb_gdn|rates ...]"; exit 64 ;;
+    all | hf | sglang | perturb | perturb_gdn | rates | rates_eot) ;;
+    *) echo "usage: $0 [all|hf|sglang|perturb|perturb_gdn|rates|rates_eot ...]"; exit 64 ;;
   esac
 done
 want() { [[ $steps == *" all "* || $steps == *" $1 "* ]]; }
@@ -40,7 +42,7 @@ source "$repo/scripts/sglang_env.sh"
 python -c 'import sglang, torch, transformers' || { echo "not the SGLang environment: $(command -v python)"; exit 1; }
 [ -z "$(git status --porcelain --untracked-files=all)" ] || { echo "checkout not clean"; exit 65; }
 for done_file in hf:hf_bf16_torch.json sglang:default.json perturb:perturb.json \
-  perturb_gdn:perturb_gdn.json rates:rates/prompts.jsonl; do
+  perturb_gdn:perturb_gdn.json rates:rates/prompts.jsonl rates_eot:rates_eot/prompts.jsonl; do
   if want "${done_file%%:*}" && [ -e "$out/${done_file#*:}" ]; then
     echo "$out/${done_file#*:} exists: ${done_file%%:*} already run"; exit 65
   fi
@@ -58,6 +60,7 @@ sha256sum "$out/targets.jsonl"
 kill_servers() {
   python -m experiments.bf16_paths.sglang_variants stop --out "$out" || true
   python -m experiments.bf16_paths.sglang_variants stop --out "$out/rates" || true
+  python -m experiments.bf16_paths.sglang_variants stop --out "$out/rates_eot" || true
   pkill -TERM -f -- 'sglang.launch_server.* --port (30240)( |$)' || true
   sleep 5
   pkill -KILL -f -- 'sglang.launch_server.* --port (30240)( |$)' || true
@@ -114,9 +117,12 @@ if want perturb_gdn; then
     --targets "$out/targets.jsonl" --out "$out/perturb_gdn.json" --seeds 8 --threads 8 \
     --fp32 "$HOME/vp-data/exactness/paths/fp32.json" || status=1
 fi
-if want rates; then
-  r="$out/rates"
-  python -m experiments.bf16_paths.rates prompts --out "$r" --count 12
+# run_rates DIR STATES PROMPT-ARGS...: rates.py's steps into DIR; transformers with its torch GDN
+# for each cached-state dtype in STATES, then with fla and an FP32 state; FP32 last.
+run_rates() {
+  local r=$1 states=$2
+  shift 2
+  python -m experiments.bf16_paths.rates prompts --out "$r" "$@"
   if GPU_STARTUP_MIN_FREE_GB=${GPU_STARTUP_MIN_FREE_GB:-48} GPU_STARTUP_TRIES=${GPU_STARTUP_TRIES:-10} \
     scripts/gpu_startup_lock.sh \
     python -m experiments.bf16_paths.sglang_variants start --variant default --out "$r"; then
@@ -126,19 +132,24 @@ if want rates; then
     echo "rates server failed to start"; status=1
   fi
   python -m experiments.bf16_paths.sglang_variants stop --out "$r"
-  if [ -e "$r/sglang.jsonl.gz" ]; then
-    for state in float32 model; do
-      timeout --foreground 900 python -m experiments.bf16_paths.rates hf --out "$r" --state-dtype "$state" || status=1
-    done
-    if [ -d "$out/pydeps/fla_core-$fla_version.dist-info" ]; then
-      PYTHONPATH="$out/pydeps" timeout --foreground 900 python -m experiments.bf16_paths.rates hf --out "$r" \
-        --state-dtype float32 || status=1
-    else
-      echo "no fla $fla_version: fla rates skipped"; status=1
-    fi
-    timeout --foreground 1200 taskset -c 32-39 python -m experiments.bf16_paths.rates fp32 --out "$r" \
-      --threads 8 || status=1
+  [ -e "$r/sglang.jsonl.gz" ] || return 0
+  for state in $states; do
+    timeout --foreground 1200 python -m experiments.bf16_paths.rates hf --out "$r" --state-dtype "$state" || status=1
+  done
+  if [ -d "$out/pydeps/fla_core-$fla_version.dist-info" ]; then
+    PYTHONPATH="$out/pydeps" timeout --foreground 1200 python -m experiments.bf16_paths.rates hf --out "$r" \
+      --state-dtype float32 || status=1
+  else
+    echo "no fla $fla_version: fla rates skipped"; status=1
   fi
+  timeout --foreground 1200 taskset -c 32-39 python -m experiments.bf16_paths.rates fp32 --out "$r" \
+    --threads 8 || status=1
+}
+if want rates; then
+  run_rates "$out/rates" "float32 model" --count 12
+fi
+if want rates_eot; then
+  run_rates "$out/rates_eot" "float32" --count 12 --output-len 768 --eot-before 400
 fi
 echo "bf16 paths hold (${steps# }) end $(date -Is) exit $status"
 nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader || true

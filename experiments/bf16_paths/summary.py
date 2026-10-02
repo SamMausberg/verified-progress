@@ -11,8 +11,9 @@ absolute difference from FP32's one forward on those tokens, and FP32's own top 
 minus FP32's logprob of the path's top-1 (how much worse, by FP32, the token the path puts
 on top is: 0 when the path's top-1 is FP32's). Before the target it gives the largest
 absolute difference from FP32 on the recorded token's logprob over the traced positions.
-Every expected file must exist; a missing transformers run or variant is an error unless
-named with `--allow-missing`.
+It also condenses `perturb.py`'s runs (`perturb.json`, `perturb_gdn.json`): per target, the
+tracked tokens' range over the seeds and the control change before the target. Every
+expected file must exist; a missing one is an error unless named with `--allow-missing`.
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 HF_RUNS = ('hf_bf16_torch', 'hf_bf16_torch_fp32state', 'hf_bf16_fla', 'hf_bf16_fla_fp32state')
+PERTURB_SITES = ('perturb', 'perturb_gdn')
 VARIANTS = (
     'default',
     'prefill_triton',
@@ -107,7 +109,55 @@ def summary(paths: Path, out: Path, allow_missing: set[str]) -> dict[str, Any]:
             for path, trace in by_id[tid]['paths'].items():
                 result['paths'][f'{source}/{path}'] = readout(trace, reference, pos, track)
         rows.append(result)
-    return {'meta': meta, 'targets': rows}
+    perturbation = {}
+    for site in PERTURB_SITES:
+        file = out / f'{site}.json'
+        if not file.exists():
+            if site in allow_missing:
+                continue
+            raise SystemExit(f'{file} missing (name it with --allow-missing to skip)')
+        perturbation[site] = perturbed(load(file))
+    return {'meta': meta, 'targets': rows, 'perturbation': perturbation}
+
+
+def perturbed(data: dict[str, Any]) -> dict[str, Any]:
+    """Per target: the unperturbed and each seed's top-1 and tracked logprobs at the target,
+    each tracked token's range over the seeds, and the largest change over the seeds of the
+    recorded token's logprob at the positions before the target (the control)."""
+    targets = {}
+    for result in data['results']:
+        pos, track = result['position'], result['track']
+        runs = result['runs']
+        seeds = [name for name in runs if name != 'none']
+        at = {
+            name: {
+                'top1': runs[name][str(pos)]['top1'],
+                'tracked': {
+                    str(t): round(runs[name][str(pos)]['tracked'][str(t)], 4) for t in track
+                },
+            }
+            for name in runs
+        }
+        first = min(int(p) for p in runs['none'])
+        control = max(
+            abs(runs[name][str(p)]['token_logprob'] - runs['none'][str(p)]['token_logprob'])
+            for name in seeds
+            for p in range(first, pos)
+        )
+        targets[result['id']] = {
+            'position': pos,
+            'at_target': at,
+            'range_over_seeds': {
+                str(t): [
+                    round(min(runs[n][str(pos)]['tracked'][str(t)] for n in seeds), 4),
+                    round(max(runs[n][str(pos)]['tracked'][str(t)] for n in seeds), 4),
+                ]
+                for t in track
+            },
+            'top1_over_seeds': sorted({runs[n][str(pos)]['top1'] for n in seeds}),
+            'max_abs_change_recorded_before': round(control, 4),
+        }
+    return {'meta': data['meta'], 'targets': targets}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -115,7 +165,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--paths', type=Path, required=True, help='paths.py output (FP32, stock)')
     parser.add_argument('--out', type=Path, required=True, help='hold.sh output')
     parser.add_argument('--json', type=Path, required=True)
-    parser.add_argument('--allow-missing', nargs='*', default=[], choices=(*HF_RUNS, *VARIANTS))
+    parser.add_argument(
+        '--allow-missing', nargs='*', default=[], choices=(*HF_RUNS, *VARIANTS, *PERTURB_SITES)
+    )
     args = parser.parse_args(argv)
     result = summary(args.paths, args.out, set(args.allow_missing))
     args.json.parent.mkdir(parents=True, exist_ok=True)

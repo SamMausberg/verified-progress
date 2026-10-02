@@ -85,10 +85,7 @@ def write_gz(path: Path, rows: list[dict[str, Any]]) -> None:
             handle.write(json.dumps(row) + '\n')
 
 
-def test_rates_summary_counts_regret_by_region(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(rates, 'OUTPUT_LEN', 3)
+def test_rates_summary_counts_regret_by_region(tmp_path: Path) -> None:
     output = [5, rates.EOT[0], 6]
     good = [[-0.1, 7], [-3.0, 8]]
     bad = [[-0.1, 8], [-3.0, 7]]
@@ -114,8 +111,11 @@ def test_rates_summary_counts_regret_by_region(
     result = rates.summary(tmp_path)
     assert result['positions'] == {'before_eot': 2, 'after_eot': 1}
     decode = result['counts']['sglang/decode']
-    assert decode['regret_above']['after_eot'] == {'0.5': 1, '1.0': 1, '2.0': 1, '5.0': 0}
-    assert decode['regret_above']['before_eot']['0.5'] == 0
+    after = decode['regret_above']['after_eot']
+    assert (after['0.5'], after['1.0'], after['2.0'], after['5.0']) == (1, 1, 1, 0)
+    assert decode['regret_above']['before_eot']['0.05'] == 0  # the path's top-1 is FP32's there
+    # FP32's top-1 (7) at -0.05 against the path's -0.1 (two positions) and -3.0 (one).
+    assert decode['fp32_top1_logprob_abs_diff']['max'] == pytest.approx(2.95)
     assert decode['top1_differs'] == {'before_eot': 0, 'after_eot': 1}
     assert result['worst']['sglang/decode'][0]['regret'] == pytest.approx(2.55)
     assert result['decision']['sglang_events'] == 1
@@ -125,3 +125,31 @@ def test_rates_summary_requires_every_source(tmp_path: Path) -> None:
     write_gz(tmp_path / 'sglang.jsonl.gz', [{'prompt': 'a'}])
     with pytest.raises(SystemExit, match='missing'):
         rates.summary(tmp_path)
+
+
+def test_perturbed_reports_seed_range_and_control() -> None:
+    def run(target_lp: float, before_lp: float) -> dict[str, Any]:
+        return {
+            '4': entry({1: before_lp, 2: -9.0}, 1),
+            '5': entry({1: target_lp, 2: -1.0}, 1),
+        }
+
+    data = {
+        'meta': {'site': 'gdn'},
+        'results': [
+            {
+                'id': 't',
+                'position': 5,
+                'track': [1, 2],
+                'runs': {
+                    'none': run(-0.5, -0.01),
+                    'seed_0': run(-0.4, -0.02),
+                    'seed_1': run(-3.0, -0.01),
+                },
+            }
+        ],
+    }
+    out = summary.perturbed(data)['targets']['t']
+    assert out['range_over_seeds']['1'] == [-3.0, -0.4]
+    assert out['top1_over_seeds'] == [1, 2]
+    assert out['max_abs_change_recorded_before'] == pytest.approx(0.01)
