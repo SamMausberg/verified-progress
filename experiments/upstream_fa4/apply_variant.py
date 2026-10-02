@@ -10,15 +10,17 @@ form (and comment line) of each fix:
 - `ceil_div`: sgl-project/sglang#35757 (head c378afffbe), `cute.ceil_div(n, t)`;
 - `max_one`: sgl-project/sglang#42019 (head 5d452c36de), `max(1, n // t)`.
 
-Prints the sha256 of the resulting file.
+Prints the sha256 of the resulting file. With --check it changes nothing and fails unless the
+tree's file is exactly what the variant gives from the tree's committed paged_kv.py.
 
-    python experiments/upstream_fa4/apply_variant.py <SGLang tree> <variant>
+    python experiments/upstream_fa4/apply_variant.py [--check] <SGLang tree> <variant>
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import subprocess
 from pathlib import Path
 
 PAGED_KV = 'python/sglang/kernels/ops/attention/flash_attn/cute/paged_kv.py'
@@ -45,13 +47,23 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument('tree', type=Path)
     ap.add_argument('variant', choices=sorted(VARIANTS))
+    ap.add_argument('--check', action='store_true', help='verify the file instead of writing it')
     args = ap.parse_args()
     path = args.tree / PAGED_KV
-    text = path.read_text()
-    if text.count(FLOOR) != 1:
-        raise SystemExit(f'{path}: expected the floor-division line exactly once')
-    text = text.replace(FLOOR, VARIANTS[args.variant])
-    path.write_text(text)
+    base = subprocess.run(
+        ['git', '-C', str(args.tree), 'show', f'HEAD:{PAGED_KV}'],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    if base.count(FLOOR) != 1:
+        raise SystemExit(f'{path}: expected the floor-division line exactly once at HEAD')
+    text = base.replace(FLOOR, VARIANTS[args.variant])
+    if args.check:
+        if path.read_text() != text:
+            raise SystemExit(f'{path}: not the {args.variant} variant of HEAD')
+    else:
+        path.write_text(text)
     print(hashlib.sha256(text.encode()).hexdigest(), path)
 
 

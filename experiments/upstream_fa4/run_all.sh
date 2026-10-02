@@ -34,6 +34,7 @@ for v in main ceil ceil_div max_one; do
   want='python/sglang/kernels/ops/attention/flash_attn/cute/paged_kv.py '
   [ "$v" = main ] && want=''
   [ "$changed" = "$want" ] || { echo "$t: unexpected changes: '$changed'" >&2; exit 1; }
+  python "$exp/apply_variant.py" --check "$t" "$v" >/dev/null || exit 1
 done
 [ "$(git -C "$trees/flash-attention" rev-parse HEAD)" = "$fa_commit" ] || { echo "flash-attention not at $fa_commit" >&2; exit 1; }
 [ -z "$(git -C "$trees/flash-attention" status --porcelain --untracked-files=no)" ] || { echo "flash-attention has local edits" >&2; exit 1; }
