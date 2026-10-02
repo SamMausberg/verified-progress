@@ -20,7 +20,9 @@ workload (`bench/`, mixed-v2 confirm split, 512 output tokens). Labels as elsewh
 - **Composed result** (measured, three sessions, `composition.json`). The full stack is
   FULL = FGH: the snapshot-free verify (F), the backbone GEMM routing table (G) and the
   certified head (H) all passed the equality step, and together they are
-  exact-up-to-rounding against stock DFlash block 16. Against tuned DFlash-16 (S0) it
+  exact-up-to-rounding against stock DFlash block 16 (classified in the equality step: 320
+  prompts of 256 tokens at c = 1, running limit 4, the runner's default pools; the timed
+  sessions' outputs were not compared). Against tuned DFlash-16 (S0) it
   loses at low concurrency and gains at c = 8. The per-user rate at c = 1, P2's latency
   question, falls to 0.986x (95% interval 0.982-0.989, a decided slowdown), and to 0.972x
   at c = 2. It rises to 1.013x at c = 4, and throughput at c = 8 rises to 1.073x
@@ -39,16 +41,22 @@ workload (`bench/`, mixed-v2 confirm split, 512 output tokens). Labels as elsewh
   session: at the tuned arm's full capacity the certified head's verify CUDA graphs need
   about 3.2 GB more than stock, and with the stock verify's 48.75 GB per-position state
   cache there is no room for it. With F that cache is gone and FGH starts. By the declared
-  rule H's own ratio is void (n = 0). Inside the stack, FGH against FG is +1.1% at c = 1
-  and within 0.7% of zero at c = 2-8, a reading from an unbalanced order, not a test.
+  rule H's own ratio is void (n = 0). Inside the stack, FGH against FG is +1.1% at c = 1,
+  +0.1% at c = 2 and -0.7% at c = 4 (below 1 in every session); at c = 8 (-0.3%) most
+  verifies have 128 rows, above H's declared 64-row limit, so the stock head runs them.
+  This is a reading from an unbalanced order, not a test.
 - **Gap to 5x** (derived from the measured ratio): FULL leaves a factor of 5.07 to the goal
   at c = 1 and 4.64 at c = 8. The ceilings (`ceiling.json`, derived) are unchanged: an
   engine running the current drafter at the HBM bandwidth floor, with no host idle and no
   per-position state, would decode 1.81x faster than tuned DFlash-16 at c = 1 and 3.15x
   at c = 8, at the measured 5.7 tokens per cycle; at c = 1, 5x needs 15.8 of a block-16
-  cycle's 16 tokens at that floor. The measured levers recover little of the engine-side
-  room (1.08x per user at c = 8 against that 3.15x, and a loss at c = 1), and even all of
-  it would leave most of the gap: drafting, not the engine, is the binding constraint.
+  cycle's 16 tokens at that floor. The levers this stack could time recover little of the
+  engine-side room (1.08x per user at c = 8 against that 3.15x, and a loss at c = 1), and
+  even all of it would leave most of the gap, so by these derived bounds drafting, not the
+  engine, is the binding constraint. The stack ran on block 16 only; at c = 8 the
+  throughput envelope's arm is block 8 (`dflash-tuned`), where F alone measured 1.058x in
+  the drafter's single session (`evidence/drafter/fold_timing/summary.json`), and no
+  composed stack was timed there.
 - **Inventory** (`levers.csv`, 29 levers). At c = 1-8, the tuned DFlash arms already
   contain the levers with served gains: block 16, Triton target and draft attention, the
   Triton GDN verify kernel (SGLang's default verify kernel on sm_90, so the 2x of repair's
@@ -389,13 +397,16 @@ c = 1 (`equality/table.csv`, `equality/gate.json`):
 | H and FGH in check mode | 0 of 249,392 and 0 of 250,464 certified verify rows differ from the stock head; 3.8% of rows and 42% of verify calls fell back to the stock head for some columns |
 
 FULL is therefore exact-up-to-rounding against stock DFlash block 16: G's GEMMs round
-differently, F is bitwise and H changes no token.
+differently, F is bitwise and H changes no token. The class has the equality step's scope
+(these 320 prompts at c = 1, running limit 4, the runner's default pools); the timed
+sessions ran at running limit 64 and c up to 8 and did not compare outputs.
 
 ### Step 2: timed sessions (`points.csv`, `composition.json`, `composition.csv`)
 
 Every session is valid for FULL against S0 and for every arm but H: each has 32 of 32
-points valid (64 of 64 requests completed, no output of the wrong length, foreign CPU at
-most 1.6 cores on average), and every launch exited cleanly except H's. H failed to start
+points valid (64 of 64 requests completed, no output of the wrong length, foreign CPU load
+averaging at most 0.39 cores per point, with a one-second peak of 1.6), and every launch
+exited cleanly except H's. H failed to start
 in all three sessions (below), so each session has eight launches. No replacement session
 was needed, and the analysis admitted s1-s3 at every concurrency.
 
@@ -443,14 +454,18 @@ decided +0.9% at c = 1 comes mostly from acceptance, not from faster GEMMs. FULL
 2.2% per cycle on the same proxy. The interaction above compares arms that share G's
 acceptance, so it is not an acceptance effect.
 
-**Drift within a session** (`drift.csv`, `position.csv`, post hoc). S0's last launch
-differs from its first by at most 1.2% (s2: +0.4% at c = 2, +0.9% at c = 4 and +1.2% at
-c = 8, the last launch faster), and FULL's two launches by at most 3.1% (s3, c = 4, the
-second launch faster, with a lower time to first token). The A-B-B-A pairing cancels a
-linear drift for FULL against S0. The single middle arms are compared with mean(S0), so a
+**Drift and launch-to-launch variation** (`drift.csv`, `position.csv`, post hoc). S0's
+last launch differs from its first by at most 1.2% (s2: +0.4% at c = 2, +0.9% at c = 4 and
++1.2% at c = 8, the last launch faster). The A-B-B-A pairing cancels a linear drift of
+this kind for FULL against S0. The single middle arms are compared with mean(S0), so a
 drift biases them by their position in the order, which s2 reverses; dividing each by S0
 interpolated in time to its own launch instead changes no arm's mean ratio by more than
-0.2%.
+0.2%. FULL's two launches differ by up to 3.1% (s3, c = 4), but that is variation between
+launches, not drift: s3's two FULL launches sit either side of s1's and s2's FULL level
+(throughput at c = 4: 2,423.5 and 2,482.9 against 2,446.7 and 2,455.7), with times to first
+token at c = 1 of 42.3 and 37.8 ms. FULL's servers also vary at start-up: their
+verify-graph captures span 6.06-6.22 GB across the six launches, while S0's take 2.91 GB
+every time (`startup_memory.csv`). The session ratio averages both launches.
 
 ### H: not timed alone, a memory cost at full capacity
 
@@ -480,7 +495,10 @@ A reading, neither declared nor a test: FGH against FG within each session
 (`last_lever.csv`) estimates H on top of F and G. The order is unbalanced (FG runs once,
 in the middle; FGH second and second to last), so drift within a session enters it. It
 is +1.1% at c = 1 (1.009, 1.013 and 1.013 in the three sessions), +0.1% at c = 2, -0.7% at
-c = 4 and -0.3% at c = 8 for the per-user rate. The two arms accept the same tokens per
+c = 4 (0.990, 0.994 and 0.994: below 1 in every session) and -0.3% at c = 8 for the
+per-user rate. By H's declared 64-row limit (the sessions record no head counters), the
+head certifies verifies of up to 4 requests of 16 tokens and leaves c = 8's verifies,
+mostly 128 rows, to the stock head, so the two arms should match at c = 8. The two arms accept the same tokens per
 cycle at c = 1, 2 and 8, as H's token identity requires (at c = 4 the batch composition,
 and with it G's rounding, varies between runs).
 
