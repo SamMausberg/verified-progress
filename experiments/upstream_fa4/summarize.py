@@ -16,6 +16,7 @@ import csv
 import json
 import math
 import re
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -68,7 +69,7 @@ def load_case(path: Path) -> dict[str, Any]:
 
 def pytest_result(path: Path) -> dict[str, Any]:
     text = path.read_text()
-    tail = re.findall(r'=+ (.*?) in [0-9.]+s', text)
+    tail = re.findall(r'^(?:=+ )?(\d+ (?:passed|failed|errors?)\b.*?) in [0-9.]+s', text, re.M)
     errors = sorted(set(re.findall(r'^E\s+(\w+(?:Error|Exception)[^\n]{0,120})', text, re.M)))
     return {
         'outcomes': re.findall(r'^(PASSED|FAILED|ERROR) (\S+)', text, re.M),
@@ -101,8 +102,14 @@ def main() -> None:
         for r in checked
         if (r['tile_n'] % r['rows_per_pass'] != 0) != (r['status'] in ('wrong', 'fault'))
     ]
+    summarize_commit = subprocess.run(
+        ['git', '-C', str(Path(__file__).parent), 'rev-parse', 'HEAD'],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
     summary = {
         'meta': meta,
+        'summarize_commit': summarize_commit,
         'cases': len(rows),
         'status_counts': counts,
         'cpasync_pattern': {
