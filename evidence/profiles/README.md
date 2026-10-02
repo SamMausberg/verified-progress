@@ -443,9 +443,10 @@ there is no longer one pass over the weight.
 
 - `dflash-tuned-b16` has none. With Triton attention nothing is planned on the host (from reading the code), and
   the host issues each graph launch 6.0-55 ms before the GPU starts it, 0.75-1.06 of a cycle
-  ahead, as in plain decoding. The GPU is busy 96.6-98.8% of the traced cycle and idles 114-119 us per cycle
-  outside graph replays even with tracing slowing the host. The untraced cycle minus the traced
-  GPU work (0.30-1.56 ms) cannot be host idle when the host runs a cycle ahead. It is consistent
+  ahead, as in plain decoding. The GPU is busy 96.6-98.8% of the traced cycle and idles
+  114-119 us per cycle outside graph replays even with tracing slowing the host. The untraced
+  cycle minus the traced GPU work (0.30-1.56 ms) cannot be host idle when the host runs this
+  far ahead. It is consistent
   with the attention work the untraced windows' longer contexts add on this arm (at c = 1,
   attention scaled linearly from 2.4 ms per cycle by 328 more tokens of a 1,645-token context
   adds about 0.5 ms; derived) and with the estimator's error.
