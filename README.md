@@ -55,7 +55,8 @@ Where the serving measurements are:
   logit probe and GSM8K runs of the two lossy levers (`evidence/lossy/`).
 - **Before and after.** Table 1 of the paper gives each engine change against
   its tuned baseline, with sessions and intervals; the certified head was served
-  against every tuned arm in three sessions (`evidence/certified_head/served/`).
+  against four tuned arms (`plain-tuned`, `mtp-tuned-triton`, `dflash-tuned-b16`
+  and `dflash-tuned`) in three sessions (`evidence/certified_head/served/`).
 - **Engine changes.** Patch series under `engine/sglang/patches/`, applied to the
   pinned SGLang commit as `engine/sglang/README.md` describes.
 
@@ -108,12 +109,13 @@ The main line of the paper:
 - **The certified head, in the GPU kernel and served.** Through the kernel, on
   60,000 replayed decode positions, 1.46% (conservative model) and 0.28% (Hopper
   model) fall back, and certified positions plus the fallback equal the stock
-  token on every position (`evidence/certified_head/`). Served against each tuned
-  arm in three sessions, it raises throughput at concurrency 1 by 2.5% for plain
-  decoding, 4.6% for MTP and 1.2% for 16-token DFlash, with identical tokens and
-  none of 592,433 certified positions differing in check mode. It loses 1.0-3.3%
-  on DFlash above concurrency 1 and on MTP at 64, so the served envelope rises
-  only at concurrency 1 (`evidence/certified_head/served/`).
+  token on every position (`evidence/certified_head/`). Served against the tuned
+  plain, MTP (Triton attention) and both DFlash arms in three sessions, it raises
+  throughput at concurrency 1 by 2.5% for plain decoding, 4.6% for MTP and 1.2%
+  for 16-token DFlash, with identical tokens and none of 592,433 certified
+  positions differing in check mode. It loses 1.0-3.3% on DFlash above
+  concurrency 1 and on MTP at 64, so the served envelope rises only at
+  concurrency 1 (`evidence/certified_head/served/`).
 
 Secondary investigations and supporting material:
 
