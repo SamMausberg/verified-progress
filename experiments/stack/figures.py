@@ -239,8 +239,12 @@ def cross_session_rows(
             row[f'bench_b8_{m}'] = round(float(b8[f'{m}_mean']), 2)
             row[f'S0_{m}'] = s0
             row[f'full_{m}'] = top
-            row[f'S0_over_bench_b16_{m}'] = round(s0 / float(b16[f'{m}_mean']), 4) if s0 != '' else ''
-            row[f'full_over_bench_b8_{m}'] = round(top / float(b8[f'{m}_mean']), 4) if top != '' else ''
+            row[f'S0_over_bench_b16_{m}'] = (
+                round(s0 / float(b16[f'{m}_mean']), 4) if s0 != '' else ''
+            )
+            row[f'full_over_bench_b8_{m}'] = (
+                round(top / float(b8[f'{m}_mean']), 4) if top != '' else ''
+            )
         rows.append(row)
     return rows
 
@@ -302,21 +306,38 @@ def plot_frontier(rows: list[dict[str, str]], full: str, path: Path) -> None:
         xs = [float(r['x_e2e_mean']) for r in pts]
         ys = [float(r['y_mean']) for r in pts]
         st = style(arm, full)
-        ax.plot(xs, ys, markersize=6, label=name(arm, full), zorder=3 if arm in ('S0', full) else 2, **st)
+        ax.plot(
+            xs,
+            ys,
+            markersize=6,
+            label=name(arm, full),
+            zorder=3 if arm in ('S0', full) else 2,
+            **st,
+        )
     for r in by_arm.get('S0', []):
         ax.annotate(
-            f'c = {r["c"]}', (float(r['x_e2e_mean']), float(r['y_mean'])), textcoords='offset points',
-            xytext=(8, -12), fontsize=8, color=INK,
+            f'c = {r["c"]}',
+            (float(r['x_e2e_mean']), float(r['y_mean'])),
+            textcoords='offset points',
+            xytext=(8, -12),
+            fontsize=8,
+            color=INK,
         )
     missing = [a for a in arm_order(full) if a not in by_arm]
     if missing:
         ax.text(
-            0.02, 0.03, 'no valid session: ' + ', '.join(name(a, full) for a in missing),
-            transform=ax.transAxes, fontsize=8, color=MUTED,
+            0.02,
+            0.03,
+            'no valid session: ' + ', '.join(name(a, full) for a in missing),
+            transform=ax.transAxes,
+            fontsize=8,
+            color=MUTED,
         )
     ax.set_xlabel('per-user rate x (output tokens/s per request, end to end)')
     ax.set_ylabel('throughput y (output tokens/s on the GPU)')
-    ax.set_title('Stack arms on tuned DFlash-16, c = 1-8 (measured; mean over sessions)', fontsize=10)
+    ax.set_title(
+        'Stack arms on tuned DFlash-16, c = 1-8 (measured; mean over sessions)', fontsize=10
+    )
     ax.grid(True, color='#d9dde1', linewidth=0.6)
     ax.legend(fontsize=8, frameon=False, loc='upper right')
     fig.savefig(path, dpi=180)
@@ -341,14 +362,21 @@ def plot_ratios(rows: list[dict[str, str]], full: str, path: Path) -> None:
         for i, c in enumerate(cs):
             for j, arm in enumerate(arms):
                 x = i + (j - (len(arms) - 1) / 2) * slot
-                r = next(r for r in rows if r['arm'] == arm and int(r['c']) == c and r['metric'] == m)
+                r = next(
+                    r for r in rows if r['arm'] == arm and int(r['c']) == c and r['metric'] == m
+                )
                 st = style(arm, full)
                 if r['declared_lo']:
                     lo, hi = float(r['declared_lo']), float(r['declared_hi'])
                     ax.add_patch(
                         Rectangle(
-                            (x - slot * 0.45, lo), slot * 0.9, max(hi - lo, 0.002),
-                            color='#e3d3a8', alpha=0.9, linewidth=0, zorder=1,
+                            (x - slot * 0.45, lo),
+                            slot * 0.9,
+                            max(hi - lo, 0.002),
+                            color='#e3d3a8',
+                            alpha=0.9,
+                            linewidth=0,
+                            zorder=1,
                         )
                     )
                 if r['sessions']:
@@ -357,19 +385,46 @@ def plot_ratios(rows: list[dict[str, str]], full: str, path: Path) -> None:
                 if r['ratio']:
                     ratio = float(r['ratio'])
                     if r['lo']:
-                        ax.plot([x, x], [float(r['lo']), float(r['hi'])], color=st['color'], linewidth=1.4, zorder=3)
+                        ax.plot(
+                            [x, x],
+                            [float(r['lo']), float(r['hi'])],
+                            color=st['color'],
+                            linewidth=1.4,
+                            zorder=3,
+                        )
                     decided = r['decision'] in ('speedup', 'slowdown')
                     ax.plot(
-                        x, ratio, marker=st['marker'], markersize=6, color=st['color'],
-                        markerfacecolor=st['color'] if decided else 'white', zorder=4,
+                        x,
+                        ratio,
+                        marker=st['marker'],
+                        markersize=6,
+                        color=st['color'],
+                        markerfacecolor=st['color'] if decided else 'white',
+                        zorder=4,
                     )
                 else:
-                    ax.text(x, 1.0, 'n=0', fontsize=6, color=MUTED, ha='center', va='bottom', rotation=90)
+                    ax.text(
+                        x,
+                        1.0,
+                        'n=0',
+                        fontsize=6,
+                        color=MUTED,
+                        ha='center',
+                        va='bottom',
+                        rotation=90,
+                    )
         ax.set_ylabel(f'{titles[m]} / S0')
         ax.grid(True, axis='y', color='#d9dde1', linewidth=0.6)
     axes[-1].set_xticks(range(len(cs)), [f'c = {c}' for c in cs])
     handles = [
-        Line2D([], [], linestyle='none', marker=style(a, full)['marker'], color=style(a, full)['color'], label=name(a, full))
+        Line2D(
+            [],
+            [],
+            linestyle='none',
+            marker=style(a, full)['marker'],
+            color=style(a, full)['color'],
+            label=name(a, full),
+        )
         for a in arms
     ]
     handles.append(Rectangle((0, 0), 1, 1, color='#e3d3a8', label='declared expected range'))
@@ -394,19 +449,42 @@ def plot_gap(gap: list[dict[str, str]], blocks: list[dict[str, str]], path: Path
     cs = [int(r['c']) for r in gap]
     xs = range(len(cs))
     series = [
-        ('decode_ceiling_snapshot_free', 'engine at the bandwidth floor, measured tau (derived)', 's', '--'),
+        (
+            'decode_ceiling_snapshot_free',
+            'engine at the bandwidth floor, measured tau (derived)',
+            's',
+            '--',
+        ),
         ('selector_bound_at_floor', '+ selector bound on tau (derived, upper bound)', '^', '-.'),
         ('full_blocks_at_floor', 'every 16-token block accepted, at the floor (derived)', 'v', ':'),
     ]
     for key, label, marker, line in series:
-        ax.plot(xs, [float(r[key]) for r in gap], color=MUTED, marker=marker, linestyle=line, label=label)
+        ax.plot(
+            xs,
+            [float(r[key]) for r in gap],
+            color=MUTED,
+            marker=marker,
+            linestyle=line,
+            label=label,
+        )
     full = gap[0]['full']
     for i, r in enumerate(gap):
         if r['full_x_ratio']:
             if r['full_x_lo']:
-                ax.plot([i, i], [float(r['full_x_lo']), float(r['full_x_hi'])], color=BLUE, linewidth=1.6)
-            ax.plot(i, float(r['full_x_ratio']), marker='D', color=BLUE, markersize=6,
-                    label=f'FULL = {full} (measured, 95% interval)' if i == 0 else None)
+                ax.plot(
+                    [i, i],
+                    [float(r['full_x_lo']), float(r['full_x_hi'])],
+                    color=BLUE,
+                    linewidth=1.6,
+                )
+            ax.plot(
+                i,
+                float(r['full_x_ratio']),
+                marker='D',
+                color=BLUE,
+                markersize=6,
+                label=f'FULL = {full} (measured, 95% interval)' if i == 0 else None,
+            )
     ax.axhline(GOAL, color=INK, linestyle='--', linewidth=1.2)
     ax.text(len(cs) - 1, GOAL * 1.04, '5x goal', ha='right', fontsize=8, color=INK)
     ax.axhline(1.0, color=INK, linewidth=0.6)
@@ -427,10 +505,23 @@ def plot_gap(gap: list[dict[str, str]], blocks: list[dict[str, str]], path: Path
     ):
         bx.plot(widths, [float(r[key]) for r in blocks], color=BLUE, linestyle=line, label=label)
         for r in blocks:
-            bx.plot(int(r['block']), float(r[key]), marker='o', color=BLUE,
-                    markerfacecolor=BLUE if r['measured'] == 'True' else 'white')
+            bx.plot(
+                int(r['block']),
+                float(r[key]),
+                marker='o',
+                color=BLUE,
+                markerfacecolor=BLUE if r['measured'] == 'True' else 'white',
+            )
     tau = float(gap[0]['baseline_tau'])
-    bx.plot(16, tau, marker='*', markersize=10, color=INK, linestyle='none', label=f'tuned DFlash-16 tau at c = 1 ({tau:.2f})')
+    bx.plot(
+        16,
+        tau,
+        marker='*',
+        markersize=10,
+        color=INK,
+        linestyle='none',
+        label=f'tuned DFlash-16 tau at c = 1 ({tau:.2f})',
+    )
     bx.set_xscale('log', base=2)
     bx.set_yscale('log', base=2)
     bx.set_xticks(widths, [str(w) for w in widths])
@@ -453,7 +544,9 @@ def main() -> int:
     ap.add_argument('--expected', type=Path, required=True)
     ap.add_argument('--ceiling', type=Path, required=True)
     ap.add_argument('--frame', type=Path, required=True)
-    ap.add_argument('--bench-frontier', type=Path, required=True, help="bench's confirm frontier.csv")
+    ap.add_argument(
+        '--bench-frontier', type=Path, required=True, help="bench's confirm frontier.csv"
+    )
     ap.add_argument('--out-dir', type=Path, required=True)
     ap.add_argument('--no-plot', action='store_true', help='write the tables only')
     args = ap.parse_args()
@@ -463,7 +556,9 @@ def main() -> int:
     frontier = frontier_rows(points, comp)
     tables = {
         'frontier.csv': frontier,
-        'cross_session.csv': cross_session_rows(frontier, read_csv(args.bench_frontier), comp['full']),
+        'cross_session.csv': cross_session_rows(
+            frontier, read_csv(args.bench_frontier), comp['full']
+        ),
         'ratios.csv': ratio_rows(comp, json.loads(args.expected.read_text())),
         'gap_by_concurrency.csv': gap_rows(comp, json.loads(args.ceiling.read_text())),
         'gap_by_block.csv': block_rows(json.loads(args.frame.read_text())),
