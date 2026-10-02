@@ -36,9 +36,10 @@ readings (each set before its run, in the scripts' docstrings) give three findin
    per path (12 workload prompts decoded for 512 tokens, then 12 prompts decoded for 768 tokens so
    that 5,426 positions lie after the end of text), SGLang's mean logprob error on FP32's top token
    (0.0039-0.0054 nats per path and sample) lies within transformers' range (0.0042-0.0057), and
-   SGLang misses FP32's top by more than 0.5 nats at 3 positions against 2 and 1 for the two
-   transformers configurations. The only miss above 2 nats, 3.2 nats at `6af1e245` position 247
-   after the end of text, is shared by the prefill paths of all three implementations. The rule
+   SGLang misses FP32's top by more than 0.5 nats at 2 distinct positions (on 3 paths), both
+   after the end of text and both also missed by transformers' torch GDN run (2 positions; the
+   fla run misses 1 of them). The only miss above 2 nats, 3.2 nats at `6af1e245` position 247, is
+   shared by the prefill paths of all three implementations. The rule
    declared before the runs needed at least 5 positions where SGLang misses by more than 2 nats
    and 3 times transformers' count; both samples were inconclusive (0 against 0, then 1 against
    1). A position missed on both of a source's paths now counts once, a correction made after the
