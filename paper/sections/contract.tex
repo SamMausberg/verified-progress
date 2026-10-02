@@ -17,7 +17,7 @@ The three references below differ in where rounding enters. Let $h\in\BF^D$ be a
 \begin{definition}[References for one decision]\label{def:contracts}
 \Rreal{} returns $\min\{i:z_i=\max_jz_j\}$; \Rbf{} returns $\min\{i:\rnb(z_i)=\max_j\rnb(z_j)\}$; and \Rstock{} returns $\min\{i:L_i=\max_jL_j\}$.
 \end{definition}
-\Rstock{} is what an unmodified server returns. \Rbf{}, which rounds each real logit once, does not give the engine's result: the engine rounds its own FP32 sum, which can lie on the other side of a rounding boundary. Emulating exactly a kernel that adds the products in sequence in FP32 gives an example with $D=3$ on which the two differ (Appendix~\ref{app:checked}) \ev{precision}. A certified head therefore targets \Rstock{}.
+\Rstock{} is what an unmodified server returns. \Rbf{}, which rounds each real logit once, does not give the engine's result: the engine rounds its own FP32 sum, which can lie on the other side of a rounding boundary. An exact emulation of a sequential FP32 kernel gives an example with $D=3$ on which the two choose different tokens (Appendix~\ref{app:checked}) \ev{precision}. A certified head therefore targets \Rstock{}.
 
 \begin{lemma}[BF16 separation]\label{lem:bf16gap}
 For real $y_a,y_b$, if $y_a-y_b>\ulpb(\max(|y_a|,|y_b|))$ then $\rnb(y_a)>\rnb(y_b)$.
