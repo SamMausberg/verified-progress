@@ -62,7 +62,8 @@ through position 399, the certified engine with its verify head deciding all 3,7
 steps commits stock's tokens on every one of 109 requests at batch 1, 8, 12 and 16; with
 logprobs requested (which keep the verify on the stock head), `cert0` and the certified
 engine also give stock's log-probabilities for the top five and five tracked tokens at
-position 439, the only log-probabilities the control records. Stock MTP's verify there
+position 439, the only log-probabilities the committed summary compares (the raw records
+keep positions 400-450). Stock MTP's verify there
 commits FP32's top token, 68189. Whether `session_000527`'s content feeds the event is
 untested (the planted-donor hold's unplanted control did not fire). The certified head's
 contract is identity with the stock engine's output for the same batch, and the stock
@@ -681,7 +682,7 @@ again) each served the same 10 synchronized waves twice: 579ae7ce alone, and wit
   identical across companion sets and passes;
 - the baseline held: each server's two passes are identical, and stock equals stock again;
 - (ii) cert0 and the certified engine equal stock bitwise on all 109 requests, 512 tokens
-  each, on both passes, and the log-probabilities recorded at 439 (the top five and five
+  each, on both passes, and the log-probabilities compared at 439 (the top five and five
   tracked tokens) are identical to the bit.
 
 These requests asked for logprobs, and a request that asks for logprobs keeps the verify on
@@ -691,8 +692,8 @@ passes): over the server's life the certified verify ran 5 times, all at most 4 
 warm-up), against 3,713 certified draft and draft-extend steps (68,802 and 34,401 rows, at
 most 16), with no uncounted call. So the seeded control shows that the certified graphs,
 the certified draft and draft-extend heads and the gated-off verify leave the tokens
-unchanged, and the log-probabilities recorded at position 439 (the top five and five
-tracked tokens, the only ones compared). A token-only rerun then served the same waves
+unchanged and leave the compared log-probabilities at position 439 (the top five and five
+tracked tokens) equal to stock's. A token-only rerun then served the same waves
 twice without logprobs,
 stock and certified in turn, reading the counters before and after every wave
 (`control_seeded_tokens.json`). In the waves alone the certified verify ran 3,708 steps and
