@@ -881,3 +881,133 @@ def test_drain_positive_control_is_found_in_sglang_format(
     del meta['input_token_logprobs'][0], meta['input_top_logprobs'][0]
     with pytest.raises(ValueError, match='do not align'):
         drain.gaps(meta, output)
+
+
+class _NoReadback:
+    """A stand-in device tensor: slicing, copy_ and to() work; any host read raises."""
+
+    copies = 0
+
+    def __init__(self, shape: tuple[int, ...] = ()) -> None:
+        self.shape = shape
+        self.device = 'cuda:0'
+
+    def __getitem__(self, key: Any) -> _NoReadback:
+        return _NoReadback(self.shape)
+
+    def copy_(self, other: Any) -> _NoReadback:
+        _NoReadback.copies += 1
+        return self
+
+    def to(self, *args: Any) -> _NoReadback:
+        return self
+
+    def _read(self, *args: Any) -> Any:
+        raise AssertionError('device readback on the serving thread')
+
+    item = tolist = cpu = numpy = synchronize = _read
+    __int__ = __float__ = __bool__ = __index__ = _read
+
+
+def test_ring_mode_issues_device_copies_only(tmp_path: Path) -> None:
+    import sys
+    from types import SimpleNamespace
+
+    from experiments.benchcert import control_waves
+
+    sys.path.insert(0, str(control_waves.HOOK_DIR))
+    try:
+        import benchcert_ring
+    finally:
+        sys.path.remove(str(control_waves.HOOK_DIR))
+
+    class Event:
+        def record(self) -> None:
+            pass
+
+        synchronize = _NoReadback._read
+
+    fake_torch = SimpleNamespace(
+        zeros=lambda *shape, dtype, device: _NoReadback(shape),
+        int64='int64',
+        int32='int32',
+        bool='bool',
+        float32='float32',
+        cuda=SimpleNamespace(Event=Event),
+    )
+    names = (
+        '_any',
+        '_any_cols',
+        '_any_dense',
+        '_ids',
+        '_status',
+        '_count',
+        '_cand',
+        '_rlo',
+        '_rhi',
+    )
+    head = SimpleNamespace(**{name: _NoReadback() for name in names})
+    glue = SimpleNamespace(
+        _state={'verify': SimpleNamespace(gate=_NoReadback(), valid=_NoReadback())},
+        _heads=SimpleNamespace(get=lambda path: SimpleNamespace(head=head)),
+    )
+    forward_batch = SimpleNamespace(
+        input_ids=_NoReadback((40,)), batch_size=10, certified_path='verify'
+    )
+    req = SimpleNamespace(
+        kv=SimpleNamespace(req_pool_idx=122), origin_input_ids=[1] * 75, output_ids=[7] * 437
+    )
+    ring = benchcert_ring.Ring(tmp_path)
+    _NoReadback.copies = 0
+    ring.record_verify(fake_torch, glue, forward_batch)
+    result = (_NoReadback((40,)), _NoReadback((10,)), _NoReadback((10, 4)))
+    ring.record_sample(fake_torch, SimpleNamespace(reqs=[req]), result)
+    assert _NoReadback.copies == 13  # 11 head and gate copies, predict and accept lengths
+    record = ring.host[0]
+    assert (record['rows'], record['batch_size'], record['host_gate']) == (40, 10, True)
+    assert record['slots'] == [122] and record['output_lens'] == [437]
+    assert ring.k == 1 and ring.thread is None
+
+
+def test_h7_launches_alternate_and_check_their_graphs(tmp_path: Path) -> None:
+    from experiments.benchcert import drain
+
+    h7 = [launch for launch in drain.LAUNCHES.values() if launch.hold.startswith('h7')]
+    assert [launch.variant for launch in h7].count('certring') == 4
+    assert [launch.variant for launch in h7].count('stock') == 2
+    assert [launch.variant for launch in h7].count('cert0') == 2
+    assert all(launch.levels == drain.LADDER and launch.extra == 5 for launch in h7)
+    ring, _ = drain.sweep_command(drain.LAUNCHES['certring1'], tmp_path)
+    env = dict(ring[i + 1].split('=', 1) for i, token in enumerate(ring) if token == '--env')
+    assert env['BENCHCERT_RING'] == str(tmp_path / 'certring1' / 'ring')
+    assert env['PYTHONPATH'].endswith('replay_hook')
+    assert env['SGLANG_CERTIFIED_HEAD_STATS_EVERY'] == str(plan.TIMED_STATS_EVERY)
+    assert 'SGLANG_CERTIFIED_HEAD_CHECK' not in env
+    assert ring[ring.index('--graph-ref') + 1] == str(tmp_path / 'cert1' / 'mtp-tuned-triton+cert')
+    zero, _ = drain.sweep_command(drain.LAUNCHES['cert0a'], tmp_path)
+    assert 'SGLANG_CERTIFIED_HEAD_MAX_ROWS=0' in zero
+    stock, _ = drain.sweep_command(drain.LAUNCHES['stock3'], tmp_path)
+    assert stock[stock.index('--graph-ref') + 1] == str(tmp_path / 'stock1' / 'mtp-tuned-triton')
+    h6, _ = drain.sweep_command(drain.LAUNCHES['cert1'], tmp_path)
+    assert '--graph-ref' not in h6
+
+
+def test_graph_check_compares_sizes_and_capture_memory(tmp_path: Path) -> None:
+    from experiments.benchcert import drain
+
+    def log(mem: float) -> str:
+        return (
+            f'[t] Capture target verify CUDA graph end. elapsed=1.0 s, mem usage={mem} GB, '
+            'avail mem=30.0 GB.\n'
+        )
+
+    launch = {'graph_captures': {'target verify': {'sizes': [1, 2, 4]}}}
+    run = tmp_path / 'ref' / '20261002-000000'
+    (run / 'server').mkdir(parents=True)
+    (run / 'sweep.json').write_text(json.dumps({'launch': launch}))
+    (run / 'server/server.log').write_text(log(6.29))
+    assert drain.graph_problems(launch, log(6.30), tmp_path / 'ref') == []
+    assert drain.graph_problems(launch, log(6.70), tmp_path / 'ref') == []
+    assert drain.graph_problems(launch, log(8.0), tmp_path / 'ref')
+    other = {'graph_captures': {'target verify': {'sizes': [1, 2]}}}
+    assert drain.graph_problems(other, log(6.29), tmp_path / 'ref')

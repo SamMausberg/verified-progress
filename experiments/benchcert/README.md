@@ -437,6 +437,64 @@ token's logprob, teacher-forced.
 - No gross event in the 20 certified c = 64 points: not reproduced in 20 closed-loop
   draws (12 timed, 8 in check mode), and the session-1 event stays unexplained.
 
+## Ring-logged reruns (not declared; added 2026-10-02 after h6a reproduced the event)
+
+h6a reproduced the wrong token once in 12 timed certified c = 64 points, and session 1's
+run is the second case: 2 of 15 certified against 0 of 15 stock at that context. In both,
+the request's accepted-draft histogram shows the verify rejecting the draft 68189 at
+position 439 and committing its own prediction, 1756. Check mode did not reproduce it
+(0 of 8), and its logged runs saw the certified verify choose correctly at that step.
+These two timed holds rerun the point with a device-side log that adds no per-step
+readback, to localise the decision (`hold_drain.sh h7a`, `hold_drain.sh h7b`; launches in
+`drain.LAUNCHES`).
+
+- Arms, alternating over the two holds. Each launch is a fresh server that replays session
+  1's ladder (c = 1-32, then 64) and then 5 more c = 64 points, at session 1's flags,
+  pools and prompt order:
+  - `certring`: session 1's certified environment plus the ring, 4 launches (24 c = 64
+    points);
+  - `stock`: 2 launches (12);
+  - `cert0`: the certified environment with `MAX_ROWS=0`, so the graphs and conditional
+    nodes are the same but the head never runs: 2 launches (12).
+- The ring (`replay_hook/benchcert_ring.py`). After every target verify replay, outside
+  the graph, it issues device copies into preallocated ring tensors (8,192 steps):
+  - the gate the conditional node read and the device row count (`valid`);
+  - which fallback ran (`_any`, `_any_cols`, `_any_dense`);
+  - for up to 64 rows: the final id, status bits, candidate count, and the first 64
+    candidates with their refined bounds. That is every candidate of a row the column
+    fallback can serve, so the winning slot, its bounds and the largest competing bound
+    follow offline.
+  The verify's predicted ids and accept lengths go into the same slot. The host keeps
+  plain values: step, time, rows, batch size, its intended gate, and each request's
+  slot, prompt length, output length and last output ids. A thread writes the ring only
+  after a second with no verify replay, between points; a point that would overwrite
+  its own start is logged as a deviation. A CPU test drives the ring with stand-in
+  tensors that fail on any host read.
+- A launch whose captured graph sizes differ from h6a's, or whose capture memory differs
+  by more than 0.5 GB in any graph family, stops before its first point, and so does the
+  hold. Five identical certified launches spread by at most 0.40 GB; check mode differs
+  by 1.8-5.9 GB.
+
+Readings at the wrong-token row (579ae7ce's row for position 439, located by the host
+slot and output length), set before the run:
+
+1. Gate mismatch: the gate the device read differs from the host's intended gate.
+2. Certificate fault: gate on, status 0 (certified without a fallback), and an id other
+   than the stock argmax. The envelope was violated; this is the most serious case.
+3. Fallback fault: gate on, status exactly AMBIGUOUS, the column fallback ran, and the id
+   is wrong. Sub-cases: whether 1756 was in the candidate list, and whether the winner
+   had the largest bound. The dense merge (other nonzero status) is read the same way.
+4. Valid fault: gate on, but the device row count `valid` does not cover the row, so it
+   was treated as padding.
+5. Gated-off stock path: gate off. `predict` then holds the stock head's argmax from
+   inside the conditional node; the `cert0` arm tests whether that path alone produces
+   the event.
+
+Null result, stated in advance: at the observed rate of about one event per 7-12 timed
+certified draws, 24 ring-logged draws have roughly a 5-10% chance of showing none. A null
+is reported as "not reproduced in 24 ring-logged draws", with the event left open; the
+ring's copies may perturb the timing, as check mode does.
+
 ## Hold commit
 
 Every hold runs from a clean checkout at the commit recorded here; `run_session.py`

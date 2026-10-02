@@ -74,7 +74,7 @@ from experiments.benchcert.rescore import OVERRIDES
 from experiments.benchcert.rescore import stop as stop_server
 from experiments.benchcert.run_session import git, provenance
 
-HOLD = 'h6'  # README "Hold commit (h6)" pins h6a, h6b and h6s
+HOLD = 'h6'  # README "Hold commit (h6)" pins h6a, h6b and h6s; "(h7)" pins h7a and h7b
 PORT = 30084
 SCORE_PORT = 30085
 TOP = 64
@@ -107,8 +107,26 @@ LAUNCHES = {
         Launch('stock2', 'stock', LADDER, 5, 'h6a'),
         Launch('certcheck', 'certcheck', (TOP,), 5, 'h6b'),
         Launch('certlog', 'certlog', (TOP,), 1, 'h6b'),
+        # h7: the timed certified environment with the device ring (24 c = 64 points),
+        # stock and MAX_ROWS=0 (12 each), alternating across two timed holds.
+        Launch('certring1', 'certring', LADDER, 5, 'h7a'),
+        Launch('stock3', 'stock', LADDER, 5, 'h7a'),
+        Launch('cert0a', 'cert0', LADDER, 5, 'h7a'),
+        Launch('certring2', 'certring', LADDER, 5, 'h7a'),
+        Launch('certring3', 'certring', LADDER, 5, 'h7b'),
+        Launch('cert0b', 'cert0', LADDER, 5, 'h7b'),
+        Launch('stock4', 'stock', LADDER, 5, 'h7b'),
+        Launch('certring4', 'certring', LADDER, 5, 'h7b'),
     )
 }
+# h7 launches must capture the same graphs as h6a's (sizes equal, capture memory within
+# GRAPH_MEM_TOL GB per graph family); otherwise the launch stops before its first point.
+# Five identical certified MTP launches (sessions 1-3, h6a) spread by up to 0.40 GB per
+# family; check mode's extra stock head adds 1.8-5.9 GB. The ring is allocated after
+# capture, so it cannot change these numbers; the check catches a wrong configuration.
+GRAPH_REF = {'stock': 'stock1', 'cert': 'cert1', 'certring': 'cert1', 'cert0': 'cert1'}
+GRAPH_MEM_TOL = 0.5
+GRAPH_MISMATCH = 3
 
 
 def label(variant: str) -> str:
@@ -133,6 +151,13 @@ def variant_env(variant: str, src: Path, stats: Path) -> dict[str, str]:
         env['SGLANG_CERTIFIED_HEAD_STATS_EVERY'] = str(plan.CHECK_STATS_EVERY)
         env['PYTHONPATH'] = str(HOOK_DIR)
         env['BENCHCERT_REPLAY_LOG'] = str(stats.parent / 'replay.jsonl')
+    if variant == 'certring':
+        # The timed certified environment plus the device ring (replay_hook/benchcert_ring.py).
+        env['PYTHONPATH'] = str(HOOK_DIR)
+        env['BENCHCERT_RING'] = str(stats.parent.parent / 'ring')
+    if variant == 'cert0':
+        # The same graphs and conditional nodes; the head never runs.
+        env['SGLANG_CERTIFIED_HEAD_MAX_ROWS'] = '0'
     return env
 
 
@@ -153,6 +178,18 @@ def sweep_command(
         'sweep',
         '--extra-top',
         str(launch.extra),
+        *(
+            [
+                '--graph-ref',
+                str(
+                    out
+                    / GRAPH_REF[launch.variant]
+                    / label(LAUNCHES[GRAPH_REF[launch.variant]].variant)
+                ),
+            ]
+            if launch.hold.startswith('h7')
+            else []
+        ),
         '--arm',
         FAMILY.arm,
         '--label',
@@ -202,8 +239,13 @@ class LadderSweep(bench_sweep.Sweep):
 def sweep_main(argv: list[str]) -> int:
     """bench.sweep.main with LadderSweep (`--extra-top N` before bench.sweep's arguments)."""
     if argv[:1] != ['--extra-top']:
-        raise SystemExit('usage: drain sweep --extra-top N <bench.sweep arguments>')
+        raise SystemExit(
+            'usage: drain sweep --extra-top N [--graph-ref DIR] <bench.sweep arguments>'
+        )
     extra, argv = int(argv[1]), argv[2:]
+    graph_ref = None
+    if argv[:1] == ['--graph-ref']:
+        graph_ref, argv = Path(argv[1]), argv[2:]
     args = bench_sweep.prepare(bench_sweep.build_parser(), argv)
     run_dir = args.out.expanduser() / args.label / time.strftime('%Y%m%d-%H%M%S')
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -220,6 +262,15 @@ def sweep_main(argv: list[str]) -> int:
     with server:
         for check in server.checks:
             print(f'[{"ok" if check.ok else "FAIL":4}] {check.name}: {check.detail}', flush=True)
+        if graph_ref is not None:
+            problems = graph_problems(server.launch_record, server.log_text(), graph_ref)
+            (run_dir / 'graph_check.json').write_text(
+                json.dumps({'reference': str(graph_ref), 'problems': problems}, indent=1) + '\n'
+            )
+            if problems:
+                print('graph check FAILED: ' + '; '.join(problems), flush=True)
+                return GRAPH_MISMATCH
+            print(f'graph check ok against {graph_ref}', flush=True)
         sweep = LadderSweep(args, server, run_dir, extra)
         sweep.write_manifest({'extra_top_points': extra})
         sweep.run()
@@ -229,6 +280,30 @@ def sweep_main(argv: list[str]) -> int:
     )
     print(f'done: {run_dir / "sweep.json"}', flush=True)
     return 0
+
+
+def graph_problems(launch: dict[str, Any], log_text: str, reference: Path) -> list[str]:
+    """Differences in captured graph sizes or capture memory from the reference launch."""
+    from experiments.benchcert.analyze import parse_server_log
+
+    runs = sorted(reference.glob('2026*'))
+    if len(runs) != 1:
+        return [f'expected one reference run under {reference}, found {len(runs)}']
+    ref_launch = json.loads((runs[0] / 'sweep.json').read_text())['launch']
+    ref_log = (runs[0] / 'server/server.log').read_text(errors='replace')
+    problems = []
+    sizes = {k: v.get('sizes') for k, v in (launch.get('graph_captures') or {}).items()}
+    ref_sizes = {k: v.get('sizes') for k, v in (ref_launch.get('graph_captures') or {}).items()}
+    if sizes != ref_sizes:
+        problems.append(f'graph sizes differ: {sorted(set(sizes) ^ set(ref_sizes)) or "sizes"}')
+    mem = {k: v['mem_gb'] for k, v in parse_server_log(log_text)['captures'].items()}
+    ref_mem = {k: v['mem_gb'] for k, v in parse_server_log(ref_log)['captures'].items()}
+    if set(mem) != set(ref_mem):
+        problems.append(f'graph families differ: {sorted(set(mem) ^ set(ref_mem))}')
+    for name in sorted(set(mem) & set(ref_mem)):
+        if abs(mem[name] - ref_mem[name]) > GRAPH_MEM_TOL:
+            problems.append(f'{name} capture memory {mem[name]} GB, reference {ref_mem[name]} GB')
+    return problems
 
 
 def _kill_tree(proc: subprocess.Popen[str]) -> None:
@@ -263,7 +338,7 @@ def run(name: str, out: Path, timeout: float) -> int:
         'variant': launch.variant,
         'levels': list(launch.levels),
         'extra_top_points': launch.extra,
-        'provenance': provenance(src, HOLD),
+        'provenance': provenance(src, launch.hold[:2]),
         'command': wrapped,
         'stats_file': str(stats) if stats else None,
         'timeout_s': timeout,
@@ -290,6 +365,8 @@ def run(name: str, out: Path, timeout: float) -> int:
     record.update(end_unix=time.time(), exit_code=status, run_dir=found[-1] if found else None)
     record_path.write_text(json.dumps(record, indent=1) + '\n')
     print(f'{name}: exit {status}, run {record["run_dir"]}', flush=True)
+    if status == GRAPH_MISMATCH:
+        return GRAPH_MISMATCH
     return 0 if status == 0 else 1
 
 
@@ -318,7 +395,7 @@ def point_dirs(out: Path, runs: Path) -> list[tuple[str, Path]]:
     found = [(f's1/{FAMILY.cert_label}/c064', p) for p in sorted(mtp_s1.glob('2026*/r0/c064'))]
     for name, launch in LAUNCHES.items():
         for point in sorted((out / name / label(launch.variant)).glob('2026*/r*/c*')):
-            found.append((f'{HOLD}/{name}/{point.parent.name}/{point.name}', point))
+            found.append((f'{launch.hold[:2]}/{name}/{point.parent.name}/{point.name}', point))
     for session in plan.DECISION_SESSIONS:
         for family in plan.FAMILIES.values():
             for arm in (family.stock_label, family.cert_label):
@@ -525,8 +602,8 @@ def target_rows(out: Path, runs: Path) -> list[dict[str, Any]]:
     differs from session 1's certified run, and the request's verify statistics."""
     prompt, position, _ = TARGET
     points = [(n, p) for n, p in point_dirs(out, runs) if p.name == f'c{TOP:03d}']
-    points = [(n, p) for n, p in points if n.startswith((HOLD, *plan.DECISION_SESSIONS))]
-    points = [(n, p) for n, p in points if FAMILY.arm in n or n.startswith(HOLD)]
+    points = [(n, p) for n, p in points if n.startswith(('h6', 'h7', *plan.DECISION_SESSIONS))]
+    points = [(n, p) for n, p in points if FAMILY.arm in n or n.startswith(('h6', 'h7'))]
     records = {name: target_record(point) for name, point in points}
     reference = records[f's1/{FAMILY.cert_label}/c064']
     assert reference is not None

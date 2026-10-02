@@ -12,6 +12,9 @@ token a request's verify read at that position. It also wraps the verify's `eagl
 committed: the predicted ids, accept lengths (bonus included) and accept index, with the
 host's view of each request (slot, prompt length, output length, last output ids).
 Nothing in the engine changes; without the variable this does nothing.
+
+With BENCHCERT_RING=<dir> instead, it installs benchcert_ring.py's wrappers (hold h7):
+device-side copies into a ring, written between points, and no per-step readback.
 """
 
 from __future__ import annotations
@@ -31,7 +34,10 @@ _COUNTER = [0]
 
 
 def _write(record: dict[str, Any]) -> None:
-    with _LOCK, open(os.environ['BENCHCERT_REPLAY_LOG'], 'a') as handle:
+    path = os.environ.get('BENCHCERT_REPLAY_LOG') or os.path.join(
+        os.environ.get('BENCHCERT_RING', '.'), 'deviations.jsonl'
+    )
+    with _LOCK, open(path, 'a') as handle:
         handle.write(json.dumps(record) + '\n')
 
 
@@ -129,5 +135,14 @@ class _Finder(importlib.abc.MetaPathFinder):
         return None
 
 
-if os.environ.get('BENCHCERT_REPLAY_LOG'):
+if os.environ.get('BENCHCERT_RING'):
+    import benchcert_ring
+
+    _out = os.environ['BENCHCERT_RING']
+    _PATCHES = {
+        TARGET: lambda module: benchcert_ring.patch_glue(module, _out),
+        SAMPLE_TARGET: lambda module: benchcert_ring.patch_sample(module, _out),
+    }
+    sys.meta_path.insert(0, _Finder())
+elif os.environ.get('BENCHCERT_REPLAY_LOG'):
     sys.meta_path.insert(0, _Finder())
