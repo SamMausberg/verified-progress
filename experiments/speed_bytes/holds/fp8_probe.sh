@@ -3,6 +3,11 @@
 set -euo pipefail
 SP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO="$(cd "$SP/../.." && pwd)"
+# The probe imports SGLang's kernels from the main checkout; require the pinned, clean tree.
+SGLANG_DIR=${SGLANG_DIR:-$HOME/sglang}
+[ "$(git -C "$SGLANG_DIR" rev-parse --short=10 HEAD)" = bd66ce343e ] || { echo "$SGLANG_DIR is not at bd66ce343e"; exit 1; }
+[ -z "$(git -C "$SGLANG_DIR" status --porcelain --untracked-files=no)" ] || { echo "$SGLANG_DIR is dirty"; exit 1; }
+unset SGLANG_WORKTREE
 # shellcheck source=/dev/null
 source "$REPO/scripts/sglang_env.sh"
 mkdir -p "$HOME/vp-data/speed-bytes"

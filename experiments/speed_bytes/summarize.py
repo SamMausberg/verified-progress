@@ -88,6 +88,21 @@ def cmd_gemm(args: argparse.Namespace) -> None:
     write_csv(rows, Path(args.out))
 
 
+# The sweeps each committed hold launched (holds/kill1.sh, kill2b.sh, kill3.sh); a hold missing
+# one of them, or holding another, is refused.
+PLANNED = {
+    'kill1': {
+        'sb-plain-bf16',
+        'sb-plain-fp8',
+        'sb-b16-bf16',
+        'sb-b16-fp8target',
+        'sb-b16-fp8draft',
+    },
+    'kill2b': {'sb2-b16-bf16', 'sb2-b16-fp8head', 'sb2-b8-bf16', 'sb2-b8-fp8head'},
+    'kill3': {'sb3-plain-bf16', 'sb3-plain-fp8oracle', 'sb3-plain-fp8tok'},
+}
+
+
 def env_label(arm: dict) -> str:
     env = {k: v for k, v in arm.get('env', {}).items() if v}
     return ' '.join(f'{k}={v}' for k, v in sorted(env.items())) or '-'
@@ -98,8 +113,12 @@ def cmd_served(args: argparse.Namespace) -> None:
     for hold in args.holds:
         hold = Path(hold)
         sweeps = sorted(hold.glob('*/*/sweep.json'))
-        if not sweeps:
-            raise SystemExit(f'{hold}: no sweep.json')
+        name = hold.name.split('_')[0]
+        labels = [f.parent.parent.name for f in sweeps]
+        if name not in PLANNED or sorted(labels) != sorted(PLANNED[name]):
+            raise SystemExit(
+                f'{hold}: sweeps {sorted(labels)} != planned {sorted(PLANNED.get(name, []))}'
+            )
         for f in sweeps:
             d = json.loads(f.read_text())
             src = d['launch']['sglang_source']
@@ -117,7 +136,7 @@ def cmd_served(args: argparse.Namespace) -> None:
                 acc = (p.get('spec') or {}).get('accept_length')
                 pts.append(
                     {
-                        'hold': hold.name.split('_')[0],
+                        'hold': name,
                         'label': d['label'],
                         'arm': d['arm']['name'],
                         'env': env_label(d['arm']),
