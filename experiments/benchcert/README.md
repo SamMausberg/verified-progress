@@ -233,7 +233,7 @@ in the analysis or the holds, shown with its outputs before and after.
    concurrency 1 with the common prefix and top-5 logprobs, and classes it by the
    stock margin between the two tokens: tie, one ulp, near (at most 0.5 nats) or
    large (`experiments/state_safety/compare.py`'s classes, applied to one margin;
-   `rescore.py`, `hold_rescore.sh`).
+   `rescore.py`, run by `hold_shared.sh`).
 
 Tokens are compared whenever both launches ran their declared configuration and
 every request finished with its full length, whatever the point's timing validity
@@ -304,7 +304,9 @@ python -m experiments.benchcert.analyze replacement --runs ~/vp-data/benchcert
 | `hold.sh` | the hold: environment, provenance checks, 44-minute limit, server cleanup |
 | `analyze.py` | predictions, validity, paired ratios and decisions, token comparisons, check counters, capture memory |
 | `figures.py` | frontier and ratio figures from the CSVs |
-| `rescore.py`, `hold_rescore.sh` | the untimed re-score of first divergences (shared lane) |
+| `rescore.py` | the untimed re-score of first divergences |
+| `control_waves.py` | the exploratory wave control (not declared) |
+| `hold_shared.sh` | the shared untimed hold after session 3: re-score, then the control |
 
 ## Post hoc diagnostic (not declared; added 2026-10-02 after h1)
 
@@ -318,6 +320,26 @@ three quarters or more of its levels, its TTFT p50 is at least 3 ms above or its
 per pass at least 2% above. For each flagged launch the summary gives its family's
 primary ratio with and without that session's pair. This changes no decision and
 excludes nothing; it says whether a verdict depends on one launch.
+
+## Exploratory control (not declared; added 2026-10-02 after h3, approved by main)
+
+In sessions 1 and 2 the MTP pairs diverged from each other above concurrency 1 at
+1.90 times the rate of the two stock runs (95% interval 1.58-2.28), while check mode
+found no differing row. As declared, that is reported and investigated, not counted
+as a failure. One control tests it under fixed batch evolution (`control_waves.py`,
+run in `hold_shared.sh` after the declared re-score): `mtp-tuned-triton` on this
+engine as a small shared-lane server (`--mem-fraction-static 0.25`, 100,000 KV
+tokens, 8 running requests and mamba slots), once stock and once with the timed
+runs' certified environment. Each serves the confirmation split's first 64 prompts
+(their prompt token ids as recorded by session 1's stock MTP run at c = 8) as 8
+waves of 8. Each wave is one batched `/generate` call (512 greedy tokens,
+`ignore_eos`), so its 8 requests are prefilled together and the batch then evolves
+as a function of the tokens alone.
+
+Reading rule, set before the run: if 64 of 64 outputs are identical, the certified
+head gives identical tokens under identical batch evolution, the claim check mode
+also makes; it does not show the cause of every timed divergence. If any differ,
+their first divergences are re-scored into the same classes.
 
 ## Hold commit
 

@@ -561,3 +561,39 @@ def test_slow_launch_diagnostic_flags_a_uniformly_slow_launch() -> None:
         )
         == 4.0
     )
+
+
+def test_control_waves_compares_and_exports_contexts(tmp_path: Path) -> None:
+    from experiments.benchcert import control_waves
+
+    for variant, tail in (('stock', [5, 6]), ('cert', [5, 7])):
+        (tmp_path / variant).mkdir()
+        with (tmp_path / variant / 'outputs.jsonl').open('w') as handle:
+            handle.write(json.dumps({'prompt': 'a', 'wave': 0, 'input_ids': [1, 2],
+                                     'output_ids': [3, 4]}) + '\n')
+            handle.write(json.dumps({'prompt': 'b', 'wave': 0, 'input_ids': [8],
+                                     'output_ids': [3, *tail]}) + '\n')
+    assert control_waves.compare_variants(tmp_path) == 0
+    summary = json.loads((tmp_path / 'compare.json').read_text())
+    assert summary['declared'] is False and summary['identical'] == 1
+    assert summary['diverged'] == 1
+    contexts = [json.loads(line) for line in (tmp_path / 'contexts.jsonl').open()]
+    assert contexts == [{'id': analyze.context_id([8], [3, 5], (6, 7)),
+                         'input_ids': [8, 3, 5], 'tokens': [6, 7]}]
+
+
+def test_control_waves_takes_the_first_64_prompts_in_workload_order(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from experiments.benchcert import control_waves
+
+    texts = [f'prompt {i}' for i in range(70)]
+    workload = tmp_path / 'confirm.jsonl'
+    workload.write_text(''.join(json.dumps({'text': t}) + '\n' for t in texts))
+    monkeypatch.setattr(control_waves, 'WORKLOAD', workload)
+    point = tmp_path / 's1' / 'mtp-tuned-triton' / '20261002-000000' / 'r0' / 'c008'
+    # Recorded in reverse order; prompts() must restore the workload order.
+    _write_raw(point, [_raw_record(t, [i]) for i, t in reversed(list(enumerate(texts[:64])))])
+    items = control_waves.prompts(tmp_path)
+    assert [key for key, _ in items] == [prompt_hash(t) for t in texts[:64]]
+    assert all(ids == [11, 12] for _, ids in items)
