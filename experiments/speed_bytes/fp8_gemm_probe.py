@@ -141,6 +141,8 @@ def main():
         'route_errors': {},
     }
     for name in shapes:
+        if 'stopped_at_budget' in meta:
+            break
         N, K = SHAPES[name]
         fp8_bytes = N * K
         copies = max(1, math.ceil(args.l2_bytes / fp8_bytes))
