@@ -439,7 +439,7 @@ and every step exited 0 (commands in section 4).
   `score_*` columns come from score mode, where each server re-scores the reference's
   sequences in one teacher-forced prefill: `score_kl_*` compare its top-20 with the dense
   reference's, and `score_argmax_agree` is the share of positions where its prefill argmax
-  equals the reference's decoded token. That share is 0.994 in every arm, the dense controls
+  equals the reference's decoded token. That share is 0.994 in every arm, the dense control
   included, so it reflects prefill against decode numerics, not the lever.
 - Measured against derived. The dense step at 128 running took 10.77 ms (128 / 11,882 tokens/s,
   the mean of the four dense arms) and the exact-replay step 10.73 ms, so replay saved 0.045 ms
