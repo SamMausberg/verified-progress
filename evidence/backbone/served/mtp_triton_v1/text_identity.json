@@ -1,0 +1,2380 @@
+{
+ "command": "experiments/backbone/stream_text_identity.py --run B1=/home/ubuntu/vp-data/backbone/e2e/mtp-triton-v1/backbone-mtp-triton-v1-B/20261002-123648 --run A1=/home/ubuntu/vp-data/backbone/e2e/mtp-triton-v1/backbone-mtp-triton-v1-A/20261002-124002 --run A2=/home/ubuntu/vp-data/backbone/e2e/mtp-triton-v1/backbone-mtp-triton-v1-A/20261002-124317 --run B2=/home/ubuntu/vp-data/backbone/e2e/mtp-triton-v1/backbone-mtp-triton-v1-B/20261002-124631 --pair B1:A1 --pair B2:A2 --pair A2:A1 --pair B2:B1 --out evidence/backbone/served/mtp_triton_v1/text_identity.json",
+ "repo_commit": "47c7ccd97c73b9ac66dca4e1d28292a966e5a7b8",
+ "comparison": "streamed text (reasoning_content then content deltas, in arrival order) and completion token count per prompt; not token ids or logprobs",
+ "tokens_before": "output tokens streamed before the chunk that holds the first difference, the smaller count of the two runs; the first differing token is at or after this index",
+ "runs": {
+  "B1": "20261002-123648",
+  "A1": "20261002-124002",
+  "A2": "20261002-124317",
+  "B2": "20261002-124631"
+ },
+ "pairs": [
+  {
+   "test": "B1",
+   "baseline": "A1",
+   "point": "r0/c001",
+   "prompts": 64,
+   "identical": 57,
+   "differing": 7,
+   "completion_tokens": [
+    512
+   ],
+   "tokens_before_min": 177,
+   "tokens_before_median": 329,
+   "first_divergences": [
+    {
+     "prompt_id": "mbpp-502",
+     "char_offset": 850,
+     "tokens_before": 177
+    },
+    {
+     "prompt_id": "oasst1-5dad260e-3d2f-4dbb-a368-806905b4b34d",
+     "char_offset": 1315,
+     "tokens_before": 289
+    },
+    {
+     "prompt_id": "humaneval-162",
+     "char_offset": 1020,
+     "tokens_before": 301
+    },
+    {
+     "prompt_id": "oasst1-72019671-c7e2-4752-a6c1-eda0007a86d9",
+     "char_offset": 1763,
+     "tokens_before": 329
+    },
+    {
+     "prompt_id": "mbpp-299",
+     "char_offset": 1305,
+     "tokens_before": 373
+    },
+    {
+     "prompt_id": "oasst1-6215f73c-d012-4f98-b2b1-66bc66cd912a",
+     "char_offset": 1791,
+     "tokens_before": 409
+    },
+    {
+     "prompt_id": "oasst1-f20e008f-8eeb-421a-ad77-18071e4d96c3",
+     "char_offset": 2007,
+     "tokens_before": 445
+    }
+   ]
+  },
+  {
+   "test": "B1",
+   "baseline": "A1",
+   "point": "r0/c008",
+   "prompts": 64,
+   "identical": 49,
+   "differing": 15,
+   "completion_tokens": [
+    512
+   ],
+   "tokens_before_min": 1,
+   "tokens_before_median": 253,
+   "first_divergences": [
+    {
+     "prompt_id": "mbpp-321",
+     "char_offset": 107,
+     "tokens_before": 1
+    },
+    {
+     "prompt_id": "oasst1-5b6f8e98-b626-46b2-b9a8-65877aefee9a",
+     "char_offset": 342,
+     "tokens_before": 81
+    },
+    {
+     "prompt_id": "oasst1-65e4ec48-2687-472e-b985-79443e3d454b",
+     "char_offset": 462,
+     "tokens_before": 113
+    },
+    {
+     "prompt_id": "oasst1-8f32fa66-9954-4ce4-8751-33164faa67ff",
+     "char_offset": 761,
+     "tokens_before": 157
+    },
+    {
+     "prompt_id": "oasst1-72019671-c7e2-4752-a6c1-eda0007a86d9",
+     "char_offset": 952,
+     "tokens_before": 181
+    },
+    {
+     "prompt_id": "mbpp-301",
+     "char_offset": 757,
+     "tokens_before": 229
+    },
+    {
+     "prompt_id": "oasst1-f20e008f-8eeb-421a-ad77-18071e4d96c3",
+     "char_offset": 1263,
+     "tokens_before": 229
+    },
+    {
+     "prompt_id": "gsm8k-train-2716",
+     "char_offset": 869,
+     "tokens_before": 253
+    },
+    {
+     "prompt_id": "mbpp-299",
+     "char_offset": 845,
+     "tokens_before": 277
+    },
+    {
+     "prompt_id": "mbpp-432",
+     "char_offset": 872,
+     "tokens_before": 285
+    },
+    {
+     "prompt_id": "mtbench-106",
+     "char_offset": 1029,
+     "tokens_before": 317
+    },
+    {
+     "prompt_id": "gsm8k-train-0066",
+     "char_offset": 1071,
+     "tokens_before": 329
+    },
+    {
+     "prompt_id": "oasst1-6215f73c-d012-4f98-b2b1-66bc66cd912a",
+     "char_offset": 1630,
+     "tokens_before": 357
+    },
+    {
+     "prompt_id": "oasst1-ad5bf3fa-229f-455d-87b1-9d5c7b7baab8",
+     "char_offset": 1763,
+     "tokens_before": 429
+    },
+    {
+     "prompt_id": "oasst1-fe6a9022-314e-4ecc-a5ee-1ce6c31f7e81",
+     "char_offset": 1907,
+     "tokens_before": 493
+    }
+   ]
+  },
+  {
+   "test": "B1",
+   "baseline": "A1",
+   "point": "r0/c032",
+   "prompts": 256,
+   "identical": 136,
+   "differing": 120,
+   "completion_tokens": [
+    512
+   ],
+   "tokens_before_min": 0,
+   "tokens_before_median": 173.0,
+   "first_divergences": [
+    {
+     "prompt_id": "humaneval-49",
+     "char_offset": 2,
+     "tokens_before": 0
+    },
+    {
+     "prompt_id": "gsm8k-train-3238",
+     "char_offset": 120,
+     "tokens_before": 1
+    },
+    {
+     "prompt_id": "mbpp-500",
+     "char_offset": 98,
+     "tokens_before": 1
+    },
+    {
+     "prompt_id": "mbpp-137",
+     "char_offset": 188,
+     "tokens_before": 5
+    },
+    {
+     "prompt_id": "oasst1-5c941d72-bc04-4dea-b4d9-21f98646c1c9",
+     "char_offset": 96,
+     "tokens_before": 9
+    },
+    {
+     "prompt_id": "oasst1-1b12f145-91f8-4457-a773-8e0f97073103",
+     "char_offset": 242,
+     "tokens_before": 13
+    },
+    {
+     "prompt_id": "oasst1-355dc7a3-1d9f-4bbb-a89a-93ca97b0fca8",
+     "char_offset": 144,
+     "tokens_before": 13
+    },
+    {
+     "prompt_id": "gsm8k-train-7371",
+     "char_offset": 149,
+     "tokens_before": 17
+    },
+    {
+     "prompt_id": "mbpp-104",
+     "char_offset": 91,
+     "tokens_before": 17
+    },
+    {
+     "prompt_id": "mbpp-309",
+     "char_offset": 115,
+     "tokens_before": 17
+    },
+    {
+     "prompt_id": "mtbench-84",
+     "char_offset": 170,
+     "tokens_before": 17
+    },
+    {
+     "prompt_id": "gsm8k-train-2551",
+     "char_offset": 101,
+     "tokens_before": 21
+    },
+    {
+     "prompt_id": "gsm8k-train-1557",
+     "char_offset": 205,
+     "tokens_before": 29
+    },
+    {
+     "prompt_id": "gsm8k-train-5759",
+     "char_offset": 569,
+     "tokens_before": 29
+    },
+    {
+     "prompt_id": "gsm8k-train-5781",
+     "char_offset": 409,
+     "tokens_before": 29
+    },
+    {
+     "prompt_id": "oasst1-1aed441d-d4c5-41ee-b54f-ca3ac0184dce",
+     "char_offset": 605,
+     "tokens_before": 29
+    },
+    {
+     "prompt_id": "oasst1-317b1bd5-af37-4a33-9138-816319834821",
+     "char_offset": 127,
+     "tokens_before": 29
+    },
+    {
+     "prompt_id": "oasst1-b83964c9-c9e8-4f41-9de2-e98da536ccb5",
+     "char_offset": 154,
+     "tokens_before": 33
+    },
+    {
+     "prompt_id": "oasst1-f6105517-bff7-4ede-9d77-db89fcec121e",
+     "char_offset": 149,
+     "tokens_before": 33
+    },
+    {
+     "prompt_id": "gsm8k-train-1283",
+     "char_offset": 227,
+     "tokens_before": 37
+    },
+    {
+     "prompt_id": "oasst1-445f658d-ab6d-426b-bdbb-1d87b3c489ce",
+     "char_offset": 170,
+     "tokens_before": 41
+    },
+    {
+     "prompt_id": "gsm8k-train-1058",
+     "char_offset": 208,
+     "tokens_before": 45
+    },
+    {
+     "prompt_id": "mbpp-330",
+     "char_offset": 633,
+     "tokens_before": 49
+    },
+    {
+     "prompt_id": "mbpp-82",
+     "char_offset": 437,
+     "tokens_before": 49
+    },
+    {
+     "prompt_id": "humaneval-66",
+     "char_offset": 221,
+     "tokens_before": 53
+    },
+    {
+     "prompt_id": "oasst1-2c629174-2898-4b56-9bd4-f88d073d5b39",
+     "char_offset": 576,
+     "tokens_before": 53
+    },
+    {
+     "prompt_id": "oasst1-26b5b4d5-73a2-493c-8218-83054ba59473",
+     "char_offset": 366,
+     "tokens_before": 57
+    },
+    {
+     "prompt_id": "oasst1-993d80d3-6231-42e4-b174-02d88b45b342",
+     "char_offset": 239,
+     "tokens_before": 57
+    },
+    {
+     "prompt_id": "oasst1-af37446e-951e-43af-94d1-12d9e8326209",
+     "char_offset": 320,
+     "tokens_before": 61
+    },
+    {
+     "prompt_id": "oasst1-c7454871-bd4f-4352-af6a-f89ff4f4f317",
+     "char_offset": 287,
+     "tokens_before": 61
+    },
+    {
+     "prompt_id": "gsm8k-train-7390",
+     "char_offset": 629,
+     "tokens_before": 65
+    },
+    {
+     "prompt_id": "oasst1-08d3e390-810d-45ac-b117-c9abb60384b1",
+     "char_offset": 409,
+     "tokens_before": 65
+    },
+    {
+     "prompt_id": "oasst1-5dad260e-3d2f-4dbb-a368-806905b4b34d",
+     "char_offset": 321,
+     "tokens_before": 69
+    },
+    {
+     "prompt_id": "gsm8k-train-3373",
+     "char_offset": 283,
+     "tokens_before": 73
+    },
+    {
+     "prompt_id": "oasst1-4765a8d9-6bc0-4e63-8598-9edee64aaca1",
+     "char_offset": 294,
+     "tokens_before": 73
+    },
+    {
+     "prompt_id": "oasst1-7a01bcd6-5f4b-41c8-ad76-7b536a1e7d22",
+     "char_offset": 347,
+     "tokens_before": 77
+    },
+    {
+     "prompt_id": "oasst1-82f4510d-d297-4261-8a7e-460bac5502a5",
+     "char_offset": 367,
+     "tokens_before": 81
+    },
+    {
+     "prompt_id": "oasst1-a10cc991-3ceb-4846-abd7-7aaa55bd594a",
+     "char_offset": 365,
+     "tokens_before": 81
+    },
+    {
+     "prompt_id": "gsm8k-train-7069",
+     "char_offset": 323,
+     "tokens_before": 85
+    },
+    {
+     "prompt_id": "oasst1-c1eb313c-9530-4968-83b0-e2ab9b83c69a",
+     "char_offset": 457,
+     "tokens_before": 89
+    },
+    {
+     "prompt_id": "oasst1-5851d3f2-c76c-482f-9557-0b757c0f77c0",
+     "char_offset": 413,
+     "tokens_before": 93
+    },
+    {
+     "prompt_id": "gsm8k-train-4114",
+     "char_offset": 473,
+     "tokens_before": 105
+    },
+    {
+     "prompt_id": "humaneval-75",
+     "char_offset": 395,
+     "tokens_before": 105
+    },
+    {
+     "prompt_id": "oasst1-56f0f4d2-a1f5-4627-982d-e7451af21748",
+     "char_offset": 674,
+     "tokens_before": 117
+    },
+    {
+     "prompt_id": "oasst1-60fea0cd-de70-4e67-99a2-e100174ced13",
+     "char_offset": 501,
+     "tokens_before": 117
+    },
+    {
+     "prompt_id": "gsm8k-train-5590",
+     "char_offset": 434,
+     "tokens_before": 121
+    },
+    {
+     "prompt_id": "oasst1-1fbd3b71-9fa6-4545-a7e9-83419fec32b3",
+     "char_offset": 419,
+     "tokens_before": 121
+    },
+    {
+     "prompt_id": "oasst1-2c27f83f-1a8d-4c27-b059-4af88b1c975b",
+     "char_offset": 487,
+     "tokens_before": 121
+    },
+    {
+     "prompt_id": "oasst1-7e7d30ee-7b32-41c9-a239-8bc580153490",
+     "char_offset": 524,
+     "tokens_before": 125
+    },
+    {
+     "prompt_id": "gsm8k-train-3581",
+     "char_offset": 488,
+     "tokens_before": 133
+    },
+    {
+     "prompt_id": "mbpp-344",
+     "char_offset": 551,
+     "tokens_before": 133
+    },
+    {
+     "prompt_id": "oasst1-cbc9bb91-2280-4bf5-96af-701e94a502c4",
+     "char_offset": 602,
+     "tokens_before": 133
+    },
+    {
+     "prompt_id": "gsm8k-train-0545",
+     "char_offset": 512,
+     "tokens_before": 137
+    },
+    {
+     "prompt_id": "mbpp-298",
+     "char_offset": 455,
+     "tokens_before": 141
+    },
+    {
+     "prompt_id": "oasst1-1cdc4856-a425-4c01-8a3e-07d24edf0431",
+     "char_offset": 632,
+     "tokens_before": 153
+    },
+    {
+     "prompt_id": "oasst1-d2e77607-7fc7-4996-9a1e-7b3a6272d6f4",
+     "char_offset": 642,
+     "tokens_before": 153
+    },
+    {
+     "prompt_id": "gsm8k-train-0657",
+     "char_offset": 531,
+     "tokens_before": 157
+    },
+    {
+     "prompt_id": "mbpp-438",
+     "char_offset": 318,
+     "tokens_before": 161
+    },
+    {
+     "prompt_id": "mbpp-278",
+     "char_offset": 437,
+     "tokens_before": 169
+    },
+    {
+     "prompt_id": "oasst1-54420bea-464c-4e3d-869b-3782a201c108",
+     "char_offset": 699,
+     "tokens_before": 169
+    },
+    {
+     "prompt_id": "humaneval-59",
+     "char_offset": 616,
+     "tokens_before": 177
+    },
+    {
+     "prompt_id": "mbpp-180",
+     "char_offset": 598,
+     "tokens_before": 193
+    },
+    {
+     "prompt_id": "oasst1-35403ce0-2ffe-4d85-99d3-23f2a49fb6f1",
+     "char_offset": 843,
+     "tokens_before": 197
+    },
+    {
+     "prompt_id": "oasst1-a6c68c47-a316-464e-9124-ec81b3323748",
+     "char_offset": 836,
+     "tokens_before": 201
+    },
+    {
+     "prompt_id": "gsm8k-train-4280",
+     "char_offset": 843,
+     "tokens_before": 205
+    },
+    {
+     "prompt_id": "mbpp-339",
+     "char_offset": 655,
+     "tokens_before": 205
+    },
+    {
+     "prompt_id": "gsm8k-train-0546",
+     "char_offset": 787,
+     "tokens_before": 209
+    },
+    {
+     "prompt_id": "gsm8k-train-2721",
+     "char_offset": 851,
+     "tokens_before": 213
+    },
+    {
+     "prompt_id": "mbpp-434",
+     "char_offset": 726,
+     "tokens_before": 217
+    },
+    {
+     "prompt_id": "mbpp-185",
+     "char_offset": 915,
+     "tokens_before": 221
+    },
+    {
+     "prompt_id": "gsm8k-train-0706",
+     "char_offset": 695,
+     "tokens_before": 225
+    },
+    {
+     "prompt_id": "gsm8k-train-5154",
+     "char_offset": 924,
+     "tokens_before": 225
+    },
+    {
+     "prompt_id": "gsm8k-train-6463",
+     "char_offset": 894,
+     "tokens_before": 225
+    },
+    {
+     "prompt_id": "humaneval-29",
+     "char_offset": 1594,
+     "tokens_before": 225
+    },
+    {
+     "prompt_id": "oasst1-8928dce5-a1fd-41ee-bbfc-e166330114ea",
+     "char_offset": 978,
+     "tokens_before": 225
+    },
+    {
+     "prompt_id": "gsm8k-train-3860",
+     "char_offset": 839,
+     "tokens_before": 237
+    },
+    {
+     "prompt_id": "oasst1-388bab3a-38bd-4a9c-91e0-1175730d2c4b",
+     "char_offset": 1200,
+     "tokens_before": 241
+    },
+    {
+     "prompt_id": "mbpp-92",
+     "char_offset": 760,
+     "tokens_before": 245
+    },
+    {
+     "prompt_id": "oasst1-5702333e-4022-4deb-9928-a24056513d56",
+     "char_offset": 1121,
+     "tokens_before": 253
+    },
+    {
+     "prompt_id": "oasst1-f42dc9c8-267d-4e4c-a3b2-1807a772b6ac",
+     "char_offset": 946,
+     "tokens_before": 257
+    },
+    {
+     "prompt_id": "mbpp-501",
+     "char_offset": 722,
+     "tokens_before": 261
+    },
+    {
+     "prompt_id": "oasst1-34ba2d58-6f0b-4128-8a72-dd8ca6c0065e",
+     "char_offset": 1099,
+     "tokens_before": 273
+    },
+    {
+     "prompt_id": "mbpp-468",
+     "char_offset": 648,
+     "tokens_before": 277
+    },
+    {
+     "prompt_id": "gsm8k-train-7286",
+     "char_offset": 1009,
+     "tokens_before": 297
+    },
+    {
+     "prompt_id": "humaneval-37",
+     "char_offset": 822,
+     "tokens_before": 305
+    },
+    {
+     "prompt_id": "oasst1-f9ccaeea-35ba-4ece-be58-e7a8070f2f6b",
+     "char_offset": 1375,
+     "tokens_before": 305
+    },
+    {
+     "prompt_id": "mbpp-257",
+     "char_offset": 1055,
+     "tokens_before": 313
+    },
+    {
+     "prompt_id": "oasst1-b22dbcbd-0ec0-4ce6-ac2c-8669a991a14c",
+     "char_offset": 1268,
+     "tokens_before": 313
+    },
+    {
+     "prompt_id": "mbpp-508",
+     "char_offset": 1195,
+     "tokens_before": 321
+    },
+    {
+     "prompt_id": "gsm8k-train-5365",
+     "char_offset": 1236,
+     "tokens_before": 325
+    },
+    {
+     "prompt_id": "humaneval-22",
+     "char_offset": 1279,
+     "tokens_before": 329
+    },
+    {
+     "prompt_id": "mbpp-487",
+     "char_offset": 729,
+     "tokens_before": 329
+    },
+    {
+     "prompt_id": "gsm8k-train-2816",
+     "char_offset": 1086,
+     "tokens_before": 333
+    },
+    {
+     "prompt_id": "mtbench-152",
+     "char_offset": 1477,
+     "tokens_before": 337
+    },
+    {
+     "prompt_id": "mbpp-48",
+     "char_offset": 1320,
+     "tokens_before": 349
+    },
+    {
+     "prompt_id": "gsm8k-train-4640",
+     "char_offset": 1230,
+     "tokens_before": 353
+    },
+    {
+     "prompt_id": "mbpp-261",
+     "char_offset": 810,
+     "tokens_before": 353
+    },
+    {
+     "prompt_id": "oasst1-ef922728-1be1-4229-be80-8b97f348cdf0",
+     "char_offset": 1560,
+     "tokens_before": 357
+    },
+    {
+     "prompt_id": "gsm8k-train-0029",
+     "char_offset": 1152,
+     "tokens_before": 365
+    },
+    {
+     "prompt_id": "gsm8k-train-2666",
+     "char_offset": 1511,
+     "tokens_before": 365
+    },
+    {
+     "prompt_id": "humaneval-108",
+     "char_offset": 1089,
+     "tokens_before": 373
+    },
+    {
+     "prompt_id": "mbpp-215",
+     "char_offset": 832,
+     "tokens_before": 381
+    },
+    {
+     "prompt_id": "mtbench-145",
+     "char_offset": 1351,
+     "tokens_before": 393
+    },
+    {
+     "prompt_id": "oasst1-657bde4f-99cb-4822-94d4-ce2d9075d339",
+     "char_offset": 1803,
+     "tokens_before": 397
+    },
+    {
+     "prompt_id": "gsm8k-train-3765",
+     "char_offset": 1507,
+     "tokens_before": 405
+    },
+    {
+     "prompt_id": "gsm8k-train-3348",
+     "char_offset": 1472,
+     "tokens_before": 417
+    },
+    {
+     "prompt_id": "gsm8k-train-3334",
+     "char_offset": 1144,
+     "tokens_before": 421
+    },
+    {
+     "prompt_id": "gsm8k-train-3361",
+     "char_offset": 1167,
+     "tokens_before": 425
+    },
+    {
+     "prompt_id": "gsm8k-train-7311",
+     "char_offset": 1320,
+     "tokens_before": 425
+    },
+    {
+     "prompt_id": "oasst1-6f4db5c0-2ce4-4ffb-bafe-47a7cab610c5",
+     "char_offset": 1938,
+     "tokens_before": 425
+    },
+    {
+     "prompt_id": "humaneval-127",
+     "char_offset": 1372,
+     "tokens_before": 433
+    },
+    {
+     "prompt_id": "oasst1-bf69e6c7-2192-4784-8014-cbf0aa5f46b0",
+     "char_offset": 1726,
+     "tokens_before": 433
+    },
+    {
+     "prompt_id": "gsm8k-train-2999",
+     "char_offset": 1313,
+     "tokens_before": 437
+    },
+    {
+     "prompt_id": "oasst1-e604ad8c-74b4-4a12-899c-9e551d35ddc4",
+     "char_offset": 1548,
+     "tokens_before": 437
+    },
+    {
+     "prompt_id": "mbpp-11",
+     "char_offset": 1705,
+     "tokens_before": 453
+    },
+    {
+     "prompt_id": "oasst1-2231e3fb-93ff-483f-9f6c-b9ba7ff552e9",
+     "char_offset": 1884,
+     "tokens_before": 453
+    },
+    {
+     "prompt_id": "gsm8k-train-2806",
+     "char_offset": 1580,
+     "tokens_before": 461
+    },
+    {
+     "prompt_id": "gsm8k-train-1169",
+     "char_offset": 1590,
+     "tokens_before": 497
+    },
+    {
+     "prompt_id": "gsm8k-train-0483",
+     "char_offset": 1639,
+     "tokens_before": 501
+    },
+    {
+     "prompt_id": "oasst1-d65de35b-f08e-4379-95de-297dfa77fb5f",
+     "char_offset": 1952,
+     "tokens_before": 501
+    }
+   ]
+  },
+  {
+   "test": "B2",
+   "baseline": "A2",
+   "point": "r0/c001",
+   "prompts": 64,
+   "identical": 57,
+   "differing": 7,
+   "completion_tokens": [
+    512
+   ],
+   "tokens_before_min": 177,
+   "tokens_before_median": 329,
+   "first_divergences": [
+    {
+     "prompt_id": "mbpp-502",
+     "char_offset": 850,
+     "tokens_before": 177
+    },
+    {
+     "prompt_id": "oasst1-5dad260e-3d2f-4dbb-a368-806905b4b34d",
+     "char_offset": 1315,
+     "tokens_before": 289
+    },
+    {
+     "prompt_id": "humaneval-162",
+     "char_offset": 1020,
+     "tokens_before": 301
+    },
+    {
+     "prompt_id": "oasst1-72019671-c7e2-4752-a6c1-eda0007a86d9",
+     "char_offset": 1763,
+     "tokens_before": 329
+    },
+    {
+     "prompt_id": "mbpp-299",
+     "char_offset": 1305,
+     "tokens_before": 373
+    },
+    {
+     "prompt_id": "oasst1-6215f73c-d012-4f98-b2b1-66bc66cd912a",
+     "char_offset": 1791,
+     "tokens_before": 409
+    },
+    {
+     "prompt_id": "oasst1-f20e008f-8eeb-421a-ad77-18071e4d96c3",
+     "char_offset": 2007,
+     "tokens_before": 445
+    }
+   ]
+  },
+  {
+   "test": "B2",
+   "baseline": "A2",
+   "point": "r0/c008",
+   "prompts": 64,
+   "identical": 49,
+   "differing": 15,
+   "completion_tokens": [
+    512
+   ],
+   "tokens_before_min": 1,
+   "tokens_before_median": 253,
+   "first_divergences": [
+    {
+     "prompt_id": "mbpp-321",
+     "char_offset": 107,
+     "tokens_before": 1
+    },
+    {
+     "prompt_id": "oasst1-5b6f8e98-b626-46b2-b9a8-65877aefee9a",
+     "char_offset": 342,
+     "tokens_before": 81
+    },
+    {
+     "prompt_id": "oasst1-65e4ec48-2687-472e-b985-79443e3d454b",
+     "char_offset": 462,
+     "tokens_before": 113
+    },
+    {
+     "prompt_id": "oasst1-8f32fa66-9954-4ce4-8751-33164faa67ff",
+     "char_offset": 761,
+     "tokens_before": 157
+    },
+    {
+     "prompt_id": "oasst1-72019671-c7e2-4752-a6c1-eda0007a86d9",
+     "char_offset": 952,
+     "tokens_before": 181
+    },
+    {
+     "prompt_id": "mbpp-301",
+     "char_offset": 757,
+     "tokens_before": 229
+    },
+    {
+     "prompt_id": "oasst1-f20e008f-8eeb-421a-ad77-18071e4d96c3",
+     "char_offset": 1263,
+     "tokens_before": 229
+    },
+    {
+     "prompt_id": "gsm8k-train-2716",
+     "char_offset": 869,
+     "tokens_before": 253
+    },
+    {
+     "prompt_id": "mbpp-299",
+     "char_offset": 845,
+     "tokens_before": 277
+    },
+    {
+     "prompt_id": "mbpp-432",
+     "char_offset": 872,
+     "tokens_before": 285
+    },
+    {
+     "prompt_id": "mtbench-106",
+     "char_offset": 1029,
+     "tokens_before": 317
+    },
+    {
+     "prompt_id": "gsm8k-train-0066",
+     "char_offset": 1071,
+     "tokens_before": 329
+    },
+    {
+     "prompt_id": "oasst1-6215f73c-d012-4f98-b2b1-66bc66cd912a",
+     "char_offset": 1630,
+     "tokens_before": 357
+    },
+    {
+     "prompt_id": "oasst1-ad5bf3fa-229f-455d-87b1-9d5c7b7baab8",
+     "char_offset": 1763,
+     "tokens_before": 429
+    },
+    {
+     "prompt_id": "oasst1-fe6a9022-314e-4ecc-a5ee-1ce6c31f7e81",
+     "char_offset": 1907,
+     "tokens_before": 493
+    }
+   ]
+  },
+  {
+   "test": "B2",
+   "baseline": "A2",
+   "point": "r0/c032",
+   "prompts": 256,
+   "identical": 158,
+   "differing": 98,
+   "completion_tokens": [
+    512
+   ],
+   "tokens_before_min": 1,
+   "tokens_before_median": 211.0,
+   "first_divergences": [
+    {
+     "prompt_id": "mbpp-500",
+     "char_offset": 98,
+     "tokens_before": 1
+    },
+    {
+     "prompt_id": "oasst1-60fea0cd-de70-4e67-99a2-e100174ced13",
+     "char_offset": 336,
+     "tokens_before": 9
+    },
+    {
+     "prompt_id": "mtbench-84",
+     "char_offset": 170,
+     "tokens_before": 17
+    },
+    {
+     "prompt_id": "gsm8k-train-1557",
+     "char_offset": 205,
+     "tokens_before": 29
+    },
+    {
+     "prompt_id": "oasst1-1aed441d-d4c5-41ee-b54f-ca3ac0184dce",
+     "char_offset": 571,
+     "tokens_before": 29
+    },
+    {
+     "prompt_id": "oasst1-82f4510d-d297-4261-8a7e-460bac5502a5",
+     "char_offset": 139,
+     "tokens_before": 29
+    },
+    {
+     "prompt_id": "oasst1-e604ad8c-74b4-4a12-899c-9e551d35ddc4",
+     "char_offset": 128,
+     "tokens_before": 29
+    },
+    {
+     "prompt_id": "mtbench-133",
+     "char_offset": 160,
+     "tokens_before": 33
+    },
+    {
+     "prompt_id": "gsm8k-train-1058",
+     "char_offset": 208,
+     "tokens_before": 45
+    },
+    {
+     "prompt_id": "mbpp-82",
+     "char_offset": 414,
+     "tokens_before": 49
+    },
+    {
+     "prompt_id": "humaneval-66",
+     "char_offset": 221,
+     "tokens_before": 53
+    },
+    {
+     "prompt_id": "oasst1-7adaed70-9a34-4e25-a026-836d2e1a8ace",
+     "char_offset": 745,
+     "tokens_before": 53
+    },
+    {
+     "prompt_id": "gsm8k-train-7390",
+     "char_offset": 629,
+     "tokens_before": 65
+    },
+    {
+     "prompt_id": "oasst1-f9ccaeea-35ba-4ece-be58-e7a8070f2f6b",
+     "char_offset": 304,
+     "tokens_before": 65
+    },
+    {
+     "prompt_id": "oasst1-5dad260e-3d2f-4dbb-a368-806905b4b34d",
+     "char_offset": 321,
+     "tokens_before": 69
+    },
+    {
+     "prompt_id": "oasst1-c7454871-bd4f-4352-af6a-f89ff4f4f317",
+     "char_offset": 287,
+     "tokens_before": 73
+    },
+    {
+     "prompt_id": "humaneval-121",
+     "char_offset": 286,
+     "tokens_before": 77
+    },
+    {
+     "prompt_id": "gsm8k-train-7069",
+     "char_offset": 323,
+     "tokens_before": 85
+    },
+    {
+     "prompt_id": "oasst1-a10cc991-3ceb-4846-abd7-7aaa55bd594a",
+     "char_offset": 403,
+     "tokens_before": 85
+    },
+    {
+     "prompt_id": "oasst1-b6feca95-4ce0-4fe8-8b97-c6b9f83d1e3a",
+     "char_offset": 457,
+     "tokens_before": 89
+    },
+    {
+     "prompt_id": "oasst1-c1eb313c-9530-4968-83b0-e2ab9b83c69a",
+     "char_offset": 457,
+     "tokens_before": 89
+    },
+    {
+     "prompt_id": "mbpp-487",
+     "char_offset": 729,
+     "tokens_before": 109
+    },
+    {
+     "prompt_id": "mbpp-501",
+     "char_offset": 289,
+     "tokens_before": 113
+    },
+    {
+     "prompt_id": "mbpp-48",
+     "char_offset": 477,
+     "tokens_before": 117
+    },
+    {
+     "prompt_id": "gsm8k-train-5590",
+     "char_offset": 434,
+     "tokens_before": 121
+    },
+    {
+     "prompt_id": "oasst1-2c27f83f-1a8d-4c27-b059-4af88b1c975b",
+     "char_offset": 487,
+     "tokens_before": 121
+    },
+    {
+     "prompt_id": "gsm8k-train-3581",
+     "char_offset": 488,
+     "tokens_before": 133
+    },
+    {
+     "prompt_id": "humaneval-75",
+     "char_offset": 451,
+     "tokens_before": 137
+    },
+    {
+     "prompt_id": "oasst1-445f658d-ab6d-426b-bdbb-1d87b3c489ce",
+     "char_offset": 476,
+     "tokens_before": 137
+    },
+    {
+     "prompt_id": "oasst1-1b12f145-91f8-4457-a773-8e0f97073103",
+     "char_offset": 632,
+     "tokens_before": 141
+    },
+    {
+     "prompt_id": "mtbench-114",
+     "char_offset": 494,
+     "tokens_before": 145
+    },
+    {
+     "prompt_id": "oasst1-5c941d72-bc04-4dea-b4d9-21f98646c1c9",
+     "char_offset": 590,
+     "tokens_before": 145
+    },
+    {
+     "prompt_id": "oasst1-7e7d30ee-7b32-41c9-a239-8bc580153490",
+     "char_offset": 614,
+     "tokens_before": 149
+    },
+    {
+     "prompt_id": "oasst1-4765a8d9-6bc0-4e63-8598-9edee64aaca1",
+     "char_offset": 585,
+     "tokens_before": 153
+    },
+    {
+     "prompt_id": "gsm8k-train-0657",
+     "char_offset": 531,
+     "tokens_before": 157
+    },
+    {
+     "prompt_id": "oasst1-5851d3f2-c76c-482f-9557-0b757c0f77c0",
+     "char_offset": 656,
+     "tokens_before": 157
+    },
+    {
+     "prompt_id": "gsm8k-train-3238",
+     "char_offset": 517,
+     "tokens_before": 161
+    },
+    {
+     "prompt_id": "mbpp-255",
+     "char_offset": 677,
+     "tokens_before": 165
+    },
+    {
+     "prompt_id": "mbpp-278",
+     "char_offset": 437,
+     "tokens_before": 169
+    },
+    {
+     "prompt_id": "oasst1-54420bea-464c-4e3d-869b-3782a201c108",
+     "char_offset": 699,
+     "tokens_before": 169
+    },
+    {
+     "prompt_id": "humaneval-59",
+     "char_offset": 616,
+     "tokens_before": 177
+    },
+    {
+     "prompt_id": "oasst1-d65de35b-f08e-4379-95de-297dfa77fb5f",
+     "char_offset": 781,
+     "tokens_before": 189
+    },
+    {
+     "prompt_id": "mbpp-180",
+     "char_offset": 598,
+     "tokens_before": 193
+    },
+    {
+     "prompt_id": "oasst1-35403ce0-2ffe-4d85-99d3-23f2a49fb6f1",
+     "char_offset": 749,
+     "tokens_before": 197
+    },
+    {
+     "prompt_id": "oasst1-26b5b4d5-73a2-493c-8218-83054ba59473",
+     "char_offset": 915,
+     "tokens_before": 201
+    },
+    {
+     "prompt_id": "gsm8k-train-1356",
+     "char_offset": 997,
+     "tokens_before": 205
+    },
+    {
+     "prompt_id": "mbpp-339",
+     "char_offset": 655,
+     "tokens_before": 205
+    },
+    {
+     "prompt_id": "oasst1-08d3e390-810d-45ac-b117-c9abb60384b1",
+     "char_offset": 783,
+     "tokens_before": 205
+    },
+    {
+     "prompt_id": "oasst1-b22dbcbd-0ec0-4ce6-ac2c-8669a991a14c",
+     "char_offset": 964,
+     "tokens_before": 205
+    },
+    {
+     "prompt_id": "oasst1-b83964c9-c9e8-4f41-9de2-e98da536ccb5",
+     "char_offset": 915,
+     "tokens_before": 217
+    },
+    {
+     "prompt_id": "gsm8k-train-5154",
+     "char_offset": 924,
+     "tokens_before": 221
+    },
+    {
+     "prompt_id": "mbpp-163",
+     "char_offset": 556,
+     "tokens_before": 221
+    },
+    {
+     "prompt_id": "oasst1-ef922728-1be1-4229-be80-8b97f348cdf0",
+     "char_offset": 971,
+     "tokens_before": 225
+    },
+    {
+     "prompt_id": "oasst1-29608c82-3268-4efe-b3d7-162ba78d60a9",
+     "char_offset": 1014,
+     "tokens_before": 233
+    },
+    {
+     "prompt_id": "oasst1-cbc9bb91-2280-4bf5-96af-701e94a502c4",
+     "char_offset": 1113,
+     "tokens_before": 233
+    },
+    {
+     "prompt_id": "oasst1-d1c4e871-7b9d-4cc4-bd1a-d2312578b5d6",
+     "char_offset": 1085,
+     "tokens_before": 241
+    },
+    {
+     "prompt_id": "oasst1-f42dc9c8-267d-4e4c-a3b2-1807a772b6ac",
+     "char_offset": 946,
+     "tokens_before": 257
+    },
+    {
+     "prompt_id": "gsm8k-train-3035",
+     "char_offset": 840,
+     "tokens_before": 261
+    },
+    {
+     "prompt_id": "oasst1-3468f18b-e2e5-4a04-8104-975126495133",
+     "char_offset": 1011,
+     "tokens_before": 261
+    },
+    {
+     "prompt_id": "gsm8k-train-2816",
+     "char_offset": 793,
+     "tokens_before": 269
+    },
+    {
+     "prompt_id": "oasst1-34ba2d58-6f0b-4128-8a72-dd8ca6c0065e",
+     "char_offset": 1068,
+     "tokens_before": 273
+    },
+    {
+     "prompt_id": "mbpp-185",
+     "char_offset": 948,
+     "tokens_before": 277
+    },
+    {
+     "prompt_id": "mbpp-468",
+     "char_offset": 648,
+     "tokens_before": 277
+    },
+    {
+     "prompt_id": "gsm8k-train-3388",
+     "char_offset": 1023,
+     "tokens_before": 281
+    },
+    {
+     "prompt_id": "gsm8k-train-7286",
+     "char_offset": 1009,
+     "tokens_before": 297
+    },
+    {
+     "prompt_id": "mbpp-244",
+     "char_offset": 892,
+     "tokens_before": 301
+    },
+    {
+     "prompt_id": "gsm8k-train-6463",
+     "char_offset": 1209,
+     "tokens_before": 305
+    },
+    {
+     "prompt_id": "humaneval-37",
+     "char_offset": 822,
+     "tokens_before": 305
+    },
+    {
+     "prompt_id": "humaneval-108",
+     "char_offset": 1027,
+     "tokens_before": 313
+    },
+    {
+     "prompt_id": "oasst1-af37446e-951e-43af-94d1-12d9e8326209",
+     "char_offset": 1342,
+     "tokens_before": 313
+    },
+    {
+     "prompt_id": "mbpp-508",
+     "char_offset": 1300,
+     "tokens_before": 321
+    },
+    {
+     "prompt_id": "gsm8k-train-2551",
+     "char_offset": 1203,
+     "tokens_before": 337
+    },
+    {
+     "prompt_id": "gsm8k-train-3361",
+     "char_offset": 962,
+     "tokens_before": 337
+    },
+    {
+     "prompt_id": "mbpp-434",
+     "char_offset": 1341,
+     "tokens_before": 369
+    },
+    {
+     "prompt_id": "mbpp-78",
+     "char_offset": 800,
+     "tokens_before": 377
+    },
+    {
+     "prompt_id": "oasst1-08a3decf-06cd-4065-84ed-26570921ed51",
+     "char_offset": 1653,
+     "tokens_before": 389
+    },
+    {
+     "prompt_id": "humaneval-69",
+     "char_offset": 1070,
+     "tokens_before": 393
+    },
+    {
+     "prompt_id": "mbpp-298",
+     "char_offset": 1017,
+     "tokens_before": 393
+    },
+    {
+     "prompt_id": "mbpp-379",
+     "char_offset": 1152,
+     "tokens_before": 397
+    },
+    {
+     "prompt_id": "oasst1-5702333e-4022-4deb-9928-a24056513d56",
+     "char_offset": 1635,
+     "tokens_before": 397
+    },
+    {
+     "prompt_id": "mtbench-141",
+     "char_offset": 1918,
+     "tokens_before": 405
+    },
+    {
+     "prompt_id": "mtbench-152",
+     "char_offset": 1661,
+     "tokens_before": 417
+    },
+    {
+     "prompt_id": "gsm8k-train-3334",
+     "char_offset": 1144,
+     "tokens_before": 421
+    },
+    {
+     "prompt_id": "gsm8k-train-7311",
+     "char_offset": 1320,
+     "tokens_before": 425
+    },
+    {
+     "prompt_id": "mbpp-182",
+     "char_offset": 1158,
+     "tokens_before": 425
+    },
+    {
+     "prompt_id": "oasst1-1544891a-5029-4477-aa9d-ee65a1923fad",
+     "char_offset": 1550,
+     "tokens_before": 425
+    },
+    {
+     "prompt_id": "oasst1-8928dce5-a1fd-41ee-bbfc-e166330114ea",
+     "char_offset": 1727,
+     "tokens_before": 437
+    },
+    {
+     "prompt_id": "oasst1-32bff71f-97d2-455c-a8bc-35440e8af207",
+     "char_offset": 2186,
+     "tokens_before": 445
+    },
+    {
+     "prompt_id": "oasst1-56f0f4d2-a1f5-4627-982d-e7451af21748",
+     "char_offset": 1637,
+     "tokens_before": 449
+    },
+    {
+     "prompt_id": "gsm8k-train-2806",
+     "char_offset": 1580,
+     "tokens_before": 461
+    },
+    {
+     "prompt_id": "gsm8k-train-5759",
+     "char_offset": 1567,
+     "tokens_before": 461
+    },
+    {
+     "prompt_id": "oasst1-7a01bcd6-5f4b-41c8-ad76-7b536a1e7d22",
+     "char_offset": 1863,
+     "tokens_before": 465
+    },
+    {
+     "prompt_id": "mbpp-310",
+     "char_offset": 1447,
+     "tokens_before": 469
+    },
+    {
+     "prompt_id": "mbpp-362",
+     "char_offset": 1213,
+     "tokens_before": 473
+    },
+    {
+     "prompt_id": "gsm8k-train-5770",
+     "char_offset": 1511,
+     "tokens_before": 481
+    },
+    {
+     "prompt_id": "gsm8k-train-1169",
+     "char_offset": 1590,
+     "tokens_before": 497
+    },
+    {
+     "prompt_id": "oasst1-c26eb9c6-b565-4114-afef-9f96a5da0e9c",
+     "char_offset": 2196,
+     "tokens_before": 497
+    },
+    {
+     "prompt_id": "oasst1-993d80d3-6231-42e4-b174-02d88b45b342",
+     "char_offset": 2003,
+     "tokens_before": 501
+    }
+   ]
+  },
+  {
+   "test": "A2",
+   "baseline": "A1",
+   "point": "r0/c001",
+   "prompts": 64,
+   "identical": 64,
+   "differing": 0,
+   "completion_tokens": [
+    512
+   ],
+   "tokens_before_min": null,
+   "tokens_before_median": null,
+   "first_divergences": []
+  },
+  {
+   "test": "A2",
+   "baseline": "A1",
+   "point": "r0/c008",
+   "prompts": 64,
+   "identical": 64,
+   "differing": 0,
+   "completion_tokens": [
+    512
+   ],
+   "tokens_before_min": null,
+   "tokens_before_median": null,
+   "first_divergences": []
+  },
+  {
+   "test": "A2",
+   "baseline": "A1",
+   "point": "r0/c032",
+   "prompts": 256,
+   "identical": 211,
+   "differing": 45,
+   "completion_tokens": [
+    512
+   ],
+   "tokens_before_min": 29,
+   "tokens_before_median": 301,
+   "first_divergences": [
+    {
+     "prompt_id": "oasst1-317b1bd5-af37-4a33-9138-816319834821",
+     "char_offset": 127,
+     "tokens_before": 29
+    },
+    {
+     "prompt_id": "oasst1-82f4510d-d297-4261-8a7e-460bac5502a5",
+     "char_offset": 139,
+     "tokens_before": 29
+    },
+    {
+     "prompt_id": "oasst1-7adaed70-9a34-4e25-a026-836d2e1a8ace",
+     "char_offset": 745,
+     "tokens_before": 53
+    },
+    {
+     "prompt_id": "oasst1-c1eb313c-9530-4968-83b0-e2ab9b83c69a",
+     "char_offset": 457,
+     "tokens_before": 89
+    },
+    {
+     "prompt_id": "mbpp-473",
+     "char_offset": 293,
+     "tokens_before": 97
+    },
+    {
+     "prompt_id": "oasst1-56f0f4d2-a1f5-4627-982d-e7451af21748",
+     "char_offset": 423,
+     "tokens_before": 105
+    },
+    {
+     "prompt_id": "oasst1-c7454871-bd4f-4352-af6a-f89ff4f4f317",
+     "char_offset": 397,
+     "tokens_before": 105
+    },
+    {
+     "prompt_id": "mbpp-487",
+     "char_offset": 729,
+     "tokens_before": 109
+    },
+    {
+     "prompt_id": "oasst1-60fea0cd-de70-4e67-99a2-e100174ced13",
+     "char_offset": 472,
+     "tokens_before": 109
+    },
+    {
+     "prompt_id": "mbpp-501",
+     "char_offset": 289,
+     "tokens_before": 113
+    },
+    {
+     "prompt_id": "mbpp-48",
+     "char_offset": 477,
+     "tokens_before": 117
+    },
+    {
+     "prompt_id": "oasst1-1b12f145-91f8-4457-a773-8e0f97073103",
+     "char_offset": 632,
+     "tokens_before": 141
+    },
+    {
+     "prompt_id": "oasst1-cbc9bb91-2280-4bf5-96af-701e94a502c4",
+     "char_offset": 755,
+     "tokens_before": 149
+    },
+    {
+     "prompt_id": "oasst1-5c941d72-bc04-4dea-b4d9-21f98646c1c9",
+     "char_offset": 849,
+     "tokens_before": 201
+    },
+    {
+     "prompt_id": "oasst1-ef922728-1be1-4229-be80-8b97f348cdf0",
+     "char_offset": 971,
+     "tokens_before": 225
+    },
+    {
+     "prompt_id": "gsm8k-train-3581",
+     "char_offset": 829,
+     "tokens_before": 229
+    },
+    {
+     "prompt_id": "oasst1-26b5b4d5-73a2-493c-8218-83054ba59473",
+     "char_offset": 950,
+     "tokens_before": 229
+    },
+    {
+     "prompt_id": "gsm8k-train-1557",
+     "char_offset": 871,
+     "tokens_before": 233
+    },
+    {
+     "prompt_id": "humaneval-75",
+     "char_offset": 796,
+     "tokens_before": 253
+    },
+    {
+     "prompt_id": "oasst1-5702333e-4022-4deb-9928-a24056513d56",
+     "char_offset": 1121,
+     "tokens_before": 253
+    },
+    {
+     "prompt_id": "gsm8k-train-2816",
+     "char_offset": 793,
+     "tokens_before": 269
+    },
+    {
+     "prompt_id": "oasst1-8928dce5-a1fd-41ee-bbfc-e166330114ea",
+     "char_offset": 1161,
+     "tokens_before": 269
+    },
+    {
+     "prompt_id": "mbpp-244",
+     "char_offset": 892,
+     "tokens_before": 301
+    },
+    {
+     "prompt_id": "humaneval-37",
+     "char_offset": 833,
+     "tokens_before": 305
+    },
+    {
+     "prompt_id": "oasst1-e604ad8c-74b4-4a12-899c-9e551d35ddc4",
+     "char_offset": 1191,
+     "tokens_before": 313
+    },
+    {
+     "prompt_id": "gsm8k-train-0733",
+     "char_offset": 1201,
+     "tokens_before": 317
+    },
+    {
+     "prompt_id": "oasst1-35403ce0-2ffe-4d85-99d3-23f2a49fb6f1",
+     "char_offset": 1236,
+     "tokens_before": 317
+    },
+    {
+     "prompt_id": "mbpp-508",
+     "char_offset": 1214,
+     "tokens_before": 321
+    },
+    {
+     "prompt_id": "gsm8k-train-5365",
+     "char_offset": 1508,
+     "tokens_before": 325
+    },
+    {
+     "prompt_id": "gsm8k-train-4114",
+     "char_offset": 1105,
+     "tokens_before": 333
+    },
+    {
+     "prompt_id": "gsm8k-train-4756",
+     "char_offset": 1102,
+     "tokens_before": 333
+    },
+    {
+     "prompt_id": "oasst1-b83964c9-c9e8-4f41-9de2-e98da536ccb5",
+     "char_offset": 1431,
+     "tokens_before": 349
+    },
+    {
+     "prompt_id": "mbpp-261",
+     "char_offset": 810,
+     "tokens_before": 353
+    },
+    {
+     "prompt_id": "gsm8k-train-0029",
+     "char_offset": 1152,
+     "tokens_before": 365
+    },
+    {
+     "prompt_id": "mbpp-78",
+     "char_offset": 800,
+     "tokens_before": 377
+    },
+    {
+     "prompt_id": "oasst1-b6feca95-4ce0-4fe8-8b97-c6b9f83d1e3a",
+     "char_offset": 1486,
+     "tokens_before": 377
+    },
+    {
+     "prompt_id": "mbpp-298",
+     "char_offset": 1017,
+     "tokens_before": 393
+    },
+    {
+     "prompt_id": "gsm8k-train-3765",
+     "char_offset": 1507,
+     "tokens_before": 405
+    },
+    {
+     "prompt_id": "gsm8k-train-3035",
+     "char_offset": 1382,
+     "tokens_before": 437
+    },
+    {
+     "prompt_id": "gsm8k-train-5590",
+     "char_offset": 1334,
+     "tokens_before": 457
+    },
+    {
+     "prompt_id": "gsm8k-train-5759",
+     "char_offset": 1567,
+     "tokens_before": 461
+    },
+    {
+     "prompt_id": "oasst1-7a01bcd6-5f4b-41c8-ad76-7b536a1e7d22",
+     "char_offset": 1863,
+     "tokens_before": 465
+    },
+    {
+     "prompt_id": "mbpp-200",
+     "char_offset": 1289,
+     "tokens_before": 489
+    },
+    {
+     "prompt_id": "mbpp-61",
+     "char_offset": 996,
+     "tokens_before": 493
+    },
+    {
+     "prompt_id": "gsm8k-train-7311",
+     "char_offset": 1514,
+     "tokens_before": 497
+    }
+   ]
+  },
+  {
+   "test": "B2",
+   "baseline": "B1",
+   "point": "r0/c001",
+   "prompts": 64,
+   "identical": 64,
+   "differing": 0,
+   "completion_tokens": [
+    512
+   ],
+   "tokens_before_min": null,
+   "tokens_before_median": null,
+   "first_divergences": []
+  },
+  {
+   "test": "B2",
+   "baseline": "B1",
+   "point": "r0/c008",
+   "prompts": 64,
+   "identical": 64,
+   "differing": 0,
+   "completion_tokens": [
+    512
+   ],
+   "tokens_before_min": null,
+   "tokens_before_median": null,
+   "first_divergences": []
+  },
+  {
+   "test": "B2",
+   "baseline": "B1",
+   "point": "r0/c032",
+   "prompts": 256,
+   "identical": 125,
+   "differing": 131,
+   "completion_tokens": [
+    512
+   ],
+   "tokens_before_min": 0,
+   "tokens_before_median": 217,
+   "first_divergences": [
+    {
+     "prompt_id": "humaneval-49",
+     "char_offset": 2,
+     "tokens_before": 0
+    },
+    {
+     "prompt_id": "gsm8k-train-3238",
+     "char_offset": 120,
+     "tokens_before": 1
+    },
+    {
+     "prompt_id": "mbpp-137",
+     "char_offset": 188,
+     "tokens_before": 5
+    },
+    {
+     "prompt_id": "oasst1-5c941d72-bc04-4dea-b4d9-21f98646c1c9",
+     "char_offset": 96,
+     "tokens_before": 9
+    },
+    {
+     "prompt_id": "oasst1-60fea0cd-de70-4e67-99a2-e100174ced13",
+     "char_offset": 336,
+     "tokens_before": 9
+    },
+    {
+     "prompt_id": "oasst1-1b12f145-91f8-4457-a773-8e0f97073103",
+     "char_offset": 242,
+     "tokens_before": 13
+    },
+    {
+     "prompt_id": "oasst1-355dc7a3-1d9f-4bbb-a89a-93ca97b0fca8",
+     "char_offset": 144,
+     "tokens_before": 13
+    },
+    {
+     "prompt_id": "gsm8k-train-7371",
+     "char_offset": 149,
+     "tokens_before": 17
+    },
+    {
+     "prompt_id": "mbpp-104",
+     "char_offset": 91,
+     "tokens_before": 17
+    },
+    {
+     "prompt_id": "mbpp-309",
+     "char_offset": 115,
+     "tokens_before": 17
+    },
+    {
+     "prompt_id": "gsm8k-train-2551",
+     "char_offset": 101,
+     "tokens_before": 21
+    },
+    {
+     "prompt_id": "gsm8k-train-5759",
+     "char_offset": 569,
+     "tokens_before": 29
+    },
+    {
+     "prompt_id": "gsm8k-train-5781",
+     "char_offset": 409,
+     "tokens_before": 29
+    },
+    {
+     "prompt_id": "oasst1-1aed441d-d4c5-41ee-b54f-ca3ac0184dce",
+     "char_offset": 571,
+     "tokens_before": 29
+    },
+    {
+     "prompt_id": "oasst1-e604ad8c-74b4-4a12-899c-9e551d35ddc4",
+     "char_offset": 128,
+     "tokens_before": 29
+    },
+    {
+     "prompt_id": "mtbench-133",
+     "char_offset": 160,
+     "tokens_before": 33
+    },
+    {
+     "prompt_id": "oasst1-b83964c9-c9e8-4f41-9de2-e98da536ccb5",
+     "char_offset": 154,
+     "tokens_before": 33
+    },
+    {
+     "prompt_id": "oasst1-f6105517-bff7-4ede-9d77-db89fcec121e",
+     "char_offset": 149,
+     "tokens_before": 33
+    },
+    {
+     "prompt_id": "gsm8k-train-1283",
+     "char_offset": 227,
+     "tokens_before": 37
+    },
+    {
+     "prompt_id": "oasst1-445f658d-ab6d-426b-bdbb-1d87b3c489ce",
+     "char_offset": 170,
+     "tokens_before": 41
+    },
+    {
+     "prompt_id": "mbpp-500",
+     "char_offset": 271,
+     "tokens_before": 45
+    },
+    {
+     "prompt_id": "mbpp-330",
+     "char_offset": 633,
+     "tokens_before": 49
+    },
+    {
+     "prompt_id": "mbpp-82",
+     "char_offset": 414,
+     "tokens_before": 49
+    },
+    {
+     "prompt_id": "oasst1-2c629174-2898-4b56-9bd4-f88d073d5b39",
+     "char_offset": 576,
+     "tokens_before": 53
+    },
+    {
+     "prompt_id": "oasst1-26b5b4d5-73a2-493c-8218-83054ba59473",
+     "char_offset": 366,
+     "tokens_before": 57
+    },
+    {
+     "prompt_id": "oasst1-993d80d3-6231-42e4-b174-02d88b45b342",
+     "char_offset": 239,
+     "tokens_before": 57
+    },
+    {
+     "prompt_id": "oasst1-af37446e-951e-43af-94d1-12d9e8326209",
+     "char_offset": 320,
+     "tokens_before": 61
+    },
+    {
+     "prompt_id": "oasst1-c7454871-bd4f-4352-af6a-f89ff4f4f317",
+     "char_offset": 303,
+     "tokens_before": 61
+    },
+    {
+     "prompt_id": "oasst1-08d3e390-810d-45ac-b117-c9abb60384b1",
+     "char_offset": 409,
+     "tokens_before": 65
+    },
+    {
+     "prompt_id": "oasst1-f9ccaeea-35ba-4ece-be58-e7a8070f2f6b",
+     "char_offset": 304,
+     "tokens_before": 65
+    },
+    {
+     "prompt_id": "gsm8k-train-3373",
+     "char_offset": 283,
+     "tokens_before": 73
+    },
+    {
+     "prompt_id": "oasst1-4765a8d9-6bc0-4e63-8598-9edee64aaca1",
+     "char_offset": 294,
+     "tokens_before": 73
+    },
+    {
+     "prompt_id": "humaneval-121",
+     "char_offset": 286,
+     "tokens_before": 77
+    },
+    {
+     "prompt_id": "oasst1-7a01bcd6-5f4b-41c8-ad76-7b536a1e7d22",
+     "char_offset": 347,
+     "tokens_before": 77
+    },
+    {
+     "prompt_id": "oasst1-a10cc991-3ceb-4846-abd7-7aaa55bd594a",
+     "char_offset": 365,
+     "tokens_before": 81
+    },
+    {
+     "prompt_id": "oasst1-b6feca95-4ce0-4fe8-8b97-c6b9f83d1e3a",
+     "char_offset": 457,
+     "tokens_before": 89
+    },
+    {
+     "prompt_id": "oasst1-c1eb313c-9530-4968-83b0-e2ab9b83c69a",
+     "char_offset": 457,
+     "tokens_before": 89
+    },
+    {
+     "prompt_id": "oasst1-5851d3f2-c76c-482f-9557-0b757c0f77c0",
+     "char_offset": 413,
+     "tokens_before": 93
+    },
+    {
+     "prompt_id": "mbpp-473",
+     "char_offset": 293,
+     "tokens_before": 97
+    },
+    {
+     "prompt_id": "gsm8k-train-4114",
+     "char_offset": 473,
+     "tokens_before": 105
+    },
+    {
+     "prompt_id": "humaneval-75",
+     "char_offset": 395,
+     "tokens_before": 105
+    },
+    {
+     "prompt_id": "oasst1-56f0f4d2-a1f5-4627-982d-e7451af21748",
+     "char_offset": 423,
+     "tokens_before": 105
+    },
+    {
+     "prompt_id": "oasst1-1fbd3b71-9fa6-4545-a7e9-83419fec32b3",
+     "char_offset": 419,
+     "tokens_before": 121
+    },
+    {
+     "prompt_id": "oasst1-7e7d30ee-7b32-41c9-a239-8bc580153490",
+     "char_offset": 524,
+     "tokens_before": 125
+    },
+    {
+     "prompt_id": "mbpp-344",
+     "char_offset": 551,
+     "tokens_before": 133
+    },
+    {
+     "prompt_id": "oasst1-cbc9bb91-2280-4bf5-96af-701e94a502c4",
+     "char_offset": 602,
+     "tokens_before": 133
+    },
+    {
+     "prompt_id": "gsm8k-train-0545",
+     "char_offset": 512,
+     "tokens_before": 137
+    },
+    {
+     "prompt_id": "mbpp-298",
+     "char_offset": 455,
+     "tokens_before": 141
+    },
+    {
+     "prompt_id": "oasst1-5dad260e-3d2f-4dbb-a368-806905b4b34d",
+     "char_offset": 643,
+     "tokens_before": 141
+    },
+    {
+     "prompt_id": "mtbench-114",
+     "char_offset": 494,
+     "tokens_before": 145
+    },
+    {
+     "prompt_id": "oasst1-1cdc4856-a425-4c01-8a3e-07d24edf0431",
+     "char_offset": 632,
+     "tokens_before": 153
+    },
+    {
+     "prompt_id": "oasst1-d2e77607-7fc7-4996-9a1e-7b3a6272d6f4",
+     "char_offset": 642,
+     "tokens_before": 153
+    },
+    {
+     "prompt_id": "mbpp-438",
+     "char_offset": 318,
+     "tokens_before": 161
+    },
+    {
+     "prompt_id": "mbpp-255",
+     "char_offset": 677,
+     "tokens_before": 165
+    },
+    {
+     "prompt_id": "humaneval-59",
+     "char_offset": 735,
+     "tokens_before": 177
+    },
+    {
+     "prompt_id": "oasst1-d65de35b-f08e-4379-95de-297dfa77fb5f",
+     "char_offset": 781,
+     "tokens_before": 189
+    },
+    {
+     "prompt_id": "gsm8k-train-0657",
+     "char_offset": 671,
+     "tokens_before": 197
+    },
+    {
+     "prompt_id": "oasst1-35403ce0-2ffe-4d85-99d3-23f2a49fb6f1",
+     "char_offset": 749,
+     "tokens_before": 197
+    },
+    {
+     "prompt_id": "oasst1-a6c68c47-a316-464e-9124-ec81b3323748",
+     "char_offset": 836,
+     "tokens_before": 201
+    },
+    {
+     "prompt_id": "gsm8k-train-1356",
+     "char_offset": 997,
+     "tokens_before": 205
+    },
+    {
+     "prompt_id": "gsm8k-train-4280",
+     "char_offset": 843,
+     "tokens_before": 205
+    },
+    {
+     "prompt_id": "oasst1-317b1bd5-af37-4a33-9138-816319834821",
+     "char_offset": 952,
+     "tokens_before": 205
+    },
+    {
+     "prompt_id": "oasst1-b22dbcbd-0ec0-4ce6-ac2c-8669a991a14c",
+     "char_offset": 964,
+     "tokens_before": 205
+    },
+    {
+     "prompt_id": "gsm8k-train-0546",
+     "char_offset": 787,
+     "tokens_before": 209
+    },
+    {
+     "prompt_id": "gsm8k-train-2721",
+     "char_offset": 851,
+     "tokens_before": 213
+    },
+    {
+     "prompt_id": "mbpp-434",
+     "char_offset": 726,
+     "tokens_before": 217
+    },
+    {
+     "prompt_id": "mbpp-163",
+     "char_offset": 556,
+     "tokens_before": 221
+    },
+    {
+     "prompt_id": "mbpp-185",
+     "char_offset": 915,
+     "tokens_before": 221
+    },
+    {
+     "prompt_id": "gsm8k-train-0706",
+     "char_offset": 695,
+     "tokens_before": 225
+    },
+    {
+     "prompt_id": "gsm8k-train-6463",
+     "char_offset": 894,
+     "tokens_before": 225
+    },
+    {
+     "prompt_id": "humaneval-29",
+     "char_offset": 1594,
+     "tokens_before": 225
+    },
+    {
+     "prompt_id": "oasst1-8928dce5-a1fd-41ee-bbfc-e166330114ea",
+     "char_offset": 978,
+     "tokens_before": 225
+    },
+    {
+     "prompt_id": "oasst1-29608c82-3268-4efe-b3d7-162ba78d60a9",
+     "char_offset": 1014,
+     "tokens_before": 233
+    },
+    {
+     "prompt_id": "gsm8k-train-3860",
+     "char_offset": 839,
+     "tokens_before": 237
+    },
+    {
+     "prompt_id": "gsm8k-train-3581",
+     "char_offset": 836,
+     "tokens_before": 241
+    },
+    {
+     "prompt_id": "oasst1-388bab3a-38bd-4a9c-91e0-1175730d2c4b",
+     "char_offset": 1200,
+     "tokens_before": 241
+    },
+    {
+     "prompt_id": "oasst1-d1c4e871-7b9d-4cc4-bd1a-d2312578b5d6",
+     "char_offset": 1085,
+     "tokens_before": 241
+    },
+    {
+     "prompt_id": "mbpp-92",
+     "char_offset": 760,
+     "tokens_before": 245
+    },
+    {
+     "prompt_id": "oasst1-82f4510d-d297-4261-8a7e-460bac5502a5",
+     "char_offset": 1012,
+     "tokens_before": 245
+    },
+    {
+     "prompt_id": "gsm8k-train-3035",
+     "char_offset": 840,
+     "tokens_before": 261
+    },
+    {
+     "prompt_id": "mbpp-501",
+     "char_offset": 722,
+     "tokens_before": 261
+    },
+    {
+     "prompt_id": "oasst1-3468f18b-e2e5-4a04-8104-975126495133",
+     "char_offset": 1011,
+     "tokens_before": 261
+    },
+    {
+     "prompt_id": "oasst1-34ba2d58-6f0b-4128-8a72-dd8ca6c0065e",
+     "char_offset": 1068,
+     "tokens_before": 273
+    },
+    {
+     "prompt_id": "gsm8k-train-3388",
+     "char_offset": 1023,
+     "tokens_before": 281
+    },
+    {
+     "prompt_id": "mtbench-84",
+     "char_offset": 1076,
+     "tokens_before": 289
+    },
+    {
+     "prompt_id": "oasst1-54420bea-464c-4e3d-869b-3782a201c108",
+     "char_offset": 1254,
+     "tokens_before": 305
+    },
+    {
+     "prompt_id": "humaneval-108",
+     "char_offset": 1027,
+     "tokens_before": 313
+    },
+    {
+     "prompt_id": "mbpp-257",
+     "char_offset": 1055,
+     "tokens_before": 313
+    },
+    {
+     "prompt_id": "gsm8k-train-0733",
+     "char_offset": 1201,
+     "tokens_before": 317
+    },
+    {
+     "prompt_id": "mbpp-508",
+     "char_offset": 1195,
+     "tokens_before": 321
+    },
+    {
+     "prompt_id": "gsm8k-train-5365",
+     "char_offset": 1236,
+     "tokens_before": 325
+    },
+    {
+     "prompt_id": "oasst1-2c27f83f-1a8d-4c27-b059-4af88b1c975b",
+     "char_offset": 1363,
+     "tokens_before": 325
+    },
+    {
+     "prompt_id": "humaneval-22",
+     "char_offset": 1279,
+     "tokens_before": 329
+    },
+    {
+     "prompt_id": "mbpp-487",
+     "char_offset": 729,
+     "tokens_before": 329
+    },
+    {
+     "prompt_id": "gsm8k-train-4756",
+     "char_offset": 1102,
+     "tokens_before": 333
+    },
+    {
+     "prompt_id": "mbpp-339",
+     "char_offset": 1063,
+     "tokens_before": 333
+    },
+    {
+     "prompt_id": "gsm8k-train-3361",
+     "char_offset": 962,
+     "tokens_before": 337
+    },
+    {
+     "prompt_id": "mtbench-152",
+     "char_offset": 1477,
+     "tokens_before": 337
+    },
+    {
+     "prompt_id": "oasst1-f42dc9c8-267d-4e4c-a3b2-1807a772b6ac",
+     "char_offset": 1273,
+     "tokens_before": 345
+    },
+    {
+     "prompt_id": "gsm8k-train-4640",
+     "char_offset": 1230,
+     "tokens_before": 353
+    },
+    {
+     "prompt_id": "gsm8k-train-1058",
+     "char_offset": 1154,
+     "tokens_before": 361
+    },
+    {
+     "prompt_id": "gsm8k-train-2666",
+     "char_offset": 1511,
+     "tokens_before": 365
+    },
+    {
+     "prompt_id": "mbpp-215",
+     "char_offset": 832,
+     "tokens_before": 381
+    },
+    {
+     "prompt_id": "oasst1-08a3decf-06cd-4065-84ed-26570921ed51",
+     "char_offset": 1653,
+     "tokens_before": 389
+    },
+    {
+     "prompt_id": "humaneval-69",
+     "char_offset": 1070,
+     "tokens_before": 393
+    },
+    {
+     "prompt_id": "mtbench-145",
+     "char_offset": 1351,
+     "tokens_before": 393
+    },
+    {
+     "prompt_id": "mbpp-379",
+     "char_offset": 1152,
+     "tokens_before": 397
+    },
+    {
+     "prompt_id": "oasst1-5702333e-4022-4deb-9928-a24056513d56",
+     "char_offset": 1635,
+     "tokens_before": 397
+    },
+    {
+     "prompt_id": "oasst1-657bde4f-99cb-4822-94d4-ce2d9075d339",
+     "char_offset": 1803,
+     "tokens_before": 397
+    },
+    {
+     "prompt_id": "gsm8k-train-7390",
+     "char_offset": 1277,
+     "tokens_before": 401
+    },
+    {
+     "prompt_id": "mtbench-141",
+     "char_offset": 1918,
+     "tokens_before": 405
+    },
+    {
+     "prompt_id": "oasst1-7adaed70-9a34-4e25-a026-836d2e1a8ace",
+     "char_offset": 1485,
+     "tokens_before": 409
+    },
+    {
+     "prompt_id": "gsm8k-train-2816",
+     "char_offset": 1349,
+     "tokens_before": 413
+    },
+    {
+     "prompt_id": "gsm8k-train-3348",
+     "char_offset": 1472,
+     "tokens_before": 417
+    },
+    {
+     "prompt_id": "mbpp-182",
+     "char_offset": 1158,
+     "tokens_before": 425
+    },
+    {
+     "prompt_id": "oasst1-1544891a-5029-4477-aa9d-ee65a1923fad",
+     "char_offset": 1550,
+     "tokens_before": 425
+    },
+    {
+     "prompt_id": "oasst1-6f4db5c0-2ce4-4ffb-bafe-47a7cab610c5",
+     "char_offset": 1938,
+     "tokens_before": 425
+    },
+    {
+     "prompt_id": "humaneval-127",
+     "char_offset": 1372,
+     "tokens_before": 433
+    },
+    {
+     "prompt_id": "oasst1-bf69e6c7-2192-4784-8014-cbf0aa5f46b0",
+     "char_offset": 1726,
+     "tokens_before": 433
+    },
+    {
+     "prompt_id": "gsm8k-train-2999",
+     "char_offset": 1313,
+     "tokens_before": 437
+    },
+    {
+     "prompt_id": "oasst1-32bff71f-97d2-455c-a8bc-35440e8af207",
+     "char_offset": 2186,
+     "tokens_before": 445
+    },
+    {
+     "prompt_id": "mbpp-11",
+     "char_offset": 1705,
+     "tokens_before": 453
+    },
+    {
+     "prompt_id": "oasst1-2231e3fb-93ff-483f-9f6c-b9ba7ff552e9",
+     "char_offset": 1884,
+     "tokens_before": 453
+    },
+    {
+     "prompt_id": "gsm8k-train-2806",
+     "char_offset": 1619,
+     "tokens_before": 469
+    },
+    {
+     "prompt_id": "mbpp-310",
+     "char_offset": 1447,
+     "tokens_before": 469
+    },
+    {
+     "prompt_id": "mbpp-362",
+     "char_offset": 1213,
+     "tokens_before": 473
+    },
+    {
+     "prompt_id": "gsm8k-train-5770",
+     "char_offset": 1511,
+     "tokens_before": 481
+    },
+    {
+     "prompt_id": "mbpp-200",
+     "char_offset": 1289,
+     "tokens_before": 489
+    },
+    {
+     "prompt_id": "mbpp-61",
+     "char_offset": 996,
+     "tokens_before": 493
+    },
+    {
+     "prompt_id": "oasst1-c26eb9c6-b565-4114-afef-9f96a5da0e9c",
+     "char_offset": 2196,
+     "tokens_before": 497
+    },
+    {
+     "prompt_id": "gsm8k-train-0483",
+     "char_offset": 1639,
+     "tokens_before": 501
+    }
+   ]
+  }
+ ]
+}

@@ -12,7 +12,9 @@ calculations from them (**derived**). [Served results](#served-results) add the 
 of each engine switch (greedy outputs against stock plain decoding), paired serving runs of the
 routing table against tuned plain decoding and against both of bench's MTP arms (FlashInfer
 attention, `mtp-tuned`; Triton attention, `mtp-tuned-triton`), and a trace of which GEMM kernels
-the served engine dispatches. The routing table's exactness class under MTP is **pending**.
+the served engine dispatches. The routing table's exactness class under MTP is **pending**; on
+`mtp-tuned-triton` its streamed greedy text differs from the switches-off engine's on 7 of 64
+prompts at c = 1.
 
 ## Setup
 
@@ -152,7 +154,8 @@ configuration:
 
 These runs use the backbone engine: SGLang at the paper's pin with patches 0001-0008
 (`engine/sglang/patches/backbone/`, branch head `59deb68e29`, clean worktree),
-`Qwen/Qwen3.5-4B@851bf6e8`, FlashInfer attention, one GH200. Every switch is off unless named.
+`Qwen/Qwen3.5-4B@851bf6e8`, FlashInfer attention (Triton attention in hold 4), one GH200. Every
+switch is off unless named.
 
 | Name | Switch | What it changes in plain decoding |
 |---|---|---|
@@ -362,32 +365,48 @@ over their mean.
   decoding the same table gives 3.4% at c = 1.
 - **c = 8 and 32: no claim.** The pairs straddle 1, and A's own two runs differ by 0.63% and 1.54%.
 - **Where the saving goes at c = 1 (derived).** The verify cycle, tokens per cycle over the
-  per-user decode rate (`accept_length / x_decode`), is 5.786 ms for A and 5.778 ms for B (means of
-  two runs; 5.5 and 11.0 us shorter per pair). At c = 1 the target verifies 4 rows per request,
-  where the table sends `in_proj_qkvz`, `out_proj`, `o_proj` and `gate_up` to the Triton kernel
-  with PDL (88 calls per verify; `down`, `qkv_proj` and `in_proj_ba` stay on cuBLAS). By the
+  per-user decode rate (`accept_length / x_decode`), is 5.786 ms for A and 5.778 ms for B
+  (means of two runs; 5.3 and 10.9 us shorter per pair, with the unrounded acceptance in each
+  run's `sweep.json`; the four-decimal values in `points.csv` give 5.4 and 11.0). At c = 1 the
+  target verifies 4 rows per request, where the table sends `in_proj_qkvz`, `out_proj`, `o_proj`
+  and `gate_up` to the Triton kernel with PDL (88 calls per verify; `down`, `qkv_proj` and
+  `in_proj_ba` stay on cuBLAS). By the
   method of the in-situ section below (cuBLAS's time minus the routed kernel's per call in
   `gemm_microbench.json`, times the calls; it reproduces that section's 197 and 120 us), those
-  calls save 81 us per verify in isolation, and the served cycle keeps 7-14% of that. The draft
+  calls save 81 us per verify in isolation, and the served cycle keeps 7-13% of that. The draft
   passes' routed GEMMs (the Hopper GEMV for each one-row draft step) would add to the prediction,
   since the table routes a call only where the routed kernel is faster in isolation, so the
   served share of the whole isolated gain is smaller still. Nothing here is traced.
 - **Time to first token is longer with the table under MTP.** B's median TTFT at c = 1 is 41.2 and
-  41.0 ms against A's 40.1 and 39.1 ms (1.1 and 2.0 ms longer per pair). Hold 3's `mtp-tuned`
-  pairs show 0.4 and 1.3 ms longer, while on tuned plain decoding B's is 0.9 and 1.4 ms shorter.
-  A request at c = 1 takes about 915 ms, so the longer TTFT costs B 0.1-0.2% per request and
-  absorbs most of its decode gain: the per-user decode rate (`x_decode`) rises 0.12% and 0.22%,
-  throughput 0.06%. The cause is not traced.
+  41.0 ms against A's 40.1 and 39.1 ms (1.1 and 2.0 ms longer per pair). A's two runs differ by
+  1.0 ms, so the size of the gap is about A's own spread, but its sign holds in all four MTP pairs:
+  hold 3's `mtp-tuned` pairs show 0.4 and 1.3 ms longer, while on tuned plain decoding B's is 0.9
+  and 1.4 ms shorter. A request at c = 1 takes about 915 ms, so 1-2 ms is 0.1-0.2% of it, about
+  the gap between the per-user decode rate's gain (`x_decode`, 0.12% and 0.22%) and throughput's
+  (0.06%). The cause is not traced.
 - **Acceptance.** At c = 1 and 8 the tokens per verify cycle repeat to four decimals within each
   arm (A: 3.2586 and 3.2524 in both sessions, the same values as all three of bench's stock
   confirmation sessions; B: 3.2595 and 3.2543) and differ between the arms, by +0.03% and +0.06%:
-  the table changes the draft and verify passes' arithmetic, which moves acceptance at near ties.
-  At c = 32 acceptance also varies between runs of the same arm.
+  the table changes the draft and verify passes' arithmetic, and with it acceptance (probably at
+  near ties; not traced). At c = 32 acceptance also varies between runs of the same arm.
 - A's rates are within 0.2% of bench's stock confirmation of this arm at c = 1 and 0.7% at c = 8,
   and up to 2.6% above it at c = 32 (6,666-6,727 tokens/s), so carrying the patches with every
   switch off costs nothing visible here either.
-- **The exactness class of lever v1 under MTP was not measured for this arm either:** the hold
-  compared no outputs between the arms, and the frontier file marks B's class pending.
+- **Streamed text (measured; not token ids or logprobs).** `stream_text_identity.py` rebuilds
+  every request's streamed text from aiperf's raw export and compares the runs prompt by prompt
+  ([`served/mtp_triton_v1/text_identity.json`](served/mtp_triton_v1/text_identity.json)). At
+  c = 1 and 8 each arm reproduces its own text on all 64 prompts across its two launches, while A
+  and B differ on 7 of 64 prompts at c = 1 and 15 of 64 at c = 8, the same prompts in both
+  sessions. At c = 1 each first difference comes after at least 177 of the 512 output tokens
+  (median 329); at c = 8 the earliest comes after 1 token and the median after 253. At c = 32 two
+  runs of the same arm already differ on 45 (A) and 131 (B) of 256 prompts, since batch
+  composition varies between runs, so the between-arm counts there (120 and 98 differing) say
+  nothing about the table.
+- **The exactness class of lever v1 under MTP is still pending.** On this arm the table changes
+  the greedy output of 7 of 64 prompts at c = 1, where each arm reproduces its own streamed text.
+  Whether those changes are rounding-level flips at near ties, the class the table has on plain
+  decoding, needs the logprob comparison against stock MTP, which has not been run; the frontier
+  file marks B's class pending.
 - These are two pairs from one session. With hold 3, lever v1 gives no material serving gain under
   MTP on either attention backend at any tested concurrency (1, 8 and 32 on both arms, and 128 on
   `mtp-tuned`); its served gains are on plain decoding (c = 1, 8 and 128).
@@ -431,7 +450,7 @@ cores).
 - The exactness class of lever v1 under MTP (greedy outputs against stock MTP), on either MTP
   arm.
 - Why the step at c = 16 keeps only a third of the GPU span's saving, why `mtp-tuned` at c = 1 is
-  slower, why the MTP verify cycle at c = 1 keeps 7-14% of its isolated GEMM saving, and
+  slower, why the MTP verify cycle at c = 1 keeps 7-13% of its isolated GEMM saving, and
   why the table lengthens time to first token under MTP; none of these is traced.
 
 ## Commands behind the served files
@@ -553,4 +572,9 @@ python -m bench.pareto $T/backbone-mtp-triton-v1-B/20261002-123648 $T/backbone-m
     --pair backbone-mtp-triton-v1-B:backbone-mtp-triton-v1-A --status paired --no-plot \
     --class backbone-mtp-triton-v1-B=pending
 # served/mtp_triton_v1/ keeps points.csv, pairs.csv, launches.csv and frontier.csv from <dir>.
+# Streamed-text identity, at repository commit 47c7ccd:
+python experiments/backbone/stream_text_identity.py --run B1=$T/backbone-mtp-triton-v1-B/20261002-123648 \
+    --run A1=$T/backbone-mtp-triton-v1-A/20261002-124002 --run A2=$T/backbone-mtp-triton-v1-A/20261002-124317 \
+    --run B2=$T/backbone-mtp-triton-v1-B/20261002-124631 --pair B1:A1 --pair B2:A2 --pair A2:A1 --pair B2:B1 \
+    --out evidence/backbone/served/mtp_triton_v1/text_identity.json
 ```
