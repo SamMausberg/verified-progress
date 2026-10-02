@@ -1,6 +1,6 @@
 {
   "generated_by": {
-    "repo_head": "6b237c060cb3ca2f5e75b00c8e0ee640a57e2c21",
+    "repo_head": "9ae55f637d3136d523486757d9a68834ec831172",
     "argv": [
       "experiments/hostgap/summarize.py",
       "/home/ubuntu/vp-data/hostgap/prof4",
@@ -2478,7 +2478,7 @@
     "dflash": {
       "1": {
         "unprofiled_cycle_ms": 6.59904574734049,
-        "gpu_busy_source": "dflash-patched-host (assumed equal: same graphs and kernels); dflash-host has no eager kernel records",
+        "gpu_busy_source": "dflash-patched-host (assumed equal: same graphs and kernels); dflash-host has no eager kernel records at c = 1",
         "traced_gpu_busy_ms_per_cycle": 5.166870418250951,
         "derived_unprofiled_idle_ms_per_cycle": 1.4321753290895396,
         "derived_unprofiled_idle_fraction": 0.21702764065042687,
@@ -2496,7 +2496,7 @@
       },
       "8": {
         "unprofiled_cycle_ms": 8.718927496995322,
-        "gpu_busy_source": "dflash-patched-host (assumed equal: same graphs and kernels); dflash-host has no eager kernel records",
+        "gpu_busy_source": "dflash-patched-host (assumed equal: same graphs and kernels); dflash-host has no eager kernel records at c = 8",
         "traced_gpu_busy_ms_per_cycle": 7.191422123222749,
         "derived_unprofiled_idle_ms_per_cycle": 1.5275053737725734,
         "derived_unprofiled_idle_fraction": 0.17519418234627773,
@@ -2514,7 +2514,7 @@
       },
       "32": {
         "unprofiled_cycle_ms": 15.693988343703799,
-        "gpu_busy_source": "dflash-patched-host (assumed equal: same graphs and kernels); dflash-host has no eager kernel records",
+        "gpu_busy_source": "dflash-patched-host (assumed equal: same graphs and kernels); dflash-host has no eager kernel records at c = 32",
         "traced_gpu_busy_ms_per_cycle": 14.18574088,
         "derived_unprofiled_idle_ms_per_cycle": 1.508247463703798,
         "derived_unprofiled_idle_fraction": 0.09610351624282205,
