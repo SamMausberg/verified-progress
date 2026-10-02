@@ -452,8 +452,13 @@ def test_report_end_to_end_on_synthetic_runs(tmp_path: Path) -> None:
             _launch(noisy, step, family, 'cert', 103.0, cert_ids, foreign={1: 3.0}),
         ]
         (noisy / 'holds' / f'h{k}.json').write_text(
-            json.dumps({'hold': f'h{k}', 'launches': launches,
-                        'provenance': {'engine_commit': 'enginehead'}})
+            json.dumps(
+                {
+                    'hold': f'h{k}',
+                    'launches': launches,
+                    'provenance': {'engine_commit': 'enginehead'},
+                }
+            )
         )
     summary = analyze.report(noisy, noisy / 'evidence', None, plot=False)
     assert summary['exactness']['families']['plain']['c1_identical'] is False

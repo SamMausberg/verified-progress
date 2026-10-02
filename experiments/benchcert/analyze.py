@@ -253,7 +253,9 @@ def config_problems(info: dict[str, Any], family: plan.Family, variant: str) -> 
     prov = info.get('provenance') or {}
     if source:
         if source.get('head') != prov.get('engine_commit') or source.get('dirty_files'):
-            problems.append(f'engine {source.get("head")} (hold declared {prov.get("engine_commit")})')
+            problems.append(
+                f'engine {source.get("head")} (hold declared {prov.get("engine_commit")})'
+            )
     elif info.get('manifest'):
         problems.append('no engine record')
     if info.get('points'):
@@ -375,8 +377,9 @@ def holm(primaries: dict[str, dict[str, Any]], alpha: float = 0.05) -> dict[str,
     """
     m = len(primaries)
     order = sorted(primaries, key=lambda fam: t_test_p(primaries[fam]))
-    decisions = {fam: 'incomplete' if primaries[fam]['n'] < DECISION_N else 'null'
-                 for fam in primaries}
+    decisions = {
+        fam: 'incomplete' if primaries[fam]['n'] < DECISION_N else 'null' for fam in primaries
+    }
     for rank, fam in enumerate(order):
         if primaries[fam]['n'] < DECISION_N or t_test_p(primaries[fam]) > alpha / (m - rank):
             break
