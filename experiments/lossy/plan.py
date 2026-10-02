@@ -108,8 +108,12 @@ REFERENCE_VERSIONS = {
 
 # Reference of the logit probe: plain-ref-1's generate run from the load test (stock
 # plain-cap256, greedy, 48 prompts x 256 tokens, top-20), pinned by SHA-256 once L0 ran.
-REFERENCE_PROBE: str | None = None
-REFERENCE_PROBE_SHA256: str | None = None
+REFERENCE_PROBE: str | None = (
+    '~/vp-data/lossy/load_test/20261002T035539Z/plain-ref-1/probe_generate.json'
+)
+REFERENCE_PROBE_SHA256: str | None = (
+    '5186472b7ae278bd4d7f9de1bd462e6126f03adb870cd0d98648cbaab0c968f7'
+)
 
 # Seconds per launch (about twice the expected time) and per GSM8K run.
 LAUNCH_TIMEOUT = 600
