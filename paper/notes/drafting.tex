@@ -29,7 +29,7 @@ Let $h_j$ be the number of verify cycles in which exactly $j$ drafted tokens wer
 The measurement uses a panel of 32 MATH-500 problems and the first 16 chat, 16 code and 16 GSM8K prompts of the benchmark's earlier confirmation split, decoded greedily with thinking on, stopping naturally at up to 2,048 new tokens, at concurrency 1, with blocks of 16 and 8~\ev{drafter-acc}. The runs used an engine trace hook that synchronizes every cycle on a shared GPU, so acceptance and token counts are valid and timings are not; the panel contains benchmark test problems and measures acceptance only, never quality.
 
 \begin{table}[htbp]
-\small\centering
+\tablefont\centering
 \caption{Committed tokens per verify cycle for the public DFlash drafter on GH200 (greedy, thinking on, concurrency 1), pooled over cycles ($\tau$) and averaged over requests as the model card does ($\bar\tau_{\rm req}$). Measured in correctness runs~\ev{drafter-acc}; the survival form $1+\sum_kS(k)$ agrees with the pooled $\tau$ to within 0.013 in every column.}
 \label{tab:drafter-tau}
 \vskip 0.05in
@@ -49,7 +49,7 @@ The per-position rates of Figure~\ref{fig:drafter-acceptance} show why a longer 
 
 \begin{figure}[htbp]
 \centering
-\input{figures/acceptance}
+\input{figures/acceptance}%
 \caption{The public DFlash drafter by block position, block size 16, greedy with thinking on, per domain of the panel. (a)~Conditional acceptance $\alpha_k$; (b)~the share of verify cycles that accept at least $k$ drafted tokens, on a logarithmic axis. Measured in correctness runs~\ev{drafter-acc}; the late rise in (a) is a selection effect of the few cycles that get that far.}
 \label{fig:drafter-acceptance}
 \end{figure}
@@ -95,7 +95,7 @@ With the audit charged the measured verify pass, P3's two-pass design misses the
 The Triton kernel is a different numerical path. DFlash at block 16 with it commits 7.603 tokens per cycle against 7.675, so its greedy outputs differ from the FlashInfer configuration's, and every figure that uses it is pending an exactness classification against plain decoding. With the DFlash baseline on the same kernel, 7.302~ms per cycle and $f=2.39\%$, so that $5\times$ end to end needs 5.54 in decode, the derived speedups change both verdicts (Table~\ref{tab:stagea-triton}). Perfect blocks reach $5\times$ end to end from $B=64$, 5.21 paying DFlash's drafting cost and 6.84 with a free drafter, and P3's two-pass estimate passes at $B=256$ (6.21), its ceiling already at $B=64$. The baselines on the two kernels are single runs from two sessions, so the baseline's own gain from the switch is not established; the wide blocks gain about two times. The Stage A verdicts therefore depend on the verify kernel. With the Triton kernel P2 turns on drafting, since a $5\times$ gain needs blocks of 64 or more tokens accepted almost entirely and the repair mechanisms tested here do not produce them (Tests~2 and~3); P3 stays refuted by Test~3 whatever the verifier. In per-position terms, a cycle drafted by DFlash at width $B$ would have to commit 61.1 of 64 tokens at $B=64$ or 132.2 of 256 at $B=256$, which for a drafter with the same conditional acceptance at every position means at least 0.9985 or 0.9941, against 0.80 to 0.91 for the public drafter at block 16; with the FlashInfer kernel none of the measured widths, 16 to 256, suffices even with every block accepted (derived)~\ev{drafting-req}. The drafter's top-16 candidate sets still contain the target's token at a conditional rate of 0.91 to 0.92 from the fourth position, but that rate is measured only at the cycle starts of the stock block-16 trajectory, so it bounds neither a selector, which would start its cycles elsewhere, nor a wide-block drafter. Past $B=16$ the FlashInfer pass grows by about 0.167~ms per extra token, roughly five times what that token's GEMM work and its 48~MiB per-position state write account for. A kernel trace at $B=256$ (Nsight Systems, two requests, 19 complete cycles) finds most of the pass in FlashInfer's GDN verify kernel~\ev{repair-verify}. It takes 1.36~ms per GDN layer, 5.3~\textmu s per position and layer, which fits a walk over the positions one after another; that is 32.68~ms per cycle and 72\% of the verify phase under the profiler. The causal-convolution update follows with 6.48~ms and the GEMMs of target and drafter take 5.87~ms. The Triton kernel replaces only the verify kernel; if the other kernels are unchanged, the Triton GDN kernel takes about 6.8~ms of the 19.19~ms Triton pass and the convolution update about a third of that pass (derived, not traced). The Triton kernel's exactness class, a trace of its pass and the acceptance of the reference continuation per width are \pend{repair-verifier}.
 
 \begin{table}[htbp]
-\small\centering
+\tablefont\centering
 \caption{Stage A with SGLang's Triton GDN verify kernel, over DFlash at block 16 on the same kernel: speedup in decode / end to end. Derived from measured verify-pass times; the $S_{\rm b}$ estimate bounds this kernel's state writes by their bytes. Pending an exactness classification of the kernel switch~\ev{repair-verify}.}
 \label{tab:stagea-triton}
 \vskip 0.05in
