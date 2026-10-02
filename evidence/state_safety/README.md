@@ -360,9 +360,11 @@ Setup section. Rates are per 1,000 compared tokens
   - The groups also differ in more than state. The first cycle follows the prefill
     chunk, every prompt contributes it, and later cycles count only prompts that have
     not yet diverged.
-  - So this is a lead for a declared follow-up, not a finding. The follow-up is a
-    first-cycle test, declared in advance, on fresh prompts. It is pending, as is a
-    look at the prefill-to-decode handoff of the GDN state.
+  - So this is a lead for a declared follow-up, not a finding. The follow-up, a
+    first-cycle test declared in advance on fresh prompts, has run ("The first verify
+    cycle after prefill: the declared test" below). It is inconclusive under its
+    decision rule, and on the fresh prompts the first cycle diverged less often per
+    fragile position than later cycles, not more.
 - **Pinning and the repeat floor.** The fresh-server repeat at concurrency 32 drops
   from 24/320 (unpinned: different pools, cap 16) to 4/320 (identical pools, cap 8).
   Both changed at once, and a smaller cap also narrows the batch compositions, so
@@ -523,10 +525,98 @@ rate treats positions as independent, although they cluster by prompt.
 and FP32 head for plain decoding, which give the radix-off noise floor (plain c1 vs
 c32 without the radix cache) and radix-off speculation against radix-off plain
 decoding; the logprobs-off control, retraction, a second MTP session, and the
-ReplaySSM and FlashInfer GDN decode paths. The first-cycle test on fresh prompts is
-declared, with its prompts, runs, analysis and decision rule fixed
-(`experiments/state_safety/README.md`, "Declared follow-up"), and is not yet run. The
-prefill-to-decode handoff check depends on its outcome.
+ReplaySSM and FlashInfer GDN decode paths. The first-cycle test on fresh prompts has
+run and is inconclusive (next section), so the prefill-to-decode handoff check, which
+was to follow a supported result, is not run.
+
+## The first verify cycle after prefill: the declared test
+
+The pinned matrix suggested that the first verify cycle after the prefill diverges from
+plain decoding more often, per fragile position, than later cycles (7/40 and 6/33 for MTP
+steps 5 and the tree; "Matrix with pinned pools"). That observation was exploratory, so
+a test with its prompts, runs, statistic and decision rule was declared before any data
+for it existed (`experiments/state_safety/README.md`, "Declared follow-up", merged at
+`b918c8b`), and `first_cycle.py` implemented it beforehand. This section reports its
+result (`first_cycle_fresh.json`).
+
+**Result: inconclusive.** Neither declared criterion holds. On the fresh prompts the first
+cycle diverged less often per fragile position than later cycles, in both primary pairs
+and both control pairs.
+
+| Pairs (960 prompts) | First cycle: diverged / fragile positions | Later cycles | Odds ratio, first vs later |
+|---|---|---|---|
+| Primary: plain c1 vs MTP steps 5 c1 | 5 / 88 | 418 / 5,590 | |
+| Primary: plain c1 vs tree c1 | 3 / 74 | 424 / 5,662 | |
+| Primary, pooled | 8 / 162 (4.9%) | 842 / 11,252 (7.5%) | 0.68 |
+| Control: MTP steps 5 c1 vs c32 | 3 / 85 | 419 / 5,881 | |
+| Control: tree c1 vs c32 | 3 / 71 | 426 / 5,686 | |
+| Control, pooled | 6 / 156 (3.8%) | 845 / 11,567 (7.3%) | 0.55 |
+
+- **(a) Primary.** The one-sided 95% percentile lower bound of the pooled primary log odds
+  ratio (+0.5 per cell; 10,000 prompt-resampling replicates, `default_rng(0)`) is
+  -1.437, not above 0. The point estimate is -0.386 (odds ratio 0.68).
+- **(b) Selection control.** The lower bound of the primary minus the control log odds
+  ratio is -0.865, not above 0 (point estimates -0.386 and -0.602).
+- **Secondary.** The one-sided Fisher exact test on the pooled primary table gives
+  p = 0.92.
+- **What this does and does not say.** The declared test is inconclusive, and under its
+  rule that is not evidence of no effect. Descriptively, the data are inconsistent with a
+  pooled primary odds ratio above 1.28 (one-sided 95%, post hoc), which is below the
+  exploratory 2.36 ("Power" in the declaration). The bound is the 95th percentile of the
+  same 10,000 prompt-resampling bootstrap replicates, percentile method, added by the
+  amendment of 2026-10-02 (`experiments/state_safety/README.md`) after the result was
+  seen (`descriptive_upper_95`). The same bound for the primary minus the control log odds
+  ratio is 1.26. On the fresh prompts the first cycle's divergence rate per fragile
+  position (4.9%) is below the later cycles' (7.5%), against 17.8% (13/73) for the same
+  two configurations in the pinned matrix. That fits the exploratory pattern having been
+  a small-sample fluctuation picked out after looking at the data, though neither the
+  declared test nor the post-hoc bound establishes it. The handoff check that was to follow a supported result (comparing the GDN state
+  handed from the prefill to the first verify with the state handed to the first plain
+  decode step) is not run.
+- **Power.** The declaration expected about 219 first-cycle and 12,200 later fragile
+  positions for 960 prompts. The runs gave 162 and 11,252, so the test had somewhat less
+  power than planned at the exploratory effect size. That matters only for an excess,
+  and the estimate points the other way.
+
+**Validity.** None of the declared void conditions applies, so the result is reported:
+- All five runs exist with the declared configurations and flags: plain c1 (hold 1,
+  2026-10-01 19:15-19:29 UTC), and MTP steps 5 and the tree (3 steps, top-k 2) at c1 and
+  c32 (hold 2, 2026-10-01 23:53 to 2026-10-02 00:16 UTC), each configuration's c1 and c32 passes from one server
+  (equal `server_id`). Pools are pinned (at most 8 running, 49,152 KV tokens, 40 GDN
+  slots), the radix cache (`extra_buffer`) and overlap scheduler are on, every pass is
+  cold, the engine is the clean pin `bd66ce343e`, and every run's `repo_sha` is the
+  declaration commit `b918c8b`.
+- Each run holds exactly the 960 frozen fresh prompts (`prompt_manifest_fresh.json`),
+  with prompt lengths equal to the frozen ones, and every record is complete (a stop, or
+  256 tokens; top-5 logprobs at every output token). No prompt failed the chunk checks,
+  so all 960 are in every pair.
+- Attestations (`attest_runner.py --watch`, outside the holds): a before and an after
+  record for each hold, each showing the checkout clean at `b918c8b` with that commit's
+  `run_matrix.py`, `server.py` and `client.py`, one `run_matrix.py` process from that
+  checkout per hold, given the canonical prompt file with its frozen hash. The analysed
+  output files match the hashes in the after records, and every pass started inside its
+  hold. The watcher ran a copy byte-identical to the committed `attest_runner.py`; its log
+  records no restart after 13:41 UTC on 2026-10-01, before the first hold, and the guard
+  that would have logged its death during a hold logged none.
+- Radix and KV provenance: the radix cache is on, as declared, and flushed before every
+  pass; plain c1 and each MTP c1 run served the same prompts in the same order, so the
+  primary pairs have identical request histories. The c32 control runs interleave
+  requests by timing, which is part of what the control is for.
+
+Command (SGLang venv, from `experiments/state_safety/`; `analyze_all.sh` runs the same
+line):
+
+```sh
+python first_cycle.py --runs ~/vp-data/state/runs_fresh \
+    --out ../../evidence/state_safety/first_cycle_fresh.json
+```
+
+The declared result was first computed with the script as it stood at `a493cbf`
+(2026-10-01 13:50 UTC, before either hold), run unchanged from `origin/main` at
+`fc47cf6`, where it and the `compare.py` functions it imports (`load_run`,
+`spec_cycles_consistent`) are as they were then. The committed file was then regenerated
+with the amended script, which adds `descriptive_upper_95`; with that key removed it is
+byte-identical to the first output.
 
 ## History dependence through radix-cache insertion
 

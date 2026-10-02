@@ -1,0 +1,65 @@
+{
+ "prompts_declared": 960,
+ "prompts_common": 960,
+ "prompts_excluded_chunking": 0,
+ "prompts_included": 960,
+ "pairs": {
+  "primary/mtp_s5": {
+   "first_cycle_fragile_divergences": 5,
+   "first_cycle_fragile_positions": 88,
+   "later_fragile_divergences": 418,
+   "later_fragile_positions": 5590
+  },
+  "primary/mtp_tree": {
+   "first_cycle_fragile_divergences": 3,
+   "first_cycle_fragile_positions": 74,
+   "later_fragile_divergences": 424,
+   "later_fragile_positions": 5662
+  },
+  "control/mtp_s5": {
+   "first_cycle_fragile_divergences": 3,
+   "first_cycle_fragile_positions": 85,
+   "later_fragile_divergences": 419,
+   "later_fragile_positions": 5881
+  },
+  "control/mtp_tree": {
+   "first_cycle_fragile_divergences": 3,
+   "first_cycle_fragile_positions": 71,
+   "later_fragile_divergences": 426,
+   "later_fragile_positions": 5686
+  }
+ },
+ "pooled_primary": {
+  "first_cycle_fragile_divergences": 8,
+  "first_cycle_fragile_positions": 162,
+  "later_fragile_divergences": 842,
+  "later_fragile_positions": 11252
+ },
+ "pooled_control": {
+  "first_cycle_fragile_divergences": 6,
+  "first_cycle_fragile_positions": 156,
+  "later_fragile_divergences": 845,
+  "later_fragile_positions": 11567
+ },
+ "log_odds_primary": -0.3859,
+ "log_odds_control": -0.602,
+ "odds_ratio_primary": 0.68,
+ "odds_ratio_control": 0.548,
+ "bootstrap": {
+  "replicates": 10000,
+  "seed": 0,
+  "interval": "percentile"
+ },
+ "a_lower_bound_log_odds_primary": -1.4371,
+ "b_lower_bound_log_odds_difference": -0.8649,
+ "a_holds": false,
+ "b_holds": false,
+ "secondary_fisher_one_sided_p": 0.9228,
+ "decision": "inconclusive",
+ "descriptive_upper_95": {
+  "note": "post hoc (amendment of 2026-10-02), not part of the declared decision",
+  "log_odds_primary": 0.2392,
+  "odds_ratio_primary": 1.271,
+  "log_odds_difference": 1.2536
+ }
+}
