@@ -1,0 +1,17 @@
+pair,run_a,run_b,prompts,diverged,exposure_tokens,per_1k_tokens,tie,one_ulp,near,large,not_argmax,length_mismatch,max_margin_median,max_margin_max,drift_p99,drift_max,same_server,pools_identical,pinned_a,pinned_b
+S0 vs bench b16 triton,ref_dflash_b16_triton/c1,plain__stack_S0/c1,320,0,69976,0,0,0,0,0,0,0,,,0,0,False,False,False,False
+B0 vs bench b16 triton,ref_dflash_b16_triton/c1,plain__stack_B0/c1,320,0,69976,0,0,0,0,0,0,0,,,0,0,False,False,False,False
+B0 vs S0,plain__stack_S0/c1,plain__stack_B0/c1,320,0,69976,0,0,0,0,0,0,0,,,0,0,False,False,False,False
+F vs B0,plain__stack_B0/c1,plain__stack_F/c1,320,0,69976,0,0,0,0,0,0,0,,,0,0,False,False,False,False
+G vs B0,plain__stack_B0/c1,plain__stack_G/c1,320,167,47829,3.492,159,7,1,0,0,0,0.125,0.25,0.2641,0.3642,False,False,False,False
+FG vs B0,plain__stack_B0/c1,plain__stack_FG/c1,320,167,47829,3.492,159,7,1,0,0,0,0.125,0.25,0.2641,0.3642,False,False,False,False
+B0 vs bench stock b16,ref_dflash_b16/c1,plain__stack_B0/c1,320,173,45274,3.821,161,11,1,0,0,0,0.125,0.375,0.3841,0.4813,False,False,False,False
+F vs bench stock b16,ref_dflash_b16/c1,plain__stack_F/c1,320,173,45274,3.821,161,11,1,0,0,0,0.125,0.375,0.3841,0.4813,False,False,False,False
+G vs bench stock b16,ref_dflash_b16/c1,plain__stack_G/c1,320,185,44763,4.133,174,10,1,0,0,0,0.125,0.375,0.3712,0.5059,False,False,False,False
+FG vs bench stock b16,ref_dflash_b16/c1,plain__stack_FG/c1,320,185,44763,4.133,174,10,1,0,0,0,0.125,0.375,0.3712,0.5059,False,False,False,False
+F vs bench b16 triton,ref_dflash_b16_triton/c1,plain__stack_F/c1,320,0,69976,0,0,0,0,0,0,0,,,0,0,False,False,False,False
+G vs bench b16 triton,ref_dflash_b16_triton/c1,plain__stack_G/c1,320,167,47829,3.492,159,7,1,0,0,0,0.125,0.25,0.2641,0.3642,False,False,False,False
+FG vs bench b16 triton,ref_dflash_b16_triton/c1,plain__stack_FG/c1,320,167,47829,3.492,159,7,1,0,0,0,0.125,0.25,0.2641,0.3642,False,False,False,False
+B0 tokens vs B0,plain__stack_B0/c1,plain__stack_B0_tokens/c1,320,0,69976,0,0,0,0,0,0,0,,,0,0,False,False,False,False
+H tokens vs B0 tokens,plain__stack_B0_tokens/c1,plain__stack_H_tokens/c1,320,0,69976,0,0,0,0,0,0,0,,,0,0,False,False,False,False
+FGH tokens vs FG,plain__stack_FG/c1,plain__stack_FGH_tokens/c1,320,0,70117,0,0,0,0,0,0,0,,,0,0,False,False,False,False

@@ -1,0 +1,38 @@
+{
+ "equality_run": "20261001T212416Z",
+ "hold_start": "2026-10-01T21:24:16+00:00",
+ "checked_at": "2026-10-02T02:16:23+00:00",
+ "analysis_commit": "8687b45ff2f1b7dbb36f0a7f1889a529bdc3c6d3",
+ "package": {
+  "checkout": "~/vp-wt/stack-cert",
+  "head": "01502cc5bf3ac5dec338fe8e86bedcf63be95d8d",
+  "declared_commit": "01502cc",
+  "at_declared_commit": true,
+  "uncommitted": [],
+  "files_checked": 16,
+  "files_changed_after_hold_start": [],
+  "gate_fingerprint": "2b4de803e032f9c76b5eb4e08350515253a878d75446bf66141215d5a9655735",
+  "fingerprint_now": "2b4de803e032f9c76b5eb4e08350515253a878d75446bf66141215d5a9655735",
+  "ok": true
+ },
+ "prompts": {
+  "path": "~/vp-data/state/prompts/prompts.jsonl",
+  "sha256": "6cf280f7b40c31e6c4940dc90a1fb7c93947ceabc74125e3523fa9a166871a94",
+  "prompts": 320,
+  "modified": "2026-09-30T18:09:00+00:00",
+  "modified_before_hold_start": true,
+  "ok": true
+ },
+ "runs_provenance": {
+  "problems": [],
+  "ok": true
+ },
+ "sessions_worktree": {
+  "hold_worktree": "~/vp-wt/stack-hold",
+  "gate_repository_commit": "84717d2e883f1aae6992ad8a1d4c65d857e71aad",
+  "head_now": "84717d2e883f1aae6992ad8a1d4c65d857e71aad",
+  "uncommitted_or_untracked": [],
+  "ok": true
+ },
+ "ok": true
+}

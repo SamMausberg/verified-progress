@@ -1,0 +1,118 @@
+{
+ "source": "/home/ubuntu/vp-data/stack/equality/20261001T212416Z/phases_FG.jsonl",
+ "max_period_ms": 50.0,
+ "by_batch": {
+  "1": {
+   "cycles": 6046,
+   "median_us": {
+    "draft_us": 1242.0,
+    "verify_us": 4859.8,
+    "accept_us": 22.6,
+    "commit_us": 78.4,
+    "append_us": 101.9,
+    "period_us": 6318.8
+   },
+   "idle_median_us": 13.2,
+   "tokens_per_cycle_mean": 5.724,
+   "us_per_token": 1163.7
+  },
+  "2": {
+   "cycles": 85,
+   "median_us": {
+    "draft_us": 1335.1,
+    "verify_us": 5173.0,
+    "accept_us": 28.4,
+    "commit_us": 115.4,
+    "append_us": 104.7,
+    "period_us": 6773.4
+   },
+   "idle_median_us": 14.2,
+   "tokens_per_cycle_mean": 7.541,
+   "us_per_token": 900.6
+  },
+  "3": {
+   "cycles": 25,
+   "median_us": {
+    "draft_us": 1385.5,
+    "verify_us": 5543.9,
+    "accept_us": 32.3,
+    "commit_us": 145.9,
+    "append_us": 103.5,
+    "period_us": 7257.8
+   },
+   "idle_median_us": 10.8,
+   "tokens_per_cycle_mean": 11.36,
+   "us_per_token": 654.2
+  },
+  "4": {
+   "cycles": 38,
+   "median_us": {
+    "draft_us": 1432.9,
+    "verify_us": 5707.3,
+    "accept_us": 43.5,
+    "commit_us": 214.3,
+    "append_us": 101.6,
+    "period_us": 7525.4
+   },
+   "idle_median_us": 12.5,
+   "tokens_per_cycle_mean": 16.211,
+   "us_per_token": 466.7
+  },
+  "5": {
+   "cycles": 51,
+   "median_us": {
+    "draft_us": 1606.2,
+    "verify_us": 6074.1,
+    "accept_us": 48.6,
+    "commit_us": 277.9,
+    "append_us": 106.1,
+    "period_us": 8101.6
+   },
+   "idle_median_us": 13.3,
+   "tokens_per_cycle_mean": 22.471,
+   "us_per_token": 360.6
+  },
+  "6": {
+   "cycles": 14,
+   "median_us": {
+    "draft_us": 1536.9,
+    "verify_us": 5945.9,
+    "accept_us": 57.0,
+    "commit_us": 385.9,
+    "append_us": 106.0,
+    "period_us": 8357.4
+   },
+   "idle_median_us": 13.6,
+   "tokens_per_cycle_mean": 36.857,
+   "us_per_token": 351.0
+  },
+  "7": {
+   "cycles": 78,
+   "median_us": {
+    "draft_us": 1694.9,
+    "verify_us": 6394.0,
+    "accept_us": 62.2,
+    "commit_us": 417.2,
+    "append_us": 106.0,
+    "period_us": 36943.4
+   },
+   "idle_median_us": 28242.2,
+   "tokens_per_cycle_mean": 39.833,
+   "us_per_token": 667.6
+  },
+  "8": {
+   "cycles": 706,
+   "median_us": {
+    "draft_us": 1773.0,
+    "verify_us": 6537.2,
+    "accept_us": 73.8,
+    "commit_us": 481.5,
+    "append_us": 109.3,
+    "period_us": 9000.0
+   },
+   "idle_median_us": 12.6,
+   "tokens_per_cycle_mean": 46.912,
+   "us_per_token": 192.4
+  }
+ }
+}

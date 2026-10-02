@@ -1,0 +1,16 @@
+S0 vs bench b16 triton                   div   0/320  per1k 0.00  {}  drift_max 0.000  lenmis 0
+B0 vs bench b16 triton                   div   0/320  per1k 0.00  {}  drift_max 0.000  lenmis 0
+B0 vs S0                                 div   0/320  per1k 0.00  {}  drift_max 0.000  lenmis 0
+F vs B0                                  div   0/320  per1k 0.00  {}  drift_max 0.000  lenmis 0
+G vs B0                                  div 167/320  per1k 3.49  {'tie': 159, 'one_ulp': 7, 'near': 1}  drift_max 0.364  lenmis 0
+FG vs B0                                 div 167/320  per1k 3.49  {'tie': 159, 'one_ulp': 7, 'near': 1}  drift_max 0.364  lenmis 0
+B0 vs bench stock b16                    div 173/320  per1k 3.82  {'tie': 161, 'one_ulp': 11, 'near': 1}  drift_max 0.481  lenmis 0
+F vs bench stock b16                     div 173/320  per1k 3.82  {'tie': 161, 'one_ulp': 11, 'near': 1}  drift_max 0.481  lenmis 0
+G vs bench stock b16                     div 185/320  per1k 4.13  {'tie': 174, 'one_ulp': 10, 'near': 1}  drift_max 0.506  lenmis 0
+FG vs bench stock b16                    div 185/320  per1k 4.13  {'tie': 174, 'one_ulp': 10, 'near': 1}  drift_max 0.506  lenmis 0
+F vs bench b16 triton                    div   0/320  per1k 0.00  {}  drift_max 0.000  lenmis 0
+G vs bench b16 triton                    div 167/320  per1k 3.49  {'tie': 159, 'one_ulp': 7, 'near': 1}  drift_max 0.364  lenmis 0
+FG vs bench b16 triton                   div 167/320  per1k 3.49  {'tie': 159, 'one_ulp': 7, 'near': 1}  drift_max 0.364  lenmis 0
+B0 tokens vs B0                          div   0/320  per1k 0.00  {}  drift_max 0.000  lenmis 0
+H tokens vs B0 tokens                    div   0/320  per1k 0.00  {}  drift_max 0.000  lenmis 0
+FGH tokens vs FG                         div   0/320  per1k 0.00  {}  drift_max 0.000  lenmis 0

@@ -1,0 +1,5 @@
+c,baseline_x_e2e,baseline_tau,full,full_n,full_x_ratio,full_x_lo,full_x_hi,goal,full_short_of_goal,decode_ceiling_snapshot_free,selector_bound_at_floor,full_blocks_at_floor,tau_for_5x_at_floor
+1,986.8883,5.7008,FGH,3,0.98554,0.98212,0.98898,5.0,5.07,1.806,2.951,5.068,15.79
+2,876.3993,5.6928,FGH,3,0.97232,0.96576,0.97892,5.0,5.14,2.0,3.268,5.621,14.23
+4,712.9608,5.682,FGH,3,1.01347,1.00651,1.02048,5.0,4.93,2.419,3.953,6.812,11.74
+8,529.9601,5.766,FGH,3,1.07872,1.06316,1.09451,5.0,4.64,3.151,5.15,8.744,9.15
