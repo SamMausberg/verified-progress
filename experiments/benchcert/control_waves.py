@@ -77,6 +77,21 @@ identical to stock on both passes, means the certified head decided and matched;
 certified verify rows means a silent fallback, reported as such; certified rows with any
 output differing from stock is a certified-head mismatch under identical batch evolution.
 Uncounted calls (host-gated certified steps without a device count) must be zero.
+
+The counter rerun counted 5 certified verify calls over the server's life, all at most 4
+rows (the warm-up): requests that ask for logprobs keep the verify on the stock head
+(SGLang's certified_head.py `_adjusts_logits`), so the seeded waves' verifies were stock in
+cert as in cert0, while the draft and draft-extend heads ran certified. `mtptokens` serves
+the same waves twice without logprobs on two servers in turn, stock (`stocktokens`) and
+certified with the counters on every glue call (`certtokens`), and reads the counters
+before and after every wave.
+
+Token-only rerun (set before it ran): certified verify steps during the waves above zero,
+with every token equal to stocktokens on both passes, means the certified verify decided
+and matched; zero means it did not run; any token difference is a certified-verify
+mismatch under identical batch evolution. Each server's two passes must be identical, and
+stocktokens is compared with the seeded control's logprob stock run as a side check
+(logprob requests should not change stock tokens).
 """
 
 from __future__ import annotations
@@ -85,6 +100,7 @@ import argparse
 import json
 import random
 import sys
+import time
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -124,6 +140,9 @@ CONTROLS = {
     'mtpsmall': Control('mtp', 64, 16, ('stock', 'cert0', 'cert', 'stock2'), None),
     # Its cert arm again with the counters written on every glue call (exclusive, untimed).
     'mtpstats': Control('mtp', 64, 16, ('certstats',), None),
+    # The same waves without logprobs (which keep the verify on the stock head), stock then
+    # certified, with counters on every glue call (exclusive, untimed).
+    'mtptokens': Control('mtp', 64, 16, ('stocktokens', 'certtokens'), None),
 }
 VARIANTS = {name: control.variants for name, control in CONTROLS.items()}
 SMALL_SIZES = (1, 8, 12, 16)
@@ -190,10 +209,10 @@ def prompts(runs: Path, name: str = 'mtp') -> list[tuple[str, list[int]]]:
 def variant_env(name: str, variant: str, stats: Path) -> dict[str, str]:
     """The timed certified environment; cert0 sets MAX_ROWS=0 so the head never runs;
     certlog adds check mode and the per-replay log (replay_hook/sitecustomize.py)."""
-    if variant in ('stock', 'stock2'):
+    if variant in ('stock', 'stock2', 'stocktokens'):
         return {}
     env = plan.certified_env(plan.FAMILIES[CONTROLS[name].family], 'cert', plan.REPO / 'src', stats)
-    if variant == 'certstats':
+    if variant in ('certstats', 'certtokens'):
         env['SGLANG_CERTIFIED_HEAD_STATS_EVERY'] = '1'
     if variant == 'cert0':
         env['SGLANG_CERTIFIED_HEAD_MAX_ROWS'] = '0'
@@ -316,7 +335,10 @@ def small_waves(out: Path, variant: str, runs: Path) -> int:
     )
     seeded = recorded['input'] + recorded['output'][:SEED_AT]
     track = {'return_logprob': True, 'top_logprobs_num': 5, 'token_ids_logprob': list(SMALL_TRACK)}
-    logprobs_ok = True
+    logprobs_ok = not variant.endswith('tokens')  # logprob requests keep the verify on stock
+    stats = out / variant / 'certified_stats.json'
+    counted = variant in ('certstats', 'certtokens')
+    counters = (out / variant / 'counters.jsonl').open('w') if counted else None
     target = out / variant / 'outputs.jsonl'
     tmp = target.with_suffix('.jsonl.tmp')
     with tmp.open('w') as handle:
@@ -324,6 +346,7 @@ def small_waves(out: Path, variant: str, runs: Path) -> int:
             batch = [items[i] for i in wave['members']]
             batch[0] = (batch[0][0], seeded)
             for rep in range(SMALL_REPS):
+                before = read_stats(stats) if counted else {}
                 results = None
                 if logprobs_ok:
                     try:
@@ -333,6 +356,12 @@ def small_waves(out: Path, variant: str, runs: Path) -> int:
                         logprobs_ok = False
                 if results is None:
                     results = generate_results(batch, wave['wave'], {})
+                if counters is not None:
+                    time.sleep(STATS_SETTLE_S)  # the last step's counters land after the reply
+                    delta = stats_delta(before, read_stats(stats))
+                    row = {'wave': wave['wave'], 'size': wave['size'], 'rep': rep, 'paths': delta}
+                    counters.write(json.dumps(row) + '\n')
+                    counters.flush()
                 for index, ((key, ids), result) in enumerate(zip(batch, results, strict=True)):
                     record: dict[str, Any] = {
                         'prompt': key,
@@ -350,7 +379,98 @@ def small_waves(out: Path, variant: str, runs: Path) -> int:
                         record['spec_verify_ct'] = meta.get('spec_verify_ct')
                     handle.write(json.dumps(record) + '\n')
     tmp.replace(target)
+    if counters is not None:
+        counters.close()
     return 0
+
+
+STATS_SETTLE_S = 1.0
+
+
+def read_stats(path: Path) -> dict[str, Any]:
+    """The certified head's cumulative counters per path ({} before the first write)."""
+    for _ in range(5):
+        if not path.exists():
+            return {}
+        try:
+            paths: dict[str, Any] = json.loads(path.read_text()).get('paths', {})
+            return paths
+        except json.JSONDecodeError:  # caught mid-write
+            time.sleep(0.2)
+    raise SystemExit(f'{path}: unreadable counters')
+
+
+def stats_delta(before: dict[str, Any], after: dict[str, Any]) -> dict[str, dict[str, int]]:
+    """Per path, the counters added between two snapshots; max_rows is the largest
+    certified batch (rows) whose histogram count grew."""
+    out = {}
+    for path, a in after.items():
+        b = before.get(path, {})
+        hist_a = a.get('certified_rows_histogram') or {}
+        hist_b = b.get('certified_rows_histogram') or {}
+        steps_a, steps_b = a.get('host_steps') or {}, b.get('host_steps') or {}
+        out[path] = {
+            'calls': a.get('calls', 0) - b.get('calls', 0),
+            'rows': a.get('rows', 0) - b.get('rows', 0),
+            'certified_steps': steps_a.get('certified', 0) - steps_b.get('certified', 0),
+            'stock_graph_steps': steps_a.get('stock_graph', 0) - steps_b.get('stock_graph', 0),
+            'max_rows': max((int(k) for k, v in hist_a.items() if v > hist_b.get(k, 0)), default=0),
+        }
+    return out
+
+
+def tokens_compare(out: Path, reference: Path) -> dict[str, Any]:
+    """The token-only rerun: certtokens against stocktokens pass by pass, each server's two
+    passes, stocktokens against the seeded control's (logprob) stock run, and the certified
+    verify's counters over the waves only, per wave size."""
+    stock = outputs_by_rep(out / 'stocktokens' / 'outputs.jsonl')
+    cert = outputs_by_rep(out / 'certtokens' / 'outputs.jsonl')
+    logprob_stock = outputs_by_rep(reference / 'stock' / 'outputs.jsonl')
+    within = {
+        'stocktokens': pair_outputs(stock[0], stock[1]),
+        'certtokens': pair_outputs(cert[0], cert[1]),
+    }
+    against = {
+        f'certtokens_vs_stocktokens/rep{rep}': pair_outputs(stock[rep], cert[rep])
+        for rep in range(SMALL_REPS)
+    }
+    side = {
+        f'stocktokens_vs_logprob_stock/rep{rep}': pair_outputs(logprob_stock[rep], stock[rep])
+        for rep in range(SMALL_REPS)
+    }
+    rows = list(iter_jsonl(out / 'certtokens' / 'counters.jsonl'))
+    by_size: dict[str, dict[str, dict[str, int]]] = {}
+    for row in rows:
+        for path, c in row['paths'].items():
+            entry = by_size.setdefault(path, {}).setdefault(
+                str(row['size']),
+                {'certified_steps': 0, 'stock_graph_steps': 0, 'rows': 0, 'max_rows': 0},
+            )
+            entry['certified_steps'] += c['certified_steps']
+            entry['stock_graph_steps'] += c['stock_graph_steps']
+            entry['rows'] += c['rows']
+            entry['max_rows'] = max(entry['max_rows'], c['max_rows'])
+    verify_steps = sum(v['certified_steps'] for v in by_size.get('verify', {}).values())
+    baseline = all(r['identical'] == r['prompts'] for r in within.values())
+    identical = all(r['identical'] == r['prompts'] for r in against.values())
+    if verify_steps == 0:
+        reading = 'the certified verify did not run in the waves'
+    elif identical:
+        reading = "the certified verify decided the waves' verifies and matched stock"
+    else:
+        reading = 'certified verify mismatch under identical batch evolution'
+    return {
+        'declared': False,
+        'reading_rule': (__doc__ or '').split('Token-only rerun (set before it ran):')[1].strip(),
+        'reference': str(reference),
+        'within_server': within,
+        'certtokens_vs_stocktokens': against,
+        'stocktokens_vs_logprob_stock': side,
+        'baseline_identical': baseline,
+        'waves_counters_by_size': by_size,
+        'waves_certified_verify_steps': verify_steps,
+        'reading': reading,
+    }
 
 
 def pair_outputs(a: dict[str, list[int]], b: dict[str, list[int]]) -> dict[str, Any]:
@@ -397,12 +517,16 @@ def stats_compare(out: Path, reference: Path) -> dict[str, Any]:
         }
     verify_rows = paths.get('verify', {}).get('rows', 0)
     identical = all(r['identical'] == r['prompts'] for r in pairs.values())
+    # Counted over the server's life, warm-up included: the waves' own verifies are not
+    # separable here (tokens_compare counts them wave by wave).
     if verify_rows == 0:
         reading = 'no certified verify row: a silent fallback to the stock head'
     elif identical:
-        reading = 'the certified head decided the verifies and matched stock'
+        reading = (
+            'certified verify rows over the server life (warm-up included); outputs equal stock'
+        )
     else:
-        reading = 'the certified head decided the verifies and the outputs differ from stock'
+        reading = 'certified verify rows over the server life (warm-up included); outputs differ'
     return {
         'declared': False,
         'reading_rule': (__doc__ or '').split('Counter rerun (set before it ran):')[1].strip(),
@@ -492,6 +616,20 @@ def small_compare(out: Path) -> dict[str, Any]:
 def compare_variants(out: Path, family: str = 'mtp', reference: Path | None = None) -> int:
     """Every pair of the control's variants: identical outputs and first divergences
     (over the prompts both served: certlog serves one wave)."""
+    if family == 'mtptokens':
+        tokens = tokens_compare(out, reference or out.parent / 'seeded')
+        (out / 'compare.json').write_text(json.dumps(tokens, indent=1) + '\n')
+        print(
+            json.dumps(
+                {k: tokens[k] for k in ('waves_counters_by_size', 'baseline_identical', 'reading')}
+            )
+        )
+        for name, result in {
+            **tokens['certtokens_vs_stocktokens'],
+            **tokens['stocktokens_vs_logprob_stock'],
+        }.items():
+            print(name, {k: v for k, v in result.items() if k != 'divergences'})
+        return 0
     if family == 'mtpstats':
         stats = stats_compare(out, reference or out.parent / 'seeded')
         (out / 'compare.json').write_text(json.dumps(stats, indent=1) + '\n')
@@ -577,7 +715,16 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument('--family', choices=sorted(VARIANTS), required=True)
         p.add_argument(
             '--variant',
-            choices=('stock', 'cert', 'cert0', 'certlog', 'stock2', 'certstats'),
+            choices=(
+                'stock',
+                'cert',
+                'cert0',
+                'certlog',
+                'stock2',
+                'certstats',
+                'stocktokens',
+                'certtokens',
+            ),
             required=True,
         )
         p.add_argument('--out', type=Path, required=True)
@@ -595,7 +742,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == 'start':
         return start(args.out, args.family, args.variant)
     if args.command == 'waves':
-        if args.family in ('mtpsmall', 'mtpstats'):
+        if args.family in ('mtpsmall', 'mtpstats', 'mtptokens'):
             return small_waves(args.out, args.variant, args.runs)
         return waves(args.out, args.family, args.variant, args.runs)
     return stop_server(args.out / args.variant)

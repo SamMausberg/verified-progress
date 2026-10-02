@@ -793,6 +793,23 @@ matched; zero certified verify rows means a silent fallback, reported as such; c
 rows with an output that differs from stock is a certified-head mismatch under identical
 batch evolution. Uncounted calls must be zero.
 
+Token-only rerun (added 2026-10-02 after the counter rerun, approved by main):
+
+    GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x experiments/benchcert/hold_seeded_tokens.sh
+
+The counter rerun found 5 certified verify calls over the server's life, all at most 4 rows
+(the warm-up): a request that asks for logprobs keeps the verify on the stock head (SGLang's
+`certified_head.py`, `_adjusts_logits`), so the seeded waves' verifies were stock in the
+cert arm as in cert0, and only the draft and draft-extend heads ran certified. `mtptokens`
+serves the same waves twice without logprobs on two servers in turn, stock (`stocktokens`)
+and certified with the counters on every glue call (`certtokens`), reading the counters
+before and after every wave. Reading, set before it runs: certified verify steps during the
+waves above zero, with every token equal to stocktokens on both passes, means the certified
+verify decided and matched; zero means it did not run; any token difference is a
+certified-verify mismatch under identical batch evolution. Each server's two passes must be
+identical, and stocktokens is compared with the logprob stock run as a side check. The
+certified verify steps, rows and largest batch are reported per wave size.
+
 ## Hold commit
 
 Every hold runs from a clean checkout at the commit recorded here; `run_session.py`

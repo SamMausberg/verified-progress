@@ -202,9 +202,37 @@ def test_stats_compare_reads_counters_and_compares_with_stock(tmp_path: Path) ->
     }
     (out / 'certstats' / 'certified_stats.json').write_text(json.dumps(stats))
     result = control_waves.stats_compare(out, ref)
-    assert result['reading'] == 'the certified head decided the verifies and matched stock'
+    assert result['reading'].startswith('certified verify rows over the server life')
     assert result['paths']['verify']['uncounted_calls'] == 0
     assert all(r['identical'] == r['prompts'] == 2 for r in result['against_stock'].values())
     stats['paths']['verify']['rows'] = 0
     (out / 'certstats' / 'certified_stats.json').write_text(json.dumps(stats))
     assert control_waves.stats_compare(out, ref)['reading'].startswith('no certified verify row')
+
+
+def test_stats_delta_counts_only_the_steps_between_snapshots() -> None:
+    before = {
+        'verify': {
+            'calls': 5,
+            'rows': 20,
+            'host_steps': {'certified': 5, 'stock_graph': 2},
+            'certified_rows_histogram': {'4': 5},
+        }
+    }
+    after = {
+        'verify': {
+            'calls': 9,
+            'rows': 52,
+            'host_steps': {'certified': 9, 'stock_graph': 2},
+            'certified_rows_histogram': {'4': 6, '16': 2, '12': 1},
+        }
+    }
+    delta = control_waves.stats_delta(before, after)
+    assert delta['verify'] == {
+        'calls': 4,
+        'rows': 32,
+        'certified_steps': 4,
+        'stock_graph_steps': 0,
+        'max_rows': 16,
+    }
+    assert control_waves.stats_delta({}, {}) == {}
