@@ -54,9 +54,12 @@ The offline replay evaluates real logits in FP64; transport is analysed in real 
 \end{table}
 
 
-\subsection{The BF16 separation lemma}\label{app:bf16gap}
+\subsection{The BF16 separation lemma and the gap condition}\label{app:bf16gap}
 \begin{proof}[Proof of Lemma~\ref{lem:bf16gap}]
 Rounding is nondecreasing, so if $\rnb(y_a)\le\rnb(y_b)$ while $y_a>y_b$, both values round to the same $v$ and lie in its preimage. When $|v|$ is not a power of two, the preimage has length $\ulpb(v)$ and both values lie in the binade of $v$. When $|v|=2^e$ the preimage is $[v-\ulpb(v)/4,\,v+\ulpb(v)/2]$ for $v>0$ (symmetrically for $v<0$): two values on one side of $v$ are within half the spacing of their binade, and two values on both sides are within $\tfrac34\ulpb(v)\le\ulpb(y_a)$. At $v=0$ the preimage has the subnormal spacing. In every case $y_a-y_b\le\ulpb(\max(|y_a|,|y_b|))$, contradicting the hypothesis.
+\end{proof}
+\begin{proof}[Proof of Theorem~\ref{thm:stock}]
+For every $b\ne a$, $\hat y_a-\hat y_b\ge z_a-z_b-G_a-G_b>\ulpb(\max(|z_a|,|z_b|)+\max(G_a,G_b))\ge\ulpb(\max(|\hat y_a|,|\hat y_b|))$, because $|\hat y_i|\le|z_i|+G_i$ and $\ulpb$ is nondecreasing in the magnitude. Lemma~\ref{lem:bf16gap} gives $L_a>L_b$, so $a$ is the only maximal index and \Rstock{} returns $a$.
 \end{proof}
 
 \subsection{Accumulation trees and the constants of the error models}\label{app:accumulation}
