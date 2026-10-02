@@ -69,22 +69,36 @@ def test_decision_ignores_the_bf16_state_run() -> None:
 
 
 def test_decision_pairs_positions_both_miss() -> None:
-    # Six SGLang misses, one of them shared with the comparator: five discordant, p = 1/32.
+    # Six SGLang misses, one of them shared with each comparator: five discordant, p = 1/32.
     shared = events(6)
-    shared['hf_bf16_float32state'] = {('p', 0)}
+    for name in rates.COMPARATORS:
+        shared[name] = {('p', 0)}
     decision = rates.decide(shared)
-    assert (decision['sglang_only'], decision['comparator_only']) == (5, 0)
-    assert decision['paired_exact_p_one_sided'] == pytest.approx(1 / 32)
+    torch_run = decision['against']['hf_bf16_float32state']
+    assert (torch_run['sglang_only'], torch_run['comparator_only']) == (5, 0)
+    assert torch_run['paired_exact_p_one_sided'] == pytest.approx(1 / 32)
     assert decision['verdict'] == 'sglang-specific'
     # One shared miss and nothing else: no discordant position, p = 1.
     one = events(1)
     one['hf_bf16_float32state'] = {('p', 0)}
-    assert rates.decide(one)['paired_exact_p_one_sided'] == 1.0
+    assert rates.decide(one)['against']['hf_bf16_float32state']['paired_exact_p_one_sided'] == 1.0
 
 
-def test_decision_compares_against_the_worse_transformers_run() -> None:
+def test_decision_needs_the_rule_against_every_comparator() -> None:
+    # Equal counts, different pairing: shared against torch (p = 1/32), disjoint against fla
+    # (p = 8/128); SGLang-specific needs both.
+    found = events(6)
+    found['hf_bf16_float32state'] = {('p', 0)}
+    found['hf_bf16_fla_float32state'] = {('p', 1000)}
+    decision = rates.decide(found)
+    assert decision['against']['hf_bf16_float32state']['sglang_specific']
+    assert not decision['against']['hf_bf16_fla_float32state']['sglang_specific']
+    assert decision['verdict'] == 'inconclusive'
+
+
+def test_decision_is_not_specific_when_one_comparator_is_comparable() -> None:
     decision = rates.decide(events(9, hf_bf16_fla_float32state=6))
-    assert decision['comparator'] == 'hf_bf16_fla_float32state'
+    assert decision['against']['hf_bf16_fla_float32state']['comparable']
     assert decision['verdict'] == 'not specific'
 
 
