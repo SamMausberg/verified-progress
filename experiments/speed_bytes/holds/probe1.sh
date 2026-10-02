@@ -5,7 +5,8 @@
 set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 ENGINE=$HOME/sglang-wt/speed-bytes
-ENGINE_COMMIT=98aa8c9821
+# The engine tree of the recorded run (98aa8c9821); see engine/sglang/README.md for rebuilding it.
+ENGINE_TREE=e95d72d554f3b70f280e466de8adc21a2f5598c2
 OUT=$HOME/vp-data/speed-bytes/probe1_$(date -u +%Y%m%dT%H%M%SZ)
 PORT=30221
 mkdir -p "$OUT"
@@ -19,7 +20,7 @@ source "$REPO/scripts/sglang_env.sh"
 cd "$REPO"
 echo "start $(date -Is) repo $(git rev-parse HEAD) engine $(git -C "$ENGINE" rev-parse HEAD)"
 [ -z "$(git status --porcelain --untracked-files=no)" ] || { echo "repository $REPO has tracked edits"; exit 1; }
-[ "$(git -C "$ENGINE" rev-parse --short=10 HEAD)" = "$ENGINE_COMMIT" ] || { echo "engine not at $ENGINE_COMMIT"; exit 1; }
+[ "$(git -C "$ENGINE" rev-parse "HEAD^{tree}")" = "$ENGINE_TREE" ] || { echo "engine tree is not $ENGINE_TREE"; exit 1; }
 [ -z "$(git -C "$ENGINE" status --porcelain --untracked-files=no)" ] || { echo "engine dirty"; exit 1; }
 # shellcheck disable=SC2329 # invoked by the EXIT trap and between servers
 kill_servers() {

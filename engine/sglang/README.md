@@ -338,7 +338,20 @@ SGLANG_WORKTREE=~/sglang-wt/speed-bytes source scripts/sglang_env.sh
 | 0004 | Quality-only modes: `SGLANG_FP8_DENSE_WSCALE=channel` (one weight scale per output channel, row and channel scales applied to an FP32 GEMM output) and `SGLANG_FP8_DENSE_ACT=none` (weights rounded through FP8 and kept for the stock BF16 GEMM: the quality of a weight-only kernel) | not selected by default |
 | 0005 | `SGLANG_FP8_DRAFT_HEAD=1` at tensor-parallel size above 1 raises an error instead of silently keeping the BF16 projection (the FP8 copy exists only at size 1). Added after the runs; none of them used more than one rank | unset: no change |
 
-Engines behind the evidence: `98aa8c9821` = 0001 (kill1, probe1), `1490d9a891` = 0001 + 0002
+Engines behind the evidence, and how to rebuild each one (the hold scripts check the engine's
+tree hash, so a rebuilt worktree passes their guard):
+
+```sh
+P="$PWD"/engine/sglang/patches/speed-bytes
+scripts/sglang_worktree.sh speed-bytes && git -C ~/sglang-wt/speed-bytes am "$P"/0001-*.patch
+#   kill1.sh, probe1.sh (tree of 98aa8c9821)
+scripts/sglang_worktree.sh speed-bytes-l2 && git -C ~/sglang-wt/speed-bytes-l2 am "$P"/0001-*.patch "$P"/0002-*.patch
+#   kill2b.sh (tree of 1490d9a891)
+git -C ~/sglang-wt/speed-bytes am "$P"/0003-*.patch
+#   kill3.sh (tree of 1bc2fc4719)
+```
+
+`98aa8c9821` = 0001 (kill1, probe1), `1490d9a891` = 0001 + 0002
 (kill2b), `1bc2fc4719` = 0001 + 0003 (kill3; 0002 and 0003 touch different files),
 `776f8e5c79` = 0001 + 0003 + 0004; `78b8ffdb7a` = 0001 + 0002 + 0005. The tree after 0001
 equals `98aa8c9821`'s and after 0001-0002 equals `1490d9a891`'s.

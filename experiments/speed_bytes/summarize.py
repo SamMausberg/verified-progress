@@ -236,9 +236,12 @@ def cmd_probe(args: argparse.Namespace) -> None:
     def load(name: str) -> dict:
         return json.loads((d / f'{name}.json').read_text())
 
-    for label in ('bf16', 'fp8tok', 'fp8ten'):
+    expected = {'bf16': None, 'fp8tok': 'act=token', 'fp8ten': 'act=tensor'}
+    for label, act in expected.items():
         log = (d / f'server_{label}.log').read_text(errors='replace')
-        if ('FP8 dense (' in log) != (label != 'bf16'):
+        if ('FP8 dense (' in log) != (act is not None) or (
+            act and f'FP8 dense (target, {act}' not in log
+        ):
             raise SystemExit(f'{d}: server_{label}.log does not match its FP8 setting')
     ref = load('bf16.gen48')
     out: dict = {'reference': 'bf16.gen48', 'logit_probe_compare': {}, 'decode_path': {}}

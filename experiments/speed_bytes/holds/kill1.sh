@@ -2,12 +2,13 @@
 # speed-bytes kill test 1 (exploratory, exclusive, ~20 min): FP8 W8A8 dense linears via cuBLASLt.
 #   lever 1: plain-tuned off/on at c = 1, 8, 64; dflash-tuned-b16 off/on (target only) at c = 1, 4
 #   lever 2 (drafter linears only): dflash-tuned-b16 with SGLANG_FP8_DENSE=draft at c = 1, 4
-# All launches use engine ~/sglang-wt/speed-bytes at ENGINE_COMMIT; the switch off is the stock path.
+# All launches use engine ~/sglang-wt/speed-bytes with the tree ENGINE_TREE; the switch off is the stock path.
 set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 SP=$REPO/experiments/speed_bytes
 ENGINE=$HOME/sglang-wt/speed-bytes
-ENGINE_COMMIT=98aa8c9821
+# The engine tree of the recorded run (98aa8c9821); see engine/sglang/README.md for rebuilding it.
+ENGINE_TREE=e95d72d554f3b70f280e466de8adc21a2f5598c2
 OUT=$HOME/vp-data/speed-bytes/kill1_$(date -u +%Y%m%dT%H%M%SZ)
 mkdir -p "$OUT"
 exec >"$OUT/hold.log" 2>&1
@@ -20,7 +21,7 @@ source "$REPO/scripts/sglang_env.sh"
 cd "$REPO"
 echo "start $(date -Is) repo $(git rev-parse HEAD) engine $(git -C "$ENGINE" rev-parse HEAD)"
 [ -z "$(git status --porcelain --untracked-files=no)" ] || { echo "repository $REPO has tracked edits"; exit 1; }
-[ "$(git -C "$ENGINE" rev-parse --short=10 HEAD)" = "$ENGINE_COMMIT" ] || { echo "engine not at $ENGINE_COMMIT"; exit 1; }
+[ "$(git -C "$ENGINE" rev-parse "HEAD^{tree}")" = "$ENGINE_TREE" ] || { echo "engine tree is not $ENGINE_TREE"; exit 1; }
 [ -z "$(git -C "$ENGINE" status --porcelain --untracked-files=no)" ] || { echo "engine dirty"; exit 1; }
 # shellcheck disable=SC2329 # invoked by the EXIT trap
 kill_servers() {
