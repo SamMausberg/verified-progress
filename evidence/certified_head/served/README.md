@@ -27,12 +27,19 @@ So the served envelope rises only at c = 1 and falls at c = 2, 4, 8 and 128. (Bu
 plain decoding, `plain-tuned-replayssm`, may lead at c = 96-128 with one confirmation
 session; it was not tested here.)
 
+**Open: one wrong token in a certified MTP run.** At MTP c = 64 (session 1) the certified
+run committed one token 3.8 nats below the batch-1 top where the other runs agreed on a
+near-top token (Exactness, below). Until a settling hold (check launches with every
+counter written, MTP in fixed waves of 64, a logged replay of that prompt) reports, MTP
+exactness is claimed only at concurrency 1 and at the check-mode batches.
+
 **Declared verdicts (measured).** By the pre-registered rule (one primary point per
 family, Holm-adjusted across the four) H4 is supported under the declared rule: at
 concurrency 1 the certified head raises throughput by 2.5% for plain decoding (1.022-
 1.028), 4.6% for MTP (1.045-1.046) and 1.2% for DFlash block 16, and at concurrency 4 it
-lowers DFlash block 8's by 1.2%. Plain's and MTP's gains are real, declared and exact at
-the tested shapes, but neither arm leads the envelope at c <= 32. The gains are confined
+lowers DFlash block 8's by 1.2%. Plain's and MTP's gains are real and declared, and
+exact at concurrency 1 and the check-mode batches, but neither arm leads the envelope at
+c <= 32. The gains are confined
 to small batches and fall well short of the prediction (MTP 1.046 against 1.086 at c = 1;
 block 16 1.012 against 1.045 at c = 1 and 0.970 against 1.009 at c = 4). Wherever the
 head serves 32-64-row MTP or DFlash batches it loses up to 3.3%; where every certified
@@ -82,7 +89,10 @@ plain, block 16, block 8 (`ratios.csv`).
 | dflash8 | c = 4 | 0.9880 | 0.9774-0.9986 | 0.9664-1.0100 | 0.040 | loss | 1.024 |
 
 Family verdicts: plain, MTP and DFlash block 16 **improve**; DFlash block 8 **loses**.
-Exactness is established for all four (next section). H4: **supported**. Block 8's loss
+H4: **supported**. The exactness behind these verdicts rests on h1's check launches,
+whose counts are partial, and on concurrency-1 identity; the check rerun is pending, and
+the declared rule does not cover the wrong token at MTP c = 64 (next section), which is
+open. Block 8's loss
 rests on Holm's last step at the nominal 0.05; its Bonferroni interval includes 1.
 
 ## Every point
@@ -149,7 +159,11 @@ microbenchmark has slower still; it was not timed.
 **Same batch shape.** The untimed check launches (h1) ran each family's certified arm at
 its tuned flags and capacity with `SGLANG_CERTIFIED_HEAD_CHECK=1`, which also runs the
 stock head in every certified step and counts, on the device, rows whose token differs
-(`check.csv`):
+(`check.csv`, step `check`). Their counters were written every 25 glue calls with no
+final write before each point's snapshot (Codex on PR #190), so the counts below are
+partial: 0 differing rows among the 594,329 rows whose counters were flushed; up to 24
+calls per point were not counted. A rerun with every counter written is pending (step
+`check2`):
 
 | Family | Path | Concurrency | Certified calls | Rows | Rows differing | Rows falling back | Calls with a fallback |
 |---|---|---|---|---|---|---|---|
@@ -168,10 +182,11 @@ outside the conditional node; it does not test the gated-off stock path inside i
 **Concurrency 1, timed.** One request at a time gives both arms the same batches, and
 every request's token ids were identical between the two arms in all three sessions:
 plain, MTP and block 16, 32 of 32 prompts each. Block 8 has no c = 1 point; its
-exactness rests on its check launch alone. By the declared rule exactness is established
-for all four families, which means token identity at concurrency 1 and at the
-check-mode batches; the exploratory wave controls below add identity under fixed batch
-evolution for MTP at 8 requests and for block 16 at c = 8 with the head gated off.
+exactness rests on its check launch alone. By the declared rule exactness was established
+for all four families from these and h1's (partial) check counts: token identity at
+concurrency 1 and at the counted check-mode batches. The exploratory wave controls below
+add identity under fixed batch evolution for MTP at 8 requests and for block 16 at c = 8
+with the head gated off.
 
 **Concurrency above 1, timed.** Closed-loop batches vary from run to run. First
 divergences per 1,000 tokens of exposure, pooled over c > 1 (`equality.csv`;
@@ -211,15 +226,18 @@ c > 1, counting every pair's first divergences (`summary.json`, `equality.csv`):
 | dflash8 | 259 / 259 / 11 / 0 | 267 / 241 / 9 / 0 |
 
 The block-16 events are the three recurring c = 8 divergences, all at the rounding
-level. The one large event is MTP at c = 64, session 1, certified against stock (1 of
-that pair's 82 divergences). At c = 64 the MTP verify batches have 256 rows and are
-gated off, so both arms commit tokens from the stock verify head; only the draft path
-runs certified there, which changes the draft blocks and the buffered GDN replay, not
-the head's decision at a given state. At that context the stock model at c = 1 ranks
-both diverging tokens below a third token, one of them 3.6 nats below the top, so one
-timed run committed a token far from the batch-1 argmax: a difference in model state
-between the runs, not a head decision. Which run, and why, is not established; it is
-reported as unexplained. The first
+level. The one large event is a wrong token committed by a certified run: MTP at c = 64,
+session 1. At an identical 514-token prefix (prompt `579ae7ce`, output position 439),
+the session-1 certified run committed `_type` (token 1756), 3.8 nats below the top of
+the batch-1 stock distribution, while the session-1 stock run and both arms of session 3,
+and session 2's certified run, committed `_triangle` (68189), 0.19 nats below the top
+(session 2's stock run had diverged earlier); all later tokens agree. A wrong draft is
+rejected by greedy verification, so the certified run's verify step committed a token it
+should not have produced. The shape is one the exactness tests did not cover: MTP at
+c = 64, where the 256-row verify batches are gated off except as the batch drains, and
+the draft and draft-extend paths are certified at 64 rows. The cause is not established:
+it is reported as an unexplained wrong-token event in a certified MTP run at c = 64, and
+MTP exactness is claimed only at concurrency 1 and at the check-mode batches. The first
 scoring run read the tokens' logprobs from the wrong response key, so every margin was
 NaN and every context classed large; it was discarded and the declared re-score rerun
 after the fix. The wave controls compare token ids and are unaffected.

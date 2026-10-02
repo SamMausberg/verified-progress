@@ -532,16 +532,37 @@ def classify_margin(margin: float, ulp: float | None) -> str:
 # ---------------------------------------------------------------------------
 
 
+# Fields of a path's stats that are not cumulative counters.
+GAUGES = ('max_certified_rows',)
+
+
 def stats_delta(after: dict[str, Any], before: dict[str, Any] | None) -> dict[str, dict]:
-    """Per-path counter differences between two certified-head stats snapshots."""
+    """Per-path counter differences between two certified-head stats snapshots.
+
+    Cumulative counters are subtracted. `max_certified_rows` is a high-water gauge, so
+    the point's own largest certified batch is taken from the difference of the
+    certified-rows histograms instead, and the host's certified gate count from
+    `host_steps` (to check that the device counters cover every certified replay).
+    """
     out = {}
     for path, counters in (after.get('paths') or {}).items():
         prior = ((before or {}).get('paths') or {}).get(path, {})
-        out[path] = {
+        delta: dict[str, Any] = {
             key: value - prior.get(key, 0)
             for key, value in counters.items()
-            if isinstance(value, int)
+            if isinstance(value, int) and key not in GAUGES
         }
+        hist, prior_hist = (
+            counters.get('certified_rows_histogram') or {},
+            prior.get('certified_rows_histogram') or {},
+        )
+        grown = [int(k) for k, v in hist.items() if int(v) > int(prior_hist.get(k, 0))]
+        delta['max_certified_rows'] = max(grown, default=0)
+        host, prior_host = counters.get('host_steps') or {}, prior.get('host_steps') or {}
+        delta['host_certified_steps'] = int(host.get('certified', 0)) - int(
+            prior_host.get('certified', 0)
+        )
+        out[path] = delta
     return out
 
 
@@ -788,7 +809,9 @@ def report(
                 handle.write(json.dumps(record) + '\n')
 
     # Check-mode launches.
-    check_rows, check_verdict = check_counters(launches)
+    check_rows, check_verdict = check_counters(launches, 'check2')
+    partial_rows, partial_verdict = check_counters(launches, 'check')
+    check_rows = partial_rows + check_rows
 
     # Certified head counters in the timed launches; launch and capture records.
     stats_rows, launch_rows, capture_rows = launch_records(launches)
@@ -811,6 +834,7 @@ def report(
         'decisions': ratio_rows,
         'exactness': exactness,
         'check': check_verdict,
+        'check_h1_partial': partial_verdict,
         'plan': {
             name: {'arm': f.arm, 'flags': f.flags, 'concurrency': f.concurrency, 'sets': f.sets}
             for name, f in plan.FAMILIES.items()
@@ -957,18 +981,21 @@ def token_comparisons(
 
 def check_counters(
     launches: dict[tuple[str, str, str], dict[str, Any]],
+    step: str = 'check2',
 ) -> tuple[list[dict[str, Any]], dict[str, bool | None]]:
     """Per point and path: certified calls, rows, fallbacks and differing rows.
 
     The verdict per family is False on positive evidence (a differing row, or a
     declared path never certified by a launch that completed), True when a complete
-    launch certified every declared path with no differing row, and None (exactness
-    incomplete) when the launch is missing, failed or left no counters.
+    launch certified every declared path with no differing row and its device counters
+    cover every certified replay the host gated (`uncounted_calls` 0 at every point),
+    and None (exactness incomplete) otherwise: a missing or failed launch, missing
+    counters, or calls left uncounted (h1's `check` launches wrote every 25 calls).
     """
     rows: list[dict[str, Any]] = []
     verdict: dict[str, bool | None] = {}
     for fam, family in plan.FAMILIES.items():
-        info = launches.get(('check', fam, 'check'))
+        info = launches.get((step, fam, 'check'))
         if info is None:
             verdict[fam] = None
             continue
@@ -988,7 +1015,12 @@ def check_counters(
                 if counters.get('calls', 0) > 0:
                     seen_paths.add(path)
                 mismatch += counters.get('mismatch_rows', 0)
-                rows.append({'family': fam, 'concurrency': c, 'path': path, **counters})
+                expected = counters['host_certified_steps'] * family.calls_per_step.get(path, 1)
+                uncounted = expected - counters.get('calls', 0)
+                if uncounted != 0:
+                    complete = False
+                rows.append({'step': step, 'family': fam, 'concurrency': c, 'path': path,
+                             **counters, 'uncounted_calls': uncounted})
         if mismatch > 0:
             verdict[fam] = False
         elif not complete or not info['points']:

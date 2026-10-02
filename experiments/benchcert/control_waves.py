@@ -38,6 +38,7 @@ closed-loop timing in the timed runs.
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import json
 import sys
 import urllib.request
@@ -52,58 +53,89 @@ from experiments.benchcert.analyze import compare, context_id, request_ids
 from experiments.benchcert.rescore import stop as stop_server
 
 PORT = 30083
-WAVES, WAVE_SIZE, OSL = 8, 8, 512
-VARIANTS = {'mtp': ('stock', 'cert'), 'dflash16': ('stock', 'cert', 'cert0')}
-# Small shared-lane servers with explicit KV caps.
-KV_TOKENS = {'mtp': 100000, 'dflash16': 30000}
+WAVES, OSL = 8, 512
+# The prompt of the one large divergence (MTP, c = 64, session 1, certified run).
+TARGET_PROMPT = '579ae7ce'
+HOOK_DIR = Path(__file__).resolve().parent / 'replay_hook'
 
 
-def overrides(family: str) -> dict[str, ArgValue]:
+@dataclass(frozen=True)
+class Control:
+    family: str  # plan family whose arm runs
+    point: int  # the timed concurrency whose recorded prompts are used
+    wave_size: int
+    variants: tuple[str, ...]
+    kv_tokens: int | None  # explicit KV cap of a small shared-lane server; None: timed pools
+
+
+CONTROLS = {
+    'mtp': Control('mtp', 8, 8, ('stock', 'cert'), 100000),
+    'dflash16': Control('dflash16', 8, 8, ('stock', 'cert', 'cert0'), 30000),
+    # The settling hold (exclusive, untimed): waves of 64 at the timed pools, and a
+    # logged check-mode replay of the large event's wave (certlog).
+    'mtp64': Control('mtp', 64, 64, ('stock', 'cert', 'certlog'), None),
+}
+VARIANTS = {name: control.variants for name, control in CONTROLS.items()}
+
+
+def overrides(name: str) -> dict[str, ArgValue]:
+    control = CONTROLS[name]
+    if control.kv_tokens is None:
+        return {}  # the arm's own pools (128 requests, 1,000,000 KV tokens, 128 slots)
     return {
         'mem-fraction-static': 0.25,
-        'max-total-tokens': KV_TOKENS[family],
-        'max-running-requests': WAVE_SIZE,
-        'max-mamba-cache-size': WAVE_SIZE,
+        'max-total-tokens': control.kv_tokens,
+        'max-running-requests': control.wave_size,
+        'max-mamba-cache-size': control.wave_size,
     }
 
 
 WORKLOAD = plan.REPO / 'bench/workloads/mixed-v2/confirm.jsonl'
 
 
-def source_point(runs: Path, family: str) -> Path:
-    """Session 1's stock point at c = 8 (64 measured requests, prompts 0-63)."""
-    label = plan.FAMILIES[family].stock_label
-    found = sorted((runs / 's1' / label).glob('2026*/r0/c008'))
+def source_point(runs: Path, name: str) -> Path:
+    """Session 1's stock point at the control's concurrency (its measured prompts)."""
+    control = CONTROLS[name]
+    label = plan.FAMILIES[control.family].stock_label
+    found = sorted((runs / 's1' / label).glob(f'2026*/r0/c{control.point:03d}'))
     if len(found) != 1:
-        raise SystemExit(f'expected one s1 {label} c=8 point, found {found}')
+        raise SystemExit(f'expected one s1 {label} c={control.point} point, found {found}')
     return found[0]
 
 
-def prompts(runs: Path, family: str = 'mtp') -> list[tuple[str, list[int]]]:
-    """(prompt hash, prompt token ids) of the first 64 confirmation prompts, in order."""
-    recorded = request_ids(source_point(runs, family))
-    wanted = [prompt_hash(item['text']) for item in iter_jsonl(WORKLOAD)][: WAVES * WAVE_SIZE]
+def prompts(runs: Path, name: str = 'mtp') -> list[tuple[str, list[int]]]:
+    """(prompt hash, prompt token ids) of the control's prompts, in workload order."""
+    count = WAVES * CONTROLS[name].wave_size
+    recorded = request_ids(source_point(runs, name))
+    wanted = [prompt_hash(item['text']) for item in iter_jsonl(WORKLOAD)][:count]
     missing = [key for key in wanted if 'input' not in recorded.get(key, {})]
     if missing:
-        raise SystemExit(f'{len(missing)} of the first 64 prompts have no recorded token ids')
+        raise SystemExit(f'{len(missing)} of the first {count} prompts have no recorded token ids')
     return [(key, recorded[key]['input']) for key in wanted]
 
 
-def variant_env(family: str, variant: str, stats: Path) -> dict[str, str]:
-    """The timed certified environment; cert0 sets MAX_ROWS=0 so the head never runs."""
+def variant_env(name: str, variant: str, stats: Path) -> dict[str, str]:
+    """The timed certified environment; cert0 sets MAX_ROWS=0 so the head never runs;
+    certlog adds check mode and the per-replay log (replay_hook/sitecustomize.py)."""
     if variant == 'stock':
         return {}
-    env = plan.certified_env(plan.FAMILIES[family], 'cert', plan.REPO / 'src', stats)
+    env = plan.certified_env(plan.FAMILIES[CONTROLS[name].family], 'cert', plan.REPO / 'src', stats)
     if variant == 'cert0':
         env['SGLANG_CERTIFIED_HEAD_MAX_ROWS'] = '0'
+    if variant == 'certlog':
+        env['SGLANG_CERTIFIED_HEAD_CHECK'] = '1'
+        env['SGLANG_CERTIFIED_HEAD_STATS_EVERY'] = '1'
+        env['PYTHONPATH'] = str(HOOK_DIR)
+        env['BENCHCERT_REPLAY_LOG'] = str(stats.parent / 'replay.jsonl')
     return env
 
 
-def start(out: Path, family: str, variant: str) -> int:
-    fam = plan.FAMILIES[family]
-    env = variant_env(family, variant, out / variant / 'certified_stats.json')
-    arm = resolve_arm(fam.arm, overrides(family), env)
-    arm = type(arm)(**{**arm.to_json(), 'max_concurrency': WAVE_SIZE})
+def start(out: Path, name: str, variant: str) -> int:
+    control = CONTROLS[name]
+    env = variant_env(name, variant, out / variant / 'certified_stats.json')
+    arm = resolve_arm(plan.FAMILIES[control.family].arm, overrides(name), env)
+    if control.kv_tokens is not None:
+        arm = type(arm)(**{**arm.to_json(), 'max_concurrency': control.wave_size})
     server = Server(arm, out / variant / 'server', PORT, sglang_worktree=plan.ENGINE_WORKTREE)
     server.start()
     try:
@@ -117,13 +149,23 @@ def start(out: Path, family: str, variant: str) -> int:
     return 0
 
 
-def waves(out: Path, family: str, variant: str, runs: Path) -> int:
-    items = prompts(runs, family)
+def waves(out: Path, name: str, variant: str, runs: Path) -> int:
+    size = CONTROLS[name].wave_size
+    items = prompts(runs, name)
+    selected = range(WAVES)
+    if variant == 'certlog':
+        # Only the wave that holds the large event's prompt.
+        index = next(
+            (i for i, (key, _) in enumerate(items) if key.startswith(TARGET_PROMPT)), None
+        )
+        if index is None:
+            raise SystemExit(f'prompt {TARGET_PROMPT} is not among the control prompts')
+        selected = range(index // size, index // size + 1)
     target = out / variant / 'outputs.jsonl'
     tmp = target.with_suffix('.jsonl.tmp')
     with tmp.open('w') as handle:
-        for wave in range(WAVES):
-            batch = items[wave * WAVE_SIZE : (wave + 1) * WAVE_SIZE]
+        for wave in selected:
+            batch = items[wave * size : (wave + 1) * size]
             body = {
                 'input_ids': [ids for _, ids in batch],
                 'sampling_params': {'max_new_tokens': OSL, 'temperature': 0.0, 'ignore_eos': True},
@@ -148,7 +190,8 @@ def waves(out: Path, family: str, variant: str, runs: Path) -> int:
 
 
 def compare_variants(out: Path, family: str = 'mtp') -> int:
-    """Every pair of the family's variants: identical outputs and first divergences."""
+    """Every pair of the control's variants: identical outputs and first divergences
+    (over the prompts both served: certlog serves one wave)."""
     runs = {
         variant: {r['prompt']: r for r in iter_jsonl(out / variant / 'outputs.jsonl')}
         for variant in VARIANTS[family]
@@ -158,7 +201,9 @@ def compare_variants(out: Path, family: str = 'mtp') -> int:
     names = list(VARIANTS[family])
     for i, left in enumerate(names):
         for right in names[i + 1 :]:
-            a, b = runs[left], runs[right]
+            shared = set(runs[left]) & set(runs[right])
+            a = {k: v for k, v in runs[left].items() if k in shared}
+            b = {k: v for k, v in runs[right].items() if k in shared}
             result = compare(
                 {k: v['output_ids'] for k, v in a.items()},
                 {k: v['output_ids'] for k, v in b.items()},
@@ -192,7 +237,7 @@ def compare_variants(out: Path, family: str = 'mtp') -> int:
         'reading_rule': rule,
         'pairs': pairs,
         'waves': WAVES,
-        'wave_size': WAVE_SIZE,
+        'wave_size': CONTROLS[family].wave_size,
         'osl': OSL,
     }
     (out / 'compare.json').write_text(json.dumps(summary, indent=1) + '\n')
@@ -207,7 +252,7 @@ def main(argv: list[str] | None = None) -> int:
     for name in ('start', 'waves', 'stop'):
         p = sub.add_parser(name)
         p.add_argument('--family', choices=sorted(VARIANTS), required=True)
-        p.add_argument('--variant', choices=('stock', 'cert', 'cert0'), required=True)
+        p.add_argument('--variant', choices=('stock', 'cert', 'cert0', 'certlog'), required=True)
         p.add_argument('--out', type=Path, required=True)
         p.add_argument('--runs', type=Path, default=Path.home() / 'vp-data/benchcert')
     c = sub.add_parser('compare')

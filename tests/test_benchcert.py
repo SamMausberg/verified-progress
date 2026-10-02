@@ -321,7 +321,14 @@ def _launch(
                     json.dumps(
                         {
                             'paths': {
-                                p: {'calls': 10 * scale, 'rows': 40 * scale, 'mismatch_rows': 0}
+                                p: {
+                                    'calls': 10 * scale,
+                                    'rows': 40 * scale,
+                                    'mismatch_rows': 0,
+                                    'max_certified_rows': 8,
+                                    'host_steps': {'certified': 10 * scale},
+                                    'certified_rows_histogram': {'4': 5 * scale, '8': 5 * scale},
+                                }
                                 for p in family.rows_per_request
                             }
                         }
@@ -379,7 +386,7 @@ def test_report_end_to_end_on_synthetic_runs(tmp_path: Path) -> None:
         {
             'hold': 'hc',
             'provenance': {'engine_commit': 'enginehead'},
-            'launches': [_launch(tmp_path, 'check', family, 'check', 50.0, same)],
+            'launches': [_launch(tmp_path, 'check2', family, 'check', 50.0, same)],
         }
     )
     (tmp_path / 'holds').mkdir()
@@ -619,3 +626,59 @@ def test_control_waves_cert0_never_certifies(tmp_path: Path) -> None:
     assert timed['SGLANG_CERTIFIED_HEAD_MAX_ROWS'] == '64'
     assert control_waves.variant_env('dflash16', 'stock', tmp_path / 's.json') == {}
     assert control_waves.overrides('dflash16')['max-total-tokens'] == 30000
+
+
+def test_stats_delta_treats_the_high_water_mark_as_a_gauge() -> None:
+    before = {'paths': {'verify': {'calls': 10, 'max_certified_rows': 64,
+                                   'certified_rows_histogram': {'32': 4, '64': 6},
+                                   'host_steps': {'certified': 10}}}}
+    after = {'paths': {'verify': {'calls': 15, 'max_certified_rows': 64,
+                                  'certified_rows_histogram': {'32': 9, '64': 6},
+                                  'host_steps': {'certified': 15}}}}
+    delta = analyze.stats_delta(after, before)['verify']
+    assert delta['calls'] == 5 and delta['host_certified_steps'] == 5
+    # The point certified only 32-row batches, although the launch's maximum is 64.
+    assert delta['max_certified_rows'] == 32
+
+
+def test_check_counters_need_every_certified_call_counted(tmp_path: Path) -> None:
+    family = plan.FAMILIES['plain']
+    same = {c: {'p0': [1, 2]} for c in family.concurrency}
+    info = _launch(tmp_path, 'check2', family, 'check', 50.0, same)
+    launches = {('check2', 'plain', 'check'): analyze.load_launch(
+        {**info, 'hold': 'h5', 'provenance': {'engine_commit': 'enginehead'}})}
+    launches[('check2', 'plain', 'check')]['problems'] = []
+    rows, verdict = analyze.check_counters(launches, 'check2')
+    assert verdict['plain'] is True and all(r['uncounted_calls'] == 0 for r in rows)
+    # One certified replay the device counters missed leaves exactness incomplete.
+    point_dir = Path(info['run_dir']) / 'r0' / 'c001'
+    snap = point_dir / 'snapshot_after' / Path(info['stats_file']).name
+    record = json.loads(snap.read_text())
+    record['paths']['decode']['host_steps']['certified'] += 1
+    snap.write_text(json.dumps(record))
+    rows, verdict = analyze.check_counters(launches, 'check2')
+    assert verdict['plain'] is None
+    assert any(r['uncounted_calls'] == 1 for r in rows)
+
+
+def test_hold_specific_pin() -> None:
+    from experiments.benchcert.run_session import pin_problem
+
+    a, b = 'a' * 40, 'b' * 40
+    readme = f'Hold commit: `{a}`\nHold commit (h5): `{b}`\n'
+    assert pin_problem(readme, a, 'h1') == ''
+    assert pin_problem(readme, b, 'h5') == ''
+    assert pin_problem(readme, a, 'h5')
+    assert pin_problem(readme, b, 'h2')
+
+
+def test_settling_controls() -> None:
+    from experiments.benchcert import control_waves
+
+    assert control_waves.overrides('mtp64') == {}
+    assert control_waves.CONTROLS['mtp64'].wave_size == 64
+    env = control_waves.variant_env('mtp64', 'certlog', Path('/x/certlog/s.json'))
+    assert env['SGLANG_CERTIFIED_HEAD_CHECK'] == '1'
+    assert env['BENCHCERT_REPLAY_LOG'] == '/x/certlog/replay.jsonl'
+    assert env['PYTHONPATH'].endswith('replay_hook')
+    assert plan.CHECK_STATS_EVERY == 1

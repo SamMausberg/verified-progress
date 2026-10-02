@@ -34,10 +34,11 @@ CERT_ENV = {
     'SGLANG_CERTIFIED_HEAD_MAX_ROWS': '64',
 }
 # Counters are read back (a device sync) only every STATS_EVERY glue calls: in timed
-# launches once per 25-90 s of decoding (two to five calls per step or cycle), in
-# check launches often enough that a point's snapshot lags it by at most 25 calls.
+# launches once per 25-90 s of decoding (two to five calls per step or cycle).
 TIMED_STATS_EVERY = 20000
-CHECK_STATS_EVERY = 25
+# Check launches write on every glue call, so the snapshot after a point holds every
+# certified call of that point (Codex on #190: at 25 the tail of a point went uncounted).
+CHECK_STATS_EVERY = 1
 
 # Sweep settings shared by every timed launch (bench/README.md, "Metrics"): the
 # confirmation split, 512 greedy output tokens with ignore_eos, max(32, 8c) measured
@@ -84,6 +85,9 @@ class Family:
     # steps + 1 and draft 1; DFlash verify block and draft projection block - 1.
     rows_per_request: dict[str, int] = field(default_factory=dict)
     max_concurrency: int = 128
+    # Head calls per gated replay where a graph holds more than one (the MTP draft graph
+    # runs its two draft steps under one gate); 1 elsewhere.
+    calls_per_step: dict[str, int] = field(default_factory=dict)
     # The one concurrency whose paired ratio enters the family verdict and H4
     # (Holm-adjusted across the four families); every other point is descriptive.
     primary: int = 1
@@ -127,6 +131,7 @@ FAMILIES = {
             concurrency=(1, 2, 4, 8, 16, 32, 64),
             check_concurrency=(1, 4, 16, 64),
             rows_per_request={'verify': 4, 'draft': 1, 'draft_extend': 1},
+            calls_per_step={'draft': 2},
         ),
         # DFlash pairs pin the KV pool on both arms. The certified graphs' work buffers
         # are allocated during graph capture, after SGLang has sized the pool from free
@@ -197,12 +202,16 @@ HOLDS = {
     'h2': (('s1', 'A'),),
     'h3': (('s2', 'B'), ('s2', 'A')),
     'h4': (('s3', 'B'), ('s3', 'A')),
+    # Added after h4 (the settling hold, untimed): the check launches rerun with every
+    # counter written (check2); h1's `check` counts are kept, labelled partial.
+    'h5': (('check2', None),),
 }
+CHECK_STEPS = ('check', 'check2')
 
 
 def launches(step: str, part: str | None) -> list[tuple[str, str]]:
     """(family, variant) launches of one hold step, in order."""
-    if step == 'check':
+    if step in CHECK_STEPS:
         return [(name, 'check') for name in FAMILIES]
     if step == REPLACEMENT_SESSION:
         raise ValueError('s4 launches are chosen by analyze.py replacement-plan')

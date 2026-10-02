@@ -311,6 +311,7 @@ python -m experiments.benchcert.analyze replacement --runs ~/vp-data/benchcert
 | `rescore.py` | the untimed re-score of first divergences |
 | `control_waves.py` | the exploratory wave control (not declared) |
 | `hold_shared.sh` | the shared untimed hold after session 3: re-score, then the control |
+| `hold_settle.sh`, `replay_hook/` | the settling hold: check rerun, MTP waves of 64, logged replay |
 
 ## Post hoc diagnostic (not declared; added 2026-10-02 after h1)
 
@@ -358,6 +359,29 @@ certified arm differs points to the head's certified ramp-down, which check mode
 then have caught at that shape; all three equal points to closed-loop timing in the
 timed runs. Until it runs, token identity is claimed only at c = 1 and at the
 check-mode batches.
+
+## Settling hold (not declared; added 2026-10-02 after the PR, approved by main)
+
+Two findings on PR #190 need a GPU hold. Codex: the check launches wrote their counters
+every 25 glue calls with no final write before each point's snapshot, so up to 24 calls
+per point went uncounted. The red team: at MTP c = 64 (session 1) the certified run
+committed a token 3.8 nats below the batch-1 top where the other runs agreed. One
+exclusive untimed hold (`hold_settle.sh`) runs:
+
+1. The check launches of all four families again (hold h5, step `check2`) with
+   `SGLANG_CERTIFIED_HEAD_STATS_EVERY=1`. The analysis also requires the device counters
+   to cover every certified replay the host gated (`uncounted_calls` 0); h1's counts are
+   kept and labelled partial.
+2. `mtp-tuned-triton` stock and certified (the timed environment) at the timed pools, in
+   synchronized waves of 64 (the c = 64 point's 512 prompts, which include `579ae7ce`),
+   compared token by token.
+3. A check-mode certified replay of the wave holding `579ae7ce`, logging every target
+   verify replay (`replay_hook/sitecustomize.py`): gated path, rows, request slots,
+   sequence lengths, verify inputs, certified ids, the stock logits' top 5 and every
+   gate.
+
+Reading (main's): any wrong token reproduced in 2 or 3 is an exactness failure of the
+certified engine; if none reproduces, the event stays an unexplained one-off.
 
 ## Hold commit
 

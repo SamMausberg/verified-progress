@@ -34,7 +34,7 @@ from experiments.benchcert import plan
 LAUNCH_TIMEOUT = {'plain': 900, 'mtp': 780, 'dflash16': 480, 'dflash8': 480}
 CHECK_TIMEOUT = 600
 _RUN_DIR = re.compile(r'^run directory: (.+)$', re.MULTILINE)
-_PIN_LINE = re.compile(r'^Hold commit: `([0-9a-f]{40})`', re.MULTILINE)
+_PIN_LINE = re.compile(r'^Hold commit(?: \((h\d+)\))?: `([0-9a-f]{40})`', re.MULTILINE)
 
 
 def git(path: Path, *args: str) -> str:
@@ -51,21 +51,28 @@ def package_digest(src: Path) -> str:
     return digest.hexdigest()
 
 
-def pin_problem(readme: str, head: str) -> str:
-    """Why `head` is not the one hold commit the README records (empty if it is)."""
+def pin_problem(readme: str, head: str, hold: str = 'h1') -> str:
+    """Why `head` is not the hold commit the README records for `hold` (empty if it is).
+
+    A line `Hold commit (hN): <sha>` pins hold hN; the plain `Hold commit: <sha>` pins
+    every hold without its own line. Each must appear exactly once.
+    """
     pins = _PIN_LINE.findall(readme)
-    if pins != [head]:
-        return f'checkout at {head}, but {plan.PIN_REF}:{plan.PIN_FILE} records {pins}'
+    own = [sha for name, sha in pins if name == hold]
+    general = [sha for name, sha in pins if not name]
+    chosen = own if own else general
+    if chosen != [head]:
+        return f'{hold} at {head}, but {plan.PIN_REF}:{plan.PIN_FILE} records {pins}'
     return ''
 
 
-def provenance(src: Path) -> dict[str, Any]:
+def provenance(src: Path, hold: str) -> dict[str, Any]:
     """Repository and engine identity; raises if either is not as declared."""
     dirty = git(plan.REPO, 'status', '--porcelain', '--untracked-files=all')
     if dirty:
         raise SystemExit(f'repository {plan.REPO} is not clean:\n{dirty}')
     head = git(plan.REPO, 'rev-parse', 'HEAD')
-    problem = pin_problem(git(plan.REPO, 'show', f'{plan.PIN_REF}:{plan.PIN_FILE}'), head)
+    problem = pin_problem(git(plan.REPO, 'show', f'{plan.PIN_REF}:{plan.PIN_FILE}'), head, hold)
     if problem:
         raise SystemExit(problem)
     engine_dirty = git(plan.ENGINE_WORKTREE, 'status', '--porcelain', '--untracked-files=no')
@@ -180,7 +187,7 @@ class Hold:
         self.record = {
             'hold': self.name,
             'steps': [list(step) for step in steps],
-            'provenance': provenance(src),
+            'provenance': provenance(src, self.name),
             'start_unix': time.time(),
             'launches': [],
         }
