@@ -389,8 +389,8 @@ over their mean.
 - **The exactness class of lever v1 under MTP was not measured for this arm either:** the hold
   compared no outputs between the arms, and the frontier file marks B's class pending.
 - These are two pairs from one session. With hold 3, lever v1 gives no material serving gain under
-  MTP on either attention backend at c = 1-32; its served gains are on plain decoding (c = 1, 8
-  and 128).
+  MTP on either attention backend at any tested concurrency (1, 8 and 32 on both arms, and 128 on
+  `mtp-tuned`); its served gains are on plain decoding (c = 1, 8 and 128).
 
 ### Which GEMM kernels the served engine runs (hold 3)
 
