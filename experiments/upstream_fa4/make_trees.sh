@@ -35,6 +35,8 @@ if [ ! -e "$fa" ]; then
   git -C "$fa" checkout --quiet --detach "$fa_commit"
 fi
 [ "$(git -C "$fa" rev-parse HEAD)" = "$fa_commit" ]
+# A reused checkout must be unmodified: run_all.sh labels its cases with the commit alone.
+[ -z "$(git -C "$fa" status --porcelain --untracked-files=no)" ] || { echo "$fa has local edits" >&2; exit 1; }
 mkdir -p "$dir/fa-pkg/flash_attn"
 : >"$dir/fa-pkg/flash_attn/__init__.py"
 ln -sfn "$fa/flash_attn/cute" "$dir/fa-pkg/flash_attn/cute"

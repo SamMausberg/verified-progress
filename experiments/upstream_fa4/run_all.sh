@@ -36,7 +36,8 @@ for v in main ceil ceil_div max_one; do
   [ "$changed" = "$want" ] || { echo "$t: unexpected changes: '$changed'" >&2; exit 1; }
 done
 [ "$(git -C "$trees/flash-attention" rev-parse HEAD)" = "$fa_commit" ] || { echo "flash-attention not at $fa_commit" >&2; exit 1; }
-[ -f "$trees/fa-pkg/flash_attn/cute/interface.py" ] || { echo "fa-pkg missing" >&2; exit 1; }
+[ -z "$(git -C "$trees/flash-attention" status --porcelain --untracked-files=no)" ] || { echo "flash-attention has local edits" >&2; exit 1; }
+[ "$(readlink -f "$trees/fa-pkg/flash_attn/cute")" = "$(cd "$trees/flash-attention/flash_attn/cute" && pwd -P)" ] || { echo "fa-pkg does not point at the checkout" >&2; exit 1; }
 python - "$trees" "$repo" >"$out/meta.json" <<'EOF'
 import hashlib, importlib.metadata as m, json, subprocess, sys, torch
 trees, repo = sys.argv[1], sys.argv[2]
