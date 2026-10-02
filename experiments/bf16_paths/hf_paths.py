@@ -34,6 +34,10 @@ positions are ill-conditioned in BF16 and the error is not specific to SGLang. I
 stays within 1 nat of FP32 on those tokens on both paths at both targets, while SGLang is
 9-14 nats off, the error is specific to SGLang's kernels. Anything between is reported as
 a partial BF16 sensitivity, not as an SGLang fault.
+
+Qualified after the run (review of #222): agreement of transformers with FP32 at positions
+selected because SGLang erred there shows that SGLang misses where transformers does not, not
+that SGLang misses more often; `rates.py` compares the rates on unselected positions.
 """
 
 from __future__ import annotations
