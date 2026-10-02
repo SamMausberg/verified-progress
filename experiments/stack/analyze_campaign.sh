@@ -13,8 +13,11 @@
 #   3. provenance.py, the checks amendment 1 moved to analysis time (provenance.json);
 #   4. startup_memory.py, each server's start-up memory from its log (startup_memory.csv);
 #   5. phases.py on the equality hold's phase diagnostic (B0 and FG at c = 1 and 8);
-#   6. figures.py, the figure tables and figures (frontier, ratios, gap, last lever).
-# Steps 1-5 run with the repository venv; step 5 needs matplotlib (SGLang venv). Any
+#   6. figures.py, the figure tables and figures (frontier, ratios, gap, last lever);
+#   7. a copy of the equality hold's records (equality/: gate, comparison summary, pairs,
+#      first divergences, check-mode statistics, plan, routing table, logs), whose gate and
+#      summary must hash to the campaign pin's values.
+# Steps 1-5 run with the repository venv; step 6 needs matplotlib (SGLang venv). Any
 # failing step stops the script with its exit status.
 set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -59,4 +62,15 @@ done
 run "$sgl_py" experiments/stack/figures.py --points "$out/points.csv" \
   --composition "$out/composition.json" --expected evidence/stack/expected.json \
   --ceiling evidence/stack/ceiling.json --frame evidence/frontier/frame.json --out-dir "$out"
+mkdir "$out/equality"
+for f in gate.json summary.json pairs.json table.csv divergences.csv plan.jsonl identity.json \
+  certified_stats_H.json certified_stats_FGH.json backbone_table_v1.json compare.log hold.log; do
+  cp "$eq_run/$f" "$out/equality/$f"
+done
+for f in gate summary; do
+  want=$("$repo_py" -c 'import json, sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])' \
+    "$pin" "${f}_sha256")
+  [ "$(sha256sum "$out/equality/$f.json" | cut -d' ' -f1)" = "$want" ] ||
+    { echo "copied $f.json does not match the campaign pin" >&2; exit 1; }
+done
 echo "analysis in $out"
