@@ -128,6 +128,9 @@ def load_points(root: Path) -> dict[tuple[str, int], dict[str, Any]]:
         if not sweep_json.exists():
             raise SystemExit(f'{sweep_json} missing: the sweep did not finish')
         sweep = json.loads(sweep_json.read_text())
+        # The session name pairs points across sessions (analyze_confirm.py): it must be set.
+        if not sweep.get('session'):
+            raise SystemExit(f'{sweep_json}: no session name')
         # Every concurrency the sweep was asked for must have a point.
         requested = {int(c) for c in sweep['concurrency']}
         observed = {
@@ -160,7 +163,7 @@ def load_points(root: Path) -> dict[tuple[str, int], dict[str, Any]]:
             points[(label_dir.name, p['concurrency'])] = {
                 'label': label_dir.name,
                 'concurrency': p['concurrency'],
-                'session': sweep.get('session', ''),
+                'session': sweep['session'],
                 'y': p['y'],
                 'y_steady': p['y_steady'],
                 'x_e2e': p['x_e2e'],

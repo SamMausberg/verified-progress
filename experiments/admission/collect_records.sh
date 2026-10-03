@@ -38,10 +38,13 @@ trap 'rm -rf "$tmp"' EXIT
       label="$(basename "$(dirname "$run")")"
       found+=("$label")
       session="$(jq -er '.session' "$run/sweep.json")"
-      jq -r --arg p "$probe" --arg l "$label" --arg s "$session" \
-        '[$p, $l, $s, .repo.head, .sglang_source.head, .sglang_source.branch,
-          (.env_overrides | to_entries | map("\(.key)=\(.value)") | join(" ")),
-          (.command[3:] | join(" "))] | @csv' "$launch"
+      # A record without its repository and engine revisions cannot identify the run: stop.
+      jq -er --arg p "$probe" --arg l "$label" --arg s "$session" \
+        'if [.repo.head, .sglang_source.head, .sglang_source.branch]
+            | any(. == null or . == "") then error("\(input_filename): no commit metadata")
+         else [$p, $l, $s, .repo.head, .sglang_source.head, .sglang_source.branch,
+           (.env_overrides | to_entries | map("\(.key)=\(.value)") | join(" ")),
+           (.command[3:] | join(" "))] | @csv end' "$launch"
     done
     got="$(printf '%s\n' "${found[@]}" | sort | tr '\n' ' ')"
     want="$(tr ' ' '\n' <<< "$expected" | sort | tr '\n' ' ')"
