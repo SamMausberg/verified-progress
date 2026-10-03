@@ -39,17 +39,29 @@ SGLANG_PIN = 'bd66ce343e'
 VENV_PYTHON = str(Path.home() / 'sglang/.venv/bin/python')
 REQUIRED_ROUTES = ('bf16', 'fp8_tensor', 'fp8_rowwise', 'fp8_triton', 'fp8_marlin', 'act_quant_fp8')
 # The grid fp8_gemm_probe.py runs by default (its SHAPES and --ms; holds/fp8_probe.sh passes neither).
-GEMM_SHAPES = (
-    'gdn_in_qkvz',
-    'out_or_o_proj',
-    'attn_qkv',
-    'mlp_gate_up',
-    'mlp_down',
-    'lm_head',
-    'dflash_qkv',
-    'dflash_fc',
-)
+# Each shape's (N, K) as nn.Linear(K -> N), fp8_gemm_probe.py's SHAPES.
+GEMM_SHAPES = {
+    'gdn_in_qkvz': (12288, 2560),
+    'out_or_o_proj': (2560, 4096),
+    'attn_qkv': (10240, 2560),
+    'mlp_gate_up': (18432, 2560),
+    'mlp_down': (2560, 9216),
+    'lm_head': (248320, 2560),
+    'dflash_qkv': (6144, 2560),
+    'dflash_fc': (2560, 12800),
+}
 GEMM_MS = (1, 2, 4, 8, 16, 32, 64, 128, 256)
+# Its other defaults: the timing rounds, the bytes of weight copies each timing cycles through
+# (ceil(256e6 / (N * K)) FP8 copies, so the weights stream from HBM past the 60 MB L2) and the
+# time budget. Runs after 2026-10-02's record their arguments.
+GEMM_L2_BYTES = 256e6
+GEMM_ARGS = {
+    'ms': ','.join(map(str, GEMM_MS)),
+    'shapes': ','.join(GEMM_SHAPES),
+    'rounds': 5,
+    'l2_bytes': GEMM_L2_BYTES,
+    'budget_s': 600.0,
+}
 # FP8 (e4m3) rounding gives a relative error of about 0.04 on the probe's random N(0, 0.02) inputs.
 GEMM_REL_ERR_MAX = 0.06
 # Backbone linears per decode step (24 GDN layers, 8 attention layers, 32 MLPs); the head and
@@ -86,6 +98,16 @@ def cmd_gemm(args: argparse.Namespace) -> None:
         raise SystemExit(
             f'{args.probe}: stopped at its time budget ({d["meta"]["stopped_at_budget"]})'
         )
+    recorded = d['meta'].get('args')  # recorded by runs after 2026-10-02's
+    if recorded is not None and {k: v for k, v in recorded.items() if k != 'out'} != GEMM_ARGS:
+        raise SystemExit(f'{args.probe}: arguments {recorded}, planned {GEMM_ARGS}')
+    # Every row is the planned shape, timed over the planned number of weight copies.
+    for r in d['rows']:
+        n, k = GEMM_SHAPES[r['shape']]
+        if (r['N'], r['K'], r['copies']) != (n, k, max(1, math.ceil(GEMM_L2_BYTES / (n * k)))):
+            raise SystemExit(
+                f'{args.probe}: {r["shape"]} M={r["M"]} {r["route"]}: N, K, copies {r["N"]}, {r["K"]}, {r["copies"]}'
+            )
     rows = [dict(r) for r in d['rows']]
     # Every GEMM route must have computed: a finite relative error against the FP32 product under
     # GEMM_REL_ERR_MAX, checked on the run's recorded value (a stub that returns without computing
@@ -702,6 +724,16 @@ def cmd_probe(args: argparse.Namespace) -> None:
             raise SystemExit(f'unit check: act={u["act"]} M={u["M"]}: relative errors {errs}')
     if not all(u['row1_alone_equals_in_batch'] for u in unit if u['act'] == 'token' and u['M'] > 1):
         raise SystemExit('unit check: a per-row-scale row depends on its batch')
+    # ...and with one scale per batch it must depend on it (row 0 of each batch is an outlier),
+    # the README's contrast; at M = 1 there is no other row.
+    if not all(
+        (u['row1_alone_equals_in_batch'] is False and u['row1_alone_vs_in_batch_max_abs_diff'] > 0)
+        if u['M'] > 1
+        else u['row1_alone_equals_in_batch'] is None
+        for u in unit
+        if u['act'] == 'tensor'
+    ):
+        raise SystemExit('unit check: a per-tensor-scale row does not depend on its batch')
     text = Path(args.unit_log).read_text()
     if not all(f'act={a} graph replay equal eager: True' in text for a in ('token', 'tensor')):
         raise SystemExit('unit check: CUDA-graph replay differs from eager')

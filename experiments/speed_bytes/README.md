@@ -36,14 +36,16 @@ conversion and mode those switches imply; per trace the engine, harness commit, 
 resolved server command and environment `run_profiles.py` recorded, and the GPU; per probe file
 the server it probed, its mode, concurrency, label, the probe's 48 prompts, 256 tokens per sequence with exactly 20
 finite top-logprob entries at every position (score mode: none at the first continuation
-position, which SGLang does not report) and (score mode) the reference tokens; and the unit
-check's relative errors against the script's 0.06 bound.
+position, which SGLang does not report) and (score mode) the reference tokens; per GEMM
+probe row the planned shape and number of weight copies (and, for runs that record them, the
+probe's arguments); and the unit check's relative errors against the script's 0.06 bound, per-row
+rows independent of the batch and per-tensor rows dependent on it.
 `fp8_gemm_probe.py` differs by formatting, a lint directive and
 fixes made after review: its `fp8_tensor` route now quantizes the weights per tensor, where the
 run reused the per-channel weights with a unit scale (the same scalar-scale cuBLASLt kernel and
 timing, but not that route's error, so `summarize.py` omits the error for that run and checks it
 for later ones), and it records the
-SGLang checkout and stops every shape once its time budget runs out (the run finished well inside
+SGLang checkout and its arguments and stops every shape once its time budget runs out (the run finished well inside
 it); `step_budget.py` is a cleaned version of the analysis that was run, and the committed
 evidence was regenerated with it. `kill3.sh` also ran a first cuBLASLt outer-vector-scale
 microbenchmark after its sweeps; that attempt was invalid (see `evidence/speed_bytes/README.md`)

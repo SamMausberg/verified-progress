@@ -138,6 +138,7 @@ def main():
         'device': torch.cuda.get_device_name(),
         'arch_list': torch.cuda.get_arch_list(),
         'sglang_source': sglang_source(),
+        'args': vars(args),
         'route_errors': {},
     }
     for name in shapes:
