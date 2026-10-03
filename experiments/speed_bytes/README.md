@@ -11,16 +11,18 @@ engine side is `engine/sglang/patches/speed-bytes/` (switches `SGLANG_FP8_DENSE*
 | `fp8_dense_unit.py` | GPU check of the engine switch outside the server: error against an FP32 product, a row computed alone against the same row inside a batch (per-row and per-tensor activation scales), CUDA-graph replay against eager |
 | `step_budget.py` | Per-step kernel budget of a plain-decode Nsight Systems window by kernel class (time, launch gaps, PDL overlap) |
 | `summarize.py` | Builds the evidence files from the raw outputs under `~/vp-data/speed-bytes/` |
-| `holds/` | The GPU holds: `fp8_probe.sh` (microbenchmark), `kill1.sh`, `kill2b.sh` and `kill3.sh` (exclusive served kill tests on the bench harness), `probe1.sh` (shared logit probe) |
+| `holds/` | The GPU holds: `fp8_probe.sh` (microbenchmark), `kill1.sh`, `kill2b.sh` and `kill3.sh` (exclusive served kill tests on the bench harness), `probe1.sh` (shared logit probe); `tree_guard.sh`, sourced by them, checks a checkout for edits |
 
 The holds ran on 2026-10-02 from copies of these scripts in a scratch directory, before this
 commit. The committed hold scripts differ from those copies in how they locate the repository and
 the helper scripts, and in guards added after review that do not change what a run measures: they
-refuse a repository with tracked edits and an engine whose tree is not the recorded one, clear
+refuse a repository or engine with tracked edits, untracked files or ignored Python files where
+Python imports from, and an engine whose tree is not the recorded one, clear
 every inherited `SGLANG_*` variable and any override of the virtualenv or CUDA toolkit that
 `scripts/sglang_env.sh` would honour, exit non-zero when any sweep, trace or probe step failed,
 `fp8_probe.sh` creates its output directory and checks the SGLang checkout, and `probe1.sh`
-refuses a port that already serves and stops only the servers it started. `fp8_dense_unit.py` now
+refuses a port that already serves (checked again under the startup lock), accepts a server only
+when the process listening on its port is the one it started, and stops only the servers it started. `fp8_dense_unit.py` now
 fails on the properties it prints (per-row rows independent of the batch, CUDA-graph replay equal
 to eager, relative error under 0.06); the run printed them all passing. `summarize.py` checks
 every input against what its hold launched: per hold the engine (its tree, which the hold scripts

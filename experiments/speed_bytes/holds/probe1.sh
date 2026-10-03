@@ -20,9 +20,11 @@ export SGLANG_WORKTREE=$ENGINE
 source "$REPO/scripts/sglang_env.sh"
 cd "$REPO"
 echo "start $(date -Is) repo $(git rev-parse HEAD) engine $(git -C "$ENGINE" rev-parse HEAD) tree $(git -C "$ENGINE" rev-parse "HEAD^{tree}")"
-[ -z "$(git status --porcelain --untracked-files=no)" ] || { echo "repository $REPO has tracked edits"; exit 1; }
+# shellcheck source=/dev/null
+source "$REPO/experiments/speed_bytes/holds/tree_guard.sh"
+[ -z "$(dirty_tree "$REPO" .)" ] || { echo "repository $REPO has edits, untracked files or ignored Python files"; exit 1; }
 [ "$(git -C "$ENGINE" rev-parse "HEAD^{tree}")" = "$ENGINE_TREE" ] || { echo "engine tree is not $ENGINE_TREE"; exit 1; }
-[ -z "$(git -C "$ENGINE" status --porcelain --untracked-files=no)" ] || { echo "engine dirty"; exit 1; }
+[ -z "$(dirty_tree "$ENGINE" python)" ] || { echo "engine dirty"; exit 1; }
 # Stops only the servers this hold started: each one leads its own process group (setsid), whose
 # id start_server records in $OUT/server_<label>.pid.
 # shellcheck disable=SC2329 # invoked by the EXIT trap and between servers
@@ -54,6 +56,8 @@ start_server() {  # label, then env assignments
   fi
   # shellcheck disable=SC2016 # the inner bash expands its own $(...) and $_
   "$REPO/scripts/gpu_startup_lock.sh" env "$@" bash -c '
+    # Under the startup lock no other hold starts a server, so check the port again here.
+    if curl -sf http://127.0.0.1:'"$PORT"'/health >/dev/null; then echo "port '"$PORT"' already serves"; exit 1; fi
     setsid python -m sglang.launch_server --model-path Qwen/Qwen3.5-4B \
       --revision 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a --host 127.0.0.1 --port '"$PORT"' \
       --attention-backend flashinfer --mm-attention-backend triton_attn \
@@ -64,7 +68,11 @@ start_server() {  # label, then env assignments
     echo "$pid" >"'"$OUT/server_$label.pid"'"
     for _ in $(seq 300); do
       kill -0 "$pid" 2>/dev/null || exit 1  # the server this call started must still be alive
-      curl -sf http://127.0.0.1:'"$PORT"'/health >/dev/null && exit 0
+      if curl -sf http://127.0.0.1:'"$PORT"'/health >/dev/null; then
+        # ...and the process listening on the port must be that server.
+        ss -Htlnp "sport = :'"$PORT"'" | grep -q "pid=$pid," && exit 0
+        echo "port '"$PORT"' answers, but not from pid $pid"; exit 1
+      fi
       sleep 2
     done
     exit 1'
