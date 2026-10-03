@@ -37,6 +37,7 @@ from confirm_analyze import (
     T95,
     declared_arms,
     expected_launches,
+    launch_count,
     load_cells,
     parse_full,
 )
@@ -60,8 +61,8 @@ def main() -> None:
             cells.get((group, 'S0', c, session), []),
         )
         return (
-            len(own) == expected_launches(arm, full[group])
-            and len(base) == 2
+            launch_count(own) == expected_launches(arm, full[group])
+            and launch_count(base) == 2
             and not any(r['invalid_reason'] for r in own + base)
         )
 

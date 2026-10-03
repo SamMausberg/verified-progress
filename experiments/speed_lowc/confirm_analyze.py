@@ -9,8 +9,9 @@ interval's lower end is above 1, "slowdown" if its upper end is below 1, otherwi
 detectable change". A session cell with an invalid point (bench's invalid_reason), or with
 a different number of launches than the declared order, is void; fewer than three valid
 sessions leave the ratio undecided. Cells come from the declared plan (groups, arms,
-concurrencies, sessions lowc-s1 to lowc-s3), so a missing one counts as void. A confirmation
-point (a `lowc-` label or session) outside the plan, the same point twice, or a valid point
+concurrencies, sessions lowc-s1 to lowc-s3), so a missing one counts as void; launches are
+counted as distinct bench runs. A confirmation point (a `lowc-` label or session) outside the
+plan, the same point twice, a point of a repeat other than the one declared, or a valid point
 whose x_e2e, y or accept length is not a finite positive number is an error.
 
 Each point is bound to its launch in the launches.csv that bench.pareto writes beside
@@ -121,6 +122,11 @@ def session_argv(group: str, arm: str, session: str) -> list[str]:
     argv += ['--out', 's' + session.removeprefix('lowc-s'), '--port', '30214', '--osl', str(OSL)]
     argv += ['--quiet-cpu-wait', '300', '--concurrency', *map(str, CONCURRENCY[group])]
     return argv
+
+
+def launch_count(rows: list[dict]) -> int:
+    """Distinct launches (bench runs) among a cell's points."""
+    return len({r['run'] for r in rows})
 
 
 def expected_launches(arm: str, full: str) -> int:
@@ -337,6 +343,8 @@ def load_cells(points: Path, full: dict[str, str]) -> dict[tuple, list[dict]]:
             seen.add(point)
             if sessions.setdefault((label, row['run']), session) != session:
                 raise SystemExit(f'{points}: launch {label} {row["run"]} in two sessions')
+            if row['repeat'] != '0':  # the declared single repeat (REPEATS), bench's repeat 0
+                raise SystemExit(f'{points}: {point} is repeat {row["repeat"]}, not the only one')
             c = int(row['concurrency'])
             if int(row['requests']) != max(MIN_REQUESTS, WAVES * c):
                 raise SystemExit(f'{points}: {point} measured {row["requests"]} requests')
@@ -375,8 +383,8 @@ def main() -> None:
         base = cells.get((group, 'S0', c, session), [])
         void = (
             any(r['invalid_reason'] for r in rows + base)
-            or len(rows) != expected_launches(arm, full[group])
-            or len(base) != 2
+            or launch_count(rows) != expected_launches(arm, full[group])
+            or launch_count(base) != 2
         )
         rec: dict[str, Any] = {
             'group': group,
