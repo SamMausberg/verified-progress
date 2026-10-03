@@ -40,7 +40,15 @@ unset _v
 CONFIRM_ENGINE=${CONFIRM_ENGINE:-$HOME/sglang-wt/speed-lowc-confirm}
 CONFIRM_TREE=${CONFIRM_TREE:-5d6db54828d7fbdac62180810b68a87cee3b39ec}
 CONFIRM_LEVERS=${CONFIRM_LEVERS:?set CONFIRM_LEVERS (e.g. AB or ABC)}
+[[ $CONFIRM_LEVERS =~ ^[ABC]+$ ]] || { echo "confirm_arms.sh: CONFIRM_LEVERS must use only A, B, C" >&2; exit 1; }
 CONFIRM_GATE=${CONFIRM_GATE:-$HOME/vp-data/speed-lowc/confirm/current/gate.json}
+# S0 imports the stock checkout that scripts/sglang_env.sh activates (SGLANG_DIR, line 11),
+# which must be the pin (engine/sglang/README.md, line 4) with no local changes.
+STOCK_SGLANG=${SGLANG_DIR:-$HOME/sglang}
+STOCK_PIN=bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824
+# The equality prompts: state's frozen set, checked against evidence/state_safety/prompt_manifest.json.
+CONFIRM_PROMPTS=${CONFIRM_PROMPTS:-$HOME/vp-data/state/prompts/prompts.jsonl}
+CONFIRM_REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 
 group_arm() {
   case $1 in
@@ -93,14 +101,61 @@ arm_args() {
   for (( i=0; i<${#name}; i++ )); do lever_args "${name:$i:1}" || return 1; done
 }
 
-# The single precondition of every timed session: the equality gate passed for exactly
-# these levers.
-gate_ok() {
-  python - "$CONFIRM_GATE" "$CONFIRM_LEVERS" <<'PY'
-import json, sys
-gate = json.load(open(sys.argv[1]))
-ok = gate.get('ok') is True and gate.get('levers') == sys.argv[2]
-print('gate', sys.argv[1], 'ok' if ok else 'REFUSED', gate.get('levers'))
+# check_inputs [prompts]: every input a hold reuses is the declared one, or it prints why
+# and returns 1: this repository without modified tracked files (it defines the arms'
+# flags), the confirm engine's tree with no local changes, stock SGLang at the pin with no
+# local changes, and with "prompts" the equality prompt file against its manifest.
+check_inputs() {
+  [ -z "$(git -C "$CONFIRM_REPO" status --porcelain --untracked-files=no)" ] ||
+    { echo "repository has modified tracked files"; return 1; }
+  [ "$(git -C "$CONFIRM_ENGINE" rev-parse 'HEAD^{tree}')" = "$CONFIRM_TREE" ] ||
+    { echo "confirm engine tree is not the declared one"; return 1; }
+  [ -z "$(git -C "$CONFIRM_ENGINE" status --porcelain)" ] ||
+    { echo "confirm engine has local changes"; return 1; }
+  [ "$(git -C "$STOCK_SGLANG" rev-parse HEAD)" = "$STOCK_PIN" ] ||
+    { echo "stock SGLang ($STOCK_SGLANG) is not at the pin $STOCK_PIN"; return 1; }
+  [ -z "$(git -C "$STOCK_SGLANG" status --porcelain)" ] ||
+    { echo "stock SGLang ($STOCK_SGLANG) has local changes"; return 1; }
+  [ "${1:-}" = prompts ] || return 0
+  python - "$CONFIRM_PROMPTS" "$CONFIRM_REPO/evidence/state_safety/prompt_manifest.json" <<'PY'
+import hashlib, json, sys
+from pathlib import Path
+prompts, manifest = Path(sys.argv[1]), json.loads(Path(sys.argv[2]).read_text())
+items = [json.loads(x) for x in prompts.read_text().splitlines() if x.strip()] if prompts.is_file() else []
+h = hashlib.sha256()
+for it in items:
+    h.update(json.dumps([it['id'], it['input_ids']]).encode())  # as experiments/state_safety/prompts.py ids_digest
+ok = len(items) == manifest['num_prompts'] and h.hexdigest() == manifest['input_ids_sha256']
+print('prompts', prompts, 'match the manifest' if ok else 'do NOT match the manifest')
 sys.exit(0 if ok else 1)
+PY
+}
+
+# The single precondition of every timed session: the equality gate passed for exactly
+# these levers, from the runs it is bound to. Its directory's meta.json (compare.py)
+# records each equality run's repository and SGLang commits: every run must come from this
+# repository's HEAD (the same arm flags, scripts and prompt manifest), every S0 run from the
+# pin and every other run from the confirm engine's HEAD, all with no modified SGLang files.
+gate_ok() {
+  python - "$CONFIRM_GATE" "$CONFIRM_LEVERS" "$(git -C "$CONFIRM_REPO" rev-parse HEAD)" \
+    "$(git -C "$CONFIRM_ENGINE" rev-parse HEAD)" "$STOCK_PIN" <<'PY'
+import json, sys
+from pathlib import Path
+path, levers, repo, engine, pin = sys.argv[1:6]
+gate = json.loads(Path(path).read_text())
+meta = json.loads((Path(path).parent / 'meta.json').read_text())
+why = []
+if gate.get('ok') is not True or gate.get('levers') != levers:
+    why.append(f'gate ok={gate.get("ok")} levers={gate.get("levers")}')
+if not meta:
+    why.append('no equality runs in meta.json')
+for run, m in sorted(meta.items()):
+    stock = run.split('/')[0].endswith('_S0')
+    if m.get('repo_sha') != repo:
+        why.append(f'{run}: repository {m.get("repo_sha")}, not {repo}')
+    if m.get('sglang_sha') != (pin if stock else engine) or m.get('sglang_dirty') is not False:
+        why.append(f'{run}: SGLang {m.get("sglang_sha")} dirty={m.get("sglang_dirty")}')
+print('gate', path, 'ok' if not why else 'REFUSED: ' + '; '.join(why))
+sys.exit(0 if not why else 1)
 PY
 }

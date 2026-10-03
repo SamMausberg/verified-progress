@@ -20,13 +20,10 @@ OUT=$HOME/vp-data/speed-lowc/confirm/equality-$(date -u +%Y%m%dT%H%M%SZ)
 RUNS=$OUT/runs
 mkdir -p "$RUNS"
 exec >>"$OUT/hold.log" 2>&1
-PROMPTS=$HOME/vp-data/state/prompts/prompts.jsonl
-[ -s "$PROMPTS" ] || { echo "missing $PROMPTS"; exit 1; }
-[ "$(git -C "$CONFIRM_ENGINE" rev-parse 'HEAD^{tree}')" = "$CONFIRM_TREE" ] ||
-  { echo "confirm engine tree is not the declared one"; exit 1; }
-[ -z "$(git -C "$CONFIRM_ENGINE" status --porcelain)" ] ||
-  { echo "confirm engine has local changes"; exit 1; }
-echo "equality start $(date -Is) repo $(git rev-parse HEAD) engine $(git -C "$CONFIRM_ENGINE" rev-parse HEAD) levers=$CONFIRM_LEVERS"
+PROMPTS=$CONFIRM_PROMPTS
+check_inputs prompts || exit 1
+echo "equality start $(date -Is) repo $(git rev-parse HEAD) engine $(git -C "$CONFIRM_ENGINE" rev-parse HEAD)" \
+  "stock $(git -C "$STOCK_SGLANG" rev-parse HEAD) levers=$CONFIRM_LEVERS"
 DFLASH="--speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash \
 --speculative-draft-model-revision 9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf --max-running-requests 4 \
 --disable-radix-cache"

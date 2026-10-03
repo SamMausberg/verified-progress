@@ -24,11 +24,8 @@ mkdir -p "$OUT"
 exec >>"$OUT/session.log" 2>&1
 cleanup() { pkill -TERM -f 'sglang.launch_server.*--port 30214' 2>/dev/null || true; }
 trap cleanup EXIT INT TERM
-[ "$(git -C "$CONFIRM_ENGINE" rev-parse 'HEAD^{tree}')" = "$CONFIRM_TREE" ] ||
-  { echo "confirm engine tree is not the declared one"; exit 1; }
-[ -z "$(git -C "$CONFIRM_ENGINE" status --porcelain)" ] ||
-  { echo "confirm engine has local changes"; exit 1; }
-gate_ok || { echo "refused: the equality gate did not pass for levers $CONFIRM_LEVERS"; exit 1; }
+check_inputs || exit 1
+gate_ok || { echo "refused: no equality gate for levers $CONFIRM_LEVERS bound to these trees"; exit 1; }
 groups=(L H)
 (( k % 2 == 0 )) && groups=(H L)
 echo "session s$k start $(date -Is) repo $(git rev-parse HEAD) engine $(git -C "$CONFIRM_ENGINE" rev-parse HEAD)" \
@@ -48,7 +45,9 @@ for g in "${groups[@]}"; do
   read -r -a conc <<< "$(group_concurrency "$g")"
   echo "group $g arm $(group_arm "$g") order ${order[*]} c=${conc[*]}"
   for name in "${order[@]}"; do
-    mapfile -t args < <(arm_args "$g" "$name") || { failed+=("$g:$name:args"); continue; }
+    # A command substitution keeps arm_args's exit status (mapfile < <(...) would drop it).
+    arm_text=$(arm_args "$g" "$name") || { failed+=("$g:$name:args"); continue; }
+    mapfile -t args <<< "$arm_text"
     echo "=== $g $name $(date -Is) ${args[*]}"
     timeout --foreground 600 python -m bench.sweep "${args[@]}" --label "lowc-$g-$name" \
       --session "lowc-s$k" --out "$OUT" --port 30214 --osl 512 --quiet-cpu-wait 300 \
