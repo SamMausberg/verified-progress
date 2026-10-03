@@ -37,6 +37,10 @@ corrections in the appendices and the notes are applied in the same change as th
 
 ## Entries the paper and the notes cite
 
+The `file:line` locations in the "Cited at" column refer to the paper's sources at commit `e66ca06`,
+which added this audit (the introduction's are four lines off even there); later edits have moved
+many of them, and `sections/setup.tex` is now `sections/measurements.tex`.
+
 | Key | Source | How the entry was checked | Cited at | How the citing text was checked | Verdict |
 |---|---|---|---|---|---|
 | `sgcode` | SGLang contributors (2026), DFlash model and candidate-head implementation ... | GitHub API at the cited commit | notes/drafting.tex:17; notes/drafting.tex:154 | notes/drafting.tex:17 ("A cycle in SGLang's DFlash worker~\cite{sgcode} works as follows"): **partly**: sgcode is models/dflash.py; the cycle described (positions 1-15 through the head, accept, commit) is in speculative/dflash_worker_v2.py and the mask token in dflash_utils.py; models/dflash.py has the is_causal inference / notes/drafting.tex:154 ("with a gate that depends on the draft hidden state"): supports: blog, "matched under a context gate H(h_t)"; code, `score = unary + <A[pred] * project(h), B[c]>` (CandidateSelector at the pin) | citing text completed (notes/drafting.tex:17): the worker cycle is in dflash_worker_v2.py, now cited as sgdflashworker beside sgcode |

@@ -1,9 +1,8 @@
 % The Work a Verifier Needs: venue version in the MLSys two-column format.
 % Build: cd paper && latexmk -pdf -interaction=nonstopmode -halt-on-error paper.tex
 % (latexmkrc fetches and hash-checks the MLSys style file; see template/README.md).
-% Main text (sections/intro ... sections/discussion), shared macros (macros.tex) and
-% terminology (terminology.tex): main-text author. Appendices (sections/appendices.tex and
-% the files it loads) and references.bib: appendix editor.
+% Main text: sections/intro ... sections/discussion, with shared macros (macros.tex) and
+% terminology (terminology.tex). Appendices: sections/appendices.tex and the files it loads.
 \RequirePackage{fix-cm}
 \documentclass{article}
 \usepackage[T1]{fontenc}
@@ -19,8 +18,7 @@
 % This is a preprint, not a paper accepted at MLSys: replace the style's proceedings
 % notice (printed at the foot of the first column) without modifying the style file.
 \makeatletter
-% The notice carries the date of the build, in the paper's day-month-year style.
-\newcommand{\builddate}{\number\day\space\ifcase\month\or January\or February\or March\or April\or May\or June\or July\or August\or September\or October\or November\or December\fi\space\number\year}
+% The notice carries the date of the build (\builddate, macros.tex).
 \renewcommand{\Notice@String}{Preprint, \builddate; not peer reviewed.}
 \makeatother
 \hypersetup{pdftitle={The Work a Verifier Needs: Certified Int8 Output Heads That Match a Production Kernel's Rounding},pdfauthor={Samuel Mausberg}}
@@ -51,7 +49,7 @@
 \input{sections/intro}
 \input{sections/contract}
 \input{sections/head}
-\input{sections/setup}
+\input{sections/measurements}
 \input{sections/transport}
 \input{sections/related}
 \input{sections/discussion}

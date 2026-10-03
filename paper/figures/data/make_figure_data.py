@@ -25,7 +25,8 @@ OUT = HERE / 'json_values.csv'
 
 # key, evidence file (relative to the repository root), path inside the JSON
 VALUES = [
-    # Figure 3b: share of held-out positions that the interval rule leaves to the stock kernel.
+    # Figure 3b (candidates.tex): share of held-out positions that the interval rule leaves to the
+    # stock kernel.
     (
         'fallback_share_hopper',
         'evidence/head_geometry/rstock_plain4b.json',
@@ -36,7 +37,8 @@ VALUES = [
         'evidence/head_geometry/rstock_plain4b.json',
         'rules/tensor_core_model/bucket/positions_needing_stock_kernel',
     ),
-    # Figure 4a: median cosine between draft and target head inputs, DFlash-4B pairs.
+    # Figure 5a (transport.tex): median cosine between draft and target head inputs, DFlash-4B
+    # pairs.
     (
         'dflash4b_cos_hd_ht_median',
         'evidence/head_geometry/stats_dflash4b.json',

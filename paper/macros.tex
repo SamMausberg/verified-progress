@@ -1,4 +1,4 @@
-% Shared macros for the main text and the appendices (owner: main-text author).
+% Shared macros for the main text and the appendices.
 % Loaded by paper.tex after \usepackage[accepted]{mlsys2025}. Appendix-only macros belong
 % in the appendix files; a macro both parts use belongs here.
 % ---------------------------------------------------------------------------
@@ -36,10 +36,7 @@
 \DeclareMathOperator{\TV}{TV}
 \DeclareMathOperator{\KL}{KL}
 \DeclareMathOperator{\fl}{fl}
-\DeclareMathOperator{\tok}{tok}
 \DeclareMathOperator{\diam}{diam}
-\newcommand{\lse}{\operatorname{LSE}}
-\newcommand{\clip}{\operatorname{clip}}
 \newcommand{\norm}[1]{\lVert #1\rVert}
 \newcommand{\rnb}{\operatorname{rn}_{\mathrm{B}}}
 \newcommand{\ulpb}{\operatorname{ulp}_{\mathrm{B}}}
@@ -51,11 +48,8 @@
 \newtheorem{theorem}{Theorem}[section]
 \newtheorem{proposition}[theorem]{Proposition}
 \newtheorem{lemma}[theorem]{Lemma}
-\newtheorem{corollary}[theorem]{Corollary}
 \theoremstyle{definition}
 \newtheorem{definition}[theorem]{Definition}
-\theoremstyle{remark}
-\newtheorem{remark}[theorem]{Remark}
 % ---------------------------------------------------------------------------
 % Names used throughout. The four references of a single decision (Definition
 % def:contracts) and the two named models of the stock kernel's FP32 accumulation error
@@ -73,6 +67,9 @@
 \newcommand{\sourcepin}{\texttt{bd66ce343e4f}}
 \newcommand{\modelpin}{\texttt{851bf6e806ef}}
 \newcommand{\repourl}{\url{https://github.com/SamMausberg/verified-progress}}
+% The date of the build, in the paper's day-month-year style: the paper's preprint notice and the
+% research notes' title page print it, so both documents carry the date they were built.
+\newcommand{\builddate}{\number\day\space\ifcase\month\or January\or February\or March\or April\or May\or June\or July\or August\or September\or October\or November\or December\fi\space\number\year}
 % ---------------------------------------------------------------------------
 % Evidence status. A committed result cites its entry in the evidence register
 % (appendix, \label{ev:<key>}): \ev{key} or \ev{key1,key2} prints a small tag, [E3] or [E3,E7], in

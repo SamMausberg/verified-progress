@@ -11,8 +11,8 @@ SGLANG_WORKTREE=~/sglang-wt/<name> source scripts/sglang_env.sh
 ```
 
 Patches live under `engine/sglang/patches/<workstream>/NNNN-<topic>.patch`. Every series
-except `stack` and `speed-bytes-sgl-kernel` applies to the pin on its own (`upstream` is
-based on upstream SGLang but applies to the pin too); `stack` composes several series.
+except `stack` applies to the pin on its own (`upstream` and `speed-bytes-sgl-kernel` are
+based on upstream SGLang but apply to the pin too); `stack` composes several series.
 The sections below give each series' apply commands, where they differ from the generic ones
 above, and what each patch changes:
 
@@ -32,7 +32,7 @@ above, and what each patch changes:
 | `speed-lowc/0001-0003` | pin | The FA4 paged-KV backport with its test, and narrow verify tiles up to two sequences |
 | `upstream-bf16/0001` | pin | Sigmoid(beta) kept in FP32 in the GDN kernels (diagnostic only) |
 | `speed-bytes/0001-0008` | pin | Online FP8 for the dense layers through cuBLASLt (or, in one mode, sgl-kernel's CUTLASS GEMM) and an FP8 DFlash draft head |
-| `speed-bytes-sgl-kernel/0001` | upstream SGLang `f6fcda8827` after `upstream/0002` | A local, test-only sm_90a build of sgl-kernel for the CUTLASS mode (described under speed-bytes) |
+| `speed-bytes-sgl-kernel/0001` | upstream SGLang `f6fcda8827` after `upstream/0002` (also applies to the pin) | A local, test-only sm_90a build of sgl-kernel for the CUTLASS mode (described under speed-bytes) |
 
 ## geometry (`patches/geometry/0001`, capture only)
 

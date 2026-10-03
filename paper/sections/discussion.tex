@@ -1,7 +1,6 @@
 % Sections 7 and 8: limitations and conclusion.
 % Claims and status: a synthesis of Sections 2-5; no new numbers. The served comparisons are
-% those of Section 4.5 (committed; single sessions except the frontier, the composed stack and the
-% served certified head, cert-served).
+% those of Section 4.5 (committed), with the session counts given there.
 \section{Limitations}\label{sec:discussion}\label{sec:limits}
 
 \paragraph{The error model is an assumption} Agreement with \Rstock{} rests on an assumed model of a closed-source kernel's accumulation; neither of the two models covers BF16 split-$K$ partial sums (Section~\ref{sec:headcontracts}). The crafted-input probes behind the \modelhopper{} used products with one exact operand and reached neither subnormals nor other GPUs, so neither model is established for all inputs. The replayed positions cannot tell the two models apart (Section~\ref{sec:rstock-share}). The engine's BF16-output kernel hides its accumulator, so the error measured on its FP32-output variant is indirect evidence \ev{kernel-error}. The int8 kernel is checked per compiled variant, not proved to compute the modelled arithmetic (Section~\ref{sec:kernel-design}).

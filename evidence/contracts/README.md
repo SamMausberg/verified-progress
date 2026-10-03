@@ -1,6 +1,6 @@
-# Evidence: witnesses that separate the exactness contracts (P7)
+# Evidence: witnesses that separate the exactness contracts (P7a)
 
-P7 is the exactness-contract proposal listed in `TASKS.md`. CPU only. Repository `.venv`:
+P7a is the exactness-contract part of proposal P7 in `TASKS.md`. CPU only. Repository `.venv`:
 Python 3.13.15, NumPy 2.3.5. Produced at the commit recorded in the JSON (`repo_commit`):
 
 ```sh
