@@ -143,6 +143,27 @@ only equality directory, `equality-20261002T215749Z`, whose `meta.json` lists ex
 and those runs and the sessions all ran at repository `9a7d52a` with no modified files. The prompt file
 matches the manifest, and every launch's flags are its declared arm's (Validity).
 
+2026-10-03, after the analysis (review of #230): one pass over every check in the confirmation's
+scripts, after review found two more inputs they accepted. The gate now also requires every
+top-logprob entry to be a finite logprob with an integer token id (compare.py's comparisons fail
+silently on NaN), each pair to compare the two runs its label names, and the summary to name the
+`runs/` directory beside it. The holds require `SGLANG_DIR` to be `~/sglang` and check the interpreter
+and checkout that S0 actually imports; before, they checked only the variable, which they drop after
+`scripts/sglang_env.sh` has used it to choose the virtualenv. They also take the engine tree as a
+constant rather than a setting and check every input again before each launch, including that the
+repository HEAD has not moved. Each hold writes into a new directory, the gate runs only when every
+equality run succeeded, and a signal ends a session instead of moving it to the next arm. A session
+accepts the gate only if `confirm_gate.py`, rerun on the gate's own directory, passes and equals
+`gate.json`, and only sessions 1-3 run. The analysis refuses the same point twice, a valid point whose
+x_e2e, y or accept length is not a finite positive number, any point with a `lowc-` label or session
+outside the plan, and a `--full` other than `L=<levers>` with `H=` the same levers without B. The
+committed run is unaffected. All 3,849,210 top-logprob entries of the 11 equality runs are finite
+with integer token ids, every pair names its own runs, and the summary names the hold's own `runs/`.
+Every timed launch ran the Python of `~/sglang/.venv`, and each S0 launch imported `~/sglang` at the
+pin (each launch's `launch.json`, `launches.csv`). The 117 points hold no duplicate and no non-finite
+or non-positive value. The amended scripts reproduce `gate.json`, `points.csv`, `launches.csv`,
+`ratios.json` and `accept.json` byte for byte (Provenance).
+
 ## Results
 
 Written 2026-10-03. Labels: **measured** (read from the files below) and **derived** (ratios, means and
@@ -317,10 +338,10 @@ equality was not tested).
   text above Amendments, the same harness (`bench/`, `experiments/state_safety/`) and the same patches
   for the confirm engine; the only change in code the holds ran is one comment in `bench/hostload.py`.
 - The analysis (`bench.pareto`, `confirm_analyze.py`, `confirm_accept.py`) ran on 2026-10-03 from
-  `853bd4b` with a clean tree. Both scripts were then tightened as the amendments say (`08a8421` and
-  `e8566e3`). The whole analysis rerun from a clean checkout of each of those commits reproduced
-  `points.csv`, `launches.csv`, `ratios.json` and `accept.json` byte for byte.
-- `equality/gate.json` is the hold's own output. `confirm_gate.py` as amended at `ef31bc9`, run on
+  `853bd4b` with a clean tree. Both scripts were then tightened as the amendments say (`08a8421`,
+  `e8566e3` and `2f1b187`). The whole analysis rerun from a clean checkout of each of those commits
+  reproduced `points.csv`, `launches.csv`, `ratios.json` and `accept.json` byte for byte.
+- `equality/gate.json` is the hold's own output. `confirm_gate.py` as amended at `2f1b187`, run on
   `~/vp-data/speed-lowc/confirm/equality-20261002T215749Z/summary.json` with `--levers ABC` (it also
   reads that directory's `runs/`), reproduces it byte for byte.
 - `equality/` and `sessions/` are unchanged copies of the holds' outputs under
