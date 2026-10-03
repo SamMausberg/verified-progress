@@ -43,6 +43,9 @@ source "$repo/scripts/sglang_env.sh" || die "scripts/sglang_env.sh failed for SG
   || die "python is $(command -v python), not $SGLANG_DIR/.venv/bin/python"
 unset PYTHONPATH
 export SGLANG_CUTE_AOT_CACHE_DIR='' OMP_NUM_THREADS=1 PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1
+# Bytecode goes to, and is read from, a cache of this run's own: Python then never loads a .pyc from
+# a tree's __pycache__ (one with an unchecked hash would run in place of the verified source).
+export PYTHONPYCACHEPREFIX=$out/pycache
 cores=${CORES:-56-59}
 cd "$repo" || die "cannot cd to $repo"
 
@@ -50,7 +53,8 @@ cd "$repo" || die "cannot cd to $repo"
 # change), flash-attention at its commit, and this repository committed. A tree may hold nothing
 # else, tracked or not, ignored or not (an untracked sitecustomize.py on PYTHONPATH would run in
 # every case), apart from Python's own __pycache__ directories.
-state() {  # git status of a tree, ignored files included, without __pycache__ entries
+# __pycache__ entries are left out: Python never reads them here (PYTHONPYCACHEPREFIX above).
+state() {  # git status of a tree, ignored files included
   git -C "$1" status --porcelain --untracked-files=all --ignored | grep -vE '^(\?\?|!!) (.*/)?__pycache__/'
 }
 git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 || die "$repo is not a git checkout"
@@ -83,6 +87,8 @@ done
   || die "fa-pkg does not point at the checkout"
 fa_pkg=$(find "$trees/fa-pkg" -mindepth 1 ! -path '*/__pycache__*' ! -path "$trees/fa-pkg/flash_attn/cute/*" -printf '%P\n' | sort | tr '\n' ' ')
 [ "$fa_pkg" = 'flash_attn flash_attn/__init__.py flash_attn/cute ' ] || die "fa-pkg holds more than flash_attn/{__init__.py,cute}: $fa_pkg"
+[ -f "$trees/fa-pkg/flash_attn/__init__.py" ] && [ ! -s "$trees/fa-pkg/flash_attn/__init__.py" ] \
+  || die "fa-pkg/flash_attn/__init__.py is not the empty file make_trees.sh writes"
 CLEARED_ENV=$cleared python -P "$exp/run_case.py" 120 python -P - "$trees" "$repo" >"$out/meta.json" <<'EOF' \
   || die "meta.json failed"
 import hashlib, importlib.metadata as m, json, os, subprocess, sys, torch
@@ -107,6 +113,7 @@ print(json.dumps({
     'packages': {p: m.version(p) for p in ('nvidia-cutlass-dsl', 'quack-kernels', 'einops')},
     'python': sys.version.split()[0],
     'venv_is_sglang_dir': True,
+    'pycache_prefix_set': bool(sys.pycache_prefix),
     'cuda_home_default': os.environ['CUDA_HOME'] == os.path.expanduser('~/.local/cuda-13.0'),
     'cuda_compat_first': os.environ['LD_LIBRARY_PATH'].split(':')[0]
     == os.path.expanduser('~/.local/cuda-compat-13.0'),
