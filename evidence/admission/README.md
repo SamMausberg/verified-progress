@@ -396,15 +396,15 @@ cp ~/vp-data/speed_highc/logprob/summary.json evidence/admission/logprob_summary
 experiments/admission/collect_records.sh ~/vp-data/speed_highc evidence/admission
 ```
 
-`collect_records.sh` (jq only) writes the record files: `launches.csv` (every server of probes
-1-3 and the confirmation) from each server's `server/launch.json` and its run's `sweep.json`;
-`prefill_requests.json`, which condenses the two prefill-probe servers' `client.json`;
-`prefill_trace.json`, the per-request GPU windows and their medians from `trace_summary.json`;
-`gdn_prefill_bench.json`, copied from the hold's output; and `logprob_runs.csv`, each logprob
-server's resolved pools, prefill batches and commits (from its `server.log` and
-`c128.meta.json`). Run on the raw data it reproduces the committed files byte for byte (checked
-with `cmp` on 2026-10-02 and 2026-10-03). It stops unless every server its hold scripts
-launched has exactly one record.
+`collect_records.sh` (jq only) writes the record files: `launches.csv` (every server of
+probes 1-3, probe 3's length generator included, and of the confirmation) from each server's
+`server/launch.json` and its run's `sweep.json`; `prefill_requests.json`, which condenses
+the two prefill-probe servers' `client.json`; `prefill_trace.json`, the per-request GPU
+windows and their medians from `trace_summary.json`; `gdn_prefill_bench.json`, copied
+from the hold's output; and `logprob_runs.csv`, each logprob server's resolved pools,
+prefill batches and commits (from its `server.log` and `c128.meta.json`). Run on the raw
+data it reproduces the committed files byte for byte (checked with `cmp` on 2026-10-02 and
+2026-10-03). It stops unless every server its hold scripts launched has exactly one record.
 
 `summarize_probe.py` counts each point's prefill batches by size from its server's log, cut at
 bench's cache flush before each point, and stops unless every point's count equals the
