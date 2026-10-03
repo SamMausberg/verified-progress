@@ -1,6 +1,6 @@
 # The Work a Verifier Needs
 
-**Samuel Mausberg · preprint · 30 September 2026**
+**Samuel Mausberg · preprint · October 2026**
 
 A greedy or seeded speculative verifier needs one fact from the target's output
 head, the winning token, yet computes every logit. This repository holds a paper
@@ -288,10 +288,10 @@ and SGLang at the pinned commit with the patch series under
 |---|---|
 | `paper/` | The manuscript: `paper.tex`, one file per section in `sections/`, shared macros and terminology, figures, bibliography and the built `paper.pdf` |
 | `paper/notes/` | The research notes: `research_notes.tex` and one file per section, built from `paper/` to `paper/research_notes.pdf` |
-| `src/` | Exact CPU references: `precision_reference.py` for the certified head, and the earlier revision's `decision_reference.py`, `race_reference.py`, `v1_reference.py` and `v2_reference.py` |
+| `src/` | The certified head's GPU package, `certified_head/` (Triton kernels, error bounds, the engine glue the `kernel` patches import, and `INTEGRATION.md`), and the exact CPU references: `precision_reference.py` for the certified head, and the earlier revision's `decision_reference.py`, `race_reference.py`, `v1_reference.py` and `v2_reference.py` |
 | `tests/` | pytest tests for the references and witnesses, the serving harness, the scripts and the experiments' analysis code; GPU tests skip without CUDA |
 | `formal/` | Lean sources and `STATUS.md` (what is and is not formalized) |
-| `bench/` | Serving benchmark harness: arms, aiperf sweeps, Pareto frontiers, quality check, frozen workloads |
+| `bench/` | Serving benchmark harness: arms, aiperf sweeps, Pareto frontiers, quality check, frozen workloads; also the certified head's kernel microbenchmarks |
 | `engine/sglang/` | SGLang changes as `git format-patch` series under `patches/<workstream>/`, with apply commands in its README |
 | `experiments/<name>/` | Capture and analysis code, one directory per experiment; `experiments/README.md` maps each to its evidence |
 | `evidence/<topic>/` | Committed results; each directory's README gives the command behind every file. `evidence/README.md` indexes the topics, the paper claims they support and the imported bundle's records at the top of `evidence/` |

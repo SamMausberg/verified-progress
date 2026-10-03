@@ -193,9 +193,10 @@ its fallback (the whole-batch stock head) in such a node, so in SGLang each
 captured batch size keeps its fallback body's allocations (about the stock
 logits, `M x vocab` BF16, by the measurement above) instead of sharing them with
 the other captures, and any recapture of the graphs (a resize, a restart of the
-graph runner) adds the same again. This is inferred from the microbenchmark, not
-measured in the engine; the engine follow-up measures memory after capture with
-and without the certified head.
+graph runner) adds the same again. This mechanism is inferred from the
+microbenchmark, not measured in the engine. The served benchmark measured the
+total: the certified graphs take 3.8-25.7 GB more memory at capture than the
+stock ones, depending on the arm (`evidence/certified_head/served/README.md`).
 
 ## Call sites at the pin (paths under `python/sglang/`)
 

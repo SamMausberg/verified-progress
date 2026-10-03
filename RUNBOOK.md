@@ -33,9 +33,11 @@ python -m pytest tests/                      # every CPU test; GPU tests skip wi
 bash scripts/check_lean.sh                   # Lean 4.19.0 from ~/.elan
 python scripts/check_paper_references.py     # bibliography and evidence-register paths
 cd paper && latexmk -pdf -interaction=nonstopmode -halt-on-error paper.tex
+latexmk -pdf -interaction=nonstopmode -halt-on-error notes/research_notes.tex
 ```
 
-The paper uses the MLSys author kit. Its style file, `mlsys2025.sty`, carries no
+The research notes build from `paper/` after the paper, because they read
+`paper.aux` for the paper's labels. The paper uses the MLSys author kit. Its style file, `mlsys2025.sty`, carries no
 licence and is not committed: `paper/latexmkrc` runs `paper/template/fetch_mlsys_kit.sh`
 before every build, which needs network access, `curl` and `unzip` the first time,
 downloads the official kit, checks the SHA-256 of the archive and of the file, and stops

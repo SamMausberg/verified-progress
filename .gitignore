@@ -1,6 +1,9 @@
 # --- Private: never commit ---
 /Sam's Inco Take Home Challenge.pdf
 /writing.md
+# Presentation decks and any other PDF at the top level (the paper's PDFs live in paper/)
+/*.pdf
+*.pptx
 
 # Python
 .venv/
@@ -12,7 +15,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
-# LaTeX build artifacts (paper/paper.pdf itself is tracked)
+# LaTeX build artifacts of the paper and the research notes (both PDFs are tracked)
 paper/*.aux
 paper/*.log
 paper/*.out
@@ -29,8 +32,14 @@ paper/template/mlsys2025.sty
 formal/.lake/
 formal/build/
 
-# Benchmark/GPU run output (may contain private workloads; see RUNBOOK.md)
-runs/
+# Raw GPU run output stays outside git, under ~/vp-data/ (RUNBOOK.md, section 6);
+# these catch a run or profile written into the checkout by mistake. Only the top-level runs/
+# is ignored: experiments/repair/runs/ holds that experiment's committed hold scripts.
+/runs/
+*.nsys-rep
+*.ncu-rep
+*.qdrep
+*.sqlite
 
 # Secrets, editors and OS files
 .env
