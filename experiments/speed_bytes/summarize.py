@@ -684,7 +684,8 @@ def cmd_served(args: argparse.Namespace) -> None:
         for item in [*load_prompts(REPO / SWEEP_WARMUP_POOL), *workload]
     }
     home = str(Path.home())
-    pts = []
+    pts: list[dict[str, Any]] = []
+    raw: list[dict[str, Any]] = []
     for hold in args.holds:
         hold = Path(hold)
         sweeps = sorted(hold.glob('*/*/sweep.json'))
@@ -839,6 +840,15 @@ def cmd_served(args: argparse.Namespace) -> None:
                     raise SystemExit(
                         f'{f}: c={p["concurrency"]}: non-finite or non-positive values'
                     )
+                # Unrounded values for the ratios below; the published columns are rounded.
+                raw.append(
+                    {
+                        'y': p['y'],
+                        'x_e2e': p['x_e2e'],
+                        'x_decode': p['x_decode'],
+                        'ms_per_cycle': 1000 * acc / p['x_decode'] if acc else None,
+                    }
+                )
                 pts.append(
                     {
                         'hold': name,
@@ -859,10 +869,11 @@ def cmd_served(args: argparse.Namespace) -> None:
                         'foreign_cpu_max': round(p['foreign_cpu_during_max'], 2),
                     }
                 )
-    for r in pts:
+    # Each ratio is computed from the unrounded values and rounded once.
+    for r, v in zip(pts, raw, strict=True):
         base = [
-            b
-            for b in pts
+            w
+            for b, w in zip(pts, raw, strict=True)
             if b['hold'] == r['hold']
             and b['arm'] == r['arm']
             and b['c'] == r['c']
@@ -871,11 +882,11 @@ def cmd_served(args: argparse.Namespace) -> None:
         if len(base) != 1:
             raise SystemExit(f'{r["hold"]} {r["label"]} c={r["c"]}: {len(base)} baselines')
         b = base[0]
-        r['y_vs_bf16'] = round(r['y'] / b['y'], 4)
-        r['x_e2e_vs_bf16'] = round(r['x_e2e'] / b['x_e2e'], 4)
-        r['x_decode_vs_bf16'] = round(r['x_decode'] / b['x_decode'], 4)
+        r['y_vs_bf16'] = round(v['y'] / b['y'], 4)
+        r['x_e2e_vs_bf16'] = round(v['x_e2e'] / b['x_e2e'], 4)
+        r['x_decode_vs_bf16'] = round(v['x_decode'] / b['x_decode'], 4)
         r['cycle_speed_vs_bf16'] = (
-            round(b['ms_per_cycle'] / r['ms_per_cycle'], 4) if r['ms_per_cycle'] else ''
+            round(b['ms_per_cycle'] / v['ms_per_cycle'], 4) if v['ms_per_cycle'] else ''
         )
     write_csv(pts, Path(args.out))
 
