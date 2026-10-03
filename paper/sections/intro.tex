@@ -12,7 +12,7 @@ The speed at stake is modest. Qwen3.5-4B's head has 248,320 entries; in BF16 it 
 \begin{figure}[t]
 \centering
 \input{figures/breakdown}%
-\caption{Where the GPU time of a stock decode step goes (Nsight Systems; no certified head), with $B$ requests per decode step (in plain decoding, head calls of $M=B$ positions) \ev{profile-attr}. The target head comprises its GEMM, the FP32 copy of its logits and the argmax. Tracing inflates the MTP cycle's idle time (hatched) but barely changes kernel durations, so the MTP heads' shares of an untraced cycle are larger than shown (Appendix~\ref{app:profile}). DFlash: the tuned configuration with 16-token blocks, GPU-bound \ev{profile-dflash}.}
+\caption{The head's share of a stock decode step is modest, less at larger batches; under MTP the drafter's projections through it cost more than the target head. Nsight Systems, no certified head; $B$ requests per step (plain decoding: head calls of $M=B$ positions) \ev{profile-attr}. Target head: GEMM, FP32 logit copy, argmax. Tracing inflates MTP's idle time (hatched), barely its kernels, so its heads' untraced shares are larger than shown (Appendix~\ref{app:profile}). DFlash: tuned, 16-token blocks, GPU-bound \ev{profile-dflash}.}
 \label{fig:breakdown}
 \end{figure}
 
@@ -27,7 +27,7 @@ A second source of bounds would reuse the drafter's work. MTP-4B and DFlash-4B (
 \begin{figure*}[t]
 \centering
 \input{figures/mechanism}%
-\caption{How the certified head chooses a token (schematic; values illustrative). \textbf{(a)}~The int8 copy gives every vocabulary entry an interval $[\lo_i,\hi_i]$ that contains its exact score; an entry with $\hi_i<\max_j\lo_j-\delta_{\max}$, where $\delta_{\max}$ is a margin for the stock kernel's modelled error and rounding (Section~\ref{sec:headcontracts}), cannot win and is dropped. \textbf{(b)}~Three alternative candidate pairs $a$ and $b$, recomputed from their BF16 weights and widened to the FP32 sums the stock kernel could form (bars; their possible BF16 values shaded). \textbf{(c)}~An open position sends the call to the stock head, for the whole batch at the same shape or, with batch-independent logits, for its candidates only (Section~\ref{sec:kernel-fallback}).}
+\caption{The certified head drops every entry that cannot win, recomputes the few that remain, and falls back to the stock head when the token stays open (schematic; values illustrative). \textbf{(a)}~The int8 copy bounds each entry's exact score by $[\lo_i,\hi_i]$; an entry with $\hi_i<\max_j\lo_j-\delta_{\max}$ cannot win, $\delta_{\max}$ being a margin for the stock kernel's modelled error and rounding (Section~\ref{sec:headcontracts}). \textbf{(b)}~Three alternative pairs of candidates $a$ and $b$, recomputed from their BF16 weights and widened to the FP32 sums the stock kernel could form. \textbf{(c)}~The two fallbacks for an open position (Section~\ref{sec:kernel-fallback}).}
 \label{fig:mechanism}
 \end{figure*}
 

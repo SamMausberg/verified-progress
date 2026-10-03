@@ -1,19 +1,26 @@
 % Figure fig:frontier (Section 4.5): the confirmed serving frontier. Its width is the line width up
-% to 10.5 cm and its height 0.48 of that; the four-entry legend clears every curve. Reads
+% to 10.5 cm and its height 0.48 of that. Reads
 % evidence/bench/confirm/frontier.csv (per arm and client concurrency: means over sessions
 % of x = output tokens per second per request, end to end, and y = output tokens per second
 % on the GPU; n = valid sessions) and evidence/bench/confirm/envelope-all.dat (the Pareto
 % envelope over the points with at least three valid sessions, grey band). Points with fewer
 % than three sessions are hollow; they do not rank on the frontier (evidence/bench/README.md).
-% Styles follow style.tex: plain decoding (arm plain) ink with circles; DFlash (arm dflash) purple
-% with diamonds, 8-token blocks solid and 16-token blocks dashed; MTP (arm mtp) purple, dash-dot,
-% with triangles, filled where three or more sessions are valid and hollow (mark hollow) where only
-% one is, which the caption says. Each curve runs from c = 1 (lower right) to c = 128 (upper
-% left); the plain curve's ends are labelled, clear of its line (c = 128 above its point: ymax 25,000
-% leaves room for the label). Error bars are one standard
-% deviation over sessions (x_e2e_std, y_std); every one is below 2% of its mean and hidden by its
-% marker, which the caption says. No arm uses the certified head. The figure has one panel, so it
-% has no title inside it; the caption names it and its status.
+% Styles follow style.tex, one colour per arm: plain decoding (arm plain) ink, solid, circles;
+% DFlash with 8-token blocks (arm dflash8) violet, solid, diamonds; DFlash with 16-token blocks
+% (arm dflash16) reddish purple, dashed, diamonds; MTP (arm mtp) green, dash-dot, triangles,
+% filled where three or more sessions are valid and hollow (mark hollow) where only one is, which
+% the caption says. Each curve runs from c = 1 (lower right) to c = 128 (upper left); the plain
+% curve's ends are labelled, clear of its line (c = 128 above its point: ymax 25,000 leaves room
+% for the label). Error bars are one standard deviation over sessions (x_e2e_std, y_std); every
+% one is below 2% of its mean and hidden by its marker, which the caption says. No arm uses the
+% certified head. The figure has one panel, so it has no title inside it; the caption names it
+% and its status.
+% Direct labels, no legend, each placed where its curve is alone (positions checked against
+% frontier.csv): plain decoding left of its c = 1-2 run (nothing lies left of x = 228 below
+% y = 3,600), opposite the c = 1 label; MTP below and right of its c = 1 point (461, 456), under the DFlash c = 1
+% points; 8-token DFlash above and right of its c = 16 point (370, 5,256), where the envelope is
+% the upper boundary of every curve; 16-token DFlash under its c = 48 point (130, 5,326), the
+% lowest curve left of x = 184, clear of the plain curve at x >= 228.
 % Keep only points with at least #1 sessions, or with fewer than #1.
 \pgfplotsset{
   only if n at least/.style={x filter/.append code={%
@@ -29,31 +36,27 @@
   ylabel={Throughput $y$ (output tokens/s)},
   xtick={100,200,500,1000},xticklabels={100,200,500,1000},
   ytick={300,1000,3000,10000},yticklabels={300,1k,3k,10k},
-  % the legend fills the empty lower-left corner, which xmin 65 and ymin 180 widen: no point lies
-  % left of x = 228 below y = 3,600,
-  % and the 16-token DFlash squares nearest it sit above y = 5,000
-  legend style={at={(0.015,0.03)},anchor=south west},
-  short legend,
   % one standard deviation over sessions; keep last in a plot's options (it changes key path)
   sd bars/.style={error bars/.cd,x dir=both,x explicit,y dir=both,y explicit,error bar style={thin}}]
 \addplot[line width=4pt,ccontext!25,forget plot,no markers]
   table[x=x,y=y]{../evidence/bench/confirm/envelope-all.dat};
 \addplot[arm plain,discard if not={label}{plain-tuned},sd bars]
   table[x=x_e2e_mean,y=y_mean,x error=x_e2e_std,y error=y_std,col sep=comma]{../evidence/bench/confirm/frontier.csv};
-  \addlegendentry{plain decoding}
-\addplot[arm dflash,discard if not={label}{dflash-tuned},sd bars]
+\addplot[arm dflash8,discard if not={label}{dflash-tuned},sd bars]
   table[x=x_e2e_mean,y=y_mean,x error=x_e2e_std,y error=y_std,col sep=comma]{../evidence/bench/confirm/frontier.csv};
-  \addlegendentry{DFlash, block 8}
 \addplot[arm dflash16,discard if not={label}{dflash-tuned-b16},sd bars]
   table[x=x_e2e_mean,y=y_mean,x error=x_e2e_std,y error=y_std,col sep=comma]{../evidence/bench/confirm/frontier.csv};
-  \addlegendentry{DFlash, block 16}
 \addplot[arm mtp,discard if not={label}{mtp-tuned},sd bars]
   table[x=x_e2e_mean,y=y_mean,x error=x_e2e_std,y error=y_std,col sep=comma]{../evidence/bench/confirm/frontier.csv};
-  \addlegendentry{MTP, 3 steps}
 % the one-session MTP points drawn again over their filled marks, hollow; the caption names them
-\addplot[only marks,cdraft,mark triangle,mark hollow,forget plot,discard if not={label}{mtp-tuned},only if n below=3]
+\addplot[only marks,cmtp,mark triangle,mark hollow,forget plot,discard if not={label}{mtp-tuned},only if n below=3]
   table[x=x_e2e_mean,y=y_mean,col sep=comma]{../evidence/bench/confirm/frontier.csv};
 \node[annot,anchor=west] at (axis cs:300,282) {$c{=}1$};
 \node[annot,anchor=south] at (axis cs:108.7,14600) {$c{=}128$};
+% direct labels (positions in the comment above)
+\node[annot,anchor=east] at (axis cs:255,450) {plain decoding};
+\node[annot,anchor=north west] at (axis cs:475,410) {MTP, 3 steps};
+\node[annot,anchor=south west] at (axis cs:390,5700) {DFlash, 8-token blocks};
+\node[annot,anchor=north,align=center] at (axis cs:135,3800) {DFlash,\\16-token blocks};
 \end{axis}
 \end{tikzpicture}%
