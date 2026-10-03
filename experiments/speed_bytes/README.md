@@ -35,7 +35,8 @@ concurrencies, request counts, the exact switches and nothing else), the setting
 took from its defaults (output length, request body, warm-up, aiperf version, and the committed
 workload and warm-up pool by hash), the arm as `bench/arms.toml`
 at the hold's commit resolves it, the server command bench launched for it, the harness commit the
-hold logged, the GH200 its launch record read, the virtualenv's interpreter and bench's own point-validity rule; per probe server
+hold logged, the GH200 its launch record read, the virtualenv's interpreter, bench's own point-validity rule
+and every published value finite (an accept length exactly on the speculative arms); per probe server
 the launch SGLang printed (`server_args`: the hold's flags and the defaults the comparison relies
 on, identical across the hold's servers apart from the switches), and the probe client and prompts
 at the hold's commit; per server log the FP8 conversion and mode those switches imply; per trace

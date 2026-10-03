@@ -518,6 +518,19 @@ def cmd_served(args: argparse.Namespace) -> None:
                 if reason or p['completed'] != p['requests']:
                     raise SystemExit(f'{f}: c={p["concurrency"]} invalid: {reason or "short"}')
                 acc = (p.get('spec') or {}).get('accept_length')
+                # ...and every value published below finite (bench's rule checks only y and x_e2e):
+                # rates and, on speculative arms (and only there), the accept length positive; TTFT
+                # not negative.
+                if (acc is not None) != bool(d['arm']['args'].get('speculative-algorithm')):
+                    raise SystemExit(f'{f}: c={p["concurrency"]}: accept length {acc}')
+                published = [p['y'], p['x_e2e'], p['x_decode'], *([acc] if acc is not None else [])]
+                ttft = p['ttft_ms']['p50']
+                if not all(
+                    isinstance(v, int | float) and math.isfinite(v) and v > 0 for v in published
+                ) or not (isinstance(ttft, int | float) and math.isfinite(ttft) and ttft >= 0):
+                    raise SystemExit(
+                        f'{f}: c={p["concurrency"]}: non-finite or non-positive values'
+                    )
                 pts.append(
                     {
                         'hold': name,
