@@ -8,8 +8,7 @@ the scripts are in `experiments/hostgap/`; raw Nsight reports, server logs and p
 outputs stay in `~/vp-data/hostgap/` (outside git).
 
 Labels: **measured** (a trace or timed run recorded here), **derived** (arithmetic on measured
-values, formula given), **hypothesis** (an explanation not tested here), **pending** (queued,
-not yet run).
+values, formula given), **hypothesis** (an explanation not tested here).
 
 ## Short answer
 

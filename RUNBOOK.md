@@ -66,7 +66,7 @@ scripts/gpu_lock.sh --status          # queued and running jobs
 ```
 
 Jobs run in arrival order, except for the priority lane (`GPU_LOCK_PRIORITY=1`),
-which only the integrator grants. The lock lasts exactly as long as the command:
+which only the maintainer grants. The lock lasts exactly as long as the command:
 when the job exits, `scripts/gpu_job.sh` terminates every process it started,
 including those that moved to another process group or session (`timeout`,
 `setsid`, `start_new_session`), and an exclusive job first waits
