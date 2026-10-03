@@ -40,7 +40,9 @@ unset _v
 CONFIRM_ENGINE=${CONFIRM_ENGINE:-$HOME/sglang-wt/speed-lowc-confirm}
 CONFIRM_TREE=${CONFIRM_TREE:-5d6db54828d7fbdac62180810b68a87cee3b39ec}
 CONFIRM_LEVERS=${CONFIRM_LEVERS:?set CONFIRM_LEVERS (e.g. AB or ABC)}
-[[ $CONFIRM_LEVERS =~ ^[ABC]+$ ]] || { echo "confirm_arms.sh: CONFIRM_LEVERS must use only A, B, C" >&2; exit 1; }
+# Each lever at most once, in the order A, B, C (arm labels and the gate compare the string).
+[[ $CONFIRM_LEVERS =~ ^A?B?C?$ ]] && [ -n "$CONFIRM_LEVERS" ] ||
+  { echo "confirm_arms.sh: CONFIRM_LEVERS must be a subset of A, B, C in that order (e.g. ABC, AC)" >&2; exit 1; }
 CONFIRM_GATE=${CONFIRM_GATE:-$HOME/vp-data/speed-lowc/confirm/current/gate.json}
 # S0 imports the stock checkout that scripts/sglang_env.sh activates (SGLANG_DIR, line 11),
 # which must be the pin (engine/sglang/README.md, line 4) with no local changes.

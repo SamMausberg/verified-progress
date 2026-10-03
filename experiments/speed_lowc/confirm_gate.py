@@ -14,7 +14,8 @@ against S0 of its group) and decides, per group, which levers may be timed:
 compare.py counts a prompt's logprobs as compared when both runs have any top-logprob
 entry, so the gate also reads both runs of every pair (the runs directory the summary
 names) and requires, for each of the 320 prompts, a top-k list of TOP_K entries at every
-output position.
+output position, and that compare.py's self-consistency check found every committed token
+of both runs to be that run's own argmax (no not_argmax position: a greedy run).
 
 Writes gate.json and exits non-zero if B0 fails in either group or no lever passes.
 
@@ -26,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -103,15 +105,23 @@ def main() -> None:
     ap.add_argument('--levers', required=True, help='levers that survived their probes, e.g. ABC')
     ap.add_argument('--out', type=Path, required=True)
     args = ap.parse_args()
-    if not args.levers or any(x not in 'ABC' for x in args.levers):
-        ap.error('--levers must be a non-empty string of A, B, C')
+    if not re.fullmatch('A?B?C?', args.levers) or not args.levers:
+        ap.error('--levers must be a non-empty subset of A, B, C in that order, e.g. ABC or AC')
     summary = json.loads(args.summary.read_text())
     pairs, runs = summary['pairs'], Path(summary['runs'])
+    selfc = summary.get('self_consistency') or {}
     cache: dict[str, str | None] = {}
+
+    def greedy(pair: dict[str, Any] | None) -> str | None:
+        for run in (pair['run_a'], pair['run_b']) if pair else ():
+            violations = (selfc.get(run) or {}).get('not_argmax')
+            if violations != 0:
+                return f'{run}: not_argmax {violations} (self-consistency)'
+        return None
 
     def checked(check: Any, pair: dict[str, Any] | None) -> tuple[bool, str]:
         ok, note = check(pair)
-        gap = positions(runs, pair, cache)
+        gap = positions(runs, pair, cache) or greedy(pair)
         return (False, gap) if ok and gap else (ok, note)
 
     gate: dict[str, Any] = {'summary': str(args.summary), 'levers': args.levers, 'groups': {}}
