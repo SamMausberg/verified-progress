@@ -1,4 +1,4 @@
-% Shared macros for the main text and the appendices (owner: main-text author).
+% Shared macros for the main text and the appendices.
 % Loaded by paper.tex after \usepackage[accepted]{mlsys2025}. Appendix-only macros belong
 % in the appendix files; a macro both parts use belongs here.
 % ---------------------------------------------------------------------------
@@ -36,10 +36,7 @@
 \DeclareMathOperator{\TV}{TV}
 \DeclareMathOperator{\KL}{KL}
 \DeclareMathOperator{\fl}{fl}
-\DeclareMathOperator{\tok}{tok}
 \DeclareMathOperator{\diam}{diam}
-\newcommand{\lse}{\operatorname{LSE}}
-\newcommand{\clip}{\operatorname{clip}}
 \newcommand{\norm}[1]{\lVert #1\rVert}
 \newcommand{\rnb}{\operatorname{rn}_{\mathrm{B}}}
 \newcommand{\ulpb}{\operatorname{ulp}_{\mathrm{B}}}
@@ -51,11 +48,8 @@
 \newtheorem{theorem}{Theorem}[section]
 \newtheorem{proposition}[theorem]{Proposition}
 \newtheorem{lemma}[theorem]{Lemma}
-\newtheorem{corollary}[theorem]{Corollary}
 \theoremstyle{definition}
 \newtheorem{definition}[theorem]{Definition}
-\theoremstyle{remark}
-\newtheorem{remark}[theorem]{Remark}
 % ---------------------------------------------------------------------------
 % Names used throughout. The four references of a single decision (Definition
 % def:contracts) and the two named models of the stock kernel's FP32 accumulation error
