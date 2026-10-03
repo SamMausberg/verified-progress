@@ -43,11 +43,13 @@
   table[x=layer,y expr=-0.15,col sep=comma]{../evidence/state_safety/first_difference_by_module.csv};
 % key above the plot, at the plot's marker sizes, 7 pt; left-aligned with the label of the
 % plain-versus-MTP row, which it clears by 2 pt
-\draw[ink] plot[only marks,mark=square*,mark size=2.3pt] coordinates {(axis cs:-0.2,2.32)};
-\node[annot,anchor=west] at (axis cs:0.15,2.32) {gated RMSNorm, decode};
-\draw[ink] plot[only marks,mark=triangle*,mark size=2.9pt] coordinates {(axis cs:7.9,2.32)};
-\node[annot,anchor=west] at (axis cs:8.3,2.32) {attention output, decode};
-\draw[ink] plot[only marks,mark=diamond*,mark size=2.9pt] coordinates {(axis cs:16.3,2.32)};
-\node[annot,anchor=west] at (axis cs:16.7,2.32) {MLP down-projection, batched prefill};
+\draw[ink] plot[only marks,mark=*,mark size=2.6pt] coordinates {(axis cs:-0.2,2.32)};
+\node[annot,anchor=west] at (axis cs:0.15,2.32) {GDN recurrence};
+\draw[ink] plot[only marks,mark=square*,mark size=2.3pt] coordinates {(axis cs:5.05,2.32)};
+\node[annot,anchor=west] at (axis cs:5.4,2.32) {gated RMSNorm, decode};
+\draw[ink] plot[only marks,mark=triangle*,mark size=2.9pt] coordinates {(axis cs:13.1,2.32)};
+\node[annot,anchor=west] at (axis cs:13.5,2.32) {attention output, decode};
+\draw[ink] plot[only marks,mark=diamond*,mark size=2.9pt] coordinates {(axis cs:21.1,2.32)};
+\node[annot,anchor=west] at (axis cs:21.5,2.32) {MLP down-projection, batched prefill};
 \end{axis}
 \end{tikzpicture}}{First differing module output by decoder layer for two configuration pairs.}%

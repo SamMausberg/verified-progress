@@ -12,7 +12,7 @@
 \term{main}{Error model $\gamma_{\rm stock}$, $G_i$}{An assumed bound $G_i=\gamma_{\rm stock}\sum_j|w_{ij}h_j|+\eta$ on the stock kernel's accumulation error, with $\gamma_{\rm stock}$ from the \modelcons{} or the \modelhopper{} (Section~\ref{sec:headcontracts}, Table~\ref{tab:assumptions}).}
 \term{main}{Gap condition; interval condition}{The two sufficient conditions under which intervals around the stock kernel's accumulators fix its token: a margin between the real logits (Theorem~\ref{thm:stock}), and the rounded intervals themselves (Proposition~\ref{prop:stockinterval}). The certified head screens with the first and decides with the second.}
 \term{main}{Error bound $\beta_i$}{A proved bound on the error of the int8 copy's score for entry $i$ (Theorem~\ref{thm:envelope}).}
-\term{main}{Interval $[lo_i,hi_i]$}{An interval that contains the value it bounds, given the stated assumptions, computed with outward rounding; the appendices call it an enclosure.}
+\term{main}{Interval $[\lo_i,\hi_i]$}{An interval that contains the value it bounds, given the stated assumptions, computed with outward rounding; the appendices call it an enclosure.}
 \term{main}{Candidate}{A vocabulary entry the screen cannot exclude; it is recomputed from its BF16 row.}
 \term{main}{Certified position}{A position whose \Rstock{} token the intervals fix for every accumulator value the error model admits.}
 \term{main}{Fallback}{The stock head at the same batch shape, for a position the intervals cannot decide: on the whole batch, or per position over its gathered candidates, the per-position fallback. The evidence files call the per-position fallback the column fallback.}
@@ -20,6 +20,13 @@
 \term{main}{Held-out}{From prompts that no choice of head, bound or threshold was fitted on.}
 \term{main}{Held-out replay, kernel replay, engine check}{Three of the six data sources of Section~\ref{sec:measure}: an FP64 replay of held-out plain-decoding positions, the GPU kernel on captured positions at their batch shapes, and the kernel inside SGLang (Table~\ref{tab:sources}).}
 \term{main}{Transport; tile summary}{Bounds carried from a drafter's per-tile summaries to the target's head input; the largest score and the sum of exponentiated scores of a tile of vocabulary entries at the drafter's head input.}
+\term{main}{GDN layer}{A Gated DeltaNet layer: linear attention with a recurrent state per request. Three of every four of Qwen3.5-4B's decoder layers are GDN layers, the rest full attention (Section~\ref{sec:setup}).}
+\term{main}{Arm, session}{A serving configuration; one round in which the compared arms are launched afresh and swept once (Section~\ref{sec:served}).}
+\term{main}{Exact up to rounding}{An arm whose first divergence from a matched stock reference is, on every prompt, an exact tie, one BF16 step or a near tie within two steps, with no change in output length; a class rule fixed after the first comparisons had been seen (Section~\ref{sec:served}).}
+\term{main}{Check mode}{The certified head running inside SGLang with the stock head also computed at every certified step, counting the positions whose token differs (Section~\ref{sec:engine}).}
+\term{main}{Gated off}{A head call larger than the 64 positions the served head certifies: the same CUDA graph runs the stock head (Section~\ref{sec:served}).}
+\term{main}{Host-gap patches, backbone GEMM routing}{Engine changes of Table~\ref{tab:levers}: FlashInfer attention planning made cheaper and free of blocking GPU reads; a table that sends each backbone GEMM to the kernel a microbenchmark found fastest for its shape.}
+\term{main}{Replayed GDN decoding, fold verify}{SGLang's buffered GDN decode, which keeps recent inputs in a ring and writes the full recurrent state every 16 tokens; DFlash verification without per-position state snapshots (SGLang's fold-every-commit protocol) (Table~\ref{tab:levers}).}
 \term{main}{$\rho$; $\delta^\ast_i$}{Drift $\norm{h^t-h^d}_2/\norm{h^t}_2$ of a draft pair; the $\rho$ below which transport's bound is narrower than the int8 copy's on entry $i$ (Proposition~\ref{thm:crossover}).}
 % ---------------------------------------------------------------------------
 % Scope app (owner: appendix editor): terms used only in the appendices, in alphabetical
@@ -37,12 +44,12 @@
 \term{main}{Guards, $P_?$}{Interval tests that decide the standard acceptance rule from enclosures of the numerator and the partition function; $P_?$ is the probability that neither fires (Theorem~\ref{thm:guards}).}
 \term{app}{Head chain}{The stock head GEMM, the FP32 copy of its logits and the argmax or top-1 that follows it (Appendix~\ref{app:profile}).}
 \term{app}{Integer pass}{A certified pass that quantizes the head input as well and accumulates exactly in int32 (Theorem~\ref{thm:integer}).}
-\term{main}{Keyed noise field}{Gumbel noise $G_{t,i}$ that is a pure function of (seed, token position $t$ in the sequence, token $i$), as in the engine's seeded sampler.}
+\term{main}{Keyed noise field}{Gumbel noise $g_{t,i}$ that is a pure function of (seed, token position $t$ in the sequence, token $i$), as in the engine's seeded sampler.}
 \term{main}{Oracle radii}{The realized per-tile deviations used as transport radii; a ceiling that no certified geometry reaches (Appendix~\ref{app:transport-families}).}
 \term{app}{Partition interval $\log(Z^+/Z^-)$}{The width, in nats, of an enclosure of the partition function; it decides how often the acceptance guards fire (Appendix~\ref{app:transport-sampled}).}
 \term{app}{Point-mass proposal}{A deterministic draft token, SGLang's default for sampled verification; its residual is a race over the untried tokens (Appendix~\ref{app:residual}).}
 \term{app}{Residual race}{An exact sample from the residual law $(p-q)_+$ by a certified race under a fixed priority field (Theorem~\ref{thm:residualrace}).}
-\term{main}{Static screen}{Tile bounds $\langle\mu_c,h\rangle+r_c\norm h$ evaluated at the target state without any draft (Proposition~\ref{prop:static}).}
+\term{main}{Static screen}{Tile bounds $\langle\mu_g,h\rangle+r_g\norm h$ evaluated at the target state without any draft (Proposition~\ref{prop:static}).}
 \term{app}{\Srace}{The reference for one seeded decision: the winner of the race with a fixed noise vector (Definition~\ref{def:srace}).}
 \term{app}{Tuning and confirmation splits}{Disjoint prompt sets of the serving workload: configurations are chosen on the first and reported on the second (Appendix~\ref{app:serving}).}
 \term{main}{Verify pass, draft step, cycle}{The target's forward pass over a drafted block; one drafter forward; a draft, its verification and the state commit (Appendix~\ref{app:profile}).}
