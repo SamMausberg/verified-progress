@@ -20,20 +20,21 @@ its results, transport, the engine changes) and run in this order:
   served, and why most DFlash verify calls above one request need a fallback (8-11; Sections 3
   and 4);
 - transport, what it is and why it fails (12; Section 5);
-- the engine changes that gained more than the head (13; Section 6);
-- six approaches that fell short, each with its number and scope (14; Sections 5 and 6,
-  Appendix E.4, and the research notes for FP8);
+- the engine changes that gained more than the head (13; Sections 4.5 and 6);
+- five other approaches that missed a rule declared before their runs (14; Section 6,
+  Appendix E.4, and the research notes for FP8 and the split-KV kernel);
 - the stock envelope before and after the two confirmed changes (15; Section 6);
-- the quality check: the exactness classes with their scope, beside GSM8K (16; Sections 4.5
-  and 6);
+- the quality check: the output comparisons of the head, the fold and the prefill delay against
+  stock, beside GSM8K, which ran on four other arms (16; Sections 4.5 and 6);
 - the takeaway, with the limits and the next steps that the paper's Limitations and `TASKS.md`
   leave open (17; Sections 8 and 9).
 
-Each main slide states one claim in its title, and its footer names the paper's section. Its
-speaker notes give what to say, the minute marks of its section, and the files the numbers come
-from. The scripts add up to about 3,240 words, 22 to 25 minutes at 130 to 150 words a minute;
-about 210 of those words are marked optional, for when questions come early. The minute marks
-budget 28.5 minutes, which leaves room for interruptions.
+Each main slide states one claim in its title and carries at most three short lines of body text
+besides its chart or headline numbers; its footer names the paper's section. Its speaker notes
+give what to say, the minute marks of its section, the scope and definitions that did not fit on
+the slide, and the files the numbers come from. The scripts add up to about 3,330 words, 22 to 26
+minutes at 130 to 150 words a minute; about 220 of those words are marked optional, for when
+questions come early. The minute marks budget 29 minutes, which leaves room for interruptions.
 
 The 29 backup slides are grouped by the questions they answer; the first backup slide is the
 index:
@@ -48,35 +49,23 @@ index:
   with the fold, the prefill delay, the declared approximations, the first composition, FP8);
 - the profile in detail, related work, upstream fixes and the code.
 
-The FP8 and upstream-fixes slides go beyond the paper: FP8 is cited only by the research notes
-(`evidence/speed_bytes/`), and the upstream status was read from GitHub on 3 October 2026.
+The FP8, split-KV and upstream-fixes material goes beyond the paper: FP8 and the split-KV kernel
+are cited only by the research notes (`evidence/speed_bytes/`, `evidence/speed_lowc/`), and the
+upstream status was read from GitHub on 3 October 2026.
 
 Charts are drawn from the committed files and use the paper's colours (`paper/figures/style.tex`):
 plain decoding ink, MTP green, DFlash with 16-token blocks reddish purple, DFlash with 8-token
 blocks violet, the certified head blue, fallback vermilion, context grey.
 
-## Changes from the first version of this deck
-
-- The main deck now runs in the order above: the setup slide moved in from the backups, and two
-  main slides are new, the approaches that fell short and the quality check that pairs GSM8K with
-  the exactness classes. Transport's two slides became one, and the limits moved onto the closing
-  slide with the next steps.
-- The frontier slide adds the mean accepted tokens per verify cycle of each drafter arm, from the
-  accept-length columns of `evidence/bench/confirm/frontier.csv`.
-- The slide on why the served gain is small described the whole-batch fallback; the served runs
-  used the per-position fallback, and the slide now says so. The served-head title says the head
-  slows the fastest arm at 2 to 8 requests, since plain decoding and MTP keep gaining there. The
-  host-gap patches left the gains chart: they were measured against MTP with FlashInfer attention,
-  which stays below stock MTP with Triton attention, and the notes say this.
-- Main-slide footers name the paper's section only, and the evidence paths moved into the speaker
-  notes. GDN, the fold, FA4 and the envelope are defined on the slide where each first appears.
-  The paper's tables are referred to by content, not by number.
-
 ## What it reflects
 
-Every number was computed from the evidence committed at `59cec92` on main (the merge of the
-paper's clarity pass) and checked against the paper's text and the evidence READMEs at the same
-commit. No experiment was rerun for the deck.
+Every number was computed from the evidence committed at `02b9c5f`, the paper's second clarity
+pass, and checked against the paper's text and the evidence READMEs at that commit. The evidence
+files the deck reads are the same there as on main at `59cec92`. Two values follow the evidence
+where the paper at that commit had not yet been corrected: 16-token DFlash's certified-head ratio
+at one request is 1.013 (+1.3%), rounded once from `evidence/certified_head/served/summary.json`,
+and the check-mode counts (592,433 and 196,734) are checked positions, fallback rows included. The
+paper's tables are referred to by content, not by number. No experiment was rerun for the deck.
 
 ## How it was built
 
