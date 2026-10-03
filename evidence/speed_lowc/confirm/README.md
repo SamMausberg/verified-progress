@@ -218,6 +218,14 @@ passes on the hold's directory at the holds' commits (`9a7d52a`, engine `dd57a50
 check passes on `equality/`, `eq_flags` gives the 11 runs' recorded flags, every launch ran its arm's
 model and the repository's warm-up pool, and every output reproduces byte for byte.
 
+2026-10-03, after the analysis (review of #230): the order check now covers the sessions as well as
+the launches within them. By start time the launches must form one block per session, with sessions
+1, 2 and 3 in turn, as three separate holds run them. Before, interleaved sessions would have passed
+as long as each session's own launches kept their order. Every equality run must also have started
+before the first timed launch. The committed run is unaffected: s1 ran 23:22-23:56, s2 00:48-01:22 and
+s3 02:05-02:39, each in its declared order, after the equality runs (21:58-22:26, `equality/meta.json`).
+Every output reproduces byte for byte.
+
 ## Results
 
 Written 2026-10-03. Labels: **measured** (read from the files below) and **derived** (ratios, means and
@@ -393,10 +401,11 @@ equality was not tested).
   for the confirm engine; the only change in code the holds ran is one comment in `bench/hostload.py`.
 - The analysis (`bench.pareto`, `confirm_analyze.py`, `confirm_accept.py`) ran on 2026-10-03 from
   `853bd4b` with a clean tree. Both scripts were then tightened as the amendments say (`08a8421`,
-  `e8566e3`, `2f1b187`, `02c5c46`, `a08e423`, `50b9e7b` and `623de0b`). The whole analysis rerun from a
-  clean checkout of each of those commits reproduced `points.csv`, `launches.csv`, `ratios.json` and `accept.json` byte for byte.
-  `sweeps.csv` was written by `confirm_sweeps.py` from a clean checkout of `50b9e7b` and again,
-  identically, from `623de0b`; the analysis needs it, `launches.csv` and `equality/` beside `points.csv`.
+  `e8566e3`, `2f1b187`, `02c5c46`, `a08e423`, `50b9e7b`, `623de0b` and `fc95fe9`). The whole
+  analysis rerun from a clean checkout of each of those commits reproduced `points.csv`,
+  `launches.csv`, `ratios.json` and `accept.json` byte for byte. `sweeps.csv` was written by
+  `confirm_sweeps.py` from a clean checkout of `50b9e7b` and again, identically, from `623de0b` and
+  `fc95fe9`; the analysis needs it, `launches.csv` and `equality/` beside `points.csv`.
 - `equality/gate.json` is the hold's own output. `confirm_gate.py` as amended at `623de0b`, run on
   `~/vp-data/speed-lowc/confirm/equality-20261002T215749Z/summary.json` with `--levers ABC` (it also
   reads that directory's `runs/`), reproduces it byte for byte.
