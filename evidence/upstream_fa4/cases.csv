@@ -1,0 +1,90 @@
+harness,tree,d,dv,causal,window_left,page_size,seqlen_k,load_path,tile_m,tile_n,rows_per_pass,status,error,failed_call,max_abs_err,bf16_ref_max_abs_err,mean_abs_err,bf16_ref_mean_abs_err,paged_calls_identical,contiguous_ok,record
+kvcache,ceil,128,128,True,,1,,paged_cpasync,128,128,16,ok,,,0.0022779107093811035,0.009228378534317017,0.00017671112436801195,0.0003663249663077295,,,kv_ceil_d128_c1_ps1.json
+kvcache,ceil,160,160,False,,1,,paged_cpasync,128,112,32,wrong,,,0.7950677871704102,0.004697531461715698,0.04064236581325531,0.0003471907402854413,,,kv_ceil_d160_c0_ps1.json
+kvcache,ceil,160,160,True,,0,,contiguous,128,112,32,ok,,,0.0021702051162719727,0.005065441131591797,0.0001769968366716057,0.00035264785401523113,,,kv_ceil_d160_c1_ps0.json
+kvcache,ceil,160,160,True,,1,,paged_cpasync,128,112,32,wrong,,,0.6738096475601196,0.005911529064178467,0.037825196981430054,0.00035720362211577594,,,kv_ceil_d160_c1_ps1.json
+kvcache,ceil,160,160,True,,112,,paged_tma,128,112,32,ok,,,0.0023206472396850586,0.005004614591598511,0.00017495299107395113,0.0003535621508490294,,,kv_ceil_d160_c1_ps112.json
+kvcache,ceil,192,192,True,,1,,paged_cpasync,128,112,16,ok,,,0.0026297569274902344,0.00996100902557373,0.00017574321827851236,0.00036061290302313864,,,kv_ceil_d192_c1_ps1.json
+kvcache,ceil,224,224,False,,1,,paged_cpasync,128,80,32,wrong,,,1.2389785051345825,0.008008122444152832,0.0699026957154274,0.00035441279760561883,,,kv_ceil_d224_c0_ps1.json
+kvcache,ceil,224,224,True,,0,,contiguous,128,80,32,ok,,,0.002456068992614746,0.004580318927764893,0.00017235177801921964,0.000349290668964386,,,kv_ceil_d224_c1_ps0.json
+kvcache,ceil,224,224,True,,1,,paged_cpasync,128,80,32,wrong,,,1.4674420356750488,0.0061754584312438965,0.08433844149112701,0.0003571144479792565,,,kv_ceil_d224_c1_ps1.json
+kvcache,ceil,224,224,True,,80,,paged_tma,128,80,32,ok,,,0.002269446849822998,0.005803108215332031,0.0001740952575346455,0.0003663929528556764,,,kv_ceil_d224_c1_ps80.json
+kvcache,ceil,256,256,False,,1,,paged_cpasync,128,80,16,ok,,,0.0024529695510864258,0.0069071948528289795,0.0001697899861028418,0.00032644293969497085,,,kv_ceil_d256_c0_ps1.json
+kvcache,ceil,256,256,False,127,1,,paged_cpasync,128,64,16,ok,,,0.0029414892196655273,0.007623553276062012,0.00023923888511490077,0.0004496734472922981,,,kv_ceil_d256_c0_w127_ps1.json
+kvcache,ceil,256,256,True,,1,,paged_cpasync,128,80,16,ok,,,0.002641022205352783,0.007623553276062012,0.00017424933321308345,0.00033397669903934,,,kv_ceil_d256_c1_ps1.json
+kvcache,ceil,256,256,True,,16,,paged_cpasync,128,80,16,ok,,,0.0022215843200683594,0.005975306034088135,0.0001714350946713239,0.0003238414356019348,,,kv_ceil_d256_c1_ps16.json
+kvcache,ceil,64,64,False,,1,,paged_cpasync,192,128,16,ok,,,0.002281367778778076,0.005267322063446045,0.00017366601969115436,0.00033049227204173803,,,kv_ceil_d64_c0_ps1.json
+kvcache,ceil,80,80,False,,1,,paged_cpasync,192,144,64,wrong,,,1.9436943531036377,0.007593482732772827,0.09649164229631424,0.0003556082083377987,,,kv_ceil_d80_c0_ps1.json
+kvcache,ceil,96,96,False,,0,,contiguous,192,144,32,ok,,,0.002292335033416748,0.004367172718048096,0.0001737431448418647,0.0003494023403618485,,,kv_ceil_d96_c0_ps0.json
+kvcache,ceil,96,96,False,,1,,paged_cpasync,192,144,32,wrong,,,0.978578507900238,0.01055079698562622,0.0397585891187191,0.00036291484138928354,,,kv_ceil_d96_c0_ps1.json
+kvcache,ceil,96,96,False,,144,,paged_tma,192,144,32,ok,,,0.0023233890533447266,0.01312720775604248,0.00017264239431824535,0.0003482258762232959,,,kv_ceil_d96_c0_ps144.json
+kvcache,ceil,96,96,False,,16,,paged_cpasync,192,144,32,wrong,,,0.32449764013290405,0.013586163520812988,0.01697225496172905,0.0003551604750100523,,,kv_ceil_d96_c0_ps16.json
+kvcache,ceil,96,96,True,,1,,paged_cpasync,192,128,32,ok,,,0.0026112794876098633,0.013653993606567383,0.00017780577763915062,0.0003680090594571084,,,kv_ceil_d96_c1_ps1.json
+kvcache,ceil_div,128,128,True,,1,,paged_cpasync,128,128,16,ok,,,0.0022779107093811035,0.009228378534317017,0.00017671112436801195,0.0003663249663077295,,,kv_ceil_div_d128_c1_ps1.json
+kvcache,ceil_div,160,160,False,,1,,paged_cpasync,128,112,32,wrong,,,0.8263177871704102,0.004697531461715698,0.03592152148485184,0.0003471907402854413,,,kv_ceil_div_d160_c0_ps1.json
+kvcache,ceil_div,160,160,True,,1,,paged_cpasync,128,112,32,wrong,,,1.1651140451431274,0.005911529064178467,0.043270811438560486,0.00035720362211577594,,,kv_ceil_div_d160_c1_ps1.json
+kvcache,ceil_div,192,192,True,,1,,paged_cpasync,128,112,16,ok,,,0.0026297569274902344,0.00996100902557373,0.00017574321827851236,0.00036061290302313864,,,kv_ceil_div_d192_c1_ps1.json
+kvcache,ceil_div,224,224,False,,1,,paged_cpasync,128,80,32,wrong,,,1.3794387578964233,0.008008122444152832,0.08163132518529892,0.00035441279760561883,,,kv_ceil_div_d224_c0_ps1.json
+kvcache,ceil_div,224,224,True,,1,,paged_cpasync,128,80,32,wrong,,,1.297861099243164,0.0061754584312438965,0.07767275720834732,0.0003571144479792565,,,kv_ceil_div_d224_c1_ps1.json
+kvcache,ceil_div,256,256,False,,1,,paged_cpasync,128,80,16,ok,,,0.0024529695510864258,0.0069071948528289795,0.0001697899861028418,0.00032644293969497085,,,kv_ceil_div_d256_c0_ps1.json
+kvcache,ceil_div,256,256,False,127,1,,paged_cpasync,128,64,16,ok,,,0.0029414892196655273,0.007623553276062012,0.00023923888511490077,0.0004496734472922981,,,kv_ceil_div_d256_c0_w127_ps1.json
+kvcache,ceil_div,256,256,True,,1,,paged_cpasync,128,80,16,ok,,,0.002641022205352783,0.007623553276062012,0.00017424933321308345,0.00033397669903934,,,kv_ceil_div_d256_c1_ps1.json
+kvcache,ceil_div,256,256,True,,16,,paged_cpasync,128,80,16,ok,,,0.0022215843200683594,0.005975306034088135,0.0001714350946713239,0.0003238414356019348,,,kv_ceil_div_d256_c1_ps16.json
+kvcache,ceil_div,96,96,False,,1,,paged_cpasync,192,144,32,wrong,,,0.962953507900238,0.01055079698562622,0.038495078682899475,0.00036291484138928354,,,kv_ceil_div_d96_c0_ps1.json
+kvcache,main,128,128,True,,1,,paged_cpasync,128,128,16,ok,,,0.0022779107093811035,0.009228378534317017,0.00017671112436801195,0.0003663249663077295,,,kv_main_d128_c1_ps1.json
+kvcache,main,160,160,False,,1,,paged_cpasync,128,112,32,error,"ValueError: Expected size in shape to be strictly positive, but got 0",,,,,,,,kv_main_d160_c0_ps1.json
+kvcache,main,160,160,True,,0,,contiguous,128,112,32,ok,,,0.0021702051162719727,0.005065441131591797,0.0001769968366716057,0.00035264785401523113,,,kv_main_d160_c1_ps0.json
+kvcache,main,160,160,True,,1,,paged_cpasync,128,112,32,error,"ValueError: Expected size in shape to be strictly positive, but got 0",,,,,,,,kv_main_d160_c1_ps1.json
+kvcache,main,160,160,True,,112,,paged_tma,128,112,32,ok,,,0.0023206472396850586,0.005004614591598511,0.00017495299107395113,0.0003535621508490294,,,kv_main_d160_c1_ps112.json
+kvcache,main,192,192,True,,1,,paged_cpasync,128,112,16,error,"ValueError: Expected size in shape to be strictly positive, but got 0",,,,,,,,kv_main_d192_c1_ps1.json
+kvcache,main,224,224,False,,1,,paged_cpasync,128,80,32,error,"ValueError: Expected size in shape to be strictly positive, but got 0",,,,,,,,kv_main_d224_c0_ps1.json
+kvcache,main,224,224,True,,0,,contiguous,128,80,32,ok,,,0.002456068992614746,0.004580318927764893,0.00017235177801921964,0.000349290668964386,,,kv_main_d224_c1_ps0.json
+kvcache,main,224,224,True,,1,,paged_cpasync,128,80,32,error,"ValueError: Expected size in shape to be strictly positive, but got 0",,,,,,,,kv_main_d224_c1_ps1.json
+kvcache,main,224,224,True,,80,,paged_tma,128,80,32,ok,,,0.002269446849822998,0.005803108215332031,0.0001740952575346455,0.0003663929528556764,,,kv_main_d224_c1_ps80.json
+kvcache,main,256,256,False,,1,,paged_cpasync,128,80,16,error,"ValueError: Expected size in shape to be strictly positive, but got 0",,,,,,,,kv_main_d256_c0_ps1.json
+kvcache,main,256,256,False,127,1,,paged_cpasync,128,64,16,error,"ValueError: Expected size in shape to be strictly positive, but got 0",,,,,,,,kv_main_d256_c0_w127_ps1.json
+kvcache,main,256,256,True,,1,,paged_cpasync,128,80,16,error,"ValueError: Expected size in shape to be strictly positive, but got 0",,,,,,,,kv_main_d256_c1_ps1.json
+kvcache,main,256,256,True,,16,,paged_cpasync,128,80,16,error,"ValueError: Expected size in shape to be strictly positive, but got 0",,,,,,,,kv_main_d256_c1_ps16.json
+kvcache,main,64,64,False,,1,,paged_cpasync,192,128,16,ok,,,0.002281367778778076,0.005267322063446045,0.00017366601969115436,0.00033049227204173803,,,kv_main_d64_c0_ps1.json
+kvcache,main,80,80,False,,1,,paged_cpasync,192,144,64,wrong,,,0.9456348419189453,0.007593482732772827,0.04567178338766098,0.0003556082083377987,,,kv_main_d80_c0_ps1.json
+kvcache,main,96,96,False,,0,,contiguous,192,144,32,ok,,,0.002292335033416748,0.004367172718048096,0.0001737431448418647,0.0003494023403618485,,,kv_main_d96_c0_ps0.json
+kvcache,main,96,96,False,,1,,paged_cpasync,192,144,32,wrong,,,0.3532935678958893,0.01055079698562622,0.02477218769490719,0.00036291484138928354,,,kv_main_d96_c0_ps1.json
+kvcache,main,96,96,False,,144,,paged_tma,192,144,32,ok,,,0.0023233890533447266,0.01312720775604248,0.00017264239431824535,0.0003482258762232959,,,kv_main_d96_c0_ps144.json
+kvcache,main,96,96,False,,16,,paged_cpasync,192,144,32,wrong,,,0.518185019493103,0.013586163520812988,0.031521327793598175,0.0003551604750100523,,,kv_main_d96_c0_ps16.json
+kvcache,main,96,96,True,,1,,paged_cpasync,192,128,32,ok,,,0.0026112794876098633,0.013653993606567383,0.00017780577763915062,0.0003680090594571084,,,kv_main_d96_c1_ps1.json
+kvcache,max_one,128,128,True,,1,,paged_cpasync,128,128,16,ok,,,0.0022779107093811035,0.009228378534317017,0.00017671112436801195,0.0003663249663077295,,,kv_max_one_d128_c1_ps1.json
+kvcache,max_one,160,160,False,,1,,paged_cpasync,128,112,32,wrong,,,0.9317865371704102,0.004697531461715698,0.043015800416469574,0.0003471907402854413,,,kv_max_one_d160_c0_ps1.json
+kvcache,max_one,160,160,True,,1,,paged_cpasync,128,112,32,wrong,,,1.0323015451431274,0.005911529064178467,0.04588651284575462,0.00035720362211577594,,,kv_max_one_d160_c1_ps1.json
+kvcache,max_one,192,192,True,,1,,paged_cpasync,128,112,16,ok,,,0.0026297569274902344,0.00996100902557373,0.00017574321827851236,0.00036061290302313864,,,kv_max_one_d192_c1_ps1.json
+kvcache,max_one,224,224,False,,1,,paged_cpasync,128,80,32,wrong,,,1.3277926445007324,0.008008122444152832,0.07476154714822769,0.00035441279760561883,,,kv_max_one_d224_c0_ps1.json
+kvcache,max_one,224,224,True,,1,,paged_cpasync,128,80,32,wrong,,,1.4507595300674438,0.0061754584312438965,0.08856252580881119,0.0003571144479792565,,,kv_max_one_d224_c1_ps1.json
+kvcache,max_one,256,256,False,,1,,paged_cpasync,128,80,16,ok,,,0.0024529695510864258,0.0069071948528289795,0.0001697899861028418,0.00032644293969497085,,,kv_max_one_d256_c0_ps1.json
+kvcache,max_one,256,256,False,127,1,,paged_cpasync,128,64,16,ok,,,0.0029414892196655273,0.007623553276062012,0.00023923888511490077,0.0004496734472922981,,,kv_max_one_d256_c0_w127_ps1.json
+kvcache,max_one,256,256,True,,1,,paged_cpasync,128,80,16,ok,,,0.002641022205352783,0.007623553276062012,0.00017424933321308345,0.00033397669903934,,,kv_max_one_d256_c1_ps1.json
+kvcache,max_one,256,256,True,,16,,paged_cpasync,128,80,16,ok,,,0.0022215843200683594,0.005975306034088135,0.0001714350946713239,0.0003238414356019348,,,kv_max_one_d256_c1_ps16.json
+kvcache,max_one,96,96,False,,1,,paged_cpasync,192,144,32,wrong,,,0.601833164691925,0.01055079698562622,0.027804451063275337,0.00036291484138928354,,,kv_max_one_d96_c0_ps1.json
+varlen,ceil,160,160,False,,1,300,paged_cpasync,128,112,32,fault,AcceleratorError: CUDA error: an illegal memory access was encountered,paged,,0.0009544193744659424,,,,,vl_ceil_d160_c0_sk300.json
+varlen,ceil,160,160,True,,1,300,paged_cpasync,128,112,32,fault,AcceleratorError: CUDA error: an illegal memory access was encountered,paged,,0.0009646415710449219,,,,,vl_ceil_d160_c1_sk300.json
+varlen,ceil,192,192,True,,1,300,paged_cpasync,128,112,16,ok,,,0.0010457336902618408,0.0009752810001373291,,,True,True,vl_ceil_d192_c1_sk300.json
+varlen,ceil,224,224,False,,1,300,paged_cpasync,128,80,32,fault,AcceleratorError: CUDA error: an illegal memory access was encountered,paged,,0.0009714663028717041,,,,,vl_ceil_d224_c0_sk300.json
+varlen,ceil,224,224,True,,1,300,paged_cpasync,128,80,32,fault,AcceleratorError: CUDA error: an illegal memory access was encountered,paged,,0.0009758472442626953,,,,,vl_ceil_d224_c1_sk300.json
+varlen,ceil,256,256,True,,1,300,paged_cpasync,128,80,16,ok,,,0.0011310875415802002,0.0009705126285552979,,,True,True,vl_ceil_d256_c1_sk300.json
+varlen,ceil,80,80,False,,1,300,paged_cpasync,192,144,64,wrong,,,1.4781765937805176,0.0009751319885253906,,,False,True,vl_ceil_d80_c0_sk300.json
+varlen,ceil,96,96,False,,1,100,paged_cpasync,192,144,32,wrong,,,0.41384798288345337,0.001853644847869873,,,False,True,vl_ceil_d96_c0_sk100.json
+varlen,ceil,96,96,False,,1,144,paged_cpasync,192,144,32,ok,,,0.0012923777103424072,0.0011687278747558594,,,True,True,vl_ceil_d96_c0_sk144.json
+varlen,ceil,96,96,False,,1,145,paged_cpasync,192,144,32,wrong,,,0.5102506279945374,0.0016262531280517578,,,False,True,vl_ceil_d96_c0_sk145.json
+varlen,ceil,96,96,False,,1,300,paged_cpasync,192,144,32,wrong,,,0.36487311124801636,0.0009655952453613281,,,False,True,vl_ceil_d96_c0_sk300.json
+varlen,fa-843bf0b86b,160,160,False,,1,300,paged_cpasync,128,112,32,fault,AcceleratorError: CUDA error: an illegal memory access was encountered,paged,,0.0009544193744659424,,,,,vl_fa_d160_c0_sk300.json
+varlen,fa-843bf0b86b,160,160,True,,1,300,paged_cpasync,128,112,32,fault,AcceleratorError: CUDA error: an illegal memory access was encountered,paged,,0.0009646415710449219,,,,,vl_fa_d160_c1_sk300.json
+varlen,fa-843bf0b86b,192,192,True,,1,300,paged_cpasync,128,112,16,ok,,,0.0010457336902618408,0.0009752810001373291,,,True,True,vl_fa_d192_c1_sk300.json
+varlen,fa-843bf0b86b,224,224,False,,1,300,paged_cpasync,128,80,32,fault,AcceleratorError: CUDA error: an illegal memory access was encountered,paged,,0.0009714663028717041,,,,,vl_fa_d224_c0_sk300.json
+varlen,fa-843bf0b86b,224,224,True,,1,300,paged_cpasync,128,80,32,fault,AcceleratorError: CUDA error: an illegal memory access was encountered,paged,,0.0009758472442626953,,,,,vl_fa_d224_c1_sk300.json
+varlen,fa-843bf0b86b,256,256,True,,1,300,paged_cpasync,128,80,16,ok,,,0.0011310875415802002,0.0009705126285552979,,,True,True,vl_fa_d256_c1_sk300.json
+varlen,fa-843bf0b86b,80,80,False,,1,300,paged_cpasync,192,144,64,wrong,,,1.3922390937805176,0.0009751319885253906,,,False,True,vl_fa_d80_c0_sk300.json
+varlen,fa-843bf0b86b,96,96,False,,1,100,paged_cpasync,192,144,32,wrong,,,0.41384798288345337,0.001853644847869873,,,False,True,vl_fa_d96_c0_sk100.json
+varlen,fa-843bf0b86b,96,96,False,,1,144,paged_cpasync,192,144,32,ok,,,0.0012923777103424072,0.0011687278747558594,,,True,True,vl_fa_d96_c0_sk144.json
+varlen,fa-843bf0b86b,96,96,False,,1,145,paged_cpasync,192,144,32,wrong,,,0.5102506279945374,0.0016262531280517578,,,True,True,vl_fa_d96_c0_sk145.json
+varlen,fa-843bf0b86b,96,96,False,,1,300,paged_cpasync,192,144,32,wrong,,,0.41659122705459595,0.0009655952453613281,,,False,True,vl_fa_d96_c0_sk300.json
+varlen,main,160,160,True,,1,300,paged_cpasync,128,112,32,error,"ValueError: Expected size in shape to be strictly positive, but got 0",paged,,0.0009646415710449219,,,,,vl_main_d160_c1_sk300.json
+varlen,main,224,224,True,,1,300,paged_cpasync,128,80,32,error,"ValueError: Expected size in shape to be strictly positive, but got 0",paged,,0.0009758472442626953,,,,,vl_main_d224_c1_sk300.json
+varlen,main,96,96,False,,1,300,paged_cpasync,192,144,32,wrong,,,0.35495126247406006,0.0009655952453613281,,,False,True,vl_main_d96_c0_sk300.json

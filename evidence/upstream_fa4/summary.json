@@ -1,0 +1,127 @@
+{
+ "meta": {
+  "repo_commit": "fd072708d63cbe278e2f6b48759497a04ba605b3",
+  "repo_dirty": false,
+  "sglang_base": "f6fcda8827e5d8a2f0b999cd3b32f5096ee6a82c",
+  "flash_attention": "843bf0b86bda1c92edc440ec58f9b5194609abac",
+  "paged_kv_sha256": {
+   "main": "a80b0cafdca4a570722d6d4edaf9a35e5ec31d535360b14a931bbc393d51a359",
+   "ceil": "aa302635ad5bc4fef9a2854a22df4571de0e0d98abee28899e62950cc67373e6",
+   "ceil_div": "5733190ab1512a0b80d3732c8fa080328616c58f489582c0ac0106d18004cd5b",
+   "max_one": "69fc331467e7c5d86d0ed241e84146f2da8f7224ff8bd2b807a6895942a34597"
+  },
+  "gpu": "NVIDIA GH200 480GB",
+  "driver": "570.195.03",
+  "torch": "2.13.0+cu130",
+  "cuda_runtime": "13.0",
+  "packages": {
+   "nvidia-cutlass-dsl": "4.8.0",
+   "quack-kernels": "0.6.5",
+   "einops": "0.8.2"
+  },
+  "python": "3.12.14"
+ },
+ "summarize_commit": "51a43761d94ce50f015b8b46d63a633dc4370ba7",
+ "cases": 89,
+ "status_counts": {
+  "kvcache/ceil": {
+   "ok": 14,
+   "wrong": 7
+  },
+  "kvcache/ceil_div": {
+   "ok": 6,
+   "wrong": 5
+  },
+  "kvcache/main": {
+   "ok": 9,
+   "error": 9,
+   "wrong": 3
+  },
+  "kvcache/max_one": {
+   "ok": 6,
+   "wrong": 5
+  },
+  "varlen/ceil": {
+   "fault": 4,
+   "ok": 3,
+   "wrong": 4
+  },
+  "varlen/fa-843bf0b86b": {
+   "fault": 4,
+   "ok": 3,
+   "wrong": 4
+  },
+  "varlen/main": {
+   "error": 2,
+   "wrong": 1
+  }
+ },
+ "cpasync_pattern": {
+  "rule": "wrong or fault iff tile_n % rows_per_pass != 0",
+  "cases_checked": 66,
+  "mismatches": [
+   "vl_ceil_d96_c0_sk144.json",
+   "vl_fa_d96_c0_sk144.json"
+  ]
+ },
+ "pytest": {
+  "ceil": {
+   "outcomes": [
+    [
+     "PASSED",
+     "experiments/upstream_fa4/regression_test_sm90.py::test_flash_attn_paged_non_tma_partial_loader_tile_sm90[1]"
+    ],
+    [
+     "PASSED",
+     "experiments/upstream_fa4/regression_test_sm90.py::test_flash_attn_paged_non_tma_partial_loader_tile_sm90[16]"
+    ]
+   ],
+   "summary": "2 passed, 22 warnings",
+   "errors": []
+  },
+  "ceil_div": {
+   "outcomes": [
+    [
+     "PASSED",
+     "experiments/upstream_fa4/regression_test_sm90.py::test_flash_attn_paged_non_tma_partial_loader_tile_sm90[1]"
+    ],
+    [
+     "PASSED",
+     "experiments/upstream_fa4/regression_test_sm90.py::test_flash_attn_paged_non_tma_partial_loader_tile_sm90[16]"
+    ]
+   ],
+   "summary": "2 passed, 22 warnings",
+   "errors": []
+  },
+  "main": {
+   "outcomes": [
+    [
+     "FAILED",
+     "experiments/upstream_fa4/regression_test_sm90.py::test_flash_attn_paged_non_tma_partial_loader_tile_sm90[1]"
+    ],
+    [
+     "FAILED",
+     "experiments/upstream_fa4/regression_test_sm90.py::test_flash_attn_paged_non_tma_partial_loader_tile_sm90[16]"
+    ]
+   ],
+   "summary": "2 failed, 28 warnings",
+   "errors": [
+    "ValueError: Expected size in shape to be strictly positive, but got 0"
+   ]
+  },
+  "max_one": {
+   "outcomes": [
+    [
+     "PASSED",
+     "experiments/upstream_fa4/regression_test_sm90.py::test_flash_attn_paged_non_tma_partial_loader_tile_sm90[1]"
+    ],
+    [
+     "PASSED",
+     "experiments/upstream_fa4/regression_test_sm90.py::test_flash_attn_paged_non_tma_partial_loader_tile_sm90[16]"
+    ]
+   ],
+   "summary": "2 passed, 22 warnings",
+   "errors": []
+  }
+ }
+}
