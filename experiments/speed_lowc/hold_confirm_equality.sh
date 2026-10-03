@@ -25,31 +25,13 @@ PROMPTS=$CONFIRM_PROMPTS
 check_inputs prompts || exit 1
 echo "equality start $(date -Is) repo $(git rev-parse HEAD) engine $(git -C "$CONFIRM_ENGINE" rev-parse HEAD)" \
   "stock $(git -C "$STOCK_SGLANG" rev-parse HEAD) levers=$CONFIRM_LEVERS"
-DFLASH="--speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash \
---speculative-draft-model-revision 9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf --max-running-requests 4 \
---disable-radix-cache"
-L_FLAGS="$DFLASH --speculative-dflash-block-size 16 --attention-backend triton"
-H_FLAGS="$DFLASH --speculative-dflash-block-size 8 --speculative-draft-attention-backend fa4"
-
-# run_eq GROUP NAME: one runner pass of arm NAME of GROUP; flags and env from lever_args.
+# run_eq GROUP NAME: one runner pass of arm NAME of GROUP; flags from eq_flags, and the fold's
+# environment for an arm with A (confirm_arms.sh).
 run_eq() {
-  local g=$1 name=$2 flags worktree='' i x env=()
-  if [ "$g" = L ]; then flags=$L_FLAGS; else flags=$H_FLAGS; fi
-  if [ "$g" = L ] && [[ $name == *C* ]] && [[ $name != *B* ]]; then
-    flags+=" --speculative-draft-attention-backend triton"
-  fi
+  local g=$1 name=$2 flags worktree='' env=()
+  flags=$(eq_flags "$g" "$name") || { echo "=== $g $name: no such arm"; failed+=("$g:$name"); return 1; }
   if [ "$name" != S0 ]; then worktree=$CONFIRM_ENGINE; fi
-  if [ "$name" != S0 ] && [ "$name" != B0 ]; then
-    for (( i=0; i<${#name}; i++ )); do
-      x=${name:$i:1}
-      case $x in
-        A) flags+=" --enable-linear-replayssm-spec"; env+=(SGLANG_GDN_REPLAYSSM_FOLD=1) ;;
-        B) flags+=" --speculative-draft-attention-backend fa4" ;;
-        C) flags+=" --attention-backend fa4" ;;
-        *) echo "=== $g $name: unknown lever $x"; failed+=("$g:$name"); return 1 ;;
-      esac
-    done
-  fi
+  if [[ $name == *A* ]]; then env+=(SGLANG_GDN_REPLAYSSM_FOLD=1); fi
   (
     if [ -n "$worktree" ]; then export SGLANG_WORKTREE=$worktree; fi
     # shellcheck source=/dev/null
@@ -67,10 +49,7 @@ run_eq() {
 failed=()
 pairs=()
 for g in L H; do
-  full=$(group_full "$g")
-  names=(S0 B0)
-  for (( j=0; j<${#full}; j++ )); do names+=("${full:$j:1}"); done
-  (( ${#full} > 1 )) && names+=("$full")
+  read -r -a names <<< "$(eq_names "$g")"
   for name in "${names[@]}"; do
     # Inputs again before every run, so a tree that changes during the hold fails the run.
     if check_inputs prompts; then run_eq "$g" "$name"; else failed+=("$g:$name:inputs"); fi

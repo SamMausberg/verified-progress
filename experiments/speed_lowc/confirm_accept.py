@@ -12,8 +12,9 @@ Cells and session validity are confirm_analyze.py's (its declared plan and void 
 session cell is void if any of its points or S0's is invalid, or if the arm or S0 has a
 different number of launches than the declared order (2 for S0 and FULL, 1 for a single
 lever); a missing session counts as void, fewer than three valid sessions give no interval,
-and a confirmation point outside the plan, the same point twice, or a valid point whose x_e2e,
-y or accept length is not a finite positive number is an error.
+and a confirmation point outside the plan, the same point twice, a valid point whose x_e2e,
+y or accept length is not a finite positive number, or a point whose launch (launches.csv,
+beside points.csv) was not made as its arm is an error.
 
     python experiments/speed_lowc/confirm_accept.py --points <points.csv> \
         --full L=ABC --full H=AC --out <dir>

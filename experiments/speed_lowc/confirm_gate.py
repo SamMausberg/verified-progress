@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import Any
 
 PROMPTS = 320
-# Top logprobs per position: experiments/speed_lowc/hold_confirm_equality.sh line 60 (--top-logprobs 5).
+# Top logprobs per position: experiments/speed_lowc/hold_confirm_equality.sh line 42 (--top-logprobs 5).
 TOP_K = 5
 ROUNDING = {'tie', 'one_ulp', 'near'}
 GROUP_LEVERS = {'L': 'ABC', 'H': 'AC'}  # B is FA4 drafting, which H already uses
@@ -48,7 +48,7 @@ def group_full(group: str, levers: str) -> str:
 
 
 def run_name(group: str, arm: str) -> str:
-    # hold_confirm_equality.sh line 60: run_matrix.py --configs plain --tag lowc_<group>_<arm>, pass c1.
+    # hold_confirm_equality.sh line 42: run_matrix.py --configs plain --tag lowc_<group>_<arm>, pass c1.
     return f'plain__lowc_{group}_{arm}/c1'
 
 

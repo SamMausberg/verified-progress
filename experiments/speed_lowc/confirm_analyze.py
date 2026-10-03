@@ -13,6 +13,13 @@ concurrencies, sessions lowc-s1 to lowc-s3), so a missing one counts as void. A 
 point (a `lowc-` label or session) outside the plan, the same point twice, or a valid point
 whose x_e2e, y or accept length is not a finite positive number is an error.
 
+Each point is bound to its launch in the launches.csv that bench.pareto writes beside
+points.csv: every S0 launch of a group must run that group's bench arm with the same
+arguments and environment, from stock SGLang at the pin; every other launch must have S0's
+arguments and environment plus exactly its levers' settings (confirm_arms.sh), from one
+engine commit other than the pin; all launches from one repository commit, with no modified
+SGLang files and no failed launch check. A launch that breaks this is an error.
+
     python experiments/speed_lowc/confirm_analyze.py --points <points.csv> --out <dir>
 """
 
@@ -38,6 +45,18 @@ SESSION_LABELS = tuple(f'lowc-s{k}' for k in range(1, SESSIONS + 1))
 CONCURRENCY = {'L': (1, 2, 4), 'H': (8, 16, 32)}
 # Values a valid point must have as finite positive numbers (confirm_accept.py reads accept_length).
 POINT_VALUES = (*METRICS, 'accept_length')
+# Each group's bench arm: experiments/speed_lowc/confirm_arms.sh, group_arm (lines 63-69).
+GROUP_ARM = {'L': 'dflash-tuned-b16', 'H': 'dflash-tuned'}
+# Each lever's settings over S0: confirm_arms.sh, lever_args (lines 90-97); on L an arm with C
+# but not B also keeps the drafter on Triton (arm_args, lines 145-148).
+LEVER_ARGS: dict[str, dict[str, Any]] = {
+    'A': {'enable-linear-replayssm-spec': True},
+    'B': {'speculative-draft-attention-backend': 'fa4'},
+    'C': {'attention-backend': 'fa4'},
+}
+LEVER_ENV = {'A': {'SGLANG_GDN_REPLAYSSM_FOLD': '1'}}
+# Stock SGLang's pin: engine/sglang/README.md, line 4.
+STOCK_PIN = 'bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824'
 
 
 def expected_launches(arm: str, full: str) -> int:
@@ -79,6 +98,58 @@ def parse_full(items: list[str]) -> dict[str, str] | None:
     return full if full['L'] and full['H'] else None
 
 
+def expected_launch(group: str, arm: str, s0: tuple[dict, dict]) -> tuple[dict, dict] | None:
+    """The arguments and environment of arm `arm` of `group`, given S0's (None: no such arm)."""
+    args, env = dict(s0[0]), dict(s0[1])
+    if arm == 'S0':
+        return args, env
+    if not arm or set(arm) - set(LEVER_ARGS):
+        return None
+    if group == 'L' and 'C' in arm and 'B' not in arm:
+        args['speculative-draft-attention-backend'] = 'triton'
+    for lever in arm:
+        args.update(LEVER_ARGS[lever])
+        env.update(LEVER_ENV.get(lever, {}))
+    return args, env
+
+
+def check_launches(launches: Path, points: set[tuple[str, str]]) -> None:
+    """Refuse unless every point's launch is in `launches` and was made as its arm."""
+    if not launches.is_file():
+        raise SystemExit(f'no {launches} beside the points (bench.pareto writes both)')
+    with launches.open() as f:
+        rows = [r for r in csv.DictReader(f) if r['label'].startswith('lowc-')]
+    by_key = {(r['label'], r['run']): r for r in rows}
+    if len(by_key) != len(rows):
+        raise SystemExit(f'{launches}: the same launch twice')
+    if missing := sorted(points - set(by_key)):
+        raise SystemExit(f'{launches}: no launch for the points of {missing}')
+    why = []
+    s0: dict[str, tuple[dict, dict]] = {}
+    for r in sorted(rows, key=lambda r: not r['label'].endswith('-S0')):
+        _, group, arm = r['label'].split('-', 2)
+        made = (json.loads(r['args']), json.loads(r['env'] or '{}'))
+        if r['label'].endswith('-S0'):
+            s0.setdefault(group, made)
+        want = expected_launch(group, arm, s0[group]) if group in s0 else None
+        if r['arm'] != GROUP_ARM.get(group) or made != want:
+            why.append(f'{r["label"]} {r["run"]}: arm {r["arm"]}, args/env not S0 plus its levers')
+        if r['sglang_dirty'] != 'False' or r['checks_failed']:
+            why.append(
+                f'{r["label"]} {r["run"]}: dirty {r["sglang_dirty"]}, checks failed {r["checks_failed"]!r}'
+            )
+        if (r['sglang_head'] == STOCK_PIN) != (arm == 'S0'):
+            why.append(f'{r["label"]} {r["run"]}: SGLang {r["sglang_head"]}')
+    engines = {r['sglang_head'] for r in rows if not r['label'].endswith('-S0')}
+    repos = {r['repo_head'] for r in rows}
+    if len(engines) > 1 or len(repos) != 1:
+        why.append(
+            f'launches span engine commits {sorted(engines)} and repository commits {sorted(repos)}'
+        )
+    if why:
+        raise SystemExit(f'{launches}: ' + '; '.join(why))
+
+
 def load_cells(points: Path, full: dict[str, str]) -> dict[tuple, list[dict]]:
     """The confirmation's points by cell; refuses a point outside the declared plan."""
     declared = set(declared_keys(full))
@@ -109,6 +180,7 @@ def load_cells(points: Path, full: dict[str, str]) -> dict[tuple, list[dict]]:
             cells[key].append(row)
     if not cells:
         raise SystemExit(f'no confirmation points in {points}')
+    check_launches(points.with_name('launches.csv'), {(p[0], p[1]) for p in seen})
     return cells
 
 
