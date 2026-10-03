@@ -25,8 +25,10 @@ now fails on the properties it prints (per-row rows independent of the batch, CU
 equal to eager, relative error under 0.06); the run printed them all passing.
 `summarize.py` checks every input against what its hold launched: per hold the engine (its tree,
 which the hold scripts now log, or for the recorded runs the commit) and that its log reached its
-last line; per sweep the arm, the concurrencies, the exact switches, the harness commit the hold
-logged, the virtualenv's interpreter and bench's own point-validity rule; per server log the FP8
+last line; per sweep the full `bench/sweep.py` invocation the hold makes (arm, label, session,
+engine, port, concurrencies, request counts, the exact switches and nothing else), the arm as
+`bench/arms.toml` at the hold's commit resolves it, the harness commit the hold logged, the
+virtualenv's interpreter and bench's own point-validity rule; per server log the FP8
 conversion and mode those switches imply; per trace the engine, harness commit, invocation,
 resolved server command and environment `run_profiles.py` recorded, and the GPU; per probe file
 its mode, concurrency, label, the probe's 48 prompts, 256 tokens per sequence with exactly 20

@@ -22,7 +22,9 @@ import json
 import math
 import re
 import shlex
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -174,6 +176,47 @@ PLANNED: dict[str, dict[str, Planned]] = {
 }
 
 
+# How each hold calls bench.sweep (its run() helper): the engine worktree and port; the session is
+# sb-<hold>, and every sweep passes --min-requests 16 --waves 4, then its switches as --env in
+# PLANNED's order, and nothing else (no --set override).
+SWEEP_LAUNCH = {
+    'kill1': ('speed-bytes', 30220),
+    'kill2b': ('speed-bytes-l2', 30222),
+    'kill3': ('speed-bytes', 30224),
+}
+SWEEP_MIN_REQUESTS, SWEEP_WAVES = 16, 4
+
+
+def expected_sweep_command(hold: Path, label: str, planned: Planned) -> list[str]:
+    """The arguments a hold's run() passes to bench/sweep.py (home written as ~, --out by name)."""
+    name = hold.name.split('_')[0]
+    arm, conc, switches = planned
+    worktree, port = SWEEP_LAUNCH[name]
+    return [
+        '--arm', arm, '--label', label, '--session', f'sb-{name}',
+        '--sglang-worktree', f'~/sglang-wt/{worktree}', '--port', str(port), '--out', hold.name,
+        '--concurrency', *map(str, conc),
+        '--min-requests', str(SWEEP_MIN_REQUESTS), '--waves', str(SWEEP_WAVES),
+        *[t for k, v in switches.items() for t in ('--env', f'{k}={v}')],
+    ]  # fmt: skip
+
+
+_ARMS_AT: dict[str, Path] = {}
+
+
+def arms_file_at(commit: str) -> Path:
+    """bench/arms.toml as it was at a repository commit (the arms a hold's sweeps resolved)."""
+    if commit not in _ARMS_AT:
+        text = subprocess.run(
+            ['git', '-C', str(REPO), 'show', f'{commit}:bench/arms.toml'],
+            capture_output=True, text=True, check=True,
+        ).stdout  # fmt: skip
+        path = Path(tempfile.mkdtemp()) / 'arms.toml'
+        path.write_text(text)
+        _ARMS_AT[commit] = path
+    return _ARMS_AT[commit]
+
+
 # The engine each hold ran, as the commit of the recorded run and its tree (the tree is what a
 # rebuild from engine/sglang/README.md reproduces; the hold scripts' ENGINE_TREE guards check it).
 HOLD_ENGINES = {
@@ -236,6 +279,7 @@ def env_label(arm: dict) -> str:
 
 
 def cmd_served(args: argparse.Namespace) -> None:
+    from bench.arms import resolve_arm
     from bench.pareto import invalid_reason
 
     # served.csv covers every planned hold, each once.
@@ -273,7 +317,28 @@ def cmd_served(args: argparse.Namespace) -> None:
                 raise SystemExit(
                     f'{f}: harness {d["launch"]["repo"]["head"][:7]}, hold log {repo[:7]}'
                 )
-            arm, conc, switches = PLANNED[name][f.parent.parent.name]
+            label = f.parent.parent.name
+            if d['label'] != label:
+                raise SystemExit(f'{f}: label {d["label"]} in the directory of {label}')
+            arm, conc, switches = PLANNED[name][label]
+            # The full invocation the hold makes, and the arm as bench/arms.toml at the hold's
+            # commit resolves it with those switches (args, environment, model, capacity).
+            home = str(Path.home())
+            cmd = [a.replace(home, '~') for a in d['command_line']]
+            if '--out' in cmd:
+                cmd[cmd.index('--out') + 1] = Path(cmd[cmd.index('--out') + 1]).name
+            resolved = resolve_arm(
+                arm,
+                env_overrides={k: v.replace('~', home, 1) for k, v in switches.items()},
+                path=arms_file_at(repo),
+            ).to_json()
+            if (
+                Path(cmd[0]).parts[-2:] != ('bench', 'sweep.py')
+                or cmd[1:] != expected_sweep_command(hold, label, PLANNED[name][label])
+                or (d['min_requests'], d['waves']) != (SWEEP_MIN_REQUESTS, SWEEP_WAVES)
+                or d['arm'] != resolved
+            ):
+                raise SystemExit(f'{f}: not the sweep its hold launches: {cmd} {d["arm"]["args"]}')
             planned = set(conc)
             got = {p['concurrency'] for p in d['points']}
             if planned != got or planned != set(d['concurrency']):
