@@ -352,6 +352,11 @@ PD's 65 prefill batches in probe 3 at c = 128 would save about 3% (derived).
 ## Commands
 
 ```sh
+# Engine of probes 1-3 (~/sglang-wt/speed_highc: the pin plus drafter 0001-0004, as
+# engine/sglang/README.md applies the drafter series); the prefill probe, the logprob run and the
+# confirmation use the stock pin in ~/sglang:
+scripts/sglang_worktree.sh speed_highc
+git -C ~/sglang-wt/speed_highc am "$PWD"/engine/sglang/patches/drafter/000[1-4]-*.patch
 # GPU (each an exclusive hold; raw runs in ~/vp-data/speed_highc/):
 scripts/gpu_lock.sh -x experiments/admission/run_admission_probe.sh      # probe 1 -> admission/
 scripts/gpu_lock.sh -x experiments/admission/run_queue_delay_probe.sh    # probe 2 -> queue-delay/
