@@ -2,38 +2,54 @@
 % research notes takes its colours, line styles, axis conventions and panel titles from this file,
 % so a colour or a series means the same thing wherever it appears.
 % ---------------------------------------------------------------------------
-% Palette. Four hues from Okabe and Ito's set and a grey, each with one meaning in every figure:
-%   cstock     ink        the stock engine and its baseline: plain decoding, the stock head,
-%                         the target's head input h^t, reference lines;
-%   ccert      blue       the certified head and its int8 copy (the proposed method);
-%   cfallback  vermilion  fallback to the stock head, and decisions left open;
-%   cdraft     purple     drafters and drift: DFlash, MTP, h^d, Delta, rho;
-%   ccontext   grey       context and alternatives not pursued: other kernels, the FP8 and
-%                         int4 copies, dropped entries, envelope bands.
-% A figure whose series have no paper-wide meaning (domains, lever stacks, module kinds) draws
-% them in ink and greys, told apart by marker and dash pattern and labelled directly.
-% Checked with an OKLab colour-vision validator (Machado, Oliveira and Fernandes 2009 simulation
-% at severity 1, distances in OKLab x100, every pair compared): blue and vermilion are at least
-% 11.0 apart under protanopia and deuteranopia; the purple is closest to the blue; all hues have
-% at least 3:1 contrast on white. The hues have similar lightness, so a greyscale print
-% separates series only by line style or marker: every series has its own dash pattern or
-% marker as well.
+% Palette. Each colour has one meaning in every figure of the paper and the research notes.
+% Method colours (three hues from Okabe and Ito's set and a grey):
+%   cstock     ink             the stock engine's baseline: plain decoding (the target alone), the
+%                              stock head, the target's head and head input h^t, reference lines;
+%   ccert      blue            the certified head and its int8 copies (the proposed method);
+%   cfallback  vermilion       fallback to the stock head, and decisions left open;
+%   ccontext   grey            context and alternatives not pursued: other kernels, the FP8 and int4
+%                              copies, dropped entries, envelope bands, and series with no
+%                              paper-wide meaning (the domains of a panel, constructed head families).
+% Arm colours, one per speculative serving arm, also used for the drafter it runs:
+%   cmtp       green           MTP (the native MTP layer, MTP-4B) and its drift;
+%   cdflash16  reddish purple  DFlash with 16-token blocks, and DFlash-4B wherever it drafts 16-token
+%                              blocks (the captures, the drafter panel): h^d, Delta and its drift;
+%   cdflash8   violet          DFlash with 8-token blocks.
+% Plain decoding is the target alone and takes the stock ink. Series that differ only in the stock
+% engine's configuration (the module kinds of the divergence figure, the lever stacks of plain
+% decoding) stay ink and are told apart by marker and dash pattern. No hue doubles for another
+% meaning: a drafter's head is drawn in its arm's colour, never in a generic draft colour.
+% Checked with the dataviz skill's validate_palette.js (Machado, Oliveira and Fernandes 2009
+% simulation at severity 1, OKLab distances x100, every pair compared, white surface). The five
+% hues pass every check: OKLCH lightness 0.44-0.68, chroma at least 0.12, contrast at least
+% 3.06:1 on white (reddish purple; the rest 3.87:1 or more); the closest pair under colour-vision
+% deficiency is green and vermilion (8.2, protanopia), the closest in normal vision reddish purple
+% and vermilion (16.4). The neutrals: ink is at least 13.8 from every hue under protanopia and
+% deuteranopia (violet); the grey is 7.6 from reddish purple (protanopia) and 11.5 from blue in
+% normal vision, so a grey series always has its own dash pattern and a direct label. The hues
+% have similar lightness, so a greyscale print separates series only by line style or marker:
+% every series has its own dash pattern or marker as well.
 \definecolor{ink}{HTML}{1B3A57}
 \definecolor{vpblue}{HTML}{0072B2}
 \definecolor{vpvermilion}{HTML}{D55E00}
-\definecolor{vppurple}{HTML}{CC79A7}
 \definecolor{muted}{HTML}{6B7780}
+\definecolor{vpgreen}{HTML}{1C6402}
+\definecolor{vppurple}{HTML}{CC79A7}
+\definecolor{vpviolet}{HTML}{6F1FA7}
 \colorlet{cstock}{ink}
 \colorlet{ccert}{vpblue}
 \colorlet{cfallback}{vpvermilion}
-\colorlet{cdraft}{vppurple}
 \colorlet{ccontext}{muted}
+\colorlet{cmtp}{vpgreen}
+\colorlet{cdflash16}{vppurple}
+\colorlet{cdflash8}{vpviolet}
 % Fills are light tints of the hue they belong to; wash is the neutral one for shaded regions.
 \colorlet{wash}{ink!6}
 % ---------------------------------------------------------------------------
 % Status of what a mark shows. Measured values carry filled markers, and empirical
-% distributions carry sparse markers (4 to 8 per curve); a hollow marker is a measured subset the
-% legend names; values computed point by point from measurements carry the same markers with
+% distributions carry sparse markers (4 to 8 per curve); a hollow marker is a measured subset its
+% label or the caption names; values computed point by point from measurements carry the same markers with
 % their own dash pattern and say so in their label; curves derived from a formula, a model or the
 % weights are plain lines without markers; schematics have no numeric ticks and say "schematic" in
 % the panel title, or once in the caption when every panel is one. Uncertainty is drawn where
@@ -41,10 +57,12 @@
 % marker.
 % A figure with several panels titles each one above its plot area: its letter in bold, a short
 % title and the status (measured, derived, expected, schematic, to scale). A figure with one panel
-% has no title inside the figure; its caption names it and its status. Labels and legends, in
-% order of preference: a direct label beside its line, at least 2 pt from any other line, mark or
-% label; a legend inside the plot in an empty region, covering no data; one key shared by several
-% panels, above or to the right of them. Never a legend below an x label or under one panel only.
+% has no title inside the figure; its caption names it and its status. Every series is named by a
+% direct label beside its line, mark or segment, at least 2 pt from any other line, mark or label,
+% with a thin leader line where the free space is a little way off. A legend is used only where
+% no such place exists, and the figure's comment says why; it then sits inside the plot in an
+% empty region, covering no data, or above several panels it serves. Never a legend below an x
+% label or under one panel only.
 \newcommand{\paneltitle}[2]{\textbf{(#1)}~#2}
 % ---------------------------------------------------------------------------
 % Lines and marks. Data series are thick (0.8 pt); reference lines (the stock head, a bound of
@@ -60,9 +78,6 @@
   mark diamond/.style={mark=diamond*,mark size=2pt,mark options={solid}},
   % a measured subset: the same shape, white inside, 0.6 pt outline
   mark hollow/.style={mark options={solid,fill=white,line width=0.6pt}},
-  % a legend sample 0.5 cm long with the mark at its centre
-  short legend/.style={legend image code/.code={\draw[mark repeat=2,mark phase=2,##1]
-    plot coordinates {(0cm,0cm) (0.25cm,0cm) (0.5cm,0cm)};}},
   % Plot-area heights, so that panels in one row match: a full panel, and each of two panels
   % stacked on one x axis.
   panel full/.style={scale only axis,height=2.8cm},
@@ -85,13 +100,14 @@
   copy int8 g128/.style={ccert,thick,dashed},
   copy fp8/.style={ccontext,thick,dashdotted},
   copy int4/.style={ccontext,thick,densely dotted},
-  % Arms and drafters, the same in the serving frontier and in the drift distributions: plain
-  % decoding ink with circles; DFlash purple with diamonds (16-token blocks dashed where both
-  % block sizes appear); MTP purple, dash-dotted, with triangles.
+  % Arms and their drafters, the same wherever they appear (serving frontier, drift
+  % distributions, drafter panel): plain decoding ink, solid, circles; DFlash with 8-token blocks
+  % violet, solid, diamonds; DFlash with 16-token blocks reddish purple, dashed, diamonds; MTP
+  % green, dash-dotted, triangles.
   arm plain/.style={cstock,thick,mark circle},
-  arm dflash/.style={cdraft,thick,mark diamond},
-  arm dflash16/.style={cdraft,thick,dashed,mark diamond},
-  arm mtp/.style={cdraft,thick,dashdotted,mark triangle},
+  arm dflash8/.style={cdflash8,thick,mark diamond},
+  arm dflash16/.style={cdflash16,thick,dashed,mark diamond},
+  arm mtp/.style={cmtp,thick,dashdotted,mark triangle},
 }
 % ---------------------------------------------------------------------------
 % Text and axes. Three sizes, set in points so that a figure prints the same
@@ -100,7 +116,8 @@
 % diagrams 8 pt (\figsmall, style note); tick labels, legends, keys, direct labels and values
 % printed in a plot 7 pt (\scriptsize, style annot), the smallest size used. Text is black; the
 % coloured line or mark beside a label carries the identity. Labels and titles in sentence case.
-% Figures are drawn at their final size: never scale a figure.
+% Tick labels are plain numbers (100, 1k, 0.001), not powers of ten, whose exponents would fall
+% below 7 pt. Figures are drawn at their final size: never scale a figure.
 % Every figure file ends with a %, and so does every line that \inputs one: a space after the
 % picture lets a full-width figure overflow its line, which pushes the caption's link anchor onto
 % a line of its own and leaves a blank line (about 12 pt) between the figure and its caption.

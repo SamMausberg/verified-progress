@@ -1,27 +1,46 @@
 % DFlash acceptance and survival by block position (research notes, fig:drafter-acceptance);
-% data: evidence/drafter/acceptance_by_position.csv. The pooled line (all domains)
-% is the drafter's, in purple; the domains have no paper-wide colour and are ink and greys, told
-% apart by marker and dash pattern. The pooled line is a data line (thick); the domains are context
-% for it and are drawn semithick. The shared key sits above the two panels.
+% data: evidence/drafter/acceptance_by_position.csv. The pooled line (all domains) is DFlash-4B's
+% with 16-token blocks, in that arm's style (style.tex: reddish purple, dashed, diamonds); the
+% domains have no paper-wide meaning and are grey, told apart by marker and dash pattern. The
+% pooled line is a data line (thick); the domains are context for it and are drawn semithick.
+% Direct labels, no key: every series is named right of its last point in (b), where the lines
+% end apart (code 0.24, MATH-500 0.19, GSM8K and the pooled line 0.13, chat 0.03 at k = 15;
+% checked against the CSV); short leaders fan the GSM8K and pooled labels 0.27 cm apart. The same
+% styles mark the same series in (a).
 \datafigure{../evidence/drafter/acceptance_by_position.csv}{%
+\def\accdata{../evidence/drafter/acceptance_by_position.csv}%
+\vpreadcsv{\acctable}{\accdata}%
+\vplookupthree{\acctable}{domain}{code}{position}{15}{block_size}{16}{survival}{\accCode}%
+\vplookupthree{\acctable}{domain}{math}{position}{15}{block_size}{16}{survival}{\accGsm}%
+\vplookupthree{\acctable}{domain}{all}{position}{15}{block_size}{16}{survival}{\accAll}%
 \begin{tikzpicture}
-\begin{groupplot}[group style={group size=2 by 1,horizontal sep=1.8cm},width=.45\linewidth,height=5.0cm,
-  xmin=0.5,xmax=15.5,xtick={1,3,5,7,9,11,13,15},xlabel={Block position $k$},grid=major,unbounded coords=discard]
-\nextgroupplot[ymin=0.6,ymax=1,ylabel={Conditional acceptance $\alpha_k$},title={\paneltitle{a}{Conditional acceptance $\alpha_k$ (measured)}},
-  legend to name=acclegend,legend columns=5,short legend,legend style={/tikz/every even column/.append style={column sep=6pt}}]
-\addplot[thick,cdraft,mark circle,discard if not={domain}{all},discard if not={block_size}{16}] table[x=position,y=accept_prob,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};\addlegendentry{all}
-\addplot[semithick,cstock,dashed,mark square,discard if not={domain}{chat},discard if not={block_size}{16}] table[x=position,y=accept_prob,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};\addlegendentry{chat}
-\addplot[semithick,cstock,mark triangle,discard if not={domain}{code},discard if not={block_size}{16}] table[x=position,y=accept_prob,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};\addlegendentry{code}
-\addplot[semithick,ccontext,dashdotted,mark diamond,discard if not={domain}{math},discard if not={block_size}{16}] table[x=position,y=accept_prob,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};\addlegendentry{GSM8K}
-\addplot[semithick,ccontext,densely dotted,mark circle,mark hollow,discard if not={domain}{math500},discard if not={block_size}{16}] table[x=position,y=accept_prob,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};\addlegendentry{MATH-500}
+\begin{groupplot}[group style={group size=2 by 1,horizontal sep=1.8cm},width=.43\linewidth,height=5.0cm,
+  xmin=0.5,xmax=15.5,xtick={1,3,5,7,9,11,13,15},xlabel={Block position $k$},grid=major,unbounded coords=discard,
+  domain chat/.style={semithick,ccontext,mark square,discard if not={domain}{chat}},
+  domain code/.style={semithick,ccontext,densely dashed,mark triangle,discard if not={domain}{code}},
+  domain gsm/.style={semithick,ccontext,dashdotted,mark circle,discard if not={domain}{math}},
+  domain math500/.style={semithick,ccontext,densely dotted,mark circle,mark hollow,discard if not={domain}{math500}},
+  every axis plot/.append style={discard if not={block_size}{16}}]
+\nextgroupplot[ymin=0.6,ymax=1,ylabel={Conditional acceptance $\alpha_k$},title={\paneltitle{a}{Conditional acceptance $\alpha_k$ (measured)}}]
+\addplot[domain chat] table[x=position,y=accept_prob,col sep=comma]{\accdata};
+\addplot[domain code] table[x=position,y=accept_prob,col sep=comma]{\accdata};
+\addplot[domain gsm] table[x=position,y=accept_prob,col sep=comma]{\accdata};
+\addplot[domain math500] table[x=position,y=accept_prob,col sep=comma]{\accdata};
+\addplot[arm dflash16,discard if not={domain}{all}] table[x=position,y=accept_prob,col sep=comma]{\accdata};
 \nextgroupplot[ymode=log,ymin=0.02,ymax=1,ylabel={Share of cycles reaching $k$, $S(k)$},title={\paneltitle{b}{Survival $S(k)$ (measured)}},
-  ytick={0.02,0.05,0.1,0.2,0.5,1},yticklabels={0.02,0.05,0.1,0.2,0.5,1}]
-\addplot[thick,cdraft,mark circle,discard if not={domain}{all},discard if not={block_size}{16}] table[x=position,y=survival,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};
-\addplot[semithick,cstock,dashed,mark square,discard if not={domain}{chat},discard if not={block_size}{16}] table[x=position,y=survival,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};
-\addplot[semithick,cstock,mark triangle,discard if not={domain}{code},discard if not={block_size}{16}] table[x=position,y=survival,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};
-\addplot[semithick,ccontext,dashdotted,mark diamond,discard if not={domain}{math},discard if not={block_size}{16}] table[x=position,y=survival,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};
-\addplot[semithick,ccontext,densely dotted,mark circle,mark hollow,discard if not={domain}{math500},discard if not={block_size}{16}] table[x=position,y=survival,col sep=comma]{../evidence/drafter/acceptance_by_position.csv};
+  ytick={0.02,0.05,0.1,0.2,0.5,1},yticklabels={0.02,0.05,0.1,0.2,0.5,1},clip=false]
+\addplot[domain chat] table[x=position,y=survival,col sep=comma]{\accdata};
+\addplot[domain code] table[x=position,y=survival,col sep=comma]{\accdata};
+\addplot[domain gsm] table[x=position,y=survival,col sep=comma]{\accdata};
+\addplot[domain math500] table[x=position,y=survival,col sep=comma]{\accdata};
+\addplot[arm dflash16,discard if not={domain}{all}] table[x=position,y=survival,col sep=comma]{\accdata};
+% series names right of the plot, by each line's last point (k = 15)
+\draw[leader] (axis cs:15.2,\accCode) -- (axis cs:15.65,0.26) (axis cs:15.2,\accGsm) -- (axis cs:15.65,0.142)
+  (axis cs:15.2,\accAll) -- (axis cs:15.65,0.104);
+\node[annot,anchor=west] at (axis cs:15.7,0.26) {code};
+\node[annot,anchor=west] at (axis cs:15.7,0.19) {MATH-500};
+\node[annot,anchor=west] at (axis cs:15.7,0.142) {GSM8K};
+\node[annot,anchor=west] at (axis cs:15.7,0.104) {all domains};
+\node[annot,anchor=west] at (axis cs:15.7,0.030) {chat};
 \end{groupplot}
-% the key shared by both panels sits above their titles (a key never sits below an x label)
-\node[anchor=south,inner sep=1pt] at ($(group c1r1.outer north)!.5!(group c2r1.outer north)+(0,2pt)$) {\pgfplotslegendfromname{acclegend}};
 \end{tikzpicture}}{Conditional acceptance and survival by block position, block size 16, per domain.}%

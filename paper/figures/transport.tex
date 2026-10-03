@@ -4,8 +4,9 @@
 % evidence/head_geometry/rho_dflash4b_quantiles.csv (threshold_int8_row at q = 0.5), and
 % cos(h^d, h^t) from evidence/head_geometry/stats_dflash4b.json (pairs/cos_hd_ht/all/q50), which
 % exists only in JSON and is read from figures/data/json_values.csv. Every number printed in (a)
-% is computed from these four values. Colours: h^t ink (the target), h^d and Delta purple (the
-% drafter and its drift), the ball blue (the int8 copy's threshold). (b) reads
+% is computed from these four values. Colours: h^t ink (the target), h^d and Delta reddish purple
+% (DFlash-4B, which drafts 16-token blocks in the captures, and its drift), the ball blue (the
+% int8 copy's threshold). (b) reads
 % evidence/head_geometry/rho_dflash4b_quantiles.csv (DFlash-4B drift and the per-entry
 % thresholds) and (c) evidence/head_geometry/rho_mtp4b_quantiles.csv (MTP-4B drift) with the same
 % thresholds; both hold 40,000 held-out pairs. Thresholds are derived from the weights (lines
@@ -35,17 +36,19 @@
 % curve enters (checked against the quantile files: the per-128-weights threshold is above 0.0061
 % for q > 0.52, the per-entry one below 0.0083 for q < 0.4, int4's above 0.12, DFlash-4B's drift
 % above 0.85 and MTP-4B's above 0.8 for q > 0.15). The arrow joins the median threshold (int8,
-% per entry) to the drafter's median drift. Drifts use the arm styles: DFlash diamonds, MTP
-% triangles, as in Figure fig:frontier. The x axis starts at 4e-4, not 1e-3, so that the
+% per entry) to the drafter's median drift. Drifts use the arm styles of Figure fig:frontier:
+% DFlash-4B (16-token blocks) reddish purple, dashed, diamonds; MTP-4B green, dash-dotted,
+% triangles. The x axis starts at 4e-4, not 1e-3, so that the
 % per-128-weights label fits in two lines left of its curve.
 \pgfplotsset{drift panel/.style={panel stacked,width=7.1cm,xmin=4e-4,xmax=10,
+  xtick={0.001,0.01,0.1,1,10},xticklabels={0.001,0.01,0.1,1,10},
   ymin=0,ymax=1,ytick={0,0.5,1},yticklabels={0,0.5,1},grid=major,xminorticks=false}}
 \begin{semilogxaxis}[drift panel,name=b,at={(7.85cm,0.25cm)},anchor=south west,xticklabels={},
   title={\paneltitle{b}{DFlash-4B: measured drift, derived thresholds}}]
 \addplot[copy int8 g128,derived] table[x=threshold_int8_g128,y=q,col sep=comma]{\rhodflash};
 \addplot[copy int8 row,derived] table[x=threshold_int8_row,y=q,col sep=comma]{\rhodflash};
 \addplot[copy int4,derived] table[x=threshold_int4_row,y=q,col sep=comma]{\rhodflash};
-\addplot[arm dflash,mark repeat=50,mark phase=25] table[x=rho_all,y=q,col sep=comma]{\rhodflash};
+\addplot[arm dflash16,mark repeat=50,mark phase=25] table[x=rho_all,y=q,col sep=comma]{\rhodflash};
 \draw[{Stealth[length=1.5mm]}-{Stealth[length=1.5mm]},leader] (axis cs:\figDstar,0.5) -- (axis cs:\figRho,0.5);
 % below the arrow, between the int4 thresholds and the drift curve
 \node[annot,anchor=north,align=center] at (axis cs:0.42,0.45) {medians\\$\vpnum{0}{\figRho/\figDstar}\times$};
@@ -80,18 +83,19 @@
 \coordinate (amid) at (68,0);
 % the closest rescaling of h^d: h^d extended (dotted) to F, the foot of the perpendicular from
 % the tip of h^t; F is marked, and the dotted perpendicular has length rho = sin(angle) ||h^t||
-\draw[cdraft,densely dotted] (D) -- (F);
+\draw[cdflash16,densely dotted] (D) -- (F);
 \draw[ink!60,densely dotted] (T) -- (F);
-\fill[cdraft] (F) circle[radius=1.7pt];
+\fill[cdflash16] (F) circle[radius=1.7pt];
 \draw[ink!60] ($(F)!3.5pt!(O)$) -- ($($(F)!3.5pt!(O)$)+($(F)!3.5pt!(T)$)-(F)$) -- ($(F)!3.5pt!(T)$);
 \node[note,anchor=south west,align=left] at ($(T)!.4!(F)+(2,2)$) {closest rescaling of $h^d$:\\$\rho=\vpnum{2}{\figSin}$};
 % vectors
 \draw[flow,very thick,shorten >=2.2pt] (O) -- (T);
 \node[below,inner sep=2pt] at (70,-2) {$h^t$, $\norm{h^t}_2=\vpnum{0}{\figHt}$};
-\draw[flow,very thick,cdraft] (O) -- (D);
-\node[anchor=south east,align=right,inner sep=1pt] at ($(D)+(-1,1)$) {$h^d$, $\norm{h^d}_2=\vpnum{1}{\figHd}$};
+\draw[flow,very thick,cdflash16] (O) -- (D);
+% h^d's label left of its tip and just below it, so it names the arrow, not the rescaling's dot F
+\node[anchor=east,align=right,inner sep=1pt] at ($(D)+(-4,-3)$) {$h^d$, $\norm{h^d}_2=\vpnum{1}{\figHd}$};
 % Delta: its symbol beside the dashed line near h^d's tip, its length under h^t's label
-\draw[thick,cdraft,dashed,shorten >=2.2pt] (D) -- (T);
+\draw[thick,cdflash16,dashed,shorten >=2.2pt] (D) -- (T);
 \node[note,inner sep=1pt] at (42,31) {$\Delta$};
 \node[note,anchor=north,inner sep=1pt] at (45,-17) {$\norm\Delta_2=\vpnum{2}{\figDrel}\,\norm{h^t}_2$};
 \draw[ink!60] ($(O)+(13,0)$) arc[start angle=0,end angle={acos(\figCos)},radius=13];

@@ -4,6 +4,8 @@
 % decide; (c) fall back for a position left open. Schematic: the values below are illustrative,
 % chosen to show each case, and are not data. Colours follow style.tex: blue the certified head,
 % vermilion an open decision, ink (tinted) what the stock head computes, grey dropped entries.
+% Every state is named beside it, with no key: (a) labels a candidate and a dropped entry, and in
+% (c) the notes right of each strip say which cells are open, certified or rerun.
 % Notes are \figsmall (8 pt); axis labels and titles \figlabel (9 pt). Every panel is a schematic,
 % so the caption says so once and the panel titles carry no status (style.tex); each axis
 % label is set along its axis, as in the plots.
@@ -32,10 +34,10 @@
 \draw[densely dotted,ink,thick] (0,2.10) -- (3.85,2.10);
 \node[note,anchor=north west,inner sep=1pt] at (0.03,2.07) {$\max_j \lo_j-\delta_{\max}$};
 \node[anchor=north] at (1.93,-0.05) {vocabulary entries $i$};
-\draw[ccert,line width=1.6pt] (0.2,-0.9) -- (0.2,-0.58);
-\node[note,anchor=west] at (0.3,-0.74) {candidate};
-\draw[ccontext!70,line width=1.2pt] (1.75,-0.9) -- (1.75,-0.58);
-\node[note,anchor=west] at (1.85,-0.74) {dropped for good};
+% direct labels: candidates right of the candidate above the dashed line, dropped right of the
+% lowest dropped entry, clear of the entries above it
+\node[note,anchor=west] at (1.40,2.83) {candidates};
+\node[note,anchor=west] at (2.74,0.45) {dropped};
 \end{scope}
 % from (a) to (b): the candidates pass on
 \draw[flow] (4.05,1.55) -- node[note,above=1pt]{candidates} (5.12,1.55);
@@ -88,7 +90,7 @@
     \filldraw[fill=\vpfill,draw=ink!45] (\vpx,#1) rectangle ++(0.3,0.45);}}
 \node[note,anchor=south] at (1.2,3.32) {one head call, $M$ positions};
 \vpstrip{2.85}{0}
-\node[note,anchor=west,align=left] at (2.5,3.07) {one position open};
+\node[note,anchor=west,align=left] at (2.5,3.07) {one position open,\\the others certified};
 \node[note,anchor=south west] at (0,1.82) {whole-batch fallback};
 \vpstrip{1.35}{1}
 \node[note,anchor=west,align=left] at (2.5,1.57) {stock head reruns all\\$M$ positions, same shape};
@@ -98,9 +100,5 @@
 % the two fallbacks for the open position: alternatives, each named above its strip
 \draw[flow] (-0.04,3.07) -- (-0.32,3.07) -- (-0.32,1.57) -- (-0.04,1.57);
 \draw[flow] (-0.32,1.57) -- (-0.32,0.07) -- (-0.04,0.07);
-% colour key
-\foreach \c/\t/\x in {ccert!22/certified/0, cfallback!45/open/1.7, ink!30/rerun by stock head/2.85} {
-  \filldraw[fill=\c,draw=ink!45] (\x,-1.35) rectangle ++(0.22,0.3);
-  \node[note,anchor=west,text height=1.6ex,text depth=0.4ex] at (\x+0.25,-1.2) {\t};}
 \end{scope}
 \end{tikzpicture}%
