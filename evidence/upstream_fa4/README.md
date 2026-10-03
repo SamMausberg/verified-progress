@@ -8,8 +8,9 @@ which confirms that PR's fix on a GH200 and offers a regression test. They also 
 failures the fix does not cover. The code is in `experiments/upstream_fa4/`.
 
 Status: measured, one run on 2026-10-02 (22:30-22:44 UTC). Correctness only; nothing here is timed.
-The tile_n 144 failures and the head_dim 160 and 224 failures below have one cause, found after this
-run and reported upstream with a fix
+The tile_n 144 failures, and the wrong outputs and faults at head_dim 160 and 224 (not the compile
+errors on `main`, which the three fixes remove), have one cause, found after this run and
+reported upstream with a fix
 ([flash-attention#2957](https://github.com/Dao-AILab/flash-attention/issues/2957),
 [#2958](https://github.com/Dao-AILab/flash-attention/pull/2958)): when tile_n is not a multiple of
 the rows the loader copies per pass (`rows_per_pass` below), the threads of its last pass still copy
