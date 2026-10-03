@@ -65,8 +65,8 @@ passes on `ceil`, `ceil_div` and `max_one` (2 of 2 each; `summary.json`, `pytest
 `main` at page size 1 (tile_n 112 and 80). On the three fixed trees, the `kvcache` harness returns
 finite but wrong output at page size 1, causal and non-causal: largest error 0.67-1.47 against
 0.0047-0.0080 for the BF16 reference. The `varlen` harness, on SGLang's `ceil` tree and on
-flash-attention `main`, stops at the first paged call with `CUDA error: an illegal memory access was
-encountered` in all four cases. The same causal cases are correct with a contiguous cache and with
+flash-attention `main`, stops in all four cases when a paged call raises `CUDA error: an illegal
+memory access was encountered`. The same causal cases are correct with a contiguous cache and with
 the paged TMA load (page size equal to tile_n), on `main` and on `ceil` (0.0022-0.0025). The
 failure is specific to the cp.async paged loader.
 
@@ -127,7 +127,7 @@ python experiments/upstream_fa4/summarize.py --expect-cases 89 --expect-pytest m
 cp ~/vp-data/upstream/fa4-evidence/run-20261002T223025Z/{cases.csv,summary.json} evidence/upstream_fa4/
 ```
 
-Checks added after the run, from Codex's review of #228 and a sweep of the same kinds of gap each
+Checks added after the run, from the review of #228 and a sweep of the same kinds of gap each
 round. `run_all.sh` now stops on:
 
 - a flash-attention checkout with local edits, or an `fa-pkg` that is not exactly that checkout
