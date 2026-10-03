@@ -58,11 +58,11 @@ trap 'rm -rf "$tmp"' EXIT
 } > "$tmp/launches.csv"
 
 # Revisions of the prefill probe: client.json holds them for runs since prefill_probe.py recorded
-# them; for the committed run the hold's log gives the repository head, and each server's log the
-# SGLang tree it imported (with $HOME as ~). Missing either stops the script.
+# them; for the committed run, which predates that, the hold's log (prefill_hold.log, if kept)
+# gives the repository head. Each server's log gives the SGLang tree it imported (with $HOME as
+# ~). A server with no repository head from either source, or no import path, stops the script.
 repo_head="$(grep -m1 -oE "^repo [0-9a-f]{40} out .*/${prefill##*/} " "$data/prefill_hold.log" \
-  | cut -d' ' -f2 || true)"
-[ -n "$repo_head" ] || { echo "$data/prefill_hold.log: no repository head" >&2; exit 1; }
+  2>/dev/null | cut -d' ' -f2 || true)"
 imported() {
   local path
   path="$(grep -m1 -oE '/[^ :]*/python/sglang/launch_server\.py' "$1" || true)"
@@ -74,7 +74,7 @@ fi_from="$(imported "$prefill/fi-prefill/server.log")"
 jq -n --slurpfile s "$prefill/stock/client.json" --slurpfile f "$prefill/fi-prefill/client.json" \
   --arg repo "$repo_head" --arg sp "$stock_from" --arg fp "$fi_from" '
 def summ(c; p): {arm: c.arm, server_under_nsys_launch: (c.command[0]=="nsys"), linear_attn_prefill_backend_flag: (c.args["linear-attn-prefill-backend"] // null),
-  repo_head: (c.repo.head // $repo), sglang_head: (c.sglang_source.head // null), sglang_imported_from: p,
+  repo_head: (c.repo.head // (if $repo == "" then error("\(c.arm): no repository head") else $repo end)), sglang_head: (c.sglang_source.head // null), sglang_imported_from: p,
   untraced: {single_median_ms: c.untraced.sequential_median_ms, concurrent8_wall_median_ms: c.untraced.concurrent8_wall_median_ms,
     single_ms_by_isl: [c.untraced.sequential[] | {isl, ms}]},
   traced: (if c.traced then {single_median_ms: c.traced.sequential_median_ms, concurrent8_wall_median_ms: c.traced.concurrent8_wall_median_ms} else null end)};
