@@ -229,6 +229,11 @@ def main() -> None:
             f'{args.root}: missing {sorted(expected - found)}, '
             f'not declared {sorted(found - expected)}'
         )
+    # Ratios and token comparisons pair arms of one hold: an arm rerun in another session
+    # (a different server start, load and history) must not be mixed in.
+    sessions = sorted({row['session'] for row in points.values()})
+    if len(sessions) != 1:
+        raise SystemExit(f'{args.root}: arms from several sessions {sessions}')
     # A paired test and its base must cover the same concurrencies: a sweep that aborted
     # part-way must not leave a comparison silently incomplete. Plain ratios are filled
     # wherever a plain point exists (arms may run at concurrencies plain does not).

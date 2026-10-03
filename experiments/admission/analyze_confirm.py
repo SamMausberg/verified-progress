@@ -50,6 +50,9 @@ EXPECTED = {
     'dflash': (32, 48),
     'dflash-delay': (32, 48),
 }
+# Each delayed arm's undelayed twin, as the session CSVs must pair them (summarize_probe.py
+# --pair), so every token-identity rate compares the same arms.
+TWINS = {'mtp-delay': 'mtp-n0', 'plain-delay': 'plain-tuned', 'dflash-delay': 'dflash'}
 METRICS = ('y', 'x_e2e', 'ttft_p50_ms', 'ttft_p99_ms')
 Points = dict[tuple[str, str, int], dict[str, str]]
 
@@ -79,6 +82,9 @@ def load(paths: list[Path]) -> tuple[list[str], Points, list[str]]:
             if key in seen:
                 raise SystemExit(f'{path}: {key} twice')
             seen.add(key)
+            twin = TWINS.get(key[0], '')
+            if row['base'] != twin or bool(twin) != bool(row['divergences_per_1k']):
+                raise SystemExit(f'{path}: {key} paired with {row["base"]!r}, expected {twin!r}')
             points[(session, *key)] = row
         if seen != expected:
             raise SystemExit(
