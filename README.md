@@ -37,9 +37,7 @@ measured or not run. The companion `paper/research_notes.pdf` (source in
 `paper/notes/`) holds the research notes behind the paper: the status of the
 questions and proposals, the serving stack and protocol, drafting and repair,
 the stock engine under speculation and further analysis, with its own evidence
-register. Slides for a talk of about 30 minutes on the paper are in
-`presentation/`: `verifier_paper_talk.pdf`, and `verifier_paper_talk.pptx` with
-the speaker notes; the README there says which commit they reflect. `TASKS.md`
+register. `TASKS.md`
 tracks the work and its status, `RUNBOOK.md` gives the commands and the rules
 for admissible runs, and `SETUP.md` describes the machine.
 
@@ -64,7 +62,7 @@ Where the serving measurements are:
   logit probe and GSM8K runs of the two lossy levers (`evidence/lossy/`) and of
   the FP8 arms (`evidence/speed_bytes/`).
 - **Before and after.** Table 2 of the paper gives each engine change against
-  its tuned baseline, with sessions and intervals. Table 1 gives the certified
+  its tuned baseline, with sessions; appendix Table 23 gives the spreads. Table 1 gives the certified
   head served against four tuned arms (`plain-tuned`, `mtp-tuned-triton`,
   `dflash-tuned-b16` and `dflash-tuned`) in three sessions
   (`evidence/certified_head/served/`).
@@ -106,8 +104,8 @@ The main line of the paper:
   (`tests/test_precision.py`: 21 test methods, 40,015 checks;
   `evidence/precision/`).
 - **The head is a small target.** It takes 10.3% of a plain decode step at
-  batch 1, so even a free head would speed the step up by only about 11%, and 6%
-  at batch 128, where the GDN recurrent kernel takes 42% (Nsight Systems;
+  batch 1 and 6% at batch 128, where the GDN recurrent kernel takes 42%; even a
+  free head would speed the batch-1 step up by only about 11% (Nsight Systems;
   `evidence/profiles/`).
 - **The certified head on recorded states (Sections 3 and 4).** On 60,000
   captured decode positions replayed through the GPU kernel at their engine
@@ -309,7 +307,7 @@ and SGLang at the pinned commit with the patch series under
 | `evidence/<topic>/` | Committed results; each directory's README gives the command behind every file. `evidence/README.md` indexes the topics, the paper claims they support and the imported bundle's records at the top of `evidence/` |
 | `sources/` | Literature review, citation audit, manuscript review, the verified bibliography and source manifest, and the imported bundle's checksums |
 | `scripts/` | GPU lock and job containment (`gpu_*.sh`), SGLang environment and worktrees (`sglang_*.sh`), repository checks (`check_*`, `verify_artifact.py`) and the bundle's auxiliary streaming client (`benchmark_sse.py`) |
-| `data/` | The bundle's synthetic drift table, which the paper plots, and the auxiliary client's example workload |
+| `data/` | The bundle's synthetic drift table, which the research notes plot, and the auxiliary client's example workload |
 | `TASKS.md`, `RUNBOOK.md`, `SETUP.md` | Task list and status; commands and evidence rules; the machine |
 
 Large raw outputs (Nsight traces, hidden-state captures, server logs) stay
