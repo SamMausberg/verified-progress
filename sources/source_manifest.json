@@ -1,6 +1,6 @@
 {
   "audit_date": "2026-10-02",
-  "source_count": 227,
+  "source_count": 236,
   "sources": [
     {
       "key": "sgcode",
@@ -375,6 +375,17 @@
       "evidence_type": "primary paper, official documentation, release or source code",
       "reproduced_performance": false,
       "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row flashinfer. Earlier: Citation audit 30 Sep 2026 (lit workstream): verified. MLSys 2025 (Outstanding Paper Award); arXiv 2501.01005v2; eleven authors. See sources/citation_audit.md."
+    },
+    {
+      "key": "fa4",
+      "bibliography_text": "Ted Zadouri, Markus Hoehnerbach, Jay Shah et al. \\emph{FlashAttention-4: Algorithm and Kernel Pipelining Co-Design for Asymmetric Hardware Scaling}. arXiv:2603.05451v1, 2026. \\url{https://arxiv.org/abs/2603.05451v1}.",
+      "urls": [
+        "https://arxiv.org/abs/2603.05451v1"
+      ],
+      "accessed": "2026-10-03",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Citation audit 3 Oct 2026 (writing team): added. Cited where Section 6 and the pins of Appendix F.3 name FlashAttention 4. arXiv API record: v1 (5 Mar 2026) is the only version, six authors, no journal reference; the Dao AI Lab post of 5 Mar 2026 (dao-lab.ai/blog/2026/flash4/) links this paper and the Dao-AILab/flash-attention repository, and the paper points to flash_attn/cute, the source of the flash-attn-4 package. The paper's kernels and measurements are for Blackwell; the package's README at tag fa4-v4.0.0.beta19 (commit 940cd9680f33) says 'for Hopper and Blackwell GPUs'. Version used: the installed distribution in the SGLang environment reports flash-attn-4 4.0.0b19 (author Tri Dao, BSD 3-Clause), uploaded to PyPI on 24 Jun 2026, the date of the GitHub release fa4-v4.0.0.beta19. Reported numbers are the authors' and were not reproduced. See sources/citation_audit.md."
     },
     {
       "key": "aiperf",
@@ -2214,6 +2225,94 @@
       "audit_note": "Citation audit 2 Oct 2026 (writing team): entry and every citing sentence rechecked; see sources/citation_audit.md, row gsm8k. Earlier: Added to paper/references.bib with paper milestone 2 (PR #30), where the text cites it; this record mirrors that BibTeX entry. Reported numbers are the authors' and were not reproduced."
     },
     {
+      "key": "norobots",
+      "bibliography_text": "Nazneen Rajani, Lewis Tunstall, Edward Beeching et al. \\emph{No Robots}. Hugging Face dataset, revision \\texttt{e6f9a4ac5c37faeb744ba9ecf0473184d7f8105b}, 2023. \\url{https://huggingface.co/datasets/HuggingFaceH4/no_robots/tree/e6f9a4ac5c37faeb744ba9ecf0473184d7f8105b}.",
+      "urls": [
+        "https://huggingface.co/datasets/HuggingFaceH4/no_robots/tree/e6f9a4ac5c37faeb744ba9ecf0473184d7f8105b"
+      ],
+      "accessed": "2026-10-03",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Citation audit 3 Oct 2026 (writing team): added. Cited for the capture prompts (Appendix C.4). Dataset card at e6f9a4a, the revision experiments/head_geometry/build_prompts.py reads: authors, title and year from its citation block; 10,000 human-written instructions and demonstrations, English, CC BY-NC 4.0. No paper describes the dataset (the card's Paper field is empty), so the card is the citable source. See sources/citation_audit.md."
+    },
+    {
+      "key": "hendrycksmath",
+      "bibliography_text": "Dan Hendrycks, Collin Burns, Saurav Kadavath et al. \\emph{Measuring Mathematical Problem Solving With the MATH Dataset}. Proceedings of the Neural Information Processing Systems Track on Datasets and Benchmarks 1 (NeurIPS 2021), 2021. \\url{https://datasets-benchmarks-proceedings.neurips.cc/paper_files/paper/2021/hash/be83ab3ecd0db773eb2dc1b0a17836a1-Abstract-round2.html}.",
+      "urls": [
+        "https://datasets-benchmarks-proceedings.neurips.cc/paper_files/paper/2021/hash/be83ab3ecd0db773eb2dc1b0a17836a1-Abstract-round2.html"
+      ],
+      "accessed": "2026-10-03",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Citation audit 3 Oct 2026 (writing team): added. Cited with lightman2024 for MATH-500 (Appendix C.4 and the drafter panel of the research notes). NeurIPS 2021 Datasets and Benchmarks proceedings page and BibTeX: title, eight authors, volume 1, no page numbers; arXiv 2103.03874v2 (8 Nov 2021, comment 'NeurIPS 2021'). PDF: MATH 'has 12,500 problems (7,500 training and 5,000 test)'. See sources/citation_audit.md."
+    },
+    {
+      "key": "lightman2024",
+      "bibliography_text": "Hunter Lightman, Vineet Kosaraju, Yuri Burda et al. \\emph{Let's Verify Step by Step}. International Conference on Learning Representations (ICLR 2024), pp. 39578--39601, 2024. \\url{https://proceedings.iclr.cc/paper_files/paper/2024/hash/aca97732e30bcf1303bc22ac3924fd16-Abstract-Conference.html}.",
+      "urls": [
+        "https://proceedings.iclr.cc/paper_files/paper/2024/hash/aca97732e30bcf1303bc22ac3924fd16-Abstract-Conference.html"
+      ],
+      "accessed": "2026-10-03",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Citation audit 3 Oct 2026 (writing team): added. Cited with hendrycksmath for MATH-500. ICLR 2024 proceedings page and BibTeX: pages 39578-39601; the proceedings name Yuri Burda and Harrison Edwards where arXiv 2305.20050v1 (31 May 2023, the only version) prints Yura Burda and Harri Edwards, and the entry follows the proceedings. Appendix C: 'we therefore evaluate our models only on the remaining 500 held-out problems. We selected these 500 test problems uniformly at random'. The HuggingFaceH4/MATH-500 card at 6e4ed1a: 'a subset of 500 problems from the MATH benchmark that OpenAI created in their Let's Verify Step by Step paper'. See sources/citation_audit.md."
+    },
+    {
+      "key": "ayaexpanse",
+      "bibliography_text": "John Dang, Shivalika Singh, Daniel D'souza et al. \\emph{Aya Expanse: Combining Research Breakthroughs for a New Multilingual Frontier}. arXiv:2412.04261v1, 2024. \\url{https://arxiv.org/abs/2412.04261v1}.",
+      "urls": [
+        "https://arxiv.org/abs/2412.04261v1"
+      ],
+      "accessed": "2026-10-03",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Citation audit 3 Oct 2026 (writing team): added. Cited for m-ArenaHard (Appendix C.4). The CohereLabs/m-ArenaHard card at ab393a9 gives this report as the dataset's citation. arXiv API record: v1 (5 Dec 2024) is the only version, 45 authors as the entry. PDF: 'We release open-weights for Aya Expanse 8B and 32B together with m-ArenaHard, the translated Arena-Hard-Auto dataset'; the 500 English Arena-Hard-Auto prompts (Li et al., 2024) were translated into 22 languages with the Google Translate API. See sources/citation_audit.md."
+    },
+    {
+      "key": "mgsm",
+      "bibliography_text": "Freda Shi, Mirac Suzgun, Markus Freitag et al. \\emph{Language Models are Multilingual Chain-of-Thought Reasoners}. International Conference on Learning Representations (ICLR 2023), 2023. \\url{https://openreview.net/forum?id=fR3wGCk-IXp}.",
+      "urls": [
+        "https://openreview.net/forum?id=fR3wGCk-IXp"
+      ],
+      "accessed": "2026-10-03",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Citation audit 3 Oct 2026 (writing team): added. Cited for MGSM (Appendix C.4). arXiv API record: v1 (6 Oct 2022) is the only version, 12 authors; ICLR 2023 poster according to the conference's accepted-paper data (iclr.cc), forum fR3wGCk-IXp (OpenReview answers curl with a challenge page). PDF: MGSM translates '250 grade-school math problems from the GSM8K dataset' into 'ten typologically diverse languages'. The capture prompts read juletxara/mgsm at b2f13d4, a copy whose card names this paper. See sources/citation_audit.md."
+    },
+    {
+      "key": "alpacaeval",
+      "bibliography_text": "Xuechen Li, Tianyi Zhang, Yann Dubois et al. \\emph{AlpacaEval: An Automatic Evaluator of Instruction-following Models}. Hugging Face dataset, revision \\texttt{2edc6fad8be6b14ea7230aabfd08188da6b8b814}, 2023. \\url{https://huggingface.co/datasets/tatsu-lab/alpaca_eval/tree/2edc6fad8be6b14ea7230aabfd08188da6b8b814}.",
+      "urls": [
+        "https://huggingface.co/datasets/tatsu-lab/alpaca_eval/tree/2edc6fad8be6b14ea7230aabfd08188da6b8b814"
+      ],
+      "accessed": "2026-10-03",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Citation audit 3 Oct 2026 (writing team): added. Cited for the divergence prompts (Appendix D.4). At 2edc6fa, the revision the prompt manifest records, the dataset's loading script alpaca_eval.py gives this citation (eight authors, 2023) and calls alpaca_eval.json the 'Official AlpacaEval 1.0 evaluation set'. The GitHub README of tatsu-lab/alpaca_eval asks that the evaluation set be cited as this entry (with its constituent datasets) and describes it as a simplification of AlpacaFarm's evaluation set (arXiv 2305.14387); no paper introduces AlpacaEval itself. See sources/citation_audit.md."
+    },
+    {
+      "key": "hermann2015",
+      "bibliography_text": "Karl Moritz Hermann, Tom\\'a\\v{s} Ko\\v{c}isk\\'y, Edward Grefenstette et al. \\emph{Teaching Machines to Read and Comprehend}. Advances in Neural Information Processing Systems 28 (NIPS 2015), 2015. \\url{https://proceedings.neurips.cc/paper_files/paper/2015/hash/afdec7005cc9f14302cd0474fd0f3c96-Abstract.html}.",
+      "urls": [
+        "https://proceedings.neurips.cc/paper_files/paper/2015/hash/afdec7005cc9f14302cd0474fd0f3c96-Abstract.html"
+      ],
+      "accessed": "2026-10-03",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Citation audit 3 Oct 2026 (writing team): added. Cited with see2017 for CNN/DailyMail (Appendix D.4), as the abisee/cnn_dailymail card at 96df5e6 asks. NeurIPS proceedings page and BibTeX: seven authors, volume 28, no page numbers; arXiv 1506.03340v3 (19 Nov 2015, comment 'Appears in: Advances in Neural Information Processing Systems 28 (NIPS 2015)'). PDF: 'we have collected two new corpora of roughly a million news stories with associated queries from the CNN and Daily Mail websites'. See sources/citation_audit.md."
+    },
+    {
+      "key": "see2017",
+      "bibliography_text": "Abigail See, Peter J. Liu, Christopher D. Manning. \\emph{Get To The Point: Summarization with Pointer-Generator Networks}. Proceedings of the 55th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers), pp. 1073--1083, 2017. doi:10.18653/v1/P17-1099.",
+      "urls": [
+        "https://doi.org/10.18653/v1/P17-1099"
+      ],
+      "accessed": "2026-10-03",
+      "evidence_type": "primary paper, official documentation, release or source code",
+      "reproduced_performance": false,
+      "audit_note": "Citation audit 3 Oct 2026 (writing team): added. Cited with hermann2015 for CNN/DailyMail (Appendix D.4). Crossref record and ACL Anthology BibTeX: title, three authors, pages 1073-1083; arXiv 1704.04368v2. The divergence prompts read version 3.0.0, the non-anonymized version; the paper operates 'directly on the original text (or non-anonymized version of the data)', and the card credits See, Liu and Manning with the code for that version. See sources/citation_audit.md."
+    },
+    {
       "key": "santilli2023jacobi",
       "bibliography_text": "Andrea Santilli, Silvio Severino, Emilian Postolache et al. \\emph{Accelerating Transformer Inference for Translation via Parallel Decoding}. Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers), pp. 12336--12355, 2023. doi:10.18653/v1/2023.acl-long.689.",
       "urls": [
@@ -2511,7 +2610,7 @@
       "audit_note": "Citation audit 2 Oct 2026 (writing team): added; replaces nsight for the Nsight Systems tracing of app_stack.tex (the run used Nsight Systems 2025.3.2). The 2025.3 User Guide documents --cuda-graph-trace graph|node. See sources/citation_audit.md."
     }
   ],
-  "scope": "Public primary sources only. No confidential assignment text or downloaded third-party paper/code bodies redistributed. Entries added on 30 September 2026 come from the lit workstream's literature review; sglangsampler was added on 1 October 2026 after reading the pinned file; paper/references.bib holds the matching BibTeX. On 2 October 2026 the writing team rechecked every entry the paper and the research notes cite, and every citing sentence (sources/citation_audit.md); nsys, flashsamplingcode and sgdflashworker were added.",
+  "scope": "Public primary sources only. No confidential assignment text or downloaded third-party paper/code bodies redistributed. Entries added on 30 September 2026 come from the lit workstream's literature review; sglangsampler was added on 1 October 2026 after reading the pinned file; paper/references.bib holds the matching BibTeX. On 2 October 2026 the writing team rechecked every entry the paper and the research notes cite, and every citing sentence (sources/citation_audit.md); nsys, flashsamplingcode and sgdflashworker were added. On 3 October 2026 fa4, norobots, hendrycksmath, lightman2024, ayaexpanse, mgsm, alpacaeval, hermann2015 and see2017 were added for FlashAttention 4 and the evaluation datasets the paper names (sources/citation_audit.md).",
   "limitations": [
     "This is a targeted prior-art audit, not proof of novelty or completeness.",
     "Model/deployment revisions remain unresolved until the GPU experiment.",

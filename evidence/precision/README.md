@@ -57,10 +57,25 @@ are not proofs.
 PATH=$HOME/.elan/bin:$PATH bash scripts/check_lean.sh > evidence/precision/lean_check.log 2>&1
 ```
 
-Lean 4.19.0 elaborates `formal/CertifiedArgmax.lean`, `formal/DecisionGuards.lean` and the three
-drafting-proposal files in `formal/drafting/` with no errors; the log also lists the axioms of
-every theorem in `formal/drafting/` (only `propext`, `Quot.sound` and `Classical.choice`). See
-`formal/STATUS.md` for what is and is not formalized. Regenerated at commit `4533e5e`.
+Lean 4.19.0 elaborates `formal/CertifiedArgmax.lean`, `formal/DecisionGuards.lean`,
+`formal/StockDecision.lean` and the three drafting-proposal files in `formal/drafting/` with no
+errors. The log also lists the axioms of the main theorems of `formal/StockDecision.lean` and of
+every theorem in `formal/drafting/`: only `propext`, `Quot.sound` and `Classical.choice`. See
+`formal/STATUS.md` for what is and is not formalized. First regenerated at commit `0da3a9a`, which added
+`formal/StockDecision.lean`, and again in PR #243 after its counterexample theorems (`_false`) were
+added; the log lists their axioms too.
+
+## `lean_variants.log`
+
+```sh
+PATH=$HOME/.elan/bin:$PATH bash scripts/check_lean_variants.sh > evidence/precision/lean_variants.log 2>&1
+```
+
+Five weakened statements of the formal lemmas, each a `sed` edit of a copy of
+`formal/StockDecision.lean` or `formal/CertifiedArgmax.lean`, all fail to elaborate, each with one
+error inside the lemma it changes. A failed proof shows that the proof needs the hypothesis, not
+that the changed statement is false; `formal/StockDecision.lean` proves three of them false by
+counterexample. `formal/STATUS.md` ("Weakened statements") lists the edits.
 
 ## `head_constants.json`
 

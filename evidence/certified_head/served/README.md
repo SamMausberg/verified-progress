@@ -14,7 +14,7 @@ that arm's paired throughput ratio (geometric mean of three sessions, 95% interv
 
 | c | Envelope arm | y ratio, certified / stock | Reading |
 |---|---|---|---|
-| 1 | `dflash-tuned-b16` | 1.012 (1.007-1.018) | up 1.2% |
+| 1 | `dflash-tuned-b16` | 1.013 (1.007-1.018) | up 1.3% |
 | 2 | `dflash-tuned-b16` | 0.990 (0.984-0.996) | down 1.0% |
 | 4 | `dflash-tuned-b16` | 0.970 (0.958-0.983) | down 3.0% |
 | 8 | `dflash-tuned` | 0.975 (0.967-0.984) | down 2.5% |
@@ -84,12 +84,12 @@ stock runs differ from each other across timings.
 **Declared verdicts (measured).** By the pre-registered rule (one primary point per
 family, Holm-adjusted across the four) H4 is supported under the declared rule: at
 concurrency 1 the certified head raises throughput by 2.5% for plain decoding (1.022-
-1.028), 4.6% for MTP (1.045-1.046) and 1.2% for DFlash block 16, and at concurrency 4 it
+1.028), 4.6% for MTP (1.045-1.046) and 1.3% for DFlash block 16, and at concurrency 4 it
 lowers DFlash block 8's by 1.2%. Plain's and MTP's gains are real and declared, and
 exact at concurrency 1 and the check-mode batches, but neither arm leads the envelope at
 c <= 32. The gains are confined
 to small batches and fall well short of the prediction (MTP 1.046 against 1.086 at c = 1;
-block 16 1.012 against 1.045 at c = 1 and 0.970 against 1.009 at c = 4). DFlash loses at
+block 16 1.013 against 1.045 at c = 1 and 0.970 against 1.009 at c = 4). DFlash loses at
 every tested point where its certified batches reach 28-64 rows (block 16 at c = 2 and 4,
 block 8 at c = 4 and 8, by 1.0-3.0%); MTP gains through c = 8 (32-row verify batches),
 shows no detectable change at c = 16 and 32, and loses 3.3% at c = 64 (64-row draft
@@ -135,13 +135,13 @@ plain, block 16, block 8 (`ratios.csv`).
 |---|---|---|---|---|---|---|---|
 | plain | c = 1 | 1.0251 | 1.0219-1.0283 | 1.0185-1.0317 | 0.0009 | gain | 1.035 |
 | mtp | c = 1 | 1.0456 | 1.0447-1.0464 | 1.0438-1.0473 | 0.00002 | gain | 1.086 |
-| dflash16 | c = 1 | 1.0125 | 1.0074-1.0177 | 1.0019-1.0232 | 0.009 | gain | 1.045 |
+| dflash16 | c = 1 | 1.0125 | 1.0073-1.0177 | 1.0019-1.0232 | 0.009 | gain | 1.045 |
 | dflash8 | c = 4 | 0.9880 | 0.9774-0.9986 | 0.9664-1.0100 | 0.040 | loss | 1.024 |
 
 Family verdicts: plain, MTP and DFlash block 16 **improve**; DFlash block 8 **loses**.
 H4: **supported** (`summary.json`, regenerated after the check rerun). The exactness
 behind these verdicts rests on the complete check launches (`check2`: every certified
-call counted, 0 of 592,433 certified rows differ) and on concurrency-1 identity; block 8
+call counted, 0 of 592,433 checked rows differ) and on concurrency-1 identity; block 8
 rests on check mode alone. Under the declared rule a large class is reported and
 investigated, not by itself a failure, so the one large class, at MTP c = 64 (a
 position where stock's BF16 decode path errs against FP32 and stock MTP runs err too;
@@ -171,7 +171,7 @@ by chance.
 | mtp | 16 | descriptive | 1.000 (0.980-1.019) | includes 1 | 0.999 | 1.041 |
 | mtp | 32 | descriptive | 0.979 (0.939-1.021) | includes 1 | 0.978 | 1.017 |
 | mtp | 64 | descriptive | 0.967 (0.949-0.986) | below 1 | 0.966 | 1.004 |
-| dflash16 | 1 | primary | 1.012 (1.007-1.018) | gain | 1.014 | 1.045 |
+| dflash16 | 1 | primary | 1.013 (1.007-1.018) | gain | 1.014 | 1.045 |
 | dflash16 | 2 | descriptive | 0.990 (0.984-0.996) | below 1 | 0.990 | 1.026 |
 | dflash16 | 4 | descriptive | 0.970 (0.958-0.983) | below 1 | 0.968 | 1.009 |
 | dflash16 | 8 | gate overhead | 0.988 (0.977-1.000) | below 1 | 0.986 | 1.000 |
@@ -191,7 +191,7 @@ detectable change at c = 16 and 32, and loses 3.3% at c = 64, where the certifie
 are 64-row draft batches. Both DFlash arms lose at every tested point where the head is
 active above c = 1: block 16 at c = 2 (32-row verify, 30-row draft projection) and c = 4
 (64 and 60 rows), block 8 at c = 4 (32 and 28) and c = 8 (64 and 56). At c = 1 block 16
-(16 and 15 rows) gains 1.2%.
+(16 and 15 rows) gains 1.3%.
 
 **Gate overhead.** Above 64 rows the engine replays the same CUDA graph with the
 certified head's flag off: the stock head runs inside a conditional node, and the
@@ -216,7 +216,7 @@ tuned flags and capacity with `SGLANG_CERTIFIED_HEAD_CHECK=1`, which also runs t
 head in every certified step and counts, on the device, rows whose token differs
 (`check.csv`). The settling hold reran them (step `check2`, hold h5) with the counters
 written on every glue call. At every point and path the device counters cover every
-certified replay the host gated (`uncounted_calls` 0), and 0 of 592,433 certified rows
+certified replay the host gated (`uncounted_calls` 0), and 0 of 592,433 checked rows
 differ. At MTP c = 64 the certified verify reached 64 rows, which happens only in the
 point's drain, with 16 or fewer requests left:
 
