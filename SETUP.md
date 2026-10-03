@@ -112,7 +112,7 @@ drafter.
   evidence.
 - The paper builds with `latexmk` (pdfLaTeX and BibTeX). The TeX Gyre fonts it needs
   come from the `tex-gyre` apt package.
-- Every Lean file in `formal/`, the two at its top level and the three in
+- Every Lean file in `formal/`, the three at its top level and the three in
   `formal/drafting/`, elaborates without errors under Lean 4.19.0
   (`bash scripts/check_lean.sh`; `formal/STATUS.md`).
 
