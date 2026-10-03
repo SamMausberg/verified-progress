@@ -168,8 +168,8 @@ Secondary investigations and supporting material:
   8-32, exact up to rounding as classed at concurrency 1
   (`evidence/speed_lowc/confirm/`).
 - **Admission at high concurrency.** Speculation trails plain decoding from
-  concurrency 48 mostly because its requests finish one or two at a time and are
-  each prefilled alone. SGLang's prefill delayer with a 16-request cap on every
+  concurrency 48 mostly because its requests finish and are prefilled one or two
+  at a time. SGLang's prefill delayer with a 16-request cap on every
   prefill batch lets MTP serve 1.18-1.32 times the best non-speculative arm at
   concurrency 48-128, at 2.6-3.1 times plain decoding's 99th-percentile time to
   first token (three sessions; exact up to rounding as classed at 64 and 128;
@@ -189,14 +189,20 @@ Secondary investigations and supporting material:
   (`evidence/bf16_paths/`).
 - **Changes offered upstream.** Two engine changes are kept as single commits
   against SGLang's upstream main (`engine/sglang/patches/upstream/`): the FA4
-  paged-KV fix, confirmed on a GH200 with a regression test in a comment on the
-  open SGLang pull request #35757, and sgl-kernel's sm_90a build for aarch64,
-  without which its SM90 CUTLASS GEMMs return without computing (SGLang pull
-  request #42263). The checks behind the FA4 comment also found two failures the
-  fix does not cover, at head dimensions 80 and 96 without causal masking and at
-  160 and 224, both with the cp.async paged loader and both also on
-  FlashAttention's main branch
-  (`evidence/upstream_fa4/`).
+  paged-KV fix, confirmed on a GH200 with a regression test in
+  [a comment](https://github.com/sgl-project/sglang/pull/35757#issuecomment-5961366446)
+  on the open SGLang pull request #35757, and sgl-kernel's sm_90a build for
+  aarch64, without which its SM90 CUTLASS GEMMs return without computing
+  ([sgl-project/sglang#42263](https://github.com/sgl-project/sglang/pull/42263)).
+  The checks behind the FA4 comment also found two failures the fix does not
+  cover, at head dimensions 80 and 96 without causal masking and at 160 and 224,
+  both with the cp.async paged loader and both also on FlashAttention's main
+  branch (`evidence/upstream_fa4/`). They are reported there as
+  [Dao-AILab/flash-attention#2957](https://github.com/Dao-AILab/flash-attention/issues/2957),
+  with a proposed fix in
+  [#2958](https://github.com/Dao-AILab/flash-attention/pull/2958), and
+  [a follow-up comment](https://github.com/sgl-project/sglang/pull/35757#issuecomment-5966360526)
+  on #35757 offers the same change for SGLang's vendored copy.
 - **Drafting.** The public DFlash-4B drafter at block 16 averages 6.18 tokens
   per verify cycle, pooled over the 80-request pilot panel, and a zero-training
   screen of its candidate sets does not rule out a rate-trained selector (P6)
