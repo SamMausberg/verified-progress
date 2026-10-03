@@ -54,9 +54,10 @@
 \node[annot,anchor=west] at (axis cs:300,282) {$c{=}1$};
 \node[annot,anchor=south east] at (axis cs:106,14800) {$c{=}128$};
 % direct labels (positions in the comment above)
-\node[annot,anchor=east] at (axis cs:255,450) {plain decoding};
-\node[annot,anchor=north west,align=left] at (axis cs:478,640) {MTP, 3 steps,\\FlashInfer};
-\node[annot,anchor=south west] at (axis cs:390,5700) {DFlash, 8-token blocks};
-\node[annot,anchor=north,align=center] at (axis cs:135,3800) {DFlash,\\16-token blocks};
+% each label in its arm's colour (style.tex), so the two DFlash labels name their lines unambiguously
+\node[annot,anchor=east,text=cstock] at (axis cs:255,450) {plain decoding};
+\node[annot,anchor=north west,align=left,text=cmtp] at (axis cs:478,640) {MTP, 3 steps,\\FlashInfer};
+\node[annot,anchor=south west,text=cdflash8] at (axis cs:390,5700) {DFlash, 8-token blocks};
+\node[annot,anchor=north,align=center,text=cdflash16] at (axis cs:135,3800) {DFlash,\\16-token blocks};
 \end{axis}
 \end{tikzpicture}%
