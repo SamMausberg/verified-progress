@@ -26,6 +26,7 @@ source "$REPO/experiments/speed_bytes/holds/tree_guard.sh"
 [ -z "$(dirty_tree "$REPO" .)" ] || { echo "repository $REPO has edits, untracked files or ignored Python files"; exit 1; }
 [ "$(git -C "$ENGINE" rev-parse "HEAD^{tree}")" = "$ENGINE_TREE" ] || { echo "engine tree is not $ENGINE_TREE"; exit 1; }
 [ -z "$(dirty_tree "$ENGINE" python)" ] || { echo "engine dirty"; exit 1; }
+log_runtime
 # shellcheck disable=SC2329 # invoked by the EXIT trap
 kill_servers() {
   pkill -TERM -f -- 'sglang.launch_server.* --port 30220( |$)' || true
@@ -35,6 +36,7 @@ kill_servers() {
 trap kill_servers EXIT
 FAILS=0
 echo "== unit check"
+echo "unit script $(sha256sum "$SP/fp8_dense_unit.py" | cut -d' ' -f1)"
 timeout --foreground 180 python "$SP/fp8_dense_unit.py"
 run() {  # label arm concurrency... -- extra args
   local label=$1 arm=$2; shift 2

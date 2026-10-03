@@ -390,6 +390,16 @@ def check_hold_finished(hold: Path) -> None:
         raise SystemExit(f'{hold}: the hold log does not end with every step done')
 
 
+def check_runtime_logged(hold: Path) -> bool:
+    """The runtime the hold logged (holds/tree_guard.sh log_runtime): this virtualenv's interpreter
+    with the planned torch and CUDA. Holds recorded before the line existed log none (False)."""
+    found = re.findall(r'^runtime (\S+) (\S+) (\S+)$', (hold / 'hold.log').read_text(), re.M)
+    for runtime in found:
+        if runtime != (VENV_PYTHON, TORCH_VERSION, TORCH_CUDA):
+            raise SystemExit(f'{hold}: runtime {" ".join(runtime)}')
+    return bool(found)
+
+
 def hold_repo(hold: Path) -> str:
     """The repository commit (the harness) a hold's log records at its start."""
     m = re.match(r'start \S+ repo (\w+) ', (hold / 'hold.log').read_text())
@@ -427,6 +437,7 @@ def cmd_served(args: argparse.Namespace) -> None:
         name = hold.name.split('_')[0]
         engine = check_hold_engine(hold)
         check_hold_finished(hold)
+        check_runtime_logged(hold)
         repo = hold_repo(hold)
         labels = [f.parent.parent.name for f in sweeps]
         if name not in PLANNED or sorted(labels) != sorted(PLANNED[name]):
@@ -794,6 +805,7 @@ def cmd_probe(args: argparse.Namespace) -> None:
     d = Path(args.probe_dir)
     check_hold_engine(d)
     check_hold_finished(d)
+    check_runtime_logged(d)
     for label, switches in PROBE1_SWITCHES.items():
         log = (d / f'server_{label}.log').read_text(errors='replace')
         if not check_fp8_log(log, switches):
@@ -820,6 +832,15 @@ def cmd_probe(args: argparse.Namespace) -> None:
         out['logit_probe_compare'][f'{a} vs {b}'] = compare_runs(load(a), load(b))
         out['decode_path'][f'{a} vs {b}'] = decode_path(load(a), load(b))
     check_hold_engine(Path(args.unit_log).parent)  # kill1, the hold that ran the unit check
+    check_runtime_logged(Path(args.unit_log).parent)
+    # The unit script, where the log records its hash (the committed kill1.sh does; the recorded
+    # run used a scratch copy and predates the line): this checkout's fp8_dense_unit.py.
+    unit_shas = set(
+        re.findall(r'^unit script ([0-9a-f]{64})$', Path(args.unit_log).read_text(), re.M)
+    )
+    unit_here = hashlib.sha256((REPO / 'experiments/speed_bytes/fp8_dense_unit.py').read_bytes())
+    if unit_shas and unit_shas != {unit_here.hexdigest()}:
+        raise SystemExit(f"{args.unit_log}: unit script {sorted(unit_shas)}, not this checkout's")
     unit: list[dict[str, Any]] = [
         {
             'act': m.group(1),

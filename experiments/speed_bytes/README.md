@@ -22,11 +22,14 @@ every inherited `SGLANG_*` variable and any override of the virtualenv or CUDA t
 `scripts/sglang_env.sh` would honour, exit non-zero when any sweep, trace or probe step failed,
 `fp8_probe.sh` creates its output directory and checks the SGLang checkout, and `probe1.sh`
 refuses a port that already serves (checked again under the startup lock), accepts a server only
-when the process listening on its port is the one it started, and stops only the servers it started. `fp8_dense_unit.py` now
+when the process listening on its port is the one it started, and stops only the servers it started.
+The holds also log their runtime (interpreter, torch and its CUDA) and `kill1.sh` the hash of
+`fp8_dense_unit.py`; the recorded runs predate both lines. `fp8_dense_unit.py` now
 fails on the properties it prints (per-row rows independent of the batch, CUDA-graph replay equal
 to eager, relative error under 0.06); the run printed them all passing. `summarize.py` checks
 every input against what its hold launched: per hold the engine (its tree, which the hold scripts
-now log, or for the recorded runs the commit) and that its log reached its last line; per sweep
+now log, or for the recorded runs the commit), the runtime and unit-script hash where it logs them,
+and that its log reached its last line; per sweep
 the full `bench/sweep.py` invocation the hold makes (arm, label, session, engine, port,
 concurrencies, request counts, the exact switches and nothing else), the settings `bench/sweep.py`
 took from its defaults (output length, request body, warm-up, aiperf version, and the committed

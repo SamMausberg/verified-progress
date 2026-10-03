@@ -25,6 +25,7 @@ source "$REPO/experiments/speed_bytes/holds/tree_guard.sh"
 [ -z "$(dirty_tree "$REPO" .)" ] || { echo "repository $REPO has edits, untracked files or ignored Python files"; exit 1; }
 [ "$(git -C "$ENGINE" rev-parse "HEAD^{tree}")" = "$ENGINE_TREE" ] || { echo "engine tree is not $ENGINE_TREE"; exit 1; }
 [ -z "$(dirty_tree "$ENGINE" python)" ] || { echo "engine dirty"; exit 1; }
+log_runtime
 # Stops only the servers this hold started: each one leads its own process group (setsid), whose
 # id start_server records in $OUT/server_<label>.pid.
 # shellcheck disable=SC2329 # invoked by the EXIT trap and between servers

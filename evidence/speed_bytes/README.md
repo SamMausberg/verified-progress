@@ -9,8 +9,9 @@ frontier.
 
 Setting: Qwen/Qwen3.5-4B at `851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a`, drafter
 z-lab/Qwen3.5-4B-DFlash at `9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf`, SGLang `bd66ce343e` plus
-`engine/sglang/patches/speed-bytes/` (engine commit per run in `served.csv`), torch 2.13.0+cu130,
-one GH200, greedy decoding, bench's harness and arms (`bench/arms.toml`) at repository commit
+`engine/sglang/patches/speed-bytes/` (engine commit per run in `served.csv`), torch 2.13.0+cu130
+(recorded by the GEMM probe; the servers ran from the same virtualenv, which `served.csv`'s checks
+confirm by path, but these holds predate a per-hold record of its versions), one GH200, greedy decoding, bench's harness and arms (`bench/arms.toml`) at repository commit
 `e690b3a`. Labels: **measured**, **derived** (arithmetic on measured values), **hypothesis**.
 
 ## Short answer
