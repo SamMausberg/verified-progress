@@ -24,11 +24,17 @@
 #
 # CONFIRM_LEVERS   levers that survived their probes; declared: ABC (FULL is ABC on L, AC on H)
 # CONFIRM_ENGINE   the confirm engine worktree (~/sglang-wt/speed-lowc-confirm)
-# CONFIRM_TREE     its declared tree hash; every hold refuses another
 # CONFIRM_GATE     gate.json written by the equality hold (confirm_gate.py); sessions refuse
-#                  a gate that failed or names other levers
+#                  a gate that failed, names other levers or is not bound to these trees
+# The engine's tree (CONFIRM_TREE) and stock SGLang (S0: ~/sglang at the pin, with its
+# .venv) are declared constants, not settings.
 
 [ -n "${VIRTUAL_ENV:-}" ] || { echo "confirm_arms.sh: source scripts/sglang_env.sh first" >&2; exit 1; }
+# scripts/sglang_env.sh (lines 11 and 19) activates the virtualenv of SGLANG_DIR, which the
+# loop below then drops: refuse another checkout first, so that S0's interpreter is stock's.
+STOCK_SGLANG=$HOME/sglang
+[ "$(realpath -m "${SGLANG_DIR:-$STOCK_SGLANG}")" = "$(realpath -m "$STOCK_SGLANG")" ] ||
+  { echo "confirm_arms.sh: SGLANG_DIR must be $STOCK_SGLANG (S0 is stock SGLang there)" >&2; exit 1; }
 # Arms add exactly their declared variables; drop any engine variable from the caller.
 for _v in $(compgen -e); do
   case $_v in
@@ -38,19 +44,21 @@ for _v in $(compgen -e); do
 done
 unset _v
 CONFIRM_ENGINE=${CONFIRM_ENGINE:-$HOME/sglang-wt/speed-lowc-confirm}
-CONFIRM_TREE=${CONFIRM_TREE:-5d6db54828d7fbdac62180810b68a87cee3b39ec}
+# The declared engine tree (evidence/speed_lowc/confirm/README.md, Engine).
+CONFIRM_TREE=5d6db54828d7fbdac62180810b68a87cee3b39ec
 CONFIRM_LEVERS=${CONFIRM_LEVERS:?set CONFIRM_LEVERS (e.g. AB or ABC)}
 # Each lever at most once, in the order A, B, C (arm labels and the gate compare the string).
 [[ $CONFIRM_LEVERS =~ ^A?B?C?$ ]] && [ -n "$CONFIRM_LEVERS" ] ||
   { echo "confirm_arms.sh: CONFIRM_LEVERS must be a subset of A, B, C in that order (e.g. ABC, AC)" >&2; exit 1; }
 CONFIRM_GATE=${CONFIRM_GATE:-$HOME/vp-data/speed-lowc/confirm/current/gate.json}
-# S0 imports the stock checkout that scripts/sglang_env.sh activates (SGLANG_DIR, line 11),
-# which must be the pin (engine/sglang/README.md, line 4) with no local changes.
-STOCK_SGLANG=${SGLANG_DIR:-$HOME/sglang}
+# Stock SGLang must be at the pin (engine/sglang/README.md, line 4) with no local changes.
 STOCK_PIN=bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824
 # The equality prompts: state's frozen set, checked against evidence/state_safety/prompt_manifest.json.
 CONFIRM_PROMPTS=${CONFIRM_PROMPTS:-$HOME/vp-data/state/prompts/prompts.jsonl}
 CONFIRM_REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+# The repository commit a hold runs at; check_inputs refuses a HEAD that moves during the hold.
+CONFIRM_REPO_HEAD=$(git -C "$CONFIRM_REPO" rev-parse HEAD) ||
+  { echo "confirm_arms.sh: cannot read the repository HEAD" >&2; exit 1; }
 
 group_arm() {
   case $1 in
@@ -104,16 +112,27 @@ arm_args() {
 }
 
 # check_inputs [prompts]: every input a hold reuses is the declared one, or it prints why
-# and returns 1: this repository without modified tracked files (it defines the arms'
-# flags), the confirm engine's tree with no local changes, stock SGLang at the pin with no
-# local changes, and with "prompts" the equality prompt file against its manifest.
+# and returns 1: this repository at the hold's starting commit without modified tracked
+# files (it defines the arms' flags), the confirm engine's tree with no local changes, the
+# stock SGLang that S0 imports at the pin with no local changes, and with "prompts" the
+# equality prompt file against its manifest. The holds call it before every launch.
 check_inputs() {
+  local stock
+  [ "$(git -C "$CONFIRM_REPO" rev-parse HEAD)" = "$CONFIRM_REPO_HEAD" ] ||
+    { echo "repository HEAD is no longer $CONFIRM_REPO_HEAD"; return 1; }
   [ -z "$(git -C "$CONFIRM_REPO" status --porcelain --untracked-files=no)" ] ||
     { echo "repository has modified tracked files"; return 1; }
   [ "$(git -C "$CONFIRM_ENGINE" rev-parse 'HEAD^{tree}')" = "$CONFIRM_TREE" ] ||
     { echo "confirm engine tree is not the declared one"; return 1; }
   [ -z "$(git -C "$CONFIRM_ENGINE" status --porcelain)" ] ||
     { echo "confirm engine has local changes"; return 1; }
+  # What S0 runs: this interpreter's sglang with no worktree on PYTHONPATH, resolved as
+  # bench/server.py (sglang_source) and experiments/state_safety/server.py do.
+  stock=$(env -u PYTHONPATH -u SGLANG_WORKTREE python -c 'import pathlib, sys, sglang
+print(pathlib.Path(sys.prefix).resolve(), pathlib.Path(sglang.__file__).resolve().parents[2])') ||
+    { echo "cannot import stock SGLang"; return 1; }
+  [ "$stock" = "$(realpath "$STOCK_SGLANG/.venv") $(realpath "$STOCK_SGLANG")" ] ||
+    { echo "S0 would run (interpreter, checkout) $stock, not $STOCK_SGLANG and its .venv"; return 1; }
   [ "$(git -C "$STOCK_SGLANG" rev-parse HEAD)" = "$STOCK_PIN" ] ||
     { echo "stock SGLang ($STOCK_SGLANG) is not at the pin $STOCK_PIN"; return 1; }
   [ -z "$(git -C "$STOCK_SGLANG" status --porcelain)" ] ||
@@ -134,8 +153,10 @@ PY
 }
 
 # The single precondition of every timed session: the equality gate passed for exactly
-# these levers, from the runs it is bound to. Its directory's meta.json (compare.py)
-# records each equality run's repository and SGLang commits: every run must come from this
+# these levers, from the runs it is bound to. The gate is recomputed by this commit's
+# confirm_gate.py from its own directory's summary.json (which must name that directory's
+# runs) and must pass and equal gate.json. The directory's meta.json (compare.py) records
+# each equality run's repository and SGLang commits: every run must come from this
 # repository's HEAD (the same arm flags, scripts and prompt manifest), every S0 run from the
 # pin and every other run from the confirm engine's HEAD, all with no modified SGLang files.
 # meta.json must hold exactly the runs the equality hold makes for these levers.
@@ -147,17 +168,30 @@ gate_ok() {
     for (( j=0; j<${#full}; j++ )); do runs+=("plain__lowc_${g}_${full:$j:1}/c1"); done
     (( ${#full} > 1 )) && runs+=("plain__lowc_${g}_$full/c1")
   done
-  python - "$CONFIRM_GATE" "$CONFIRM_LEVERS" "$(git -C "$CONFIRM_REPO" rev-parse HEAD)" \
-    "$(git -C "$CONFIRM_ENGINE" rev-parse HEAD)" "$STOCK_PIN" "${runs[@]}" <<'PY'
-import json, sys
+  python - "$CONFIRM_GATE" "$CONFIRM_LEVERS" "$CONFIRM_REPO_HEAD" \
+    "$(git -C "$CONFIRM_ENGINE" rev-parse HEAD)" "$STOCK_PIN" \
+    "$CONFIRM_REPO/experiments/speed_lowc/confirm_gate.py" "${runs[@]}" <<'PY'
+import json, subprocess, sys, tempfile
 from pathlib import Path
-path, levers, repo, engine, pin = sys.argv[1:6]
-expected = set(sys.argv[6:])
+path, levers, repo, engine, pin, script = sys.argv[1:7]
+expected = set(sys.argv[7:])
 gate = json.loads(Path(path).read_text())
-meta = json.loads((Path(path).parent / 'meta.json').read_text())
+home = Path(path).resolve().parent
+meta = json.loads((home / 'meta.json').read_text())
 why = []
 if gate.get('ok') is not True or gate.get('levers') != levers:
     why.append(f'gate ok={gate.get("ok")} levers={gate.get("levers")}')
+if Path(str(gate.get('summary'))).resolve() != home / 'summary.json':
+    why.append(f'gate.json was computed from {gate.get("summary")}, not {home / "summary.json"}')
+with tempfile.TemporaryDirectory() as tmp:
+    fresh_path = Path(tmp) / 'gate.json'
+    check = subprocess.run([sys.executable, script, '--summary', str(home / 'summary.json'),
+                            '--levers', levers, '--out', str(fresh_path)], capture_output=True, text=True)
+    fresh = json.loads(fresh_path.read_text()) if fresh_path.is_file() else {}
+fresh['summary'] = gate.get('summary')  # the same file, possibly named through another path
+if check.returncode != 0 or fresh != gate:
+    tail = (check.stdout + check.stderr).strip().splitlines()[-1:]
+    why.append(f'the gate recomputed from {home} (exit {check.returncode}) differs from gate.json {tail}')
 if set(meta) != expected:
     why.append(f'meta.json runs missing {sorted(expected - set(meta))}, extra {sorted(set(meta) - expected)}')
 for run, m in sorted(meta.items()):

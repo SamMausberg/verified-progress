@@ -12,7 +12,8 @@
 set -uo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo" || exit 1
-[ "$#" -eq 1 ] && [[ $1 =~ ^[1-9]$ ]] || { echo "usage: $0 <session number 1-9>" >&2; exit 64; }
+# The declared sessions are 1, 2 and 3 (confirm_analyze.py refuses any other).
+[ "$#" -eq 1 ] && [[ $1 =~ ^[1-3]$ ]] || { echo "usage: $0 <session number 1-3>" >&2; exit 64; }
 k=$1
 unset SGLANG_WORKTREE PYTHONPATH
 # shellcheck source=/dev/null
@@ -20,10 +21,14 @@ source "$repo/scripts/sglang_env.sh"
 # shellcheck source=/dev/null
 source "$repo/experiments/speed_lowc/confirm_arms.sh"
 OUT=$HOME/vp-data/speed-lowc/confirm/s$k-$(date -u +%Y%m%dT%H%M%SZ)
-mkdir -p "$OUT"
-exec >>"$OUT/session.log" 2>&1
+# A new directory for every hold: never write into or append to an earlier one.
+{ mkdir -p "$(dirname "$OUT")" && mkdir "$OUT"; } || { echo "cannot create a new $OUT" >&2; exit 1; }
+exec >"$OUT/session.log" 2>&1 || exit 1
 cleanup() { pkill -TERM -f 'sglang.launch_server.*--port 30214' 2>/dev/null || true; }
-trap cleanup EXIT INT TERM
+# A signal ends the hold (the EXIT trap stops the server); it does not go on to the next arm.
+trap cleanup EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
 check_inputs || exit 1
 gate_ok || { echo "refused: no equality gate for levers $CONFIRM_LEVERS bound to these trees"; exit 1; }
 groups=(L H)
@@ -45,6 +50,8 @@ for g in "${groups[@]}"; do
   read -r -a conc <<< "$(group_concurrency "$g")"
   echo "group $g arm $(group_arm "$g") order ${order[*]} c=${conc[*]}"
   for name in "${order[@]}"; do
+    # Inputs again before every launch, so a tree that changes during the hold fails the launch.
+    check_inputs || { failed+=("$g:$name:inputs"); continue; }
     # A command substitution keeps arm_args's exit status (mapfile < <(...) would drop it).
     arm_text=$(arm_args "$g" "$name") || { failed+=("$g:$name:args"); continue; }
     mapfile -t args <<< "$arm_text"

@@ -9,8 +9,9 @@ interval's lower end is above 1, "slowdown" if its upper end is below 1, otherwi
 detectable change". A session cell with an invalid point (bench's invalid_reason), or with
 a different number of launches than the declared order, is void; fewer than three valid
 sessions leave the ratio undecided. Cells come from the declared plan (groups, arms,
-concurrencies, sessions lowc-s1 to lowc-s3), so a missing one counts as void, and a
-confirmation point outside the plan is an error.
+concurrencies, sessions lowc-s1 to lowc-s3), so a missing one counts as void. A confirmation
+point (a `lowc-` label or session) outside the plan, the same point twice, or a valid point
+whose x_e2e, y or accept length is not a finite positive number is an error.
 
     python experiments/speed_lowc/confirm_analyze.py --points <points.csv> --out <dir>
 """
@@ -21,6 +22,7 @@ import argparse
 import csv
 import json
 import math
+import re
 import statistics
 from collections import defaultdict
 from pathlib import Path
@@ -32,8 +34,10 @@ SESSIONS = 3
 
 
 SESSION_LABELS = tuple(f'lowc-s{k}' for k in range(1, SESSIONS + 1))
-# The declared concurrencies: experiments/speed_lowc/confirm_arms.sh, group_concurrency (lines 54-55).
+# The declared concurrencies: experiments/speed_lowc/confirm_arms.sh, group_concurrency (lines 70-76).
 CONCURRENCY = {'L': (1, 2, 4), 'H': (8, 16, 32)}
+# Values a valid point must have as finite positive numbers (confirm_accept.py reads accept_length).
+POINT_VALUES = (*METRICS, 'accept_length')
 
 
 def expected_launches(arm: str, full: str) -> int:
@@ -43,7 +47,7 @@ def expected_launches(arm: str, full: str) -> int:
 def declared_arms(full: str) -> list[str]:
     """S0, each single lever (only when FULL has more than one) and FULL.
 
-    The launch order of experiments/speed_lowc/hold_confirm_session.sh (lines 39-47).
+    The launch order of experiments/speed_lowc/hold_confirm_session.sh (lines 41-49).
     """
     singles = list(full) if len(full) > 1 else []
     return ['S0', *singles, full]
@@ -61,25 +65,47 @@ def declared_keys(full: dict[str, str]) -> list[tuple[str, str, int, str]]:
 
 
 def parse_full(items: list[str]) -> dict[str, str] | None:
-    """--full GROUP=ARM pairs, or None unless both groups have levers from A, B, C."""
-    full = dict(item.split('=', 1) for item in items if '=' in item)
-    if set(full) != {'L', 'H'} or any(not f or set(f) - set('ABC') for f in full.values()):
+    """--full GROUP=ARM for L and H, once each, or None.
+
+    FULL as experiments/speed_lowc/confirm_arms.sh (group_full) builds it from the levers: on
+    L a non-empty subset of A, B, C in that order, on H the same without B.
+    """
+    pairs = [item.split('=', 1) for item in items]
+    if any(len(p) != 2 for p in pairs) or sorted(p[0] for p in pairs) != ['H', 'L']:
         return None
-    return full
+    full = dict((p[0], p[1]) for p in pairs)
+    if not re.fullmatch('A?B?C?', full['L']) or full['H'] != full['L'].replace('B', ''):
+        return None
+    return full if full['L'] and full['H'] else None
 
 
 def load_cells(points: Path, full: dict[str, str]) -> dict[tuple, list[dict]]:
     """The confirmation's points by cell; refuses a point outside the declared plan."""
     declared = set(declared_keys(full))
     cells: dict[tuple, list[dict]] = defaultdict(list)
+    seen: set[tuple[str, ...]] = set()
     with points.open() as f:
         for row in csv.DictReader(f):
-            if not row['label'].startswith('lowc-') or not row['session'].startswith('lowc-s'):
+            label, session = row['label'], row['session']
+            if not (label.startswith('lowc-') or session.startswith('lowc-')):
                 continue
-            _, group, arm = row['label'].split('-', 2)
-            key = (group, arm, int(row['concurrency']), row['session'])
+            parts = label.split('-', 2)
+            key = (
+                (parts[1], parts[2], int(row['concurrency']), session)
+                if len(parts) == 3 and parts[0] == 'lowc'
+                else None
+            )
             if key not in declared:
-                raise SystemExit(f'{points}: point outside the declared plan: {key}')
+                raise SystemExit(f'{points}: point outside the declared plan: {label} {session}')
+            point = (label, row['run'], row['repeat'], row['concurrency'], session)
+            if point in seen:
+                raise SystemExit(f'{points}: the same point twice: {point}')
+            seen.add(point)
+            if not row['invalid_reason']:
+                for m in POINT_VALUES:
+                    v = float(row[m])
+                    if not (math.isfinite(v) and v > 0):
+                        raise SystemExit(f'{points}: valid point {point} has {m} = {row[m]!r}')
             cells[key].append(row)
     if not cells:
         raise SystemExit(f'no confirmation points in {points}')
@@ -95,7 +121,7 @@ def main() -> None:
     args = ap.parse_args()
     full = parse_full(args.full)
     if full is None:
-        ap.error('--full must name both groups, L and H, each with levers from A, B, C')
+        ap.error('--full must give L=<levers> and H=<the same without B>, e.g. L=ABC H=AC')
     cells = load_cells(args.points, full)
 
     results: list[dict[str, Any]] = []

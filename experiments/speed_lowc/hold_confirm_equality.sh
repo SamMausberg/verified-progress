@@ -18,8 +18,9 @@ source "$repo/scripts/sglang_env.sh"
 source "$repo/experiments/speed_lowc/confirm_arms.sh"
 OUT=$HOME/vp-data/speed-lowc/confirm/equality-$(date -u +%Y%m%dT%H%M%SZ)
 RUNS=$OUT/runs
-mkdir -p "$RUNS"
-exec >>"$OUT/hold.log" 2>&1
+# A new directory for every hold: never write into or append to an earlier one.
+{ mkdir -p "$(dirname "$OUT")" && mkdir "$OUT" "$RUNS"; } || { echo "cannot create a new $OUT" >&2; exit 1; }
+exec >"$OUT/hold.log" 2>&1 || exit 1
 PROMPTS=$CONFIRM_PROMPTS
 check_inputs prompts || exit 1
 echo "equality start $(date -Is) repo $(git rev-parse HEAD) engine $(git -C "$CONFIRM_ENGINE" rev-parse HEAD)" \
@@ -45,6 +46,7 @@ run_eq() {
         A) flags+=" --enable-linear-replayssm-spec"; env+=(SGLANG_GDN_REPLAYSSM_FOLD=1) ;;
         B) flags+=" --speculative-draft-attention-backend fa4" ;;
         C) flags+=" --attention-backend fa4" ;;
+        *) echo "=== $g $name: unknown lever $x"; failed+=("$g:$name"); return 1 ;;
       esac
     done
   fi
@@ -70,7 +72,8 @@ for g in L H; do
   for (( j=0; j<${#full}; j++ )); do names+=("${full:$j:1}"); done
   (( ${#full} > 1 )) && names+=("$full")
   for name in "${names[@]}"; do
-    run_eq "$g" "$name"
+    # Inputs again before every run, so a tree that changes during the hold fails the run.
+    if check_inputs prompts; then run_eq "$g" "$name"; else failed+=("$g:$name:inputs"); fi
     [ "$name" = S0 ] || pairs+=("[\"$g $name vs S0\", \"plain__lowc_${g}_S0/c1\", \"plain__lowc_${g}_$name/c1\"]")
   done
 done
@@ -78,13 +81,14 @@ done
 python experiments/state_safety/compare.py --runs "$RUNS" --pairs "$OUT/pairs.json" \
   --out-json "$OUT/summary.json" --out-csv "$OUT/divergences.csv" --out-table "$OUT/table.csv" \
   --out-meta "$OUT/meta.json" > "$OUT/compare.log" 2>&1 || failed+=(compare)
-if [[ " ${failed[*]} " != *" compare "* ]]; then
+# The gate decides only on a hold whose every run and comparison succeeded, so a gate.json
+# exists only where that is so.
+if (( ${#failed[@]} == 0 )); then
   python experiments/speed_lowc/confirm_gate.py --summary "$OUT/summary.json" \
     --levers "$CONFIRM_LEVERS" --out "$OUT/gate.json" || failed+=(gate)
 fi
 if (( ${#failed[@]} == 0 )); then
-  ln -sfn "$OUT" "$(dirname "$OUT")/current"
-  echo "current -> $OUT"
+  if ln -sfn "$OUT" "$(dirname "$OUT")/current"; then echo "current -> $OUT"; else failed+=(current); fi
 fi
 nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader
 echo "equality end $(date -Is) failed: ${failed[*]:-none}"

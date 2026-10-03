@@ -12,10 +12,13 @@ against S0 of its group) and decides, per group, which levers may be timed:
 * a lever is timed only if its own arm and the group's FULL arm pass.
 
 compare.py counts a prompt's logprobs as compared when both runs have any top-logprob
-entry, so the gate also reads both runs of every pair (the runs directory the summary
-names) and requires, for each of the 320 prompts, a top-k list of TOP_K entries at every
-output position, and that compare.py's self-consistency check found every committed token
-of both runs to be that run's own argmax (no not_argmax position: a greedy run).
+entry, so the gate also reads both runs of every pair and requires, for each of the 320
+prompts, a top-k list of TOP_K entries at every output position, each a finite logprob with
+an integer token id (compare.py's comparisons are meaningless on NaN or infinity), and that
+compare.py's self-consistency check found every committed token of both runs to be that
+run's own argmax (no not_argmax position: a greedy run). Each pair must compare the runs
+its label names (S0 and the arm of that group, as hold_confirm_equality.sh names them), and
+the runs directory the summary names must be the one beside it (the hold's own).
 
 Writes gate.json and exits non-zero if B0 fails in either group or no lever passes.
 
@@ -27,13 +30,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import sys
 from pathlib import Path
 from typing import Any
 
 PROMPTS = 320
-# Top logprobs per position: experiments/speed_lowc/hold_confirm_equality.sh line 61 (--top-logprobs 5).
+# Top logprobs per position: experiments/speed_lowc/hold_confirm_equality.sh line 60 (--top-logprobs 5).
 TOP_K = 5
 ROUNDING = {'tie', 'one_ulp', 'near'}
 GROUP_LEVERS = {'L': 'ABC', 'H': 'AC'}  # B is FA4 drafting, which H already uses
@@ -41,6 +45,20 @@ GROUP_LEVERS = {'L': 'ABC', 'H': 'AC'}  # B is FA4 drafting, which H already use
 
 def group_full(group: str, levers: str) -> str:
     return ''.join(x for x in levers if x in GROUP_LEVERS[group])
+
+
+def run_name(group: str, arm: str) -> str:
+    # hold_confirm_equality.sh line 60: run_matrix.py --configs plain --tag lowc_<group>_<arm>, pass c1.
+    return f'plain__lowc_{group}_{arm}/c1'
+
+
+def entry_ok(entry: Any) -> bool:
+    """A top-logprob entry as compare.py reads it: [finite logprob, integer token id]."""
+    if not isinstance(entry, list) or len(entry) != 2:
+        return False
+    lp, token = entry
+    number = isinstance(lp, (int, float)) and not isinstance(lp, bool) and math.isfinite(lp)
+    return number and isinstance(token, int) and not isinstance(token, bool)
 
 
 def coverage(runs: Path, run: str) -> str | None:
@@ -53,10 +71,13 @@ def coverage(runs: Path, run: str) -> str | None:
         1
         for r in records
         if len(r.get('top_logprobs') or []) != len(r['output_ids'])
-        or any(len(top) != TOP_K for top in r['top_logprobs'])
+        or any(len(top) != TOP_K or not all(map(entry_ok, top)) for top in r['top_logprobs'])
     )
     if len(records) != PROMPTS or short:
-        return f'{run}: {len(records)} prompts, {short} without top-{TOP_K} at every position'
+        return (
+            f'{run}: {len(records)} prompts, {short} without {TOP_K} top logprobs (finite, with '
+            'integer token ids) at every position'
+        )
     return None
 
 
@@ -109,6 +130,8 @@ def main() -> None:
         ap.error('--levers must be a non-empty subset of A, B, C in that order, e.g. ABC or AC')
     summary = json.loads(args.summary.read_text())
     pairs, runs = summary['pairs'], Path(summary['runs'])
+    if runs.resolve() != args.summary.resolve().parent / 'runs':
+        sys.exit(f'{args.summary} compares runs in {runs}, not the runs/ directory beside it')
     selfc = summary.get('self_consistency') or {}
     cache: dict[str, str | None] = {}
 
@@ -119,7 +142,11 @@ def main() -> None:
                 return f'{run}: not_argmax {violations} (self-consistency)'
         return None
 
-    def checked(check: Any, pair: dict[str, Any] | None) -> tuple[bool, str]:
+    def checked(check: Any, group: str, arm: str) -> tuple[bool, str]:
+        pair = pairs.get(f'{group} {arm} vs S0')
+        expected = (run_name(group, 'S0'), run_name(group, arm))
+        if pair is not None and (pair.get('run_a'), pair.get('run_b')) != expected:
+            return False, f'compares {pair.get("run_a")} with {pair.get("run_b")}, not {expected}'
         ok, note = check(pair)
         gap = positions(runs, pair, cache) or greedy(pair)
         return (False, gap) if ok and gap else (ok, note)
@@ -129,11 +156,11 @@ def main() -> None:
     for group in ('L', 'H'):
         full = group_full(group, args.levers)
         checks: dict[str, Any] = {}
-        b0_ok, b0_note = checked(bitwise, pairs.get(f'{group} B0 vs S0'))
+        b0_ok, b0_note = checked(bitwise, group, 'B0')
         checks['B0'] = {'ok': b0_ok, 'note': b0_note}
         arms = list(full) + ([full] if len(full) > 1 else [])
         for arm in arms:
-            ok, note = checked(exact, pairs.get(f'{group} {arm} vs S0'))
+            ok, note = checked(exact, group, arm)
             checks[arm] = {'ok': ok, 'note': note}
         full_ok = checks[full]['ok'] if full else False
         timed = ''.join(x for x in full if checks[x]['ok']) if full_ok else ''
