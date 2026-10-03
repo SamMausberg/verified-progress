@@ -1,0 +1,32 @@
+From 3d4e5c51ca0745ba5865202679c4d78d82476c9d Mon Sep 17 00:00:00 2001
+From: Sam Mausberg <samuelmausberg@gmail.com>
+Date: Fri, 2 Oct 2026 19:16:43 +0000
+Subject: [PATCH] LOCAL TEST ONLY: build common_ops for sm_90a alone (not for
+ upstream)
+
+---
+ python/sglang/kernels/aot/CMakeLists.txt | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/python/sglang/kernels/aot/CMakeLists.txt b/python/sglang/kernels/aot/CMakeLists.txt
+index 657c22609a..e276c632e5 100644
+--- a/python/sglang/kernels/aot/CMakeLists.txt
++++ b/python/sglang/kernels/aot/CMakeLists.txt
+@@ -253,6 +253,14 @@ if ("${CUDA_VERSION}" VERSION_GREATER_EQUAL "12.8" OR SGL_KERNEL_ENABLE_FP4)
+     )
+ endif()
+ 
++# LOCAL TEST BUILD ONLY, not part of the PR: keep only the sm_90a gencode (added by the condition
++# above) so the GH200 test build compiles one architecture instead of six.
++set(_test_drop_gencodes ${SGL_KERNEL_CUDA_FLAGS})
++list(FILTER _test_drop_gencodes INCLUDE REGEX "^-gencode=")
++list(FILTER _test_drop_gencodes EXCLUDE REGEX "^-gencode=arch=compute_90a,code=sm_90a$")
++list(REMOVE_ITEM SGL_KERNEL_CUDA_FLAGS ${_test_drop_gencodes})
++message(STATUS "LOCAL TEST BUILD: common_ops gencodes limited to: ${SGL_KERNEL_CUDA_FLAGS}")
++
+ # All source files
+ # NOTE: Please sort the filenames alphabetically
+ set(SOURCES
+-- 
+2.34.1
+

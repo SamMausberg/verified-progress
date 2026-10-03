@@ -18,3 +18,19 @@ dirty_tree() {
 log_runtime() {
   python "$(dirname "${BASH_SOURCE[0]}")/../runtime_record.py"
 }
+
+# kill_own_servers <port> stops the SGLang servers on that port that this hold started: the
+# launch_server processes whose environment carries SB_HOLD=<this hold's output directory>, which
+# every hold that starts servers exports first (bench and run_profiles.py pass their environment
+# on). A server another hold runs on the port is left alone.
+kill_own_servers() {
+  local sig p
+  for sig in TERM KILL; do
+    for p in $(pgrep -f -- "sglang.launch_server.* --port $1( |\$)"); do
+      if tr '\0' '\n' <"/proc/$p/environ" 2>/dev/null | grep -qxF "SB_HOLD=$SB_HOLD"; then
+        kill "-$sig" "$p" 2>/dev/null || true
+      fi
+    done
+    if [ "$sig" = TERM ]; then sleep 5; fi
+  done
+}

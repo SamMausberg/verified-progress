@@ -1,0 +1,185 @@
+From c8f465815efae2d67c9fe85a6ace34e0d687d82f Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Fri, 2 Oct 2026 20:48:20 +0000
+Subject: [PATCH] FP8 dense: static calibrated activation scales and a
+ calibration mode
+
+SGLANG_FP8_DENSE_ACT=static reads one activation maximum per layer from
+SGLANG_FP8_DENSE_CALIB and quantizes with that fixed scale (one kernel, no
+row-scale kernel; batch-invariant). SGLANG_FP8_DENSE_ACT=calibrate keeps
+BF16 and records each layer's running input maximum, written to
+SGLANG_FP8_DENSE_CALIB_OUT every 2 s (reset by <out>.reset).
+---
+ .../layers/quantization/fp8_dense_online.py   | 100 +++++++++++++++++-
+ 1 file changed, 98 insertions(+), 2 deletions(-)
+
+diff --git a/python/sglang/srt/layers/quantization/fp8_dense_online.py b/python/sglang/srt/layers/quantization/fp8_dense_online.py
+index f563219811..cb90f8a90b 100644
+--- a/python/sglang/srt/layers/quantization/fp8_dense_online.py
++++ b/python/sglang/srt/layers/quantization/fp8_dense_online.py
+@@ -15,6 +15,14 @@ SGLANG_FP8_DENSE_ACT selects the activation scale:
+   tensor one scale for the whole batch (its maximum), passed to cuBLASLt. One kernel fewer per
+          layer, but each row's result depends on the other rows in the batch, padded CUDA-graph
+          rows included.
++  static one fixed activation scale per layer, read from SGLANG_FP8_DENSE_CALIB (a JSON map from
++         module name to the activation's absolute maximum on a calibration set; scale = max/448).
++         One quantization kernel and no row-scale kernel per layer; a row's result does not
++         depend on the rest of the batch. Values beyond the calibrated maximum saturate.
++  calibrate  BF16 as stock (nothing converted), with a forward pre-hook on every selected layer
++         that keeps the running absolute maximum of its input. Run without CUDA graphs. A thread
++         writes the maxima to SGLANG_FP8_DENSE_CALIB_OUT every 2 s; creating the file
++         "<out>.reset" zeroes them (after start-up warm-up, before the calibration prompts).
+   none   QUALITY ONLY: weights round-trip through FP8 (per tensor, or per channel with
+          WSCALE=channel) and stay BF16 for the stock BF16 GEMM, so activations are not
+          quantized. It measures the quality of a weight-only FP8 (W8A16) kernel; its speed is
+@@ -42,7 +50,7 @@ logger = logging.getLogger(__name__)
+ FP8 = torch.float8_e4m3fn
+ FP8_MAX = float(torch.finfo(FP8).max)
+ _MODES = ("target", "draft", "both")
+-_ACTS = ("token", "tensor", "oracle", "none")
++_ACTS = ("token", "tensor", "oracle", "none", "static", "calibrate")
+ _ORACLE_ROWS = 32768
+ 
+ 
+@@ -52,6 +60,13 @@ def _per_token_quant(x: torch.Tensor):
+     return sglang_per_token_quant_fp8(x)
+ 
+ 
++def _static_quant(x: torch.Tensor, scale: torch.Tensor):
++    from sglang.kernels.ops.quantization.fp8_kernel import scaled_fp8_quant
++
++    q, _ = scaled_fp8_quant(x, scale)
++    return q
++
++
+ def _per_tensor_quant(x: torch.Tensor):
+     from sglang.kernels.ops.quantization.fp8_kernel import scaled_fp8_quant
+ 
+@@ -72,7 +87,16 @@ class Fp8DenseOnlineLinearMethod:
+         x2 = x.reshape(-1, shape[-1])
+         if not x2.is_contiguous():
+             x2 = x2.contiguous()
+-        if self.act == "oracle":
++        if self.act == "static":
++            q = _static_quant(x2, layer.act_scale_fp8)
++            out = torch._scaled_mm(
++                q,
++                layer.weight_fp8_t,
++                scale_a=layer.act_scale_fp8.reshape(()),
++                scale_b=layer.weight_scale_fp8,
++                out_dtype=x.dtype,
++            )
++        elif self.act == "oracle":
+             q = self.oracle_inputs[x2.shape[1]][: x2.shape[0]]
+             out = torch._scaled_mm(
+                 q,
+@@ -115,6 +139,52 @@ class Fp8DenseOnlineLinearMethod:
+         return out.view(*shape[:-1], out.shape[-1])
+ 
+ 
++def _start_calibration(modules: dict, out_path: str) -> None:
++    import json
++    import threading
++    import time
++
++    for m in modules.values():
++        m._fp8_amax = torch.zeros((), dtype=torch.float32, device=m.weight.device)
++        m._fp8_calls = 0
++
++    def hook(mod, args):
++        x = args[0]
++        if isinstance(x, torch.Tensor) and x.numel():
++            torch.maximum(
++                mod._fp8_amax, x.detach().abs().amax().float(), out=mod._fp8_amax
++            )
++            mod._fp8_calls += 1
++
++    for m in modules.values():
++        m.register_forward_pre_hook(hook)
++    state = {"resets": 0}
++
++    def dump() -> None:
++        while True:
++            time.sleep(2)
++            if os.path.exists(out_path + ".reset"):
++                for m in modules.values():
++                    m._fp8_amax.zero_()
++                    m._fp8_calls = 0
++                os.remove(out_path + ".reset")
++                state["resets"] += 1
++            rec = {
++                "resets": state["resets"],
++                "time": time.time(),
++                "amax": {n: float(m._fp8_amax.item()) for n, m in modules.items()},
++                "calls": {n: m._fp8_calls for n, m in modules.items()},
++            }
++            with open(out_path + ".tmp", "w") as fh:
++                json.dump(rec, fh)
++            os.replace(out_path + ".tmp", out_path)
++
++    threading.Thread(target=dump, daemon=True, name="fp8-calibration").start()
++    logger.info(
++        "FP8 dense calibration: %d layers hooked, writing %s", len(modules), out_path
++    )
++
++
+ def maybe_convert_dense_to_fp8(model: torch.nn.Module, is_draft_worker: bool) -> None:
+     mode = os.environ.get("SGLANG_FP8_DENSE", "").strip()
+     if not mode:
+@@ -142,6 +212,15 @@ def maybe_convert_dense_to_fp8(model: torch.nn.Module, is_draft_worker: bool) ->
+         )
+     channel = wscale == "channel"
+     method = Fp8DenseOnlineLinearMethod(act, channel)
++    calib = {}
++    if act == "static":
++        import json
++
++        path = os.environ.get("SGLANG_FP8_DENSE_CALIB", "")
++        if not path:
++            raise ValueError("SGLANG_FP8_DENSE_ACT=static needs SGLANG_FP8_DENSE_CALIB")
++        calib = json.load(open(path))["amax"]
++    hooked = {}
+     converted, skipped, bytes_before, bytes_after = 0, [], 0, 0
+     for name, module in model.named_modules():
+         qm = getattr(module, "quant_method", None)
+@@ -154,6 +233,9 @@ def maybe_convert_dense_to_fp8(model: torch.nn.Module, is_draft_worker: bool) ->
+         if any(s in name for s in skip) or n % 16 or k % 16:
+             skipped.append(name)
+             continue
++        if act == "calibrate":
++            hooked[name] = module
++            continue
+         with torch.no_grad():
+             if channel:
+                 scale = (w.abs().amax(dim=1).float() / FP8_MAX).clamp(min=1e-12)
+@@ -174,6 +256,12 @@ def maybe_convert_dense_to_fp8(model: torch.nn.Module, is_draft_worker: bool) ->
+         module.weight_fp8_t = wq.t()
+         module.weight_scale_fp8 = scale.reshape(1, -1) if channel else scale.reshape(())
+         module.fp8_one = torch.ones((), dtype=torch.float32, device=w.device)
++        if act == "static":
++            if name not in calib or not calib[name] > 0:
++                raise ValueError(f"no calibrated activation maximum for {name}")
++            module.act_scale_fp8 = torch.tensor(
++                [calib[name] / FP8_MAX], dtype=torch.float32, device=w.device
++            )
+         # Free the BF16 weight; nothing on the converted path reads it.
+         module.weight = torch.nn.Parameter(
+             torch.empty(0, dtype=w.dtype, device=w.device), requires_grad=False
+@@ -185,6 +273,14 @@ def maybe_convert_dense_to_fp8(model: torch.nn.Module, is_draft_worker: bool) ->
+             )
+         converted += 1
+     torch.cuda.empty_cache()
++    if act == "calibrate":
++        out = os.environ.get("SGLANG_FP8_DENSE_CALIB_OUT", "")
++        if not out:
++            raise ValueError(
++                "SGLANG_FP8_DENSE_ACT=calibrate needs SGLANG_FP8_DENSE_CALIB_OUT"
++            )
++        _start_calibration(hooked, out)
++        return
+     if act == "none":
+         bytes_after = bytes_before
+     if act == "oracle":
+-- 
+2.34.1
+

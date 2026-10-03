@@ -30,11 +30,15 @@ source "$REPO/experiments/speed_bytes/holds/tree_guard.sh"
 log_runtime
 # shellcheck disable=SC2329 # invoked by the EXIT trap
 kill_servers() {
-  pkill -TERM -f -- 'sglang.launch_server.* --port 30222( |$)' || true
-  sleep 5
-  pkill -KILL -f -- 'sglang.launch_server.* --port 30222( |$)' || true
+  kill_own_servers 30222
 }
 trap kill_servers EXIT
+# Every process this hold starts carries SB_HOLD (kill_own_servers stops only those); a server
+# already answering on the port belongs to someone else, so the hold refuses to run.
+export SB_HOLD=$OUT
+if curl -sf "http://127.0.0.1:30222/health" >/dev/null; then
+  echo "port 30222 already serves: refusing to run"; exit 1
+fi
 FAILS=0
 run() {  # label arm concurrency... -- extra args
   local label=$1 arm=$2; shift 2
