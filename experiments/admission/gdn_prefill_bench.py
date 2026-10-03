@@ -169,6 +169,15 @@ def main() -> None:
         'points': points,
     }
     args.out.write_text(json.dumps(result, indent=2) + '\n')
+    # Failures are kept in the file as diagnostics, but a missing measurement fails the run.
+    failed = [
+        f'{p["tokens"]}x{p["requests"]} {k}'
+        for p in points
+        for k, v in p.items()
+        if isinstance(v, str) and v.startswith('failed')
+    ]
+    if failed:
+        raise SystemExit(f'{len(failed)} measurement(s) failed: {", ".join(failed)}')
 
 
 if __name__ == '__main__':

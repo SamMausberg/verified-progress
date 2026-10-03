@@ -36,6 +36,12 @@ ARMS
 rm -f "$out/summary.json" "$out/report.json" "$out/classes.json" "$out/divergences.csv" \
   "$out/table.csv"
 status=0
+# Every pass of every run must come from one repository and one SGLang revision.
+revisions="$(jq -r '"\(.repo_sha) \(.sglang_sha)"' "$runs"/*/c*.meta.json | sort -u)"
+if [ "$(grep -c . <<< "$revisions")" != 1 ]; then
+  echo "the runs mix revisions: $revisions" >&2
+  status=1
+fi
 python experiments/state_safety/compare.py --runs "$runs" --pairs "$out/pairs.json" \
   --out-json "$out/summary.json" --out-csv "$out/divergences.csv" \
   --out-table "$out/table.csv" > "$out/compare.log" 2>&1 || status=1

@@ -85,6 +85,11 @@ def summ(c; p): {arm: c.arm, server_under_nsys_launch: (c.command[0]=="nsys"), l
 
 jq '{gap_ms_between_windows: 20, windows: .windows, first_30_median: .first_30_median, rows: .rows}' \
   "$prefill/stock/trace_summary.json" > "$tmp/prefill_trace.json"
+# Each point holds tokens, requests and eager and queued times for four kernels: 10 numbers.
+# A failed measurement is a string there, so a point with fewer numbers stops the script.
+jq -e '(.points | length) > 0 and all(.points[]; ([.[] | numbers] | length) == 10)' \
+  "$prefill/gdn_prefill_bench.json" > /dev/null \
+  || { echo "$prefill/gdn_prefill_bench.json: a failed or missing measurement" >&2; exit 1; }
 cp "$prefill/gdn_prefill_bench.json" "$tmp/gdn_prefill_bench.json"
 
 {

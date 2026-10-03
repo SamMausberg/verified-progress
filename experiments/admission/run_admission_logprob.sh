@@ -22,6 +22,12 @@ cd "$repo" || exit 1
 out="${1:-$HOME/vp-data/speed_highc/logprob}"
 runs="$out/runs"
 prompts="$HOME/vp-data/state/prompts/prompts_fresh.jsonl"
+# A runs directory left by an earlier attempt would let the classifier mix its passes with
+# this one's when a pass fails here: start from an empty one.
+if [ -n "$(ls -A "$runs" 2>/dev/null)" ]; then
+  echo "$runs is not empty; move it aside" >&2
+  exit 1
+fi
 mkdir -p "$runs"
 pin="--disable-radix-cache --max-running-requests 128 --max-total-tokens 120000 --max-mamba-cache-size 128"
 status=0

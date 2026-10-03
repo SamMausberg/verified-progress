@@ -90,7 +90,11 @@ def main() -> None:
     print(f'{len(rows)} GPU windows (gap > {args.gap_ms} ms)')
     for i, r in enumerate(rows):
         print(i, json.dumps(r))
-    singles = rows[:30] if len(rows) >= 30 else rows
+    # The probe's 30 single requests come first; fewer windows means a request is missing from
+    # the trace (or two merged), and the median would describe something else.
+    if len(rows) < 30:
+        raise SystemExit(f'{len(rows)} GPU windows, expected at least the 30 single requests')
+    singles = rows[:30]
 
     def med(key: str) -> float:
         return statistics.median(r[key] for r in singles)
