@@ -133,7 +133,7 @@ so a repeated prompt is computed afresh.
   drafter, KV tokens and GDN state memory at the same `--mem-fraction-static`.
 - Slow-launch check. The machine has an intermittent launch-level slow state (TTFT p50 about
   4 ms higher at every concurrency and decode 2-6% slower, invisible to the foreign-CPU and
-  clock checks; seen by the red team in two other workstreams' holds). For every launch (arm
+  clock checks; seen by an adversarial review in two other workstreams' holds). For every launch (arm
   and session) and each of its concurrencies, `analyze.launch_flags` compares TTFT p50 and the
   time per forward pass (ITL p50 times the mean accept length; ITL p50 for plain decoding) with
   the median of the same arm's sessions at that concurrency. A launch is flagged when, at a
@@ -246,14 +246,14 @@ Times are the commits' own (UTC, 2026-10-02); the times written in the subjects 
 - `a5d605f` (03:12): the pre-registration.
 - `a4321f4` (03:13): the GSM8K references' engine and the per-problem pairing stated.
 - `4654446` (03:15): the slow-launch check and the with/without-flagged verdicts.
-- `a8ae713` (03:22), after the red team's design review: the decode-path probe criterion for
+- `a8ae713` (03:22), after an adversarial design review: the decode-path probe criterion for
   every probed arm (was: generate mode reported without a threshold); GSM8K on
   `replayssm-cap256-fp16` (hold `q3`) and only GSM8K-measured arms in the FP16 envelope;
   `plain-tuned` in every session at c = 64 and 128 as an exact arm; non-headline arms at both
   ends of the session order; the GSM8K yardstick (exact arms' spread), the comparison with
   stock DFlash, the version check, the EOS check, runner-up ratios, accept lengths and the
   FP16 band caveat.
-- `1f89c2c` (03:25), after the red team's re-check (no blocking findings): the decode-path KL
+- `1f89c2c` (03:25), after that review's re-check (no blocking findings): the decode-path KL
   includes each first-divergence position; the GSM8K gate of the envelope is per lever; the
   drift exposure of the `int4-plain-cap256` / `plain-cap256` pair is stated.
 - Revision 4 (the commit after `1f89c2c`, after L0's first part, 03:31-03:35, and before any

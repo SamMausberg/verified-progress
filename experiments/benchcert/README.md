@@ -141,7 +141,7 @@ certified graph.
 
 ## Decision rule
 
-(Revised 2026-10-02 01:50 UTC, before any timed run, after a red-team review: one
+(Revised 2026-10-02 01:50 UTC, before any timed run, after an adversarial review: one
 primary point per family with a Holm adjustment replaced verdicts over all 22
 points, and the exactness verdict now needs positive evidence.)
 
@@ -326,7 +326,7 @@ per pass at least 2% above. For each flagged launch the summary gives its family
 primary ratio with and without that session's pair. This changes no decision and
 excludes nothing; it says whether a verdict depends on one launch.
 
-## Exploratory control (not declared; added 2026-10-02 after h3, approved by main)
+## Exploratory control (not declared; added 2026-10-02 after h3, approved by the maintainer)
 
 In sessions 1 and 2 the MTP pairs diverged from each other above concurrency 1 at
 1.90 times the rate of the two stock runs (95% interval 1.58-2.28), while check mode
@@ -346,13 +346,13 @@ head gives identical tokens under identical batch evolution, the claim check mod
 also makes; it does not show the cause of every timed divergence. If any differ,
 their first divergences are re-scored into the same classes.
 
-A second control (added 2026-10-02 after h4, approved by main) concerns DFlash block
+A second control (added 2026-10-02 after h4, approved by the maintainer) concerns DFlash block
 16 at c = 8, a gated-off point, where the timed certified and stock arms diverged on
 the same three prompts at the same positions in all three sessions while each arm
 reproduced itself. In the same waves (prompts recorded by session 1's stock block-16
 run at c = 8, 30,000 KV tokens), three arms: stock, certified as timed, and certified
 with `SGLANG_CERTIFIED_HEAD_MAX_ROWS=0`, so the head never runs and only the stock head
-and draft sampler inside the conditional nodes remain. Reading rule (main's, set before
+and draft sampler inside the conditional nodes remain. Reading rule (the maintainer's, set before
 the run): the `MAX_ROWS=0` arm differing from stock points to the gated-off path inside
 the conditional nodes, an integration exactness bug; it equal to stock while the
 certified arm differs points to the head's certified ramp-down, which check mode should
@@ -360,11 +360,11 @@ then have caught at that shape; all three equal points to closed-loop timing in 
 timed runs. It ran in the shared hold after session 3; the evidence README gives the
 result.
 
-## Settling hold (not declared; added 2026-10-02 after the PR, approved by main)
+## Settling hold (not declared; added 2026-10-02 after the PR, approved by the maintainer)
 
-Two findings on PR #190 need a GPU hold. Codex: the check launches wrote their counters
+Two review findings on PR #190 need a GPU hold. First, the check launches wrote their counters
 every 25 glue calls with no final write before each point's snapshot, so up to 24 calls
-per point went uncounted. The red team: at MTP c = 64 (session 1) the certified run
+per point went uncounted. Second, at MTP c = 64 (session 1) the certified run
 committed a token 3.8 nats below the batch-1 top where the other runs agreed. One
 exclusive untimed hold (`hold_settle.sh`) runs:
 
@@ -380,12 +380,12 @@ exclusive untimed hold (`hold_settle.sh`) runs:
    sequence lengths, verify inputs, certified ids, the stock logits' top 5 and every
    gate.
 
-Reading (main's): any wrong token reproduced in 2 or 3 is an exactness failure of the
+Reading (the maintainer's): any wrong token reproduced in 2 or 3 is an exactness failure of the
 certified engine; if none reproduces, the event stays an unexplained one-off.
 
 ## Drain reruns (not declared; added 2026-10-02 after the settling hold was queued)
 
-Reviewer 1 placed the large event in the c = 64 point's final drain. `579ae7ce` was the
+The review of PR #190 placed the large event in the c = 64 point's final drain. `579ae7ce` was the
 570th of the point's 576 requests (64 warmup, then 512 measured) and started 2.2 s
 before the point ended; the token arrived while the server's running batch fell from
 49 to 26 to 10 requests. At 16 requests or fewer the MTP verify batch is at most 64
@@ -395,8 +395,8 @@ Three exclusive holds (`hold_drain.sh h6a`, `hold_drain.sh h6b`, `hold_drain_sco
 launches in `drain.LAUNCHES`) rerun the point itself, closed loop, with session 1's
 flags, pools (128 running requests, 128 mamba slots, the arm's 1,000,000-token KV cap)
 and prompt order. Each point flushes the cache and sends the same 576 requests in order.
-The design took the red team's four changes (server history, alternation and balance,
-a near-timed check-mode variant, a two-tier rule), approved by main.
+The design took four changes from an adversarial review (server history, alternation and
+balance, a near-timed check-mode variant, a two-tier rule), approved by the maintainer.
 
 1. h6a (timed): `cert1`, `stock1`, `cert2`, `stock2`, alternating. Each is a fresh server
    that runs session 1's ladder (c = 1, 2, 4, 8, 16, 32, then 64, as session 1's launch
@@ -486,7 +486,7 @@ slot and output length), set before the run:
 1. Gate mismatch: the gate the device read differs from the host's intended gate.
 2. Certificate fault: gate on, status 0 (certified without a fallback), and an id other
    than the stock argmax. The envelope was violated; this is the most serious case.
-   Split on 2026-10-02 (main's ruling, committed before h7b's ring was read), by the
+   Split on 2026-10-02 (the maintainer's ruling, committed before h7b's ring was read), by the
    ring's refined values against `z_ref`, the stock logits of 579ae7ce's batch-1 hidden
    state at this position (the stress hold's `return_hidden_states` pull):
    - 2a, a head fault: 1756's refined value is about `z_ref(1756)` while the three
@@ -590,7 +590,7 @@ report at batch 1 with the top 5. A run with no mismatch rules out a fault of th
 and its fallbacks under graph replay for these inputs and sizes. It does not rule out
 one that needs the engine's own surrounding graph or the scheduler.
 
-## Context waves (not declared; approved by main 2026-10-02, after the stress test)
+## Context waves (not declared; approved by the maintainer 2026-10-02, after the stress test)
 
     GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x experiments/benchcert/hold_context_waves.sh
 
@@ -618,7 +618,7 @@ verify head runs at position 439.
 - Estimate: about 4 s per wave plus the pause and the flush, and 1-1.5 min per server
   start: about 38 min in all.
 
-Reading rule, set before the run (main's, with the red team's counts), over the waves
+Reading rule, set before the run (the maintainer's, with counts from an adversarial review), over the waves
 whose output reaches position 439 with session 1's prefix; cert0 and certified are each
 compared with stock:
 
@@ -634,7 +634,7 @@ would expect about 11 events in 100 waves; at a per-draw rate of 3-5% it would e
 so a null is likely and decides little. The first submission (four blocks, 150 waves,
 without cert0) was stopped after its first block to add cert0.
 
-## Planted donor (not declared; designed 2026-10-02 after h7, approved by main with the red team's changes)
+## Planted donor (not declared; designed 2026-10-02 after h7, approved by the maintainer with changes from an adversarial review)
 
     GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x experiments/benchcert/hold_drain.sh h8
 
@@ -687,7 +687,7 @@ anywhere. `order1` is reported descriptively: an event with 527 still running at
 would point to shared state between concurrent requests and, for that draw, rule out the
 reuse of 527's freed KV pages or state slot.
 
-## Coarse write-after-read barrier (not declared; approved by main 2026-10-02, after h8)
+## Coarse write-after-read barrier (not declared; approved by the maintainer 2026-10-02, after h8)
 
     GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x experiments/benchcert/hold_drain.sh h9
 
@@ -716,7 +716,7 @@ Reading rule, set before the run, over the draws whose 579ae7ce output reaches p
   same;
 - none in either: inconclusive.
 
-## Serial references (not declared; approved by main 2026-10-02, after h8's reference step)
+## Serial references (not declared; approved by the maintainer 2026-10-02, after h8's reference step)
 
     GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -s experiments/benchcert/hold_paths.sh
 
@@ -751,7 +751,7 @@ the row is ill-conditioned even in FP32 and neither BF16 path is the accurate on
 serial re-scores replace the concurrent classes and h6s gaps where they differ, and the
 change in each class count is reported.
 
-## Seeded MTP control (not declared; approved by main 2026-10-02, after h8's reference step)
+## Seeded MTP control (not declared; approved by the maintainer 2026-10-02, after h8's reference step)
 
     GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x experiments/benchcert/hold_seeded_waves.sh
 
@@ -779,7 +779,7 @@ Readings, set before the run, over every request's tokens:
   All identical means they do not, at the most sensitive row known, so differences between
   the arms in the closed loop need a different batch evolution (timing) or a race.
 
-Counter rerun (added 2026-10-02 after the run, approved by main):
+Counter rerun (added 2026-10-02 after the run, approved by the maintainer):
 
     GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x experiments/benchcert/hold_seeded_stats.sh
 
@@ -793,7 +793,7 @@ matched; zero certified verify rows means a silent fallback, reported as such; c
 rows with an output that differs from stock is a certified-head mismatch under identical
 batch evolution. Uncounted calls must be zero.
 
-Token-only rerun (added 2026-10-02 after the counter rerun, approved by main):
+Token-only rerun (added 2026-10-02 after the counter rerun, approved by the maintainer):
 
     GPU_LOCK_PRIORITY=1 scripts/gpu_lock.sh -x experiments/benchcert/hold_seeded_tokens.sh
 
@@ -824,7 +824,7 @@ Hold commit (h8): `d0ef114eb8348c6c96701fbaecf645b63b42a363`
 
 ## Amendments
 
-- 2026-10-02, after h8's reference step (found by Codex on #190): the declared re-score
+- 2026-10-02, after h8's reference step (found in the review of #190): the declared re-score
   ("Exactness" item 4, "at concurrency 1") ran with 16 requests in flight
   (`rescore.py --workers` defaulted to 16), so the server batched the contexts' prefills
   and the margins were not batch-1 values; at 579ae7ce/439 the same context gave 1756 at

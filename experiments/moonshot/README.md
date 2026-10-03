@@ -25,7 +25,7 @@ their command in the docstring. The levers that need engine changes come from th
 | `build_token_map.py` | Builds hot-vocabulary maps for the MTP draft head from the model's own outputs on a calibration set | maps in `~/vp-data/moonshot/token_map/` |
 | `logit_probe.py` | Quality proxy: first greedy divergence and top-k KL against a reference server, in decode and teacher-forced modes | `p4_output_probe.csv` (P4's output probe) |
 | `quality_arms.py` | Runs the logit probe (and optionally the token-map calibration) for a list of lever stacks, one small server each | `p4_output_probe.csv` (P4's output probe) |
-| `gsm8k_arms.py` | GSM8K accuracy per lever stack through `bench.quality`, for the declared quality budget | pending |
+| `gsm8k_arms.py` | GSM8K accuracy per lever stack through `bench.quality`, for the declared quality budget | none (not run; the lossy study ran `bench.quality` directly, `experiments/lossy/`) |
 | `gdn_state_rank_study.py` | P13: offline test of a GDN state reduced to rank r in the key dimension (energy, query and product bases), measuring KL, top-1 agreement and a delayed-retrieval probe on the HF model | `gdn_state_rank_study.json` |
 | `make_long_prompts.py` | The 2,048-token prompts of P4's served test, built from a bench split | input of the P4 test |
 | `run_p4_admission.sh`, `check_admission.py` | P4's admission preflight: every arm's server must run 128 requests at once during the measured phase | `evidence/moonshot/README.md` 2c (preflight 20261001T212044Z; a text record, raw outputs outside git) |
@@ -34,7 +34,7 @@ their command in the docstring. The levers that need engine changes come from th
 | `output_probe.py` | Outcome of P4's server output probe (refuted, undecided or no difference) | `output_probe` in `p4_ab_verdict.json` |
 | `validate_p4_ab.py` | Validates one P4 A/B run and applies the declared decision rule | `p4_ab_verdict.json` |
 
-"Pending" means no committed evidence yet; `evidence/moonshot/README.md` gives each run's status.
+`evidence/moonshot/README.md` gives each run's status.
 Tests: `tests/test_moonshot_levers.py` (lever composition and the engine patches),
 `tests/test_gdn_exact_replay.py` (the replay kernel) and `tests/test_moonshot_check_admission.py`,
 `test_moonshot_output_probe.py`, `test_moonshot_validate_p4_ab.py` and

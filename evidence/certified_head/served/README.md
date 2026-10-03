@@ -232,7 +232,7 @@ point's drain, with 16 or fewer requests left:
 | dflash8 | draft projection | 1, 4, 8 | 3,263 | 50,491 | 0 | 1.70% | 20.7% | 56 |
 
 The first check launches (h1, step `check`) wrote their counters every 25 glue calls with
-no final write before each point's snapshot (Codex on PR #190). A point's unwritten tail
+no final write before each point's snapshot (found in the review of PR #190). A point's unwritten tail
 fell into the next point's counts, because the counters are cumulative, so only the tail
 of each launch's last point was lost: up to 24 glue calls (several per decoding step or
 MTP cycle; glue calls, not head calls). Their 594,329 counted rows, also with no
@@ -292,7 +292,7 @@ concurrency 1 with the common prefix and classed by the stock margin between the
 tokens (`experiments/benchcert/rescore.py`; classes as in
 `experiments/state_safety/compare.py`, applied to one margin). The first re-score sent 16
 contexts at a time, so the server batched their prefills and the margins were not batch-1
-values (Codex on PR #190; amendment in `experiments/benchcert/README.md`). It was rerun one
+values (found in the review of PR #190; amendment in `experiments/benchcert/README.md`). It was rerun one
 context at a time (`hold_paths.sh`), and `classes.csv` comes from that run. Of 1,113 unique
 contexts, 540 are ties, 553 one ulp apart, 19 near (at most 0.5 nats) and 1 large (the
 concurrent run: 530, 550, 32 and 1). 455 margins changed, almost all by swapping tie and

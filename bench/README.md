@@ -171,7 +171,7 @@ changes numerically in `lossy = "..."`; an `exact-up-to-rounding` arm states the
 and the comparison that classified it in `exactness_note`. A lossy note added in code
 (moonshot's levers) always turns the class into `lossy` or `pending`.
 
-The rule below was set by the coordinator on 2026-10-01 at 05:20 UTC, after the
+The rule below was set by the maintainer on 2026-10-01 at 05:20 UTC, after the
 first equality results (`campaigns/equality_tuned.sh`) had been seen; it replaced
 a proposal that used rate intervals. It rests on the divergence classes of the state
 workstream's comparator (PR #37, `experiments/state_safety/compare.py`), which

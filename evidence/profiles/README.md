@@ -6,8 +6,8 @@ and the moonshot track. Everything here is produced by the scripts in
 `experiments/profiling/`; raw Nsight reports stay in `~/vp-data/profile/` (outside git).
 
 Status of each result is marked: **measured** (from a trace or a timed run in this
-directory), **derived** (a calculation from measured inputs and tensor sizes, formula
-given), or **pending** (queued, not yet run).
+directory) or **derived** (a calculation from measured inputs and tensor sizes, formula
+given).
 
 ## Setup
 
@@ -243,7 +243,7 @@ eager `torch.argmax` + `VerifyTreeGreedy`; the GDN state commit
 the draft-extend graph (MTP layer over the verified tokens, head over B rows); eager
 `torch.argmax`. Every cycle streams the 1.27 GB head four times: three draft projections
 and one verification. Configuration: NEXTN (EAGLE v2), 3 steps, topk 1, 4 draft tokens,
-otherwise default flags (the speculative configuration is not yet tuned).
+otherwise default flags (untuned: bench's tuned MTP arms came later, PR #57).
 
 | | B=1 | B=8 | B=32 |
 |---|---|---|---|

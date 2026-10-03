@@ -1,0 +1,7 @@
+pair,run_a,run_b,prompts,diverged,exposure_tokens,per_1k_tokens,tie,one_ulp,near,large,not_argmax,length_mismatch,max_margin_median,max_margin_max,drift_p99,drift_max,same_server,pools_identical,pinned_a,pinned_b
+mtp n0 vs n0 repeat c128,mtp_s3_replayssm__adm_n0/c128,mtp_s3_replayssm__adm_n0b/c128,960,258,180360,1.43,237,18,3,0,0,0,0.125,0.375,0.3674,1.189,False,True,True,True
+mtp pd vs n0 c128,mtp_s3_replayssm__adm_n0/c128,mtp_s3_replayssm__adm_pd/c128,960,223,182199,1.224,207,14,2,0,0,0,0.125,0.375,0.3617,1.189,False,True,True,True
+mtp pd vs n0 repeat c128,mtp_s3_replayssm__adm_n0b/c128,mtp_s3_replayssm__adm_pd/c128,960,236,181610,1.299,222,12,2,0,0,0,0.125,0.375,0.3566,0.4811,False,True,True,True
+mtp n0 vs n0 repeat c64,mtp_s3_replayssm__adm_n0/c64,mtp_s3_replayssm__adm_n0b/c64,960,238,184688,1.289,219,17,2,0,0,0,0.125,0.25,0.3325,0.4868,False,True,True,True
+mtp pd vs n0 c64,mtp_s3_replayssm__adm_n0/c64,mtp_s3_replayssm__adm_pd/c64,960,421,158431,2.657,382,36,3,0,0,0,0.125,0.375,0.367,0.7206,False,True,True,True
+mtp pd vs n0 repeat c64,mtp_s3_replayssm__adm_n0b/c64,mtp_s3_replayssm__adm_pd/c64,960,428,159088,2.69,404,21,3,0,0,0,0.125,0.375,0.3611,0.7206,False,True,True,True

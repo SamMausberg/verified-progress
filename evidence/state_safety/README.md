@@ -5,8 +5,8 @@ attention state correct under native MTP speculation, and for how and why stock
 configurations that should give the same greedy output disagree. Scripts and exact
 commands are in [`experiments/state_safety/`](../../experiments/state_safety/README.md).
 
-This file is updated as runs complete. Results not yet collected are marked
-**pending**; nothing below is extrapolated from them.
+Runs that were declared but not made are marked **not run**; nothing below is
+extrapolated from them.
 
 ## Setup
 
@@ -82,7 +82,8 @@ Checks on the tool itself:
   tapped sessions too, and there they show the signature described under "History dependence" below
   (first difference at layer 3's attention, with identical projections). Of the five,
   only `mt_bench-0056` changes in the deterministic history test without the tap. The
-  KV-level link for all five is pending.
+  KV-level link was checked for `mt_bench-0056` only, as a history pair, and confirms the
+  repoint there ("Cache-level checks (tap v4)"); for the other four it was not run.
 - Positive controls (`tap_control_*.json`, analysed with the current `mechanism.py`):
   a one-ulp change injected into the first element of layer 9's `mlp.down_proj` output
   in every forward is named as the first difference, at the first prompt token, for
@@ -403,7 +404,7 @@ Setup section. Rates are per 1,000 compared tokens
   deliberate mixed-regime comparison that lists every prompt whose logprobs differ,
   with `first_logprob_diff`).
 - **Missing pairs.** `missing_pairs` in `noise_floor_pinned.json` lists the pairs
-  whose runs are still queued. They are listed under Pending below. This regeneration
+  whose runs were never made. They are listed under Not run below. This regeneration
   used `STATE_ALLOW_MISSING=1`.
 
 ### Configuration switches for plain decoding and MTP steps 3
@@ -597,8 +598,8 @@ Counts are over 320 prompts
 (fewer where stated), and the intervals assume prompts are independent. The post-onset
 rate treats positions as independent, although they cluster by prompt.
 
-**Pending** (queued, pinned): the logprobs-off control, retraction, and the ReplaySSM
-and FlashInfer GDN decode paths. The first-cycle test on fresh prompts has run and is
+**Not run** (declared with pinned pools): the logprobs-off control, retraction, and the
+ReplaySSM and FlashInfer GDN decode paths. The first-cycle test on fresh prompts has run and is
 inconclusive (next section), so the prefill-to-decode handoff check, which was to
 follow a supported result, is not run.
 
@@ -704,7 +705,7 @@ verify step at output index 3 or 5. Its `qkv_proj` output and every earlier modu
 output that both tap versions hash are identical. Both sessions of each pair ran the
 same configuration at batch 1 and served the same 167 prompts in the same order. At the
 same batch shape that points to the attention reading different cached KV; the cache
-hashes that would show it directly are pending (below). For `mt_bench-0056` the only
+hashes that would show it directly were not taken for these four (below). For `mt_bench-0056` the only
 tapped comparison is plain at concurrency 1 vs 32 (`mechanism_plain_c1_vs_c32.json`),
 which shows the same signature but at different batch shapes, where the attention
 kernel itself can differ. The evidence for it is the deterministic reproduction below.
@@ -874,7 +875,7 @@ Passing the deterministic KV split to FlashInfer's target-verify plan
 that: 28 of 96 prompts still diverged between concurrency 1 and 32 (at most 16 running), 1.55 per 1,000 compared
 tokens, all at exact ties (`noise_floor.csv`, row `deterministic + verify KV split
 patch`; that run predates the patch's `SGLANG_STATE_VERIFY_FIXED_SPLIT` gate and had
-the change on unconditionally). A plausible reason, not yet tested: the
+the change on unconditionally). A plausible reason, not tested: the
 draft is not batch-invariant, so acceptance lengths, and with them the offset of a
 position inside its verify block, differ between batch sizes. On the full prompt set
 with pinned pools, deterministic plain decoding is bitwise identical between c1 and c32
@@ -884,7 +885,7 @@ c32 ("Configuration switches for plain decoding and MTP steps 3" above).
 
 ## Targeted state tests
 
-Results so far (`targeted.json`; each test's command in
+Results (`targeted.json`; each test's command in
 `experiments/state_safety/run_targeted.sh`). Configuration for every count below: native
 MTP (`--speculative-algorithm EAGLE`, top-k 1) with 3 or 5 steps as stated, radix cache on
 with the default `extra_buffer` GDN strategy, overlap scheduler and CUDA graphs on, the

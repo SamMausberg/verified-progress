@@ -45,7 +45,7 @@ review are marked as such there); they give three findings.
    shared by the prefill paths of all three implementations. The rule
    declared before the runs needed at least 5 positions where SGLang misses by more than 2 nats
    and 3 times transformers' count; both samples were inconclusive (0 against 0, then 1 against
-   1, the same position). Three refinements made after the runs (Codex on #222) change neither
+   1, the same position). Three refinements made after the runs (from the review of #222) change neither
    verdict: a position missed on both of a source's paths counts once, the exact test pairs the
    implementations by position (SGLang-only against transformers-only misses), and the rule is
    applied against each of the two transformers runs rather than the one with more misses.
