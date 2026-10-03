@@ -252,6 +252,15 @@ limit of 2 cores. The committed run is unaffected: all 3,520 equality records fi
 (2,374 at 256 tokens, 1,146 on the stop token), every point is complete with foreign CPU at most
 0.263 cores on average, and `gate.json`, `ratios.json` and `accept.json` reproduce byte for byte.
 
+2026-10-03, after the analysis (review of #230): only launches with points entered the session and
+order checks, so a failed attempt followed by a retry would have looked like one launch. Every
+confirmation launch in `sweeps.csv` now counts, since `bench.sweep` writes `sweep.json` once its
+server is up. Each must be in the declared plan, `launches.csv` must list the same launches, and the
+session-block and order checks run over all of them. A retry is therefore refused, while a launch
+with no points still voids only its own cells, as declared. The committed run is unaffected: its 39
+launch directories are the 39 launches with points, and `ratios.json` and `accept.json` reproduce byte
+for byte.
+
 ## Results
 
 Written 2026-10-03. Labels: **measured** (read from the files below) and **derived** (ratios, means and
@@ -427,8 +436,8 @@ equality was not tested).
   for the confirm engine; the only change in code the holds ran is one comment in `bench/hostload.py`.
 - The analysis (`bench.pareto`, `confirm_analyze.py`, `confirm_accept.py`) ran on 2026-10-03 from
   `853bd4b` with a clean tree. Both scripts were then tightened as the amendments say (`08a8421`,
-  `e8566e3`, `2f1b187`, `02c5c46`, `a08e423`, `50b9e7b`, `623de0b`, `fc95fe9`, `cc4810b`, `e0a9b35`
-  and `3dd4d15`). The whole analysis rerun from a clean checkout of each of those commits reproduced
+  `e8566e3`, `2f1b187`, `02c5c46`, `a08e423`, `50b9e7b`, `623de0b`, `fc95fe9`, `cc4810b`, `e0a9b35`,
+  `3dd4d15` and `276d019`). The whole analysis rerun from a clean checkout of each of those commits reproduced
   `points.csv`, `launches.csv`, `ratios.json` and `accept.json` byte for byte. `sweeps.csv` was written by
   `confirm_sweeps.py` from a clean checkout of `50b9e7b` and again, identically, from each later one;
   the analysis needs it, `launches.csv` and `equality/` beside `points.csv`.
