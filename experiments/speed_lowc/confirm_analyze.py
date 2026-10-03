@@ -14,17 +14,22 @@ point (a `lowc-` label or session) outside the plan, the same point twice, or a 
 whose x_e2e, y or accept length is not a finite positive number is an error.
 
 Each point is bound to its launch in the launches.csv that bench.pareto writes beside
-points.csv: every S0 launch of a group must run that group's bench arm with the same
-arguments and environment, from stock SGLang at the pin; every other launch must have S0's
-arguments and environment plus exactly its levers' settings (confirm_arms.sh), from one
-engine commit other than the pin; all launches from one repository commit, with no modified
-SGLang files and no failed launch check. Each launch's sweep, in the sweeps.csv that
+points.csv: every S0 launch of a group must run exactly that group's bench arm as bench
+resolves it (bench.arms.resolve_arm), from stock SGLang at the pin; every other launch must
+have that arm's arguments and environment plus exactly its levers' settings (confirm_arms.sh),
+from one engine commit other than the pin; all launches from one repository commit, with no
+modified SGLang files and no failed launch check. Each launch's sweep, in the sweeps.csv that
 confirm_sweeps.py writes beside them, must be the declared one: the confirm split, 512 output
 tokens to the end (ignore_eos), one repeat of the group's concurrencies with 64 measured
 requests or 8 waves, no failed launch check, the session its points name, and the same model,
-request body and client settings as every other launch; each point must have measured
-max(64, 8c) requests. A launch that breaks this, or one whose points name two sessions, is
-an error.
+request body and client settings as every other launch. Its bench.sweep options, parsed from
+its recorded command line, must equal those of the command hold_confirm_session.sh gives that
+arm in that session, and each point must have measured max(64, 8c) requests. Each session's
+launches must follow the declared order (hold_confirm_session.sh; a launch with no points may
+be missing, which voids its cells). The equality gate beside the points (equality/gate.json)
+must have passed for these levers, and its runs (equality/meta.json) must be the ones the
+equality hold makes, from the engine and repository commits the launches ran and stock SGLang
+at the pin. A launch that breaks this, or one whose points name two sessions, is an error.
 
     python experiments/speed_lowc/confirm_analyze.py --points <points.csv> --out <dir>
 """
@@ -38,9 +43,16 @@ import json
 import math
 import re
 import statistics
+import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from confirm_sweeps import options
+
+from bench.arms import resolve_arm
 
 T95 = {1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571}
 METRICS = ('x_e2e', 'y')
@@ -62,6 +74,12 @@ LEVER_ARGS: dict[str, dict[str, Any]] = {
     'C': {'attention-backend': 'fa4'},
 }
 LEVER_ENV = {'A': {'SGLANG_GDN_REPLAYSSM_FOLD': '1'}}
+# The same as bench.sweep arguments (lever_args, lines 90-97).
+LEVER_CLI = {
+    'A': ['--set', 'enable-linear-replayssm-spec=true', '--env', 'SGLANG_GDN_REPLAYSSM_FOLD=1'],
+    'B': ['--set', 'speculative-draft-attention-backend=fa4'],
+    'C': ['--set', 'attention-backend=fa4'],
+}
 # Stock SGLang's pin: engine/sglang/README.md, line 4.
 STOCK_PIN = 'bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824'
 # The declared sweep (README, Step 2): bench.sweep's confirm split and its defaults of one
@@ -80,8 +98,29 @@ SHARED_SWEEP = (
     'streaming',
     'per_chunk_usage',
     'export_level',
+    'aiperf_workers',
+    'snapshot_files',
     'aiperf_version',
 )
+
+
+def session_argv(group: str, arm: str, session: str) -> list[str]:
+    """The bench.sweep arguments hold_confirm_session.sh (lines 59-61) gives `arm` in `session`.
+
+    Its arm part is confirm_arms.sh's arm_args (lines 141-153); the engine worktree and the
+    output directory are given as confirm_sweeps.options reduces them.
+    """
+    argv = ['--arm', GROUP_ARM[group]]
+    if group == 'L' and 'C' in arm and 'B' not in arm:
+        argv += ['--set', 'speculative-draft-attention-backend=triton']
+    if arm != 'S0':
+        argv += ['--sglang-worktree', 'confirm-engine']
+        for lever in arm:
+            argv += LEVER_CLI[lever]
+    argv += ['--label', f'lowc-{group}-{arm}', '--session', session]
+    argv += ['--out', 's' + session.removeprefix('lowc-s'), '--port', '30214', '--osl', str(OSL)]
+    argv += ['--quiet-cpu-wait', '300', '--concurrency', *map(str, CONCURRENCY[group])]
+    return argv
 
 
 def expected_launches(arm: str, full: str) -> int:
@@ -138,8 +177,60 @@ def expected_launch(group: str, arm: str, s0: tuple[dict, dict]) -> tuple[dict, 
     return args, env
 
 
-def check_launches(launches: Path, points: set[tuple[str, str]]) -> None:
-    """Refuse unless every point's launch is in `launches` and was made as its arm."""
+def declared_order(session: str, full: dict[str, str]) -> list[str]:
+    """The labels of a session's launches in the order of hold_confirm_session.sh (lines 34-49)."""
+    k = int(session.removeprefix('lowc-s'))
+    order: list[str] = []
+    for g in ('L', 'H') if k % 2 else ('H', 'L'):
+        singles = list(full[g]) if len(full[g]) > 1 else []
+        if k % 2 == 0:
+            singles.reverse()
+        order += [f'lowc-{g}-{a}' for a in ('S0', full[g], *singles, full[g], 'S0')]
+    return order
+
+
+def check_order(sessions: dict[tuple[str, str], str], full: dict[str, str]) -> None:
+    """Refuse unless each session's launches, by run (start time), keep the declared order."""
+    for session in SESSION_LABELS:
+        by_start = sorted(sessions.items(), key=lambda x: x[0][1])
+        ran = [label for (label, _), s in by_start if s == session]
+        declared = iter(declared_order(session, full))
+        if not all(label in declared for label in ran):
+            raise SystemExit(f'the launches of {session} are not in the declared order: {ran}')
+
+
+def check_gate(equality: Path, full: dict[str, str], engine: str, repo: str) -> None:
+    """Refuse unless the equality gate passed for these levers on the launches' commits."""
+    try:
+        gate = json.loads((equality / 'gate.json').read_text())
+        meta = json.loads((equality / 'meta.json').read_text())
+    except (OSError, ValueError) as exc:
+        raise SystemExit(f'no readable equality gate in {equality} ({exc!r})') from exc
+    # The runs as hold_confirm_equality.sh names them (confirm_arms.sh, eq_names).
+    runs = {
+        f'plain__lowc_{g}_{a}/c1'
+        for g in full
+        for a in ('S0', 'B0', *full[g], *([full[g]] if len(full[g]) > 1 else []))
+    }
+    why = []
+    if gate.get('ok') is not True or gate.get('levers') != full['L']:
+        why.append(f'gate ok={gate.get("ok")} levers={gate.get("levers")}, not {full["L"]}')
+    if set(meta) != runs:
+        why.append(f'runs {sorted(meta)}, not {sorted(runs)}')
+    for run, m in sorted(meta.items()):
+        sglang = STOCK_PIN if run.split('/')[0].endswith('_S0') else engine
+        made = (m.get('sglang_sha'), m.get('sglang_dirty'), m.get('repo_sha'))
+        if made != (sglang, False, repo):
+            why.append(f'{run}: SGLang, dirty, repository {made}')
+    if why:
+        raise SystemExit(f'{equality}: ' + '; '.join(why))
+
+
+def check_launches(launches: Path, points: set[tuple[str, str]]) -> tuple[str, str]:
+    """Refuse unless every point's launch is in `launches` and was made as its arm.
+
+    Returns the engine and repository commits that all launches share.
+    """
     if not launches.is_file():
         raise SystemExit(f'no {launches} beside the points (bench.pareto writes both)')
     with launches.open() as f:
@@ -150,12 +241,11 @@ def check_launches(launches: Path, points: set[tuple[str, str]]) -> None:
     if missing := sorted(points - set(by_key)):
         raise SystemExit(f'{launches}: no launch for the points of {missing}')
     why = []
-    s0: dict[str, tuple[dict, dict]] = {}
-    for r in sorted(rows, key=lambda r: not r['label'].endswith('-S0')):
+    # S0 is the group's bench arm as bench resolves it, with no override.
+    s0 = {g: (resolve_arm(a).args, resolve_arm(a).env) for g, a in GROUP_ARM.items()}
+    for r in rows:
         _, group, arm = r['label'].split('-', 2)
         made = (json.loads(r['args']), json.loads(r['env'] or '{}'))
-        if r['label'].endswith('-S0'):
-            s0.setdefault(group, made)
         want = expected_launch(group, arm, s0[group]) if group in s0 else None
         if r['arm'] != GROUP_ARM.get(group) or made != want:
             why.append(f'{r["label"]} {r["run"]}: arm {r["arm"]}, args/env not S0 plus its levers')
@@ -167,12 +257,13 @@ def check_launches(launches: Path, points: set[tuple[str, str]]) -> None:
             why.append(f'{r["label"]} {r["run"]}: SGLang {r["sglang_head"]}')
     engines = {r['sglang_head'] for r in rows if not r['label'].endswith('-S0')}
     repos = {r['repo_head'] for r in rows}
-    if len(engines) > 1 or len(repos) != 1:
+    if len(engines) != 1 or len(repos) != 1:
         why.append(
             f'launches span engine commits {sorted(engines)} and repository commits {sorted(repos)}'
         )
     if why:
         raise SystemExit(f'{launches}: ' + '; '.join(why))
+    return engines.pop(), repos.pop()
 
 
 def check_sweeps(sweeps: Path, launches: dict[tuple[str, str], str]) -> None:
@@ -203,6 +294,11 @@ def check_sweeps(sweeps: Path, launches: dict[tuple[str, str], str]) -> None:
         }
         if wrong := {k: row[k] for k, v in want.items() if row[k] != v}:
             why.append(f'{label} {run}: {wrong}')
+        expected = options(session_argv(group, label.split('-', 2)[2], session))
+        if (made := json.loads(row['options'])) != expected:
+            keys = sorted(set(made) | set(expected))
+            diff = {k: made.get(k) for k in keys if made.get(k) != expected.get(k)}
+            why.append(f"{label} {run}: bench.sweep options {diff}, not its arm's command")
     for k in SHARED_SWEEP:
         if len(values := {by_key[key][k] for key in launches}) != 1:
             why.append(f'launches differ in {k}: {sorted(values)}')
@@ -247,8 +343,10 @@ def load_cells(points: Path, full: dict[str, str]) -> dict[tuple, list[dict]]:
             cells[key].append(row)
     if not cells:
         raise SystemExit(f'no confirmation points in {points}')
-    check_launches(points.with_name('launches.csv'), set(sessions))
+    engine, repo = check_launches(points.with_name('launches.csv'), set(sessions))
     check_sweeps(points.with_name('sweeps.csv'), sessions)
+    check_order(sessions, full)
+    check_gate(points.with_name('equality'), full, engine, repo)
     return cells
 
 

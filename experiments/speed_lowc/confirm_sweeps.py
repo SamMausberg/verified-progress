@@ -1,11 +1,15 @@
 """Client-side settings of the speed-lowc confirmation's launches, for confirm_analyze.py.
 
 points.csv and launches.csv (bench.pareto) carry each point's measurements and each launch's
-server arguments, but not the sweep that produced them: workload, output length, request
-counts, request body. This reads every launch's own manifest (bench.sweep's sweep.json) from
-the launch directories that bench.pareto read, and writes sweeps.csv with one row per launch,
-which confirm_analyze.py checks against the declared sessions. A directory without a readable
-sweep.json, or the same launch twice, is an error, and nothing is written.
+server arguments, but not the sweep that produced them. This reads every launch's own manifest
+(bench.sweep's sweep.json) from the launch directories that bench.pareto read, and writes
+sweeps.csv with one row per launch: every setting the manifest records, and in `options` every
+bench.sweep option, from its recorded command line parsed by bench.sweep's own parser (so
+options the manifest does not record, and defaults, are included). Machine paths are left out:
+the workload files (their hashes are kept), the output directory (its session part is kept)
+and the engine worktree (whether one was given; launches.csv records its commit).
+confirm_analyze.py checks the rows against the declared sessions. A directory without a
+readable sweep.json, or the same launch twice, is an error, and nothing is written.
 
     python experiments/speed_lowc/confirm_sweeps.py ~/vp-data/speed-lowc/confirm/s*-*/lowc-*/* \
         --out evidence/speed_lowc/confirm
@@ -16,8 +20,13 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
+import sys
 from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from bench.sweep import build_parser
 
 COLUMNS = (
     'label',
@@ -39,9 +48,21 @@ COLUMNS = (
     'streaming',
     'per_chunk_usage',
     'export_level',
+    'aiperf_workers',
+    'snapshot_files',
     'aiperf_version',
     'checks_failed',
+    'options',
 )
+
+
+def options(argv: list[str]) -> dict[str, Any]:
+    """bench.sweep's parsed options for `argv`, without machine paths (see the module doc)."""
+    ns = vars(build_parser().parse_args(argv))
+    del ns['workload'], ns['warmup_pool']
+    ns['out'] = re.sub(r'-\d{8}T\d{6}Z$', '', Path(ns['out']).name)
+    ns['sglang_worktree'] = ns['sglang_worktree'] is not None
+    return dict(json.loads(json.dumps(ns, default=str)))
 
 
 def sweep_row(launch: Path) -> dict[str, Any]:
@@ -69,10 +90,13 @@ def sweep_row(launch: Path) -> dict[str, Any]:
             'streaming': s['streaming'],
             'per_chunk_usage': s['per_chunk_usage'],
             'export_level': s['export_level'],
+            'aiperf_workers': s['aiperf_workers'],
+            'snapshot_files': json.dumps(s['snapshot_files']),
             'aiperf_version': s['aiperf_version'],
             'checks_failed': ' '.join(
                 c['name'] for c in s['checks'] if c.get('required') and not c.get('ok')
             ),
+            'options': json.dumps(options(s['command_line'][1:]), sort_keys=True),
         }
     except (OSError, ValueError, KeyError, TypeError) as exc:
         raise SystemExit(f'{launch}: no readable sweep manifest ({exc!r})') from exc
