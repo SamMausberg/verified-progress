@@ -85,8 +85,8 @@ in the same hold it is level at c=64 (+0.2%) and higher at c=96 and 128 (+4.9% a
 `pareto.png` draws it hollow. It became eligible for the exact frontier only when the
 radix-off reference made it exact (equality/); two more sessions (confirm-supp2 and
 confirm-supp3) were planned but not run, so this is not a result. The lossy study timed the
-same decoding at capacity 256 (`replayssm-cap256`) in three sessions, where it was the best
-exact arm at c = 64, 128 and 256 (`evidence/lossy/README.md`).
+same decoding at capacity 256 (`replayssm-cap256`) in three sessions, where it was the fastest
+of that study's exact arms at c = 64, 128 and 256 (`evidence/lossy/README.md`).
 
 y in tok/s per arm (mean over sessions; n=3 unless marked):
 
