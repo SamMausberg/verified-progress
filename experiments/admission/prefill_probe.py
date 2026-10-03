@@ -28,7 +28,7 @@ from typing import Any
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
 from bench.arms import parse_overrides, resolve_arm, server_command
-from bench.server import port_free
+from bench.server import git_state, port_free, sglang_source
 
 CONFIRM = REPO / 'bench/workloads/mixed-v2/confirm.jsonl'
 WARMUP = REPO / 'bench/workloads/mixed-v2/warmup.jsonl'
@@ -142,7 +142,15 @@ def main() -> None:
     base = f'http://127.0.0.1:{args.port}'
     single = prompts(CONFIRM, args.requests)
     rounds = [prompts(CONFIRM, 40 + 8 * 5)[40 + 8 * i : 48 + 8 * i] for i in range(5)]
-    record: dict[str, Any] = {'arm': arm.name, 'args': arm.args, 'command': command}
+    # The revisions of this repository and of the SGLang tree the server imports, as
+    # bench.server records them in launch.json.
+    record: dict[str, Any] = {
+        'arm': arm.name,
+        'args': arm.args,
+        'command': command,
+        'repo': git_state(REPO),
+        'sglang_source': sglang_source(sys.executable, env),
+    }
     with (out / 'server.log').open('wb') as log:
         proc = subprocess.Popen(
             command, stdout=log, stderr=subprocess.STDOUT, env=env, start_new_session=True

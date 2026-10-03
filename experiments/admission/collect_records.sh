@@ -57,14 +57,31 @@ trap 'rm -rf "$tmp"' EXIT
   done
 } > "$tmp/launches.csv"
 
-jq -n --slurpfile s "$prefill/stock/client.json" --slurpfile f "$prefill/fi-prefill/client.json" '
-def summ(c): {arm: c.arm, server_under_nsys_launch: (c.command[0]=="nsys"), linear_attn_prefill_backend_flag: (c.args["linear-attn-prefill-backend"] // null),
+# Revisions of the prefill probe: client.json holds them for runs since prefill_probe.py recorded
+# them; for the committed run the hold's log gives the repository head, and each server's log the
+# SGLang tree it imported (with $HOME as ~). Missing either stops the script.
+repo_head="$(grep -m1 -oE "^repo [0-9a-f]{40} out .*/${prefill##*/} " "$data/prefill_hold.log" \
+  | cut -d' ' -f2 || true)"
+[ -n "$repo_head" ] || { echo "$data/prefill_hold.log: no repository head" >&2; exit 1; }
+imported() {
+  local path
+  path="$(grep -m1 -oE '/[^ :]*/python/sglang/launch_server\.py' "$1" || true)"
+  [ -n "$path" ] || { echo "$1: no SGLang import path" >&2; return 1; }
+  echo "~${path#"$HOME"}"
+}
+stock_from="$(imported "$prefill/stock/server.log")"
+fi_from="$(imported "$prefill/fi-prefill/server.log")"
+jq -n --slurpfile s "$prefill/stock/client.json" --slurpfile f "$prefill/fi-prefill/client.json" \
+  --arg repo "$repo_head" --arg sp "$stock_from" --arg fp "$fi_from" '
+def summ(c; p): {arm: c.arm, server_under_nsys_launch: (c.command[0]=="nsys"), linear_attn_prefill_backend_flag: (c.args["linear-attn-prefill-backend"] // null),
+  repo_head: (c.repo.head // $repo), sglang_head: (c.sglang_source.head // null), sglang_imported_from: p,
   untraced: {single_median_ms: c.untraced.sequential_median_ms, concurrent8_wall_median_ms: c.untraced.concurrent8_wall_median_ms,
     single_ms_by_isl: [c.untraced.sequential[] | {isl, ms}]},
   traced: (if c.traced then {single_median_ms: c.traced.sequential_median_ms, concurrent8_wall_median_ms: c.traced.concurrent8_wall_median_ms} else null end)};
 {run: "prefill-20261002T175303Z", requests: "30 confirm-split prompts one at a time (max_tokens 1, non-streaming, thinking on), then 5 rounds of 8 concurrent",
  resolved_gdn_backends: "decode=triton, prefill=flashinfer, verify=triton in both servers (server logs)",
- stock: summ($s[0]), explicit_flashinfer_prefill: summ($f[0])}' > "$tmp/prefill_requests.json"
+ revisions: "repo_head from client.json, else the hold log; sglang_head from client.json (null where the probe did not record it); sglang_imported_from from the server log",
+ stock: summ($s[0]; $sp), explicit_flashinfer_prefill: summ($f[0]; $fp)}' > "$tmp/prefill_requests.json"
 
 jq '{gap_ms_between_windows: 20, windows: .windows, first_30_median: .first_30_median, rows: .rows}' \
   "$prefill/stock/trace_summary.json" > "$tmp/prefill_trace.json"

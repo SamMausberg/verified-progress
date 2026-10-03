@@ -141,7 +141,11 @@ def load_points(root: Path) -> dict[tuple[str, int], dict[str, Any]]:
                 f'{label_dir.name}: points at c = {sorted(observed)}, '
                 f'sweep asked for c = {sorted(requested)}'
             )
-        sizes = prefill_batch_sizes(runs[0].parent, [int(c) for c in sweep['concurrency']])
+        # bench.sweep runs one repeat's points in ascending concurrency, whatever the order on
+        # its command line (Sweep.run, bench/sweep.py:429); a second repeat would reverse it.
+        if sweep.get('repeats', 1) != 1:
+            raise SystemExit(f'{sweep_json}: {sweep["repeats"]} repeats; one is supported')
+        sizes = prefill_batch_sizes(runs[0].parent, sorted(requested))
         for point_json in sorted(runs[0].glob('c*/point.json')):
             p = json.loads(point_json.read_text())
             problems = []
