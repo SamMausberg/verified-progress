@@ -16,11 +16,18 @@
 % In (b) and (c), batches above M = 16 are consecutive capture rows, not engine batches: the
 % capture's engine batches held at most 16 requests (evidence/certified_head/README.md). Both
 % panels shade that region and the caption explains the shading once.
-% Layout (style.tex): equal plot heights; (a) is wider for its six decades. (a)'s legend sits in its
-% empty lower right, below the int4 curve's last segment (which reaches 0.13% only at k = V);
-% the FP8 label sits right of its curve near k = 64 and the int4 label under its curve's right
-% part. (b)'s legend is drawn from \addlegendimage samples (line and mark together) with the
-% status split in its header; its curves and markers carry no legend entries. All titles centred.
+% Layout (style.tex): equal plot heights; (a) is wider for its six decades. Every series is
+% labelled directly, no legend. In (a) the two greedy int8 curves end within 0.3 cm of each other,
+% inside the FP8 curve, so their labels sit in the empty lower right with leaders to the curves'
+% last points (the per-128-weights leader passes below FP8's last point at k = 256; the per-entry
+% leader crosses the FP8 curve once); the race's label sits left of its circles, where no curve
+% runs; the FP8 label sits right of its curve near k = 64 and the int4 label under its curve's
+% right part. In (b) each model's label sits beside its curve and markers (conservative above the
+% dashed curve left of M = 16, Hopper under its circles at M = 64); the caption gives the status
+% (lines derived, markers measured). In (c) the whole-batch label sits above its curve left of
+% M = 32 and the all-certified label under the lowest curve; the per-position curve runs between
+% the other two at every M, so its label sits in the empty upper left with a leader to its marker
+% at M = 128, where the gap to the whole-batch curve is widest. All titles centred.
 \vpjson{fallback_share_hopper}{\phop}
 \vpjson{fallback_share_conservative}{\pcons}
 \def\headtime{../evidence/certified_head/head_path_time.csv}
@@ -36,19 +43,21 @@
   xlabel={Vocabulary entries recomputed, $k$},ylabel={Positions needing $\ge k$},
   title={\paneltitle{a}{Candidates per position (measured)}},unbounded coords=discard,
   xtick={1,10,100,1000,10000,248320},
-  xticklabels={1,10,$10^2$,$10^3$,$10^4$,$V$},
+  xticklabels={1,10,100,1k,10k,$V$},
   ytick={1,0.1,0.01,0.001,0.0001},yticklabels={100\%,10\%,1\%,0.1\%,0.01\%},
-  minor tick num=0,xminorticks=false,yminorticks=false,
-  % lower right, right of the FP8 curve's last point (k = 256) and left of the int4 curve's
-  % last segment; 0.35 cm samples keep the circle round
-  legend style={at={(0.95,0.03)},anchor=south east},
-  legend image code/.code={\draw[mark repeat=2,mark phase=2,#1] plot coordinates {(0cm,0cm) (0.175cm,0cm) (0.35cm,0cm)};}]
-\addlegendimage{empty legend}\addlegendentry{int8 copy:}
-\addplot[copy int8 row] table[x=k,y=plain_int8_row_greedy,col sep=comma]{\ccdf};\addlegendentry{per entry}
-\addplot[copy int8 g128] table[x=k,y=plain_int8_g128_greedy,col sep=comma]{\ccdf};\addlegendentry{per 128 weights}
-\addplot[ccert,only marks,mark=o,mark size=1.8pt,mark options={line width=0.9pt}] table[x=k,y=plain_int8_g128_gumbel_t1.0,col sep=comma]{\ccdf};\addlegendentry{race at $T{=}1$}
+  minor tick num=0,xminorticks=false,yminorticks=false]
+\addplot[copy int8 row] table[x=k,y=plain_int8_row_greedy,col sep=comma]{\ccdf};
+\addplot[copy int8 g128] table[x=k,y=plain_int8_g128_greedy,col sep=comma]{\ccdf};
+\addplot[ccert,only marks,mark=o,mark size=1.8pt,mark options={line width=0.9pt}] table[x=k,y=plain_int8_g128_gumbel_t1.0,col sep=comma]{\ccdf};
+% int8 labels in the lower right, with leaders to the last points (k = 24 and 16)
+\draw[leader] (axis cs:300,9e-4) -- (axis cs:26,3.5e-4);
+\node[annot,anchor=west] at (axis cs:300,9e-4) {int8, per entry};
+\draw[leader] (axis cs:300,2.3e-4) -- (axis cs:17.5,1.7e-4);
+\node[annot,anchor=west] at (axis cs:300,2.3e-4) {int8, per 128 weights};
+% the race's label left of its circles (k = 5-8), clear of the greedy curves (k >= 10 there)
+\node[annot,anchor=north east,align=right] at (axis cs:7,1.6e-3) {race,\\$T{=}1$};
 \addplot[copy fp8,forget plot] table[x=k,y=plain_fp8_row_greedy,col sep=comma]{\ccdf};
-% FP8's label right of its curve (1.4% at k = 50), between the legend and the int4 label
+% FP8's label right of its curve (1.4% at k = 50), between the int8 labels and the int4 label
 \node[annot,anchor=west] at (axis cs:50,0.035) {FP8, per entry};
 \addplot[copy int4,forget plot] table[x=k,y=plain_int4_g128_greedy,col sep=comma]{\ccdf};
 % int4's label under its curve's right part (0.49 at k = 16,384, 0.36 at 65,536)
@@ -58,21 +67,18 @@
   xtick={1,4,16,64,256},xticklabels={1,4,16,64,256},
   xlabel={Positions per head call, $M$},ylabel={Head calls needing\\a fallback},ylabel style={align=center},
   ytick={0,0.2,0.4,0.6,0.8,1},yticklabels={0\%,20\%,40\%,60\%,80\%,100\%},
-  title={\paneltitle{b}{Whole-batch fallback}},clip=false,
-  % upper left, above every curve (the conservative line reaches 25% only at M = 20); the box may
-  % cover the corner of the shaded region, which is context, not data
-  legend style={at={(0.02,0.98)},anchor=north west},
-  legend image code/.code={\draw[mark repeat=2,mark phase=2,#1] plot coordinates {(0cm,0cm) (0.2cm,0cm) (0.4cm,0cm)};}]
+  title={\paneltitle{b}{Whole-batch fallback}},clip=false]
 \fill[wash] (axis cs:16,0) rectangle (axis cs:256,1);
 \draw[ink!45] (axis cs:16,0) -- (axis cs:16,1);
-\addlegendimage{empty legend}\addlegendentry{lines: derived}
-\addlegendimage{empty legend}\addlegendentry{marks: measured}
-\addlegendimage{cfallback,thick,model cons}\addlegendentry{conservative}
-\addlegendimage{cfallback,thick,model hopper}\addlegendentry{Hopper}
-\addplot[cfallback,thick,model cons,derived,domain=1:256,samples=120,forget plot]{1-(1-\pcons)^x};
-\addplot[cfallback,thick,model hopper,derived,domain=1:256,samples=120,forget plot]{1-(1-\phop)^x};
-\addplot[cfallback,only marks,mark square,forget plot] table[x=M,y=batch_fallback_rate,col sep=comma]{\headtime};
-\addplot[cfallback,only marks,mark circle,forget plot] table[x=M,y=hopper_batch_fallback_rate,col sep=comma]{\headtime};
+\addplot[cfallback,thick,model cons,derived,domain=1:256,samples=120]{1-(1-\pcons)^x};
+\addplot[cfallback,thick,model hopper,derived,domain=1:256,samples=120]{1-(1-\phop)^x};
+\addplot[cfallback,only marks,mark square] table[x=M,y=batch_fallback_rate,col sep=comma]{\headtime};
+\addplot[cfallback,only marks,mark circle] table[x=M,y=hopper_batch_fallback_rate,col sep=comma]{\headtime};
+% model labels: conservative above its curve left of M = 16 (the curve is at 17% at M = 13),
+% Hopper under its circles (15% at M = 64), clear of the circle at M = 32 (8%) and of the dotted
+% line at M = 128
+\node[annot,anchor=south east] at (axis cs:13,0.22) {conservative};
+\node[annot] at (axis cs:66,0.05) {Hopper};
 \draw[ink!50,densely dotted] (axis cs:128,0) -- (axis cs:128,1);
 % the measured shares at M = 128, below and right of their markers, clear of the dotted line and
 % of the derived curves above them
@@ -83,14 +89,12 @@
 % conservative model. Under the Hopper model, whose fallback rates are lower, both expected times
 % lie between these lines and the decided batch at every M (checked against the CSV); the caption
 % says so. The p10-p90 whiskers span at most 0.05 below M = 256 and hide behind the marker. The
-% statuses (measured, expected) are in the legend, so the title is short and centred.
+% statuses (measured, expected) are in the caption, so the title is short and centred.
 \nextgroupplot[width=3.7cm,xmode=log,log basis x=2,xmin=1,xmax=256,ymin=0.5,ymax=2.5,
   xtick={1,4,16,64,256},xticklabels={1,4,16,64,256},
   ytick={0.5,1,1.5,2,2.5},yticklabels={0.5,1,1.5,2,2.5},
   xlabel={Positions per head call, $M$},ylabel={Time over the stock head},
-  title={\paneltitle{c}{Head-only time}},
-  legend style={at={(0.02,0.98)},anchor=north west},
-  legend image code/.code={\draw[mark repeat=2,mark phase=2,#1] plot coordinates {(0cm,0cm) (0.2cm,0cm) (0.4cm,0cm)};}]
+  title={\paneltitle{c}{Head-only time}}]
 \fill[wash] (axis cs:16,0.5) rectangle (axis cs:256,2.5);
 \draw[ink!45] (axis cs:16,0.5) -- (axis cs:16,2.5);
 \draw[ref line] (axis cs:1,1) -- (axis cs:256,1);
@@ -100,10 +104,15 @@
   table[x=M,y expr={\thisrow{w8a16_us}/\thisrow{stock_us}},
     y error plus expr={(\thisrow{w8a16_p90_us}-\thisrow{w8a16_us})/\thisrow{stock_us}},
     y error minus expr={(\thisrow{w8a16_us}-\thisrow{w8a16_p10_us})/\thisrow{stock_us}},col sep=comma]{\headtime};
-  \addlegendentry{all certified, measured}
 \addplot[cfallback,thick,densely dotted,mark square,mark hollow] table[x=M,y expr={\thisrow{columns_expected_us}/\thisrow{stock_us}},col sep=comma]{\headtime};
-  \addlegendentry{per position, expected}
 \addplot[cfallback,thick,dashed,mark square] table[x=M,y expr={\thisrow{w8a16_expected_us}/\thisrow{stock_us}},col sep=comma]{\headtime};
-  \addlegendentry{whole batch, expected}
+% labels (positions in the comment at the top): whole batch above and left of its curve (1.27 at
+% M = 52), all certified under the lowest curve (0.74 at M = 32), per position with a leader to
+% its marker at M = 128 (1.31; whole batch 1.88) that passes above the whole-batch label and
+% crosses the whole-batch curve once, between its markers at M = 64 and 128
+\node[annot,anchor=south east] at (axis cs:52,1.5) {whole-batch fallback};
+\node[annot,anchor=south east] at (axis cs:250,0.53) {all certified};
+\draw[leader] (axis cs:23,2.2) -- (axis cs:121,1.33);
+\node[annot,anchor=east] at (axis cs:23,2.2) {per-position fallback};
 \end{groupplot}
 \end{tikzpicture}%

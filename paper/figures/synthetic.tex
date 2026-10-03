@@ -1,23 +1,37 @@
 % Work counts on constructed heads (research notes, fig:synthetic); data: data/synthetic_drift.csv
-% (experiments/synthetic_drift.py). The two head families have no paper-wide colour,
-% so they are ink (clustered) and grey (unstructured); solid lines count the decision alone and
-% dashed lines add the dense residual. Counts are computed exactly on synthetic heads: work, not time.
+% (experiments/synthetic_drift.py). The two head families have no paper-wide meaning, so both are
+% grey (style.tex), told apart by marker: circles for the clustered family, squares for the
+% unstructured one; solid lines count the decision alone and dashed lines (hollow markers) add the
+% dense residual; the dotted line with triangles is the clustered family's share of proposals
+% accepted. Counts are computed exactly on synthetic heads: work, not time.
+% Direct labels, no legend: each series is named right of the plot, with a leader from its value
+% at d = 4; the labels are fanned at least 0.33 cm apart (values 1.00, 0.97, 0.22, 0.11 and 0.06,
+% checked against the CSV).
 \def\synthdata{../data/synthetic_drift.csv}
+\vpreadcsv{\synthtable}{\synthdata}
+\vplookuptwo{\synthtable}{family}{clustered}{drift}{4}{accept_projected_fraction}{\synCD}
+\vplookuptwo{\synthtable}{family}{clustered}{drift}{4}{decision_plus_residual_projected_fraction}{\synCR}
+\vplookuptwo{\synthtable}{family}{unstructured}{drift}{4}{accept_projected_fraction}{\synUD}
+\vplookuptwo{\synthtable}{family}{unstructured}{drift}{4}{decision_plus_residual_projected_fraction}{\synUR}
+\vplookuptwo{\synthtable}{family}{clustered}{drift}{4}{acceptance_fraction}{\synCA}
 \begin{tikzpicture}
 \begin{axis}[width=.55\linewidth,height=5.2cm,xmin=-.2,xmax=4.2,ymin=0,ymax=1.05,xtick={0,1,2,4},
   xlabel={Drift scale $d$},ylabel={Share of the target's\\vocabulary entries projected},ylabel style={align=center},
-  % one panel: no title inside the figure; the key sits to the right, one entry a line
-  grid=major,legend style={at={(1.03,.5)},anchor=west,fill=none},short legend,
-  every axis plot/.append style={unbounded coords=discard}]
-\addplot[thick,cstock,mark circle,discard if not={family}{clustered}] table[x=drift,y=accept_projected_fraction,col sep=comma]{\synthdata};
-\addlegendentry{clustered: decision}
-\addplot[thick,cstock,dashed,mark circle,mark hollow,discard if not={family}{clustered}] table[x=drift,y=decision_plus_residual_projected_fraction,col sep=comma]{\synthdata};
-\addlegendentry{clustered: decision + dense residual}
+  % one panel: no title inside the figure
+  grid=major,clip=false,every axis plot/.append style={unbounded coords=discard}]
+\addplot[thick,ccontext,mark circle,discard if not={family}{clustered}] table[x=drift,y=accept_projected_fraction,col sep=comma]{\synthdata};
+\addplot[thick,ccontext,dashed,mark circle,mark hollow,discard if not={family}{clustered}] table[x=drift,y=decision_plus_residual_projected_fraction,col sep=comma]{\synthdata};
 \addplot[thick,ccontext,mark square,discard if not={family}{unstructured}] table[x=drift,y=accept_projected_fraction,col sep=comma]{\synthdata};
-\addlegendentry{unstructured: decision}
 \addplot[thick,ccontext,dashed,mark square,mark hollow,discard if not={family}{unstructured}] table[x=drift,y=decision_plus_residual_projected_fraction,col sep=comma]{\synthdata};
-\addlegendentry{unstructured: decision + dense residual}
-\addplot[semithick,cstock,densely dotted,mark triangle,discard if not={family}{clustered}] table[x=drift,y=acceptance_fraction,col sep=comma]{\synthdata};
-\addlegendentry{clustered: share of proposals accepted}
+\addplot[semithick,ccontext,densely dotted,mark triangle,discard if not={family}{clustered}] table[x=drift,y=acceptance_fraction,col sep=comma]{\synthdata};
+% series names right of the plot, leaders from the values at d = 4
+\draw[leader] (axis cs:4.08,\synUR) -- (axis cs:4.3,1.04) (axis cs:4.08,\synCR) -- (axis cs:4.3,0.94)
+  (axis cs:4.08,\synUD) -- (axis cs:4.3,0.25) (axis cs:4.08,\synCD) -- (axis cs:4.3,0.15)
+  (axis cs:4.08,\synCA) -- (axis cs:4.3,0.05);
+\node[annot,anchor=west] at (axis cs:4.32,1.04) {unstructured: decision + dense residual};
+\node[annot,anchor=west] at (axis cs:4.32,0.94) {clustered: decision + dense residual};
+\node[annot,anchor=west] at (axis cs:4.32,0.25) {unstructured: decision};
+\node[annot,anchor=west] at (axis cs:4.32,0.15) {clustered: decision};
+\node[annot,anchor=west] at (axis cs:4.32,0.05) {clustered: share of proposals accepted};
 \end{axis}
 \end{tikzpicture}%

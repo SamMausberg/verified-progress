@@ -19,7 +19,7 @@ This section measures the certified head on states recorded from the engine, the
 \begin{figure*}[t]
 \centering
 \input{figures/candidates}%
-\caption{What the certified head costs. \textbf{(a)}~Held-out replay, \Rreal{} decision: share of positions that need at least $k$ candidates, for four copies of the head (greedy) and for the per-128-weights int8 copy in a seeded race at $T=1$ \ev{ccdf}. \textbf{(b)}~Share of head calls of $M$ positions that fall back to the stock head: lines, independent fallback at the held-out shares of Table~\ref{tab:fallback} \ev{rstock}; markers, the kernel replay \ev{kernel-path}. \textbf{(c)}~Time per call over the stock head's, head alone: measured with every position certified (medians; p10--p90 within the markers below 256), and expected with each fallback under the \modelcons{} from measured times and the rates of (b) \ev{kernel-path}. Shaded: above 16 positions the calls are consecutive replay positions, not engine batches.}
+\caption{Int8 leaves few candidates, but whole-batch fallback grows with the batch; alone, with the per-position fallback under the \modelcons{}, the head is expected to take about 0.7 of the stock head's time up to 16 positions, and every mode is slower from 128. \textbf{(a)}~Held-out replay, \Rreal{}: four copies, greedy, and the per-128-weights int8 copy in a seeded race at $T=1$ \ev{ccdf}. \textbf{(b)}~Lines: independent fallback at the held-out shares of Table~\ref{tab:fallback} \ev{rstock}; markers: the kernel replay \ev{kernel-path}. \textbf{(c)}~Head alone, over the stock head: measured with every position certified (medians; p10--p90 within the markers below 256), and expected with each fallback under the \modelcons{} from measured times and the rates of (b) \ev{kernel-path}. Shaded: above 16 positions, consecutive replay positions, not engine batches.}
 \label{fig:candidates}\label{fig:geometry-candidates}
 \end{figure*}
 
@@ -88,14 +88,14 @@ DFlash, 8-token & 4--8 & 0.975--0.988 (0.967--0.999) & check mode$^d$\\
 \begin{figure}[t]
 \centering
 \input{figures/frontier}%
-\caption{Stock serving frontier (measured; baseline, no certified head): four of nine tuned arms, client concurrency 1 (lower right) to 128 (64 for 16-token DFlash blocks). Points average three or four sessions (hollow: one); one standard deviation, below 2\% of each mean, hides behind the markers \ev{bench-frontier}. Grey: envelope of all nine arms' points with three or more sessions.}
+\caption{Speculation serves more than plain decoding up to $c=32$ and, with SGLang's default admission, less from 48, for every drafter. Four of nine tuned stock arms, $c=1$ to 128 (64 for 16-token DFlash); points average three or four sessions (hollow: one), with standard deviations under 2\% of each mean \ev{bench-frontier}. Grey: envelope of all nine arms' points with three or more sessions.}
 \label{fig:frontier}
 \end{figure}
 
 \begin{figure*}[t]
 \centering
 \input{figures/transport}%
-\caption{Why transport fails. \textbf{(a)}~Median DFlash-4B head inputs, to scale: norms over the 4,020 whole-step pairs, cosine over 20,000 random aligned pairs. Transport's bound beats the int8 copy's only if $h^d$ lies in the dot at the tip of $h^t$, of radius $\delta^\ast\norm{h^t}_2$ for the median $\delta^\ast$ (Proposition~\ref{thm:crossover}). \textbf{(b, c)}~Cumulative distributions of the measured drift $\rho$ over 40,000 aligned held-out pairs of DFlash-4B (b) and MTP-4B (c), against the thresholds $\delta^\ast_i$ derived from the weights for every vocabulary entry; the arrows join the median threshold for int8 with one scale per entry to each drafter's median drift (107 and 112 times apart) \ev{head-constants,rho,transport,rho-mtp,stats-dflash}.}
+\caption{Transport fails because the drafters' head inputs are far from the target's: the median drift is 107 (DFlash-4B) and 112 (MTP-4B) times the median threshold $\delta^\ast$ below which transport's bound beats that of int8 with one scale per entry. \textbf{(a)}~Median DFlash-4B head inputs, to scale (norms over the 4,020 whole-step pairs, cosine over 20,000 random aligned pairs); transport wins only if $h^d$ lies in the dot of radius $\delta^\ast\norm{h^t}_2$ (Proposition~\ref{thm:crossover}). \textbf{(b, c)}~Measured drift $\rho$ over 40,000 aligned held-out pairs per drafter, against the thresholds $\delta^\ast_i$ derived from the weights for every vocabulary entry; arrows join the two medians \ev{head-constants,rho,transport,rho-mtp,stats-dflash}.}
 \label{fig:rho}\label{fig:transport}
 \end{figure*}
 
