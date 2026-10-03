@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import re
@@ -304,6 +305,22 @@ def cmd_served(args: argparse.Namespace) -> None:
 
 # The trace variants of holds/kill2b.sh and the switches each runs with.
 TRACE_SWITCHES = {'bf16': {}, 'fp8': TARGET}
+# holds/kill2b.sh's run_profiles.py invocation (its out-dir value aside; EXTRA in that script).
+TRACE_ARGV = [
+    '--arm',
+    'plain',
+    '--mode',
+    'nsys',
+    '--concurrency',
+    '1',
+    '64',
+    '--out-dir',
+    '--port',
+    '30222',
+    '--extra-server-args',
+    '--disable-radix-cache --max-mamba-cache-size 128 --max-total-tokens 1000000 '
+    '--max-running-requests 128',
+]
 
 
 def cmd_steps(args: argparse.Namespace) -> None:
@@ -313,7 +330,7 @@ def cmd_steps(args: argparse.Namespace) -> None:
     seen: list[tuple[str, int]] = []
     for rep in args.reports:
         rep = Path(rep)
-        check_hold_engine(rep.parent.parent)  # <hold>/trace_<variant>/<report>
+        engine = check_hold_engine(rep.parent.parent)  # <hold>/trace_<variant>/<report>
         m = re.search(r'trace_(\w+)/plain_bs(\d+)', str(rep))
         if not m or m.group(1) not in TRACE_SWITCHES:
             raise SystemExit(f'{rep}: expected .../trace_{{bf16,fp8}}/plain_bs<B>.nsys-rep')
@@ -321,6 +338,18 @@ def cmd_steps(args: argparse.Namespace) -> None:
         log = (rep.parent / 'server.log').read_text(errors='replace')
         if not check_fp8_log(log, TRACE_SWITCHES[m.group(1)]):
             raise SystemExit(f'{rep}: server.log does not match variant {m.group(1)}')
+        # run_profiles.py's record of the traced process: the engine the hold ran and exactly the
+        # invocation holds/kill2b.sh makes.
+        meta = json.loads((rep.parent / 'run_meta.json').read_text())
+        argv = meta['argv']
+        out_dir = argv[argv.index('--out-dir') + 1] if '--out-dir' in argv else ''
+        if (
+            meta['sglang_sha'] != engine
+            or Path(argv[0]).name != 'run_profiles.py'
+            or [a for i, a in enumerate(argv[1:], 1) if argv[i - 1] != '--out-dir'] != TRACE_ARGV
+            or Path(out_dir).name != rep.parent.name
+        ):
+            raise SystemExit(f'{rep}: run_meta.json records {meta["sglang_sha"][:10]} {argv}')
         seen.append((m.group(1), int(m.group(2))))
         b = budget(rep)
         for r in b['classes']:
@@ -362,6 +391,24 @@ PROBE_KINDS = {
 }
 
 
+# experiments/moonshot/logit_probe.py's defaults (lines 318-320), which holds/probe1.sh uses: 16 prompts per
+# domain of bench/workloads/mixed-v2/tune.jsonl (48), 256 generated tokens, top-20 logprobs.
+PROBE_WORKLOAD = REPO / 'bench/workloads/mixed-v2/tune.jsonl'
+PROBE_WORKLOAD_SHA = '35896665fe5e6d7b01397058c4ea876db29e488471a183a0b41073fa70c2c003'
+PROBE_PER_DOMAIN, PROBE_TOKENS, PROBE_TOPK = 16, 256, 20
+
+
+def probe_prompt_ids() -> list[str]:
+    from experiments.moonshot.logit_probe import select_prompts
+
+    if hashlib.sha256(PROBE_WORKLOAD.read_bytes()).hexdigest() != PROBE_WORKLOAD_SHA:
+        raise SystemExit(f'{PROBE_WORKLOAD} is not the tune split the probes used')
+    ids = [r['id'] for r in select_prompts(PROBE_WORKLOAD, PROBE_PER_DOMAIN)]
+    if len(ids) != 48:
+        raise SystemExit(f'expected 48 probe prompts, found {len(ids)}')
+    return ids
+
+
 def check_probe_run(run: dict, name: str, ref: dict) -> None:
     """A probe file is the run its name says: mode, concurrency, label, prompts and settings."""
     label, kind = name.split('.')
@@ -371,6 +418,20 @@ def check_probe_run(run: dict, name: str, ref: dict) -> None:
     for key in ('prompt_ids', 'workload_sha256', 'thinking', 'max_new_tokens', 'topk'):
         if run[key] != ref[key]:
             raise SystemExit(f'{name}: {key} differs from the reference')
+    # The full sample: the probe's 48 prompts (its own selection from the committed tune split,
+    # 16 per domain) and every sequence 256 tokens long (generate ignores EOS) with a top-20 entry
+    # per token.
+    if (run['workload_sha256'], run['prompt_ids']) != (PROBE_WORKLOAD_SHA, probe_prompt_ids()):
+        raise SystemExit(f"{name}: not the probe's 48 prompts of the committed tune split")
+    if (
+        (run['max_new_tokens'], run['topk'], run['thinking']) != (PROBE_TOKENS, PROBE_TOPK, True)
+        or any(
+            len(s['tokens']) != PROBE_TOKENS or len(s['top']) != PROBE_TOKENS
+            for s in run['sequences']
+        )
+        or len(run['sequences']) != len(run['prompt_ids'])
+    ):
+        raise SystemExit(f'{name}: not {PROBE_TOKENS} tokens with top-{PROBE_TOPK} per sequence')
     # Score mode is teacher-forced on the reference's tokens.
     if mode == 'score' and [s['tokens'] for s in run['sequences']] != [
         s['tokens'] for s in ref['sequences']

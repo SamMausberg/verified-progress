@@ -26,7 +26,8 @@ equal to eager, relative error under 0.06); the run printed them all passing.
 `summarize.py` checks every input against what its hold launched: per sweep the arm, the
 concurrencies and the exact switches, per server log the FP8 conversion and mode those switches
 imply, per hold the engine (its tree, which the hold scripts now log, or for the recorded runs
-the commit), per probe file its mode, concurrency, label, prompts and
+the commit), per trace the engine and invocation `run_profiles.py` recorded, per probe file its
+mode, concurrency, label, the probe's 48 prompts, 256 tokens with top-20 entries per sequence and
 (score mode) the reference tokens, and bench's own point-validity rule.
 `fp8_gemm_probe.py` differs by formatting, a lint directive and
 fixes made after review: its `fp8_tensor` route now quantizes the weights per tensor, where the
