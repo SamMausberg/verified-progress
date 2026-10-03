@@ -27,11 +27,14 @@ equal to eager, relative error under 0.06); the run printed them all passing.
 which the hold scripts now log, or for the recorded runs the commit) and that its log reached its
 last line; per sweep the full `bench/sweep.py` invocation the hold makes (arm, label, session,
 engine, port, concurrencies, request counts, the exact switches and nothing else), the arm as
-`bench/arms.toml` at the hold's commit resolves it, the harness commit the hold logged, the
-virtualenv's interpreter and bench's own point-validity rule; per server log the FP8
+`bench/arms.toml` at the hold's commit resolves it, the server command bench launched for it,
+the harness commit the hold logged, the virtualenv's interpreter and bench's own point-validity
+rule; per probe server the launch SGLang printed (`server_args`: the hold's flags and the
+defaults the comparison relies on, identical across the hold's servers apart from the switches),
+and the probe client and prompts at the hold's commit; per server log the FP8
 conversion and mode those switches imply; per trace the engine, harness commit, invocation,
 resolved server command and environment `run_profiles.py` recorded, and the GPU; per probe file
-its mode, concurrency, label, the probe's 48 prompts, 256 tokens per sequence with exactly 20
+the server it probed, its mode, concurrency, label, the probe's 48 prompts, 256 tokens per sequence with exactly 20
 finite top-logprob entries at every position (score mode: none at the first continuation
 position, which SGLang does not report) and (score mode) the reference tokens; and the unit
 check's relative errors against the script's 0.06 bound.

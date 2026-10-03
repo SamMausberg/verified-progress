@@ -16,6 +16,7 @@ speculative arms. ``gemm`` adds, per M, the summed time of one plain decode step
 from __future__ import annotations
 
 import argparse
+import ast
 import csv
 import hashlib
 import json
@@ -279,7 +280,7 @@ def env_label(arm: dict) -> str:
 
 
 def cmd_served(args: argparse.Namespace) -> None:
-    from bench.arms import resolve_arm
+    from bench.arms import resolve_arm, server_command
     from bench.pareto import invalid_reason
 
     # served.csv covers every planned hold, each once.
@@ -321,8 +322,9 @@ def cmd_served(args: argparse.Namespace) -> None:
             if d['label'] != label:
                 raise SystemExit(f'{f}: label {d["label"]} in the directory of {label}')
             arm, conc, switches = PLANNED[name][label]
-            # The full invocation the hold makes, and the arm as bench/arms.toml at the hold's
-            # commit resolves it with those switches (args, environment, model, capacity).
+            # The full invocation the hold makes, the arm as bench/arms.toml at the hold's commit
+            # resolves it with those switches (args, environment, model, capacity), and the
+            # server command bench launched for it.
             home = str(Path.home())
             cmd = [a.replace(home, '~') for a in d['command_line']]
             if '--out' in cmd:
@@ -331,12 +333,14 @@ def cmd_served(args: argparse.Namespace) -> None:
                 arm,
                 env_overrides={k: v.replace('~', home, 1) for k, v in switches.items()},
                 path=arms_file_at(repo),
-            ).to_json()
+            )
+            launched = server_command(resolved, VENV_PYTHON, '127.0.0.1', SWEEP_LAUNCH[name][1])
             if (
                 Path(cmd[0]).parts[-2:] != ('bench', 'sweep.py')
                 or cmd[1:] != expected_sweep_command(hold, label, PLANNED[name][label])
                 or (d['min_requests'], d['waves']) != (SWEEP_MIN_REQUESTS, SWEEP_WAVES)
-                or d['arm'] != resolved
+                or d['arm'] != resolved.to_json()
+                or d['launch']['command'] != launched
             ):
                 raise SystemExit(f'{f}: not the sweep its hold launches: {cmd} {d["arm"]["args"]}')
             planned = set(conc)
@@ -518,6 +522,69 @@ PROBE_KINDS = {
 }
 
 
+# holds/probe1.sh's servers: the flags its start_server passes (port PORT=30221, 48 running, 64
+# mamba slots), and the defaults the comparison relies on (no quantization or speculation, CUDA
+# graphs and the overlap scheduler on, one rank, BF16 weights and KV cache).
+PROBE1_PORT = 30221
+PROBE_SERVER_ARGS: dict[str, Any] = {
+    'model_path': 'Qwen/Qwen3.5-4B',
+    'revision': '851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a',
+    'host': '127.0.0.1',
+    'attention_backend': 'flashinfer',
+    'mm_attention_backend': 'triton_attn',
+    'mem_fraction_static': 0.25,
+    'max_total_tokens': 150000,
+    'disable_radix_cache': True,
+    'random_seed': 0,
+    'stream_interval': 4,
+    'quantization': None,
+    'speculative_algorithm': None,
+    'disable_cuda_graph': False,
+    'disable_overlap_schedule': False,
+    'tp_size': 1,
+    'dtype': 'auto',
+    'kv_cache_dtype': 'auto',
+    'enable_torch_compile': False,
+}
+# The probe harness (the client and its prompts) at the repository commit the probes ran from; a
+# hold run from another commit must have these files unchanged.
+PROBE_HARNESS = ('e690b3a9a2c9801b761023d6c0bf486dceb1dd8d',
+                 ('experiments/moonshot/logit_probe.py', 'bench/workloads/mixed-v2/tune.jsonl'))  # fmt: skip
+
+
+def server_args(log: str, where: str) -> dict[str, Any]:
+    """The ServerArgs SGLang printed at start-up (one `server_args={...}` line per server log)."""
+    found = re.findall(r'server_args=(\{.*\})$', log, re.M)
+    if len(found) != 1:
+        raise SystemExit(f'{where}: {len(found)} server_args lines')
+    return ast.literal_eval(found[0])
+
+
+def check_probe_servers(d: Path, labels: list[str], port: int, running: int, mamba: int) -> None:
+    """The hold's probe servers ran exactly the planned launch, identical apart from the switches."""
+    planned = {
+        **PROBE_SERVER_ARGS,
+        'port': port,
+        'max_running_requests': running,
+        'max_mamba_cache_size': mamba,
+    }
+    seen = []
+    for label in labels:
+        a = server_args((d / f'server_{label}.log').read_text(errors='replace'), f'{d}/{label}')
+        wrong = {k: a.get(k) for k, v in planned.items() if a.get(k) != v}
+        if wrong:
+            raise SystemExit(f'{d}/server_{label}.log: {wrong}, planned {planned}')
+        seen.append(a)
+    if any(a != seen[0] for a in seen):
+        raise SystemExit(f'{d}: the probe servers were not launched identically')
+    # ...from a repository commit whose probe client and prompts are the recorded ones.
+    commit, files = PROBE_HARNESS
+    if subprocess.run(
+        ['git', '-C', str(REPO), 'diff', '--quiet', commit, hold_repo(d), '--', *files]
+    ).returncode:
+        raise SystemExit(f'{d}: the probe harness at {hold_repo(d)[:7]} differs from {commit[:7]}')
+
+
 # experiments/moonshot/logit_probe.py's defaults (lines 318-320), which holds/probe1.sh uses: 16 prompts per
 # domain of bench/workloads/mixed-v2/tune.jsonl (48), 256 generated tokens, top-20 logprobs.
 PROBE_WORKLOAD = REPO / 'bench/workloads/mixed-v2/tune.jsonl'
@@ -588,11 +655,15 @@ def cmd_probe(args: argparse.Namespace) -> None:
         log = (d / f'server_{label}.log').read_text(errors='replace')
         if not check_fp8_log(log, switches):
             raise SystemExit(f'{d}: server_{label}.log does not match its FP8 setting')
+    check_probe_servers(d, list(PROBE1_SWITCHES), PROBE1_PORT, 48, 64)
     ref = json.loads((d / 'bf16.gen48.json').read_text())
 
     def load(name: str) -> dict:
         run = json.loads((d / f'{name}.json').read_text())
         check_probe_run(run, name, ref)
+        # ...and was made against this hold's server.
+        if run['url'] != f'http://127.0.0.1:{PROBE1_PORT}':
+            raise SystemExit(f'{name}: probed {run["url"]}')
         return run
 
     load('bf16.gen48')
