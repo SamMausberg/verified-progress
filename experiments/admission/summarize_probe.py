@@ -5,13 +5,17 @@ For every point the CSV row gives y, y_steady, x_e2e (includes TTFT), x_decode, 
 p50/p99, accept length, prefill batches, output tokens, span and foreign CPU load,
 the ratios of y and x to the `--plain` label at the same concurrency, and, for each
 `--pair TEST=BASE`, the ratios to BASE and the first-divergence count of greedy token
-ids against BASE (needs --return-token-ids on both runs). Every point must pass the
-validity checks (complete, expected prompts, foreign CPU mean at most 2 cores) or the
-script stops before writing.
+ids against BASE (needs --return-token-ids on both runs). The last three columns count
+the point's prefill batches above, at and well below the 16-request prefill cap, from its
+server's log. Every label and concurrency the hold script ran is declared with `--expect`:
+the directory must hold exactly those points, each passing the validity checks (complete,
+expected prompts, foreign CPU mean at most 2 cores), or the script stops before writing.
 
     python experiments/admission/summarize_probe.py ~/vp-data/speed_highc/queue-delay \
+        --expect plain-tuned=64,96 --expect plain-pd=64,96 --expect mtp-n0=64,96 \
+        --expect mtp-pd=64,96 --expect replayssm=96 \
         --plain plain-tuned --pair mtp-pd=mtp-n0 --pair plain-pd=plain-tuned \
-        --out evidence/admission/queue_delay_points.csv
+        --out evidence/admission/probe2_prefill_delayer.csv
 """
 
 from __future__ import annotations
@@ -19,6 +23,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -31,8 +36,36 @@ FIELDS = [
     'ttft_p99_ms', 'accept_length', 'prefill_batches', 'requests', 'output_tokens', 'span_s',
     'foreign_cpu_mean', 'foreign_cpu_max', 'y_vs_plain', 'x_vs_plain', 'base', 'y_vs_base',
     'x_vs_base', 'identical', 'diverged', 'length_mismatch', 'exposure_tokens',
-    'divergences_per_1k',
+    'divergences_per_1k', 'prefill_batches_over_16', 'prefill_batches_at_16',
+    'prefill_batches_of_1_or_2',
 ]  # fmt: skip
+# The delayed arms pass --prefill-max-requests 16 (run_queue_delay_probe.sh:20,
+# run_natural_probe.sh:35, run_admission_confirm.sh:32), which caps every prefill batch at 16
+# requests (PrefillAdder.add_one_req, python/sglang/srt/managers/schedule_policy.py:1350 at
+# SGLang bd66ce34). Batches at 16 are the most the cap can have cut.
+PREFILL_CAP = 16
+_NEW_SEQ = re.compile(r'#new-seq: (\d+)')
+
+
+def prefill_batch_sizes(run: Path, levels: list[int]) -> dict[int, list[int]]:
+    """Requests per prefill batch at each concurrency of a run, from the server's log.
+
+    SGLang logs one "Prefill batch" line per prefill forward with its request count. bench.sweep
+    flushes the cache before every point, so the n-th flush starts the n-th concurrency of the
+    run's sweep.json.
+    """
+    segments: list[list[int]] = []
+    for line in (run / 'server/server.log').read_text(errors='replace').splitlines():
+        if 'Cache flushed successfully' in line:
+            segments.append([])
+        elif segments and 'Prefill batch' in line:
+            match = _NEW_SEQ.search(line)
+            if match is None:
+                raise SystemExit(f'{run}: prefill line without #new-seq: {line}')
+            segments[-1].append(int(match.group(1)))
+    if len(segments) != len(levels):
+        raise SystemExit(f'{run}: {len(segments)} cache flushes for {len(levels)} concurrencies')
+    return dict(zip(levels, segments, strict=True))
 
 
 def output_ids(point_dir: Path) -> dict[str, list[int]]:
@@ -105,6 +138,7 @@ def load_points(root: Path) -> dict[tuple[str, int], dict[str, Any]]:
                 f'{label_dir.name}: points at c = {sorted(observed)}, '
                 f'sweep asked for c = {sorted(requested)}'
             )
+        sizes = prefill_batch_sizes(runs[0].parent, [int(c) for c in sweep['concurrency']])
         for point_json in sorted(runs[0].glob('c*/point.json')):
             p = json.loads(point_json.read_text())
             problems = []
@@ -116,6 +150,12 @@ def load_points(root: Path) -> dict[tuple[str, int], dict[str, Any]]:
                 problems.append('host_contention')
             if problems:
                 raise SystemExit(f'{point_json}: invalid ({", ".join(problems)})')
+            batch = sizes[int(p['concurrency'])]
+            if len(batch) != p['server_log']['prefill_log_lines']:
+                raise SystemExit(
+                    f'{point_json}: {len(batch)} prefill lines after its cache flush, '
+                    f'{p["server_log"]["prefill_log_lines"]} in point.json'
+                )
             spec = p.get('spec') or {}
             points[(label_dir.name, p['concurrency'])] = {
                 'label': label_dir.name,
@@ -134,6 +174,9 @@ def load_points(root: Path) -> dict[tuple[str, int], dict[str, Any]]:
                 'span_s': p['span_s'],
                 'foreign_cpu_mean': p['foreign_cpu_during_mean'],
                 'foreign_cpu_max': p['foreign_cpu_during_max'],
+                'prefill_batches_over_16': sum(n > PREFILL_CAP for n in batch),
+                'prefill_batches_at_16': sum(n == PREFILL_CAP for n in batch),
+                'prefill_batches_of_1_or_2': sum(n <= 2 for n in batch),
                 '_dir': point_json.parent,
             }
     if not points:
@@ -144,18 +187,41 @@ def load_points(root: Path) -> dict[tuple[str, int], dict[str, Any]]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     parser.add_argument('root', type=Path)
+    parser.add_argument(
+        '--expect',
+        action='append',
+        required=True,
+        metavar='LABEL=C1,C2,...',
+        help='a label the hold script ran and its concurrencies; one per label, all required',
+    )
     parser.add_argument('--plain', default='plain-tuned')
     parser.add_argument('--pair', action='append', default=[], metavar='TEST=BASE')
     parser.add_argument('--out', type=Path, required=True)
     args = parser.parse_args()
-    points = load_points(args.root.expanduser())
+    expected: set[tuple[str, int]] = set()
+    for item in args.expect:
+        label, _, levels = item.partition('=')
+        try:
+            expected |= {(label, int(c)) for c in levels.split(',')}
+        except ValueError:
+            parser.error(f'--expect {item}: not LABEL=C1,C2,...')
+        if not label:
+            parser.error(f'--expect {item}: no label')
     pairs = dict(item.split('=', 1) for item in args.pair)
-    # Every label named on the command line must have run: a failed sweep leaves no r0
-    # directory, and its absence must stop the summary rather than drop a comparison.
-    found = {label for label, _ in points}
-    missing = sorted({args.plain, *pairs, *pairs.values()} - found)
-    if missing:
-        raise SystemExit(f'{args.root}: no points for requested label(s) {", ".join(missing)}')
+    declared = {label for label, _ in expected}
+    undeclared = sorted({args.plain, *pairs, *pairs.values()} - declared)
+    if undeclared:
+        parser.error(f'not declared with --expect: {", ".join(undeclared)}')
+    points = load_points(args.root.expanduser())
+    # Every label and concurrency the hold script ran must be here and nothing else: a failed
+    # sweep leaves no r0 directory, and its absence must stop the summary rather than drop an
+    # arm or a comparison.
+    found = set(points)
+    if found != expected:
+        raise SystemExit(
+            f'{args.root}: missing {sorted(expected - found)}, '
+            f'not declared {sorted(found - expected)}'
+        )
     # A paired test and its base must cover the same concurrencies: a sweep that aborted
     # part-way must not leave a comparison silently incomplete. Plain ratios are filled
     # wherever a plain point exists (arms may run at concurrencies plain does not).

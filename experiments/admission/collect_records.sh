@@ -8,7 +8,16 @@
 set -euo pipefail
 data="${1:-$HOME/vp-data/speed_highc}"
 out="${2:-evidence/admission}"
-probes=(probe1:admission probe2:queue-delay probe3:natural-20261002T195727Z)
+# probe:directory:every label its hold script launched (run_admission_probe.sh:35-45,
+# run_queue_delay_probe.sh:34-38, run_natural_probe.sh:50-55); each must have exactly one launch
+# record, and no other may appear.
+probes=(
+  "probe1:admission:dflash-fold-n16 dflash-fold-n4 dflash-n16 dflash-n4 mtp-n0 mtp-n32 mtp-n8 plain-tuned replayssm"
+  "probe2:queue-delay:mtp-n0 mtp-pd plain-pd plain-tuned replayssm"
+  "probe3:natural-20261002T195727Z:dflash-fold-pd mtp-n0 mtp-pd plain-pd plain-tuned replayssm"
+)
+# The three servers of run_admission_logprob.sh:28.
+logprob_runs=(mtp_s3_replayssm__adm_n0 mtp_s3_replayssm__adm_n0b mtp_s3_replayssm__adm_pd)
 prefill="$data/prefill-20261002T175303Z"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
@@ -16,21 +25,26 @@ trap 'rm -rf "$tmp"' EXIT
 {
   echo "probe,label,session,repo_head,sglang_head,sglang_branch,env,command"
   for spec in "${probes[@]}"; do
-    probe=${spec%%:*}
-    dir="$data/${spec#*:}"
-    found=0
+    IFS=: read -r probe sub expected <<< "$spec"
+    dir="$data/$sub"
+    found=()
     for launch in "$dir"/*/[0-9]*-[0-9]*/server/launch.json; do
       [ -e "$launch" ] || continue
-      found=1
       run="$(dirname "$(dirname "$launch")")"
       label="$(basename "$(dirname "$run")")"
-      session="$(jq -r '.session' "$run/sweep.json")"
+      found+=("$label")
+      session="$(jq -er '.session' "$run/sweep.json")"
       jq -r --arg p "$probe" --arg l "$label" --arg s "$session" \
         '[$p, $l, $s, .repo.head, .sglang_source.head, .sglang_source.branch,
           (.env_overrides | to_entries | map("\(.key)=\(.value)") | join(" ")),
           (.command[3:] | join(" "))] | @csv' "$launch"
     done
-    [ "$found" = 1 ] || { echo "no launch records under $dir" >&2; exit 1; }
+    got="$(printf '%s\n' "${found[@]}" | sort | tr '\n' ' ')"
+    want="$(tr ' ' '\n' <<< "$expected" | sort | tr '\n' ' ')"
+    if [ "$got" != "$want" ]; then
+      echo "$dir: launch records for [$got], expected one each for [$want]" >&2
+      exit 1
+    fi
   done
 } > "$tmp/launches.csv"
 
@@ -49,9 +63,17 @@ cp "$prefill/gdn_prefill_bench.json" "$tmp/gdn_prefill_bench.json"
 
 {
   echo "run,prefill_batches,max_total_num_tokens,max_mamba_cache_size,max_running_requests,sglang_sha,repo_sha"
-  for run in "$data"/logprob/runs/*; do
+  for name in "${logprob_runs[@]}"; do
+    run="$data/logprob/runs/$name"
     log="$run/server.log"
-    echo "$(basename "$run"),$(grep -c 'Prefill batch' "$log"),$(grep -o 'max_total_num_tokens=[0-9]*' "$log" | tail -1 | cut -d= -f2),$(grep -o 'max_mamba_cache_size: [0-9]*' "$log" | tail -1 | cut -d' ' -f2),$(grep -o 'max_running_requests=[0-9]*' "$log" | tail -1 | cut -d= -f2),$(jq -r .sglang_sha "$run/c128.meta.json"),$(jq -r .repo_sha "$run/c128.meta.json")"
+    # Each value must be present: a failed grep or a null field stops the script.
+    batches="$(grep -c 'Prefill batch' "$log")"
+    kv="$(grep -o 'max_total_num_tokens=[0-9]*' "$log" | tail -1 | cut -d= -f2)"
+    mamba="$(grep -o 'max_mamba_cache_size: [0-9]*' "$log" | tail -1 | cut -d' ' -f2)"
+    running="$(grep -o 'max_running_requests=[0-9]*' "$log" | tail -1 | cut -d= -f2)"
+    sglang="$(jq -er .sglang_sha "$run/c128.meta.json")"
+    repo="$(jq -er .repo_sha "$run/c128.meta.json")"
+    echo "$name,$batches,$kv,$mamba,$running,$sglang,$repo"
   done
 } > "$tmp/logprob_runs.csv"
 
