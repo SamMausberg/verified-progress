@@ -18,7 +18,7 @@ BF16 operands. "Exact" below means that real-arithmetic value, the R-real refere
 `src/precision_reference.py` and `evidence/precision/README.md`, not the stock kernel's
 BF16 output (R-stock).
 
-## Decision so far
+## Decision
 
 - **H2, transport: refuted on DFlash-4B and on native MTP-4B for every bound family and
   tiling tested** (scalar, coordinate, grouped 32/128 and low-rank radii with W or Delta

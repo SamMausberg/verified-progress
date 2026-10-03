@@ -84,7 +84,10 @@ in the same hold it is level at c=64 (+0.2%) and higher at c=96 and 128 (+4.9% a
 +8.1%; 15,012 tok/s at c=128). `envelope.csv` lists it as `best_below_min_n` and
 `pareto.png` draws it hollow. It became eligible for the exact frontier only when the
 radix-off reference made it exact (equality/); two more sessions (confirm-supp2 and
-confirm-supp3) are scheduled, and until they land this is not a result.
+confirm-supp3) ran on 2026-10-01, but their points were never added to `confirm/` or analysed,
+so this is not a result. The lossy study timed the
+same decoding at capacity 256 (`replayssm-cap256`) in three sessions, where it was the fastest
+of that study's exact arms at c = 64, 128 and 256 (`evidence/lossy/README.md`).
 
 y in tok/s per arm (mean over sessions; n=3 unless marked):
 
@@ -164,8 +167,8 @@ bench/campaigns/confirm_evidence.sh                              # CPU only: thi
 Natural output lengths on the tune split, used to justify the fixed 512-token panel and
 the sampled quality check. Measured on workload `mixed-v1` (git history, commit 8b4b7ab),
 whose maths prompts were GSM8K test problems; `mixed-v2` replaces them with GSM8K train
-problems so that no workload prompt is in the quality set. A rerun on `mixed-v2` will
-replace these files.
+problems so that no workload prompt is in the quality set. These files were not rerun on
+`mixed-v2`.
 
 - `natural_requests_tune.csv`: one row per request (576), from
   `~/vp-data/bench/natural/natural-tune-mtp/20260930-191122`.
@@ -308,7 +311,7 @@ First classification, against the radix-on plain c=1 run (comparisons from the r
 | `plain-tuned-replayssm` | 175 | 45,360 | 3.86 (3.33-4.47) | 1.13 (0.91-1.39) | 160 / 13 / 1 / **1** / 0 |
 
 Classes (`classes.json`, rule in `bench/README.md` "Exactness classes", set by the
-coordinator after the first results were seen): `mtp-tuned`, `mtp-tuned-triton`,
+maintainer after the first results were seen): `mtp-tuned`, `mtp-tuned-triton`,
 `dflash-tuned-b16`, `plain-tuned-triton` and `plain-tuned-replayssm` are
 `exact-up-to-rounding`, since every first divergence against their matched reference is
 rounding-level. No tuned arm is `lossy`. The rates and ratios sit beside the classes but

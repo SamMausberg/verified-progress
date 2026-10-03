@@ -55,6 +55,3 @@ scripts/gpu_lock.sh -s experiments/profiling/analyze_all.sh
 | `compare_attribution.py` | Component-by-component comparison of two attributions of the same configurations | `plain_rerun_check.csv` |
 | `tensor_instructions.py` | Which tensor-core instruction the head GEMM kernels issue: HGMMA- and HMMA-path operation counts and the executed SASS from the head ncu reports, and a `cuobjdump -symbols` search of cuBLAS's libraries for the nvjet kernels | `head_tensor_instructions.json` |
 | `wgmma_precision.py` | Probe of the tensor cores' BF16 accumulation with crafted inputs (fractional bits kept, truncation direction, block size, accumulator handling, rounding to FP32), through Triton's `wgmma` and through the head's own cuBLAS call at every head-kernel row count; GPU, `run_all.sh wgmma`, a few seconds, no timing | `wgmma_precision.json` |
-
-"Pending" marks outputs whose GPU runs are listed as pending in the evidence README; the scripts
-are committed so that those runs use reviewed code.

@@ -146,8 +146,8 @@ whose conditional acceptance is the same alpha at every position, a cycle commit
 
 The cycle periods are for perfect blocks, so they contain no rejected work; with the FlashInfer
 verifier no width reaches 5x even when every block is accepted, which is the repair README's
-verdict restated. The Triton figures carry that README's pending-exactness label for the Triton
-verify kernel.
+verdict restated. The Triton figures carry that README's caveat: their configuration (FlashInfer GDN decode,
+verify forced to Triton) was not compared for exactness.
 
 Measured on the block-16 panel-v1 trace (`support/zlab_b16_panel_v1_survival.csv`), DFlash's
 conditional acceptance by position is 0.80 to 0.91 (mean 0.889 over positions 5-15). For a
@@ -440,7 +440,7 @@ foreign CPU load averaged 0.27-0.83 cores per point.
   pairs between 0.966 and 0.970), which is the best configuration at c = 1, and 1.4% on block 8.
   At c = 2 it is 1.7% slower on block 16 and 1.0% faster on block 8. So in this session the
   fold does not improve low-concurrency serving and makes the c = 1 leader slower.
-  A likely cause, from code reading and not yet measured: SGLang's recurrent GDN kernel uses
+  A likely cause, from code reading and tested by patch 0005 below: SGLang's recurrent GDN kernel uses
   value tiles of 4 on sm_90 for at most 64 sequences only when it writes per-position states
   (`_select_recurrent_launch_config`, `target_verify`); the ring-writing verify the fold uses
   keeps tiles of 32, so at small batches it launches 8x fewer blocks. The kernel check above
@@ -605,7 +605,7 @@ other grid of blocks or batches:
 6. The sweep is a kernel microbenchmark on random inputs, so no served-throughput claim follows
    from it. A restricted patch would still need the kernel parity check and a served session
    (stock, the fold with 0001-0004, and the fold with the restricted rule, at c = 1-32 on both
-   tuned arms), which waits for main's go after the end-to-end campaigns.
+   tuned arms), which waits for the maintainer's go after the end-to-end campaigns.
 
 A sweep whose bitwise gate fails writes its report to `sweep.failed.json`, not `sweep.json`.
 

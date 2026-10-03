@@ -12,8 +12,7 @@ Setting: Qwen/Qwen3.5-4B at `851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a` with the 
 z-lab/Qwen3.5-4B-DFlash at `9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf`, SGLang
 `bd66ce343e` plus the patch series below, one GH200, greedy decoding, bench's harness and
 workload (`bench/`, mixed-v2 confirm split, 512 output tokens). Labels as elsewhere:
-**measured**, **derived** (arithmetic on measured values, formula in the named script),
-**pending** (declared, not yet run).
+**measured** and **derived** (arithmetic on measured values, formula in the named script).
 
 ## Short answer
 
@@ -73,9 +72,7 @@ measured effect as measured (never multiplied with another lever's), the kind of
 (served end to end, served single runs, held-batch cycle windows, isolated kernel
 microbenchmark, offline oracle, or derived) with its n, where it is, the exactness class
 against stock decoding and its source, the engine series and switch, what blocks it, and
-whether it enters the composed run. "c" is client concurrency. Where a cited file is on an
-open pull request rather than on `main`, the row names the pull request and its numbers
-are marked pending until it merges.
+whether it enters the composed run. "c" is client concurrency.
 
 Baselines (measured, bench confirmation, n = 3 sessions each, `evidence/bench/confirm/frontier.csv`): the best tuned DFlash arm of an exact class is `dflash-tuned-b16` (block
 16, Triton target and draft attention; exact-up-to-rounding) by per-user rate at every
@@ -525,7 +522,8 @@ state writes removed and no commit cost. At a batch of 1 the verify is 0.14 ms a
 commit 0.025 ms longer, a cycle 2.2% longer (6.18 to 6.32 ms), within the net 0.17 ms
 cost of the derivation's low end. (FG contains G, which the diagnostic cannot separate.)
 Drafter patch 0005 (narrow value tiles for the fold's ring-writing
-verify, open PR #167) targets that small-batch cost; it is not in this campaign.
+verify, PR #167, merged after these sessions) targets that small-batch cost; it is not in this campaign
+(its served result is in `evidence/drafter/README.md`).
 
 G against its declared range, which stays as declared: inside at c = 1 (1.009 in
 1.00-1.027, though per cycle about +0.1%) and c = 8 (1.008 in 1.00-1.013, not decided),

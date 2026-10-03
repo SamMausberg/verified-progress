@@ -12,7 +12,7 @@ calculations from them (**derived**). [Served results](#served-results) add the 
 of each engine switch (greedy outputs against stock plain decoding), paired serving runs of the
 routing table against tuned plain decoding and against both of bench's MTP arms (FlashInfer
 attention, `mtp-tuned`; Triton attention, `mtp-tuned-triton`), and a trace of which GEMM kernels
-the served engine dispatches. The routing table's exactness class under MTP is **pending**; on
+the served engine dispatches. The routing table's exactness class under MTP was **not measured**; on
 `mtp-tuned-triton` its streamed greedy text differs from the switches-off engine's on 7 of 64
 prompts at c = 1.
 
@@ -111,9 +111,9 @@ SGLang's packed path multiplies the concatenated 12352 x 2560 weight in one GEMM
 1024 rows, with the real weights of all 24 GDN layers, random N(0, 1) BF16 inputs, cuBLAS 13.1 on
 this GH200, in an isolated microbenchmark (`merge_microbench.json`): **every element of the packed
 GEMM's output is bitwise equal to the separate GEMMs' outputs** (cuBLAS picks the qkvz GEMM's
-kernel for the packed one at each tested M). This is a per-GEMM statement; whether served tokens
-are unchanged is pending (the exactness runs below). Against the stock pair (ba on a side stream)
-the packed GEMM is neutral up to M = 16, 3% slower at M = 32 and 5-13% faster from M = 64 to
+kernel for the packed one at each tested M). This is a per-GEMM statement; the served exactness
+runs below find it bitwise where it acts at concurrency 1 (prefill) and do not cover it in
+decode. Against the stock pair (ba on a side stream) the packed GEMM is neutral up to M = 16, 3% slower at M = 32 and 5-13% faster from M = 64 to
 1024.
 
 ### RMSNorm
@@ -146,7 +146,7 @@ configuration:
   M = 4 is the exception, 0.6 us slower) and loses at M = 32. Without PDL it is slower than stock.
 - **Folding the norm and the SiLU into the GEMM, as implemented, is a loss of 13-70 us per layer.**
   It removes two launches of about 1.5-2 us each but slows each GEMM by far more. Our reading of the
-  kernel (not yet profiled): every program first sums the squares of its rows over all of K before
+  kernel (not profiled): every program first sums the squares of its rows over all of K before
   it streams any weight, and the A operand is formed in registers every iteration instead of being
   loaded asynchronously into the tensor-core pipeline.
 
@@ -403,7 +403,7 @@ over their mean.
   runs of the same arm already differ on 45 (A) and 131 (B) of 256 prompts, since batch
   composition varies between runs, so the between-arm counts there (120 and 98 differing) say
   nothing about the table.
-- **The exactness class of lever v1 under MTP is still pending.** On this arm the table changes
+- **The exactness class of lever v1 under MTP was not measured.** On this arm the table changes
   the greedy output of 7 of 64 prompts at c = 1, where each arm reproduces its own streamed text.
   Whether those changes are rounding-level flips at near ties, the class the table has on plain
   decoding, needs the logprob comparison against stock MTP, which has not been run; the frontier
@@ -446,10 +446,10 @@ cores).
   other two thirds go is not resolved: the span and the unprofiled step come from different
   single windows.
 
-## Pending
+## Not measured or not explained
 
 - The exactness class of lever v1 under MTP (greedy outputs against stock MTP), on either MTP
-  arm.
+  arm: not run.
 - Why the step at c = 16 keeps only a third of the GPU span's saving, why `mtp-tuned` at c = 1 is
   slower, why the MTP verify cycle at c = 1 keeps 7-13% of its isolated GEMM saving, and
   why the table lengthens time to first token under MTP; none of these is traced.

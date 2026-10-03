@@ -1,7 +1,8 @@
 # Moonshot portfolio: ceilings, lever tests and ranking (Phase 1)
 
-Status: Phase 1 in progress. Measured results so far are single runs; every row marked
-*pending* is queued on the shared GPU (FIFO lock) and will replace the placeholder.
+Status: complete. The lever sweeps in Section 2 are single runs; P4's served test (2c, four
+pairs) and the bench and lossy results that the portfolio (Section 3) cites are repeated
+measurements.
 
 Setup for everything here: Qwen/Qwen3.5-4B @ `851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a` on one
 GH200 (96 GB HBM3, sm_90, aarch64), SGLang `bd66ce343e` plus engine/moonshot patches from
@@ -106,7 +107,7 @@ Batch-1 floors: plain BF16 2.22 ms (451 tok/s); MTP 3 steps at accept 3.4: 995 t
 times the plain engine's ceiling on its own: 8.4 GFLOP per token caps an FP8 engine near
 140k tok/s with every byte removed, and at batch 1 the weight bytes set the floor.
 
-## 2. Levers measured so far (single runs; `lever_sweeps_quick.csv`)
+## 2. Levers measured (single runs; `lever_sweeps_quick.csv`)
 
 bench `plain` arm (radix on, max-running 128, mamba cache 640 slots, mem 0.85) plus one lever.
 
@@ -126,11 +127,13 @@ bench `plain` arm (radix on, max-running 128, mamba cache 640 slots, mem 0.85) p
   wheel's `common_ops`, and measures the cuBLASLt per-tensor route served.)
 - FP8 KV does nothing at ~334-token contexts; it matters only for long contexts.
 - ReplaySSM and NGRAM arms failed to launch in this pass (radix strategy and bench's
-  draft-graph check, both fixed in the harness); rerun pending.
+  draft-graph check, both fixed in the harness) and were not rerun here. Bench later measured
+  ReplaySSM decoding as `plain-tuned-replayssm` (`evidence/bench/README.md`); NGRAM was not
+  measured.
 
 One_batch engine-only decode steps (first pass, `decode_ceiling_try1.csv`, noisy below
 B = 64 because of per-step host overhead): B = 512 FP32 state 26.9 ms (19.0k tok/s), BF16
-23.0 ms (22.3k), FP16 22.5 ms (22.8k). Rerun with longer decodes pending.
+23.0 ms (22.3k), FP16 22.5 ms (22.8k). Not rerun with longer decodes.
 
 ## 2b. Speculation at high concurrency: byte arithmetic (derived)
 
@@ -160,9 +163,13 @@ Assumptions for the components below: 3.8 TB/s, 650 TFLOPS BF16, context ~400 to
   8.27 and 12.49 ms against 5.27, 6.62 and 10.62 ms of traced GPU-busy time at B = 1, 8 and
   32, i.e. 1.27x, 1.25x and 1.18x (`evidence/profiles/README.md`). The lever that
   could let speculation win at c >= 32 is whatever makes the cycle that much slower than its
-  parts; the hostgap workstream is attributing MTP at B = 64 and 128.
+  parts; the hostgap workstream derived the GPU-idle part of it up to B = 128 (1.81 ms per
+  stock tuned-MTP cycle at B = 128, 9% of the cycle: untraced cycle minus traced GPU-busy time;
+  `evidence/hostgap/README.md`).
 - The cheapest frontier gain meanwhile is scheduling: choose plain decode above the batch
-  size where MTP stops paying (`--speculative-adaptive`, measured in the next sweep).
+  size where MTP stops paying (`--speculative-adaptive`). Bench's tuning measured adaptive
+  depth below plain decoding at c = 128, 10,010 against 13,844 tok/s in single runs
+  (`evidence/bench/README.md`, slot T2).
 
 ## 2c. Strict write-avoiding GDN decode (proposal P4, patch 0007)
 
@@ -215,7 +222,7 @@ a single 262,144-token prefill hits an illegal memory access in
 The A/B then ran through the server with chunked prefill (run_p4b.sh).
 
 **Analysis of the served A/B, declared on 2026-10-01 at 07:12 UTC, before the run started**
-(agreed with the coordinator; the run script is `experiments/moonshot/run_p4b.sh`, committed
+(agreed with the maintainer; the run script is `experiments/moonshot/run_p4b.sh`, committed
 with this declaration):
 
 - Design: batch 128, 2,048-token prompts (`long2048.jsonl`), 512 generated tokens, greedy,
@@ -480,11 +487,9 @@ host and no FlashInfer `plan()` runs in the cycle: the host can run ahead of the
 That recovers 18% at c = 1, against the up-to-27% idle share the profile workstream derived.
 Exactness differs between the two arms: Triton attention for the draft only changes which
 tokens are proposed, never the target's decisions, so it is exact; Triton attention for the
-target changes the target's attention arithmetic, so its class waits for bench's equality
-classification. Bench's first related pair does not isolate Triton: it ran Triton attention
-together with ReplaySSM-spec (buffered verify) and diverged 3.80 times per 1,000 tokens,
-against a floor of 3.42 per 1,000 that is plain decoding at client concurrency 1 against 32
-(ratio 1.11, interval 0.90-1.37; not final).
+target changes the target's attention arithmetic, so its class comes from bench's equality
+classification: exact-up-to-rounding (`plain-tuned-triton` against stock plain decoding and
+`dflash-tuned-b16` against stock DFlash block 16; `evidence/bench/README.md`).
 The plan-stream arm fails at the first verify: the hybrid GDN backend does not implement
 `update_verify_buffers_to_fill_after_draft` (`base_attn_backend.py:258`,
 NotImplementedError), so the plan stream cannot be used with Qwen3.5 MTP at this commit.
@@ -630,23 +635,24 @@ to the measured noise floor); "lossy" changes them and needs the quality budget 
 
 | # | lever | end | class | ceiling (derived) or measured | quality cost | effort | status / owner |
 |---|---|---|---|---|---|---|---|
-| 1 | Public DFlash-4B drafter (z-lab) | latency | exact | drafter measured tau 6.18 at c=1, block 16 (`evidence/drafter/acceptance_summary.csv`); model card 3.4-4.6x on B200 | none | serving works | drafter owns baseline; I stack levers on it |
-| 2 | Remove the speculative host gap (MTP/DFlash, c=1-4) | latency | `--attention-backend triton`: class pending bench's equality classification (it changes the target's attention arithmetic; bench's first pair, 3.80/1K against the 3.42/1K plain c=1-vs-32 floor, combines Triton with ReplaySSM-spec, so it does not isolate Triton); `--speculative-draft-attention-backend triton`: exact (draft only) | measured: Triton for target and draft 1.18x at c=1, 1.14x at c=4; draft only 1.08x / 1.06x (2d) | none for draft-only | flag; engine fix by hostgap | DFlash + Triton attention queued |
+| 1 | Public DFlash-4B drafter (z-lab) | latency | exact | drafter measured tau 6.18 at c=1, block 16 (`evidence/drafter/acceptance_summary.csv`); model card 3.4-4.6x on B200 | none | serving works | measured: bench's tuned DFlash arms lead the confirmed frontier at c = 1-32 (`evidence/bench/confirm/`); the composed exact stack builds on block 16 (`evidence/stack/`) |
+| 2 | Remove the speculative host gap (MTP/DFlash, c=1-4) | latency | `--attention-backend triton`: exact-up-to-rounding (bench's equality report: `plain-tuned-triton`, `dflash-tuned-b16`); `--speculative-draft-attention-backend triton`: exact (draft only) | measured: Triton for target and draft 1.18x at c=1, 1.14x at c=4; draft only 1.08x / 1.06x (2d) | none for draft-only | flag; engine fix by hostgap | measured: `dflash-tuned-b16` (DFlash block 16, Triton attention) leads at c = 1-4 (`evidence/bench/confirm/`); the host-gap series gives `mtp-tuned` +9.4-9.6% per user at c = 1-8 (`evidence/hostgap/`) |
 | 3 | FP16 GDN state + capacity lift (radix off, 256-1,024) | throughput | lossy | measured 1.24x at c=128 (single run); three sessions at capacity 256: 1.163x, 1.158x, 1.171x over the best exact arm at c=64, 128, 256 (`evidence/lossy/`); derived ceiling 1.46x | logit probe within budget in both modes; GSM8K -0.99 to -1.36 points against the two references, missing the -1.0-point rule but inside the exact arms' spread (-1.36 to +1.06) (`evidence/lossy/`) | flags only | measured by the lossy track: faster, outside its quality band (the trade is stated there); c>256 not run |
 | 4 | Strict write-avoiding replay (P4, patch 0007) | throughput | bit-identical to the packed decode at kernel level (synthetic activations, one layer; 2c); the server output probe at c=1 found no difference | kernel 1.22x at B=128/256 (L=4); traffic-only ceiling 1.18x at B=128 (f = 0.416); derived ~1.08x per decode step; measured served decode 1.0042x (95% interval 1.0026-1.0058) at 128 running requests | none | built | rejected by its served test (2c) |
-| 5 | MTP + ReplaySSM-spec at high batch | throughput | class pending measurement; mechanism suggests lossy (verify outputs from a chunked UT transform on TF32 tensor cores) | derived 34.3k vs plain 23.7k (FP32) | none | flags only | queued |
-| 6 | INT4 QAD target (nota-ai) with its INT4 DFlash drafter | latency | lossy | verify weight bytes 8.4 -> 3.3 GB (2.6x fewer, derived from the safetensors headers); arXiv 2607.04244 reports 6.98x over its baseline on an A10G; measured here (three sessions, `evidence/lossy/`): x 1.015 at c=1 (no detectable change) and y 1.046 at c=1 (faster); y 0.72-0.87x of the best exact arm at c=2-256 | the same report: MMLU-Pro 0.690 -> 0.659, IFEval 0.857 -> 0.845, GPQA-D 0.700 -> 0.667; here the logit probe fails (top-1 0.969-0.975, KL 0.012) and the GSM8K run stopped at its time limit (`evidence/lossy/`) | checkpoints local | measured by the lossy track: outside its quality band; slower at c>=2 (at c=1, y 1.046, faster; x within the band) |
-| 7 | Hot-vocab draft head (patches 0001 MTP, 0005 DFlash) | latency | exact | MTP cycle floor -26% at c=1 | none | built | queued |
-| 8 | Relaxed greedy acceptance, g in {1, 2} (patches 0002, 0004) | latency | lossy | pending | pending | built | queued |
-| 9 | Certified int8 head | latency | exact | head is 15% of plain bytes, 39% of verify bytes under the INT4 target | none | kernel workstream | integrate workstream |
+| 5 | MTP + ReplaySSM-spec at high batch | throughput | exact-up-to-rounding by bench's equality report (`mtp-tuned`), although the mechanism suggested lossy (verify outputs from a chunked UT transform on TF32 tensor cores) | derived 34.3k vs plain 23.7k (FP32); measured as `mtp-tuned`, 12,003 against plain decoding's 13,898 tok/s at c = 128 (`evidence/bench/confirm/`) | none | flags only | measured by bench: trails plain decoding from c = 48 |
+| 6 | INT4 QAD target (nota-ai) with its INT4 DFlash drafter | latency | lossy | verify weight bytes 8.4 -> 3.3 GB (2.6x fewer, derived from the safetensors headers); arXiv 2607.04244 reports 6.98x over its baseline on an A10G; measured here (three sessions, `evidence/lossy/`): x 1.015 at c=1 (no detectable change) and y 1.046 at c=1 (faster); y 0.715-0.870x of the best exact arm at c=2-256 | the same report: MMLU-Pro 0.690 -> 0.659, IFEval 0.857 -> 0.845, GPQA-D 0.700 -> 0.667; here the logit probe fails (top-1 0.969-0.975, KL 0.012) and the GSM8K run stopped at its time limit (`evidence/lossy/`) | checkpoints local | measured by the lossy track: outside its quality band; slower at c>=2 (at c=1, y 1.046, faster; x within the band) |
+| 7 | Hot-vocab draft head (patches 0001 MTP, 0005 DFlash) | latency | exact | MTP cycle floor -26% at c=1 | none | built | not timed served; on DFlash the stack inventory derives about break-even (D7, `evidence/stack/`); held-out map coverage in 2f |
+| 8 | Relaxed greedy acceptance, g in {1, 2} (patches 0002, 0004) | latency | lossy | not measured | not measured | built | not run |
+| 9 | Certified int8 head | latency | exact | head is 15% of plain bytes, 39% of verify bytes under the INT4 target | none | built (`src/certified_head/`) | measured served (`evidence/certified_head/served/`): the envelope rises only at c = 1 and falls at c = 2-8 and 128 |
 | - | FP8 W8A8 (Triton), FP8 KV, BF16 state, 2:4 sparsity | - | lossy | measured no gain (FP8 W8A8, FP8 KV); BF16 dominated by FP16; 2:4 unsupported in SGLang | - | - | dropped |
 
 Deserving dedicated work next: (a) host-gap removal for the speculative cycle
 (sync-free verify planning; the profile workstream has the call sites), because it
 multiplies every drafter at c = 1-4; (b) the c >= 256 streaming front end, because
-client throughput above c = 256 is not yet measured cleanly (see 1.3) and every throughput
+client throughput above c = 256 is not measured cleanly (see 1.3) and every throughput
 lever above c = 128 depends on it.
-(b) went to the bench workstream and (a) stayed with moonshot.
+(b) went to the bench workstream (`evidence/bench/frontend/`) and (a), after the flag-level
+test in 2d, to the hostgap workstream (`evidence/hostgap/`).
 
 ### Quality budget for the lossy stack (fixed before measuring)
 

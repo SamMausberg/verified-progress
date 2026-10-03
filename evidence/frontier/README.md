@@ -15,7 +15,8 @@ thinking on. Data: the drafter workstream's block-16 DFlash trace on panel-v1 (8
 131,487 output positions), its per-cycle support table (21,067 cycles, top-16 candidates per
 slot) and an n-gram snapshot of 1,345 training continuations whose prompts are disjoint from
 the panel (provenance of all three in `evidence/drafter/README.md`). The Triton figures
-carry the repair README's pending-exactness label for the Triton GDN verify kernel.
+carry the repair README's caveat: their configuration (FlashInfer GDN decode, verify forced to
+Triton) was not compared for exactness.
 
 ## Verdicts
 

@@ -1,0 +1,17 @@
+comparison,concurrency,metric,test,bases,s0_base,s0_ratio,s1_base,s1_ratio,s2_base,s2_ratio,mean,min,max,rule,verdict
+primary,48,y,mtp-delay,plain-tuned plain-delay replayssm,plain-tuned,1.3318,plain-tuned,1.3103,plain-tuned,1.3142,1.3188,1.3103,1.3318,leads if every session > 1,leads
+primary,48,x_e2e,mtp-delay,plain-tuned plain-delay replayssm,plain-tuned,1.4100,plain-tuned,1.3901,plain-tuned,1.3914,1.3972,1.3901,1.4100,reported,
+primary,64,y,mtp-delay,plain-tuned plain-delay replayssm,replayssm,1.3037,replayssm,1.3023,replayssm,1.2985,1.3015,1.2985,1.3037,leads if every session > 1,leads
+primary,64,x_e2e,mtp-delay,plain-tuned plain-delay replayssm,replayssm,1.3954,replayssm,1.3877,replayssm,1.3899,1.3910,1.3877,1.3954,reported,
+primary,96,y,mtp-delay,plain-tuned plain-delay replayssm,replayssm,1.2652,replayssm,1.2475,replayssm,1.2496,1.2541,1.2475,1.2652,leads if every session > 1,leads
+primary,96,x_e2e,mtp-delay,plain-tuned plain-delay replayssm,replayssm,1.3339,replayssm,1.3189,replayssm,1.3223,1.3250,1.3189,1.3339,reported,
+primary,128,y,mtp-delay,plain-tuned plain-delay replayssm,replayssm,1.1871,replayssm,1.1760,replayssm,1.1796,1.1809,1.1760,1.1871,leads if every session > 1,leads
+primary,128,x_e2e,mtp-delay,plain-tuned plain-delay replayssm,replayssm,1.2572,replayssm,1.2459,replayssm,1.2512,1.2514,1.2459,1.2572,reported,
+against dflash,32,y,mtp-delay,dflash dflash-delay,dflash-delay,0.9740,dflash-delay,0.9780,dflash-delay,0.9793,0.9771,0.9740,0.9793,leads if every session > 1,does not lead
+against dflash,32,x_e2e,mtp-delay,dflash dflash-delay,dflash-delay,0.9486,dflash-delay,0.9528,dflash-delay,0.9544,0.9519,0.9486,0.9544,reported,
+against dflash,48,y,mtp-delay,dflash dflash-delay,dflash-delay,1.1342,dflash-delay,1.1135,dflash-delay,1.1229,1.1235,1.1135,1.1342,leads if every session > 1,leads
+against dflash,48,x_e2e,mtp-delay,dflash dflash-delay,dflash-delay,1.0979,dflash-delay,1.0805,dflash-delay,1.0873,1.0886,1.0805,1.0979,reported,
+low concurrency,1,y,mtp-delay,mtp-n0,mtp-n0,1.0006,mtp-n0,0.9977,mtp-n0,0.9851,0.9944,0.9851,1.0006,no harm if mean >= 0.99 and every session >= 0.98,no harm
+low concurrency,1,x_e2e,mtp-delay,mtp-n0,mtp-n0,1.0007,mtp-n0,0.9977,mtp-n0,0.9851,0.9945,0.9851,1.0007,no harm if mean >= 0.99 and every session >= 0.98,no harm
+low concurrency,8,y,mtp-delay,mtp-n0,mtp-n0,0.9974,mtp-n0,0.9885,mtp-n0,0.9895,0.9918,0.9885,0.9974,no harm if mean >= 0.99 and every session >= 0.98,no harm
+low concurrency,8,x_e2e,mtp-delay,mtp-n0,mtp-n0,0.9974,mtp-n0,0.9884,mtp-n0,0.9897,0.9918,0.9884,0.9974,no harm if mean >= 0.99 and every session >= 0.98,no harm
