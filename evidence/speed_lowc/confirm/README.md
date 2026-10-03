@@ -115,12 +115,15 @@ session would have entered its interval. `confirm_accept.py` uses the same readi
 confirmation's points both outputs are byte for byte the same as before (Provenance).
 
 2026-10-03, after the analysis (review of #230): `confirm_gate.py`'s check for lever arms did not
-require top-logprob arrays, so an arm that returned tokens without them would have passed. It now also
-requires top logprobs compared on all 320 prompts, and token-identical prompts plus classified first
-divergences to cover all 320. The gate that decided the sessions ran inside the equality hold with the
-earlier check. In that hold every pair compared top logprobs on 320/320 prompts and every pair's
-identical and classified prompts add up to 320 (`equality/summary.json`), and the amended script, run
-on the hold's `summary.json`, writes a `gate.json` byte for byte equal to `equality/gate.json`.
+require top-logprob arrays, so an arm that returned tokens without them would have passed, and
+compare.py's `logprobs_compared` counts a prompt once both runs have any top-logprob entry. The gate now
+also requires top logprobs compared on all 320 prompts, token-identical prompts plus classified first
+divergences covering all 320, and, read from both runs of every pair, 5 top logprobs at every output
+position of every prompt. The gate that decided the sessions ran inside the equality hold with the
+earlier check. In that hold every pair compared top logprobs on 320/320 prompts, every pair's identical
+and classified prompts add up to 320 (`equality/summary.json`), and the 11 runs have 5 top logprobs at
+every one of their 769,842 output positions (all runs together). The amended script, run on the hold's `summary.json`, writes a
+`gate.json` byte for byte equal to `equality/gate.json`.
 
 ## Results
 
@@ -299,9 +302,9 @@ equality was not tested).
   `853bd4b` with a clean tree. Both scripts were then tightened as the amendments say (`08a8421` and
   `e8566e3`). The whole analysis rerun from a clean checkout of each of those commits reproduced
   `points.csv`, `launches.csv`, `ratios.json` and `accept.json` byte for byte.
-- `equality/gate.json` is the hold's own output. `confirm_gate.py` as amended at `06c901f`, run on
-  `~/vp-data/speed-lowc/confirm/equality-20261002T215749Z/summary.json` with `--levers ABC`, reproduces
-  it byte for byte.
+- `equality/gate.json` is the hold's own output. `confirm_gate.py` as amended at `76aec72`, run on
+  `~/vp-data/speed-lowc/confirm/equality-20261002T215749Z/summary.json` with `--levers ABC` (it also
+  reads that directory's `runs/`), reproduces it byte for byte.
 - `equality/` and `sessions/` are unchanged copies of the holds' outputs under
   `~/vp-data/speed-lowc/confirm/`: `equality-20261002T215749Z/`, `s1-20261002T232241Z/`,
   `s2-20261003T004812Z/` and `s3-20261003T020536Z/`.
