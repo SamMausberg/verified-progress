@@ -7,8 +7,8 @@ below). `StockDecision.lean` was added and checked the same way on 2026-10-03.
 None of these files contains `sorry`, `admit` or a new `axiom`. `#print axioms`
 on the main theorems reports only Lean's standard axioms: `propext`, `Quot.sound`
 and, for `envelope_compose`, `widen` and `shift_encloses` (through `omega`),
-`Classical.choice`. No axiom is added. A deliberately false
-variant of `sequential_sum_bound` is rejected, so the check is not vacuous.
+`Classical.choice`. No axiom is added. Five deliberately false
+variants are rejected, so the checks are not vacuous ("False variants", below).
 
 ## `DecisionGuards.lean` (from the supplied bundle, unchanged)
 
@@ -65,10 +65,32 @@ that is argued on paper, not checked. The stock token is the first maximal index
 - `roundModel_grid`: a concrete rounding satisfies the model, so it is not vacuous.
 
 `#print axioms` reports only `propext`, `Quot.sound` and `Classical.choice`.
-Weakening the strict hypothesis of `separation` (`>` to `>=`), or the condition on
-earlier entries in `interval_condition` (`<` to `<=`), makes the file fail to
-elaborate. Both weakened statements are false: a tie rounded to even, or an
-earlier index tying `k`.
+
+## False variants
+
+`scripts/check_lean_variants.sh` weakens one hypothesis of a lemma at a time, by a `sed` edit of a
+copy in a temporary directory, and expects Lean to reject the copy; `formal/` itself is never
+edited, since `check_lean.sh` elaborates every file there. Rerun with
+
+```sh
+PATH=$HOME/.elan/bin:$PATH bash scripts/check_lean_variants.sh
+```
+
+It exits 0 only if every variant fails to elaborate, and prints the line of each error. Checked on
+2026-10-03 with Lean 4.19.0 (`evidence/precision/lean_variants.log`); each variant fails with one
+error, inside the lemma it weakens:
+
+| Variant | Lemma and edit | Why the weakened statement is false | Error |
+|---|---|---|---|
+| `separation_nonstrict` | `separation`: `ya - yb > u (...)` to `>=` | a gap of exactly one spacing can round to a tie (ties to even) | `StockDecision.lean:83`, `omega` |
+| `gap_condition_nonstrict` | `pair_gap` and `gap_condition`: the gap `>` to `>=` | the same tie at the boundary of the margin | `StockDecision.lean:101`, `omega` |
+| `screen_drop_half_margin` | `screen_drop`: margin `2 * Gmax + u (zbar + Gmax)` to `Gmax + u (zbar + Gmax)` | both accumulators may move by up to `Gmax`, so one `Gmax` does not cover them | `StockDecision.lean:138`, `omega` |
+| `interval_condition_earlier_tie` | `interval_condition` and `interval_condition_rounded`: earlier entries' `<` to `<=` | an earlier index that ties `k` is the first maximum | `StockDecision.lean:163`, `omega` |
+| `sequential_sum_bound_exact` | `sequential_sum_bound`: `(K + 1) ^ n` to `K ^ n` on the right | it would make every running sum exact | `CertifiedArgmax.lean:211`, type mismatch |
+
+Where a lemma's weakened hypothesis is passed on by another lemma (`pair_gap` to `gap_condition`,
+`interval_condition` to `interval_condition_rounded`), both are weakened, so that the only error is
+the weakened proof's, not a mismatch between the two statements.
 
 ## `drafting/`: three drafting proposals (supplied by the author, fixed and checked here)
 

@@ -114,8 +114,8 @@ The main line of the paper:
   token on every position (`evidence/certified_head/`). Served against the tuned
   plain, MTP (Triton attention) and both DFlash arms in three sessions, it
   raises throughput at concurrency 1 by 2.5% for plain decoding, 4.6% for MTP
-  and 1.2% for 16-token DFlash, with identical tokens and none of 592,433
-  certified positions differing in check mode. It loses 1.0-3.3% where the head
+  and 1.3% for 16-token DFlash, with identical tokens and none of 592,433
+  checked positions differing in check mode. It loses 1.0-3.3% where the head
   is active, on DFlash above concurrency 1 and on MTP at 64, and 0.6% at 128
   where it is gated off, so the served envelope rises only at concurrency 1 and
   falls at 2, 4, 8 and 128 (`evidence/certified_head/served/`).

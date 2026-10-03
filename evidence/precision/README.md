@@ -64,6 +64,17 @@ every theorem in `formal/drafting/`: only `propext`, `Quot.sound` and `Classical
 `formal/STATUS.md` for what is and is not formalized. Regenerated at commit `0da3a9a`, which added
 `formal/StockDecision.lean`.
 
+## `lean_variants.log`
+
+```sh
+PATH=$HOME/.elan/bin:$PATH bash scripts/check_lean_variants.sh > evidence/precision/lean_variants.log 2>&1
+```
+
+Five deliberately false variants of the formal lemmas, each one weakened hypothesis on a copy of
+`formal/StockDecision.lean` or `formal/CertifiedArgmax.lean`, all fail to elaborate, each with one
+error inside the lemma it weakens. `formal/STATUS.md` ("False variants") lists the edits and why
+each weakened statement is false.
+
 ## `head_constants.json`
 
 Weight-only constants of the Qwen3.5-4B tied head
