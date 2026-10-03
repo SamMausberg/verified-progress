@@ -246,8 +246,11 @@ What this establishes (measured unless marked derived):
 - **The sessions reproduce the confirmed frontier** (`evidence/bench/confirm/frontier.csv`,
   other sessions; derived): `plain-tuned` here is within 0.4% of its confirmed y at c = 32-128,
   `dflash-tuned` within 0.9% at c = 32 and 48 and `mtp-tuned` within 2.3% at c = 32-128.
-  Against the confirmed envelope, MTP with PD is 1.28-1.32 times its y at c = 48-128 and DFlash
-  with PD 1.19 times at c = 32 (derived across sessions).
+  Against the confirmed envelope (`evidence/bench/confirm/envelope.csv`: arms with at least
+  three sessions, so `dflash-tuned` at c = 32 and `plain-tuned` at c = 48-128), MTP with PD is
+  1.28-1.32 times its y at c = 48-128 and DFlash with PD 1.19 times at c = 32 (derived across
+  sessions). `plain-tuned-replayssm` has one session there and does not rank; this
+  confirmation's primary comparison includes it.
 - **What the delay and the cap each did.** As in the probes, a cap can only split batches, and
   undelayed MTP has at most 6 batches above 16 requests per point, so the fall in its prefill
   batches with PD (281 to 77 at c = 48, 518 to 81 at c = 128, session means) comes from the

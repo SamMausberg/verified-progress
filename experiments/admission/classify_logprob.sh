@@ -36,8 +36,15 @@ ARMS
 rm -f "$out/summary.json" "$out/report.json" "$out/classes.json" "$out/divergences.csv" \
   "$out/table.csv"
 status=0
-# Every pass of every run must come from one repository and one SGLang revision.
-revisions="$(jq -r '"\(.repo_sha) \(.sglang_sha)"' "$runs"/*/c*.meta.json | sort -u)"
+# Every pass of every run must record its repository and SGLang revisions, and all must be the
+# same; a pass without them (or no pass at all) fails the check.
+if ! revisions="$(jq -er 'if (.repo_sha // "") == "" or (.sglang_sha // "") == ""
+    then error("\(input_filename): no revisions") else "\(.repo_sha) \(.sglang_sha)" end' \
+    "$runs"/*/c*.meta.json)"; then
+  echo "a pass of the runs records no revisions" >&2
+  status=1
+fi
+revisions="$(sort -u <<< "$revisions")"
 if [ "$(grep -c . <<< "$revisions")" != 1 ]; then
   echo "the runs mix revisions: $revisions" >&2
   status=1
