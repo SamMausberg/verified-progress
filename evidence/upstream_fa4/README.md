@@ -120,8 +120,10 @@ experiments/upstream_fa4/make_trees.sh ~/vp-data/upstream/fa4-evidence/trees
 # The checks, under the shared GPU lock (repository commit fd07270, recorded in meta.json).
 SGLANG_DIR=~/sglang-upstream scripts/gpu_lock.sh -s experiments/upstream_fa4/run_all.sh \
     ~/vp-data/upstream/fa4-evidence/trees ~/vp-data/upstream/fa4-evidence/run-20261002T223025Z
-# The summaries, rewritten from the run's records at commit 51a4376 (summarize_commit).
-python experiments/upstream_fa4/summarize.py ~/vp-data/upstream/fa4-evidence/run-20261002T223025Z
+# The summaries, rewritten from the run's records at commit 51a4376 (summarize_commit). Since
+# 4efc901 summarize.py also takes the expected numbers of cases and test trees:
+python experiments/upstream_fa4/summarize.py --expect-cases 89 --expect-pytest main,ceil,ceil_div,max_one \
+    ~/vp-data/upstream/fa4-evidence/run-20261002T223025Z
 cp ~/vp-data/upstream/fa4-evidence/run-20261002T223025Z/{cases.csv,summary.json} evidence/upstream_fa4/
 ```
 
@@ -146,7 +148,9 @@ error as a fault (this run's faults were all illegal memory accesses); and the r
 checks that the imported `sglang` comes from the tree under test.
 
 `summarize.py` now fails unless every record was imported from its own tree (`fa-pkg` for
-flash-attention).
+flash-attention), and, since 4efc901, unless the run is complete: exactly the expected number of
+case records, each with a known status, and on every tree a regression test with two PASSED or
+FAILED outcomes and nothing skipped (pytest exits 0 when both cases are skipped).
 
 The committed run is unaffected by what these checks guard against:
 
@@ -159,8 +163,9 @@ The committed run is unaffected by what these checks guard against:
   nvidia-cutlass-dsl 4.6.2 and quack-kernels 0.6.4; the system Python has no nvidia-cutlass-dsl.
 - Its output directory was new: it was created at 22:30:25 UTC, and all 89 records in it were
   created after that, between 22:30:27 and 22:42:56 (file birth times); the pytest logs followed.
-- `summarize.py` with the import check, rerun on its records, passes and gives the committed
-  `cases.csv` and `summary.json` unchanged (apart from `summarize_commit`).
+- `summarize.py` with the import and completeness checks, rerun on its records (89 cases, the test
+  on four trees, 2 outcomes each, none skipped), passes and gives the committed `cases.csv` and
+  `summary.json` unchanged (apart from `summarize_commit`).
 
 The run directory keeps the raw records: one JSON line and the standard error per case, the
 regression test's pytest logs, `meta.json` and the hold's log. It stays outside git.
