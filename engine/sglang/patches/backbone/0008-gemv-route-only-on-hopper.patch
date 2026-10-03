@@ -8,7 +8,7 @@ A table entry of mode gemv called hopper_bf16_gemv after shape checks only, so
 a table enabled on another GPU would run the Hopper kernel there, bypassing
 the capability check of SGLang's own gemv backend. Require compute capability
 9.x on CUDA (ROCm reports gfx94x as 9.x, so HIP is excluded); elsewhere the
-call falls back to cuBLAS (Codex on #91).
+call falls back to cuBLAS (review on #91).
 ---
  python/sglang/srt/layers/backbone_gemm.py | 19 ++++++++++++++++---
  1 file changed, 16 insertions(+), 3 deletions(-)

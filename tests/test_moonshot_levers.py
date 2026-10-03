@@ -87,7 +87,7 @@ def test_reduced_draft_head_unties_only_for_a_reduced_vocabulary() -> None:
 def test_mamba_state_carries_the_exact_replay_beta_ring() -> None:
     """Patch 0007's beta ring reaches the per-layer cache view, and is None when off.
 
-    Codex flagged `replayssm_beta` as a local that never reaches the layer cache; the
+    A review flagged `replayssm_beta` as a local that never reaches the layer cache; the
     pool passes it to `MambaPool.State`, whose field defaults to None, and
     `at_layer_idx` slices every field, which this test pins down.
     """
