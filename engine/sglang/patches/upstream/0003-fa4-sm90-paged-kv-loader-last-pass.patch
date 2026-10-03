@@ -1,0 +1,59 @@
+From bed5de9e5663c3a5e302a503147584efbff7d405 Mon Sep 17 00:00:00 2001
+From: Sam Mausberg <samuelmausberg@gmail.com>
+Date: Sat, 3 Oct 2026 00:50:58 +0000
+Subject: [PATCH] [FA4] SM90 paged KV: ceil-divide page-table entries and stop the
+ loader's last pass at the tile
+
+Backport to SGLang's vendored FA4 of Dao-AILab/flash-attention#2958 (issue #2957),
+on top of the ceil-divide of #2745 / sgl-project/sglang#35757. When n_block_size is
+not a multiple of the rows one loader pass covers, the last pass copied rows past
+the tile into other rows of sX (a predicated-off cp.async still zero-fills its
+destination): wrong output at head_dim 80/96 (non-causal), illegal memory access
+at 160/224 with page_size != tile_n. Not opened as an
+SGLang PR.
+
+---
+ .../ops/attention/flash_attn/cute/paged_kv.py       | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/python/sglang/kernels/ops/attention/flash_attn/cute/paged_kv.py b/python/sglang/kernels/ops/attention/flash_attn/cute/paged_kv.py
+index 9b24a4268b..9d9b19f14c 100644
+--- a/python/sglang/kernels/ops/attention/flash_attn/cute/paged_kv.py
++++ b/python/sglang/kernels/ops/attention/flash_attn/cute/paged_kv.py
+@@ -93,7 +93,8 @@ class PagedKVManager(ParamsBase):
+             atom_async_copy, thr_layout, val_layout
+         )
+         gmem_thr_copy_KV = gmem_tiled_copy_KV.get_slice(thread_idx)
+-        page_entry_per_thread = n_block_size // num_threads
++        # Include the final partially populated wave of rows.
++        page_entry_per_thread = (n_block_size + num_threads - 1) // num_threads
+ 
+         if const_expr(mSFK_paged is not None or mSFV_paged is not None):
+             atom_async_copy_sf = cute.make_copy_atom(
+@@ -299,6 +300,7 @@ class PagedKVManager(ParamsBase):
+             if n_block >= 0
+             else 0
+         )
++        rows_per_pass = self.num_threads // self.gmem_threads_per_row
+         for m in cutlass.range_constexpr(cute.size(tXsX, mode=[1])):
+             row_valid = tXc0X[0, m, 0][0] < seqlenk_row_limit
+             should_load = cute.make_fragment_like(tXsX[(0, None), m, 0], cute.Boolean)
+@@ -319,7 +321,14 @@ class PagedKVManager(ParamsBase):
+             mX_paged_cur_copy = cute.tiled_divide(
+                 mX_paged_cur, (self.async_copy_elems,)
+             )
+-            self._copy_row_async(tXsX, tXcX, mX_paged_cur_copy, m, should_load)
++            if const_expr(tXc0X[0, m, 0][0] + rows_per_pass <= self.n_block_size):
++                self._copy_row_async(tXsX, tXcX, mX_paged_cur_copy, m, should_load)
++            else:
++                # Last pass when n_block_size is not a multiple of rows_per_pass: rows past the
++                # tile alias other rows of sX (next head-dim block or stage), and a predicated-off
++                # cp.async still zero-fills its destination, so those threads must not copy.
++                if tXcX[0, m, 0][0] < self.n_block_size:
++                    self._copy_row_async(tXsX, tXcX, mX_paged_cur_copy, m, should_load)
+ 
+     @cute.jit
+     def load_sf_KV(self, n_block: Int32, sSFX: cute.Tensor, K_or_V: str):
+-- 
+2.34.1
+
