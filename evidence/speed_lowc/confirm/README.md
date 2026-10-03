@@ -288,6 +288,19 @@ the manifest's prompts in order with their lengths, every run's server was launc
 declared split and pool, and `gate.json`, `points.csv`, `launches.csv`, `sweeps.csv`, `ratios.json`
 and `accept.json` reproduce byte for byte.
 
+2026-10-03, after the analysis (review of #230): a failed step can no longer certify results.
+`bench.sweep` writes `sweep.json` after every point but marks it finished (`finished_unix`) only when
+it returns normally, after the server has shut down, so a launch that failed after its last point
+looked complete to the analysis even though its session recorded the failure. `sweeps.csv` now
+exports `finished`, and a launch that did not finish counts for the session blocks and the order, but
+its points do not: its cells are void, as for a launch without points. On the equality side, the gate
+check now requires the hold's log (`hold.log`, in the hold's directory and in `equality/`) to record
+each of the 11 runs once with exit status 0 and to end with `failed: none`. The committed run is
+unaffected: all 39 launches finished normally, the equality hold's log records every run with exit 0
+and ends `failed: none`, and `gate.json`, `points.csv`, `launches.csv`, `ratios.json` and
+`accept.json` reproduce byte for byte; `sweeps.csv` gains the `finished` column, and every other
+column is unchanged.
+
 ## Results
 
 Written 2026-10-03. Labels: **measured** (read from the files below) and **derived** (ratios, means and
@@ -298,8 +311,9 @@ Provenance, below, says where `9a7d52a` is kept.
 
 ### Validity of the runs (measured)
 
-- The equality hold and all three sessions end `failed: none`, and every launch exited 0
-  (`equality/hold.log`, `sessions/s1.log` to `s3.log`).
+- The equality hold and all three sessions end `failed: none`, every launch exited 0
+  (`equality/hold.log`, `sessions/s1.log` to `s3.log`), and every launch's sweep finished normally
+  (`sweeps.csv`, `finished`).
 - 39 launches (13 per session, in the declared order) gave 117 points. Every point is valid by bench's
   rules (`points.csv`): no failed requests, no output-length mismatch, c requests running at once
   (`max_running_logged`), no KV retractions, a decode CUDA-graph fraction of 1.0. No cell is void, so
@@ -464,12 +478,13 @@ equality was not tested).
 - The analysis (`bench.pareto`, `confirm_analyze.py`, `confirm_accept.py`) ran on 2026-10-03 from
   `853bd4b` with a clean tree. Both scripts were then tightened as the amendments say (`08a8421`,
   `e8566e3`, `2f1b187`, `02c5c46`, `a08e423`, `50b9e7b`, `623de0b`, `fc95fe9`, `cc4810b`, `e0a9b35`,
-  `3dd4d15`, `276d019`, `946547e` and `57120f7`). The whole analysis rerun from a clean checkout of
-  each of those commits reproduced `points.csv`, `launches.csv`, `ratios.json` and `accept.json` byte
-  for byte. `sweeps.csv` was written by `confirm_sweeps.py` from a clean checkout of `50b9e7b` and
-  again, identically, from each later one; the analysis needs it, `launches.csv` and `equality/`
-  beside `points.csv`.
-- `equality/gate.json` is the hold's own output. `confirm_gate.py` as amended at `57120f7`, run on
+  `3dd4d15`, `276d019`, `946547e`, `57120f7` and `e48c37f`). The whole analysis rerun from a clean
+  checkout of each of those commits reproduced `points.csv`, `launches.csv`, `ratios.json` and
+  `accept.json` byte for byte. `sweeps.csv` is `confirm_sweeps.py`'s output from a clean checkout of
+  `e48c37f`. The exporter was added at `a08e423` and gained columns at `50b9e7b`, `946547e` and
+  `e48c37f`; each earlier committed version agrees with this one on every column they share. The
+  analysis needs it, `launches.csv` and `equality/` beside `points.csv`.
+- `equality/gate.json` is the hold's own output. `confirm_gate.py` as amended at `e48c37f`, run on
   `~/vp-data/speed-lowc/confirm/equality-20261002T215749Z/summary.json` with `--levers ABC` (it also
   reads that directory's `runs/` and the hold's prompt file, `~/vp-data/state/prompts/prompts.jsonl`),
   reproduces it byte for byte.
@@ -486,6 +501,6 @@ equality was not tested).
 | `equality/gate.json` | the gate: per group, B0's bitwise check, each lever's and FULL's class check, the levers allowed to be timed | written by the same hold (`python experiments/speed_lowc/confirm_gate.py --summary <dir>/summary.json --levers ABC --out <dir>/gate.json`), then copied |
 | `sessions/s1.log`, `s2.log`, `s3.log` | each session's log: gate check, engine and repository commits, arm order, each launch's points and exit status | `CONFIRM_LEVERS=ABC scripts/gpu_lock.sh -x experiments/speed_lowc/hold_confirm_session.sh <k>` (writes `~/vp-data/speed-lowc/confirm/s<k>-<UTC>/session.log`), then `cp ~/vp-data/speed-lowc/confirm/s<k>-*/session.log evidence/speed_lowc/confirm/sessions/s<k>.log` |
 | `points.csv`, `launches.csv` | every point (throughput, latency, accept length, foreign CPU, validity) and every launch (arguments, environment, pools, SGLang and repository commits, checks) | `source scripts/sglang_env.sh; python -m bench.pareto ~/vp-data/speed-lowc/confirm/s*-*/lowc-*/* --out evidence/speed_lowc/confirm --points-only --status confirm` |
-| `sweeps.csv` | every launch's client settings from its `sweep.json` (session, model, workload hash, output length, request body, concurrencies, repeats, minimum requests, waves, client options, failed checks) and, in `options`, every `bench.sweep` option parsed from its recorded command line; the analysis checks them against the declared sweep and each arm's command | `python experiments/speed_lowc/confirm_sweeps.py ~/vp-data/speed-lowc/confirm/s*-*/lowc-*/* --out evidence/speed_lowc/confirm` |
+| `sweeps.csv` | every launch's client settings from its `sweep.json` (session, model, workload hash, output length, request body, concurrencies, repeats, minimum requests, waves, client options, failed checks, whether the sweep finished normally, this repository's commit and modified files at launch) and, in `options`, every `bench.sweep` option parsed from its recorded command line; the analysis checks them against the declared sweep and each arm's command | `python experiments/speed_lowc/confirm_sweeps.py ~/vp-data/speed-lowc/confirm/s*-*/lowc-*/* --out evidence/speed_lowc/confirm` |
 | `ratios.json` | session ratios, geometric means, 95% intervals and decisions per group, arm and concurrency | `python experiments/speed_lowc/confirm_analyze.py --points evidence/speed_lowc/confirm/points.csv --full L=ABC --full H=AC --out evidence/speed_lowc/confirm` |
 | `accept.json` | mean accept length per group, arm and concurrency; per-cycle ratios with the same interval | `python experiments/speed_lowc/confirm_accept.py --points evidence/speed_lowc/confirm/points.csv --full L=ABC --full H=AC --out evidence/speed_lowc/confirm` |
