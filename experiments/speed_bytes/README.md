@@ -40,7 +40,8 @@ and every published value finite (an accept length exactly on the speculative ar
 the launch SGLang printed (`server_args`: the hold's flags and the defaults the comparison relies
 on, identical across the hold's servers apart from the switches), and the probe client and prompts
 at the hold's commit; per server log the FP8 conversion and mode those switches imply; per trace
-(all four from one kill2b hold) the engine, harness commit, invocation, resolved server command and environment `run_profiles.py`
+(all four from one kill2b hold) the report `windows.jsonl` records for its window (by name, and by the
+trace's session start against the window's), the engine, harness commit, invocation, resolved server command and environment `run_profiles.py`
 recorded, and the GPU; per probe file the server it probed, its mode, concurrency, label, the
 probe's 48 prompts, 256 tokens per sequence with exactly 20 finite top-logprob entries at every
 position (score mode: none at the first continuation position, which SGLang does not report) and

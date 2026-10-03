@@ -23,6 +23,7 @@ import json
 import math
 import re
 import shlex
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -575,6 +576,9 @@ def cmd_served(args: argparse.Namespace) -> None:
 # The trace variants of holds/kill2b.sh and the switches each runs with.
 TRACE_SWITCHES = {'bf16': {}, 'fp8': TARGET}
 # holds/kill2b.sh's run_profiles.py invocation (its out-dir value aside; EXTRA in that script).
+# A report's trace session starts within this many seconds of its recorded window (the recorded
+# ones within 0.01 s; consecutive windows of a run are about 30 s or more apart).
+TRACE_START_TOLERANCE_S = 1.0
 TRACE_ARGV = [
     '--arm',
     'plain',
@@ -606,6 +610,9 @@ TRACE_NSYS = ['nsys', 'launch', '--trace=cuda,nvtx', '--cuda-graph-trace=node',
 
 def cmd_steps(args: argparse.Namespace) -> None:
     from step_budget import budget
+
+    from experiments.profiling.nsys_db import export_sqlite
+    from experiments.profiling.run_profiles import build_parser, read_windows, window_problems
 
     # Every report comes from one kill2b hold (the comparison is within one session), whose logged
     # runtime, where it logs one, is the planned one.
@@ -652,7 +659,35 @@ def cmd_steps(args: argparse.Namespace) -> None:
             raise SystemExit(
                 f'{rep}: run_meta.json records {meta["repo_sha"][:7]} {cmd} {meta["gpu"]}'
             )
-        seen.append((m.group(1), int(m.group(2))))
+        # The report is the one run_profiles.py recorded for this window: its windows.jsonl is a
+        # complete record of the invocation (run_profiles' own check) and names exactly one nsys
+        # window at this concurrency, whose output is this report.
+        variant, batch = m.group(1), int(m.group(2))
+        recorded = build_parser().parse_args(argv[1:])
+        windows, bad = read_windows(rep.parent / 'windows.jsonl')
+        problems = bad + window_problems(
+            windows, recorded.arm, recorded.mode, recorded.concurrency, recorded.repeats
+        )
+        nsys = [
+            w for w in windows if (w.get('window_kind'), w.get('concurrency')) == ('nsys', batch)
+        ]
+        if (
+            problems
+            or (rep.parent.name, rep.name) != (f'trace_{variant}', f'plain_bs{batch}.nsys-rep')
+            or len(nsys) != 1
+            or Path(nsys[0]['output']).parts[-2:] != (rep.parent.name, rep.stem)
+        ):
+            raise SystemExit(f'{rep}: not the report windows.jsonl records ({problems})')
+        # ...and its contents are that window's: the trace session started when the window did.
+        con = sqlite3.connect(export_sqlite(rep))
+        (start_ns,) = con.execute(
+            'select utcEpochNs from TARGET_INFO_SESSION_START_TIME'
+        ).fetchone()
+        con.close()
+        if abs(start_ns / 1e9 - nsys[0]['window_wall_start']) > TRACE_START_TOLERANCE_S:
+            raise SystemExit(f'{rep}: trace started at {start_ns / 1e9}, its window at '
+                             f'{nsys[0]["window_wall_start"]}')  # fmt: skip
+        seen.append((variant, batch))
         b = budget(rep)
         for r in b['classes']:
             rows.append(
