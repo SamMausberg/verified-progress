@@ -43,7 +43,9 @@ import argparse
 import json
 import math
 import re
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -64,6 +66,10 @@ def group_full(group: str, levers: str) -> str:
 # Stock SGLang's pin: engine/sglang/README.md, line 4.
 STOCK_PIN = 'bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824'
 MANIFEST = Path(__file__).resolve().parents[2] / 'evidence/state_safety/prompt_manifest.json'
+# State's comparison and the outputs the equality hold has it write (hold_confirm_equality.sh,
+# lines 60-62).
+COMPARE = Path(__file__).resolve().parents[2] / 'experiments/state_safety/compare.py'
+COMPARE_OUTPUTS = ('summary.json', 'divergences.csv', 'table.csv', 'meta.json')
 # The equality arms' flags, which hold_confirm_equality.sh runs (through confirm_arms.sh,
 # eq_flags) and equality_problems checks: the group's DFlash flags, running limit 4 and the
 # radix cache off; on L an arm with C but not B keeps the drafter on Triton.
@@ -252,8 +258,10 @@ def equality_problems(
     from its summary.json must equal gate.json. With `raw` (the hold's own directory, as a
     session reads it) the summary must compare that directory's runs/, the gate is decided again
     with every run's coverage, and each run's server log must show the GDN fold on (fold=True)
-    exactly when the arm has A. Without it (the committed copy, which has no runs/ or logs) those
-    three are left to the session, which checked them before it ran.
+    exactly when the arm has A, and compare.py run again on runs/ must reproduce the directory's
+    summary.json, divergences.csv, table.csv and meta.json byte for byte, which binds them to the
+    run files. Without it (the committed copy, which has no runs/ or logs) those four are left to
+    the session, which checked them before it ran.
     """
     home = gate_path.resolve().parent
     try:
@@ -293,6 +301,24 @@ def equality_problems(
     runs = None
     if raw:
         runs = home / 'runs'
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            again = subprocess.run(
+                [sys.executable, str(COMPARE), '--runs', str(summary.get('runs')),
+                 '--pairs', str(home / 'pairs.json'), '--out-json', str(out / 'summary.json'),
+                 '--out-csv', str(out / 'divergences.csv'), '--out-table', str(out / 'table.csv'),
+                 '--out-meta', str(out / 'meta.json')],
+                capture_output=True, text=True, check=False,
+            )  # fmt: skip
+            same = again.returncode == 0 and all(
+                (out / f).is_file() and (home / f).is_file()
+                and (out / f).read_bytes() == (home / f).read_bytes()
+                for f in COMPARE_OUTPUTS
+            )  # fmt: skip
+        if not same:
+            why.append(
+                f'compare.py run again on {runs} does not reproduce {", ".join(COMPARE_OUTPUTS)}'
+            )
         if (
             Path(summary.get('runs', '')).resolve() != runs
             or Path(str(gate.get('summary'))).resolve() != home / 'summary.json'

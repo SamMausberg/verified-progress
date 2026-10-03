@@ -24,7 +24,8 @@ with no modified SGLang files and no failed launch check. Each launch's sweep, i
 confirm_sweeps.py writes beside them, must be the declared one: the confirm split, 512 output
 tokens to the end (ignore_eos), one repeat of the group's concurrencies with 64 measured
 requests or 8 waves, no failed launch check, the session its points name, and the same model,
-request body and client settings as every other launch, the model and revision of its bench
+request body and client settings as every other launch, the holds' repository commit with no
+modified tracked files at launch (bench.server's record), the model and revision of its bench
 arm and the repository's warm-up pool. Its bench.sweep options, parsed from
 its recorded command line, must equal those of the command hold_confirm_session.sh gives that
 arm in that session, and each point must have measured max(64, 8c) requests. Every launch
@@ -341,6 +342,8 @@ def check_sweeps(sweeps: Path, launches: dict[tuple[str, str], str]) -> None:
             'waves': str(WAVES),
             'checks_failed': '',
             'aiperf_version': AIPERF_VERSION,
+            'repo_head': HOLD_REPO,
+            'repo_dirty_files': '[]',
         }
         if wrong := {k: row[k] for k, v in want.items() if row[k] != v}:
             why.append(f'{label} {run}: {wrong}')
