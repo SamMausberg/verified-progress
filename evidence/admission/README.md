@@ -208,11 +208,11 @@ best base chosen by its own y, x against the same base):
 | Comparison | c | Best base (all three sessions) | y ratio per session | Mean y ratio | Mean x ratio | Verdict |
 |---|---|---|---|---|---|---|
 | MTP + PD over the best non-speculative arm | 48 | `plain-tuned` | 1.332 / 1.310 / 1.314 | 1.319 | 1.397 | leads |
-| | 64 | `plain-tuned-replayssm` | 1.304 / 1.302 / 1.298 | 1.302 | 1.391 | leads |
+| | 64 | `plain-tuned-replayssm` | 1.304 / 1.302 / 1.299 | 1.302 | 1.391 | leads |
 | | 96 | `plain-tuned-replayssm` | 1.265 / 1.248 / 1.250 | 1.254 | 1.325 | leads |
 | | 128 | `plain-tuned-replayssm` | 1.187 / 1.176 / 1.180 | 1.181 | 1.251 | leads |
 | MTP + PD over the best DFlash arm | 32 | `dflash-tuned` + PD | 0.974 / 0.978 / 0.979 | 0.977 | 0.952 | does not lead |
-| | 48 | `dflash-tuned` + PD | 1.134 / 1.113 / 1.123 | 1.123 | 1.089 | leads |
+| | 48 | `dflash-tuned` + PD | 1.134 / 1.114 / 1.123 | 1.124 | 1.089 | leads |
 | MTP + PD over MTP | 1 | `mtp-tuned` | 1.001 / 0.998 / 0.985 | 0.994 | 0.995 | no harm |
 | | 8 | `mtp-tuned` | 0.997 / 0.989 / 0.990 | 0.992 | 0.992 | no harm |
 
