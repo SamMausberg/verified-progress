@@ -107,7 +107,7 @@ values (an assumption, not tested beyond this run).
 **Per-step budget at c = 1** (`step_budget.csv`, microseconds per decode step; BF16 / FP8
 per-row): step span 3,535 / 3,426; GEMMs 2,685 (head 351 included) / 1,403 FP8 + 350 head;
 row-scale multiply 0 / 485; activation quantization 0 / 252; launch gaps 102 / 208; PDL overlap
-44 / 7; other kernels 202 / 153. At c = 64: step 6,331 / 6,258; backbone GEMMs 2,680 / 1,747
+44 / 7; other kernels 202 / 153. At c = 64: step 6,331 / 6,259; backbone GEMMs 2,680 / 1,747
 (0.65x); row-scale 649 (5.07 us each); quantization 286 (2.23 us each).
 
 **Derived for a fused design** (not built): removing the two extra kernels and the gaps before
@@ -132,8 +132,9 @@ scripts/gpu_lock.sh -x experiments/speed_bytes/holds/kill1.sh
 scripts/gpu_lock.sh -s experiments/speed_bytes/holds/probe1.sh
 scripts/gpu_lock.sh -x experiments/speed_bytes/holds/kill2b.sh
 scripts/gpu_lock.sh -x experiments/speed_bytes/holds/kill3.sh
-# evidence (CPU): probe1.json and step_budget.csv at repository commit 5811250; gemm_probe.csv and
-# served.csv at c740981 (served.csv identical to its 5811250 version)
+# evidence (CPU): probe1.json at repository commit 5811250; gemm_probe.csv and served.csv at
+# c740981 (served.csv identical to its 5811250 version); step_budget.csv at 28c18fc, after review
+# fixed the step span and boundary gaps (0.1-0.5 us per step longer than at 5811250)
 D=~/vp-data/speed-bytes
 python experiments/speed_bytes/summarize.py gemm $D/fp8_gemm_probe_20261002T170014Z.json --out evidence/speed_bytes/gemm_probe.csv
 python experiments/speed_bytes/summarize.py served $D/kill1_20261002T173359Z $D/kill2b_20261002T180019Z $D/kill3_20261002T192532Z --out evidence/speed_bytes/served.csv
