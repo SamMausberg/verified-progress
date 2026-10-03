@@ -1,0 +1,9 @@
+L B0 vs S0                               div   0/320  per1k 0.00  {}  drift_max 0.000  lenmis 0
+L A vs S0                                div   0/320  per1k 0.00  {}  drift_max 0.000  lenmis 0
+L B vs S0                                div  39/320  per1k 0.58  {'tie': 38, 'one_ulp': 1}  drift_max 0.246  lenmis 0
+L C vs S0                                div 177/320  per1k 3.99  {'tie': 168, 'one_ulp': 8, 'near': 1}  drift_max 0.429  lenmis 0
+L ABC vs S0                              div 177/320  per1k 3.99  {'tie': 168, 'one_ulp': 8, 'near': 1}  drift_max 0.429  lenmis 0
+H B0 vs S0                               div   0/320  per1k 0.00  {}  drift_max 0.000  lenmis 0
+H A vs S0                                div   0/320  per1k 0.00  {}  drift_max 0.000  lenmis 0
+H C vs S0                                div 189/320  per1k 4.33  {'tie': 176, 'one_ulp': 12, 'near': 1}  drift_max 0.585  lenmis 0
+H AC vs S0                               div 189/320  per1k 4.33  {'tie': 176, 'one_ulp': 12, 'near': 1}  drift_max 0.585  lenmis 0

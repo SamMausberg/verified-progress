@@ -1,0 +1,55 @@
+{
+ "summary": "/home/ubuntu/vp-data/speed-lowc/confirm/equality-20261002T215749Z/summary.json",
+ "levers": "ABC",
+ "groups": {
+  "L": {
+   "full": "ABC",
+   "checks": {
+    "B0": {
+     "ok": true,
+     "note": "bitwise 320/320"
+    },
+    "A": {
+     "ok": true,
+     "note": "identical 320/320, classes {}"
+    },
+    "B": {
+     "ok": true,
+     "note": "identical 281/320, classes {'tie': 38, 'one_ulp': 1}"
+    },
+    "C": {
+     "ok": true,
+     "note": "identical 143/320, classes {'tie': 168, 'one_ulp': 8, 'near': 1}"
+    },
+    "ABC": {
+     "ok": true,
+     "note": "identical 143/320, classes {'tie': 168, 'one_ulp': 8, 'near': 1}"
+    }
+   },
+   "timed_levers": "ABC"
+  },
+  "H": {
+   "full": "AC",
+   "checks": {
+    "B0": {
+     "ok": true,
+     "note": "bitwise 320/320"
+    },
+    "A": {
+     "ok": true,
+     "note": "identical 320/320, classes {}"
+    },
+    "C": {
+     "ok": true,
+     "note": "identical 131/320, classes {'tie': 176, 'one_ulp': 12, 'near': 1}"
+    },
+    "AC": {
+     "ok": true,
+     "note": "identical 131/320, classes {'tie': 176, 'one_ulp': 12, 'near': 1}"
+    }
+   },
+   "timed_levers": "AC"
+  }
+ },
+ "ok": true
+}

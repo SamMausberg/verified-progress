@@ -39,7 +39,9 @@ measured. Probe 4's exact tree comes from `build_engines.sh confirm` at `48b2933
 Probe 4's gate (`check_probe3.py`, on probe 3's outputs and on its own microbenchmark) now also
 requires FA4 to meet the target kill rule: at least 200 us saved per target forward at B = 1, context
 512. That check was added after probes 3 and 4 ran. Both of their microbenchmarks pass it (233.3 and
-234.1 us, `probe3/` and `probe4/attn_microbench.json`).
+234.1 us, `probe3/` and `probe4/attn_microbench.json`). Later still, an exception inside the checker became exit 2,
+an error. Before, it exited 1, which `hold_probe4.sh` reads as the kill verdict. Probe 4's committed run
+had check exit 0 on both calls (`probe4/probe3_check.txt`), so it is unaffected.
 
 ## Results
 
@@ -148,8 +150,8 @@ Ratios are the mean of the FA4 launches over the mean of the S0 launches. The tw
 by at most 0.15%, and at every c both FA4 launches are faster than both S0 launches. One session: a
 probe, not a confirmation. Accepted tokens per cycle move with the drafter's rounding. The verifier
 still decides every token, but which positions each verify covers changes, and in probe 1's smoke 5
-of 6 outputs matched stock. The arm's exactness class is pending (`launches.csv`); the confirmation's
-equality run decides it. The gain is larger than the microbenchmark alone suggests at these
+of 6 outputs matched stock. The arm's exactness class is pending in `launches.csv`; the confirmation's
+equality run later put FA4 drafting at exact up to rounding against stock at c = 1 (`confirm/README.md`). The gain is larger than the microbenchmark alone suggests at these
 contexts (about 0.1-0.3 ms per cycle, derived, against 0.2-0.4 ms served); the per-cycle ratio (x over accepted tokens) is
 1.034-1.040.
 
@@ -174,8 +176,8 @@ x columns are x_e2e in tok/s/user; ratios are the test over the mean of the two 
 "per cycle" divides x by accepted tokens per cycle, since FA4 changes the target's rounding and with
 it the token trajectories and acceptance. The FA4 target arms' exactness class is pending as well
 (`probe4/launches.csv`): FA4's error against FP32 equals Triton's, but the two were not compared
-bitwise, and in probe 3's smoke (FA4 target and draft) 5 of 6 outputs matched stock; the confirmation's equality run decides
-it. Every ratio is above 2% and outside the base launches'
+bitwise, and in probe 3's smoke (FA4 target and draft) 5 of 6 outputs matched stock. The confirmation's equality run
+later put FA4 target attention at exact up to rounding against stock at c = 1 (`confirm/README.md`). Every ratio is above 2% and outside the base launches'
 spread. On `dflash-tuned` FA4 replaces FlashInfer target attention, whose verify planning runs on the
 host every cycle; the larger gain at c = 8 than at 32 fits removing a fixed per-cycle cost, but this
 probe does not separate the kernel from the host share. One session: a probe, not a confirmation.

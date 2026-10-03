@@ -15,7 +15,8 @@ With --microbench-only only the first check runs, on the attn_microbench.json in
 (probe 4 uses this on its own run of the microbenchmark on the confirm engine).
 
 Exit 0: passed. Exit 1: probe 3 ran and failed a check (the served A/B is skipped).
-Exit 2: probe 3's outputs are missing or unreadable (an error, not a verdict).
+Exit 2: probe 3's outputs are missing or unreadable, or the checker itself raised (an error,
+not a verdict: hold_probe4.sh reads exit 1 as the kill verdict).
 
     python experiments/speed_lowc/check_probe3.py [--dir <probe3 dir>] [--microbench-only]
 """
@@ -35,7 +36,7 @@ ROOT = Path.home() / 'vp-data/speed-lowc'
 KILL_SAVING_US = 200.0
 
 
-def main() -> None:
+def check() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     ap.add_argument('--dir', type=Path, default=None)
     ap.add_argument('--microbench-only', action='store_true')
@@ -117,6 +118,15 @@ def main() -> None:
 
     print(f'{run}: ' + ('passed' if not failures else 'FAILED: ' + '; '.join(failures)))
     sys.exit(0 if not failures else 1)
+
+
+def main() -> None:
+    # An uncaught exception would exit 1, the kill verdict; any error is exit 2 instead.
+    try:
+        check()
+    except Exception as exc:
+        print(f'check_probe3: error, not a verdict: {exc!r}')
+        sys.exit(2)
 
 
 if __name__ == '__main__':
