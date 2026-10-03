@@ -214,6 +214,10 @@ def env_label(arm: dict) -> str:
 def cmd_served(args: argparse.Namespace) -> None:
     from bench.pareto import invalid_reason
 
+    # served.csv covers every planned hold, each once.
+    names = sorted(Path(h).name.split('_')[0] for h in args.holds)
+    if names != sorted(PLANNED):
+        raise SystemExit(f'holds {names} != planned {sorted(PLANNED)}')
     pts = []
     for hold in args.holds:
         hold = Path(hold)
