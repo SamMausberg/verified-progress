@@ -52,7 +52,8 @@ Where the serving measurements are:
 - **Quality.** GSM8K for plain decoding (two launches), two MTP arms, DFlash and
   replayed decoding (`evidence/bench/quality/`); the greedy-output exactness
   class of every tuned arm (`evidence/bench/equality/`); the quality budget,
-  logit probe and GSM8K runs of the two lossy levers (`evidence/lossy/`).
+  logit probe and GSM8K runs of the two lossy levers (`evidence/lossy/`) and of
+  the FP8 arms (`evidence/speed_bytes/`).
 - **Before and after.** Table 1 of the paper gives each engine change against
   its tuned baseline, with sessions and intervals; the certified head was served
   against four tuned arms (`plain-tuned`, `mtp-tuned-triton`, `dflash-tuned-b16`
@@ -148,25 +149,54 @@ Secondary investigations and supporting material:
   +1.8% at 8 (`evidence/drafter/`). Composed with the backbone table and the
   certified head, it puts 16-token DFlash's per-request rate at concurrency 1 at
   0.986 times stock and its throughput at 8 at 1.073 times (three sessions;
-  exact up to rounding on 320 prompts at concurrency 1; `evidence/stack/`). With
-  narrow tiles up to two requests and FA4 attention for drafter and target (the
-  target needs a backported fix to FA4's paged-KV loader), the envelope's DFlash
-  arms gain 8.4-9.3% in per-request rate at concurrency 1-4 and 12.4-13.7% in
-  throughput at 8-32 (three sessions; exact up to rounding as classed at
-  concurrency 1; `evidence/speed_lowc/confirm/`). SGLang's prefill delayer with
-  a 16-request cap on every prefill batch lets MTP serve 1.18-1.32 times the
-  best non-speculative arm at concurrency 48-128, at 2.6-3.1 times plain
-  decoding's 99th-percentile time to first token (three sessions; exact up to
-  rounding as classed at 64 and 128; `evidence/admission/`). FP8 weights for the
-  dense layers gain only 1.3-3.6% served, because their quantization and scaling
-  kernels take back the GEMMs' saving, and miss the logit probe's top-1 floor
-  (one session; `evidence/speed_bytes/`). Two
+  exact up to rounding on 320 prompts at concurrency 1; `evidence/stack/`). Two
   declared approximations miss the quality budget fixed before measuring: FP16
-  recurrent state serves 1.16-1.17 times the best non-lossy arm's throughput at
-  concurrency 64-256 (three sessions) for 1.0-1.4 GSM8K points below plain
-  decoding's reference runs, a difference this check cannot resolve, and the
-  int4 target with its int4 drafter fails a logit probe and is slower above
-  concurrency 1 (`evidence/lossy/`).
+  recurrent state serves 1.16-1.17 times the throughput of the best non-lossy
+  arm timed with it at concurrency 64-256 (three sessions) for 1.0-1.4 GSM8K
+  points below plain decoding's reference runs, a difference this check cannot
+  resolve, and the int4 target with its int4 drafter fails a logit probe and is
+  slower above concurrency 1 (`evidence/lossy/`).
+- **Low-concurrency attention and state levers.** Kernel probes at the served
+  shapes chose what to chase on the DFlash arms that lead at concurrency 1-32:
+  SGLang's split-KV verify kernel saves too little at these contexts and was
+  dropped, and FA4 runs the drafter's attention 1.3-8.5 times as fast as Triton
+  but compiles at the target's head dimension of 256 only with a fix to its
+  paged-KV loader, backported from an open SGLang pull request
+  (`evidence/speed_lowc/`). In three sessions, the fold with narrow verify tiles
+  and FA4 attention for drafter and target together raise the envelope arms'
+  per-request rate 8.4-9.3% at concurrency 1-4 and their throughput 12.4-13.7% at
+  8-32, exact up to rounding as classed at concurrency 1
+  (`evidence/speed_lowc/confirm/`).
+- **Admission at high concurrency.** Speculation trails plain decoding from
+  concurrency 48 mostly because its requests finish one or two at a time and are
+  each prefilled alone. SGLang's prefill delayer with a 16-request cap on every
+  prefill batch lets MTP serve 1.18-1.32 times the best non-speculative arm at
+  concurrency 48-128, at 2.6-3.1 times plain decoding's 99th-percentile time to
+  first token (three sessions; exact up to rounding as classed at 64 and 128;
+  `evidence/admission/`).
+- **FP8 weights.** SGLang's `--quantization fp8` computes nothing useful on this
+  GH200, because the aarch64 sgl-kernel lacks sm_90a code. Through cuBLASLt the
+  FP8 GEMMs are fast, but served plain decoding gains only 1.3-3.6%, because the
+  quantization and scaling kernels take back the GEMMs' saving; static or
+  CUTLASS scales serve 1.12-1.26 times as fast but sit on or below the logit
+  probe's top-1 floor, so neither is inside the quality budget (single sessions;
+  `evidence/speed_bytes/`).
+- **BF16 paths against FP32.** At one position after the model's end-of-text
+  token, stock SGLang's batch-1 BF16 decoding puts first a token 8.9 nats below
+  FP32's top, where transformers in BF16 keeps FP32's top token. A second
+  position is ill-conditioned in BF16 for any implementation, and on 15,360
+  unselected positions per path SGLang's typical error matches transformers'
+  (`evidence/bf16_paths/`).
+- **Changes offered upstream.** Two engine changes are kept as single commits
+  against SGLang's upstream main (`engine/sglang/patches/upstream/`): the FA4
+  paged-KV fix, confirmed on a GH200 with a regression test in a comment on the
+  open SGLang pull request #35757, and sgl-kernel's sm_90a build for aarch64,
+  without which its SM90 CUTLASS GEMMs return without computing (SGLang pull
+  request #42263). The checks behind the FA4 comment also found two failures the
+  fix does not cover, at head dimensions 80 and 96 without causal masking and at
+  160 and 224, both with the cp.async paged loader and both also on
+  FlashAttention's main branch
+  (`evidence/upstream_fa4/`).
 - **Drafting.** The public DFlash-4B drafter at block 16 averages 6.18 tokens
   per verify cycle, pooled over the 80-request pilot panel, and a zero-training
   screen of its candidate sets does not rule out a rate-trained selector (P6)
@@ -280,10 +310,11 @@ reads `CITATION.cff`; the equivalent BibTeX entry is:
 ```bibtex
 @techreport{mausberg2026verifier,
   author = {Mausberg, Samuel},
-  title  = {The Work a Verifier Needs},
+  title  = {The Work a Verifier Needs: Certified Int8 Output Heads That Match a
+            Production Kernel's Rounding},
   year   = {2026},
-  month  = sep,
-  note   = {Research manuscript, revision 4, in progress},
+  month  = oct,
+  note   = {Preprint, not peer reviewed},
   url    = {https://github.com/SamMausberg/verified-progress}
 }
 ```
