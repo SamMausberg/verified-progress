@@ -22,14 +22,16 @@ modified SGLang files and no failed launch check. Each launch's sweep, in the sw
 confirm_sweeps.py writes beside them, must be the declared one: the confirm split, 512 output
 tokens to the end (ignore_eos), one repeat of the group's concurrencies with 64 measured
 requests or 8 waves, no failed launch check, the session its points name, and the same model,
-request body and client settings as every other launch. Its bench.sweep options, parsed from
+request body and client settings as every other launch, the model and revision of its bench
+arm and the repository's warm-up pool. Its bench.sweep options, parsed from
 its recorded command line, must equal those of the command hold_confirm_session.sh gives that
 arm in that session, and each point must have measured max(64, 8c) requests. Each session's
 launches must follow the declared order (hold_confirm_session.sh; a launch with no points may
-be missing, which voids its cells). The equality gate beside the points (equality/gate.json)
-must have passed for these levers, and its runs (equality/meta.json) must be the ones the
-equality hold makes, from the engine and repository commits the launches ran and stock SGLang
-at the pin. A launch that breaks this, or one whose points name two sessions, is an error.
+be missing, which voids its cells). The equality gate beside the points (equality/) must bind
+these launches as a session requires (confirm_gate.py, equality_problems): passed for these
+levers, its runs exactly the equality hold's, made as their arms, from the engine and
+repository commits the launches ran with S0 at the pin, and the gate decided again from its
+summary.json equal to gate.json. A launch that breaks this, or one whose points name two sessions, is an error.
 
     python experiments/speed_lowc/confirm_analyze.py --points <points.csv> --out <dir>
 """
@@ -50,6 +52,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from confirm_gate import STOCK_PIN, equality_problems
 from confirm_sweeps import options
 
 from bench.arms import resolve_arm
@@ -80,19 +83,15 @@ LEVER_CLI = {
     'B': ['--set', 'speculative-draft-attention-backend=fa4'],
     'C': ['--set', 'attention-backend=fa4'],
 }
-# Stock SGLang's pin: engine/sglang/README.md, line 4.
-STOCK_PIN = 'bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824'
 # The declared sweep (README, Step 2): bench.sweep's confirm split and its defaults of one
 # repeat, 64 measured requests and 8 waves (bench/sweep.py lines 57, 504 and 530-531), with 512
 # output tokens (hold_confirm_session.sh line 60).
 CONFIRM_SPLIT = Path(__file__).resolve().parents[2] / 'bench/workloads/mixed-v2/confirm.jsonl'
+WARMUP_POOL = CONFIRM_SPLIT.with_name('warmup.jsonl')  # bench/sweep.py line 58
 OSL, REPEATS, MIN_REQUESTS, WAVES = 512, 1, 64, 8
 # Settings every launch must share (sweeps.csv), so that the arms differ only in the server.
 SHARED_SWEEP = (
-    'model',
-    'revision',
     'workload_prompts',
-    'warmup_pool_sha256',
     'request_body',
     'min_warmup',
     'streaming',
@@ -200,29 +199,12 @@ def check_order(sessions: dict[tuple[str, str], str], full: dict[str, str]) -> N
 
 
 def check_gate(equality: Path, full: dict[str, str], engine: str, repo: str) -> None:
-    """Refuse unless the equality gate passed for these levers on the launches' commits."""
-    try:
-        gate = json.loads((equality / 'gate.json').read_text())
-        meta = json.loads((equality / 'meta.json').read_text())
-    except (OSError, ValueError) as exc:
-        raise SystemExit(f'no readable equality gate in {equality} ({exc!r})') from exc
-    # The runs as hold_confirm_equality.sh names them (confirm_arms.sh, eq_names).
-    runs = {
-        f'plain__lowc_{g}_{a}/c1'
-        for g in full
-        for a in ('S0', 'B0', *full[g], *([full[g]] if len(full[g]) > 1 else []))
-    }
-    why = []
-    if gate.get('ok') is not True or gate.get('levers') != full['L']:
-        why.append(f'gate ok={gate.get("ok")} levers={gate.get("levers")}, not {full["L"]}')
-    if set(meta) != runs:
-        why.append(f'runs {sorted(meta)}, not {sorted(runs)}')
-    for run, m in sorted(meta.items()):
-        sglang = STOCK_PIN if run.split('/')[0].endswith('_S0') else engine
-        made = (m.get('sglang_sha'), m.get('sglang_dirty'), m.get('repo_sha'))
-        if made != (sglang, False, repo):
-            why.append(f'{run}: SGLang, dirty, repository {made}')
-    if why:
+    """Refuse unless the equality gate beside the points binds these launches.
+
+    confirm_gate.py's equality_problems, as a session applies it, on the committed copy (which
+    has no runs/ or server logs: the sessions checked those before they ran).
+    """
+    if why := equality_problems(equality / 'gate.json', full['L'], repo, engine, raw=False):
         raise SystemExit(f'{equality}: ' + '; '.join(why))
 
 
@@ -278,12 +260,16 @@ def check_sweeps(sweeps: Path, launches: dict[tuple[str, str], str]) -> None:
     if missing := sorted(set(launches) - set(by_key)):
         raise SystemExit(f'{sweeps}: no sweep for the launches {missing}')
     split = hashlib.sha256(CONFIRM_SPLIT.read_bytes()).hexdigest()
+    warmup = hashlib.sha256(WARMUP_POOL.read_bytes()).hexdigest()
     why = []
     for (label, run), session in sorted(launches.items()):
         row, group = by_key[(label, run)], label.split('-')[1]
         want = {
             'session': session,
+            'model': resolve_arm(GROUP_ARM[group]).model,
+            'revision': resolve_arm(GROUP_ARM[group]).revision,
             'workload_sha256': split,
+            'warmup_pool_sha256': warmup,
             'osl': str(OSL),
             'ignore_eos': 'True',
             'concurrency': json.dumps(list(CONCURRENCY[group])),

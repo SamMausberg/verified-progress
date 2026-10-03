@@ -96,12 +96,6 @@ lever_args() {
   esac
 }
 
-# Equality arms (hold_confirm_equality.sh): state's runner at c = 1 with the group's DFlash
-# flags, running limit 4 and the radix cache off.
-EQ_DFLASH="--speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash \
---speculative-draft-model-revision 9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf --max-running-requests 4 \
---disable-radix-cache"
-
 # eq_names GROUP prints the equality arms of GROUP in run order: S0, B0, each lever, FULL.
 eq_names() {
   local full j out='S0 B0'
@@ -111,30 +105,11 @@ eq_names() {
   echo "$out"
 }
 
-# eq_flags GROUP NAME prints the runner's --extra-flags for equality arm NAME of GROUP
-# (A also sets SGLANG_GDN_REPLAYSSM_FOLD=1, which run_eq exports).
+# eq_flags GROUP NAME prints the runner's --extra-flags for equality arm NAME of GROUP, from
+# confirm_gate.py (eq_flags), the definition the gate checks the runs against. A also sets
+# SGLANG_GDN_REPLAYSSM_FOLD=1, which run_eq exports.
 eq_flags() {
-  local g=$1 name=$2 flags i x
-  case $g in
-    L) flags="$EQ_DFLASH --speculative-dflash-block-size 16 --attention-backend triton" ;;
-    H) flags="$EQ_DFLASH --speculative-dflash-block-size 8 --speculative-draft-attention-backend fa4" ;;
-    *) return 1 ;;
-  esac
-  if [ "$g" = L ] && [[ $name == *C* ]] && [[ $name != *B* ]]; then
-    flags+=" --speculative-draft-attention-backend triton"
-  fi
-  if [ "$name" != S0 ] && [ "$name" != B0 ]; then
-    for (( i=0; i<${#name}; i++ )); do
-      x=${name:$i:1}
-      case $x in
-        A) flags+=" --enable-linear-replayssm-spec" ;;
-        B) flags+=" --speculative-draft-attention-backend fa4" ;;
-        C) flags+=" --attention-backend fa4" ;;
-        *) echo "unknown lever $x" >&2; return 1 ;;
-      esac
-    done
-  fi
-  echo "$flags"
+  python "$CONFIRM_REPO/experiments/speed_lowc/confirm_gate.py" --eq-flags "$1" "$2"
 }
 
 # arm_args GROUP NAME prints the bench.sweep / bench.server arguments of arm NAME.
@@ -194,73 +169,12 @@ PY
 }
 
 # The single precondition of every timed session: the equality gate passed for exactly
-# these levers, from the runs it is bound to. The gate is recomputed by this commit's
-# confirm_gate.py from its own directory's summary.json (which must name that directory's
-# runs) and must pass and equal gate.json. The directory's meta.json (compare.py) records
-# each equality run's repository and SGLang commits: every run must come from this
-# repository's HEAD (the same arm flags, scripts and prompt manifest), every S0 run from the
-# pin and every other run from the confirm engine's HEAD, all with no modified SGLang files.
-# meta.json must hold exactly the runs the equality hold makes for these levers, each made as
-# the hold makes it: its arm's flags (eq_flags), one pass at c = 1 from a cold cache, 256 new
-# tokens (run_matrix.py's default, line 61; the hold does not change it) and every prompt of the
-# manifest; and its server log must show the GDN fold on (fold=True) exactly when the arm has A.
+# these levers and binds this session (confirm_gate.py, equality_problems): the runs its
+# directory's meta.json lists are exactly the equality hold's, each from this repository's
+# HEAD, S0 from the pin and every other run from the confirm engine's HEAD, made as its arm,
+# with the fold on exactly in the arms with A; and the gate decided again by this commit's
+# confirm_gate.py from that directory's summary.json and runs/ equals gate.json.
 gate_ok() {
-  local g name flags runs=()
-  for g in L H; do
-    for name in $(eq_names "$g"); do
-      flags=$(eq_flags "$g" "$name") || return 1
-      runs+=("plain__lowc_${g}_$name/c1|$flags")  # as hold_confirm_equality.sh names them
-    done
-  done
-  python - "$CONFIRM_GATE" "$CONFIRM_LEVERS" "$CONFIRM_REPO_HEAD" \
-    "$(git -C "$CONFIRM_ENGINE" rev-parse HEAD)" "$STOCK_PIN" \
-    "$CONFIRM_REPO/experiments/speed_lowc/confirm_gate.py" \
-    "$CONFIRM_REPO/evidence/state_safety/prompt_manifest.json" "${runs[@]}" <<'PY'
-import json, re, subprocess, sys, tempfile
-from pathlib import Path
-path, levers, repo, engine, pin, script, manifest = sys.argv[1:8]
-flags = dict(item.split('|', 1) for item in sys.argv[8:])
-expected = set(flags)
-prompts = json.loads(Path(manifest).read_text())['num_prompts']
-gate = json.loads(Path(path).read_text())
-home = Path(path).resolve().parent
-meta = json.loads((home / 'meta.json').read_text())
-why = []
-if gate.get('ok') is not True or gate.get('levers') != levers:
-    why.append(f'gate ok={gate.get("ok")} levers={gate.get("levers")}')
-if Path(str(gate.get('summary'))).resolve() != home / 'summary.json':
-    why.append(f'gate.json was computed from {gate.get("summary")}, not {home / "summary.json"}')
-with tempfile.TemporaryDirectory() as tmp:
-    fresh_path = Path(tmp) / 'gate.json'
-    check = subprocess.run([sys.executable, script, '--summary', str(home / 'summary.json'),
-                            '--levers', levers, '--out', str(fresh_path)], capture_output=True, text=True)
-    fresh = json.loads(fresh_path.read_text()) if fresh_path.is_file() else {}
-fresh['summary'] = gate.get('summary')  # the same file, possibly named through another path
-if check.returncode != 0 or fresh != gate:
-    tail = (check.stdout + check.stderr).strip().splitlines()[-1:]
-    why.append(f'the gate recomputed from {home} (exit {check.returncode}) differs from gate.json {tail}')
-if set(meta) != expected:
-    why.append(f'meta.json runs missing {sorted(expected - set(meta))}, extra {sorted(set(meta) - expected)}')
-for run, m in sorted(meta.items()):
-    stock = run.split('/')[0].endswith('_S0')
-    if run in flags:
-        want = {'flags': flags[run].split(), 'concurrency': 1, 'warm': False, 'max_new_tokens': 256,
-                'num_prompts': prompts}
-        wrong = {k: m.get(k) for k, v in want.items() if m.get(k) != v}
-        if wrong:
-            why.append(f'{run}: made with {wrong}, not as its arm (flags {flags[run]})')
-        log = home / 'runs' / run.split('/')[0] / 'server.log'
-        folds = re.findall(r'GDN ReplaySSM ring buffers allocated \(record_len=\d+, fold=(\w+)\)',
-                           log.read_text(errors='replace') if log.is_file() else '')
-        arm = run.split('/')[0].rsplit('_', 1)[1]
-        fold_on = bool(folds) and set(folds) == {'True'}
-        if not log.is_file() or fold_on != ('A' in arm) or ('A' not in arm and folds):
-            why.append(f'{run}: server log fold={folds or "absent"}, arm {arm}')
-    if m.get('repo_sha') != repo:
-        why.append(f'{run}: repository {m.get("repo_sha")}, not {repo}')
-    if m.get('sglang_sha') != (pin if stock else engine) or m.get('sglang_dirty') is not False:
-        why.append(f'{run}: SGLang {m.get("sglang_sha")} dirty={m.get("sglang_dirty")}')
-print('gate', path, 'ok' if not why else 'REFUSED: ' + '; '.join(why))
-sys.exit(0 if not why else 1)
-PY
+  python "$CONFIRM_REPO/experiments/speed_lowc/confirm_gate.py" --check-gate "$CONFIRM_GATE" \
+    --levers "$CONFIRM_LEVERS" --repo "$CONFIRM_REPO_HEAD" --engine "$(git -C "$CONFIRM_ENGINE" rev-parse HEAD)"
 }
