@@ -41,7 +41,7 @@ every page. `natbib`, `eso-pic`, `forloop` and `times` come from TeX Live.
 
 `paper.tex` loads `\usepackage[accepted]{mlsys2025}` so that the author block prints. The
 paper is a preprint, not an accepted MLSys paper, so its preamble replaces the style's
-proceedings notice with a preprint notice. Three further settings live in `paper.tex`,
+proceedings notice with a preprint notice. Four further settings live in `paper.tex`,
 and the style file itself is not modified:
 
 - `\raggedbottom` replaces the style's `\flushbottom`, which stretches any column that
@@ -51,6 +51,9 @@ and the style file itself is not modified:
   typesets each caption twice and otherwise produces duplicate PDF destinations.
 - `fix-cm` makes Computer Modern scalable, so math at the style's 5.5 pt script size
   needs no font substitution.
+- `\fancyhead[R]{\small\thepage}` prints the page number at the right of the running head.
+  The style prints no page numbers, and its zero `\footskip` leaves no room for a footer; the
+  first page keeps the style's empty head.
 
 There is no affiliation to print, so the name is set in the author block directly rather
 than through `\mlsysauthor`, and the first-column footnote is written in `paper.tex`
