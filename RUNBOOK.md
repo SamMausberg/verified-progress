@@ -103,8 +103,9 @@ python -m bench.pareto <run dirs> --out <output dir> --baseline plain
 `experiments/README.md` maps each experiment directory to its evidence directory
 and to where its commands are recorded; `evidence/README.md` indexes the
 evidence directories, the paper claims each supports, and the imported bundle's
-files at the top of `evidence/`. Status by task is in `TASKS.md`. When a pull
-request merges, the paper replaces the matching pending items with its numbers.
+files at the top of `evidence/`. Status by task is in `TASKS.md`. A result
+enters the paper or the research notes only after its pull request merges, and
+both cite its committed evidence.
 
 ## 6. What makes a run admissible
 

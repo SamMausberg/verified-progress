@@ -61,8 +61,10 @@ certified engine matches stock at the most sensitive position known. With 579ae7
 through position 399, the certified engine with its verify head deciding all 3,708 verify
 steps commits stock's tokens on every one of 109 requests at batch 1, 8, 12 and 16; with
 logprobs requested (which keep the verify on the stock head), `cert0` and the certified
-engine are also logprob-identical to stock. Stock MTP's verify there commits FP32's top
-token, 68189. Whether `session_000527`'s content feeds the event is
+engine also give stock's log-probabilities for the top five and five tracked tokens at
+position 439, the only log-probabilities the committed summary compares (the raw records
+keep positions 400-450). Stock MTP's verify there
+commits FP32's top token, 68189. Whether `session_000527`'s content feeds the event is
 untested (the planted-donor hold's unplanted control did not fire). The certified head's
 contract is identity with the stock engine's output for the same batch, and the stock
 engine is not FP32-exact at positions like this one. MTP identity is claimed at
@@ -680,7 +682,8 @@ again) each served the same 10 synchronized waves twice: 579ae7ce alone, and wit
   identical across companion sets and passes;
 - the baseline held: each server's two passes are identical, and stock equals stock again;
 - (ii) cert0 and the certified engine equal stock bitwise on all 109 requests, 512 tokens
-  each, on both passes, and their logprobs at 439 are identical to the bit.
+  each, on both passes, and the log-probabilities compared at 439 (the top five and five
+  tracked tokens) are identical to the bit.
 
 These requests asked for logprobs, and a request that asks for logprobs keeps the verify on
 the stock head by design (SGLang's `certified_head.py`, `_adjusts_logits`). A counter rerun
@@ -688,8 +691,10 @@ of the cert arm confirmed it (`control_seeded_stats.json`; same outputs as stock
 passes): over the server's life the certified verify ran 5 times, all at most 4 rows (the
 warm-up), against 3,713 certified draft and draft-extend steps (68,802 and 34,401 rows, at
 most 16), with no uncounted call. So the seeded control shows that the certified graphs,
-the certified draft and draft-extend heads and the gated-off verify leave tokens and
-logprobs unchanged. A token-only rerun then served the same waves twice without logprobs,
+the certified draft and draft-extend heads and the gated-off verify leave the tokens
+unchanged and leave the compared log-probabilities at position 439 (the top five and five
+tracked tokens) equal to stock's. A token-only rerun then served the same waves
+twice without logprobs,
 stock and certified in turn, reading the counters before and after every wave
 (`control_seeded_tokens.json`). In the waves alone the certified verify ran 3,708 steps and
 137,584 rows (272, 1,128, 1,166 and 1,142 steps at sizes 1, 8, 12 and 16, at most 4, 32,
@@ -748,13 +753,13 @@ plain decoding's fallback rates on every path. The check launches measured more 
 DFlash rows (verify 3-4% of rows), and because a call falls back when any of its rows
 does, the share of calls needing a fallback grows with the batch:
 
-| Path | Calls with a fallback, by concurrency (check launches) |
+| Path | Calls with a fallback, by concurrency (complete check launches, `check2`) |
 |---|---|
 | plain decode | 2% (c = 1), 14% (8), 61% (64) |
-| MTP verify | 8% (1), 26% (4), 59% (16), 67% (64; mostly gated off) |
+| MTP verify | 8% (1), 26% (4), 61% (16), 63% (64; mostly gated off) |
 | MTP draft | 2% (1), 10% (4), 32% (16), 76% (64) |
-| block 16 verify / draft projection | 42% / 37% (1), 64% / 58% (2), 83% / 75% (4) |
-| block 8 verify / draft projection | 20% / 12% (1), 55% / 35% (4), 70% / 45% (8) |
+| block 16 verify / draft projection | 42% / 37% (1), 64% / 58% (2), 82% / 76% (4) |
+| block 8 verify / draft projection | 20% / 12% (1), 54% / 31% (4), 71% / 45% (8) |
 
 Most of these are near ties completed by the per-position fallback; a few percent of
 calls had a row whose candidate list overflowed and took the whole-batch fallback

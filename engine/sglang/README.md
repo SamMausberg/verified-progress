@@ -60,7 +60,7 @@ Every change is off unless its flag or environment variable is set.
 | 0004 | The relaxed rule of 0002 on the DFlash greedy verify path (same chain layout). | `g = 0`, exact |
 | 0005 | `--speculative-token-map` for DFlash: the captured draft greedy head (tp = 1) scores only the hot rows and maps the argmax back to its token id; the eager fallback keeps the full head. | unchanged without a token map |
 | 0006 | Under an 8-bit GDN state, the ReplaySSM decode ring keeps 16-bit (d, k) records, so the state is rounded to 8 bits only at a flush. | unchanged for FP32/FP16/BF16 state |
-| 0007 | `SGLANG_GDN_EXACT_REPLAY=1` with `--enable-linear-replayssm`: rounding-preserving live replay for GDN decode. The ring stores the packed decode's own FP32 operands (normalized key, raw value, g, beta) and every step replays them from the dense anchor in the packed kernel's order; the anchor is written every `--linear-replayssm-cache-len` steps. Designed to be bit-identical to the packed decode; validation pending (`tests/test_gdn_exact_replay.py`, `experiments/moonshot/gdn_exact_replay_check.py`). FP32 state only. | unchanged |
+| 0007 | `SGLANG_GDN_EXACT_REPLAY=1` with `--enable-linear-replayssm`: rounding-preserving live replay for GDN decode. The ring stores the packed decode's own FP32 operands (normalized key, raw value, g, beta) and every step replays them from the dense anchor in the packed kernel's order; the anchor is written every `--linear-replayssm-cache-len` steps. Bit-identical to the packed decode at kernel level, on synthetic activations (0 of 201,326,592 state words and 0 of 1,572,864 output words differ at ring lengths 4 and 16; `experiments/moonshot/gdn_exact_replay_check.py`, `tests/test_gdn_exact_replay.py`, `evidence/moonshot/README.md`); served, the output probe at concurrency 1 found no difference, which does not establish end-to-end exactness. FP32 state only. | unchanged |
 | 0008 | With `SGLANG_GDN_EXACT_REPLAY=1` but no ring (no `--enable-linear-replayssm`, or no beta ring), decode raises instead of silently running another kernel; the first exact-replay dispatch is logged ("GDN decode: exact replay kernel, ring length L"). | unchanged when the flag is off |
 | 0009 | `SGLANG_GDN_EXACT_REPLAY_BV` selects the exact-replay value tile (default 32, the packed decode's); any other value must be re-checked for bit-equality. | unchanged (32) |
 
@@ -232,8 +232,10 @@ switch give the same token ids and top-5 logprobs at concurrency 1, and `--bf16-
 gemv` and the routing table (lever v1) are exact up to rounding; and paired serving of lever v1
 against tuned plain decoding (3.4% faster at concurrency 1, 1.0% at 128). Against MTP
 with FlashInfer attention (`mtp-tuned`) it gains nothing (0.9% slower at concurrency 1 in both
-pairs, one beyond the session's spread; untested against `mtp-tuned-triton` at c = 1-32), and
-an nsys trace of plain decoding shows each route dispatching as tabled.
+pairs, one beyond the session's spread). Against `mtp-tuned-triton` it gives 1.0006x and
+1.0007x at c = 1 and no claim at 8 and 32; the streamed greedy text differs from the
+switches-off engine's on 7 of 64 prompts at c = 1, so its exactness class under MTP is not
+established. An nsys trace of plain decoding shows each route dispatching as tabled.
 
 ## hostgap (`patches/hostgap/0001-0005`, branch `engine/hostgap`)
 
@@ -315,3 +317,55 @@ SGLANG_WORKTREE=~/sglang-wt/lossy source scripts/sglang_env.sh
 | Patch | What it changes | Default behaviour |
 |---|---|---|
 | 0001 | `DFlashDraftModel` builds its context projection `fc` as a `ReplicatedLinear` with the draft's quantization config whenever one is set, and refuses to load a checkpoint that leaves any `fc` parameter unset. Without it, a compressed-tensors drafter stores `fc` as `weight_packed`/`weight_scale`, which match no parameter of the plain `nn.Linear`; the loader skips them silently and `fc.weight` keeps uninitialised memory. | unquantized drafters (no quantization config) build and load `fc` exactly as before |
+
+## upstream (`patches/upstream/0001-0002`, base: upstream SGLang `f6fcda8827`)
+
+These two patches are for upstream SGLang, not for the paper's engine. Each is one commit on upstream
+`main` at `f6fcda8827` (2026-10-02). Both also apply to the pin with `git am`.
+
+```sh
+git -C <SGLang checkout at f6fcda8827> am "$PWD"/engine/sglang/patches/upstream/<patch>.patch
+```
+
+| Patch | What it changes | Upstream |
+|---|---|---|
+| 0001 | FA4 (CuTe DSL) paged KV on SM90. `PagedKVManager.create` ceil-divides the page-table entries per loader thread (`flash_attn/cute/paged_kv.py`), as Dao-AILab/flash-attention#2745 does. With floor division, the head_dim 256 tile (128 x 80) gets 0 entries for the 128 loader threads, and FA4 fails to compile for Qwen3.5-4B's full-attention layers at SGLang's default page size of 1. The patch adds an SM90 head_dim 256 test to `test_flash_attention_4.py`. Checked at head_dim 256 (tile_n 80 and 64) and 192 (tile_n 112). At head_dim 160 and 224 it gets past the compile error but not to correct output, so those need a separate fix (see the comment); other head dims on SM90's cp.async paged path are not covered. | Not opened as a PR: the same ceil-divide (written there as `cute.ceil_div`) is in the open sgl-project/sglang#35757. The test is offered there in [a comment](https://github.com/sgl-project/sglang/pull/35757#issuecomment-5961366446) |
+| 0002 | sgl-kernel's CMake adds the sm_90a gencode for `common_ops` and `spatial_ops` whenever CUDA >= 12.4, not only when FA3 is built. FA3 is off by default on aarch64, so `common_ops` in the aarch64 wheel (inspected: `sglang-kernel` 0.4.8) has no sm_90a code. On GH200 its SM90 CUTLASS GEMMs (`fp8_scaled_mm`, `int8_scaled_mm`, the FP8 and W4A8 MoE GEMMs) print CUTLASS's "Arch conditional MMA" error and return without computing. Builds with FA3 on (the x86_64 default) get the same flags as before. | [sgl-project/sglang#42263](https://github.com/sgl-project/sglang/pull/42263): the same diff on a newer upstream `main` |
+
+## speed-lowc (`patches/speed-lowc/0001-0003`, built by `experiments/speed_lowc/build_engines.sh`)
+
+```sh
+experiments/speed_lowc/build_engines.sh fa4       # ~/sglang-wt/speed-lowc: pin + 0001-0002
+experiments/speed_lowc/build_engines.sh confirm   # ~/sglang-wt/speed-lowc-confirm: pin + drafter 0001-0004 + 0001 + 0003
+SGLANG_WORKTREE=~/sglang-wt/speed-lowc-confirm source scripts/sglang_env.sh
+```
+
+| Patch | What it changes | Default behaviour |
+|---|---|---|
+| 0001 | Backport of Dao-AILab/flash-attention#2745's paged-KV loader fix to SGLang's vendored FA4: `page_entry_per_thread` is ceil-divided. On sm_90 the head-dim-256 forward tile is 128 x 80, so the floor gave 80 // 128 = 0 entries and FA4 failed to compile for any head-dim-256 model with a paged KV cache whose page size is not the tile's (`evidence/speed_lowc/README.md`). | tiles with n below 128 now compile; tiles whose n is a multiple of 128 compute the same count; the 192 x 144 tile (head dim 65-96, non-causal) gets two entries per thread instead of one, a shape these probes did not test |
+| 0002 | SM90 regression test for 0001 (`test/registered/kernels/ops/attention/test_flash_attention_4_paged_sm90.py`): head dim 256 against an FP32 reference over a shuffled page table: page size 1, causal and not; page size 16, causal. Head dim 128 (page size 1, causal) as a control. | test only |
+| 0003 | The recurrent GDN kernel's ring-writing verify (`cache_ring`, the fold's verify from drafter 0003) uses value tiles of 4 for at most 2 sequences on sm_90, and 32 above. Drafter 0005 used 4 for up to 64 sequences. The cutoff is the threshold that the drafter's pre-registered kernel sweep gives (N\* = 2, `evidence/drafter/README.md`, "Ring-writing verify tiles by batch"): on DFlash blocks 16 and 8, tile 4 took 0.54-0.70 of tile 32's time at 1 and 2 sequences and 1.03-1.40 of it at every batch from 3 to 64. These probes do not measure its served effect. The two tilings are bitwise equal on sm_90 (the sweep's bitwise gate). | changes only the ring-writing verify, which runs only with drafter 0003's fold |
+
+Tree hashes (stable across builds): fa4 `dcd97db178c101495148fb7a361203f975bcf711`, confirm
+`5d6db54828d7fbdac62180810b68a87cee3b39ec`. The probe and confirmation holds check them. Probe 4 ran on
+the earlier confirm tree `9a01a622f6e7f7f816ce6255ba5de56d52e09dbc`, whose 0003 stopped at 4 sequences
+(`evidence/speed_lowc/README.md`, Provenance).
+
+## upstream-bf16 (`patches/upstream-bf16/0001`, branch `engine/upstream-bf16`, head `4608661757`)
+
+One diagnostic patch on `bd66ce343e` for `experiments/bf16_paths/` (variant `beta_fp32`): it keeps
+sigmoid(beta) in FP32 in the packed GDN decode kernel (`fused_recurrent.py`) and in the gating kernel
+whose output feeds GDN prefill (`fused_gdn_gating.py`), where the pin rounds it through BF16. The two
+lines are the changes of the open upstream PRs #38977 and #40362 (upstream issue #38975); the patch
+exists only to measure whether that rounding explains a BF16 decode/prefill disagreement, not as a
+proposed change.
+
+```sh
+scripts/sglang_worktree.sh upstream-bf16
+git -C ~/sglang-wt/upstream-bf16 am "$PWD"/engine/sglang/patches/upstream-bf16/0001-*.patch
+SGLANG_WORKTREE=~/sglang-wt/upstream-bf16 source scripts/sglang_env.sh
+```
+
+| Patch | What it changes | Default behaviour |
+|---|---|---|
+| 0001 | `beta_val = tl.sigmoid(b_val).to(tl.float32)` in the packed decode kernel; the gating kernel stores the FP32 sigmoid into its FP32 output buffer | numerics change only in beta's low mantissa bits (at most one BF16 rounding, about 0.4% relative) |

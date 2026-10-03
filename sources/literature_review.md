@@ -241,8 +241,8 @@ Three lessons for the team follow.
 - **EPIC** (Ahmed and Singh, arXiv 2601.01714) [`epic`] keeps intervals on
   Gumbel-perturbed scores and eliminates candidates that cannot overtake the leader.
   This is the same elimination logic H3 needs, applied to a different uncertain term
-  (lookahead entropy rather than quantized logits). Reported by the H3 search agent;
-  metadata verified, method read by that agent only.
+  (lookahead entropy rather than quantized logits). Reported by the H3 search;
+  metadata verified, method read in that search only.
 
 ### 3.2 Fused and post-logit sampling kernels
 
@@ -774,7 +774,7 @@ from the sources as checked. The verdicts are judgement.
 | Work | What it does | Exact? | Hardware | Difference from H3 |
 |---|---|---|---|---|
 | VA-file (VLDB 1998) [`vafile`]; FEXIPRO (SIGMOD 2017) [`fexipro`] | quantized or integer approximations give per-item bounds; survivors are computed exactly; FEXIPRO adds an SVD basis | exact (real arithmetic) | CPU | general MIPS/k-NN, not an LM head; no GPU batching, no sampling |
-| EAHR (Chunran Zhang, arXiv 2608.07152v1, Aug 2026) [`eahr`] | per-vector int8 with `|q^T v - q^^T v^| <= ||e_q|| ||v|| + ||q^|| ||e_v||` plus a gamma floating-point guard; ambiguous items rescored in float32 | exact, with an FP guard | CPU (Qdrant) | retrieval, not an LM head (found by the H3 search agent; metadata verified here) |
+| EAHR (Chunran Zhang, arXiv 2608.07152v1, Aug 2026) [`eahr`] | per-vector int8 with `|q^T v - q^^T v^| <= ||e_q|| ||v|| + ||q^|| ||e_v||` plus a gamma floating-point guard; ambiguous items rescored in float32 | exact, with an FP guard | CPU (Qdrant) | retrieval, not an LM head (found by the H3 search; metadata verified here) |
 | HiRE (arXiv 2402.09360) [`hire`]; SVD-Softmax (NeurIPS 2017) [`svdsoftmax`]; SpecVocab [`specvocab`] | cheap int4, low-rank or SVD-preview scores pick a fixed-size candidate set, which is recomputed exactly | approximate (fixed k', no bound) | TPUv5e; GPU | no certificate |
 | CSV-Decode (arXiv 2511.21702v2) [`csvdecode`] | k-means clusters of LM-head rows, centre-plus-radius bounds, exact top-k (Thm 1) | exact in real arithmetic; no FP treatment in the text | A100, H100, 4090 | geometric bounds at h, not quantization envelopes |
 | knlp "Certified LM-head decode" (Luis Chamberlain, `mcgrof/knlp`, `docs/lm-head-decode.md`, first committed 2026-06-23, MIT) [`knlphead`] | PCA basis, int8 shadow of the projected head, Cauchy-Schwarz bound on the out-of-basis part, blocks opened by bound | greedy argmax; its own table reports 0.998 argmax match at 14B, so FP is not fully handled | W7900; H100 (1.85x only through a CUDA graph; parity at batch >= 4) | greedy only; no sound FP model |
@@ -885,7 +885,7 @@ measured quality trade-offs in exchange for large speedups.
 
 - Every paper's existence and metadata were checked on its arXiv abstract page.
 - Numbers marked **(checked)** I read in the source myself.
-- The remaining numbers were read from the paper text by two scout agents and not
+- The remaining numbers were read from the paper text in a first pass and not
   re-read by me.
 - All speedups are the authors' own, on their hardware. None was measured on our
   GH200.
@@ -924,7 +924,7 @@ than a few requests (Section 8).
 
 For Qwen3.5-4B no quality curve exists; one would have to be measured. DFlash's
 per-position acceptance on Qwen3.5-4B is about 0.78-0.88 (DFlash 2 blog, Fig. 5,
-per the scout). A lossy rule mainly raises it at concurrency 1-8, where speculation
+per the first-pass search). A lossy rule mainly raises it at concurrency 1-8, where speculation
 is bandwidth-bound.
 
 ### 12.3 Datastore and retrieval drafting (lossless; gains depend on the workload)
@@ -987,7 +987,7 @@ These help agentic, code and summarization traffic, and little on open chat.
   experiment:** half the state bytes and half the per-request memory. Whether
   SGLang's sm_90 GDN kernels accept an FP16 state was not checked.
 - No paper offloads the live recurrent state to Grace memory. GH200 offload work
-  (BOOST, SuperInfer, DAK, per the scout) moves weights or KV instead.
+  (BOOST, SuperInfer, DAK, per the first-pass search) moves weights or KV instead.
 
 ### 12.6 2:4 sparsity with FP8 on Hopper
 
@@ -996,7 +996,7 @@ These help agentic, code and summarization traffic, and little on open chat.
   raises LLaMA-7B WikiText perplexity from 5.68 to 11.00 and 11.53 respectively.
 - **MaskLLM** (NeurIPS 2024) [`maskllm`]: learned 2:4 masks reach 6.72 perplexity
   (dense 5.12) at about 1,280 A100-hours.
-- Red Hat's Sparse-Llama-3.1-8B-2of4 (FP8, H100, vLLM, Dec 2024 blog; per the scout)
+- Red Hat's Sparse-Llama-3.1-8B-2of4 (FP8, H100, vLLM, Dec 2024 blog; per the first-pass search)
   reports 1.7x single-stream latency over dense BF16. Only up to about 30 % of that
   comes from sparsity, and it needed 13B tokens of distillation.
 - **SlideSparse** [`slidesparse`]: cuSPARSELt is often slower than dense at M < 256, and
@@ -1026,14 +1026,14 @@ They are judgement, not measurement.
    - The Nota INT4 target plus matched drafter, whose checkpoints are local and
      whose quality cost is measured.
 
-The combination is plausibly several-fold at concurrency 1 (the scout estimates
+The combination is plausibly several-fold at concurrency 1 (the first-pass search estimated
 8-10x for all three; that is an estimate, not a measurement) and much less at 32+.
 
 ## 13. Coverage, and what could not be verified
 
 **Coverage.**
 
-- The session's web-search budget (200 calls, shared by all lit agents) ran out
+- The session's web-search budget (200 calls, shared by the whole review) ran out
   partway through. Later checks used arXiv's own search, arXiv abstract and HTML
   pages, Crossref, publisher pages and the GitHub API.
 - Semantic Scholar, dblp, OpenReview and the ACM Digital Library blocked or
@@ -1042,7 +1042,7 @@ The combination is plausibly several-fold at concurrency 1 (the scout estimates
 - Coverage of September 2026 arXiv submissions, patents and non-English work is
   incomplete.
 - Much of the closest H3 prior art sits in 2026 GitHub repositories, several built with
-  AI agents. A systematic GitHub code search (for example "certified" and "lm_head" or
+  AI coding tools. A systematic GitHub code search (for example "certified" and "lm_head" or
   "shadow" across repositories) would be the most valuable additional check before any
   priority claim.
 
@@ -1052,10 +1052,10 @@ The combination is plausibly several-fold at concurrency 1 (the scout estimates
 - The Qwen3-Next and Qwen3.5 blog posts (JavaScript-rendered).
 - Moore, Kearfott and Cloud theorem numbers.
 - DS-Softmax's final venue.
-- The ICLR 2019 venue of L2S: confirmed via mlanthology by an agent, not by me.
+- The ICLR 2019 venue of L2S: confirmed via mlanthology in the first pass, not by me.
 - Workshop venues taken from arXiv comments only: VocabTrim, Loretz and Hochreiter,
   and others.
-- Method details read only by a subagent, not re-read by me:
+- Method details read only in the first pass, not re-read by me:
   - EPIC and EAHR;
   - the Llama 3.2 model-card quote on the 8-bit classification layer;
   - ModelOpt and llm-compressor defaults;
@@ -1071,12 +1071,12 @@ The combination is plausibly several-fold at concurrency 1 (the scout estimates
 - The PR 36136 sampling-law concern (Section 5.2) comes from reading the code. It has
   not been tested.
 - Moonshot section (Section 12). Numbers not marked **(checked)** were read from the
-  paper text by scout agents and not re-read by me. Specifically:
+  paper text in the first pass and not re-read by me. Specifically:
   - the Judge Decoding venue (a saved iclr.cc listing);
   - the Red Hat 2:4 blog numbers and the SGLang NGRAM PR benchmarks;
   - the SlideSparse and SpenseGPT figures;
   - the DFlash per-position acceptance of 0.78-0.88;
-  - the scout's 8-10x combined estimate, which is an estimate, not a measurement.
+  - the first-pass search's 8-10x combined estimate, which is an estimate, not a measurement.
 
   No code release was found for LeapQuant, DAMP, SketchSSM, Bole, TreeWY or DFlow.
   Whether SGLang's GDN kernels accept a float16 state on sm_90 was not checked.

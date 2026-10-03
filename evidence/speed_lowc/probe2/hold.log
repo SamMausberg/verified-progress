@@ -1,0 +1,26 @@
+probe2 start 2026-10-02T18:35:24+00:00 repo e690b3a9a2c9801b761023d6c0bf486dceb1dd8d dirty=1
+== S0 2026-10-02T18:35:36+00:00
+r0 c=  1 ok=64/64 x=  980.8 tok/s/user y=   868.5 tok/s ttft_p50=   40.2 ms accept=5.701 osl_mismatch=0 foreign_cpu=1.23
+r0 c=  2 ok=64/64 x=  872.1 tok/s/user y=  1503.0 tok/s ttft_p50=   44.6 ms accept=5.693 osl_mismatch=0 foreign_cpu=0.86
+r0 c=  4 ok=64/64 x=  708.5 tok/s/user y=  2418.3 tok/s ttft_p50=   46.5 ms accept=5.682 osl_mismatch=0 foreign_cpu=0.57
+r0 c=  8 ok=64/64 x=  528.7 tok/s/user y=  3493.6 tok/s ttft_p50=   50.8 ms accept=5.766 osl_mismatch=0 foreign_cpu=0.68
+exit 0 2026-10-02T18:38:48+00:00
+== D 2026-10-02T18:38:48+00:00
+r0 c=  1 ok=64/64 x= 1007.2 tok/s/user y=   889.8 tok/s ttft_p50=   40.2 ms accept=5.650 osl_mismatch=0 foreign_cpu=1.01
+r0 c=  2 ok=64/64 x=  894.1 tok/s/user y=  1542.3 tok/s ttft_p50=   44.1 ms accept=5.650 osl_mismatch=0 foreign_cpu=0.7
+r0 c=  4 ok=64/64 x=  738.1 tok/s/user y=  2500.1 tok/s ttft_p50=   45.8 ms accept=5.689 osl_mismatch=0 foreign_cpu=0.56
+r0 c=  8 ok=64/64 x=  548.0 tok/s/user y=  3633.0 tok/s ttft_p50=   50.0 ms accept=5.784 osl_mismatch=0 foreign_cpu=0.5
+exit 0 2026-10-02T18:41:57+00:00
+== D 2026-10-02T18:41:57+00:00
+r0 c=  1 ok=64/64 x= 1011.4 tok/s/user y=   893.4 tok/s ttft_p50=   38.7 ms accept=5.650 osl_mismatch=0 foreign_cpu=0.54
+r0 c=  2 ok=64/64 x=  895.8 tok/s/user y=  1546.1 tok/s ttft_p50=   43.0 ms accept=5.650 osl_mismatch=0 foreign_cpu=0.63
+r0 c=  4 ok=64/64 x=  733.8 tok/s/user y=  2511.4 tok/s ttft_p50=   44.9 ms accept=5.709 osl_mismatch=0 foreign_cpu=0.53
+r0 c=  8 ok=64/64 x=  554.2 tok/s/user y=  3671.4 tok/s ttft_p50=   48.5 ms accept=5.784 osl_mismatch=0 foreign_cpu=0.58
+exit 0 2026-10-02T18:45:05+00:00
+== S0 2026-10-02T18:45:05+00:00
+r0 c=  1 ok=64/64 x=  981.1 tok/s/user y=   869.0 tok/s ttft_p50=   40.0 ms accept=5.701 osl_mismatch=0 foreign_cpu=0.63
+r0 c=  2 ok=64/64 x=  871.5 tok/s/user y=  1501.5 tok/s ttft_p50=   44.6 ms accept=5.693 osl_mismatch=0 foreign_cpu=0.68
+r0 c=  4 ok=64/64 x=  708.3 tok/s/user y=  2418.1 tok/s ttft_p50=   46.5 ms accept=5.682 osl_mismatch=0 foreign_cpu=0.53
+r0 c=  8 ok=64/64 x=  527.9 tok/s/user y=  3489.0 tok/s ttft_p50=   51.0 ms accept=5.766 osl_mismatch=0 foreign_cpu=0.35
+exit 0 2026-10-02T18:48:18+00:00
+probe2 end 2026-10-02T18:48:18+00:00 failed: none

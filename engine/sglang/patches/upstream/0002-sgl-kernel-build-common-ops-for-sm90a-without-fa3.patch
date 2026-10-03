@@ -1,0 +1,33 @@
+From 8e081301368cd55b02d1c2c29c2c16a908e882dd Mon Sep 17 00:00:00 2001
+From: Sam Mausberg <samuelmausberg@gmail.com>
+Date: Fri, 2 Oct 2026 19:08:02 +0000
+Subject: [PATCH] [sgl-kernel] Build common_ops for sm_90a without FA3
+
+Since #28394 the sm_90a gencode for common_ops is added only when FA3 is
+enabled, and FA3 defaults to off on aarch64. The aarch64 wheels therefore
+carry no sm_90a code, and on GH200 the SM90 CUTLASS kernels (fp8_scaled_mm,
+int8_scaled_mm, the FP8 blockwise and W4A8 MoE GEMMs) run CUTLASS's
+"Arch conditional MMA instruction used without targeting sm90a" stub.
+Add sm_90a for CUDA >= 12.4 again, independent of FA3. Builds with FA3 on
+(the x86_64 default) get the same flags as before.
+---
+ python/sglang/kernels/aot/CMakeLists.txt | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/python/sglang/kernels/aot/CMakeLists.txt b/python/sglang/kernels/aot/CMakeLists.txt
+index d32edc2255..657c22609a 100644
+--- a/python/sglang/kernels/aot/CMakeLists.txt
++++ b/python/sglang/kernels/aot/CMakeLists.txt
+@@ -240,7 +240,8 @@ if ("${CUDA_VERSION}" VERSION_GREATER_EQUAL "12.8" OR SGL_KERNEL_ENABLE_SM100A)
+     endif()
+ endif()
+ 
+-if ("${CUDA_VERSION}" VERSION_GREATER_EQUAL "12.4" AND SGL_KERNEL_ENABLE_FA3)
++# common_ops' SM90 CUTLASS kernels (FP8/INT8 GEMM, MoE) need sm_90a, with or without FA3.
++if ("${CUDA_VERSION}" VERSION_GREATER_EQUAL "12.4")
+     list(APPEND SGL_KERNEL_CUDA_FLAGS
+         "-gencode=arch=compute_90a,code=sm_90a"
+     )
+-- 
+2.34.1
+

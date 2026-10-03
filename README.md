@@ -24,15 +24,41 @@ system overheads and the latency-throughput frontiers.
 
 Read `paper/paper.pdf`, typeset in the MLSys two-column format: a 10-page main
 text on the exactness contract, the certified head and transport, then the
-references and the appendices. The paper cites committed evidence as [E*n*] and
-marks work whose result is not yet committed as [D*n*]; the evidence register in
-the appendices lists every cited file with the program that produced it. The
-companion `paper/research_notes.pdf` (source in `paper/notes/`) holds the
-research notes behind the paper: the status of the questions and proposals, the
-serving stack and protocol, drafting and repair, the stock engine under
-speculation and further analysis, with its own evidence register. `TASKS.md`
-tracks the work and its status, `RUNBOOK.md` gives the commands and the rules
-for admissible runs, and `SETUP.md` describes the machine.
+references and the appendices. The paper cites committed evidence as [E*n*],
+and the evidence register in the appendices lists every cited file with the
+program that produced it; work that was not done is stated as not measured or
+not run. The companion `paper/research_notes.pdf` (source in `paper/notes/`)
+holds the research notes behind the paper: the status of the questions and
+proposals, the serving stack and protocol, drafting and repair, the stock
+engine under speculation and further analysis, with its own evidence register.
+`TASKS.md` tracks the work and its status, `RUNBOOK.md` gives the commands and
+the rules for admissible runs, and `SETUP.md` describes the machine.
+
+Where the serving measurements are:
+
+- **Harness and commands.** `bench/` launches each server arm once per session at
+  a fixed capacity, refuses to measure unless CUDA graphs are captured and the
+  overlap scheduler is on, and sweeps client concurrency with aiperf
+  (`bench/README.md`). The arms and their flags are in `bench/arms.toml`;
+  `RUNBOOK.md` and each evidence README give the exact commands.
+- **Pareto frontiers.** Throughput (output tokens/s on the GPU) against
+  per-request rate (output tokens/s per user) at client concurrency 1 to 128 for
+  nine tuned arms, most points averaging three or four sessions:
+  `evidence/bench/confirm/` (`pareto.png`, `points.csv`, `envelope.csv`), drawn
+  in Figure 4 of the paper.
+- **Profiles.** Nsight Systems attribution of the plain decode step and of the
+  MTP and DFlash cycles, and Nsight Compute on the key kernels:
+  `evidence/profiles/` (the paper's Appendix E.2). The reports stay outside git.
+- **Quality.** GSM8K for plain decoding (two launches), two MTP arms, DFlash and
+  replayed decoding (`evidence/bench/quality/`); the greedy-output exactness
+  class of every tuned arm (`evidence/bench/equality/`); the quality budget,
+  logit probe and GSM8K runs of the two lossy levers (`evidence/lossy/`).
+- **Before and after.** Table 1 of the paper gives each engine change against
+  its tuned baseline, with sessions and intervals; the certified head was served
+  against four tuned arms (`plain-tuned`, `mtp-tuned-triton`, `dflash-tuned-b16`
+  and `dflash-tuned`) in three sessions (`evidence/certified_head/served/`).
+- **Engine changes.** Patch series under `engine/sglang/patches/`, applied to the
+  pinned SGLang commit as `engine/sglang/README.md` describes.
 
 ## Main results
 
@@ -40,8 +66,8 @@ Every GPU number below was measured on Qwen3.5-4B (revision `851bf6e8`) on one
 GH200 with SGLang at the pinned commit: some in the running server, others with
 its kernels in isolation or offline on states captured from it. The README of
 each evidence directory says which, and gives the command, commits and flags
-behind every number. Results whose pull requests are still open are not listed;
-the paper shows them as pending items, never as numbers.
+behind every number. Results whose pull requests are still open are not listed,
+and the paper does not cite them.
 
 The main line of the paper:
 
@@ -76,9 +102,21 @@ The main line of the paper:
   real-arithmetic winner with 1.3-1.6 candidate rows per decision on average.
   Under the stock-kernel contract, 1.40% of positions fall back to the stock
   kernel with the conservative accumulation model and 0.35% with the tighter
-  Hopper model, whose justification is pending; the certified decoder-tail
-  proposal (P1) failed its kill test (`evidence/head_geometry/`). The
-  certified-head kernels and their engine integration are still in review.
+  Hopper model; the certified decoder-tail proposal (P1) failed its kill test
+  (`evidence/head_geometry/`). Crafted-input probes find the stock head kernels
+  accumulating as the Hopper model assumes, but neither model is established for
+  all inputs.
+- **The certified head, in the GPU kernel and served.** Through the kernel, on
+  60,000 replayed decode positions, 1.46% (conservative model) and 0.28% (Hopper
+  model) fall back, and certified positions plus the fallback equal the stock
+  token on every position (`evidence/certified_head/`). Served against the tuned
+  plain, MTP (Triton attention) and both DFlash arms in three sessions, it
+  raises throughput at concurrency 1 by 2.5% for plain decoding, 4.6% for MTP
+  and 1.2% for 16-token DFlash, with identical tokens and none of 592,433
+  certified positions differing in check mode. It loses 1.0-3.3% where the head
+  is active, on DFlash above concurrency 1 and on MTP at 64, and 0.6% at 128
+  where it is gated off, so the served envelope rises only at concurrency 1 and
+  falls at 2, 4, 8 and 128 (`evidence/certified_head/served/`).
 
 Secondary investigations and supporting material:
 
@@ -95,8 +133,27 @@ Secondary investigations and supporting material:
 - **Serving baselines.** `bench/` launches each server arm once at a fixed
   capacity and sweeps client concurrency with aiperf; the tuned plain,
   native-MTP and DFlash-4B arms in `bench/arms.toml` come from a search on a
-  separate tuning split (`evidence/bench/`). The confirmation sweeps behind the
-  reported frontier and the quality check are not merged yet.
+  separate tuning split (`evidence/bench/`). On the held-out confirmation split
+  speculation leads plain decoding through concurrency 32 and trails it from 48
+  in every family, and GSM8K finds no arm detectably different from plain
+  decoding, a check that rules out large losses only.
+- **Engine changes against the tuned arms.** Making FlashInfer's attention
+  planning cheaper and free of blocking GPU reads raises tuned MTP's throughput
+  by 9.4-9.6% at concurrency 1-8 (one session, token-identical), though stock
+  MTP with Triton attention stays faster there (`evidence/hostgap/`). Verifying
+  16-token DFlash blocks without per-position state snapshots costs 3.2% at
+  concurrency 1 and gains 6.1% at 8 (patches 0001-0004, one session); with patch
+  0005's narrow value tiles a later session measured +2.0% at concurrency 1 and
+  +1.8% at 8 (`evidence/drafter/`). Composed with the backbone table and the
+  certified head, it puts 16-token DFlash's per-request rate at concurrency 1 at
+  0.986 times stock and its throughput at 8 at 1.073 times (three sessions;
+  exact up to rounding on 320 prompts at concurrency 1; `evidence/stack/`). Two
+  declared approximations miss the quality budget fixed before measuring: FP16
+  recurrent state serves 1.16-1.17 times the best non-lossy arm's throughput at
+  concurrency 64-256 (three sessions) for 1.0-1.4 GSM8K points below plain
+  decoding's reference runs, a difference this check cannot resolve, and the
+  int4 target with its int4 drafter fails a logit probe and is slower above
+  concurrency 1 (`evidence/lossy/`).
 - **Drafting.** The public DFlash-4B drafter at block 16 averages 6.18 tokens
   per verify cycle, pooled over the 80-request pilot panel, and a zero-training
   screen of its candidate sets does not rule out a rate-trained selector (P6)
@@ -124,15 +181,18 @@ Secondary investigations and supporting material:
   2-16 rows and a packed GDN input projection from 64 rows serves tuned plain
   decoding 3.4% faster at concurrency 1 and 1.0% at 128 (two pairs, one
   session), with greedy outputs exact up to rounding against stock; at
-  concurrency 8 it gains 0.4%, a tenth of the microbenchmark prediction. An
-  nsys trace shows the routes dispatch as tabled but keep only 37-52% of their
+  concurrency 8 it gains 0.4%, a tenth of the microbenchmark prediction. An nsys
+  trace shows the routes dispatch as tabled but keep only 37-52% of their
   isolated GPU gain in the served step. On MTP with FlashInfer attention
   (`mtp-tuned`) the table gains nothing (0.9% slower at concurrency 1 in both
-  pairs, only one of them beyond the session's spread); it is untested against
-  `mtp-tuned-triton` at concurrency 1-32. The packed projection alone gives the same tokens and
-  top-5 logprobs as stock on 320 prompts at concurrency 1. Folding the norm
-  and SiLU into the GEMM, as implemented, is a measured loss
-  (`evidence/backbone/`).
+  pairs, only one of them beyond the session's spread), and against
+  `mtp-tuned-triton` nothing material at concurrency 1 (1.0006x and 1.0007x,
+  below the 0.15% spread of bench's stock sessions) and no claim at 8 and 32. On
+  `mtp-tuned-triton` it changes the streamed greedy text on 7 of 64 prompts at
+  concurrency 1, so its exactness class under MTP is not established. The packed
+  projection alone gives the same tokens and top-5 logprobs as stock on 320
+  prompts at concurrency 1. Folding the norm and SiLU into the GEMM, as
+  implemented, is a measured loss (`evidence/backbone/`).
 - **Exact witnesses.** `tests/test_state_structure.py` and
   `tests/test_contracts.py` check in exact arithmetic why the recurrent state
   resists exact compression, why computation cannot be shared across unrelated
@@ -193,14 +253,11 @@ outside git; each evidence README names the run it summarizes.
 
 ## Attribution
 
-Samuel Mausberg is the author. The earlier revisions were prepared with GPT-6
-Astra Pro (OpenAI). This revision was produced with Claude Code, using Claude
-Opus 5.5 agents for the literature review, theory, measurements and writing.
-The literature, theory and evidence changes the paper cites were approved by an
-independent reviewing agent before merging, and the author directed the work
-and reviewed it as it progressed, including in discussions of specific points
-with Claude and with OpenAI models. No AI system is an author. The confidential
-assignment that motivated the work is not included, and no model weights are
+Samuel Mausberg is the author of the paper, directed the work and is responsible
+for its claims.
+AI tools (Claude Opus 5.5 and GPT-6 Astra Pro) were used in developing the paper
+and the code. No AI system is an author. The confidential assignment that
+motivated the work is not reproduced or quoted, and no model weights are
 redistributed.
 
 ## Citing this work
