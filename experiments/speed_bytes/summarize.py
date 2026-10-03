@@ -21,6 +21,7 @@ import hashlib
 import json
 import math
 import re
+import shlex
 import sys
 from pathlib import Path
 from typing import Any
@@ -30,6 +31,9 @@ sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 SGLANG_PIN = 'bd66ce343e'
+# The interpreter of every served run: the virtualenv scripts/sglang_env.sh activates by default
+# (the holds clear SGLANG_DIR, which would select another).
+VENV_PYTHON = str(Path.home() / 'sglang/.venv/bin/python')
 REQUIRED_ROUTES = ('bf16', 'fp8_tensor', 'fp8_rowwise', 'fp8_triton', 'fp8_marlin', 'act_quant_fp8')
 # The grid fp8_gemm_probe.py runs by default (its SHAPES and --ms; holds/fp8_probe.sh passes neither).
 GEMM_SHAPES = (
@@ -73,6 +77,8 @@ def cmd_gemm(args: argparse.Namespace) -> None:
         raise SystemExit(
             f'{args.probe}: SGLang {src["head"][:10]} dirty={src["dirty_files"]}, pin {SGLANG_PIN}'
         )
+    if not d['meta']['device'].startswith('NVIDIA GH200'):
+        raise SystemExit(f'{args.probe}: device {d["meta"]["device"]}')
     if d['meta'].get('stopped_at_budget'):
         raise SystemExit(
             f'{args.probe}: stopped at its time budget ({d["meta"]["stopped_at_budget"]})'
@@ -198,6 +204,23 @@ def check_hold_engine(hold: Path) -> str:
     return m.group(1)
 
 
+def check_hold_finished(hold: Path) -> None:
+    """The hold ran to its last line ("end <time>", with ", failed steps: 0" where it counts them)."""
+    ends = re.findall(
+        r'^end \S+?(?:, failed steps: (\d+))?$', (hold / 'hold.log').read_text(), re.M
+    )
+    if len(ends) != 1 or ends[0] not in ('', '0'):
+        raise SystemExit(f'{hold}: the hold log does not end with every step done')
+
+
+def hold_repo(hold: Path) -> str:
+    """The repository commit (the harness) a hold's log records at its start."""
+    m = re.match(r'start \S+ repo (\w+) ', (hold / 'hold.log').read_text())
+    if not m:
+        raise SystemExit(f'{hold}: no repository commit in the hold log')
+    return m.group(1)
+
+
 def check_fp8_log(log: str, env: dict[str, str]) -> bool:
     """The server log shows exactly the FP8 conversions the switches ask for, with their mode."""
     mode = env.get('SGLANG_FP8_DENSE')
@@ -225,6 +248,8 @@ def cmd_served(args: argparse.Namespace) -> None:
         sweeps = sorted(hold.glob('*/*/sweep.json'))
         name = hold.name.split('_')[0]
         engine = check_hold_engine(hold)
+        check_hold_finished(hold)
+        repo = hold_repo(hold)
         labels = [f.parent.parent.name for f in sweeps]
         if name not in PLANNED or sorted(labels) != sorted(PLANNED[name]):
             raise SystemExit(
@@ -240,6 +265,14 @@ def cmd_served(args: argparse.Namespace) -> None:
                 raise SystemExit(f'{f}: engine {src["head"][:10]}, hold log {engine[:10]}')
             if d['launch']['repo'].get('dirty_files'):
                 raise SystemExit(f'{f}: harness repository was dirty')
+            # ...and the harness commit its log records (bench resolves the arm's flags from it),
+            # with the virtualenv scripts/sglang_env.sh activates by default.
+            if d['launch']['python'] != VENV_PYTHON:
+                raise SystemExit(f'{f}: interpreter {d["launch"]["python"]}')
+            if d['launch']['repo']['head'] != repo:
+                raise SystemExit(
+                    f'{f}: harness {d["launch"]["repo"]["head"][:7]}, hold log {repo[:7]}'
+                )
             arm, conc, switches = PLANNED[name][f.parent.parent.name]
             planned = set(conc)
             got = {p['concurrency'] for p in d['points']}
@@ -321,6 +354,18 @@ TRACE_ARGV = [
     '--disable-radix-cache --max-mamba-cache-size 128 --max-total-tokens 1000000 '
     '--max-running-requests 128',
 ]
+# The server command run_profiles.py resolved for that invocation, after its interpreter: its
+# BASE_FLAGS, the plain arm, the port and the extra arguments; under its nsys launch prefix with
+# the default trace options (a per-run session name aside), run by VENV_PYTHON.
+TRACE_SERVER = [
+    '-m', 'sglang.launch_server', '--model-path', 'Qwen/Qwen3.5-4B',
+    '--revision', '851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a', '--attention-backend', 'flashinfer',
+    '--mm-attention-backend', 'triton_attn', '--host', '127.0.0.1', '--port', '30222',
+    '--disable-radix-cache', '--max-mamba-cache-size', '128', '--max-total-tokens', '1000000',
+    '--max-running-requests', '128',
+]  # fmt: skip
+TRACE_NSYS = ['nsys', 'launch', '--trace=cuda,nvtx', '--cuda-graph-trace=node',
+              '--cuda-flush-interval=250']  # fmt: skip
 
 
 def cmd_steps(args: argparse.Namespace) -> None:
@@ -331,6 +376,7 @@ def cmd_steps(args: argparse.Namespace) -> None:
     for rep in args.reports:
         rep = Path(rep)
         engine = check_hold_engine(rep.parent.parent)  # <hold>/trace_<variant>/<report>
+        check_hold_finished(rep.parent.parent)
         m = re.search(r'trace_(\w+)/plain_bs(\d+)', str(rep))
         if not m or m.group(1) not in TRACE_SWITCHES:
             raise SystemExit(f'{rep}: expected .../trace_{{bf16,fp8}}/plain_bs<B>.nsys-rep')
@@ -350,6 +396,20 @@ def cmd_steps(args: argparse.Namespace) -> None:
             or Path(out_dir).name != rep.parent.name
         ):
             raise SystemExit(f'{rep}: run_meta.json records {meta["sglang_sha"][:10]} {argv}')
+        # ...from the harness commit the hold ran, with the server command and environment that
+        # invocation resolves to, on the GH200.
+        cmd = shlex.split(meta['server_command'])
+        if (
+            meta['repo_sha'] != hold_repo(rep.parent.parent)
+            or [*cmd[:2], *cmd[3:6]] != TRACE_NSYS
+            or not cmd[2].startswith('--session-new=')
+            or cmd[6:] != [VENV_PYTHON, *TRACE_SERVER]
+            or meta['env'] != {}
+            or not meta['gpu'].startswith('NVIDIA GH200')
+        ):
+            raise SystemExit(
+                f'{rep}: run_meta.json records {meta["repo_sha"][:7]} {cmd} {meta["gpu"]}'
+            )
         seen.append((m.group(1), int(m.group(2))))
         b = budget(rep)
         for r in b['classes']:
@@ -370,6 +430,8 @@ def cmd_steps(args: argparse.Namespace) -> None:
     write_csv(rows, Path(args.out))
 
 
+# fp8_dense_unit.py's bound on the relative error against the FP32 product (its line 51).
+UNIT_REL_ERR_MAX = 0.06
 UNIT = re.compile(
     r'act=(\w+) M=(\d+) dtype=\S+ rel_err row0 ([\d.]+) others ([\d.na]+) '
     r'row1 alone==in-batch (\w+) maxdiff ([\d.e+-]+)'
@@ -432,6 +494,17 @@ def check_probe_run(run: dict, name: str, ref: dict) -> None:
         or len(run['sequences']) != len(run['prompt_ids'])
     ):
         raise SystemExit(f'{name}: not {PROBE_TOKENS} tokens with top-{PROBE_TOPK} per sequence')
+    # Each position's entry holds exactly the top-20 (logprob, token id) pairs with finite
+    # logprobs: a shorter list would make the KL renormalize over a truncated support. In score
+    # mode SGLang returns no entry for the first continuation position (logit_probe.run_score), so
+    # there position 0 is empty and compare_runs scores the other 255.
+    for i, s in enumerate(run['sequences']):
+        for j, top in enumerate(s['top']):
+            want = 0 if (mode == 'score' and j == 0) else PROBE_TOPK
+            if len(top) != want or not all(
+                len(e) == 2 and math.isfinite(e[0]) and isinstance(e[1], int) for e in top
+            ):
+                raise SystemExit(f'{name}: sequence {i} position {j}: not {want} entries')
     # Score mode is teacher-forced on the reference's tokens.
     if mode == 'score' and [s['tokens'] for s in run['sequences']] != [
         s['tokens'] for s in ref['sequences']
@@ -445,6 +518,7 @@ def cmd_probe(args: argparse.Namespace) -> None:
 
     d = Path(args.probe_dir)
     check_hold_engine(d)
+    check_hold_finished(d)
     for label, switches in PROBE1_SWITCHES.items():
         log = (d / f'server_{label}.log').read_text(errors='replace')
         if not check_fp8_log(log, switches):
@@ -479,10 +553,17 @@ def cmd_probe(args: argparse.Namespace) -> None:
         for m in UNIT.finditer(Path(args.unit_log).read_text())
     ]
     # fp8_dense_unit.py: both activation modes at M = 1, 16 and 64; with per-row scales a row's
-    # result must not depend on the rest of the batch (the README's claim).
+    # result must not depend on the rest of the batch (the README's claim). Every relative error is
+    # under the script's bound (UNIT_REL_ERR_MAX), the other rows' only where there are other rows.
     combos = sorted((u['act'], u['M']) for u in unit)
     if combos != sorted((a, m) for a in ('token', 'tensor') for m in (1, 16, 64)):
         raise SystemExit(f'unit-check lines {combos}')
+    for u in unit:
+        errs = [u['rel_err_row0'], u['rel_err_other_rows_max']]
+        if (errs[1] is None) != (u['M'] == 1) or not all(
+            e < UNIT_REL_ERR_MAX for e in errs if e is not None
+        ):
+            raise SystemExit(f'unit check: act={u["act"]} M={u["M"]}: relative errors {errs}')
     if not all(u['row1_alone_equals_in_batch'] for u in unit if u['act'] == 'token' and u['M'] > 1):
         raise SystemExit('unit check: a per-row-scale row depends on its batch')
     text = Path(args.unit_log).read_text()

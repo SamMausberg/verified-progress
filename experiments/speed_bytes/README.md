@@ -23,12 +23,16 @@ clear every inherited `SGLANG_*` variable and any override of the virtualenv or 
 refuses a port that already serves and stops only the servers it started. `fp8_dense_unit.py`
 now fails on the properties it prints (per-row rows independent of the batch, CUDA-graph replay
 equal to eager, relative error under 0.06); the run printed them all passing.
-`summarize.py` checks every input against what its hold launched: per sweep the arm, the
-concurrencies and the exact switches, per server log the FP8 conversion and mode those switches
-imply, per hold the engine (its tree, which the hold scripts now log, or for the recorded runs
-the commit), per trace the engine and invocation `run_profiles.py` recorded, per probe file its
-mode, concurrency, label, the probe's 48 prompts, 256 tokens with top-20 entries per sequence and
-(score mode) the reference tokens, and bench's own point-validity rule.
+`summarize.py` checks every input against what its hold launched: per hold the engine (its tree,
+which the hold scripts now log, or for the recorded runs the commit) and that its log reached its
+last line; per sweep the arm, the concurrencies, the exact switches, the harness commit the hold
+logged, the virtualenv's interpreter and bench's own point-validity rule; per server log the FP8
+conversion and mode those switches imply; per trace the engine, harness commit, invocation,
+resolved server command and environment `run_profiles.py` recorded, and the GPU; per probe file
+its mode, concurrency, label, the probe's 48 prompts, 256 tokens per sequence with exactly 20
+finite top-logprob entries at every position (score mode: none at the first continuation
+position, which SGLang does not report) and (score mode) the reference tokens; and the unit
+check's relative errors against the script's 0.06 bound.
 `fp8_gemm_probe.py` differs by formatting, a lint directive and
 fixes made after review: its `fp8_tensor` route now quantizes the weights per tensor, where the
 run reused the per-channel weights with a unit scale (the same scalar-scale cuBLASLt kernel and
