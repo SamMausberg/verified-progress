@@ -67,6 +67,9 @@
 \newcommand{\sourcepin}{\texttt{bd66ce343e4f}}
 \newcommand{\modelpin}{\texttt{851bf6e806ef}}
 \newcommand{\repourl}{\url{https://github.com/SamMausberg/verified-progress}}
+% The date of the build, in the paper's day-month-year style: the paper's preprint notice and the
+% research notes' title page print it, so both documents carry the date they were built.
+\newcommand{\builddate}{\number\day\space\ifcase\month\or January\or February\or March\or April\or May\or June\or July\or August\or September\or October\or November\or December\fi\space\number\year}
 % ---------------------------------------------------------------------------
 % Evidence status. A committed result cites its entry in the evidence register
 % (appendix, \label{ev:<key>}): \ev{key} or \ev{key1,key2} prints a small tag, [E3] or [E3,E7], in
