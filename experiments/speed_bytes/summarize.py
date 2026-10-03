@@ -229,7 +229,7 @@ SWEEP_MIN_REQUESTS, SWEEP_WAVES = 16, 4
 # --export-level raw, --min-warmup 2, --streaming, no --aiperf-workers, no --snapshot-file, no
 # --return-token-ids) and request_body() for them (bench/sweep.py:77-88), driven by aiperf 0.13.0
 # (bench/README.md:11), on the committed workload and warm-up pool (bench/sweep.py:57-58).
-SWEEP_REQUEST = {
+SWEEP_REQUEST: dict[str, Any] = {
     'request_body': {
         'temperature': 0.0,
         'ignore_eos': True,
@@ -247,8 +247,62 @@ SWEEP_REQUEST = {
     'snapshot_files': [],
     'aiperf_version': '0.13.0',
 }
+# The two consumed defaults sweep.json does not record (bench/sweep.py:533-534: --warmup-osl 128,
+# --seed 0); check_aiperf_commands() finds them in the aiperf commands the sweep saved.
+SWEEP_WARMUP_OSL, SWEEP_SEED = 128, 0
 SWEEP_WORKLOAD = 'bench/workloads/mixed-v2/confirm.jsonl'
 SWEEP_WARMUP_POOL = 'bench/workloads/mixed-v2/warmup.jsonl'
+
+
+def check_aiperf_commands(f: Path, d: dict, port: int) -> None:
+    """Every aiperf command the sweep saved is the one bench/sweep.py builds from the planned settings.
+
+    The server warm-up (twice the largest concurrency, no warm-up requests, --warmup-osl) and each
+    point (bench's request and warm-up counts, --osl), with the request body and --seed; so seed,
+    output lengths and counts are those of the documented run.
+    """
+    from bench.sweep import aiperf_command, requests_for, warmup_for
+
+    run, conc = f.parent, d['concurrency']
+    planned = {'server_warmup': (max(conc), 2 * max(conc), 0, SWEEP_WARMUP_OSL)}
+    for c in conc:
+        planned[f'r0/c{c:03d}'] = (
+            c,
+            requests_for(c, SWEEP_MIN_REQUESTS, SWEEP_WAVES),
+            warmup_for(c, SWEEP_REQUEST['min_warmup']),
+            SWEEP_REQUEST['osl'],
+        )
+    have = sorted(str(x.parent.relative_to(run)) for x in run.rglob('aiperf_command.json'))
+    if have != sorted(planned):
+        raise SystemExit(f'{f}: aiperf commands {have}, planned {sorted(planned)}')
+    for sub, (c, requests, warmup, osl) in planned.items():
+        point = run / sub
+        got = json.loads((point / 'aiperf_command.json').read_text())
+        # The two paths are recorded where the sweep wrote them; compare them below the run directory.
+        for flag, tail in (('--input-file', 'inputs.jsonl'), ('--output-artifact-dir', 'aiperf')):
+            i = got.index(flag) + 1 if flag in got else len(got)
+            if i == len(got) or not got[i].endswith(f'/{run.parent.name}/{run.name}/{sub}/{tail}'):
+                raise SystemExit(f"{point}/aiperf_command.json: {flag} is not this point's")
+            got[i] = f'{sub}/{tail}'
+        want = aiperf_command(
+            model=d['arm']['model'],
+            revision=d['arm']['revision'],
+            url=f'http://127.0.0.1:{port}',
+            input_file=Path(sub) / 'inputs.jsonl',
+            artifact_dir=Path(sub) / 'aiperf',
+            concurrency=c,
+            requests=requests,
+            warmup=warmup,
+            osl=osl,
+            body=SWEEP_REQUEST['request_body'],
+            seed=SWEEP_SEED,
+            per_chunk_usage=SWEEP_REQUEST['per_chunk_usage'],
+            export_level=SWEEP_REQUEST['export_level'],
+            streaming=SWEEP_REQUEST['streaming'],
+            workers=SWEEP_REQUEST['aiperf_workers'],
+        )
+        if got != want:
+            raise SystemExit(f'{point}/aiperf_command.json is not the planned aiperf command')
 
 
 def sweep_workload_ok(w: dict) -> bool:
@@ -422,6 +476,7 @@ def cmd_served(args: argparse.Namespace) -> None:
             request = {k: d[k] for k in SWEEP_REQUEST}
             if request != SWEEP_REQUEST or not sweep_workload_ok(d['workload']):
                 raise SystemExit(f'{f}: request settings {request}, workload {d["workload"]}')
+            check_aiperf_commands(f, d, SWEEP_LAUNCH[name][1])
             planned = set(conc)
             got = {p['concurrency'] for p in d['points']}
             if planned != got or planned != set(d['concurrency']):

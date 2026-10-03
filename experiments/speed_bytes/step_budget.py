@@ -56,6 +56,11 @@ def budget(report: Path) -> dict:
     steps = len(starts) - 1
     if steps < 10:
         raise SystemExit(f'{report}: only {steps} complete replays of the decode graph')
+    # The replay after the last complete one closes the window: its first kernel ends the last
+    # span, and the gap before each replay after the first (the closing one included) is a
+    # boundary gap.
+    closing_start = g.start.iloc[starts[-1]]
+    boundary_gaps = (g.start - g.end.shift(1)).iloc[starts[1:]].to_numpy()
     g = g.iloc[starts[0] : starts[-1]].reset_index(drop=True)
     dur = (g.end - g.start).to_numpy()
     gap = (g.start - g.end.shift(1)).fillna(0).to_numpy()
@@ -67,7 +72,7 @@ def budget(report: Path) -> dict:
         a['busy_ns'] += d_
         if not b:
             a['gap_ns' if gp >= 0 else 'overlap_ns'] += abs(gp)
-    span = (g.start.iloc[-1] - g.start.iloc[0]) / steps
+    span = (closing_start - g.start.iloc[0]) / steps
     rows = [
         {
             'class': c,
@@ -83,7 +88,7 @@ def budget(report: Path) -> dict:
         'report': str(report),
         'steps': steps,
         'step_span_us': span / 1e3,
-        'replay_boundary_gap_us_per_step': gap[boundary].clip(min=0).sum() / steps / 1e3,
+        'replay_boundary_gap_us_per_step': boundary_gaps.clip(min=0).sum() / steps / 1e3,
         'classes': rows,
     }
 

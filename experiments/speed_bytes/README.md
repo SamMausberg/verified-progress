@@ -50,6 +50,10 @@ quantizes the weights per tensor, where the run reused the per-channel weights w
 omits the error for that run and checks it for later ones), and it records the SGLang checkout,
 its own checkout and source hash, and its arguments, and stops every shape once its time budget
 runs out (the run finished well inside it); `step_budget.py` is a cleaned version of the analysis
-that was run, and the committed evidence was regenerated with it. `kill3.sh` also ran a first
+that was run, corrected after review so that each step span and boundary gap ends at the first
+kernel of the replay that closes the window, and the committed evidence was regenerated with it.
+`summarize.py served` also requires every aiperf command a sweep saved (its server warm-up and each
+point) to equal the one `bench/sweep.py` builds from the planned settings, seed and output lengths
+included. `kill3.sh` also ran a first
 cuBLASLt outer-vector-scale microbenchmark after its sweeps; that attempt was invalid (see
 `evidence/speed_bytes/README.md`) and is left out of the committed script.
