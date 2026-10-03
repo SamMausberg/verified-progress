@@ -69,7 +69,8 @@ that is argued on paper, not checked. The stock token is the first maximal index
 - `separation_nonstrict_false`, `gap_condition_nonstrict_false`,
   `interval_condition_tie_false`: with that rounding, Lemma 2.2 and Theorem 2.3 with a
   non-strict gap, and Proposition 2.4 with an earlier entry of `C` allowed to tie `k`,
-  are false. Each is a counterexample in which a tie decides (a gap of one spacing
+  are false. The last keeps the paper's choice of `k` as the first entry of `C` with the
+  largest lower end. Each is a counterexample in which a tie decides (a gap of one spacing
   rounding to a tie, or an earlier index winning the first-index rule).
 
 `#print axioms` reports only `propext`, `Quot.sound` and `Classical.choice`.
@@ -87,7 +88,7 @@ PATH=$HOME/.elan/bin:$PATH bash scripts/check_lean_variants.sh
 It exits 0 only if every variant fails to elaborate, and prints the line of each error. A failed
 proof shows that the proof needs the hypothesis; it does not show that the weakened statement is
 false. That is proved in Lean for the first, second and fourth rows below (the `_false` theorems
-above); for `screen_drop` and `sequential_sum_bound` the last column is an argument, not a proof. Checked on
+above); for `screen_drop` and `sequential_sum_bound` the third column is an argument, not a proof. Checked on
 2026-10-03 with Lean 4.19.0 (`evidence/precision/lean_variants.log`); each variant fails with one
 error, inside the lemma it weakens:
 

@@ -247,16 +247,36 @@ theorem gap_condition_nonstrict_false :
   have h0 := this.2 0 (by simp [z, rnTie])
   exact absurd h0 (by decide)
 
-/-- Proposition 2.4 needs an earlier entry of `C` to lie strictly below: if it
-may tie, the first-index rule returns the earlier entry. -/
+/-- Proposition 2.4 needs an earlier entry of `C` to lie strictly below `lo k`:
+if it may tie, the first-index rule returns the earlier entry. The statement keeps
+the paper's choice of `k` as the first entry of `C` with the largest lower end
+(`kfirst`), so the counterexample refutes the paper's weakened proposition, not a
+looser one. -/
 theorem interval_condition_tie_false :
     ¬ ∀ (L lo hi : Fin 2 → Int), (∀ i, lo i ≤ L i ∧ L i ≤ hi i) → ∀ (C : Fin 2 → Prop) (k : Fin 2), C k →
-      (∀ i, C i → lo i ≤ lo k) → (∀ j, ¬ C j → ∃ i, C i ∧ hi j < lo i) →
+      (∀ i, C i → lo i ≤ lo k) → (∀ i, C i → lo i = lo k → k ≤ i) →
+      (∀ j, ¬ C j → ∃ i, C i ∧ hi j < lo i) →
       (∀ j, C j → j < k → hi j ≤ lo k) → (∀ j, C j → k < j → hi j ≤ lo k) →
       IsFirstMax L k := by
   intro h
-  have := h (fun _ => 0) (fun _ => 0) (fun _ => 0) (fun _ => ⟨Int.le_refl 0, Int.le_refl 0⟩) (fun _ => True) 1 trivial
-    (fun _ _ => Int.le_refl 0) (fun _ c => absurd trivial c) (fun _ _ _ => Int.le_refl 0) (fun _ _ _ => Int.le_refl 0)
+  -- lower ends (-1, 0), upper ends and values (0, 0): k = 1 is the first entry with the
+  -- largest lower end, entry 0 ties it in value and wins the first-index rule.
+  let lo : Fin 2 → Int := fun i => if i.val = 0 then -1 else 0
+  have enc : ∀ i, lo i ≤ (fun _ => (0 : Int)) i ∧ (fun _ => (0 : Int)) i ≤ (fun _ => (0 : Int)) i := by
+    intro i; simp only [lo]; split <;> omega
+  have lo1 : lo 1 = 0 := by simp [lo]
+  have kmax : ∀ i, (fun _ => True) i → lo i ≤ lo 1 := by
+    intro i _; rw [lo1]; simp only [lo]; split <;> omega
+  have kfirst : ∀ i : Fin 2, (fun _ => True) i → lo i = lo 1 → (1 : Fin 2) ≤ i := by
+    intro i _ e
+    have hi2 := i.isLt
+    by_cases h0 : i.val = 0
+    · simp [lo, h0] at e
+    · show (1 : Fin 2).val ≤ i.val; simp; omega
+  have := h (fun _ => 0) lo (fun _ => 0) enc (fun _ => True) 1 trivial kmax kfirst
+    (fun _ c => absurd trivial c)
+    (fun _ _ _ => by show (0:Int) ≤ lo 1; rw [lo1]; exact Int.le_refl 0)
+    (fun _ _ _ => by show (0:Int) ≤ lo 1; rw [lo1]; exact Int.le_refl 0)
   have h0 := this.2 0 rfl
   exact absurd h0 (by decide)
 
