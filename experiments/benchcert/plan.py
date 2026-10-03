@@ -37,7 +37,7 @@ CERT_ENV = {
 # launches once per 25-90 s of decoding (two to five calls per step or cycle).
 TIMED_STATS_EVERY = 20000
 # Check launches write on every glue call, so the snapshot after a point holds every
-# certified call of that point (Codex on #190: at 25 the tail of a point went uncounted).
+# certified call of that point (review of #190: at 25 the tail of a point went uncounted).
 CHECK_STATS_EVERY = 1
 
 # Sweep settings shared by every timed launch (bench/README.md, "Metrics"): the

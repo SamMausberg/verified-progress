@@ -14,9 +14,9 @@ over 24 layers with distinct weights and state slots:
 * ``chain``: conv, recurrent and norm in served order.
 
 Inputs are random; the kernels do not consume each other's outputs (timing
-only). Kill rule (declared in ~/vp-coord/proposals/speed_lowc.md): stop the
-fused-kernel lever if chain - recurrent is under 0.25 ms per verify forward
-(24 layers) at B = 1.
+only). Declared kill rule (the result is in evidence/speed_lowc/README.md):
+stop the fused-kernel lever if chain - recurrent is under 0.25 ms per verify
+forward (24 layers) at B = 1.
 
     scripts/gpu_lock.sh -x python experiments/speed_lowc/gdn_chain_bench.py --out <json>
 """
