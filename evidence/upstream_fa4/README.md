@@ -104,7 +104,7 @@ part of this directory.
 
 | File | What it holds |
 |---|---|
-| `cases.csv` | One row per case (89): harness, tree, head dims, causal, window, page size, KV length (`varlen`), load path, tile, `rows_per_pass`, status (`ok`, `wrong`, `error` = Python error, `fault` = CUDA fault), the error message, the largest and mean errors and the BF16 reference's, `paged_calls_identical` and `contiguous_ok` (`varlen`), and the raw record's file name |
+| `cases.csv` | One row per case (89): harness, tree, head dims, causal, window, page size, KV length (`varlen`), load path, tile, `rows_per_pass`, status (`ok`, `wrong`, `error` = Python error, `fault` = CUDA error; every one in this run was an illegal memory access), the error message, the largest and mean errors and the BF16 reference's, `paged_calls_identical` and `contiguous_ok` (`varlen`), and the raw record's file name |
 | `summary.json` | `meta` (this repository's commit for the run, SGLang base and flash-attention commits, sha256 of each tree's `paged_kv.py`, GPU, driver, torch, CUDA, package versions), `summarize_commit`, status counts per harness and tree, the `rows_per_pass` check (`cpasync_pattern`) and the regression test's outcome per tree (`pytest`) |
 
 ## Commands
@@ -137,6 +137,13 @@ Input checks added after the run, from Codex's review of #228. `run_all.sh` now 
 - any file in an SGLang tree or the flash-attention checkout beyond its expected change, tracked,
   untracked or ignored, apart from `__pycache__` (an untracked `sitecustomize.py` on `PYTHONPATH`
   would run in every case), and any uncommitted or untracked file in this repository (b064a31).
+
+In the same pass (a1acb6f), `run_all.sh` also clears inherited `PYTEST_*`, `TORCH_*`, `CUBLAS_*`,
+`NVIDIA_TF32_OVERRIDE` and `CUDA_LAUNCH_BLOCKING`; the two check scripts turn TF32 off for their
+FP32 references explicitly (torch's default for matmuls; no TF32 override was set in the shell that
+submitted this run or in the lock scripts, so its references were already FP32) and count any CUDA
+error as a fault (this run's faults were all illegal memory accesses); and the regression test
+checks that the imported `sglang` comes from the tree under test.
 
 `summarize.py` now fails unless every record was imported from its own tree (`fa-pkg` for
 flash-attention).
