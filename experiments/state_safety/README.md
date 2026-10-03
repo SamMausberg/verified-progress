@@ -327,7 +327,7 @@ reason go in a new commit before the runs.
 ### Amendment of 2026-10-02: descriptive upper bounds (post hoc)
 
 Written on 2026-10-02 after the result above was computed and seen, and approved by the
-integrator before this change was run. It adds description; it changes nothing that was
+maintainer before this change was run. It adds description; it changes nothing that was
 declared.
 
 - **Why.** The declared statistics are one-sided lower bounds. For a result that is not

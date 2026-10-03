@@ -226,7 +226,7 @@ also held a non-finite value and failed the threshold check, so 0 decided rows
 were wrong, but that was not guaranteed.
 
 **Exposure.** W8A16 calls at default tiles with more than 64 rows (the broken
-configuration) and with 17 to 64 rows (the suspect ones). In this PR: the GPU
+configuration) and with 17 to 64 rows (the suspect ones). In PR #45: the GPU
 tests' W8A16 checks above 16 rows, the x2 partial runtime rows at M = 32 and 64
 in the PR description, and none of the committed evidence files (the replay ran
 the engine's batches of at most 16 rows, whose tiles have a 128-byte box). In the
@@ -385,7 +385,7 @@ Also in x7c at 46bcc84, outside `run_all.sh`: `pointer_vs_tma_*.json`,
 the host's foreign CPU load (`*.hostload.json`); none was contended (the micro
 averaged 1.76 foreign cores against a threshold of 2). x7b's micro run (0d770c6)
 was flagged contended (2.03, the author's own CPU compiles during the hold) and is
-not used. Six commits follow 46bcc84 in this PR and change package code: the
+not used. Six commits follow 46bcc84 in PR #45 and change package code: the
 margin rule for the row's lower bound in the self-test (a9f1793), the W8A8 and
 BF16 default tiles (2d1794a), the check that the quantization data belongs to
 the supplied weight, with contiguous inputs required (d3a2b13), the row norm's
@@ -416,8 +416,8 @@ requires at least 157 passed tests and none failed or skipped. None of these com
 W8A16 pass's default tiles or kernels, so x7c's timings stand for the W8A16
 path. (A first attempt at this
 hold, x8s, ran under the system Python, without the SGLang environment, and
-produced no results.) The SGLang engine checks are in the engine follow-up, not
-in this PR.
+produced no results.) The SGLang engine checks are in the engine follow-up (PR #52), not
+in PR #45.
 
 **Checks recorded under the earlier, more lenient row-lower rule.** Until a9f1793
 the self-test, the stress test and `tma_candidates` let the row's lower bound on
@@ -431,7 +431,7 @@ margin in every check (0 envelope misses), so on those inputs it cannot fall in
 that band unless epilogue 3's arithmetic differs from the other epilogues'.
 x8s2's GPU tests and stress test (9f7f369) check it under the new rule.
 
-**The row norm for seeded sampling (Codex, fixed after 78b3bb3).** `_prep_kernel`
+**The row norm for seeded sampling (found in review, fixed after 78b3bb3).** `_prep_kernel`
 bounds each row's norm ||h||, which seeded sampling uses in
 `logit_magnitude_bound` to cap its score-error allowance, by multiplying the FP64
 sum of all K squares by an inflation factor. Until the fix that factor covered
@@ -591,7 +591,7 @@ Limitations of the sampled path:
   16-row tile drop out of the FP64 epilogue (542 FP64 instructions and 165
   registers, against 1,607 and 200 for M as a runtime argument;
   `sample_kernel_sass.json`). At M = 2 to 16 every column pays.
-- Proposed fixes, in a follow-up PR: the probe check as a masked store of the
+- Proposed fixes, not built: the probe check as a masked store of the
   probe tokens' bounds, compared in the decision kernel (no reductions or
   barriers in the epilogue); and 16-row tiles for the sampled pass above 16 rows.
 
@@ -666,9 +666,9 @@ retried, and the configuration completed its 1,035,776 row-checks; other jobs
 allocating on the GPU in those seconds could have failed. The cause is not
 established; PyTorch's caching allocator across the step's 224 batch shapes is
 the likely one. The results stand: memory pressure cannot hide a miss, and no
-call of the head failed. This PR's script
+call of the head failed. `stress_defaults.py`
 has no memory cap, so run it under the exclusive lock, as its docstring's
-command does; the cap is in a follow-up PR.
+command does; no cap was added later.
 
 **The faulty TMA tiles** (`tma_m128_check.json`, 46bcc84, the two families that
 missed in x7b; three identical runs each, lower and upper misses per run):
@@ -854,9 +854,10 @@ fallback columns are rates, not runtime: a fallback reruns the stock head for th
 batch (or, in column mode, for the near-tie rows), and its cost is measured in the
 head microbenchmark, not here. The DFlash draft projection falls back on 90% of its
 rows (the threshold check fails on the flat logits of deep block positions); it is
-left off in the proposed bench arm, and its runtime was not measured. Whether
-column mode stays ahead of the stock head up to M = 64, which the proposed arms
-assume, is pending the final head microbenchmark.
+left off in the proposed bench arm, and its runtime was not measured. The final head
+microbenchmark ("Results at the final commit") confirms what the proposed arms assume:
+column mode stays ahead of the stock head through M = 64 under the conservative model
+(420.5 against 451.6 us).
 
 One request at a time (batch 1, so a certified server and a stock server see the
 same shapes), the two servers' outputs are identical on 64 of 64 prompts for plain
