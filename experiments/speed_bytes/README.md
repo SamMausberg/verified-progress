@@ -31,7 +31,8 @@ the commit), per probe file its mode, concurrency, label, prompts and
 `fp8_gemm_probe.py` differs by formatting, a lint directive and
 fixes made after review: its `fp8_tensor` route now quantizes the weights per tensor, where the
 run reused the per-channel weights with a unit scale (the same scalar-scale cuBLASLt kernel and
-timing, but not that route's error, so `summarize.py` omits the error for it), and it records the
+timing, but not that route's error, so `summarize.py` omits the error for that run and checks it
+for later ones), and it records the
 SGLang checkout and stops every shape once its time budget runs out (the run finished well inside
 it); `step_budget.py` is a cleaned version of the analysis that was run, and the committed
 evidence was regenerated with it. `kill3.sh` also ran a first cuBLASLt outer-vector-scale

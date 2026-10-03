@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -41,6 +42,8 @@ GEMM_SHAPES = (
     'dflash_fc',
 )
 GEMM_MS = (1, 2, 4, 8, 16, 32, 64, 128, 256)
+# FP8 (e4m3) rounding gives a relative error of about 0.04 on the probe's random N(0, 0.02) inputs.
+GEMM_REL_ERR_MAX = 0.06
 # Backbone linears per decode step (24 GDN layers, 8 attention layers, 32 MLPs); the head and
 # the GDN in_proj_ba (kept BF16) are not counted.
 STEP_COUNTS = {
@@ -74,11 +77,25 @@ def cmd_gemm(args: argparse.Namespace) -> None:
             f'{args.probe}: stopped at its time budget ({d["meta"]["stopped_at_budget"]})'
         )
     rows = [dict(r) for r in d['rows']]
+    # Every GEMM route must have computed: a finite relative error against the FP32 product under
+    # GEMM_REL_ERR_MAX, checked on the run's recorded value (a stub that returns without computing
+    # fails this). The activation-quantization kernel alone has no product to compare.
     for r in rows:
-        # The run's fp8_tensor route timed scalar-scale cuBLASLt GEMMs on weights quantized per
-        # output channel (unit weight scale), so its error is not the per-tensor route's: drop it.
-        if r['route'] == 'fp8_tensor':
-            r['rel_err_vs_fp32'] = ''
+        err = r['rel_err_vs_fp32']
+        if r['route'] != 'act_quant_fp8' and not (
+            isinstance(err, int | float) and math.isfinite(err) and err < GEMM_REL_ERR_MAX
+        ):
+            raise SystemExit(f'{args.probe}: {r["route"]} {r["shape"]} M={r["M"]}: error {err}')
+    # The recorded run (17:00 UTC, before the probe recorded its SGLang checkout) timed its
+    # fp8_tensor route as scalar-scale cuBLASLt GEMMs on weights quantized per output channel (unit
+    # weight scale) and measured the error after reapplying the channel scales: it shows that the
+    # kernel computed, but it is not the per-tensor route's error, so the published column is left
+    # empty for that run. Later runs quantize that route per tensor (and record the checkout); their
+    # error is published.
+    if src is None:
+        for r in rows:
+            if r['route'] == 'fp8_tensor':
+                r['rel_err_vs_fp32'] = ''
     have = {(r['shape'], r['M'], r['route']) for r in rows}
     shapes = sorted({r['shape'] for r in rows})
     ms = sorted({r['M'] for r in rows})
