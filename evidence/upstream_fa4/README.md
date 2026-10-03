@@ -127,56 +127,59 @@ python experiments/upstream_fa4/summarize.py --expect-cases 89 --expect-pytest m
 cp ~/vp-data/upstream/fa4-evidence/run-20261002T223025Z/{cases.csv,summary.json} evidence/upstream_fa4/
 ```
 
-Input checks added after the run, from Codex's review of #228. `run_all.sh` now stops on:
+Checks added after the run, from Codex's review of #228 and a sweep of the same kinds of gap each
+round. `run_all.sh` now stops on:
 
 - a flash-attention checkout with local edits, or an `fa-pkg` that is not exactly that checkout
   (9d1844f);
 - an SGLang tree whose `paged_kv.py` is not exactly its variant of the base file
   (`apply_variant.py --check`, 4461a99);
-- a failed environment activation or a `python` other than `SGLANG_DIR`'s venv, and it clears
-  inherited `SGLANG_*`, `CUTE_DSL_*`, `FLASH_ATTENTION_*` and `PYTHON*` settings (80f4ba8);
-- an output directory that already holds anything but `hold.log` (80f4ba8);
-- any file in an SGLang tree or the flash-attention checkout beyond its expected change, tracked,
-  untracked or ignored, apart from `__pycache__` (an untracked `sitecustomize.py` on `PYTHONPATH`
-  would run in every case), and any uncommitted or untracked file in this repository (b064a31);
+- any other file in an SGLang tree or the flash-attention checkout, tracked, untracked or ignored,
+  apart from `__pycache__` (an untracked `sitecustomize.py` on `PYTHONPATH` would run in every
+  case), and any uncommitted or untracked file in this repository (b064a31);
 - ignored files Python could import ahead of the venv: anything in `experiments/upstream_fa4/` or
-  `src/`, and module-like files or untracked directories at the repository root (5a50ff7). It also
-  clears `CUDA_HOME`, `CUDA_HOME_13`, `CUDA_COMPAT_DIR`, `CUDA_PATH`, `LD_LIBRARY_PATH` and
-  `LD_PRELOAD` before `scripts/sglang_env.sh`, which otherwise takes the toolkit and compatibility
-  libraries from the first three, and starts every Python with `-P`, so no script's directory is
-  put on `sys.path`.
+  `src/`, and module-like files or untracked directories at the repository root (5a50ff7);
+- a failed environment activation or a `python` other than `SGLANG_DIR`'s venv (80f4ba8);
+- an output directory that already holds anything but `hold.log` (80f4ba8).
 
-In the same pass (a1acb6f), `run_all.sh` also clears inherited `PYTEST_*`, `TORCH_*`, `CUBLAS_*`,
-`NVIDIA_TF32_OVERRIDE` and `CUDA_LAUNCH_BLOCKING`; the two check scripts turn TF32 off for their
-FP32 references explicitly (torch's default for matmuls; no TF32 override was set in the shell that
-submitted this run or in the lock scripts, so its references were already FP32) and count any CUDA
-error as a fault (this run's faults were all illegal memory accesses); and the regression test
-checks that the imported `sglang` comes from the tree under test.
+It also clears inherited settings before activating the environment: `SGLANG_*`, `CUTE_DSL_*`,
+`FLASH_ATTENTION_*` and `PYTHON*` (80f4ba8); `PYTEST_*`, `TORCH_*`, `CUBLAS_*`,
+`NVIDIA_TF32_OVERRIDE` and `CUDA_LAUNCH_BLOCKING` (a1acb6f); and `CUDA_HOME`, `CUDA_HOME_13`,
+`CUDA_COMPAT_DIR`, `CUDA_PATH`, `LD_LIBRARY_PATH` and `LD_PRELOAD`, from the first three of which
+`scripts/sglang_env.sh` would otherwise take the CUDA toolkit and compatibility libraries
+(5a50ff7). Every Python it starts runs with `-P`, so no script's directory is put on `sys.path`
+(5a50ff7). Cases, regression-test runs and the `meta.json` step run through `run_case.py`, which
+gives each a process group, stops it at the time limit and, after any exit, stops whatever it left
+running; `timeout --foreground`, used before, stops only its direct child (b181506).
 
-`summarize.py` now fails unless every record was imported from its own tree (`fa-pkg` for
-flash-attention), and, since 4efc901, unless the run is complete: exactly the expected number of
-case records, each with a known status, and on every tree a regression test with two PASSED or
-FAILED outcomes and nothing skipped (pytest exits 0 when both cases are skipped).
+The check scripts turn TF32 off for their FP32 references explicitly and count any CUDA error as a
+fault, and the regression test checks that the imported `sglang` comes from the tree under test
+(a1acb6f). `summarize.py` fails unless every record was imported from its own tree (`fa-pkg` for
+flash-attention), and unless the run is complete: exactly the expected number of case records,
+each with a known status, and on every tree a regression test with two PASSED or FAILED outcomes
+and nothing skipped (pytest exits 0 when both cases are skipped) (4efc901).
 
 The committed run is unaffected by what these checks guard against:
 
-- The trees it used pass the tree checks: checked afterwards, they hold nothing beyond their
-  expected change apart from `__pycache__`, and the four `paged_kv.py` hashes the run recorded
-  (`summary.json`, `meta`) are exactly the variants'. The run recorded no uncommitted change to
-  a tracked file of this repository (`repo_dirty` false; untracked files were not checked then).
-- No CUDA path override or preload was set in the shell that submitted it (checked in that shell;
-  the lock scripts set none, and its inherited `LD_LIBRARY_PATH` held only the system's OpenMPI
-  directories, which `scripts/sglang_env.sh` places after the CUDA ones), so the run used this
-  machine's CUDA 13.0 toolkit and compatibility libraries; `meta` records CUDA runtime 13.0. Its repository checkout, checked
-  afterwards, holds no ignored importable file in the places listed above.
+- Its trees, checked afterwards, hold nothing beyond their expected change apart from
+  `__pycache__`, and the four `paged_kv.py` hashes the run recorded (`summary.json`, `meta`) are
+  exactly the variants'. The repository checkout, checked afterwards, holds no ignored importable
+  file in the places listed above; at run time `repo_dirty` (tracked files only) was false.
 - It ran in the upstream venv: `meta` records torch 2.13.0+cu130, nvidia-cutlass-dsl 4.8.0 and
   quack-kernels 0.6.5, which only that venv has here. The paper's SGLang venv has
   nvidia-cutlass-dsl 4.6.2 and quack-kernels 0.6.4; the system Python has no nvidia-cutlass-dsl.
+- The shell that submitted it set none of the CUDA path or preload variables above, and no TF32
+  override; the lock scripts set none either. Its inherited `LD_LIBRARY_PATH` held only the
+  system's OpenMPI directories, which `scripts/sglang_env.sh` places after the CUDA ones. `meta`
+  records CUDA runtime 13.0, and torch's default leaves TF32 off in FP32 matmuls, so the
+  references were FP32. Its faults were all illegal memory accesses.
+- No case or test run reached its time limit: every case exited 0, 2, 3 or 4 and every test run
+  0 or 1 (`hold.log`). When the cases had finished, `nvidia-smi` listed no process on the GPU.
 - Its output directory was new: it was created at 22:30:25 UTC, and all 89 records in it were
   created after that, between 22:30:27 and 22:42:56 (file birth times); the pytest logs followed.
 - `summarize.py` with the import and completeness checks, rerun on its records (89 cases, the test
-  on four trees, 2 outcomes each, none skipped), passes and gives the committed `cases.csv` and
-  `summary.json` unchanged (apart from `summarize_commit`).
+  on four trees with 2 outcomes each, none skipped), passes and gives the committed `cases.csv`
+  and `summary.json` unchanged apart from `summarize_commit`.
 
 The run directory keeps the raw records: one JSON line and the standard error per case, the
 regression test's pytest logs, `meta.json` and the hold's log. It stays outside git.
