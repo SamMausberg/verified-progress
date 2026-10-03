@@ -236,6 +236,13 @@ now be repeat 0, the single repeat declared, and launches are counted as distinc
 committed run is unaffected: all 117 points are repeat 0, every cell has the declared number of
 distinct launches, and `ratios.json` and `accept.json` reproduce byte for byte.
 
+2026-10-03, after the analysis (review of #230): the analysis required one repository commit and one
+engine commit shared by every launch and equality run, but not the holds' own. It now requires the
+holds' commits, repository `9a7d52a` (tag `speed-lowc-confirm-holds`) and engine `dd57a50a59` (tree
+`5d6db548`), with stock SGLang at the pin, and every launch to have run aiperf 0.13.0, the version
+`SETUP.md` declares. The committed run is unaffected: those are the commits and the version every
+launch and equality run recorded, and `ratios.json` and `accept.json` reproduce byte for byte.
+
 ## Results
 
 Written 2026-10-03. Labels: **measured** (read from the files below) and **derived** (ratios, means and
@@ -411,9 +418,9 @@ equality was not tested).
   for the confirm engine; the only change in code the holds ran is one comment in `bench/hostload.py`.
 - The analysis (`bench.pareto`, `confirm_analyze.py`, `confirm_accept.py`) ran on 2026-10-03 from
   `853bd4b` with a clean tree. Both scripts were then tightened as the amendments say (`08a8421`,
-  `e8566e3`, `2f1b187`, `02c5c46`, `a08e423`, `50b9e7b`, `623de0b`, `fc95fe9` and `cc4810b`). The
-  whole analysis rerun from a clean checkout of each of those commits reproduced `points.csv`,
-  `launches.csv`, `ratios.json` and `accept.json` byte for byte. `sweeps.csv` was written by
+  `e8566e3`, `2f1b187`, `02c5c46`, `a08e423`, `50b9e7b`, `623de0b`, `fc95fe9`, `cc4810b` and
+  `e0a9b35`). The whole analysis rerun from a clean checkout of each of those commits reproduced
+  `points.csv`, `launches.csv`, `ratios.json` and `accept.json` byte for byte. `sweeps.csv` was written by
   `confirm_sweeps.py` from a clean checkout of `50b9e7b` and again, identically, from each later one;
   the analysis needs it, `launches.csv` and `equality/` beside `points.csv`.
 - `equality/gate.json` is the hold's own output. `confirm_gate.py` as amended at `623de0b`, run on
