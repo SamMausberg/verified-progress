@@ -227,8 +227,8 @@ What this establishes (measured unless marked derived):
   ratios of means, derived).
 - **Against the same arm without PD** (session-paired, `y_vs_base` in `confirm_points.csv`):
   `mtp-tuned` gains 1.19 times at c = 32 (sessions 1.17-1.21), 1.33 at 48 (1.31-1.34), 1.41 at
-  64 (1.39-1.43), 1.48 at 96 (1.47-1.49) and 1.47 at 128 (1.45-1.50). `dflash-tuned`, which
-  already applies `--min-free-slots-delay 4` by default, gains 1.21 and 1.27 times at c = 32
+  64 (1.39-1.43), 1.48 at 96 (1.47-1.49) and 1.46 at 128 (1.45-1.50). `dflash-tuned`, which
+  already applies `--min-free-slots-delay 4` by default, gains 1.20 and 1.27 times at c = 32
   and 48.
 - **At c = 32 PD helps DFlash as much as MTP.** `dflash-tuned` with PD (8,176 tok/s) is the
   best arm at c = 32, and MTP with PD reaches 0.977 of it. MTP with PD overtakes the best
