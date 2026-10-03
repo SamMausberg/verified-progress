@@ -2,19 +2,23 @@
 # Build the record files of evidence/admission/ from the raw runs (CPU only, jq):
 #   experiments/admission/collect_records.sh [DATA] [OUT]
 # DATA defaults to ~/vp-data/speed_highc, OUT to evidence/admission. launches.csv has one row
-# per server of probes 1-3 (bench's server/launch.json and the run's sweep.json);
-# prefill_requests.json condenses the two prefill-probe servers' client.json; logprob_runs.csv
-# lists the logprob servers' resolved pools, prefill batches and commits.
+# per server of probes 1-3 and confirmation sessions 0-2 (bench's server/launch.json and the
+# run's sweep.json); prefill_requests.json condenses the two prefill-probe servers'
+# client.json; logprob_runs.csv lists the logprob servers' resolved pools, prefill batches and
+# commits.
 set -euo pipefail
 data="${1:-$HOME/vp-data/speed_highc}"
 out="${2:-evidence/admission}"
 # probe:directory:every label its hold script launched (run_admission_probe.sh:35-45,
-# run_queue_delay_probe.sh:34-38, run_natural_probe.sh:50-55); each must have exactly one launch
-# record, and no other may appear.
+# run_queue_delay_probe.sh:34-38, run_natural_probe.sh:50-55, run_admission_confirm.sh:52-62);
+# each must have exactly one launch record, and no other may appear.
 probes=(
   "probe1:admission:dflash-fold-n16 dflash-fold-n4 dflash-n16 dflash-n4 mtp-n0 mtp-n32 mtp-n8 plain-tuned replayssm"
   "probe2:queue-delay:mtp-n0 mtp-pd plain-pd plain-tuned replayssm"
   "probe3:natural-20261002T195727Z:dflash-fold-pd mtp-n0 mtp-pd plain-pd plain-tuned replayssm"
+  "confirm-s0:confirm/s0:dflash dflash-delay mtp-delay mtp-n0 plain-delay plain-tuned replayssm"
+  "confirm-s1:confirm/s1:dflash dflash-delay mtp-delay mtp-n0 plain-delay plain-tuned replayssm"
+  "confirm-s2:confirm/s2:dflash dflash-delay mtp-delay mtp-n0 plain-delay plain-tuned replayssm"
 )
 # The three servers of run_admission_logprob.sh:28.
 logprob_runs=(mtp_s3_replayssm__adm_n0 mtp_s3_replayssm__adm_n0b mtp_s3_replayssm__adm_pd)

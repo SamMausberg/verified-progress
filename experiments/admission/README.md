@@ -25,6 +25,7 @@ arrivals are batched, the speculative cycle runs close to its held-batch time.
 | `run_admission_logprob.sh` | Exactness: greedy outputs with top-5 logprobs, MTP with and without the delayer and a repeat without it, pinned pools, c = 64 and 128 |
 | `classify_logprob.sh` | Classifies every delayed-vs-undelayed comparison of that run with `bench.divergence` (CPU) |
 | `run_admission_confirm.sh` | Confirmation: three sessions, one per hold |
+| `analyze_confirm.py` | The declared analysis below, applied to the three sessions' `summarize_probe.py` CSVs; writes `confirm_points.csv`, `confirm_arms.csv` and `confirm_analysis.csv` |
 | `summarize_probe.py` | CSV of every point of a probe or session directory, with ratios, token identity and prefill batches by size (above, at and well below the 16-request cap); every label and concurrency the hold ran is declared with `--expect` and required |
 | `collect_records.sh` | Launch records and the prefill probe's condensed client, trace and kernel files for `evidence/admission/` (jq only); every server the holds launched must have a record |
 
