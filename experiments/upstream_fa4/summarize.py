@@ -1,6 +1,10 @@
 """Collect run_all.sh's per-case JSON lines and pytest logs into cases.csv and summary.json.
 
-    python experiments/upstream_fa4/summarize.py <run_all.sh output dir>
+    python experiments/upstream_fa4/summarize.py --expect-cases N --expect-pytest main,ceil,... <dir>
+
+It fails unless the directory holds exactly the N case records run_all.sh ran, every record has a
+known status and was imported from its own tree, and the regression test completed (2 PASSED or
+FAILED outcomes, nothing skipped or erroring at collection) on every tree named.
 
 `rows_per_pass` is the number of KV rows the SM90 cp.async paged loader's 128 threads cover in one
 copy (paged_kv.py: num_threads // gmem_threads_per_row, with gmem_threads_per_row =
@@ -77,12 +81,21 @@ def load_case(path: Path) -> dict[str, Any]:
     return row
 
 
+STATUSES = {'ok', 'wrong', 'error', 'fault'}
+PYTEST_CASES = 2  # regression_test_sm90.py: page sizes 1 and 16
+
+
 def pytest_result(path: Path) -> dict[str, Any]:
     text = path.read_text()
     tail = re.findall(r'^(?:=+ )?(\d+ (?:passed|failed|errors?)\b.*?) in [0-9.]+s', text, re.M)
     errors = sorted(set(re.findall(r'^E\s+(\w+(?:Error|Exception)[^\n]{0,120})', text, re.M)))
+    outcomes = re.findall(r'^(PASSED|FAILED|ERROR) (\S+)', text, re.M)
+    # -rA lists every outcome; a skip or a collection error means the test did not complete.
+    incomplete = re.findall(r'^(SKIPPED|ERROR|XFAIL|XPASS)\b.*$', text, re.M)
+    if len(outcomes) != PYTEST_CASES or incomplete or any(o[0] == 'ERROR' for o in outcomes):
+        raise SystemExit(f'{path}: regression test did not complete: {outcomes} {incomplete}')
     return {
-        'outcomes': re.findall(r'^(PASSED|FAILED|ERROR) (\S+)', text, re.M),
+        'outcomes': outcomes,
         'summary': tail[-1] if tail else None,
         'errors': errors,
     }
@@ -91,10 +104,21 @@ def pytest_result(path: Path) -> dict[str, Any]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument('out', type=Path)
+    ap.add_argument('--expect-cases', type=int, required=True, help='case records run_all.sh ran')
+    ap.add_argument('--expect-pytest', required=True, help='trees the regression test ran on')
     args = ap.parse_args()
     meta = json.loads((args.out / 'meta.json').read_text())
     rows = [load_case(p) for p in sorted(args.out.glob('kv_*.json'))]
     rows += [load_case(p) for p in sorted(args.out.glob('vl_*.json'))]
+    if len(rows) != args.expect_cases:
+        raise SystemExit(f'{args.out}: {len(rows)} case records, expected {args.expect_cases}')
+    unknown = [r['record'] for r in rows if r['status'] not in STATUSES]
+    if unknown:
+        raise SystemExit(f'unknown status in {unknown}')
+    pytest_trees = args.expect_pytest.split(',')
+    found = sorted(p.stem.removeprefix('pytest_') for p in args.out.glob('pytest_*.log'))
+    if found != sorted(pytest_trees):
+        raise SystemExit(f'{args.out}: pytest logs for {found}, expected {sorted(pytest_trees)}')
     with open(args.out / 'cases.csv', 'w', newline='') as f:
         w = csv.DictWriter(f, fieldnames=FIELDS)
         w.writeheader()
@@ -127,10 +151,7 @@ def main() -> None:
             'cases_checked': len(checked),
             'mismatches': mismatches,
         },
-        'pytest': {
-            p.stem.removeprefix('pytest_'): pytest_result(p)
-            for p in sorted(args.out.glob('pytest_*.log'))
-        },
+        'pytest': {v: pytest_result(args.out / f'pytest_{v}.log') for v in sorted(pytest_trees)},
     }
     (args.out / 'summary.json').write_text(json.dumps(summary, indent=1) + '\n')
     print(json.dumps({k: summary[k] for k in ('cases', 'status_counts', 'cpasync_pattern')}))

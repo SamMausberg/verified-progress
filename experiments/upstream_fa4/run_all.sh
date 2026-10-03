@@ -97,9 +97,11 @@ EOF
 cat "$out/meta.json"
 
 status=0
+ncases=0
 run() {  # tag, PYTHONPATH, command...
   local tag=$1 pp=$2
   shift 2
+  ncases=$((ncases + 1))
   PYTHONPATH=$pp timeout --foreground 150 taskset -c "$cores" "$@" >"$out/$tag.json" 2>"$out/$tag.stderr"
   local rc=$?
   echo "$tag exit=$rc $(head -c 300 "$out/$tag.json")"
@@ -181,16 +183,17 @@ for c in "d96_c0_sk300|--head-dim 96 --seqlen-k 300" "d160_c1_sk300|--head-dim 1
 done
 
 echo "=== 4. regression test offered in the comment (head_dim 256, page sizes 1 and 16)"
-for v in main ceil ceil_div max_one; do
+pytest_trees=(main ceil ceil_div max_one)
+for v in "${pytest_trees[@]}"; do
   SGLANG_TREE=$trees/sglang-$v PYTHONPATH=$trees/sglang-$v/python timeout --foreground 300 \
     taskset -c "$cores" python -m pytest -p no:cacheprovider -rA -q "$exp/regression_test_sm90.py" \
     >"$out/pytest_$v.log" 2>&1
   rc=$?
-  echo "pytest $v exit=$rc $(grep -E '^(PASSED|FAILED|ERROR) |[0-9]+ (passed|failed)' "$out/pytest_$v.log" | tr '\n' ' ')"
+  echo "pytest $v exit=$rc $(grep -E '^(PASSED|FAILED|ERROR|SKIPPED)|[0-9]+ (passed|failed|skipped)' "$out/pytest_$v.log" | tr '\n' ' ')"
   case $rc in 0|1) ;; *) status=1 ;; esac
 done
 
 nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader
-python "$exp/summarize.py" "$out" || status=1
+python "$exp/summarize.py" --expect-cases "$ncases" --expect-pytest "$(IFS=,; echo "${pytest_trees[*]}")" "$out" || status=1
 echo "=== done $(date -u +%FT%TZ) status=$status"
 exit "$status"
