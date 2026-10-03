@@ -108,6 +108,12 @@ length for the arm divided by the same for S0, with the geometric mean and 95% t
 throughput ratios, and it voids session cells by `confirm_analyze.py`'s rule. Nothing else changed: the
 holds, the gate and `confirm_analyze.py` ran as declared.
 
+2026-10-03, after the analysis (review of #230): `confirm_analyze.py` now refuses a point outside the
+declared plan (a session other than s1-s3, an undeclared arm or concurrency) and treats a declared
+cell with no points as void, where it had read whatever sessions and arms `points.csv` held; a fourth
+session would have entered its interval. `confirm_accept.py` uses the same reading. On this
+confirmation's points both outputs are byte for byte the same as before (Provenance).
+
 ## Results
 
 Written 2026-10-03. Labels: **measured** (read from the files below) and **derived** (ratios, means and
@@ -281,10 +287,9 @@ class from stock (`dflash-tuned`) to exact up to rounding against stock.
   text above Amendments, the same harness (`bench/`, `experiments/state_safety/`) and the same patches
   for the confirm engine; the only change in code the holds ran is one comment in `bench/hostload.py`.
 - The analysis (`bench.pareto`, `confirm_analyze.py`, `confirm_accept.py`) ran on 2026-10-03 from
-  `853bd4b` with a clean tree. `confirm_accept.py` was then tightened (`08a8421`: cells from the declared
-  plan, the same void rule as `confirm_analyze.py`, an interval only from three valid sessions), and the
-  whole analysis rerun from a clean checkout of `08a8421` reproduced `points.csv`, `launches.csv`,
-  `ratios.json` and `accept.json` byte for byte. `confirm_analyze.py` is unchanged since it was declared.
+  `853bd4b` with a clean tree. Both scripts were then tightened as the amendments say (`08a8421` and
+  `e8566e3`). The whole analysis rerun from a clean checkout of each of those commits reproduced
+  `points.csv`, `launches.csv`, `ratios.json` and `accept.json` byte for byte.
 - `equality/` and `sessions/` are unchanged copies of the holds' outputs under
   `~/vp-data/speed-lowc/confirm/`: `equality-20261002T215749Z/`, `s1-20261002T232241Z/`,
   `s2-20261003T004812Z/` and `s3-20261003T020536Z/`.
