@@ -54,10 +54,11 @@ Where the serving measurements are:
   class of every tuned arm (`evidence/bench/equality/`); the quality budget,
   logit probe and GSM8K runs of the two lossy levers (`evidence/lossy/`) and of
   the FP8 arms (`evidence/speed_bytes/`).
-- **Before and after.** Table 1 of the paper gives each engine change against
-  its tuned baseline, with sessions and intervals; the certified head was served
-  against four tuned arms (`plain-tuned`, `mtp-tuned-triton`, `dflash-tuned-b16`
-  and `dflash-tuned`) in three sessions (`evidence/certified_head/served/`).
+- **Before and after.** Table 2 of the paper gives each engine change against
+  its tuned baseline, with sessions and intervals. Table 1 gives the certified
+  head served against four tuned arms (`plain-tuned`, `mtp-tuned-triton`,
+  `dflash-tuned-b16` and `dflash-tuned`) in three sessions
+  (`evidence/certified_head/served/`).
 - **Engine changes.** Patch series under `engine/sglang/patches/`, applied to the
   pinned SGLang commit as `engine/sglang/README.md` describes.
 
