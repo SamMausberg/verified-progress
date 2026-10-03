@@ -134,9 +134,10 @@ Secondary investigations and supporting material:
   capacity and sweeps client concurrency with aiperf; the tuned plain,
   native-MTP and DFlash-4B arms in `bench/arms.toml` come from a search on a
   separate tuning split (`evidence/bench/`). On the held-out confirmation split
-  speculation leads plain decoding through concurrency 32 and trails it from 48
-  in every family, and GSM8K finds no arm detectably different from plain
-  decoding, a check that rules out large losses only.
+  speculation leads plain decoding through concurrency 32 and, with SGLang's
+  default admission, trails it from 48 in every family; GSM8K finds no arm
+  detectably different from plain decoding, a check that rules out large losses
+  only.
 - **Engine changes against the tuned arms.** Making FlashInfer's attention
   planning cheaper and free of blocking GPU reads raises tuned MTP's throughput
   by 9.4-9.6% at concurrency 1-8 (one session, token-identical), though stock
@@ -147,7 +148,19 @@ Secondary investigations and supporting material:
   +1.8% at 8 (`evidence/drafter/`). Composed with the backbone table and the
   certified head, it puts 16-token DFlash's per-request rate at concurrency 1 at
   0.986 times stock and its throughput at 8 at 1.073 times (three sessions;
-  exact up to rounding on 320 prompts at concurrency 1; `evidence/stack/`). Two
+  exact up to rounding on 320 prompts at concurrency 1; `evidence/stack/`). With
+  narrow tiles up to two requests and FA4 attention for drafter and target (the
+  target needs a backported fix to FA4's paged-KV loader), the envelope's DFlash
+  arms gain 8.4-9.3% in per-request rate at concurrency 1-4 and 12.4-13.7% in
+  throughput at 8-32 (three sessions; exact up to rounding as classed at
+  concurrency 1; `evidence/speed_lowc/confirm/`). SGLang's prefill delayer with
+  a 16-request cap on every prefill batch lets MTP serve 1.18-1.32 times the
+  best non-speculative arm at concurrency 48-128, at 2.6-3.1 times plain
+  decoding's 99th-percentile time to first token (three sessions; exact up to
+  rounding as classed at 64 and 128; `evidence/admission/`). FP8 weights for the
+  dense layers gain only 1.3-3.6% served, because their quantization and scaling
+  kernels take back the GEMMs' saving, and miss the logit probe's top-1 floor
+  (one session; `evidence/speed_bytes/`). Two
   declared approximations miss the quality budget fixed before measuring: FP16
   recurrent state serves 1.16-1.17 times the best non-lossy arm's throughput at
   concurrency 64-256 (three sessions) for 1.0-1.4 GSM8K points below plain
@@ -255,10 +268,9 @@ outside git; each evidence README names the run it summarizes.
 
 Samuel Mausberg is the author of the paper, directed the work and is responsible
 for its claims.
-AI tools (Claude Opus 5.5 and GPT-6 Astra Pro) were used in developing the paper
-and the code. No AI system is an author. The confidential assignment that
-motivated the work is not reproduced or quoted, and no model weights are
-redistributed.
+AI (Claude Opus 5.5, GPT-6 Astra Pro) was used in developing the paper and the
+code. The confidential assignment that motivated the work is not reproduced or
+quoted, and no model weights are redistributed.
 
 ## Citing this work
 
