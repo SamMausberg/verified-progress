@@ -37,7 +37,8 @@ if [ ! -e "$fa" ]; then
 fi
 [ "$(git -C "$fa" rev-parse HEAD)" = "$fa_commit" ] || { echo "$fa is not at $fa_commit" >&2; exit 1; }
 # A reused checkout must be unmodified: run_all.sh labels its cases with the commit alone.
-[ -z "$(git -C "$fa" status --porcelain --untracked-files=no)" ] || { echo "$fa has local edits" >&2; exit 1; }
+extra=$(git -C "$fa" status --porcelain --untracked-files=all --ignored | grep -vE '^(\?\?|!!) (.*/)?__pycache__/' || true)
+[ -z "$extra" ] || { echo "$fa has local or extra files: $extra" >&2; exit 1; }
 # fa-pkg is rebuilt each time, so nothing left in it can be imported beside flash_attn.cute.
 rm -rf "$dir/fa-pkg"
 mkdir -p "$dir/fa-pkg/flash_attn"

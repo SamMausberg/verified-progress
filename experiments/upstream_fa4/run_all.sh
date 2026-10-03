@@ -44,18 +44,25 @@ cores=${CORES:-56-59}
 cd "$repo" || die "cannot cd to $repo"
 
 # Inputs: every SGLang tree at the base commit with only its paged_kv.py changed (main: no
-# change), flash-attention at its commit, this repository's commit recorded.
+# change), flash-attention at its commit, and this repository committed. A tree may hold nothing
+# else, tracked or not, ignored or not (an untracked sitecustomize.py on PYTHONPATH would run in
+# every case), apart from Python's own __pycache__ directories.
+state() {  # git status of a tree, ignored files included, without __pycache__ entries
+  git -C "$1" status --porcelain --untracked-files=all --ignored | grep -vE '^(\?\?|!!) (.*/)?__pycache__/'
+}
+repo_state=$(git -C "$repo" status --porcelain --untracked-files=all | grep -vE '^\?\? (.*/)?__pycache__/')
+[ -z "$repo_state" ] || die "the repository has uncommitted or untracked files: $(echo "$repo_state" | head -3 | tr '\n' ' ')"
 for v in main ceil ceil_div max_one; do
   t=$trees/sglang-$v
   [ "$(git -C "$t" rev-parse HEAD)" = "$sglang_base" ] || die "$t: not at $sglang_base"
-  changed=$(git -C "$t" status --porcelain --untracked-files=no | awk '{print $2}' | tr '\n' ' ')
-  want='python/sglang/kernels/ops/attention/flash_attn/cute/paged_kv.py '
+  changed=$(state "$t" | tr '\n' ' ')
+  want=' M python/sglang/kernels/ops/attention/flash_attn/cute/paged_kv.py '
   [ "$v" = main ] && want=''
   [ "$changed" = "$want" ] || die "$t: unexpected changes: '$changed'"
   python "$exp/apply_variant.py" --check "$t" "$v" >/dev/null || die "$t: not the $v variant"
 done
 [ "$(git -C "$trees/flash-attention" rev-parse HEAD)" = "$fa_commit" ] || die "flash-attention not at $fa_commit"
-[ -z "$(git -C "$trees/flash-attention" status --porcelain --untracked-files=no)" ] || die "flash-attention has local edits"
+[ -z "$(state "$trees/flash-attention")" ] || die "flash-attention has local or extra files: $(state "$trees/flash-attention" | head -3 | tr '\n' ' ')"
 [ "$(readlink -f "$trees/fa-pkg/flash_attn/cute")" = "$(cd "$trees/flash-attention/flash_attn/cute" && pwd -P)" ] \
   || die "fa-pkg does not point at the checkout"
 fa_pkg=$(find "$trees/fa-pkg" -mindepth 1 ! -path '*/__pycache__*' ! -path "$trees/fa-pkg/flash_attn/cute/*" -printf '%P\n' | sort | tr '\n' ' ')
@@ -68,7 +75,7 @@ assert sys.prefix == os.path.join(os.environ['SGLANG_DIR'], '.venv'), sys.prefix
 pk = 'python/sglang/kernels/ops/attention/flash_attn/cute/paged_kv.py'
 print(json.dumps({
     'repo_commit': git('-C', repo, 'rev-parse', 'HEAD'),
-    'repo_dirty': bool(git('-C', repo, 'status', '--porcelain', '--untracked-files=no')),
+    'repo_dirty': False,  # run_all.sh stops on any uncommitted or untracked file
     'sglang_base': git('-C', f'{trees}/sglang-main', 'rev-parse', 'HEAD'),
     'flash_attention': git('-C', f'{trees}/flash-attention', 'rev-parse', 'HEAD'),
     'paged_kv_sha256': {
