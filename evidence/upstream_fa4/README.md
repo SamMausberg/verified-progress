@@ -125,10 +125,30 @@ python experiments/upstream_fa4/summarize.py ~/vp-data/upstream/fa4-evidence/run
 cp ~/vp-data/upstream/fa4-evidence/run-20261002T223025Z/{cases.csv,summary.json} evidence/upstream_fa4/
 ```
 
-Two input checks were added to `run_all.sh` after the run: that the flash-attention checkout has no
-local edits and `fa-pkg` points at it (9d1844f), and that each SGLang tree's `paged_kv.py` is exactly
-its variant of the base file (`apply_variant.py --check`, 4461a99). The trees the run used pass both;
-the four `paged_kv.py` hashes the run recorded (`summary.json`, `meta`) are those of the variants.
+Input checks added after the run, from Codex's review of #228. `run_all.sh` now stops on:
+
+- a flash-attention checkout with local edits, or an `fa-pkg` that is not exactly that checkout
+  (9d1844f);
+- an SGLang tree whose `paged_kv.py` is not exactly its variant of the base file
+  (`apply_variant.py --check`, 4461a99);
+- a failed environment activation or a `python` other than `SGLANG_DIR`'s venv, and it clears
+  inherited `SGLANG_*`, `CUTE_DSL_*`, `FLASH_ATTENTION_*` and `PYTHON*` settings (80f4ba8);
+- an output directory that already holds anything but `hold.log` (80f4ba8).
+
+`summarize.py` now fails unless every record was imported from its own tree (`fa-pkg` for
+flash-attention).
+
+The committed run is unaffected by what these checks guard against:
+
+- The trees it used pass the first two checks, and the four `paged_kv.py` hashes it recorded
+  (`summary.json`, `meta`) are exactly the variants'.
+- It ran in the upstream venv: `meta` records torch 2.13.0+cu130, nvidia-cutlass-dsl 4.8.0 and
+  quack-kernels 0.6.5, which only that venv has here. The paper's SGLang venv has
+  nvidia-cutlass-dsl 4.6.2 and quack-kernels 0.6.4; the system Python has no nvidia-cutlass-dsl.
+- Its output directory was new: it was created at 22:30:25 UTC, and all 89 records in it were
+  created after that, between 22:30:27 and 22:42:56 (file birth times); the pytest logs followed.
+- `summarize.py` with the import check, rerun on its records, passes and gives the committed
+  `cases.csv` and `summary.json` unchanged (apart from `summarize_commit`).
 
 The run directory keeps the raw records: one JSON line and the standard error per case, the
 regression test's pytest logs, `meta.json` and the hold's log. It stays outside git.
