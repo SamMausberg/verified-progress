@@ -123,6 +123,16 @@ STEP_COUNTS = {
 }
 
 
+def finite(v: Any, positive: bool = True) -> bool:
+    """A published number: an int or float, finite, and positive (or, with positive=False, at least 0)."""
+    return (
+        isinstance(v, int | float)
+        and not isinstance(v, bool)
+        and math.isfinite(v)
+        and (v > 0 if positive else v >= 0)
+    )
+
+
 def write_out(text: str, out: Path) -> None:
     """Write the output whole or not at all (a temporary file renamed over it)."""
     tmp = out.with_name(f'.{out.name}.tmp')
@@ -244,6 +254,12 @@ def cmd_gemm(args: argparse.Namespace) -> None:
     # GEMM_REL_ERR_MAX, checked on the run's recorded value (a stub that returns without computing
     # fails this). The activation-quantization kernel alone has no product to compare.
     for r in rows:
+        # Both timings finite and positive (JSON admits NaN), the minimum not above the median.
+        if not (finite(r['us_median']) and finite(r['us_min']) and r['us_min'] <= r['us_median']):
+            raise SystemExit(
+                f'{args.probe}: {r["route"]} {r["shape"]} M={r["M"]}: '
+                f'timings {r["us_median"]}, {r["us_min"]}'
+            )
         err = r['rel_err_vs_fp32']
         if r['route'] != 'act_quant_fp8' and not (
             isinstance(err, int | float) and math.isfinite(err) and err < GEMM_REL_ERR_MAX
@@ -786,14 +802,18 @@ def cmd_served(args: argparse.Namespace) -> None:
                 acc = (p.get('spec') or {}).get('accept_length')
                 # ...and every value published below finite (bench's rule checks only y and x_e2e):
                 # rates and, on speculative arms (and only there), the accept length positive; TTFT
-                # not negative.
+                # and foreign CPU not negative.
                 if (acc is not None) != bool(d['arm']['args'].get('speculative-algorithm')):
                     raise SystemExit(f'{f}: c={p["concurrency"]}: accept length {acc}')
                 published = [p['y'], p['x_e2e'], p['x_decode'], *([acc] if acc is not None else [])]
-                ttft = p['ttft_ms']['p50']
-                if not all(
-                    isinstance(v, int | float) and math.isfinite(v) and v > 0 for v in published
-                ) or not (isinstance(ttft, int | float) and math.isfinite(ttft) and ttft >= 0):
+                at_least_0 = [
+                    p['ttft_ms']['p50'],
+                    p['foreign_cpu_during_mean'],
+                    p['foreign_cpu_during_max'],
+                ]
+                if not all(finite(v) for v in published) or not all(
+                    finite(v, positive=False) for v in at_least_0
+                ):
                     raise SystemExit(
                         f'{f}: c={p["concurrency"]}: non-finite or non-positive values'
                     )
@@ -994,6 +1014,22 @@ def cmd_steps(args: argparse.Namespace) -> None:
                              f'{nsys[0]["window_wall_start"]}')  # fmt: skip
         seen.append((variant, batch))
         b = budget(db)
+        # Every published value finite: the step span, kernels and busy time of each class
+        # positive, gaps and overlap not negative.
+        if not (
+            finite(b['step_span_us'])
+            and finite(b['replay_boundary_gap_us_per_step'], positive=False)
+            and b['classes']
+            and all(
+                all(finite(r[k]) for k in ('kernels_per_step', 'us_per_step', 'us_per_kernel'))
+                and all(
+                    finite(r[k], positive=False)
+                    for k in ('gap_before_us_per_step', 'overlap_us_per_step')
+                )
+                for r in b['classes']
+            )
+        ):
+            raise SystemExit(f'{rep}: a step-budget value is not finite, or out of range')
         for r in b['classes']:
             rows.append(
                 {

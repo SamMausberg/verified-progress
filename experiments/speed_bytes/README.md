@@ -42,37 +42,39 @@ the unit check, `scripts/sglang_env.sh`). It checks
   its log ends with its end line and no failed step;
 - per sweep: that the hold log's section for its label names its run directory (bench's `done:`
   line); the full `bench/sweep.py` invocation the hold makes (arm, label, session, engine, port,
-  concurrencies, request counts, the exact switches and nothing else); the settings
-  `bench/sweep.py` took from its defaults (output length, request body, warm-up, aiperf version,
-  and the committed workload and warm-up pool by hash) and every aiperf command it saved (server
-  warm-up and points, seed and output lengths included); the arm as `bench/arms.toml` at the
-  hold's commit resolves it and the server command bench launched for it; the harness commit the
-  hold logged, the engine worktree SGLang was imported from, the GH200 its launch record read and
-  the virtualenv's interpreter; that its server log is the one bench summarized at the end of the
-  sweep; and that every point is its `point.json` and what `bench/results.py` computes again
-  from the requests aiperf recorded, valid by bench's own rule, with every published value finite
-  (an accept length exactly on the speculative arms);
+  concurrencies, request counts, the exact switches and nothing else); the settings `bench/sweep.py`
+  took from its defaults (output length, request body, warm-up, aiperf version, and the committed
+  workload and warm-up pool by hash) and every aiperf command it saved (server warm-up and points,
+  seed and output lengths included); the arm as `bench/arms.toml` at the hold's commit resolves it
+  and the server command bench launched for it; the harness commit the hold logged, the engine
+  worktree SGLang was imported from, the GH200 its launch record read and the virtualenv's
+  interpreter; that its server log is the one bench summarized at the end of the sweep; and that
+  every point is its `point.json` and what `bench/results.py` computes again from the requests
+  aiperf recorded, valid by bench's own rule, with every published value finite (rates positive,
+  TTFT and foreign CPU not negative, an accept length exactly on the speculative arms);
 - per probe server: the launch SGLang printed (`server_args`: the hold's flags and the defaults
   the comparison relies on, identical across the hold's servers apart from the switches), a log
   written inside that server's section of the hold log, and the probe client and prompts at the
   hold's commit;
 - per server log: the FP8 conversion and mode the switches imply;
-- per trace (all four from one kill2b hold, each exported afresh): the hold log's report of
-  writing it (`Generated:`) in that variant's section, where `run_profiles.py` also started; the
-  report `windows.jsonl` records for its window (by name, and by the trace's session start against
-  the window's); the server log whose decode lines `windows.jsonl` summarized; and the engine,
-  harness commit, invocation, resolved server command, environment, GPU and Nsight Systems
-  version `run_profiles.py` recorded;
+- per trace (all four from one kill2b hold, each exported afresh): the hold log's report of writing
+  it (`Generated:`) in that variant's section, where `run_profiles.py` also started; the report
+  `windows.jsonl` records for its window (by name, and by the trace's session start against the
+  window's); the server log whose decode lines `windows.jsonl` summarized; every published value
+  finite (span, kernels and busy time positive, gaps and overlap not negative); and the engine,
+  harness commit, invocation, resolved server command, environment, GPU and Nsight Systems version
+  `run_profiles.py` recorded;
 - per probe file: its "wrote" line (the file's sequence count and seconds) and its hash in that
   server's section of the hold log, its mode, concurrency and label, the probe's 48 prompts, and
   256 tokens per sequence with exactly 20 finite top-logprob entries at every position (score
   mode: none at the first continuation position, which SGLang does not report) and (score mode)
   the reference tokens;
 - per GEMM probe run: its SGLang checkout (`~/sglang`, the pin, clean), GH200, torch and CUDA, a
-  planned shape, M and number of weight copies for every row, each row once, and (for runs that
-  record them) the probe's arguments and output name, a clean harness whose probe, hold and what
-  the hold runs equal this checkout's, the runtime, no inherited SGLang switch or import path, the GPU lock held and no
-  other process on the GPU;
+  planned shape, M and number of weight copies for every row, each row once, its timings finite and
+  positive (minimum not above median), and (for runs that record them) the probe's arguments and
+  output name, a clean harness whose probe, hold and what the hold runs equal this checkout's, the
+  runtime, no inherited SGLang switch or import path, the GPU lock held and no other process on the
+  GPU;
 - the unit check: one complete run in the `== unit check` section of a kill1 hold's log, the
   script's hash there, its relative errors against the script's 0.06 bound, per-row rows
   independent of the batch and per-tensor rows dependent on it.
