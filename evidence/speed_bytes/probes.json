@@ -1,0 +1,553 @@
+{
+ "budget": {
+  "agreement_min": 0.98,
+  "kl_max": 0.01
+ },
+ "arms": {
+  "probe2/bf16": {
+   "dir": "probe2_20261002T203931Z",
+   "switches": {},
+   "reference": "probe2_20261002T203931Z/bf16.gen48",
+   "reference_same_session": true,
+   "score": {
+    "positions": 12240,
+    "kl_mean": 0.00023085512825456845,
+    "argmax_agreement": 0.993545751633987
+   }
+  },
+  "probe2/fp8chan": {
+   "dir": "probe2_20261002T203931Z",
+   "switches": {
+    "SGLANG_FP8_DENSE": "target",
+    "SGLANG_FP8_DENSE_ACT": "token",
+    "SGLANG_FP8_DENSE_WSCALE": "channel"
+   },
+   "reference": "probe2_20261002T203931Z/bf16.gen48",
+   "reference_same_session": true,
+   "score": {
+    "positions": 12240,
+    "kl_mean": 0.003686851711742936,
+    "argmax_agreement": 0.9811274509803921
+   },
+   "gen48": {
+    "positions": 3365,
+    "kl_mean": 0.002850372512843575,
+    "sequences_identical": 4,
+    "first_divergence_median": 34.5,
+    "divergences_per_1k_shared_tokens": 13.075780089153046
+   },
+   "decode_path": {
+    "agreement": 0.9870929891463772,
+    "kl_mean": 0.003218455663606187,
+    "positions": 3409,
+    "diverged_sequences": 44,
+    "divergences_per_1k_shared_tokens": 13.075780089153046
+   },
+   "score_within_budget": true,
+   "decode_within_budget": true,
+   "within_budget": true
+  },
+  "probe2/w8chan": {
+   "dir": "probe2_20261002T203931Z",
+   "switches": {
+    "SGLANG_FP8_DENSE": "target",
+    "SGLANG_FP8_DENSE_ACT": "none",
+    "SGLANG_FP8_DENSE_WSCALE": "channel"
+   },
+   "reference": "probe2_20261002T203931Z/bf16.gen48",
+   "reference_same_session": true,
+   "score": {
+    "positions": 12240,
+    "kl_mean": 0.002158698969434677,
+    "argmax_agreement": 0.9861928104575164
+   },
+   "gen48": {
+    "positions": 4318,
+    "kl_mean": 0.001875175706527631,
+    "sequences_identical": 7,
+    "first_divergence_median": 70.5,
+    "divergences_per_1k_shared_tokens": 9.495136637332099
+   },
+   "decode_path": {
+    "agreement": 0.990594172975453,
+    "kl_mean": 0.0020146007697606867,
+    "positions": 4359,
+    "diverged_sequences": 41,
+    "divergences_per_1k_shared_tokens": 9.495136637332099
+   },
+   "score_within_budget": true,
+   "decode_within_budget": true,
+   "within_budget": true
+  },
+  "probe2/w8ten": {
+   "dir": "probe2_20261002T203931Z",
+   "switches": {
+    "SGLANG_FP8_DENSE": "target",
+    "SGLANG_FP8_DENSE_ACT": "none"
+   },
+   "reference": "probe2_20261002T203931Z/bf16.gen48",
+   "reference_same_session": true,
+   "score": {
+    "positions": 12240,
+    "kl_mean": 0.0022524401786846405,
+    "argmax_agreement": 0.9851307189542484
+   },
+   "gen48": {
+    "positions": 2881,
+    "kl_mean": 0.0018833648331121815,
+    "sequences_identical": 1,
+    "first_divergence_median": 38.5,
+    "divergences_per_1k_shared_tokens": 16.313779937521694
+   },
+   "decode_path": {
+    "agreement": 0.983948087431694,
+    "kl_mean": 0.0021948869140413947,
+    "positions": 2928,
+    "diverged_sequences": 47,
+    "divergences_per_1k_shared_tokens": 16.313779937521694
+   },
+   "score_within_budget": true,
+   "decode_within_budget": true,
+   "within_budget": true
+  },
+  "calib/bf16": {
+   "dir": "calib_20261002T211742Z",
+   "switches": {},
+   "reference": "calib_20261002T211742Z/bf16.gen48",
+   "reference_same_session": true,
+   "score": {
+    "positions": 12240,
+    "kl_mean": 0.00023085512825456845,
+    "argmax_agreement": 0.993545751633987
+   },
+   "gen1_vs_ref_decode_path": {
+    "agreement": 0.9964556343192373,
+    "kl_mean": 0.00023688617379591295,
+    "positions": 8182,
+    "diverged_sequences": 29,
+    "divergences_per_1k_shared_tokens": 3.5569728934134672
+   },
+   "c48_vs_c1": {
+    "positions": 8153,
+    "kl_mean": 0.00023023271081003353,
+    "sequences_identical": 19,
+    "first_divergence_median": 209.5,
+    "divergences_per_1k_shared_tokens": 3.5569728934134672
+   },
+   "c48_vs_c1_decode_path": {
+    "agreement": 0.9964556343192373,
+    "kl_mean": 0.00023688617379591295,
+    "positions": 8182,
+    "diverged_sequences": 29,
+    "divergences_per_1k_shared_tokens": 3.5569728934134672
+   }
+  },
+  "calib/static": {
+   "dir": "calib_20261002T211742Z",
+   "switches": {
+    "SGLANG_FP8_DENSE": "target",
+    "SGLANG_FP8_DENSE_ACT": "static"
+   },
+   "reference": "calib_20261002T211742Z/bf16.gen48",
+   "reference_same_session": true,
+   "calibration": "fp8_static_calib.json",
+   "score": {
+    "positions": 12240,
+    "kl_mean": 0.004434031526225461,
+    "argmax_agreement": 0.9803104575163398
+   },
+   "gen48": {
+    "positions": 2468,
+    "kl_mean": 0.0037031469337842657,
+    "sequences_identical": 2,
+    "first_divergence_median": 27.0,
+    "divergences_per_1k_shared_tokens": 18.638573743922205
+   },
+   "decode_path": {
+    "agreement": 0.9817024661893397,
+    "kl_mean": 0.004387127149114647,
+    "positions": 2514,
+    "diverged_sequences": 46,
+    "divergences_per_1k_shared_tokens": 18.638573743922205
+   },
+   "gen1_vs_ref_decode_path": {
+    "agreement": 0.980319803198032,
+    "kl_mean": 0.004182443406199755,
+    "positions": 2439,
+    "diverged_sequences": 48,
+    "divergences_per_1k_shared_tokens": 20.075282308657467
+   },
+   "c48_vs_c1": {
+    "positions": 2306,
+    "kl_mean": 0.003252594557723858,
+    "sequences_identical": 1,
+    "first_divergence_median": 31.5,
+    "divergences_per_1k_shared_tokens": 20.381613183000866
+   },
+   "c48_vs_c1_decode_path": {
+    "agreement": 0.9800254993625159,
+    "kl_mean": 0.0038518438785904033,
+    "positions": 2353,
+    "diverged_sequences": 47,
+    "divergences_per_1k_shared_tokens": 20.381613183000866
+   },
+   "score_within_budget": true,
+   "decode_within_budget": true,
+   "within_budget": true
+  },
+  "cutlass/cutlass": {
+   "dir": "cutlass_20261002T222848Z",
+   "switches": {
+    "SGLANG_FP8_DENSE": "target",
+    "SGLANG_FP8_DENSE_ACT": "cutlass"
+   },
+   "reference": "calib_20261002T211742Z/bf16.gen48",
+   "reference_same_session": false,
+   "score": {
+    "positions": 12240,
+    "kl_mean": 0.00381045688389624,
+    "argmax_agreement": 0.9800653594771241
+   },
+   "gen48": {
+    "positions": 3028,
+    "kl_mean": 0.0029671275936880817,
+    "sequences_identical": 2,
+    "first_divergence_median": 38.5,
+    "divergences_per_1k_shared_tokens": 15.191545574636724
+   },
+   "decode_path": {
+    "agreement": 0.9850357839947951,
+    "kl_mean": 0.0034644401262596334,
+    "positions": 3074,
+    "diverged_sequences": 46,
+    "divergences_per_1k_shared_tokens": 15.191545574636724
+   },
+   "gen1_vs_ref_decode_path": {
+    "agreement": 0.987146529562982,
+    "kl_mean": 0.002993687474448157,
+    "positions": 3501,
+    "diverged_sequences": 45,
+    "divergences_per_1k_shared_tokens": 13.020833333333334
+   },
+   "c48_vs_c1": {
+    "positions": 3336,
+    "kl_mean": 0.002354236361599428,
+    "sequences_identical": 4,
+    "first_divergence_median": 46.0,
+    "divergences_per_1k_shared_tokens": 13.189448441247002
+   },
+   "c48_vs_c1_decode_path": {
+    "agreement": 0.98698224852071,
+    "kl_mean": 0.002721548659660914,
+    "positions": 3380,
+    "diverged_sequences": 44,
+    "divergences_per_1k_shared_tokens": 13.189448441247002
+   },
+   "score_within_budget": true,
+   "decode_within_budget": true,
+   "within_budget": true
+  },
+  "calibho/bf16": {
+   "dir": "calibho_20261002T231429Z",
+   "switches": {},
+   "reference": "calibho_20261002T231429Z/bf16.gen48",
+   "reference_same_session": true,
+   "score": {
+    "positions": 12240,
+    "kl_mean": 0.0002310905873476186,
+    "argmax_agreement": 0.9928921568627451
+   },
+   "gen1_vs_ref_decode_path": {
+    "agreement": 0.9963975155279503,
+    "kl_mean": 0.0002323105297202067,
+    "positions": 8050,
+    "diverged_sequences": 29,
+    "divergences_per_1k_shared_tokens": 3.6155092881186883
+   },
+   "c48_vs_c1": {
+    "positions": 8021,
+    "kl_mean": 0.000225281388614752,
+    "sequences_identical": 19,
+    "first_divergence_median": 184.5,
+    "divergences_per_1k_shared_tokens": 3.6155092881186883
+   },
+   "c48_vs_c1_decode_path": {
+    "agreement": 0.9963975155279503,
+    "kl_mean": 0.0002323105297202067,
+    "positions": 8050,
+    "diverged_sequences": 29,
+    "divergences_per_1k_shared_tokens": 3.6155092881186883
+   }
+  },
+  "calibho/staticho": {
+   "dir": "calibho_20261002T231429Z",
+   "switches": {
+    "SGLANG_FP8_DENSE": "target",
+    "SGLANG_FP8_DENSE_ACT": "static"
+   },
+   "reference": "calibho_20261002T231429Z/bf16.gen48",
+   "reference_same_session": true,
+   "calibration": "fp8_static_calib_heldout.json",
+   "score": {
+    "positions": 12240,
+    "kl_mean": 0.0046192782408893875,
+    "argmax_agreement": 0.9781862745098039
+   },
+   "gen48": {
+    "positions": 2300,
+    "kl_mean": 0.003151075994400056,
+    "sequences_identical": 1,
+    "first_divergence_median": 26.0,
+    "divergences_per_1k_shared_tokens": 20.434782608695652
+   },
+   "decode_path": {
+    "agreement": 0.97997443544951,
+    "kl_mean": 0.00414300009106467,
+    "positions": 2347,
+    "diverged_sequences": 47,
+    "divergences_per_1k_shared_tokens": 20.434782608695652
+   },
+   "gen1_vs_ref_decode_path": {
+    "agreement": 0.9823042168674698,
+    "kl_mean": 0.004418968355103092,
+    "positions": 2656,
+    "diverged_sequences": 47,
+    "divergences_per_1k_shared_tokens": 18.01456496742047
+   },
+   "c48_vs_c1": {
+    "positions": 3097,
+    "kl_mean": 0.002540654395482276,
+    "sequences_identical": 3,
+    "first_divergence_median": 42.5,
+    "divergences_per_1k_shared_tokens": 14.530190506942201
+   },
+   "c48_vs_c1_decode_path": {
+    "agreement": 0.9856779121578613,
+    "kl_mean": 0.002985350291278699,
+    "positions": 3142,
+    "diverged_sequences": 45,
+    "divergences_per_1k_shared_tokens": 14.530190506942201
+   },
+   "score_within_budget": false,
+   "decode_within_budget": false,
+   "within_budget": false
+  },
+  "calibho/static": {
+   "dir": "calibho_20261002T231429Z",
+   "switches": {
+    "SGLANG_FP8_DENSE": "target",
+    "SGLANG_FP8_DENSE_ACT": "static"
+   },
+   "reference": "calibho_20261002T231429Z/bf16.gen48",
+   "reference_same_session": true,
+   "calibration": "fp8_static_calib.json",
+   "score": {
+    "positions": 12240,
+    "kl_mean": 0.0044781868583736815,
+    "argmax_agreement": 0.9794934640522875
+   },
+   "gen48": {
+    "positions": 2556,
+    "kl_mean": 0.0037041808987399163,
+    "sequences_identical": 2,
+    "first_divergence_median": 29.0,
+    "divergences_per_1k_shared_tokens": 17.996870109546165
+   },
+   "decode_path": {
+    "agreement": 0.9823212913143735,
+    "kl_mean": 0.004349796824513862,
+    "positions": 2602,
+    "diverged_sequences": 46,
+    "divergences_per_1k_shared_tokens": 17.996870109546165
+   },
+   "gen1_vs_ref_decode_path": {
+    "agreement": 0.980319803198032,
+    "kl_mean": 0.004182659838581567,
+    "positions": 2439,
+    "diverged_sequences": 48,
+    "divergences_per_1k_shared_tokens": 20.075282308657467
+   },
+   "c48_vs_c1": {
+    "positions": 2228,
+    "kl_mean": 0.0033063985847299904,
+    "sequences_identical": 1,
+    "first_divergence_median": 31.5,
+    "divergences_per_1k_shared_tokens": 21.095152603231597
+   },
+   "c48_vs_c1_decode_path": {
+    "agreement": 0.9793406593406594,
+    "kl_mean": 0.003926572014473851,
+    "positions": 2275,
+    "diverged_sequences": 47,
+    "divergences_per_1k_shared_tokens": 21.095152603231597
+   },
+   "score_within_budget": false,
+   "decode_within_budget": true,
+   "within_budget": false,
+   "gen1_tokens_equal_calib_static": true
+  },
+  "probe3/ovlbf16": {
+   "dir": "probe3_20261003T031911Z",
+   "switches": {},
+   "reference": "probe3_20261003T031911Z/ovlbf16.gen48",
+   "reference_same_session": true,
+   "score": {
+    "positions": 12240,
+    "kl_mean": 0.00023554051012234802,
+    "argmax_agreement": 0.9933006535947713
+   },
+   "gen1_vs_ref_decode_path": {
+    "agreement": 0.9965231986572354,
+    "kl_mean": 0.00023889140452361686,
+    "positions": 8341,
+    "diverged_sequences": 29,
+    "divergences_per_1k_shared_tokens": 3.48893166506256
+   },
+   "c48_vs_c1": {
+    "positions": 8312,
+    "kl_mean": 0.00023243929918788774,
+    "sequences_identical": 19,
+    "first_divergence_median": 209.5,
+    "divergences_per_1k_shared_tokens": 3.48893166506256
+   },
+   "c48_vs_c1_decode_path": {
+    "agreement": 0.9965231986572354,
+    "kl_mean": 0.00023889140452361686,
+    "positions": 8341,
+    "diverged_sequences": 29,
+    "divergences_per_1k_shared_tokens": 3.48893166506256
+   },
+   "sequences_equal_to_calib_bf16": {
+    "gen48": 46,
+    "gen1": 48
+   }
+  },
+  "probe3/cutlass": {
+   "dir": "probe3_20261003T031911Z",
+   "switches": {
+    "SGLANG_FP8_DENSE": "target",
+    "SGLANG_FP8_DENSE_ACT": "cutlass"
+   },
+   "reference": "probe3_20261003T031911Z/ovlbf16.gen48",
+   "reference_same_session": true,
+   "score": {
+    "positions": 12240,
+    "kl_mean": 0.0038257871771695032,
+    "argmax_agreement": 0.9797385620915032
+   },
+   "gen48": {
+    "positions": 3056,
+    "kl_mean": 0.0030467627937556738,
+    "sequences_identical": 2,
+    "first_divergence_median": 39.5,
+    "divergences_per_1k_shared_tokens": 15.052356020942408
+   },
+   "decode_path": {
+    "agreement": 0.9851708575112831,
+    "kl_mean": 0.003537237240578913,
+    "positions": 3102,
+    "diverged_sequences": 46,
+    "divergences_per_1k_shared_tokens": 15.052356020942408
+   },
+   "gen1_vs_ref_decode_path": {
+    "agreement": 0.9874476987447699,
+    "kl_mean": 0.003165863302113538,
+    "positions": 3585,
+    "diverged_sequences": 45,
+    "divergences_per_1k_shared_tokens": 12.711864406779661
+   },
+   "c48_vs_c1": {
+    "positions": 3336,
+    "kl_mean": 0.002354236361599428,
+    "sequences_identical": 4,
+    "first_divergence_median": 46.0,
+    "divergences_per_1k_shared_tokens": 13.189448441247002
+   },
+   "c48_vs_c1_decode_path": {
+    "agreement": 0.98698224852071,
+    "kl_mean": 0.002721548659660914,
+    "positions": 3380,
+    "diverged_sequences": 44,
+    "divergences_per_1k_shared_tokens": 13.189448441247002
+   },
+   "score_within_budget": false,
+   "decode_within_budget": true,
+   "within_budget": false,
+   "sequences_equal_to_cutlass_cutlass": {
+    "gen48": 48,
+    "gen1": 48
+   }
+  },
+  "probe3/bf16": {
+   "dir": "probe3_20261003T031911Z",
+   "switches": {},
+   "reference": "probe3_20261003T031911Z/ovlbf16.gen48",
+   "reference_same_session": true,
+   "score": {
+    "positions": 12240,
+    "kl_mean": 0.0002365250353908282,
+    "argmax_agreement": 0.9933823529411765
+   },
+   "gen48": {
+    "positions": 11870,
+    "kl_mean": 1.3647208235154846e-06,
+    "sequences_identical": 46,
+    "first_divergence_median": 256.0,
+    "divergences_per_1k_shared_tokens": 0.16849199663016007
+   },
+   "decode_path": {
+    "agreement": 0.9998315363881402,
+    "kl_mean": 1.9640020125678025e-06,
+    "positions": 11872,
+    "diverged_sequences": 2,
+    "divergences_per_1k_shared_tokens": 0.16849199663016007
+   },
+   "gen1_vs_ref_decode_path": {
+    "agreement": 0.9965231986572354,
+    "kl_mean": 0.00023889140452361686,
+    "positions": 8341,
+    "diverged_sequences": 29,
+    "divergences_per_1k_shared_tokens": 3.48893166506256
+   },
+   "c48_vs_c1": {
+    "positions": 8153,
+    "kl_mean": 0.00023023271081003353,
+    "sequences_identical": 19,
+    "first_divergence_median": 209.5,
+    "divergences_per_1k_shared_tokens": 3.5569728934134672
+   },
+   "c48_vs_c1_decode_path": {
+    "agreement": 0.9964556343192373,
+    "kl_mean": 0.00023688617379591295,
+    "positions": 8182,
+    "diverged_sequences": 29,
+    "divergences_per_1k_shared_tokens": 3.5569728934134672
+   },
+   "sequences_equal_to_calib_bf16": {
+    "gen48": 48,
+    "gen1": 48
+   }
+  }
+ },
+ "static_unit_check": {
+  "rows": [
+   {
+    "M": 1,
+    "rel_err": 0.0375,
+    "row1_alone_equals_in_batch": true
+   },
+   {
+    "M": 16,
+    "rel_err": 0.0378,
+    "row1_alone_equals_in_batch": true
+   },
+   {
+    "M": 64,
+    "rel_err": 0.0376,
+    "row1_alone_equals_in_batch": true
+   }
+  ],
+  "saturation finite": true,
+  "graph replay equal eager": true
+ }
+}

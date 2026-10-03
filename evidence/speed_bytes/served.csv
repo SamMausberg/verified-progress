@@ -1,0 +1,54 @@
+hold,label,arm,env,engine,repo,c,requests,y,x_e2e,x_decode,ttft_p50_ms,accept_length,ms_per_cycle,foreign_cpu_mean,foreign_cpu_max,y_vs_bf16,x_e2e_vs_bf16,x_decode_vs_bf16,cycle_speed_vs_bf16
+kill1,sb-b16-bf16,dflash-tuned-b16,-,98aa8c9821,e690b3a,1,16,812.6,905.2,976.9,38.7,5.319,5.446,0.25,0.39,1.0,1.0,1.0,1.0
+kill1,sb-b16-bf16,dflash-tuned-b16,-,98aa8c9821,e690b3a,4,16,2169.2,667.0,717.9,45.0,5.333,7.429,0.22,0.56,1.0,1.0,1.0,1.0
+kill1,sb-b16-fp8draft,dflash-tuned-b16,SGLANG_FP8_DENSE=draft,98aa8c9821,e690b3a,1,16,790.1,879.1,956.8,43.5,5.316,5.556,0.25,0.54,0.9723,0.9712,0.9794,0.9801
+kill1,sb-b16-fp8draft,dflash-tuned-b16,SGLANG_FP8_DENSE=draft,98aa8c9821,e690b3a,4,16,2137.3,673.6,731.9,50.1,5.443,7.437,0.24,0.53,0.9853,1.0099,1.0196,0.999
+kill1,sb-b16-fp8target,dflash-tuned-b16,SGLANG_FP8_DENSE=target,98aa8c9821,e690b3a,1,16,850.2,950.8,1034.1,39.1,5.516,5.335,0.26,0.44,1.0463,1.0504,1.0586,1.0208
+kill1,sb-b16-fp8target,dflash-tuned-b16,SGLANG_FP8_DENSE=target,98aa8c9821,e690b3a,4,16,2275.3,716.6,780.3,45.3,5.554,7.118,0.28,0.59,1.0489,1.0744,1.0869,1.0437
+kill1,sb-plain-bf16,plain-tuned,-,98aa8c9821,e690b3a,1,16,281.8,282.1,286.9,34.1,,,0.26,0.66,1.0,1.0,1.0,
+kill1,sb-plain-bf16,plain-tuned,-,98aa8c9821,e690b3a,8,32,2003.2,250.6,258.4,65.5,,,0.28,0.57,1.0,1.0,1.0,
+kill1,sb-plain-bf16,plain-tuned,-,98aa8c9821,e690b3a,64,256,9946.0,155.6,161.2,122.2,,,0.26,0.63,1.0,1.0,1.0,
+kill1,sb-plain-fp8,plain-tuned,SGLANG_FP8_DENSE=target,98aa8c9821,e690b3a,1,16,291.7,292.0,297.3,34.1,,,0.2,0.49,1.0352,1.0353,1.0362,
+kill1,sb-plain-fp8,plain-tuned,SGLANG_FP8_DENSE=target,98aa8c9821,e690b3a,8,32,2032.2,254.2,262.5,67.0,,,0.2,0.6,1.0145,1.0145,1.0157,
+kill1,sb-plain-fp8,plain-tuned,SGLANG_FP8_DENSE=target,98aa8c9821,e690b3a,64,256,10078.2,157.6,163.6,121.4,,,0.26,1.11,1.0133,1.0132,1.0144,
+kill2b,sb2-b16-bf16,dflash-tuned-b16,-,1490d9a891,e690b3a,1,16,810.4,902.0,977.3,40.9,5.319,5.443,0.33,0.8,1.0,1.0,1.0,1.0
+kill2b,sb2-b16-bf16,dflash-tuned-b16,-,1490d9a891,e690b3a,4,16,2157.4,662.7,714.8,46.5,5.333,7.461,0.26,0.5,1.0,1.0,1.0,1.0
+kill2b,sb2-b16-fp8head,dflash-tuned-b16,SGLANG_FP8_DRAFT_HEAD=1,1490d9a891,e690b3a,1,16,822.9,912.8,990.3,40.9,5.265,5.316,0.28,1.03,1.0153,1.0119,1.0133,1.0238
+kill2b,sb2-b16-fp8head,dflash-tuned-b16,SGLANG_FP8_DRAFT_HEAD=1,1490d9a891,e690b3a,4,16,2188.9,684.0,739.3,46.1,5.34,7.224,0.38,0.9,1.0146,1.0321,1.0343,1.0329
+kill2b,sb2-b8-bf16,dflash-tuned,-,1490d9a891,e690b3a,8,32,3562.1,521.7,554.9,45.2,4.649,8.378,0.26,0.75,1.0,1.0,1.0,1.0
+kill2b,sb2-b8-fp8head,dflash-tuned,SGLANG_FP8_DRAFT_HEAD=1,1490d9a891,e690b3a,8,32,3528.0,519.2,551.5,45.3,4.631,8.397,0.26,0.68,0.9904,0.9952,0.9938,0.9977
+kill3,sb3-plain-bf16,plain-tuned,-,1bc2fc4719,e690b3a,1,16,282.1,282.3,287.1,33.5,,,0.12,0.38,1.0,1.0,1.0,
+kill3,sb3-plain-bf16,plain-tuned,-,1bc2fc4719,e690b3a,8,32,1997.7,249.9,257.6,65.8,,,0.23,0.62,1.0,1.0,1.0,
+kill3,sb3-plain-bf16,plain-tuned,-,1bc2fc4719,e690b3a,64,256,9916.5,155.1,160.7,121.5,,,0.32,1.15,1.0,1.0,1.0,
+kill3,sb3-plain-fp8oracle,plain-tuned,SGLANG_FP8_DENSE=target SGLANG_FP8_DENSE_ACT=oracle,1bc2fc4719,e690b3a,1,16,385.7,386.2,396.2,36.3,,,0.19,0.45,1.3673,1.3677,1.3798,
+kill3,sb3-plain-fp8oracle,plain-tuned,SGLANG_FP8_DENSE=target SGLANG_FP8_DENSE_ACT=oracle,1bc2fc4719,e690b3a,8,32,2640.2,330.3,345.1,69.8,,,0.23,0.68,1.3216,1.3219,1.3394,
+kill3,sb3-plain-fp8oracle,plain-tuned,SGLANG_FP8_DENSE=target SGLANG_FP8_DENSE_ACT=oracle,1bc2fc4719,e690b3a,64,256,11755.9,183.9,192.0,124.7,,,0.16,0.6,1.1855,1.1857,1.1952,
+kill3,sb3-plain-fp8tok,plain-tuned,SGLANG_FP8_DENSE=target SGLANG_FP8_DENSE_ACT=token,1bc2fc4719,e690b3a,1,16,292.3,292.5,297.7,33.8,,,0.08,0.2,1.0361,1.0361,1.0368,
+kill3,sb3-plain-fp8tok,plain-tuned,SGLANG_FP8_DENSE=target SGLANG_FP8_DENSE_ACT=token,1bc2fc4719,e690b3a,8,32,2039.9,255.2,263.3,66.4,,,0.09,0.22,1.0211,1.0212,1.022,
+kill3,sb3-plain-fp8tok,plain-tuned,SGLANG_FP8_DENSE=target SGLANG_FP8_DENSE_ACT=token,1bc2fc4719,e690b3a,64,256,10072.1,157.5,163.5,125.8,,,0.1,0.44,1.0157,1.0157,1.0178,
+kill4,sb4-plain-bf16,plain-tuned,-,776f8e5c79,e690b3a,1,16,282.6,282.9,287.6,32.9,,,0.26,0.85,1.0,1.0,1.0,
+kill4,sb4-plain-bf16,plain-tuned,-,776f8e5c79,e690b3a,8,32,2009.6,251.4,259.0,63.9,,,0.2,0.61,1.0,1.0,1.0,
+kill4,sb4-plain-bf16,plain-tuned,-,776f8e5c79,e690b3a,64,256,9881.5,154.5,160.1,116.4,,,0.25,0.71,1.0,1.0,1.0,
+kill4,sb4-plain-fp8tensor,plain-tuned,SGLANG_FP8_DENSE=target SGLANG_FP8_DENSE_ACT=tensor,776f8e5c79,e690b3a,1,16,316.6,317.0,323.3,34.9,,,0.21,0.63,1.1203,1.1204,1.1243,
+kill4,sb4-plain-fp8tensor,plain-tuned,SGLANG_FP8_DENSE=target SGLANG_FP8_DENSE_ACT=tensor,776f8e5c79,e690b3a,8,32,2230.1,279.0,288.9,65.5,,,0.25,0.72,1.1097,1.1098,1.1156,
+kill4,sb4-plain-fp8tensor,plain-tuned,SGLANG_FP8_DENSE=target SGLANG_FP8_DENSE_ACT=tensor,776f8e5c79,e690b3a,64,256,10843.0,169.6,176.3,120.0,,,0.23,0.63,1.0973,1.0974,1.1011,
+kill6,sb6-b16-bf16,dflash-tuned-b16,-,171774b1c5,e690b3a,1,16,811.1,902.6,977.4,39.7,5.319,5.442,0.29,0.72,1.0,1.0,1.0,1.0
+kill6,sb6-b16-bf16,dflash-tuned-b16,-,171774b1c5,e690b3a,4,16,2162.6,664.7,715.8,45.5,5.333,7.451,0.39,0.79,1.0,1.0,1.0,1.0
+kill6,sb6-b16-fp8static,dflash-tuned-b16,SGLANG_FP8_DENSE=target SGLANG_FP8_DENSE_ACT=static SGLANG_FP8_DENSE_CALIB=~/vp-data/speed-bytes/fp8_static_calib.json,171774b1c5,e690b3a,1,16,961.1,1082.1,1191.5,39.0,5.588,4.69,0.09,0.24,1.1849,1.1988,1.219,1.1604
+kill6,sb6-b16-fp8static,dflash-tuned-b16,SGLANG_FP8_DENSE=target SGLANG_FP8_DENSE_ACT=static SGLANG_FP8_DENSE_CALIB=~/vp-data/speed-bytes/fp8_static_calib.json,171774b1c5,e690b3a,4,16,2440.5,791.1,865.7,44.9,5.539,6.398,0.19,0.55,1.1285,1.19,1.2094,1.1645
+kill6,sb6-b16-ovl-bf16,dflash-tuned-b16,PYTHONPATH=~/vp-data/upstream/sm90a/overlay,171774b1c5,e690b3a,1,16,810.4,902.0,975.5,39.8,5.319,5.453,0.13,0.32,1.0,1.0,1.0,1.0
+kill6,sb6-b16-ovl-bf16,dflash-tuned-b16,PYTHONPATH=~/vp-data/upstream/sm90a/overlay,171774b1c5,e690b3a,4,16,2161.8,664.4,715.4,45.4,5.333,7.455,0.1,0.2,1.0,1.0,1.0,1.0
+kill6,sb6-b16-ovl-fp8cutlass,dflash-tuned-b16,PYTHONPATH=~/vp-data/upstream/sm90a/overlay SGLANG_FP8_DENSE=target SGLANG_FP8_DENSE_ACT=cutlass,171774b1c5,e690b3a,1,16,967.6,1106.5,1223.1,39.8,5.709,4.668,0.16,0.42,1.194,1.2268,1.2538,1.1683
+kill6,sb6-b16-ovl-fp8cutlass,dflash-tuned-b16,PYTHONPATH=~/vp-data/upstream/sm90a/overlay SGLANG_FP8_DENSE=target SGLANG_FP8_DENSE_ACT=cutlass,171774b1c5,e690b3a,4,16,2438.2,803.5,883.3,45.4,5.851,6.625,0.24,0.67,1.1278,1.2094,1.2347,1.1254
+kill6,sb6-plain-bf16,plain-tuned,-,171774b1c5,e690b3a,1,16,282.1,282.4,287.2,34.0,,,0.37,0.86,1.0,1.0,1.0,
+kill6,sb6-plain-bf16,plain-tuned,-,171774b1c5,e690b3a,8,32,1995.2,249.6,257.4,66.8,,,0.22,0.53,1.0,1.0,1.0,
+kill6,sb6-plain-bf16,plain-tuned,-,171774b1c5,e690b3a,64,256,9899.1,154.8,160.5,120.4,,,0.29,0.83,1.0,1.0,1.0,
+kill6,sb6-plain-fp8static,plain-tuned,SGLANG_FP8_DENSE=target SGLANG_FP8_DENSE_ACT=static SGLANG_FP8_DENSE_CALIB=~/vp-data/speed-bytes/fp8_static_calib.json,171774b1c5,e690b3a,1,16,355.5,355.9,364.0,34.7,,,0.24,0.79,1.2601,1.2604,1.2673,
+kill6,sb6-plain-fp8static,plain-tuned,SGLANG_FP8_DENSE=target SGLANG_FP8_DENSE_ACT=static SGLANG_FP8_DENSE_CALIB=~/vp-data/speed-bytes/fp8_static_calib.json,171774b1c5,e690b3a,8,32,2456.0,307.3,319.8,67.3,,,0.31,0.69,1.231,1.2312,1.2426,
+kill6,sb6-plain-fp8static,plain-tuned,SGLANG_FP8_DENSE=target SGLANG_FP8_DENSE_ACT=static SGLANG_FP8_DENSE_CALIB=~/vp-data/speed-bytes/fp8_static_calib.json,171774b1c5,e690b3a,64,256,11465.0,179.3,186.7,117.7,,,0.29,0.99,1.1582,1.1583,1.1637,
+kill6,sb6-plain-ovl-bf16,plain-tuned,PYTHONPATH=~/vp-data/upstream/sm90a/overlay,171774b1c5,e690b3a,1,16,282.2,282.5,287.3,34.1,,,0.23,0.83,1.0,1.0,1.0,
+kill6,sb6-plain-ovl-bf16,plain-tuned,PYTHONPATH=~/vp-data/upstream/sm90a/overlay,171774b1c5,e690b3a,8,32,1997.6,249.9,257.7,65.5,,,0.27,0.61,1.0,1.0,1.0,
+kill6,sb6-plain-ovl-bf16,plain-tuned,PYTHONPATH=~/vp-data/upstream/sm90a/overlay,171774b1c5,e690b3a,64,256,9902.7,154.9,160.5,122.5,,,0.24,0.81,1.0,1.0,1.0,
+kill6,sb6-plain-ovl-fp8cutlass,plain-tuned,PYTHONPATH=~/vp-data/upstream/sm90a/overlay SGLANG_FP8_DENSE=target SGLANG_FP8_DENSE_ACT=cutlass,171774b1c5,e690b3a,1,16,340.4,340.8,348.6,36.3,,,0.29,0.95,1.2063,1.2065,1.2132,
+kill6,sb6-plain-ovl-fp8cutlass,plain-tuned,PYTHONPATH=~/vp-data/upstream/sm90a/overlay SGLANG_FP8_DENSE=target SGLANG_FP8_DENSE_ACT=cutlass,171774b1c5,e690b3a,8,32,2382.2,298.0,310.1,71.2,,,0.3,0.82,1.1925,1.1927,1.2037,
+kill6,sb6-plain-ovl-fp8cutlass,plain-tuned,PYTHONPATH=~/vp-data/upstream/sm90a/overlay SGLANG_FP8_DENSE=target SGLANG_FP8_DENSE_ACT=cutlass,171774b1c5,e690b3a,64,256,11091.9,173.5,180.7,124.5,,,0.28,0.93,1.1201,1.1203,1.126,

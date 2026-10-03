@@ -1,0 +1,111 @@
+{
+ "budget_pt": -1.0,
+ "runs": {
+  "sb-gsm8k-bf16": {
+   "hold": "q6_20261003T012924Z",
+   "accuracy": 0.8984078847611827,
+   "accuracy_wilson95": [
+    0.880929283260497,
+    0.9135724923111209
+   ],
+   "truncated": 231,
+   "no_answer": 92,
+   "completion_tokens_mean": 6099.253980288097,
+   "wall_s": 1061.9063863754272,
+   "env": {},
+   "engine": "171774b1c5"
+  },
+  "sb-gsm8k-fp8static": {
+   "hold": "q6_20261003T012924Z",
+   "accuracy": 0.9067475360121304,
+   "accuracy_wilson95": [
+    0.889851628910415,
+    0.9212810116113224
+   ],
+   "truncated": 209,
+   "no_answer": 75,
+   "completion_tokens_mean": 5794.481425322214,
+   "wall_s": 942.4960815906525,
+   "env": {
+    "SGLANG_FP8_DENSE": "target",
+    "SGLANG_FP8_DENSE_ACT": "static",
+    "SGLANG_FP8_DENSE_CALIB": "~/vp-data/speed-bytes/fp8_static_calib.json"
+   },
+   "engine": "171774b1c5"
+  },
+  "sb-gsm8k-ovl-bf16": {
+   "hold": "q7_20261003T024115Z",
+   "accuracy": 0.8946171341925702,
+   "accuracy_wilson95": [
+    0.8768850230865695,
+    0.9100572684168124
+   ],
+   "truncated": 251,
+   "no_answer": 91,
+   "completion_tokens_mean": 6350.960576194087,
+   "wall_s": 1114.2285256385803,
+   "env": {
+    "PYTHONPATH": "~/vp-data/upstream/sm90a/overlay"
+   },
+   "engine": "171774b1c5"
+  },
+  "sb-gsm8k-ovl-fp8cutlass": {
+   "hold": "q7_20261003T024115Z",
+   "accuracy": 0.8870356330553449,
+   "accuracy_wilson95": [
+    0.8688160718982901,
+    0.9030072514686193
+   ],
+   "truncated": 220,
+   "no_answer": 101,
+   "completion_tokens_mean": 6051.4776345716455,
+   "wall_s": 999.2136030197144,
+   "env": {
+    "PYTHONPATH": "~/vp-data/upstream/sm90a/overlay",
+    "SGLANG_FP8_DENSE": "target",
+    "SGLANG_FP8_DENSE_ACT": "cutlass"
+   },
+   "engine": "171774b1c5"
+  }
+ },
+ "pairs": [
+  {
+   "run_a": "~/vp-data/speed-bytes/q6_20261003T012924Z/sb-gsm8k-bf16/20261003-012924",
+   "run_b": "~/vp-data/speed-bytes/q6_20261003T012924Z/sb-gsm8k-fp8static/20261003-014813",
+   "problems": 1319,
+   "accuracy_a": 0.8984078847611827,
+   "accuracy_b": 0.9067475360121304,
+   "accuracy_delta_b_minus_a": 0.00833965125094771,
+   "correct_only_a": 76,
+   "correct_only_b": 87,
+   "mcnemar_exact_p": 0.4335671268286527,
+   "same_predicted_answer": 0.7657316148597423,
+   "identical_generation": 0.0,
+   "delta_pt": 0.833965125094771,
+   "delta_ci95_pt": [
+    -1.0626658256944264,
+    2.7305960758839642
+   ],
+   "within_budget": true
+  },
+  {
+   "run_a": "~/vp-data/speed-bytes/q7_20261003T024115Z/sb-gsm8k-ovl-bf16/20261003-024115",
+   "run_b": "~/vp-data/speed-bytes/q7_20261003T024115Z/sb-gsm8k-ovl-fp8cutlass/20261003-030056",
+   "problems": 1319,
+   "accuracy_a": 0.8946171341925702,
+   "accuracy_b": 0.8870356330553449,
+   "accuracy_delta_b_minus_a": -0.007581501137225222,
+   "correct_only_a": 89,
+   "correct_only_b": 79,
+   "mcnemar_exact_p": 0.4875669955799865,
+   "same_predicted_answer": 0.759666413949962,
+   "identical_generation": 0.0,
+   "delta_pt": -0.7581501137225222,
+   "delta_ci95_pt": [
+    -2.6837581971860978,
+    1.167457969741064
+   ],
+   "within_budget": true
+  }
+ ]
+}
