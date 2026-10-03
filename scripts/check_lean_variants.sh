@@ -43,7 +43,7 @@ check_variant separation_nonstrict StockDecision.lean \
 # Theorem 2.3: the pairwise gap condition with a non-strict gap.
 check_variant gap_condition_nonstrict StockDecision.lean \
   's/(gap : za - zb > Ga + Gb/(gap : za - zb >= Ga + Gb/; s/z a - z b > G a + G b/z a - z b >= G a + G b/'
-# Section 2.2: the screen margin with delta_max halved to Gmax + u(zbar + Gmax).
+# Section 2.2: the screen margin with one Gmax removed, Gmax + u(zbar + Gmax).
 check_variant screen_drop_half_margin StockDecision.lean \
   's/(drop : hi j < lo i - (2 \* Gmax + u (zbar + Gmax)))/(drop : hi j < lo i - (Gmax + u (zbar + Gmax)))/'
 # Proposition 2.4: an earlier entry of C allowed to tie k (both forms of the condition).

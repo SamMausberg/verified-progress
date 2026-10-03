@@ -395,7 +395,7 @@ c = 1 (`equality/table.csv`, `equality/gate.json`):
 | G and FG against B0 | 167 of 320 prompts diverge; every first divergence is a tie (159), one ulp (7) or near (1): exact-up-to-rounding |
 | G and FG against stock DFlash-16 (bench's reference with FlashInfer attention) | 185 diverge: 174 tie, 10 one ulp, 1 near |
 | H (tokens only) against B0, FGH against FG | tokens and output lengths identical on all 320 |
-| H and FGH in check mode | 0 of 249,392 and 0 of 250,464 certified verify rows differ from the stock head; 3.8% of rows and 42% of verify calls fell back to the stock head for some columns |
+| H and FGH in check mode | 0 of 249,392 and 0 of 250,464 checked verify rows differ from the stock head; 3.8% of rows and 42% of verify calls fell back to the stock head for some columns |
 
 FULL is therefore exact-up-to-rounding against stock DFlash block 16: G's GEMMs round
 differently, F is bitwise and H changes no token. The class has the equality step's scope
