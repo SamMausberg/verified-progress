@@ -129,16 +129,17 @@ every one of their 769,842 output positions (all runs together). The amended scr
 reuses. Both holds refuse a repository with modified tracked files, a confirm engine other than the
 declared tree or with local changes, and stock SGLang (which S0 imports) away from the pin `bd66ce343e`
 or with local changes; the equality hold also checks its prompt file against
-`evidence/state_safety/prompt_manifest.json`. A session accepts the gate only if every equality run in
-its `meta.json` comes from the session's repository commit, S0's from the pin and every other run's from
-the confirm engine's commit, all without modified SGLang files. `CONFIRM_LEVERS` must use only A, B and
+`evidence/state_safety/prompt_manifest.json`. A session accepts the gate only if its `meta.json` lists
+exactly the runs the equality hold makes for the levers (11 for ABC) and every one comes from the
+session's repository commit, S0's from the pin and every other run's from the confirm engine's commit,
+all without modified SGLang files. `CONFIRM_LEVERS` must use only A, B and
 C, and a session builds each arm's arguments so that a failure fails the arm. The holds ran the earlier
 versions (tag `speed-lowc-confirm-holds`), and the committed run is unaffected: every S0 run, two in
 the equality hold and twelve timed launches, imported `bd66ce343e` with no modified files, and every
-other run `dd57a50a59` with none (`equality/meta.json`, `launches.csv`); the three sessions read the
-only equality directory, `equality-20261002T215749Z`, whose runs and the sessions all ran at repository
-`9a7d52a` with no modified files; the prompt file matches the manifest; and every launch's flags are
-its declared arm's (Validity).
+other run `dd57a50a59` with none (`equality/meta.json`, `launches.csv`). The three sessions read the
+only equality directory, `equality-20261002T215749Z`, whose `meta.json` lists exactly those 11 runs,
+and those runs and the sessions all ran at repository `9a7d52a` with no modified files. The prompt file
+matches the manifest, and every launch's flags are its declared arm's (Validity).
 
 ## Results
 
