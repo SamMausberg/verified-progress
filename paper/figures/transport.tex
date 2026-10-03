@@ -92,7 +92,8 @@
 \draw[flow,very thick,shorten >=2.2pt] (O) -- (T);
 \node[below,inner sep=2pt] at (70,-2) {$h^t$, $\norm{h^t}_2=\vpnum{0}{\figHt}$};
 \draw[flow,very thick,cdflash16] (O) -- (D);
-\node[anchor=south east,align=right,inner sep=1pt] at ($(D)+(-1,1)$) {$h^d$, $\norm{h^d}_2=\vpnum{1}{\figHd}$};
+% h^d's label left of its tip and just below it, so it names the arrow, not the rescaling's dot F
+\node[anchor=east,align=right,inner sep=1pt] at ($(D)+(-4,-3)$) {$h^d$, $\norm{h^d}_2=\vpnum{1}{\figHd}$};
 % Delta: its symbol beside the dashed line near h^d's tip, its length under h^t's label
 \draw[thick,cdflash16,dashed,shorten >=2.2pt] (D) -- (T);
 \node[note,inner sep=1pt] at (42,31) {$\Delta$};

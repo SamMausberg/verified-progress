@@ -10,14 +10,14 @@
 % (arm dflash16) reddish purple, dashed, diamonds; MTP (arm mtp) green, dash-dot, triangles,
 % filled where three or more sessions are valid and hollow (mark hollow) where only one is, which
 % the caption says. Each curve runs from c = 1 (lower right) to c = 128 (upper left); the plain
-% curve's ends are labelled, clear of its line (c = 128 above its point: ymax 25,000 leaves room
-% for the label). Error bars are one standard deviation over sessions (x_e2e_std, y_std); every
+% curve's ends are labelled, clear of its line (c = 128 above and left of its point, clear of MTP's c = 128
+% triangle below it and of the top frame). Error bars are one standard deviation over sessions (x_e2e_std, y_std); every
 % one is below 2% of its mean and hidden by its marker, which the caption says. No arm uses the
 % certified head. The figure has one panel, so it has no title inside it; the caption names it
 % and its status.
 % Direct labels, no legend, each placed where its curve is alone (positions checked against
 % frontier.csv): plain decoding left of its c = 1-2 run (nothing lies left of x = 228 below
-% y = 3,600), opposite the c = 1 label; MTP below and right of its c = 1 point (461, 456), under the DFlash c = 1
+% y = 3,600), opposite the c = 1 label; MTP, two lines, right of its c = 1 point (461, 456), under the DFlash c = 1
 % points; 8-token DFlash above and right of its c = 16 point (370, 5,256), where the envelope is
 % the upper boundary of every curve; 16-token DFlash under its c = 48 point (130, 5,326), the
 % lowest curve left of x = 184, clear of the plain curve at x >= 228.
@@ -52,10 +52,10 @@
 \addplot[only marks,cmtp,mark triangle,mark hollow,forget plot,discard if not={label}{mtp-tuned},only if n below=3]
   table[x=x_e2e_mean,y=y_mean,col sep=comma]{../evidence/bench/confirm/frontier.csv};
 \node[annot,anchor=west] at (axis cs:300,282) {$c{=}1$};
-\node[annot,anchor=south] at (axis cs:108.7,14600) {$c{=}128$};
+\node[annot,anchor=south east] at (axis cs:106,14800) {$c{=}128$};
 % direct labels (positions in the comment above)
 \node[annot,anchor=east] at (axis cs:255,450) {plain decoding};
-\node[annot,anchor=north west] at (axis cs:475,410) {MTP, 3 steps};
+\node[annot,anchor=north west,align=left] at (axis cs:478,640) {MTP, 3 steps,\\FlashInfer};
 \node[annot,anchor=south west] at (axis cs:390,5700) {DFlash, 8-token blocks};
 \node[annot,anchor=north,align=center] at (axis cs:135,3800) {DFlash,\\16-token blocks};
 \end{axis}
