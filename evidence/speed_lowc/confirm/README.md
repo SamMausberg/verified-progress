@@ -125,6 +125,21 @@ and classified prompts add up to 320 (`equality/summary.json`), and the 11 runs 
 every one of their 769,842 output positions (all runs together). The amended script, run on the hold's `summary.json`, writes a
 `gate.json` byte for byte equal to `equality/gate.json`.
 
+2026-10-03, after the analysis (review of #230): the hold scripts now check every input a later step
+reuses. Both holds refuse a repository with modified tracked files, a confirm engine other than the
+declared tree or with local changes, and stock SGLang (which S0 imports) away from the pin `bd66ce343e`
+or with local changes; the equality hold also checks its prompt file against
+`evidence/state_safety/prompt_manifest.json`. A session accepts the gate only if every equality run in
+its `meta.json` comes from the session's repository commit, S0's from the pin and every other run's from
+the confirm engine's commit, all without modified SGLang files. `CONFIRM_LEVERS` must use only A, B and
+C, and a session builds each arm's arguments so that a failure fails the arm. The holds ran the earlier
+versions (tag `speed-lowc-confirm-holds`), and the committed run is unaffected: every S0 run, two in
+the equality hold and twelve timed launches, imported `bd66ce343e` with no modified files, and every
+other run `dd57a50a59` with none (`equality/meta.json`, `launches.csv`); the three sessions read the
+only equality directory, `equality-20261002T215749Z`, whose runs and the sessions all ran at repository
+`9a7d52a` with no modified files; the prompt file matches the manifest; and every launch's flags are
+its declared arm's (Validity).
+
 ## Results
 
 Written 2026-10-03. Labels: **measured** (read from the files below) and **derived** (ratios, means and
