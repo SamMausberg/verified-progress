@@ -495,7 +495,7 @@ The plan-stream arm fails at the first verify: the hybrid GDN backend does not i
 NotImplementedError), so the plan stream cannot be used with Qwen3.5 MTP at this commit.
 The engine-level fix (sync-free FlashInfer planning) belongs to the hostgap workstream.
 
-## 2e. Block-parallel GDN verification (proposal P7, first rejection tests)
+## 2e. Block-parallel GDN verification (proposal P7b, first rejection tests)
 
 `gdn_fast_verify_check.py`, one layer, synthetic activations with the checkpoint's gates.
 
@@ -517,7 +517,7 @@ The engine-level fix (sync-free FlashInfer planning) belongs to the hostgap work
 At one request SGLang's chunked kernel is slower than the recurrent verify at every width
 up to 256 (its cost is launch- and setup-bound and nearly flat), so even the unchecked fast
 path does not beat the recurrent path: SGLang's chunked GDN kernel is not a usable fast path
-for P7 (synthetic inputs, one layer, one request). A purpose-built block-parallel kernel is
+for P7b (synthetic inputs, one layer, one request). A purpose-built block-parallel kernel is
 untested. (The recurrent kernel without snapshots is slower than with them because
 the wrapper picks a different launch configuration when no snapshot buffer is passed.) The
 FlashInfer MTP verify kernel that the DFlash baseline uses is not in this table yet.
@@ -689,7 +689,7 @@ with `summarise.py` at `e47f0e5` (checked on 2026-10-01; a later version may add
 Job B (2026-10-01, about 01:40-02:19 UTC; repo `167bf99`, engine `1101be8c5f` =
 `bd66ce343e` + moonshot patches 0001-0008; the bench launch records of its servers carry both
 commits and no modified files). Kernel checks and kernel bench (2c), host-gap levers (2d) and
-P7 (2e), from the repository root with `PYTHONPATH=~/sglang-wt/moonshot/python`:
+P7b (2e), from the repository root with `PYTHONPATH=~/sglang-wt/moonshot/python`:
 
 ```sh
 python experiments/moonshot/gdn_exact_replay_check.py check --batch 8 --steps 48 --ring 4 \
@@ -714,7 +714,7 @@ python experiments/moonshot/gdn_fast_verify_check.py bench --widths 4 16 64 128 
 The JSONs were copied from `exact_replay/check_L4.json`, `check_L16.json`,
 `check_L4_layer20.json` and `bench.json` to `gdn_exact_replay_check_L4.json`, `_L16.json`,
 `_L4_layer20.json` and `gdn_exact_replay_bench.json`, and from `p7/` with a `p7_` prefix.
-The commits of the kernel and P7 steps are inferred from the same job (neither tree changed
+The commits of the kernel and P7b steps are inferred from the same job (neither tree changed
 during it). The plan-stream arm of the host sweep failed (2d) and has no row. Two generators
 have changed since. `gdn_exact_replay_check.py` now exits non-zero when a check is not
 bit-identical; its output is unchanged. `gdn_fast_verify_check.py bench` now also times
