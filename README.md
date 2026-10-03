@@ -308,8 +308,7 @@ outside git; each evidence README names the run it summarizes.
 Samuel Mausberg is the author of the paper, directed the work and is responsible
 for its claims.
 AI (Claude Opus 5.5, GPT-6 Astra Pro) was used in developing the paper and the
-code. The confidential assignment that motivated the work is not reproduced or
-quoted, and no model weights are redistributed.
+code. No model weights are redistributed.
 
 ## Citing this work
 
