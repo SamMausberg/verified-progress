@@ -13,6 +13,13 @@ repo="$(cd "$here/../.." && pwd)"
 source "$repo/scripts/sglang_env.sh"
 cd "$repo" || exit 1
 out="${1:-$HOME/vp-data/speed_highc/prefill-$(date -u +%Y%m%dT%H%M%SZ)}"
+# gdn_prefill_bench.py writes its file only when every shape has finished, so a complete file
+# from an earlier attempt would outlive a failed rerun and be collected as this one's: start
+# from an empty directory.
+if [ -n "$(ls -A "$out" 2>/dev/null)" ]; then
+  echo "$out is not empty; move it aside" >&2
+  exit 1
+fi
 mkdir -p "$out"
 echo "repo $(git rev-parse HEAD) out $out $(date -u +%H:%M:%S)"
 status=0

@@ -36,11 +36,21 @@ ARMS
 rm -f "$out/summary.json" "$out/report.json" "$out/classes.json" "$out/divergences.csv" \
   "$out/table.csv"
 status=0
-# Every pass of every run must record its repository and SGLang revisions, and all must be the
-# same; a pass without them (or no pass at all) fails the check.
+# The six passes of run_admission_logprob.sh (its three runs at c = 64 and 128) must each have
+# their outputs and their metadata, and every one must record the same repository and SGLang
+# revisions; a missing file or a pass without revisions fails the check.
+metas=()
+for run in mtp_s3_replayssm__adm_n0 mtp_s3_replayssm__adm_n0b mtp_s3_replayssm__adm_pd; do
+  for pass in c64 c128; do
+    for file in "$runs/$run/$pass.jsonl" "$runs/$run/$pass.meta.json"; do
+      [ -s "$file" ] || { echo "$file is missing or empty" >&2; status=1; }
+    done
+    metas+=("$runs/$run/$pass.meta.json")
+  done
+done
 if ! revisions="$(jq -er 'if (.repo_sha // "") == "" or (.sglang_sha // "") == ""
     then error("\(input_filename): no revisions") else "\(.repo_sha) \(.sglang_sha)" end' \
-    "$runs"/*/c*.meta.json)"; then
+    "${metas[@]}")"; then
   echo "a pass of the runs records no revisions" >&2
   status=1
 fi
