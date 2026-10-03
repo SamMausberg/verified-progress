@@ -224,6 +224,43 @@ SWEEP_LAUNCH = {
     'kill3': ('speed-bytes', 30224),
 }
 SWEEP_MIN_REQUESTS, SWEEP_WAVES = 16, 4
+# What bench/sweep.py sends for the options the holds leave out: its argument defaults
+# (bench/sweep.py:501-578: --osl 512, --repeats 1, --ignore-eos, --thinking, --per-chunk-usage,
+# --export-level raw, --min-warmup 2, --streaming, no --aiperf-workers, no --snapshot-file, no
+# --return-token-ids) and request_body() for them (bench/sweep.py:77-88), driven by aiperf 0.13.0
+# (bench/README.md:11), on the committed workload and warm-up pool (bench/sweep.py:57-58).
+SWEEP_REQUEST = {
+    'request_body': {
+        'temperature': 0.0,
+        'ignore_eos': True,
+        'chat_template_kwargs': {'enable_thinking': True},
+        'return_spec_tokens_details': True,
+    },
+    'osl': 512,
+    'ignore_eos': True,
+    'repeats': 1,
+    'min_warmup': 2,
+    'per_chunk_usage': True,
+    'export_level': 'raw',
+    'streaming': True,
+    'aiperf_workers': None,
+    'snapshot_files': [],
+    'aiperf_version': '0.13.0',
+}
+SWEEP_WORKLOAD = 'bench/workloads/mixed-v2/confirm.jsonl'
+SWEEP_WARMUP_POOL = 'bench/workloads/mixed-v2/warmup.jsonl'
+
+
+def sweep_workload_ok(w: dict) -> bool:
+    """The sweep's workload and warm-up pool are this checkout's committed files, every prompt read."""
+    conf, pool = REPO / SWEEP_WORKLOAD, REPO / SWEEP_WARMUP_POOL
+    return (
+        Path(w['file']).parts[-4:] == Path(SWEEP_WORKLOAD).parts
+        and Path(w['warmup_pool']).parts[-4:] == Path(SWEEP_WARMUP_POOL).parts
+        and w['sha256'] == hashlib.sha256(conf.read_bytes()).hexdigest()
+        and w['warmup_pool_sha256'] == hashlib.sha256(pool.read_bytes()).hexdigest()
+        and w['prompts'] == len(conf.read_text().splitlines())
+    )
 
 
 def expected_sweep_command(hold: Path, label: str, planned: Planned) -> list[str]:
@@ -381,6 +418,10 @@ def cmd_served(args: argparse.Namespace) -> None:
                 or d['launch']['command'] != launched
             ):
                 raise SystemExit(f'{f}: not the sweep its hold launches: {cmd} {d["arm"]["args"]}')
+            # The settings bench/sweep.py took from its defaults, which the command line does not show.
+            request = {k: d[k] for k in SWEEP_REQUEST}
+            if request != SWEEP_REQUEST or not sweep_workload_ok(d['workload']):
+                raise SystemExit(f'{f}: request settings {request}, workload {d["workload"]}')
             planned = set(conc)
             got = {p['concurrency'] for p in d['points']}
             if planned != got or planned != set(d['concurrency']):

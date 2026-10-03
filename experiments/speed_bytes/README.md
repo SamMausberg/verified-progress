@@ -26,7 +26,9 @@ to eager, relative error under 0.06); the run printed them all passing. `summari
 every input against what its hold launched: per hold the engine (its tree, which the hold scripts
 now log, or for the recorded runs the commit) and that its log reached its last line; per sweep
 the full `bench/sweep.py` invocation the hold makes (arm, label, session, engine, port,
-concurrencies, request counts, the exact switches and nothing else), the arm as `bench/arms.toml`
+concurrencies, request counts, the exact switches and nothing else), the settings `bench/sweep.py`
+took from its defaults (output length, request body, warm-up, aiperf version, and the committed
+workload and warm-up pool by hash), the arm as `bench/arms.toml`
 at the hold's commit resolves it, the server command bench launched for it, the harness commit the
 hold logged, the virtualenv's interpreter and bench's own point-validity rule; per probe server
 the launch SGLang printed (`server_args`: the hold's flags and the defaults the comparison relies
