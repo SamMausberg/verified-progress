@@ -9,18 +9,23 @@
 set -euo pipefail
 data="${1:-$HOME/vp-data/speed_highc}"
 out="${2:-evidence/admission}"
-# probe:directory:every label its hold script launched (run_admission_probe.sh:35-45,
+# The engine each group ran on: probes 1-3 on the pin plus drafter 0001-0004 committed in
+# ~/sglang-wt/speed_highc (evidence/admission/README.md, "Provenance"), the confirmation on the
+# stock pin (engine/sglang/README.md:4).
+patched=8f4225186e13d4245c3b9bfadbc7f62aea694463
+pin=bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824
+# probe:directory:engine:every label its hold script launched (run_admission_probe.sh:35-45,
 # run_queue_delay_probe.sh:34-38, run_natural_probe.sh:24-26 for the length generator and
-# 50-55, run_admission_confirm.sh:52-62); each must have exactly one launch record, and no other
-# may appear.
+# 50-55, run_admission_confirm.sh:52-62); each must have exactly one launch record, on that
+# engine, and no other may appear.
 probes=(
-  "probe1:admission:dflash-fold-n16 dflash-fold-n4 dflash-n16 dflash-n4 mtp-n0 mtp-n32 mtp-n8 plain-tuned replayssm"
-  "probe2:queue-delay:mtp-n0 mtp-pd plain-pd plain-tuned replayssm"
-  "probe3:natural-20261002T195727Z/gen:natural-gen"
-  "probe3:natural-20261002T195727Z:dflash-fold-pd mtp-n0 mtp-pd plain-pd plain-tuned replayssm"
-  "confirm-s0:confirm/s0:dflash dflash-delay mtp-delay mtp-n0 plain-delay plain-tuned replayssm"
-  "confirm-s1:confirm/s1:dflash dflash-delay mtp-delay mtp-n0 plain-delay plain-tuned replayssm"
-  "confirm-s2:confirm/s2:dflash dflash-delay mtp-delay mtp-n0 plain-delay plain-tuned replayssm"
+  "probe1:admission:$patched:dflash-fold-n16 dflash-fold-n4 dflash-n16 dflash-n4 mtp-n0 mtp-n32 mtp-n8 plain-tuned replayssm"
+  "probe2:queue-delay:$patched:mtp-n0 mtp-pd plain-pd plain-tuned replayssm"
+  "probe3:natural-20261002T195727Z/gen:$patched:natural-gen"
+  "probe3:natural-20261002T195727Z:$patched:dflash-fold-pd mtp-n0 mtp-pd plain-pd plain-tuned replayssm"
+  "confirm-s0:confirm/s0:$pin:dflash dflash-delay mtp-delay mtp-n0 plain-delay plain-tuned replayssm"
+  "confirm-s1:confirm/s1:$pin:dflash dflash-delay mtp-delay mtp-n0 plain-delay plain-tuned replayssm"
+  "confirm-s2:confirm/s2:$pin:dflash dflash-delay mtp-delay mtp-n0 plain-delay plain-tuned replayssm"
 )
 # The three servers of run_admission_logprob.sh:28.
 logprob_runs=(mtp_s3_replayssm__adm_n0 mtp_s3_replayssm__adm_n0b mtp_s3_replayssm__adm_pd)
@@ -31,7 +36,7 @@ trap 'rm -rf "$tmp"' EXIT
 {
   echo "probe,label,session,repo_head,sglang_head,sglang_branch,env,command"
   for spec in "${probes[@]}"; do
-    IFS=: read -r probe sub expected <<< "$spec"
+    IFS=: read -r probe sub engine expected <<< "$spec"
     dir="$data/$sub"
     found=()
     for launch in "$dir"/*/[0-9]*-[0-9]*/server/launch.json; do
@@ -43,9 +48,11 @@ trap 'rm -rf "$tmp"' EXIT
       # A record without its repository and engine revisions, or whose repository or engine
       # tree had tracked modifications (dirty_files, absent counting as unknown), cannot
       # identify the code that ran: stop.
-      jq -er --arg p "$probe" --arg l "$label" --arg s "$session" \
+      jq -er --arg p "$probe" --arg l "$label" --arg s "$session" --arg e "$engine" \
         'if [.repo.head, .sglang_source.head, .sglang_source.branch]
             | any(. == null or . == "") then error("\(input_filename): no commit metadata")
+         elif .sglang_source.head != $e
+           then error("\(input_filename): engine \(.sglang_source.head), declared \($e)")
          elif .repo.dirty_files != [] or .sglang_source.dirty_files != []
            then error("\(input_filename): dirty or unrecorded tree")
          else [$p, $l, $s, .repo.head, .sglang_source.head, .sglang_source.branch,
@@ -75,8 +82,16 @@ imported() {
 }
 stock_from="$(imported "$prefill/stock/server.log")"
 fi_from="$(imported "$prefill/fi-prefill/server.log")"
+# Where client.json records the two trees (runs since prefill_probe.py recorded them), both must
+# be clean and SGLang at the pin, as for the serving launches; the committed run predates that.
 jq -n --slurpfile s "$prefill/stock/client.json" --slurpfile f "$prefill/fi-prefill/client.json" \
-  --arg repo "$repo_head" --arg sp "$stock_from" --arg fp "$fi_from" '
+  --arg repo "$repo_head" --arg sp "$stock_from" --arg fp "$fi_from" --arg pin "$pin" '
+def check(c): if (c.repo != null and c.repo.dirty_files != [])
+    or (c.sglang_source != null and c.sglang_source.dirty_files != [])
+  then error("\(c.arm): dirty or unrecorded tree in client.json")
+  elif c.sglang_source != null and c.sglang_source.head != $pin
+  then error("\(c.arm): SGLang \(c.sglang_source.head), not the pin")
+  else c end;
 def summ(c; p): {arm: c.arm, server_under_nsys_launch: (c.command[0]=="nsys"), linear_attn_prefill_backend_flag: (c.args["linear-attn-prefill-backend"] // null),
   repo_head: (c.repo.head // (if $repo == "" then error("\(c.arm): no repository head") else $repo end)), sglang_head: (c.sglang_source.head // null), sglang_imported_from: p,
   untraced: {single_median_ms: c.untraced.sequential_median_ms, concurrent8_wall_median_ms: c.untraced.concurrent8_wall_median_ms,
@@ -85,7 +100,7 @@ def summ(c; p): {arm: c.arm, server_under_nsys_launch: (c.command[0]=="nsys"), l
 {run: "prefill-20261002T175303Z", requests: "30 confirm-split prompts one at a time (max_tokens 1, non-streaming, thinking on), then 5 rounds of 8 concurrent",
  resolved_gdn_backends: "decode=triton, prefill=flashinfer, verify=triton in both servers (server logs)",
  revisions: "repo_head from client.json, else the hold log; sglang_head from client.json (null where the probe did not record it); sglang_imported_from from the server log",
- stock: summ($s[0]; $sp), explicit_flashinfer_prefill: summ($f[0]; $fp)}' > "$tmp/prefill_requests.json"
+ stock: summ(check($s[0]); $sp), explicit_flashinfer_prefill: summ(check($f[0]); $fp)}' > "$tmp/prefill_requests.json"
 
 jq '{gap_ms_between_windows: 20, windows: .windows, first_30_median: .first_30_median, rows: .rows}' \
   "$prefill/stock/trace_summary.json" > "$tmp/prefill_trace.json"

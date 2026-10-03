@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Classify the greedy outputs of run_admission_logprob.sh (CPU only):
-#   experiments/admission/classify_logprob.sh [OUT]
+#   experiments/admission/classify_logprob.sh [--unrecorded-repo-state] [OUT]
 # OUT (default ~/vp-data/speed_highc/logprob) holds runs/ from the GPU hold. Every
 # comparison of the delayed run with an undelayed one (both undelayed launches, at c = 64 and
 # 128) is its own entry in arms.json, so bench.divergence classifies each of them; the third
@@ -12,6 +12,14 @@ repo="$(cd "$here/../.." && pwd)"
 # shellcheck source=/dev/null
 source "$repo/scripts/sglang_env.sh"
 cd "$repo" || exit 1
+unrecorded_repo_state=0
+if [ "${1:-}" = --unrecorded-repo-state ]; then
+  unrecorded_repo_state=1
+  shift
+fi
+case "${1:-}" in
+  -*) echo "unknown option $1; usage: $0 [--unrecorded-repo-state] [OUT]" >&2; exit 2 ;;
+esac
 out="${1:-$HOME/vp-data/speed_highc/logprob}"
 runs="$out/runs"
 prompts="$HOME/vp-data/state/prompts/prompts_fresh.jsonl"
@@ -72,6 +80,19 @@ done
 revisions="$(sort -u <<< "$revisions" | grep .)"
 if [ "$(grep -c . <<< "$revisions")" != 1 ]; then
   echo "the passes differ in revisions or settings: $revisions" >&2
+  status=1
+fi
+# run_admission_logprob.sh records the repository's state at launch (repo_state.json): it must be
+# a clean tree at the passes' commit. A run from before it recorded one (the committed run) needs
+# --unrecorded-repo-state, which says so.
+state="$out/repo_state.json"
+if [ -e "$state" ]; then
+  jq -e --arg sha "${revisions%% *}" '.head == $sha and .dirty_files == []' "$state" > /dev/null \
+    || { echo "$state: not a clean tree at the passes' commit" >&2; status=1; }
+elif [ "$unrecorded_repo_state" = 1 ]; then
+  echo "no repository state recorded at launch (--unrecorded-repo-state)" >&2
+else
+  echo "$state is missing; a run from before it was recorded needs --unrecorded-repo-state" >&2
   status=1
 fi
 # The prompt file must be the frozen fresh set (its count and input_ids_sha256 in the committed

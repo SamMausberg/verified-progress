@@ -28,7 +28,15 @@ if [ -n "$(ls -A "$runs" 2>/dev/null)" ]; then
   echo "$runs is not empty; move it aside" >&2
   exit 1
 fi
+# The passes record the repository's commit, not its working tree: refuse tracked modifications,
+# and record the state at launch for classify_logprob.sh.
+if [ -n "$(git -C "$repo" status --porcelain --untracked-files=no)" ]; then
+  echo "$repo has tracked modifications; the passes would not reproduce from its commit" >&2
+  exit 1
+fi
 mkdir -p "$runs"
+python -c 'import json, sys; from bench.server import git_state; print(json.dumps(git_state(sys.argv[1])))' \
+  "$repo" > "$out/repo_state.json" || exit 1
 pin="--disable-radix-cache --max-running-requests 128 --max-total-tokens 120000 --max-mamba-cache-size 128"
 status=0
 for tag in adm_n0 adm_n0b adm_pd; do

@@ -286,7 +286,10 @@ SGLang resolves `mtp-tuned`'s NEXTN), 3 steps, top-k 1, 4 draft tokens, buffered
 and once with it. Pools are pinned identically: 128 running, 120,000 KV tokens, 128 GDN slots,
 radix cache off, all as resolved by each server (`logprob_runs.csv`). There are 960 fresh
 prompts, 256 new tokens with natural stopping, and passes at c = 64 and 128. The delay fired:
-221 prefill batches over both passes against 884 and 875 without it.
+221 prefill batches over both passes against 884 and 875 without it. Every pass records SGLang
+at the pin with a clean tree, the frozen prompt set and repository `7b35508`; whether the
+repository's working tree was clean was not recorded for this run (the hold script now refuses
+tracked modifications and records the state, and the classifier checks it).
 
 `classify_logprob.sh` compares the delayed run with both undelayed launches at each concurrency
 and classifies each comparison with `bench.divergence`'s rule (`logprob_classes.json`;
@@ -406,7 +409,9 @@ python experiments/admission/analyze_confirm.py ~/vp-data/speed_highc/confirm/s0
 python experiments/state_safety/prompts.py --set fresh \
   --out ~/vp-data/state/prompts/prompts_fresh.jsonl --manifest /tmp/prompt_manifest_fresh.json
 GPU_STARTUP_MIN_FREE_GB=88 scripts/gpu_lock.sh -x experiments/admission/run_admission_logprob.sh
-experiments/admission/classify_logprob.sh ~/vp-data/speed_highc/logprob
+# The hold classifies its own runs. The committed run predates the repository record the hold
+# now writes (repo_state.json), so it is reclassified with the flag that says so:
+experiments/admission/classify_logprob.sh --unrecorded-repo-state ~/vp-data/speed_highc/logprob
 cp ~/vp-data/speed_highc/logprob/report.json evidence/admission/logprob_report.json
 cp ~/vp-data/speed_highc/logprob/classes.json evidence/admission/logprob_classes.json
 cp ~/vp-data/speed_highc/logprob/table.csv evidence/admission/logprob_pairs.csv
