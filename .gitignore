@@ -1,9 +1,11 @@
 # --- Private: never commit ---
 /Sam's Inco Take Home Challenge.pdf
 /writing.md
-# Presentation decks and any other PDF at the top level (the paper's PDFs live in paper/)
+# Presentation decks and any other PDF at the top level (the paper's PDFs live in paper/); the
+# talk's deck in presentation/ is committed
 /*.pdf
 *.pptx
+!/presentation/*.pptx
 
 # Python
 .venv/
