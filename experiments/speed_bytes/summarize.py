@@ -37,6 +37,8 @@ SGLANG_PIN = 'bd66ce343e'
 # The interpreter of every served run: the virtualenv scripts/sglang_env.sh activates by default
 # (the holds clear SGLANG_DIR, which would select another).
 VENV_PYTHON = str(Path.home() / 'sglang/.venv/bin/python')
+# The virtualenv's torch and its CUDA (SETUP.md, key versions), which every timed route ran on.
+TORCH_VERSION, TORCH_CUDA = '2.13.0+cu130', '13.0'
 REQUIRED_ROUTES = ('bf16', 'fp8_tensor', 'fp8_rowwise', 'fp8_triton', 'fp8_marlin', 'act_quant_fp8')
 # The grid fp8_gemm_probe.py runs by default (its SHAPES and --ms; holds/fp8_probe.sh passes neither).
 # Each shape's (N, K) as nn.Linear(K -> N), fp8_gemm_probe.py's SHAPES.
@@ -95,6 +97,8 @@ def cmd_gemm(args: argparse.Namespace) -> None:
         )
     if not d['meta']['device'].startswith('NVIDIA GH200'):
         raise SystemExit(f'{args.probe}: device {d["meta"]["device"]}')
+    if (d['meta']['torch'], d['meta']['cuda']) != (TORCH_VERSION, TORCH_CUDA):
+        raise SystemExit(f'{args.probe}: torch {d["meta"]["torch"]}, CUDA {d["meta"]["cuda"]}')
     if d['meta'].get('stopped_at_budget'):
         raise SystemExit(
             f'{args.probe}: stopped at its time budget ({d["meta"]["stopped_at_budget"]})'
@@ -443,6 +447,11 @@ def cmd_served(args: argparse.Namespace) -> None:
             # with the virtualenv scripts/sglang_env.sh activates by default.
             if d['launch']['python'] != VENV_PYTHON:
                 raise SystemExit(f'{f}: interpreter {d["launch"]["python"]}')
+            # ...on the GH200 (the GPU the launch record read before starting the server).
+            gpu = d['launch']['gpu_before_start']
+            gpu_name = dict(zip(gpu['fields'], gpu['values'], strict=True))['name']
+            if not gpu_name.startswith('NVIDIA GH200'):
+                raise SystemExit(f'{f}: GPU {gpu_name}')
             if d['launch']['repo']['head'] != repo:
                 raise SystemExit(
                     f'{f}: harness {d["launch"]["repo"]["head"][:7]}, hold log {repo[:7]}'

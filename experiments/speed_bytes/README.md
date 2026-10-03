@@ -32,7 +32,7 @@ concurrencies, request counts, the exact switches and nothing else), the setting
 took from its defaults (output length, request body, warm-up, aiperf version, and the committed
 workload and warm-up pool by hash), the arm as `bench/arms.toml`
 at the hold's commit resolves it, the server command bench launched for it, the harness commit the
-hold logged, the virtualenv's interpreter and bench's own point-validity rule; per probe server
+hold logged, the GH200 its launch record read, the virtualenv's interpreter and bench's own point-validity rule; per probe server
 the launch SGLang printed (`server_args`: the hold's flags and the defaults the comparison relies
 on, identical across the hold's servers apart from the switches), and the probe client and prompts
 at the hold's commit; per server log the FP8 conversion and mode those switches imply; per trace
@@ -41,8 +41,8 @@ recorded, and the GPU; per probe file the server it probed, its mode, concurrenc
 probe's 48 prompts, 256 tokens per sequence with exactly 20 finite top-logprob entries at every
 position (score mode: none at the first continuation position, which SGLang does not report) and
 (score mode) the reference tokens; per GEMM probe row the planned shape and number of weight
-copies (and, for runs that record them, the probe's arguments and a clean harness whose probe and
-hold equal this checkout's); and the unit check's relative errors against the script's 0.06 bound,
+copies and the run's torch and CUDA versions (and, for runs that record them, the probe's arguments
+and a clean harness whose probe and hold equal this checkout's); and the unit check's relative errors against the script's 0.06 bound,
 per-row rows independent of the batch and per-tensor rows dependent on it. `fp8_gemm_probe.py`
 differs by formatting, a lint directive and fixes made after review: its `fp8_tensor` route now
 quantizes the weights per tensor, where the run reused the per-channel weights with a unit scale
