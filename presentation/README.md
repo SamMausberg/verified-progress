@@ -15,7 +15,7 @@ its results, transport, the engine changes) and run in this order:
   frontier with the mean accepted tokens per verify cycle of each drafter arm (3-4; Sections 4.1
   and 4.5);
 - where the time goes and what "exact" means: the head's share of a step, BF16 ties, and stock
-  SGLang's batch-dependent outputs (5-7; Sections 1, 2 and 4.1, Appendix E.2);
+  SGLang's batch-dependent outputs (5-7; Sections 1, 2 and 4.1, Appendices D and E.2);
 - the certified head: the method, its results on recorded engine states, what it bought when
   served, and why most DFlash verify calls above one request need a fallback (8-11; Sections 3
   and 4);
@@ -24,15 +24,15 @@ its results, transport, the engine changes) and run in this order:
 - five other approaches that missed a rule declared before their runs (14; Section 6,
   Appendix E.4, and the research notes for FP8 and the split-KV kernel);
 - the stock envelope before and after the two confirmed changes (15; Section 6);
-- the quality check: the output comparisons of the head, the fold and the prefill delay against
-  stock, beside GSM8K, which ran on four other arms (16; Sections 4.5 and 6);
+- the quality check: the output comparisons of the head, the fold, the fold with FA4 and the
+  prefill delay against stock, beside GSM8K, which ran on four other arms (16; Sections 4.5 and 6);
 - the takeaway, with the limits and the next steps that the paper's Limitations and `TASKS.md`
   leave open (17; Sections 8 and 9).
 
 Each main slide states one claim in its title and carries at most three short lines of body text
 besides its chart or headline numbers; its footer names the paper's section. Its speaker notes
 give what to say, the minute marks of its section, the scope and definitions that did not fit on
-the slide, and the files the numbers come from. The scripts add up to about 3,330 words, 22 to 26
+the slide, and the files the numbers come from. The scripts add up to about 3,340 words, 22 to 26
 minutes at 130 to 150 words a minute; about 220 of those words are marked optional, for when
 questions come early. The minute marks budget 29 minutes, which leaves room for interruptions.
 
@@ -59,13 +59,9 @@ blocks violet, the certified head blue, fallback vermilion, context grey.
 
 ## What it reflects
 
-Every number was computed from the evidence committed at `02b9c5f`, the paper's second clarity
-pass, and checked against the paper's text and the evidence READMEs at that commit. The evidence
-files the deck reads are the same there as on main at `59cec92`. Two values follow the evidence
-where the paper at that commit had not yet been corrected: 16-token DFlash's certified-head ratio
-at one request is 1.013 (+1.3%), rounded once from `evidence/certified_head/served/summary.json`,
-and the check-mode counts (592,433 and 196,734) are checked positions, fallback rows included. The
-paper's tables are referred to by content, not by number. No experiment was rerun for the deck.
+Every number was computed from the evidence committed on main at `1c19cd5`, and checked against
+the paper's text and the evidence READMEs at that commit. The paper's tables are referred to by
+content, not by number. No experiment was rerun for the deck.
 
 ## How it was built
 
