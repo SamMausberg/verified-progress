@@ -370,7 +370,7 @@ SGLANG_WORKTREE=~/sglang-wt/upstream-bf16 source scripts/sglang_env.sh
 |---|---|---|
 | 0001 | `beta_val = tl.sigmoid(b_val).to(tl.float32)` in the packed decode kernel; the gating kernel stores the FP32 sigmoid into its FP32 output buffer | numerics change only in beta's low mantissa bits (at most one BF16 rounding, about 0.4% relative) |
 
-## speed-bytes (`patches/speed-bytes/0001-0005`, branches `engine/speed-bytes` and `engine/speed-bytes-l2`)
+## speed-bytes (`patches/speed-bytes/0001-0008`, branches `engine/speed-bytes`, `engine/speed-bytes-l2` and `engine/speed-bytes-cutlass`)
 
 Online FP8 for the dense linear layers, through cuBLASLt rather than sgl-kernel's CUTLASS FP8
 GEMM (the aarch64 sgl-kernel 0.4.7 wheel's `common_ops` carries no sm_90a code, so on GH200 that GEMM is
@@ -390,6 +390,9 @@ SGLANG_WORKTREE=~/sglang-wt/speed-bytes source scripts/sglang_env.sh
 | 0003 | `SGLANG_FP8_DENSE_ACT=oracle`: timing only, outputs invalid. The converted GEMMs read a fixed random FP8 input, so no quantization or row-scale kernel runs; it bounds what fusing those into the producing kernels could gain | not selected by default |
 | 0004 | Quality-only modes: `SGLANG_FP8_DENSE_WSCALE=channel` (one weight scale per output channel, row and channel scales applied to an FP32 GEMM output) and `SGLANG_FP8_DENSE_ACT=none` (weights rounded through FP8 and kept for the stock BF16 GEMM: the quality of a weight-only kernel) | not selected by default |
 | 0005 | `SGLANG_FP8_DRAFT_HEAD=1` at tensor-parallel size above 1 raises an error instead of silently keeping the BF16 projection (the FP8 copy exists only at size 1). Added after the runs; none of them used more than one rank | unset: no change |
+| 0006 | `SGLANG_FP8_DENSE_ACT=static`: one fixed activation scale per layer (calibrated maximum / 448, read from the JSON file `SGLANG_FP8_DENSE_CALIB`; a layer missing from it is an error), one saturating quantization kernel and a scalar-scale `torch._scaled_mm` per layer, no row-scale kernel; a row's result does not depend on the rest of the batch. `SGLANG_FP8_DENSE_ACT=calibrate` converts nothing and records each selected layer's running input maximum (forward pre-hooks; run without CUDA graphs), written to `SGLANG_FP8_DENSE_CALIB_OUT` every 2 s | not selected by default |
+| 0007 | `SGLANG_FP8_DENSE_ACT=cutlass`: per-row dynamic activation scales and per-output-channel weight scales, both applied in the epilogue of sgl-kernel's CUTLASS `fp8_scaled_mm` (one quantization kernel per layer, no row-scale kernel). Needs an sgl-kernel build with sm_90a code on Hopper (the aarch64 0.4.7 wheel has none: see below). The server's log line prints `wscale=tensor` for this mode although its weight scales are per channel | not selected by default |
+| 0008 | `SGLANG_FP8_DENSE_ACT=calibrate` raises an error at load under tensor, pipeline or data parallelism or with `SGLANG_FP8_DENSE=both`, where several model runners would write and reset the one maxima file. Added after the runs; all ran one rank with `target` | not selected by default |
 
 Engines behind the evidence, and how to rebuild each one (the hold scripts check the engine's
 tree hash, so a rebuilt worktree passes their guard):
@@ -402,9 +405,51 @@ scripts/sglang_worktree.sh speed-bytes-l2 && git -C ~/sglang-wt/speed-bytes-l2 a
 #   kill2b.sh (tree of 1490d9a891)
 git -C ~/sglang-wt/speed-bytes am "$P"/0003-*.patch
 #   kill3.sh (tree of 1bc2fc4719)
+git -C ~/sglang-wt/speed-bytes am "$P"/0004-*.patch
+#   kill4.sh, probe2.sh (tree of 776f8e5c79)
+git -C ~/sglang-wt/speed-bytes am "$P"/0006-*.patch
+#   calib.sh (tree of c8f465815e)
+scripts/sglang_worktree.sh speed-bytes-cutlass &&
+  git -C ~/sglang-wt/speed-bytes-cutlass am "$P"/0001-*.patch "$P"/0003-*.patch "$P"/0004-*.patch "$P"/0006-*.patch "$P"/0007-*.patch
+#   cutlass.sh, calibho.sh, kill6.sh, q6.sh, q7.sh, probe3.sh (tree of 171774b1c5)
 ```
 
 `98aa8c9821` = 0001 (kill1, probe1), `1490d9a891` = 0001 + 0002
 (kill2b), `1bc2fc4719` = 0001 + 0003 (kill3; 0002 and 0003 touch different files),
-`776f8e5c79` = 0001 + 0003 + 0004; `78b8ffdb7a` = 0001 + 0002 + 0005. The tree after 0001
+`776f8e5c79` = 0001 + 0003 + 0004; `78b8ffdb7a` = 0001 + 0002 + 0005; `c8f465815e` =
+0001 + 0003 + 0004 + 0006; `171774b1c5` = the same + 0007; `23e0e0afd1` = the same + 0008 (no
+recorded run used it). The tree after 0001
 equals `98aa8c9821`'s and after 0001-0002 equals `1490d9a891`'s.
+
+The CUTLASS mode (0007) and the holds that use it put an sm_90a build of sgl-kernel first on
+`PYTHONPATH` (the overlay; nothing installed is modified). It was built from upstream SGLang
+`f6fcda8827` with `patches/upstream/0002` (the CMake change, opened upstream as
+[sgl-project/sglang#42263](https://github.com/sgl-project/sglang/pull/42263)) and then
+`patches/speed-bytes-sgl-kernel/0001` (local and test-only: it keeps the sm_90a gencode alone, to
+compile one architecture instead of six), target `common_ops_sm90_build`, configured as
+scikit-build-core does for the wheel (Release, stable ABI, CUDA 13.0, torch 2.13.0+cu130) with the
+Python and torch of a virtualenv that has upstream's `sglang-kernel` 0.4.8 installed. The overlay
+is a copy of that 0.4.8 Python package with its `sm90/common_ops.abi3.so` replaced by the build
+(sha256 `978c525c67e5f22eb2c29ce13d6f65fed023a09cb9063ec1b9ca74d3edb8902a`, which the holds
+check; a rebuild is not guaranteed to reproduce it byte for byte, and the holds refuse one that
+differs until the checksum in them is updated). The engine's pin expects 0.4.7, so the holds
+also check the server logs for missing operators and fallbacks.
+
+```sh
+SGLANG_DIR=<upstream SGLang checkout whose .venv has sglang-kernel 0.4.8> source scripts/sglang_env.sh
+git -C "$SGLANG_DIR" worktree add ~/sglang-upstream-wt/sm90a-test f6fcda8827
+git -C ~/sglang-upstream-wt/sm90a-test am "$PWD"/engine/sglang/patches/upstream/0002-*.patch \
+  "$PWD"/engine/sglang/patches/speed-bytes-sgl-kernel/0001-*.patch
+PY=$(command -v python)
+cmake -S ~/sglang-upstream-wt/sm90a-test/python/sglang/kernels/aot -B build-sm90a -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$("$PY" -c 'import torch; print(torch.utils.cmake_prefix_path)')" \
+  -DPython_EXECUTABLE="$PY" -DPython3_EXECUTABLE="$PY" \
+  -DSKBUILD_SABI_COMPONENT=Development.SABIModule -DSKBUILD_SABI_VERSION=3.10 \
+  -DCMAKE_CUDA_COMPILER="$CUDA_HOME/bin/nvcc" -DCUDAToolkit_ROOT="$CUDA_HOME"
+ninja -C build-sm90a common_ops_sm90_build
+SITE=$("$PY" -c 'import os, sgl_kernel; print(os.path.dirname(os.path.dirname(sgl_kernel.__file__)))')
+OVERLAY=~/vp-data/upstream/sm90a/overlay
+mkdir -p "$OVERLAY" && cp -a "$SITE/sgl_kernel" "$OVERLAY/"
+find "$OVERLAY" -name __pycache__ -prune -exec rm -rf {} +
+cp build-sm90a/sm90/common_ops.abi3.so "$OVERLAY/sgl_kernel/sm90/common_ops.abi3.so"
+```

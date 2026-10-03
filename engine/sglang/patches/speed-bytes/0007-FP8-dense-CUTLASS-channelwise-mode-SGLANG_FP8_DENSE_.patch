@@ -1,0 +1,76 @@
+From 171774b1c5d0aee6778060056180dee47211dc98 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Fri, 2 Oct 2026 21:21:54 +0000
+Subject: [PATCH] FP8 dense: CUTLASS channelwise mode
+ (SGLANG_FP8_DENSE_ACT=cutlass)
+
+Per-row dynamic activation scales and per-channel weight scales, both in the
+epilogue of sgl-kernel's CUTLASS fp8_scaled_mm. Needs an sgl-kernel build
+with sm_90a code (the aarch64 0.4.7 wheel has none).
+---
+ .../layers/quantization/fp8_dense_online.py   | 21 +++++++++++++++----
+ 1 file changed, 17 insertions(+), 4 deletions(-)
+
+diff --git a/python/sglang/srt/layers/quantization/fp8_dense_online.py b/python/sglang/srt/layers/quantization/fp8_dense_online.py
+index cb90f8a90b..89f12dd4df 100644
+--- a/python/sglang/srt/layers/quantization/fp8_dense_online.py
++++ b/python/sglang/srt/layers/quantization/fp8_dense_online.py
+@@ -19,6 +19,10 @@ SGLANG_FP8_DENSE_ACT selects the activation scale:
+          module name to the activation's absolute maximum on a calibration set; scale = max/448).
+          One quantization kernel and no row-scale kernel per layer; a row's result does not
+          depend on the rest of the batch. Values beyond the calibrated maximum saturate.
++  cutlass one scale per row (dynamic) and one per weight output channel, both applied in the epilogue of
++         sgl-kernel's CUTLASS fp8_scaled_mm. Needs an sgl-kernel build with sm_90a code on Hopper
++         (the aarch64 0.4.7 wheel has none). One quantization kernel and no row-scale kernel per
++         layer; a row's result does not depend on the rest of the batch.
+   calibrate  BF16 as stock (nothing converted), with a forward pre-hook on every selected layer
+          that keeps the running absolute maximum of its input. Run without CUDA graphs. A thread
+          writes the maxima to SGLANG_FP8_DENSE_CALIB_OUT every 2 s; creating the file
+@@ -50,7 +54,7 @@ logger = logging.getLogger(__name__)
+ FP8 = torch.float8_e4m3fn
+ FP8_MAX = float(torch.finfo(FP8).max)
+ _MODES = ("target", "draft", "both")
+-_ACTS = ("token", "tensor", "oracle", "none", "static", "calibrate")
++_ACTS = ("token", "tensor", "oracle", "none", "static", "calibrate", "cutlass")
+ _ORACLE_ROWS = 32768
+ 
+ 
+@@ -87,7 +91,14 @@ class Fp8DenseOnlineLinearMethod:
+         x2 = x.reshape(-1, shape[-1])
+         if not x2.is_contiguous():
+             x2 = x2.contiguous()
+-        if self.act == "static":
++        if self.act == "cutlass":
++            from sgl_kernel import fp8_scaled_mm
++
++            q, xs = _per_token_quant(x2)
++            out = fp8_scaled_mm(
++                q, layer.weight_fp8_t, xs.view(-1), layer.weight_scale_vec, x.dtype
++            )
++        elif self.act == "static":
+             q = _static_quant(x2, layer.act_scale_fp8)
+             out = torch._scaled_mm(
+                 q,
+@@ -210,8 +221,8 @@ def maybe_convert_dense_to_fp8(model: torch.nn.Module, is_draft_worker: bool) ->
+         raise ValueError(
+             f"SGLANG_FP8_DENSE_WSCALE={wscale!r} (channel needs act=token)"
+         )
+-    channel = wscale == "channel"
+-    method = Fp8DenseOnlineLinearMethod(act, channel)
++    channel = wscale == "channel" or act == "cutlass"
++    method = Fp8DenseOnlineLinearMethod(act, channel and act != "cutlass")
+     calib = {}
+     if act == "static":
+         import json
+@@ -256,6 +267,8 @@ def maybe_convert_dense_to_fp8(model: torch.nn.Module, is_draft_worker: bool) ->
+         module.weight_fp8_t = wq.t()
+         module.weight_scale_fp8 = scale.reshape(1, -1) if channel else scale.reshape(())
+         module.fp8_one = torch.ones((), dtype=torch.float32, device=w.device)
++        if act == "cutlass":
++            module.weight_scale_vec = scale.contiguous()
+         if act == "static":
+             if name not in calib or not calib[name] > 0:
+                 raise ValueError(f"no calibrated activation maximum for {name}")
+-- 
+2.34.1
+

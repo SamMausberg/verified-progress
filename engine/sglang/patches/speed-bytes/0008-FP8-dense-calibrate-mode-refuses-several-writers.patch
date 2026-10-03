@@ -1,0 +1,64 @@
+From 23e0e0afd126a3760ec383ee5a0f52406cf4a927 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Sat, 3 Oct 2026 06:19:36 +0000
+Subject: [PATCH] FP8 dense: calibrate mode refuses several writers
+
+SGLANG_FP8_DENSE_ACT=calibrate writes one maxima file from the model
+runner that converts the layers. With tensor, pipeline or data
+parallelism, or SGLANG_FP8_DENSE=both, several runners would write and
+reset the same file. Refuse those configurations at load instead.
+---
+ .../layers/quantization/fp8_dense_online.py   | 23 +++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+
+diff --git a/python/sglang/srt/layers/quantization/fp8_dense_online.py b/python/sglang/srt/layers/quantization/fp8_dense_online.py
+index 89f12dd4df..de6a1e1eed 100644
+--- a/python/sglang/srt/layers/quantization/fp8_dense_online.py
++++ b/python/sglang/srt/layers/quantization/fp8_dense_online.py
+@@ -27,6 +27,8 @@ SGLANG_FP8_DENSE_ACT selects the activation scale:
+          that keeps the running absolute maximum of its input. Run without CUDA graphs. A thread
+          writes the maxima to SGLANG_FP8_DENSE_CALIB_OUT every 2 s; creating the file
+          "<out>.reset" zeroes them (after start-up warm-up, before the calibration prompts).
++         One model runner writes the file, so tensor, pipeline and data parallelism and
++         SGLANG_FP8_DENSE=both are refused.
+   none   QUALITY ONLY: weights round-trip through FP8 (per tensor, or per channel with
+          WSCALE=channel) and stay BF16 for the stock BF16 GEMM, so activations are not
+          quantized. It measures the quality of a weight-only FP8 (W8A16) kernel; its speed is
+@@ -196,6 +198,25 @@ def _start_calibration(modules: dict, out_path: str) -> None:
+     )
+ 
+ 
++def _check_single_calibration_writer(mode: str) -> None:
++    """Calibration writes one file from one model runner; refuse setups with several writers."""
++    from sglang.srt.distributed import (
++        get_pipeline_model_parallel_world_size,
++        get_tensor_model_parallel_world_size,
++    )
++    from sglang.srt.runtime_context import get_server_args
++
++    tp = get_tensor_model_parallel_world_size()
++    pp = get_pipeline_model_parallel_world_size()
++    dp = getattr(get_server_args(), "dp_size", 1)
++    if mode == "both" or (tp, pp, dp) != (1, 1, 1):
++        raise ValueError(
++            "SGLANG_FP8_DENSE_ACT=calibrate writes one file from one model runner: it needs "
++            f"tensor, pipeline and data parallel sizes of 1 (got {tp}, {pp}, {dp}) and "
++            f"SGLANG_FP8_DENSE=target or draft (got {mode!r})"
++        )
++
++
+ def maybe_convert_dense_to_fp8(model: torch.nn.Module, is_draft_worker: bool) -> None:
+     mode = os.environ.get("SGLANG_FP8_DENSE", "").strip()
+     if not mode:
+@@ -207,6 +228,8 @@ def maybe_convert_dense_to_fp8(model: torch.nn.Module, is_draft_worker: bool) ->
+     act = os.environ.get("SGLANG_FP8_DENSE_ACT", "token").strip()
+     if act not in _ACTS:
+         raise ValueError(f"SGLANG_FP8_DENSE_ACT={act!r}; expected one of {_ACTS}")
++    if act == "calibrate":
++        _check_single_calibration_writer(mode)
+     skip = [
+         s
+         for s in os.environ.get("SGLANG_FP8_DENSE_SKIP", "in_proj_ba,visual").split(",")
+-- 
+2.34.1
+
