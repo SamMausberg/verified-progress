@@ -25,9 +25,10 @@ requests or 8 waves, no failed launch check, the session its points name, and th
 request body and client settings as every other launch, the model and revision of its bench
 arm and the repository's warm-up pool. Its bench.sweep options, parsed from
 its recorded command line, must equal those of the command hold_confirm_session.sh gives that
-arm in that session, and each point must have measured max(64, 8c) requests. Each session's
-launches must follow the declared order (hold_confirm_session.sh; a launch with no points may
-be missing, which voids its cells). The equality gate beside the points (equality/) must bind
+arm in that session, and each point must have measured max(64, 8c) requests. By start time
+the launches must form one block per session, sessions 1, 2 and 3 in turn, each in the declared
+order (hold_confirm_session.sh; a launch with no points may be missing, which voids its
+cells), all after the equality runs started. The equality gate beside the points (equality/) must bind
 these launches as a session requires (confirm_gate.py, equality_problems): passed for these
 levers, its runs exactly the equality hold's, made as their arms, from the engine and
 repository commits the launches ran with S0 at the pin, and the gate decided again from its
@@ -189,23 +190,41 @@ def declared_order(session: str, full: dict[str, str]) -> list[str]:
 
 
 def check_order(sessions: dict[tuple[str, str], str], full: dict[str, str]) -> None:
-    """Refuse unless each session's launches, by run (start time), keep the declared order."""
+    """Refuse unless the launches, by run (start time), are the declared sessions in turn.
+
+    Each session is one hold (hold_confirm_session.sh), run in the order 1, 2, 3 (README,
+    Commands): by start time its launches form one block, the blocks follow the session order,
+    and within a block the launches keep the declared order (a launch may be missing).
+    """
+    by_start = sorted(sessions.items(), key=lambda x: x[0][1])
+    blocks = [s for i, (_, s) in enumerate(by_start) if i == 0 or s != by_start[i - 1][1]]
+    if blocks != sorted(set(blocks), key=SESSION_LABELS.index) or len(blocks) != len(set(blocks)):
+        raise SystemExit(f'the sessions ran interleaved or out of turn: {blocks}')
     for session in SESSION_LABELS:
-        by_start = sorted(sessions.items(), key=lambda x: x[0][1])
         ran = [label for (label, _), s in by_start if s == session]
         declared = iter(declared_order(session, full))
         if not all(label in declared for label in ran):
             raise SystemExit(f'the launches of {session} are not in the declared order: {ran}')
 
 
-def check_gate(equality: Path, full: dict[str, str], engine: str, repo: str) -> None:
+def check_gate(
+    equality: Path, full: dict[str, str], engine: str, repo: str, first_launch: str
+) -> None:
     """Refuse unless the equality gate beside the points binds these launches.
 
     confirm_gate.py's equality_problems, as a session applies it, on the committed copy (which
-    has no runs/ or server logs: the sessions checked those before they ran).
+    has no runs/ or server logs: the sessions checked those before they ran); and every
+    equality run must have started before the first timed launch (`first_launch`, a run id).
+    Both stamps are the host's local time (run_matrix.py started_at, bench.sweep's run dir).
     """
     if why := equality_problems(equality / 'gate.json', full['L'], repo, engine, raw=False):
         raise SystemExit(f'{equality}: ' + '; '.join(why))
+    meta = json.loads((equality / 'meta.json').read_text())
+    starts = [str(m.get('started_at')) for m in meta.values()]
+    late = [t for t in starts if not re.fullmatch(r'\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d', t)
+            or re.sub(r'[-:]', '', t).replace('T', '-') >= first_launch]  # fmt: skip
+    if late:
+        raise SystemExit(f'{equality}: equality runs started at {late}, not before {first_launch}')
 
 
 def check_launches(launches: Path, points: set[tuple[str, str]]) -> tuple[str, str]:
@@ -332,7 +351,7 @@ def load_cells(points: Path, full: dict[str, str]) -> dict[tuple, list[dict]]:
     engine, repo = check_launches(points.with_name('launches.csv'), set(sessions))
     check_sweeps(points.with_name('sweeps.csv'), sessions)
     check_order(sessions, full)
-    check_gate(points.with_name('equality'), full, engine, repo)
+    check_gate(points.with_name('equality'), full, engine, repo, min(run for _, run in sessions))
     return cells
 
 
