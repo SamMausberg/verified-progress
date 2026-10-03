@@ -5,9 +5,10 @@ against S0 of its group) and decides, per group, which levers may be timed:
 
 * B0 (confirm engine, every switch off) must be bitwise equal to S0: identical token
   ids and top-logprob arrays on every prompt;
-* every other arm is exact up to rounding: all prompts compared, no length mismatch,
-  every first divergence classified tie, one_ulp or near (bench's rule as an
-  allow-list; large, not_argmax and unknown fail);
+* every other arm is exact up to rounding: all prompts compared, top-logprob arrays
+  compared on all of them, no length mismatch, every prompt either token-identical or
+  with a classified first divergence, and every class tie, one_ulp or near (bench's rule
+  as an allow-list; large, not_argmax and unknown fail);
 * a lever is timed only if its own arm and the group's FULL arm pass.
 
 Writes gate.json and exits non-zero if B0 fails in either group or no lever passes.
@@ -38,6 +39,11 @@ def exact(pair: dict[str, Any] | None) -> tuple[bool, str]:
         return False, 'missing'
     if pair.get('prompts') != PROMPTS or pair.get('length_mismatch', 1) != 0:
         return False, f'prompts {pair.get("prompts")} length_mismatch {pair.get("length_mismatch")}'
+    if pair.get('logprobs_compared') != PROMPTS:
+        return False, f'top logprobs compared on {pair.get("logprobs_compared")}/{PROMPTS} prompts'
+    classified = sum((pair.get('classes') or {}).values())
+    if pair.get('identical', 0) + classified != PROMPTS:
+        return False, f'identical {pair.get("identical")} + classified {classified} != {PROMPTS}'
     bad = {c: n for c, n in (pair.get('classes') or {}).items() if c not in ROUNDING and n}
     if bad:
         return False, f'non-rounding first divergences {bad}'
