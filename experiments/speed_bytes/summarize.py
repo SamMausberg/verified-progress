@@ -594,6 +594,12 @@ TRACE_NSYS = ['nsys', 'launch', '--trace=cuda,nvtx', '--cuda-graph-trace=node',
 def cmd_steps(args: argparse.Namespace) -> None:
     from step_budget import budget
 
+    # Every report comes from one kill2b hold (the comparison is within one session), whose logged
+    # runtime, where it logs one, is the planned one.
+    holds = {Path(rep).absolute().parent.parent for rep in args.reports}
+    if len(holds) != 1 or next(iter(holds)).name.split('_')[0] != 'kill2b':
+        raise SystemExit(f'reports from {sorted(map(str, holds))}: planned one kill2b hold')
+    check_runtime_logged(next(iter(holds)))
     rows = []
     seen: list[tuple[str, int]] = []
     for rep in args.reports:
