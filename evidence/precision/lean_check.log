@@ -9,6 +9,9 @@ checking StockDecision.lean
 'StockDecision.interval_condition_rounded' depends on axioms: [propext, Classical.choice, Quot.sound]
 'StockDecision.firstMax_unique' depends on axioms: [propext, Quot.sound]
 'StockDecision.roundModel_grid' depends on axioms: [propext, Quot.sound]
+'StockDecision.separation_nonstrict_false' depends on axioms: [propext, Quot.sound]
+'StockDecision.gap_condition_nonstrict_false' depends on axioms: [propext, Quot.sound]
+'StockDecision.interval_condition_tie_false' depends on axioms: [propext]
 checking drafting/CausalDefect.lean
 'CausalDefect.weighted_depth' depends on axioms: [propext, Classical.choice, Quot.sound]
 'CausalDefect.causal_defect_converges' depends on axioms: [propext, Classical.choice, Quot.sound]

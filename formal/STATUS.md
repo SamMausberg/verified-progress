@@ -7,8 +7,9 @@ below). `StockDecision.lean` was added and checked the same way on 2026-10-03.
 None of these files contains `sorry`, `admit` or a new `axiom`. `#print axioms`
 on the main theorems reports only Lean's standard axioms: `propext`, `Quot.sound`
 and, for `envelope_compose`, `widen` and `shift_encloses` (through `omega`),
-`Classical.choice`. No axiom is added. Five deliberately false
-variants are rejected, so the checks are not vacuous ("False variants", below).
+`Classical.choice`. No axiom is added. `StockDecision.lean` also proves, by
+counterexample, that three of its strict hypotheses are needed, and a script checks
+that the proofs fail under five weakened statements ("Weakened statements", below).
 
 ## `DecisionGuards.lean` (from the supplied bundle, unchanged)
 
@@ -63,10 +64,17 @@ that is argued on paper, not checked. The stock token is the first maximal index
   interval ends and with the ends rounded from accumulator intervals by a monotone
   `rn`. The proof uses only that `k` attains the largest lower end in `C`.
 - `roundModel_grid`: a concrete rounding satisfies the model, so it is not vacuous.
+- `rnTie`, `roundModel_tie`: round-to-nearest on the even integers with ties to
+  multiples of 4 (ties to even), spacing 2; it satisfies the model.
+- `separation_nonstrict_false`, `gap_condition_nonstrict_false`,
+  `interval_condition_tie_false`: with that rounding, Lemma 2.2 and Theorem 2.3 with a
+  non-strict gap, and Proposition 2.4 with an earlier entry of `C` allowed to tie `k`,
+  are false. Each is a counterexample in which a tie decides (a gap of one spacing
+  rounding to a tie, or an earlier index winning the first-index rule).
 
 `#print axioms` reports only `propext`, `Quot.sound` and `Classical.choice`.
 
-## False variants
+## Weakened statements
 
 `scripts/check_lean_variants.sh` weakens one hypothesis of a lemma at a time (for `sequential_sum_bound`, it strengthens the conclusion instead), by a `sed` edit of a
 copy in a temporary directory, and expects Lean to reject the copy; `formal/` itself is never
@@ -76,11 +84,14 @@ edited, since `check_lean.sh` elaborates every file there. Rerun with
 PATH=$HOME/.elan/bin:$PATH bash scripts/check_lean_variants.sh
 ```
 
-It exits 0 only if every variant fails to elaborate, and prints the line of each error. Checked on
+It exits 0 only if every variant fails to elaborate, and prints the line of each error. A failed
+proof shows that the proof needs the hypothesis; it does not show that the weakened statement is
+false. That is proved in Lean for the first, second and fourth rows below (the `_false` theorems
+above); for `screen_drop` and `sequential_sum_bound` the last column is an argument, not a proof. Checked on
 2026-10-03 with Lean 4.19.0 (`evidence/precision/lean_variants.log`); each variant fails with one
 error, inside the lemma it weakens:
 
-| Variant | Lemma and edit | Why the weakened statement is false | Error |
+| Variant | Lemma and edit | Why the weakened statement fails | Error |
 |---|---|---|---|
 | `separation_nonstrict` | `separation`: `ya - yb > u (...)` to `>=` | a gap of exactly one spacing can round to a tie (ties to even) | `StockDecision.lean:83`, `omega` |
 | `gap_condition_nonstrict` | `pair_gap` and `gap_condition`: the gap `>` to `>=` | the same tie at the boundary of the margin | `StockDecision.lean:101`, `omega` |

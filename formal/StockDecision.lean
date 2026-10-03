@@ -203,6 +203,63 @@ theorem roundModel_grid : RoundModel (fun y => 2 * (y / 2)) (fun _ => 2) where
     omega
   spacing_mono := fun _ _ _ _ => by omega
 
+/-- Round-to-nearest on the even integers with ties to multiples of 4 (ties to
+even): the kind of rounding the model describes, with spacing 2. -/
+def rnTie (y : Int) : Int := if y % 4 = 1 then y - 1 else if y % 4 = 3 then y + 1 else y
+
+theorem roundModel_tie : RoundModel rnTie (fun _ => 2) where
+  mono := fun a b h => by unfold rnTie; split <;> split <;> (try split) <;> (try split) <;> omega
+  near := fun y => by
+    have : iabs (rnTie y - y) ≤ 1 := by
+      unfold rnTie; split
+      · exact iabs_le_of (by omega) (by omega)
+      · split
+        · exact iabs_le_of (by omega) (by omega)
+        · exact iabs_le_of (by omega) (by omega)
+    omega
+  spacing_mono := fun _ _ _ _ => by omega
+
+/-- Lemma 2.2 needs its strict gap: with a gap equal to the spacing, a tie
+rounded to even can make the two values round to the same number. -/
+theorem separation_nonstrict_false :
+    ¬ ∀ (rn u : Int → Int), RoundModel rn u → ∀ ya yb : Int,
+      ya - yb ≥ u (max (iabs ya) (iabs yb)) → rn yb < rn ya := by
+  intro h
+  have := h rnTie (fun _ => 2) roundModel_tie 1 (-1) (by show (1:Int) - -1 ≥ 2; omega)
+  simp [rnTie] at this
+
+/-- Theorem 2.3 needs its strict gap: with equality the stock token can be an
+earlier index that ties after rounding. -/
+theorem gap_condition_nonstrict_false :
+    ¬ ∀ (rn u : Int → Int), RoundModel rn u → ∀ (z y G : Fin 2 → Int),
+      (∀ i, iabs (y i - z i) ≤ G i) → ∀ a : Fin 2,
+      (∀ b, b ≠ a → z a - z b ≥ G a + G b + u (max (iabs (z a)) (iabs (z b)) + max (G a) (G b))) →
+      IsFirstMax (fun i => rn (y i)) a := by
+  intro h
+  let z : Fin 2 → Int := fun i => if i.val = 0 then -1 else 1
+  have hz : ∀ i, iabs (z i - z i) ≤ 0 := fun i => by simp [iabs]
+  have gap : ∀ b : Fin 2, b ≠ 1 → z 1 - z b ≥ 0 + 0 + 2 := by
+    intro b hb
+    have : b.val = 0 := by have := b.isLt; have : b.val ≠ 1 := fun e => hb (Fin.ext e); omega
+    simp [z, this]
+  have := h rnTie (fun _ => 2) roundModel_tie z z (fun _ => 0) hz 1 (fun b hb => by
+    have := gap b hb; simpa using this)
+  have h0 := this.2 0 (by simp [z, rnTie])
+  exact absurd h0 (by decide)
+
+/-- Proposition 2.4 needs an earlier entry of `C` to lie strictly below: if it
+may tie, the first-index rule returns the earlier entry. -/
+theorem interval_condition_tie_false :
+    ¬ ∀ (L lo hi : Fin 2 → Int), (∀ i, lo i ≤ L i ∧ L i ≤ hi i) → ∀ (C : Fin 2 → Prop) (k : Fin 2), C k →
+      (∀ i, C i → lo i ≤ lo k) → (∀ j, ¬ C j → ∃ i, C i ∧ hi j < lo i) →
+      (∀ j, C j → j < k → hi j ≤ lo k) → (∀ j, C j → k < j → hi j ≤ lo k) →
+      IsFirstMax L k := by
+  intro h
+  have := h (fun _ => 0) (fun _ => 0) (fun _ => 0) (fun _ => ⟨Int.le_refl 0, Int.le_refl 0⟩) (fun _ => True) 1 trivial
+    (fun _ _ => Int.le_refl 0) (fun _ c => absurd trivial c) (fun _ _ _ => Int.le_refl 0) (fun _ _ _ => Int.le_refl 0)
+  have h0 := this.2 0 rfl
+  exact absurd h0 (by decide)
+
 end StockDecision
 
 #print axioms StockDecision.separation
@@ -212,3 +269,6 @@ end StockDecision
 #print axioms StockDecision.interval_condition_rounded
 #print axioms StockDecision.firstMax_unique
 #print axioms StockDecision.roundModel_grid
+#print axioms StockDecision.separation_nonstrict_false
+#print axioms StockDecision.gap_condition_nonstrict_false
+#print axioms StockDecision.interval_condition_tie_false

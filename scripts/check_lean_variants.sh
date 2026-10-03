@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# Check that the Lean lemmas are not vacuous: each deliberately false variant below must fail to
-# elaborate. Every variant weakens a hypothesis (or, for sequential_sum_bound, strengthens the conclusion) of a lemma in formal/ (a strict inequality made
-# non-strict, or a margin halved), on a copy in a temporary directory; formal/ itself is never
+# Check that the Lean proofs need their hypotheses: each weakened statement below must fail to
+# elaborate. A failure shows that the proof uses the hypothesis, not that the changed statement is
+# false; formal/StockDecision.lean proves three of them false by counterexample (the _false
+# theorems). Every variant weakens a hypothesis (or, for sequential_sum_bound, strengthens the
+# conclusion) of a lemma in formal/ (a strict inequality made non-strict, or one Gmax removed
+# from a margin), on a copy in a temporary directory; formal/ itself is never
 # modified, because scripts/check_lean.sh elaborates every file there and must pass.
 #
 #   PATH=$HOME/.elan/bin:$PATH bash scripts/check_lean_variants.sh
