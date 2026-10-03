@@ -12,8 +12,10 @@ against S0 of its group) and decides, per group, which levers may be timed:
 * a lever is timed only if its own arm and the group's FULL arm pass.
 
 compare.py counts a prompt's logprobs as compared when both runs have any top-logprob
-entry, so the gate also reads both runs of every pair and requires, for each of the 320
-prompts, a normally finished, nonempty generation (not aborted, ended at NEW_TOKENS tokens or
+entry and pairs records by id, so the gate also reads both runs of every pair and requires one
+record per prompt of the hold's prompt file (--prompts, state's frozen set by default, checked
+against its manifest), in the file's order with that prompt's id and length, and for each of the
+320 prompts a normally finished, nonempty generation (not aborted, ended at NEW_TOKENS tokens or
 on its stop token) with a top-k list of TOP_K entries at every output position, each a finite logprob with
 an integer token id and no token id twice (compare.py's comparisons are meaningless on NaN or
 infinity, and it keys a position's entries by token id), and that
@@ -25,7 +27,7 @@ the runs directory the summary names must be the one beside it (the hold's own).
 Writes gate.json and exits non-zero if B0 fails in either group or no lever passes.
 
     python experiments/speed_lowc/confirm_gate.py --summary <equality dir>/summary.json \
-        --levers ABC --out <equality dir>/gate.json
+        --levers ABC --out <equality dir>/gate.json [--prompts <the hold's prompt file>]
 
 The same file holds the one check of whether a gate binds a timed session
 (equality_problems; hold_confirm_session.sh runs it through confirm_arms.sh, gate_ok, and
@@ -33,13 +35,16 @@ confirm_analyze.py on the committed copy) and the equality arms' flags (eq_flags
 equality hold runs and that check compares with each run's:
 
     python experiments/speed_lowc/confirm_gate.py --check-gate <equality dir>/gate.json \
-        --levers ABC --repo <repository commit> --engine <confirm engine commit>
+        --levers ABC --repo <repository commit> --engine <confirm engine commit> \
+        [--prompts <the hold's prompt file>]
     python experiments/speed_lowc/confirm_gate.py --eq-flags L ABC
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
+import itertools
 import json
 import math
 import re
@@ -66,6 +71,9 @@ def group_full(group: str, levers: str) -> str:
 # Stock SGLang's pin: engine/sglang/README.md, line 4.
 STOCK_PIN = 'bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824'
 MANIFEST = Path(__file__).resolve().parents[2] / 'evidence/state_safety/prompt_manifest.json'
+# The prompt file the equality hold gives the runner: confirm_arms.sh's CONFIRM_PROMPTS default
+# (line 57), run_matrix.py's --prompts default (experiments/state_safety/run_matrix.py line 52).
+PROMPT_FILE = Path.home() / 'vp-data/state/prompts/prompts.jsonl'
 # State's comparison and the outputs the equality hold has it write (hold_confirm_equality.sh,
 # lines 60-62).
 COMPARE = Path(__file__).resolve().parents[2] / 'experiments/state_safety/compare.py'
@@ -144,8 +152,33 @@ def finished(r: dict[str, Any]) -> bool:
     return fr.get('type') == 'stop' and len(ids) <= NEW_TOKENS and ids[-1] == fr.get('matched')
 
 
-def coverage(runs: Path, run: str) -> str | None:
-    """None if `run` has PROMPTS finished records with TOP_K top logprobs at every position."""
+def declared_prompts(path: Path) -> list[tuple[str, int]] | str:
+    """The (id, prompt length) of every prompt in `path`, in order, or why it is not MANIFEST's set.
+
+    Checked as confirm_arms.sh's check_inputs checks it before every equality run: the
+    manifest's prompt count and its digest of every prompt's id and input ids
+    (experiments/state_safety/prompts.py, ids_digest).
+    """
+    try:
+        items = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+        manifest = json.loads(MANIFEST.read_text())
+        digest = hashlib.sha256()
+        for it in items:
+            digest.update(json.dumps([it['id'], it['input_ids']]).encode())
+        ok = len(items) == manifest['num_prompts'] == PROMPTS
+        ok = ok and digest.hexdigest() == manifest['input_ids_sha256']
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        return f'unreadable prompts {path} ({exc!r})'
+    if not ok:
+        return f'{path} is not the prompt set of {MANIFEST.name}'
+    return [(it['id'], len(it['input_ids'])) for it in items]
+
+
+def coverage(runs: Path, run: str, prompts: list[tuple[str, int]] | str) -> str | None:
+    """None if `run` has a finished record of every prompt in `prompts`, in their order (id and
+    the server's prompt token count), with TOP_K top logprobs at every position."""
+    if isinstance(prompts, str):
+        return prompts
     path = runs / f'{run}.jsonl'
     if not path.is_file():
         return f'{run}: no run file'
@@ -162,16 +195,24 @@ def coverage(runs: Path, run: str) -> str | None:
             f'{run}: {len(records)} prompts, {unfinished} not finished normally, {short} without '
             f'{TOP_K} top logprobs (finite, with distinct integer token ids) at every position'
         )
+    # The runner writes one record per prompt in the prompt file's order (client.py, run_pass).
+    if [(r.get('id'), r.get('prompt_tokens')) for r in records] != prompts:
+        return f'{run}: records are not the prompts of {MANIFEST.name} in order (id, prompt tokens)'
     return None
 
 
-def positions(runs: Path, pair: dict[str, Any] | None, cache: dict[str, str | None]) -> str | None:
+def positions(
+    runs: Path,
+    prompts: list[tuple[str, int]] | str,
+    pair: dict[str, Any] | None,
+    cache: dict[str, str | None],
+) -> str | None:
     """The first coverage failure of the pair's two runs, or None."""
     if pair is None:
         return None
     for run in (pair['run_a'], pair['run_b']):
         if run not in cache:
-            cache[run] = coverage(runs, run)
+            cache[run] = coverage(runs, run, prompts)
         if cache[run]:
             return cache[run]
     return None
@@ -204,12 +245,16 @@ def bitwise(pair: dict[str, Any] | None) -> tuple[bool, str]:
     return ok, f'bitwise {pair.get("bitwise_identical")}/{pair.get("prompts")}'
 
 
-def decide(summary_path: Path, levers: str, runs: Path | None) -> dict[str, Any]:
-    """The gate for `levers` from compare.py's summary; with `runs`, also each run's coverage."""
+def decide(
+    summary_path: Path, levers: str, runs: Path | None, prompts: Path = PROMPT_FILE
+) -> dict[str, Any]:
+    """The gate for `levers` from compare.py's summary; with `runs`, also each run's coverage
+    of the equality prompts (`prompts`, checked against MANIFEST)."""
     summary = json.loads(summary_path.read_text())
     pairs = summary['pairs']
     selfc = summary.get('self_consistency') or {}
     cache: dict[str, str | None] = {}
+    declared = declared_prompts(prompts) if runs else ''
 
     def greedy(pair: dict[str, Any] | None) -> str | None:
         for run in (pair['run_a'], pair['run_b']) if pair else ():
@@ -224,7 +269,7 @@ def decide(summary_path: Path, levers: str, runs: Path | None) -> dict[str, Any]
         if pair is not None and (pair.get('run_a'), pair.get('run_b')) != expected:
             return False, f'compares {pair.get("run_a")} with {pair.get("run_b")}, not {expected}'
         ok, note = check(pair)
-        gap = (positions(runs, pair, cache) if runs else None) or greedy(pair)
+        gap = (positions(runs, declared, pair, cache) if runs else None) or greedy(pair)
         return (False, gap) if ok and gap else (ok, note)
 
     gate: dict[str, Any] = {'summary': str(summary_path), 'levers': levers, 'groups': {}}
@@ -246,7 +291,13 @@ def decide(summary_path: Path, levers: str, runs: Path | None) -> dict[str, Any]
 
 
 def equality_problems(
-    gate_path: Path, levers: str, repo: str, engine: str, *, raw: bool
+    gate_path: Path,
+    levers: str,
+    repo: str,
+    engine: str,
+    *,
+    raw: bool,
+    prompt_file: Path = PROMPT_FILE,
 ) -> list[str]:
     """Why the equality gate at `gate_path` does not bind timed sessions of `levers`, or [].
 
@@ -254,22 +305,26 @@ def equality_problems(
     exactly the runs the equality hold makes, each from repository `repo`, S0 from stock
     SGLang at the pin and every other run from `engine`, none with modified SGLang files, each
     made as its arm (eq_flags, one cold pass at c = 1, 256 new tokens: run_matrix.py's default,
-    line 61, which the hold keeps; every prompt of the manifest); and the gate decided again
-    from its summary.json must equal gate.json. With `raw` (the hold's own directory, as a
-    session reads it) the summary must compare that directory's runs/, the gate is decided again
-    with every run's coverage, and each run's server log must show the GDN fold on (fold=True)
-    exactly when the arm has A, and compare.py run again on runs/ must reproduce the directory's
-    summary.json, divergences.csv, table.csv and meta.json byte for byte, which binds them to the
-    run files. Without it (the committed copy, which has no runs/ or logs) those four are left to
-    the session, which checked them before it ran.
+    line 61, which the hold keeps; every prompt of the manifest, with the manifest's total of
+    prompt tokens); and the gate decided again from its summary.json must equal gate.json. With
+    `raw` (the hold's own directory, as a session reads it) the summary must compare that
+    directory's runs/, the gate is decided again with every run's coverage of the prompts in
+    `prompt_file` (checked against the manifest), each run's server must have been launched
+    with the manifest's model and revision, each run's server log must be that server's and
+    show the GDN fold on (fold=True) exactly when the arm has A, and compare.py run again on
+    runs/ must reproduce the directory's summary.json, divergences.csv, table.csv and meta.json
+    byte for byte, which binds them to the run files. Without it (the committed copy, which has
+    no runs/ or logs) those are left to the session, which checked them before it ran.
     """
     home = gate_path.resolve().parent
     try:
         gate = json.loads(gate_path.read_text())
         meta = json.loads((home / 'meta.json').read_text())
         summary = json.loads((home / 'summary.json').read_text())
-        prompts = json.loads(MANIFEST.read_text())['num_prompts']
-    except (OSError, ValueError, KeyError) as exc:
+        manifest = json.loads(MANIFEST.read_text())
+        prompts, prompt_tokens = manifest['num_prompts'], manifest['input_tokens']['total']
+        model = {'--model-path': manifest['model'], '--revision': manifest['model_revision']}
+    except (OSError, ValueError, KeyError, TypeError) as exc:
         return [f'unreadable equality outputs in {home} ({exc!r})']
     why = []
     if gate.get('ok') is not True or gate.get('levers') != levers:
@@ -287,12 +342,30 @@ def equality_problems(
         if made != (STOCK_PIN if arm == 'S0' else engine, False, repo):
             why.append(f'{run}: SGLang, dirty, repository {made}')
         want = {'flags': eq_flags(group, arm), 'concurrency': 1, 'warm': False,
-                'max_new_tokens': NEW_TOKENS, 'num_prompts': prompts}  # fmt: skip
+                'max_new_tokens': NEW_TOKENS, 'num_prompts': prompts,
+                'prompt_tokens': prompt_tokens}  # fmt: skip
         if wrong := {k: m.get(k) for k, v in want.items() if m.get(k) != v}:
             why.append(f'{run}: made with {wrong}, not as its arm')
         if raw:
+            # The run's server, from the run's own meta (run_matrix.py; compare.py's meta.json is
+            # made from it): launched with the model the prompts were tokenized for, and the
+            # server log beside the run is that server's (its launch command on the first line,
+            # one server process, the one in server_id: experiments/state_safety/server.py).
+            try:
+                info = json.loads((home / 'runs' / f'{run}.meta.json').read_text())['server_info']
+                cmd, pid = [str(x) for x in info['cmd']], str(info['server_id']).split(':')[-2]
+            except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
+                cmd, pid = [repr(exc)], ''
+            launched = {a: b for a, b in itertools.pairwise(cmd) if a in model}
+            if launched != model:
+                why.append(f'{run}: server launched with {launched}, not {model}')
             log = home / 'runs' / run.split('/')[0] / 'server.log'
             text = log.read_text(errors='replace') if log.is_file() else ''
+            started = re.findall(r'Started server process \[(\d+)\]', text)
+            if text.split('\n', 1)[0] != ' '.join(cmd) or started != [pid]:
+                why.append(
+                    f"{run}: server log is not its server's (processes {started}, not [{pid}])"
+                )
             folds = re.findall(
                 r'GDN ReplaySSM ring buffers allocated \(record_len=\d+, fold=(\w+)\)', text
             )
@@ -324,7 +397,7 @@ def equality_problems(
             or Path(str(gate.get('summary'))).resolve() != home / 'summary.json'
         ):
             why.append(f'gate.json and summary.json are not those of {home} and its runs/')
-    fresh = decide(home / 'summary.json', levers, runs)
+    fresh = decide(home / 'summary.json', levers, runs, prompt_file)
     fresh['summary'] = gate.get('summary')  # the same file, named where the hold wrote it
     if fresh != gate:
         why.append(f'gate.json differs from the gate decided again from {home / "summary.json"}')
@@ -340,6 +413,8 @@ def main() -> None:
     ap.add_argument('--engine', help="check: the confirm engine's commit")
     ap.add_argument('--eq-flags', nargs=2, metavar=('GROUP', 'ARM'), help="print an arm's flags")
     ap.add_argument('--levers', help='levers that survived their probes, e.g. ABC')
+    ap.add_argument('--prompts', type=Path, default=PROMPT_FILE,
+                    help="decide and check: the equality hold's prompt file")  # fmt: skip
     args = ap.parse_args()
     if args.eq_flags:
         group, arm = args.eq_flags
@@ -354,7 +429,9 @@ def main() -> None:
     if args.check_gate:
         if not (args.repo and args.engine):
             ap.error('--check-gate needs --repo and --engine')
-        why = equality_problems(args.check_gate, args.levers, args.repo, args.engine, raw=True)
+        why = equality_problems(
+            args.check_gate, args.levers, args.repo, args.engine, raw=True, prompt_file=args.prompts
+        )
         print('gate', args.check_gate, 'ok' if not why else 'REFUSED: ' + '; '.join(why))
         sys.exit(1 if why else 0)
     if not (args.summary and args.out):
@@ -364,7 +441,7 @@ def main() -> None:
         sys.exit(
             f'{args.summary} compares runs in {summary["runs"]}, not the runs/ directory beside it'
         )
-    gate = decide(args.summary, args.levers, Path(summary['runs']))
+    gate = decide(args.summary, args.levers, Path(summary['runs']), args.prompts)
     for group, g in gate['groups'].items():
         print(group, 'full', g['full'], 'timed', g['timed_levers'] or '-', json.dumps(g['checks']))
     args.out.write_text(json.dumps(gate, indent=1) + '\n')

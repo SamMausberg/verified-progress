@@ -171,10 +171,12 @@ PY
 # The single precondition of every timed session: the equality gate passed for exactly
 # these levers and binds this session (confirm_gate.py, equality_problems): the runs its
 # directory's meta.json lists are exactly the equality hold's, each from this repository's
-# HEAD, S0 from the pin and every other run from the confirm engine's HEAD, made as its arm,
-# with the fold on exactly in the arms with A; and the gate decided again by this commit's
-# confirm_gate.py from that directory's summary.json and runs/ equals gate.json.
+# HEAD, S0 from the pin and every other run from the confirm engine's HEAD, made as its arm
+# on the manifest's prompts (CONFIRM_PROMPTS) and model, with the fold on exactly in the arms
+# with A; and the gate decided again by this commit's confirm_gate.py from that directory's
+# summary.json and runs/ equals gate.json.
 gate_ok() {
   python "$CONFIRM_REPO/experiments/speed_lowc/confirm_gate.py" --check-gate "$CONFIRM_GATE" \
-    --levers "$CONFIRM_LEVERS" --repo "$CONFIRM_REPO_HEAD" --engine "$(git -C "$CONFIRM_ENGINE" rev-parse HEAD)"
+    --levers "$CONFIRM_LEVERS" --repo "$CONFIRM_REPO_HEAD" --engine "$(git -C "$CONFIRM_ENGINE" rev-parse HEAD)" \
+    --prompts "$CONFIRM_PROMPTS"
 }

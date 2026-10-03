@@ -21,14 +21,15 @@ resolves it (bench.arms.resolve_arm), from stock SGLang at the pin; every other 
 have that arm's arguments and environment plus exactly its levers' settings (confirm_arms.sh),
 from the confirm engine commit the holds ran; all launches from the holds' repository commit,
 with no modified SGLang files and no failed launch check. Each launch's sweep, in the sweeps.csv that
-confirm_sweeps.py writes beside them, must be the declared one: the confirm split, 512 output
+confirm_sweeps.py writes beside them, must be the declared one: the confirm split (its hash and
+prompt count) and the warm-up pool (its hash) that the workload's manifest declares, 512 output
 tokens to the end (ignore_eos), one repeat of the group's concurrencies with 64 measured
 requests or 8 waves, no failed launch check, the session its points name, and the same model,
 request body and client settings as every other launch, the holds' repository commit with no
-modified tracked files at launch (bench.server's record), the model and revision of its bench
-arm and the repository's warm-up pool. Its bench.sweep options, parsed from
-its recorded command line, must equal those of the command hold_confirm_session.sh gives that
-arm in that session, and each point must have measured max(64, 8c) requests. Every launch
+modified tracked files at launch (bench.server's record), and the model and revision of its
+bench arm. Its bench.sweep options, parsed from its recorded command line, must equal those of
+the command hold_confirm_session.sh gives that arm in that session, and each point must have
+measured max(64, 8c) requests. Every launch
 counts here, including an attempt with no points (it is in sweeps.csv and launches.csv, which
 must list the same launches): by start time they must form one block per session, sessions 1,
 2 and 3 in turn, each in the declared order (hold_confirm_session.sh), so a retried launch is
@@ -39,7 +40,8 @@ levers, its runs exactly the equality hold's, made as their arms, from the engin
 repository commits the launches ran with S0 at the pin, and the gate decided again from its
 summary.json equal to gate.json. A launch that breaks this, or one whose points name two sessions, is an error.
 
-    python experiments/speed_lowc/confirm_analyze.py --points <points.csv> --out <dir>
+    python experiments/speed_lowc/confirm_analyze.py --points <points.csv> \
+        --full L=ABC --full H=AC --out <dir>
 """
 
 from __future__ import annotations
@@ -77,7 +79,7 @@ POINT_VALUES = (*METRICS, 'accept_length')
 # Each group's bench arm: experiments/speed_lowc/confirm_arms.sh, group_arm (lines 63-69).
 GROUP_ARM = {'L': 'dflash-tuned-b16', 'H': 'dflash-tuned'}
 # Each lever's settings over S0: confirm_arms.sh, lever_args (lines 90-97); on L an arm with C
-# but not B also keeps the drafter on Triton (arm_args, lines 145-148).
+# but not B also keeps the drafter on Triton (arm_args, lines 120-123).
 LEVER_ARGS: dict[str, dict[str, Any]] = {
     'A': {'enable-linear-replayssm-spec': True},
     'B': {'speculative-draft-attention-backend': 'fa4'},
@@ -95,6 +97,8 @@ LEVER_CLI = {
 # output tokens (hold_confirm_session.sh line 60).
 CONFIRM_SPLIT = Path(__file__).resolve().parents[2] / 'bench/workloads/mixed-v2/confirm.jsonl'
 WARMUP_POOL = CONFIRM_SPLIT.with_name('warmup.jsonl')  # bench/sweep.py line 58
+# The frozen workload's manifest, which declares both files by hash and prompt count (files).
+WORKLOAD_MANIFEST = CONFIRM_SPLIT.with_name('manifest.json')
 OSL, REPEATS, MIN_REQUESTS, WAVES = 512, 1, 64, 8
 # The holds' commits (evidence/speed_lowc/confirm/README.md, Results and Provenance): this
 # repository at 9a7d52a (tag speed-lowc-confirm-holds) and the confirm engine that
@@ -119,7 +123,7 @@ SHARED_SWEEP = (
 def session_argv(group: str, arm: str, session: str) -> list[str]:
     """The bench.sweep arguments hold_confirm_session.sh (lines 59-61) gives `arm` in `session`.
 
-    Its arm part is confirm_arms.sh's arm_args (lines 141-153); the engine worktree and the
+    Its arm part is confirm_arms.sh's arm_args (lines 116-128); the engine worktree and the
     output directory are given as confirm_sweeps.options reduces them.
     """
     argv = ['--arm', GROUP_ARM[group]]
@@ -325,6 +329,11 @@ def check_sweeps(sweeps: Path, launches: dict[tuple[str, str], str]) -> None:
         raise SystemExit(f'{sweeps}: no sweep for the launches {missing}')
     split = hashlib.sha256(CONFIRM_SPLIT.read_bytes()).hexdigest()
     warmup = hashlib.sha256(WARMUP_POOL.read_bytes()).hexdigest()
+    declared = json.loads(WORKLOAD_MANIFEST.read_text())['files']
+    if (split, warmup) != (declared['confirm']['sha256'], declared['warmup']['sha256']):
+        raise SystemExit(
+            f'{CONFIRM_SPLIT.parent}: the files are not those {WORKLOAD_MANIFEST.name} declares'
+        )
     why = []
     for (label, run), session in sorted(launches.items()):
         row, group = by_key[(label, run)], label.split('-')[1]
@@ -333,6 +342,7 @@ def check_sweeps(sweeps: Path, launches: dict[tuple[str, str], str]) -> None:
             'model': resolve_arm(GROUP_ARM[group]).model,
             'revision': resolve_arm(GROUP_ARM[group]).revision,
             'workload_sha256': split,
+            'workload_prompts': str(declared['confirm']['prompts']),
             'warmup_pool_sha256': warmup,
             'osl': str(OSL),
             'ignore_eos': 'True',

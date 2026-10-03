@@ -64,7 +64,7 @@ python experiments/state_safety/compare.py --runs "$RUNS" --pairs "$OUT/pairs.js
 # exists only where that is so.
 if (( ${#failed[@]} == 0 )); then
   python experiments/speed_lowc/confirm_gate.py --summary "$OUT/summary.json" \
-    --levers "$CONFIRM_LEVERS" --out "$OUT/gate.json" || failed+=(gate)
+    --levers "$CONFIRM_LEVERS" --prompts "$PROMPTS" --out "$OUT/gate.json" || failed+=(gate)
 fi
 if (( ${#failed[@]} == 0 )); then
   if ln -sfn "$OUT" "$(dirname "$OUT")/current"; then echo "current -> $OUT"; else failed+=(current); fi
