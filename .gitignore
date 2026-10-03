@@ -5,7 +5,7 @@
 # talk's deck in presentation/ is committed
 /*.pdf
 *.pptx
-!/presentation/*.pptx
+!/presentation/verifier_paper_talk.pptx
 
 # Python
 .venv/
