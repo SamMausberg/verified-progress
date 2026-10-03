@@ -179,7 +179,8 @@ Secondary investigations and supporting material:
   FP8 GEMMs are fast, but served plain decoding gains only 1.3-3.6%, because the
   quantization and scaling kernels take back the GEMMs' saving; static or
   CUTLASS scales serve 1.12-1.26 times as fast but sit on or below the logit
-  probe's top-1 floor, so neither is inside the quality budget (single sessions;
+  probe's top-1 floor, so neither is shown to be inside the quality budget
+  (single sessions;
   `evidence/speed_bytes/`).
 - **BF16 paths against FP32.** At one position after the model's end-of-text
   token, stock SGLang's batch-1 BF16 decoding puts first a token 8.9 nats below
