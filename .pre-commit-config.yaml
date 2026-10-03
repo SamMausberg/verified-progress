@@ -1,7 +1,8 @@
 # Install once with `pre-commit install`; run everything with `pre-commit run --all-files`.
-# Generated evidence, the paper and the checksum list are byte-exact records of
-# the supplied bundle, and git format-patch files must stay applicable, so the
-# auto-fixing hooks leave them alone.
+# Generated evidence and data and the checksum list are byte-exact records, the paper's
+# sources and committed PDFs are built and checked by their own scripts
+# (scripts/check_paper_references.py), and git format-patch files must stay applicable,
+# so the auto-fixing hooks leave them alone.
 exclude: ^(evidence/|data/|sources/|paper/|engine/sglang/patches/.*\.patch$)
 
 repos:
