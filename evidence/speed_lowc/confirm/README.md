@@ -261,6 +261,17 @@ with no points still voids only its own cells, as declared. The committed run is
 launch directories are the 39 launches with points, and `ratios.json` and `accept.json` reproduce byte
 for byte.
 
+2026-10-03, after the analysis (review of #230): two bindings by content rather than identity. A
+session's gate check reran the gate from `summary.json` without tying that file to the run files.
+It now runs state's `compare.py` again on the equality directory's `runs/` and requires
+`summary.json`, `divergences.csv`, `table.csv` and `meta.json` to come out byte for byte the same.
+`launches.csv` does not carry the repository's modified files at launch, so `sweeps.csv` now
+exports this repository's commit and modified tracked files as `bench.server` recorded them for each
+launch, and the analysis requires the holds' commit with none modified. The committed run is
+unaffected: `compare.py` reproduces all four files from the hold's runs, every launch recorded
+`9a7d52a` with no modified files, and `gate.json`, `ratios.json` and `accept.json` reproduce byte for
+byte.
+
 ## Results
 
 Written 2026-10-03. Labels: **measured** (read from the files below) and **derived** (ratios, means and
@@ -437,11 +448,11 @@ equality was not tested).
 - The analysis (`bench.pareto`, `confirm_analyze.py`, `confirm_accept.py`) ran on 2026-10-03 from
   `853bd4b` with a clean tree. Both scripts were then tightened as the amendments say (`08a8421`,
   `e8566e3`, `2f1b187`, `02c5c46`, `a08e423`, `50b9e7b`, `623de0b`, `fc95fe9`, `cc4810b`, `e0a9b35`,
-  `3dd4d15` and `276d019`). The whole analysis rerun from a clean checkout of each of those commits reproduced
-  `points.csv`, `launches.csv`, `ratios.json` and `accept.json` byte for byte. `sweeps.csv` was written by
+  `3dd4d15`, `276d019` and `946547e`). The whole analysis rerun from a clean checkout of each of those
+  commits reproduced `points.csv`, `launches.csv`, `ratios.json` and `accept.json` byte for byte. `sweeps.csv` was written by
   `confirm_sweeps.py` from a clean checkout of `50b9e7b` and again, identically, from each later one;
   the analysis needs it, `launches.csv` and `equality/` beside `points.csv`.
-- `equality/gate.json` is the hold's own output. `confirm_gate.py` as amended at `3dd4d15`, run on
+- `equality/gate.json` is the hold's own output. `confirm_gate.py` as amended at `946547e`, run on
   `~/vp-data/speed-lowc/confirm/equality-20261002T215749Z/summary.json` with `--levers ABC` (it also
   reads that directory's `runs/`), reproduces it byte for byte.
 - `equality/` and `sessions/` are unchanged copies of the holds' outputs under
