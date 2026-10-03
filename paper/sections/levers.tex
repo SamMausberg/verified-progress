@@ -9,34 +9,29 @@
 The largest served gains came from changes outside the head, measured against the tuned stock arms of Section~\ref{sec:served} (Table~\ref{tab:levers}). On the envelope the certified head gained only at $c=1$, by 1.2\% (Table~\ref{tab:head-served}).
 
 \begin{table}[!b]
-\caption{Engine changes (Section~\ref{sec:levers}) and the certified head (Section~\ref{sec:served}) against the tuned stock arm each modifies (group rows), flags otherwise identical; one session each, except the rows marked$^c$. Ratio: throughput $y$, or per-request rate $x$ where marked, with over without the change; brackets: run-pair range, or 95\% $t$ interval$^c$. Outputs: greedy outputs against stock, same configuration; exactness is not established where not compared.}\label{tab:levers}
+\caption{Changes outside the head give the largest served gains. Ratio: $y$ or $x$ with over without the change, on the group's tuned stock arm unless a row names another; flags otherwise identical.}\label{tab:levers}
 \vskip 0.05in
-% 7 pt, the one main-text table below 9 pt: at 8 pt its wrapped rows cost about five lines of
-% the ten-page main text, at 9 pt an unwrapped row needs about 295 pt against the 235 pt column.
-\centering\scriptsize\setlength{\tabcolsep}{1.8pt}
-\begin{tabular*}{\columnwidth}{@{}l@{\extracolsep{\fill}}rll@{}}
+% 7 pt: at 8 or 9 pt the six columns need about 265 or 295 pt against the 235 pt column.
+% Grey: run-pair ranges and intervals printed nowhere else in the paper, so they stay here
+% (the certified head's intervals are in Table tab:cert-served).
+\centering\scriptsize\setlength{\tabcolsep}{1.5pt}
+\begin{tabular*}{\columnwidth}{@{}l@{\extracolsep{\fill}}rcl>{\color{muted}}ll@{}}
 \toprule
-Change & $c$ & Ratio (pairs) & Outputs\\\midrule
-\multicolumn{4}{@{}l}{\emph{MTP, three steps, FlashInfer attention} \ev{hostgap,admission}}\\
-Host-gap patches & 1--8 & 1.094--1.096 (1.090--1.101) & token-identical$^a$\\
-% The label and c share a cell: c = 32--128 in its own cell widens the c column past the table's width.
-\multicolumn{2}{@{}l}{Prefill delay, cap$^{c,e}$\hfill 32--128} & 1.19--1.48 (1.17--1.50) & exact up to rounding\\\addlinespace[2pt]
-\multicolumn{4}{@{}l}{\emph{Plain decoding} \ev{backbone,bench-frontier,bench-equality}}\\
-Backbone GEMM routing & 1 & 1.035 (1.034--1.035) & exact up to rounding\\
-Replayed GDN decoding & 128 & 1.081 (one pair) & exact up to rounding\\\addlinespace[2pt]
-\multicolumn{4}{@{}l}{\emph{DFlash, 16-token blocks} \ev{drafter-fold,lowc-confirm}}\\
-Fold verify & 1 & 0.968 (0.966--0.970) & bitwise$^b$\\
-& 8--32 & 1.061--1.120 (1.053--1.134) & \\
-Fold, FA4$^{c,f}$ & 1--4 & $x$\,1.084--1.093 (1.056--1.114) & exact up to rounding\\
-\quad on 8-token blocks & 8--32 & 1.124--1.137 (1.108--1.166) & \\\addlinespace[2pt]
-\multicolumn{4}{@{}l}{\emph{Certified head, per arm$^c$} \ev{cert-served}}\\
-Plain decoding & 1 & 1.025 (1.022--1.028) & identical$^d$\\
-MTP, Triton attention & 1 & 1.046 (1.045--1.046) & identical$^d$\\
-DFlash, 16-token & 1 & 1.012 (1.007--1.018) & identical$^d$\\
-& 2--4 & 0.970--0.990 (0.958--0.996) & \\
-DFlash, 8-token & 4--8 & 0.975--0.988 (0.967--0.999) & check mode$^d$\\
+Change & $c$ & \multicolumn{2}{@{\hspace{4pt}}l}{Ratio} & (pairs) & Exact\\\midrule
+\multicolumn{6}{@{}l}{\emph{MTP, three steps, FlashInfer attention} \ev{hostgap,admission}}\\
+Host-gap patches & 1--8 & $y$ & 1.094--1.096 & (1.090--1.101) & token-identical$^a$\\
+Prefill delay, cap$^\dagger$ & 32--128 & $y$ & 1.19--1.48 & (1.17--1.50) & up to rounding\\
+\enspace over best non-spec.\ arm & 48--128 & $y$ & 1.18--1.32 & & at $c=64$, 128\\\addlinespace[2pt]
+\multicolumn{6}{@{}l}{\emph{Plain decoding} \ev{backbone,bench-frontier,bench-equality}}\\
+Backbone GEMM routing & 1 & $y$ & 1.035 & (1.034--1.035) & up to rounding\\
+Replayed GDN decoding & 128 & $y$ & 1.081 & (one pair) & up to rounding\\\addlinespace[2pt]
+\multicolumn{6}{@{}l}{\emph{DFlash, 16-token blocks} \ev{drafter-fold,lowc-confirm}}\\
+Fold verify & 1 & $y$ & 0.968 & (0.966--0.970) & bitwise$^b$\\
+& 8--32 & $y$ & 1.061--1.120 & (1.053--1.134) & \\
+Fold, narrow tiles, FA4$^\dagger$ & 1--4 & $x$ & 1.084--1.093 & (1.056--1.114) & up to rounding\\
+\enspace on 8-token blocks & 8--32 & $y$ & 1.124--1.137 & (1.108--1.166) & at $c=1$\\
 \bottomrule
-\multicolumn{4}{@{}p{\columnwidth}@{}}{$^a$Tokens, verify-step counts and draft histograms on 192 of 192 requests; log-probabilities not compared. $^b$Identical tokens and top-five log-probabilities, with matched pools and fixed batch composition, in a separate check. $^c$Three sessions; geometric mean of the session ratios. $^d$Token ids at $c=1$ and every certified position in check mode (Appendix~\ref{app:cert-served}). $^e$Against MTP without it (best non-speculative arm: 1.18--1.32 at $c=48$--128); brackets: session range; outputs classed at $c=64$ and 128. $^f$Narrow verify tiles, FA4 target and drafter attention (the 8-token arm already drafts with FA4); from $c=8$ against the stock 8-token arm; $x$ declared at $c\le4$; outputs classed at $c=1$.}
+\multicolumn{6}{@{}p{\columnwidth}@{}}{Exact: greedy outputs against stock, same configuration; not established where not compared. $^a$Tokens, verify-step counts and draft histograms on 192 of 192 requests; log-probabilities not compared. $^b$Identical tokens and top-five log-probabilities, with matched pools and fixed batch composition, in a separate check. $^\dagger$Three sessions, not one; mean ratio (fold: geometric); grey, session range (prefill) or 95\% $t$ interval.}
 \end{tabular*}
 \end{table}
 \paragraph{Recurrent state and attention} Removing per-request state traffic pays as the batch grows. \emph{Replayed GDN decoding}, SGLang's buffered decode, keeps recent inputs in a ring and writes the full recurrent state only every 16 tokens. It gains 8.1\% at $c=128$ (one run pair) \ev{bench-frontier}. \emph{Fold verify}, SGLang's fold-every-commit protocol, verifies DFlash blocks without per-position state snapshots. In one session it costs 3.2\% at $c=1$ and gains 6.1\% at $c=8$ \ev{drafter-fold}. Composed with routing and the head, it fell below the range declared before the run at $c=2$--8 (Appendix~\ref{app:stack-composition}). Up to $c=32$ it gains most with \emph{narrow verify tiles} (the stock verify's tiles, used by the fold's kernel at one or two requests) and \emph{FA4} (FlashAttention~4) attention for the target and, on 16-token blocks, the drafter. FA4 needs a backported fix to its paged-KV loader to compile at the target's head dimension of 256 on this GPU. On the envelope's DFlash arms the three changes together raise the per-request rate 8.4--9.3\% at $c=1$--4 and throughput 12.4--13.7\% at 8--32 in three sessions, exact up to rounding as classed at $c=1$ \ev{lowc-confirm}.
