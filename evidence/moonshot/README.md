@@ -861,5 +861,10 @@ SGLANG_GDN_EXACT_REPLAY_BV=16 python experiments/moonshot/gdn_exact_replay_check
   --out ~/vp-data/moonshot/exact_replay/bench_bv16_20261001T082738Z.json
 ```
 
+The two check files and `gdn_exact_replay_check_L4.json` are byte-identical: the check's JSON
+records neither the value tile (set only through `SGLANG_GDN_EXACT_REPLAY_BV`) nor a time, the
+three runs share their arguments and seed, and every count agrees. The file name is the only record
+of the tile.
+
 Lever definitions (flags and environment per lever, lossy labels, conflicts):
 `experiments/moonshot/levers.py`.

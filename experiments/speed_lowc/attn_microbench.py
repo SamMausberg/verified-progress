@@ -19,9 +19,9 @@ shape, and whether split-KV equals the Triton kernel bitwise. Inputs are random
 BF16; timings are medians of CUDA-graph replays (warm L2: one forward's KV is
 4-64 MB).
 
-Kill rule (~/vp-coord/proposals/speed_lowc.md): drop FA4/split-KV for the target
-if the best alternative saves under 0.2 ms per target forward (8 layers) at
-B = 1 and context 512.
+Declared kill rule (the result is in evidence/speed_lowc/README.md): drop
+FA4/split-KV for the target if the best alternative saves under 0.2 ms per
+target forward (8 layers) at B = 1 and context 512.
 
     scripts/gpu_lock.sh -x python experiments/speed_lowc/attn_microbench.py --out <json>
 """
