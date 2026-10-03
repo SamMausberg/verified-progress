@@ -68,7 +68,7 @@ that is argued on paper, not checked. The stock token is the first maximal index
 
 ## False variants
 
-`scripts/check_lean_variants.sh` weakens one hypothesis of a lemma at a time, by a `sed` edit of a
+`scripts/check_lean_variants.sh` weakens one hypothesis of a lemma at a time (for `sequential_sum_bound`, it strengthens the conclusion instead), by a `sed` edit of a
 copy in a temporary directory, and expects Lean to reject the copy; `formal/` itself is never
 edited, since `check_lean.sh` elaborates every file there. Rerun with
 

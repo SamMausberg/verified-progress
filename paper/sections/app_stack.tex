@@ -103,13 +103,13 @@ Table~\ref{tab:levers-intervals} gives the spread behind each ratio of Table~\re
 \centering\tablefont\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}lrrlll@{}}
 \toprule
-Change & $c$ & Sessions & Ratio & \ci{Spread} & Spread over\\\midrule
+Change & $c$ & Sessions & Ratio & \ci{Spread} & Spread from\\\midrule
 \multicolumn{6}{@{}l}{\emph{MTP, three steps, FlashInfer attention}~\ev{hostgap,admission}}\\
 Host-gap patches & 1--8 & 1 & $y$ 1.094--1.096 & \ci{1.090--1.101} & run pairs\\
 Prefill delay, cap & 32--128 & 3 & $y$ 1.19--1.48 & \ci{1.17--1.50} & sessions\\
 \enspace over best non-speculative arm & 48--128 & 3 & $y$ 1.18--1.32 & \ci{--} & \\\addlinespace[2pt]
 \multicolumn{6}{@{}l}{\emph{Plain decoding}~\ev{backbone,bench-frontier}}\\
-Backbone GEMM routing & 1 & 1 & $y$ 1.035 & \ci{1.034--1.035} & run pairs\\
+Backbone GEMM routing & 1 & 1 & $y$ 1.034 & \ci{1.034--1.035} & run pairs\\
 Replayed GDN decoding & 128 & 1 & $y$ 1.081 & \ci{--} & one run pair\\\addlinespace[2pt]
 \multicolumn{6}{@{}l}{\emph{DFlash, 16-token blocks}~\ev{drafter-fold,lowc-confirm}}\\
 Fold verify & 1 & 1 & $y$ 0.968 & \ci{0.966--0.970} & run pairs\\

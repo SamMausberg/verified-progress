@@ -135,13 +135,13 @@ plain, block 16, block 8 (`ratios.csv`).
 |---|---|---|---|---|---|---|---|
 | plain | c = 1 | 1.0251 | 1.0219-1.0283 | 1.0185-1.0317 | 0.0009 | gain | 1.035 |
 | mtp | c = 1 | 1.0456 | 1.0447-1.0464 | 1.0438-1.0473 | 0.00002 | gain | 1.086 |
-| dflash16 | c = 1 | 1.0125 | 1.0074-1.0177 | 1.0019-1.0232 | 0.009 | gain | 1.045 |
+| dflash16 | c = 1 | 1.0125 | 1.0073-1.0177 | 1.0019-1.0232 | 0.009 | gain | 1.045 |
 | dflash8 | c = 4 | 0.9880 | 0.9774-0.9986 | 0.9664-1.0100 | 0.040 | loss | 1.024 |
 
 Family verdicts: plain, MTP and DFlash block 16 **improve**; DFlash block 8 **loses**.
 H4: **supported** (`summary.json`, regenerated after the check rerun). The exactness
 behind these verdicts rests on the complete check launches (`check2`: every certified
-call counted, 0 of 592,433 certified rows differ) and on concurrency-1 identity; block 8
+call counted, 0 of 592,433 checked rows differ) and on concurrency-1 identity; block 8
 rests on check mode alone. Under the declared rule a large class is reported and
 investigated, not by itself a failure, so the one large class, at MTP c = 64 (a
 position where stock's BF16 decode path errs against FP32 and stock MTP runs err too;
@@ -216,7 +216,7 @@ tuned flags and capacity with `SGLANG_CERTIFIED_HEAD_CHECK=1`, which also runs t
 head in every certified step and counts, on the device, rows whose token differs
 (`check.csv`). The settling hold reran them (step `check2`, hold h5) with the counters
 written on every glue call. At every point and path the device counters cover every
-certified replay the host gated (`uncounted_calls` 0), and 0 of 592,433 certified rows
+certified replay the host gated (`uncounted_calls` 0), and 0 of 592,433 checked rows
 differ. At MTP c = 64 the certified verify reached 64 rows, which happens only in the
 point's drain, with 16 or fewer requests left:
 
