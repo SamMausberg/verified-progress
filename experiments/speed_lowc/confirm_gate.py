@@ -11,6 +11,11 @@ against S0 of its group) and decides, per group, which levers may be timed:
   as an allow-list; large, not_argmax and unknown fail);
 * a lever is timed only if its own arm and the group's FULL arm pass.
 
+compare.py counts a prompt's logprobs as compared when both runs have any top-logprob
+entry, so the gate also reads both runs of every pair (the runs directory the summary
+names) and requires, for each of the 320 prompts, a top-k list of TOP_K entries at every
+output position.
+
 Writes gate.json and exits non-zero if B0 fails in either group or no lever passes.
 
     python experiments/speed_lowc/confirm_gate.py --summary <equality dir>/summary.json \
@@ -26,12 +31,43 @@ from pathlib import Path
 from typing import Any
 
 PROMPTS = 320
+# Top logprobs per position: experiments/speed_lowc/hold_confirm_equality.sh line 61 (--top-logprobs 5).
+TOP_K = 5
 ROUNDING = {'tie', 'one_ulp', 'near'}
 GROUP_LEVERS = {'L': 'ABC', 'H': 'AC'}  # B is FA4 drafting, which H already uses
 
 
 def group_full(group: str, levers: str) -> str:
     return ''.join(x for x in levers if x in GROUP_LEVERS[group])
+
+
+def coverage(runs: Path, run: str) -> str | None:
+    """None if `run` has PROMPTS records, each with TOP_K top logprobs at every output position."""
+    path = runs / f'{run}.jsonl'
+    if not path.is_file():
+        return f'{run}: no run file'
+    records = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    short = sum(
+        1
+        for r in records
+        if len(r.get('top_logprobs') or []) != len(r['output_ids'])
+        or any(len(top) != TOP_K for top in r['top_logprobs'])
+    )
+    if len(records) != PROMPTS or short:
+        return f'{run}: {len(records)} prompts, {short} without top-{TOP_K} at every position'
+    return None
+
+
+def positions(runs: Path, pair: dict[str, Any] | None, cache: dict[str, str | None]) -> str | None:
+    """The first coverage failure of the pair's two runs, or None."""
+    if pair is None:
+        return None
+    for run in (pair['run_a'], pair['run_b']):
+        if run not in cache:
+            cache[run] = coverage(runs, run)
+        if cache[run]:
+            return cache[run]
+    return None
 
 
 def exact(pair: dict[str, Any] | None) -> tuple[bool, str]:
@@ -69,17 +105,25 @@ def main() -> None:
     args = ap.parse_args()
     if not args.levers or any(x not in 'ABC' for x in args.levers):
         ap.error('--levers must be a non-empty string of A, B, C')
-    pairs = json.loads(args.summary.read_text())['pairs']
+    summary = json.loads(args.summary.read_text())
+    pairs, runs = summary['pairs'], Path(summary['runs'])
+    cache: dict[str, str | None] = {}
+
+    def checked(check: Any, pair: dict[str, Any] | None) -> tuple[bool, str]:
+        ok, note = check(pair)
+        gap = positions(runs, pair, cache)
+        return (False, gap) if ok and gap else (ok, note)
+
     gate: dict[str, Any] = {'summary': str(args.summary), 'levers': args.levers, 'groups': {}}
     ok_all = True
     for group in ('L', 'H'):
         full = group_full(group, args.levers)
         checks: dict[str, Any] = {}
-        b0_ok, b0_note = bitwise(pairs.get(f'{group} B0 vs S0'))
+        b0_ok, b0_note = checked(bitwise, pairs.get(f'{group} B0 vs S0'))
         checks['B0'] = {'ok': b0_ok, 'note': b0_note}
         arms = list(full) + ([full] if len(full) > 1 else [])
         for arm in arms:
-            ok, note = exact(pairs.get(f'{group} {arm} vs S0'))
+            ok, note = checked(exact, pairs.get(f'{group} {arm} vs S0'))
             checks[arm] = {'ok': ok, 'note': note}
         full_ok = checks[full]['ok'] if full else False
         timed = ''.join(x for x in full if checks[x]['ok']) if full_ok else ''
