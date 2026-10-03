@@ -140,9 +140,21 @@ def write_out(text: str, out: Path) -> None:
     tmp.replace(out)
 
 
+def write_json(obj: Any, out: Path) -> None:
+    """Write a JSON output whole, refusing any non-finite number (NaN or infinity) in it."""
+    try:
+        text = json.dumps(obj, indent=1, default=float, allow_nan=False)
+    except ValueError as e:
+        raise SystemExit(f'{out}: a value is not a finite number ({e})') from None
+    write_out(text + '\n', out)
+
+
 def write_csv(rows: list[dict], out: Path) -> None:
     if not rows or any(list(r) != list(rows[0]) for r in rows):
         raise SystemExit('nothing to write, or rows with different columns')
+    # No output carries a non-finite number.
+    if any(isinstance(v, float) and not math.isfinite(v) for r in rows for v in r.values()):
+        raise SystemExit(f'{out}: a value is not a finite number')
     buf = io.StringIO(newline='')
     w = csv.DictWriter(buf, fieldnames=list(rows[0]))
     w.writeheader()
@@ -703,6 +715,16 @@ def cmd_served(args: argparse.Namespace) -> None:
             gpu_name = dict(zip(gpu['fields'], gpu['values'], strict=True))['name']
             if not gpu_name.startswith('NVIDIA GH200'):
                 raise SystemExit(f'{f}: GPU {gpu_name}')
+            # ...with every required launch check bench made passed (CUDA graphs captured and
+            # covering the capacity, the overlap scheduler on, the capacity and attention backend
+            # asked for, the speculative configuration resolved), as the launch record has them.
+            checks = d['checks']
+            if (
+                not checks
+                or checks != d['launch']['checks']
+                or not all(c['ok'] for c in checks if c['required'])
+            ):
+                raise SystemExit(f'{f}: launch checks {checks}')
             if d['launch']['repo']['head'] != repo:
                 raise SystemExit(
                     f'{f}: harness {d["launch"]["repo"]["head"][:7]}, hold log {repo[:7]}'
@@ -1313,7 +1335,7 @@ def cmd_probe(args: argparse.Namespace) -> None:
     if not all(f'act={a} graph replay equal eager: True' in lines for a in ('token', 'tensor')):
         raise SystemExit('unit check: CUDA-graph replay differs from eager')
     out['unit_check'] = unit
-    write_out(json.dumps(out, indent=1, default=float) + '\n', Path(args.out))
+    write_json(out, Path(args.out))
     print(f'wrote {args.out}')
 
 

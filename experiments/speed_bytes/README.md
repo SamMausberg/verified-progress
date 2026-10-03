@@ -33,10 +33,10 @@ the batch, CUDA-graph replay equal to eager, relative error under 0.06); the run
 passing.
 
 `summarize.py` checks every input against what its hold launched, writes nothing unless every
-check passes, and names the recorded runs by the hash of their hold logs (and of the GEMM probe's
-JSON): only these may lack the records listed above, and any other hold must have run this
-checkout's hold scripts and the harness they run (bench, the profiling driver, the probe client,
-the unit check, `scripts/sglang_env.sh`). It checks
+check passes, writes no non-finite number, and names the recorded runs by the hash of their hold
+logs (and of the GEMM probe's JSON): only these may lack the records listed above, and any other
+hold must have run this checkout's hold scripts and the harness they run (bench, the profiling
+driver, the probe client, the unit check, `scripts/sglang_env.sh`). It checks
 
 - per hold: the engine (its tree, or for the recorded runs the commit), the runtime, and that
   its log ends with its end line and no failed step;
@@ -47,11 +47,12 @@ the unit check, `scripts/sglang_env.sh`). It checks
   workload and warm-up pool by hash) and every aiperf command it saved (server warm-up and points,
   seed and output lengths included); the arm as `bench/arms.toml` at the hold's commit resolves it
   and the server command bench launched for it; the harness commit the hold logged, the engine
-  worktree SGLang was imported from, the GH200 its launch record read and the virtualenv's
-  interpreter; that its server log is the one bench summarized at the end of the sweep; and that
-  every point is its `point.json` and what `bench/results.py` computes again from the requests
-  aiperf recorded, valid by bench's own rule, with every published value finite (rates positive,
-  TTFT and foreign CPU not negative, an accept length exactly on the speculative arms);
+  worktree SGLang was imported from, the GH200 its launch record read, the virtualenv's interpreter
+  and bench's required launch checks (CUDA graphs, overlap scheduler, capacity, attention backend)
+  passed; that its server log is the one bench summarized at the end of the sweep; and that every
+  point is its `point.json` and what `bench/results.py` computes again from the requests aiperf
+  recorded, valid by bench's own rule, with every published value finite (rates positive, TTFT and
+  foreign CPU not negative, an accept length exactly on the speculative arms);
 - per probe server: the launch SGLang printed (`server_args`: the hold's flags and the defaults
   the comparison relies on, identical across the hold's servers apart from the switches), a log
   written inside that server's section of the hold log, and the probe client and prompts at the
