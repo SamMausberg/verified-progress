@@ -15,11 +15,11 @@ keywords:
   - SGLang
 preferred-citation:
   type: report
-  title: "The Work a Verifier Needs"
+  title: "The Work a Verifier Needs: Certified Int8 Output Heads That Match a Production Kernel's Rounding"
   authors:
     - family-names: Mausberg
       given-names: Samuel
   year: 2026
-  month: 9
+  month: 10
   url: "https://github.com/SamMausberg/verified-progress"
-  notes: "Research manuscript, revision 4, in progress."
+  notes: "Preprint, not peer reviewed."
