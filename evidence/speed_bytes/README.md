@@ -10,9 +10,12 @@ frontier.
 Setting: Qwen/Qwen3.5-4B at `851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a`, drafter
 z-lab/Qwen3.5-4B-DFlash at `9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf`, SGLang `bd66ce343e` plus
 `engine/sglang/patches/speed-bytes/` (engine commit per run in `served.csv`), torch 2.13.0+cu130
-(recorded by the GEMM probe; the servers ran from the same virtualenv, which `served.csv`'s checks
-confirm by path, but these holds predate a per-hold record of its versions), one GH200, greedy decoding, bench's harness and arms (`bench/arms.toml`) at repository commit
-`e690b3a`. Labels: **measured**, **derived** (arithmetic on measured values), **hypothesis**.
+(recorded by the GEMM probe) and sglang-kernel 0.4.7 (the aarch64 wheel whose libraries the
+`cuobjdump` command below reads); the servers ran from the same virtualenv, which `served.csv`'s
+checks confirm by path, but these runs predate a record of its package versions and of
+sgl-kernel's libraries, which later runs carry and `summarize.py` checks. One GH200, greedy
+decoding, bench's harness and arms (`bench/arms.toml`) at repository commit `e690b3a`. Labels:
+**measured**, **derived** (arithmetic on measured values), **hypothesis**.
 
 ## Short answer
 
@@ -30,7 +33,7 @@ confirm by path, but these holds predate a per-hold record of its versions), one
   GH200 every converted layer reaches the CUTLASS GEMM unless `USE_TRITON_W8A8_FP8_KERNEL` is set.
 - **The GEMMs are fast through cuBLASLt** (measured, `gemm_probe.csv`). With one scale per
   tensor, `torch._scaled_mm` runs cuBLASLt FP8 kernels: the backbone GEMMs of one decode step take
-  1,474 us at M = 1 against 2,478 us in BF16 (0.59x) and 0.59-0.66x up to M = 256; the head
+  1,474 us at M = 1 against 2,478 us in BF16 (0.60x) and 0.59-0.66x up to M = 256; the head
   0.51x (180 against 353 us at M = 1). torch's per-row `_scaled_mm` (its own kernel on sm90) runs
   (it is not the stub) but takes 0.89-1.03x of BF16, SGLang's Triton W8A8 kernel 0.80-1.10x and
   Marlin W8A16 0.84x at M = 1 rising to 2.2x at M = 256.

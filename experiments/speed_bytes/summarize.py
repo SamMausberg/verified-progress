@@ -19,6 +19,7 @@ import argparse
 import ast
 import csv
 import hashlib
+import io
 import json
 import math
 import re
@@ -27,6 +28,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +42,48 @@ SGLANG_PIN = 'bd66ce343e'
 VENV_PYTHON = str(Path.home() / 'sglang/.venv/bin/python')
 # The virtualenv's torch and its CUDA (SETUP.md, key versions), which every timed route ran on.
 TORCH_VERSION, TORCH_CUDA = '2.13.0+cu130', '13.0'
+# The runtime every run records (runtime_record.py) must be this one: the virtualenv's interpreter,
+# torch and the serving packages at SETUP.md's key versions (lines 57-58), and the hash of the
+# sgl-kernel 0.4.7 libraries installed in ~/sglang/.venv (whose sm90 library the evidence
+# README's cuobjdump command reads).
+RUNTIME = {
+    'python': VENV_PYTHON,
+    'torch': TORCH_VERSION,
+    'cuda': TORCH_CUDA,
+    'packages': {
+        'flash-attn-4': '4.0.0b19',
+        'flashinfer-python': '0.6.18',
+        'sglang-kernel': '0.4.7',
+        'transformers': '5.12.1',
+        'triton': '3.7.1',
+        'xgrammar': '0.2.7',
+    },
+    'sgl_kernel_libraries': '0ef282cb3a79d7d82dc9569e676dc1565e02b99844b2b8e133a09021f525c39d',
+}
+# The recorded runs, by the sha256 of their hold log (the GEMM probe: of its JSON). They predate
+# records the committed holds and probe now write: the engine tree on the start line, the runtime
+# line, ", failed steps: N" on the end line, the unit script's and the probe files' hashes, each
+# trace's FP8 switch, and the GEMM probe's SGLang checkout, harness, arguments, runtime,
+# environment and GPU lock. Those records may be missing from these files alone; every other run
+# must carry them all and must have run this checkout's hold script.
+RECORDED = {
+    '6ca9713bee9c02ea3b1f141642412f45949c0cf68f8256c7fff655647145031b',  # fp8_gemm_probe_20261002T170014Z.json
+    '10252528807bb4dd3d7917888f9adc7696ee08670527ebcbab649971dc0ab913',  # kill1_20261002T173359Z
+    '773bfc5f571d75e77265f89e71971fd5f1a63d76ee5734c7a492e2053d484124',  # kill2b_20261002T180019Z
+    'a8a59f7abd2cbbb693c3d83938444778295f8915cf0d9777c9a10ac274455dfb',  # kill3_20261002T192532Z
+    '39789a292ff925cc85fd01874f92f37fe507398e1f0de420c9bd88b31ca8011e',  # probe1_20261002T174507Z
+}  # fmt: skip
+
+
+def sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def is_recorded(path: Path) -> bool:
+    """The file is one of the recorded runs' hold logs or GEMM probe JSON (RECORDED)."""
+    return sha256_file(path) in RECORDED
+
+
 REQUIRED_ROUTES = ('bf16', 'fp8_tensor', 'fp8_rowwise', 'fp8_triton', 'fp8_marlin', 'act_quant_fp8')
 # The grid fp8_gemm_probe.py runs by default (its SHAPES and --ms; holds/fp8_probe.sh passes neither).
 # Each shape's (N, K) as nn.Linear(K -> N), fp8_gemm_probe.py's SHAPES.
@@ -79,22 +123,65 @@ STEP_COUNTS = {
 }
 
 
+def write_out(text: str, out: Path) -> None:
+    """Write the output whole or not at all (a temporary file renamed over it)."""
+    tmp = out.with_name(f'.{out.name}.tmp')
+    tmp.write_text(text)
+    tmp.replace(out)
+
+
 def write_csv(rows: list[dict], out: Path) -> None:
-    if not rows:
-        raise SystemExit('nothing to write')
-    with out.open('w', newline='') as fh:
-        w = csv.DictWriter(fh, fieldnames=list(rows[0]))
-        w.writeheader()
-        w.writerows(rows)
+    if not rows or any(list(r) != list(rows[0]) for r in rows):
+        raise SystemExit('nothing to write, or rows with different columns')
+    buf = io.StringIO(newline='')
+    w = csv.DictWriter(buf, fieldnames=list(rows[0]))
+    w.writeheader()
+    w.writerows(rows)
+    write_out(buf.getvalue(), out)
     print(f'wrote {out} ({len(rows)} rows)')
 
 
+# What runs after 2026-10-02's record in the probe's meta, which the recorded run predates.
+GEMM_LATER = (
+    'sglang_source',
+    'harness',
+    'args',
+    'runtime',
+    'env',
+    'gpu_lock_held',
+    'gpu_processes',
+)
+
+
 def cmd_gemm(args: argparse.Namespace) -> None:
-    d = json.loads(Path(args.probe).read_text())
-    src = d['meta'].get('sglang_source')  # recorded by runs after 2026-10-02's
-    if src and (src['dirty_files'] or not src['head'].startswith(SGLANG_PIN)):
+    probe = Path(args.probe)
+    d = json.loads(probe.read_text())
+    recorded_run = is_recorded(probe)
+    absent = [k for k in GEMM_LATER if d['meta'].get(k) is None]
+    if absent and not recorded_run:
+        raise SystemExit(f'{probe}: no {absent} in its meta (only the recorded run may lack them)')
+    # The SGLang checkout the kernels came from: ~/sglang (fp8_probe.sh), at the pin, clean.
+    src = d['meta'].get('sglang_source')
+    if src and (
+        src['dirty_files']
+        or not src['head'].startswith(SGLANG_PIN)
+        or src['path'] != str(Path.home() / 'sglang')
+    ):
         raise SystemExit(
-            f'{args.probe}: SGLang {src["head"][:10]} dirty={src["dirty_files"]}, pin {SGLANG_PIN}'
+            f'{args.probe}: SGLang {src["path"]} {src["head"][:10]} dirty={src["dirty_files"]}, '
+            f'pin {SGLANG_PIN}'
+        )
+    # The runtime (interpreter, packages, sgl-kernel's libraries), no inherited SGLang switch or
+    # import path, and the GPU held by this run alone.
+    if not recorded_run and (
+        d['meta']['runtime'] != RUNTIME
+        or d['meta']['env'] != {}
+        or d['meta']['gpu_lock_held'] is not True
+        or d['meta']['gpu_processes'] != []
+    ):
+        raise SystemExit(
+            f'{probe}: runtime {d["meta"]["runtime"]}, environment {d["meta"]["env"]}, GPU lock '
+            f'{d["meta"]["gpu_lock_held"]}, other GPU processes {d["meta"]["gpu_processes"]}'
         )
     if not d['meta']['device'].startswith('NVIDIA GH200'):
         raise SystemExit(f'{args.probe}: device {d["meta"]["device"]}')
@@ -119,11 +206,26 @@ def cmd_gemm(args: argparse.Namespace) -> None:
             or harness['probe_sha256'] != hashlib.sha256(here).hexdigest()
         ):
             raise SystemExit(f'{args.probe}: harness {harness}')
+    # The planned arguments, and this file is the run's output (not a renamed copy of another).
     recorded = d['meta'].get('args')  # recorded by runs after 2026-10-02's
-    if recorded is not None and {k: v for k, v in recorded.items() if k != 'out'} != GEMM_ARGS:
+    if recorded is not None and (
+        {k: v for k, v in recorded.items() if k != 'out'} != GEMM_ARGS
+        or Path(recorded['out']).name != probe.name
+    ):
         raise SystemExit(f'{args.probe}: arguments {recorded}, planned {GEMM_ARGS}')
-    # Every row is the planned shape, timed over the planned number of weight copies.
+    # Every row is a planned shape, M and route (int8_mm only where torch._int_mm runs, M > 16),
+    # once, timed over the planned number of weight copies.
+    seen = set()
     for r in d['rows']:
+        key = (r['shape'], r['M'], r['route'])
+        if (
+            key in seen
+            or r['shape'] not in GEMM_SHAPES
+            or r['M'] not in GEMM_MS
+            or r['route'] not in (*REQUIRED_ROUTES, *(('int8_mm',) if r['M'] > 16 else ()))
+        ):
+            raise SystemExit(f'{args.probe}: row {key} is not planned, or repeated')
+        seen.add(key)
         n, k = GEMM_SHAPES[r['shape']]
         if (r['N'], r['K'], r['copies']) != (n, k, max(1, math.ceil(GEMM_L2_BYTES / (n * k)))):
             raise SystemExit(
@@ -145,7 +247,7 @@ def cmd_gemm(args: argparse.Namespace) -> None:
     # kernel computed, but it is not the per-tensor route's error, so the published column is left
     # empty for that run. Later runs quantize that route per tensor (and record the checkout); their
     # error is published.
-    if src is None:
+    if recorded_run:
         for r in rows:
             if r['route'] == 'fp8_tensor':
                 r['rel_err_vs_fp32'] = ''
@@ -367,13 +469,15 @@ def check_hold_engine(hold: Path) -> str:
 
     The hold scripts log the engine's tree next to its commit; a log with a tree must show the
     recorded tree (a rebuilt engine has another commit id but the same tree). The recorded runs
-    predate the tree in the log, so for them the commit itself must match.
+    predate the tree in the log, so for them alone the commit itself must match.
     """
     name = hold.name.split('_')[0]
     head = (hold / 'hold.log').read_text().split('\n', 1)[0]
-    m = re.match(r'start \S+ repo \w+ engine (\w+)(?: tree (\w+))?', head)
+    m = re.match(r'start \S+ repo \w+ engine (\w+)(?: tree (\w+))?$', head)
     if not m or name not in HOLD_ENGINES:
         raise SystemExit(f'{hold}: no engine in the hold log, or an unknown hold')
+    if not m.group(2) and not is_recorded(hold / 'hold.log'):
+        raise SystemExit(f'{hold}: the hold log records no engine tree')
     commit, tree = HOLD_ENGINES[name]
     if (m.group(2) != tree) if m.group(2) else not m.group(1).startswith(commit):
         raise SystemExit(
@@ -382,23 +486,31 @@ def check_hold_engine(hold: Path) -> str:
     return m.group(1)
 
 
+END_LINE = re.compile(r'^end (\S+?)(?:, failed steps: (\d+))?$', re.M)
+
+
 def check_hold_finished(hold: Path) -> None:
-    """The hold ran to its last line ("end <time>", with ", failed steps: 0" where it counts them)."""
-    ends = re.findall(
-        r'^end \S+?(?:, failed steps: (\d+))?$', (hold / 'hold.log').read_text(), re.M
-    )
-    if len(ends) != 1 or ends[0] not in ('', '0'):
+    """The hold ran to its last line: "end <time>, failed steps: 0" (the recorded runs, which do
+    not count failed steps, "end <time>"), as the log's last line and its only end line."""
+    text = (hold / 'hold.log').read_text()
+    ends = END_LINE.findall(text)
+    done = ('', '0') if is_recorded(hold / 'hold.log') else ('0',)
+    if len(ends) != 1 or ends[0][1] not in done or not END_LINE.match(text.splitlines()[-1]):
         raise SystemExit(f'{hold}: the hold log does not end with every step done')
 
 
-def check_runtime_logged(hold: Path) -> bool:
-    """The runtime the hold logged (holds/tree_guard.sh log_runtime): this virtualenv's interpreter
-    with the planned torch and CUDA. Holds recorded before the line existed log none (False)."""
-    found = re.findall(r'^runtime (\S+) (\S+) (\S+)$', (hold / 'hold.log').read_text(), re.M)
-    for runtime in found:
-        if runtime != (VENV_PYTHON, TORCH_VERSION, TORCH_CUDA):
-            raise SystemExit(f'{hold}: runtime {" ".join(runtime)}')
-    return bool(found)
+def check_runtime_logged(hold: Path) -> None:
+    """The runtime the hold logged (holds/tree_guard.sh log_runtime, once) is RUNTIME. Only the
+    recorded runs, which predate the line, may log none."""
+    found = re.findall(r'^runtime (.*)$', (hold / 'hold.log').read_text(), re.M)
+    if not found and is_recorded(hold / 'hold.log'):
+        return
+    try:
+        ok = len(found) == 1 and json.loads(found[0]) == RUNTIME
+    except ValueError:
+        ok = False
+    if not ok:
+        raise SystemExit(f'{hold}: runtime {found}, planned {RUNTIME}')
 
 
 def hold_repo(hold: Path) -> str:
@@ -407,6 +519,84 @@ def hold_repo(hold: Path) -> str:
     if not m:
         raise SystemExit(f'{hold}: no repository commit in the hold log')
     return m.group(1)
+
+
+def check_hold_script(hold: Path, *helpers: str) -> None:
+    """A hold other than the recorded ones (which ran scratch copies) ran this checkout's hold
+    script, its guard and runtime record, and the helpers it runs: the files are identical at
+    the repository commit it logged."""
+    if is_recorded(hold / 'hold.log'):
+        return
+    files = [
+        f'experiments/speed_bytes/holds/{hold.name.split("_")[0]}.sh',
+        'experiments/speed_bytes/holds/tree_guard.sh',
+        'experiments/speed_bytes/runtime_record.py',
+        *helpers,
+    ]
+    if subprocess.run(
+        ['git', '-C', str(REPO), 'diff', '--quiet', hold_repo(hold), 'HEAD', '--', *files]
+    ).returncode:
+        raise SystemExit(f"{hold}: its scripts at {hold_repo(hold)[:7]} are not this checkout's")
+
+
+def check_hold(hold: Path, *helpers: str) -> str:
+    """Every check of a hold's own log (engine, last line, runtime, scripts); the engine commit."""
+    engine = check_hold_engine(hold)
+    check_hold_finished(hold)
+    check_runtime_logged(hold)
+    check_hold_script(hold, *helpers)
+    return engine
+
+
+HEADING = re.compile(r'^== (.+?)(?: (\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d[+-]\d\d:\d\d))?$')
+
+
+def hold_sections(hold: Path) -> list[dict[str, Any]]:
+    """The hold log split at its "== <name> [<time>]" headings (the lines before the first are a
+    section named None): per section its lines, its start (the heading's time, if it has one) and
+    its end (the next timed heading's time, or the end line's), in seconds since the epoch."""
+    text = (hold / 'hold.log').read_text()
+    sections: list[dict[str, Any]] = [{'name': None, 'start': None, 'lines': []}]
+    for line in text.splitlines():
+        m = HEADING.match(line)
+        if m:
+            when = datetime.fromisoformat(m.group(2)).timestamp() if m.group(2) else None
+            sections.append({'name': m.group(1), 'start': when, 'lines': []})
+        else:
+            sections[-1]['lines'].append(line)
+    ends = END_LINE.findall(text)
+    last = datetime.fromisoformat(ends[-1][0]).timestamp() if ends else None
+    for i, sec in enumerate(sections):
+        sec['end'] = next((s['start'] for s in sections[i + 1 :] if s['start'] is not None), last)
+    return sections
+
+
+def hold_section(hold: Path, name: str) -> dict[str, Any]:
+    """The hold log's one section with this heading."""
+    found = [s for s in hold_sections(hold) if s['name'] == name]
+    if len(found) != 1:
+        raise SystemExit(f'{hold}: {len(found)} sections "== {name}" in the hold log')
+    return found[0]
+
+
+SERVER_STAMP = re.compile(r'^\[(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)', re.M)
+
+
+def check_log_in_section(log: Path, section: dict[str, Any]) -> None:
+    """A server log was written while the hold ran this section: its first and last time stamps
+    (SGLang's, local time to the second, as the hold's clock) lie between the section's start
+    and the next section's."""
+    stamps = [
+        datetime.strptime(s, '%Y-%m-%d %H:%M:%S').timestamp()
+        for s in SERVER_STAMP.findall(log.read_text(errors='replace'))
+    ]
+    if (
+        not stamps
+        or section['start'] is None
+        or section['end'] is None
+        or not section['start'] <= min(stamps) <= max(stamps) <= section['end']
+    ):
+        raise SystemExit(f'{log}: not written inside its hold-log section "== {section["name"]}"')
 
 
 def check_fp8_log(log: str, env: dict[str, str]) -> bool:
@@ -426,19 +616,27 @@ def env_label(arm: dict) -> str:
 def cmd_served(args: argparse.Namespace) -> None:
     from bench.arms import resolve_arm, server_command
     from bench.pareto import invalid_reason
+    from bench.results import load_requests, prompt_hash, summarise_point
+    from bench.sweep import cycled, load_prompts, log_segment_stats, requests_for
 
     # served.csv covers every planned hold, each once.
     names = sorted(Path(h).name.split('_')[0] for h in args.holds)
     if names != sorted(PLANNED):
         raise SystemExit(f'holds {names} != planned {sorted(PLANNED)}')
+    # The committed workload and warm-up pool (sweep_workload_ok checks the sweeps used them), as
+    # bench/sweep.py indexes them to read a point's requests.
+    workload = load_prompts(REPO / SWEEP_WORKLOAD)
+    prompt_index = {
+        prompt_hash(item['text']): {'id': item['id'], 'domain': item['domain']}
+        for item in [*load_prompts(REPO / SWEEP_WARMUP_POOL), *workload]
+    }
+    home = str(Path.home())
     pts = []
     for hold in args.holds:
         hold = Path(hold)
         sweeps = sorted(hold.glob('*/*/sweep.json'))
         name = hold.name.split('_')[0]
-        engine = check_hold_engine(hold)
-        check_hold_finished(hold)
-        check_runtime_logged(hold)
+        engine = check_hold(hold)
         repo = hold_repo(hold)
         labels = [f.parent.parent.name for f in sweeps]
         if name not in PLANNED or sorted(labels) != sorted(PLANNED[name]):
@@ -471,11 +669,22 @@ def cmd_served(args: argparse.Namespace) -> None:
             label = f.parent.parent.name
             if d['label'] != label:
                 raise SystemExit(f'{f}: label {d["label"]} in the directory of {label}')
+            # The sweep the hold ran for this label: the label's one section of the hold log ends
+            # with bench's "done: <run directory>/sweep.json" for this run directory (printed after
+            # the sweep's last write), and the manifest is that last write.
+            done = [x[6:] for x in hold_section(hold, label)['lines'] if x.startswith('done: ')]
+            if [Path(x).parts[-4:] for x in done] != [
+                (hold.name, label, f.parent.name, 'sweep.json')
+            ] or not {'server_log_totals', 'finished_unix'} <= set(d):
+                raise SystemExit(f'{f}: not the sweep the hold log records for {label} ({done})')
+            # SGLang was imported from the hold's engine worktree.
+            worktree = f'{home}/sglang-wt/{SWEEP_LAUNCH[name][0]}'
+            if src.get('module_file') != f'{worktree}/python/sglang/__init__.py':
+                raise SystemExit(f'{f}: SGLang imported from {src.get("module_file")}')
             arm, conc, switches = PLANNED[name][label]
             # The full invocation the hold makes, the arm as bench/arms.toml at the hold's commit
             # resolves it with those switches (args, environment, model, capacity), and the
             # server command bench launched for it.
-            home = str(Path.home())
             cmd = [a.replace(home, '~') for a in d['command_line']]
             if '--out' in cmd:
                 cmd[cmd.index('--out') + 1] = Path(cmd[cmd.index('--out') + 1]).name
@@ -508,11 +717,42 @@ def cmd_served(args: argparse.Namespace) -> None:
             env = {k: v for k, v in d['arm'].get('env', {}).items() if v}
             if d['arm']['name'] != arm or env != switches:
                 raise SystemExit(f'{f}: arm {d["arm"]["name"]} {env}, planned {arm} {switches}')
-            # The server's own log must show those switches' conversions, with their mode.
+            # The server's own log must show those switches' conversions, with their mode; and it
+            # is this sweep's server log: bench's summary of it at the end of the sweep
+            # (server_log_totals: decode and prefill line counts, logged rates) is its summary.
             log = (f.parent / 'server' / 'server.log').read_text(errors='replace')
             if not check_fp8_log(log, env):
                 raise SystemExit(f'{f}: server log does not match the FP8 switches {env}')
+            if log_segment_stats(log) != d['server_log_totals']:
+                raise SystemExit(f'{f}: server/server.log is not the log this sweep summarized')
             for p in d['points']:
+                # The point is its directory's record (point.json), and every value bench
+                # summarized for it is what bench.results computes again from the requests aiperf
+                # recorded there (bench/sweep.py's Sweep.point: the measured prompts, the target
+                # output lengths, the profiling phase's summary).
+                point = f.parent / f'r{p["repeat"]}' / f'c{p["concurrency"]:03d}'
+                measured = cycled(
+                    workload, requests_for(p['concurrency'], SWEEP_MIN_REQUESTS, SWEEP_WAVES)
+                )
+                target = (
+                    {prompt_hash(x['text']): int(x['output_length']) for x in measured}
+                    if 'output_length' in measured[0]
+                    else SWEEP_REQUEST['osl']
+                )
+                phase = point / 'aiperf/phases/profiling/profile_export_aiperf.json'
+                again = summarise_point(
+                    load_requests(point / 'aiperf', prompt_index),
+                    target,
+                    p['concurrency'],
+                    json.loads(phase.read_text()) if phase.exists() else None,
+                )
+                canon = json.dumps(json.loads((point / 'point.json').read_text()), sort_keys=True)
+                if canon != json.dumps(p, sort_keys=True) or any(
+                    json.dumps(v, sort_keys=True, default=str)
+                    != json.dumps(p.get(k), sort_keys=True, default=str)
+                    for k, v in again.items()
+                ):
+                    raise SystemExit(f'{f}: c={p["concurrency"]} is not what its requests give')
                 # bench's own validity rule (failed or short requests, aiperf errors, warm cache,
                 # other prompts, host contention), plus every request completed.
                 reason = invalid_reason(p)
@@ -606,28 +846,49 @@ TRACE_SERVER = [
 ]  # fmt: skip
 TRACE_NSYS = ['nsys', 'launch', '--trace=cuda,nvtx', '--cuda-graph-trace=node',
               '--cuda-flush-interval=250']  # fmt: skip
+# The Nsight Systems that wrote the reports (run_meta.json), whose export step_budget.py reads.
+TRACE_NSYS_VERSION = 'NVIDIA Nsight Systems version 2025.3.2.474-253236389321v0'
 
 
 def cmd_steps(args: argparse.Namespace) -> None:
     from step_budget import budget
 
-    from experiments.profiling.run_profiles import build_parser, read_windows, window_problems
+    from experiments.profiling.run_profiles import (
+        build_parser,
+        log_stats,
+        read_windows,
+        window_problems,
+    )
 
-    # Every report comes from one kill2b hold (the comparison is within one session), whose logged
-    # runtime, where it logs one, is the planned one.
+    # Every report comes from one kill2b hold (the comparison is within one session).
     holds = {Path(rep).absolute().parent.parent for rep in args.reports}
     if len(holds) != 1 or next(iter(holds)).name.split('_')[0] != 'kill2b':
         raise SystemExit(f'reports from {sorted(map(str, holds))}: planned one kill2b hold')
-    check_runtime_logged(next(iter(holds)))
+    hold = next(iter(holds))
+    engine = check_hold(hold)
     rows = []
     seen: list[tuple[str, int]] = []
     for rep in args.reports:
         rep = Path(rep)
-        engine = check_hold_engine(rep.parent.parent)  # <hold>/trace_<variant>/<report>
-        check_hold_finished(rep.parent.parent)
         m = re.search(r'trace_(\w+)/plain_bs(\d+)', str(rep))
         if not m or m.group(1) not in TRACE_SWITCHES:
             raise SystemExit(f'{rep}: expected .../trace_{{bf16,fp8}}/plain_bs<B>.nsys-rep')
+        # The hold ran this trace in its "== trace <variant>" section: nsys reported writing
+        # this report there ("Generated:" and its path), run_profiles.py started then, and (holds
+        # other than the recorded one, which predates the line) the hold logged the variant's
+        # switch there.
+        section = hold_section(hold, f'trace {m.group(1)}')
+        lines = section['lines']
+        generated = [
+            Path(lines[i + 1].strip()).parts[-3:] for i in range(len(lines) - 1)
+            if lines[i] == 'Generated:'
+        ]  # fmt: skip
+        switch = TRACE_SWITCHES[m.group(1)].get('SGLANG_FP8_DENSE', '')
+        if generated.count((hold.name, rep.parent.name, rep.name)) != 1 or not (
+            is_recorded(hold / 'hold.log')
+            or f'trace {m.group(1)}: SGLANG_FP8_DENSE={switch}' in lines
+        ):
+            raise SystemExit(f'{rep}: not a report the hold log records in its trace section')
         # The traced server's log (beside the report) must show the variant's conversion.
         log = (rep.parent / 'server.log').read_text(errors='replace')
         if not check_fp8_log(log, TRACE_SWITCHES[m.group(1)]):
@@ -635,6 +896,9 @@ def cmd_steps(args: argparse.Namespace) -> None:
         # run_profiles.py's record of the traced process: the engine the hold ran and exactly the
         # invocation holds/kill2b.sh makes.
         meta = json.loads((rep.parent / 'run_meta.json').read_text())
+        started = datetime.fromisoformat(meta['started']).timestamp()
+        if not section['start'] <= started <= section['end']:
+            raise SystemExit(f'{rep}: run_meta.json started {meta["started"]}, outside its section')
         argv = meta['argv']
         out_dir = argv[argv.index('--out-dir') + 1] if '--out-dir' in argv else ''
         if (
@@ -654,6 +918,7 @@ def cmd_steps(args: argparse.Namespace) -> None:
             or cmd[6:] != [VENV_PYTHON, *TRACE_SERVER]
             or meta['env'] != {}
             or not meta['gpu'].startswith('NVIDIA GH200')
+            or meta['nsys_version'] != TRACE_NSYS_VERSION
         ):
             raise SystemExit(
                 f'{rep}: run_meta.json records {meta["repo_sha"][:7]} {cmd} {meta["gpu"]}'
@@ -677,6 +942,14 @@ def cmd_steps(args: argparse.Namespace) -> None:
             or Path(nsys[0]['output']).parts[-2:] != (rep.parent.name, rep.stem)
         ):
             raise SystemExit(f'{rep}: not the report windows.jsonl records ({problems})')
+        # The server log beside it is this run's: for every window, what run_profiles.py read from
+        # it (the decode lines stamped inside the window) is what it reads now.
+        for w in windows:
+            stats = log_stats(
+                rep.parent / 'server.log', w['window_wall_start'], w['window_wall_end']
+            )
+            if {k: v for k, v in w.items() if k.startswith('log_')} != stats:
+                raise SystemExit(f'{rep.parent}/server.log: not the log windows.jsonl summarized')
         # ...and its contents are that window's: the trace session started when the window did.
         # Export the report afresh (nsys_db reuses any newer .sqlite beside it, which need not be
         # this report's) and read everything below from that export.
@@ -865,25 +1138,25 @@ PROBE_WROTE = re.compile(r'^wrote (\S+) \((\d+) sequences, ([\d.]+) s\)$')
 def check_probe_written(hold: Path, label: str, kind: str, run: dict) -> None:
     """The probe file was written while this hold ran its server `label`.
 
-    The hold log holds one section per server ("== start <label> ..." up to the next one); the
-    file's "wrote" line (logit_probe.py's, with the sequence count and seconds the file records)
-    must be in that section, once. Holds that log the file's sha256 after writing it (the
-    committed probe holds do; the recorded runs predate it) must log this file's.
+    The hold log holds one section per server ("== start <label> <time>" up to the next
+    heading); the file's "wrote" line (logit_probe.py's, with the sequence count and seconds the
+    file records) must be in that section, once, and so must the file's sha256, which the
+    committed probe holds log after writing it (only the recorded runs, which predate that line,
+    may lack it).
     """
     name = f'{label}.{kind}.json'
-    section, wrote, shas = None, [], []
-    for line in (hold / 'hold.log').read_text().splitlines():
-        if line.startswith('== start '):
-            section = line.split()[2]
-        m = PROBE_WROTE.match(line)
-        if m and Path(m.group(1)).name == name:
-            wrote.append((section, int(m.group(2)), m.group(3)))
-        if re.fullmatch(rf'[0-9a-f]{{64}}  \S*/{re.escape(name)}', line):
-            shas.append(line.split()[0])
-    want = (label, len(run['sequences']), f'{run["seconds"]:.1f}')
-    raw = (hold / name).read_bytes()
-    if wrote != [want] or (shas and shas != [hashlib.sha256(raw).hexdigest()]):
-        raise SystemExit(f'{hold}/{name}: hold log records {wrote} {shas}, the file {want}')
+    wrote, shas = [], []
+    for sec in hold_sections(hold):
+        for line in sec['lines']:
+            m = PROBE_WROTE.match(line)
+            if m and Path(m.group(1)).name == name:
+                wrote.append((sec['name'], int(m.group(2)), m.group(3)))
+            if re.fullmatch(rf'[0-9a-f]{{64}}  \S*/{re.escape(name)}', line):
+                shas.append((sec['name'], line.split()[0]))
+    want = (f'start {label}', len(run['sequences']), f'{run["seconds"]:.1f}')
+    sha = (f'start {label}', sha256_file(hold / name))
+    if wrote != [want] or (shas != [sha] and (shas or not is_recorded(hold / 'hold.log'))):
+        raise SystemExit(f'{hold}/{name}: hold log records {wrote} {shas}, the file {want} {sha}')
 
 
 def cmd_probe(args: argparse.Namespace) -> None:
@@ -891,13 +1164,13 @@ def cmd_probe(args: argparse.Namespace) -> None:
     from experiments.moonshot.logit_probe import compare_runs
 
     d = Path(args.probe_dir)
-    check_hold_engine(d)
-    check_hold_finished(d)
-    check_runtime_logged(d)
+    check_hold(d)
     for label, switches in PROBE1_SWITCHES.items():
         log = (d / f'server_{label}.log').read_text(errors='replace')
         if not check_fp8_log(log, switches):
             raise SystemExit(f'{d}: server_{label}.log does not match its FP8 setting')
+        # ...and was written while the hold ran that server.
+        check_log_in_section(d / f'server_{label}.log', hold_section(d, f'start {label}'))
     check_probe_servers(d, list(PROBE1_SWITCHES), PROBE1_PORT, 48, 64)
     ref = json.loads((d / 'bf16.gen48.json').read_text())
 
@@ -921,16 +1194,26 @@ def cmd_probe(args: argparse.Namespace) -> None:
     for a, b in [('fp8tok.gen48', 'fp8tok.gen1'), ('fp8ten.gen48', 'fp8ten.gen1')]:
         out['logit_probe_compare'][f'{a} vs {b}'] = compare_runs(load(a), load(b))
         out['decode_path'][f'{a} vs {b}'] = decode_path(load(a), load(b))
-    check_hold_engine(Path(args.unit_log).parent)  # kill1, the hold that ran the unit check
-    check_runtime_logged(Path(args.unit_log).parent)
-    # The unit script, where the log records its hash (the committed kill1.sh does; the recorded
-    # run used a scratch copy and predates the line): this checkout's fp8_dense_unit.py.
-    unit_shas = set(
-        re.findall(r'^unit script ([0-9a-f]{64})$', Path(args.unit_log).read_text(), re.M)
-    )
-    unit_here = hashlib.sha256((REPO / 'experiments/speed_bytes/fp8_dense_unit.py').read_bytes())
-    if unit_shas and unit_shas != {unit_here.hexdigest()}:
-        raise SystemExit(f"{args.unit_log}: unit script {sorted(unit_shas)}, not this checkout's")
+    # The unit check is kill1's: --unit-log is that hold's log, checked as any hold's, whose
+    # "== unit check" section holds every unit-check line of the log and ends with the script's
+    # "OK". It starts with the hash of the unit script, which must be this checkout's (only the
+    # recorded run, which ran a scratch copy and predates the line, may lack it).
+    unit_log = Path(args.unit_log)
+    if unit_log.name != 'hold.log' or unit_log.parent.name.split('_')[0] != 'kill1':
+        raise SystemExit(f'{unit_log}: not the log of a kill1 hold')
+    check_hold(unit_log.parent, 'experiments/speed_bytes/fp8_dense_unit.py')
+    lines = hold_section(unit_log.parent, 'unit check')['lines']
+    text, full = '\n'.join(lines), unit_log.read_text()
+    unit_shas = re.findall(r'^unit script ([0-9a-f]{64})$', full, re.M)
+    unit_here = sha256_file(REPO / 'experiments/speed_bytes/fp8_dense_unit.py')
+    if (
+        len(UNIT.findall(full)) != len(UNIT.findall(text))
+        or full.count('graph replay equal eager') != text.count('graph replay equal eager')
+        or lines[-1:] != ['OK']
+        or unit_shas != re.findall(r'^unit script ([0-9a-f]{64})$', text, re.M)
+        or (unit_shas != [unit_here] and (unit_shas or not is_recorded(unit_log)))
+    ):
+        raise SystemExit(f"{unit_log}: not one complete unit check of this checkout's script")
     unit: list[dict[str, Any]] = [
         {
             'act': m.group(1),
@@ -940,7 +1223,7 @@ def cmd_probe(args: argparse.Namespace) -> None:
             'row1_alone_equals_in_batch': {'True': True, 'False': False}.get(m.group(5)),
             'row1_alone_vs_in_batch_max_abs_diff': float(m.group(6)),
         }
-        for m in UNIT.finditer(Path(args.unit_log).read_text())
+        for m in UNIT.finditer(text)
     ]
     # fp8_dense_unit.py: both activation modes at M = 1, 16 and 64; with per-row scales a row's
     # result must not depend on the rest of the batch (the README's claim). Every relative error is
@@ -966,11 +1249,10 @@ def cmd_probe(args: argparse.Namespace) -> None:
         if u['act'] == 'tensor'
     ):
         raise SystemExit('unit check: a per-tensor-scale row does not depend on its batch')
-    text = Path(args.unit_log).read_text()
-    if not all(f'act={a} graph replay equal eager: True' in text for a in ('token', 'tensor')):
+    if not all(f'act={a} graph replay equal eager: True' in lines for a in ('token', 'tensor')):
         raise SystemExit('unit check: CUDA-graph replay differs from eager')
     out['unit_check'] = unit
-    Path(args.out).write_text(json.dumps(out, indent=1, default=float) + '\n')
+    write_out(json.dumps(out, indent=1, default=float) + '\n', Path(args.out))
     print(f'wrote {args.out}')
 
 

@@ -19,11 +19,13 @@ Random N(0, 0.02) weights; the relative error column only checks that each route
 import argparse
 import json
 import math
+import os
 import statistics
 import sys
 import time
 from pathlib import Path
 
+import runtime_record
 import torch
 import torch.nn.functional as F
 
@@ -51,26 +53,47 @@ def quant_rowwise_int8(w):
     return (w.float() / s).round().clamp(-127, 127).to(torch.int8), s
 
 
+def git_dirty(root, import_dir):
+    """What makes a checkout differ from its commit as Python sees it (holds/tree_guard.sh's
+    dirty_tree): tracked edits, untracked files, and ignored .py files under import_dir."""
+    import re
+    import subprocess
+
+    def git(*a):
+        return subprocess.run(
+            ['git', '-C', str(root), *a], capture_output=True, text=True, check=True
+        ).stdout.splitlines()
+
+    ignored = git('status', '--porcelain', '--ignored', '--untracked-files=all', '--', import_dir)
+    return git('status', '--porcelain', '--untracked-files=all') + [
+        line
+        for line in ignored
+        if re.fullmatch(r'!! .*\.py', line)
+        and not re.match(r'!! (\.venv/|python/sglang/_version\.py$)', line)
+    ]
+
+
 def sglang_source():
-    """The SGLang checkout the kernels were imported from: path, HEAD and tracked edits."""
+    """The SGLang checkout the kernels were imported from: path, HEAD and what differs from it."""
     import subprocess
 
     import sglang
 
     root = Path(sglang.__file__).resolve().parents[2]
-
-    def git(*a):
-        return subprocess.run(['git', '-C', str(root), *a], capture_output=True, text=True).stdout
-
     return {
         'path': str(root),
-        'head': git('rev-parse', 'HEAD').strip(),
-        'dirty_files': git('status', '--porcelain', '--untracked-files=no').splitlines(),
+        'head': subprocess.run(
+            ['git', '-C', str(root), 'rev-parse', 'HEAD'],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip(),
+        'dirty_files': git_dirty(root, 'python'),
     }
 
 
 def harness_source():
-    """This probe's repository checkout: HEAD, tracked edits, and the sha256 of this file."""
+    """This probe's repository checkout: HEAD, what differs from it, and the sha256 of this file."""
     import hashlib
     import subprocess
 
@@ -78,14 +101,35 @@ def harness_source():
 
     def git(*a):
         return subprocess.run(
-            ['git', '-C', str(here.parent), *a], capture_output=True, text=True
-        ).stdout
+            ['git', '-C', str(here.parent), *a], capture_output=True, text=True, check=True
+        ).stdout.strip()
 
     return {
-        'head': git('rev-parse', 'HEAD').strip(),
-        'dirty_files': git('status', '--porcelain', '--untracked-files=no').splitlines(),
+        'head': git('rev-parse', 'HEAD'),
+        'dirty_files': git_dirty(git('rev-parse', '--show-toplevel'), '.'),
         'probe_sha256': hashlib.sha256(here.read_bytes()).hexdigest(),
     }
+
+
+def gpu_lock_held():
+    """Whether a process holds the GPU lock (bench/server.py's test: a shared request fails)."""
+    import subprocess
+
+    lock = Path(os.environ.get('GPU_LOCK_FILE', Path.home() / '.gpu.lock'))
+    return lock.exists() and (
+        subprocess.run(['flock', '-n', '-s', str(lock), 'true'], check=False).returncode != 0
+    )
+
+
+def gpu_processes():
+    """Other processes using the GPU, as nvidia-smi lists them (this one left out)."""
+    import subprocess
+
+    out = subprocess.run(
+        ['nvidia-smi', '--query-compute-apps=pid,process_name', '--format=csv,noheader'],
+        capture_output=True, text=True, check=True,
+    ).stdout  # fmt: skip
+    return [line for line in out.splitlines() if line.split(',')[0].strip() != str(os.getpid())]
 
 
 def time_graph(fn, copies, rounds, reps):
@@ -159,6 +203,14 @@ def main():
         'sglang_source': sglang_source(),
         'harness': harness_source(),
         'args': vars(args),
+        # The runtime (runtime_record.py), the SGLang switches and import path the process
+        # inherited, and that the GPU was held for this run alone.
+        'runtime': runtime_record.record(),
+        'env': {
+            k: v for k, v in os.environ.items() if k.startswith('SGLANG_') or k == 'PYTHONPATH'
+        },
+        'gpu_lock_held': gpu_lock_held(),
+        'gpu_processes': gpu_processes(),
         'route_errors': {},
     }
     for name in shapes:

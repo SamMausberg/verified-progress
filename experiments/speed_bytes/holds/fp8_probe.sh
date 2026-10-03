@@ -17,6 +17,7 @@ SGLANG_DIR=$HOME/sglang
 source "$REPO/scripts/sglang_env.sh"
 mkdir -p "$HOME/vp-data/speed-bytes"
 OUT="$HOME/vp-data/speed-bytes/fp8_gemm_probe_$(date -u +%Y%m%dT%H%M%SZ).json"
+[ ! -e "$OUT" ] || { echo "$OUT exists"; exit 1; }
 nvidia-smi --query-gpu=clocks.sm,clocks.mem,power.draw,memory.used --format=csv
 timeout --foreground 840 python "$SP/fp8_gemm_probe.py" --out "$OUT" --budget-s 720
 nvidia-smi --query-gpu=clocks.sm,clocks.mem,power.draw,memory.used --format=csv

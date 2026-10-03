@@ -9,7 +9,9 @@ ENGINE=$HOME/sglang-wt/speed-bytes
 ENGINE_TREE=e95d72d554f3b70f280e466de8adc21a2f5598c2
 OUT=$HOME/vp-data/speed-bytes/probe1_$(date -u +%Y%m%dT%H%M%SZ)
 PORT=30221
-mkdir -p "$OUT"
+# A new directory: one that exists (a hold started in the same second) is refused.
+mkdir -p "$(dirname "$OUT")"
+mkdir "$OUT"
 exec >"$OUT/hold.log" 2>&1
 # Only what this script sets reaches SGLang: no inherited SGLANG_* variable (the FP8 switches, an
 # SGLANG_DIR naming another virtualenv), PYTHONPATH or CUDA toolkit override; sglang_env.sh then uses
