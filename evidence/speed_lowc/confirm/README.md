@@ -114,6 +114,14 @@ cell with no points as void, where it had read whatever sessions and arms `point
 session would have entered its interval. `confirm_accept.py` uses the same reading. On this
 confirmation's points both outputs are byte for byte the same as before (Provenance).
 
+2026-10-03, after the analysis (review of #230): `confirm_gate.py`'s check for lever arms did not
+require top-logprob arrays, so an arm that returned tokens without them would have passed. It now also
+requires top logprobs compared on all 320 prompts, and token-identical prompts plus classified first
+divergences to cover all 320. The gate that decided the sessions ran inside the equality hold with the
+earlier check. In that hold every pair compared top logprobs on 320/320 prompts and every pair's
+identical and classified prompts add up to 320 (`equality/summary.json`), and the amended script, run
+on the hold's `summary.json`, writes a `gate.json` byte for byte equal to `equality/gate.json`.
+
 ## Results
 
 Written 2026-10-03. Labels: **measured** (read from the files below) and **derived** (ratios, means and
@@ -277,7 +285,8 @@ Bench's confirmed envelope (`evidence/bench/confirm/envelope.csv`, measured in o
 6,844.2 at c = 8, 16 and 32 (`dflash-tuned`). S0 here is within 0.7% of each (870.7, 1,508.8, 2,433.8,
 3,648.7, 5,288.2, 6,847.0), and FULL is 9-14% above them. That comparison crosses sessions and does
 not change the envelope: the FULL arms are not bench arms (`bench/arms.toml`), and on H they move the
-class from stock (`dflash-tuned`) to exact up to rounding against stock.
+class from stock (`dflash-tuned`) to exact up to rounding against stock (classed at c = 1; batched
+equality was not tested).
 
 ### Provenance
 
@@ -290,6 +299,9 @@ class from stock (`dflash-tuned`) to exact up to rounding against stock.
   `853bd4b` with a clean tree. Both scripts were then tightened as the amendments say (`08a8421` and
   `e8566e3`). The whole analysis rerun from a clean checkout of each of those commits reproduced
   `points.csv`, `launches.csv`, `ratios.json` and `accept.json` byte for byte.
+- `equality/gate.json` is the hold's own output. `confirm_gate.py` as amended at `06c901f`, run on
+  `~/vp-data/speed-lowc/confirm/equality-20261002T215749Z/summary.json` with `--levers ABC`, reproduces
+  it byte for byte.
 - `equality/` and `sessions/` are unchanged copies of the holds' outputs under
   `~/vp-data/speed-lowc/confirm/`: `equality-20261002T215749Z/`, `s1-20261002T232241Z/`,
   `s2-20261003T004812Z/` and `s3-20261003T020536Z/`.
