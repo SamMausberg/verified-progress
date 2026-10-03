@@ -7,7 +7,7 @@ equal to the kernel's tile_n uses the paged TMA load; any other page size uses t
 loader (PagedKVManager in paged_kv.py). The output is compared with an FP32 reference; a BF16
 PyTorch reference gives the error scale, and the pass rule is that of SGLang's FA4 tests
 (max error <= 2x and mean error <= 1.5x the BF16 reference's). Prints one JSON line and exits
-0 (ok), 3 (wrong), 2 (Python error) or 4 (CUDA fault).
+0 (ok), 3 (wrong), 2 (Python error) or 4 (CUDA error).
 
 The SGLang tree under test is whatever `sglang` resolves to (PYTHONPATH=<tree>/python).
 
@@ -87,6 +87,9 @@ def main() -> None:
         if ps == 0
         else ('paged_tma' if ps == cfg.n_block_size else 'paged_cpasync'),
     }
+    # FP32 references in true FP32: no TF32 in matmuls, whatever the defaults or environment.
+    torch.backends.cuda.matmul.allow_tf32 = False
+    torch.backends.cudnn.allow_tf32 = False
     torch.manual_seed(0)
     dev, dtype = 'cuda', torch.bfloat16
     b, sq, sk_max, h, hk = 3, 16, 600, 16, 4
@@ -124,7 +127,7 @@ def main() -> None:
         )
         torch.cuda.synchronize()
     except Exception as e:
-        fault = 'illegal memory access' in str(e)
+        fault = 'CUDA error' in str(e)  # any CUDA error, e.g. an illegal memory access
         rec['status'] = 'fault' if fault else 'error'
         rec['error'] = f'{type(e).__name__}: {str(e).splitlines()[0][:200]}'
         rec['traceback_tail'] = traceback.format_exc().splitlines()[-6:]

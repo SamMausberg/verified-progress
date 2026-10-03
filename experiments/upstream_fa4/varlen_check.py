@@ -5,7 +5,7 @@ page table (page i holds key i), so the cp.async paged loader runs; then the sam
 a page table (the contiguous path). Both are compared with an FP32 SDPA reference and an FP64
 loop; BF16 SDPA against the FP64 loop gives the error scale. The paged call runs --calls times on
 the same inputs, and the record says whether the outputs were bitwise identical. Prints one JSON
-line and exits 0 (ok), 3 (wrong), 2 (Python error) or 4 (CUDA fault). A case is ok when every
+line and exits 0 (ok), 3 (wrong), 2 (Python error) or 4 (CUDA error). A case is ok when every
 paged output and the contiguous output are within 2x the BF16 error scale (+1e-5).
 
 --impl sglang imports SGLang's vendored copy (PYTHONPATH=<SGLang tree>/python); --impl fa
@@ -75,6 +75,9 @@ def main() -> None:
         'tile_n': cfg.n_block_size,
         'load_path': 'paged_cpasync',
     }
+    # FP32 references in true FP32: no TF32 in matmuls, whatever the defaults or environment.
+    torch.backends.cuda.matmul.allow_tf32 = False
+    torch.backends.cudnn.allow_tf32 = False
     torch.manual_seed(0)
     dev, dt = 'cuda', torch.bfloat16
     q = torch.randn(sq, h, d, device=dev, dtype=dt)
@@ -143,7 +146,7 @@ def main() -> None:
         )
         torch.cuda.synchronize()
     except Exception as e:
-        fault = 'illegal memory access' in str(e)
+        fault = 'CUDA error' in str(e)  # any CUDA error, e.g. an illegal memory access
         rec['status'] = 'fault' if fault else 'error'
         rec['failed_call'] = stage
         rec['error'] = f'{type(e).__name__}: {str(e).splitlines()[0][:200]}'

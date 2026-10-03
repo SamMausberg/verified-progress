@@ -13,16 +13,21 @@ import importlib.util
 import os
 
 import pytest
+import sglang
 import torch
 from einops import rearrange
 from sglang.kernels.ops.attention.flash_attention import flash_attn_with_kvcache
 from sglang.srt.utils import is_sm90_supported
 
+# The SGLang under test and the helpers must come from the same tree, ahead of anything a test
+# runner puts on sys.path.
+_tree = os.path.realpath(os.environ['SGLANG_TREE'])
+assert os.path.realpath(sglang.__file__).startswith(os.path.join(_tree, 'python', 'sglang')), (
+    sglang.__file__
+)
 _spec = importlib.util.spec_from_file_location(
     'sglang_fa4_tests',
-    os.path.join(
-        os.environ['SGLANG_TREE'], 'test/registered/kernels/ops/attention/test_flash_attention_4.py'
-    ),
+    os.path.join(_tree, 'test/registered/kernels/ops/attention/test_flash_attention_4.py'),
 )
 assert _spec is not None and _spec.loader is not None
 _fa4_tests = importlib.util.module_from_spec(_spec)

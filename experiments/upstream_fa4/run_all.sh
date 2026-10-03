@@ -28,11 +28,11 @@ if [ -e "$out" ]; then
 fi
 mkdir -p "$out" || die "cannot create $out"
 
-# Environment: only SGLANG_DIR's venv, no inherited module paths, no inherited settings that
-# change SGLang's or the CuTe DSL's behaviour, and in-process compile caches only, so no kernel
-# compiled from one tree is reused by another.
+# Environment: only SGLANG_DIR's venv; no inherited module paths; no inherited settings that change
+# SGLang, the CuTe DSL, torch, cuBLAS (TF32) or pytest; and in-process compile caches only, so no
+# kernel compiled from one tree is reused by another.
 export SGLANG_DIR=${SGLANG_DIR:-$HOME/sglang-upstream}
-cleared=$(compgen -e | grep -E '^(SGLANG_|CUTE_DSL_|FLASH_ATTENTION_|PYTHON)' | grep -vx SGLANG_DIR | tr '\n' ' ')
+cleared=$(compgen -e | grep -E '^(SGLANG_|CUTE_DSL_|FLASH_ATTENTION_|PYTHON|PYTEST_|TORCH_|CUBLAS_|NVIDIA_TF32_OVERRIDE$|CUDA_LAUNCH_BLOCKING$)' | grep -vx SGLANG_DIR | tr '\n' ' ')
 for v in $cleared; do unset "$v"; done
 # shellcheck source=/dev/null
 source "$repo/scripts/sglang_env.sh" || die "scripts/sglang_env.sh failed for SGLANG_DIR=$SGLANG_DIR"
@@ -50,6 +50,7 @@ cd "$repo" || die "cannot cd to $repo"
 state() {  # git status of a tree, ignored files included, without __pycache__ entries
   git -C "$1" status --porcelain --untracked-files=all --ignored | grep -vE '^(\?\?|!!) (.*/)?__pycache__/'
 }
+git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 || die "$repo is not a git checkout"
 repo_state=$(git -C "$repo" status --porcelain --untracked-files=all | grep -vE '^\?\? (.*/)?__pycache__/')
 [ -z "$repo_state" ] || die "the repository has uncommitted or untracked files: $(echo "$repo_state" | head -3 | tr '\n' ' ')"
 for v in main ceil ceil_div max_one; do
