@@ -18,7 +18,7 @@ sglang_base=f6fcda8827e5d8a2f0b999cd3b32f5096ee6a82c
 fa_commit=843bf0b86bda1c92edc440ec58f9b5194609abac
 mkdir -p "$dir"
 dir=$(cd "$dir" && pwd)
-git -C "$clone" cat-file -e "$sglang_base^{commit}"
+git -C "$clone" cat-file -e "$sglang_base^{commit}" || { echo "$clone has no commit $sglang_base" >&2; exit 1; }
 for variant in main ceil ceil_div max_one; do
   tree=$dir/sglang-$variant
   if [ -e "$tree" ]; then
@@ -27,6 +27,7 @@ for variant in main ceil ceil_div max_one; do
   fi
   git -C "$clone" worktree add --quiet --detach "$tree" "$sglang_base"
   python3 "$repo/experiments/upstream_fa4/apply_variant.py" "$tree" "$variant"
+  python3 "$repo/experiments/upstream_fa4/apply_variant.py" --check "$tree" "$variant" >/dev/null
 done
 fa=$dir/flash-attention
 if [ ! -e "$fa" ]; then
@@ -34,9 +35,11 @@ if [ ! -e "$fa" ]; then
   git -C "$fa" sparse-checkout set flash_attn/cute
   git -C "$fa" checkout --quiet --detach "$fa_commit"
 fi
-[ "$(git -C "$fa" rev-parse HEAD)" = "$fa_commit" ]
+[ "$(git -C "$fa" rev-parse HEAD)" = "$fa_commit" ] || { echo "$fa is not at $fa_commit" >&2; exit 1; }
 # A reused checkout must be unmodified: run_all.sh labels its cases with the commit alone.
 [ -z "$(git -C "$fa" status --porcelain --untracked-files=no)" ] || { echo "$fa has local edits" >&2; exit 1; }
+# fa-pkg is rebuilt each time, so nothing left in it can be imported beside flash_attn.cute.
+rm -rf "$dir/fa-pkg"
 mkdir -p "$dir/fa-pkg/flash_attn"
 : >"$dir/fa-pkg/flash_attn/__init__.py"
 ln -sfn "$fa/flash_attn/cute" "$dir/fa-pkg/flash_attn/cute"

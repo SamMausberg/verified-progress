@@ -9,40 +9,62 @@
 # SGLANG_DIR (default ~/sglang-upstream) is the SGLang checkout whose .venv has upstream main's
 # pins (torch 2.13.0+cu130, nvidia-cutlass-dsl 4.8.0); scripts/sglang_env.sh activates it.
 set -uo pipefail
+die() { echo "run_all.sh: $*" >&2; exit 1; }
 trees=${1:?usage: run_all.sh <trees dir> <output dir>}
 out=${2:?usage: run_all.sh <trees dir> <output dir>}
-repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd) || die "cannot resolve the repository"
 exp=$repo/experiments/upstream_fa4
 sglang_base=f6fcda8827e5d8a2f0b999cd3b32f5096ee6a82c
 fa_commit=843bf0b86bda1c92edc440ec58f9b5194609abac
+[ -d "$trees" ] || die "no trees directory $trees (run make_trees.sh first)"
+trees=$(cd "$trees" && pwd)
+
+# A fresh output directory: summarize.py reads every record in it, so records of an earlier run
+# must not be there. A caller may already have redirected this script's output to <out>/hold.log.
+if [ -e "$out" ]; then
+  [ -d "$out" ] || die "$out exists and is not a directory"
+  extra=$(find "$out" -mindepth 1 -maxdepth 1 ! -name hold.log | head -1)
+  [ -z "$extra" ] || die "$out is not empty ($extra); use a new directory"
+fi
+mkdir -p "$out" || die "cannot create $out"
+
+# Environment: only SGLANG_DIR's venv, no inherited module paths, no inherited settings that
+# change SGLang's or the CuTe DSL's behaviour, and in-process compile caches only, so no kernel
+# compiled from one tree is reused by another.
 export SGLANG_DIR=${SGLANG_DIR:-$HOME/sglang-upstream}
+cleared=$(compgen -e | grep -E '^(SGLANG_|CUTE_DSL_|FLASH_ATTENTION_|PYTHON)' | grep -vx SGLANG_DIR | tr '\n' ' ')
+for v in $cleared; do unset "$v"; done
 # shellcheck source=/dev/null
-source "$repo/scripts/sglang_env.sh"
-# In-process compile caches only, so no kernel compiled from one tree is reused by another.
-export SGLANG_CUTE_AOT_CACHE_DIR='' OMP_NUM_THREADS=1 PYTHONUNBUFFERED=1
-unset FLASH_ATTENTION_CUTE_DSL_CACHE_ENABLED FLASH_ATTENTION_CUTE_DSL_CACHE_DIR
+source "$repo/scripts/sglang_env.sh" || die "scripts/sglang_env.sh failed for SGLANG_DIR=$SGLANG_DIR"
+[ "$(command -v python)" = "$SGLANG_DIR/.venv/bin/python" ] \
+  || die "python is $(command -v python), not $SGLANG_DIR/.venv/bin/python"
+unset PYTHONPATH
+export SGLANG_CUTE_AOT_CACHE_DIR='' OMP_NUM_THREADS=1 PYTHONUNBUFFERED=1 PYTHONNOUSERSITE=1
 cores=${CORES:-56-59}
-mkdir -p "$out"
-cd "$repo" || exit 1
+cd "$repo" || die "cannot cd to $repo"
 
 # Inputs: every SGLang tree at the base commit with only its paged_kv.py changed (main: no
 # change), flash-attention at its commit, this repository's commit recorded.
 for v in main ceil ceil_div max_one; do
   t=$trees/sglang-$v
-  [ "$(git -C "$t" rev-parse HEAD)" = "$sglang_base" ] || { echo "$t: not at $sglang_base" >&2; exit 1; }
+  [ "$(git -C "$t" rev-parse HEAD)" = "$sglang_base" ] || die "$t: not at $sglang_base"
   changed=$(git -C "$t" status --porcelain --untracked-files=no | awk '{print $2}' | tr '\n' ' ')
   want='python/sglang/kernels/ops/attention/flash_attn/cute/paged_kv.py '
   [ "$v" = main ] && want=''
-  [ "$changed" = "$want" ] || { echo "$t: unexpected changes: '$changed'" >&2; exit 1; }
-  python "$exp/apply_variant.py" --check "$t" "$v" >/dev/null || exit 1
+  [ "$changed" = "$want" ] || die "$t: unexpected changes: '$changed'"
+  python "$exp/apply_variant.py" --check "$t" "$v" >/dev/null || die "$t: not the $v variant"
 done
-[ "$(git -C "$trees/flash-attention" rev-parse HEAD)" = "$fa_commit" ] || { echo "flash-attention not at $fa_commit" >&2; exit 1; }
-[ -z "$(git -C "$trees/flash-attention" status --porcelain --untracked-files=no)" ] || { echo "flash-attention has local edits" >&2; exit 1; }
-[ "$(readlink -f "$trees/fa-pkg/flash_attn/cute")" = "$(cd "$trees/flash-attention/flash_attn/cute" && pwd -P)" ] || { echo "fa-pkg does not point at the checkout" >&2; exit 1; }
-python - "$trees" "$repo" >"$out/meta.json" <<'EOF'
-import hashlib, importlib.metadata as m, json, subprocess, sys, torch
+[ "$(git -C "$trees/flash-attention" rev-parse HEAD)" = "$fa_commit" ] || die "flash-attention not at $fa_commit"
+[ -z "$(git -C "$trees/flash-attention" status --porcelain --untracked-files=no)" ] || die "flash-attention has local edits"
+[ "$(readlink -f "$trees/fa-pkg/flash_attn/cute")" = "$(cd "$trees/flash-attention/flash_attn/cute" && pwd -P)" ] \
+  || die "fa-pkg does not point at the checkout"
+fa_pkg=$(find "$trees/fa-pkg" -mindepth 1 ! -path '*/__pycache__*' ! -path "$trees/fa-pkg/flash_attn/cute/*" -printf '%P\n' | sort | tr '\n' ' ')
+[ "$fa_pkg" = 'flash_attn flash_attn/__init__.py flash_attn/cute ' ] || die "fa-pkg holds more than flash_attn/{__init__.py,cute}: $fa_pkg"
+CLEARED_ENV=$cleared python - "$trees" "$repo" >"$out/meta.json" <<'EOF' || die "meta.json failed"
+import hashlib, importlib.metadata as m, json, os, subprocess, sys, torch
 trees, repo = sys.argv[1], sys.argv[2]
-git = lambda *a: subprocess.run(['git', *a], capture_output=True, text=True).stdout.strip()
+git = lambda *a: subprocess.run(['git', *a], capture_output=True, text=True, check=True).stdout.strip()
+assert sys.prefix == os.path.join(os.environ['SGLANG_DIR'], '.venv'), sys.prefix
 pk = 'python/sglang/kernels/ops/attention/flash_attn/cute/paged_kv.py'
 print(json.dumps({
     'repo_commit': git('-C', repo, 'rev-parse', 'HEAD'),
@@ -60,6 +82,8 @@ print(json.dumps({
     'cuda_runtime': torch.version.cuda,
     'packages': {p: m.version(p) for p in ('nvidia-cutlass-dsl', 'quack-kernels', 'einops')},
     'python': sys.version.split()[0],
+    'venv_is_sglang_dir': True,
+    'env_cleared': os.environ['CLEARED_ENV'].split(),
 }))
 EOF
 cat "$out/meta.json"

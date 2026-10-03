@@ -51,11 +51,21 @@ def rows_per_pass(d: int, dv: int) -> int:
     return LOADER_THREADS // (math.gcd(d, dv, 64) // 8)
 
 
+def expected_module_dir(rec: dict[str, Any]) -> str:
+    # The directory each record's implementation must have been imported from (make_trees.sh).
+    if rec['harness'] == 'varlen' and rec['impl'] == 'fa':
+        return '/fa-pkg/flash_attn/cute/'
+    return f'/sglang-{rec["tree"]}/python/sglang/'
+
+
 def load_case(path: Path) -> dict[str, Any]:
     text = path.read_text().strip()
     if not text:
         raise SystemExit(f'{path}: no JSON line (see {path.with_suffix(".stderr")})')
     rec = json.loads(text.splitlines()[-1])
+    module = rec['sglang'] if rec['harness'] == 'kvcache' else rec['module']
+    if expected_module_dir(rec) not in module:
+        raise SystemExit(f'{path}: imported from {module}, not from {expected_module_dir(rec)}')
     row: dict[str, Any] = {k: rec.get(k) for k in FIELDS}
     row['rows_per_pass'] = rows_per_pass(rec['d'], rec['dv'])
     row['record'] = path.name
