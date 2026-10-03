@@ -140,8 +140,12 @@ versions (tag `speed-lowc-confirm-holds`), and the committed run is unaffected: 
 the equality hold and twelve timed launches, imported `bd66ce343e` with no modified files, and every
 other run `dd57a50a59` with none (`equality/meta.json`, `launches.csv`). The three sessions read the
 only equality directory, `equality-20261002T215749Z`, whose `meta.json` lists exactly those 11 runs,
-and those runs and the sessions all ran at repository `9a7d52a` with no modified files. The prompt file
-matches the manifest, and every launch's flags are its declared arm's (Validity).
+and those runs and the sessions all ran at repository `9a7d52a` with no modified files. The sessions
+record that in each launch's `launch.json` (no modified repository files). The equality runs record
+only the commit, so it is known from the hold worktree, `~/vp-wt/speed-lowc-confirm-hold`: it is at
+`9a7d52a` with no modified tracked files, and none of its tracked files changed after 21:23:47 UTC on
+2026-10-02, when that commit was checked out, before the equality hold started at 21:57. The prompt
+file matches the manifest, and every launch's flags are its declared arm's (Validity).
 
 2026-10-03, after the analysis (review of #230): one pass over every check in the confirmation's
 scripts, after review found two more inputs they accepted. The gate now also requires every
@@ -225,6 +229,12 @@ as long as each session's own launches kept their order. Every equality run must
 before the first timed launch. The committed run is unaffected: s1 ran 23:22-23:56, s2 00:48-01:22 and
 s3 02:05-02:39, each in its declared order, after the equality runs (21:58-22:26, `equality/meta.json`).
 Every output reproduces byte for byte.
+
+2026-10-03, after the analysis (review of #230): the void rule counted point rows as launches, so one
+launch with rows of two repeats could have stood in for a missing S0 or FULL launch. Every point must
+now be repeat 0, the single repeat declared, and launches are counted as distinct bench runs. The
+committed run is unaffected: all 117 points are repeat 0, every cell has the declared number of
+distinct launches, and `ratios.json` and `accept.json` reproduce byte for byte.
 
 ## Results
 
@@ -401,11 +411,11 @@ equality was not tested).
   for the confirm engine; the only change in code the holds ran is one comment in `bench/hostload.py`.
 - The analysis (`bench.pareto`, `confirm_analyze.py`, `confirm_accept.py`) ran on 2026-10-03 from
   `853bd4b` with a clean tree. Both scripts were then tightened as the amendments say (`08a8421`,
-  `e8566e3`, `2f1b187`, `02c5c46`, `a08e423`, `50b9e7b`, `623de0b` and `fc95fe9`). The whole
-  analysis rerun from a clean checkout of each of those commits reproduced `points.csv`,
+  `e8566e3`, `2f1b187`, `02c5c46`, `a08e423`, `50b9e7b`, `623de0b`, `fc95fe9` and `cc4810b`). The
+  whole analysis rerun from a clean checkout of each of those commits reproduced `points.csv`,
   `launches.csv`, `ratios.json` and `accept.json` byte for byte. `sweeps.csv` was written by
-  `confirm_sweeps.py` from a clean checkout of `50b9e7b` and again, identically, from `623de0b` and
-  `fc95fe9`; the analysis needs it, `launches.csv` and `equality/` beside `points.csv`.
+  `confirm_sweeps.py` from a clean checkout of `50b9e7b` and again, identically, from each later one;
+  the analysis needs it, `launches.csv` and `equality/` beside `points.csv`.
 - `equality/gate.json` is the hold's own output. `confirm_gate.py` as amended at `623de0b`, run on
   `~/vp-data/speed-lowc/confirm/equality-20261002T215749Z/summary.json` with `--levers ABC` (it also
   reads that directory's `runs/`), reproduces it byte for byte.
