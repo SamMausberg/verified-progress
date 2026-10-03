@@ -21,20 +21,20 @@ its results, transport, the engine changes) and run in this order:
   and 4);
 - transport, what it is and why it fails (12; Section 5);
 - the engine changes that gained more than the head (13; Sections 4.5 and 6);
-- five other approaches that missed a rule declared before their runs (14; Section 6,
+- the stock envelope before and after the two confirmed changes (14; Section 6);
+- five other approaches that missed a rule declared before their runs (15; Section 6,
   Appendix E.4, and the research notes for FP8 and the split-KV kernel);
-- the stock envelope before and after the two confirmed changes (15; Section 6);
 - the quality check: the output comparisons of the head, the fold, the fold with FA4 and the
   prefill delay against stock, beside GSM8K, which ran on four other arms (16; Sections 4.5 and 6);
-- the takeaway, with the limits and the next steps that the paper's Limitations and `TASKS.md`
-  leave open (17; Sections 8 and 9).
+- the takeaway, with the limits, the next steps (among them rerunning the frontier and the drift
+  measurement with a DFlash 2 drafter) and the upstream PRs and issues (17; Sections 8 and 9).
 
 Each main slide states one claim in its title and carries at most three short lines of body text
 besides its chart or headline numbers; its footer names the paper's section. Its speaker notes
 give what to say, the minute marks of its section, the scope and definitions that did not fit on
-the slide, and the files the numbers come from. The scripts add up to about 3,340 words, 22 to 26
+the slide, and the files the numbers come from. The scripts add up to about 3,390 words, 23 to 26
 minutes at 130 to 150 words a minute; about 220 of those words are marked optional, for when
-questions come early. The minute marks budget 29 minutes, which leaves room for interruptions.
+questions come early. The minute marks budget 29.5 minutes, which leaves room for interruptions.
 
 The 29 backup slides are grouped by the questions they answer; the first backup slide is the
 index:
@@ -59,7 +59,7 @@ blocks violet, the certified head blue, fallback vermilion, context grey.
 
 ## What it reflects
 
-Every number was computed from the evidence committed on main at `1c19cd5`, and checked against
+Every number was computed from the evidence committed on main at `c2f1e8a`, and checked against
 the paper's text and the evidence READMEs at that commit. The paper's tables are referred to by
 content, not by number. No experiment was rerun for the deck.
 
