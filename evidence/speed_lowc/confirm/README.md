@@ -204,6 +204,20 @@ the equality hold makes, from the engine and repository commits the launches ran
 launch matches its arm and its command, every session ran in the declared order, the gate's 11 runs
 are at the launches' commits, and `ratios.json` and `accept.json` reproduce byte for byte.
 
+2026-10-03, after the analysis (review of #230): there is now one check of whether an equality gate
+binds the timed sessions, `equality_problems` in `confirm_gate.py`. Sessions apply it through
+`gate_ok`, and the analysis applies it to the committed `equality/`. It requires the gate passed for
+the levers, exactly the runs the equality hold makes, each at the right commits and made as its arm
+(flags, c = 1, a cold pass, 256 new tokens, every prompt), and the gate decided again from
+`summary.json` equal to `gate.json`. On the hold's own directory it also checks every run's coverage
+and the fold in its server log; the committed copy has neither, and the sessions checked both before
+they ran. The equality arms' flags have one definition (`eq_flags` in `confirm_gate.py`), which the
+equality hold runs and the check compares with each run's. Each launch's model and revision must be its
+bench arm's, and its warm-up pool the repository's. The committed run is unaffected: the full check
+passes on the hold's directory at the holds' commits (`9a7d52a`, engine `dd57a50a59`), the offline
+check passes on `equality/`, `eq_flags` gives the 11 runs' recorded flags, every launch ran its arm's
+model and the repository's warm-up pool, and every output reproduces byte for byte.
+
 ## Results
 
 Written 2026-10-03. Labels: **measured** (read from the files below) and **derived** (ratios, means and
@@ -379,11 +393,11 @@ equality was not tested).
   for the confirm engine; the only change in code the holds ran is one comment in `bench/hostload.py`.
 - The analysis (`bench.pareto`, `confirm_analyze.py`, `confirm_accept.py`) ran on 2026-10-03 from
   `853bd4b` with a clean tree. Both scripts were then tightened as the amendments say (`08a8421`,
-  `e8566e3`, `2f1b187`, `02c5c46`, `a08e423` and `50b9e7b`). The whole analysis rerun from a clean checkout
-  of each of those commits reproduced `points.csv`, `launches.csv`, `ratios.json` and `accept.json` byte for byte.
-  `sweeps.csv` was written by `confirm_sweeps.py` from a clean checkout of `50b9e7b`; the analysis needs
-  it, `launches.csv` and `equality/` beside `points.csv`.
-- `equality/gate.json` is the hold's own output. `confirm_gate.py` as amended at `a08e423`, run on
+  `e8566e3`, `2f1b187`, `02c5c46`, `a08e423`, `50b9e7b` and `623de0b`). The whole analysis rerun from a
+  clean checkout of each of those commits reproduced `points.csv`, `launches.csv`, `ratios.json` and `accept.json` byte for byte.
+  `sweeps.csv` was written by `confirm_sweeps.py` from a clean checkout of `50b9e7b` and again,
+  identically, from `623de0b`; the analysis needs it, `launches.csv` and `equality/` beside `points.csv`.
+- `equality/gate.json` is the hold's own output. `confirm_gate.py` as amended at `623de0b`, run on
   `~/vp-data/speed-lowc/confirm/equality-20261002T215749Z/summary.json` with `--levers ABC` (it also
   reads that directory's `runs/`), reproduces it byte for byte.
 - `equality/` and `sessions/` are unchanged copies of the holds' outputs under
