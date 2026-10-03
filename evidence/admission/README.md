@@ -355,8 +355,10 @@ PD's 65 prefill batches in probe 3 at c = 128 would save about 3% (derived).
 # GPU (each an exclusive hold; raw runs in ~/vp-data/speed_highc/):
 scripts/gpu_lock.sh -x experiments/admission/run_admission_probe.sh      # probe 1 -> admission/
 scripts/gpu_lock.sh -x experiments/admission/run_queue_delay_probe.sh    # probe 2 -> queue-delay/
-scripts/gpu_lock.sh -x experiments/admission/run_natural_probe.sh        # probe 3 -> natural-<UTC>/ (here 20261002T195727Z)
-scripts/gpu_lock.sh -x experiments/admission/run_prefill_probe.sh        # prefill -> prefill-<UTC>/ (here 20261002T175303Z)
+scripts/gpu_lock.sh -x experiments/admission/run_natural_probe.sh \
+  ~/vp-data/speed_highc/natural-20261002T195727Z                         # probe 3 (OUT as committed)
+scripts/gpu_lock.sh -x experiments/admission/run_prefill_probe.sh \
+  ~/vp-data/speed_highc/prefill-20261002T175303Z                         # prefill (OUT as committed)
 # CPU (--expect declares every label and concurrency the hold script ran; all are required):
 python experiments/admission/summarize_probe.py ~/vp-data/speed_highc/admission \
   --expect plain-tuned=64,128 --expect mtp-n0=64,128 --expect mtp-n8=64,128 \
