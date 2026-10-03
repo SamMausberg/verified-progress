@@ -38,11 +38,20 @@ plain decoding from position 400 puts 1756 on top (-0.32), a token FP32 puts 8.9
 its top. By the serial-references hold's pre-set reading, the stock decode path carries the
 error there: a stock-engine numerics fault, independent of the certified head (the reading
 named the GDN decode path; the layer that errs was not located). At the plain c = 128 event
-(`a4db11ff`, position 333) the reading's other branch applies: the BF16 prefill and scorer
-references miss FP32's top token by about 13-15 nats, and stock decoding commits it. As an
-interpretation, both are positions ill-conditioned in BF16: every path, BF16 and FP32,
-agrees within 0.05 nats on each of the 39 positions before them, and they part at the
-position alone. Against FP32, closed-loop c = 64 runs commit a token at least 2 nats below
+(`a4db11ff`, position 333) the reading's other branch applies: the BF16 prefill and
+scorer references miss FP32's top token by about 13-15 nats, and stock decoding commits
+it. Every path, BF16 and FP32, agrees within 0.05 nats on the 39 positions before each of
+the two, and they part at the position alone. This README first read both as positions
+ill-conditioned in BF16. The later comparison with Hugging Face transformers and with
+perturbed FP32 ([`../../bf16_paths/README.md`](../../bf16_paths/README.md)) supports
+that for `a4db11ff`/333 only (noise within one BF16 rounding flips FP32's own top-1,
+and transformers in BF16 misses there as SGLang's prefills do). At `579ae7ce`/439
+transformers in BF16 keeps FP32's top token in all 16 readings (three of them move
+a tracked token by 1.15-3.08 nats, which the pre-set reading calls a partial BF16
+sensitivity), and the same noise moves 1756 by at most 0.52 nats (a probe, not a
+bound), so that miss is an SGLang outlier at one position, selected because SGLang
+erred there; on unselected positions SGLang's error rate is not distinguishable from
+transformers'. Against FP32, closed-loop c = 64 runs commit a token at least 2 nats below
 the top at 439 in 4 of 19 stock MTP draws (5715) and in 8 of 34 uninstrumented draws of
 engines carrying the certified graphs (1756 four times, 5715 four times), a grouping chosen
 after seeing the data. 1756 itself appears only in the latter (4 of 34 against 0 of 19;
@@ -623,9 +632,15 @@ the GDN decode path; the layer was not located); at a4db11ff/333 they side with 
 decode path, so the prefill and scorer references are the inaccurate ones and h6s's gross
 label there inverts. The reading reserved "ill-conditioned even in FP32" for FP32's paths
 disagreeing by more than 0.1 nats, which did not happen. Neither BF16 path is
-systematically wrong; as an interpretation, these are positions ill-conditioned in BF16,
-both after the request's first end of text, at an identifier the model copies into a
-regenerated prompt. The same 514-token prefill gave 1756 at -5.50
+systematically wrong. Both positions lie after the request's first end of text,
+at an identifier the model copies into a regenerated prompt. As an interpretation
+this README took both to be ill-conditioned in BF16; the later comparison
+([`../../bf16_paths/README.md`](../../bf16_paths/README.md)) supports that
+for a4db11ff/333 only. At 579ae7ce/439 Hugging Face transformers in BF16 (four
+configurations, four paths each) keeps FP32's top-1 and puts 1756 at -10.11 to -7.60,
+FP32 under relative noise of one BF16 rounding moves 1756 by at most 0.52 nats in 16
+draws (a probe, not a bound), and no single SGLang kernel swap removes the decode miss:
+it is an SGLang outlier at this position. The same 514-token prefill gave 1756 at -5.50
 when 16 requests shared the server (the concurrent re-score), so batching alone moves it
 by 2.6 nats. The planted token 9471 is never on top (-10.4 to -11.3 under the prefills,
 -3.57 under decode).
