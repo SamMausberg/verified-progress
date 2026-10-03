@@ -16,7 +16,7 @@ Decode on this GPU streams bytes, so the byte counts of Table~\ref{tab:bytes} gi
 \caption{Byte counts for Qwen3.5-4B at revision \modelpin, derived from the checkpoint's safetensors headers and \code{config.json}~\cite{qwenconfig}; calculations, not measurements.}
 \label{tab:bytes}
 \vskip 0.05in
-\begin{tabularx}{\linewidth}{@{}P{5.2cm}rY@{}}\toprule
+\begin{tabularx}{\linewidth}{@{}lrY@{}}\toprule
 Component & Bytes & Derivation\\\midrule
 Tied head (and input embedding) & 1.271 GB & $248{,}320\times2{,}560\times2$ (BF16)\\
 Decoder weights other than the embedding & 7.140 GB & sum of tensor sizes in the checkpoint\\
@@ -34,12 +34,12 @@ Attention KV per context token & 32 KiB & $8\times4\times256\times2\times2$ (BF1
 
 \begin{table}[htbp]
 \tablefont\centering
-\caption{Where a plain decode step goes, from Nsight Systems windows of 227--572 steps at the stated batch sizes, CUDA graphs and the overlap scheduler on, greedy decoding. Measured~\ev{profile-attr}.}
+\caption{Where a plain decode step goes, by batch size $B$: the head chain takes 10.3\% of the step at $B=1$ and 6.1\% at $B=128$. Nsight Systems windows of 227--572 steps; CUDA graphs and the overlap scheduler on; greedy decoding. Measured~\ev{profile-attr}.}
 \label{tab:profile-plain}
 \vskip 0.05in
 \begin{tabular}{@{}lrrrr@{}}\toprule
 Share of a plain decode step & $B=1$ & $B=8$ & $B=32$ & $B=128$\\\midrule
-Step under the profiler (\textmu s) & 3,541 & 3,982 & 5,128 & 8,886\\
+Step under the profiler (\textmu s) & 3,541 & 3,982 & 5,128 & 8,886\\\midrule
 Head chain (head GEMM, FP32 copy of its logits, argmax) & 10.3\% & 9.4\% & 7.8\% & 6.1\%\\
 Weight GEMMs (GDN, attention and MLP projections) & 68.0\% & 64.5\% & 54.0\% & 34.5\%\\
 GDN recurrent kernel & 3.5\% & 6.8\% & 18.0\% & 41.6\%\\
@@ -56,14 +56,15 @@ GPU idle, inside and outside graph replays & 4.3\% & 4.0\% & 3.0\% & 1.7\%\\\bot
 
 \begin{table}[htbp]
 \tablefont\centering
-\caption{Where a speculative cycle goes with the native MTP layer (untuned: three steps, top-$k$ 1, four draft tokens). Shares are of the cycle under the profiler; the idle share is inflated by the profiler, which lengthens this host-bound cycle by 25\%, 19\% and 11\% at $B=1$, 8 and 32 (first two rows). Measured~\ev{profile-attr,profile-head}.}
+\caption{Where a speculative cycle goes with the native MTP layer, untuned (three steps, top-$k$ 1, four draft tokens), by batch size $B$. Shares are of the cycle under the profiler. The profiler lengthens this host-bound cycle by 25\%, 19\% and 11\% at $B=1$, 8 and 32 (first two rows), which inflates the idle share. Measured~\ev{profile-attr,profile-head}.}
 \label{tab:profile-mtp}
 \vskip 0.05in
 \begin{tabular}{@{}lrrr@{}}\toprule
 MTP speculation, three draft steps & $B=1$ & $B=8$ & $B=32$\\\midrule
 Cycle under the profiler (\textmu s) & 8,407 & 9,833 & 13,886\\
 Cycle without a profiler (ms, mean of 3 windows) & 6.70 & 8.27 & 12.49\\
-Output tokens/s without a profiler (plain decoding at the same $B$) & 384 (289) & 2,573 (2,048) & 7,087 (6,298)\\
+Output tokens/s without a profiler & 384 & 2,573 & 7,087\\
+\quad plain decoding at the same $B$ & 289 & 2,048 & 6,298\\
 Accepted length, tokens per cycle (windows without a profiler) & 2.57 & 2.66 & 2.77\\\midrule
 Target head chain (verify GEMM over $4B$ positions, FP32 copy, argmax) & 4.4\% & 4.1\% & 3.9\%\\
 Draft head chains (three draft GEMMs, FP32 copies, top-1, extend argmax) & 12.9\% & 11.3\% & 8.5\%\\
@@ -85,39 +86,71 @@ GPU idle, inside and outside graph replays & 37.3\% & 32.7\% & 23.5\%\\\bottomru
 \subsection{The serving baseline}\label{app:serving}\label{sec:serving}
 The stock engine's tuned serving configurations set the bar a certified verifier must clear. Section~\ref{sec:served} reports their frontier (Figure~\ref{fig:frontier}) and Section~\ref{sec:levers} the engine changes measured against them (Table~\ref{tab:levers}); this subsection gives how the frontier is measured. None of these configurations uses the certified head, which Appendix~\ref{app:cert-served} serves against them.
 
-\paragraph{What the frontier measures}\label{sec:serving-frontiers} Each \emph{arm} is one server configuration, swept over client concurrency in closed loop on a frozen workload of 1,857 public chat, code and mathematics prompts with every output fixed at 512 tokens~\ev{workload}. For request $i$ of the $N$ at a sweep point, with $n_i$ generated tokens, sent at $s_i$ and finished $e_i$ later, the frontier plots
+\paragraph{What the frontier measures}\label{sec:serving-frontiers} Each \emph{arm} is one server configuration, swept over client concurrency in closed loop on a frozen workload of 1,857 public chat, code and mathematics prompts (from MT-Bench~\cite{mtbench}, OASST1~\cite{oasst1}, HumanEval~\cite{humaneval}, MBPP~\cite{mbpp} and GSM8K~\cite{gsm8k}) with every output fixed at 512 tokens~\ev{workload}. For request $i$ of the $N$ at a sweep point, with $n_i$ generated tokens, sent at $s_i$ and finished $e_i$ later, the frontier plots
 \begin{equation}
 x=\frac1N\sum_{i=1}^N\frac{n_i}{e_i},\qquad y=\frac{\sum_in_i}{\max_i(s_i+e_i)-\min_is_i},\label{eq:frontier}
 \end{equation}
 the mean per-request output rate including the time to first token, and output tokens per second on the one GPU. The arms were chosen on a tuning split of the workload, one launch per configuration~\ev{tuning}, and are reported on a disjoint confirmation split of 1,152 prompts in three sessions, each arm launched afresh beside its matched plain baseline~\ev{bench-frontier}. Every arm is stock or exact up to rounding: each arm that changes the target's arithmetic first diverged from a matched stock reference on the divergence prompts only at an exact tie, within one BF16 step or at a near tie with both margins within two steps, and no output differed in length~\ev{bench-equality}. This class rule was fixed after the first comparisons had been seen, from divergence classes that predate them (Appendix~\ref{app:divergence}). The protocol in full (launch checks, capacity, the configuration search, the output comparisons, a GSM8K quality check and the measurement hazards) is in Section~\notessec{notes:serving}{4} of the research notes.
 
-Figure~\ref{fig:frontier} draws four of the nine arms. At concurrency 1 the DFlash arm with 16-token blocks gives 3.06 times the throughput and 3.45 times the per-request rate of its matched plain baseline; the best speculative arm, MTP, gives 0.98 times plain at concurrency 48 and 0.86 times at 128 with SGLang's default admission. Delaying prefills and capping each prefill batch at 16 requests lifts MTP to 1.18--1.32 times the best non-speculative arm at concurrency 48 to 128 in three further sessions (Section~\ref{sec:levers})~\ev{admission}. Over the 52 points with three or four sessions, the coefficient of variation of throughput has a median of 0.35\% and a maximum of 1.9\%~\ev{bench-frontier}.
+Figure~\ref{fig:frontier} draws four of the nine arms. At concurrency 1 the DFlash arm with 16-token blocks gives 3.06 times the throughput and 3.45 times the per-request rate of its matched plain baseline; the best speculative arm, MTP, gives 0.98 times plain at concurrency 48 and 0.86 times at 128 with SGLang's default admission~\ev{bench-frontier}. Delaying prefills and capping each prefill batch at 16 requests lifts MTP to 1.18--1.32 times the best non-speculative arm at concurrency 48 to 128 in three further sessions (Section~\ref{sec:levers})~\ev{admission}. Over the 52 points with three or four sessions, the coefficient of variation of throughput has a median of 0.35\% and a maximum of 1.9\%~\ev{bench-frontier}.
 
-\subsection{The composed exact stack}\label{app:stack-composition}
-Table~\ref{tab:stack-arms} gives every arm of the composed stack. The stack runs on the tuned stock DFlash arm with 16-token blocks of Table~\ref{tab:levers} (Triton attention, at most 64 running requests) and composes three exact engine changes, each of which passed an equality step before any timed run: the snapshot-free GDN verify (F, SGLang's fold-every-commit protocol), the backbone GEMM routing table (G) and the certified head on verification (H: per-position fallback, the \modelcons, at most 64 positions per call). Other exact changes were left out for reasons fixed in advance; the host-gap patches, for one, change nothing on this arm. The composed engine is the pinned SGLang with 33 opt-in patches. S0 is stock SGLang, and B0 the composed engine with every switch off. The arms, their order, the expected ranges and the decision rule were declared before any timed run. Each of three sessions launched S0 and the full stack FGH at its start and end and every other arm once between them, in reversed order in the second session. An arm's session ratio is over the mean of S0's two launches, and an interval that excludes 1 decides a speedup or a slowdown~\ev{stack-composition}.
+Table~\ref{tab:levers-intervals} gives the spread behind each ratio of Table~\ref{tab:levers}, the engine changes of Section~\ref{sec:levers} against the tuned arm each modifies.
 
 \begin{table}[htbp]
-\tablefont\centering
-\caption{The composed stack and its parts against tuned stock DFlash with 16-token blocks (S0): per-request rate $x$ and throughput $y$ at client concurrency $c$, each the geometric mean of three session ratios with its 95\% $t$ interval, rounded outward. Measured~\ev{stack-composition}. H alone has no row: its server did not start (text). Decisions use the unrounded interval, so G's $y$ at $c=2$ (upper end 0.9992) is a slowdown.}
-\label{tab:stack-arms}
+\newcommand*{\ci}[1]{\textcolor{muted}{#1}}
+\caption{Every spread behind Table~\ref{tab:levers} lies on the same side of 1 as its ratio, and most come from one session. Ratio and comparator as in Table~\ref{tab:levers}. Spread: the lowest and highest paired ratio over the stock and changed runs of one session (run pairs), the lowest and highest session ratio (sessions), or the 95\% $t$ interval of the geometric mean of three session ratios; for a row that spans several $c$, it runs from the lowest end to the highest.}\label{tab:levers-intervals}
 \vskip 0.05in
-\begin{tabular}{@{}llrrrr@{}}\toprule
-Arm & & $c=1$ & $c=2$ & $c=4$ & $c=8$\\\midrule
-FGH: full stack & $x$ & 0.986 (0.982--0.989) & 0.972 (0.965--0.979) & 1.013 (1.006--1.021) & 1.079 (1.063--1.095)\\
-& $y$ & 0.990 (0.987--0.993) & 0.980 (0.973--0.987) & 1.013 (1.004--1.021) & 1.073 (1.057--1.089)\\\addlinespace[2pt]
-FG & $x$ & 0.974 (0.966--0.983) & 0.971 (0.958--0.985) & 1.021 (1.007--1.034) & 1.082 (1.058--1.107)\\
-& $y$ & 0.981 (0.972--0.989) & 0.979 (0.967--0.992) & 1.020 (1.008--1.033) & 1.077 (1.053--1.100)\\\addlinespace[2pt]
-F: fold verify & $x$ & 0.970 (0.967--0.974) & 0.987 (0.983--0.990) & 1.009 (1.001--1.016) & 1.073 (1.064--1.082)\\
-& $y$ & 0.971 (0.968--0.974) & 0.987 (0.984--0.990) & 1.007 (1.001--1.014) & 1.068 (1.060--1.076)\\\addlinespace[2pt]
-G: GEMM routing & $x$ & 1.009 (1.003--1.014) & 0.988 (0.985--0.992) & 1.017 (1.011--1.022) & 1.008 (0.995--1.021)\\
-& $y$ & 1.014 (1.009--1.020) & 0.996 (0.992--1.000) & 1.017 (1.012--1.023) & 1.007 (0.993--1.021)\\\addlinespace[2pt]
-B0: switches off & $x$ & 0.999 (0.996--1.003) & 0.998 (0.994--1.003) & 0.999 (0.989--1.010) & 0.995 (0.983--1.007)\\
-& $y$ & 0.999 (0.996--1.002) & 0.998 (0.995--1.002) & 0.999 (0.990--1.009) & 0.995 (0.983--1.007)\\
+\centering\tablefont\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrlll@{}}
+\toprule
+Change & $c$ & Sessions & Ratio & \ci{Spread} & Spread from\\\midrule
+\multicolumn{6}{@{}l}{\emph{MTP, three steps, FlashInfer attention}~\ev{hostgap,admission}}\\
+Host-gap patches & 1--8 & 1 & $y$ 1.094--1.096 & \ci{1.090--1.101} & run pairs\\
+Prefill delay, cap & 32--128 & 3 & $y$ 1.19--1.48 & \ci{1.17--1.50} & sessions\\
+\enspace over best non-speculative arm & 48--128 & 3 & $y$ 1.18--1.32 & \ci{--} & \\\addlinespace[2pt]
+\multicolumn{6}{@{}l}{\emph{Plain decoding}~\ev{backbone,bench-frontier}}\\
+Backbone GEMM routing & 1 & 1 & $y$ 1.034 & \ci{1.034--1.035} & run pairs\\
+Replayed GDN decoding & 128 & 1 & $y$ 1.081 & \ci{--} & one run pair\\\addlinespace[2pt]
+\multicolumn{6}{@{}l}{\emph{DFlash, 16-token blocks}~\ev{drafter-fold,lowc-confirm}}\\
+Fold verify & 1 & 1 & $y$ 0.968 & \ci{0.966--0.970} & run pairs\\
+& 8--32 & 1 & $y$ 1.061--1.120 & \ci{1.053--1.134} & run pairs\\
+Fold, narrow tiles, FA4 & 1--4 & 3 & $x$ 1.084--1.093 & \ci{1.056--1.114} & 95\% $t$ interval\\
+\enspace on 8-token blocks & 8--32 & 3 & $y$ 1.124--1.137 & \ci{1.108--1.166} & 95\% $t$ interval\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-B0 is bitwise equal to S0 (token identifiers and top-five log-probabilities), and F to B0. G, FG and FGH are exact up to rounding against stock DFlash with 16-token blocks: every first divergence is an exact tie, one BF16 step or a near tie. H gave the same tokens as B0, FGH the same as FG, and in check mode none of 249,392 and 250,464 certified verify positions differed from the stock head. All of these were classified in the equality step, on 320 prompts of 256 tokens at $c=1$ with a running limit of 4; the timed sessions, at $c$ up to 8 with a running limit of 64, did not compare outputs.
+\subsection{The composed exact stack}\label{app:stack-composition}
+Table~\ref{tab:stack-arms} gives every arm of the composed stack. The stack runs on the tuned stock DFlash arm with 16-token blocks of Table~\ref{tab:levers} (Triton attention, at most 64 running requests) and composes three exact engine changes, each of which passed an equality step before any timed run: the snapshot-free GDN verify (F, SGLang's fold-every-commit protocol for ReplaySSM~\cite{gdncode}), the backbone GEMM routing table (G) and the certified head on verification (H: per-position fallback, the \modelcons, at most 64 positions per call). Other exact changes were left out for reasons fixed in advance; the host-gap patches, for one, change nothing on this arm. The composed engine is the pinned SGLang with 33 opt-in patches. S0 is stock SGLang, and B0 the composed engine with every switch off. The arms, their order, the expected ranges and the decision rule were declared before any timed run. Each of three sessions launched S0 and the full stack FGH at its start and end and every other arm once between them, in reversed order in the second session. An arm's session ratio is over the mean of S0's two launches, and an interval that excludes 1 decides a speedup or a slowdown~\ev{stack-composition}.
+
+\begin{table}[htbp]
+\tablefont\centering
+% Intervals sit in their own columns, set lighter than the ratios they qualify.
+\newcommand*{\ci}[1]{\textcolor{muted}{#1}}
+\caption{The composed stack and its parts against tuned stock DFlash with 16-token blocks (S0): the full stack FGH loses at $c=1$ and 2 and gains at $c=4$ and 8. Each ratio is the geometric mean of three session ratios at client concurrency $c$, with its 95\% $t$ interval rounded outward. H alone has no row: its server did not start (text). Decisions use the unrounded interval, so G's $y$ at $c=2$ (upper end 0.9992) is a slowdown. Measured~\ev{stack-composition}.}
+\label{tab:stack-arms}
+\vskip 0.05in
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrlrlrlrl@{}}\toprule
+& \multicolumn{2}{c}{$c=1$} & \multicolumn{2}{c}{$c=2$} & \multicolumn{2}{c}{$c=4$} & \multicolumn{2}{c}{$c=8$}\\\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(l){8-9}
+Arm & ratio & \ci{interval} & ratio & \ci{interval} & ratio & \ci{interval} & ratio & \ci{interval}\\\midrule
+\multicolumn{9}{@{}l}{\emph{Per-request rate $x$, over S0}}\\
+FGH: full stack & 0.986 & \ci{0.982--0.989} & 0.972 & \ci{0.965--0.979} & 1.013 & \ci{1.006--1.021} & 1.079 & \ci{1.063--1.095}\\
+FG & 0.974 & \ci{0.966--0.983} & 0.971 & \ci{0.958--0.985} & 1.021 & \ci{1.007--1.034} & 1.082 & \ci{1.058--1.107}\\
+F: fold verify & 0.970 & \ci{0.967--0.974} & 0.987 & \ci{0.983--0.990} & 1.009 & \ci{1.001--1.016} & 1.073 & \ci{1.064--1.082}\\
+G: GEMM routing & 1.009 & \ci{1.003--1.014} & 0.988 & \ci{0.985--0.992} & 1.017 & \ci{1.011--1.022} & 1.008 & \ci{0.995--1.021}\\
+B0: switches off & 0.999 & \ci{0.996--1.003} & 0.998 & \ci{0.994--1.003} & 0.999 & \ci{0.989--1.010} & 0.995 & \ci{0.983--1.007}\\\addlinespace
+\multicolumn{9}{@{}l}{\emph{Throughput $y$, over S0}}\\
+FGH: full stack & 0.990 & \ci{0.987--0.993} & 0.980 & \ci{0.973--0.987} & 1.013 & \ci{1.004--1.021} & 1.073 & \ci{1.057--1.089}\\
+FG & 0.981 & \ci{0.972--0.989} & 0.979 & \ci{0.967--0.992} & 1.020 & \ci{1.008--1.033} & 1.077 & \ci{1.053--1.100}\\
+F: fold verify & 0.971 & \ci{0.968--0.974} & 0.987 & \ci{0.984--0.990} & 1.007 & \ci{1.001--1.014} & 1.068 & \ci{1.060--1.076}\\
+G: GEMM routing & 1.014 & \ci{1.009--1.020} & 0.996 & \ci{0.992--1.000} & 1.017 & \ci{1.012--1.023} & 1.007 & \ci{0.993--1.021}\\
+B0: switches off & 0.999 & \ci{0.996--1.002} & 0.998 & \ci{0.995--1.002} & 0.999 & \ci{0.990--1.009} & 0.995 & \ci{0.983--1.007}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+B0 is bitwise equal to S0 (token identifiers and top-five log-probabilities), and F to B0. G, FG and FGH are exact up to rounding against stock DFlash with 16-token blocks: every first divergence is an exact tie, one BF16 step or a near tie. H gave the same tokens as B0, FGH the same as FG, and in check mode none of 249,392 and 250,464 checked verify positions differed from the stock head. All of these were classified in the equality step, on 320 prompts of 256 tokens at $c=1$ with a running limit of 4; the timed sessions, at $c$ up to 8 with a running limit of 64, did not compare outputs.
 
 Against S0 the full stack loses at low concurrency and gains at $c=8$. Its per-request rate is 0.986 times S0's at $c=1$ and 0.972 times at $c=2$, then 1.013 times at $c=4$ and 1.079 times at $c=8$, where throughput is 1.073 times; all are decided. It lies inside its declared range only at $c=1$ and below it at $c=2$, 4 and 8. F's three sessions agree with its one-session measurement in Table~\ref{tab:levers} (throughput 0.971 and 1.068 times at $c=1$ and 8, against 0.968 and 1.061). Part of G's change is not GEMM time: G rounds differently, so the token trajectories change, and the tokens accepted per verify cycle rise by 0.7\% at $c=1$ and fall by 0.4\% at $c=2$, the same in every session. B0 shows no detectable cost of carrying the patches.
 
@@ -129,44 +162,45 @@ Derived bounds put these ratios in proportion. An engine running this drafter at
 The served benchmark asks whether the certified head improves the tuned arms' frontier without changing their outputs, under a design, metric and decision rule declared before its first timed run~\ev{cert-served}. Each family's tuned arm runs against the same arm with the certified head, on one engine build and with identical flags apart from the head's variables: plain decoding (the decode head), MTP with three steps and Triton attention (the verify, draft and draft-extend heads), and DFlash with 16- and 8-token blocks (the verify head and the draft projection). Each pair ran in three sessions, certified first in the second. The head runs in the microbenchmark's best mode where it pays: the per-position fallback, the \modelcons{}, and certification only for calls of at most 64 positions; a larger call replays the same CUDA graph with the head gated off. Both DFlash arms pin their attention cache at 60,000 tokens, because the certified graphs' work buffers are allocated after SGLang sizes its pools (unpinned, the composed stack's certified server ran out of memory, Appendix~\ref{app:stack-composition}). None of the 132 timed points is invalid. Table~\ref{tab:cert-served} gives every point.
 
 \begin{table}[htbp]
-\caption{The certified head served against the same tuned arm without it: throughput $y$ with over without, geometric mean of three session ratios with its 95\% $t$ interval, and the ratio predicted before the runs from the head-only times. One primary point per family, Holm-adjusted across the four; the other points are descriptive. Gated off: no certified path runs at the point's batch sizes, apart from the drain at its end~\ev{cert-served}.}\label{tab:cert-served}
+\newcommand*{\ci}[1]{\textcolor{muted}{#1}}
+\caption{The certified head's gains are confined to small batches and fall short of the prediction. $y$ ratio: throughput with the certified head over the same tuned arm without it, the geometric mean of three session ratios, with its 95\% $t$ interval. Predicted: the ratio predicted before the runs from the head-only times. Role: one primary point per family, Holm-adjusted across the four; the other points are descriptive. Gated off: no certified path runs at the point's batch sizes, apart from the drain at its end~\ev{cert-served}.}\label{tab:cert-served}
 \vskip 0.05in
 \centering\tablefont\setlength{\tabcolsep}{4pt}
-\begin{tabular}{@{}lrlrr@{}}
+\begin{tabular}{@{}lrlrlr@{}}
 \toprule
-Arm & $c$ & Role & $y$ ratio (95\% interval) & Predicted\\\midrule
-Plain decoding & 1 & primary & 1.025 (1.022--1.028) & 1.035\\
- & 4 & descriptive & 1.021 (1.019--1.024) & 1.031\\
- & 8 & descriptive & 1.021 (1.014--1.027) & 1.030\\
- & 16 & descriptive & 1.020 (1.016--1.025) & 1.029\\
- & 32 & descriptive & 1.011 (1.002--1.020) & 1.016\\
- & 64 & descriptive & 0.999 (0.994--1.005) & 1.005\\
- & 128 & gated off & 0.994 (0.993--0.996) & 1.000\\
+Arm & $c$ & Role & $y$ ratio & \ci{95\% interval} & Predicted\\\midrule
+Plain decoding & 1 & primary & 1.025 & \ci{1.022--1.028} & 1.035\\
+ & 4 & descriptive & 1.021 & \ci{1.019--1.024} & 1.031\\
+ & 8 & descriptive & 1.021 & \ci{1.014--1.027} & 1.030\\
+ & 16 & descriptive & 1.020 & \ci{1.016--1.025} & 1.029\\
+ & 32 & descriptive & 1.011 & \ci{1.002--1.020} & 1.016\\
+ & 64 & descriptive & 0.999 & \ci{0.994--1.005} & 1.005\\
+ & 128 & gated off & 0.994 & \ci{0.993--0.996} & 1.000\\
 \addlinespace[2pt]
-MTP, Triton attention & 1 & primary & 1.046 (1.045--1.046) & 1.086\\
- & 2 & descriptive & 1.035 (1.029--1.041) & 1.077\\
- & 4 & descriptive & 1.030 (1.024--1.037) & 1.071\\
- & 8 & descriptive & 1.017 (1.004--1.030) & 1.057\\
- & 16 & descriptive & 1.000 (0.980--1.019) & 1.041\\
- & 32 & descriptive & 0.979 (0.939--1.021) & 1.017\\
- & 64 & descriptive & 0.967 (0.949--0.986) & 1.004\\
+MTP, Triton attention & 1 & primary & 1.046 & \ci{1.045--1.046} & 1.086\\
+ & 2 & descriptive & 1.035 & \ci{1.029--1.041} & 1.077\\
+ & 4 & descriptive & 1.030 & \ci{1.024--1.037} & 1.071\\
+ & 8 & descriptive & 1.017 & \ci{1.004--1.030} & 1.057\\
+ & 16 & descriptive & 1.000 & \ci{0.980--1.019} & 1.041\\
+ & 32 & descriptive & 0.979 & \ci{0.939--1.021} & 1.017\\
+ & 64 & descriptive & 0.967 & \ci{0.949--0.986} & 1.004\\
 \addlinespace[2pt]
-DFlash, 16-token blocks & 1 & primary & 1.012 (1.007--1.018) & 1.045\\
- & 2 & descriptive & 0.990 (0.984--0.996) & 1.026\\
- & 4 & descriptive & 0.970 (0.958--0.983) & 1.009\\
- & 8 & gated off & 0.988 (0.977--1.000) & 1.000\\
+DFlash, 16-token blocks & 1 & primary & 1.013 & \ci{1.007--1.018} & 1.045\\
+ & 2 & descriptive & 0.990 & \ci{0.984--0.996} & 1.026\\
+ & 4 & descriptive & 0.970 & \ci{0.958--0.983} & 1.009\\
+ & 8 & gated off & 0.988 & \ci{0.977--1.000} & 1.000\\
 \addlinespace[2pt]
-DFlash, 8-token blocks & 4 & primary & 0.988 (0.977--0.999) & 1.024\\
- & 8 & descriptive & 0.975 (0.967--0.984) & 1.008\\
- & 16 & gated off & 0.988 (0.962--1.015) & 1.000\\
- & 32 & gated off & 0.994 (0.945--1.046) & 1.000\\
+DFlash, 8-token blocks & 4 & primary & 0.988 & \ci{0.977--0.999} & 1.024\\
+ & 8 & descriptive & 0.975 & \ci{0.967--0.984} & 1.008\\
+ & 16 & gated off & 0.988 & \ci{0.962--1.015} & 1.000\\
+ & 32 & gated off & 0.994 & \ci{0.945--1.046} & 1.000\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\paragraph{Throughput} By the declared rule the certified head raises throughput at $c=1$ by 2.5\% for plain decoding, 4.6\% for MTP and 1.2\% for 16-token DFlash, and lowers 8-token DFlash's by 1.2\% at $c=4$, where the decision rests on Holm's last step at the nominal 0.05 and the Bonferroni interval across the four primaries includes 1. The gains are confined to small batches and fall short of the prediction. Plain decoding gains about 2\% up to $c=16$ and 1.1\% at 32, then nothing at 64. MTP gains 3.0--4.6\% up to $c=4$ and 1.7\% at 8, shows no detectable change at 16 and 32, and loses 3.3\% at 64, where its certified calls are draft calls of 64 positions. Both DFlash arms lose 1.0--3.0\% at every tested point where the head is active above $c=1$, where their certified calls reach 28--64 positions. On the served envelope, the confirmation frontier's best arm at each concurrency (Figure~\ref{fig:frontier}), the ratio is 1.012 at $c=1$, 0.990, 0.970 and 0.975 at $c=2$, 4 and 8, and 0.994 at 128, with no detectable change at 16, 32 and 64: the served envelope rises only at $c=1$ and falls at $c=2$, 4, 8 and 128. Where every certified path is gated off, the captured certified graph still costs 0.6\% (plain decoding at $c=128$) to 1.2\% (16-token DFlash at $c=8$), and the certified graphs take 3.8--25.7~GB more memory at capture. The check launches show the share of head calls that need a fallback growing with the batch, from 2\% at $c=1$ to 61\% at 64 for plain decoding and to 76--82\% at $c=4$ for 16-token DFlash. That is consistent with the losses, but the time per fallback inside the served graphs was not measured, so the mechanism is a hypothesis.
+\paragraph{Throughput} By the declared rule the certified head raises throughput at $c=1$ by 2.5\% for plain decoding, 4.6\% for MTP and 1.3\% for 16-token DFlash, and lowers 8-token DFlash's by 1.2\% at $c=4$, where the decision rests on Holm's last step at the nominal 0.05 and the Bonferroni interval across the four primaries includes 1. The gains are confined to small batches and fall short of the prediction. Plain decoding gains about 2\% up to $c=16$ and 1.1\% at 32, then nothing at 64. MTP gains 3.0--4.6\% up to $c=4$ and 1.7\% at 8, shows no detectable change at 16 and 32, and loses 3.3\% at 64, where its certified calls are draft calls of 64 positions. Both DFlash arms lose 1.0--3.0\% at every tested point where the head is active above $c=1$, where their certified calls reach 28--64 positions. On the served envelope, the confirmation frontier's best arm at each concurrency (Figure~\ref{fig:frontier}), the ratio is 1.013 at $c=1$, 0.990, 0.970 and 0.975 at $c=2$, 4 and 8, and 0.994 at 128, with no detectable change at 16, 32 and 64: the served envelope rises only at $c=1$ and falls at $c=2$, 4, 8 and 128. Where every certified path is gated off, the captured certified graph still costs 0.6\% (plain decoding at $c=128$) to 1.2\% (16-token DFlash at $c=8$), and the certified graphs take 3.8--25.7~GB more memory at capture. The check launches show the share of head calls that need a fallback growing with the batch, from 2\% at $c=1$ to 61\% at 64 for plain decoding and to 76--82\% at $c=4$ for 16-token DFlash. That is consistent with the losses, but the time per fallback inside the served graphs was not measured, so the mechanism is a hypothesis.
 
-\paragraph{Exactness} Check launches ran each certified arm at its tuned flags with the stock head also computed in every certified step, counting on the device the positions whose token differs: every certified call was counted, and 0 of 592,433 certified positions differ. At $c=1$, where one request at a time gives both arms the same batches, every request's token ids were identical between the arms in all three sessions (plain decoding, MTP and 16-token DFlash, 32 of 32 prompts each); 8-token DFlash has no $c=1$ point and rests on check mode alone. A batch's verify goes to the stock head if any of its requests asks for log-probabilities, penalties, a grammar or token mask, logit bias, a custom logit processor or logprob capture. The benchmark workload has none of these. In a deployment, a batch that holds such a request gets the stock verify: a condition on both the exactness scope and the speedup.
+\paragraph{Exactness} Check launches ran each certified arm at its tuned flags with the stock head also computed in every certified step, counting on the device the positions whose token differs: every certified call was counted, and 0 of 592,433 checked positions differ. At $c=1$, where one request at a time gives both arms the same batches, every request's token ids were identical between the arms in all three sessions (plain decoding, MTP and 16-token DFlash, 32 of 32 prompts each); 8-token DFlash has no $c=1$ point and rests on check mode alone. A batch's verify goes to the stock head if any of its requests asks for log-probabilities, penalties, a grammar or token mask, logit bias, a custom logit processor or logprob capture. The benchmark workload has none of these. In a deployment, a batch that holds such a request gets the stock verify: a condition on both the exactness scope and the speedup.
 
 Above $c=1$ closed-loop batches vary from run to run. Pooled over $c>1$, first divergences between the certified and stock runs of a session occur at 1.21 times (95\% interval 0.92--1.59) the rate between stock runs of different sessions for plain decoding, 1.11 times (1.0002--1.22) for MTP and 1.03 times (0.91--1.16) for 8-token DFlash; 16-token DFlash diverged 9 times against none between stock runs, on the same 3 prompts at $c=8$ in every session, and a wave control points to the batch evolution as the cause. Re-scored on a stock server at batch 1, all but 20 of the 1,113 first-divergence contexts are exact ties or one BF16 step apart (19 within 0.5 nats, 1 large). MTP's lower bound sits just above 1, and the excess fits the certified engine's different step times changing the batch evolution: under identical batch evolution the arms are identical. In a seeded control at the most sensitive position known (prompt \code{579ae7ce}, decoded with MTP from output position 400 in waves of 1, 8, 12 and 16 requests), the certified verify decided all 3,708 verify steps and every token of the 109 requests equalled stock's on both passes. With log-probabilities requested, which keep the verify on the stock head, the certified graphs, the certified draft and draft-extend heads and the gated-off verify left every token of the 109 requests equal to stock's, and the top-five and five tracked tokens' log-probabilities at position 439 identical to the bit. Waves with fixed batch evolution also gave identical outputs for MTP (64 of 64 prompts, and 512 of 512 in waves of 64 at the timed pools) and for 16-token DFlash at $c=8$ with the head gated off (64 of 64).
 

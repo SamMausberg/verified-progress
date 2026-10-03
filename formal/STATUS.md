@@ -3,11 +3,13 @@
 Checked on 2026-09-30 with Lean 4.19.0 (elan toolchain from `lean-toolchain`,
 aarch64): `bash scripts/check_lean.sh` elaborates `DecisionGuards.lean` and
 `CertifiedArgmax.lean` with no errors (it also checks the files in `drafting/`,
-below). Neither file contains `sorry`, `admit` or a new `axiom`. `#print axioms`
+below). `StockDecision.lean` was added and checked the same way on 2026-10-03.
+None of these files contains `sorry`, `admit` or a new `axiom`. `#print axioms`
 on the main theorems reports only Lean's standard axioms: `propext`, `Quot.sound`
 and, for `envelope_compose`, `widen` and `shift_encloses` (through `omega`),
-`Classical.choice`. No axiom is added. A deliberately false
-variant of `sequential_sum_bound` is rejected, so the check is not vacuous.
+`Classical.choice`. No axiom is added. `StockDecision.lean` also proves, by
+counterexample, that three of its strict hypotheses are needed, and a script checks
+that the proofs fail under five weakened statements ("Weakened statements", below).
 
 ## `DecisionGuards.lean` (from the supplied bundle, unchanged)
 
@@ -41,6 +43,66 @@ Scores are integers after clearing a common positive denominator.
   the magnitudes it combines satisfies
   `K^n (|computed - exact| + sum|t|) <= (K+1)^n sum|t|`, i.e. the gamma_n bound
   `|error| <= ((1 + 1/K)^n - 1) sum|t|`.
+
+## `StockDecision.lean` (the stock token under a rounding model; added 2026-10-03)
+
+Values are integers after clearing a common positive denominator. Rounding is a
+function `rn` with a spacing `u` on magnitudes, assumed to satisfy `RoundModel`:
+`rn` is monotone, `2 |rn y - y| <= u |y|`, and `u` does not decrease with the
+magnitude. BF16 round-to-nearest-even has these properties in its finite range;
+that is argued on paper, not checked. The stock token is the first maximal index
+(`IsFirstMax`, unique by `firstMax_unique`).
+
+- `separation`: Lemma 2.2 (BF16 separation).
+- `pair_gap`, `gap_condition`: Theorem 2.3 (gap condition); `a` need not be
+  given as the real winner, since the hypothesis implies it.
+- `screen_drop`: the screen margin of Section 2.2. Given valid intervals and
+  bounds `Gmax >= G_i` and `zbar >=` every interval end's magnitude, an entry whose
+  upper end is more than `2 Gmax + u (zbar + Gmax)` below another's lower end rounds
+  strictly below it and is not the stock token.
+- `interval_condition`, `interval_condition_rounded`: Proposition 2.4, on rounded
+  interval ends and with the ends rounded from accumulator intervals by a monotone
+  `rn`. The proof uses only that `k` attains the largest lower end in `C`.
+- `roundModel_grid`: a concrete rounding satisfies the model, so it is not vacuous.
+- `rnTie`, `roundModel_tie`: round-to-nearest on the even integers with ties to
+  multiples of 4 (ties to even), spacing 2; it satisfies the model.
+- `separation_nonstrict_false`, `gap_condition_nonstrict_false`,
+  `interval_condition_tie_false`: with that rounding, Lemma 2.2 and Theorem 2.3 with a
+  non-strict gap, and Proposition 2.4 with an earlier entry of `C` allowed to tie `k`,
+  are false. The last keeps the paper's choice of `k` as the first entry of `C` with the
+  largest lower end. Each is a counterexample in which a tie decides (a gap of one spacing
+  rounding to a tie, or an earlier index winning the first-index rule).
+
+`#print axioms` reports only `propext`, `Quot.sound` and `Classical.choice`.
+
+## Weakened statements
+
+`scripts/check_lean_variants.sh` weakens one hypothesis of a lemma at a time (for `sequential_sum_bound`, it strengthens the conclusion instead), by a `sed` edit of a
+copy in a temporary directory, and expects Lean to reject the copy; `formal/` itself is never
+edited, since `check_lean.sh` elaborates every file there. Rerun with
+
+```sh
+PATH=$HOME/.elan/bin:$PATH bash scripts/check_lean_variants.sh
+```
+
+It exits 0 only if every variant fails to elaborate, and prints the line of each error. A failed
+proof shows that the proof needs the hypothesis; it does not show that the weakened statement is
+false. That is proved in Lean for the first, second and fourth rows below (the `_false` theorems
+above); for `screen_drop` and `sequential_sum_bound` the third column is an argument, not a proof. Checked on
+2026-10-03 with Lean 4.19.0 (`evidence/precision/lean_variants.log`); each variant fails with one
+error, inside the lemma it weakens:
+
+| Variant | Lemma and edit | Why the weakened statement fails | Error |
+|---|---|---|---|
+| `separation_nonstrict` | `separation`: `ya - yb > u (...)` to `>=` | a gap of exactly one spacing can round to a tie (ties to even) | `StockDecision.lean:83`, `omega` |
+| `gap_condition_nonstrict` | `pair_gap` and `gap_condition`: the gap `>` to `>=` | the same tie at the boundary of the margin | `StockDecision.lean:101`, `omega` |
+| `screen_drop_half_margin` | `screen_drop`: margin `2 * Gmax + u (zbar + Gmax)` to `Gmax + u (zbar + Gmax)` | both accumulators may move by up to `Gmax`, so one `Gmax` does not cover them | `StockDecision.lean:138`, `omega` |
+| `interval_condition_earlier_tie` | `interval_condition` and `interval_condition_rounded`: earlier entries' `<` to `<=` | an earlier index that ties `k` is the first maximum | `StockDecision.lean:163`, `omega` |
+| `sequential_sum_bound_exact` | `sequential_sum_bound`: `(K + 1) ^ n` to `K ^ n` on the right | it would make every running sum exact | `CertifiedArgmax.lean:211`, type mismatch |
+
+Where a lemma's weakened hypothesis is passed on by another lemma (`pair_gap` to `gap_condition`,
+`interval_condition` to `interval_condition_rounded`), both are weakened, so that the only error is
+the weakened proof's, not a mismatch between the two statements.
 
 ## `drafting/`: three drafting proposals (supplied by the author, fixed and checked here)
 
@@ -89,8 +151,9 @@ so acceptance can be computed offline exactly) and `oracle_clipping`.
 
 ## What is not formalized
 
-IEEE-754 rounding itself and the bridge from floating-point values to these
-integers; the tree (pairwise, blocked, fused) version of the accumulation
+IEEE-754 rounding itself (that BF16 round-to-nearest-even satisfies
+`RoundModel`) and the bridge from floating-point values to these integers; the
+stock kernel's error bound `G_i` (an assumed error model); the tree (pairwise, blocked, fused) version of the accumulation
 bound; Cauchy-Schwarz; real exponentials and the transport mass bounds; the
 Gumbel-max law and every probability statement; the tensor-core adder model;
 compiler lowering, CUDA race freedom and engine state restoration. The exact

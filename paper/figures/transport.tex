@@ -94,17 +94,18 @@
 \draw[flow,very thick,cdflash16] (O) -- (D);
 % h^d's label left of its tip and just below it, so it names the arrow, not the rescaling's dot F
 \node[anchor=east,align=right,inner sep=1pt] at ($(D)+(-4,-3)$) {$h^d$, $\norm{h^d}_2=\vpnum{1}{\figHd}$};
-% Delta: its symbol beside the dashed line near h^d's tip, its length under h^t's label
+% Delta: its symbol beside the dashed line near h^d's tip, and the pair's drift rho = ||Delta|| / ||h^t||
+% under h^t's label (the closest rescaling's rho, printed above, is the smaller value)
 \draw[thick,cdflash16,dashed,shorten >=2.2pt] (D) -- (T);
 \node[note,inner sep=1pt] at (42,31) {$\Delta$};
-\node[note,anchor=north,inner sep=1pt] at (45,-17) {$\norm\Delta_2=\vpnum{2}{\figDrel}\,\norm{h^t}_2$};
+\node[note,anchor=north,inner sep=1pt] at (45,-17) {$\rho=\norm\Delta_2/\norm{h^t}_2=\vpnum{2}{\figDrel}$};
 \draw[ink!60] ($(O)+(13,0)$) arc[start angle=0,end angle={acos(\figCos)},radius=13];
 \node[note,anchor=west] at (16,9) {$\cos=\vpnum{2}{\figCos}$};
 % the ball inside which transport would beat int8: radius delta* ||h^t||, to scale
 \fill[ccert] (T) circle[radius={\figDstar*\figHt}];
 \draw[ccert,thin] (T) circle[radius=2.6pt];
 \draw[ccert,thin] (T) -- (159,-14);
-\node[note,text=black,anchor=north,align=center] at (159,-15) {transport wins only\\inside this dot, of radius\\$\vpnum{4}{\figDstar}\,\norm{h^t}_2$};
+\node[note,text=black,anchor=north,align=center] at (159,-15) {transport wins only\\inside this dot, of radius\\$\vpnum{5}{\figDstar}\,\norm{h^t}_2$};
 \end{scope}
 % (a)'s title on (b)'s title line
 \node[panel title,anchor=north] at (amid |- b.outer north) {\paneltitle{a}{Median DFlash-4B head inputs, to scale}};

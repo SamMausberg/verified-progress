@@ -1,0 +1,6 @@
+Lean (version 4.19.0, aarch64-unknown-linux-gnu, commit 6caaee842e94, Release)
+rejected separation_nonstrict: 83:2: error: omega could not prove the goal
+rejected gap_condition_nonstrict: 101:2: error: omega could not prove the goal
+rejected screen_drop_half_margin: 138:64: error: omega could not prove the goal
+rejected interval_condition_earlier_tie: 163:36: error: omega could not prove the goal
+rejected sequential_sum_bound_exact: 211:2: error: type mismatch, term

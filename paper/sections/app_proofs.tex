@@ -22,7 +22,7 @@ Table~\ref{tab:assumptions-full} lists every rounding, accumulation, tie-breakin
 Assumption & Status & Results that depend on it\\\midrule
 Head weights and inputs are BF16 and are normal or zero. Every product $w_{ij}h_j$, and every product of an int8 code with a BF16 input, is exact in FP32 unless it underflows; underflow and flush to zero of products and partial sums cost less than $2^{-126}$ each and are charged to the absolute floor $\eta$. & Exact in the normal range; normal operands assumed. & Thms.~\ref{thm:stock}, \ref{thm:envelope}, \ref{thm:envelope-general}; Prop.~\ref{prop:stockinterval}\\\addlinespace[2pt]
 The stock head rounds its FP32 accumulator to BF16 (nearest, ties to even) and widens it exactly; \code{torch.argmax} returns the smallest maximal index in greedy decoding and verification. & Code reading. & Def.~\ref{def:contracts}; Lem.~\ref{lem:bf16gap}; Prop.~\ref{prop:stockinterval}\\\addlinespace[2pt]
-Stock accumulation error $|\hat y_i-z_i|\le\gamma_{\rm stock}\sum_j|w_{ij}h_j|+\eta$ at every served shape: $\gamma_{\rm stock}=\gcons$ (\modelcons: $2D$ roundings at $2^{-23}$, any order, which covers multi-term adders that keep at least 23 fractional bits per block of 8 to 32 terms) or $\gamma_{\rm stock}=\ghop$ (\modelhopper: Khattak and Mikaitis's model of Hopper's BF16 tensor cores, measured on the warp-level \code{mma} path, plus FP32 split-$K$); $\eta=2^{-113}$; no split-$K$ partials stored in BF16; crafted-input probes of the stock kernels match the \modelhopper{} (Appendix~\ref{app:accumulation}) \ev{profile-wgmma}. The replay omitted $\eta$, which can change a decision only if an endpoint lies within $2^{-112}$ of a BF16 rounding boundary or a gap within $2^{-112}$ of its threshold. & Assumed; consistent with all replayed positions and with the FP32-output kernel's observed error, 58 times inside the \modelhopper{} \ev{kernel-error}; implemented floor $2^{-100}$ \ev{kernel-impl}. & Certification against \Rstock; Table~\ref{tab:rstock}\\\addlinespace[2pt]
+Stock accumulation error $|\hat y_i-z_i|\le\gamma_{\rm stock}\sum_j|w_{ij}h_j|+\eta$ at every served shape: $\gamma_{\rm stock}=\gcons$ (\modelcons: $2D$ roundings at $2^{-23}$, any order, which covers multi-term adders that keep at least 23 fractional bits per block of 8 to 32 terms) or $\gamma_{\rm stock}=\ghop$ (\modelhopper: Khattak and Mikaitis's model of Hopper's BF16 tensor cores, measured on the warp-level \code{mma} path~\cite{khattak2026}, plus FP32 split-$K$); $\eta=2^{-113}$; no split-$K$ partials stored in BF16. The replay omitted $\eta$, which can change a decision only if an endpoint lies within $2^{-112}$ of a BF16 rounding boundary or a gap within $2^{-112}$ of its threshold. & Assumed; crafted-input probes of the stock kernels match the \modelhopper{} (Appendix~\ref{app:accumulation}) \ev{profile-wgmma}; consistent with all replayed positions and with the FP32-output kernel's observed error, 58 times inside the \modelhopper{} \ev{kernel-error}; implemented floor $2^{-100}$ \ev{kernel-impl}. & Certification against \Rstock; Table~\ref{tab:rstock}\\\addlinespace[2pt]
 A position's stock BF16 logits do not depend on the other positions of the batch or on which vocabulary entries are present. & Measured on this build at 20 batch sizes; the part about which entries are present is re-checked at start-up, at the deployed batch sizes \ev{kernel-invariance}. & Per-position fallback only\\\addlinespace[2pt]
 Comparisons are made at the same batch shape and serving configuration. & Required (Section~\ref{sec:same-shape}). & Every agreement claim\\\addlinespace[2pt]
 The low-precision pass accumulates in FP32 on tensor cores within $\gamma_{\rm copy}=\gcons$, the \modelcons{} whichever model is assumed for the stock kernel, which holds if its adders keep at least 23 fractional bits per block of 8 to 32 terms, or exactly in int32 for int8 codes times int8 activation codes. & Model assumed; integer pass exact. & Thms.~\ref{thm:envelope}, \ref{thm:envelope-general}; Table~\ref{tab:candidates}\\\addlinespace[2pt]
@@ -40,17 +40,17 @@ Transport is in real arithmetic with one head for both passes; $\delta^\ast$ use
 \caption{Numerical assumptions, in short (in full: Table~\ref{tab:assumptions-full}). ``Code'': read from SGLang's and PyTorch's code at the versions of Section~\ref{sec:setup}.}\label{tab:assumptions}
 \vskip 0.05in
 \centering\tablefont
-\begin{tabularx}{\linewidth}{@{}Y>{\raggedright\arraybackslash}p{6.4cm}@{}}
+\begin{tabularx}{\linewidth}{@{}YP{2.5cm}P{5.2cm}@{}}
 \toprule
-Assumption & Status\\\midrule
-BF16 operands are normal or zero, so products are exact in FP32 (underflow is charged to $\eta$) & Exact for normal operands\\\addlinespace[2pt]
-The stock head rounds its FP32 accumulator to BF16 (nearest, ties to even); \code{torch.argmax} returns the first maximal index & Code\\\addlinespace[2pt]
-The stock kernel's error is at most $\gamma_{\rm stock}\sum_j|w_{ij}h_j|+\eta$ at every served shape, under the \modelcons{} or the \modelhopper; no split-$K$ partial sums in BF16 & Assumed; consistent with every replayed position, the FP32-output variant and crafted-input probes (Section~\ref{sec:headcontracts}) \ev{kernel-error,profile-wgmma}\\\addlinespace[2pt]
-The int8 pass's own accumulation error is at most $\gamma_{\rm copy}=\gcons$ times $\sum_j|\bar w_{ij}h_j|$, and the kernel computes the modelled arithmetic & Assumed; checked per compiled variant at start-up and by runtime probes, not proved (Section~\ref{sec:kernel-design}) \ev{kernel-impl,kernel-tma}\\\addlinespace[2pt]
-Agreement is checked at the same batch shape and configuration & Required (Section~\ref{sec:same-shape})\\\addlinespace[2pt]
-Per-position fallback only: a position's stock logits do not depend on the rest of the batch or on which entries are present & Measured at 20 batch sizes; entry subsets re-checked at start-up \ev{kernel-invariance}\\\addlinespace[2pt]
-Seeded sampling (Section~\ref{sec:decisions}): noise is a function of (seed, token position in the sequence, token); no top-$k$ or top-$p$; the deterministic mode's head kernel is covered by the \modelcons{} only & Code; matched on replayed positions \ev{kernel-seeded}\\\addlinespace[2pt]
-The offline replay evaluates real logits in FP64; transport is analysed in real arithmetic & How the replay computes\\
+Assumption & Status & Support\\\midrule
+BF16 operands are normal or zero, so products are exact in FP32 (underflow is charged to $\eta$) & Exact for normal operands & \\\addlinespace[2pt]
+The stock head rounds its FP32 accumulator to BF16 (nearest, ties to even); \code{torch.argmax} returns the first maximal index & Code & \\\addlinespace[2pt]
+The stock kernel's error is at most $\gamma_{\rm stock}\sum_j|w_{ij}h_j|+\eta$ at every served shape, under the \modelcons{} or the \modelhopper; no split-$K$ partial sums in BF16 & Assumed & Consistent with every replayed position, the FP32-output variant and crafted-input probes (Section~\ref{sec:headcontracts}) \ev{kernel-error,profile-wgmma}\\\addlinespace[2pt]
+The int8 pass's own accumulation error is at most $\gamma_{\rm copy}=\gcons$ times $\sum_j|\bar w_{ij}h_j|$, and the kernel computes the modelled arithmetic & Assumed & Checked per compiled variant at start-up and by runtime probes, not proved (Section~\ref{sec:kernel-design}) \ev{kernel-impl,kernel-tma}\\\addlinespace[2pt]
+Agreement is checked at the same batch shape and configuration & Required (Section~\ref{sec:same-shape}) & \\\addlinespace[2pt]
+Per-position fallback only: a position's stock logits do not depend on the rest of the batch or on which entries are present & Measured & At 20 batch sizes; entry subsets re-checked at start-up \ev{kernel-invariance}\\\addlinespace[2pt]
+Seeded sampling (Section~\ref{sec:decisions}): noise is a function of (seed, token position in the sequence, token); no top-$k$ or top-$p$; the deterministic mode's head kernel is covered by the \modelcons{} only & Code & Matched on replayed positions \ev{kernel-seeded}\\\addlinespace[2pt]
+The offline replay evaluates real logits in FP64; transport is analysed in real arithmetic & How the replay computes & \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -156,13 +156,13 @@ At $T=1$ and error bound $\beta$ (so $t\approx4\beta$), the bound on the expecte
 Measured on captured states, the bound's median is 1.00 logit, 75 times the median realized error of 0.013, because the bound assumes the worst alignment of $e_i$ and $h$~\ev{stats}. The measured candidate sets are far below the bound because most top-two margins are several logits: the gap between the two largest logits has a median of 7.3 logits and a 10th percentile of 0.68~\ev{stats}. Tables~\ref{tab:candidates} and~\ref{tab:rstock} give the candidate sets per copy and the positions and steps the contract leaves to the stock kernel, which Section~\ref{sec:geometry-selfevidence} summarizes.
 
 \begin{table}[htbp]
-\caption{Candidate tokens per greedy decision on 6,005 held-out plain-decode positions from 160 prompts; \modelcons{} for the copy's accumulation; Cauchy--Schwarz error bound per entry for int8 with one scale per entry, blockwise $\ell_2$ otherwise. ``Bytes'': the copy relative to the BF16 head; ``1 entry'': decided without re-scoring. Measured on replayed states \ev{selfevidence-csv}.}\label{tab:candidates}\label{tab:geometry-candidates}
+\caption{Candidate tokens per greedy decision for each cheap copy of the head, on 6,005 held-out plain-decode positions from 160 prompts. Error bound per entry: Cauchy--Schwarz for int8 with one scale per entry, blockwise $\ell_2$ otherwise; \modelcons{} for the copy's accumulation. ``1 entry'': decided without re-scoring. Measured on replayed states \ev{selfevidence-csv}.}\label{tab:candidates}\label{tab:geometry-candidates}
 \vskip 0.05in
 \centering\tablefont\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}lrrrrrr@{}}
 \toprule
 & & \multicolumn{3}{c}{Candidate tokens} & \multicolumn{2}{c}{Decided with}\\\cmidrule(lr){3-5}\cmidrule(l){6-7}
-Copy & Bytes & mean & p99 & max & 1 entry & $\le8$\\\midrule
+Copy & Bytes vs BF16 & mean & p99 & max & 1 entry & $\le8$\\\midrule
 int8, per entry & 0.50 & 1.55 & 8 & 30 & 75.4\% & 99.3\%\\
 int8, 128 cols & 0.52 & 1.34 & 5 & 23 & 81.4\% & 99.8\%\\
 int8, 32 cols & 0.54 & 1.26 & 5 & 20 & 84.0\% & 99.9\%\\
@@ -173,7 +173,7 @@ int4, 128 cols & 0.27 & 72,847 & 248,295 & 248,320 & 0\% & 0\%\\
 \end{table}
 
 \begin{table}[htbp]
-\caption{Share of the 6,005 held-out positions, and of the capture's 750 decode steps (counting each step's held-out positions, 8.0 on average), that the contract leaves to the stock kernel, by condition and by the model assumed for the stock kernel's accumulation. The last two rows are sensitivity rows that do not model the stock tensor-core GEMM. Measured on replayed states \ev{rstock}.}\label{tab:rstock}
+\caption{Share of held-out positions and of decode steps that the contract leaves to the stock kernel, by condition and by the model assumed for the stock kernel's accumulation. Positions: the 6,005 held-out ones. Steps: the capture's 750 decode steps, counting each step's held-out positions (8.0 on average). The last two rows are sensitivity rows that do not model the stock tensor-core GEMM. Measured on replayed states \ev{rstock}.}\label{tab:rstock}
 \vskip 0.05in
 \centering\tablefont\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}lrrrrr@{}}
@@ -183,22 +183,22 @@ Stock model & $\gamma_{\rm stock}$ & positions & steps & positions & steps\\\mid
 Conservative & $\gcons$ & 3.03\% & 21.6\% & 1.40\% & 10.9\%\\
 Hopper & $\ghop$ & 2.18\% & 16.0\% & 0.35\% & 2.8\%\\
 Sensitivity & $10^{-5}$ & 1.97\% & 14.9\% & 0.017\% & 0.13\%\\
-IEEE FP32 tree & $1.7\times10^{-6}$ & 1.95\% & 14.8\% & 0\% & 0\%\\
+IEEE FP32 tree & $1.67\times10^{-6}$ & 1.95\% & 14.8\% & 0\% & 0\%\\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{table}[htbp]
-\caption{Recomputation and fallback by the model assumed for the stock kernel: mean candidates and the share of positions left to the stock head. Held-out replay columns: the gap and interval conditions, and the share of decode steps (8.0 held-out positions each) with a position the interval condition leaves. The last row is a sensitivity check, not a model of the stock kernel. By condition and step in full: Table~\ref{tab:rstock}.}\label{tab:fallback}
+\caption{Recomputation and fallback by the model assumed for the stock kernel. Gap, interval: share of positions that condition leaves to the stock head. Steps with a fallback: share of decode steps (8.0 held-out positions each) with a position the interval condition leaves. The last row is a sensitivity check, not a model of the stock kernel. By condition and step in full: Table~\ref{tab:rstock}.}\label{tab:fallback}
 \vskip 0.05in
 \centering\tablefont\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}lrrrrr@{}}
 \toprule
 & \multicolumn{2}{c}{Kernel replay \ev{kernel-replay}} & \multicolumn{3}{c}{Held-out replay \ev{rstock}}\\\cmidrule(lr){2-3}\cmidrule(l){4-6}
-Model ($\gamma_{\rm stock}$) & Cand. & Interval & Gap & Interval & \begin{tabular}[b]{@{}r@{}}Steps with\\a fallback\end{tabular}\\\midrule
+Model ($\gamma_{\rm stock}$) & \begin{tabular}[b]{@{}r@{}}Mean\\candidates\end{tabular} & Interval & Gap & Interval & \begin{tabular}[b]{@{}r@{}}Steps with\\a fallback\end{tabular}\\\midrule
 Conservative ($\gcons$) & 1.84 & 1.46\% & 3.03\% & 1.40\% & 10.9\%\\
 Hopper ($\ghop$) & 1.78 & 0.28\% & 2.18\% & 0.35\% & 2.8\%\\
-IEEE FP32 tree ($1.7\times10^{-6}$) & -- & -- & 1.95\% & 0\% & 0\%\\
+IEEE FP32 tree ($1.67\times10^{-6}$) & -- & -- & 1.95\% & 0\% & 0\%\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -214,24 +214,28 @@ Re-scoring candidates with IEEE FP32 accumulation on CUDA cores leaves no positi
 
 \begin{table}[htbp]
 \tablefont\centering
-\caption{Candidates and the gap condition on replayed speculative captures, with plain decoding for comparison: the int8 copy with one scale per entry (FP8 where named) under the elementwise minimum of the rigorous per-entry error bounds and the \modelcons{} for the copy. ``Candidates'': mean and 99th percentile. ``Left to stock'': share of positions the gap condition (Theorem~\ref{thm:stock}) leaves to the stock kernel; ``Steps'': share of the capture's steps with at least one such position; each under the \modelhopper{} and under the \modelcons{} of the stock kernel. Measured~\ev{selfevidence-csv,selfevidence-dflash,selfevidence-mtp,rstock}.}\label{tab:spec-positions}
+\caption{Candidates and the gap condition's fallback on the replayed speculative captures, with plain decoding for comparison. The copy is int8 with one scale per entry (FP8 where named), under the elementwise minimum of the rigorous per-entry error bounds and the \modelcons{} for its accumulation. The gap condition (Theorem~\ref{thm:stock}) is evaluated under each model of the stock kernel; a step counts if it has at least one position left to stock. Indented rows are subsets of the row above them. Measured~\ev{selfevidence-csv,selfevidence-dflash,selfevidence-mtp,rstock}.}\label{tab:spec-positions}
 \vskip 0.05in
-\setlength{\tabcolsep}{3.5pt}
-\begin{tabular}{@{}l>{\raggedright\arraybackslash}p{3.6cm}rrrrrrr@{}}\toprule
-& & & \multicolumn{2}{c}{Candidates} & \multicolumn{2}{c}{Left to stock} & \multicolumn{2}{c}{Steps}\\\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(l){8-9}
-Capture & Positions & Count & mean & p99 & Hopper & conservative & Hopper & conservative\\\midrule
-Plain decoding & held-out & 6,005 & 1.54 & 7 & 2.18\% & 3.03\% & 16.0\% & 21.6\%\\\addlinespace
-DFlash-4B, block 16 & all verification & 4,000 & & & 5.68\% & 8.60\% & 78.2\% & 84.2\%\\
-& verification, needed by the verifier & 1,162 & 1.57 & 8 & & & &\\
-& verification, after the first rejection & 2,838 & 4.03 & 20 & & & &\\
-& all verification, FP8 copy & 4,000 & 28.91 & 240 & & & &\\
-& draft head, reached & 1,138 of 4,020 & 1.28 & 4 & & & &\\
-& draft head, not reached & 2,882 of 4,020 & 3.36 & 11 & & & &\\\addlinespace
-MTP-4B, four steps & all verification & 4,010 & & & 2.84\% & 4.04\% & 37.5\% & 48.0\%\\
-& verification, needed by the verifier & 2,901 & 1.51 & 7 & & & &\\
-& verification, after the first rejection & 1,109 & 2.44 & 11 & & & &\\
-& draft head, reached & 2,997 of 4,024 & 2.44 & 15 & & & &\\
-& all draft positions & 4,024 & & & 4.20\% & 6.44\% & 44.0\% & 60.0\%\\\bottomrule
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrrrrr@{}}\toprule
+& & \multicolumn{2}{c}{Candidates} & \multicolumn{4}{c}{Left to stock by the gap condition}\\\cmidrule(lr){3-4}\cmidrule(l){5-8}
+& & & & \multicolumn{2}{c}{share of positions} & \multicolumn{2}{c}{share of steps}\\\cmidrule(lr){5-6}\cmidrule(l){7-8}
+Positions & Count & mean & p99 & Hopper & conservative & Hopper & conservative\\\midrule
+Plain decoding, held-out & 6,005 & 1.54 & 7 & 2.18\% & 3.03\% & 16.0\% & 21.6\%\\\addlinespace
+\multicolumn{8}{@{}l}{\emph{DFlash-4B, block 16}}\\
+All verification & 4,000 & & & 5.68\% & 8.60\% & 78.2\% & 84.2\%\\
+\quad needed by the verifier & 1,162 & 1.57 & 8 & & & &\\
+\quad after the first rejection & 2,838 & 4.03 & 20 & & & &\\
+\quad all, FP8 copy & 4,000 & 28.91 & 240 & & & &\\
+All draft positions & 4,020 & & & & & &\\
+\quad draft head, reached & 1,138 & 1.28 & 4 & & & &\\
+\quad draft head, not reached & 2,882 & 3.36 & 11 & & & &\\\addlinespace
+\multicolumn{8}{@{}l}{\emph{MTP-4B, four steps}}\\
+All verification & 4,010 & & & 2.84\% & 4.04\% & 37.5\% & 48.0\%\\
+\quad needed by the verifier & 2,901 & 1.51 & 7 & & & &\\
+\quad after the first rejection & 1,109 & 2.44 & 11 & & & &\\
+All draft positions & 4,024 & & & 4.20\% & 6.44\% & 44.0\% & 60.0\%\\
+\quad draft head, reached & 2,997 & 2.44 & 15 & & & &\\\bottomrule
 \end{tabular}
 \end{table}
 
@@ -241,9 +245,9 @@ The certified path of Section~\ref{sec:kernel-design} is sound only for a kernel
 \paragraph{Expected time under the \modelhopper{}} Section~\ref{sec:kernel-runtime} gives the head's expected time with each fallback under the \modelcons{}. Under the \modelhopper{}, with its lower fallback rates, both expected times lie between those and the all-certified time at every measured $M$~\ev{kernel-path}.
 
 \subsection{What is machine-checked, what is tested, and what is proved on paper}\label{app:checked}\label{app:cpu}
-\paragraph{Machine-checked} Lean 4.19.0 elaborates two files of this paper's lemmas with no \code{sorry}, no \code{admit} and no added axiom~\ev{lean}. Three further files, on the drafting proposals of Section~\notessec{app:external-drafting}{5.8} of the research notes, elaborate the same way; nothing in this paper rests on them. The paper's two files work over integers, which stand for scores after clearing a common positive denominator. \code{formal/CertifiedArgmax.lean} proves that a quantization bound and an accumulation bound add and that outward widening keeps an enclosure valid (\code{envelope\_compose}, \code{widen}); that disjoint enclosures decide comparisons, that a certified winner is the unique maximizer and that any two certificates from valid enclosures name the same token (\code{separation}, \code{certified\_argmax}, \code{certificate\_unique}), which is the decision logic of Theorem~\ref{thm:ladder}; that the filter $\hi_i\ge\max_j\lo_j$ keeps every maximizer and drops only beaten entries (\code{maximizer\_survives}, \code{dropped\_row\_loses}); that adding a fixed noise value or scaling by a positive temperature preserves an enclosure (\code{shift\_encloses}, \code{scale\_encloses}); the acceptance guards of Theorem~\ref{thm:guards} with an enclosed numerator and their exclusivity (\code{accept\_guard}, \code{reject\_guard}, \code{guards\_exclusive}); the residual-weight enclosure of Theorem~\ref{thm:residualself} (\code{residual\_interval}); the $\ell_\infty$/$\ell_1$ Hölder bound behind the Hölder form of transport (Appendix~\ref{app:transport-geometry}) and the Hölder form of the quantization error bound (\code{holder}); and the sequential case of Lemma~\ref{lem:tree} (\code{sequential\_sum\_bound}). \code{formal/DecisionGuards.lean} holds nine declarations: scaled-integer acceptance and rejection guards and their stability under refinement, associativity of chronological composition, deterministic replay of records from equal starts (the logical skeleton of the replay proposition for the recurrent state in Section~\notessec{app:state}{6.2} of the research notes), and guards that stop a stale epoch or prefix from publishing state. A deliberately false variant of \code{sequential\_sum\_bound} is rejected, so the check is not vacuous.
+\paragraph{Machine-checked} Lean 4.19.0 elaborates three files of this paper's lemmas with no \code{sorry}, no \code{admit} and no added axiom~\ev{lean}. Three further files, on the drafting proposals of Section~\notessec{app:external-drafting}{5.8} of the research notes, elaborate the same way; nothing in this paper rests on them. The paper's three files work over integers, which stand for scores after clearing a common positive denominator. \code{formal/CertifiedArgmax.lean} proves that a quantization bound and an accumulation bound add and that outward widening keeps an enclosure valid (\code{envelope\_compose}, \code{widen}); that disjoint enclosures decide comparisons, that a certified winner is the unique maximizer and that any two certificates from valid enclosures name the same token (\code{separation}, \code{certified\_argmax}, \code{certificate\_unique}), which is the decision logic of Theorem~\ref{thm:ladder}; that the filter $\hi_i\ge\max_j\lo_j$ keeps every maximizer and drops only beaten entries (\code{maximizer\_survives}, \code{dropped\_row\_loses}); that adding a fixed noise value or scaling by a positive temperature preserves an enclosure (\code{shift\_encloses}, \code{scale\_encloses}); the acceptance guards of Theorem~\ref{thm:guards} with an enclosed numerator and their exclusivity (\code{accept\_guard}, \code{reject\_guard}, \code{guards\_exclusive}); the residual-weight enclosure of Theorem~\ref{thm:residualself} (\code{residual\_interval}); the $\ell_\infty$/$\ell_1$ Hölder bound behind the Hölder form of transport (Appendix~\ref{app:transport-geometry}) and the Hölder form of the quantization error bound (\code{holder}); and the sequential case of Lemma~\ref{lem:tree} (\code{sequential\_sum\_bound}). \code{formal/DecisionGuards.lean} holds nine declarations: scaled-integer acceptance and rejection guards and their stability under refinement, associativity of chronological composition, deterministic replay of records from equal starts (the logical skeleton of the replay proposition for the recurrent state in Section~\notessec{app:state}{6.2} of the research notes), and guards that stop a stale epoch or prefix from publishing state. \code{formal/StockDecision.lean} checks the stock token's decision rules under a model of rounding. Rounding is assumed monotone, moves a value by at most half the spacing at its magnitude, and has a spacing that does not decrease with the magnitude (\code{RoundModel}). BF16 round-to-nearest-even has these properties in its finite range: for real $y$, the nearest BF16 value lies within half the spacing of the binade containing $y$, which is the spacing at $|y|$; rounding to nearest is monotone; and the spacing does not decrease with the magnitude. This argument is not machine-checked. With the stock token defined as the first maximal index (\code{IsFirstMax}, unique by \code{firstMax\_unique}), the file proves Lemma~\ref{lem:bf16gap} (\code{separation}) and Theorem~\ref{thm:stock} (\code{gap\_condition}). It also proves the screen margin of Section~\ref{sec:headcontracts}: an entry whose upper end lies more than $\delta_{\max}$ below another's lower end rounds below it and is not the stock token (\code{screen\_drop}). Proposition~\ref{prop:stockinterval} is proved both on rounded interval ends and with those ends rounded from accumulator intervals (\code{interval\_condition}, \code{interval\_condition\_rounded}). A concrete rounding satisfies the model (\code{roundModel\_grid}). Under the rounding model the strict hypotheses are needed: the file gives counterexamples, each decided by a tie, to Lemma~\ref{lem:bf16gap} and Theorem~\ref{thm:stock} with a non-strict gap and to Proposition~\ref{prop:stockinterval} with an earlier entry allowed to tie (\code{separation\_nonstrict\_false}, \code{gap\_condition\_nonstrict\_false}, \code{interval\_condition\_tie\_false}). A script also checks that the proofs fail when \code{screen\_drop}'s margin loses one $G_{\max}$ or \code{sequential\_sum\_bound} is strengthened to an exact sum; such a failure shows that a proof uses its hypothesis, not that the changed statement is false (\path{formal/STATUS.md} lists the edits and the command that reruns them).
 
-Outside the checker are IEEE rounding and the bridge from floating-point values to these integers; the tree, pairwise, blocked and fused forms of the accumulation bound; Cauchy--Schwarz; real exponentials and the transported mass bounds; the Gumbel-max law and every probability statement; the tensor-core adder model; and compiler lowering, race freedom on the GPU and the engine's state restoration.
+Outside the checker are IEEE rounding itself (that BF16 rounding satisfies \code{RoundModel}) and the bridge from floating-point values to these integers; the stock kernel's error bound $G_i$, an assumed error model; the tree, pairwise, blocked and fused forms of the accumulation bound; Cauchy--Schwarz; real exponentials and the transported mass bounds; the Gumbel-max law and every probability statement; the tensor-core adder model; and compiler lowering, race freedom on the GPU and the engine's state restoration.
 
 \paragraph{Tested against exact arithmetic} An exact floating-point reference (\code{src/precision\_reference.py}) emulates every BF16, FP32 and FP64 rounding on rationals and checks each bound and decision of Sections~\ref{sec:selfevidence} and~\ref{sec:decisions} against real arithmetic~\ev{precision}. Its 21 test methods run 40,015 generated checks: 5,600 accumulation-bound checks over eight summation models (sequential, pairwise, blocked, split-$K$, round toward zero, flush to zero and the fused multi-term adder), where the largest observed error was 17--83\% of the bound depending on the model; 1,767 approximate-pass entries and 2,767 integer-pass entries enclosed; 420 certified argmax cases, 72 of them exact ties, of which 183 ended at the approximate pass, 191 after FP32 re-scoring, 24 in FP64 and 22 in exact arithmetic; 360 races under a fixed noise field (62 with a forced tie at the top), 200 top-$k$ sets, 300 acceptance decisions (148 with the uniform placed next to the threshold), 300 residual races and 300 verifications in SGLang's sibling form; 900 emulations of the stock head's rounding on adversarial near-tie heads with $D\le8$; 160 heads with subnormal weights and inputs; and the witnesses cited in the text for R-bf16 (Section~\ref{sec:headcontracts}), for BF16 split-$K$ partials and for a noise stream consumed in evaluation order. The heads are synthetic with small $V$ and $D$, and the fused adder is a model, not hardware.
 

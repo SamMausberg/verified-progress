@@ -1,48 +1,41 @@
 % Section 6: what moved the served frontier more than the certified head: exact engine changes
 % outside the head and two declared approximations, each against the tuned stock arm it
-% modifies (Table tab:levers, which also holds the certified head's rows of Section 4.5).
+% modifies (Table tab:levers; its ranges and intervals are in Table tab:levers-intervals, Appendix E).
 % Claims and status: one session each of the host-gap patches, backbone GEMM routing, replayed
 % GDN decoding and fold verify; three sessions each of the fold with narrow tiles and FA4, the
 % capped prefill delay and the served head; the declared approximations with their quality
 % holds. All from committed evidence (keys at each claim).
 \section{What Moved the Frontier More}\label{sec:levers}
-The largest served gains came from changes outside the head, measured against the tuned stock arms of Section~\ref{sec:served}; on the envelope the certified head gained only at $c=1$, by 1.2\% (Table~\ref{tab:levers} holds both).
+The largest served gains came from changes outside the head, each timed against the tuned stock arm it modifies (Table~\ref{tab:levers}). On the envelope, the fold with narrow tiles and FA4, and the prefill delay, gain far more than the certified head, which gained there only at $c=1$, by 1.3\% (Table~\ref{tab:head-served}).
 
 \begin{table}[!b]
-\caption{Engine changes (Section~\ref{sec:levers}) and the certified head (Section~\ref{sec:served}) against the tuned stock arm each modifies (group rows), flags otherwise identical; one session each, except the rows marked$^c$. Ratio: throughput $y$, or per-request rate $x$ where marked, with over without the change; brackets: run-pair range, or 95\% $t$ interval$^c$. Outputs: greedy outputs against stock, same configuration; exactness is not established where not compared.}\label{tab:levers}
+\caption{Changes outside the head give the largest served gains. Ratio: $y$ with the change over $y$ without it ($x$ where marked), on the group's tuned stock arm unless a row names another, other flags identical; one session unless marked (spreads: Table~\ref{tab:levers-intervals}).}\label{tab:levers}
 \vskip 0.05in
-% 7 pt, the one main-text table below 9 pt: at 8 pt its wrapped rows cost about five lines of
-% the ten-page main text, at 9 pt an unwrapped row needs about 295 pt against the 235 pt column.
-\centering\scriptsize\setlength{\tabcolsep}{1.8pt}
+% 8 pt: at 9 pt the four columns need about 244 pt against the 235 pt column.
+\centering\fontsize{8}{9}\selectfont\setlength{\tabcolsep}{3pt}
 \begin{tabular*}{\columnwidth}{@{}l@{\extracolsep{\fill}}rll@{}}
 \toprule
-Change & $c$ & Ratio (pairs) & Outputs\\\midrule
+Change & $c$ & Ratio & Exact\\\midrule
 \multicolumn{4}{@{}l}{\emph{MTP, three steps, FlashInfer attention} \ev{hostgap,admission}}\\
-Host-gap patches & 1--8 & 1.094--1.096 (1.090--1.101) & token-identical$^a$\\
-% The label and c share a cell: c = 32--128 in its own cell widens the c column past the table's width.
-\multicolumn{2}{@{}l}{Prefill delay, cap$^{c,e}$\hfill 32--128} & 1.19--1.48 (1.17--1.50) & exact up to rounding\\\addlinespace[2pt]
+Host-gap patches & 1--8 & 1.094--1.096 & token-identical$^a$\\
+Prefill delay, cap$^\dagger$ & 32--128 & 1.19--1.48 & up to rounding$^c$\\
+\enspace over best non-spec.\ arm$^\dagger$ & 48--128 & 1.18--1.32 & \\
 \multicolumn{4}{@{}l}{\emph{Plain decoding} \ev{backbone,bench-frontier,bench-equality}}\\
-Backbone GEMM routing & 1 & 1.035 (1.034--1.035) & exact up to rounding\\
-Replayed GDN decoding & 128 & 1.081 (one pair) & exact up to rounding\\\addlinespace[2pt]
+Backbone GEMM routing & 1 & 1.034 & up to rounding\\
+Replayed GDN decoding & 128 & 1.081 & up to rounding\\
 \multicolumn{4}{@{}l}{\emph{DFlash, 16-token blocks} \ev{drafter-fold,lowc-confirm}}\\
-Fold verify & 1 & 0.968 (0.966--0.970) & bitwise$^b$\\
-& 8--32 & 1.061--1.120 (1.053--1.134) & \\
-Fold, FA4$^{c,f}$ & 1--4 & $x$\,1.084--1.093 (1.056--1.114) & exact up to rounding\\
-\quad on 8-token blocks & 8--32 & 1.124--1.137 (1.108--1.166) & \\\addlinespace[2pt]
-\multicolumn{4}{@{}l}{\emph{Certified head, per arm$^c$} \ev{cert-served}}\\
-Plain decoding & 1 & 1.025 (1.022--1.028) & identical$^d$\\
-MTP, Triton attention & 1 & 1.046 (1.045--1.046) & identical$^d$\\
-DFlash, 16-token & 1 & 1.012 (1.007--1.018) & identical$^d$\\
-& 2--4 & 0.970--0.990 (0.958--0.996) & \\
-DFlash, 8-token & 4--8 & 0.975--0.988 (0.967--0.999) & check mode$^d$\\
+Fold verify & 1 & 0.968 & bitwise$^b$\\
+& 8--32 & 1.061--1.120 & \\
+Fold, narrow tiles, FA4$^\dagger$ & 1--4 & $x$\,1.084--1.093 & up to rounding$^c$\\
+\enspace on 8-token blocks$^\dagger$ & 8--32 & 1.124--1.137 & \\
 \bottomrule
-\multicolumn{4}{@{}p{\columnwidth}@{}}{$^a$Tokens, verify-step counts and draft histograms on 192 of 192 requests; log-probabilities not compared. $^b$Identical tokens and top-five log-probabilities, with matched pools and fixed batch composition, in a separate check. $^c$Three sessions; geometric mean of the session ratios. $^d$Token ids at $c=1$ and every certified position in check mode (Appendix~\ref{app:cert-served}). $^e$Against MTP without it (best non-speculative arm: 1.18--1.32 at $c=48$--128); brackets: session range; outputs classed at $c=64$ and 128. $^f$Narrow verify tiles, FA4 target and drafter attention (the 8-token arm already drafts with FA4); from $c=8$ against the stock 8-token arm; $x$ declared at $c\le4$; outputs classed at $c=1$.}
+\multicolumn{4}{@{}p{\columnwidth}@{}}{Exact: greedy outputs against stock, same configuration; not established where not compared. $^a$Tokens, verify-step counts and draft histograms on 192 of 192 requests; log-probabilities not compared. $^b$Identical tokens and top-five log-probabilities, with matched pools and fixed batch composition, in a separate check. $^c$Classed at $c=64$ and 128 (prefill) or $c=1$ (fold). $^\dagger$Three sessions; mean ratio (fold: geometric).}
 \end{tabular*}
 \end{table}
-\paragraph{Recurrent state and attention} Removing per-request state traffic pays as the batch grows. \emph{Replayed GDN decoding}, SGLang's buffered decode, keeps recent inputs in a ring and writes the full recurrent state only every 16 tokens; it gains 8.1\% at $c=128$ (one run pair) \ev{bench-frontier}. \emph{Fold verify}, SGLang's fold-every-commit protocol, verifies DFlash blocks without per-position state snapshots: in one session it costs 3.2\% at $c=1$ and gains 6.1\% at $c=8$ \ev{drafter-fold}, and composed with routing and the head it fell below the range declared before the run at $c=2$--8 (Appendix~\ref{app:stack-composition}). Up to $c=32$ it gains most combined with \emph{narrow verify tiles} (the stock verify's tiles, used by the fold's kernel at one or two requests) and \emph{FA4} (FlashAttention~4) attention for the target and, on 16-token blocks, the drafter; FA4 needs a backported fix to its paged-KV loader to compile at the target's head dimension of 256 on this GPU. On the envelope's DFlash arms the three changes together raise the per-request rate 8.4--9.3\% at $c=1$--4 and throughput 12.4--13.7\% at 8--32 in three sessions, exact up to rounding as classed at $c=1$ \ev{lowc-confirm}.
+\paragraph{Recurrent state and attention} Removing per-request state traffic pays as the batch grows. \emph{Replayed GDN decoding}, SGLang's implementation of ReplaySSM~\cite{replayssm}, keeps recent inputs in a ring and writes the full recurrent state only every 16 tokens. It gains 8.1\% at $c=128$ (one run pair) \ev{bench-frontier}. \emph{Fold verify}, SGLang's fold-every-commit protocol for ReplaySSM~\cite{gdncode}, verifies DFlash blocks without per-position state snapshots. In one session it costs 3.2\% at $c=1$ and gains 6.1\% at $c=8$ \ev{drafter-fold}. Composed with routing and the head, it fell below the range declared before the run at $c=2$--8 (Appendix~\ref{app:stack-composition}) \ev{stack-composition}. Up to $c=32$ it gains most with \emph{narrow verify tiles}, which the fold's kernel takes from the stock verify at one or two requests, and \emph{FA4}~\citep[FlashAttention~4;][]{fa4} for the target's attention and, on 16-token blocks, the drafter's. FA4 needs a backported fix to its paged-KV loader to compile at the target's head dimension of 256 on this GPU. On the envelope's DFlash arms the three changes together raise the per-request rate 8.4--9.3\% at $c=1$--4 and throughput 12.4--13.7\% at 8--32 in three sessions, exact up to rounding as classed at $c=1$ \ev{lowc-confirm}.
 
-\paragraph{Admission} From $c=48$ speculation loses on admissions, since its requests finish and are prefilled one or two at a time. SGLang's \emph{prefill delay} holds new prefills while the waiting queue is short or few slots are free; with each prefill batch capped at 16 requests, it lets MTP serve 1.18--1.32 times the best non-speculative arm at $c=48$--128 in three sessions, exact up to rounding (classed at $c=64$ and 128), for 2.6--3.1 times plain decoding's 99th-percentile time to first token \ev{admission}.
+\paragraph{Admission} From $c=48$ speculation loses on admissions: requests finish and are prefilled one or two at a time. SGLang's \emph{prefill delay} holds prefills while the queue is short or few slots are free. With prefill batches capped at 16 requests, MTP serves 1.18--1.32 times the best non-speculative arm at $c=48$--128 in three sessions, exact up to rounding (classed at $c=64$ and 128), but at a 99th-percentile time to first token 2.6--3.1 times plain decoding's \ev{admission}.
 
-\paragraph{Host and GEMM time} The \emph{host-gap patches} remove blocking GPU reads from FlashInfer's attention planning, host work that idles the MTP cycle (Figure~\ref{fig:breakdown}). In one session they raise MTP's throughput 9.4--9.6\% at $c=1$--8 \ev{hostgap}, still short of stock MTP with Triton attention, which plans nothing on the host \ev{bench-frontier}. \emph{Backbone GEMM routing} sends each backbone weight GEMM to the kernel a microbenchmark found fastest for its shape; it gains 3.4--3.5\% for plain decoding at $c=1$ but not for MTP \ev{backbone}.
+\paragraph{Host and GEMM time} The \emph{host-gap patches} remove blocking GPU reads from FlashInfer's attention planning, host work that idles the MTP cycle (Figure~\ref{fig:breakdown}). In one session they raise MTP's throughput 9.4--9.6\% at $c=1$--8 \ev{hostgap}. Stock MTP with Triton attention, which plans nothing on the host, is still faster \ev{bench-frontier}. \emph{Backbone GEMM routing} sends each backbone weight GEMM to the kernel a microbenchmark found fastest for its shape. It gains 3.4--3.5\% for plain decoding at $c=1$ but not for MTP \ev{backbone}.
 
-\paragraph{Declared approximations} Two declared approximations, which change the model's arithmetic, miss the quality budget set in advance (GSM8K within 1 point; a logit probe) \ev{lossy}. FP16 recurrent state serves 1.16--1.17 times the best non-lossy arm timed with it at $c=64$--256 (three sessions), for 1.0--1.4 GSM8K points below plain decoding's reference runs, within the exact arms' own spread. An int4 target with its int4 drafter~\cite{nota2026} fails the probe and is slower above $c=1$.
+\paragraph{Declared approximations} Two declared approximations change the model's arithmetic, and both miss the quality budget set in advance (GSM8K within 1 point; a logit probe) \ev{lossy}. FP16 recurrent state serves 1.16--1.17 times the best non-lossy arm timed with it at $c=64$--256 (three sessions). It scores 1.0--1.4 GSM8K points below plain decoding's reference runs, within the exact arms' own spread. An int4 target with its int4 drafter~\cite{nota2026} fails the probe and is slower above $c=1$.
