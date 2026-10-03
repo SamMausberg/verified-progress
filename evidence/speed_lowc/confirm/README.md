@@ -119,10 +119,11 @@ require top-logprob arrays, so an arm that returned tokens without them would ha
 compare.py's `logprobs_compared` counts a prompt once both runs have any top-logprob entry. The gate now
 also requires top logprobs compared on all 320 prompts, token-identical prompts plus classified first
 divergences covering all 320, and, read from both runs of every pair, 5 top logprobs at every output
-position of every prompt. The gate that decided the sessions ran inside the equality hold with the
+position of every prompt and no committed token that is not that run's own argmax (compare.py's
+self-consistency check). The gate that decided the sessions ran inside the equality hold with the
 earlier check. In that hold every pair compared top logprobs on 320/320 prompts, every pair's identical
-and classified prompts add up to 320 (`equality/summary.json`), and the 11 runs have 5 top logprobs at
-every one of their 769,842 output positions (all runs together). The amended script, run on the hold's `summary.json`, writes a
+and classified prompts add up to 320 (`equality/summary.json`), the 11 runs have 5 top logprobs at
+every one of their 769,842 output positions (all runs together), and every run has not_argmax 0. The amended script, run on the hold's `summary.json`, writes a
 `gate.json` byte for byte equal to `equality/gate.json`.
 
 2026-10-03, after the analysis (review of #230): the hold scripts now check every input a later step
@@ -133,7 +134,8 @@ or with local changes; the equality hold also checks its prompt file against
 exactly the runs the equality hold makes for the levers (11 for ABC) and every one comes from the
 session's repository commit, S0's from the pin and every other run's from the confirm engine's commit,
 all without modified SGLang files. `CONFIRM_LEVERS` must use only A, B and
-C, and a session builds each arm's arguments so that a failure fails the arm. The holds ran the earlier
+C, each at most once and in that order, and a session builds each arm's arguments so that a failure
+fails the arm. The holds ran the earlier
 versions (tag `speed-lowc-confirm-holds`), and the committed run is unaffected: every S0 run, two in
 the equality hold and twelve timed launches, imported `bd66ce343e` with no modified files, and every
 other run `dd57a50a59` with none (`equality/meta.json`, `launches.csv`). The three sessions read the
@@ -318,7 +320,7 @@ equality was not tested).
   `853bd4b` with a clean tree. Both scripts were then tightened as the amendments say (`08a8421` and
   `e8566e3`). The whole analysis rerun from a clean checkout of each of those commits reproduced
   `points.csv`, `launches.csv`, `ratios.json` and `accept.json` byte for byte.
-- `equality/gate.json` is the hold's own output. `confirm_gate.py` as amended at `76aec72`, run on
+- `equality/gate.json` is the hold's own output. `confirm_gate.py` as amended at `ef31bc9`, run on
   `~/vp-data/speed-lowc/confirm/equality-20261002T215749Z/summary.json` with `--levers ABC` (it also
   reads that directory's `runs/`), reproduces it byte for byte.
 - `equality/` and `sessions/` are unchanged copies of the holds' outputs under
