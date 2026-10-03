@@ -611,7 +611,6 @@ TRACE_NSYS = ['nsys', 'launch', '--trace=cuda,nvtx', '--cuda-graph-trace=node',
 def cmd_steps(args: argparse.Namespace) -> None:
     from step_budget import budget
 
-    from experiments.profiling.nsys_db import export_sqlite
     from experiments.profiling.run_profiles import build_parser, read_windows, window_problems
 
     # Every report comes from one kill2b hold (the comparison is within one session), whose logged
@@ -679,7 +678,15 @@ def cmd_steps(args: argparse.Namespace) -> None:
         ):
             raise SystemExit(f'{rep}: not the report windows.jsonl records ({problems})')
         # ...and its contents are that window's: the trace session started when the window did.
-        con = sqlite3.connect(export_sqlite(rep))
+        # Export the report afresh (nsys_db reuses any newer .sqlite beside it, which need not be
+        # this report's) and read everything below from that export.
+        db = Path(tempfile.mkdtemp()) / f'{variant}_bs{batch}.sqlite'
+        subprocess.run(
+            ['nsys', 'export', '--type', 'sqlite', '--force-overwrite', 'true', '-o', str(db),
+             str(rep)],
+            check=True, capture_output=True,
+        )  # fmt: skip
+        con = sqlite3.connect(db)
         (start_ns,) = con.execute(
             'select utcEpochNs from TARGET_INFO_SESSION_START_TIME'
         ).fetchone()
@@ -688,7 +695,7 @@ def cmd_steps(args: argparse.Namespace) -> None:
             raise SystemExit(f'{rep}: trace started at {start_ns / 1e9}, its window at '
                              f'{nsys[0]["window_wall_start"]}')  # fmt: skip
         seen.append((variant, batch))
-        b = budget(rep)
+        b = budget(db)
         for r in b['classes']:
             rows.append(
                 {
@@ -852,6 +859,33 @@ def check_probe_run(run: dict, name: str, ref: dict) -> None:
         raise SystemExit(f'{name}: not scored on the reference tokens')
 
 
+PROBE_WROTE = re.compile(r'^wrote (\S+) \((\d+) sequences, ([\d.]+) s\)$')
+
+
+def check_probe_written(hold: Path, label: str, kind: str, run: dict) -> None:
+    """The probe file was written while this hold ran its server `label`.
+
+    The hold log holds one section per server ("== start <label> ..." up to the next one); the
+    file's "wrote" line (logit_probe.py's, with the sequence count and seconds the file records)
+    must be in that section, once. Holds that log the file's sha256 after writing it (the
+    committed probe holds do; the recorded runs predate it) must log this file's.
+    """
+    name = f'{label}.{kind}.json'
+    section, wrote, shas = None, [], []
+    for line in (hold / 'hold.log').read_text().splitlines():
+        if line.startswith('== start '):
+            section = line.split()[2]
+        m = PROBE_WROTE.match(line)
+        if m and Path(m.group(1)).name == name:
+            wrote.append((section, int(m.group(2)), m.group(3)))
+        if re.fullmatch(rf'[0-9a-f]{{64}}  \S*/{re.escape(name)}', line):
+            shas.append(line.split()[0])
+    want = (label, len(run['sequences']), f'{run["seconds"]:.1f}')
+    raw = (hold / name).read_bytes()
+    if wrote != [want] or (shas and shas != [hashlib.sha256(raw).hexdigest()]):
+        raise SystemExit(f'{hold}/{name}: hold log records {wrote} {shas}, the file {want}')
+
+
 def cmd_probe(args: argparse.Namespace) -> None:
     from experiments.lossy.analyze import decode_path
     from experiments.moonshot.logit_probe import compare_runs
@@ -870,6 +904,8 @@ def cmd_probe(args: argparse.Namespace) -> None:
     def load(name: str) -> dict:
         run = json.loads((d / f'{name}.json').read_text())
         check_probe_run(run, name, ref)
+        label, kind = name.split('.')
+        check_probe_written(d, label, kind, run)
         # ...and was made against this hold's server.
         if run['url'] != f'http://127.0.0.1:{PROBE1_PORT}':
             raise SystemExit(f'{name}: probed {run["url"]}')

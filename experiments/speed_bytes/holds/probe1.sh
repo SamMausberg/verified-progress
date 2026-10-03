@@ -87,6 +87,8 @@ probe() {  # label; returns non-zero if any of its three runs failed (it is call
     --concurrency 1 --label "$label-c1" --out "$OUT/$label.gen1.json" || rc=1
   timeout --foreground 300 python experiments/moonshot/logit_probe.py run --url "$url" --mode score \
     --reference "$OUT/bf16.gen48.json" --concurrency 48 --label "$label-score" --out "$OUT/$label.score.json" || rc=1
+  # Bind the files to this server's section of the log (summarize.py checks the hashes).
+  sha256sum "$OUT/$label".{gen48,gen1,score}.json || rc=1
   return "$rc"
 }
 for spec in "bf16:SGLANG_FP8_DENSE=" "fp8tok:SGLANG_FP8_DENSE=target SGLANG_FP8_DENSE_ACT=token" \

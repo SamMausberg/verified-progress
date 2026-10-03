@@ -23,8 +23,8 @@ every inherited `SGLANG_*` variable and any override of the virtualenv or CUDA t
 `fp8_probe.sh` creates its output directory and checks the SGLang checkout, and `probe1.sh`
 refuses a port that already serves (checked again under the startup lock), accepts a server only
 when the process listening on its port is the one it started, and stops only the servers it started.
-The holds also log their runtime (interpreter, torch and its CUDA) and `kill1.sh` the hash of
-`fp8_dense_unit.py`; the recorded runs predate both lines. `fp8_dense_unit.py` now
+The holds also log their runtime (interpreter, torch and its CUDA), `kill1.sh` the hash of
+`fp8_dense_unit.py` and `probe1.sh` the hash of each probe file it wrote; the recorded runs predate both lines. `fp8_dense_unit.py` now
 fails on the properties it prints (per-row rows independent of the batch, CUDA-graph replay equal
 to eager, relative error under 0.06); the run printed them all passing. `summarize.py` checks
 every input against what its hold launched: per hold the engine (its tree, which the hold scripts
@@ -40,9 +40,10 @@ and every published value finite (an accept length exactly on the speculative ar
 the launch SGLang printed (`server_args`: the hold's flags and the defaults the comparison relies
 on, identical across the hold's servers apart from the switches), and the probe client and prompts
 at the hold's commit; per server log the FP8 conversion and mode those switches imply; per trace
-(all four from one kill2b hold) the report `windows.jsonl` records for its window (by name, and by the
-trace's session start against the window's), the engine, harness commit, invocation, resolved server command and environment `run_profiles.py`
-recorded, and the GPU; per probe file the server it probed, its mode, concurrency, label, the
+(all four from one kill2b hold, each exported afresh) the report `windows.jsonl` records for its window
+(by name, and by the trace's session start against the window's), the engine, harness commit, invocation, resolved server command and environment `run_profiles.py`
+recorded, and the GPU; per probe file the server it probed (its "wrote" line, with the file's sequence count and
+seconds, in that server's section of the hold log, and the file's hash where the hold logs it), its mode, concurrency, label, the
 probe's 48 prompts, 256 tokens per sequence with exactly 20 finite top-logprob entries at every
 position (score mode: none at the first continuation position, which SGLang does not report) and
 (score mode) the reference tokens; per GEMM probe row the planned shape and number of weight
