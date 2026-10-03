@@ -82,7 +82,7 @@
 \draw[ink!50,densely dotted] (axis cs:128,0) -- (axis cs:128,1);
 % the measured shares at M = 128, below and right of their markers, clear of the dotted line and
 % of the derived curves above them
-\node[annot,anchor=north west] at (axis cs:140,\fbconsmeas) {\vppct{0}{100*\fbconsmeas}};
+\node[annot,anchor=north west] at (axis cs:148,\fbconsmeas-0.06) {\vppct{0}{100*\fbconsmeas}};
 \node[annot,anchor=north west] at (axis cs:140,\fbhopmeas) {\vppct{0}{100*\fbhopmeas}};
 % ---------------- (c) head-only time ----------------
 % Three series: the measured decided batch and the expected times with each fallback under the
@@ -111,6 +111,7 @@
 % its marker at M = 128 (1.31; whole batch 1.88) that passes above the whole-batch label and
 % crosses the whole-batch curve once, between its markers at M = 64 and 128
 \node[annot,anchor=south east] at (axis cs:52,1.5) {whole-batch fallback};
+\draw[leader] (axis cs:50,1.5) -- (axis cs:61,1.39);
 \node[annot,anchor=south east] at (axis cs:250,0.53) {all certified};
 \draw[leader] (axis cs:23,2.2) -- (axis cs:121,1.33);
 \node[annot,anchor=east] at (axis cs:23,2.2) {per-position fallback};
