@@ -65,21 +65,25 @@ Table~\ref{tab:headconstants} gives the constants of the tied head from which th
 
 \begin{table}[htbp]
 \tablefont\centering
-\caption{Weight-only constants of the Qwen3.5-4B head, computed in float64 on the CPU; quantiles over all 248,320 vocabulary entries. $\delta^\ast_i=\norm{e_i}_2/r_g(i)$ is the drift below which transport's Euclidean error bound for entry $i$ is narrower than that of the named low-precision copy (``per entry'': one scale per entry), with 64-entry tiles of contiguous token indices and $\mu_g$ the tile mean; the last row is the analogous threshold for the $\ell_\infty$/$\ell_1$ pairing, $s_i\norm h_1/2$ against $r^\infty_g\norm\Delta_1$. Error-bound widths are compared, not certification rates or runtime. Derived~\ev{head-constants}.}
+\caption{Weight-only constants of the Qwen3.5-4B head, from which the thresholds of Section~\ref{sec:crossover} are derived. Quantiles over all 248,320 vocabulary entries, computed in float64 on the CPU; error-bound widths are compared, not certification rates or runtime. ``Per entry'': one scale per entry. $\delta^\ast_i=\norm{e_i}_2/r_g(i)$, on 64-entry tiles of contiguous token indices with $\mu_g$ the tile mean: the drift below which transport's Euclidean error bound for entry $i$ is narrower than that of the named low-precision copy. Hölder threshold: the analogue for the $\ell_\infty$/$\ell_1$ pairing, $s_i\norm h_1/2$ against $r^\infty_g\norm\Delta_1$. Derived~\ev{head-constants}.}
 \label{tab:headconstants}
 \vskip 0.05in
 \begin{tabular}{@{}lrrr@{}}\toprule
 Quantity (tied head, $248{,}320\times2{,}560$) & p10 & p50 & p90\\\midrule
-Weight-row norm $\norm{w_i}_2$ & 0.574 & 0.652 & 0.746\\
-int8 per entry, $\norm{e_i}_2/\norm{w_i}_2$ & 0.81\% & 0.97\% & 1.25\%\\
-int8 per 128 weights & 0.64\% & 0.68\% & 0.75\%\\
-int4 per entry & 14.8\% & 17.5\% & 22.6\%\\
-64-entry tile $r_g/\norm{w_i}_2$, token-index order & 0.99 & 1.14 & 1.31\\
-\quad random tiles (control) & 1.03 & 1.19 & 1.37\\
-$\delta^\ast$ against int8 per entry & 0.67\% & 0.85\% & 1.15\%\\
-$\delta^\ast$ against int8 per 128 weights & 0.51\% & 0.61\% & 0.72\%\\
-$\delta^\ast$ against int4 per entry & 12.2\% & 15.5\% & 20.8\%\\
-Hölder threshold on $\norm\Delta_1/\norm h_1$ against int8 per entry (Proposition~\ref{prop:holder-crossover}) & 0.23\% & 0.30\% & 0.40\%\\\bottomrule
+Weight-row norm $\norm{w_i}_2$ & 0.574 & 0.652 & 0.746\\\addlinespace
+\multicolumn{4}{@{}l}{\emph{Copy error, $\norm{e_i}_2/\norm{w_i}_2$}}\\
+\quad int8, per entry & 0.81\% & 0.97\% & 1.25\%\\
+\quad int8, per 128 weights & 0.64\% & 0.68\% & 0.75\%\\
+\quad int4, per entry & 14.8\% & 17.5\% & 22.6\%\\\addlinespace
+\multicolumn{4}{@{}l}{\emph{64-entry tile radius, $r_g/\norm{w_i}_2$}}\\
+\quad token-index order & 0.99 & 1.14 & 1.31\\
+\quad random tiles (control) & 1.03 & 1.19 & 1.37\\\addlinespace
+\multicolumn{4}{@{}l}{\emph{Crossover drift $\delta^\ast$ against}}\\
+\quad int8, per entry & 0.67\% & 0.85\% & 1.15\%\\
+\quad int8, per 128 weights & 0.51\% & 0.61\% & 0.72\%\\
+\quad int4, per entry & 12.2\% & 15.5\% & 20.8\%\\\addlinespace
+\multicolumn{4}{@{}l}{\emph{Hölder threshold on $\norm\Delta_1/\norm h_1$ (Proposition~\ref{prop:holder-crossover}) against}}\\
+\quad int8, per entry & 0.23\% & 0.30\% & 0.40\%\\\bottomrule
 \end{tabular}
 \end{table}
 
@@ -105,7 +109,7 @@ Table~\ref{tab:rho-groups-mtp} breaks down the drift of the MTP layer. It is wid
 
 \begin{table}[htbp]
 \tablefont\centering
-\caption{Drift $\rho=\norm{h^t-h^d}_2/\norm{h^t}_2$ of DFlash-4B pairs by outcome, domain, block position and context length (tokens before the verified position), on 40,000 held-out pairs. The smallest drift over all pairs is 0.823. Measured~\ev{rho}.}
+\caption{The DFlash-4B drift barely depends on outcome, domain, block position or context length. Drift $\rho=\norm{h^t-h^d}_2/\norm{h^t}_2$ on 40,000 held-out pairs; context: tokens before the verified position. The smallest drift over all pairs is 0.823. Measured~\ev{rho}.}
 \label{tab:rho-groups}
 \vskip 0.05in
 \begin{tabular}[t]{@{}lrrrr@{}}\toprule
@@ -136,7 +140,7 @@ Context $\ge$1,024 & 267 & 0.877 & 0.930 & 0.966\\\bottomrule
 
 \begin{table}[htbp]
 \tablefont\centering
-\caption{Drift $\rho$ of MTP-4B pairs by outcome, domain, draft step and context length, on 40,000 held-out pairs from 160 prompts. Measured~\ev{rho-mtp}.}
+\caption{The MTP-4B drift is wider than DFlash-4B's and depends more on the draft. Drift $\rho$ by outcome, domain, draft step and context length, on 40,000 held-out pairs from 160 prompts. Measured~\ev{rho-mtp}.}
 \label{tab:rho-groups-mtp}
 \vskip 0.05in
 \begin{tabular}{@{}lrrrrr@{}}\toprule
@@ -164,13 +168,13 @@ Context $\ge$1{,}024 & 284 & 0.516 & 0.782 & 0.967 & 1.169\\\bottomrule
 Table~\ref{tab:transport-full} gives, per tiling, the best certified family, which is the elementwise minimum of all certified radii, and Table~\ref{tab:transport} summarizes both drafters over every family and tiling, with the share a real verify batch must still read. Table~\ref{tab:transport-families} gives every family on the tiling where transport did best, $k$-means tiles of 64 entries. The greedy skip hardly depends on the family: every certified family skips between 0.52\% and 0.64\% of the vocabulary on average, within 0.014 percentage points of the static screen with the same family. A row-level variant, which bounds each entry from its own draft score with its tile's radius, skips 0.65\% for MTP-4B on the same tiles, the largest certified skip measured~\ev{transport-mtp}. The family does matter for the partition interval of sampled acceptance, which the scalar $\ell_\infty$ radius leaves 820--901 nats wide and the grouped, low-rank and combined families narrow about sixfold, to 134--169 nats. No certified family brings it below 130 nats, and even oracle radii, at 12--13 nats, leave the acceptance test undecided most of the time (Appendix~\ref{app:transport-sampled}). On these tiles, entry-level transport, which bounds each entry by its own deviation from the tile centre instead of the tile's largest, adds at most 0.012 percentage points to the tile-level skip.
 
 \begin{table}[htbp]
-\caption{Transport on held-out draft pairs with the best certified bound family per tiling (the elementwise minimum of all certified radii). ``Skipped'': mean share of the vocabulary a greedy verifier skips, by transport (T), by the static screen with the same geometry (S) and by oracle radii (O), the realized per-tile deviations that no certified geometry can undercut. ``Width'': median partition width $\log(Z^+/Z^-)$ in nats; $P_?$: mean probability, over proposals $x\sim q$ at $T=1$, that the acceptance test stays undecided. Measured \ev{transport,transport-mtp}.}\label{tab:transport-full}
+\caption{Certified transport skips about as much of the vocabulary as the static screen on every tiling, far less than oracle radii. Held-out draft pairs, with the best certified bound family per tiling (the elementwise minimum of all certified radii). Static: the static screen with the same geometry. Oracle: the realized per-tile deviations, which no certified geometry can undercut. Width: median partition width $\log(Z^+/Z^-)$. $P_?$: mean probability, over proposals $x\sim q$, that the acceptance test stays undecided. Measured \ev{transport,transport-mtp}.}\label{tab:transport-full}
 \vskip 0.05in
 \centering\tablefont\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}lrrrrr@{}}
 \toprule
-& \multicolumn{3}{c}{Skipped (greedy)} & \multicolumn{2}{c}{Sampled}\\\cmidrule(lr){2-4}\cmidrule(l){5-6}
-Tiling & T & S & O & Width & $P_?$\\\midrule
+& \multicolumn{3}{c}{Skipped (greedy, mean)} & \multicolumn{2}{c}{Sampled, $T=1$}\\\cmidrule(lr){2-4}\cmidrule(l){5-6}
+Tiling & transport & static & oracle & Width, nats & $P_?$\\\midrule
 \multicolumn{6}{@{}l}{\emph{DFlash-4B, block 16: 4,020 pairs, 110 prompts}}\\
 Contiguous 64 & 0.08\% & 0.08\% & 89.3\% & 133 & 0.995\\
 Contiguous 256 & 0.00\% & 0.00\% & 83.9\% & 213 & 1.000\\
@@ -178,7 +182,7 @@ Contiguous 1,024 & 0.00\% & 0.00\% & 76.9\% & 244 & 1.000\\
 Random 256 & 0.00\% & 0.00\% & 76.0\% & 238 & 1.000\\
 $k$-means 64 & 0.59\% & 0.58\% & 83.7\% & 134 & 0.964\\
 $k$-means 256 & 0.10\% & 0.10\% & 77.0\% & 138 & 0.982\\
-$k$-means 1,024 & 0.02\% & 0.02\% & 68.4\% & 146 & 0.991\\\midrule
+$k$-means 1,024 & 0.02\% & 0.02\% & 68.4\% & 146 & 0.991\\\addlinespace
 \multicolumn{6}{@{}l}{\emph{MTP-4B, four steps: 16,016 pairs, 160 prompts}}\\
 Contiguous 64 & 0.08\% & 0.08\% & 98.5\% & 146 & 1.000\\
 Contiguous 256 & 0.00\% & 0.00\% & 96.4\% & 233 & 1.000\\
@@ -192,7 +196,7 @@ $k$-means 1,024 & 0.02\% & 0.02\% & 86.8\% & 162 & 1.000\\
 \end{table}
 
 \begin{table}[htbp]
-\caption{Transport on the pairs from whole held-out capture steps (DFlash-4B: 4,020 from 110 prompts; MTP-4B: 16,016 from 160), over every bound family and tiling tested (tiles of 64 to 1,024 entries). Single values are the best case; ranges span the tilings (by tiling: Table~\ref{tab:transport-full}). ``Skipped'': mean share of the vocabulary a greedy verifier skips; ``read by a real verify batch'': the share in tiles that at least one position of the batch still needs; $P_?$: mean probability, over proposals at $T=1$, that the sampled acceptance test stays undecided. Measured \ev{transport,transport-mtp}.}\label{tab:transport}
+\caption{Transport in summary, over every bound family and tiling tested (tiles of 64 to 1,024 entries). Pairs from whole held-out capture steps: DFlash-4B, 4,020 from 110 prompts; MTP-4B, 16,016 from 160. Single values are the best case; ranges span the tilings (by tiling: Table~\ref{tab:transport-full}). Skipped: mean share of the vocabulary a greedy verifier skips. Read by a real verify batch: the share in tiles that at least one position of the batch still needs. $P_?$: mean probability, over proposals at $T=1$, that the sampled acceptance test stays undecided. Measured \ev{transport,transport-mtp}.}\label{tab:transport}
 \vskip 0.05in
 \centering\tablefont
 \begin{tabular}{@{}lrr@{}}
@@ -210,12 +214,12 @@ Sampled test undecided, $P_?$ & $\ge$0.964 & $\ge$0.998\\
 
 \begin{table}[htbp]
 \tablefont\centering
-\caption{Transport by bound family on $k$-means tiles of 64 entries: mean share of the vocabulary skipped for greedy verification (tile level), and the median width of the partition interval in nats at $T=1$, for transport and for the static screen at the target state with the same geometry. Oracle radii are the realized per-tile deviations, a ceiling that no certified geometry reaches. Measured~\ev{transport,transport-mtp}.}
+\caption{Transport by bound family on $k$-means tiles of 64 entries: the family barely changes the greedy skip but changes the width of the partition interval. Skipped: mean share of the vocabulary skipped for greedy verification (tile level). Width: median width of the partition interval, $\log(Z^+/Z^-)$, at $T=1$. Transport is compared with the static screen at the target state with the same geometry. Oracle radii are the realized per-tile deviations, a ceiling that no certified geometry reaches. Measured~\ev{transport,transport-mtp}.}
 \label{tab:transport-families}
 \vskip 0.05in
 \begin{tabular}{@{}lrrrrrrrr@{}}\toprule
 & \multicolumn{4}{c}{DFlash-4B (4,020 pairs)} & \multicolumn{4}{c}{MTP-4B (16,016 pairs)}\\\cmidrule(lr){2-5}\cmidrule(l){6-9}
-& \multicolumn{2}{c}{Skipped} & \multicolumn{2}{c}{$\log(Z^+/Z^-)$} & \multicolumn{2}{c}{Skipped} & \multicolumn{2}{c}{$\log(Z^+/Z^-)$}\\\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(l){8-9}
+& \multicolumn{2}{c}{Skipped} & \multicolumn{2}{c}{Width, nats} & \multicolumn{2}{c}{Skipped} & \multicolumn{2}{c}{Width, nats}\\\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(l){8-9}
 Bound family & transport & static & transport & static & transport & static & transport & static\\\midrule
 Scalar $\ell_\infty$ radius & 0.52\% & 0.52\% & 820 & 890 & 0.53\% & 0.53\% & 901 & 930\\
 Coordinate radii & 0.59\% & 0.58\% & 287 & 312 & 0.64\% & 0.64\% & 315 & 324\\
@@ -224,7 +228,7 @@ Grouped $\ell_2$, groups of 128 & 0.53\% & 0.53\% & 144 & 158 & 0.53\% & 0.53\% 
 Low rank, basis from $W$ (64) & 0.53\% & 0.53\% & 150 & 165 & 0.54\% & 0.53\% & 151 & 160\\
 Low rank, basis from $\Delta$ (64) & 0.54\% & 0.53\% & 135 & 146 & 0.55\% & 0.54\% & 147 & 157\\
 Low rank, basis from $\Delta$ (256) & 0.55\% & 0.54\% & 151 & 163 & 0.56\% & 0.55\% & 166 & 174\\
-Minimum of all certified radii & 0.59\% & 0.58\% & 134 & 146 & 0.64\% & 0.64\% & 146 & 156\\
+Minimum of all certified radii & 0.59\% & 0.58\% & 134 & 146 & 0.64\% & 0.64\% & 146 & 156\\\addlinespace
 Oracle radii (not certified) & 83.70\% & 89.74\% & 13 & 17 & 96.02\% & 99.36\% & 12 & 23\\\bottomrule
 \end{tabular}
 \end{table}
@@ -246,12 +250,13 @@ The replay estimates, with a model rather than a drafter, how far a drafter woul
 
 \begin{table}[htbp]
 \tablefont\centering
-\caption{Drift-scaling extrapolation, a model and not a measured drafter: the draft input is replaced by $h^t-s\Delta$ and the best certified family on $k$-means 256-entry tiles is re-evaluated. Shares skipped are for greedy verification; the partition width is a median in nats and $\E_qP_?$ a mean, both at $T=1$. Derived from measured pairs~\ev{transport,transport-mtp}.}
+\caption{Drift-scaling extrapolation, a model and not a measured drafter: on DFlash-4B, greedy transport skips half the vocabulary on average only at a tenth of the measured drift. The draft input is replaced by $h^t-s\Delta$ and the best certified family on $k$-means 256-entry tiles is re-evaluated. Skipped: share of the vocabulary skipped for greedy verification. Width: median $\log(Z^+/Z^-)$; $\E_qP_?$: mean; both at $T=1$. Derived from measured pairs~\ev{transport,transport-mtp}.}
 \label{tab:transport-scaling}
 \vskip 0.05in
 \begin{tabular}{@{}lrrrrrrrr@{}}\toprule
 & \multicolumn{4}{c}{DFlash-4B} & \multicolumn{4}{c}{MTP-4B}\\\cmidrule(lr){2-5}\cmidrule(l){6-9}
-Scale $s$ & skip, mean & skip, median & $\log(Z^+/Z^-)$ & $\E_qP_?$ & skip, mean & skip, median & $\log(Z^+/Z^-)$ & $\E_qP_?$\\\midrule
+& \multicolumn{2}{c}{Skipped} & & & \multicolumn{2}{c}{Skipped} & &\\\cmidrule(lr){2-3}\cmidrule(lr){6-7}
+Scale $s$ & mean & median & Width, nats & $\E_qP_?$ & mean & median & Width, nats & $\E_qP_?$\\\midrule
 1 (measured) & 0.10\% & 0.09\% & 137.9 & 0.98 & 0.11\% & 0.11\% & 152.3 & 1.00\\
 0.3 & 1.55\% & 0.27\% & 48.7 & 1.00 & 1.90\% & 0.38\% & 57.5 & 1.00\\
 0.1 & 49.22\% & 49.38\% & 22.5 & 1.00 & 80.08\% & 96.23\% & 24.8 & 1.00\\

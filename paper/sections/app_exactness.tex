@@ -15,16 +15,17 @@ An exactness claim needs a reference and a sense of equality. The reference is a
 
 \begin{table}[htbp]
 \tablefont\centering
-\caption{Exactness contracts and the results that claim them. ``Measured on replayed positions'' means captured engine states replayed offline, not a served run.}
+\caption{Exactness contracts: what each requires to be equal, the results of this paper that claim it, and their support. With an inverse-CDF reference, identical seeded samples require certifying with CDF bounds against the same uniform and falling back without redrawing. ``Replayed positions'': captured engine states replayed offline, not a served run.}
 \label{tab:contracts}
 \vskip 0.05in
-\begin{tabularx}{\linewidth}{@{}P{2.3cm}P{3.7cm}YP{5.2cm}@{}}\toprule
-Contract & What must be equal & Results that claim it & Status\\\midrule
-Identical internal state & Named logical tensors (recurrent state, attention cache) at named boundaries, bitwise; not layouts or scratch buffers & None in this paper: the certified head reads the hidden state and writes no state & Not claimed here\\\addlinespace[3pt]
-Identical greedy outputs & Decisions, ties and stopping, with a valid state from which to continue & Certified head under \Rstock{} (Theorem~\ref{thm:stock}, Proposition~\ref{prop:stockinterval}) & Proved under an error model; measured on replayed positions, through the kernel on 60,000 of them~\ev{kernel-replay}; in SGLang at the same batch shape on every certified greedy path~\ev{kernel-engine}\\\addlinespace[3pt]
-Identical seeded samples & The reference's mapping from seed to output; with an inverse-CDF reference, certify with CDF bounds against the same uniform and fall back without redrawing & Certified race with the stock seeded field; fixed-noise verification against the seeded sampler on the verify pass's logits (Section~\ref{sec:decisions}) & Proved; on 60,000 replayed positions at $T=0.7$ and 1.0, without top-$k$ or top-$p$, the certified sampler with its fallback equals the stock seeded sampler on every position~\ev{kernel-seeded}; in SGLang, fixed-noise verification returned SGLang's seeded token for the verify pass's logits on all 21,016 verification positions of the check~\ev{kernel-engine}; acceptance against the stock rejection-sampling verifier not measured\\\addlinespace[3pt]
-Exact sampling distribution & A named law: the ideal model's, the categorical law of the reference's scores, or the finite random-number implementation's; speculative correction targets the verifier's own $p$ & Races (Theorem~\ref{thm:race}); fixed-noise verification in law; residual races (Appendix~\ref{app:residual}) & Proved\\\addlinespace[3pt]
-Empirical quality equivalence & Task scores and distances within declared margins, with confidence intervals & None in this paper & Not claimed here\\\bottomrule
+\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{\linewidth}{@{}P{2.0cm}P{3.5cm}P{3.3cm}P{1.6cm}Y@{}}\toprule
+Contract & What must be equal & Claimed by & Status & Measured\\\midrule
+Identical internal state & Named logical tensors (recurrent state, attention cache) at named boundaries, bitwise; not layouts or scratch buffers & None in this paper: the certified head reads the hidden state and writes no state & Not claimed here & --\\\addlinespace[3pt]
+Identical greedy outputs & Decisions, ties and stopping, with a valid state from which to continue & Certified head under \Rstock{} (Thm.~\ref{thm:stock}, Prop.~\ref{prop:stockinterval}) & Proved under an error model & Replayed positions, through the kernel on 60,000 of them~\ev{kernel-replay}. SGLang at the same batch shape: every certified greedy path~\ev{kernel-engine}\\\addlinespace[3pt]
+Identical seeded samples & The reference's mapping from seed to output & Certified race with the stock seeded field; fixed-noise verification against the seeded sampler on the verify pass's logits (Section~\ref{sec:decisions}) & Proved & 60,000 replayed positions at $T=0.7$ and 1.0, no top-$k$ or top-$p$: the certified sampler with its fallback equals the stock seeded sampler at every position~\ev{kernel-seeded}. SGLang: fixed-noise verification returned SGLang's seeded token for the verify pass's logits at all 21,016 verification positions of the check~\ev{kernel-engine}. Not measured: acceptance against the stock rejection-sampling verifier\\\addlinespace[3pt]
+Exact sampling distribution & A named law: the ideal model's, the categorical law of the reference's scores, or the finite random-number implementation's; speculative correction targets the verifier's own $p$ & Races (Thm.~\ref{thm:race}); fixed-noise verification in law; residual races (Appendix~\ref{app:residual}) & Proved & --\\\addlinespace[3pt]
+Empirical quality equivalence & Task scores and distances within declared margins, with confidence intervals & None in this paper & Not claimed here & --\\\bottomrule
 \end{tabularx}
 \end{table}
 
@@ -44,17 +45,17 @@ Table~\ref{tab:consumers} lists the information each consumer of the head requir
 
 \begin{table}[htbp]
 \tablefont\centering
-\caption{Consumers of the head and what each needs. The last rows are where a narrow fast path usually loses.}
+\caption{What each consumer of the head needs, and the certificate this paper gives it. A narrow fast path usually loses on the last rows. ``Analysis'': worked out in Appendix~\ref{app:sampling} but not built.}
 \label{tab:consumers}
 \vskip 0.05in
-\begin{tabularx}{\linewidth}{@{}P{3.4cm}YP{5.2cm}@{}}\toprule
+\begin{tabularx}{\linewidth}{@{}P{3.4cm}YP{5.4cm}@{}}\toprule
 Consumer & Required information & Certificate in this paper\\\midrule
-Greedy token & Winning index under the reference kernel and tie rule & Ladder plus stock contract (Theorems~\ref{thm:ladder} and~\ref{thm:stock})\\\addlinespace[3pt]
+Greedy token & Winning index under the reference kernel and tie rule & Ladder plus stock contract (Thms.~\ref{thm:ladder} and~\ref{thm:stock})\\\addlinespace[3pt]
 Exact top-$k$ & Winning indices in order, and their scores; no partition function & Ladder on membership and on the order within the set (Appendix~\ref{app:truncated})\\\addlinespace[3pt]
-Seeded or fixed-noise sample, full vocabulary & Argmax of perturbed scores under the token-keyed field & Certified race (Theorem~\ref{thm:race})\\\addlinespace[3pt]
-Seeded top-$k$ or top-$p$ sample (stock) & Each candidate's rank in the sorted probabilities, which keys its noise, and the sort's order on ties; for top-$p$, the mass above each token & Membership and complete order within the set, then the race (Appendix~\ref{app:truncated}; analysis)\\\addlinespace[3pt]
-Acceptance bit & $\exp(z_X)$ against $Uq_XZ$; an interval can suffice & Guards (Appendix~\ref{app:guards}; analysis). The engine path uses fixed-noise verification instead\\\addlinespace[3pt]
-Residual sample & The $(p-q)_+$ law, including omitted mass & Residual races (Appendix~\ref{app:residual}; analysis)\\\addlinespace[3pt]
+Seeded or fixed-noise sample, full vocabulary & Argmax of perturbed scores under the token-keyed field & Certified race (Thm.~\ref{thm:race})\\\addlinespace[3pt]
+Seeded top-$k$ or top-$p$ sample (stock) & Each candidate's rank in the sorted probabilities, which keys its noise, and the sort's order on ties; for top-$p$, the mass above each token & Membership and complete order within the set, then the race (Appendix~\ref{app:truncated}); analysis\\\addlinespace[3pt]
+Acceptance bit & $\exp(z_X)$ against $Uq_XZ$; an interval can suffice & Guards (Appendix~\ref{app:guards}); analysis. The engine path uses fixed-noise verification instead\\\addlinespace[3pt]
+Residual sample & The $(p-q)_+$ law, including omitted mass & Residual races (Appendix~\ref{app:residual}); analysis\\\addlinespace[3pt]
 Bonus sample & A sample from the target law under the random-number contract & Certified race\\\addlinespace[3pt]
 Top-$p$ sample & Mass above each token relative to $Z$ & Partition bounds, or the ordinary path\\\addlinespace[3pt]
 Arbitrary log-probabilities & Requested logits and the full partition function & None; the ordinary path\\\bottomrule
@@ -105,23 +106,24 @@ Table~\ref{tab:floor} gives how often configurations that ought to agree diverge
 
 \begin{table}[htbp]
 \tablefont\centering
-\caption{How often stock configurations that ought to agree diverge in tokens on the 320 divergence prompts within 256 tokens: prompts whose tokens diverge, divergences per 1,000 compared tokens, and the class of the divergences. Cap-16 runs: servers capped at 16 running requests, pools sized at start-up; cap-8 runs: capped at 8 with identical, fixed pools. ``One spacing'': both runs' top-two margins within one BF16 spacing. Measured~\ev{state-noise,state-pinned}.}\label{tab:floor}
+\caption{How often stock configurations that ought to agree diverge in tokens, and the class of the divergences. Prompts: the 320 divergence prompts, within 256 tokens. Cap-16 runs: servers capped at 16 running requests, pools sized at start-up. Cap-8 runs: capped at 8, with identical, fixed pools. Per 1,000 tokens: divergences per 1,000 compared tokens. ``One spacing'': both runs' top-two margins within one BF16 spacing; the text describes the two-spacing events. Measured~\ev{state-noise,state-pinned}.}\label{tab:floor}
 \vskip 0.05in
-\begin{tabularx}{\linewidth}{@{}P{6.6cm}rrY@{}}\toprule
-Pair & Diverged & Per 1,000 & At the divergence\\\midrule
-\multicolumn{4}{@{}l}{\emph{Cap-16 runs}}\\
-Plain, concurrency 1 vs 32, one server (the floor) & 167 & 3.42 & margin at most 0.375 nats\\
-Plain, same-server repeat at either concurrency & 0 & 0 & one prompt's log-probabilities differ\\
-Plain, fresh-server repeat at batch 1 & 0 & 0 & bitwise identical\\
-Plain, fresh-server repeat at concurrency 32 & 24 & 0.35 & exact ties\\\addlinespace
-\multicolumn{4}{@{}l}{\emph{Cap-8 runs}}\\
-Plain, fresh-server repeat at concurrency 1 & 0 & 0 & bitwise identical\\
-Plain, fresh-server repeat at concurrency 32 & 4 & 0.06 & exact ties\\
-Plain, concurrency 1 vs 32, one server (the floor) & 41 & 0.63 & 39 exact ties, 2 within one spacing\\
-Plain, same-server repeat at concurrency 1 & 17 & 0.25 & exact ties or within one spacing\\
-Plain, same-server repeat at concurrency 32 & 4 & 0.06 & exact ties\\
-MTP (one, three or five steps, or a tree) vs plain, concurrency 1 or 32 & 164--181 & 3.5--4.0 & exact ties, or within one or two spacings (text)\\
-MTP, concurrency 1 vs 32 & 152--165 & 3.1--3.5 & exact ties, or within one or two spacings\\\bottomrule
+\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{\linewidth}{@{}llrrY@{}}\toprule
+Runs compared & Concurrency & \begin{tabular}[b]{@{}r@{}}Prompts\\diverged\end{tabular} & \begin{tabular}[b]{@{}r@{}}Per 1,000\\tokens\end{tabular} & At the divergence\\\midrule
+\multicolumn{5}{@{}l}{\emph{Cap-16 runs}}\\
+Plain, one server (the floor) & 1 vs 32 & 167 & 3.42 & margin at most 0.375 nats\\
+Plain, same-server repeat & 1 or 32 & 0 & 0 & one prompt's log-probabilities differ\\
+Plain, fresh-server repeat & 1 & 0 & 0 & bitwise identical\\
+Plain, fresh-server repeat & 32 & 24 & 0.35 & exact ties\\\addlinespace
+\multicolumn{5}{@{}l}{\emph{Cap-8 runs}}\\
+Plain, one server (the floor) & 1 vs 32 & 41 & 0.63 & 39 exact ties, 2 within one spacing\\
+Plain, same-server repeat & 1 & 17 & 0.25 & exact ties or within one spacing\\
+Plain, same-server repeat & 32 & 4 & 0.06 & exact ties\\
+Plain, fresh-server repeat & 1 & 0 & 0 & bitwise identical\\
+Plain, fresh-server repeat & 32 & 4 & 0.06 & exact ties\\
+MTP (one, three or five steps, or a tree) vs plain & 1 or 32 & 164--181 & 3.5--4.0 & exact ties, or within one or two spacings\\
+MTP & 1 vs 32 & 152--165 & 3.1--3.5 & exact ties, or within one or two spacings\\\bottomrule
 \end{tabularx}
 \end{table}
 
@@ -139,14 +141,14 @@ The statements about the stock engine in this paper come from reading SGLang at 
 
 \begin{table}[htbp]
 \tablefont\centering
-\caption{Code paths of the stock engine behind the paper's statements about it, read in the source at the pinned SGLang commit; observations, not measurements.}
+\caption{The stock engine's code paths behind the paper's statements about it, and where a certified head would attach. Read in the source at the pinned SGLang commit; observations, not measurements.}
 \label{tab:integration}
 \vskip 0.05in
-\begin{tabularx}{\linewidth}{@{}P{4.6cm}Y@{}}\toprule
-Path under \code{python/sglang/} & Observation\\\midrule
-\path{srt/layers/logits_processor.py} & \code{\_compute\_lm\_head} is the single hook through which plain decoding, the MTP drafter and the verifier compute logits: \code{torch.matmul} with BF16 output by default, \code{torch.mm(..., out\_dtype=float32)} under \code{-{}-enable-fp32-lm-head}. A certified head would replace this call for admitted consumers only; log-probability requests and unsupported transforms keep the ordinary path.\\
-\path{srt/models/qwen3_5_text.py} & The Qwen3.5 head is tied to \code{embed\_tokens}, which is not a \code{ParallelLMHead}, so SGLang's quantized-head paths do not apply; a low-precision copy must be separate, and the BF16 head stays resident for re-scoring and fallback.\\
-\path{srt/layers/sampler.py} & Unseeded sampling is an exponential race; seeded sampling over the full vocabulary is a Gumbel race keyed by (seed, position, token) in FP64 (\code{multinomial\_with\_seed}), and the certified race uses the same field. The seeded top-$k$ and top-$p$ path keys the same hash by position in the sorted probabilities instead, and the sampler refuses min-$p$ with a seed~\cite{sglangsampler}.\\
-\path{srt/models/dflash.py} & DFlash projects draft hidden states through the target head for its candidates; this is where transport's draft-side summaries would be produced.\\\bottomrule
+\begin{tabularx}{\linewidth}{@{}P{4.3cm}YP{5.0cm}@{}}\toprule
+Path under \code{python/sglang/} & What the code does & For a certified head\\\midrule
+\path{srt/layers/logits_processor.py} & \code{\_compute\_lm\_head} is the single hook through which plain decoding, the MTP drafter and the verifier compute logits: \code{torch.matmul} with BF16 output by default, \code{torch.mm(..., out\_dtype=float32)} under \code{-{}-enable-fp32-lm-head} & Would replace this call for admitted consumers only; log-probability requests and unsupported transforms keep the ordinary path\\\addlinespace[3pt]
+\path{srt/models/qwen3_5_text.py} & The Qwen3.5 head is tied to \code{embed\_tokens}, which is not a \code{ParallelLMHead}, so SGLang's quantized-head paths do not apply & A low-precision copy must be separate; the BF16 head stays resident for re-scoring and fallback\\\addlinespace[3pt]
+\path{srt/layers/sampler.py} & Unseeded sampling: an exponential race. Seeded sampling over the full vocabulary: a Gumbel race keyed by (seed, position, token) in FP64 (\code{multinomial\_with\_seed}). Seeded top-$k$ and top-$p$: the same hash, keyed by position in the sorted probabilities instead. Min-$p$ with a seed: refused~\cite{sglangsampler} & The certified race uses the full-vocabulary seeded field\\\addlinespace[3pt]
+\path{srt/models/dflash.py} & DFlash projects draft hidden states through the target head for its candidates & Where transport's draft-side summaries would be produced\\\bottomrule
 \end{tabularx}
 \end{table}
