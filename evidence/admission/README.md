@@ -352,8 +352,8 @@ PD's 65 prefill batches in probe 3 at c = 128 would save about 3% (derived).
 # GPU (each an exclusive hold; raw runs in ~/vp-data/speed_highc/):
 scripts/gpu_lock.sh -x experiments/admission/run_admission_probe.sh      # probe 1 -> admission/
 scripts/gpu_lock.sh -x experiments/admission/run_queue_delay_probe.sh    # probe 2 -> queue-delay/
-scripts/gpu_lock.sh -x experiments/admission/run_natural_probe.sh        # probe 3 -> natural-<UTC>/
-scripts/gpu_lock.sh -x experiments/admission/run_prefill_probe.sh        # prefill -> prefill-<UTC>/
+scripts/gpu_lock.sh -x experiments/admission/run_natural_probe.sh        # probe 3 -> natural-<UTC>/ (here 20261002T195727Z)
+scripts/gpu_lock.sh -x experiments/admission/run_prefill_probe.sh        # prefill -> prefill-<UTC>/ (here 20261002T175303Z)
 # CPU (--expect declares every label and concurrency the hold script ran; all are required):
 python experiments/admission/summarize_probe.py ~/vp-data/speed_highc/admission \
   --expect plain-tuned=64,128 --expect mtp-n0=64,128 --expect mtp-n8=64,128 \
@@ -373,8 +373,10 @@ python experiments/admission/summarize_probe.py ~/vp-data/speed_highc/natural-20
 python experiments/admission/analyze_prefill_trace.py \
   ~/vp-data/speed_highc/prefill-20261002T175303Z/stock/prefill.nsys-rep \
   --out ~/vp-data/speed_highc/prefill-20261002T175303Z/stock/trace_summary.json
-# Confirmation: three exclusive holds (session index 0, 1, 2), then CPU:
+# Confirmation: three exclusive holds, one per session (arm order reversed in session 1), then CPU:
 scripts/gpu_lock.sh -x experiments/admission/run_admission_confirm.sh 0   # -> confirm/s0/
+scripts/gpu_lock.sh -x experiments/admission/run_admission_confirm.sh 1   # -> confirm/s1/
+scripts/gpu_lock.sh -x experiments/admission/run_admission_confirm.sh 2   # -> confirm/s2/
 for s in 0 1 2; do
   python experiments/admission/summarize_probe.py ~/vp-data/speed_highc/confirm/s$s \
     --expect plain-tuned=32,48,64,96,128 --expect replayssm=32,48,64,96,128 \
@@ -386,7 +388,10 @@ done
 python experiments/admission/analyze_confirm.py ~/vp-data/speed_highc/confirm/s0.csv \
   ~/vp-data/speed_highc/confirm/s1.csv ~/vp-data/speed_highc/confirm/s2.csv \
   --out-dir evidence/admission
-# Exactness (GPU hold, untimed; then CPU):
+# Exactness (GPU hold, untimed; then CPU). Its 960 prompts, if absent (SGLang venv; the manifest
+# written must match evidence/state_safety/prompt_manifest_fresh.json):
+python experiments/state_safety/prompts.py --set fresh \
+  --out ~/vp-data/state/prompts/prompts_fresh.jsonl --manifest /tmp/prompt_manifest_fresh.json
 GPU_STARTUP_MIN_FREE_GB=88 scripts/gpu_lock.sh -x experiments/admission/run_admission_logprob.sh
 experiments/admission/classify_logprob.sh ~/vp-data/speed_highc/logprob
 cp ~/vp-data/speed_highc/logprob/report.json evidence/admission/logprob_report.json
