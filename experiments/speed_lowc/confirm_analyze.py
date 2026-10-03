@@ -18,8 +18,8 @@ Each point is bound to its launch in the launches.csv that bench.pareto writes b
 points.csv: every S0 launch of a group must run exactly that group's bench arm as bench
 resolves it (bench.arms.resolve_arm), from stock SGLang at the pin; every other launch must
 have that arm's arguments and environment plus exactly its levers' settings (confirm_arms.sh),
-from one engine commit other than the pin; all launches from one repository commit, with no
-modified SGLang files and no failed launch check. Each launch's sweep, in the sweeps.csv that
+from the confirm engine commit the holds ran; all launches from the holds' repository commit,
+with no modified SGLang files and no failed launch check. Each launch's sweep, in the sweeps.csv that
 confirm_sweeps.py writes beside them, must be the declared one: the confirm split, 512 output
 tokens to the end (ignore_eos), one repeat of the group's concurrencies with 64 measured
 requests or 8 waves, no failed launch check, the session its points name, and the same model,
@@ -91,6 +91,13 @@ LEVER_CLI = {
 CONFIRM_SPLIT = Path(__file__).resolve().parents[2] / 'bench/workloads/mixed-v2/confirm.jsonl'
 WARMUP_POOL = CONFIRM_SPLIT.with_name('warmup.jsonl')  # bench/sweep.py line 58
 OSL, REPEATS, MIN_REQUESTS, WAVES = 512, 1, 64, 8
+# The holds' commits (evidence/speed_lowc/confirm/README.md, Results and Provenance): this
+# repository at 9a7d52a (tag speed-lowc-confirm-holds) and the confirm engine that
+# build_engines.sh confirm made, dd57a50a59, tree 5d6db548 (README, Engine).
+HOLD_REPO = '9a7d52a70542551fc061bf385dbe043dcf794aed'
+HOLD_ENGINE = 'dd57a50a59a729dba0a5a8449acc80795901bb4c'
+# The load generator: aiperf 0.13.0 (SETUP.md line 98, bench/README.md line 11).
+AIPERF_VERSION = '0.13.0'
 # Settings every launch must share (sweeps.csv), so that the arms differ only in the server.
 SHARED_SWEEP = (
     'workload_prompts',
@@ -101,7 +108,6 @@ SHARED_SWEEP = (
     'export_level',
     'aiperf_workers',
     'snapshot_files',
-    'aiperf_version',
 )
 
 
@@ -236,7 +242,7 @@ def check_gate(
 def check_launches(launches: Path, points: set[tuple[str, str]]) -> tuple[str, str]:
     """Refuse unless every point's launch is in `launches` and was made as its arm.
 
-    Returns the engine and repository commits that all launches share.
+    Returns the engine and repository commits of the holds, which all launches must have.
     """
     if not launches.is_file():
         raise SystemExit(f'no {launches} beside the points (bench.pareto writes both)')
@@ -264,13 +270,14 @@ def check_launches(launches: Path, points: set[tuple[str, str]]) -> tuple[str, s
             why.append(f'{r["label"]} {r["run"]}: SGLang {r["sglang_head"]}')
     engines = {r['sglang_head'] for r in rows if not r['label'].endswith('-S0')}
     repos = {r['repo_head'] for r in rows}
-    if len(engines) != 1 or len(repos) != 1:
+    if engines != {HOLD_ENGINE} or repos != {HOLD_REPO}:
         why.append(
-            f'launches span engine commits {sorted(engines)} and repository commits {sorted(repos)}'
+            f'launches ran engine commits {sorted(engines)} and repository commits {sorted(repos)},'
+            f" not the holds' {HOLD_ENGINE} and {HOLD_REPO}"
         )
     if why:
         raise SystemExit(f'{launches}: ' + '; '.join(why))
-    return engines.pop(), repos.pop()
+    return HOLD_ENGINE, HOLD_REPO
 
 
 def check_sweeps(sweeps: Path, launches: dict[tuple[str, str], str]) -> None:
@@ -302,6 +309,7 @@ def check_sweeps(sweeps: Path, launches: dict[tuple[str, str], str]) -> None:
             'min_requests': str(MIN_REQUESTS),
             'waves': str(WAVES),
             'checks_failed': '',
+            'aiperf_version': AIPERF_VERSION,
         }
         if wrong := {k: row[k] for k, v in want.items() if row[k] != v}:
             why.append(f'{label} {run}: {wrong}')
