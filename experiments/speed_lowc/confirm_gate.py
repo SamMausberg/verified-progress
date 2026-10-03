@@ -13,7 +13,8 @@ against S0 of its group) and decides, per group, which levers may be timed:
 
 compare.py counts a prompt's logprobs as compared when both runs have any top-logprob
 entry, so the gate also reads both runs of every pair and requires, for each of the 320
-prompts, a top-k list of TOP_K entries at every output position, each a finite logprob with
+prompts, a normally finished, nonempty generation (not aborted, ended at NEW_TOKENS tokens or
+on its stop token) with a top-k list of TOP_K entries at every output position, each a finite logprob with
 an integer token id and no token id twice (compare.py's comparisons are meaningless on NaN or
 infinity, and it keys a position's entries by token id), and that
 compare.py's self-consistency check found every committed token of both runs to be that
@@ -49,6 +50,9 @@ from typing import Any
 PROMPTS = 320
 # Top logprobs per position: experiments/speed_lowc/hold_confirm_equality.sh line 42 (--top-logprobs 5).
 TOP_K = 5
+# New tokens per prompt: run_matrix.py's default (experiments/state_safety/run_matrix.py line 61),
+# which the equality hold keeps.
+NEW_TOKENS = 256
 ROUNDING = {'tie', 'one_ulp', 'near'}
 GROUP_LEVERS = {'L': 'ABC', 'H': 'AC'}  # B is FA4 drafting, which H already uses
 
@@ -117,22 +121,40 @@ def top_ok(top: Any) -> bool:
     return len({token for _, token in top}) == TOP_K
 
 
+def finished(r: dict[str, Any]) -> bool:
+    """A normally finished, nonempty generation, as the runner's client recorded it.
+
+    Not aborted, at least one output token, the server's completion count equal to the tokens
+    received, and finished either at NEW_TOKENS tokens (length) or on the matched stop token,
+    which is then the last one received.
+    """
+    ids, fr = r.get('output_ids'), r.get('finish_reason')
+    if not isinstance(ids, list) or not ids or not isinstance(fr, dict):
+        return False
+    if r.get('aborted_by_client') is not False or r.get('completion_tokens') != len(ids):
+        return False
+    if fr.get('type') == 'length':
+        return fr.get('length') == NEW_TOKENS == len(ids)
+    return fr.get('type') == 'stop' and len(ids) <= NEW_TOKENS and ids[-1] == fr.get('matched')
+
+
 def coverage(runs: Path, run: str) -> str | None:
-    """None if `run` has PROMPTS records, each with TOP_K top logprobs at every output position."""
+    """None if `run` has PROMPTS finished records with TOP_K top logprobs at every position."""
     path = runs / f'{run}.jsonl'
     if not path.is_file():
         return f'{run}: no run file'
     records = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    unfinished = sum(1 for r in records if not finished(r))
     short = sum(
         1
         for r in records
-        if len(r.get('top_logprobs') or []) != len(r['output_ids'])
-        or any(not top_ok(top) for top in r['top_logprobs'])
+        if len(r.get('top_logprobs') or []) != len(r.get('output_ids') or [])
+        or any(not top_ok(top) for top in r.get('top_logprobs') or [])
     )
-    if len(records) != PROMPTS or short:
+    if len(records) != PROMPTS or unfinished or short:
         return (
-            f'{run}: {len(records)} prompts, {short} without {TOP_K} top logprobs (finite, with '
-            'distinct integer token ids) at every position'
+            f'{run}: {len(records)} prompts, {unfinished} not finished normally, {short} without '
+            f'{TOP_K} top logprobs (finite, with distinct integer token ids) at every position'
         )
     return None
 
@@ -257,7 +279,7 @@ def equality_problems(
         if made != (STOCK_PIN if arm == 'S0' else engine, False, repo):
             why.append(f'{run}: SGLang, dirty, repository {made}')
         want = {'flags': eq_flags(group, arm), 'concurrency': 1, 'warm': False,
-                'max_new_tokens': 256, 'num_prompts': prompts}  # fmt: skip
+                'max_new_tokens': NEW_TOKENS, 'num_prompts': prompts}  # fmt: skip
         if wrong := {k: m.get(k) for k, v in want.items() if m.get(k) != v}:
             why.append(f'{run}: made with {wrong}, not as its arm')
         if raw:

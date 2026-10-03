@@ -12,7 +12,8 @@ sessions leave the ratio undecided. Cells come from the declared plan (groups, a
 concurrencies, sessions lowc-s1 to lowc-s3), so a missing one counts as void; launches are
 counted as distinct bench runs. A confirmation point (a `lowc-` label or session) outside the
 plan, the same point twice, a point of a repeat other than the one declared, or a valid point
-whose x_e2e, y or accept length is not a finite positive number is an error.
+whose x_e2e, y or accept length is not a finite positive number, or whose own columns show a
+failed, missing or wrong-length request or foreign CPU above bench's limit, is an error.
 
 Each point is bound to its launch in the launches.csv that bench.pareto writes beside
 points.csv: every S0 launch of a group must run exactly that group's bench arm as bench
@@ -58,6 +59,7 @@ from confirm_gate import STOCK_PIN, equality_problems
 from confirm_sweeps import options
 
 from bench.arms import resolve_arm
+from bench.hostload import CONTENTION_CORES
 
 T95 = {1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571}
 METRICS = ('x_e2e', 'y')
@@ -357,6 +359,18 @@ def load_cells(points: Path, full: dict[str, str]) -> dict[tuple, list[dict]]:
             if int(row['requests']) != max(MIN_REQUESTS, WAVES * c):
                 raise SystemExit(f'{points}: {point} measured {row["requests"]} requests')
             if not row['invalid_reason']:
+                # bench's validity, read again from the point's own columns (bench/pareto.py,
+                # invalid_reason): every request completed, none failed, none of the wrong length,
+                # and foreign CPU within bench's contention limit.
+                complete = (row['failed'], row['osl_mismatch'], row['completed']) == (
+                    '0',
+                    '0',
+                    row['requests'],
+                )
+                if not complete or not float(row['foreign_cpu_mean']) <= CONTENTION_CORES:
+                    raise SystemExit(f'{points}: valid point {point} has failed {row["failed"]}, '
+                                     f'{row["completed"]}/{row["requests"]} completed, osl mismatch '
+                                     f'{row["osl_mismatch"]}, foreign CPU {row["foreign_cpu_mean"]}')  # fmt: skip
                 for m in POINT_VALUES:
                     v = float(row[m])
                     if not (math.isfinite(v) and v > 0):
