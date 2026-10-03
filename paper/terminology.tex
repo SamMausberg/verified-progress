@@ -1,6 +1,6 @@
 % Terminology, declared once (macros.tex explains \term). Scope main: terms the main text
-% relies on (owner: main-text author). Scope app: terms used only in the appendices (owner:
-% appendix editor). The glossary (Appendix app:glossary) prints both scopes.
+% relies on. Scope app: terms used only in the appendices. The glossary (Appendix
+% app:glossary) prints both scopes.
 \term{main}{Vocabulary entry $i$}{A token of the vocabulary and its row $w_i$ of the head matrix $W$; the rows of $W$ are always called entries, never positions.}
 \term{main}{Position}{One head input $h$ and the token decided from it: a decode step's request, or one drafted token under verification.}
 \term{main}{Head input $h$}{The BF16 vector the engine feeds to the output head (the final norm's output) at one position.}
@@ -29,8 +29,8 @@
 \term{main}{Replayed GDN decoding, fold verify}{SGLang's buffered GDN decode, which keeps recent inputs in a ring and writes the full recurrent state every 16 tokens; DFlash verification without per-position state snapshots (SGLang's fold-every-commit protocol) (Table~\ref{tab:levers}).}
 \term{main}{$\rho$; $\delta^\ast_i$}{Drift $\norm{h^t-h^d}_2/\norm{h^t}_2$ of a draft pair; the $\rho$ below which transport's bound is narrower than the int8 copy's on entry $i$ (Proposition~\ref{thm:crossover}).}
 % ---------------------------------------------------------------------------
-% Scope app (owner: appendix editor): terms used only in the appendices, in alphabetical
-% order; printed by the glossary (Appendix app:glossary).
+% Scope app: terms used only in the appendices, in alphabetical order; printed by the glossary
+% (Appendix app:glossary).
 \term{app}{Accepted length}{Committed tokens per verify cycle, the bonus token included (Table~\ref{tab:profile-mtp}).}
 \term{main}{Batch size $B$, concurrency $c$}{$B$ is the number of requests in one decode step; $c$ is the number of requests the client keeps in flight, which the server may cap below $c$.}
 \term{app}{Batch union}{The set of vocabulary tiles or entries that at least one position of a batch still needs; a kernel that shares weight reads across the batch must read the whole union (Appendix~\ref{app:transport-sampled}).}

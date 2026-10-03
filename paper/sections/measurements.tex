@@ -1,17 +1,17 @@
 % Section 4: measurements of the certified head on the engine's states (setup and the
 % fixed-configuration rule, recomputation, fallback and agreement, the engine check, head-only
 % runtime), then served decoding (the stock frontier, Figure fig:frontier, and the exact engine
-% changes of Table tab:levers). The file keeps its old name so that the editorial tools that list
-% the main-text files keep working.
+% changes of Table tab:levers).
 % Claims and status: pins from SETUP.md and the evidence READMEs; capture method and alignment
 % from committed head-geometry evidence; stock divergences from committed state-safety
 % evidence; held-out replay, kernel replay, engine check, head-only microbenchmark and
 % primitive costs from committed evidence. Served decoding: bench's confirmation frontier,
-% equality and quality checks, and one-session paired runs of each engine change
-% (hostgap, drafter-fold, backbone, bench-frontier), and three sessions of the composed DFlash
-% stack (stack-composition) and of the two declared approximations with their quality holds
-% (lossy), and three sessions of the certified head served alone (cert-served), all committed.
-% Figure 4 (Section 5's) is placed in this file so that it floats onto the
+% equality and quality checks; one-session paired runs of the host-gap patches, fold verify,
+% backbone routing and replayed GDN decoding (hostgap, drafter-fold, backbone, bench-frontier);
+% three sessions each of the fold with FA4 attention (lowc-confirm), the capped prefill delay
+% (admission) and the certified head served alone (cert-served); the two declared
+% approximations with their quality holds (lossy); the BF16 paths (bf16-paths); all committed.
+% Figure fig:rho (Section 5's) is placed in this file so that it floats onto the
 % page where Section 5 begins.
 \section{Measurements}\label{sec:measure}
 This section measures the certified head on states recorded from the engine, then the served engine with and without engine changes. Its numbers come from six sources, each named with its decision rule where it is used (Table~\ref{tab:sources} in Appendix~\ref{app:register}): the \emph{held-out replay} in FP64, the \emph{kernel replay} at the captured batch shapes, the \emph{engine check} inside SGLang, a head-only \emph{microbenchmark}, the \emph{speculative captures} and the served sweeps (Section~\ref{sec:served}). Numbers labelled baseline are the stock engine's.
