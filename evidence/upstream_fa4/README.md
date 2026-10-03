@@ -131,7 +131,7 @@ Checks added after the run, from Codex's review of #228 and a sweep of the same 
 round. `run_all.sh` now stops on:
 
 - a flash-attention checkout with local edits, or an `fa-pkg` that is not exactly that checkout
-  (9d1844f);
+  (9d1844f) with the empty `__init__.py` `make_trees.sh` writes (ea4ce6b);
 - an SGLang tree whose `paged_kv.py` is not exactly its variant of the base file
   (`apply_variant.py --check`, 4461a99);
 - any other file in an SGLang tree or the flash-attention checkout, tracked, untracked or ignored,
@@ -146,11 +146,13 @@ It also clears inherited settings before activating the environment: `SGLANG_*`,
 `FLASH_ATTENTION_*` and `PYTHON*` (80f4ba8); `PYTEST_*`, `TORCH_*`, `CUBLAS_*`,
 `NVIDIA_TF32_OVERRIDE` and `CUDA_LAUNCH_BLOCKING` (a1acb6f); and `CUDA_HOME`, `CUDA_HOME_13`,
 `CUDA_COMPAT_DIR`, `CUDA_PATH`, `LD_LIBRARY_PATH` and `LD_PRELOAD`, from the first three of which
-`scripts/sglang_env.sh` would otherwise take the CUDA toolkit and compatibility libraries
-(5a50ff7). Every Python it starts runs with `-P`, so no script's directory is put on `sys.path`
-(5a50ff7). Cases, regression-test runs and the `meta.json` step run through `run_case.py`, which
-gives each a process group, stops it at the time limit and, after any exit, stops whatever it left
-running; `timeout --foreground`, used before, stops only its direct child (b181506).
+`scripts/sglang_env.sh` would otherwise take the CUDA toolkit and compatibility libraries (5a50ff7).
+Every Python it starts runs with `-P`, so no script's directory is put on `sys.path` (5a50ff7), and
+reads and writes bytecode only in a cache of the run's own (`PYTHONPYCACHEPREFIX`), never in a
+tree's `__pycache__`, where a `.pyc` with an unchecked hash would run in place of the verified
+source (ea4ce6b). Cases, regression-test runs and the `meta.json` step run through `run_case.py`,
+which gives each a process group, stops it at the time limit and, after any exit, stops whatever it
+left running; `timeout --foreground`, used before, stops only its direct child (b181506).
 
 The check scripts turn TF32 off for their FP32 references explicitly and count any CUDA error as a
 fault, and the regression test checks that the imported `sglang` comes from the tree under test
@@ -161,10 +163,13 @@ and nothing skipped (pytest exits 0 when both cases are skipped) (4efc901).
 
 The committed run is unaffected by what these checks guard against:
 
-- Its trees, checked afterwards, hold nothing beyond their expected change apart from
-  `__pycache__`, and the four `paged_kv.py` hashes the run recorded (`summary.json`, `meta`) are
-  exactly the variants'. The repository checkout, checked afterwards, holds no ignored importable
-  file in the places listed above; at run time `repo_dirty` (tracked files only) was false.
+- Its trees, checked afterwards, hold nothing beyond their expected change apart from `__pycache__`,
+  and every bytecode file in those was first written during the run (from 22:30:28, each tree's at
+  its first case), so none was left from before the run. `fa-pkg`'s `__init__.py` is the
+  empty file `make_trees.sh` wrote at 22:12. The four `paged_kv.py` hashes the run recorded
+  (`summary.json`, `meta`) are exactly the variants'. The repository checkout, checked afterwards,
+  holds no ignored importable file in the places listed above; at run time `repo_dirty` (tracked
+  files only) was false.
 - It ran in the upstream venv: `meta` records torch 2.13.0+cu130, nvidia-cutlass-dsl 4.8.0 and
   quack-kernels 0.6.5, which only that venv has here. The paper's SGLang venv has
   nvidia-cutlass-dsl 4.6.2 and quack-kernels 0.6.4; the system Python has no nvidia-cutlass-dsl.
