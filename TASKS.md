@@ -54,7 +54,7 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 | upstream | Bug reports and fixes for SGLang from what the workstreams found | `active`: posts on sgl-project/sglang and Dao-AILab/flash-attention (task list below), all open; no BF16-against-FP32 issue, since neither error is shown to be specific to SGLang (PR #222), and no MTP admission default proposed (PR #225) |
 | paper | Manuscript revision as results land | `done` (milestones PR #21, #30, #32, #36; editorial PR #49) |
 | author, appendix, editor | MLSys-format paper and research notes | `done` (PR #53 and the folds below; editorial pass PR #161) |
-| paper (2026-10-02) | `paper/`: fixes, the results fold, PDF rebuilds | `active` (PR #169, #171, #172, #176, #181, #182, #187, #188, #199, #202, #205, #206, #212, #214, #215, #221, #223, #227, #229 merged); the latest speed results (#224, #225, #230, #232) are folded in PR #233, in review, and the PDFs are rebuilt after it |
+| paper (2026-10-02) | `paper/`: fixes, the results fold, PDF rebuilds | `review` (PR #169, #171, #172, #176, #181, #182, #187, #188, #199, #202, #205, #206, #212, #214, #215, #221, #223, #227, #229, #233 merged): the latest speed results (#224, #225, #230, #232) are folded (#233); the PDF rebuild from `main` is in review (PR #236) |
 | writing | Writing and formatting of the whole paper, citation audit, cold reads | `done` (PR #183, #184, #194-#198, #200, #203, #204, #207) |
 | organize | Repository organization: layout, indexes, top-level documents, this list | `done` (PR #122, #124, #125, #126, #127, #170, #179, #216, #218) |
 | speed-lowc | Speed at c = 1-8: the DFlash cycle, attention kernel latency, fusion, drafter cost | `done` (PR #220, #230; `evidence/speed_lowc/`): split-KV verify killed, GDN fusion not built, FA4 head-dim-256 backport; the fold with FA4 attention confirmed at 1.08-1.14x stock at c = 1-32 in three sessions, exact up to rounding at c = 1 |
@@ -64,12 +64,10 @@ baseline, A, B, A+B pattern; isolated speedups are never multiplied.
 
 ## In review (2026-10-03)
 
-Open pull requests. Their results are not on `main`, and neither this file nor the paper quotes
-their numbers:
+Open pull requests:
 
-- PR #233: the paper and research-notes fold of the latest speed results (#224, #225, #230,
-  #232).
-- After #233: `paper/paper.pdf` and `paper/research_notes.pdf` rebuilt from `main`.
+- PR #236: `paper/paper.pdf` and `paper/research_notes.pdf` rebuilt from `main` after PR #233,
+  which folded the latest speed results.
 
 ## Task list
 
@@ -187,8 +185,8 @@ their numbers:
 - `done` Integrate results as they merge (author, appendix): folds up to PR #127 as listed in its sync, then cache-level checks (PR #121), backbone (PR #129, #157), seeded truncated sampling and the trimmed chronology (PR #130), hostgap (PR #132), figures (PR #135), novelty and the runtime question (PR #137), P4's plateau (PR #136), the drafting requirement (PR #140), the confirmed frontier (PR #141, #143), floor caps (PR #144), P13 (PR #149), the certified head (PR #154, #160), the drafting frontier (PR #155), the fold and P10 (PR #158)
 - `done` Editorial pass: main text organized around its argument, peripheral investigations moved to `paper/notes/research_notes.tex`, figures redrawn with one palette (editor, appendix-editor, figures; PR #161): paper 48 pages, research notes 52, main text ends on page 10, 0 LaTeX warnings
 - `done` Cite the committed evidence for the Hopper model and row invariance in the geometry README (paper; PR #169; `evidence/head_geometry/README.md`)
-- `done` Rebuild `paper/paper.pdf` and add `paper/research_notes.pdf` from main (PR #171, #176, #189, #193, #223; rebuild-only as for PR #156 and #159); the final rebuild from `main` after PR #233 is `todo`
+- `done` Rebuild `paper/paper.pdf` and add `paper/research_notes.pdf` from main (PR #171, #176, #189, #193, #223; rebuild-only as for PR #156 and #159); the final rebuild from `main` after PR #233 is in review (PR #236)
 - `done` Pins and contract text: FlashAttention 4 runs on this host (bench's `dflash-tuned` draft attention), and the start-up self-test re-checks only gathered entries (paper; PR #172; `paper/sections/app_register.tex`, `evidence/drafter/README.md`)
-- `active` Fold the results into the paper with plots and evidence markers (paper; merged: PR #181, #182, #187, #188, #199, #202, #205, #206, #212, #214, #215, #221, #227, #229): the served certified head with the framing revision (#214), the ring-tile and DFlash host-gap folds (#215), the cold-read fixes (#227), and the BF16 paths result, the low-concurrency probes and the upstream patches (#229); the latest speed results (FP8 #224 and #232, admission #225, the low-concurrency confirmation #230) are folded in PR #233, in review
+- `done` Fold the results into the paper with plots and evidence markers (paper; PR #181, #182, #187, #188, #199, #202, #205, #206, #212, #214, #215, #221, #227, #229, #233): the served certified head with the framing revision (#214), the ring-tile and DFlash host-gap folds (#215), the cold-read fixes (#227), the BF16 paths result, the low-concurrency probes and the upstream patches (#229), and the latest speed results, FP8 (#224, #232), admission (#225) and the low-concurrency confirmation (#230), with the FA4 upstream checks (#233)
 - `done` Writing and formatting pass over the whole paper (writing; PR #183, #184, #194-#198, #200, #203, #204, #207): citation audit, prose by section, figures and tables, notes figures
 - `done` README and RUNBOOK with exact reproduction commands (organize; PR #125), the README's status and a map of the serving measurements (PR #218)
