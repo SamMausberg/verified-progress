@@ -27,10 +27,12 @@ requests or 8 waves, no failed launch check, the session its points name, and th
 request body and client settings as every other launch, the model and revision of its bench
 arm and the repository's warm-up pool. Its bench.sweep options, parsed from
 its recorded command line, must equal those of the command hold_confirm_session.sh gives that
-arm in that session, and each point must have measured max(64, 8c) requests. By start time
-the launches must form one block per session, sessions 1, 2 and 3 in turn, each in the declared
-order (hold_confirm_session.sh; a launch with no points may be missing, which voids its
-cells), all after the equality runs started. The equality gate beside the points (equality/) must bind
+arm in that session, and each point must have measured max(64, 8c) requests. Every launch
+counts here, including an attempt with no points (it is in sweeps.csv and launches.csv, which
+must list the same launches): by start time they must form one block per session, sessions 1,
+2 and 3 in turn, each in the declared order (hold_confirm_session.sh), so a retried launch is
+an error, while a launch that is missing or has no points only voids its own cells; all after
+the equality runs started. The equality gate beside the points (equality/) must bind
 these launches as a session requires (confirm_gate.py, equality_problems): passed for these
 levers, its runs exactly the equality hold's, made as their arms, from the engine and
 repository commits the launches ran with S0 at the pin, and the gate decided again from its
@@ -241,8 +243,33 @@ def check_gate(
         raise SystemExit(f'{equality}: equality runs started at {late}, not before {first_launch}')
 
 
-def check_launches(launches: Path, points: set[tuple[str, str]]) -> tuple[str, str]:
-    """Refuse unless every point's launch is in `launches` and was made as its arm.
+def launched(sweeps: Path, full: dict[str, str]) -> dict[tuple[str, str], str]:
+    """Every confirmation launch (label, run) that sweeps.csv lists, with its session.
+
+    bench.sweep writes sweep.json once the server is up, so an attempt that failed before its
+    first point is here although it has no points. Each must be in the declared plan.
+    """
+    if not sweeps.is_file():
+        raise SystemExit(f'no {sweeps} beside the points (confirm_sweeps.py writes it)')
+    with sweeps.open() as f:
+        rows = [
+            r
+            for r in csv.DictReader(f)
+            if r['label'].startswith('lowc-') or r['session'].startswith('lowc-')
+        ]
+    out = {(r['label'], r['run']): r['session'] for r in rows}
+    if len(out) != len(rows):
+        raise SystemExit(f'{sweeps}: the same launch twice')
+    for (label, run), session in sorted(out.items()):
+        if session not in SESSION_LABELS or label not in declared_order(session, full):
+            raise SystemExit(
+                f'{sweeps}: launch {label} {run} in {session} is outside the declared plan'
+            )
+    return out
+
+
+def check_launches(launches: Path, keys: set[tuple[str, str]]) -> tuple[str, str]:
+    """Refuse unless `launches` lists exactly the launches `keys`, each made as its arm.
 
     Returns the engine and repository commits of the holds, which all launches must have.
     """
@@ -253,8 +280,10 @@ def check_launches(launches: Path, points: set[tuple[str, str]]) -> tuple[str, s
     by_key = {(r['label'], r['run']): r for r in rows}
     if len(by_key) != len(rows):
         raise SystemExit(f'{launches}: the same launch twice')
-    if missing := sorted(points - set(by_key)):
-        raise SystemExit(f'{launches}: no launch for the points of {missing}')
+    if set(by_key) != keys:
+        raise SystemExit(
+            f'{launches}: launches {sorted(set(by_key) ^ keys)} are not in both it and sweeps.csv'
+        )
     why = []
     # S0 is the group's bench arm as bench resolves it, with no override.
     s0 = {g: (resolve_arm(a).args, resolve_arm(a).env) for g, a in GROUP_ARM.items()}
@@ -378,10 +407,17 @@ def load_cells(points: Path, full: dict[str, str]) -> dict[tuple, list[dict]]:
             cells[key].append(row)
     if not cells:
         raise SystemExit(f'no confirmation points in {points}')
-    engine, repo = check_launches(points.with_name('launches.csv'), set(sessions))
-    check_sweeps(points.with_name('sweeps.csv'), sessions)
-    check_order(sessions, full)
-    check_gate(points.with_name('equality'), full, engine, repo, min(run for _, run in sessions))
+    # Every launch, with points or not (a failed attempt), counts for the session blocks and
+    # the order; one with no points voids only its own cells.
+    every = launched(points.with_name('sweeps.csv'), full)
+    if missing := sorted(set(sessions) - set(every)):
+        raise SystemExit(f'{points}: no sweep for the launches of {missing}')
+    if other := sorted(k for k in sessions if sessions[k] != every[k]):
+        raise SystemExit(f'{points}: points of {other} name another session than their sweep')
+    engine, repo = check_launches(points.with_name('launches.csv'), set(every))
+    check_sweeps(points.with_name('sweeps.csv'), every)
+    check_order(every, full)
+    check_gate(points.with_name('equality'), full, engine, repo, min(run for _, run in every))
     return cells
 
 
