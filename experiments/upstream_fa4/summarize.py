@@ -119,6 +119,8 @@ def main() -> None:
     found = sorted(p.stem.removeprefix('pytest_') for p in args.out.glob('pytest_*.log'))
     if found != sorted(pytest_trees):
         raise SystemExit(f'{args.out}: pytest logs for {found}, expected {sorted(pytest_trees)}')
+    # Validate the pytest logs before writing anything.
+    pytest_results = {v: pytest_result(args.out / f'pytest_{v}.log') for v in sorted(pytest_trees)}
     with open(args.out / 'cases.csv', 'w', newline='') as f:
         w = csv.DictWriter(f, fieldnames=FIELDS)
         w.writeheader()
@@ -151,7 +153,7 @@ def main() -> None:
             'cases_checked': len(checked),
             'mismatches': mismatches,
         },
-        'pytest': {v: pytest_result(args.out / f'pytest_{v}.log') for v in sorted(pytest_trees)},
+        'pytest': pytest_results,
     }
     (args.out / 'summary.json').write_text(json.dumps(summary, indent=1) + '\n')
     print(json.dumps({k: summary[k] for k in ('cases', 'status_counts', 'cpasync_pattern')}))

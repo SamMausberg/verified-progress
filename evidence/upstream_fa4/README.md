@@ -8,7 +8,18 @@ which confirms that PR's fix on a GH200 and offers a regression test. They also 
 failures the fix does not cover. The code is in `experiments/upstream_fa4/`.
 
 Status: measured, one run on 2026-10-02 (22:30-22:44 UTC). Correctness only; nothing here is timed.
-The tile_n 144 finding below has not been reported upstream; its cause is not located.
+The wrong outputs and faults at head_dim 160 and 224 on the three fixed trees (not the compile errors
+on `main`, which the three fixes remove), and the tile_n 144 failures on `ceil`, `ceil_div` and
+flash-attention `main`, have one cause, found after this run and reported upstream with a proposed
+fix ([flash-attention#2957](https://github.com/Dao-AILab/flash-attention/issues/2957),
+[#2958](https://github.com/Dao-AILab/flash-attention/pull/2958); the tests that locate it are there,
+not in this run): when tile_n is not a multiple of the rows the loader copies per pass
+(`rows_per_pass` below), the threads of its last pass still copy rows past the tile, and a
+predicated-off cp.async zero-fills its destination, so they overwrite the first rows of the next
+head-dim block or stage in shared memory, or write past the K/V buffer. On `main` and `max_one` the
+tile_n 144 tile also misses a page-table entry: their forms give each thread 1, while the loader's
+last pass reads a second for rows 128-143 (the gap flash-attention#2745 closed; read from
+`paged_kv.py`, not run).
 
 ## What was compared
 
@@ -65,12 +76,12 @@ passes on `ceil`, `ceil_div` and `max_one` (2 of 2 each; `summary.json`, `pytest
 `main` at page size 1 (tile_n 112 and 80). On the three fixed trees, the `kvcache` harness returns
 finite but wrong output at page size 1, causal and non-causal: largest error 0.67-1.47 against
 0.0047-0.0080 for the BF16 reference. The `varlen` harness, on SGLang's `ceil` tree and on
-flash-attention `main`, stops at the first paged call with `CUDA error: an illegal memory access was
-encountered` in all four cases. The same causal cases are correct with a contiguous cache and with
+flash-attention `main`, stops in all four cases when a paged call raises `CUDA error: an illegal
+memory access was encountered`. The same causal cases are correct with a contiguous cache and with
 the paged TMA load (page size equal to tile_n), on `main` and on `ceil` (0.0022-0.0025). The
 failure is specific to the cp.async paged loader.
 
-**tile_n 144: wrong output on every tree (found here, cause not located).** Head_dim 96 and 80
+**tile_n 144: wrong output on every tree (found here; causes above).** Head_dim 96 and 80
 without causal masking use a 192 x 144 tile: `main`'s floor and `max_one` give 1 entry per thread,
 `ceil` and `ceil_div` give 2, and all four compile. With the cp.async paged loader the output is
 finite but wrong on all four trees: at head_dim 96 and page size 1 the largest error is 0.35
@@ -127,7 +138,7 @@ python experiments/upstream_fa4/summarize.py --expect-cases 89 --expect-pytest m
 cp ~/vp-data/upstream/fa4-evidence/run-20261002T223025Z/{cases.csv,summary.json} evidence/upstream_fa4/
 ```
 
-Checks added after the run, from Codex's review of #228 and a sweep of the same kinds of gap each
+Checks added after the run, from the review of #228 and a sweep of the same kinds of gap each
 round. `run_all.sh` now stops on:
 
 - a flash-attention checkout with local edits, or an `fa-pkg` that is not exactly that checkout
