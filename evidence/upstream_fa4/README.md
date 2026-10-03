@@ -138,7 +138,13 @@ Input checks added after the run, from Codex's review of #228. `run_all.sh` now 
 - an output directory that already holds anything but `hold.log` (80f4ba8);
 - any file in an SGLang tree or the flash-attention checkout beyond its expected change, tracked,
   untracked or ignored, apart from `__pycache__` (an untracked `sitecustomize.py` on `PYTHONPATH`
-  would run in every case), and any uncommitted or untracked file in this repository (b064a31).
+  would run in every case), and any uncommitted or untracked file in this repository (b064a31);
+- ignored files Python could import ahead of the venv: anything in `experiments/upstream_fa4/` or
+  `src/`, and module-like files or untracked directories at the repository root (5a50ff7). It also
+  clears `CUDA_HOME`, `CUDA_HOME_13`, `CUDA_COMPAT_DIR`, `CUDA_PATH`, `LD_LIBRARY_PATH` and
+  `LD_PRELOAD` before `scripts/sglang_env.sh`, which otherwise takes the toolkit and compatibility
+  libraries from the first three, and starts every Python with `-P`, so no script's directory is
+  put on `sys.path`.
 
 In the same pass (a1acb6f), `run_all.sh` also clears inherited `PYTEST_*`, `TORCH_*`, `CUBLAS_*`,
 `NVIDIA_TF32_OVERRIDE` and `CUDA_LAUNCH_BLOCKING`; the two check scripts turn TF32 off for their
@@ -158,6 +164,11 @@ The committed run is unaffected by what these checks guard against:
   expected change apart from `__pycache__`, and the four `paged_kv.py` hashes the run recorded
   (`summary.json`, `meta`) are exactly the variants'. The run recorded no uncommitted change to
   a tracked file of this repository (`repo_dirty` false; untracked files were not checked then).
+- No CUDA path override or preload was set in the shell that submitted it (checked in that shell;
+  the lock scripts set none, and its inherited `LD_LIBRARY_PATH` held only the system's OpenMPI
+  directories, which `scripts/sglang_env.sh` places after the CUDA ones), so the run used this
+  machine's CUDA 13.0 toolkit and compatibility libraries; `meta` records CUDA runtime 13.0. Its repository checkout, checked
+  afterwards, holds no ignored importable file in the places listed above.
 - It ran in the upstream venv: `meta` records torch 2.13.0+cu130, nvidia-cutlass-dsl 4.8.0 and
   quack-kernels 0.6.5, which only that venv has here. The paper's SGLang venv has
   nvidia-cutlass-dsl 4.6.2 and quack-kernels 0.6.4; the system Python has no nvidia-cutlass-dsl.
