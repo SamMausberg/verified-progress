@@ -83,7 +83,8 @@ done
   || die "fa-pkg does not point at the checkout"
 fa_pkg=$(find "$trees/fa-pkg" -mindepth 1 ! -path '*/__pycache__*' ! -path "$trees/fa-pkg/flash_attn/cute/*" -printf '%P\n' | sort | tr '\n' ' ')
 [ "$fa_pkg" = 'flash_attn flash_attn/__init__.py flash_attn/cute ' ] || die "fa-pkg holds more than flash_attn/{__init__.py,cute}: $fa_pkg"
-CLEARED_ENV=$cleared python -P - "$trees" "$repo" >"$out/meta.json" <<'EOF' || die "meta.json failed"
+CLEARED_ENV=$cleared python -P "$exp/run_case.py" 120 python -P - "$trees" "$repo" >"$out/meta.json" <<'EOF' \
+  || die "meta.json failed"
 import hashlib, importlib.metadata as m, json, os, subprocess, sys, torch
 trees, repo = sys.argv[1], sys.argv[2]
 git = lambda *a: subprocess.run(['git', *a], capture_output=True, text=True, check=True).stdout.strip()
@@ -121,11 +122,14 @@ run() {  # tag, PYTHONPATH, command...
   local tag=$1 pp=$2
   shift 2
   ncases=$((ncases + 1))
-  PYTHONPATH=$pp timeout --foreground 150 taskset -c "$cores" "$@" >"$out/$tag.json" 2>"$out/$tag.stderr"
+  # run_case.py: a time limit that also stops any process the case started (timeout
+  # --foreground would stop only its direct child).
+  python -P "$exp/run_case.py" 150 env PYTHONPATH="$pp" taskset -c "$cores" "$@" \
+    >"$out/$tag.json" 2>"$out/$tag.stderr"
   local rc=$?
   echo "$tag exit=$rc $(head -c 300 "$out/$tag.json")"
-  # 0 ok, 3 wrong output, 2 Python error, 4 CUDA fault are results; anything else (a timeout,
-  # a crash before the JSON line) makes the run incomplete.
+  # 0 ok, 3 wrong output, 2 Python error, 4 CUDA error are results; anything else (124 for a
+  # timeout, a crash before the JSON line) makes the run incomplete.
   case $rc in 0|2|3|4) ;; *) status=1 ;; esac
 }
 
@@ -204,7 +208,7 @@ done
 echo "=== 4. regression test offered in the comment (head_dim 256, page sizes 1 and 16)"
 pytest_trees=(main ceil ceil_div max_one)
 for v in "${pytest_trees[@]}"; do
-  SGLANG_TREE=$trees/sglang-$v PYTHONPATH=$trees/sglang-$v/python timeout --foreground 300 \
+  python -P "$exp/run_case.py" 300 env SGLANG_TREE="$trees/sglang-$v" PYTHONPATH="$trees/sglang-$v/python" \
     taskset -c "$cores" python -P -m pytest -p no:cacheprovider -rA -q "$exp/regression_test_sm90.py" \
     >"$out/pytest_$v.log" 2>&1
   rc=$?
