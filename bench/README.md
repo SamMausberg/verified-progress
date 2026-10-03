@@ -34,6 +34,15 @@ to `evidence/bench/`.
 | `workloads/mixed-v2/` | Chat, code and maths prompts split into warmup, tune and confirm |
 | `quality/gsm8k_test.jsonl` | Frozen GSM8K test split for `quality.py` |
 | `campaigns/` | The GPU holds and evidence builds behind `evidence/bench/`; each script is cited where its output is described |
+| `micro_head.py` | The certified int8 head against SGLang's BF16 head, per batch size, in CUDA graphs |
+| `head_primitives.py` | Per-call cost of each head-path primitive (stock head, tile GEMM, re-scoring, int8 pass) |
+| `tune_gemv.py` | Tile-shape sweep of the W8A16 envelope GEMM behind `default_gemv_config` in `src/certified_head/head.py` |
+| `profile_gemv.py` | Launches the certified head's kernels for Nsight Compute |
+| `summarize_head.py` | Head-path CSV and table from `micro_head.py`'s JSON |
+
+The last five files are the certified head's kernel microbenchmarks, not part of the
+serving harness: `experiments/certified_head/run_all.sh` runs them, and
+`evidence/certified_head/README.md` gives the command behind each result.
 
 ## Metrics
 

@@ -10,12 +10,31 @@ git -C ~/sglang-wt/<name> am "$PWD"/engine/sglang/patches/<workstream>/<patch>.p
 SGLANG_WORKTREE=~/sglang-wt/<name> source scripts/sglang_env.sh
 ```
 
-Patches live under `engine/sglang/patches/<workstream>/NNNN-<topic>.patch`, with one
-section per workstream below.
+Patches live under `engine/sglang/patches/<workstream>/NNNN-<topic>.patch`. Every series
+except `stack` and `speed-bytes-sgl-kernel` applies to the pin on its own (`upstream` is
+based on upstream SGLang but applies to the pin too); `stack` composes several series.
+The sections below give each series' apply commands, where they differ from the generic ones
+above, and what each patch changes:
 
-## geometry
+| Series | Base | What it is for |
+|---|---|---|
+| `geometry/0001` | pin | Captures the LM-head inputs for the head-geometry replay (measurement only) |
+| `moonshot/0001-0009` | pin | Hot-vocabulary draft heads, relaxed (lossy) acceptance, an FP8 GDN state and exact GDN state replay (P4) |
+| `drafter/0001-0005` | pin | The DFlash cycle trace, ReplaySSM verification for DFlash, the exact GDN fold and its narrow verify tiles |
+| `state/0001-0002` | pin | A state tap for divergence forensics and a fixed KV split in the verify plan |
+| `kernel/0001-0010` | pin | The certified LM head on SGLang's head paths |
+| `repair/0001-0002` | pin | Long-window repair probes in the DFlash worker and a timing-only verify without per-position states |
+| `backbone/0001-0008` | pin | Faster GEMM kernels for the backbone's projections at decode batch sizes, routed by a table, and the norm and SiLU folded into a GEMM's prologue |
+| `hostgap/0001-0005` | pin | Planning FlashInfer's speculative attention without blocking device-to-host reads |
+| `stack/0001-0003` | pin, composed with other series | Kernel 0002-0003 rebased onto the drafter and moonshot series, and refusals of relaxed acceptance with the certified head |
+| `lossy/0001` | pin | Loading the INT4 DFlash drafter's quantized context projection |
+| `upstream/0001-0002` | upstream SGLang `f6fcda8827` (both also apply to the pin) | The FA4 paged-KV fix with its test, and sgl-kernel's sm_90a build on aarch64, offered upstream |
+| `speed-lowc/0001-0003` | pin | The FA4 paged-KV backport with its test, and narrow verify tiles up to two sequences |
+| `upstream-bf16/0001` | pin | Sigmoid(beta) kept in FP32 in the GDN kernels (diagnostic only) |
+| `speed-bytes/0001-0008` | pin | Online FP8 for the dense layers through cuBLASLt (or, in one mode, sgl-kernel's CUTLASS GEMM) and an FP8 DFlash draft head |
+| `speed-bytes-sgl-kernel/0001` | upstream SGLang `f6fcda8827` after `upstream/0002` | A local, test-only sm_90a build of sgl-kernel for the CUTLASS mode (described under speed-bytes) |
 
-### geometry/0001-head-capture-replay-dumps.patch (capture only)
+## geometry (`patches/geometry/0001`, capture only)
 
 The geometry workstream's patch. It records the exact LM-head inputs for the real-head replay in
 `experiments/head_geometry/`. It changes nothing unless `SGLANG_HEAD_CAPTURE_DIR` is set.
@@ -86,7 +105,7 @@ SGLANG_WORKTREE=~/sglang-wt/drafter source scripts/sglang_env.sh
 The drafter's timed runs use the stock engine; trained drafters load through SGLang's
 unmodified `DFlashDraftModel` and `DFlash2DraftModel`.
 
-## state/ (divergence forensics)
+## state (`patches/state/0001-0002`, divergence forensics)
 
 Both patches apply to the pin `bd66ce343e` in this order and change nothing unless
 the variables below are set:
@@ -299,9 +318,8 @@ SGLANG_WORKTREE=~/sglang-wt/stack source scripts/sglang_env.sh
 | 0002 | kernel 0003 (certified MTP draft and DFlash draft projection) rebased: the hot-vocabulary DFlash draft head of moonshot 0005 returns before the certified draft projection | unchanged unless `--speculative-token-map` or `SGLANG_CERTIFIED_HEAD_DRAFT=1` |
 | 0003 | the EAGLE/MTP greedy chain path raises if moonshot's relaxed acceptance (`SGLANG_SPEC_RELAXED_GREEDY_LOGIT_GAP > 0`) meets certified verify ids, whose graph computes no logits (the DFlash path got the same refusal in 0001) | unchanged unless both are set |
 
-The composed tree is `628f650ea031b0fc8a68233ff10d8878eb22686d`. The kernel series (0001,
-0004-0006) and the drafter's 0001-0003 are on `main`; the kernel's later 0007-0010 and the
-drafter's 0004-0005 are not part of the composed engine.
+The composed tree is `628f650ea031b0fc8a68233ff10d8878eb22686d`. The kernel's later
+0007-0010 and the drafter's 0004-0005 are not part of the composed engine.
 
 ## lossy (`patches/lossy/0001`, branch `engine/lossy`, head `57560de690`)
 

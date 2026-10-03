@@ -1,7 +1,7 @@
 """CPU tests of the profile runs' completeness check (run_profiles.py --check-complete,
 check_run.py) and of run_all.sh's use of it: a run is skipped only when every window
 record its command appends is present, and an interrupted run is moved aside and
-repeated, never extended (Codex on #173)."""
+repeated, never extended (review on #173)."""
 
 from __future__ import annotations
 
@@ -69,7 +69,7 @@ def test_expected_windows_by_mode() -> None:
 def test_window_problems_flags_missing_surplus_foreign_and_failed_windows() -> None:
     full = rows_for('dflash-tuned', 'none', [1, 4], repeats=3)
     assert rp.window_problems(full, 'dflash-tuned', 'none', [1, 4], 3) == []
-    # Interrupted after the first repetition at c = 1 (the case Codex raised on #173).
+    # Interrupted after the first repetition at c = 1 (the case raised in review on #173).
     assert rp.window_problems(full[:1], 'dflash-tuned', 'none', [1, 4], 3) == [
         'c=1 none: 1 of 3 windows',
         'c=4 none: 0 of 3 windows',
@@ -116,7 +116,7 @@ def test_check_complete_exit_codes(tmp_path: Path) -> None:
 
 
 def test_check_complete_compares_the_recorded_command(tmp_path: Path) -> None:
-    # Codex on #192: a run made with other options must not count as this run.
+    # Review on #192: a run made with other options must not count as this run.
     args = ('--arm', 'dflash-tuned', '--mode', 'none', '--repeats', '3', '--concurrency', '1', '4')
     out = tmp_path / 'run'
     rows = rows_for('dflash-tuned', 'none', [1, 4], repeats=3)
@@ -355,7 +355,7 @@ def test_dflash_cycle_refuses_partial_or_invalid_inputs(
         attr['categories'].append({'category': 'mystery', 'us_per_step': 1.0})
         path.write_text(json.dumps(attr))
     elif damage in ('other_engine', 'other_server'):
-        # Codex on #192: a resumed hold may pair runs from different revisions or flags.
+        # Review on #192: a resumed hold may pair runs from different revisions or flags.
         path = win / 'dflash-tuned_nsys_meta.json'
         meta = json.loads(path.read_text())
         if damage == 'other_engine':

@@ -456,7 +456,7 @@ def test_the_job_keeps_the_callers_signal_dispositions(tmp_path: Path, ignored: 
 
 
 def test_a_job_whose_caller_ignores_sigpipe_survives_it(tmp_path: Path) -> None:
-    """Codex's example on #146: with SIGPIPE ignored by the caller, the job survives one."""
+    """The review example on #146: with SIGPIPE ignored by the caller, the job survives one."""
     lock = tmp_path / 'gpu.lock'
     lock.touch()
     env = dict(fake_smi(tmp_path), GPU_LOCK_FILE=str(lock))

@@ -11,7 +11,8 @@
 #
 # Every job takes a ticket named <rank>-<arrival ns>-<x|s>-<pid>, so jobs run in
 # arrival order. The rank is 5; GPU_LOCK_PRIORITY=1 gives rank 1, which sorts ahead
-# of every normal ticket (use it only when the integrator grants priority). An exclusive job waits until its ticket is the oldest live ticket of
+# of every normal ticket (use it only when the maintainer grants priority). An exclusive
+# job waits until its ticket is the oldest live ticket of
 # either kind, then takes the lock exclusively (which also waits for shared jobs
 # already running) and keeps its ticket until it exits. A shared job waits only
 # for older exclusive tickets, takes the lock in shared mode alongside other
