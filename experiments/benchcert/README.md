@@ -141,7 +141,7 @@ certified graph.
 
 ## Decision rule
 
-(Revised 2026-10-02 01:50 UTC, before any timed run, after a red-team review: one
+(Revised 2026-10-02 01:50 UTC, before any timed run, after an adversarial review: one
 primary point per family with a Holm adjustment replaced verdicts over all 22
 points, and the exactness verdict now needs positive evidence.)
 

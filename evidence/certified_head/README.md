@@ -856,8 +856,9 @@ head microbenchmark, not here. The DFlash draft projection falls back on 90% of 
 rows (the threshold check fails on the flat logits of deep block positions); it is
 left off in the proposed bench arm, and its runtime was not measured. The final head
 microbenchmark ("Results at the final commit") confirms what the proposed arms assume:
-column mode stays ahead of the stock head through M = 64 under the conservative model
-(420.5 against 451.6 us).
+column mode stays ahead of the stock head through M = 64 under the conservative model, by
+expected time (derived from the microbenchmark and the replayed fallback rates: 420.5
+against 451.6 us).
 
 One request at a time (batch 1, so a certified server and a stock server see the
 same shapes), the two servers' outputs are identical on 64 of 64 prompts for plain

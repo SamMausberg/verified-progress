@@ -13,8 +13,8 @@ No GPU time is needed for any rule below.
 
 ## The requirement (`frame.py`, derived)
 
-From `evidence/repair/stage_a_oracle_triton.json` (Triton GDN verify kernel, whose
-exactness class was not measured): the DFlash block-16 baseline runs 7,301.8 us per cycle for
+From `evidence/repair/stage_a_oracle_triton.json` (Triton GDN verify kernel with FlashInfer
+GDN decode, a configuration not compared for exactness): the DFlash block-16 baseline runs 7,301.8 us per cycle for
 7.603 tokens with a 2.39% non-decode share, so 5x end to end needs 5.542x in decode, at
 most 173.27 us per committed token (5.771 tokens per ms). Tokens a cycle must commit:
 

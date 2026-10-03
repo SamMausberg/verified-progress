@@ -161,8 +161,8 @@ Assumptions for the components below: 3.8 TB/s, 650 TFLOPS BF16, context ~400 to
   8.27 and 12.49 ms against 5.27, 6.62 and 10.62 ms of traced GPU-busy time at B = 1, 8 and
   32, i.e. 1.27x, 1.25x and 1.18x (`evidence/profiles/README.md`). The lever that
   could let speculation win at c >= 32 is whatever makes the cycle that much slower than its
-  parts; the hostgap workstream attributed it up to B = 128 (`evidence/hostgap/README.md`:
-  1.81 ms of idle per stock cycle at B = 128, 9% of the cycle).
+  parts; the hostgap workstream measured the GPU-idle part of it up to B = 128 (1.81 ms per
+  stock tuned-MTP cycle at B = 128, 9% of the cycle; `evidence/hostgap/README.md`).
 - The cheapest frontier gain meanwhile is scheduling: choose plain decode above the batch
   size where MTP stops paying (`--speculative-adaptive`). Bench's tuning measured adaptive
   depth below plain decoding at c = 128, 10,010 against 13,844 tok/s in single runs

@@ -146,8 +146,8 @@ whose conditional acceptance is the same alpha at every position, a cycle commit
 
 The cycle periods are for perfect blocks, so they contain no rejected work; with the FlashInfer
 verifier no width reaches 5x even when every block is accepted, which is the repair README's
-verdict restated. The Triton figures carry that README's caveat: the Triton verify kernel's exactness class
-was not measured.
+verdict restated. The Triton figures carry that README's caveat: their configuration (FlashInfer GDN decode,
+verify forced to Triton) was not compared for exactness.
 
 Measured on the block-16 panel-v1 trace (`support/zlab_b16_panel_v1_survival.csv`), DFlash's
 conditional acceptance by position is 0.80 to 0.91 (mean 0.889 over positions 5-15). For a
@@ -605,7 +605,7 @@ other grid of blocks or batches:
 6. The sweep is a kernel microbenchmark on random inputs, so no served-throughput claim follows
    from it. A restricted patch would still need the kernel parity check and a served session
    (stock, the fold with 0001-0004, and the fold with the restricted rule, at c = 1-32 on both
-   tuned arms), which waited for the maintainer's go after the end-to-end campaigns.
+   tuned arms), which waits for the maintainer's go after the end-to-end campaigns.
 
 A sweep whose bitwise gate fails writes its report to `sweep.failed.json`, not `sweep.json`.
 

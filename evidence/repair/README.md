@@ -72,13 +72,13 @@ measured V(B) + commit; with no anchor pass at all the two-pass design is S_a.
   also make the DFlash baseline cheaper (16 per-position writes per cycle), so a fair rerun gives
   both the same verifier. If both passes dropped the writes, the estimate (anchor pass = V(B)
   without them) would need them to be at least 50% of V(256). With SGLang's Triton verify kernel
-  P3 passes Stage A at B = 256 (next section; exactness class not measured). Stage B below refutes P3 independently of the
+  P3 passes Stage A at B = 256 (next section; exactness not compared in this configuration, FlashInfer GDN decode with the verify forced to Triton). Stage B below refutes P3 independently of the
   verifier.
 - **P2 Arm A: 5x end to end only at B = 256 with zero drafting cost and every block accepted**
   (derived from measured V(B)): S_a = 5.01x end to end sits at the threshold; paying DFlash's
   own drafting cost at width B, perfect blocks reach 4.68x. Better drafting alone does not give
   5x with this verifier; with SGLang's Triton verify kernel it would, from B = 64 (next section;
-  exactness class not measured).
+  exactness not compared in this configuration, FlashInfer GDN decode with the verify forced to Triton).
 - With this verifier the verify pass is the binding constraint. Past B = 16, V(B) grows by about
   0.167 ms per extra token, roughly five times what that token's GEMM work and 48 MiB
   per-position FP32 state write account for; the state commit is 0.11-0.14 ms at every width.
@@ -130,11 +130,14 @@ within one session, 0.18 and 3.98 ms at B = 16 and 256, below), close to their b
 kernel itself: selecting SGLang's Triton GDN verify kernel instead
 (`--linear-attn-verify-backend triton`, a stock option) makes the whole pass 2.06x faster at
 B = 64 and 2.34x faster at B = 256; the kernel trace below attributes 72% of the FlashInfer
-pass at B = 256 to the verify kernel itself. **Exactness: not classified.** The Triton
-verify kernel is a different numerical path: stock DFlash at block 16 with it commits 7.603 tokens per cycle
+pass at B = 256 to the verify kernel itself. **Exactness: not compared in this configuration** (FlashInfer GDN decode, verify forced to
+Triton). With SGLang's default Triton decode the verify runs the same Triton kernel, and bench's
+equality report finds only rounding-level divergences against plain decoding there
+(`dflash-tuned-b16`, exact-up-to-rounding; `evidence/bench/README.md`). The Triton
+verify kernel is a different numerical path from FlashInfer's: stock DFlash at block 16 with it commits 7.603 tokens per cycle
 against 7.675 with the FlashInfer kernel, so the greedy outputs differ, and every Triton-based
 figure here (the speed ratios, the baseline below, the Triton Stage A table) lacks an
-exactness classification of that kernel switch against plain decoding, which was not run. That baseline runs
+exactness classification of that kernel switch, with FlashInfer decode, against plain decoding. That baseline runs
 7.302 ms per cycle (1,041 tokens/s pooled, against 1,029 with FlashInfer in the Stage A
 session): single runs from two sessions, a 2.1% shorter cycle and 0.9% fewer tokens per cycle,
 within plausible run-to-run and cross-session variance, so the baseline gain is not
@@ -182,7 +185,7 @@ kernels unchanged, they take about 12.4 ms of the 44.70 ms pass without the prof
 this.
 
 Stage A with the Triton verify kernel and the DFlash baseline on the same kernel (derived from
-the measured V(B) and baseline; `stage_a_oracle_triton.csv`; exactness class not measured;
+the measured V(B) and baseline; `stage_a_oracle_triton.csv`; exactness not compared in this configuration, FlashInfer GDN decode with the verify forced to Triton;
 f = 2.39%, so 5x end to end needs 5.54x in decode; decode / end to end):
 
 | B | S_a ideal free drafter | perfect blocks with DFlash drafting | S_b estimate | S_b ceiling |
@@ -197,13 +200,13 @@ f = 2.39%, so 5x end to end needs 5.54x in decode; decode / end to end):
 B = 64 and 256, where `audit_saving_needed_for_target_us` is 0.)
 
 - **The Stage A verdicts depend on the verify kernel.** With the Triton kernel (exactness
-  class not measured), perfect B-token blocks reach the 5x target at B = 64 even paying
+  not compared in this configuration, FlashInfer GDN decode with the verify forced to Triton), perfect B-token blocks reach the 5x target at B = 64 even paying
   DFlash's drafting cost, and P3's two-pass design reaches it at B = 256 (its ceiling at
   B = 64). With the default FlashInfer kernel neither does (above). With the FlashInfer kernel
   and its measured state writes (4.10 ms, FlashInfer verify kernel, cross-session), P3's ceiling
   with a state-free audit and an uncharged boundary replay would also reach it at B = 256
   (5.18x end to end, `S_b_ceiling_stateless_audit_e2e`; 2.33 ms needed).
-- With the Triton kernel (exactness class not measured), P2 therefore turns on drafting: a
+- With the Triton kernel (exactness not compared in this configuration, FlashInfer GDN decode with the verify forced to Triton), P2 therefore turns on drafting: a
   5x gain needs blocks of 64 or more tokens accepted almost entirely, and the repair mechanisms
   tested here do not produce them (one-step recycling and exact Jacobi sweeps in the engine
   below, about one token per exact pass; Stage B). P3 stays refuted by Stage B.
