@@ -9,23 +9,26 @@
 set -euo pipefail
 data="${1:-$HOME/vp-data/speed_highc}"
 out="${2:-evidence/admission}"
-# The engine each group ran on: probes 1-3 on the pin plus drafter 0001-0004 committed in
-# ~/sglang-wt/speed_highc (evidence/admission/README.md, "Provenance"), the confirmation on the
-# stock pin (engine/sglang/README.md:4).
-patched=8f4225186e13d4245c3b9bfadbc7f62aea694463
+# The engine each group ran on, identified by its source tree rather than its commit, since
+# re-applying the patches with git am gives new commit SHAs for the same content. Probes 1-3:
+# the pin plus drafter 0001-0004 (evidence/admission/README.md, "Provenance"), the tree that
+# applying those four patches to the pin gives. Confirmation: the stock pin
+# (engine/sglang/README.md:4), whose commit the prefill check below also requires.
 pin=bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824
+patched_tree=5b6e7eae6ea66b2df29a1edc74d60631bd6f3f24
+pin_tree=04b956b119d9f9f19507b7b033d0133863aeeb68
 # probe:directory:engine:every label its hold script launched (run_admission_probe.sh:35-45,
 # run_queue_delay_probe.sh:34-38, run_natural_probe.sh:24-26 for the length generator and
 # 50-55, run_admission_confirm.sh:52-62); each must have exactly one launch record, on that
-# engine, and no other may appear.
+# engine tree, and no other may appear.
 probes=(
-  "probe1:admission:$patched:dflash-fold-n16 dflash-fold-n4 dflash-n16 dflash-n4 mtp-n0 mtp-n32 mtp-n8 plain-tuned replayssm"
-  "probe2:queue-delay:$patched:mtp-n0 mtp-pd plain-pd plain-tuned replayssm"
-  "probe3:natural-20261002T195727Z/gen:$patched:natural-gen"
-  "probe3:natural-20261002T195727Z:$patched:dflash-fold-pd mtp-n0 mtp-pd plain-pd plain-tuned replayssm"
-  "confirm-s0:confirm/s0:$pin:dflash dflash-delay mtp-delay mtp-n0 plain-delay plain-tuned replayssm"
-  "confirm-s1:confirm/s1:$pin:dflash dflash-delay mtp-delay mtp-n0 plain-delay plain-tuned replayssm"
-  "confirm-s2:confirm/s2:$pin:dflash dflash-delay mtp-delay mtp-n0 plain-delay plain-tuned replayssm"
+  "probe1:admission:$patched_tree:dflash-fold-n16 dflash-fold-n4 dflash-n16 dflash-n4 mtp-n0 mtp-n32 mtp-n8 plain-tuned replayssm"
+  "probe2:queue-delay:$patched_tree:mtp-n0 mtp-pd plain-pd plain-tuned replayssm"
+  "probe3:natural-20261002T195727Z/gen:$patched_tree:natural-gen"
+  "probe3:natural-20261002T195727Z:$patched_tree:dflash-fold-pd mtp-n0 mtp-pd plain-pd plain-tuned replayssm"
+  "confirm-s0:confirm/s0:$pin_tree:dflash dflash-delay mtp-delay mtp-n0 plain-delay plain-tuned replayssm"
+  "confirm-s1:confirm/s1:$pin_tree:dflash dflash-delay mtp-delay mtp-n0 plain-delay plain-tuned replayssm"
+  "confirm-s2:confirm/s2:$pin_tree:dflash dflash-delay mtp-delay mtp-n0 plain-delay plain-tuned replayssm"
 )
 # The three servers of run_admission_logprob.sh:28.
 logprob_runs=(mtp_s3_replayssm__adm_n0 mtp_s3_replayssm__adm_n0b mtp_s3_replayssm__adm_pd)
@@ -48,16 +51,23 @@ trap 'rm -rf "$tmp"' EXIT
       # A record without its repository and engine revisions, or whose repository or engine
       # tree had tracked modifications (dirty_files, absent counting as unknown), cannot
       # identify the code that ran: stop.
-      jq -er --arg p "$probe" --arg l "$label" --arg s "$session" --arg e "$engine" \
-        'if [.repo.head, .sglang_source.head, .sglang_source.branch]
+      jq -er --arg p "$probe" --arg l "$label" --arg s "$session" \
+        'if [.repo.head, .sglang_source.head, .sglang_source.branch, .sglang_source.path]
             | any(. == null or . == "") then error("\(input_filename): no commit metadata")
-         elif .sglang_source.head != $e
-           then error("\(input_filename): engine \(.sglang_source.head), declared \($e)")
          elif .repo.dirty_files != [] or .sglang_source.dirty_files != []
            then error("\(input_filename): dirty or unrecorded tree")
          else [$p, $l, $s, .repo.head, .sglang_source.head, .sglang_source.branch,
            (.env_overrides | to_entries | map("\(.key)=\(.value)") | join(" ")),
            (.command[3:] | join(" "))] | @csv end' "$launch"
+      # The recorded engine commit, resolved in the recorded checkout, must have the declared tree.
+      path="$(jq -er '.sglang_source.path' "$launch")"
+      head="$(jq -er '.sglang_source.head' "$launch")"
+      tree="$(git -C "$path" rev-parse --verify --quiet "$head^{tree}")" \
+        || { echo "$launch: engine commit $head not found in $path" >&2; exit 1; }
+      if [ "$tree" != "$engine" ]; then
+        echo "$launch: engine tree $tree, declared $engine" >&2
+        exit 1
+      fi
     done
     got="$(printf '%s\n' "${found[@]}" | sort | tr '\n' ' ')"
     want="$(tr ' ' '\n' <<< "$expected" | sort | tr '\n' ' ')"

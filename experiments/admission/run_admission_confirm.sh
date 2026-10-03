@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Confirmation of admission batching with SGLang's queue-based prefill delayer, one
-# session per hold, about 33 minutes each; three sessions (0, 1, 2), arm order reversed
-# in odd sessions:
+# Confirmation of admission batching with SGLang's queue-based prefill delayer and its
+# 16-request prefill cap, one session per hold, about 33 minutes each; three sessions
+# (0, 1, 2), arm order reversed in odd sessions:
 #   scripts/gpu_lock.sh -x experiments/admission/run_admission_confirm.sh <session index> [OUT]
 # OUT defaults to ~/vp-data/speed_highc/confirm/s<session index>.
 # Design as bench's confirm (bench/README.md): confirm split, 512 output tokens with

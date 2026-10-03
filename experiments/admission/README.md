@@ -46,6 +46,11 @@ every concurrency of a server launched once.
 The probes ran on the confirmation split (to compare with the confirmed envelope), so the
 choice of mechanism, not of its parameters, was made on that split.
 
+Edited after the data (2026-10-03, `2da710e`, after all three sessions): the sentence on
+`--prefill-max-requests 16` capping every prefill batch was added in review, and a clause saying
+the setting was chosen before the probes ran was dropped because nothing records it. The flags
+and the declared analysis below are unchanged since `7b35508`.
+
 ## Declared analysis of the confirmation
 
 Three sessions, each pairing every arm with its baselines in the same hold.

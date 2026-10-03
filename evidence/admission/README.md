@@ -8,9 +8,10 @@ ratios. Measured values come from the CSVs named in each section; ratios are der
 
 In short: with SGLang's prefill delayer and a 16-request prefill cap (PD below), `mtp-tuned`
 leads every non-speculative arm at c = 48-128 in all three confirmation sessions (1.32 times
-at c = 48 to 1.18 times at c = 128 in y), costs nothing measurable at c = 1 and 8, and is
-exact up to rounding against `mtp-tuned` without PD at c = 64 and 128 (untimed logprob run).
-Its price is TTFT: p99 2.6-3.1 times `plain-tuned`'s at c = 48-128.
+at c = 48 to 1.18 times at c = 128 in y), passes the declared no-harm rule at c = 1 and 8
+(y 0.994 and 0.992 of MTP without PD, TTFT p50 up 1-3 ms), and is exact up to rounding
+against `mtp-tuned` without PD at c = 64 and 128 (untimed logprob run). Its price is TTFT:
+p99 2.6-3.1 times `plain-tuned`'s at c = 48-128.
 
 Common to every run unless stated: one GH200; Qwen3.5-4B at `851bf6e8`; bench harness
 (`bench/sweep.py`) with the arms of `bench/arms.toml` (capacity 128, radix cache off,
@@ -234,12 +235,18 @@ What this establishes (measured unless marked derived):
   best arm at c = 32, and MTP with PD reaches 0.977 of it. MTP with PD overtakes the best
   DFlash arm between c = 32 and 48: at c = 48 it leads by 1.12 times in y and 1.09 times in x.
   `dflash-tuned` with PD was not run above c = 48.
-- **At c = 1 and 8 PD does nothing measurable.** Both arms ran the same number of prefill
-  batches (66 and 57 per point) and produced identical greedy outputs in every session, so the
-  y ratios (0.985-1.001) are launch-to-launch variation. That is what the delayer's rules give
-  (derived from `prefill_delayer.py`): in a closed loop at c <= 8 a request waits only while at
-  most 7 others run, so the queue threshold int(0.125 x running) is 0; with 128 slots the slot
-  condition never holds; and no batch can reach the cap.
+- **At c = 1 and 8 PD passes the declared no-harm rule and changes no schedule, but it is not
+  free.** Both arms ran the same prefill batches (66 and 57 per point) with identical greedy
+  outputs in every session, and the delay never holds a request there (derived from
+  `prefill_delayer.py`: in a closed loop at c <= 8 a request waits only while at most 7 others
+  run, so the queue threshold int(0.125 x running) is 0; with 128 slots the slot condition never
+  holds; and no batch can reach the cap). Yet TTFT p50 is 0.6-2.7 ms higher with PD in all six
+  session pairs, TTFT p99 1.3-7.1 ms higher in all six, and y is lower in five of them (ratios
+  0.985-1.001). A plausible cause, read in the code at the pin but not measured: with the
+  delayer on, every scheduling pass reads the pool statistics and negotiates through the
+  delayer, a small all-gather on the CPU group, even when no delay fires
+  (`python/sglang/srt/managers/scheduler.py:3804-3823`, `prefill_delayer.py:354-373` and
+  `393-395` in the same directory).
 - **PD costs plain decoding 0.8-1.6% of y at c = 48-128** (session ranges do not overlap). There
   its prefill batches rise from 27-60 to 36-82, none above 16 requests: the cap splits its
   synchronized waves. At c = 32 it changes nothing. `plain-tuned-replayssm` was not run with PD.
@@ -343,7 +350,8 @@ PD's 65 prefill batches in probe 3 at c = 128 would save about 3% (derived).
 ## Not shown here
 
 - No arm separates the delay from the cap, so their shares of any gain or TTFT cost are
-  unknown.
+  unknown. The 1-3 ms TTFT rise at c = 1 and 8 is not attributed either: the per-pass
+  negotiation is a reading of the code, not a measurement.
 - The exactness class is measured for `mtp-tuned` with PD at c = 64 and 128 only. DFlash and
   plain decoding with PD, and MTP at other concurrencies, have token-identity screens only.
 - PD was not run on `plain-tuned-replayssm`, and `dflash-tuned` with PD not above c = 48.
