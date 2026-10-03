@@ -40,10 +40,14 @@ trap 'rm -rf "$tmp"' EXIT
       label="$(basename "$(dirname "$run")")"
       found+=("$label")
       session="$(jq -er '.session' "$run/sweep.json")"
-      # A record without its repository and engine revisions cannot identify the run: stop.
+      # A record without its repository and engine revisions, or whose repository or engine
+      # tree had tracked modifications (dirty_files, absent counting as unknown), cannot
+      # identify the code that ran: stop.
       jq -er --arg p "$probe" --arg l "$label" --arg s "$session" \
         'if [.repo.head, .sglang_source.head, .sglang_source.branch]
             | any(. == null or . == "") then error("\(input_filename): no commit metadata")
+         elif .repo.dirty_files != [] or .sglang_source.dirty_files != []
+           then error("\(input_filename): dirty or unrecorded tree")
          else [$p, $l, $s, .repo.head, .sglang_source.head, .sglang_source.branch,
            (.env_overrides | to_entries | map("\(.key)=\(.value)") | join(" ")),
            (.command[3:] | join(" "))] | @csv end' "$launch"

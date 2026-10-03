@@ -15,6 +15,9 @@ cd "$repo" || exit 1
 out="${1:-$HOME/vp-data/speed_highc/logprob}"
 runs="$out/runs"
 prompts="$HOME/vp-data/state/prompts/prompts_fresh.jsonl"
+manifest="evidence/state_safety/prompt_manifest_fresh.json"
+# The runs used stock SGLang at the paper's pin (engine/sglang/README.md:4, SETUP.md:50).
+pin=bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824
 cat > "$out/pairs.json" <<'PAIRS'
 [
   ["mtp n0 vs n0 repeat c128", "mtp_s3_replayssm__adm_n0/c128", "mtp_s3_replayssm__adm_n0b/c128"],
@@ -42,23 +45,26 @@ status=0
 # count, token budget, top-k and pool pin; the runs differ only in the delay flags. A missing
 # file, a pass without revisions, a dirty or unrecorded tree or any difference fails the check.
 metas=()
+passes=()
 for run in mtp_s3_replayssm__adm_n0 mtp_s3_replayssm__adm_n0b mtp_s3_replayssm__adm_pd; do
   for pass in c64 c128; do
     for file in "$runs/$run/$pass.jsonl" "$runs/$run/$pass.meta.json"; do
       [ -s "$file" ] || { echo "$file is missing or empty" >&2; status=1; }
     done
     metas+=("$runs/$run/$pass.meta.json")
+    passes+=("$runs/$run/$pass.jsonl")
   done
 done
 # One jq call per file: jq 1.6 given several files takes its exit status from the last one.
 revisions=""
 for meta in "${metas[@]}"; do
-  if ! line="$(jq -er 'if (.repo_sha // "") == "" or (.sglang_sha // "") == ""
+  if ! line="$(jq -er --arg pin "$pin" 'if (.repo_sha // "") == "" or (.sglang_sha // "") == ""
       then error("no revisions")
+      elif .sglang_sha != $pin then error("SGLang \(.sglang_sha), not the pin")
       elif .sglang_dirty != false then error("SGLang tree dirty or not recorded")
       else "\(.repo_sha) \(.sglang_sha) \(.model_revision) \(.num_prompts) \(.max_new_tokens)"
         + " \(.top_logprobs_num) \(.pool_pin | tojson)" end' "$meta")"; then
-    echo "$meta: no revisions or a dirty SGLang tree" >&2
+    echo "$meta: no revisions, not the pinned SGLang, or a dirty SGLang tree" >&2
     status=1
   fi
   revisions+="$line"$'\n'
@@ -68,6 +74,25 @@ if [ "$(grep -c . <<< "$revisions")" != 1 ]; then
   echo "the passes differ in revisions or settings: $revisions" >&2
   status=1
 fi
+# The prompt file must be the frozen fresh set (its count and input_ids_sha256 in the committed
+# manifest), and every pass must have run exactly those prompts, each at its frozen length.
+python - "$prompts" "$manifest" "${passes[@]}" <<'PROMPTS' || status=1
+import json, sys
+sys.path.insert(0, 'experiments/state_safety')
+from prompts import ids_digest
+
+prompts, manifest, *passes = sys.argv[1:]
+items = [json.loads(line) for line in open(prompts) if line.strip()]
+frozen = json.load(open(manifest))
+if len(items) != frozen['num_prompts'] or ids_digest(items) != frozen['input_ids_sha256']:
+    sys.exit(f'{prompts} is not the frozen set of {manifest}')
+lengths = {item['id']: len(item['input_ids']) for item in items}
+for path in passes:
+    rows = [json.loads(line) for line in open(path) if line.strip()]
+    ran = {row['id']: row['prompt_tokens'] for row in rows}
+    if len(rows) != len(lengths) or ran != lengths:
+        sys.exit(f'{path}: its prompts are not the frozen set')
+PROMPTS
 python experiments/state_safety/compare.py --runs "$runs" --pairs "$out/pairs.json" \
   --out-json "$out/summary.json" --out-csv "$out/divergences.csv" \
   --out-table "$out/table.csv" > "$out/compare.log" 2>&1 || status=1
