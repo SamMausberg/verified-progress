@@ -14,7 +14,8 @@ against S0 of its group) and decides, per group, which levers may be timed:
 compare.py counts a prompt's logprobs as compared when both runs have any top-logprob
 entry, so the gate also reads both runs of every pair and requires, for each of the 320
 prompts, a top-k list of TOP_K entries at every output position, each a finite logprob with
-an integer token id (compare.py's comparisons are meaningless on NaN or infinity), and that
+an integer token id and no token id twice (compare.py's comparisons are meaningless on NaN or
+infinity, and it keys a position's entries by token id), and that
 compare.py's self-consistency check found every committed token of both runs to be that
 run's own argmax (no not_argmax position: a greedy run). Each pair must compare the runs
 its label names (S0 and the arm of that group, as hold_confirm_equality.sh names them), and
@@ -61,6 +62,13 @@ def entry_ok(entry: Any) -> bool:
     return number and isinstance(token, int) and not isinstance(token, bool)
 
 
+def top_ok(top: Any) -> bool:
+    """TOP_K well-formed entries with TOP_K distinct token ids."""
+    if not isinstance(top, list) or len(top) != TOP_K or not all(map(entry_ok, top)):
+        return False
+    return len({token for _, token in top}) == TOP_K
+
+
 def coverage(runs: Path, run: str) -> str | None:
     """None if `run` has PROMPTS records, each with TOP_K top logprobs at every output position."""
     path = runs / f'{run}.jsonl'
@@ -71,12 +79,12 @@ def coverage(runs: Path, run: str) -> str | None:
         1
         for r in records
         if len(r.get('top_logprobs') or []) != len(r['output_ids'])
-        or any(len(top) != TOP_K or not all(map(entry_ok, top)) for top in r['top_logprobs'])
+        or any(not top_ok(top) for top in r['top_logprobs'])
     )
     if len(records) != PROMPTS or short:
         return (
             f'{run}: {len(records)} prompts, {short} without {TOP_K} top logprobs (finite, with '
-            'integer token ids) at every position'
+            'distinct integer token ids) at every position'
         )
     return None
 

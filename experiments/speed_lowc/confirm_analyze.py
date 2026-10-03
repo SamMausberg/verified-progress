@@ -18,7 +18,13 @@ points.csv: every S0 launch of a group must run that group's bench arm with the 
 arguments and environment, from stock SGLang at the pin; every other launch must have S0's
 arguments and environment plus exactly its levers' settings (confirm_arms.sh), from one
 engine commit other than the pin; all launches from one repository commit, with no modified
-SGLang files and no failed launch check. A launch that breaks this is an error.
+SGLang files and no failed launch check. Each launch's sweep, in the sweeps.csv that
+confirm_sweeps.py writes beside them, must be the declared one: the confirm split, 512 output
+tokens to the end (ignore_eos), one repeat of the group's concurrencies with 64 measured
+requests or 8 waves, no failed launch check, the session its points name, and the same model,
+request body and client settings as every other launch; each point must have measured
+max(64, 8c) requests. A launch that breaks this, or one whose points name two sessions, is
+an error.
 
     python experiments/speed_lowc/confirm_analyze.py --points <points.csv> --out <dir>
 """
@@ -27,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import re
@@ -57,6 +64,24 @@ LEVER_ARGS: dict[str, dict[str, Any]] = {
 LEVER_ENV = {'A': {'SGLANG_GDN_REPLAYSSM_FOLD': '1'}}
 # Stock SGLang's pin: engine/sglang/README.md, line 4.
 STOCK_PIN = 'bd66ce343e4f6e2f2b75d7e820fe4d0718a8d824'
+# The declared sweep (README, Step 2): bench.sweep's confirm split and its defaults of one
+# repeat, 64 measured requests and 8 waves (bench/sweep.py lines 57, 504 and 530-531), with 512
+# output tokens (hold_confirm_session.sh line 60).
+CONFIRM_SPLIT = Path(__file__).resolve().parents[2] / 'bench/workloads/mixed-v2/confirm.jsonl'
+OSL, REPEATS, MIN_REQUESTS, WAVES = 512, 1, 64, 8
+# Settings every launch must share (sweeps.csv), so that the arms differ only in the server.
+SHARED_SWEEP = (
+    'model',
+    'revision',
+    'workload_prompts',
+    'warmup_pool_sha256',
+    'request_body',
+    'min_warmup',
+    'streaming',
+    'per_chunk_usage',
+    'export_level',
+    'aiperf_version',
+)
 
 
 def expected_launches(arm: str, full: str) -> int:
@@ -150,11 +175,47 @@ def check_launches(launches: Path, points: set[tuple[str, str]]) -> None:
         raise SystemExit(f'{launches}: ' + '; '.join(why))
 
 
+def check_sweeps(sweeps: Path, launches: dict[tuple[str, str], str]) -> None:
+    """Refuse unless each launch (label, run) -> session ran the declared sweep in that session."""
+    if not sweeps.is_file():
+        raise SystemExit(f'no {sweeps} beside the points (confirm_sweeps.py writes it)')
+    with sweeps.open() as f:
+        rows = [r for r in csv.DictReader(f) if r['label'].startswith('lowc-')]
+    by_key = {(r['label'], r['run']): r for r in rows}
+    if len(by_key) != len(rows):
+        raise SystemExit(f'{sweeps}: the same launch twice')
+    if missing := sorted(set(launches) - set(by_key)):
+        raise SystemExit(f'{sweeps}: no sweep for the launches {missing}')
+    split = hashlib.sha256(CONFIRM_SPLIT.read_bytes()).hexdigest()
+    why = []
+    for (label, run), session in sorted(launches.items()):
+        row, group = by_key[(label, run)], label.split('-')[1]
+        want = {
+            'session': session,
+            'workload_sha256': split,
+            'osl': str(OSL),
+            'ignore_eos': 'True',
+            'concurrency': json.dumps(list(CONCURRENCY[group])),
+            'repeats': str(REPEATS),
+            'min_requests': str(MIN_REQUESTS),
+            'waves': str(WAVES),
+            'checks_failed': '',
+        }
+        if wrong := {k: row[k] for k, v in want.items() if row[k] != v}:
+            why.append(f'{label} {run}: {wrong}')
+    for k in SHARED_SWEEP:
+        if len(values := {by_key[key][k] for key in launches}) != 1:
+            why.append(f'launches differ in {k}: {sorted(values)}')
+    if why:
+        raise SystemExit(f'{sweeps}: ' + '; '.join(why))
+
+
 def load_cells(points: Path, full: dict[str, str]) -> dict[tuple, list[dict]]:
     """The confirmation's points by cell; refuses a point outside the declared plan."""
     declared = set(declared_keys(full))
     cells: dict[tuple, list[dict]] = defaultdict(list)
     seen: set[tuple[str, ...]] = set()
+    sessions: dict[tuple[str, str], str] = {}
     with points.open() as f:
         for row in csv.DictReader(f):
             label, session = row['label'], row['session']
@@ -168,10 +229,16 @@ def load_cells(points: Path, full: dict[str, str]) -> dict[tuple, list[dict]]:
             )
             if key not in declared:
                 raise SystemExit(f'{points}: point outside the declared plan: {label} {session}')
-            point = (label, row['run'], row['repeat'], row['concurrency'], session)
+            # A point is its launch, repeat and concurrency, whichever session it names.
+            point = (label, row['run'], row['repeat'], row['concurrency'])
             if point in seen:
                 raise SystemExit(f'{points}: the same point twice: {point}')
             seen.add(point)
+            if sessions.setdefault((label, row['run']), session) != session:
+                raise SystemExit(f'{points}: launch {label} {row["run"]} in two sessions')
+            c = int(row['concurrency'])
+            if int(row['requests']) != max(MIN_REQUESTS, WAVES * c):
+                raise SystemExit(f'{points}: {point} measured {row["requests"]} requests')
             if not row['invalid_reason']:
                 for m in POINT_VALUES:
                     v = float(row[m])
@@ -180,7 +247,8 @@ def load_cells(points: Path, full: dict[str, str]) -> dict[tuple, list[dict]]:
             cells[key].append(row)
     if not cells:
         raise SystemExit(f'no confirmation points in {points}')
-    check_launches(points.with_name('launches.csv'), {(p[0], p[1]) for p in seen})
+    check_launches(points.with_name('launches.csv'), set(sessions))
+    check_sweeps(points.with_name('sweeps.csv'), sessions)
     return cells
 
 
