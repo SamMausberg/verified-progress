@@ -1,0 +1,69 @@
+From 1490d9a89126945fffe4fc6f6ddf9f96698dc557 Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Fri, 2 Oct 2026 17:14:18 +0000
+Subject: [PATCH] DFLASH: optional FP8 draft head (SGLANG_FP8_DRAFT_HEAD=1)
+
+Projects the drafter's greedy candidates through an FP8 copy of the tied
+head with torch._scaled_mm (cuBLASLt). The per-tensor weight scale and the
+per-row activation scale are positive, so the argmax skips them. Only the
+drafts change; the target verifies every draft.
+---
+ .../srt/speculative/dflash_worker_v2.py       | 35 ++++++++++++++++++-
+ 1 file changed, 34 insertions(+), 1 deletion(-)
+
+diff --git a/python/sglang/srt/speculative/dflash_worker_v2.py b/python/sglang/srt/speculative/dflash_worker_v2.py
+index 75e698ee80..c5fc5882ca 100644
+--- a/python/sglang/srt/speculative/dflash_worker_v2.py
++++ b/python/sglang/srt/speculative/dflash_worker_v2.py
+@@ -142,6 +142,25 @@ class _DflashDraftSampler:
+         max_tokens = int(max_bs) * (self.block_size - 1)
+         device = weight.device
+         self.out = torch.empty((max_tokens,), dtype=torch.int64, device=device)
++        # SGLANG_FP8_DRAFT_HEAD=1: project drafts through an FP8 copy of the head
++        # (per-tensor weight scale, per-row activation scale). Both scales are
++        # positive and constant along a row, so the argmax needs neither; only the
++        # drafts change, and the target verifies every one of them.
++        self.weight_fp8_t = None
++        if self.tp_size == 1 and os.environ.get("SGLANG_FP8_DRAFT_HEAD") == "1":
++            fp8 = torch.float8_e4m3fn
++            fp8_max = float(torch.finfo(fp8).max)
++            with torch.no_grad():
++                w = weight[: self.num_org]
++                scale = (w.abs().amax().float() / fp8_max).clamp(min=1e-12)
++                self.weight_fp8_t = (
++                    (w.float() / scale).clamp(-fp8_max, fp8_max).to(fp8).t()
++                )
++            self.fp8_one = torch.ones((), dtype=torch.float32, device=device)
++            logger.info(
++                "DFLASH draft head in FP8: %.2f GB copy (per-tensor weight scale).",
++                self.weight_fp8_t.numel() / 1e9,
++            )
+         if self.tp_size > 1:
+             # Static buffers (fixed addresses) keep the in-graph select replay-safe.
+             self.local_max = torch.empty(
+@@ -172,7 +191,21 @@ class _DflashDraftSampler:
+         if hs.dtype != self.weight.dtype:
+             hs = hs.to(self.weight.dtype)
+         n = hs.shape[0]
+-        logits = torch.matmul(hs, self.weight[: self.num_org].T)
++        if self.weight_fp8_t is not None:
++            from sglang.kernels.ops.quantization.fp8_kernel import (
++                sglang_per_token_quant_fp8,
++            )
++
++            q, _ = sglang_per_token_quant_fp8(hs.contiguous())
++            logits = torch._scaled_mm(
++                q,
++                self.weight_fp8_t,
++                scale_a=self.fp8_one,
++                scale_b=self.fp8_one,
++                out_dtype=torch.bfloat16,
++            )
++        else:
++            logits = torch.matmul(hs, self.weight[: self.num_org].T)
+         if self.tp_size == 1:
+             tokens = torch.argmax(logits, dim=-1).to(torch.long)
+             if self.org_vocab_start:
+-- 
+2.34.1
+

@@ -1,0 +1,31 @@
+From 78b8ffdb7a762d9d68f2dd1cceff0421e55f759c Mon Sep 17 00:00:00 2001
+From: Samuel Mausberg <samuelmausberg@gmail.com>
+Date: Fri, 2 Oct 2026 20:00:59 +0000
+Subject: [PATCH] DFLASH FP8 draft head: refuse SGLANG_FP8_DRAFT_HEAD=1 under
+ tensor parallelism
+
+The FP8 copy is built only at tensor-parallel size 1; with more ranks the
+switch would be ignored silently and a run labelled FP8 would use the BF16
+projection.
+---
+ python/sglang/srt/speculative/dflash_worker_v2.py | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/python/sglang/srt/speculative/dflash_worker_v2.py b/python/sglang/srt/speculative/dflash_worker_v2.py
+index c5fc5882ca..63136ea4ba 100644
+--- a/python/sglang/srt/speculative/dflash_worker_v2.py
++++ b/python/sglang/srt/speculative/dflash_worker_v2.py
+@@ -147,6 +147,10 @@ class _DflashDraftSampler:
+         # positive and constant along a row, so the argmax needs neither; only the
+         # drafts change, and the target verifies every one of them.
+         self.weight_fp8_t = None
++        if os.environ.get("SGLANG_FP8_DRAFT_HEAD") == "1" and self.tp_size != 1:
++            raise RuntimeError(
++                "SGLANG_FP8_DRAFT_HEAD=1 is implemented for tensor-parallel size 1 only"
++            )
+         if self.tp_size == 1 and os.environ.get("SGLANG_FP8_DRAFT_HEAD") == "1":
+             fp8 = torch.float8_e4m3fn
+             fp8_max = float(torch.finfo(fp8).max)
+-- 
+2.34.1
+

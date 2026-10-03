@@ -369,3 +369,42 @@ SGLANG_WORKTREE=~/sglang-wt/upstream-bf16 source scripts/sglang_env.sh
 | Patch | What it changes | Default behaviour |
 |---|---|---|
 | 0001 | `beta_val = tl.sigmoid(b_val).to(tl.float32)` in the packed decode kernel; the gating kernel stores the FP32 sigmoid into its FP32 output buffer | numerics change only in beta's low mantissa bits (at most one BF16 rounding, about 0.4% relative) |
+
+## speed-bytes (`patches/speed-bytes/0001-0005`, branches `engine/speed-bytes` and `engine/speed-bytes-l2`)
+
+Online FP8 for the dense linear layers, through cuBLASLt rather than sgl-kernel's CUTLASS FP8
+GEMM (the aarch64 sgl-kernel 0.4.7 wheel's `common_ops` carries no sm_90a code, so on GH200 that GEMM is
+CUTLASS's stub, which prints an abort message and computes nothing;
+`evidence/speed_bytes/README.md`). Every switch is off unless its environment variable is set.
+
+```sh
+scripts/sglang_worktree.sh speed-bytes
+git -C ~/sglang-wt/speed-bytes am "$PWD"/engine/sglang/patches/speed-bytes/*.patch
+SGLANG_WORKTREE=~/sglang-wt/speed-bytes source scripts/sglang_env.sh
+```
+
+| Patch | What it changes | Default behaviour |
+|---|---|---|
+| 0001 | `SGLANG_FP8_DENSE=target\|draft\|both`: after loading, every linear layer on SGLang's unquantized BF16 path in the target, the draft model or both is converted to `float8_e4m3fn` with one weight scale per tensor and runs `torch._scaled_mm` with scalar scales (cuBLASLt). `SGLANG_FP8_DENSE_ACT=token` (default) quantizes activations per row and multiplies the row scale into the BF16 output afterwards; `tensor` uses one dynamic scale per batch. `SGLANG_FP8_DENSE_SKIP` lists module-name substrings kept in BF16 (default `in_proj_ba,visual`). Hooked in `ModelRunner.load_model` | unset: nothing is converted |
+| 0002 | `SGLANG_FP8_DRAFT_HEAD=1`: DFlash's greedy draft projection reads an FP8 copy of the tied head (0.64 GB) through `torch._scaled_mm`; both scales are positive per row, so the argmax skips them. Only the drafts change | unset: the stock BF16 projection |
+| 0003 | `SGLANG_FP8_DENSE_ACT=oracle`: timing only, outputs invalid. The converted GEMMs read a fixed random FP8 input, so no quantization or row-scale kernel runs; it bounds what fusing those into the producing kernels could gain | not selected by default |
+| 0004 | Quality-only modes: `SGLANG_FP8_DENSE_WSCALE=channel` (one weight scale per output channel, row and channel scales applied to an FP32 GEMM output) and `SGLANG_FP8_DENSE_ACT=none` (weights rounded through FP8 and kept for the stock BF16 GEMM: the quality of a weight-only kernel) | not selected by default |
+| 0005 | `SGLANG_FP8_DRAFT_HEAD=1` at tensor-parallel size above 1 raises an error instead of silently keeping the BF16 projection (the FP8 copy exists only at size 1). Added after the runs; none of them used more than one rank | unset: no change |
+
+Engines behind the evidence, and how to rebuild each one (the hold scripts check the engine's
+tree hash, so a rebuilt worktree passes their guard):
+
+```sh
+P="$PWD"/engine/sglang/patches/speed-bytes
+scripts/sglang_worktree.sh speed-bytes && git -C ~/sglang-wt/speed-bytes am "$P"/0001-*.patch
+#   kill1.sh, probe1.sh (tree of 98aa8c9821)
+scripts/sglang_worktree.sh speed-bytes-l2 && git -C ~/sglang-wt/speed-bytes-l2 am "$P"/0001-*.patch "$P"/0002-*.patch
+#   kill2b.sh (tree of 1490d9a891)
+git -C ~/sglang-wt/speed-bytes am "$P"/0003-*.patch
+#   kill3.sh (tree of 1bc2fc4719)
+```
+
+`98aa8c9821` = 0001 (kill1, probe1), `1490d9a891` = 0001 + 0002
+(kill2b), `1bc2fc4719` = 0001 + 0003 (kill3; 0002 and 0003 touch different files),
+`776f8e5c79` = 0001 + 0003 + 0004; `78b8ffdb7a` = 0001 + 0002 + 0005. The tree after 0001
+equals `98aa8c9821`'s and after 0001-0002 equals `1490d9a891`'s.
