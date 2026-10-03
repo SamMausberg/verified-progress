@@ -1,0 +1,70 @@
+gate /home/ubuntu/vp-data/speed-lowc/confirm/current/gate.json ok ABC
+session s3 start 2026-10-03T02:05:37+00:00 repo 9a7d52a70542551fc061bf385dbe043dcf794aed engine dd57a50a59a729dba0a5a8449acc80795901bb4c levers=ABC groups=L H
+group L arm dflash-tuned-b16 order S0 ABC A B C ABC S0 c=1 2 4
+=== L S0 2026-10-03T02:05:37+00:00 --arm dflash-tuned-b16
+r0 c=  1 ok=64/64 x=  982.8 tok/s/user y=   869.9 tok/s ttft_p50=   38.2 ms accept=5.701 osl_mismatch=0 foreign_cpu=0.85
+r0 c=  2 ok=64/64 x=  875.3 tok/s/user y=  1507.8 tok/s ttft_p50=   43.1 ms accept=5.693 osl_mismatch=0 foreign_cpu=0.56
+r0 c=  4 ok=64/64 x=  712.9 tok/s/user y=  2432.4 tok/s ttft_p50=   45.1 ms accept=5.682 osl_mismatch=0 foreign_cpu=0.68
+exit 0 2026-10-03T02:08:30+00:00
+=== L ABC 2026-10-03T02:08:30+00:00 --arm dflash-tuned-b16 --sglang-worktree /home/ubuntu/sglang-wt/speed-lowc-confirm --set enable-linear-replayssm-spec=true --env SGLANG_GDN_REPLAYSSM_FOLD=1 --set speculative-draft-attention-backend=fa4 --set attention-backend=fa4
+r0 c=  1 ok=64/64 x= 1075.1 tok/s/user y=   955.6 tok/s ttft_p50=   40.0 ms accept=5.725 osl_mismatch=0 foreign_cpu=0.66
+r0 c=  2 ok=64/64 x=  947.5 tok/s/user y=  1646.6 tok/s ttft_p50=   44.5 ms accept=5.725 osl_mismatch=0 foreign_cpu=0.94
+r0 c=  4 ok=64/64 x=  771.9 tok/s/user y=  2638.6 tok/s ttft_p50=   45.8 ms accept=5.745 osl_mismatch=0 foreign_cpu=0.38
+exit 0 2026-10-03T02:11:18+00:00
+=== L A 2026-10-03T02:11:18+00:00 --arm dflash-tuned-b16 --sglang-worktree /home/ubuntu/sglang-wt/speed-lowc-confirm --set enable-linear-replayssm-spec=true --env SGLANG_GDN_REPLAYSSM_FOLD=1
+r0 c=  1 ok=64/64 x= 1003.4 tok/s/user y=   889.4 tok/s ttft_p50=   38.7 ms accept=5.701 osl_mismatch=0 foreign_cpu=0.62
+r0 c=  2 ok=64/64 x=  889.0 tok/s/user y=  1532.9 tok/s ttft_p50=   43.5 ms accept=5.693 osl_mismatch=0 foreign_cpu=0.48
+r0 c=  4 ok=64/64 x=  719.0 tok/s/user y=  2455.5 tok/s ttft_p50=   44.9 ms accept=5.682 osl_mismatch=0 foreign_cpu=0.55
+exit 0 2026-10-03T02:14:11+00:00
+=== L B 2026-10-03T02:14:11+00:00 --arm dflash-tuned-b16 --sglang-worktree /home/ubuntu/sglang-wt/speed-lowc-confirm --set speculative-draft-attention-backend=fa4
+r0 c=  1 ok=64/64 x= 1012.2 tok/s/user y=   894.4 tok/s ttft_p50=   37.8 ms accept=5.650 osl_mismatch=0 foreign_cpu=0.53
+r0 c=  2 ok=64/64 x=  898.8 tok/s/user y=  1550.1 tok/s ttft_p50=   42.1 ms accept=5.650 osl_mismatch=0 foreign_cpu=0.76
+r0 c=  4 ok=64/64 x=  738.5 tok/s/user y=  2526.5 tok/s ttft_p50=   43.4 ms accept=5.709 osl_mismatch=0 foreign_cpu=0.55
+exit 0 2026-10-03T02:17:01+00:00
+=== L C 2026-10-03T02:17:01+00:00 --arm dflash-tuned-b16 --set speculative-draft-attention-backend=triton --sglang-worktree /home/ubuntu/sglang-wt/speed-lowc-confirm --set attention-backend=fa4
+r0 c=  1 ok=64/64 x= 1012.8 tok/s/user y=   899.2 tok/s ttft_p50=   41.3 ms accept=5.722 osl_mismatch=0 foreign_cpu=0.72
+r0 c=  2 ok=64/64 x=  900.8 tok/s/user y=  1562.4 tok/s ttft_p50=   45.2 ms accept=5.722 osl_mismatch=0 foreign_cpu=0.47
+r0 c=  4 ok=64/64 x=  739.0 tok/s/user y=  2534.7 tok/s ttft_p50=   46.8 ms accept=5.767 osl_mismatch=0 foreign_cpu=0.48
+exit 0 2026-10-03T02:19:52+00:00
+=== L ABC 2026-10-03T02:19:52+00:00 --arm dflash-tuned-b16 --sglang-worktree /home/ubuntu/sglang-wt/speed-lowc-confirm --set enable-linear-replayssm-spec=true --env SGLANG_GDN_REPLAYSSM_FOLD=1 --set speculative-draft-attention-backend=fa4 --set attention-backend=fa4
+r0 c=  1 ok=64/64 x= 1077.0 tok/s/user y=   957.1 tok/s ttft_p50=   38.6 ms accept=5.725 osl_mismatch=0 foreign_cpu=0.51
+r0 c=  2 ok=64/64 x=  955.0 tok/s/user y=  1658.5 tok/s ttft_p50=   42.2 ms accept=5.725 osl_mismatch=0 foreign_cpu=0.44
+r0 c=  4 ok=64/64 x=  778.4 tok/s/user y=  2659.3 tok/s ttft_p50=   44.1 ms accept=5.745 osl_mismatch=0 foreign_cpu=0.31
+exit 0 2026-10-03T02:22:37+00:00
+=== L S0 2026-10-03T02:22:37+00:00 --arm dflash-tuned-b16
+r0 c=  1 ok=64/64 x=  984.4 tok/s/user y=   871.4 tok/s ttft_p50=   38.3 ms accept=5.701 osl_mismatch=0 foreign_cpu=1.16
+r0 c=  2 ok=64/64 x=  877.0 tok/s/user y=  1510.6 tok/s ttft_p50=   42.3 ms accept=5.693 osl_mismatch=0 foreign_cpu=0.49
+r0 c=  4 ok=64/64 x=  713.7 tok/s/user y=  2435.1 tok/s ttft_p50=   44.6 ms accept=5.682 osl_mismatch=0 foreign_cpu=0.53
+exit 0 2026-10-03T02:25:29+00:00
+group H arm dflash-tuned order S0 AC A C AC S0 c=8 16 32
+=== H S0 2026-10-03T02:25:29+00:00 --arm dflash-tuned
+r0 c=  8 ok=64/64 x=  520.9 tok/s/user y=  3661.1 tok/s ttft_p50=   43.1 ms accept=4.730 osl_mismatch=0 foreign_cpu=0.32
+r0 c= 16 ok=128/128 x=  373.4 tok/s/user y=  5305.3 tok/s ttft_p50=   47.5 ms accept=4.671 osl_mismatch=0 foreign_cpu=0.24
+r0 c= 32 ok=256/256 x=  238.0 tok/s/user y=  6874.5 tok/s ttft_p50=   57.5 ms accept=4.737 osl_mismatch=0 foreign_cpu=0.51
+exit 0 2026-10-03T02:27:55+00:00
+=== H AC 2026-10-03T02:27:55+00:00 --arm dflash-tuned --sglang-worktree /home/ubuntu/sglang-wt/speed-lowc-confirm --set enable-linear-replayssm-spec=true --env SGLANG_GDN_REPLAYSSM_FOLD=1 --set attention-backend=fa4
+r0 c=  8 ok=64/64 x=  583.5 tok/s/user y=  4114.5 tok/s ttft_p50=   46.0 ms accept=4.789 osl_mismatch=0 foreign_cpu=0.27
+r0 c= 16 ok=128/128 x=  418.3 tok/s/user y=  5922.4 tok/s ttft_p50=   49.1 ms accept=4.727 osl_mismatch=0 foreign_cpu=0.33
+r0 c= 32 ok=256/256 x=  269.9 tok/s/user y=  7715.8 tok/s ttft_p50=   61.8 ms accept=4.719 osl_mismatch=0 foreign_cpu=0.55
+exit 0 2026-10-03T02:30:13+00:00
+=== H A 2026-10-03T02:30:13+00:00 --arm dflash-tuned --sglang-worktree /home/ubuntu/sglang-wt/speed-lowc-confirm --set enable-linear-replayssm-spec=true --env SGLANG_GDN_REPLAYSSM_FOLD=1
+r0 c=  8 ok=64/64 x=  545.9 tok/s/user y=  3830.5 tok/s ttft_p50=   42.4 ms accept=4.730 osl_mismatch=0 foreign_cpu=0.41
+r0 c= 16 ok=128/128 x=  400.4 tok/s/user y=  5675.0 tok/s ttft_p50=   45.9 ms accept=4.671 osl_mismatch=0 foreign_cpu=0.5
+r0 c= 32 ok=256/256 x=  260.5 tok/s/user y=  7470.3 tok/s ttft_p50=   54.5 ms accept=4.735 osl_mismatch=0 foreign_cpu=0.64
+exit 0 2026-10-03T02:32:33+00:00
+=== H C 2026-10-03T02:32:33+00:00 --arm dflash-tuned --sglang-worktree /home/ubuntu/sglang-wt/speed-lowc-confirm --set attention-backend=fa4
+r0 c=  8 ok=64/64 x=  555.9 tok/s/user y=  3926.3 tok/s ttft_p50=   46.1 ms accept=4.789 osl_mismatch=0 foreign_cpu=0.75
+r0 c= 16 ok=128/128 x=  389.6 tok/s/user y=  5527.7 tok/s ttft_p50=   50.5 ms accept=4.727 osl_mismatch=0 foreign_cpu=0.35
+r0 c= 32 ok=256/256 x=  246.0 tok/s/user y=  7051.8 tok/s ttft_p50=   62.9 ms accept=4.730 osl_mismatch=0 foreign_cpu=0.43
+exit 0 2026-10-03T02:34:54+00:00
+=== H AC 2026-10-03T02:34:54+00:00 --arm dflash-tuned --sglang-worktree /home/ubuntu/sglang-wt/speed-lowc-confirm --set enable-linear-replayssm-spec=true --env SGLANG_GDN_REPLAYSSM_FOLD=1 --set attention-backend=fa4
+r0 c=  8 ok=64/64 x=  587.4 tok/s/user y=  4140.3 tok/s ttft_p50=   44.8 ms accept=4.789 osl_mismatch=0 foreign_cpu=0.26
+r0 c= 16 ok=128/128 x=  420.2 tok/s/user y=  5948.5 tok/s ttft_p50=   48.6 ms accept=4.727 osl_mismatch=0 foreign_cpu=0.31
+r0 c= 32 ok=256/256 x=  272.6 tok/s/user y=  7793.0 tok/s ttft_p50=   55.3 ms accept=4.735 osl_mismatch=0 foreign_cpu=0.72
+exit 0 2026-10-03T02:37:11+00:00
+=== H S0 2026-10-03T02:37:11+00:00 --arm dflash-tuned
+r0 c=  8 ok=64/64 x=  518.7 tok/s/user y=  3646.4 tok/s ttft_p50=   43.7 ms accept=4.730 osl_mismatch=0 foreign_cpu=0.2
+r0 c= 16 ok=128/128 x=  369.9 tok/s/user y=  5255.1 tok/s ttft_p50=   48.5 ms accept=4.671 osl_mismatch=0 foreign_cpu=0.43
+r0 c= 32 ok=256/256 x=  235.1 tok/s/user y=  6770.2 tok/s ttft_p50=   58.3 ms accept=4.750 osl_mismatch=0 foreign_cpu=0.47
+exit 0 2026-10-03T02:39:36+00:00
+session s3 end 2026-10-03T02:39:36+00:00 failed: none

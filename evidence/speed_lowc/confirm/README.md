@@ -101,4 +101,202 @@ Outputs: `~/vp-data/speed-lowc/confirm/equality-<UTC>/` (with `current` pointing
 
 ## Amendments
 
-None yet.
+2026-10-03, after the three sessions: the declared report of accepted tokens per cycle (last item of
+Analysis) is computed by `experiments/speed_lowc/confirm_accept.py`, which was written after the sessions
+had run. Besides each arm's mean accept length it gives a session-paired per-cycle ratio, x_e2e over accept
+length for the arm divided by the same for S0, with the geometric mean and 95% t interval used for the
+throughput ratios, and it voids session cells by `confirm_analyze.py`'s rule. Nothing else changed: the
+holds, the gate and `confirm_analyze.py` ran as declared.
+
+## Results
+
+Written 2026-10-03. Labels: **measured** (read from the files below) and **derived** (ratios, means and
+intervals computed from them). The equality hold ran on 2026-10-02 from 21:57 to 22:28 UTC; the timed
+sessions ran s1 23:22-23:56 on 2026-10-02, then s2 00:48-01:22 and s3 02:05-02:39 on 2026-10-03. All
+four holds ran with this repository at `9a7d52a` and the confirm engine at `dd57a50a59` (tree `5d6db548`).
+Provenance, below, says where `9a7d52a` is kept.
+
+### Validity of the runs (measured)
+
+- The equality hold and all three sessions end `failed: none`, and every launch exited 0
+  (`equality/hold.log`, `sessions/s1.log` to `s3.log`).
+- 39 launches (13 per session, in the declared order) gave 117 points. Every point is valid by bench's
+  rules (`points.csv`): no failed requests, no output-length mismatch, c requests running at once
+  (`max_running_logged`), no KV retractions, a decode CUDA-graph fraction of 1.0. No cell is void, so
+  every ratio below has three sessions.
+- Foreign CPU load averaged at most 0.26 cores per point. One point's maximum passed 2 cores: 2.49 at
+  the first point of s1 (L, S0, c = 1), whose mean was 0.19.
+- Engines (`launches.csv`, from each server's `launch.json`): every S0 launch imported stock `~/sglang`
+  at the pin `bd66ce343e` and every other launch the confirm engine at `dd57a50a59`, both with no
+  modified files, and no launch check failed (CUDA graphs, overlap scheduler, capacity). Applying the
+  committed patches as `build_engines.sh confirm` does to the pin gives tree `5d6db548` again (checked
+  on 2026-10-03).
+- Flags: in each group, every arm's server command differs from S0's only by its levers' flags and,
+  for A, `SGLANG_GDN_REPLAYSSM_FOLD=1` (`launches.csv`, columns `args` and `env`).
+- Pools: the running limit was 64 (L) and 128 (H) in every launch. The KV pools differ. Launches
+  with the fold (A, ABC, AC) resolved bench's cap of 1,000,000 tokens (30.5 GB); the others resolved
+  about 308,000 (L) and 258,000 (H) tokens, because stock verification reserves per-position GDN states,
+  as in the drafter's fold timing (`evidence/drafter/README.md`). Neither pool binds at c <= 32: every
+  point ran c requests at once without a retraction.
+- `launches.csv` lists the lever arms' `exactness` as `pending`, bench's label for an arm whose overrides
+  change its numerics (`bench/arms.py`); their class is the one the next section gives.
+
+### Output equality (measured; `equality/`)
+
+What was compared: state's 320 prompts (the file the hold read matches the token-ID hash in
+`evidence/state_safety/prompt_manifest.json`), up to 256 greedy tokens each, token ids and the top-5
+logprobs at every output position. Each arm ran at c = 1 (one request at a time) with the radix cache
+off, a running limit of 4 and 4 mamba slots. The KV pools were SGLang's own, not pinned (169,854 to
+240,944 tokens, per run in `meta.json`); with one request at a time they cannot change batch
+composition. Every arm is compared with S0 of its group. These classes therefore cover single-request
+serving; at c > 1 neither arm's batch composition is controlled, and batched output equality was not
+tested.
+
+| Group | Arm | Token-identical prompts | Bitwise prompts (tokens and top-5 logprobs) | First logprob difference | First token divergences | Max drift (nats) | Class against S0 |
+|---|---|---|---|---|---|---|---|
+| L | B0 | 320/320 | 320/320 | none | none | 0 | bitwise |
+| L | A | 320/320 | 320/320 | none | none | 0 | bitwise |
+| L | B | 281/320 | 202/320 | output 2 or later (118 prompts) | 38 tie, 1 one_ulp | 0.246 | exact up to rounding |
+| L | C | 143/320 | 0/320 | output 0 (all 320) | 168 tie, 8 one_ulp, 1 near | 0.429 | exact up to rounding |
+| L | ABC | 143/320 | 0/320 | output 0 (all 320) | 168 tie, 8 one_ulp, 1 near | 0.429 | exact up to rounding |
+| H | B0 | 320/320 | 320/320 | none | none | 0 | bitwise |
+| H | A | 320/320 | 320/320 | none | none | 0 | bitwise |
+| H | C | 131/320 | 0/320 | output 0 (319), output 1 (1) | 176 tie, 12 one_ulp, 1 near | 0.585 | exact up to rounding |
+| H | AC | 131/320 | 0/320 | output 0 (319), output 1 (1) | 176 tie, 12 one_ulp, 1 near | 0.585 | exact up to rounding |
+
+The classes are those of `experiments/state_safety/compare.py`. At a prompt's first token divergence
+each run has a margin between the two competing tokens: tie means one run's margin is exactly 0,
+one_ulp that both margins are at most one BF16 spacing, near that both are at most 0.5 nats (the two
+near events have margins of 0.125 and 0.25 nats, two spacings). No divergence is large or not_argmax,
+and in every run each committed token is that run's own argmax (`summary.json`, `self_consistency`).
+Drift is the largest logprob difference over the common prefix, among tokens in both runs' top-5 lists
+with a logprob above -4 in either run. One H prompt (`gsm8k-0009`) reaches 0.585 nats under C and AC
+with identical tokens; compare.py counts it as a large drift (`prompts_with_large_drift`), and the
+declared gate, which decides on first divergences, does not use it. Divergences per 1,000 tokens of
+exposure: B 0.58, C and ABC 3.99 (L), C and AC 4.33 (H) (`table.csv`).
+
+Per lever, on these prompts: A (the fold, with narrow ring-verify tiles up to 2 sequences) is bitwise
+equal to stock DFlash in both groups. B (FA4 drafting) changes only the drafter, so the target's
+logprobs move only through which positions each verify covers: no logprob differs before output 2,
+the first output whose verify depends on the draft, and every token divergence is a tie or one ulp.
+C (FA4 target attention) changes the target's rounding from the prefill on, so output 0 differs on
+almost every prompt, and every first divergence is rounding-level. ABC and AC have the same counts as
+C. The plan expected exact up to rounding for all three levers; B and C are in that class, and A is
+bitwise.
+
+### Throughput (measured points, derived ratios; `ratios.json`, `accept.json`)
+
+A session ratio is an arm's mean over its launches divided by the mean of S0's two launches in the
+same session. Across s1, s2 and s3 the table gives the geometric mean and a 95% t interval on the logs
+(2 degrees of freedom). Within a session the two S0 launches differed by at most 0.48% in x_e2e at
+c = 1-4 and 1.22% at c = 8-32.
+
+Primary outcome, FULL against S0 (declared: x_e2e on L, y on H). Absolute values are means over six
+launches (two per session), x in tok/s/user and y in tok/s.
+
+| Group, c | S0 x_e2e | FULL x_e2e | x_e2e ratio (95% CI) | S0 y | FULL y | y ratio (95% CI) |
+|---|---|---|---|---|---|---|
+| L (ABC), 1 | 983.6 | 1,075.3 | 1.093 (1.079-1.108) | 870.7 | 955.8 | 1.098 (1.086-1.109) |
+| L (ABC), 2 | 875.8 | 949.7 | 1.084 (1.063-1.106) | 1,508.8 | 1,650.3 | 1.094 (1.074-1.114) |
+| L (ABC), 4 | 713.3 | 773.6 | 1.085 (1.056-1.114) | 2,433.8 | 2,644.0 | 1.086 (1.060-1.114) |
+| H (AC), 8 | 519.0 | 586.5 | 1.130 (1.117-1.143) | 3,648.7 | 4,136.8 | 1.134 (1.122-1.146) |
+| H (AC), 16 | 372.3 | 419.9 | 1.128 (1.123-1.133) | 5,288.2 | 5,944.7 | 1.124 (1.120-1.129) |
+| H (AC), 32 | 237.9 | 272.0 | 1.144 (1.115-1.173) | 6,847.0 | 7,782.8 | 1.137 (1.108-1.166) |
+
+FULL is a speedup at every concurrency by the declared rule, on both metrics; the lowest interval end
+is 1.056 (L, c = 4, x_e2e). Per session, for example, ABC's x_e2e ratio at c = 1 was 1.099, 1.087
+and 1.094 in s1, s2 and s3, and AC's y ratio at c = 32 was 1.125, 1.148 and 1.137.
+
+Every arm, with accepted tokens per cycle (mean over all launches of the three sessions) and the
+per-cycle ratio (x_e2e per accepted token, arm over S0; above 1 means a shorter cycle):
+
+| Group | c | Arm | x_e2e ratio (95% CI) | y ratio (95% CI) | Accept S0 / arm | Accept change | Per-cycle ratio (95% CI) |
+|---|---|---|---|---|---|---|---|
+| L | 1 | ABC | 1.093 (1.079-1.108) | 1.098 (1.086-1.109) | 5.701 / 5.725 | +0.4% | 1.089 (1.074-1.103) |
+| L | 1 | A | 1.019 (1.010-1.028) | 1.021 (1.014-1.028) | 5.701 / 5.701 | 0.0% | 1.019 (1.010-1.028) |
+| L | 1 | B | 1.029 (1.015-1.043) | 1.027 (1.016-1.039) | 5.701 / 5.650 | -0.9% | 1.038 (1.025-1.052) |
+| L | 1 | C | 1.030 (1.020-1.041) | 1.033 (1.025-1.042) | 5.701 / 5.722 | +0.4% | 1.027 (1.016-1.038) |
+| L | 2 | ABC | 1.084 (1.063-1.106) | 1.094 (1.074-1.114) | 5.693 / 5.725 | +0.6% | 1.078 (1.057-1.100) |
+| L | 2 | A | 1.014 (1.005-1.023) | 1.015 (1.007-1.024) | 5.693 / 5.693 | 0.0% | 1.014 (1.005-1.023) |
+| L | 2 | B | 1.025 (1.007-1.043) | 1.026 (1.009-1.043) | 5.693 / 5.650 | -0.8% | 1.033 (1.014-1.051) |
+| L | 2 | C | 1.030 (1.011-1.051) | 1.037 (1.019-1.056) | 5.693 / 5.722 | +0.5% | 1.025 (1.006-1.045) |
+| L | 4 | ABC | 1.085 (1.056-1.114) | 1.086 (1.060-1.114) | 5.682 / 5.745 | +1.1% | 1.073 (1.045-1.102) |
+| L | 4 | A | 1.005 (0.990-1.021) | 1.006 (0.992-1.021) | 5.682 / 5.682 | 0.0% | 1.005 (0.990-1.021) |
+| L | 4 | B | 1.032 (1.004-1.062) | 1.035 (1.009-1.063) | 5.682 / 5.709 | +0.5% | 1.028 (0.999-1.057) |
+| L | 4 | C | 1.038 (1.008-1.069) | 1.043 (1.015-1.072) | 5.682 / 5.767 | +1.5% | 1.023 (0.993-1.053) |
+| H | 8 | AC | 1.130 (1.117-1.143) | 1.134 (1.122-1.146) | 4.731 / 4.789 | +1.2% | 1.116 (1.103-1.130) |
+| H | 8 | A | 1.048 (1.040-1.057) | 1.046 (1.038-1.055) | 4.731 / 4.731 | 0.0% | 1.048 (1.040-1.057) |
+| H | 8 | C | 1.076 (1.053-1.099) | 1.080 (1.059-1.103) | 4.731 / 4.788 | +1.2% | 1.063 (1.040-1.086) |
+| H | 16 | AC | 1.128 (1.123-1.133) | 1.124 (1.120-1.129) | 4.670 / 4.727 | +1.2% | 1.114 (1.109-1.120) |
+| H | 16 | A | 1.074 (1.057-1.091) | 1.073 (1.060-1.085) | 4.670 / 4.670 | 0.0% | 1.074 (1.058-1.090) |
+| H | 16 | C | 1.051 (1.035-1.068) | 1.050 (1.034-1.067) | 4.670 / 4.727 | +1.2% | 1.039 (1.022-1.056) |
+| H | 32 | AC | 1.144 (1.115-1.173) | 1.137 (1.108-1.166) | 4.736 / 4.735 | 0.0% | 1.144 (1.111-1.178) |
+| H | 32 | A | 1.102 (1.088-1.115) | 1.099 (1.077-1.120) | 4.736 / 4.739 | +0.1% | 1.101 (1.089-1.113) |
+| H | 32 | C | 1.037 (1.011-1.063) | 1.032 (1.010-1.055) | 4.736 / 4.730 | -0.1% | 1.038 (1.006-1.071) |
+
+Every cell is a speedup by the declared rule except A on L at c = 4, which shows no detectable change.
+
+**Acceptance.** B and C change the token paths and with them the accepted tokens per cycle. FULL's
+acceptance rose by 0.4-1.1% on L and by up to 1.2% on H, so most of FULL's gain is a shorter cycle:
+the per-cycle ratio is 1.073-1.089 on L and 1.114-1.144 on H, every interval above 1. The plan asks
+to name gains that come from acceptance drift. Two single-lever gains at L, c = 4, rest partly on it:
+C (accept +1.5%, per-cycle 1.023, interval 0.993-1.053) and B (+0.5%, 1.028, 0.999-1.057); for
+neither lever alone is a shorter cycle established there. At c = 1 and 2, B lowers acceptance (by 0.9%
+and 0.8%), so its per-cycle gain (1.038 and 1.033) is larger than its throughput gain. The sign of the
+drift depends on the prompts: on the equality hold's 320 prompts, C lowered acceptance (4.585 to 4.540
+on L, 4.064 to 4.029 on H, `equality/meta.json`), while on bench's workload it raised it at every
+concurrency except c = 32. This fits different token paths after rounding-level divergences, not
+better drafting or verification.
+
+**Single levers** are attribution and, as declared, are not multiplied to predict FULL.
+
+- A, the fold: 1.019 and 1.014 in x_e2e at c = 1 and 2 on L, and no detectable change at c = 4
+  (1.005, 0.990-1.021), where patch 0003 returns the ring-writing verify to wide tiles. On H it grows
+  with concurrency, 1.048, 1.074 and 1.102 at c = 8, 16 and 32. A plausible reading, not tested here:
+  the per-position GDN states that stock verification writes and the fold drops grow with the batch.
+- B, FA4 drafting (L only): 1.029, 1.025 and 1.032 at c = 1, 2 and 4.
+- C, FA4 target attention: 1.030, 1.030 and 1.038 on L, and 1.076, 1.051 and 1.037 on H, where the
+  gain shrinks with concurrency. On H, C replaces FlashInfer target attention, whose verify planning
+  runs on the host every cycle; a fixed per-cycle saving fits that trend, but these sessions do not
+  separate kernel time from host time.
+- The one-session probes in the lever table lie inside these intervals for B (x 1.029, 1.027 and
+  1.039 at c = 1, 2 and 4) and for C on H (1.074 at c = 8, 1.026 at c = 32). The fold's one-session
+  y ratios on block 8 (1.058, 1.082 and 1.118 at c = 8, 16 and 32) lie inside A's y intervals at
+  c = 16 and 32 and just above the interval at c = 8 (1.046, 1.038-1.055).
+
+### Against the confirmed frontier (a pointer, not a result)
+
+Bench's confirmed envelope (`evidence/bench/confirm/envelope.csv`, measured in other sessions) has y
+874.4, 1,509.8 and 2,433.3 tok/s at c = 1, 2 and 4 (`dflash-tuned-b16`) and 3,651.3, 5,255.6 and
+6,844.2 at c = 8, 16 and 32 (`dflash-tuned`). S0 here is within 0.7% of each (870.7, 1,508.8, 2,433.8,
+3,648.7, 5,288.2, 6,847.0), and FULL is 9-14% above them. That comparison crosses sessions and does
+not change the envelope: the FULL arms are not bench arms (`bench/arms.toml`), and on H they move the
+class from stock (`dflash-tuned`) to exact up to rounding against stock.
+
+### Provenance
+
+- The four holds ran from `9a7d52a`, this branch's head before it was rebased onto main after #220
+  merged. That commit is kept as the tag `speed-lowc-confirm-holds`. Its rebased twin, `adaf3ff`, has
+  the same confirmation scripts (`experiments/speed_lowc/confirm_*`, `hold_confirm_*`), the same plan
+  text above Amendments, the same harness (`bench/`, `experiments/state_safety/`) and the same patches
+  for the confirm engine; the only change in code the holds ran is one comment in `bench/hostload.py`.
+- The analysis (`bench.pareto`, `confirm_analyze.py`, `confirm_accept.py`) ran on 2026-10-03 from
+  `853bd4b` with a clean tree. `confirm_accept.py` was then tightened (`08a8421`: cells from the declared
+  plan, the same void rule as `confirm_analyze.py`, an interval only from three valid sessions), and the
+  whole analysis rerun from a clean checkout of `08a8421` reproduced `points.csv`, `launches.csv`,
+  `ratios.json` and `accept.json` byte for byte. `confirm_analyze.py` is unchanged since it was declared.
+- `equality/` and `sessions/` are unchanged copies of the holds' outputs under
+  `~/vp-data/speed-lowc/confirm/`: `equality-20261002T215749Z/`, `s1-20261002T232241Z/`,
+  `s2-20261003T004812Z/` and `s3-20261003T020536Z/`.
+
+### Files
+
+| File | Content | Command |
+|---|---|---|
+| `equality/hold.log` | the equality hold's log: each arm's engine, environment and flags, its runner pass and exit status, the gate's verdict | `CONFIRM_LEVERS=ABC scripts/gpu_lock.sh -x experiments/speed_lowc/hold_confirm_equality.sh` (writes `~/vp-data/speed-lowc/confirm/equality-<UTC>/hold.log`), then `cp ~/vp-data/speed-lowc/confirm/equality-20261002T215749Z/hold.log evidence/speed_lowc/confirm/equality/` |
+| `equality/pairs.json`, `summary.json`, `table.csv`, `divergences.csv`, `meta.json`, `compare.log` | the compared pairs; per pair, identical and bitwise prompts, first-difference positions, classes and drift; every first divergence with both margins; each run's flags, commits and resolved pools; compare.py's console output | written by the same hold (`experiments/state_safety/compare.py --runs <dir>/runs --pairs <dir>/pairs.json --out-json <dir>/summary.json --out-csv <dir>/divergences.csv --out-table <dir>/table.csv --out-meta <dir>/meta.json`), then copied with `cp` as above |
+| `equality/gate.json` | the gate: per group, B0's bitwise check, each lever's and FULL's class check, the levers allowed to be timed | written by the same hold (`python experiments/speed_lowc/confirm_gate.py --summary <dir>/summary.json --levers ABC --out <dir>/gate.json`), then copied |
+| `sessions/s1.log`, `s2.log`, `s3.log` | each session's log: gate check, engine and repository commits, arm order, each launch's points and exit status | `CONFIRM_LEVERS=ABC scripts/gpu_lock.sh -x experiments/speed_lowc/hold_confirm_session.sh <k>` (writes `~/vp-data/speed-lowc/confirm/s<k>-<UTC>/session.log`), then `cp ~/vp-data/speed-lowc/confirm/s<k>-*/session.log evidence/speed_lowc/confirm/sessions/s<k>.log` |
+| `points.csv`, `launches.csv` | every point (throughput, latency, accept length, foreign CPU, validity) and every launch (arguments, environment, pools, SGLang and repository commits, checks) | `source scripts/sglang_env.sh; python -m bench.pareto ~/vp-data/speed-lowc/confirm/s*-*/lowc-*/* --out evidence/speed_lowc/confirm --points-only --status confirm` |
+| `ratios.json` | session ratios, geometric means, 95% intervals and decisions per group, arm and concurrency | `python experiments/speed_lowc/confirm_analyze.py --points evidence/speed_lowc/confirm/points.csv --full L=ABC --full H=AC --out evidence/speed_lowc/confirm` |
+| `accept.json` | mean accept length per group, arm and concurrency; per-cycle ratios with the same interval | `python experiments/speed_lowc/confirm_accept.py --points evidence/speed_lowc/confirm/points.csv --full L=ABC --full H=AC --out evidence/speed_lowc/confirm` |

@@ -1,0 +1,10 @@
+pair,run_a,run_b,prompts,diverged,exposure_tokens,per_1k_tokens,tie,one_ulp,near,large,not_argmax,length_mismatch,max_margin_median,max_margin_max,drift_p99,drift_max,same_server,pools_identical,pinned_a,pinned_b
+L B0 vs S0,plain__lowc_L_S0/c1,plain__lowc_L_B0/c1,320,0,69976,0,0,0,0,0,0,0,,,0,0,False,False,False,False
+L A vs S0,plain__lowc_L_S0/c1,plain__lowc_L_A/c1,320,0,69976,0,0,0,0,0,0,0,,,0,0,False,False,False,False
+L B vs S0,plain__lowc_L_S0/c1,plain__lowc_L_B/c1,320,39,66748,0.5843,38,1,0,0,0,0,0.125,0.25,0.2448,0.2463,False,False,False,False
+L C vs S0,plain__lowc_L_S0/c1,plain__lowc_L_C/c1,320,177,44343,3.992,168,8,1,0,0,0,0.125,0.25,0.3651,0.4289,False,False,False,False
+L ABC vs S0,plain__lowc_L_S0/c1,plain__lowc_L_ABC/c1,320,177,44343,3.992,168,8,1,0,0,0,0.125,0.25,0.3651,0.4289,False,False,False,False
+H B0 vs S0,plain__lowc_H_S0/c1,plain__lowc_H_B0/c1,320,0,69995,0,0,0,0,0,0,0,,,0,0,False,False,False,False
+H A vs S0,plain__lowc_H_S0/c1,plain__lowc_H_A/c1,320,0,69995,0,0,0,0,0,0,0,,,0,0,False,False,False,False
+H C vs S0,plain__lowc_H_S0/c1,plain__lowc_H_C/c1,320,189,43675,4.327,176,12,1,0,0,0,0.125,0.25,0.4017,0.5854,False,False,False,False
+H AC vs S0,plain__lowc_H_S0/c1,plain__lowc_H_AC/c1,320,189,43675,4.327,176,12,1,0,0,0,0.125,0.25,0.4017,0.5854,False,False,False,False

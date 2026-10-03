@@ -1,0 +1,413 @@
+{
+  "runs": "/home/ubuntu/vp-data/speed-lowc/confirm/equality-20261002T215749Z/runs",
+  "pairs": {
+    "L B0 vs S0": {
+      "prompts": 320,
+      "bitwise_identical": 320,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {},
+      "diverged": 0,
+      "identical": 320,
+      "length_mismatch": 0,
+      "exposure_tokens": 69976,
+      "per_1k_tokens": 0.0,
+      "classes": {},
+      "max_margin_median": null,
+      "max_margin_p90": null,
+      "max_margin_max": null,
+      "drift_median": 0.0,
+      "drift_p99": 0.0,
+      "drift_max": 0.0,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain__lowc_L_S0/c1",
+      "run_b": "plain__lowc_L_B0/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
+    },
+    "L A vs S0": {
+      "prompts": 320,
+      "bitwise_identical": 320,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {},
+      "diverged": 0,
+      "identical": 320,
+      "length_mismatch": 0,
+      "exposure_tokens": 69976,
+      "per_1k_tokens": 0.0,
+      "classes": {},
+      "max_margin_median": null,
+      "max_margin_p90": null,
+      "max_margin_max": null,
+      "drift_median": 0.0,
+      "drift_p99": 0.0,
+      "drift_max": 0.0,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain__lowc_L_S0/c1",
+      "run_b": "plain__lowc_L_A/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
+    },
+    "L B vs S0": {
+      "prompts": 320,
+      "bitwise_identical": 202,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "6+": 115
+      },
+      "diverged": 39,
+      "identical": 281,
+      "length_mismatch": 0,
+      "exposure_tokens": 66748,
+      "per_1k_tokens": 0.5842871696530233,
+      "classes": {
+        "tie": 38,
+        "one_ulp": 1
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.25,
+      "drift_median": 0.0,
+      "drift_p99": 0.24479317665100098,
+      "drift_max": 0.2462618350982666,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain__lowc_L_S0/c1",
+      "run_b": "plain__lowc_L_B/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
+    },
+    "L C vs S0": {
+      "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 127
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 193
+        }
+      },
+      "first_difference_index": {
+        "0": 320
+      },
+      "diverged": 177,
+      "identical": 143,
+      "length_mismatch": 0,
+      "exposure_tokens": 44343,
+      "per_1k_tokens": 3.9916108517691633,
+      "classes": {
+        "tie": 168,
+        "one_ulp": 8,
+        "near": 1
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.25,
+      "drift_median": 0.21074438095092773,
+      "drift_p99": 0.36514854431152344,
+      "drift_max": 0.42885828018188477,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain__lowc_L_S0/c1",
+      "run_b": "plain__lowc_L_C/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
+    },
+    "L ABC vs S0": {
+      "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 127
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 193
+        }
+      },
+      "first_difference_index": {
+        "0": 320
+      },
+      "diverged": 177,
+      "identical": 143,
+      "length_mismatch": 0,
+      "exposure_tokens": 44343,
+      "per_1k_tokens": 3.9916108517691633,
+      "classes": {
+        "tie": 168,
+        "one_ulp": 8,
+        "near": 1
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.25,
+      "drift_median": 0.21074438095092773,
+      "drift_p99": 0.36514854431152344,
+      "drift_max": 0.42885828018188477,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain__lowc_L_S0/c1",
+      "run_b": "plain__lowc_L_ABC/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
+    },
+    "H B0 vs S0": {
+      "prompts": 320,
+      "bitwise_identical": 320,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {},
+      "diverged": 0,
+      "identical": 320,
+      "length_mismatch": 0,
+      "exposure_tokens": 69995,
+      "per_1k_tokens": 0.0,
+      "classes": {},
+      "max_margin_median": null,
+      "max_margin_p90": null,
+      "max_margin_max": null,
+      "drift_median": 0.0,
+      "drift_p99": 0.0,
+      "drift_max": 0.0,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain__lowc_H_S0/c1",
+      "run_b": "plain__lowc_H_B0/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
+    },
+    "H A vs S0": {
+      "prompts": 320,
+      "bitwise_identical": 320,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 0
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 0
+        }
+      },
+      "first_difference_index": {},
+      "diverged": 0,
+      "identical": 320,
+      "length_mismatch": 0,
+      "exposure_tokens": 69995,
+      "per_1k_tokens": 0.0,
+      "classes": {},
+      "max_margin_median": null,
+      "max_margin_p90": null,
+      "max_margin_max": null,
+      "drift_median": 0.0,
+      "drift_p99": 0.0,
+      "drift_max": 0.0,
+      "prompts_with_large_drift": 0,
+      "run_a": "plain__lowc_H_S0/c1",
+      "run_b": "plain__lowc_H_A/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
+    },
+    "H C vs S0": {
+      "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 127
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 192
+        }
+      },
+      "first_difference_index": {
+        "0": 319,
+        "1": 1
+      },
+      "diverged": 189,
+      "identical": 131,
+      "length_mismatch": 0,
+      "exposure_tokens": 43675,
+      "per_1k_tokens": 4.327418431597024,
+      "classes": {
+        "tie": 176,
+        "one_ulp": 12,
+        "near": 1
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.25,
+      "drift_median": 0.21451067924499512,
+      "drift_p99": 0.4016885757446289,
+      "drift_max": 0.5853710174560547,
+      "prompts_with_large_drift": 1,
+      "run_a": "plain__lowc_H_S0/c1",
+      "run_b": "plain__lowc_H_C/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
+    },
+    "H AC vs S0": {
+      "prompts": 320,
+      "bitwise_identical": 0,
+      "logprobs_compared": 320,
+      "output0_differs": {
+        "prompt_le_64": {
+          "prompts": 127,
+          "differ": 127
+        },
+        "prompt_gt_64": {
+          "prompts": 193,
+          "differ": 192
+        }
+      },
+      "first_difference_index": {
+        "0": 319,
+        "1": 1
+      },
+      "diverged": 189,
+      "identical": 131,
+      "length_mismatch": 0,
+      "exposure_tokens": 43675,
+      "per_1k_tokens": 4.327418431597024,
+      "classes": {
+        "tie": 176,
+        "one_ulp": 12,
+        "near": 1
+      },
+      "max_margin_median": 0.125,
+      "max_margin_p90": 0.125,
+      "max_margin_max": 0.25,
+      "drift_median": 0.21451067924499512,
+      "drift_p99": 0.4016885757446289,
+      "drift_max": 0.5853710174560547,
+      "prompts_with_large_drift": 1,
+      "run_a": "plain__lowc_H_S0/c1",
+      "run_b": "plain__lowc_H_AC/c1",
+      "pinned_a": false,
+      "pinned_b": false,
+      "same_server": false,
+      "pools_identical": false
+    }
+  },
+  "missing_pairs": [],
+  "mixed_pin_pairs": [],
+  "self_consistency": {
+    "plain__lowc_L_S0/c1": {
+      "positions": 69976,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain__lowc_L_B0/c1": {
+      "positions": 69976,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain__lowc_L_A/c1": {
+      "positions": 69976,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain__lowc_L_B/c1": {
+      "positions": 69967,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain__lowc_L_C/c1": {
+      "positions": 69983,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain__lowc_L_ABC/c1": {
+      "positions": 69983,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain__lowc_H_S0/c1": {
+      "positions": 69995,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain__lowc_H_B0/c1": {
+      "positions": 69995,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain__lowc_H_A/c1": {
+      "positions": 69995,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain__lowc_H_C/c1": {
+      "positions": 69998,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    },
+    "plain__lowc_H_AC/c1": {
+      "positions": 69998,
+      "not_argmax": 0,
+      "worst_gap": 0.0
+    }
+  }
+}

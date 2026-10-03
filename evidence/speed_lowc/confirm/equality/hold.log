@@ -1,0 +1,39 @@
+equality start 2026-10-02T21:57:49+00:00 repo 9a7d52a70542551fc061bf385dbe043dcf794aed engine dd57a50a59a729dba0a5a8449acc80795901bb4c levers=ABC
+=== L S0 2026-10-02T21:57:49+00:00 worktree=stock env= flags=--speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash --speculative-draft-model-revision 9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf --max-running-requests 4 --disable-radix-cache --speculative-dflash-block-size 16 --attention-backend triton
+plain__lowc_L_S0/c1: 69976 tokens in 108 s
+exit 0 2026-10-02T22:00:29+00:00
+=== L B0 2026-10-02T22:00:29+00:00 worktree=/home/ubuntu/sglang-wt/speed-lowc-confirm env= flags=--speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash --speculative-draft-model-revision 9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf --max-running-requests 4 --disable-radix-cache --speculative-dflash-block-size 16 --attention-backend triton
+plain__lowc_L_B0/c1: 69976 tokens in 108 s
+exit 0 2026-10-02T22:03:19+00:00
+=== L A 2026-10-02T22:03:19+00:00 worktree=/home/ubuntu/sglang-wt/speed-lowc-confirm env=SGLANG_GDN_REPLAYSSM_FOLD=1 flags=--speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash --speculative-draft-model-revision 9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf --max-running-requests 4 --disable-radix-cache --speculative-dflash-block-size 16 --attention-backend triton --enable-linear-replayssm-spec
+plain__lowc_L_A/c1: 69976 tokens in 106 s
+exit 0 2026-10-02T22:06:05+00:00
+=== L B 2026-10-02T22:06:05+00:00 worktree=/home/ubuntu/sglang-wt/speed-lowc-confirm env= flags=--speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash --speculative-draft-model-revision 9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf --max-running-requests 4 --disable-radix-cache --speculative-dflash-block-size 16 --attention-backend triton --speculative-draft-attention-backend fa4
+plain__lowc_L_B/c1: 69967 tokens in 104 s
+exit 0 2026-10-02T22:08:48+00:00
+=== L C 2026-10-02T22:08:48+00:00 worktree=/home/ubuntu/sglang-wt/speed-lowc-confirm env= flags=--speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash --speculative-draft-model-revision 9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf --max-running-requests 4 --disable-radix-cache --speculative-dflash-block-size 16 --attention-backend triton --speculative-draft-attention-backend triton --attention-backend fa4
+plain__lowc_L_C/c1: 69983 tokens in 106 s
+exit 0 2026-10-02T22:11:32+00:00
+=== L ABC 2026-10-02T22:11:32+00:00 worktree=/home/ubuntu/sglang-wt/speed-lowc-confirm env=SGLANG_GDN_REPLAYSSM_FOLD=1 flags=--speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash --speculative-draft-model-revision 9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf --max-running-requests 4 --disable-radix-cache --speculative-dflash-block-size 16 --attention-backend triton --enable-linear-replayssm-spec --speculative-draft-attention-backend fa4 --attention-backend fa4
+plain__lowc_L_ABC/c1: 69983 tokens in 101 s
+exit 0 2026-10-02T22:14:10+00:00
+=== H S0 2026-10-02T22:14:10+00:00 worktree=stock env= flags=--speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash --speculative-draft-model-revision 9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf --max-running-requests 4 --disable-radix-cache --speculative-dflash-block-size 8 --speculative-draft-attention-backend fa4
+plain__lowc_H_S0/c1: 69995 tokens in 116 s
+exit 0 2026-10-02T22:17:05+00:00
+=== H B0 2026-10-02T22:17:05+00:00 worktree=/home/ubuntu/sglang-wt/speed-lowc-confirm env= flags=--speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash --speculative-draft-model-revision 9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf --max-running-requests 4 --disable-radix-cache --speculative-dflash-block-size 8 --speculative-draft-attention-backend fa4
+plain__lowc_H_B0/c1: 69995 tokens in 117 s
+exit 0 2026-10-02T22:19:59+00:00
+=== H A 2026-10-02T22:19:59+00:00 worktree=/home/ubuntu/sglang-wt/speed-lowc-confirm env=SGLANG_GDN_REPLAYSSM_FOLD=1 flags=--speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash --speculative-draft-model-revision 9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf --max-running-requests 4 --disable-radix-cache --speculative-dflash-block-size 8 --speculative-draft-attention-backend fa4 --enable-linear-replayssm-spec
+plain__lowc_H_A/c1: 69995 tokens in 114 s
+exit 0 2026-10-02T22:22:52+00:00
+=== H C 2026-10-02T22:22:52+00:00 worktree=/home/ubuntu/sglang-wt/speed-lowc-confirm env= flags=--speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash --speculative-draft-model-revision 9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf --max-running-requests 4 --disable-radix-cache --speculative-dflash-block-size 8 --speculative-draft-attention-backend fa4 --attention-backend fa4
+plain__lowc_H_C/c1: 69998 tokens in 104 s
+exit 0 2026-10-02T22:25:34+00:00
+=== H AC 2026-10-02T22:25:34+00:00 worktree=/home/ubuntu/sglang-wt/speed-lowc-confirm env=SGLANG_GDN_REPLAYSSM_FOLD=1 flags=--speculative-algorithm DFLASH --speculative-draft-model-path z-lab/Qwen3.5-4B-DFlash --speculative-draft-model-revision 9a1996ccf887b79ab3af4fcbf8c1d1f4b5658bcf --max-running-requests 4 --disable-radix-cache --speculative-dflash-block-size 8 --speculative-draft-attention-backend fa4 --enable-linear-replayssm-spec --attention-backend fa4
+plain__lowc_H_AC/c1: 69998 tokens in 103 s
+exit 0 2026-10-02T22:28:15+00:00
+L full ABC timed ABC {"B0": {"ok": true, "note": "bitwise 320/320"}, "A": {"ok": true, "note": "identical 320/320, classes {}"}, "B": {"ok": true, "note": "identical 281/320, classes {'tie': 38, 'one_ulp': 1}"}, "C": {"ok": true, "note": "identical 143/320, classes {'tie': 168, 'one_ulp': 8, 'near': 1}"}, "ABC": {"ok": true, "note": "identical 143/320, classes {'tie': 168, 'one_ulp': 8, 'near': 1}"}}
+H full AC timed AC {"B0": {"ok": true, "note": "bitwise 320/320"}, "A": {"ok": true, "note": "identical 320/320, classes {}"}, "C": {"ok": true, "note": "identical 131/320, classes {'tie': 176, 'one_ulp': 12, 'near': 1}"}, "AC": {"ok": true, "note": "identical 131/320, classes {'tie': 176, 'one_ulp': 12, 'near': 1}"}}
+gate ok
+current -> /home/ubuntu/vp-data/speed-lowc/confirm/equality-20261002T215749Z
+equality end 2026-10-02T22:28:25+00:00 failed: none
