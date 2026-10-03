@@ -306,11 +306,14 @@ the table is `classify_logprob.sh` rerun on the same runs, which adds the other 
 
 ## The cost of one small prefill (`prefill_requests.json`, `prefill_trace.json`, `gdn_prefill_bench.json`)
 
-Stock `plain-tuned` (SGLang `bd66ce34`, repository `e690b3a` with the scripts uncommitted),
-requests with one output token so each is a prefill, 30 confirmation prompts one at a time and
-five rounds of eight. Both servers resolved `prefill=flashinfer` for the GDN layers (their logs),
-so the explicit `--linear-attn-prefill-backend flashinfer` server is a repeat of the stock one;
-the stock server ran under `nsys launch` for the whole probe.
+Stock `plain-tuned`, requests with one output token so each is a prefill, 30 confirmation
+prompts one at a time and five rounds of eight. Both servers resolved `prefill=flashinfer` for
+the GDN layers (their logs), so the explicit `--linear-attn-prefill-backend flashinfer` server is
+a repeat of the stock one; the stock server ran under `nsys launch` for the whole probe.
+Revisions (`prefill_requests.json`): repository `e690b3a` with the scripts uncommitted, from the
+hold's log; both servers imported SGLang from `~/sglang` (their logs), the pinned clone at
+`bd66ce34` (`SETUP.md`). This probe did not record the SGLang revision itself;
+`prefill_probe.py` now records both revisions in `client.json`.
 
 - One request takes 35.9 ms (median) on the server under `nsys launch` and 33.0 ms on the one
   without it, the same for prompts of 17 to 343 tokens: the cost is per request, not per token.
@@ -404,9 +407,9 @@ experiments/admission/collect_records.sh ~/vp-data/speed_highc evidence/admissio
 `collect_records.sh` (jq only) writes the record files: `launches.csv` (every server of
 probes 1-3, probe 3's length generator included, and of the confirmation) from each server's
 `server/launch.json` and its run's `sweep.json`; `prefill_requests.json`, which condenses
-the two prefill-probe servers' `client.json`; `prefill_trace.json`, the per-request GPU
-windows and their medians from `trace_summary.json`; `gdn_prefill_bench.json`, copied
-from the hold's output; and `logprob_runs.csv`, each logprob server's resolved pools,
+the two prefill-probe servers' `client.json` with their revisions; `prefill_trace.json`, the
+per-request GPU windows and their medians from `trace_summary.json`; `gdn_prefill_bench.json`,
+copied from the hold's output; and `logprob_runs.csv`, each logprob server's resolved pools,
 prefill batches and commits (from its `server.log` and `c128.meta.json`). Run on the raw
 data it reproduces the committed files byte for byte (checked with `cmp` on 2026-10-02 and
 2026-10-03). It stops unless every server its hold scripts launched has exactly one record.
