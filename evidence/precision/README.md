@@ -57,10 +57,12 @@ are not proofs.
 PATH=$HOME/.elan/bin:$PATH bash scripts/check_lean.sh > evidence/precision/lean_check.log 2>&1
 ```
 
-Lean 4.19.0 elaborates `formal/CertifiedArgmax.lean`, `formal/DecisionGuards.lean` and the three
-drafting-proposal files in `formal/drafting/` with no errors; the log also lists the axioms of
-every theorem in `formal/drafting/` (only `propext`, `Quot.sound` and `Classical.choice`). See
-`formal/STATUS.md` for what is and is not formalized. Regenerated at commit `4533e5e`.
+Lean 4.19.0 elaborates `formal/CertifiedArgmax.lean`, `formal/DecisionGuards.lean`,
+`formal/StockDecision.lean` and the three drafting-proposal files in `formal/drafting/` with no
+errors. The log also lists the axioms of the main theorems of `formal/StockDecision.lean` and of
+every theorem in `formal/drafting/`: only `propext`, `Quot.sound` and `Classical.choice`. See
+`formal/STATUS.md` for what is and is not formalized. Regenerated at commit `0da3a9a`, which added
+`formal/StockDecision.lean`.
 
 ## `head_constants.json`
 

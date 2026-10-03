@@ -1,6 +1,14 @@
 Lean (version 4.19.0, aarch64-unknown-linux-gnu, commit 6caaee842e94, Release)
 checking CertifiedArgmax.lean
 checking DecisionGuards.lean
+checking StockDecision.lean
+'StockDecision.separation' depends on axioms: [propext, Classical.choice, Quot.sound]
+'StockDecision.gap_condition' depends on axioms: [propext, Classical.choice, Quot.sound]
+'StockDecision.screen_drop' depends on axioms: [propext, Classical.choice, Quot.sound]
+'StockDecision.interval_condition' depends on axioms: [propext, Classical.choice, Quot.sound]
+'StockDecision.interval_condition_rounded' depends on axioms: [propext, Classical.choice, Quot.sound]
+'StockDecision.firstMax_unique' depends on axioms: [propext, Quot.sound]
+'StockDecision.roundModel_grid' depends on axioms: [propext, Quot.sound]
 checking drafting/CausalDefect.lean
 'CausalDefect.weighted_depth' depends on axioms: [propext, Classical.choice, Quot.sound]
 'CausalDefect.causal_defect_converges' depends on axioms: [propext, Classical.choice, Quot.sound]

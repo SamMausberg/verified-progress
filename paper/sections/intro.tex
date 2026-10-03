@@ -12,7 +12,7 @@ The speed at stake is modest. Qwen3.5-4B's head has 248,320 entries; in BF16 it 
 \begin{figure}[t]
 \centering
 \input{figures/breakdown}%
-\caption{The head's share of a stock decode step is modest, less at larger batches; under MTP the drafter's projections through it cost more than the target head. Nsight Systems, no certified head; $B$ requests per step (plain decoding: head calls of $M=B$ positions) \ev{profile-attr}. Target head: GEMM, FP32 logit copy, argmax. Tracing inflates MTP's idle time (hatched), barely its kernels, so its heads' untraced shares are larger than shown (Appendix~\ref{app:profile}). DFlash: tuned, 16-token blocks, GPU-bound \ev{profile-dflash}.}
+\caption{The head takes a modest share of a stock decode step, less at larger batches. Under MTP, the drafter's projections through it cost more than the target head. Nsight Systems, no certified head. $B$ requests per step; plain decoding's head calls have $M=B$ positions \ev{profile-attr}. Target head: GEMM, FP32 logit copy, argmax. Tracing inflates MTP's idle time (hatched) but barely its kernels, so its heads' untraced shares are larger than shown (Appendix~\ref{app:profile}). DFlash: tuned, 16-token blocks, GPU-bound \ev{profile-dflash}.}
 \label{fig:breakdown}
 \end{figure}
 
@@ -27,7 +27,7 @@ A second source of bounds would reuse the drafter's work. MTP-4B and DFlash-4B (
 \begin{figure*}[t]
 \centering
 \input{figures/mechanism}%
-\caption{The certified head drops every entry that cannot win, recomputes the few that remain, and falls back to the stock head when the token stays open (schematic; values illustrative). \textbf{(a)}~The int8 copy bounds each entry's exact score by $[\lo_i,\hi_i]$; an entry with $\hi_i<\max_j\lo_j-\delta_{\max}$ cannot win; $\delta_{\max}$ covers the stock kernel's modelled error and rounding (Section~\ref{sec:headcontracts}). \textbf{(b)}~Three candidate pairs $a,b$, recomputed from BF16 weights and widened to the FP32 sums the stock kernel could form. \textbf{(c)}~The two fallbacks (Section~\ref{sec:kernel-fallback}).}
+\caption{The certified head drops the entries it can rule out and recomputes the few that remain. If the token stays open, it falls back to the stock head. Schematic; values illustrative. \textbf{(a)}~The int8 copy bounds each entry's exact score by $[\lo_i,\hi_i]$. An entry cannot win if $\hi_i<\max_j\lo_j-\delta_{\max}$, where $\delta_{\max}$ covers the stock kernel's modelled error and rounding (Section~\ref{sec:headcontracts}). \textbf{(b)}~Three candidate pairs $a,b$, recomputed from BF16 weights and widened to the FP32 sums the stock kernel could form. \textbf{(c)}~The two fallbacks (Section~\ref{sec:kernel-fallback}).}
 \label{fig:mechanism}
 \end{figure*}
 

@@ -14,7 +14,7 @@ We measure the certified head on states recorded from the engine, then serve it.
 \begin{figure*}[t]
 \centering
 \input{figures/candidates}%
-\caption{Int8 leaves few candidates, but whole-batch fallback grows with the batch; timed alone, with the per-position fallback under the \modelcons{}, the head is expected to take about 0.7 of the stock head's time up to 16 positions, and every mode is slower from 128. \textbf{(a)}~Held-out replay, \Rreal{}: four copies, greedy, and the per-128-weights int8 copy in a seeded race at $T=1$ \ev{ccdf}. \textbf{(b)}~Lines: independent fallback at Table~\ref{tab:fallback}'s held-out shares \ev{rstock}; markers: kernel replay \ev{kernel-path}. \textbf{(c)}~Over the stock head: measured with every position certified (medians; p10--p90 within the markers below 256), and expected with each fallback, from measured times and (b)'s conservative rates \ev{kernel-path}. Shaded: consecutive replay positions, not engine batches.}
+\caption{Int8 leaves few candidates, but whole-batch fallback grows with the batch. Timed alone, with the per-position fallback under the \modelcons{}, the head's expected time is about 0.7 of the stock head's up to 16 positions. From 128, every mode is slower. \textbf{(a)}~Held-out replay, \Rreal{}: four copies, greedy, and the per-128-weights int8 copy in a seeded race at $T=1$ \ev{ccdf}. \textbf{(b)}~Lines: independent fallback at Table~\ref{tab:fallback}'s held-out shares \ev{rstock}. Markers: kernel replay \ev{kernel-path}. \textbf{(c)}~Time over the stock head, measured with every position certified (medians; p10--p90 within the markers below 256). Each fallback's expected time uses measured times and (b)'s conservative rates \ev{kernel-path}. Shaded: consecutive replay positions, not engine batches.}
 \label{fig:candidates}\label{fig:geometry-candidates}
 \end{figure*}
 
@@ -51,7 +51,7 @@ In the microbenchmark (the head alone at $M=1$ to 256, CUDA graphs, warm L2 cach
 \begin{figure}[t]
 \centering
 \input{figures/frontier}%
-\caption{Under SGLang's default admission, speculation leads plain decoding at low concurrency and trails it at high: the best arm of each drafter (not all drawn) serves more up to $c=32$ and less from 48. Four of nine tuned stock arms, $c=1$ to 128 (64 for 16-token DFlash); points average three or four sessions (hollow: one), with standard deviations under 2\% of each mean \ev{bench-frontier}. Grey: Pareto envelope of all nine arms' points with three or more sessions.}
+\caption{Under SGLang's default admission, each drafter's best arm, drawn or not, serves more than plain decoding up to $c=32$ and less from 48. Drawn: four of nine tuned stock arms, $c=1$ to 128 (64 for 16-token DFlash). MTP here uses FlashInfer attention; the certified head was served on MTP's Triton arm (Table~\ref{tab:levers}). Points average three or four sessions (hollow: one), with standard deviations under 2\% of each mean \ev{bench-frontier}. Grey: Pareto envelope of all nine arms' points with three or more sessions.}
 \label{fig:frontier}
 \end{figure}
 
@@ -60,7 +60,7 @@ In the microbenchmark (the head alone at $M=1$ to 256, CUDA graphs, warm L2 cach
 \begin{figure*}[t]
 \centering
 \input{figures/transport}%
-\caption{Transport fails because draft head inputs are far from the target's: the median drift is 107 (DFlash-4B) and 112 (MTP-4B) times the median threshold $\delta^\ast$ below which transport beats the per-entry int8 copy. \textbf{(a)}~Median DFlash-4B head inputs, to scale (norms over the 4,020 whole-step pairs, cosine over 20,000 random aligned pairs); transport wins only if $h^d$ lies in the dot of radius $\delta^\ast\norm{h^t}_2$ (Proposition~\ref{thm:crossover}). \textbf{(b, c)}~Drift $\rho$ over 40,000 aligned held-out pairs per drafter, against each entry's threshold $\delta^\ast_i$ from the weights; arrows join the medians \ev{head-constants,rho,transport,rho-mtp,stats-dflash}.}
+\caption{Transport fails because draft head inputs are far from the target's. Median drift is 107 (DFlash-4B) and 112 (MTP-4B) times the median threshold $\delta^\ast$ below which transport beats the per-entry int8 copy. \textbf{(a)}~Median DFlash-4B head inputs, to scale: norms over 4,020 whole-step pairs, cosine over 20,000 random aligned pairs. Transport needs $h^d$ in the dot of radius $\delta^\ast\norm{h^t}_2$ (Proposition~\ref{thm:crossover}). \textbf{(b,\,c)}~Drift $\rho$ over 40,000 aligned held-out pairs per drafter, against each entry's threshold $\delta^\ast_i$ from the weights \ev{head-constants,rho,transport,rho-mtp,stats-dflash}.}
 \label{fig:rho}\label{fig:transport}
 \end{figure*}
 
