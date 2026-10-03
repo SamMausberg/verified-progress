@@ -8,14 +8,18 @@ which confirms that PR's fix on a GH200 and offers a regression test. They also 
 failures the fix does not cover. The code is in `experiments/upstream_fa4/`.
 
 Status: measured, one run on 2026-10-02 (22:30-22:44 UTC). Correctness only; nothing here is timed.
-The tile_n 144 failures, and the wrong outputs and faults at head_dim 160 and 224 (not the compile
-errors on `main`, which the three fixes remove), have one cause, found after this run and
-reported upstream with a fix
-([flash-attention#2957](https://github.com/Dao-AILab/flash-attention/issues/2957),
-[#2958](https://github.com/Dao-AILab/flash-attention/pull/2958)): when tile_n is not a multiple of
-the rows the loader copies per pass (`rows_per_pass` below), the threads of its last pass still copy
-rows past the tile, and a predicated-off cp.async zero-fills its destination, so they overwrite the
-first rows of the next head-dim block or stage in shared memory, or write past the K/V buffer.
+The wrong outputs and faults at head_dim 160 and 224 on the three fixed trees (not the compile errors
+on `main`, which the three fixes remove), and the tile_n 144 failures on `ceil`, `ceil_div` and
+flash-attention `main`, have one cause, found after this run and reported upstream with a proposed
+fix ([flash-attention#2957](https://github.com/Dao-AILab/flash-attention/issues/2957),
+[#2958](https://github.com/Dao-AILab/flash-attention/pull/2958); the tests that locate it are there,
+not in this run): when tile_n is not a multiple of the rows the loader copies per pass
+(`rows_per_pass` below), the threads of its last pass still copy rows past the tile, and a
+predicated-off cp.async zero-fills its destination, so they overwrite the first rows of the next
+head-dim block or stage in shared memory, or write past the K/V buffer. On `main` and `max_one` the
+tile_n 144 tile also misses a page-table entry: their forms give each thread 1, while the loader's
+last pass reads a second for rows 128-143 (the gap flash-attention#2745 closed; read from
+`paged_kv.py`, not run).
 
 ## What was compared
 
@@ -77,7 +81,7 @@ memory access was encountered`. The same causal cases are correct with a contigu
 the paged TMA load (page size equal to tile_n), on `main` and on `ceil` (0.0022-0.0025). The
 failure is specific to the cp.async paged loader.
 
-**tile_n 144: wrong output on every tree (found here; cause above).** Head_dim 96 and 80
+**tile_n 144: wrong output on every tree (found here; causes above).** Head_dim 96 and 80
 without causal masking use a 192 x 144 tile: `main`'s floor and `max_one` give 1 entry per thread,
 `ceil` and `ceil_div` give 2, and all four compile. With the cp.async paged loader the output is
 finite but wrong on all four trees: at head_dim 96 and page size 1 the largest error is 0.35
