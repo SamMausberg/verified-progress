@@ -133,15 +133,20 @@ Input checks added after the run, from Codex's review of #228. `run_all.sh` now 
   (`apply_variant.py --check`, 4461a99);
 - a failed environment activation or a `python` other than `SGLANG_DIR`'s venv, and it clears
   inherited `SGLANG_*`, `CUTE_DSL_*`, `FLASH_ATTENTION_*` and `PYTHON*` settings (80f4ba8);
-- an output directory that already holds anything but `hold.log` (80f4ba8).
+- an output directory that already holds anything but `hold.log` (80f4ba8);
+- any file in an SGLang tree or the flash-attention checkout beyond its expected change, tracked,
+  untracked or ignored, apart from `__pycache__` (an untracked `sitecustomize.py` on `PYTHONPATH`
+  would run in every case), and any uncommitted or untracked file in this repository (b064a31).
 
 `summarize.py` now fails unless every record was imported from its own tree (`fa-pkg` for
 flash-attention).
 
 The committed run is unaffected by what these checks guard against:
 
-- The trees it used pass the first two checks, and the four `paged_kv.py` hashes it recorded
-  (`summary.json`, `meta`) are exactly the variants'.
+- The trees it used pass the tree checks: checked afterwards, they hold nothing beyond their
+  expected change apart from `__pycache__`, and the four `paged_kv.py` hashes the run recorded
+  (`summary.json`, `meta`) are exactly the variants'. The run recorded no uncommitted change to
+  a tracked file of this repository (`repo_dirty` false; untracked files were not checked then).
 - It ran in the upstream venv: `meta` records torch 2.13.0+cu130, nvidia-cutlass-dsl 4.8.0 and
   quack-kernels 0.6.5, which only that venv has here. The paper's SGLang venv has
   nvidia-cutlass-dsl 4.6.2 and quack-kernels 0.6.4; the system Python has no nvidia-cutlass-dsl.
