@@ -136,19 +136,28 @@ PY
 # records each equality run's repository and SGLang commits: every run must come from this
 # repository's HEAD (the same arm flags, scripts and prompt manifest), every S0 run from the
 # pin and every other run from the confirm engine's HEAD, all with no modified SGLang files.
+# meta.json must hold exactly the runs the equality hold makes for these levers.
 gate_ok() {
+  local g full j runs=()
+  for g in L H; do
+    full=$(group_full "$g")
+    runs+=("plain__lowc_${g}_S0/c1" "plain__lowc_${g}_B0/c1")  # as hold_confirm_equality.sh names them
+    for (( j=0; j<${#full}; j++ )); do runs+=("plain__lowc_${g}_${full:$j:1}/c1"); done
+    (( ${#full} > 1 )) && runs+=("plain__lowc_${g}_$full/c1")
+  done
   python - "$CONFIRM_GATE" "$CONFIRM_LEVERS" "$(git -C "$CONFIRM_REPO" rev-parse HEAD)" \
-    "$(git -C "$CONFIRM_ENGINE" rev-parse HEAD)" "$STOCK_PIN" <<'PY'
+    "$(git -C "$CONFIRM_ENGINE" rev-parse HEAD)" "$STOCK_PIN" "${runs[@]}" <<'PY'
 import json, sys
 from pathlib import Path
 path, levers, repo, engine, pin = sys.argv[1:6]
+expected = set(sys.argv[6:])
 gate = json.loads(Path(path).read_text())
 meta = json.loads((Path(path).parent / 'meta.json').read_text())
 why = []
 if gate.get('ok') is not True or gate.get('levers') != levers:
     why.append(f'gate ok={gate.get("ok")} levers={gate.get("levers")}')
-if not meta:
-    why.append('no equality runs in meta.json')
+if set(meta) != expected:
+    why.append(f'meta.json runs missing {sorted(expected - set(meta))}, extra {sorted(set(meta) - expected)}')
 for run, m in sorted(meta.items()):
     stock = run.split('/')[0].endswith('_S0')
     if m.get('repo_sha') != repo:
