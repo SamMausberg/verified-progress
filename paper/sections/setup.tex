@@ -61,7 +61,8 @@ In the microbenchmark (the head alone at $M=1$ to 256, CUDA graphs, warm L2 cach
 Change & $c$ & Ratio (pairs) & Outputs\\\midrule
 \multicolumn{4}{@{}l}{\emph{MTP, three steps, FlashInfer attention} \ev{hostgap,admission}}\\
 Host-gap patches & 1--8 & 1.094--1.096 (1.090--1.101) & token-identical$^a$\\
-Prefill delay, cap$^{c,e}$ & $\ge$32 & 1.19--1.48 (1.17--1.50) & exact up to rounding\\\addlinespace[2pt]
+% The label and c share a cell: c = 32--128 in its own cell widens the c column past the table's width.
+\multicolumn{2}{@{}l}{Prefill delay, cap$^{c,e}$\hfill 32--128} & 1.19--1.48 (1.17--1.50) & exact up to rounding\\\addlinespace[2pt]
 \multicolumn{4}{@{}l}{\emph{Plain decoding} \ev{backbone,bench-frontier,bench-equality}}\\
 Backbone GEMM routing & 1 & 1.035 (1.034--1.035) & exact up to rounding\\
 Replayed GDN decoding & 128 & 1.081 (one pair) & exact up to rounding\\\addlinespace[2pt]
