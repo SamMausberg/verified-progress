@@ -51,11 +51,11 @@ where the left side adds the int8 pass, the selection of candidates, their recom
 In the microbenchmark (the head alone at $M=1$ to 256, CUDA graphs, warm L2 cache; medians of 30 graph replays) a fully certified batch at $M=1$ takes 239.6~\textmu s, against 370.5~\textmu s for the stock head. Adding each fallback's measured cost at its measured rate gives an expected time of about 0.7 of the stock head's up to 16 positions, with the per-position fallback under the \modelcons{} (Figure~\ref{fig:candidates}c) \ev{kernel-rowwise,kernel-path}. From 128 positions every mode is slower, because the int8 pass alone is slower than the stock head there; with the whole-batch fallback, 77\% of calls also pay for the stock head. The pass is not bound by memory bandwidth: at one position its directed-rounding epilogue keeps SM throughput at 79\% of peak while it draws 62--63\% of DRAM bandwidth, so its time grows with $M$ faster than the stock GEMM's \ev{kernel-micro}. At one position the expected time under the \modelcons{} is 0.66--0.67 of the stock head's with either fallback \ev{kernel-path}, so with the head at 10.3\% of a plain decode step at batch 1, the step would shorten by at most about 3.4--3.5\% (derived; served, 2.5\%, Section~\ref{sec:served}).
 
 \begin{table}[!b]
-\caption{Engine changes (Section~\ref{sec:served}) against the tuned stock arm each modifies (group rows), flags otherwise identical; one session each, except the rows marked$^c$. Ratio: throughput $y$ with over without the change; brackets: run-pair range, or 95\% $t$ interval$^c$. Outputs: greedy outputs against stock, same configuration; exactness is not established where not compared.}\label{tab:levers}
+\caption{Engine changes (Section~\ref{sec:served}) against the tuned stock arm each modifies (group rows), flags otherwise identical; one session each, except the rows marked$^c$. Ratio: throughput $y$, or per-request rate $x$ where marked, with over without the change; brackets: run-pair range, or 95\% $t$ interval$^c$. Outputs: greedy outputs against stock, same configuration; exactness is not established where not compared.}\label{tab:levers}
 \vskip 0.05in
 % 7 pt, the one main-text table below 9 pt: at 8 pt its wrapped rows cost about five lines of
 % the ten-page main text, at 9 pt an unwrapped row needs about 295 pt against the 235 pt column.
-\centering\scriptsize\setlength{\tabcolsep}{2pt}
+\centering\scriptsize\setlength{\tabcolsep}{1.8pt}
 \begin{tabular*}{\columnwidth}{@{}l@{\extracolsep{\fill}}rll@{}}
 \toprule
 Change & $c$ & Ratio (pairs) & Outputs\\\midrule
@@ -68,7 +68,7 @@ Replayed GDN decoding & 128 & 1.081 (one pair) & exact up to rounding\\\addlines
 \multicolumn{4}{@{}l}{\emph{DFlash, 16-token blocks} \ev{drafter-fold,lowc-confirm}}\\
 Fold verify & 1 & 0.968 (0.966--0.970) & bitwise$^b$\\
 & 8--32 & 1.061--1.120 (1.053--1.134) & \\
-Fold, FA4$^{c,f}$ & 1--4 & 1.084--1.093 (1.056--1.114) & exact up to rounding\\
+Fold, FA4$^{c,f}$ & 1--4 & $x$\,1.084--1.093 (1.056--1.114) & exact up to rounding\\
 & 8--32 & 1.124--1.137 (1.108--1.166) & \\\addlinespace[2pt]
 \multicolumn{4}{@{}l}{\emph{Certified head, per arm$^c$} \ev{cert-served}}\\
 Plain decoding & 1 & 1.025 (1.022--1.028) & identical$^d$\\
@@ -77,7 +77,7 @@ DFlash, 16-token & 1 & 1.012 (1.007--1.018) & identical$^d$\\
 & 2--4 & 0.970--0.990 (0.958--0.996) & \\
 DFlash, 8-token & 4--8 & 0.975--0.988 (0.967--0.999) & check mode$^d$\\
 \bottomrule
-\multicolumn{4}{@{}p{\columnwidth}@{}}{$^a$Tokens, verify-step counts and draft histograms on 192 of 192 requests; log-probabilities not compared. $^b$Identical tokens and top-five log-probabilities, with matched pools and fixed batch composition, in a separate check. $^c$Three sessions; geometric mean of the session ratios. $^d$Token ids at $c=1$ and every certified position in check mode (Appendix~\ref{app:cert-served}). $^e$Against MTP without it (best non-speculative arm: 1.18--1.32 at $c=48$--128); brackets: session range; outputs classed at $c=64$ and 128. $^f$Narrow verify tiles, FA4 target and drafter attention; from $c=8$ the 8-token arm; ratio of $x$ at $c\le4$ (declared); outputs classed at $c=1$.}
+\multicolumn{4}{@{}p{\columnwidth}@{}}{$^a$Tokens, verify-step counts and draft histograms on 192 of 192 requests; log-probabilities not compared. $^b$Identical tokens and top-five log-probabilities, with matched pools and fixed batch composition, in a separate check. $^c$Three sessions; geometric mean of the session ratios. $^d$Token ids at $c=1$ and every certified position in check mode (Appendix~\ref{app:cert-served}). $^e$Against MTP without it (best non-speculative arm: 1.18--1.32 at $c=48$--128); brackets: session range; outputs classed at $c=64$ and 128. $^f$Narrow verify tiles, FA4 target and drafter attention; from $c=8$ the 8-token arm; $x$ declared at $c\le4$; outputs classed at $c=1$.}
 \end{tabular*}
 \end{table}
 
