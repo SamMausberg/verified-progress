@@ -35,7 +35,8 @@ passing.
 `summarize.py` checks every input against what its hold launched, writes nothing unless every
 check passes, and names the recorded runs by the hash of their hold logs (and of the GEMM probe's
 JSON): only these may lack the records listed above, and any other hold must have run this
-checkout's hold scripts. It checks
+checkout's hold scripts and the harness they run (bench, the profiling driver, the probe client,
+the unit check, `scripts/sglang_env.sh`). It checks
 
 - per hold: the engine (its tree, or for the recorded runs the commit), the runtime, and that
   its log ends with its end line and no failed step;
@@ -69,8 +70,8 @@ checkout's hold scripts. It checks
   the reference tokens;
 - per GEMM probe run: its SGLang checkout (`~/sglang`, the pin, clean), GH200, torch and CUDA, a
   planned shape, M and number of weight copies for every row, each row once, and (for runs that
-  record them) the probe's arguments and output name, a clean harness whose probe and hold equal
-  this checkout's, the runtime, no inherited SGLang switch or import path, the GPU lock held and no
+  record them) the probe's arguments and output name, a clean harness whose probe, hold and what
+  the hold runs equal this checkout's, the runtime, no inherited SGLang switch or import path, the GPU lock held and no
   other process on the GPU;
 - the unit check: one complete run in the `== unit check` section of a kill1 hold's log, the
   script's hash there, its relative errors against the script's 0.06 bound, per-row rows

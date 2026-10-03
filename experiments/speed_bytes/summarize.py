@@ -141,6 +141,14 @@ def write_csv(rows: list[dict], out: Path) -> None:
     print(f'wrote {out} ({len(rows)} rows)')
 
 
+# The probe and what its hold runs (holds/fp8_probe.sh), identical at the harness commit a run records.
+GEMM_HARNESS = (
+    'experiments/speed_bytes/fp8_gemm_probe.py',
+    'experiments/speed_bytes/runtime_record.py',
+    'experiments/speed_bytes/holds/fp8_probe.sh',
+    'experiments/speed_bytes/holds/tree_guard.sh',
+    'scripts/sglang_env.sh',
+)
 # What runs after 2026-10-02's record in the probe's meta, which the recorded run predates.
 GEMM_LATER = (
     'sglang_source',
@@ -191,14 +199,14 @@ def cmd_gemm(args: argparse.Namespace) -> None:
         raise SystemExit(
             f'{args.probe}: stopped at its time budget ({d["meta"]["stopped_at_budget"]})'
         )
-    # The harness (recorded by runs after 2026-10-02's): a clean checkout whose probe and hold are
-    # this checkout's, so the documented method produced the timings.
+    # The harness (recorded by runs after 2026-10-02's): a clean checkout whose probe and hold, with
+    # what the hold runs (GEMM_HARNESS), are this checkout's, so the documented method produced the
+    # timings.
     harness = d['meta'].get('harness')
     if harness is not None:
         here = (REPO / 'experiments/speed_bytes/fp8_gemm_probe.py').read_bytes()
         same = subprocess.run(
-            ['git', '-C', str(REPO), 'diff', '--quiet', harness['head'], 'HEAD', '--',
-             'experiments/speed_bytes/fp8_gemm_probe.py', 'experiments/speed_bytes/holds/fp8_probe.sh'],
+            ['git', '-C', str(REPO), 'diff', '--quiet', harness['head'], 'HEAD', '--', *GEMM_HARNESS],
         ).returncode == 0  # fmt: skip
         if (
             harness['dirty_files']
@@ -521,17 +529,34 @@ def hold_repo(hold: Path) -> str:
     return m.group(1)
 
 
-def check_hold_script(hold: Path, *helpers: str) -> None:
+# What each hold runs besides its script, guard, runtime record and scripts/sglang_env.sh: bench
+# (the sweeps: bench/sweep.py and the modules and arms it reads), the profiling driver of the
+# traces, the probe client and the unit check.
+HOLD_HELPERS = {
+    'kill1': ('bench', 'experiments/speed_bytes/fp8_dense_unit.py'),
+    'kill2b': (
+        'bench',
+        'experiments/profiling/run_profiles.py',
+        'experiments/profiling/drive_decode.py',
+    ),
+    'kill3': ('bench',),
+    'probe1': ('experiments/moonshot/logit_probe.py',),
+}
+
+
+def check_hold_script(hold: Path) -> None:
     """A hold other than the recorded ones (which ran scratch copies) ran this checkout's hold
-    script, its guard and runtime record, and the helpers it runs: the files are identical at
-    the repository commit it logged."""
+    script, its guard and runtime record, scripts/sglang_env.sh and the harness it runs
+    (HOLD_HELPERS): the files are identical at the repository commit it logged."""
     if is_recorded(hold / 'hold.log'):
         return
+    name = hold.name.split('_')[0]
     files = [
-        f'experiments/speed_bytes/holds/{hold.name.split("_")[0]}.sh',
+        f'experiments/speed_bytes/holds/{name}.sh',
         'experiments/speed_bytes/holds/tree_guard.sh',
         'experiments/speed_bytes/runtime_record.py',
-        *helpers,
+        'scripts/sglang_env.sh',
+        *HOLD_HELPERS[name],
     ]
     if subprocess.run(
         ['git', '-C', str(REPO), 'diff', '--quiet', hold_repo(hold), 'HEAD', '--', *files]
@@ -539,12 +564,12 @@ def check_hold_script(hold: Path, *helpers: str) -> None:
         raise SystemExit(f"{hold}: its scripts at {hold_repo(hold)[:7]} are not this checkout's")
 
 
-def check_hold(hold: Path, *helpers: str) -> str:
+def check_hold(hold: Path) -> str:
     """Every check of a hold's own log (engine, last line, runtime, scripts); the engine commit."""
     engine = check_hold_engine(hold)
     check_hold_finished(hold)
     check_runtime_logged(hold)
-    check_hold_script(hold, *helpers)
+    check_hold_script(hold)
     return engine
 
 
@@ -1201,7 +1226,7 @@ def cmd_probe(args: argparse.Namespace) -> None:
     unit_log = Path(args.unit_log)
     if unit_log.name != 'hold.log' or unit_log.parent.name.split('_')[0] != 'kill1':
         raise SystemExit(f'{unit_log}: not the log of a kill1 hold')
-    check_hold(unit_log.parent, 'experiments/speed_bytes/fp8_dense_unit.py')
+    check_hold(unit_log.parent)
     lines = hold_section(unit_log.parent, 'unit check')['lines']
     text, full = '\n'.join(lines), unit_log.read_text()
     unit_shas = re.findall(r'^unit script ([0-9a-f]{64})$', full, re.M)
