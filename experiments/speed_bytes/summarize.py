@@ -51,16 +51,17 @@ GEMM_SHAPES = {
     'dflash_fc': (2560, 12800),
 }
 GEMM_MS = (1, 2, 4, 8, 16, 32, 64, 128, 256)
-# Its other defaults: the timing rounds, the bytes of weight copies each timing cycles through
-# (ceil(256e6 / (N * K)) FP8 copies, so the weights stream from HBM past the 60 MB L2) and the
-# time budget. Runs after 2026-10-02's record their arguments.
+# The arguments holds/fp8_probe.sh runs it with (line 19: the defaults and --budget-s 720): the
+# timing rounds, the bytes of weight copies each timing cycles through (ceil(256e6 / (N * K)) FP8
+# copies, so the weights stream from HBM past the 60 MB L2) and the time budget. Runs after
+# 2026-10-02's record their arguments.
 GEMM_L2_BYTES = 256e6
 GEMM_ARGS = {
     'ms': ','.join(map(str, GEMM_MS)),
     'shapes': ','.join(GEMM_SHAPES),
     'rounds': 5,
     'l2_bytes': GEMM_L2_BYTES,
-    'budget_s': 600.0,
+    'budget_s': 720.0,
 }
 # FP8 (e4m3) rounding gives a relative error of about 0.04 on the probe's random N(0, 0.02) inputs.
 GEMM_REL_ERR_MAX = 0.06
