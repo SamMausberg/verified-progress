@@ -37,7 +37,9 @@ measured or not run. The companion `paper/research_notes.pdf` (source in
 `paper/notes/`) holds the research notes behind the paper: the status of the
 questions and proposals, the serving stack and protocol, drafting and repair,
 the stock engine under speculation and further analysis, with its own evidence
-register. `TASKS.md`
+register. Slides for a talk of about 30 minutes on the paper are in
+`presentation/`: `verifier_paper_talk.pdf`, and `verifier_paper_talk.pptx` with
+the speaker notes; the README there says which commit they reflect. `TASKS.md`
 tracks the work and its status, `RUNBOOK.md` gives the commands and the rules
 for admissible runs, and `SETUP.md` describes the machine.
 
@@ -307,6 +309,7 @@ and SGLang at the pinned commit with the patch series under
 | `evidence/<topic>/` | Committed results; each directory's README gives the command behind every file. `evidence/README.md` indexes the topics, the paper claims they support and the imported bundle's records at the top of `evidence/` |
 | `sources/` | Literature review, citation audit, manuscript review, the verified bibliography and source manifest, and the imported bundle's checksums |
 | `scripts/` | GPU lock and job containment (`gpu_*.sh`), SGLang environment and worktrees (`sglang_*.sh`), repository checks (`check_*`, `verify_artifact.py`) and the bundle's auxiliary streaming client (`benchmark_sse.py`) |
+| `presentation/` | Slides for a talk of about 30 minutes on the paper, with speaker notes and backup slides grouped by question (`verifier_paper_talk.pptx`, and a PDF); its README says which commit they reflect and how they were built |
 | `data/` | The bundle's synthetic drift table, which the research notes plot, and the auxiliary client's example workload |
 | `TASKS.md`, `RUNBOOK.md`, `SETUP.md` | Task list and status; commands and evidence rules; the machine |
 
