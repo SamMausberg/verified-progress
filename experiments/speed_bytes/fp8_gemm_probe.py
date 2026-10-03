@@ -69,6 +69,25 @@ def sglang_source():
     }
 
 
+def harness_source():
+    """This probe's repository checkout: HEAD, tracked edits, and the sha256 of this file."""
+    import hashlib
+    import subprocess
+
+    here = Path(__file__).resolve()
+
+    def git(*a):
+        return subprocess.run(
+            ['git', '-C', str(here.parent), *a], capture_output=True, text=True
+        ).stdout
+
+    return {
+        'head': git('rev-parse', 'HEAD').strip(),
+        'dirty_files': git('status', '--porcelain', '--untracked-files=no').splitlines(),
+        'probe_sha256': hashlib.sha256(here.read_bytes()).hexdigest(),
+    }
+
+
 def time_graph(fn, copies, rounds, reps):
     """Per-call microseconds of fn(i) for i over copies, replayed in a CUDA graph."""
     s = torch.cuda.Stream()
@@ -138,6 +157,7 @@ def main():
         'device': torch.cuda.get_device_name(),
         'arch_list': torch.cuda.get_arch_list(),
         'sglang_source': sglang_source(),
+        'harness': harness_source(),
         'args': vars(args),
         'route_errors': {},
     }

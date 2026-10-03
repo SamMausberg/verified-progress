@@ -99,6 +99,21 @@ def cmd_gemm(args: argparse.Namespace) -> None:
         raise SystemExit(
             f'{args.probe}: stopped at its time budget ({d["meta"]["stopped_at_budget"]})'
         )
+    # The harness (recorded by runs after 2026-10-02's): a clean checkout whose probe and hold are
+    # this checkout's, so the documented method produced the timings.
+    harness = d['meta'].get('harness')
+    if harness is not None:
+        here = (REPO / 'experiments/speed_bytes/fp8_gemm_probe.py').read_bytes()
+        same = subprocess.run(
+            ['git', '-C', str(REPO), 'diff', '--quiet', harness['head'], 'HEAD', '--',
+             'experiments/speed_bytes/fp8_gemm_probe.py', 'experiments/speed_bytes/holds/fp8_probe.sh'],
+        ).returncode == 0  # fmt: skip
+        if (
+            harness['dirty_files']
+            or not same
+            or harness['probe_sha256'] != hashlib.sha256(here).hexdigest()
+        ):
+            raise SystemExit(f'{args.probe}: harness {harness}')
     recorded = d['meta'].get('args')  # recorded by runs after 2026-10-02's
     if recorded is not None and {k: v for k, v in recorded.items() if k != 'out'} != GEMM_ARGS:
         raise SystemExit(f'{args.probe}: arguments {recorded}, planned {GEMM_ARGS}')
