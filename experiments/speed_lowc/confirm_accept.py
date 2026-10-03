@@ -8,11 +8,11 @@ accept) of the arm over (x_e2e / accept) of S0, with the same geometric mean and
 as the throughput ratios. A per-cycle ratio near the x_e2e ratio means the gain is a shorter
 cycle; a per-cycle ratio near 1 with a higher accept length means the gain is acceptance.
 
-Session validity follows confirm_analyze.py: a session cell is void if any of its points or
-S0's is invalid, or if the arm or S0 has a different number of launches than the declared
-order (2 for S0 and FULL, 1 for a single lever). Cells are taken from the declared plan, not
-from the file, so a missing session counts as void; fewer than three valid sessions give no
-interval. A confirmation label outside the plan is an error.
+Cells and session validity are confirm_analyze.py's (its declared plan and void rule): a
+session cell is void if any of its points or S0's is invalid, or if the arm or S0 has a
+different number of launches than the declared order (2 for S0 and FULL, 1 for a single
+lever); a missing session counts as void, fewer than three valid sessions give no interval,
+and a confirmation point outside the plan is an error.
 
     python experiments/speed_lowc/confirm_accept.py --points <points.csv> \
         --full L=ABC --full H=AC --out <dir>
@@ -21,29 +21,23 @@ interval. A confirmation label outside the plan is an error.
 from __future__ import annotations
 
 import argparse
-import csv
 import json
 import math
 import statistics
 import sys
-from collections import defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from confirm_analyze import SESSIONS, T95, expected_launches
-
-# The declared concurrencies: experiments/speed_lowc/confirm_arms.sh, group_concurrency (lines 54-55).
-CONCURRENCY = {'L': (1, 2, 4), 'H': (8, 16, 32)}
-SESSION_LABELS = tuple(f'lowc-s{k}' for k in range(1, SESSIONS + 1))
-
-
-def declared_arms(full: str) -> list[str]:
-    """S0, each single lever (only when FULL has more than one) and FULL.
-
-    The launch order of experiments/speed_lowc/hold_confirm_session.sh (lines 39-47).
-    """
-    singles = list(full) if len(full) > 1 else []
-    return ['S0', *singles, full]
+from confirm_analyze import (
+    CONCURRENCY,
+    SESSION_LABELS,
+    SESSIONS,
+    T95,
+    declared_arms,
+    expected_launches,
+    load_cells,
+    parse_full,
+)
 
 
 def main() -> None:
@@ -53,27 +47,10 @@ def main() -> None:
                     help='FULL arm of each group, as for confirm_analyze.py')  # fmt: skip
     ap.add_argument('--out', type=Path, required=True)
     args = ap.parse_args()
-    full = dict(item.split('=', 1) for item in args.full)
-    if set(full) != {'L', 'H'} or any(not f or set(f) - set('ABC') for f in full.values()):
+    full = parse_full(args.full)
+    if full is None:
         ap.error('--full must name both groups, L and H, each with levers from A, B, C')
-
-    cells: dict[tuple, list[dict]] = defaultdict(list)
-    with args.points.open() as f:
-        for row in csv.DictReader(f):
-            if not row['label'].startswith('lowc-') or not row['session'].startswith('lowc-s'):
-                continue
-            _, group, arm = row['label'].split('-', 2)
-            key = (group, arm, int(row['concurrency']), row['session'])
-            if (
-                group not in full
-                or arm not in declared_arms(full[group])
-                or key[2] not in CONCURRENCY[group]
-                or key[3] not in SESSION_LABELS
-            ):
-                raise SystemExit(f'{args.points}: point outside the declared plan: {key}')
-            cells[key].append(row)
-    if not cells:
-        raise SystemExit(f'no confirmation points in {args.points}')
+    cells = load_cells(args.points, full)
 
     def valid(group: str, arm: str, c: int, session: str) -> bool:
         own, base = (
