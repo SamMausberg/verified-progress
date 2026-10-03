@@ -250,7 +250,7 @@ or on its matched stop token. The analysis likewise reads a point's validity aga
 columns: every request completed, none failed or of the wrong length, and foreign CPU within bench's
 limit of 2 cores. The committed run is unaffected: all 3,520 equality records finished normally
 (2,374 at 256 tokens, 1,146 on the stop token), every point is complete with foreign CPU at most
-0.26 cores on average, and `gate.json`, `ratios.json` and `accept.json` reproduce byte for byte.
+0.263 cores on average, and `gate.json`, `ratios.json` and `accept.json` reproduce byte for byte.
 
 ## Results
 
@@ -268,7 +268,7 @@ Provenance, below, says where `9a7d52a` is kept.
   rules (`points.csv`): no failed requests, no output-length mismatch, c requests running at once
   (`max_running_logged`), no KV retractions, a decode CUDA-graph fraction of 1.0. No cell is void, so
   every ratio below has three sessions.
-- Foreign CPU load averaged at most 0.26 cores per point. One point's maximum passed 2 cores: 2.49 at
+- Foreign CPU load averaged at most 0.263 cores per point. One point's maximum passed 2 cores: 2.49 at
   the first point of s1 (L, S0, c = 1), whose mean was 0.19.
 - Engines (`launches.csv`, from each server's `launch.json`): every S0 launch imported stock `~/sglang`
   at the pin `bd66ce343e` and every other launch the confirm engine at `dd57a50a59`, both with no
