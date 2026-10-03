@@ -40,7 +40,7 @@ decoding, bench's harness and arms (`bench/arms.toml`) at repository commit `e69
 - **Served, the saving almost vanishes** (measured, `served.csv`, killed by its own rule). FP8
   W8A8 on the target (128 layers, 7.13 to 3.57 GB) with per-row activation scales makes
   `plain-tuned` 1.035x at c = 1, 1.014x at c = 8 and 1.013x at c = 64 in x (kill1; kill3 repeats
-  it: 1.036, 1.021, 1.015). Against a kill rule of at least 5% in decode rate on
+  it: 1.036, 1.021, 1.016). Against a kill rule of at least 5% in decode rate on
   `dflash-tuned-b16` at c = 1 and on `plain-tuned` at c = 64, it fails at c = 64.
 - **Where it goes** (measured, `step_budget.csv`, Nsight trace of plain decoding at c = 1). The FP8
   GEMMs save 931 us per step in the served graph (backbone 2,334 to 1,403 us, 0.60x, as the
@@ -98,7 +98,7 @@ flags. At these request counts a ratio within about 1-2% of 1 is not a detected 
 | kill1 | dflash-tuned-b16 | FP8 drafter linears | 1 / 4 | 0.972 / 0.985 | 0.971 / 1.010 | 0.980 / 0.999 |
 | kill2b | dflash-tuned-b16 | FP8 draft head | 1 / 4 | 1.015 / 1.015 | 1.012 / 1.032 | 1.024 / 1.033 |
 | kill2b | dflash-tuned | FP8 draft head | 8 | 0.990 | 0.995 | 0.998 |
-| kill3 | plain-tuned | FP8 target, per-row | 1 / 8 / 64 | 1.036 / 1.021 / 1.016 | 1.036 / 1.021 / 1.015 | |
+| kill3 | plain-tuned | FP8 target, per-row | 1 / 8 / 64 | 1.036 / 1.021 / 1.016 | 1.036 / 1.021 / 1.016 | |
 | kill3 | plain-tuned | FP8 oracle (timing only, outputs invalid) | 1 / 8 / 64 | 1.367 / 1.322 / 1.185 | 1.368 / 1.322 / 1.186 | |
 
 On block 16 a lossy target changes the token trajectories of these 16 prompts, and with them the
@@ -136,9 +136,11 @@ scripts/gpu_lock.sh -x experiments/speed_bytes/holds/kill1.sh
 scripts/gpu_lock.sh -s experiments/speed_bytes/holds/probe1.sh
 scripts/gpu_lock.sh -x experiments/speed_bytes/holds/kill2b.sh
 scripts/gpu_lock.sh -x experiments/speed_bytes/holds/kill3.sh
-# evidence (CPU): probe1.json at repository commit 5811250; gemm_probe.csv and served.csv at
-# c740981 (served.csv identical to its 5811250 version); step_budget.csv at 28c18fc, after review
-# fixed the step span and boundary gaps (0.1-0.5 us per step longer than at 5811250)
+# evidence (CPU): probe1.json at repository commit 5811250; gemm_probe.csv at c740981;
+# step_budget.csv at 28c18fc, after review fixed the step span and boundary gaps (0.1-0.5 us per
+# step longer than at 5811250); served.csv at c150377, after review computed its ratios from the
+# unrounded values instead of the rounded columns (the fourth decimal of 25 ratios moves; of the
+# values cited here only kill3's x at c = 64, 1.015 to 1.016)
 D=~/vp-data/speed-bytes
 python experiments/speed_bytes/summarize.py gemm $D/fp8_gemm_probe_20261002T170014Z.json --out evidence/speed_bytes/gemm_probe.csv
 python experiments/speed_bytes/summarize.py served $D/kill1_20261002T173359Z $D/kill2b_20261002T180019Z $D/kill3_20261002T192532Z --out evidence/speed_bytes/served.csv
