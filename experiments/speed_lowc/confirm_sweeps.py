@@ -3,8 +3,10 @@
 points.csv and launches.csv (bench.pareto) carry each point's measurements and each launch's
 server arguments, but not the sweep that produced them. This reads every launch's own manifest
 (bench.sweep's sweep.json) from the launch directories that bench.pareto read, and writes
-sweeps.csv with one row per launch: every setting the manifest records, this repository's commit
-and modified tracked files as bench.server recorded them at launch, and in `options` every
+sweeps.csv with one row per launch: every setting the manifest records, whether the sweep
+finished normally (bench.sweep adds finished_unix to the manifest only when it returns normally,
+after its last point and the server's shutdown), this repository's commit and modified tracked
+files as bench.server recorded them at launch, and in `options` every
 bench.sweep option, from its recorded command line parsed by bench.sweep's own parser (so
 options the manifest does not record, and defaults, are included). Machine paths are left out:
 the workload files (their hashes are kept), the output directory (its session part is kept)
@@ -53,6 +55,7 @@ COLUMNS = (
     'snapshot_files',
     'aiperf_version',
     'checks_failed',
+    'finished',
     'repo_head',
     'repo_dirty_files',
     'options',
@@ -99,6 +102,8 @@ def sweep_row(launch: Path) -> dict[str, Any]:
             'checks_failed': ' '.join(
                 c['name'] for c in s['checks'] if c.get('required') and not c.get('ok')
             ),
+            # bench/sweep.py line 629 (main): the last manifest write, only on a normal return.
+            'finished': 'finished_unix' in s,
             # This repository as bench.server recorded it at launch (bench/server.py, git_state).
             'repo_head': s['launch']['repo']['head'],
             'repo_dirty_files': json.dumps(s['launch']['repo']['dirty_files']),

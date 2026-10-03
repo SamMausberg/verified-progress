@@ -7,10 +7,11 @@ S0's two launches (x_e2e and y). Across sessions: the geometric mean of the sess
 and a 95% t interval on their logs (n - 1 degrees of freedom). Decision: "speedup" if the
 interval's lower end is above 1, "slowdown" if its upper end is below 1, otherwise "no
 detectable change". A session cell with an invalid point (bench's invalid_reason), or with
-a different number of launches than the declared order, is void; fewer than three valid
-sessions leave the ratio undecided. Cells come from the declared plan (groups, arms,
-concurrencies, sessions lowc-s1 to lowc-s3), so a missing one counts as void; launches are
-counted as distinct bench runs. A confirmation point (a `lowc-` label or session) outside the
+a different number of launches than the declared order, is void; a launch whose sweep did not
+finish normally (sweeps.csv) counts for the order, but its points do not, so its cells are void;
+fewer than three valid sessions leave the ratio undecided. Cells come from the declared plan
+(groups, arms, concurrencies, sessions lowc-s1 to lowc-s3), so a missing one counts as void;
+launches are counted as distinct bench runs. A confirmation point (a `lowc-` label or session) outside the
 plan, the same point twice, a point of a repeat other than the one declared, or a valid point
 whose x_e2e, y or accept length is not a finite positive number, or whose own columns show a
 failed, missing or wrong-length request or foreign CPU above bench's limit, is an error.
@@ -33,12 +34,14 @@ measured max(64, 8c) requests. Every launch
 counts here, including an attempt with no points (it is in sweeps.csv and launches.csv, which
 must list the same launches): by start time they must form one block per session, sessions 1,
 2 and 3 in turn, each in the declared order (hold_confirm_session.sh), so a retried launch is
-an error, while a launch that is missing or has no points only voids its own cells; all after
-the equality runs started. The equality gate beside the points (equality/) must bind
-these launches as a session requires (confirm_gate.py, equality_problems): passed for these
-levers, its runs exactly the equality hold's, made as their arms, from the engine and
-repository commits the launches ran with S0 at the pin, and the gate decided again from its
-summary.json equal to gate.json. A launch that breaks this, or one whose points name two sessions, is an error.
+an error, while a launch that is missing, has no points or did not finish only voids its own
+cells; all after the equality runs started. The equality gate beside the points (equality/)
+must bind these launches as a session requires (confirm_gate.py, equality_problems): passed
+for these levers in a hold whose log (hold.log) records every run and the hold succeeding,
+its runs exactly the equality hold's, made as their arms, from the engine and repository
+commits the launches ran with S0 at the pin, and the gate decided again from its summary.json
+equal to gate.json. A launch that breaks this, or one whose points name two sessions, is an
+error.
 
     python experiments/speed_lowc/confirm_analyze.py --points <points.csv> \
         --full L=ABC --full H=AC --out <dir>
@@ -316,8 +319,11 @@ def check_launches(launches: Path, keys: set[tuple[str, str]]) -> tuple[str, str
     return HOLD_ENGINE, HOLD_REPO
 
 
-def check_sweeps(sweeps: Path, launches: dict[tuple[str, str], str]) -> None:
-    """Refuse unless each launch (label, run) -> session ran the declared sweep in that session."""
+def check_sweeps(sweeps: Path, launches: dict[tuple[str, str], str]) -> set[tuple[str, str]]:
+    """Refuse unless each launch (label, run) -> session ran the declared sweep in that session.
+
+    Returns the launches whose sweep did not finish normally (sweeps.csv, `finished`).
+    """
     if not sweeps.is_file():
         raise SystemExit(f'no {sweeps} beside the points (confirm_sweeps.py writes it)')
     with sweeps.open() as f:
@@ -365,8 +371,11 @@ def check_sweeps(sweeps: Path, launches: dict[tuple[str, str], str]) -> None:
     for k in SHARED_SWEEP:
         if len(values := {by_key[key][k] for key in launches}) != 1:
             why.append(f'launches differ in {k}: {sorted(values)}')
+    if odd := sorted(k for k in launches if by_key[k].get('finished') not in ('True', 'False')):
+        why.append(f'launches {odd}: finished is neither True nor False')
     if why:
         raise SystemExit(f'{sweeps}: ' + '; '.join(why))
+    return {key for key in launches if by_key[key]['finished'] != 'True'}
 
 
 def load_cells(points: Path, full: dict[str, str]) -> dict[tuple, list[dict]]:
@@ -428,10 +437,16 @@ def load_cells(points: Path, full: dict[str, str]) -> dict[tuple, list[dict]]:
     if other := sorted(k for k in sessions if sessions[k] != every[k]):
         raise SystemExit(f'{points}: points of {other} name another session than their sweep')
     engine, repo = check_launches(points.with_name('launches.csv'), set(every))
-    check_sweeps(points.with_name('sweeps.csv'), every)
+    unfinished = check_sweeps(points.with_name('sweeps.csv'), every)
     check_order(every, full)
     check_gate(points.with_name('equality'), full, engine, repo, min(run for _, run in every))
-    return cells
+    # A launch whose sweep did not finish normally (bench.sweep failed after its points, or was
+    # stopped) counts for the order, but its points do not: its cells are void, as for a launch
+    # without points.
+    return {
+        key: [r for r in rows if (r['label'], r['run']) not in unfinished]
+        for key, rows in cells.items()
+    }
 
 
 def main() -> None:

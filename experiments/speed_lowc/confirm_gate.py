@@ -290,6 +290,36 @@ def decide(
     return gate
 
 
+def hold_problems(home: Path, levers: str) -> list[str]:
+    """Why the equality hold's log in `home` does not record a successful hold of `levers`, or [].
+
+    hold_confirm_equality.sh logs each run as '=== <group> <arm> <time> ...' followed by its
+    runner's 'exit <status> <time>' (lines 40 and 45), and ends with 'equality end <time>
+    failed: none' only when every run, the comparison and the gate succeeded (line 73). Each run
+    of the hold must appear once, with exit status 0.
+    """
+    path = home / 'hold.log'
+    if not path.is_file():
+        return [f'no {path}']
+    lines = path.read_text(errors='replace').splitlines()
+    exits: dict[str, list[str]] = {}
+    run = None
+    for line in lines:
+        if m := re.match(r'=== (\S+ \S+)', line):
+            run = m[1]
+            exits.setdefault(run, [])
+        elif run and (m := re.match(r'exit (\d+) ', line)):
+            exits[run].append(m[1])
+            run = None
+    want = {f'{g} {a}': ['0'] for g in ('L', 'H') for a in eq_names(g, levers)}
+    why = []
+    if exits != want:
+        why.append(f'{path}: runs and exit statuses {exits}, not each run once with exit 0')
+    if not lines or not re.fullmatch(r'equality end \S+ failed: none', lines[-1]):
+        why.append(f'{path} does not end with the hold succeeding (failed: none)')
+    return why
+
+
 def equality_problems(
     gate_path: Path,
     levers: str,
@@ -301,7 +331,8 @@ def equality_problems(
 ) -> list[str]:
     """Why the equality gate at `gate_path` does not bind timed sessions of `levers`, or [].
 
-    The gate must have passed for `levers`; its directory's meta.json (compare.py) must list
+    The gate must have passed for `levers`, in a hold whose log records every run and the hold
+    itself succeeding (hold_problems); its directory's meta.json (compare.py) must list
     exactly the runs the equality hold makes, each from repository `repo`, S0 from stock
     SGLang at the pin and every other run from `engine`, none with modified SGLang files, each
     made as its arm (eq_flags, one cold pass at c = 1, 256 new tokens: run_matrix.py's default,
@@ -314,7 +345,7 @@ def equality_problems(
     show the GDN fold on (fold=True) exactly when the arm has A, and compare.py run again on
     runs/ must reproduce the directory's summary.json, divergences.csv, table.csv and meta.json
     byte for byte, which binds them to the run files. Without it (the committed copy, which has
-    no runs/ or logs) those are left to the session, which checked them before it ran.
+    no runs/ or server logs) those are left to the session, which checked them before it ran.
     """
     home = gate_path.resolve().parent
     try:
@@ -326,7 +357,7 @@ def equality_problems(
         model = {'--model-path': manifest['model'], '--revision': manifest['model_revision']}
     except (OSError, ValueError, KeyError, TypeError) as exc:
         return [f'unreadable equality outputs in {home} ({exc!r})']
-    why = []
+    why = hold_problems(home, levers)
     if gate.get('ok') is not True or gate.get('levers') != levers:
         why.append(f'gate ok={gate.get("ok")} levers={gate.get("levers")}, not {levers}')
     arms = {run_name(g, a): (g, a) for g in ('L', 'H') for a in eq_names(g, levers)}
