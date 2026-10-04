@@ -341,3 +341,9 @@ reads `CITATION.cff`; the equivalent BibTeX entry is:
 ```
 
 Copyright © 2026 Samuel Mausberg.
+
+## License
+
+The manuscript and original research material use [CC BY 4.0](LICENSES/CC-BY-4.0.txt).
+Original code uses [MIT](LICENSES/MIT.txt). Third-party notices remain in effect.
+See [LICENSE](LICENSE) for the scope and [CITATION.cff](CITATION.cff) for citation metadata.

@@ -13,7 +13,9 @@ keywords:
   - LLM inference
   - certified computation
   - SGLang
+license: MIT
 preferred-citation:
+  license: CC-BY-4.0
   type: report
   title: "The Work a Verifier Needs: Certified Int8 Output Heads That Match a Production Kernel's Rounding"
   authors:

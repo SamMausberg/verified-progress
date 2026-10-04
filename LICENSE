@@ -1,0 +1,14 @@
+Copyright (c) 2026 Samuel Mausberg, for original contributions.
+
+Manuscripts (PDF and LaTeX), original figures, research data, and written
+research material are licensed under Creative Commons Attribution 4.0
+International (CC BY 4.0). See LICENSES/CC-BY-4.0.txt.
+
+Original software, including Python, C++, Lean, build scripts, and software
+documentation, is licensed under the MIT License. See LICENSES/MIT.txt.
+
+These grants apply only to Samuel Mausberg's original contributions.
+Third-party code, document classes, excerpts, and other material retain their
+own licenses and notices. Preserve their authorship and source attributions.
+
+Please cite the manuscript as described in CITATION.cff.
